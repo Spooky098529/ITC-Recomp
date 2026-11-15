@@ -237,7 +237,7 @@ void Init(Context& h) {
       guest::StoreU32(h.base, sf::kStrings, set);
       PPCContext t = CallContext(h);
       t.r3.u64 = h.data;
-      Run(v, __imp__sub_8210A860, NativeStringsInit, t, h.base);
+      Run(v, __imp__sub_8210A860, ITC_CONTEXT_FN(NativeStringsInit), t, h.base);
       const uint32_t table = guest::LoadU32(h.base, sf::kStrings);
       const bool made = set == 0;
       out[v].Word(made ? table == t.r3.u32 : t.r3.u32);
@@ -261,7 +261,7 @@ void OnLoaded(Context& h) {
     const uint32_t flag = h.data + 4 * h.random.Below(64) + (i % 4 == 3 ? 2 : 0);
     Both(
         h, results, [] {}, [&](PPCContext& t) { t.r6.u64 = flag; },
-        __imp__sub_8210A850, NativeStringsOnLoaded, h.data, 512, fmt::format("case {}", i));
+        __imp__sub_8210A850, ITC_CONTEXT_FN(NativeStringsOnLoaded), h.data, 512, fmt::format("case {}", i));
   }
   results.Report();
 }
@@ -304,7 +304,7 @@ void Release(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = table.address;
       t.r4.u64 = (uint64_t(h.random.Next()) << 32) | mask;
-      Run(v, __imp__sub_8210A538, NativeStringsRelease, t, h.base);
+      Run(v, __imp__sub_8210A538, ITC_CONTEXT_FN(NativeStringsRelease), t, h.base);
       for (uint32_t f = 0; f < sf::kStringFiles; f++) {
         const uint32_t now = guest::LoadU32(h.base, table.address + 4 * f);
         out[v].Word(now == files[f] ? 1 : now);
@@ -351,9 +351,9 @@ void Loaded(Context& h) {
     GuestFunction recompiled, native;
   };
   const Function functions[] = {
-      {"sub_82211C90 Text::IsLoaded", __imp__sub_82211C90, NativeTextIsLoaded},
-      {"sub_8210A768 Strings::IsLoaded", __imp__sub_8210A768, NativeStringsIsLoaded},
-      {"sub_821081A0 Font::IsLoaded", __imp__sub_821081A0, NativeFontIsLoaded},
+      {"sub_82211C90 Text::IsLoaded", __imp__sub_82211C90, ITC_CONTEXT_FN(NativeTextIsLoaded)},
+      {"sub_8210A768 Strings::IsLoaded", __imp__sub_8210A768, ITC_CONTEXT_FN(NativeStringsIsLoaded)},
+      {"sub_821081A0 Font::IsLoaded", __imp__sub_821081A0, ITC_CONTEXT_FN(NativeFontIsLoaded)},
   };
   for (const Function& function : functions) {
     Results results(function.name);
@@ -367,7 +367,7 @@ void Loaded(Context& h) {
         guest::StoreU32(h.base, sf::kStrings, h.data);
         guest::StoreU32(h.base, sf::kFont, h.data + 512);
         PPCContext t = CallContext(h);
-        t.r3.u64 = function.native == NativeFontIsLoaded ? h.data + 512 : h.data;
+        t.r3.u64 = function.native == ITC_CONTEXT_FN(NativeFontIsLoaded) ? h.data + 512 : h.data;
         Run(v, function.recompiled, function.native, t, h.base);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Word(t.r3.u32);
@@ -393,7 +393,7 @@ void PageCount(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = r3;
       t.r4.u64 = at;
-      Run(v, __imp__sub_8210A5C0, NativePageCount, t, h.base);
+      Run(v, __imp__sub_8210A5C0, ITC_CONTEXT_FN(NativePageCount), t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
     }
@@ -427,7 +427,7 @@ void CopyPage(Context& h) {
       t.r5.u64 = text;
       t.r6.u64 = (uint64_t(h.random.Next()) << 32) | uint32_t(page);
       t.r7.u64 = (uint64_t(h.random.Next()) << 32) | uint32_t(skip);
-      Run(v, __imp__sub_8210A5E8, NativeCopyPage, t, h.base);
+      Run(v, __imp__sub_8210A5E8, ITC_CONTEXT_FN(NativeCopyPage), t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
     }
@@ -448,7 +448,7 @@ void ShaderEntries(Context& h) {
         guest::StoreU32(h.base, sf::kShaderEntries + 4 * k, i == 0 ? 0 : uint32_t(h.random.Next()));
       }
       PPCContext t = CallContext(h);
-      Run(v, __imp__sub_825D9590, NativeInitShaderEntries, t, h.base);
+      Run(v, __imp__sub_825D9590, ITC_CONTEXT_FN(NativeInitShaderEntries), t, h.base);
       out[v].Bytes(Read(h.base, sf::kShaderEntries, 48));
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -479,7 +479,7 @@ void SetParams(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = font.address;
       t.r4.u64 = params;
-      Run(v, __imp__sub_82108368, NativeSetParams, t, h.base);
+      Run(v, __imp__sub_82108368, ITC_CONTEXT_FN(NativeSetParams), t, h.base);
       out[v].Word(guest::LoadU32(h.base, font.address + 16));
       for (uint32_t k : kFloats) {
         out[v].Float(guest::LoadU32(h.base, font.address + k));
@@ -595,21 +595,21 @@ void LayoutCases(Context& h, const Layout& l, const char* name, GuestFunction re
 void FontLayout(Context& h) {
   Layout l;
   SetUpLayout(h, l, true);
-  LayoutCases(h, l, "sub_82108B30 Font::TextWidth", __imp__sub_82108B30, NativeTextWidth, 1000,
+  LayoutCases(h, l, "sub_82108B30 Font::TextWidth", __imp__sub_82108B30, ITC_CONTEXT_FN(NativeTextWidth), 1000,
               true, [&](PPCContext& t, uint32_t text) {
                 t.r4.u64 = h.data + kParams;
                 t.r5.u64 = text;
               });
-  LayoutCases(h, l, "sub_82108458 Font::LineWidth", __imp__sub_82108458, NativeLineWidth, 1000,
+  LayoutCases(h, l, "sub_82108458 Font::LineWidth", __imp__sub_82108458, ITC_CONTEXT_FN(NativeLineWidth), 1000,
               true, [&](PPCContext& t, uint32_t text) { t.r4.u64 = text; });
   LayoutCases(h, l, "sub_82108810 (a justified line's glyphs)", __imp__sub_82108810,
-              NativeLineGlyphs, 300, false, [&](PPCContext& t, uint32_t text) {
+              ITC_CONTEXT_FN(NativeLineGlyphs), 300, false, [&](PPCContext& t, uint32_t text) {
                 t.r3.u64 = h.random.Next();
                 t.r4.u64 = text;
               });
-  LayoutCases(h, l, "sub_82108FE0 Font::LineX", __imp__sub_82108FE0, NativeLineX, 1500, true,
+  LayoutCases(h, l, "sub_82108FE0 Font::LineX", __imp__sub_82108FE0, ITC_CONTEXT_FN(NativeLineX), 1500, true,
               [&](PPCContext& t, uint32_t text) { t.r4.u64 = text; });
-  LayoutCases(h, l, "sub_82108568 Font::LineY", __imp__sub_82108568, NativeLineY, 1500, true,
+  LayoutCases(h, l, "sub_82108568 Font::LineY", __imp__sub_82108568, ITC_CONTEXT_FN(NativeLineY), 1500, true,
               [&](PPCContext& t, uint32_t) {
                 const uint32_t lines = h.random.Below(6) == 0 ? uint32_t(h.random.Next())
                                                               : h.random.Below(6);
@@ -617,12 +617,12 @@ void FontLayout(Context& h) {
                 t.r5.u64 = (uint64_t(h.random.Next()) << 32) |
                            (h.random.Below(6) == 0 ? uint32_t(h.random.Next()) : h.random.Below(6));
               });
-  LayoutCases(h, l, "sub_82108210 Font::CountGlyphs", __imp__sub_82108210, NativeCountGlyphs,
+  LayoutCases(h, l, "sub_82108210 Font::CountGlyphs", __imp__sub_82108210, ITC_CONTEXT_FN(NativeCountGlyphs),
               300, false, [&](PPCContext& t, uint32_t text) {
                 t.r4.u64 = h.data + 4 * h.random.Below(8);
                 t.r5.u64 = text;
               });
-  LayoutCases(h, l, "sub_821082A0 Font::OutCode", __imp__sub_821082A0, NativeOutCode, 1000,
+  LayoutCases(h, l, "sub_821082A0 Font::OutCode", __imp__sub_821082A0, ITC_CONTEXT_FN(NativeOutCode), 1000,
               false, [&](PPCContext& t, uint32_t) {
                 const uint32_t vertex = h.data + 3072;
                 guest::StoreU32(h.base, vertex + 0,
@@ -760,7 +760,7 @@ void ClipCases(Context& h, const Layout& l) {
       PPCContext t = CallContext(h);
       t.r3.u64 = l.font.address;
       t.r4.u64 = vertices;
-      Run(v, __imp__sub_82108C90, NativeClipGlyph, t, h.base);
+      Run(v, __imp__sub_82108C90, ITC_CONTEXT_FN(NativeClipGlyph), t, h.base);
       VertexOutputs(h, out[v], vertices, 6);
       out[v].Bytes(Read(h.base, h.data, 3200));
       out[v].Word(t.r3.u32);
@@ -796,7 +796,7 @@ void AddGlyphCases(Context& h, const Layout& l) {
       };
       t.f1.u64 = coordinate();
       t.f2.u64 = coordinate();
-      Run(v, __imp__sub_82109560, NativeAddGlyph, t, h.base);
+      Run(v, __imp__sub_82109560, ITC_CONTEXT_FN(NativeAddGlyph), t, h.base);
       VertexOutputs(h, out[v], area, 26);
       out[v].Bytes(Read(h.base, sf::kDrawGlobals, 48));
       out[v].Bytes(Read(h.base, h.data, 3200));
@@ -826,7 +826,7 @@ void BuildVerticesCases(Context& h, const Layout& l, const Block& area) {
       PPCContext t = CallContext(h);
       t.r3.u64 = l.font.address;
       t.r4.u64 = text;
-      Run(v, __imp__sub_82109AA8, NativeBuildVertices, t, h.base);
+      Run(v, __imp__sub_82109AA8, ITC_CONTEXT_FN(NativeBuildVertices), t, h.base);
       for (uint32_t c = 0; c < 4; c++) {
         VertexOutputs(h, out[v], area.address + 6000 * c, 240);
       }
@@ -1102,7 +1102,7 @@ void SwprintfCase(Context& h, Results& results, const Block& block, const Format
     }
     t.r3.u64 = output;
     t.r4.u64 = format_address != 0 ? format_address : h.data + 512;
-    Run(v, __imp__sub_8210A490, NativeSwprintf, t, h.base);
+    Run(v, __imp__sub_8210A490, ITC_CONTEXT_FN(NativeSwprintf), t, h.base);
     out[v].Bytes(Read(h.base, block.address, block.bytes));
     out[v].Bytes(Read(h.base, h.data, kScratchBytes));
     out[v].Bytes(Read(h.base, t.r1.u32 + 24, 200));
@@ -1195,7 +1195,7 @@ void FormatGroupedCases(Context& h) {
       t.r3.u64 = h.random.Next();
       t.r4.u64 = (uint64_t(h.random.Next()) << 32) | uint32_t(value);
       t.r5.u64 = output;
-      Run(v, __imp__sub_8210A680, NativeFormatGrouped, t, h.base);
+      Run(v, __imp__sub_8210A680, ITC_CONTEXT_FN(NativeFormatGrouped), t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
     }
@@ -1375,14 +1375,14 @@ void FormatVCases(Context& h) {
         t.r5.u64 = id;
         if (which == 0) {
           t.r6.u64 = args;
-          Run(v, __imp__sub_8210A990, hooks::StringsFormatVSteps, t, h.base);
+          Run(v, __imp__sub_8210A990, ITC_CONTEXT_FN(hooks::StringsFormatVSteps), t, h.base);
         } else {
           t.r6.u64 = slots[0];
           t.r7.u64 = slots[1];
           t.r8.u64 = slots[2];
           t.r9.u64 = slots[3];
           t.r10.u64 = slots[4];
-          Run(v, __imp__sub_8210ABC0, hooks::StringsFormatSteps, t, h.base);
+          Run(v, __imp__sub_8210ABC0, ITC_CONTEXT_FN(hooks::StringsFormatSteps), t, h.base);
         }
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Bytes(Read(h.base, output, output_block.bytes));

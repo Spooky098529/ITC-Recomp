@@ -492,19 +492,19 @@ void Type8Screen0Updates(Context& h, uint32_t world) {
     t.r4.u64 = w + kDispatcherAt;
   };
   Group(h, world, "Type8Screen0::MenuPage", 0x8223C6B8, 12, {144, 48}, menu, __imp__sub_8223C6B8,
-        hooks::Type8Screen0MenuPage);
+        ITC_CONTEXT_FN(hooks::Type8Screen0MenuPage));
   const auto steps = [base](PPCContext&, Random& r, uint32_t w) {
     LayMenuWorld(base, w, r);
     LayPages(base, w + kObjectAt, r);
   };
   Group(h, world, "Type8Screen0::OpeningStep", 0x8223C1A0, 8, {128, 32}, steps,
-        __imp__sub_8223C1A0, hooks::Type8Screen0OpeningStep);
+        __imp__sub_8223C1A0, ITC_CONTEXT_FN(hooks::Type8Screen0OpeningStep));
   Group(h, world, "Type8Screen0::ItemStep", 0x8223BBC8, 6, {128, 32}, steps, __imp__sub_8223BBC8,
-        hooks::Type8Screen0ItemStep);
+        ITC_CONTEXT_FN(hooks::Type8Screen0ItemStep));
   Group(h, world, "Type8Screen0::CursorStep", 0x8223C330, 8, {128, 40}, steps,
-        __imp__sub_8223C330, hooks::Type8Screen0CursorStep);
+        __imp__sub_8223C330, ITC_CONTEXT_FN(hooks::Type8Screen0CursorStep));
   Group(h, world, "Type8Screen0::FadeOutStep", 0x8223BAF0, 8, {112, 24}, steps,
-        __imp__sub_8223BAF0, hooks::Type8Screen0FadeOutStep);
+        __imp__sub_8223BAF0, ITC_CONTEXT_FN(hooks::Type8Screen0FadeOutStep));
   const auto stands = [base](PPCContext&, Random& r, uint32_t w) {
     LayCars(base, r);
     LayStandBlocks(base, w + kObjectAt, r);
@@ -512,7 +512,7 @@ void Type8Screen0Updates(Context& h, uint32_t world) {
   };
   const auto stand_outputs = [base](Outputs& out) { StandOutputs(base, out); };
   Group(h, world, "Type8Screen0::UpdateStand", 0x8223B808, 10, {4096, 96}, stands,
-        __imp__sub_8223B808, hooks::Type8Screen0UpdateStand, stand_outputs);
+        __imp__sub_8223B808, ITC_CONTEXT_FN(hooks::Type8Screen0UpdateStand), stand_outputs);
   Group(
       h, world, "Type8Screen0::Update", 0x8223C588, 12, {160, 40},
       [base, steps, stands](PPCContext& t, Random& r, uint32_t w) {
@@ -520,9 +520,9 @@ void Type8Screen0Updates(Context& h, uint32_t world) {
         LaySteps(base, r);
         stands(t, r, w);
       },
-      __imp__sub_8223C588, hooks::Type8Screen0Update, stand_outputs);
+      __imp__sub_8223C588, ITC_CONTEXT_FN(hooks::Type8Screen0Update), stand_outputs);
   Group(h, world, "Type8Screen0::SetTexts", 0x8223B760, 4, {160, 32}, NoSetup,
-        __imp__sub_8223B760, hooks::Type8Screen0SetTexts);
+        __imp__sub_8223B760, ITC_CONTEXT_FN(hooks::Type8Screen0SetTexts));
   Group(
       h, world, "Type8Screen0::CarCard", 0x8223BC68, 6, {144, 40},
       [](PPCContext& t, Random& r, uint32_t) {
@@ -530,7 +530,7 @@ void Type8Screen0Updates(Context& h, uint32_t world) {
         t.r5.u64 = r.Below(80);
         t.r6.u64 = r.Below(256);
       },
-      __imp__sub_8223BC68, hooks::Type8Screen0CarCard);
+      __imp__sub_8223BC68, ITC_CONTEXT_FN(hooks::Type8Screen0CarCard));
   Group(
       h, world, "Type8Screen0::Show", 0x8223BF18, 8, {176, 64},
       [base](PPCContext&, Random& r, uint32_t w) {
@@ -546,7 +546,7 @@ void Type8Screen0Updates(Context& h, uint32_t world) {
         LayStandBlocks(base, w + kObjectAt, r);
         guest::StoreU32(base, w + kObjectAt + 9652, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(4));
       },
-      __imp__sub_8223BF18, hooks::Type8Screen0Show);
+      __imp__sub_8223BF18, ITC_CONTEXT_FN(hooks::Type8Screen0Show));
   memory::Free(g_stand);
   g_stand = 0;
 }
@@ -574,18 +574,18 @@ void Type8Screen0s(Context& h, uint32_t world) {
   const auto item_outputs = [base](Outputs& out) { ItemOutputs(base, out); };
 
   Group(h, world, "Type8Screen0::Type8Screen0", 0x8223D2F0, 4, {96, 16}, NoSetup,
-        __imp__sub_8223D2F0, hooks::Type8Screen0Construct);
+        __imp__sub_8223D2F0, ITC_CONTEXT_FN(hooks::Type8Screen0Construct));
   Group(h, world, "Type8Screen0::~Type8Screen0", 0x8223BF00, 6, {0, 0, false}, items,
-        __imp__sub_8223BF00, hooks::Type8Screen0Destruct, item_outputs);
+        __imp__sub_8223BF00, ITC_CONTEXT_FN(hooks::Type8Screen0Destruct), item_outputs);
   Group(
       h, world, "Type8Screen0::DeletingDestructor", 0x8223C528, 6, {112, 24},
       [base](PPCContext& t, Random& r, uint32_t w) {
         LayItems(base, w + kObjectAt, r);
         t.r4.u64 = r.Next() & ~1ull;
       },
-      __imp__sub_8223C528, hooks::Type8Screen0DeletingDestruct, item_outputs);
+      __imp__sub_8223C528, ITC_CONTEXT_FN(hooks::Type8Screen0DeletingDestruct), item_outputs);
   Deleting(h, "Type8Screen0::DeletingDestructor", 0x8223C528, 9800, __imp__sub_8223C528,
-           hooks::Type8Screen0DeletingDestruct);
+           ITC_CONTEXT_FN(hooks::Type8Screen0DeletingDestruct));
   Group(
       h, world, "Type8Screen0::OnEnter", 0x8223B630, 8, {144, 40},
       [base](PPCContext& t, Random& r, uint32_t w) {
@@ -593,7 +593,7 @@ void Type8Screen0s(Context& h, uint32_t world) {
         guest::StoreU32(base, w + kObjectAt + 9616, r.Below(2));
         (void)t;
       },
-      __imp__sub_8223B630, hooks::Type8Screen0OnEnter, item_outputs);
+      __imp__sub_8223B630, ITC_CONTEXT_FN(hooks::Type8Screen0OnEnter), item_outputs);
   Group(h, world, "Type8Screen0::OpenMovie", 0x8223B530, 3, {0, 0}, NoSetup, __imp__sub_8223B530,
         [](PPCContext& t, uint8_t* b) {
           const t8m::ScreenCalls c = RecordingCalls(t, b);
@@ -604,7 +604,7 @@ void Type8Screen0s(Context& h, uint32_t world) {
       [base](PPCContext&, Random& r, uint32_t w) {
         guest::StoreU32(base, w + kObjectAt + 9612, r.Below(2));
       },
-      __imp__sub_8223B6D8, hooks::Type8Screen0WaitForMovie);
+      __imp__sub_8223B6D8, ITC_CONTEXT_FN(hooks::Type8Screen0WaitForMovie));
   Group(
       h, world, "Type8Screen0::Suspend", 0x8223B540, 6, {96, 16},
       [base](PPCContext&, Random& r, uint32_t w) {
@@ -612,11 +612,11 @@ void Type8Screen0s(Context& h, uint32_t world) {
       },
       __imp__sub_8223B540, WithRecording(t8m::Screen0Suspend));
   Group(h, world, "Type8Screen0::PickYes", 0x8223B590, 3, {0, 0}, NoSetup, __imp__sub_8223B590,
-        hooks::Type8Screen0PickYes);
+        ITC_CONTEXT_FN(hooks::Type8Screen0PickYes));
   Group(h, world, "Type8Screen0::PickNo", 0x8223B5A0, 3, {0, 0}, NoSetup, __imp__sub_8223B5A0,
-        hooks::Type8Screen0PickNo);
+        ITC_CONTEXT_FN(hooks::Type8Screen0PickNo));
   Group(h, world, "Type8Screen0::PickBack", 0x8223B5B0, 3, {0, 0}, NoSetup, __imp__sub_8223B5B0,
-        hooks::Type8Screen0PickBack);
+        ITC_CONTEXT_FN(hooks::Type8Screen0PickBack));
   const auto flags = [](Random& r) -> uint64_t {
     switch (r.Below(4)) {
       case 0: return 0;
@@ -631,14 +631,14 @@ void Type8Screen0s(Context& h, uint32_t world) {
         t.r4.u64 = flags(r);
         t.r5.u64 = flags(r);
       },
-      __imp__sub_8223BD20, hooks::Type8Screen0ShowPage);
+      __imp__sub_8223BD20, ITC_CONTEXT_FN(hooks::Type8Screen0ShowPage));
   // A leaf with a tail call: ShowPage's frame compared.
   Group(
       h, world, "Type8Screen0::OnDialogClosed", 0x8223C098, 8, {128, 32},
       [base](PPCContext&, Random& r, uint32_t w) {
         guest::StoreU32(base, w + kObjectAt + 9648, r.Below(2) == 0 ? 1 : r.Below(4) - 1);
       },
-      __imp__sub_8223C098, hooks::Type8Screen0OnDialogClosed);
+      __imp__sub_8223C098, ITC_CONTEXT_FN(hooks::Type8Screen0OnDialogClosed));
   Group(
       h, world, "Type8Screen0::Leave", 0x8223BA48, 8, {112, 24},
       [base](PPCContext& t, Random& r, uint32_t w) {
@@ -651,11 +651,11 @@ void Type8Screen0s(Context& h, uint32_t world) {
         t.r3.u64 = t8m::Screen0Leave(b, t.r4.u32, t.r1.u32, c);
       });
   Group(h, world, "Type8Screen0::OnLeft", 0x8223B588, 6, {0, 0, false}, items,
-        __imp__sub_8223B588, hooks::Type8Screen0OnLeft, item_outputs);
+        __imp__sub_8223B588, ITC_CONTEXT_FN(hooks::Type8Screen0OnLeft), item_outputs);
   Group(
       h, world, "Type8Screen0::Confirm", 0x8223C430, 8, {128, 32},
       [](PPCContext& t, Random&, uint32_t w) { t.r5.u64 = w + kDispatcherAt; },
-      __imp__sub_8223C430, hooks::Type8Screen0Confirm);
+      __imp__sub_8223C430, ITC_CONTEXT_FN(hooks::Type8Screen0Confirm));
   Group(
       h, world, "Type8Screen0::ConfirmPage", 0x8223B5C0, 10, {0, 0},
       [base](PPCContext&, Random& r, uint32_t w) {
@@ -663,20 +663,20 @@ void Type8Screen0s(Context& h, uint32_t world) {
         guest::StoreU32(base, w + kObjectAt + 9648, kAnswers[r.Below(5)]);
         guest::StoreU32(base, w + kObjectAt + 9652, r.Below(5));
       },
-      __imp__sub_8223B5C0, hooks::Type8Screen0ConfirmPage);
+      __imp__sub_8223B5C0, ITC_CONTEXT_FN(hooks::Type8Screen0ConfirmPage));
   const auto chosen = [base](PPCContext& t, Random& r, uint32_t w) {
     t.r4.u64 = w + kDispatcherAt;
     guest::StoreU32(base, w + kObjectAt + kList + 16,
                     r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(6));
   };
   Group(h, world, "Type8Screen0::ChosenPage", 0x8223C0C0, 10, {112, 24}, chosen,
-        __imp__sub_8223C0C0, hooks::Type8Screen0ChosenPage);
+        __imp__sub_8223C0C0, ITC_CONTEXT_FN(hooks::Type8Screen0ChosenPage));
   Group(
       h, world, "Type8Screen0::PlaceCursor", 0x8223BE88, 8, {112, 24},
       [](PPCContext& t, Random& r, uint32_t) {
         t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(5);
       },
-      __imp__sub_8223BE88, hooks::Type8Screen0PlaceCursor);
+      __imp__sub_8223BE88, ITC_CONTEXT_FN(hooks::Type8Screen0PlaceCursor));
   // Pages -1, 1 (ConfirmPage), 2 (the empty handler) and 3 (ChosenPage);
   // MenuPage (page 0) has no world here.
   Group(
@@ -688,7 +688,7 @@ void Type8Screen0s(Context& h, uint32_t world) {
         static constexpr uint32_t kAnswers[] = {0, 1, 2, 0xFFFFFFFFu};
         guest::StoreU32(base, w + kObjectAt + 9648, kAnswers[r.Below(4)]);
       },
-      __imp__sub_8223C888, hooks::Type8Screen0Draw);
+      __imp__sub_8223C888, ITC_CONTEXT_FN(hooks::Type8Screen0Draw));
   Type8Screen0Updates(h, world);
   g_movies = nullptr;
   saved.Restore();
@@ -854,7 +854,7 @@ void Type8ModeSlots(Context& h, uint32_t world) {
         LayMode(base, r);
         t.r3.u64 = (uint64_t(r.Below(2)) << 32) | (g_mode + 848);
       },
-      __imp__sub_8223D3C0, hooks::Type8ModeAllLoaded, mode_outputs);
+      __imp__sub_8223D3C0, ITC_CONTEXT_FN(hooks::Type8ModeAllLoaded), mode_outputs);
   Group(
       h, world, "ModeType8::Interrupt", 0x8223D960, 8, {96, 8},
       [base](PPCContext& t, Random& r, uint32_t) {
@@ -862,7 +862,7 @@ void Type8ModeSlots(Context& h, uint32_t world) {
         guest::StoreU32(base, g_mode + 87724, r.Below(2) == 0 ? 5 : r.Below(8));
         t.r3.u64 = g_mode + 32;
       },
-      __imp__sub_8223D960, hooks::Type8ModeInterrupt, mode_outputs);
+      __imp__sub_8223D960, ITC_CONTEXT_FN(hooks::Type8ModeInterrupt), mode_outputs);
   Group(
       h, world, "ModeType8::NextMode", 0x8223DD90, 10, {144, 48},
       [base, answer](PPCContext& t, Random& r, uint32_t w) {
@@ -881,7 +881,7 @@ void Type8ModeSlots(Context& h, uint32_t world) {
         }
         guest::StoreU32(base, kTwoPlayerBlock, block);
       },
-      __imp__sub_8223DD90, hooks::Type8ModeNextMode, [base](Outputs& out) {
+      __imp__sub_8223DD90, ITC_CONTEXT_FN(hooks::Type8ModeNextMode), [base](Outputs& out) {
         ModeOutputs(base, out);
         out.Bytes(Read(base, g_save + 0x1F85C, 284));
         const uint32_t block = guest::LoadU32(base, kTwoPlayerBlock);
@@ -911,7 +911,7 @@ void Type8ModeSlots(Context& h, uint32_t world) {
           guest::StoreU32(base, kLoadingMovies + 4 * k, g_loading_movie);
         }
       },
-      __imp__sub_8223DBC0, hooks::Type8ModeWaitForLoads, [base](Outputs& out) {
+      __imp__sub_8223DBC0, ITC_CONTEXT_FN(hooks::Type8ModeWaitForLoads), [base](Outputs& out) {
         ModeOutputs(base, out);
         StandOutputs(base, out);
         out.Bytes(Read(base, g_loading_movie, 0xA100));
@@ -922,7 +922,7 @@ void Type8ModeSlots(Context& h, uint32_t world) {
         answer(t, r, w);
         LayTeardownStand(base, r);
       },
-      __imp__sub_8223D8E8, hooks::Type8ModePollTeardown, [base](Outputs& out) {
+      __imp__sub_8223D8E8, ITC_CONTEXT_FN(hooks::Type8ModePollTeardown), [base](Outputs& out) {
         ModeOutputs(base, out);
         StandOutputs(base, out);
       });
@@ -951,7 +951,7 @@ void Type8ModeSlots(Context& h, uint32_t world) {
         // deletes none (the movie world's movie 0 isn't a heap block).
         guest::StoreU32(base, 0x826C5CDC, 0);
       },
-      __imp__sub_8223D4D0, hooks::Type8ModeTearDown, [base](Outputs& out) {
+      __imp__sub_8223D4D0, ITC_CONTEXT_FN(hooks::Type8ModeTearDown), [base](Outputs& out) {
         ModeOutputs(base, out);
         out.Bytes(Read(base, g_strings, strings_and_font::kStringsBytes));
         out.Bytes(Read(base, ui_movies::kMovieTable + 4, 8));
@@ -964,7 +964,7 @@ void Type8ModeSlots(Context& h, uint32_t world) {
         t.r3.u64 = (uint64_t(r.Below(4) == 0) << 32) | (g_mode + 32);
         t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(6);
       },
-      __imp__sub_8223DA00, hooks::Type8ModeForceExit, [base](Outputs& out) {
+      __imp__sub_8223DA00, ITC_CONTEXT_FN(hooks::Type8ModeForceExit), [base](Outputs& out) {
         ModeOutputs(base, out);
         StandOutputs(base, out);
       });

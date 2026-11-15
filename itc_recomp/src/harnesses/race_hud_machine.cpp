@@ -1430,53 +1430,53 @@ void Handlers(Context& h) {
   const HandlerSpec f112{112, 24};
   const G groups[] = {
       {"RaceHudMachine::PreRaceUpdate (sub_8216C210)", 80, &by_signed, __imp__sub_8216C210,
-       hooks::RaceHudMachinePreRaceUpdate, f96, false, hud_last},
+       ITC_CONTEXT_FN(hooks::RaceHudMachinePreRaceUpdate), f96, false, hud_last},
       {"RaceHudMachine::PreRaceDraw (sub_8216C2A0)", 80, &by_draw, __imp__sub_8216C2A0,
-       hooks::RaceHudMachinePreRaceDraw, f96, true, hud_last},
+       ITC_CONTEXT_FN(hooks::RaceHudMachinePreRaceDraw), f96, true, hud_last},
       {"RaceHudMachine::CountdownDraw (sub_8216C330)", 80, &by_draw, __imp__sub_8216C330,
-       hooks::RaceHudMachineCountdownDraw, f96, true, countdown_draw},
+       ITC_CONTEXT_FN(hooks::RaceHudMachineCountdownDraw), f96, true, countdown_draw},
       {"RaceHudMachine::StartIntro (sub_8216C510)", 30, &by_signed, __imp__sub_8216C510,
-       hooks::RaceHudMachineStartIntro, HandlerSpec{}, false, never},
+       ITC_CONTEXT_FN(hooks::RaceHudMachineStartIntro), HandlerSpec{}, false, never},
       {"RaceHudMachine::EndIntro (sub_8216C520)", 30, &by_signed, __imp__sub_8216C520,
-       hooks::RaceHudMachineEndIntro, HandlerSpec{}, false, never},
+       ITC_CONTEXT_FN(hooks::RaceHudMachineEndIntro), HandlerSpec{}, false, never},
       {"RaceHudMachine::IntroUpdate (sub_8216C530)", 80, &by_signed, __imp__sub_8216C530,
-       hooks::RaceHudMachineIntroUpdate, f96, false, hud_last},
+       ITC_CONTEXT_FN(hooks::RaceHudMachineIntroUpdate), f96, false, hud_last},
       {"RaceHudMachine::IntroDraw (sub_8216C5B8)", 80, &by_draw, __imp__sub_8216C5B8,
-       hooks::RaceHudMachineIntroDraw, f96, true, hud_last},
+       ITC_CONTEXT_FN(hooks::RaceHudMachineIntroDraw), f96, true, hud_last},
       {"RaceHudMachine::CountdownUpdate (sub_8216CB98)", 80, &by_signed, __imp__sub_8216CB98,
-       hooks::RaceHudMachineCountdownUpdate, f112, false, hud_last},
+       ITC_CONTEXT_FN(hooks::RaceHudMachineCountdownUpdate), f112, false, hud_last},
       {"RaceHudMachine::RaceDraw (sub_8216CE00)", 80, &by_draw, __imp__sub_8216CE00,
-       hooks::RaceHudMachineRaceDraw, f96, true, countdown_draw},
+       ITC_CONTEXT_FN(hooks::RaceHudMachineRaceDraw), f96, true, countdown_draw},
       {"RaceHudMachine::RaceUpdate (sub_8216D918)", 100, &by_signed, __imp__sub_8216D918,
-       hooks::RaceHudMachineRaceUpdate, f112, false,
+       ITC_CONTEXT_FN(hooks::RaceHudMachineRaceUpdate), f112, false,
        [](int32_t k, bool replay) { return !((k == 1 || k == 2 || k == 3 || k == 6) && !replay); }},
       // __savegprlr_24: r24 to r31 and lr in the 80 bytes below sp.
       {"RaceHudMachine::SetUp (sub_8216D450)", 100, &set_up, __imp__sub_8216D450,
-       hooks::RaceHudMachineSetUp, HandlerSpec{160, 80, true}, false, hud_last},
+       ITC_CONTEXT_FN(hooks::RaceHudMachineSetUp), HandlerSpec{160, 80, true}, false, hud_last},
       // MenuList::Release's frame (below the handler's) is its own harness's.
       {"RaceHudMachine::ResultsUpdate (sub_8216DFD0)", 120, &results_update,
-       __imp__sub_8216DFD0, hooks::RaceHudMachineResultsUpdate, HandlerSpec{144, 56}, false,
+       __imp__sub_8216DFD0, ITC_CONTEXT_FN(hooks::RaceHudMachineResultsUpdate), HandlerSpec{144, 56}, false,
        never},
       {"RaceHudMachine::CloseResults (sub_8216D198)", 80, &close_results, __imp__sub_8216D198,
-       hooks::RaceHudMachineCloseResults, f96, false, never},
+       ITC_CONTEXT_FN(hooks::RaceHudMachineCloseResults), f96, false, never},
       {"RaceHudMachine::PauseUpdate (sub_8216DB70)", 200, &pause_update, __imp__sub_8216DB70,
-       hooks::RaceHudMachinePauseUpdate, HandlerSpec{128, 48}, false, never},
+       ITC_CONTEXT_FN(hooks::RaceHudMachinePauseUpdate), HandlerSpec{128, 48}, false, never},
       {"RaceHudMachine::AfterRaceUpdate (sub_8216DD88)", 200, &after_race_update,
-       __imp__sub_8216DD88, hooks::RaceHudMachineAfterRaceUpdate, HandlerSpec{128, 40}, false,
+       __imp__sub_8216DD88, ITC_CONTEXT_FN(hooks::RaceHudMachineAfterRaceUpdate), HandlerSpec{128, 40}, false,
        never},
       {"RaceHudMachine::ClosePause (sub_8216C658)", 100, &close_pause, __imp__sub_8216C658,
-       hooks::RaceHudMachineClosePause, f96, false, never},
+       ITC_CONTEXT_FN(hooks::RaceHudMachineClosePause), f96, false, never},
       {"RaceHudMachine::ResultsDraw (sub_8216D6D0)", 120, &results_draw, __imp__sub_8216D6D0,
-       hooks::RaceHudMachineResultsDraw, f96, true, never},
+       ITC_CONTEXT_FN(hooks::RaceHudMachineResultsDraw), f96, true, never},
       {"RaceHudMachine::AfterRaceDraw (sub_8216C6D8, with sub_82211D10)", 150, &after_race_draw,
-       __imp__sub_8216C6D8, hooks::RaceHudMachineAfterRaceDraw, f96, true, never},
+       __imp__sub_8216C6D8, ITC_CONTEXT_FN(hooks::RaceHudMachineAfterRaceDraw), f96, true, never},
       {"RaceHudMachine::PauseDraw (sub_8216CF08, with sub_82211D08)", 150, &pause_draw,
-       __imp__sub_8216CF08, hooks::RaceHudMachinePauseDraw, f96, true, countdown_draw},
+       __imp__sub_8216CF08, ITC_CONTEXT_FN(hooks::RaceHudMachinePauseDraw), f96, true, countdown_draw},
       {"RaceHudMachine::RacePauseDraw (sub_8216CFE0, with sub_82211D08)", 150, &pause_draw,
-       __imp__sub_8216CFE0, hooks::RaceHudMachineRacePauseDraw, f96, true, countdown_draw},
+       __imp__sub_8216CFE0, ITC_CONTEXT_FN(hooks::RaceHudMachineRacePauseDraw), f96, true, countdown_draw},
       // __savegprlr_29: r29 to r31 and lr in the 32 bytes below sp.
       {"RaceHudMachine::StartCountdown (sub_8216CC60)", 200, &start_countdown,
-       __imp__sub_8216CC60, hooks::RaceHudMachineStartCountdown, HandlerSpec{112, 32}, false,
+       __imp__sub_8216CC60, ITC_CONTEXT_FN(hooks::RaceHudMachineStartCountdown), HandlerSpec{112, 32}, false,
        nullptr},
   };
   for (const G& g : groups) {
@@ -1510,9 +1510,9 @@ void Helpers(Context& h, const World& w) {
     }
   };
   Group(h, w, "RaceHudMachine::OpponentPrize (sub_8216C820)", 80, prizes, __imp__sub_8216C820,
-        hooks::RaceHudMachineOpponentPrize, Spec{112, 24});
+        ITC_CONTEXT_FN(hooks::RaceHudMachineOpponentPrize), Spec{112, 24});
   Group(h, w, "RaceHudMachine::ItemBonus (sub_8216C938, with sub_8216C9B8)", 80, prizes,
-        __imp__sub_8216C938, hooks::RaceHudMachineItemBonus, Spec{96, 16});
+        __imp__sub_8216C938, ITC_CONTEXT_FN(hooks::RaceHudMachineItemBonus), Spec{96, 16});
   auto first_day = [&h](PPCContext&, Random& r, const World& w) {
     guest::StoreU32(h.base, w.race.address + 0xA3AF0,
                     r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(3));
@@ -1521,7 +1521,7 @@ void Helpers(Context& h, const World& w) {
                     r.Below(8) == 0 ? uint32_t(r.Next()) : kDays[r.Below(6)]);
   };
   Group(h, w, "RaceHudMachine::IsFirstDay (sub_8216D3F0)", 40, first_day, __imp__sub_8216D3F0,
-        hooks::RaceHudMachineIsFirstDay, Spec{96, 8});
+        ITC_CONTEXT_FN(hooks::RaceHudMachineIsFirstDay), Spec{96, 8});
 }
 
 // --- RaceHudMachine::Init: an empty state machine or one with random

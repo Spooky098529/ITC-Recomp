@@ -29,6 +29,7 @@
 // --native_collision_world, which calls them whatever this flag says).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "track_route/track_route.h"
@@ -61,12 +62,7 @@ ITC_FLAG_BOOL(native_track_route, true, "ITC",
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_TRACK_ROUTE(address, body)   \
-  extern "C" REX_FUNC(sub_##address) {   \
-    REX_FUNC_PROLOGUE();                 \
-    if (!ITC_FLAG(native_track_route)) { \
-      __imp__sub_##address(ctx, base);   \
-      return;                            \
-    }                                    \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_track_route)) { \
     ctx.fpscr.disableFlushMode();        \
     body;                                \
   }
@@ -135,13 +131,13 @@ ITC_TRACK_ROUTE(820FA9D0, ctx.f1.f64 = PathDistance(base, ctx.r3.u32, ctx.r4.u32
 
 // r3 = out, r4 = which, r5 = the section, r6 = the slice (r3 kept). Points
 // 5 to 16 (sub_820F8FA0, never seen in play): the original.
-extern "C" REX_FUNC(sub_820F9768) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820F9768) {
+  
   if (ITC_FLAG(native_track_route)) {
     ctx.fpscr.disableFlushMode();
     if (SlicePoint(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
       return;
     }
   }
-  __imp__sub_820F9768(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820F9768);
 }

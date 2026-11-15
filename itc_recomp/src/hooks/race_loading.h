@@ -7,19 +7,31 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 namespace hooks {
 
-void CourseSetupInit(PPCContext& ctx, uint8_t* base);           // sub_821517D8
-void CourseSetupStart(PPCContext& ctx, uint8_t* base);          // sub_82151408
-void CourseSetupBegin(PPCContext& ctx, uint8_t* base);          // sub_82150DE0
-void CourseSetupOnCourseReady(PPCContext& ctx, uint8_t* base);  // sub_82150DD0
-void CourseSetupWaitDraw(PPCContext& ctx, uint8_t* base);       // sub_821515A0
-void CourseSetupWaitCourse(PPCContext& ctx, uint8_t* base);     // sub_821514A0
-void CourseSetupEndTick(PPCContext& ctx, uint8_t* base);        // sub_821516F0
-void LoadingScreenShow(PPCContext& ctx, uint8_t* base);         // sub_822478D0
-void LoadingScreenRun(PPCContext& ctx, uint8_t* base);          // sub_82247898
-void LoadingScreenFinish(PPCContext& ctx, uint8_t* base);       // sub_82247A60
-void CheckSystemRequest(PPCContext& ctx, uint8_t* base);        // sub_82293460
+void CourseSetupInit(PPCContext& ctx, uint8_t* base);
+void CourseSetupInit(lifted::Regs& ctx, uint8_t* base);           // sub_821517D8
+void CourseSetupStart(PPCContext& ctx, uint8_t* base);
+void CourseSetupStart(lifted::Regs& ctx, uint8_t* base);          // sub_82151408
+void CourseSetupBegin(PPCContext& ctx, uint8_t* base);
+void CourseSetupBegin(lifted::Regs& ctx, uint8_t* base);          // sub_82150DE0
+void CourseSetupOnCourseReady(PPCContext& ctx, uint8_t* base);
+void CourseSetupOnCourseReady(lifted::Regs& ctx, uint8_t* base);  // sub_82150DD0
+void CourseSetupWaitDraw(PPCContext& ctx, uint8_t* base);
+void CourseSetupWaitDraw(lifted::Regs& ctx, uint8_t* base);       // sub_821515A0
+void CourseSetupWaitCourse(PPCContext& ctx, uint8_t* base);
+void CourseSetupWaitCourse(lifted::Regs& ctx, uint8_t* base);     // sub_821514A0
+void CourseSetupEndTick(PPCContext& ctx, uint8_t* base);
+void CourseSetupEndTick(lifted::Regs& ctx, uint8_t* base);        // sub_821516F0
+void LoadingScreenShow(PPCContext& ctx, uint8_t* base);
+void LoadingScreenShow(lifted::Regs& ctx, uint8_t* base);         // sub_822478D0
+void LoadingScreenRun(PPCContext& ctx, uint8_t* base);
+void LoadingScreenRun(lifted::Regs& ctx, uint8_t* base);          // sub_82247898
+void LoadingScreenFinish(PPCContext& ctx, uint8_t* base);
+void LoadingScreenFinish(lifted::Regs& ctx, uint8_t* base);       // sub_82247A60
+void CheckSystemRequest(PPCContext& ctx, uint8_t* base);
+void CheckSystemRequest(lifted::Regs& ctx, uint8_t* base);        // sub_82293460
 
 }  // namespace hooks

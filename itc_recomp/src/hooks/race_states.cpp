@@ -3,6 +3,7 @@
 // the harness shares (hooks/race_states.h).
 
 #include "hooks/race_states.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -35,7 +36,7 @@ namespace hooks {
 
 namespace rs = race_states;
 
-void RaceStatesProgressCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesProgressCreate) {
   ctx.fpscr.disableFlushMode();
   const auto r3 = NativeHeapActive() ? rs::ProgressCreate(base) : std::nullopt;
   if (!r3) {
@@ -45,7 +46,7 @@ void RaceStatesProgressCreate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;
 }
 
-void RaceStatesProgressReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesProgressReset) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 96;
   if (!rs::ProgressResetNative(frame)) {
@@ -55,38 +56,38 @@ void RaceStatesProgressReset(PPCContext& ctx, uint8_t* base) {
   rs::ProgressReset(base, ctx.r3.u32, frame);
 }
 
-void RaceStatesSetChecks(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesSetChecks) {
   ctx.fpscr.disableFlushMode();
   rs::SetChecks(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
 }
 
-void RaceStatesReleaseRacers(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesReleaseRacers) {
   ctx.fpscr.disableFlushMode();
   rs::ReleaseRacers(base, ctx.r3.u32, ctx.r1.u32, NativeHeapActive(),
                     RaceWorldOpponentsCall(ctx, base));
 }
 
-void RaceStatesCountTime(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesCountTime) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::CountTime(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void RaceStatesTickFraction(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesTickFraction) {
   ctx.fpscr.disableFlushMode();
   rs::TickFraction(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112);
 }
 
-void RaceStatesRank(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesRank) {
   ctx.fpscr.disableFlushMode();
   rs::Rank(base, ctx.r3.u32, ctx.r1.u32 - 1728);
 }
 
-void RaceStatesSectionsBeside(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesSectionsBeside) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::SectionsBeside(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void RaceStatesSectionsBefore(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesSectionsBefore) {
   ctx.fpscr.disableFlushMode();
   bool same = false;
   const int64_t r3 = rs::SectionsBefore(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, &same);
@@ -95,27 +96,27 @@ void RaceStatesSectionsBefore(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void RaceStatesPositionNotAfter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesPositionNotAfter) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::PositionNotAfter(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceStatesCountHits(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesCountHits) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::CountHits(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void RaceStatesDamage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesDamage) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::Damage(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 160);
 }
 
-void RaceStatesDrainSp(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesDrainSp) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::DrainSp(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 224);
 }
 
-void RaceStatesCheckLap(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesCheckLap) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 544;
   if (!rs::CheckLapNative(base, ctx.r4.u32, frame)) {
@@ -125,79 +126,79 @@ void RaceStatesCheckLap(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rs::CheckLap(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame);
 }
 
-void RaceStatesCheckFinish(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesCheckFinish) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::CheckFinish(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 144);
 }
 
-void RaceStatesMapToSection(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesMapToSection) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::MapToSection(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void RaceStatesFadeInFree(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesFadeInFree) {
   ctx.fpscr.disableFlushMode();
   rs::FadeInFree(base, ctx.r3.u32);
 }
 
-void RaceStatesFadeOut(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesFadeOut) {
   ctx.fpscr.disableFlushMode();
   rs::FadeOut(base);
 }
 
-void RaceStatesEndWhenFaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesEndWhenFaded) {
   ctx.fpscr.disableFlushMode();
   rs::EndWhenFaded(base, ctx.r4.u32);
 }
 
-void RaceStatesUnload(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesUnload) {
   ctx.fpscr.disableFlushMode();
   if (!NativeHeapActive() || !rs::Unload(base)) {
     __imp__sub_82163920(ctx, base);
   }
 }
 
-void RaceStatesOnRollingStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesOnRollingStart) {
   ctx.fpscr.disableFlushMode();
   rs::OnRollingStart(base, ctx.r3.u32);
 }
 
-void RaceStatesOnStandingStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesOnStandingStart) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::OnStandingStart(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void RaceStatesClearStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesClearStep) {
   ctx.fpscr.disableFlushMode();
   rs::ClearStep(base, ctx.r3.u32);
 }
 
-void RaceStatesOnQuit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesOnQuit) {
   ctx.fpscr.disableFlushMode();
   rs::OnQuit(base, ctx.r3.u32);
 }
 
-void RaceStatesOnReplay(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesOnReplay) {
   ctx.fpscr.disableFlushMode();
   rs::OnReplay(base, ctx.r3.u32);
 }
 
-void RaceStatesFreeStartTick(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesFreeStartTick) {
   ctx.fpscr.disableFlushMode();
   rs::FreeStartTick(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceStatesQuitTick(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesQuitTick) {
   ctx.fpscr.disableFlushMode();
   rs::QuitTick(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceStatesAfterRaceTick(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesAfterRaceTick) {
   ctx.fpscr.disableFlushMode();
   rs::AfterRaceTick(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceStatesRollingStartTick(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesRollingStartTick) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 112;
   rs::RollingStartTick(base, ctx.r3.u32, ctx.r4.u32, frame, NativeHeapActive(),
@@ -205,27 +206,27 @@ void RaceStatesRollingStartTick(PPCContext& ctx, uint8_t* base) {
                        RaceWorldStartCalls(ctx, base, frame - 272 - 224));
 }
 
-void RaceStatesRacersNear(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesRacersNear) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::RacersNear(base, ctx.r1.u32 - 208);
 }
 
-void RaceStatesRacersClose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesRacersClose) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::RacersClose(base, ctx.r1.u32 - 208);
 }
 
-void RaceStatesRacersStill(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesRacersStill) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::RacersStill(base, ctx.r3.u32);
 }
 
-void RaceStatesCountdownTick(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesCountdownTick) {
   ctx.fpscr.disableFlushMode();
   rs::CountdownTick(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112);
 }
 
-void RaceStatesStandingStartTick(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesStandingStartTick) {
   ctx.fpscr.disableFlushMode();
   if (!rs::StandingStartTickNative(base, ctx.r3.u32)) {
     __imp__sub_821692C8(ctx, base);
@@ -247,7 +248,7 @@ void RaceStatesStandingStartTick(PPCContext& ctx, uint8_t* base) {
   rs::StandingStartTick(base, ctx.r3.u32, ctx.r4.u32, frame, NativeHeapActive(), calls);
 }
 
-void RaceStatesBegin(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesBegin) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 112;
   if (!rs::ProgressResetNative(frame - 96)) {
@@ -257,17 +258,17 @@ void RaceStatesBegin(PPCContext& ctx, uint8_t* base) {
   rs::Begin(base, ctx.r3.u32, frame);
 }
 
-void RaceStatesFollowRoute(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesFollowRoute) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::FollowRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 240);
 }
 
-void RaceStatesSectionsJoin(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesSectionsJoin) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::SectionsJoin(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
 }
 
-void RaceStatesStartRoute(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesStartRoute) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 496;
   if (!rs::StartRouteNative(base, ctx.r3.u32, frame)) {
@@ -277,7 +278,7 @@ void RaceStatesStartRoute(PPCContext& ctx, uint8_t* base) {
   rs::StartRoute(base, ctx.r3.u32, frame);
 }
 
-void RaceStatesRouteDistance(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesRouteDistance) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 656;
   if (!rs::RouteDistanceNative(ctx.r4.u32, frame)) {
@@ -287,7 +288,7 @@ void RaceStatesRouteDistance(PPCContext& ctx, uint8_t* base) {
   rs::RouteDistance(base, ctx.r3.u32, ctx.r4.u32, frame);
 }
 
-void RaceStatesRaceTick(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesRaceTick) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 208;
   if (!rs::RaceTickNative(base, ctx.r3.u32, frame)) {
@@ -297,7 +298,7 @@ void RaceStatesRaceTick(PPCContext& ctx, uint8_t* base) {
   rs::RaceTick(base, ctx.r3.u32, ctx.r4.u32, frame);
 }
 
-void RaceStatesOnGo(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesOnGo) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 112;
   if (!rs::OnGoNative(base, ctx.r3.u32, frame)) {
@@ -307,7 +308,7 @@ void RaceStatesOnGo(PPCContext& ctx, uint8_t* base) {
   rs::OnGo(base, ctx.r3.u32, frame);
 }
 
-void RaceStatesInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesInit) {
   ctx.fpscr.disableFlushMode();
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
@@ -324,7 +325,7 @@ void RaceStatesInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = replaced ? *r3 : machine_r3 + (*r3 - machine);
 }
 
-void RaceStatesOnRaceEnd(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesOnRaceEnd) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const rs::GuestCall call = [&ctx, base](uint32_t function, uint32_t sp, uint32_t back,
@@ -348,7 +349,7 @@ void RaceStatesOnRaceEnd(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
 }
 
-void RaceStatesTimeAdd(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceStatesTimeAdd) {
   ctx.r3.u64 = rs::TimeAdd(guest::LoadU32(base, ctx.r3.u32), guest::LoadU32(base, ctx.r4.u32));
 }
 
@@ -356,12 +357,7 @@ void RaceStatesTimeAdd(PPCContext& ctx, uint8_t* base) {
 
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_STATES(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_race_states)) {  \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_states)) { \
     hooks::step(ctx, base);               \
   }
 

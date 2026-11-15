@@ -18,6 +18,7 @@
 // as fast in time as at 30 Hz. Everything is put back afterwards.
 
 #include "frame_pacing/frame_pacer.h"
+#include "hooks/native_entry.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "hooks/post_effects.h"
@@ -87,8 +88,8 @@ void LogGlow() {
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_821379D8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(821379D8) {
+  
   bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
   if (!ITC_FLAG(interpolate_draw_state) || !frame_pacing::GameMessages_InRace()) {
     hooks::PostEffectsGlowRecord(ctx, base);

@@ -7,6 +7,7 @@
 // flag.
 
 #include "hooks/car_draw.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -148,7 +149,7 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   car_draw::Calls calls;
   calls.draw = SceneryListsDrawCalls(guest);
   calls.memcpy = [guest](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp, uint32_t lr) {
-    PPCContext& ctx = guest->ctx;
+    lifted::Regs& ctx = guest->ctx;
     uint8_t* base = guest->base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
@@ -162,12 +163,12 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   };
   calls.find_nearest = [guest](const uint64_t regs[7], double f1, double f2, double f3,
                                uint32_t sp, uint32_t lr) {
-    PPCContext& ctx = guest->ctx;
+    lifted::Regs& ctx = guest->ctx;
     uint8_t* base = guest->base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
-    PPCRegister* registers[7] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7, &ctx.r8, &ctx.r9};
+    lifted::Temp* registers[7] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7, &ctx.r8, &ctx.r9};
     for (int i = 0; i < 7; i++) {
       registers[i]->u64 = regs[i];
     }
@@ -183,7 +184,7 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   if (MorphJobsMakersNative()) {
     calls.make_morph_job = [guest](uint32_t maker, uint32_t morph,
                                    uint32_t sp) -> std::optional<uint32_t> {
-      PPCContext& ctx = guest->ctx;
+      lifted::Regs& ctx = guest->ctx;
       uint8_t* base = guest->base;
       const auto job = morph_jobs::MakeJob(base, morph_jobs::Kind::kMorph, maker, morph, sp,
                                            MorphJobsConstructCalls(ctx, base));
@@ -193,12 +194,12 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   }
   calls.call = [guest](uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                        uint32_t lr) {
-    PPCContext& ctx = guest->ctx;
+    lifted::Regs& ctx = guest->ctx;
     uint8_t* base = guest->base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
-    PPCRegister* registers[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+    lifted::Temp* registers[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
                                  &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
     for (int i = 0; i < count; i++) {
       registers[i]->u64 = regs[i];
@@ -211,7 +212,7 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   };
   calls.call_r28 = [guest, call = calls.call](uint32_t function, const uint64_t* regs, int count,
                                               uint32_t sp, uint32_t lr, uint64_t r28) {
-    PPCContext& ctx = guest->ctx;
+    lifted::Regs& ctx = guest->ctx;
     const uint64_t saved = ctx.r28.u64;
     ctx.r28.u64 = r28;
     const uint64_t r3 = call(function, regs, count, sp, lr);
@@ -220,7 +221,7 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   };
   calls.call_r24 = [guest, call = calls.call](uint32_t function, const uint64_t* regs, int count,
                                               uint32_t sp, uint32_t lr, uint64_t r24) {
-    PPCContext& ctx = guest->ctx;
+    lifted::Regs& ctx = guest->ctx;
     const uint64_t saved = ctx.r24.u64;
     ctx.r24.u64 = r24;
     const uint64_t r3 = call(function, regs, count, sp, lr);
@@ -230,7 +231,7 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   calls.call_r24_r28 = [guest, call = calls.call](uint32_t function, const uint64_t* regs,
                                                   int count, uint32_t sp, uint32_t lr,
                                                   uint64_t r24, uint64_t r28) {
-    PPCContext& ctx = guest->ctx;
+    lifted::Regs& ctx = guest->ctx;
     const uint64_t saved24 = ctx.r24.u64, saved28 = ctx.r28.u64;
     ctx.r24.u64 = r24;
     ctx.r28.u64 = r28;
@@ -251,7 +252,7 @@ namespace {
 // r3 as a draw leaves it: the last queue call's (left in ctx by the guest
 // call), else the draw's (r3 as it came, all 64 bits, when that's the
 // draw's: Model::Draw's model when its +28 is 0).
-void LeaveDraw(PPCContext& ctx, const car_draw::Draw& draw) {
+void LeaveDraw(lifted::Regs& ctx, const car_draw::Draw& draw) {
   if (!draw.queued && draw.r3 != ctx.r3.u32) {
     ctx.r3.u64 = draw.r3;
   }
@@ -260,9 +261,9 @@ void LeaveDraw(PPCContext& ctx, const car_draw::Draw& draw) {
 
 }  // namespace
 
-void CarDrawCarPartDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDrawCarPartDraw) {
   if (!CarDrawModelCalleesNative()) {
-    __imp__sub_820D06F0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820D06F0);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -273,21 +274,21 @@ void CarDrawCarPartDraw(PPCContext& ctx, uint8_t* base) {
       car_draw::CarPartDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                             ctx.r6.u32, ctx.r7.u32, ctx.r24.u32, ctx.r28.u32);
   if (!draw) {
-    __imp__sub_820D06F0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820D06F0);
     return;
   }
   ctx.lr = lr;
   LeaveDraw(ctx, *draw);
 }
 
-void CarDrawBlinkTimersAdvance(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDrawBlinkTimersAdvance) {
   ctx.fpscr.disableFlushMode();
   car_draw::BlinkTimersAdvance(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void CarDrawIsNearPlayerHeight(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDrawIsNearPlayerHeight) {
   if (!CarDrawHeightCalleesNative()) {
-    __imp__sub_820DAB58(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820DAB58);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -302,7 +303,7 @@ void CarDrawIsNearPlayerHeight(PPCContext& ctx, uint8_t* base) {
 
 namespace {
 
-void LeaveLeft(PPCContext& ctx, const car_draw::Left& left) {
+void LeaveLeft(lifted::Regs& ctx, const car_draw::Left& left) {
   if (!left.in_ctx) {
     ctx.r3.u64 = left.r3;
   }
@@ -311,9 +312,9 @@ void LeaveLeft(PPCContext& ctx, const car_draw::Left& left) {
 
 }  // namespace
 
-void CarDrawSceneLightsDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDrawSceneLightsDraw) {
   if (!CarDrawLightKitCalleesNative()) {
-    __imp__sub_820DDE58(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820DDE58);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -331,9 +332,9 @@ bool CarDrawShadowsCalleesNative() {
   return CarDrawPartsCalleesNative() && CarDrawLightingCalleesNative();
 }
 
-void CarDrawSceneParts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDrawSceneParts) {
   if (!CarDrawShadowsCalleesNative()) {
-    __imp__sub_820E2EE8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820E2EE8);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -353,10 +354,10 @@ bool CarDrawInteriorCalleesNative() {
   return CarDrawPartsCalleesNative();
 }
 
-void CarDrawSceneInterior(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDrawSceneInterior) {
   if (!CarDrawInteriorCalleesNative() || !ITC_FLAG(native_accessories) ||
       !ITC_FLAG(native_scene_models)) {
-    __imp__sub_820E53F0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820E53F0);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -376,9 +377,9 @@ bool CarDrawCockpitCalleesNative() {
          ITC_FLAG(native_scene_models) && CarDrawLightingCalleesNative();
 }
 
-void CarDrawSceneCockpit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDrawSceneCockpit) {
   if (!CarDrawCockpitCalleesNative()) {
-    __imp__sub_820DC498(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820DC498);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -393,9 +394,9 @@ void CarDrawSceneCockpit(PPCContext& ctx, uint8_t* base) {
 
 // --- The traffic body ---
 
-void CarDrawSceneTraffic(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDrawSceneTraffic) {
   if (!CarDrawShadowsCalleesNative()) {
-    __imp__sub_820E6A40(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820E6A40);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -414,9 +415,9 @@ bool CarDrawWheelsCalleesNative() {
   return CarDrawPartsCalleesNative() && CarDrawMorphCalleesNative();
 }
 
-void CarDrawSceneWheels(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDrawSceneWheels) {
   if (!CarDrawWheelsCalleesNative()) {
-    __imp__sub_820ECE28(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820ECE28);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -438,9 +439,9 @@ bool CarDrawUpdateCalleesNative() {
          ITC_FLAG(native_second_set);
 }
 
-void CarDrawUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDrawUpdate) {
   if (!CarDrawUpdateCalleesNative()) {
-    __imp__sub_820DAC68(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820DAC68);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -459,12 +460,7 @@ void CarDrawUpdate(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_CAR_DRAW(address, step)     \
-  extern "C" REX_FUNC(sub_##address) {  \
-    REX_FUNC_PROLOGUE();                \
-    if (!ITC_FLAG(native_car_draw)) {   \
-      __imp__sub_##address(ctx, base);  \
-      return;                           \
-    }                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_draw)) { \
     hooks::step(ctx, base);             \
   }
 

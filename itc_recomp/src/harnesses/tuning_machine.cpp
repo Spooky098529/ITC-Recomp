@@ -389,7 +389,7 @@ void Screen(PPCContext& t, Random& r, const World& w) {
 // (Add replaces those); its frame (but its saves, r27 on) compared.
 void Init(Context& h, const World& w) {
   Run(h, w, {"TuningMachine::Init (sub_821E7568)", 24, __imp__sub_821E7568,
-             hooks::TuningMachineInit, {{-1232, -48}},
+             ITC_CONTEXT_FN(hooks::TuningMachineInit), {{-1232, -48}},
              [](PPCContext& t, Random& r, const World& w) {
                namespace gm = game_modes;
                const uint32_t machine = w.screen();
@@ -415,19 +415,19 @@ void Handlers(Context& h, const World& w) {
   // ZeroRecord16 and DecalImages::Reset: leaves (r4 a record in the
   // screen; r3 the decal images).
   Run(h, w, {"TuningMachine::ZeroRecord16 (sub_821FE540)", 20, __imp__sub_821FE540,
-             hooks::TuningMachineZeroRecord16, {},
+             ITC_CONTEXT_FN(hooks::TuningMachineZeroRecord16), {},
              [](PPCContext& t, Random& r, const World& w) {
                t.r4.u64 = w.screen() + 30800 + 4 * r.Below(16);
              }});
   Run(h, w, {"DecalImages::Reset (sub_821FE590)", 20, __imp__sub_821FE590,
-             hooks::TuningMachineResetImages, {},
+             ITC_CONTEXT_FN(hooks::TuningMachineResetImages), {},
              [](PPCContext& t, Random& r, const World& w) {
                t.r3.u64 = (r.Below(4) == 0 ? (r.Next() << 32) : 0) | (w.screen() + tm::kImages);
              }});
   // Create: the three blocks VirtualAlloc made compared by content and
   // freed; its saves (r26 on) left out.
   Run(h, w, {"TuningMachine::Create (sub_821CE4C8; sub_821FE540, sub_821FE590)", 60,
-             __imp__sub_821CE4C8, hooks::TuningMachineCreate, {{-144, -56}}, Screen,
+             __imp__sub_821CE4C8, ITC_CONTEXT_FN(hooks::TuningMachineCreate), {{-144, -56}}, Screen,
              [&h](PPCContext&, const World& w, Outputs& out) {
                const uint32_t s = w.screen();
                Allocated(h.base, out, s + tm::kQueue, 28);
@@ -435,21 +435,21 @@ void Handlers(Context& h, const World& w) {
                Allocated(h.base, out, s + tm::kMenu2, 68);
              }});
   Run(h, w, {"TuningMachine::OpenMovies (sub_821CBDB0)", 20, __imp__sub_821CBDB0,
-             hooks::TuningMachineOpenMovies, {{-96, -16}}, Screen});
+             ITC_CONTEXT_FN(hooks::TuningMachineOpenMovies), {{-96, -16}}, Screen});
   // WaitForMovies: the movie loaded or not (above; one movie stands for
   // the three).
   Run(h, w, {"TuningMachine::WaitForMovies (sub_821CE9E8)", 100, __imp__sub_821CE9E8,
-             hooks::TuningMachineWaitForMovies, {{-112, -24}}, Screen});
+             ITC_CONTEXT_FN(hooks::TuningMachineWaitForMovies), {{-112, -24}}, Screen});
   Run(h, w, {"TuningMachine::OnDialogClosed (sub_821D8898)", 100, __imp__sub_821D8898,
-             hooks::TuningMachineOnDialogClosed, {{-128, -32}},
+             ITC_CONTEXT_FN(hooks::TuningMachineOnDialogClosed), {{-128, -32}},
              [](PPCContext& t, Random& r, const World& w) {
                Screen(t, r, w);
                t.r4.u64 = w.at(kModeAt);
              }});
   Run(h, w, {"TuningMachine::Unload (sub_821D69A0)", 60, __imp__sub_821D69A0,
-             hooks::TuningMachineUnload, {{-112, -16}}, Screen});
+             ITC_CONTEXT_FN(hooks::TuningMachineUnload), {{-112, -16}}, Screen});
   Run(h, w, {"TuningMachine::Close (sub_821D6A78)", 60, __imp__sub_821D6A78,
-             hooks::TuningMachineClose, {},
+             ITC_CONTEXT_FN(hooks::TuningMachineClose), {},
              [](PPCContext& t, Random& r, const World& w) {
                Screen(t, r, w);
                t.r4.u64 = w.at(kModeAt);
@@ -458,7 +458,7 @@ void Handlers(Context& h, const World& w) {
   // was freed compared); the decal images unloaded (above). Its saves and
   // UnloadAll's (and its callees') below its frame left out.
   Run(h, w, {"TuningMachine::Destroy (sub_821CBD40)", 60, __imp__sub_821CBD40,
-             hooks::TuningMachineDestroy, {{-112, -24}},
+             ITC_CONTEXT_FN(hooks::TuningMachineDestroy), {{-112, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                const uint32_t s = w.screen();
@@ -473,10 +473,10 @@ void Handlers(Context& h, const World& w) {
     t.r3.u64 = w.screen() + tm::kImages;
   };
   Run(h, w, {"DecalImages::SavePlaceholders (sub_82208130; sub_821F8950)", 40,
-             __imp__sub_82208130, hooks::TuningMachineSavePlaceholders, {{-112, -16}},
+             __imp__sub_82208130, ITC_CONTEXT_FN(hooks::TuningMachineSavePlaceholders), {{-112, -16}},
              images});
   Run(h, w, {"DecalImages::SavePlaceholders14 (sub_821F8950)", 40, __imp__sub_821F8950,
-             hooks::TuningMachineSavePlaceholders14, {{-112, -16}}, images});
+             ITC_CONTEXT_FN(hooks::TuningMachineSavePlaceholders14), {{-112, -16}}, images});
 }
 
 // TuningScreen::SetUp's callees: player 0's save with its garage shaped as
@@ -591,7 +591,7 @@ void SetUpCallees(Context& h, const World& w) {
     out.Word(guest::LoadU32(h.base, w.save + career::kSelectedCar));
   };
   Run(h, w, {"TuningScreen::LoadInteriorSlots (sub_821DE280)", 60, __imp__sub_821DE280,
-             hooks::TuningMachineLoadInteriorSlots, {},
+             ITC_CONTEXT_FN(hooks::TuningMachineLoadInteriorSlots), {},
              [](PPCContext& t, Random& r, const World& w) {
                ShapeSave(w.base, w, r);
                Screen(t, r, w);
@@ -600,7 +600,7 @@ void SetUpCallees(Context& h, const World& w) {
   // LoadCurrentChoices: its frame but its saves (r23 on, -80) compared;
   // the vinyl angles' floats truncated to words (compared exactly).
   Run(h, w, {"TuningScreen::LoadCurrentChoices (sub_821DA4B0; sub_820C9E98)", 200,
-             __imp__sub_821DA4B0, hooks::TuningMachineLoadCurrentChoices, {{-192, -80}},
+             __imp__sub_821DA4B0, ITC_CONTEXT_FN(hooks::TuningMachineLoadCurrentChoices), {{-192, -80}},
              [](PPCContext& t, Random& r, const World& w) {
                ShapeSave(w.base, w, r);
                Screen(t, r, w);
@@ -633,7 +633,7 @@ void FillBits(uint8_t* base, uint32_t at, uint32_t words, uint32_t mode, Random&
 // frame but its saves (r26 on, -56) compared; the save compared.
 void OwnedParts(Context& h, const World& w) {
   Run(h, w, {"TuningScreen::LoadOwnedParts (sub_821DBAB0; sub_821CDF98)", 240,
-             __imp__sub_821DBAB0, hooks::TuningMachineLoadOwnedParts, {{-160, -56}},
+             __imp__sub_821DBAB0, ITC_CONTEXT_FN(hooks::TuningMachineLoadOwnedParts), {{-160, -56}},
              [](PPCContext& t, Random& r, const World& w) {
                ShapeSave(w.base, w, r);
                Screen(t, r, w);
@@ -669,7 +669,7 @@ void OwnedParts(Context& h, const World& w) {
 // The prices are words truncated by fctiwz, compared exactly.
 void Prices(Context& h, const World& w) {
   Run(h, w, {"TuningScreen::SetPrices (sub_821DAD58)", 240, __imp__sub_821DAD58,
-             hooks::TuningMachineSetPrices, {{-256, -128}},
+             ITC_CONTEXT_FN(hooks::TuningMachineSetPrices), {{-256, -128}},
              [](PPCContext& t, Random& r, const World& w) {
                ShapeSave(w.base, w, r);
                Screen(t, r, w);
@@ -710,7 +710,7 @@ void Prices(Context& h, const World& w) {
 // a frame: the words below sp compared all the same, the save too.
 void UnlockedParts(Context& h, const World& w) {
   Run(h, w, {"TuningScreen::LoadUnlockedParts (sub_821CFFC8)", 240, __imp__sub_821CFFC8,
-             hooks::TuningMachineLoadUnlockedParts, {{-256, 0}},
+             ITC_CONTEXT_FN(hooks::TuningMachineLoadUnlockedParts), {{-256, 0}},
              [](PPCContext& t, Random& r, const World& w) {
                Screen(t, r, w);
                const uint32_t s = w.screen();
@@ -745,7 +745,7 @@ void UnlockedParts(Context& h, const World& w) {
 // the frames below, are written by the originals only); the save too.
 void SetUpScreen(Context& h, const World& w) {
   Run(h, w, {"TuningScreen::SetUp (sub_821E1B48; its five callees)", 100, __imp__sub_821E1B48,
-             hooks::TuningMachineSetUp,
+             ITC_CONTEXT_FN(hooks::TuningMachineSetUp),
              {{-int32_t(tm::kSetUpFrame), -48},
               {-int32_t(tm::kSetUpFrame) - 160, -int32_t(tm::kSetUpFrame) - 128}},
              [](PPCContext& t, Random& r, const World& w) {
@@ -854,11 +854,11 @@ void DialogNo(Context& h, const World& w) {
     Screen(t, r, w);
   };
   Run(h, w, {"TuningMachine::OnDialogNo (sub_821CEA88; sub_821F7988)", 400, __imp__sub_821CEA88,
-             hooks::TuningMachineOnDialogNo, {{-96, -8}, {-192, -104}}, shape});
+             ITC_CONTEXT_FN(hooks::TuningMachineOnDialogNo), {{-96, -8}, {-192, -104}}, shape});
   Run(h, w, {"TuningMachine::StickerDialogNo (sub_821F7988)", 100, __imp__sub_821F7988,
-             hooks::TuningMachineStickerDialogNo, {{-96, -8}}, shape});
+             ITC_CONTEXT_FN(hooks::TuningMachineStickerDialogNo), {{-96, -8}}, shape});
   Run(h, w, {"TuningMachine::OnNoticeClosed (sub_821CF8B8)", 200, __imp__sub_821CF8B8,
-             hooks::TuningMachineOnNoticeClosed, {{-96, -8}},
+             ITC_CONTEXT_FN(hooks::TuningMachineOnNoticeClosed), {{-96, -8}},
              [shape](PPCContext& t, Random& r, const World& w) {
                shape(t, r, w);
                if (r.Below(4) != 0) {
@@ -1109,7 +1109,7 @@ void StartCases(Context& h) {
       Write(base, kFades, fades.data(), kFadesBytes);
       PPCContext t = start;
       t.fpscr.disableFlushModeUnconditional();
-      (v == 0 ? __imp__sub_821E7368 : hooks::TuningMachineStart)(t, base);
+      (v == 0 ? __imp__sub_821E7368 : ITC_CONTEXT_FN(hooks::TuningMachineStart))(t, base);
       // The 48 bytes under Start's frame: the original TuningScreen::SetUp's
       // register saves (r27 to r31 and lr; DecalImages::SavePlaceholders'
       // r30, r31 and lr before them), which the recompiled Start calls

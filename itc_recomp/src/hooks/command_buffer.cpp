@@ -4,6 +4,7 @@
 // those with none).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "hooks/command_buffer.h"
 
@@ -33,12 +34,7 @@ ITC_FLAG_BOOL(native_command_buffer, true, "ITC",
 namespace cb = graphics::command_buffer;
 
 #define ITC_COMMAND_BUFFER(address, ...)      \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_command_buffer)) {   \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_command_buffer)) { \
     __VA_ARGS__;                              \
   }
 
@@ -52,7 +48,7 @@ ITC_COMMAND_BUFFER(8229E9D0, ctx.r3.u64 = cb::WriteCallback(base, ctx.r3.u32, ct
 // original's.
 ITC_COMMAND_BUFFER(8229E308, {
   if (guest::LoadU32(base, ctx.r3.u32 + cb::kRecorder) != 0) {
-    __imp__sub_8229E308(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8229E308);
     return;
   }
   ctx.r3.u64 = cb::Reserve(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
@@ -62,7 +58,7 @@ ITC_COMMAND_BUFFER(8229E308, {
 ITC_COMMAND_BUFFER(8229EB10, {
   if (guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32 + cb::kChainDevice) + cb::kRecorder) !=
       0) {
-    __imp__sub_8229EB10(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8229EB10);
     return;
   }
   ctx.r3.u64 = cb::NewBlock(base, ctx.r3.u32);
@@ -72,7 +68,7 @@ ITC_COMMAND_BUFFER(8229EB10, {
 // sub_8229EC00 and sub_8229E908 are gone (2026-11-06): their callers in play
 // are native (Device::Swap's call to sub_8229EC00 through
 // hooks::NextCommandSegment), and the flag switches only those callers.
-graphics::command_buffer::Kick hooks::CommandBufferKick(PPCContext& ctx, uint8_t* base) {
+graphics::command_buffer::Kick hooks::CommandBufferKick(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t device, uint32_t result, uint32_t address, uint32_t words,
                       uint32_t interrupts, uint32_t list) {
     uint32_t r3 = 0;
@@ -90,18 +86,18 @@ graphics::command_buffer::Kick hooks::CommandBufferKick(PPCContext& ctx, uint8_t
   };
 }
 
-void hooks::EndCommandSegment(PPCContext& ctx, uint8_t* base) {
+void hooks::EndCommandSegment(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {
-    __imp__sub_8229EF48(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8229EF48);
     return;
   }
   const uint32_t device = ctx.r3.u32;
   ctx.r3.u64 = cb::EndSegment(base, device, CommandBufferKick(ctx, base));
 }
 
-void hooks::NextCommandSegment(PPCContext& ctx, uint8_t* base) {
+void hooks::NextCommandSegment(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {
-    __imp__sub_8229EC00(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8229EC00);
     return;
   }
   const uint32_t device = ctx.r3.u32, words = ctx.r4.u32;
@@ -109,8 +105,8 @@ void hooks::NextCommandSegment(PPCContext& ctx, uint8_t* base) {
 }
 
 #define ITC_SEGMENT_FLOW(address, ...)                                             \
-  extern "C" REX_FUNC(sub_##address) {                                           \
-    REX_FUNC_PROLOGUE();                                                         \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                           \
+    \
     if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {   \
       __imp__sub_##address(ctx, base);                                           \
       return;                                                                    \
@@ -152,21 +148,16 @@ ITC_COMMAND_BUFFER(822AF978,
 // (sub_8229EF48, the tiling worker sub_822B6BF8) kick none. The pending
 // range it took (sub_8229DE48) has had no writer in play since
 // Resource::Lock is native.
-extern "C" REX_FUNC(sub_8229E5D0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_command_buffer)) {
-    __imp__sub_8229E5D0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8229E5D0, ITC_FLAG(native_command_buffer)) {
   guest::StoreU32(base, ctx.r5.u32, 0);
 }
 
 // The data cache flush (sub_822AC470): Dropped (no data cache to flush on
 // PC, the user's call, 2026-10-24, as Resource::Unlock leaves it out). Its
 // translation writes only its own stack and leaves r3; so does this.
-extern "C" REX_FUNC(sub_822AC470) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822AC470) {
+  
   if (!ITC_FLAG(native_command_buffer)) {
-    __imp__sub_822AC470(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822AC470);
   }
 }

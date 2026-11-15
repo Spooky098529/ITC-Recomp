@@ -6,6 +6,7 @@
 // the screen's machine, so their adapters stay.
 
 #include "hooks/type8_screens.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/type67_screens.h"
@@ -86,7 +87,7 @@ namespace hooks {
 namespace t8 = type8_screens;
 
 #define ITC_T8_STEP(name, expression)                          \
-  void name(PPCContext& ctx, uint8_t* base) {                  \
+  ITC_REGS_STEP(name) {                  \
     const t8::Calls calls = Type67ScreensCalls(ctx, base);     \
     (void)calls;                                               \
     const uint32_t sp = ctx.r1.u32;                            \
@@ -250,7 +251,7 @@ ITC_T8_STEP(Type8ColorListSetUpRace,
 
 #undef ITC_T8_STEP
 
-void Type8InitMachine(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type8InitMachine) {
   const uint64_t object_r3 = ctx.r3.u64;
   uint32_t machine = 0;
   bool replaced = false;
@@ -262,7 +263,7 @@ void Type8InitMachine(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
-void Type8ColorListInitMachine(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type8ColorListInitMachine) {
   const uint64_t object_r3 = ctx.r3.u64;
   uint32_t machine = 0;
   bool replaced = false;
@@ -275,12 +276,7 @@ void Type8ColorListInitMachine(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_TYPE8_SCREENS(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {      \
-    REX_FUNC_PROLOGUE();                    \
-    if (!ITC_FLAG(native_type8_screens)) {  \
-      __imp__sub_##address(ctx, base);      \
-      return;                               \
-    }                                       \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type8_screens)) { \
     hooks::step(ctx, base);                 \
   }
 

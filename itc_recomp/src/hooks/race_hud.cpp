@@ -4,6 +4,7 @@
 // the originals' return addresses, from frames like theirs.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/guest_call.h"
@@ -21,12 +22,7 @@ ITC_FLAG_BOOL(native_race_hud, true, "ITC",
 // RaceHud::RunMovie: r3 = the HUD, r4 = UiMovie::Run's (0 to advance, else
 // draw only). The original's tail calls keep lr, r1 and r4; state 1's
 // (sub_82212908, merged) runs UiMovie::Run from its 112-byte frame.
-extern "C" REX_FUNC(sub_822141E8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_hud)) {
-    __imp__sub_822141E8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(822141E8, ITC_FLAG(native_race_hud)) {
   const race_hud::HudMovie movie = race_hud::RunMovie(base, ctx.r3.u32);
   switch (movie.call) {
     case race_hud::HudCall::kNone:
@@ -59,7 +55,7 @@ namespace race_hud_hooks {
 // The logo's movie run (UiMovie::Run, r4 = 0) while shown; once it has
 // ended, UiMovie::FinishNamed on the logo's named animation (its id, +8)
 // and the finished flag set. From a frame like the original's (112 bytes).
-void DrawRivalLogo(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DrawRivalLogo) {
   if (!ITC_FLAG(native_race_hud)) {
     __imp__sub_82211A28(ctx, base);
     return;

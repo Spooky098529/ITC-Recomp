@@ -80,7 +80,7 @@ void Formats(Context& h, uint32_t block) {
   {
     Results results("XAudio::SourceOutputFormat (sub_8245DC88)");
     for (int i = 0; i < 64; i++) {
-      Case(h, results, block, __imp__sub_8245DC88, hooks::XAudioSourceOutputFormat,
+      Case(h, results, block, __imp__sub_8245DC88, ITC_CONTEXT_FN(hooks::XAudioSourceOutputFormat),
            [&](Random& random, PPCContext& t) {
              // Type 4 (XMA) half the time, with up to 8 streams.
              if (random.Below(2) == 0) {
@@ -97,7 +97,7 @@ void Formats(Context& h, uint32_t block) {
   {
     Results results("XAudioSubmixVoice::Describe (sub_8245F010)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_8245F010, hooks::XAudioSubmixDescribe,
+      Case(h, results, block, __imp__sub_8245F010, ITC_CONTEXT_FN(hooks::XAudioSubmixDescribe),
            [&](Random& random, PPCContext& t) {
              // The count and channel bytes 0 now and then (their defaults).
              if (random.Below(3) == 0) {
@@ -119,7 +119,7 @@ void Formats(Context& h, uint32_t block) {
     // Every pair of 0-8 channels, and random words.
     for (uint32_t in = 0; in <= 8; in++) {
       for (uint32_t to = 0; to <= 8; to++) {
-        Case(h, results, block, __imp__sub_8245EC40, hooks::XAudioDefaultMatrix,
+        Case(h, results, block, __imp__sub_8245EC40, ITC_CONTEXT_FN(hooks::XAudioDefaultMatrix),
              [&](Random& random, PPCContext& t) {
                t.r3.u64 = (random.Next() & ~0xFFull) | in;
                t.r4.u64 = (random.Next() & ~0xFFull) | to;
@@ -130,7 +130,7 @@ void Formats(Context& h, uint32_t block) {
       }
     }
     for (int i = 0; i < 16; i++) {
-      Case(h, results, block, __imp__sub_8245EC40, hooks::XAudioDefaultMatrix,
+      Case(h, results, block, __imp__sub_8245EC40, ITC_CONTEXT_FN(hooks::XAudioDefaultMatrix),
            [&](Random& random, PPCContext& t) {
              t.r3.u64 = random.Next();
              t.r4.u64 = random.Next();
@@ -146,7 +146,7 @@ void Buffers(Context& h, uint32_t block) {
   {
     Results results("XAudioBuffer::Size (sub_8245FA28)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_8245FA28, hooks::XAudioBufferSize,
+      Case(h, results, block, __imp__sub_8245FA28, ITC_CONTEXT_FN(hooks::XAudioBufferSize),
            [&](Random& random, PPCContext& t) {
              // Type 0 most of the time (the only one with samples).
              guest::StoreU8(h.base, block, random.Below(4) != 0 ? 0 : uint8_t(random.Next()));
@@ -163,7 +163,7 @@ void Buffers(Context& h, uint32_t block) {
     Results results("XAudioBuffer::Clear (sub_8245F8E8)");
     // The buffer at +0 (its samples at +0x400), a format at +0x100.
     for (int i = 0; i < 96; i++) {
-      Case(h, results, block, __imp__sub_8245F8E8, hooks::XAudioBufferClear,
+      Case(h, results, block, __imp__sub_8245F8E8, ITC_CONTEXT_FN(hooks::XAudioBufferClear),
            [&](Random& random, PPCContext& t) {
              // Capacity: 256 frames at 48 kHz of up to 6 channels fit the
              // block from +0x400 only for the smaller ones: keep the
@@ -194,7 +194,7 @@ void Accessors(Context& h, uint32_t block) {
     // The live engine's buffers, read only; r13 a stand-in PCR in the block.
     if (guest::LoadU32(h.base, xa::kEngine) != 0) {
       for (int i = 0; i < 12; i++) {
-        Case(h, results, block, __imp__sub_8245DEB0, hooks::XAudioEngineBuffer,
+        Case(h, results, block, __imp__sub_8245DEB0, ITC_CONTEXT_FN(hooks::XAudioEngineBuffer),
              [&](Random&, PPCContext& t) {
                guest::StoreU8(h.base, block + 0x200 + xa::kPcrProcessor, uint8_t(i % 6));
                t.r13.u64 = block + 0x200;
@@ -210,12 +210,12 @@ void Accessors(Context& h, uint32_t block) {
     GuestFunction native;
   };
   const Simple simple[] = {
-      {"XAudioVoice::GetType (sub_8245E318)", __imp__sub_8245E318, hooks::XAudioGetType},
-      {"XAudioVoice::GetFormat (sub_8245E328)", __imp__sub_8245E328, hooks::XAudioGetFormat},
+      {"XAudioVoice::GetType (sub_8245E318)", __imp__sub_8245E318, ITC_CONTEXT_FN(hooks::XAudioGetType)},
+      {"XAudioVoice::GetFormat (sub_8245E328)", __imp__sub_8245E328, ITC_CONTEXT_FN(hooks::XAudioGetFormat)},
       {"XAudioVoice::SetFormatWords (sub_82461140)", __imp__sub_82461140,
-       hooks::XAudioSetFormatWords},
-      {"XAudioVoice::AddRef (sub_8245F860)", __imp__sub_8245F860, hooks::XAudioAddRef},
-      {"sub_8245FB00 (the root vtable)", __imp__sub_8245FB00, hooks::XAudioSetRootVtable},
+       ITC_CONTEXT_FN(hooks::XAudioSetFormatWords)},
+      {"XAudioVoice::AddRef (sub_8245F860)", __imp__sub_8245F860, ITC_CONTEXT_FN(hooks::XAudioAddRef)},
+      {"sub_8245FB00 (the root vtable)", __imp__sub_8245FB00, ITC_CONTEXT_FN(hooks::XAudioSetRootVtable)},
   };
   for (const Simple& s : simple) {
     Results results(s.name);
@@ -234,7 +234,7 @@ void Accessors(Context& h, uint32_t block) {
     // The counter's index chosen so it lands in the block (the live
     // counters at 0x82954F24 aren't touched).
     for (int i = 0; i < 24; i++) {
-      Case(h, results, block, __imp__sub_8245F640, hooks::XAudioAddStat,
+      Case(h, results, block, __imp__sub_8245F640, ITC_CONTEXT_FN(hooks::XAudioAddStat),
            [&](Random& random, PPCContext& t) {
              const uint32_t counter = block + 4 * random.Below(64);
              t.r3.u64 = (uint32_t(counter - xa::kStats) >> 2) | (random.Next() & 0xC0000000ull);
@@ -312,29 +312,29 @@ void Calls(Context& h, uint32_t block) {
     bool needs_codec;
   };
   const Function functions[] = {
-      {"XAudioFactory::Size (sub_8245D610)", __imp__sub_8245D610, hooks::XAudioFactorySize, true,
+      {"XAudioFactory::Size (sub_8245D610)", __imp__sub_8245D610, ITC_CONTEXT_FN(hooks::XAudioFactorySize), true,
        false},
-      {"XAudioFactory::Create (sub_8245D630)", __imp__sub_8245D630, hooks::XAudioFactoryCreate,
+      {"XAudioFactory::Create (sub_8245D630)", __imp__sub_8245D630, ITC_CONTEXT_FN(hooks::XAudioFactoryCreate),
        true, false},
       {"XAudioBuffer::AddRefThunk (sub_8245F6B0)", __imp__sub_8245F6B0,
-       hooks::XAudioBufferAddRefThunk, true, false},
+       ITC_CONTEXT_FN(hooks::XAudioBufferAddRefThunk), true, false},
       {"XAudioBuffer::ReleaseThunk (sub_8245F6D0)", __imp__sub_8245F6D0,
-       hooks::XAudioBufferReleaseThunk, true, false},
-      {"XAudioVoice::Release (sub_8245F878)", __imp__sub_8245F878, hooks::XAudioRelease, false,
+       ITC_CONTEXT_FN(hooks::XAudioBufferReleaseThunk), true, false},
+      {"XAudioVoice::Release (sub_8245F878)", __imp__sub_8245F878, ITC_CONTEXT_FN(hooks::XAudioRelease), false,
        false},
-      {"XAudioObject::Free (sub_8245AAD8)", __imp__sub_8245AAD8, hooks::XAudioObjectFree, false,
+      {"XAudioObject::Free (sub_8245AAD8)", __imp__sub_8245AAD8, ITC_CONTEXT_FN(hooks::XAudioObjectFree), false,
        false},
       {"XAudioSourceVoice::ApplyVolume (sub_8245DFC0)", __imp__sub_8245DFC0,
-       hooks::XAudioApplyVolume, false, true},
+       ITC_CONTEXT_FN(hooks::XAudioApplyVolume), false, true},
       {"XAudioSourceVoice::StopAndReset (sub_8245DD60)", __imp__sub_8245DD60,
-       hooks::XAudioStopAndReset, false, false},
+       ITC_CONTEXT_FN(hooks::XAudioStopAndReset), false, false},
       {"XAudioVoice::SetEffectParameters (sub_82461418)", __imp__sub_82461418,
-       hooks::XAudioSetEffectParameters, false, false},
+       ITC_CONTEXT_FN(hooks::XAudioSetEffectParameters), false, false},
       {"XAudioVoice::ReleaseOutputs (sub_82460A58)", __imp__sub_82460A58,
-       hooks::XAudioReleaseOutputs, false, false},
+       ITC_CONTEXT_FN(hooks::XAudioReleaseOutputs), false, false},
       {"XAudioVoice::SetOutputMatrices (sub_82460AB8)", __imp__sub_82460AB8,
-       hooks::XAudioSetOutputMatrices, false, false},
-      {"XAudioVoice::SetFormat (sub_82460778)", __imp__sub_82460778, hooks::XAudioSetFormat,
+       ITC_CONTEXT_FN(hooks::XAudioSetOutputMatrices), false, false},
+      {"XAudioVoice::SetFormat (sub_82460778)", __imp__sub_82460778, ITC_CONTEXT_FN(hooks::XAudioSetFormat),
        false, false},
   };
   for (const Function& f : functions) {
@@ -370,7 +370,7 @@ void Descriptions(Context& h, uint32_t block) {
   {
     Results results("XAudioSourceVoice::Describe (sub_8245E010)");
     for (int i = 0; engine && i < 48; i++) {
-      Case(h, results, block, __imp__sub_8245E010, hooks::XAudioSourceDescribe,
+      Case(h, results, block, __imp__sub_8245E010, ITC_CONTEXT_FN(hooks::XAudioSourceDescribe),
            [&](Random& random, PPCContext& t) {
              if (random.Below(2) == 0) {
                guest::StoreU8(h.base, block, 4);
@@ -392,7 +392,7 @@ void Descriptions(Context& h, uint32_t block) {
   {
     Results results("XAudioSourceVoice::Reformat (sub_8245DCF0)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_8245DCF0, hooks::XAudioReformat,
+      Case(h, results, block, __imp__sub_8245DCF0, ITC_CONTEXT_FN(hooks::XAudioReformat),
            [&](Random& random, PPCContext& t) {
              World(h.base, block, random);
              Store(h.base, block + 76, AnyObject(random, block));
@@ -408,7 +408,7 @@ void Descriptions(Context& h, uint32_t block) {
   {
     Results results("XAudioBuffer::ClearThunk (sub_8245FA10)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_8245FA10, hooks::XAudioBufferClearThunk,
+      Case(h, results, block, __imp__sub_8245FA10, ITC_CONTEXT_FN(hooks::XAudioBufferClearThunk),
            [&](Random& random, PPCContext& t) {
              guest::StoreU8(h.base, block + 13, uint8_t(1 + random.Below(6)));
              Store(h.base, block + 16, Rate(random));
@@ -432,7 +432,7 @@ void Descriptions(Context& h, uint32_t block) {
     // the game (the car sounds' submix has a reverb).
     Results results("XAudioVoice::BaseSize (sub_82461158)");
     for (int i = 0; engine && i < 48; i++) {
-      Case(h, results, block, __imp__sub_82461158, hooks::XAudioBaseSize,
+      Case(h, results, block, __imp__sub_82461158, ITC_CONTEXT_FN(hooks::XAudioBaseSize),
            [&](Random& random, PPCContext& t) {
              const uint32_t description = block + 0x1A00;
              if (random.Below(2) == 0) {
@@ -457,7 +457,7 @@ void Descriptions(Context& h, uint32_t block) {
         PPCContext t = CallContext(h);
         t.r4.u64 = 64 + 64 * i;
         t.r5.u64 = 0x61820006;
-        (v == 0 ? __imp__sub_8245EF80 : hooks::XAudioAlloc)(t, h.base);
+        (v == 0 ? __imp__sub_8245EF80 : ITC_CONTEXT_FN(hooks::XAudioAlloc))(t, h.base);
         out[v].Word(t.r3.u32 != 0);
         if (t.r3.u32 != 0) {
           memory::crt::XMemFree(t.r3.u32, 0x61820006);
@@ -486,7 +486,7 @@ void Objects(Context& h, uint32_t block) {
   {
     Results results("XAudioBuffer::XAudioBuffer (sub_8245F750)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_8245F750, hooks::XAudioBufferConstruct,
+      Case(h, results, block, __imp__sub_8245F750, ITC_CONTEXT_FN(hooks::XAudioBufferConstruct),
            [&](Random& random, PPCContext& t) {
              World(h.base, block, random);
              const uint32_t format = block + 0x1F80;
@@ -507,7 +507,7 @@ void Objects(Context& h, uint32_t block) {
     // slot +20 is the game's.
     Results results("XAudioBuffer::Create (sub_8245FA80)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_8245FA80, hooks::XAudioBufferCreate,
+      Case(h, results, block, __imp__sub_8245FA80, ITC_CONTEXT_FN(hooks::XAudioBufferCreate),
            [&](Random& random, PPCContext& t) {
              World(h.base, block, random);
              Store(h.base, block + kVtable + 20, 0x8245F860);
@@ -528,7 +528,7 @@ void Objects(Context& h, uint32_t block) {
   {
     Results results("XAudioVoice::Construct (sub_82461500)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_82461500, hooks::XAudioVoiceConstruct,
+      Case(h, results, block, __imp__sub_82461500, ITC_CONTEXT_FN(hooks::XAudioVoiceConstruct),
            [&](Random& random, PPCContext& t) {
              World(h.base, block, random);
              t.r3.u64 = block;
@@ -554,7 +554,7 @@ void Objects(Context& h, uint32_t block) {
         t.r3.u64 = 0x61820006;
         t.r4.u64 = 32 + 96 * i;
         t.r5.u64 = block;
-        (v == 0 ? __imp__sub_824605E8 : hooks::XAudioDefaultAllocator)(t, h.base);
+        (v == 0 ? __imp__sub_824605E8 : ITC_CONTEXT_FN(hooks::XAudioDefaultAllocator))(t, h.base);
         out[v].Word(t.r3.u32);
         AllocatorOutputs(out[v], h.base, guest::LoadU32(h.base, block));
       }
@@ -583,7 +583,7 @@ void Objects(Context& h, uint32_t block) {
         t.r3.u64 = fresh ? 0x61820006 : random.Next();
         t.r4.u64 = fresh ? 32 + random.Below(1024) : random.Next();
         t.r5.u64 = inout;
-        (v == 0 ? __imp__sub_82460688 : hooks::XAudioGetAllocator)(t, h.base);
+        (v == 0 ? __imp__sub_82460688 : ITC_CONTEXT_FN(hooks::XAudioGetAllocator))(t, h.base);
         out[v].Word(t.r3.u32);
         if (fresh) {
           AllocatorOutputs(out[v], h.base, guest::LoadU32(h.base, inout));
@@ -645,7 +645,7 @@ void VoiceOutputs(Context& h, uint32_t block) {
   {
     Results results("XAudioVoice::ConstructOutputs (sub_82460738)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_82460738, hooks::XAudioConstructOutputs,
+      Case(h, results, block, __imp__sub_82460738, ITC_CONTEXT_FN(hooks::XAudioConstructOutputs),
            [&](Random& random, PPCContext& t) {
              World(h.base, block, random);
              t.r3.u64 = block;
@@ -661,7 +661,7 @@ void VoiceOutputs(Context& h, uint32_t block) {
     // the live factory (its description only read).
     Results results("XAudioVoice::OutputsSize (sub_824607C8)");
     for (int i = 0; engine && i < 48; i++) {
-      FramedCase(h, results, block, __imp__sub_824607C8, hooks::XAudioOutputsSize,
+      FramedCase(h, results, block, __imp__sub_824607C8, ITC_CONTEXT_FN(hooks::XAudioOutputsSize),
                  [&](Random& random, PPCContext& t) {
                    const uint32_t description = block + 0x1A00;
                    if (random.Below(2) == 0) {
@@ -692,7 +692,7 @@ void VoiceOutputs(Context& h, uint32_t block) {
     Results results("XAudioVoice::SetOutput (sub_82460998)");
     for (int i = 0; engine && i < 48; i++) {
       uint32_t mastering = 0;
-      FramedCase(h, results, block, __imp__sub_82460998, hooks::XAudioSetOutput,
+      FramedCase(h, results, block, __imp__sub_82460998, ITC_CONTEXT_FN(hooks::XAudioSetOutput),
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    entries(random, 1);
@@ -719,7 +719,7 @@ void VoiceOutputs(Context& h, uint32_t block) {
       uint32_t mastering = 0;
       const bool jump = i % 4 == 3;  // sub_8245F228, the submix's slot +36
       FramedCase(h, results, block, jump ? __imp__sub_8245F228 : __imp__sub_82460BF0,
-                 hooks::XAudioSetOutputVoices,
+                 ITC_CONTEXT_FN(hooks::XAudioSetOutputVoices),
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    const uint32_t list = block + 0x1F60;
@@ -745,7 +745,7 @@ void VoiceOutputs(Context& h, uint32_t block) {
   {
     Results results("XAudioVoice::Pass (sub_82461070)");
     for (int i = 0; i < 48; i++) {
-      FramedCase(h, results, block, __imp__sub_82461070, hooks::XAudioPass,
+      FramedCase(h, results, block, __imp__sub_82461070, ITC_CONTEXT_FN(hooks::XAudioPass),
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    Store(h.base, block + 44, random.Below(2) == 0 ? 0 : 0x8245F860);
@@ -759,7 +759,7 @@ void VoiceOutputs(Context& h, uint32_t block) {
   {
     Results results("XAudioVoice::Destroy (sub_82461240)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_82461240, hooks::XAudioDestroy,
+      Case(h, results, block, __imp__sub_82461240, ITC_CONTEXT_FN(hooks::XAudioDestroy),
            [&](Random& random, PPCContext& t) {
              World(h.base, block, random);
              Store(h.base, block + 32, random.Below(3) == 0 ? 0 : AnyObject(random, block) + 8);
@@ -782,7 +782,7 @@ void VoiceOutputs(Context& h, uint32_t block) {
     Results results("XAudioVoice::ProcessEffect (sub_82461678)");
     const uint32_t engine_address = guest::LoadU32(h.base, xa::kEngine);
     for (int i = 0; engine && i < 64; i++) {
-      FramedCase(h, results, block, __imp__sub_82461678, hooks::XAudioProcessEffect,
+      FramedCase(h, results, block, __imp__sub_82461678, ITC_CONTEXT_FN(hooks::XAudioProcessEffect),
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    const uint32_t entry = block + 0x1F80;
@@ -814,7 +814,7 @@ void VoiceOutputs(Context& h, uint32_t block) {
     Results results("XAudioVoice::CreateObject (sub_82461308)");
     for (int i = 0; engine && i < 32; i++) {
       uint32_t allocator = 0;
-      FramedCase(h, results, block, __imp__sub_82461308, hooks::XAudioCreateObject,
+      FramedCase(h, results, block, __imp__sub_82461308, ITC_CONTEXT_FN(hooks::XAudioCreateObject),
                  [&](Random& random, PPCContext& t) {
                    const uint32_t out = block + 0x1FF0;
                    xa::DefaultAllocator(h.base, 0x61820006, 4096, out);
@@ -995,7 +995,7 @@ void Making(Context& h, uint32_t block) {
   {
     Results results("XAudioVoice::CreateEffects (sub_82461600)");
     for (int i = 0; i < 32; i++) {
-      RealCase(h, results, block, __imp__sub_82461600, hooks::XAudioCreateEffects,
+      RealCase(h, results, block, __imp__sub_82461600, ITC_CONTEXT_FN(hooks::XAudioCreateEffects),
                [&](Random& random, PPCContext& t, uint32_t allocator) {
                  Store(h.base, block + 8, allocator);
                  Store(h.base, block + 36, block + 0x1E00);
@@ -1010,7 +1010,7 @@ void Making(Context& h, uint32_t block) {
   {
     Results results("XAudioVoice::InitBase (sub_82461D50)");
     for (int i = 0; i < 32; i++) {
-      RealCase(h, results, block, __imp__sub_82461D50, hooks::XAudioInitBase,
+      RealCase(h, results, block, __imp__sub_82461D50, ITC_CONTEXT_FN(hooks::XAudioInitBase),
                [&](Random& random, PPCContext& t, uint32_t allocator) {
                  Store(h.base, block + 8, allocator);
                  const uint32_t description = block + 0x1E80;
@@ -1027,7 +1027,7 @@ void Making(Context& h, uint32_t block) {
     // outputs (the mastering voice).
     Results results("XAudioVoice::InitOutputs (sub_82460880)");
     for (int i = 0; i < 32; i++) {
-      RealCase(h, results, block, __imp__sub_82460880, hooks::XAudioInitOutputs,
+      RealCase(h, results, block, __imp__sub_82460880, ITC_CONTEXT_FN(hooks::XAudioInitOutputs),
                [&](Random& random, PPCContext& t, uint32_t allocator) {
                  Store(h.base, block, kSourceVtable);
                  Store(h.base, block + 8, allocator);
@@ -1047,7 +1047,7 @@ void Making(Context& h, uint32_t block) {
     // channels, +12 no chain); the voice's vtable the submix voice's.
     Results results("XAudioSubmixVoice::Init (sub_8245F230)");
     for (int i = 0; i < 32; i++) {
-      RealCase(h, results, block, __imp__sub_8245F230, hooks::XAudioSubmixInit,
+      RealCase(h, results, block, __imp__sub_8245F230, ITC_CONTEXT_FN(hooks::XAudioSubmixInit),
                [&](Random& random, PPCContext& t, uint32_t allocator) {
                  Store(h.base, block, kSubmixVtable);
                  Store(h.base, block + 8, allocator);
@@ -1095,7 +1095,7 @@ void Making(Context& h, uint32_t block) {
   {
     Results results("XAudioSourceVoice::Size (sub_8245E0D8)");
     for (int i = 0; live != 0 && i < 32; i++) {
-      FramedCase(h, results, block, __imp__sub_8245E0D8, hooks::XAudioSourceSize,
+      FramedCase(h, results, block, __imp__sub_8245E0D8, ITC_CONTEXT_FN(hooks::XAudioSourceSize),
                  [&](Random& random, PPCContext& t) {
                    source(random, block + 0x1E80);
                    t.r3.u64 = block + 0x1E80;
@@ -1110,7 +1110,7 @@ void Making(Context& h, uint32_t block) {
     // of the native XMA layer, not freed).
     Results results("XAudioSourceVoice::Init (sub_8245E348)");
     for (int i = 0; live != 0 && i < 16; i++) {
-      RealCase(h, results, block, __imp__sub_8245E348, hooks::XAudioSourceInit,
+      RealCase(h, results, block, __imp__sub_8245E348, ITC_CONTEXT_FN(hooks::XAudioSourceInit),
                [&](Random& random, PPCContext& t, uint32_t allocator) {
                  Store(h.base, block, kSourceVtable);
                  Store(h.base, block + 8, allocator);
@@ -1140,7 +1140,7 @@ void Passes(Context& h, uint32_t block) {
   {
     Results results("XAudioVoice::ProcessEffects (sub_82461E88)");
     for (int i = 0; engine && i < 48; i++) {
-      FramedCase(h, results, block, __imp__sub_82461E88, hooks::XAudioProcessEffects,
+      FramedCase(h, results, block, __imp__sub_82461E88, ITC_CONTEXT_FN(hooks::XAudioProcessEffects),
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    Store(h.base, block + 0x1F90, buffer_word(random, t));
@@ -1154,7 +1154,7 @@ void Passes(Context& h, uint32_t block) {
   {
     Results results("XAudioVoice::MixToOutputs (sub_82460CB8)");
     for (int i = 0; engine && i < 48; i++) {
-      FramedCase(h, results, block, __imp__sub_82460CB8, hooks::XAudioMixToOutputs,
+      FramedCase(h, results, block, __imp__sub_82460CB8, ITC_CONTEXT_FN(hooks::XAudioMixToOutputs),
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    Store(h.base, block + 0x1F90, buffer_word(random, t));
@@ -1170,7 +1170,7 @@ void Passes(Context& h, uint32_t block) {
     // (a format of 1-2 channels at 8 kHz: 42 frames).
     Results results("XAudioSubmixVoice::Pass (sub_8245EFA0)");
     for (int i = 0; i < 48; i++) {
-      FramedCase(h, results, block, __imp__sub_8245EFA0, hooks::XAudioSubmixPass,
+      FramedCase(h, results, block, __imp__sub_8245EFA0, ITC_CONTEXT_FN(hooks::XAudioSubmixPass),
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    Store(h.base, block + 44, random.Below(2) == 0 ? 0 : 0x8245F860);
@@ -1273,7 +1273,7 @@ void Locked(Context& h, uint32_t block) {
   {
     Results results("XAudioSourceVoice::GetState (sub_8245DDC8)");
     for (int i = 0; i < 32; i++) {
-      LockedCase(h, results, block, __imp__sub_8245DDC8, hooks::XAudioSourceGetState, i % 2 == 0,
+      LockedCase(h, results, block, __imp__sub_8245DDC8, ITC_CONTEXT_FN(hooks::XAudioSourceGetState), i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    Store(h.base, block + 76, AnyObject(random, block));
@@ -1287,7 +1287,7 @@ void Locked(Context& h, uint32_t block) {
   {
     Results results("XAudioVoice::Play (sub_82461798)");
     for (int i = 0; i < 32; i++) {
-      LockedCase(h, results, block, __imp__sub_82461798, hooks::XAudioPlay, i % 2 == 0,
+      LockedCase(h, results, block, __imp__sub_82461798, ITC_CONTEXT_FN(hooks::XAudioPlay), i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    t.r3.u64 = block;
@@ -1304,7 +1304,7 @@ void Locked(Context& h, uint32_t block) {
     const uint32_t stages = guest::LoadU8(h.base, engine + 128);
     for (int i = 0; i < 48; i++) {
       uint32_t list = 0;
-      LockedCase(h, results, block, __imp__sub_82460EF0, hooks::XAudioActivate, true,
+      LockedCase(h, results, block, __imp__sub_82460EF0, ITC_CONTEXT_FN(hooks::XAudioActivate), true,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    Store(h.base, block + kVtable + 52, 0x8245E318);
@@ -1338,7 +1338,7 @@ void Locked(Context& h, uint32_t block) {
   {
     Results results("XAudioVoice::Deactivate (sub_82460D50)");
     for (int i = 0; i < 32; i++) {
-      LockedCase(h, results, block, __imp__sub_82460D50, hooks::XAudioDeactivate, i % 2 == 0,
+      LockedCase(h, results, block, __imp__sub_82460D50, ITC_CONTEXT_FN(hooks::XAudioDeactivate), i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    FakeList(h.base, block + 0x1FC0, block + 24, random.Below(2) == 0);
@@ -1353,7 +1353,7 @@ void Locked(Context& h, uint32_t block) {
     Results results("XAudioSourceVoice::StartLater (sub_8245E7D0)");
     const uint32_t pending = engine + 68;
     for (int i = 0; i < 32; i++) {
-      LockedCase(h, results, block, __imp__sub_8245E7D0, hooks::XAudioStartLater, true,
+      LockedCase(h, results, block, __imp__sub_8245E7D0, ITC_CONTEXT_FN(hooks::XAudioStartLater), true,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    t.r3.u64 = block;
@@ -1370,7 +1370,7 @@ void Locked(Context& h, uint32_t block) {
     Results results("XAudioSourceVoice::CancelPendingStart (sub_8245E428)");
     const uint32_t offset = guest::LoadU32(h.base, engine + 76);
     for (int i = 0; offset < 0x100 && i < 32; i++) {
-      LockedCase(h, results, block, __imp__sub_8245E428, hooks::XAudioCancelPendingStart,
+      LockedCase(h, results, block, __imp__sub_8245E428, ITC_CONTEXT_FN(hooks::XAudioCancelPendingStart),
                  i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
@@ -1384,7 +1384,7 @@ void Locked(Context& h, uint32_t block) {
   {
     Results results("XAudioVoice::StopOrTail (sub_824619B0)");
     for (int i = 0; i < 48; i++) {
-      LockedCase(h, results, block, __imp__sub_824619B0, hooks::XAudioStopOrTail, i % 2 == 0,
+      LockedCase(h, results, block, __imp__sub_824619B0, ITC_CONTEXT_FN(hooks::XAudioStopOrTail), i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    t.r3.u64 = block;
@@ -1400,7 +1400,7 @@ void Locked(Context& h, uint32_t block) {
     // run); now and then this thread is the mixer's.
     Results results("XAudio::WaitForVoice (sub_8245AE60)");
     for (int i = 0; i < 32; i++) {
-      LockedCase(h, results, block, __imp__sub_8245AE60, hooks::XAudioWaitForVoice, i % 2 == 0,
+      LockedCase(h, results, block, __imp__sub_8245AE60, ITC_CONTEXT_FN(hooks::XAudioWaitForVoice), i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    const uint32_t fake = block + 0x1A00;
                    const uint32_t mixer = guest::LoadU32(h.base, t.r13.u32 + 256);
@@ -1472,7 +1472,7 @@ void Lifecycle(Context& h, uint32_t block) {
     // The pending list taken back (StartLater's insert, for bit 0).
     Results results("XAudioSourceVoice::Start (sub_8245EBA0)");
     for (int i = 0; i < 48; i++) {
-      LockedCase(h, results, block, __imp__sub_8245EBA0, hooks::XAudioSourceStart, true,
+      LockedCase(h, results, block, __imp__sub_8245EBA0, ITC_CONTEXT_FN(hooks::XAudioSourceStart), true,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    nodes(random);
@@ -1490,7 +1490,7 @@ void Lifecycle(Context& h, uint32_t block) {
   {
     Results results("XAudioSourceVoice::Stop (sub_8245E9F0)");
     for (int i = 0; i < 48; i++) {
-      LockedCase(h, results, block, __imp__sub_8245E9F0, hooks::XAudioSourceStop, i % 2 == 0,
+      LockedCase(h, results, block, __imp__sub_8245E9F0, ITC_CONTEXT_FN(hooks::XAudioSourceStop), i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    nodes(random);
@@ -1508,7 +1508,7 @@ void Lifecycle(Context& h, uint32_t block) {
     Results results("XAudioSourceVoice::Pass (sub_8245DED0)");
     const uint32_t processor_buffers = engine + 12;
     for (int i = 0; i < 48; i++) {
-      LockedCase(h, results, block, __imp__sub_8245DED0, hooks::XAudioSourcePass, i % 2 == 0,
+      LockedCase(h, results, block, __imp__sub_8245DED0, ITC_CONTEXT_FN(hooks::XAudioSourcePass), i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    nodes(random);
@@ -1531,7 +1531,7 @@ void Lifecycle(Context& h, uint32_t block) {
     // The voice taken back out of the live source list.
     Results results("XAudioSourceVoice::XAudioSourceVoice (sub_8245E6A8)");
     for (int i = 0; i < 32; i++) {
-      LockedCase(h, results, block, __imp__sub_8245E6A8, hooks::XAudioSourceConstruct, true,
+      LockedCase(h, results, block, __imp__sub_8245E6A8, ITC_CONTEXT_FN(hooks::XAudioSourceConstruct), true,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    t.r3.u64 = block;
@@ -1547,7 +1547,7 @@ void Lifecycle(Context& h, uint32_t block) {
     Results results("XAudioSubmixVoice::XAudioSubmixVoice (sub_8245F298)");
     for (int i = 0; stages != 0 && i < 32; i++) {
       uint32_t list = 0;
-      LockedCase(h, results, block, __imp__sub_8245F298, hooks::XAudioSubmixConstruct, true,
+      LockedCase(h, results, block, __imp__sub_8245F298, ITC_CONTEXT_FN(hooks::XAudioSubmixConstruct), true,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    const uint32_t description = block + 0x1F80;
@@ -1591,15 +1591,15 @@ void Lifecycle(Context& h, uint32_t block) {
     results.Report();
   };
   destructor("XAudioVoice::~XAudioVoiceOutputs (sub_82460B50)", __imp__sub_82460B50,
-             hooks::XAudioOutputsDestroy, false, false);
+             ITC_CONTEXT_FN(hooks::XAudioOutputsDestroy), false, false);
   destructor("XAudioSourceVoice::~XAudioSourceVoice (sub_8245E1B8)", __imp__sub_8245E1B8,
-             hooks::XAudioSourceDestroy, true, false);
+             ITC_CONTEXT_FN(hooks::XAudioSourceDestroy), true, false);
   destructor("XAudioSourceVoice::DeletingDestructor (sub_8245E7A0)", __imp__sub_8245E7A0,
-             hooks::XAudioSourceDeletingDestructor, true, false);
+             ITC_CONTEXT_FN(hooks::XAudioSourceDeletingDestructor), true, false);
   destructor("XAudioSubmixVoice::~XAudioSubmixVoice (sub_8245F108)", __imp__sub_8245F108,
-             hooks::XAudioSubmixDestroy, false, true);
+             ITC_CONTEXT_FN(hooks::XAudioSubmixDestroy), false, true);
   destructor("XAudioSubmixVoice::DeletingDestructor (sub_8245F3A0)", __imp__sub_8245F3A0,
-             hooks::XAudioSubmixDeletingDestructor, false, true);
+             ITC_CONTEXT_FN(hooks::XAudioSubmixDeletingDestructor), false, true);
   if (!hooks::NativeHeapActive()) {
     return;
   }
@@ -1610,7 +1610,7 @@ void Lifecycle(Context& h, uint32_t block) {
   {
     Results results("XAudioVoice::CreateSource (sub_8245EAA0)");
     for (int i = 0; live != 0 && i < 16; i++) {
-      RealCase(h, results, block, __imp__sub_8245EAA0, hooks::XAudioCreateSource, true,
+      RealCase(h, results, block, __imp__sub_8245EAA0, ITC_CONTEXT_FN(hooks::XAudioCreateSource), true,
                [&](Random& random, PPCContext& t, uint32_t allocator) {
                  const uint32_t description = block + 0x1E80;
                  for (uint32_t k = 0; k < 92; k += 4) {
@@ -1641,7 +1641,7 @@ void Lifecycle(Context& h, uint32_t block) {
     Results results("XAudioVoice::CreateSubmix (sub_8245F3D0)");
     for (int i = 0; stages != 0 && i < 16; i++) {
       uint32_t list = 0;
-      RealCase(h, results, block, __imp__sub_8245F3D0, hooks::XAudioCreateSubmix, true,
+      RealCase(h, results, block, __imp__sub_8245F3D0, ITC_CONTEXT_FN(hooks::XAudioCreateSubmix), true,
                [&](Random& random, PPCContext& t, uint32_t allocator) {
                  const uint32_t description = block + 0x1E80;
                  for (uint32_t k = 0; k < 32; k += 4) {
@@ -1697,25 +1697,25 @@ void Api(Context& h, uint32_t block) {
     bool codec;
   };
   const Method methods[] = {
-      {"XAudioVoice::AddRef, the API's (sub_82459DB0)", __imp__sub_82459DB0, hooks::XAudioApiAddRef, false},
-      {"XAudioVoice::Release, the API's (sub_82459E18)", __imp__sub_82459E18, hooks::XAudioApiRelease, false},
+      {"XAudioVoice::AddRef, the API's (sub_82459DB0)", __imp__sub_82459DB0, ITC_CONTEXT_FN(hooks::XAudioApiAddRef), false},
+      {"XAudioVoice::Release, the API's (sub_82459E18)", __imp__sub_82459E18, ITC_CONTEXT_FN(hooks::XAudioApiRelease), false},
       {"XAudioVoice::SetEffectParameters, the API's (sub_82459E80)", __imp__sub_82459E80,
-       hooks::XAudioApiSetEffectParameters, false},
+       ITC_CONTEXT_FN(hooks::XAudioApiSetEffectParameters), false},
       {"XAudioVoice::SetOutputVoices, the API's (sub_82459EF0)", __imp__sub_82459EF0,
-       hooks::XAudioApiSetOutputVoices, false},
-      {"XAudioVoice::SetOutputMatrix (sub_82459F48)", __imp__sub_82459F48, hooks::XAudioApiSetOutputMatrix, false},
-      {"XAudioVoice::GetState, the API's (sub_82459FA0)", __imp__sub_82459FA0, hooks::XAudioApiGetState, false},
-      {"XAudioVoice::Stop, the API's (sub_8245A1B0)", __imp__sub_8245A1B0, hooks::XAudioApiStop, false},
-      {"XAudioVoice::GetOutputFormat (sub_8245A3B8)", __imp__sub_8245A3B8, hooks::XAudioApiGetOutputFormat, false},
-      {"XAudioSourceVoice::SubmitPacket (sub_8245A050)", __imp__sub_8245A050, hooks::XAudioApiSubmitPacket, true},
-      {"XAudioSourceVoice, the codec's +36 (sub_8245A108)", __imp__sub_8245A108, hooks::XAudioApiCodec36, true},
-      {"XAudioSourceVoice::FlushPackets (sub_8245A208)", __imp__sub_8245A208, hooks::XAudioApiFlushPackets, true},
-      {"XAudioSourceVoice, the codec's +72 (sub_8245A270)", __imp__sub_8245A270, hooks::XAudioApiCodec72, true},
-      {"XAudioSourceVoice::Reset (sub_8245A0B0)", __imp__sub_8245A0B0, hooks::XAudioApiReset, false},
-      {"XAudioSourceVoice::SetVolume (sub_8245A2C8)", __imp__sub_8245A2C8, hooks::XAudioApiSetVolume, false},
+       ITC_CONTEXT_FN(hooks::XAudioApiSetOutputVoices), false},
+      {"XAudioVoice::SetOutputMatrix (sub_82459F48)", __imp__sub_82459F48, ITC_CONTEXT_FN(hooks::XAudioApiSetOutputMatrix), false},
+      {"XAudioVoice::GetState, the API's (sub_82459FA0)", __imp__sub_82459FA0, ITC_CONTEXT_FN(hooks::XAudioApiGetState), false},
+      {"XAudioVoice::Stop, the API's (sub_8245A1B0)", __imp__sub_8245A1B0, ITC_CONTEXT_FN(hooks::XAudioApiStop), false},
+      {"XAudioVoice::GetOutputFormat (sub_8245A3B8)", __imp__sub_8245A3B8, ITC_CONTEXT_FN(hooks::XAudioApiGetOutputFormat), false},
+      {"XAudioSourceVoice::SubmitPacket (sub_8245A050)", __imp__sub_8245A050, ITC_CONTEXT_FN(hooks::XAudioApiSubmitPacket), true},
+      {"XAudioSourceVoice, the codec's +36 (sub_8245A108)", __imp__sub_8245A108, ITC_CONTEXT_FN(hooks::XAudioApiCodec36), true},
+      {"XAudioSourceVoice::FlushPackets (sub_8245A208)", __imp__sub_8245A208, ITC_CONTEXT_FN(hooks::XAudioApiFlushPackets), true},
+      {"XAudioSourceVoice, the codec's +72 (sub_8245A270)", __imp__sub_8245A270, ITC_CONTEXT_FN(hooks::XAudioApiCodec72), true},
+      {"XAudioSourceVoice::Reset (sub_8245A0B0)", __imp__sub_8245A0B0, ITC_CONTEXT_FN(hooks::XAudioApiReset), false},
+      {"XAudioSourceVoice::SetVolume (sub_8245A2C8)", __imp__sub_8245A2C8, ITC_CONTEXT_FN(hooks::XAudioApiSetVolume), false},
       {"XAudioSourceVoice::SetFrequencyRatio (sub_8245A340)", __imp__sub_8245A340,
-       hooks::XAudioApiSetFrequencyRatio, true},
-      {"XAudioSourceVoice::SetFormat (sub_82459FF8)", __imp__sub_82459FF8, hooks::XAudioApiSetFormat, true},
+       ITC_CONTEXT_FN(hooks::XAudioApiSetFrequencyRatio), true},
+      {"XAudioSourceVoice::SetFormat (sub_82459FF8)", __imp__sub_82459FF8, ITC_CONTEXT_FN(hooks::XAudioApiSetFormat), true},
   };
   for (const Method& m : methods) {
     Results results(m.name);
@@ -1746,7 +1746,7 @@ void Api(Context& h, uint32_t block) {
     Results results("XAudioVoice::Start, the API's (sub_8245A168)");
     const uint32_t pending_offset = guest::LoadU32(h.base, engine + 76);
     for (int i = 0; pending_offset < 0x100 && i < 32; i++) {
-      LockedCase(h, results, block, __imp__sub_8245A168, hooks::XAudioApiStart, true,
+      LockedCase(h, results, block, __imp__sub_8245A168, ITC_CONTEXT_FN(hooks::XAudioApiStart), true,
                  [&](Random& random, PPCContext& t) {
                    World(h.base, block, random);
                    FakeList(h.base, block + 0x1FC8, block + pending_offset, random.Below(2) == 0);
@@ -1768,7 +1768,7 @@ void Api(Context& h, uint32_t block) {
   {
     Results results("XAudioGetMasteringVoice (sub_8245A568)");
     for (int i = 0; i < 8; i++) {
-      LockedCase(h, results, block, __imp__sub_8245A568, hooks::XAudioApiGetMasteringVoice, false,
+      LockedCase(h, results, block, __imp__sub_8245A568, ITC_CONTEXT_FN(hooks::XAudioApiGetMasteringVoice), false,
                  [&](Random&, PPCContext& t) { t.r3.u64 = block + 0x1F80; },
                  [&](Outputs& out) {
                    // The live mastering voice compared as found, not as an address.
@@ -1784,7 +1784,7 @@ void Api(Context& h, uint32_t block) {
     // commits, so nothing starts).
     Results results("XAudio::Commit (sub_8245A6E8)");
     for (int i = 0; i < 8; i++) {
-      LockedCase(h, results, block, __imp__sub_8245A6E8, hooks::XAudioApiCommit, false,
+      LockedCase(h, results, block, __imp__sub_8245A6E8, ITC_CONTEXT_FN(hooks::XAudioApiCommit), false,
                  [&](Random&, PPCContext&) {}, [](Outputs&) {}, fmt::format("case {}", i));
     }
     results.Report();
@@ -1797,7 +1797,7 @@ void Api(Context& h, uint32_t block) {
     Results results("XAudioRegisterProcessingCallback (sub_8245A5E8)");
     Block scratch;
     for (int i = 0; i < 16; i++) {
-      LockedCase(h, results, block, __imp__sub_8245A5E8, hooks::XAudioApiRegisterCallback, false,
+      LockedCase(h, results, block, __imp__sub_8245A5E8, ITC_CONTEXT_FN(hooks::XAudioApiRegisterCallback), false,
                  [&](Random& random, PPCContext& t) {
                    Store(h.base, block + 0x1F80, 0);
                    t.r3.u64 = (random.Next() & ~0xFFull) | random.Below(2);
@@ -1843,7 +1843,7 @@ void Api(Context& h, uint32_t block) {
     // The API lock entered before the spin lock the case holds.
     Results results("XAudioCreateSourceVoice (sub_8245A768)");
     for (int i = 0; live != 0 && i < 8; i++) {
-      RealCase(h, results, block, __imp__sub_8245A768, hooks::XAudioApiCreateSourceVoice, true,
+      RealCase(h, results, block, __imp__sub_8245A768, ITC_CONTEXT_FN(hooks::XAudioApiCreateSourceVoice), true,
                [&](Random& random, PPCContext& t, uint32_t) {
                  const uint32_t description = block + 0x1E80;
                  for (uint32_t k = 0; k < 92; k += 4) {
@@ -1873,7 +1873,7 @@ void Api(Context& h, uint32_t block) {
     Results results("XAudioCreateSubmixVoice (sub_8245A7C8)");
     for (int i = 0; stages != 0 && i < 8; i++) {
       uint32_t list = 0;
-      RealCase(h, results, block, __imp__sub_8245A7C8, hooks::XAudioApiCreateSubmixVoice, true,
+      RealCase(h, results, block, __imp__sub_8245A7C8, ITC_CONTEXT_FN(hooks::XAudioApiCreateSubmixVoice), true,
                [&](Random& random, PPCContext& t, uint32_t) {
                  const uint32_t description = block + 0x1E80;
                  for (uint32_t k = 0; k < 32; k += 4) {

@@ -3,6 +3,7 @@
 // harness shares (hooks/app_states.h).
 
 #include "hooks/app_states.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "app_states/app.h"
@@ -82,10 +83,10 @@ uint32_t High(uint64_t value) { return uint32_t(value >> 32); }
 
 }  // namespace
 
-void AppMessagesErase(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppMessagesErase) {
   if (!as::MessagesErase(base, ctx.r4.u32, High(ctx.r5.u64), ctx.r5.u32, High(ctx.r6.u64),
                          ctx.r6.u32)) {
-    __imp__sub_82092E70(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82092E70);
     return;
   }
   REX_STORE_U64(ctx.r1.u32 + 32, ctx.r5.u64);
@@ -93,55 +94,55 @@ void AppMessagesErase(PPCContext& ctx, uint8_t* base) {
   REX_STORE_U64(ctx.r3.u32, ctx.r5.u64);
 }
 
-void AppMessagesClear(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppMessagesClear) {
   if (!as::MessagesClear(base, ctx.r3.u32)) {
-    __imp__sub_82092F98(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82092F98);
     return;
   }
   ctx.r3.u64 = ctx.r1.u32 - 16;
 }
 
-void AppMessagesAllocate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppMessagesAllocate) {
   if (Heap()) {
     if (const auto block = as::MessagesAllocate(base, ctx.r3.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  __imp__sub_82092B78(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82092B78);
 }
 
-void AppOpAllocateNodes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppOpAllocateNodes) {
   if (Heap()) {
     if (const auto block = as::OpAllocateNodes(base, ctx.r3.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  __imp__sub_820ACF10(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820ACF10);
 }
 
-void AppOpIncSize(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppOpIncSize) {
   if (!as::OpIncSize(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_820AD768(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AD768);
   }
 }
 
-void AppListClear(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppListClear) {
   if (!Heap()) {
-    __imp__sub_820ACF88(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820ACF88);
     return;
   }
   ctx.r3.u64 = as::ListClear(base, ctx.r3.u32);
 }
 
-void AppPtrListErase(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppPtrListErase) {
   std::optional<uint32_t> next;
   if (Heap()) {
     next = std_list::Erase(base, ctx.r4.u32, High(ctx.r5.u64), ctx.r5.u32);
   }
   if (!next) {
-    __imp__sub_82098E80(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82098E80);
     return;
   }
   const uint64_t result = (ctx.r5.u64 & 0xFFFFFFFF00000000ull) | *next;
@@ -149,21 +150,21 @@ void AppPtrListErase(PPCContext& ctx, uint8_t* base) {
   REX_STORE_U64(ctx.r3.u32, result);
 }
 
-void AppDelegateClone(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppDelegateClone) {
   if (Heap()) {
     if (const auto copy = as::DelegateClone(base, ctx.r3.u32)) {
       ctx.r3.u64 = *copy;
       return;
     }
   }
-  __imp__sub_820ACA48(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820ACA48);
 }
 
-void AppLayerIsEmpty(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppLayerIsEmpty) {
   ctx.r3.u64 = as::LayerIsEmpty(base, ctx.r3.u32);
 }
 
-as::AppCalls AppStatesCalls(PPCContext& ctx, uint8_t* base) {
+as::AppCalls AppStatesCalls(lifted::Regs& ctx, uint8_t* base) {
   as::AppCalls calls;
   calls.call = [&ctx, base](uint32_t target, uint32_t r3, std::optional<uint64_t> r4,
                             std::optional<uint64_t> r5, uint32_t return_address) {
@@ -218,7 +219,7 @@ as::AppCalls AppStatesCalls(PPCContext& ctx, uint8_t* base) {
   return calls;
 }
 
-void AppHandlerMapForEach(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppHandlerMapForEach) {
   const uint32_t result = ctx.r3.u32;
   const uint64_t first = ctx.r4.u64, last = ctx.r5.u64, functor = ctx.r6.u64,
                  adjust = ctx.r7.u64;
@@ -229,7 +230,7 @@ void AppHandlerMapForEach(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = result;
 }
 
-void AppForEachMessage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppForEachMessage) {
   const uint32_t result = ctx.r3.u32;
   const uint64_t first = ctx.r4.u64, last = ctx.r5.u64, functor = ctx.r6.u64,
                  adjust = ctx.r7.u64;
@@ -240,7 +241,7 @@ void AppForEachMessage(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = result;
 }
 
-void AppForEachRequest(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppForEachRequest) {
   const uint32_t result = ctx.r3.u32;
   const uint64_t first = ctx.r4.u64, last = ctx.r5.u64, functor = ctx.r6.u64,
                  adjust = ctx.r7.u64;
@@ -253,7 +254,7 @@ void AppForEachRequest(PPCContext& ctx, uint8_t* base) {
 
 namespace {
 
-void RunHandlerStep(PPCContext& ctx, uint8_t* base, bool listener) {
+void RunHandlerStep(lifted::Regs& ctx, uint8_t* base, bool listener) {
   const uint32_t app = ctx.r3.u32;
   const uint64_t entry = ctx.r4.u64;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
@@ -266,10 +267,10 @@ void RunHandlerStep(PPCContext& ctx, uint8_t* base, bool listener) {
 
 }  // namespace
 
-void AppRunHandler(PPCContext& ctx, uint8_t* base) { RunHandlerStep(ctx, base, false); }
-void AppRunListener(PPCContext& ctx, uint8_t* base) { RunHandlerStep(ctx, base, true); }
+ITC_REGS_STEP(AppRunHandler) { RunHandlerStep(ctx, base, false); }
+ITC_REGS_STEP(AppRunListener) { RunHandlerStep(ctx, base, true); }
 
-void AppDeliverMessage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppDeliverMessage) {
   const uint32_t app = ctx.r3.u32;
   const uint32_t message = ctx.r4.u32;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
@@ -279,14 +280,14 @@ void AppDeliverMessage(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ctx.r1.u32 - 32;
 }
 
-void AppApplyRequest(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppApplyRequest) {
   std::optional<bool> inserted;
   const uint32_t type = High(ctx.r4.u64);
   if (Heap() && (type > 7 || framework::CanAllocate(base))) {
     inserted = as::AppApplyRequest(base, ctx.r3.u32, type, ctx.r4.u32, High(ctx.r5.u64));
   }
   if (!inserted) {
-    __imp__sub_82093BE0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82093BE0);
     return;
   }
   REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
@@ -296,7 +297,7 @@ void AppApplyRequest(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void AppUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppUpdate) {
   const uint32_t app = ctx.r3.u32;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
   calls.in_frame(144, uint32_t(ctx.lr), [&](uint32_t frame) {
@@ -312,7 +313,7 @@ namespace {
 // address, r5 = the delegate; the copy made with its slot 2 and the request
 // pushed, from a 112-byte frame like the original's (the request at r1 + 80
 // there). r3 as PushBack leaves it.
-void AddRequestStep(PPCContext& ctx, uint8_t* base, uint32_t type, uint32_t clone_return,
+void AddRequestStep(lifted::Regs& ctx, uint8_t* base, uint32_t type, uint32_t clone_return,
                     uint32_t push_return) {
   const uint32_t interface = ctx.r3.u32;
   const uint32_t key = ctx.r4.u32;
@@ -327,7 +328,7 @@ void AddRequestStep(PPCContext& ctx, uint8_t* base, uint32_t type, uint32_t clon
       ctx.r3.u64 = vector;
       ctx.r4.u64 = request;
       ctx.lr = push_return;
-      __imp__sub_8209A930(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_8209A930);
       return;
     }
     ctx.r3.u64 = *inserted ? frame - 16 : vector;
@@ -336,62 +337,62 @@ void AddRequestStep(PPCContext& ctx, uint8_t* base, uint32_t type, uint32_t clon
 
 }  // namespace
 
-void AppAddHandler(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppAddHandler) {
   AddRequestStep(ctx, base, 0, 0x82094868, 0x82094878);
 }
-void AppAddToggledHandler(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppAddToggledHandler) {
   AddRequestStep(ctx, base, 2, 0x82094908, 0x82094918);
 }
-void AppAddAlwaysHandler(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppAddAlwaysHandler) {
   AddRequestStep(ctx, base, 4, 0x820949A8, 0x820949B8);
 }
-void AppAddListener(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppAddListener) {
   AddRequestStep(ctx, base, 6, 0x82094A48, 0x82094A58);
 }
 
-void AppOpConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppOpConstruct) {
   if (!Heap() || !as::OpConstruct(base, ctx.r3.u32)) {
-    __imp__sub_820AD0B8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AD0B8);
   }
 }
 
-void AppOpBuyNode(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppOpBuyNode) {
   std::optional<uint32_t> node;
   if (Heap()) {
     node = as::OpBuyNode(base, ctx.r4.u32, ctx.r5.u32, guest::LoadU32(base, ctx.r6.u32),
                          guest::LoadU32(base, ctx.r6.u32 + 4));
   }
   if (!node) {
-    __imp__sub_820ACFF8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820ACFF8);
     return;
   }
   ctx.r3.u64 = *node;
 }
 
-void AppLayerPush(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppLayerPush) {
   if (!Heap() || !as::LayerPush(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_820ADAD0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820ADAD0);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32 + as::kLayerOps;
 }
 
-void AppMessagesInsertN(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppMessagesInsertN) {
   if (!Heap() || !as::MessagesInsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                       guest::LoadU32(base, ctx.r6.u32))) {
-    __imp__sub_820938C0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820938C0);
     return;
   }
   REX_STORE_U64(ctx.r1.u32 + 24, ctx.r4.u64);
 }
 
-void AppMessagesInsert(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppMessagesInsert) {
   std::optional<uint32_t> where;
   if (Heap()) {
     where = as::MessagesInsert(base, ctx.r4.u32, High(ctx.r5.u64), ctx.r5.u32, ctx.r6.u32);
   }
   if (!where) {
-    __imp__sub_82094110(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82094110);
     return;
   }
   REX_STORE_U64(ctx.r1.u32 + 32, ctx.r5.u64);
@@ -399,13 +400,13 @@ void AppMessagesInsert(PPCContext& ctx, uint8_t* base) {
   guest::StoreU32(base, ctx.r3.u32 + 4, *where);
 }
 
-void AppMessagesPushBack(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppMessagesPushBack) {
   std::optional<bool> inserted;
   if (Heap()) {
     inserted = as::MessagesPushBack(base, ctx.r3.u32, ctx.r4.u32);
   }
   if (!inserted) {
-    __imp__sub_820944E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820944E0);
     return;
   }
   if (*inserted) {
@@ -413,23 +414,23 @@ void AppMessagesPushBack(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void AppSendMessage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppSendMessage) {
   std::optional<bool> inserted;
   if (Heap()) {
     inserted = as::AppSendMessage(base, ctx.r3.u32, ctx.r4.u32);
   }
   if (!inserted) {
-    __imp__sub_82094AB0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82094AB0);
     return;
   }
   ctx.r3.u64 = *inserted ? ctx.r1.u32 - 16 : ctx.r3.u32 + as::kInterfaceMessages;
 }
 
-void AppStatesIsEmpty(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppStatesIsEmpty) {
   ctx.r3.u64 = as::StatesIsEmpty(base, ctx.r3.u32, AppStatesCalls(ctx, base));
 }
 
-void AppIsRunning(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppIsRunning) {
   ctx.r3.u64 = as::AppIsRunning(base, ctx.r3.u32, AppStatesCalls(ctx, base));
   ctx.r11.u64 = ctx.r3.u64;
 }
@@ -439,7 +440,7 @@ namespace {
 // A step over the allocation layer from the original's frame of `bytes`:
 // `body(frame)` gives false where the original must run (nothing done).
 template <typename Body>
-bool InOwnFrame(PPCContext& ctx, uint8_t* base, uint32_t bytes, const as::AppCalls& calls,
+bool InOwnFrame(lifted::Regs& ctx, uint8_t* base, uint32_t bytes, const as::AppCalls& calls,
                 Body body) {
   if (!Heap()) {
     return false;
@@ -449,15 +450,15 @@ bool InOwnFrame(PPCContext& ctx, uint8_t* base, uint32_t bytes, const as::AppCal
   return ours;
 }
 
-void LayerConstructStep(PPCContext& ctx, uint8_t* base, bool with_state,
-                        void (*original)(PPCContext&, uint8_t*)) {
+void LayerConstructStep(lifted::Regs& ctx, uint8_t* base, bool with_state,
+                        lifted::ImportFunction* original) {
   const uint32_t layer = ctx.r3.u32, owner = ctx.r4.u32;
   const std::optional<uint32_t> state =
       with_state ? std::optional<uint32_t>(ctx.r5.u32) : std::nullopt;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
   // The lists' constructors hand back without the process heap.
   if (!Heap() || memory::crt::GetProcessHeap(base) == 0) {
-    original(ctx, base);
+    lifted::Sdk(ctx, base, original);
     return;
   }
   calls.in_frame(with_state ? 112 : 96, uint32_t(ctx.lr), [&](uint32_t frame) {
@@ -468,51 +469,51 @@ void LayerConstructStep(PPCContext& ctx, uint8_t* base, bool with_state,
 
 }  // namespace
 
-void AppLayerConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppLayerConstruct) {
   LayerConstructStep(ctx, base, false, __imp__sub_820AD118);
 }
-void AppLayerConstructWithState(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppLayerConstructWithState) {
   LayerConstructStep(ctx, base, true, __imp__sub_820ADBD8);
 }
 
-void AppLayerAddChild(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppLayerAddChild) {
   const uint32_t layer = ctx.r3.u32, child = ctx.r4.u32;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
   if (!InOwnFrame(ctx, base, 112, calls, [&](uint32_t frame) {
         as::LayerAddChild(base, layer, child, frame, calls);
         return true;
       })) {
-    __imp__sub_820ADA08(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820ADA08);
     return;
   }
   ctx.r3.u64 = layer + as::kLayerChildren;
 }
 
-void AppStatesAddLayer(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppStatesAddLayer) {
   const uint32_t states = ctx.r3.u32, state = ctx.r4.u32;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
   if (!InOwnFrame(ctx, base, 112, calls, [&](uint32_t frame) {
         return as::StatesAddLayer(base, states, state, frame, calls);
       })) {
-    __imp__sub_820AE130(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AE130);
     return;
   }
   ctx.r3.u64 = guest::LoadU32(base, states + as::kStatesRoot) + as::kLayerChildren;
 }
 
-void AppStatesConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppStatesConstruct) {
   const uint32_t states = ctx.r3.u32, setup = ctx.r4.u32;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
   if (!InOwnFrame(ctx, base, 176, calls, [&](uint32_t frame) {
         return as::StatesConstruct(base, states, setup, frame, calls);
       })) {
-    __imp__sub_820AE348(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AE348);
     return;
   }
   ctx.r3.u64 = states;
 }
 
-void AppStatesCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppStatesCreate) {
   const uint32_t setup = ctx.r3.u32;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
   std::optional<uint32_t> states;
@@ -520,13 +521,13 @@ void AppStatesCreate(PPCContext& ctx, uint8_t* base) {
         states = as::StatesCreate(base, setup, frame, calls);
         return states.has_value();
       })) {
-    __imp__sub_820AE498(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AE498);
     return;
   }
   ctx.r3.u64 = *states;
 }
 
-void AppStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppStart) {
   const uint32_t interface = ctx.r3.u32;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
   std::optional<uint32_t> r3;
@@ -534,7 +535,7 @@ void AppStart(PPCContext& ctx, uint8_t* base) {
         r3 = as::AppStart(base, interface, frame, calls);
         return r3.has_value();
       })) {
-    __imp__sub_82092878(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82092878);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -542,7 +543,7 @@ void AppStart(PPCContext& ctx, uint8_t* base) {
 
 namespace {
 
-void ListForEachStep(PPCContext& ctx, uint8_t* base, bool ops) {
+void ListForEachStep(lifted::Regs& ctx, uint8_t* base, bool ops) {
   const uint32_t result = ctx.r3.u32;
   const uint64_t first = ctx.r4.u64, last = ctx.r5.u64, functor = ctx.r6.u64,
                  adjust = ctx.r7.u64;
@@ -553,7 +554,7 @@ void ListForEachStep(PPCContext& ctx, uint8_t* base, bool ops) {
   ctx.r3.u64 = result;
 }
 
-void UpdateChildStep(PPCContext& ctx, uint8_t* base, bool toggled) {
+void UpdateChildStep(lifted::Regs& ctx, uint8_t* base, bool toggled) {
   const uint32_t layer = ctx.r3.u32, child = ctx.r4.u32;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
   uint32_t answer = 0;
@@ -565,20 +566,20 @@ void UpdateChildStep(PPCContext& ctx, uint8_t* base, bool toggled) {
 
 }  // namespace
 
-void AppPtrListForEach(PPCContext& ctx, uint8_t* base) { ListForEachStep(ctx, base, false); }
-void AppOpListForEach(PPCContext& ctx, uint8_t* base) { ListForEachStep(ctx, base, true); }
-void AppUpdateChild(PPCContext& ctx, uint8_t* base) { UpdateChildStep(ctx, base, false); }
-void AppUpdateChildToggled(PPCContext& ctx, uint8_t* base) { UpdateChildStep(ctx, base, true); }
+ITC_REGS_STEP(AppPtrListForEach) { ListForEachStep(ctx, base, false); }
+ITC_REGS_STEP(AppOpListForEach) { ListForEachStep(ctx, base, true); }
+ITC_REGS_STEP(AppUpdateChild) { UpdateChildStep(ctx, base, false); }
+ITC_REGS_STEP(AppUpdateChildToggled) { UpdateChildStep(ctx, base, true); }
 
-void AppToggleOffChild(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppToggleOffChild) {
   const uint32_t layer = ctx.r3.u32, child = ctx.r4.u32;
   ctx.r3.u64 =
       as::ToggleOffChild(base, layer, child, uint32_t(ctx.lr), AppStatesCalls(ctx, base));
 }
 
-void AppLayerApplyOps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppLayerApplyOps) {
   if (!Heap()) {
-    __imp__sub_820ADE68(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820ADE68);
     return;
   }
   const uint32_t layer = ctx.r3.u32;
@@ -595,7 +596,7 @@ namespace {
 // The updates, from a 144-byte frame (the layer's own, or the one the slot
 // thunks and the stack's targets tail-call into).
 template <typename Update>
-void UpdateStep(PPCContext& ctx, uint8_t* base, Update update) {
+void UpdateStep(lifted::Regs& ctx, uint8_t* base, Update update) {
   const uint32_t r3 = ctx.r3.u32;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
   uint32_t answer = 0;
@@ -605,38 +606,38 @@ void UpdateStep(PPCContext& ctx, uint8_t* base, Update update) {
 
 }  // namespace
 
-void AppLayerUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppLayerUpdate) {
   UpdateStep(ctx, base, [&](uint32_t layer, uint32_t frame, const as::AppCalls& calls) {
     return as::LayerUpdate(base, layer, false, frame, calls);
   });
 }
-void AppLayerUpdateToggled(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppLayerUpdateToggled) {
   UpdateStep(ctx, base, [&](uint32_t layer, uint32_t frame, const as::AppCalls& calls) {
     return as::LayerUpdate(base, layer, true, frame, calls);
   });
 }
-void AppLayerStateUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppLayerStateUpdate) {
   UpdateStep(ctx, base, [&](uint32_t state, uint32_t frame, const as::AppCalls& calls) {
     return as::LayerStateUpdate(base, state, false, frame, calls);
   });
 }
-void AppLayerStateUpdateToggled(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppLayerStateUpdateToggled) {
   UpdateStep(ctx, base, [&](uint32_t state, uint32_t frame, const as::AppCalls& calls) {
     return as::LayerStateUpdate(base, state, true, frame, calls);
   });
 }
-void AppStatesOnUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppStatesOnUpdate) {
   UpdateStep(ctx, base, [&](uint32_t states, uint32_t frame, const as::AppCalls& calls) {
     return as::StatesOnUpdate(base, states, false, frame, calls);
   });
 }
-void AppStatesOnUpdateToggled(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppStatesOnUpdateToggled) {
   UpdateStep(ctx, base, [&](uint32_t states, uint32_t frame, const as::AppCalls& calls) {
     return as::StatesOnUpdate(base, states, true, frame, calls);
   });
 }
 
-void AppLayerApplyOp(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppLayerApplyOp) {
   const uint32_t layer = ctx.r3.u32;
   const uint64_t op = ctx.r4.u64;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
@@ -645,7 +646,7 @@ void AppLayerApplyOp(PPCContext& ctx, uint8_t* base) {
                  [&](uint32_t frame) { answer = as::LayerApplyOp(base, layer, op, frame, calls); });
   if (!answer) {
     ctx.r4.u64 = op;
-    __imp__sub_820ADC60(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820ADC60);
     return;
   }
   ctx.r3.u64 = *answer;
@@ -653,7 +654,7 @@ void AppLayerApplyOp(PPCContext& ctx, uint8_t* base) {
 
 namespace {
 
-void ToggleStep(PPCContext& ctx, uint8_t* base, bool off) {
+void ToggleStep(lifted::Regs& ctx, uint8_t* base, bool off) {
   const uint32_t layer = ctx.r3.u32;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
   uint32_t answer = 0;
@@ -664,20 +665,20 @@ void ToggleStep(PPCContext& ctx, uint8_t* base, bool off) {
 
 }  // namespace
 
-void AppLayerToggleOn(PPCContext& ctx, uint8_t* base) { ToggleStep(ctx, base, false); }
-void AppLayerToggleOff(PPCContext& ctx, uint8_t* base) { ToggleStep(ctx, base, true); }
+ITC_REGS_STEP(AppLayerToggleOn) { ToggleStep(ctx, base, false); }
+ITC_REGS_STEP(AppLayerToggleOff) { ToggleStep(ctx, base, true); }
 
-void AppToggleOnChild(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppToggleOnChild) {
   const uint32_t child = ctx.r4.u32;
   ctx.r3.u64 = as::ToggleOnChild(base, child, uint32_t(ctx.lr), AppStatesCalls(ctx, base));
 }
 
-void AppLayerStateToggleOff(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppLayerStateToggleOff) {
   const uint32_t state = ctx.r3.u32;
   ctx.r3.u64 = as::LayerStateToggleOff(base, state, uint32_t(ctx.lr), AppStatesCalls(ctx, base));
 }
 
-void AppStatesOnMessage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppStatesOnMessage) {
   const uint32_t states = ctx.r3.u32, message = ctx.r5.u32;
   const uint64_t r4 = ctx.r4.u64;
   const as::AppCalls calls = AppStatesCalls(ctx, base);
@@ -689,7 +690,7 @@ void AppStatesOnMessage(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = states;
     ctx.r4.u64 = r4;
     ctx.r5.u64 = message;
-    __imp__sub_820AE1C8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AE1C8);
     return;
   }
   ctx.r3.u64 = *answer;
@@ -718,12 +719,7 @@ void AppStatesOnMessage(PPCContext& ctx, uint8_t* base) {
 // walks' plain C++ call them).
 
 #define ITC_APP_STATES_ADAPTER(address, step) \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_app_states)) {       \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_app_states)) { \
     hooks::step(ctx, base);                   \
   }
 
@@ -747,13 +743,13 @@ ITC_APP_STATES_ADAPTER(82093DC0, AppUpdate)
 ITC_APP_STATES_ADAPTER(820AE130, AppStatesAddLayer)
 // AppStates::Create: the app's start-up harness's recorder first
 // (hooks/app_start_up.h: App::App's callees).
-extern "C" REX_FUNC(sub_820AE498) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820AE498) {
+  
   if (hooks::StartUpRecorded(ctx, 0x820AE498)) {
     return;
   }
   if (!ITC_FLAG(native_app_states)) {
-    __imp__sub_820AE498(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AE498);
     return;
   }
   hooks::AppStatesCreate(ctx, base);
@@ -776,11 +772,11 @@ ITC_APP_STATES_ADAPTER(820AE1C8, AppStatesOnMessage)
 // exist): r4's low word is a component (a delegate), whose vtable slot 1
 // it calls; logged as "component <address>" with that slot's target (a
 // delegate's, sub_8223A3F0 or sub_82233460, is at +8).
-extern "C" REX_FUNC(sub_82092968) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82092968) {
+  
   const auto run = [&] {
     if (!ITC_FLAG(native_app_states)) {
-      __imp__sub_82092968(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_82092968);
       return;
     }
     hooks::AppRunHandler(ctx, base);

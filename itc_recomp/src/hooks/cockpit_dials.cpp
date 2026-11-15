@@ -41,6 +41,7 @@
 // and poses with the translated code's on logic passes.
 
 #include "frame_pacing/game_messages.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
@@ -280,7 +281,7 @@ struct Check {
     angles++;
     angle_error = std::max(angle_error, std::fabs(native - game));
   }
-  void Pose(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t locals, float angle,
+  void Pose(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t locals, float angle,
             const Matrix4& car_world, const Matrix4& native) {
     uint32_t r1 = ctx.r1.u32;
     uint32_t scratch = frame - 0x200;  // four matrices and the angle
@@ -304,7 +305,7 @@ struct Check {
       pose_error = std::max(pose_error, std::fabs(native[i] - game[i]));
     }
   }
-  float GameDialAngle(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t range,
+  float GameDialAngle(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t range,
                       uint32_t kind, uint32_t car) {
     uint32_t r1 = ctx.r1.u32;
     ctx.r1.u32 = frame - 0x280;
@@ -313,7 +314,7 @@ struct Check {
     ctx.r1.u32 = r1;
     return float(ctx.f1.f64);
   }
-  std::array<float, 2> GameTachAngles(PPCContext& ctx, uint8_t* base, uint32_t frame,
+  std::array<float, 2> GameTachAngles(lifted::Regs& ctx, uint8_t* base, uint32_t frame,
                                       uint32_t table, uint32_t car, uint32_t dash_type) {
     uint32_t r1 = ctx.r1.u32;
     uint32_t out = frame - 0x200;
@@ -342,7 +343,7 @@ Check g_check;
 // tick's camera, and products pair across passes by it) at the original's
 // frame + 160, `lr` the original's return address (for diagnostics keyed by
 // caller); `world`, its pose for the frame, goes to the replay.
-void DrawNeedle(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t part, uint32_t camera,
+void DrawNeedle(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t part, uint32_t camera,
                 const Matrix4& drawn, const Matrix4& world, uint32_t lr) {
   uint32_t r1 = ctx.r1.u32;
   uint32_t world_at = frame + 160;
@@ -395,12 +396,7 @@ constexpr std::array<std::array<uint32_t, 3>, 2> kTachNeedles = {{
 
 // The dash's needles: r3 = the dash, r4 = the car, r5 = the camera passes.
 // In mode 5 ([dash + 4]) the second needle is the turbo gauge, from car + 704.
-extern "C" REX_FUNC(sub_820E45A8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_cockpit_dials)) {
-    __imp__sub_820E45A8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820E45A8, ITC_FLAG(native_cockpit_dials)) {
   uint32_t dash = ctx.r3.u32, car = ctx.r4.u32, camera = ctx.r5.u32 + kCameraOffset;
   uint32_t type = guest::LoadU32(base, dash);
   uint32_t frame = MakeFrame(base, ctx.r1.u32, kDialsFrame);
@@ -442,12 +438,7 @@ extern "C" REX_FUNC(sub_820E45A8) {
 // The tachometer's dash (one caller, sub_820E51D0): r3 = the dash, r4 = the
 // car, r5 = the camera passes. Its two angles from sub_820D3740: the
 // speedometer's and the tachometer's.
-extern "C" REX_FUNC(sub_820E42E8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_cockpit_dials)) {
-    __imp__sub_820E42E8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820E42E8, ITC_FLAG(native_cockpit_dials)) {
   uint32_t dash = ctx.r3.u32, car = ctx.r4.u32, camera = ctx.r5.u32 + kCameraOffset;
   uint32_t type = guest::LoadU32(base, dash);
   uint32_t table = guest::LoadU32(base, dash + kTachTable);

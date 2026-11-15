@@ -7,6 +7,7 @@
 // originals run.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "frame_passes/frame_passes.h"
@@ -52,14 +53,14 @@ bool hooks::NativeFramePasses() {
   }
 
 // FramePasses::FlipWorkMem: r3 not read, left as it came.
-extern "C" REX_FUNC(sub_82096218) {
+ITC_NATIVE_ENTRY_ALWAYS(82096218) {
   ITC_FRAME_PASSES_FALLBACK(82096218)
   fp::FlipWorkMem(base);
 }
 
 // The delegate thunk: r3 = the object; its slot 2 as a tail call (r12 the
 // vtable and r11 the target, as the original leaves them).
-extern "C" REX_FUNC(sub_82096350) {
+ITC_NATIVE_ENTRY_ALWAYS(82096350) {
   ITC_FRAME_PASSES_FALLBACK(82096350)
   const uint32_t target = fp::DelegateSlot2Target(base, ctx.r3.u32);
   ctx.r12.u64 = guest::LoadU32(base, ctx.r3.u32);
@@ -70,29 +71,29 @@ extern "C" REX_FUNC(sub_82096350) {
 
 // FramePasses::RecordConstants and RecordSamplers: r4 = the command list;
 // r3 the last slot, r4 = 1 (the count of the original's last AllocateSlots).
-extern "C" REX_FUNC(sub_82096360) {
+ITC_NATIVE_ENTRY_ALWAYS(82096360) {
   ITC_FRAME_PASSES_FALLBACK(82096360)
   const auto last = fp::RecordConstants(base, ctx.r4.u32);
   if (!last) {
-    __imp__sub_82096360(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82096360);
     return;
   }
   ctx.r3.u64 = *last;
   ctx.r4.u64 = 1;
 }
 
-extern "C" REX_FUNC(sub_82096030) {
+ITC_NATIVE_ENTRY_ALWAYS(82096030) {
   ITC_FRAME_PASSES_FALLBACK(82096030)
   const auto last = fp::RecordSamplers(base, ctx.r4.u32);
   if (!last) {
-    __imp__sub_82096030(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82096030);
     return;
   }
   ctx.r3.u64 = *last;
   ctx.r4.u64 = 1;
 }
 
-void hooks::FramePassesRecordPrimitiveReset(PPCContext& ctx, uint8_t* base) {
+void hooks::FramePassesRecordPrimitiveReset(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   bool done = false;
   guest_call::InFrame(ctx, base, fp::kRecordPrimitiveResetFrame, 0x82589A6C, [&](uint32_t) {
@@ -114,14 +115,14 @@ void hooks::FramePassesRecordPrimitiveReset(PPCContext& ctx, uint8_t* base) {
   });
   ctx.lr = lr;
   if (!done) {
-    __imp__sub_82589990(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82589990);
   }
 }
 
 
-void hooks::FramePassesJobWait(PPCContext& ctx, uint8_t* base) {
+void hooks::FramePassesJobWait(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_frame_passes)) {
-    __imp__sub_82094B10(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82094B10);
     return;
   }
   const uint32_t job = ctx.r3.u32;
@@ -150,9 +151,9 @@ void hooks::FramePassesJobWait(PPCContext& ctx, uint8_t* base) {
 // original's (the interface's and the renderer's getters, PostEffects::InitBoot
 // through its adapter's work); the device lock over the native video output
 // (the original without --native_video_output). r3 the video output.
-void hooks::FramePassesBoot(PPCContext& ctx, uint8_t* base) {
+void hooks::FramePassesBoot(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_frame_passes) || !ITC_FLAG(native_video_output)) {
-    __imp__sub_820962B8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820962B8);
     return;
   }
   const uint32_t passes = ctx.r3.u32;
@@ -184,17 +185,17 @@ void hooks::FramePassesBoot(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-extern "C" REX_FUNC(sub_820962B8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820962B8) {
+  
   hooks::FramePassesBoot(ctx, base);
 }
 
 // FramePasses::FramePasses: r3 = it, r4 = the block; the guest calls from a
 // 224-byte frame like the original's (the delegates and the key there, the
 // word it reads at its +164 read there); r3 it.
-void hooks::FramePassesConstruct(PPCContext& ctx, uint8_t* base) {
+void hooks::FramePassesConstruct(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_frame_passes)) {
-    __imp__sub_82098630(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82098630);
     return;
   }
   const uint32_t passes = ctx.r3.u32;
@@ -233,8 +234,8 @@ void hooks::FramePassesConstruct(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = passes;
 }
 
-extern "C" REX_FUNC(sub_82098630) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82098630) {
+  
   hooks::FramePassesConstruct(ctx, base);
 }
 
@@ -244,9 +245,9 @@ extern "C" REX_FUNC(sub_82098630) {
 // through their adapters' work. r3 as the last leaves it. The original
 // where the plain C++ declines (the getters then called again) or with the
 // command list's diagnostics on.
-void hooks::FramePassesRecord(PPCContext& ctx, uint8_t* base) {
+void hooks::FramePassesRecord(lifted::Regs& ctx, uint8_t* base) {
   if (!hooks::NativeFramePasses()) {
-    __imp__sub_82096418(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82096418);
     return;
   }
   const uint32_t passes = ctx.r3.u32;
@@ -289,11 +290,11 @@ void hooks::FramePassesRecord(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
   if (!done) {
     ctx.r3.u64 = passes;  // the getters left their answers
-    __imp__sub_82096418(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82096418);
   }
 }
 
-extern "C" REX_FUNC(sub_82096418) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82096418) {
+  
   hooks::FramePassesRecord(ctx, base);
 }

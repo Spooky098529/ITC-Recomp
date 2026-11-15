@@ -3,6 +3,7 @@
 // (hooks/scene.h).
 
 #include "hooks/scene.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "accessories/accessories.h"
@@ -56,7 +57,7 @@ namespace {
 
 // A guest function through the function table (its override when it has
 // one), from `r1` with `lr`, r3 and r4 set; r1 and lr put back.
-void GuestCall(PPCContext& ctx, uint8_t* base, uint32_t function, uint32_t r1, uint32_t lr,
+void GuestCall(lifted::Regs& ctx, uint8_t* base, uint32_t function, uint32_t r1, uint32_t lr,
                uint64_t r3, uint64_t r4) {
   const uint64_t stack = ctx.r1.u64, link = ctx.lr;
   ctx.r1.u64 = r1;
@@ -70,7 +71,7 @@ void GuestCall(PPCContext& ctx, uint8_t* base, uint32_t function, uint32_t r1, u
 
 // The pool objects' deleting destructors: slot 0 of the object's vtable,
 // r4 = the flags, from `frame` with `lr`.
-scene::DestroyCall Destroyer(PPCContext& ctx, uint8_t* base, uint32_t lr) {
+scene::DestroyCall Destroyer(lifted::Regs& ctx, uint8_t* base, uint32_t lr) {
   return [&ctx, base, lr](uint32_t object, uint32_t flags, uint32_t frame) {
     const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object));
     GuestCall(ctx, base, function, frame, lr, object, flags);
@@ -79,12 +80,12 @@ scene::DestroyCall Destroyer(PPCContext& ctx, uint8_t* base, uint32_t lr) {
 
 }  // namespace
 
-void SceneSetUpConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneSetUpConstruct) {
   scene::SetUpConstruct(base, ctx.r3.u32);
   ctx.r11.u64 = 0;
 }
 
-void SceneFreePagesIn(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneFreePagesIn) {
   if (hooks::NativeHeapActive()) {
     if (const auto r3 = scene::FreePagesIn(base, ctx.r3.u32)) {
       ctx.r3.u64 = *r3;
@@ -94,17 +95,17 @@ void SceneFreePagesIn(PPCContext& ctx, uint8_t* base) {
   lifted::original::c820D09A0(ctx, base);
 }
 
-void SceneStartTeardownA(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneStartTeardownA) {
   scene::StartTeardownA(base);
 }
 
-void SceneStartTeardown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneStartTeardown) {
   // ReleaseAll runs only when the scene exists.
   const uint32_t set = guest::LoadU32(base, accessories::kSet);
   if (guest::LoadU32(base, scene::kScene) != 0 &&
       (set == 0 || !ITC_FLAG(native_accessories) || !AccessoriesNativeLoads() ||
        !ModelsNativeLifetime() || !accessories::SetReleasable(base, set))) {
-    __imp__sub_820C4D88(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820C4D88);
     return;
   }
   const auto r3 = scene::StartTeardown(base, [&](uint32_t set) -> uint64_t {
@@ -116,13 +117,13 @@ void SceneStartTeardown(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void SceneSetInteriorWord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneSetInteriorWord) {
   if (const auto r3 = scene::SetInteriorWord(base, ctx.r3.u32, ctx.r4.u32)) {
     ctx.r3.u64 = *r3;
   }
 }
 
-void SceneLoadsDone(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneLoadsDone) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = scene::LoadsDone(
       base, ctx.r3.u32, ctx.r1.u32,
@@ -133,9 +134,9 @@ void SceneLoadsDone(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
 }
 
-void SceneDestroyA(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneDestroyA) {
   if (!hooks::NativeHeapActive() || !scene::DestroyAFreeable(base, ctx.r3.u32)) {
-    __imp__sub_820C3CF8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820C3CF8);
     return;
   }
   scene::DestroyA(base, ctx.r3.u32, ctx.r1.u32, [&](uint32_t object, uint32_t frame) {
@@ -145,54 +146,54 @@ void SceneDestroyA(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = 0;
 }
 
-void SceneAssetsConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneAssetsConstruct) {
   if (!ModelsNativeLifetime() || !scene::AssetsConstruct(base, ctx.r3.u32)) {
-    __imp__sub_820C5008(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820C5008);
   }
 }
 
-void SceneCarSceneConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneCarSceneConstruct) {
   if (!ModelsNativeLifetime() || !scene::CarSceneConstruct(base, ctx.r3.u32)) {
-    __imp__sub_820C89A8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820C89A8);
     return;
   }
   ctx.fpscr.disableFlushMode();
 }
 
-void SceneAssetsReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneAssetsReset) {
   if (ModelsNativeLifetime()) {
     if (const auto r3 = scene::AssetsReset(base, ctx.r3.u32)) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  __imp__sub_820C4A70(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820C4A70);
 }
 
-void SceneAssetsDestruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneAssetsDestruct) {
   if (ModelsNativeLifetime()) {
     if (const auto r3 = scene::AssetsDestruct(base, ctx.r3.u32)) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  __imp__sub_820C5168(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820C5168);
 }
 
-void SceneListDeleteAll(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneListDeleteAll) {
   scene::ListDeleteAll(base, ctx.r3.u32, ctx.r1.u32, Destroyer(ctx, base, 0x8259402C));
   ctx.r3.u64 = 0;
 }
 
-void SceneListDestruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneListDestruct) {
   scene::ListDestruct(base, ctx.r3.u32, ctx.r1.u32, Destroyer(ctx, base, 0x8259402C));
   ctx.r3.u64 = 0;
 }
 
-void SceneCarSceneDestruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneCarSceneDestruct) {
   if (!ModelsNativeLifetime() ||
       !scene::CarSceneDestructible(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_820C9110(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820C9110);
     return;
   }
   const auto r3 = scene::CarSceneDestruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
@@ -200,9 +201,9 @@ void SceneCarSceneDestruct(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;
 }
 
-void SceneUpdateA(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneUpdateA) {
   if (!hooks::NativeHeapActive() || !scene::UpdateANative(base)) {
-    __imp__sub_820C3DA0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820C3DA0);
     return;
   }
   const auto texture_free = [&](uint32_t header_in, uint32_t data_in,
@@ -225,12 +226,12 @@ void SceneUpdateA(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3 ? *r3 : r3_in;
 }
 
-void SceneInitLighting(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneInitLighting) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = scene::InitLighting(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void SceneAssetsRelease(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneAssetsRelease) {
   if (ModelsNativeLifetime()) {
     const auto r3 = scene::AssetsRelease(base, ctx.r3.u32, [&](uint32_t at) {
       // FreePagesIn's original, from Release's 128-byte frame.
@@ -248,30 +249,30 @@ void SceneAssetsRelease(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_820C4C80(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820C4C80);
 }
 
-void SceneCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneCreate) {
   if (!hooks::NativeHeapActive() || !ModelsNativeLifetime() || !scene::CreateNative(base)) {
-    __imp__sub_820C8A50(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820C8A50);
     return;
   }
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = scene::Create(base, ctx.r1.u32);
 }
 
-void SceneLoadAssets(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneLoadAssets) {
   if (!hooks::NativeHeapActive() || !NativeArchiveQueue()) {
-    __imp__sub_820C8B40(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820C8B40);
     return;
   }
   ctx.r3.u64 = scene::LoadAssets(base, ctx.r3.u32, ctx.r13.u32, NativeArchiveLoad(base));
 }
 
-void SceneOnFileLoaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneOnFileLoaded) {
   const uint32_t request = ctx.r3.u32, data = ctx.r4.u32, scene_at = ctx.r6.u32;
   if (!ModelsNativeLifetime() || !scene::FileLoadedNative(base, request, scene_at)) {
-    __imp__sub_820C52A0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820C52A0);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -294,7 +295,7 @@ void SceneOnFileLoaded(PPCContext& ctx, uint8_t* base) {
       ctx.r3.u64 = xpr;
       ctx.r4.u64 = file;
       ctx.lr = 0x820C52D0;
-      __imp__sub_82596F68(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_82596F68);
     };
     calls.provider_set = [&](uint32_t provider, uint32_t xpr) -> uint64_t {
       ctx.r3.u64 = provider;
@@ -310,7 +311,7 @@ void SceneOnFileLoaded(PPCContext& ctx, uint8_t* base) {
       ctx.r5.u64 = buffer_at;
       ctx.r6.u64 = pixels;
       ctx.lr = 0x820C54F0;
-      __imp__sub_820ED020(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_820ED020);
     };
     r3 = scene::FileLoaded(base, request, data, scene_at, stack, calls);
   });
@@ -324,9 +325,9 @@ namespace {
 
 // A register step (or an original) from `frame` with `lr`, r3 and r4 set;
 // r1 and lr put back. Returns the r3 it leaves.
-using Step = void (*)(PPCContext&, uint8_t*);
+using Step = void (*)(lifted::Regs&, uint8_t*);
 
-uint64_t StepCall(PPCContext& ctx, uint8_t* base, Step step, uint32_t frame, uint32_t lr,
+uint64_t StepCall(lifted::Regs& ctx, uint8_t* base, Step step, uint32_t frame, uint32_t lr,
                   uint64_t r3, uint64_t r4) {
   const uint64_t stack = ctx.r1.u64, link = ctx.lr;
   ctx.r1.u64 = frame;
@@ -341,7 +342,7 @@ uint64_t StepCall(PPCContext& ctx, uint8_t* base, Step step, uint32_t frame, uin
 
 // VirtualFree(pages, 0, MEM_RELEASE) as its adapter does it, else the
 // original from `frame`.
-uint64_t FreePages(PPCContext& ctx, uint8_t* base, uint32_t pages, uint32_t frame, uint32_t lr) {
+uint64_t FreePages(lifted::Regs& ctx, uint8_t* base, uint32_t pages, uint32_t frame, uint32_t lr) {
   if (const auto r3 = hooks::VirtualFree(pages, 0, 0x8000, lr)) {
     return *r3;
   }
@@ -359,7 +360,7 @@ uint64_t FreePages(PPCContext& ctx, uint8_t* base, uint32_t pages, uint32_t fram
 
 }  // namespace
 
-void SceneDestroyB(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneDestroyB) {
   const uint64_t lr = ctx.lr;
   scene::DestroyB(
       base, ctx.r3.u32, ctx.r1.u32,
@@ -378,13 +379,13 @@ void SceneDestroyB(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = 0;
 }
 
-void SceneUpdateModels(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneUpdateModels) {
   const uint64_t lr = ctx.lr, r3_in = ctx.r3.u64;
   const auto r3 = scene::UpdateModels(base, ctx.r3.u32, ctx.r1.u32,
                                       [&](uint32_t model, uint32_t frame) {
                                         return StepCall(ctx, base,
                                                         ITC_FLAG(native_scene_models)
-                                                            ? hooks::SceneModelUpdate
+                                                            ? ITC_REGS_FN(hooks::SceneModelUpdate)
                                                             : __imp__sub_820DA180,
                                                         frame, 0x820C5A9C, model, ctx.r4.u64);
                                       });
@@ -392,7 +393,7 @@ void SceneUpdateModels(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3.value_or(r3_in);
 }
 
-void SceneUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneUpdate) {
   const uint64_t lr = ctx.lr;
   scene::UpdateCalls calls;
   calls.finish = [&](uint32_t function, uint32_t frame, uint32_t return_address, uint32_t r3,
@@ -411,22 +412,22 @@ void SceneUpdate(PPCContext& ctx, uint8_t* base) {
     return FreePages(ctx, base, scene, frame, 0x820C9684);
   };
   calls.release = [&](uint32_t assets, uint32_t frame) {
-    return StepCall(ctx, base, SceneAssetsRelease, frame, 0x820C9664, assets, ctx.r4.u64);
+    return StepCall(ctx, base, ITC_REGS_FN(SceneAssetsRelease), frame, 0x820C9664, assets, ctx.r4.u64);
   };
   calls.destruct = [&](uint32_t scene, uint32_t frame) {
-    return StepCall(ctx, base, SceneCarSceneDestruct, frame, 0x820C9670, scene, 0);
+    return StepCall(ctx, base, ITC_REGS_FN(SceneCarSceneDestruct), frame, 0x820C9670, scene, 0);
   };
   calls.update_models = [&](uint32_t scene, uint32_t frame) {
     return StepCall(ctx, base,
-                    ITC_FLAG(native_vehicle_accessors) ? SceneUpdateModels : __imp__sub_820C5A60,
+                    ITC_FLAG(native_vehicle_accessors) ? ITC_REGS_FN(SceneUpdateModels) : __imp__sub_820C5A60,
                     frame, 0x820C96A4, scene, ctx.r4.u64);
   };
   calls.update_a = [&](uint64_t r3, uint32_t frame) {
-    return StepCall(ctx, base, SceneUpdateA, frame, 0x820C96B4, r3, ctx.r4.u64);
+    return StepCall(ctx, base, ITC_REGS_FN(SceneUpdateA), frame, 0x820C96B4, r3, ctx.r4.u64);
   };
   calls.accessories_destroy = [&](uint32_t frame) {
     return StepCall(ctx, base,
-                    ITC_FLAG(native_accessories) ? AccessoriesDestroy : __imp__sub_820F1078,
+                    ITC_FLAG(native_accessories) ? ITC_REGS_FN(AccessoriesDestroy) : __imp__sub_820F1078,
                     frame, 0x820C96D0, ctx.r3.u64, ctx.r4.u64);
   };
   const uint64_t r3 = scene::Update(base, ctx.r1.u32, ctx.r3.u64, calls);
@@ -440,12 +441,7 @@ void SceneUpdate(PPCContext& ctx, uint8_t* base) {
 // off.
 
 #define ITC_SCENE(address, step)       \
-  extern "C" REX_FUNC(sub_##address) { \
-    REX_FUNC_PROLOGUE();               \
-    if (!ITC_FLAG(native_scene)) {     \
-      __imp__sub_##address(ctx, base); \
-      return;                          \
-    }                                  \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_scene)) { \
     hooks::step(ctx, base);            \
   }
 

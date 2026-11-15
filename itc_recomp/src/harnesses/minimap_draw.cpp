@@ -273,7 +273,7 @@ void MinimapDrawCases(Context& h) {
       t.r4.u64 = w.other + kDescription;
       t.r24.u64 = w.r24;
       const uint32_t mark = exit_table::Mark(h.base);
-      (v == 0 ? RecompiledDraw : hooks::MinimapDraw)(t, h.base);
+      (v == 0 ? ITC_CONTEXT_FN(RecompiledDraw) : ITC_CONTEXT_FN(hooks::MinimapDraw))(t, h.base);
       out[v].Bytes(Read(h.base, w.other, kOtherBytes));
       for (const Area& a : kGlobals) {
         out[v].Bytes(Read(h.base, a.from, a.bytes));

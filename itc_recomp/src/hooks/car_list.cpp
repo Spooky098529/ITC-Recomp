@@ -3,6 +3,7 @@
 // (hooks/car_list.h).
 
 #include "hooks/car_list.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -81,7 +82,7 @@ namespace {
 // The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -91,7 +92,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -112,7 +113,7 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
@@ -120,7 +121,7 @@ class GuestCalls {
 }  // namespace
 
 #define ITC_CL_STEP(name, expression)          \
-  void name(PPCContext& ctx, uint8_t* base) {  \
+  ITC_REGS_STEP(name) {  \
     GuestCalls guest(ctx, base);               \
     const car_list::Calls calls = guest.calls(); \
     (void)calls;                               \
@@ -208,7 +209,7 @@ ITC_CL_STEP(CarListOpen, cl::Open(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListBaseFree, cl::Free(base, ctx.r3.u64, sp, calls))
 // PanelSet::Free and HandleInput are tail calls of the base's on the set
 // + 4, with no plain C++ of their own: their prints are here.
-void CarListSetFree(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarListSetFree) {
   ITC_NATIVE_RUNNING("sub_8224B880 PanelSet::Free");
   GuestCalls guest(ctx, base);
   const car_list::Calls calls = guest.calls();
@@ -216,7 +217,7 @@ void CarListSetFree(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cl::Free(base, ctx.r3.u64 + 4, sp, calls);
 }
 ITC_CL_STEP(CarListBaseHandleInput, cl::HandleInput(base, ctx.r3.u64, sp, calls))
-void CarListSetHandleInput(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarListSetHandleInput) {
   ITC_NATIVE_RUNNING("sub_8224CA28 PanelSet::HandleInput");
   GuestCalls guest(ctx, base);
   const car_list::Calls calls = guest.calls();
@@ -253,7 +254,7 @@ ITC_CL_STEP(CarListDrawAll, cl::DrawAll(base, sp, calls))
 ITC_CL_STEP(CarListUpdateStand, cl::UpdateStand(base, ctx.r3.u64, sp, calls))
 ITC_CL_STEP(CarListBaseUpdate, cl::Update(base, ctx.r3.u64, sp, calls))
 // PanelSet::Update: a tail call of the base's on the set + 4.
-void CarListSetUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarListSetUpdate) {
   ITC_NATIVE_RUNNING("sub_8224CF18 PanelSet::Update");
   GuestCalls guest(ctx, base);
   const car_list::Calls calls = guest.calls();
@@ -261,7 +262,7 @@ void CarListSetUpdate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cl::Update(base, ctx.r3.u64 + 4, sp, calls);
 }
 // PanelSet::Build: a tail call of the base's on the set + 4.
-void CarListSetBuild(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarListSetBuild) {
   ITC_NATIVE_RUNNING("sub_8224CAD8 PanelSet::Build");
   GuestCalls guest(ctx, base);
   const car_list::Calls calls = guest.calls();
@@ -294,12 +295,7 @@ ITC_CL_STEP(CarListPairPicked, cl::PairPicked(base, ctx.r3.u32))
 }  // namespace hooks
 
 #define ITC_CAR_LIST(address, step)       \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_car_list)) {     \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_list)) { \
     hooks::step(ctx, base);               \
   }
 
@@ -399,10 +395,10 @@ ITC_CAR_LIST(8224B8D8, CarListCarPage)
 // PanelSetPair's, never seen in play, the original's): the original when the
 // car makers' callees aren't native (SetUpColors' and ShowStandCar's plain
 // C++).
-extern "C" REX_FUNC(sub_8224C450) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8224C450) {
+  
   if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {
-    __imp__sub_8224C450(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8224C450);
     return;
   }
   hooks::CarListStep17(ctx, base);
@@ -415,8 +411,8 @@ extern "C" REX_FUNC(sub_8224C450) {
 // two type 6 callers, not seen in play, run its original; the register steps
 // stay for the harness).
 #define ITC_CAR_LIST_STAND(address, step)                                                     \
-  extern "C" REX_FUNC(sub_##address) {                                                       \
-    REX_FUNC_PROLOGUE();                                                                     \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                                       \
+    \
     if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {      \
       __imp__sub_##address(ctx, base);                                                       \
       return;                                                                                \

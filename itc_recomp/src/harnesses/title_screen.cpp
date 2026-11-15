@@ -547,15 +547,15 @@ void InitMachine(PPCContext& t, Random& r, const World& w) {
 
 void Inits(Context& h, const World& w) {
   // Their frames but their saves (r27 on) compared.
-  Run(h, w, {"TitleLoad::Init (sub_822213B0)", 24, __imp__sub_822213B0, hooks::TitleLoadInit,
+  Run(h, w, {"TitleLoad::Init (sub_822213B0)", 24, __imp__sub_822213B0, ITC_CONTEXT_FN(hooks::TitleLoadInit),
              {{-912, -48}}, InitMachine});
   Run(h, w, {"TitleScreen::Init (sub_82224270)", 24, __imp__sub_82224270,
-             hooks::TitleScreenInit, {{-1232, -48}}, InitMachine});
+             ITC_CONTEXT_FN(hooks::TitleScreenInit), {{-1232, -48}}, InitMachine});
 }
 
 void TitleLoad(Context& h, const World& w) {
   // Create: the block VirtualAlloc made compared by content.
-  Run(h, w, {"TitleLoad::Create (sub_82220BA8)", 60, __imp__sub_82220BA8, hooks::TitleLoadCreate,
+  Run(h, w, {"TitleLoad::Create (sub_82220BA8)", 60, __imp__sub_82220BA8, ITC_CONTEXT_FN(hooks::TitleLoadCreate),
              {{-112, -24}}, Machine,
              [&h](PPCContext& t, const World&, Outputs& out) {
                // r3 the block's address (VirtualAlloc's).
@@ -565,25 +565,25 @@ void TitleLoad(Context& h, const World& w) {
              }});
   // Destroy: the block the layer's pages (whether it was freed compared).
   Run(h, w, {"TitleLoad::Destroy (sub_82220468)", 60, __imp__sub_82220468,
-             hooks::TitleLoadDestroy, {{-96, -16}},
+             ITC_CONTEXT_FN(hooks::TitleLoadDestroy), {{-96, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                guest::StoreU32(w.base, ts::kLoadBlock, MakePages(w.base, 68, r));
              }});
   Run(h, w, {"TitleLoad::OpenMovie (sub_822204B0)", 20, __imp__sub_822204B0,
-             hooks::TitleLoadOpenMovie, {}, Machine});
+             ITC_CONTEXT_FN(hooks::TitleLoadOpenMovie), {}, Machine});
   Run(h, w, {"TitleLoad::WaitForMovie (sub_82220C18)", 100, __imp__sub_82220C18,
-             hooks::TitleLoadWaitForMovie, {{-96, -16}}, Machine});
+             ITC_CONTEXT_FN(hooks::TitleLoadWaitForMovie), {{-96, -16}}, Machine});
   // Start: BootData::Load recorded (RecordOpen).
-  Run(h, w, {"TitleLoad::Start (sub_82220C88)", 40, __imp__sub_82220C88, hooks::TitleLoadStart,
+  Run(h, w, {"TitleLoad::Start (sub_82220C88)", 40, __imp__sub_82220C88, ITC_CONTEXT_FN(hooks::TitleLoadStart),
              {{-96, -8}}, Machine});
   Run(h, w, {"TitleLoad::Unload (sub_82220EF8)", 60, __imp__sub_82220EF8,
-             hooks::TitleLoadUnload, {{-112, -16}}, Machine});
+             ITC_CONTEXT_FN(hooks::TitleLoadUnload), {{-112, -16}}, Machine});
   Run(h, w, {"TitleLoad::OpenTitle (sub_82220F60)", 40, __imp__sub_82220F60,
-             hooks::TitleLoadOpenTitle, {}, Machine});
+             ITC_CONTEXT_FN(hooks::TitleLoadOpenTitle), {}, Machine});
   // Leave: now and then no movie found (the pairs not there, the missing
   // movie 0).
-  Run(h, w, {"TitleLoad::Leave (sub_82220FC8)", 60, __imp__sub_82220FC8, hooks::TitleLoadLeave,
+  Run(h, w, {"TitleLoad::Leave (sub_82220FC8)", 60, __imp__sub_82220FC8, ITC_CONTEXT_FN(hooks::TitleLoadLeave),
              {{-112, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
@@ -593,20 +593,20 @@ void TitleLoad(Context& h, const World& w) {
                }
              }});
   Run(h, w, {"TitleLoad::PostClose (sub_82221078)", 40, __imp__sub_82221078,
-             hooks::TitleLoadPostClose, {}, Mode});
+             ITC_CONTEXT_FN(hooks::TitleLoadPostClose), {}, Mode});
   Run(h, w, {"TitleLoad::WaitForArchive (sub_822204C0)", 20, __imp__sub_822204C0,
-             hooks::TitleLoadWaitForArchive, {{-96, -8}}, Mode});
+             ITC_CONTEXT_FN(hooks::TitleLoadWaitForArchive), {{-96, -8}}, Mode});
   // PlayLogo: r3 the block's started word.
   Run(h, w, {"TitleLoad::PlayLogo (sub_822210C8)", 100, __imp__sub_822210C8,
-             hooks::TitleLoadPlayLogo, {{-112, -24}},
+             ITC_CONTEXT_FN(hooks::TitleLoadPlayLogo), {{-112, -24}},
              [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.at(kLoadBlockAt) + 16; }});
   // Draw: the page -1, 4 or 5; only its own frame compared.
-  Run(h, w, {"TitleLoad::Draw (sub_82221198)", 100, __imp__sub_82221198, hooks::TitleLoadDraw,
+  Run(h, w, {"TitleLoad::Draw (sub_82221198)", 100, __imp__sub_82221198, ITC_CONTEXT_FN(hooks::TitleLoadDraw),
              {{-112, -8}}, Machine});
   // Update: the transition -1 or 0 to 12 (the debug sequence's steps and
   // PlayLogo); its frame without its saves (r24 on).
   Run(h, w, {"TitleLoad::Update (sub_82221228)", 200, __imp__sub_82221228,
-             hooks::TitleLoadUpdate, {{-208, -72}}, Machine});
+             ITC_CONTEXT_FN(hooks::TitleLoadUpdate), {{-208, -72}}, Machine});
 }
 
 // The title's words: +4 (the main menu's item) 0 to 9, +16 (from the boot)
@@ -619,7 +619,7 @@ void Words(Random& r, const World& w) {
 void ScreenHandlers(Context& h, const World& w) {
   // Create: the four blocks VirtualAlloc made compared by content.
   Run(h, w, {"TitleScreen::Create (sub_82221D98)", 60, __imp__sub_82221D98,
-             hooks::TitleScreenCreate, {{-112, -40}}, Machine,
+             ITC_CONTEXT_FN(hooks::TitleScreenCreate), {{-112, -40}}, Machine,
              [&h](PPCContext& t, const World&, Outputs& out) {
                // r3 the title's words' address (the last VirtualAlloc's).
                out.Word(t.r3.u32 == guest::LoadU32(h.base, ts::kWords) ? 1 : 0);
@@ -633,7 +633,7 @@ void ScreenHandlers(Context& h, const World& w) {
   // (whether each was freed compared); the item 0 to 9, the list's
   // selection 2 or not.
   Run(h, w, {"TitleScreen::Destroy (sub_82221EC0)", 100, __imp__sub_82221EC0,
-             hooks::TitleScreenDestroy, {{-128, -40}},
+             ITC_CONTEXT_FN(hooks::TitleScreenDestroy), {{-128, -40}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                Machine(t, r, w);
@@ -648,35 +648,35 @@ void ScreenHandlers(Context& h, const World& w) {
                guest::StoreU32(base, ts::kWords, words);
              }});
   Run(h, w, {"TitleScreen::OpenMovie (sub_82221990)", 20, __imp__sub_82221990,
-             hooks::TitleScreenOpenMovie, {}, Machine});
+             ITC_CONTEXT_FN(hooks::TitleScreenOpenMovie), {}, Machine});
   Run(h, w, {"TitleScreen::WaitForMovie (sub_82221FC8)", 100, __imp__sub_82221FC8,
-             hooks::TitleScreenWaitForMovie, {{-96, -16}}, Machine});
+             ITC_CONTEXT_FN(hooks::TitleScreenWaitForMovie), {{-96, -16}}, Machine});
   // SetUp: the movie's seven texts; its frame without SetText's parameter
   // area (+48 to +79: r7 on, the original's leftovers) and its saves.
   Run(h, w, {"TitleScreen::SetUp (sub_82222A50)", 100, __imp__sub_82222A50,
-             hooks::TitleScreenSetUp, {{-176, -128}, {-96, -40}},
+             ITC_CONTEXT_FN(hooks::TitleScreenSetUp), {{-176, -128}, {-96, -40}},
              [](PPCContext&, Random& r, const World& w) { Words(r, w); }});
   // Start: how the title was entered 0 to 3, the sound manager; its frame
   // and SetUp's below it, without SetText's parameter area and SetUp's
   // saves.
   Run(h, w, {"TitleScreen::Start (sub_82223AB8; sub_82222A50)", 100, __imp__sub_82223AB8,
-             hooks::TitleScreenStart, {{-112, -16}, {-288, -240}, {-208, -152}},
+             ITC_CONTEXT_FN(hooks::TitleScreenStart), {{-112, -16}, {-288, -240}, {-208, -152}},
              [](PPCContext&, Random& r, const World& w) {
                Words(r, w);
                SoundManager(r, w);
              }});
   Run(h, w, {"TitleScreen::Unload (sub_822224D0)", 60, __imp__sub_822224D0,
-             hooks::TitleScreenUnload, {{-112, -24}}, Machine});
+             ITC_CONTEXT_FN(hooks::TitleScreenUnload), {{-112, -24}}, Machine});
   // OpenNext: the list's selection 6 or not.
   Run(h, w, {"TitleScreen::OpenNext (sub_82222538)", 60, __imp__sub_82222538,
-             hooks::TitleScreenOpenNext, {{-112, -24}},
+             ITC_CONTEXT_FN(hooks::TitleScreenOpenNext), {{-112, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                guest::StoreU32(w.base, w.at(kListAt) + 16, r.Below(2) == 0 ? 6 : r.Below(8));
              }});
   // Leave: now and then no movie found.
   Run(h, w, {"TitleScreen::Leave (sub_822225D8)", 60, __imp__sub_822225D8,
-             hooks::TitleScreenLeave, {{-112, -16}},
+             ITC_CONTEXT_FN(hooks::TitleScreenLeave), {{-112, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                if (r.Below(3) == 0) {
@@ -685,19 +685,19 @@ void ScreenHandlers(Context& h, const World& w) {
                }
              }});
   Run(h, w, {"TitleScreen::OnGameDataLoaded (sub_822219A0)", 40, __imp__sub_822219A0,
-             hooks::TitleScreenOnGameDataLoaded, {}, Machine});
+             ITC_CONTEXT_FN(hooks::TitleScreenOnGameDataLoaded), {}, Machine});
   Run(h, w, {"TitleScreen::OnInterrupt (sub_82221A78)", 10, __imp__sub_82221A78,
-             hooks::TitleScreenOnInterrupt, {}, Machine});
+             ITC_CONTEXT_FN(hooks::TitleScreenOnInterrupt), {}, Machine});
   Run(h, w, {"TitleScreen::OnResume (sub_82221A90)", 10, __imp__sub_82221A90,
-             hooks::TitleScreenOnResume, {}, Machine,
+             ITC_CONTEXT_FN(hooks::TitleScreenOnResume), {}, Machine,
              [&h](PPCContext&, const World&, Outputs& out) {
                out.Bytes(Read(h.base, ts::kSystemChecks, 16));
              }});
   Run(h, w, {"TitleScreen::LoadGameData (sub_82222688)", 40, __imp__sub_82222688,
-             hooks::TitleScreenLoadGameData, {}, Mode});
+             ITC_CONTEXT_FN(hooks::TitleScreenLoadGameData), {}, Mode});
   // LeavePage: the item 0 to 9.
   Run(h, w, {"TitleScreen::LeavePage (sub_822229D0)", 60, __imp__sub_822229D0,
-             hooks::TitleScreenLeavePage, {},
+             ITC_CONTEXT_FN(hooks::TitleScreenLeavePage), {},
              [](PPCContext& t, Random& r, const World& w) {
                Words(r, w);
                t.r3.u64 = w.mode();
@@ -706,7 +706,7 @@ void ScreenHandlers(Context& h, const World& w) {
   // Draw: the page -1, 1 or 5 (LoadGameData, LeavePage); only its own frame
   // compared.
   Run(h, w, {"TitleScreen::Draw (sub_82223A18)", 100, __imp__sub_82223A18,
-             hooks::TitleScreenDraw, {{-128, -16}},
+             ITC_CONTEXT_FN(hooks::TitleScreenDraw), {{-128, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                Words(r, w);
                t.r3.u64 = w.machine() | (uint64_t(r.Below(2)) << 32);
@@ -719,7 +719,7 @@ void ScreenHandlers(Context& h, const World& w) {
   // one -1 or small, the started word 0 or not; only its own frame compared
   // (r19 on saved).
   Run(h, w, {"TitleScreen::Update (sub_822240B0)", 300, __imp__sub_822240B0,
-             hooks::TitleScreenUpdateTransitions, {{-288, -112}},
+             ITC_CONTEXT_FN(hooks::TitleScreenUpdateTransitions), {{-288, -112}},
              [](PPCContext&, Random& r, const World& w) {
                uint8_t* base = w.base;
                const uint32_t pages = w.at(kPagesAt);
@@ -839,39 +839,39 @@ void Transitions(Context& h, const World& w) {
     int32_t saves;
   };
   const Case cases[] = {
-      {"TitleScreen::Intro (sub_82222B60)", __imp__sub_82222B60, hooks::TitleScreenIntro, 112, 24},
+      {"TitleScreen::Intro (sub_82222B60)", __imp__sub_82222B60, ITC_CONTEXT_FN(hooks::TitleScreenIntro), 112, 24},
       {"TitleScreen::PressStartLoop (sub_82222BF8)", __imp__sub_82222BF8,
-       hooks::TitleScreenPressStartLoop, 112, 24},
+       ITC_CONTEXT_FN(hooks::TitleScreenPressStartLoop), 112, 24},
       {"TitleScreen::Transition2 (sub_82222C90)", __imp__sub_82222C90,
-       hooks::TitleScreenTransition2, 112, 24},
+       ITC_CONTEXT_FN(hooks::TitleScreenTransition2), 112, 24},
       {"TitleScreen::LeavePressStart (sub_82222D40)", __imp__sub_82222D40,
-       hooks::TitleScreenLeavePressStart, 112, 24},
+       ITC_CONTEXT_FN(hooks::TitleScreenLeavePressStart), 112, 24},
       {"TitleScreen::ShowMainMenu (sub_82223B78)", __imp__sub_82223B78,
-       hooks::TitleScreenShowMainMenu, 128, 40},
+       ITC_CONTEXT_FN(hooks::TitleScreenShowMainMenu), 128, 40},
       {"TitleScreen::ShowMainMenuAtOnce (sub_82223C38)", __imp__sub_82223C38,
-       hooks::TitleScreenShowMainMenuAtOnce, 128, 40},
+       ITC_CONTEXT_FN(hooks::TitleScreenShowMainMenuAtOnce), 128, 40},
       {"TitleScreen::HighlightMain (sub_82222DD0)", __imp__sub_82222DD0,
-       hooks::TitleScreenHighlightMain, 112, 24},
+       ITC_CONTEXT_FN(hooks::TitleScreenHighlightMain), 112, 24},
       {"TitleScreen::MoveMainCursor (sub_82222E88)", __imp__sub_82222E88,
-       hooks::TitleScreenMoveMainCursor, 160, 64},
+       ITC_CONTEXT_FN(hooks::TitleScreenMoveMainCursor), 160, 64},
       {"TitleScreen::Transition9 (sub_82223050)", __imp__sub_82223050,
-       hooks::TitleScreenTransition9, 160, 64},
+       ITC_CONTEXT_FN(hooks::TitleScreenTransition9), 160, 64},
       {"TitleScreen::Transition10 (sub_822231B0)", __imp__sub_822231B0,
-       hooks::TitleScreenTransition10, 160, 64},
+       ITC_CONTEXT_FN(hooks::TitleScreenTransition10), 160, 64},
       {"TitleScreen::ShowCareerMenu (sub_82223D70)", __imp__sub_82223D70,
-       hooks::TitleScreenShowCareerMenu, 144, 48},
+       ITC_CONTEXT_FN(hooks::TitleScreenShowCareerMenu), 144, 48},
       {"TitleScreen::HighlightCareer (sub_82223328)", __imp__sub_82223328,
-       hooks::TitleScreenHighlightCareer, 128, 32},
+       ITC_CONTEXT_FN(hooks::TitleScreenHighlightCareer), 128, 32},
       {"TitleScreen::MoveCareerCursor (sub_82223428)", __imp__sub_82223428,
-       hooks::TitleScreenMoveCareerCursor, 144, 56},
+       ITC_CONTEXT_FN(hooks::TitleScreenMoveCareerCursor), 144, 56},
       {"TitleScreen::BackFromCareer (sub_82223E58)", __imp__sub_82223E58,
-       hooks::TitleScreenBackFromCareer, 128, 32},
-      {"TitleScreen::ShowMenu4 (sub_82223F30)", __imp__sub_82223F30, hooks::TitleScreenShowMenu4,
+       ITC_CONTEXT_FN(hooks::TitleScreenBackFromCareer), 128, 32},
+      {"TitleScreen::ShowMenu4 (sub_82223F30)", __imp__sub_82223F30, ITC_CONTEXT_FN(hooks::TitleScreenShowMenu4),
        128, 32},
       {"TitleScreen::BackFromMenu4 (sub_82223FD8)", __imp__sub_82223FD8,
-       hooks::TitleScreenBackFromMenu4, 128, 32},
+       ITC_CONTEXT_FN(hooks::TitleScreenBackFromMenu4), 128, 32},
       {"TitleScreen::MoveMenu4Cursor (sub_822235D0)", __imp__sub_822235D0,
-       hooks::TitleScreenMoveMenu4Cursor, 144, 48},
+       ITC_CONTEXT_FN(hooks::TitleScreenMoveMenu4Cursor), 144, 48},
   };
   // Each transition's own frame without its saves compared (the set-ups'
   // frames below them have their own cases).
@@ -882,11 +882,11 @@ void Transitions(Context& h, const World& w) {
   // parameter area, +48 to +79: r7 on, the originals' leftovers).
   auto setup = [](PPCContext&, Random& r, const World& w) { TransitionWorld(r, w); };
   Run(h, w, {"TitleScreen::SetUpMainMenu (sub_82223700)", 150, __imp__sub_82223700,
-             hooks::TitleScreenSetUpMainMenu, {{-144, -40}}, setup, ListBlock});
+             ITC_CONTEXT_FN(hooks::TitleScreenSetUpMainMenu), {{-144, -40}}, setup, ListBlock});
   Run(h, w, {"TitleScreen::SetUpCareerMenu (sub_82223840)", 150, __imp__sub_82223840,
-             hooks::TitleScreenSetUpCareerMenu, {{-144, -96}, {-64, -40}}, setup, ListBlock});
+             ITC_CONTEXT_FN(hooks::TitleScreenSetUpCareerMenu), {{-144, -96}, {-64, -40}}, setup, ListBlock});
   Run(h, w, {"TitleScreen::SetUpMenu4 (sub_82223940)", 60, __imp__sub_82223940,
-             hooks::TitleScreenSetUpMenu4, {{-128, -80}, {-48, -32}}, setup, ListBlock});
+             ITC_CONTEXT_FN(hooks::TitleScreenSetUpMenu4), {{-128, -80}, {-48, -32}}, setup, ListBlock});
 }
 
 void MenuPages(Context& h, const World& w) {
@@ -931,22 +931,22 @@ void MenuPages(Context& h, const World& w) {
   const bool multiplayer = ITC_FLAG(multiplayer_menu_items);
   ITC_FLAG(multiplayer_menu_items) = true;
   Run(h, w, {"TitleScreen::MainMenu (sub_82222700)", 400, __imp__sub_82222700,
-             hooks::TitleScreenMainMenu, {{-144, -32}}, input});
+             ITC_CONTEXT_FN(hooks::TitleScreenMainMenu), {{-144, -32}}, input});
   Run(h, w, {"TitleScreen::MainMenu (sub_82222700), item 3 or 4 accepted", 100,
-             __imp__sub_82222700, hooks::TitleScreenMainMenu, {{-144, -32}}, multiplayer_item});
+             __imp__sub_82222700, ITC_CONTEXT_FN(hooks::TitleScreenMainMenu), {{-144, -32}}, multiplayer_item});
   ITC_FLAG(multiplayer_menu_items) = false;
   Run(h, w,
       {"TitleScreen::MainMenu (sub_82222700), multiplayer items bypassed (expected to differ)",
-       400, __imp__sub_82222700, hooks::TitleScreenMainMenu, {{-144, -32}}, input});
+       400, __imp__sub_82222700, ITC_CONTEXT_FN(hooks::TitleScreenMainMenu), {{-144, -32}}, input});
   Run(h, w,
       {"TitleScreen::MainMenu (sub_82222700), item 3 or 4 accepted, bypassed (expected to "
        "differ)",
-       100, __imp__sub_82222700, hooks::TitleScreenMainMenu, {{-144, -32}}, multiplayer_item});
+       100, __imp__sub_82222700, ITC_CONTEXT_FN(hooks::TitleScreenMainMenu), {{-144, -32}}, multiplayer_item});
   ITC_FLAG(multiplayer_menu_items) = multiplayer;
   // CareerMenu: player 0's save a new game's (Progress::Clear run on it
   // first, for Progress::Restart's garage), its day shaped after.
   Run(h, w, {"TitleScreen::CareerMenu (sub_82221AC0)", 400, __imp__sub_82221AC0,
-             hooks::TitleScreenCareerMenu, {{-128, -24}},
+             ITC_CONTEXT_FN(hooks::TitleScreenCareerMenu), {{-128, -24}},
              [&h, input](PPCContext& t, Random& r, const World& w) {
                PPCContext c = CallContext(h);
                c.r3.u64 = w.save;
@@ -955,7 +955,7 @@ void MenuPages(Context& h, const World& w) {
                guest::StoreU32(w.base, w.save + 6100, r.Below(3) == 0 ? 0 : 1 + r.Below(30));
              }});
   Run(h, w, {"TitleScreen::Menu4 (sub_82222378)", 200, __imp__sub_82222378,
-             hooks::TitleScreenMenu4, {{-112, -24}}, input});
+             ITC_CONTEXT_FN(hooks::TitleScreenMenu4), {{-112, -24}}, input});
 }
 
 // --- The mode: the mode the world's (its dispatcher without handlers, so
@@ -1029,35 +1029,35 @@ void NormalizePointers(uint8_t* base, uint32_t at, uint32_t bytes, uint32_t lo, 
 
 void Mode(Context& h, const World& w) {
   Run(h, w, {"ModeType4::MachineOf (sub_82224B40)", 60, __imp__sub_82224B40,
-             hooks::ModeType4MachineOf, {}, BlockArgs});
+             ITC_CONTEXT_FN(hooks::ModeType4MachineOf), {}, BlockArgs});
   Run(h, w, {"ModeType4::AllLoaded (sub_82224BC0)", 60, __imp__sub_82224BC0,
-             hooks::ModeType4AllLoaded, {}, BlockArgs});
+             ITC_CONTEXT_FN(hooks::ModeType4AllLoaded), {}, BlockArgs});
   Run(h, w, {"ModeType4::FindShown (sub_82224C10)", 60, __imp__sub_82224C10,
-             hooks::ModeType4FindShown, {{-96, -8}}, BlockArgs, ScreenBlock});
+             ITC_CONTEXT_FN(hooks::ModeType4FindShown), {{-96, -8}}, BlockArgs, ScreenBlock});
   Run(h, w, {"ModeType4::Restart (sub_82225098)", 100, __imp__sub_82225098,
-             hooks::ModeType4Restart, {{-112, -16}}, Delegate, ScreenBlock});
+             ITC_CONTEXT_FN(hooks::ModeType4Restart), {{-112, -16}}, ITC_CONTEXT_FN(Delegate), ScreenBlock});
   Run(h, w, {"ModeType4::NextMode (sub_82225390)", 200, __imp__sub_82225390,
-             hooks::ModeType4NextMode, {{-144, -56}, {-240, -152}}, Delegate, ScreenBlock});
+             ITC_CONTEXT_FN(hooks::ModeType4NextMode), {{-144, -56}, {-240, -152}}, ITC_CONTEXT_FN(Delegate), ScreenBlock});
   Run(h, w, {"ModeType4::LeaveScreen (sub_822252C8)", 60, __imp__sub_822252C8,
-             hooks::ModeType4LeaveScreen, {{-128, -32}, {-224, -136}}, Delegate, ScreenBlock});
+             ITC_CONTEXT_FN(hooks::ModeType4LeaveScreen), {{-128, -32}, {-224, -136}}, ITC_CONTEXT_FN(Delegate), ScreenBlock});
   Run(h, w, {"ModeType4::WaitForLeave (sub_822251D0)", 100, __imp__sub_822251D0,
-             hooks::ModeType4WaitForLeave, {{-112, -16}, {-208, -120}}, Delegate, ScreenBlock});
+             ITC_CONTEXT_FN(hooks::ModeType4WaitForLeave), {{-112, -16}, {-208, -120}}, ITC_CONTEXT_FN(Delegate), ScreenBlock});
   Run(h, w, {"ModeType4::Leaving (sub_82225698)", 100, __imp__sub_82225698,
-             hooks::ModeType4Leaving, {{-128, -32}}, Delegate, ScreenBlock});
+             ITC_CONTEXT_FN(hooks::ModeType4Leaving), {{-128, -32}}, ITC_CONTEXT_FN(Delegate), ScreenBlock});
   Run(h, w, {"ModeType4::NextModeAnswer (sub_82224B98)", 20, __imp__sub_82224B98,
-             hooks::ModeType4NextModeAnswer, {}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType4NextModeAnswer), {}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType4::Interrupt (sub_82224E20)", 100, __imp__sub_82224E20,
-             hooks::ModeType4Interrupt, {{-96, -8}}, Interface});
+             ITC_CONTEXT_FN(hooks::ModeType4Interrupt), {{-96, -8}}, Interface});
   Run(h, w, {"ModeType4::ForceExit (sub_82224ED0)", 60, __imp__sub_82224ED0,
-             hooks::ModeType4ForceExit, {{-32, -16}}, Interface, ScreenBlock});
-  Run(h, w, {"ModeType4::Resume (sub_82225048)", 20, __imp__sub_82225048, hooks::ModeType4Resume,
+             ITC_CONTEXT_FN(hooks::ModeType4ForceExit), {{-32, -16}}, Interface, ScreenBlock});
+  Run(h, w, {"ModeType4::Resume (sub_82225048)", 20, __imp__sub_82225048, ITC_CONTEXT_FN(hooks::ModeType4Resume),
              {}, Interface});
   // Init: the mode random words (its dispatcher's count 0 to 7); the UI
   // movies' start and Strings::Load recorded; the block VirtualAlloc made
   // compared by content and freed, its addresses in it, in the mode and in
   // r3 made offsets; its frame's +80 to +87 compared (the machines' Inits'
   // frames below hold the machines' addresses).
-  Run(h, w, {"ModeType4::Init (sub_82224C70)", 12, __imp__sub_82224C70, hooks::ModeType4Init,
+  Run(h, w, {"ModeType4::Init (sub_82224C70)", 12, __imp__sub_82224C70, ITC_CONTEXT_FN(hooks::ModeType4Init),
              {{-112 + 80, -112 + 88}},
              [](PPCContext& t, Random& r, const World& w) {
                guest::StoreU32(w.base, w.mode() + 36 + 200, r.Below(8));
@@ -1090,7 +1090,7 @@ void Mode(Context& h, const World& w) {
 
 void PressStart(Context& h, const World& w) {
   Run(h, w, {"Players::AssignController (sub_8209F6B8)", 100, __imp__sub_8209F6B8,
-             hooks::PlayersAssignController, {},
+             ITC_CONTEXT_FN(hooks::PlayersAssignController), {},
              [](PPCContext& t, Random& r, const World& w) {
                for (uint32_t k = 0; k < 5; k++) {
                  guest::StoreU32(w.base, 0x826BABA4 + 4 * k,
@@ -1100,7 +1100,7 @@ void PressStart(Context& h, const World& w) {
                t.r4.u64 = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(5);
              }});
   Run(h, w, {"TitleScreen::OnControllerPicked (sub_822219E0)", 100, __imp__sub_822219E0,
-             hooks::TitleScreenOnControllerPicked, {},
+             ITC_CONTEXT_FN(hooks::TitleScreenOnControllerPicked), {},
              [](PPCContext& t, Random& r, const World& w) {
                guest::StoreU32(w.base, 0x826D8454, w.at(kAnswerAt) + 0x40);
                guest::StoreU32(w.base, w.at(kAnswerAt) + 0x40 + 52,
@@ -1114,7 +1114,7 @@ void PressStart(Context& h, const World& w) {
   // (MenuInput), the idle count 0 to 597 or negative; its frame without its
   // saves.
   Run(h, w, {"TitleScreen::Update (sub_822221A0)", 400, __imp__sub_822221A0,
-             hooks::TitleScreenPressStart, {{-144, -56}},
+             ITC_CONTEXT_FN(hooks::TitleScreenPressStart), {{-144, -56}},
              [](PPCContext& t, Random& r, const World& w) {
                TransitionWorld(r, w);
                MenuInput(r, w);

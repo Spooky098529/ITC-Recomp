@@ -6,6 +6,7 @@
 // stays for every other semaphore.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "hooks/archive.h"
@@ -66,22 +67,22 @@ bool hooks::NativeArchiveQueue() {
 // Semaphore::Wait and Signal: r3 = the semaphore. The archive's four are
 // taken as host semaphores (r3 left as it is: read by no caller, the
 // originals leave their last call's); every other one is the game's.
-extern "C" REX_FUNC(sub_82592670) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82592670) {
+  
   if (archive::HostSemaphore* s = hooks::ArchiveSemaphore(ctx.r3.u32)) {
     s->Wait(base);
     return;
   }
-  __imp__sub_82592670(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82592670);
 }
 
-extern "C" REX_FUNC(sub_825926E8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825926E8) {
+  
   if (archive::HostSemaphore* s = hooks::ArchiveSemaphore(ctx.r3.u32)) {
     s->Signal(base);
     return;
   }
-  __imp__sub_825926E8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825926E8);
 }
 
 #define ITC_ARCHIVE_FALLBACK(address) \
@@ -93,7 +94,7 @@ extern "C" REX_FUNC(sub_825926E8) {
 
 // r3 the answer (zero-extended: the originals' lwz).
 #define ITC_ARCHIVE_WORD(address, expr)  \
-  extern "C" REX_FUNC(sub_##address) {  \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {  \
     ITC_ARCHIVE_FALLBACK(address)       \
     ctx.r3.u64 = uint32_t(expr);        \
   }
@@ -106,7 +107,7 @@ ITC_ARCHIVE_WORD(8209D868, archive::Toc(base, ctx.r3.u32))
 ITC_ARCHIVE_WORD(820A0678, archive::AssetSize(base, ctx.r3.u32))
 // ListNode::~ListNode (from the panel screens' and the slots' clean-ups,
 // recompiled; never seen in play): r3 left.
-extern "C" REX_FUNC(sub_8224FB10) {
+ITC_NATIVE_ENTRY_ALWAYS(8224FB10) {
   ITC_ARCHIVE_FALLBACK(8224FB10)
   archive::NodeDestruct(base, ctx.r3.u32);
 }
@@ -114,8 +115,8 @@ extern "C" REX_FUNC(sub_8224FB10) {
 // The static set-ups: no arguments; r3 = atexit's. The original runs when
 // the native atexit can't (c_runtime's flags), as SignInWatch::StaticInit's.
 #define ITC_ARCHIVE_STATIC_INIT(address, function)                 \
-  extern "C" REX_FUNC(sub_##address) {                            \
-    REX_FUNC_PROLOGUE();                                          \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                            \
+    \
     if (!ITC_FLAG(native_archive) || !hooks::NativeAtexit()) {    \
       __imp__sub_##address(ctx, base);                            \
       return;                                                     \
@@ -132,13 +133,13 @@ namespace {
 // The request finish's calls, from inside a frame as the original's (96
 // bytes), with its return addresses.
 struct FinishGuestCalls {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
 
   static void Callback(void* self, uint32_t function, uint32_t serial, uint32_t data,
                        uint32_t size, uint32_t context) {
     auto& c = *static_cast<FinishGuestCalls*>(self);
-    PPCContext& ctx = c.ctx;
+    lifted::Regs& ctx = c.ctx;
     uint8_t* base = c.base;
     guest_call::InFrame(ctx, base, 96, 0x8209D6F8, [&](uint32_t) {
       ctx.r3.u64 = serial;
@@ -151,7 +152,7 @@ struct FinishGuestCalls {
   }
   static void GuestFree(void* self, uint32_t address, uint32_t size, uint32_t type) {
     auto& c = *static_cast<FinishGuestCalls*>(self);
-    PPCContext& ctx = c.ctx;
+    lifted::Regs& ctx = c.ctx;
     guest_call::InFrame(ctx, c.base, 96, 0x8209D71C, [&](uint32_t) {
       ctx.r3.u64 = address;
       ctx.r4.u64 = size;
@@ -167,7 +168,7 @@ struct FinishGuestCalls {
 // The request finish: r3 = the request. Its r31 is restored; r3 and the
 // other volatile registers are whatever its calls leave (read by no
 // caller).
-void hooks::ArchiveFinishRequest(PPCContext& ctx, uint8_t* base) {
+void hooks::ArchiveFinishRequest(lifted::Regs& ctx, uint8_t* base) {
   FinishGuestCalls calls{ctx, base};
   if (auto r3 = archive::FinishRequest(base, ctx.r3.u32, calls.Calls())) {
     ctx.r3.u64 = *r3;
@@ -177,14 +178,14 @@ void hooks::ArchiveFinishRequest(PPCContext& ctx, uint8_t* base) {
 // LoaderFunctor::Invoke: r3 = the functor, r4 = the argument: a tail call of
 // the functor's +4 with r4 as r3 (r11 and ctr the target, as the original's
 // mtctr; lr the caller's).
-void hooks::ArchiveInvokeFunctor(PPCContext& ctx, uint8_t* base) {
+void hooks::ArchiveInvokeFunctor(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t target = archive::LoaderFunctorTarget(base, ctx.r3.u32);
   ctx.r3.u64 = ctx.r4.u64;
   ctx.r11.u64 = target;
   lifted::CallFromContext(ctx, base, target);
 }
 
-extern "C" REX_FUNC(sub_8209DD80) {
+ITC_NATIVE_ENTRY_ALWAYS(8209DD80) {
   ITC_ARCHIVE_FALLBACK(8209DD80)
   hooks::ArchiveInvokeFunctor(ctx, base);
 }
@@ -194,13 +195,13 @@ extern "C" REX_FUNC(sub_8209DD80) {
 // own frame (its byte swaps' and the block's output size) are read by
 // nothing. memcpy, where the native copy can't, through `ctx` in a frame as
 // the original's (160 bytes).
-void hooks::ArchiveUclUnpack(PPCContext& ctx, uint8_t* base) {
+void hooks::ArchiveUclUnpack(lifted::Regs& ctx, uint8_t* base) {
   struct Guest {
-    PPCContext& ctx;
+    lifted::Regs& ctx;
     uint8_t* base;
     static void Memcpy(void* self, uint32_t destination, uint32_t source, uint32_t size) {
       auto& g = *static_cast<Guest*>(self);
-      PPCContext& ctx = g.ctx;
+      lifted::Regs& ctx = g.ctx;
       guest_call::InFrame(ctx, g.base, 160, 0x822946E4, [&](uint32_t) {
         ctx.r3.u64 = destination;
         ctx.r4.u64 = source;
@@ -213,7 +214,7 @@ void hooks::ArchiveUclUnpack(PPCContext& ctx, uint8_t* base) {
       archive::UclUnpack(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, {&Guest::Memcpy, &guest});
 }
 
-extern "C" REX_FUNC(sub_82294610) {
+ITC_NATIVE_ENTRY_ALWAYS(82294610) {
   ITC_ARCHIVE_FALLBACK(82294610)
   hooks::ArchiveUclUnpack(ctx, base);
 }
@@ -230,7 +231,7 @@ extern "C" REX_FUNC(sub_82294610) {
 namespace {
 
 // r3 the serial (lwz's, zero-extended) or -1 (li's).
-void SetSerial(PPCContext& ctx, int64_t serial) {
+void SetSerial(lifted::Regs& ctx, int64_t serial) {
   if (serial < 0) {
     ctx.r3.s64 = -1;
   } else {
@@ -241,11 +242,11 @@ void SetSerial(PPCContext& ctx, int64_t serial) {
 // The set-up's VirtualAlloc where the native layer is off, from inside a
 // frame as the original's (112 bytes).
 struct SetUpGuestCalls {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   static uint32_t Alloc(void* self, uint32_t size) {
     auto& c = *static_cast<SetUpGuestCalls*>(self);
-    PPCContext& ctx = c.ctx;
+    lifted::Regs& ctx = c.ctx;
     guest_call::InFrame(ctx, c.base, 112, 0x8209D604, [&](uint32_t) {
       ctx.r3.u64 = 0;
       ctx.r4.u64 = size;
@@ -263,7 +264,7 @@ struct SetUpGuestCalls {
 // Archive::Load: r3 = an asset id, r4 = the destination, r5 = a callback, r6
 // = its context, r7, r8 = a size; r3 the serial or -1. Its r26 to r31 are
 // restored; the request it leaves in its own frame is read by nothing.
-extern "C" REX_FUNC(sub_8209DE48) {
+ITC_NATIVE_ENTRY_ALWAYS(8209DE48) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209DE48)
   if (hooks::StartUpRecorded(ctx, 0x8209DE48)) {
     return;
@@ -275,7 +276,7 @@ extern "C" REX_FUNC(sub_8209DE48) {
 
 // Archive::WaitIdle, Archive::CancelQueued (r3 = whether to wait): r3 read by
 // no caller.
-extern "C" REX_FUNC(sub_8209D730) {
+ITC_NATIVE_ENTRY_ALWAYS(8209D730) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209D730)
   if (hooks::StartUpRecorded(ctx, 0x8209D730)) {
     return;
@@ -283,19 +284,19 @@ extern "C" REX_FUNC(sub_8209D730) {
   archive::WaitIdle(base);
 }
 
-extern "C" REX_FUNC(sub_8209DB90) {
+ITC_NATIVE_ENTRY_ALWAYS(8209DB90) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209DB90)
   archive::CancelQueued(base, ctx.r3.s32 != 0);
 }
 
 // Archive::QueueLength: r3 the count (lwz's).
-extern "C" REX_FUNC(sub_8209D7B0) {
+ITC_NATIVE_ENTRY_ALWAYS(8209D7B0) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209D7B0)
   ctx.r3.u64 = archive::QueueLength(base);
 }
 
 // The cancel of a request: r3 = its serial; r3 1 or 0.
-extern "C" REX_FUNC(sub_8209DB20) {
+ITC_NATIVE_ENTRY_ALWAYS(8209DB20) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209DB20)
   ctx.r3.u64 = archive::Cancel(base, ctx.r3.u32);
 }
@@ -319,11 +320,11 @@ archive::LoadCall hooks::NativeArchiveLoad(uint8_t* base) {
   };
 }
 
-void hooks::SetArchiveSerial(PPCContext& ctx, int64_t serial) { SetSerial(ctx, serial); }
+void hooks::SetArchiveSerial(lifted::Regs& ctx, int64_t serial) { SetSerial(ctx, serial); }
 
 // The set-up: r3 = the request; r3 read by no caller (the next request sets
 // its own).
-void hooks::ArchiveSetUp(PPCContext& ctx, uint8_t* base) {
+void hooks::ArchiveSetUp(lifted::Regs& ctx, uint8_t* base) {
   SetUpGuestCalls calls{ctx, base};
   archive::SetUp(base, ctx.r3.u32, calls.Calls());
 }
@@ -331,7 +332,7 @@ void hooks::ArchiveSetUp(PPCContext& ctx, uint8_t* base) {
 // The loader's next request: r3 = the current request or 0; r3 the next. Its
 // calls from inside a frame as the original's (112 bytes), the finish's and
 // the set-up's own below it.
-void hooks::ArchiveNextRequest(PPCContext& ctx, uint8_t* base) {
+void hooks::ArchiveNextRequest(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t current = ctx.r3.u32;
   uint32_t next = 0;
   guest_call::InFrame(ctx, base, 112, uint32_t(ctx.lr), [&](uint32_t) {
@@ -342,7 +343,7 @@ void hooks::ArchiveNextRequest(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = next;
 }
 
-extern "C" REX_FUNC(sub_8209DD98) {
+ITC_NATIVE_ENTRY_ALWAYS(8209DD98) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209DD98)
   hooks::ArchiveNextRequest(ctx, base);
 }
@@ -359,11 +360,11 @@ extern "C" REX_FUNC(sub_8209DD98) {
 // last call leaves it). The original runs unless --native_archive,
 // --native_std_string over the allocation layer and --native_file_layer are
 // all on.
-extern "C" REX_FUNC(sub_8209DFA8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
+  
   if (!ITC_FLAG(native_archive) || !ITC_FLAG(native_std_string) || !hooks::NativeHeapActive() ||
       !ITC_FLAG(native_file_layer)) {
-    __imp__sub_8209DFA8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209DFA8);
     return;
   }
   ITC_NATIVE_RUNNING("sub_8209DFA8 Archive::ReadLoose");
@@ -380,7 +381,7 @@ extern "C" REX_FUNC(sub_8209DFA8) {
         ctx.r3.u64 = string;
         ctx.r4.u64 = text;
         ctx.r5.u64 = allocator;
-        __imp__sub_82593248(ctx, base);
+        lifted::Sdk(ctx, base, __imp__sub_82593248);
       });
     }
   };
@@ -391,7 +392,7 @@ extern "C" REX_FUNC(sub_8209DFA8) {
         ctx.r4.u64 = source;
         ctx.r5.u64 = 0;
         ctx.r6.s64 = -1;
-        __imp__sub_82091720(ctx, base);
+        lifted::Sdk(ctx, base, __imp__sub_82091720);
       });
     }
   };
@@ -401,7 +402,7 @@ extern "C" REX_FUNC(sub_8209DFA8) {
         ctx.r3.u64 = string;
         ctx.r4.u64 = 1;
         ctx.r5.u64 = 0;
-        __imp__sub_82091328(ctx, base);
+        lifted::Sdk(ctx, base, __imp__sub_82091328);
       });
     }
   };
@@ -420,7 +421,7 @@ extern "C" REX_FUNC(sub_8209DFA8) {
       ctx.r4.u64 = 0x82001DE8;
       ctx.r5.u64 = 0x82001DEC;
       ctx.r6.u64 = 0;
-      __imp__sub_82593088(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_82593088);
     });
     text = ctx.r3.u32;
   }

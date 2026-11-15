@@ -4,6 +4,7 @@
 // stay recompiled: threads and sync are the core (docs/rexglue-removal.md).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "helpers/object_attributes.h"
 
@@ -11,8 +12,8 @@
 
 // r3 = the attributes (12 bytes), r4 = their name (an 8-byte ANSI string),
 // r5 = the name's text (0 for none); returns r3.
-extern "C" REX_FUNC(sub_822970A8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822970A8) {
+  
   const uint32_t attributes_address = ctx.r3.u32;
   const uint32_t name_address = ctx.r4.u32;
   const uint32_t text_address = ctx.r5.u32;

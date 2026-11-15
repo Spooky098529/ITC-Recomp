@@ -378,9 +378,9 @@ void KindCases(Context& h, uint32_t area, uint32_t race) {
     GuestFunction recompiled, native;
     bool ignores;
   } functions[] = {
-      {"WallQuery::ModeSkips (sub_820FC870)", Original<__imp__sub_820FC870>, NativeModeSkips,
+      {"WallQuery::ModeSkips (sub_820FC870)", Original<__imp__sub_820FC870>, ITC_CONTEXT_FN(NativeModeSkips),
        false},
-      {"WallQuery::IgnoresWall (sub_820FD6D8)", Original<__imp__sub_820FD6D8>, NativeIgnoresWall,
+      {"WallQuery::IgnoresWall (sub_820FD6D8)", Original<__imp__sub_820FD6D8>, ITC_CONTEXT_FN(NativeIgnoresWall),
        true},
   };
   for (const auto& f : functions) {
@@ -425,8 +425,8 @@ void ThroughCases(Context& h, uint32_t area, uint32_t race) {
     GuestFunction recompiled, native;
   } functions[] = {
       {"WallQuery::CornersThroughWall (sub_820FC3C8)", Original<__imp__sub_820FC3C8>,
-       NativeCorners},
-      {"WallQuery::EdgesAcrossWall (sub_820FC900)", Original<__imp__sub_820FC900>, NativeEdges},
+       ITC_CONTEXT_FN(NativeCorners)},
+      {"WallQuery::EdgesAcrossWall (sub_820FC900)", Original<__imp__sub_820FC900>, ITC_CONTEXT_FN(NativeEdges)},
   };
   enum Group { kNumbers, kOneNaN };
   const char* const kGroupNames[] = {"", ", one NaN"};
@@ -478,11 +478,11 @@ void QueryCases(Context& h, uint32_t area, uint32_t race) {
     GuestFunction recompiled, native;
     QueryKind kind;
   } functions[] = {
-      {"WallQuery::TestCell (sub_820FDC18)", Original<__imp__sub_820FDC18>, NativeTestCell,
+      {"WallQuery::TestCell (sub_820FDC18)", Original<__imp__sub_820FDC18>, ITC_CONTEXT_FN(NativeTestCell),
        kTestCell},
       {"TrackCollision::QueryWalls (sub_820FDF38)", Original<__imp__sub_820FDF38>,
-       NativeQueryWalls, kQueryWalls},
-      {"TrackCollision::WallHits (sub_820FF1B0)", Original<__imp__sub_820FF1B0>, NativeWallHits,
+       ITC_CONTEXT_FN(NativeQueryWalls), kQueryWalls},
+      {"TrackCollision::WallHits (sub_820FF1B0)", Original<__imp__sub_820FF1B0>, ITC_CONTEXT_FN(NativeWallHits),
        kWallHits},
   };
   uint8_t saved_mesh[12];

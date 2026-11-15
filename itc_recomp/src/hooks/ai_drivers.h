@@ -6,6 +6,7 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 namespace hooks {
 
@@ -15,19 +16,22 @@ namespace hooks {
 // the original where it can't be native or with the flag off. r3 and f1 as
 // the original leaves them.
 void AiDriveCar(PPCContext& ctx, uint8_t* base);
+void AiDriveCar(lifted::Regs& ctx, uint8_t* base);
 // AiDriver::UpdateIdle (sub_821399A8) as its adapter runs it: r3 = the
 // driver, r1 the caller's stack pointer.
 void AiUpdateIdle(PPCContext& ctx, uint8_t* base);
+void AiUpdateIdle(lifted::Regs& ctx, uint8_t* base);
 
 // AiDrivers::UpdateAll (sub_82139628) as its adapter runs it: r1 the
 // caller's stack pointer; the plain C++ with --native_ai_drivers (the
 // drivers' updates through their +6148), the original with the flag off. r3
 // as the original leaves it.
 void AiUpdateAll(PPCContext& ctx, uint8_t* base);
+void AiUpdateAll(lifted::Regs& ctx, uint8_t* base);
 
 // For harnesses: while set, these run instead (from the adapters and the
 // functions above), answering with made-up data.
-using GuestStandIn = void (*)(PPCContext&, uint8_t*);
+using GuestStandIn = void (*)(lifted::Regs&, uint8_t*);
 extern GuestStandIn g_drive_car_stand_in;
 extern GuestStandIn g_update_idle_stand_in;
 extern GuestStandIn g_update_all_stand_in;

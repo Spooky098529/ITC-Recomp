@@ -4,6 +4,7 @@
 // recompiled and call these, so the adapters stay.
 
 #include "hooks/tuning_pages.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "car_models/vinyl.h"
@@ -172,61 +173,61 @@ namespace hooks {
 
 namespace tp = tuning_pages;
 
-void TuningPagesLevelCount(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesLevelCount) {
   ctx.r3.u64 = tp::LevelCount(base, ctx.r3.u32);
 }
 
-void TuningPagesTypeCount(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesTypeCount) {
   ctx.r3.u64 = tp::TypeCount(base, ctx.r3.u32);
 }
 
-void TuningPagesPageCursor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesPageCursor) {
   ctx.r3.u64 = tp::PageCursor(base, ctx.r3.u32);
 }
 
-void TuningPagesPageItemCount(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesPageItemCount) {
   ctx.r3.u64 = tp::PageItemCount(base, ctx.r3.u32);
 }
 
-void TuningPagesIsPickOwned(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesIsPickOwned) {
   ctx.r3.u64 = tp::IsPickOwned(base, ctx.r3.u32);
 }
 
-void TuningPagesMarkOwned(PPCContext& ctx, uint8_t* base) { tp::MarkOwned(base, ctx.r3.u32); }
+ITC_REGS_STEP(TuningPagesMarkOwned) { tp::MarkOwned(base, ctx.r3.u32); }
 
-void TuningPagesTestAndSetWheelFlag(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesTestAndSetWheelFlag) {
   ctx.r3.u64 = tp::TestAndSetWheelFlag(base, ctx.r3.u32, ctx.r4.u64);
 }
 
-void TuningPagesSetWheelListEnd(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetWheelListEnd) {
   tp::SetWheelListEnd(base, ctx.r3.u32);
 }
 
-void TuningPagesInchListEnd(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInchListEnd) {
   ctx.r3.u64 = tp::InchListEnd(base, ctx.r3.u32);
 }
 
-void TuningPagesSetUpVinylBusyIcon(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetUpVinylBusyIcon) {
   tp::SetUpVinylBusyIcon(base, ctx.r3.u32);
 }
 
-void TuningPagesAllLoaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesAllLoaded) {
   ctx.r3.u64 = tp::AllLoaded(base, ctx.r3.u32);
 }
 
-void TuningPagesKeepListTextures(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesKeepListTextures) {
   tp::KeepListTextures(base, ctx.r3.u32);
 }
 
-void TuningPagesSetEditorLimits(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetEditorLimits) {
   tp::SetEditorLimits(base, ctx.r3.u32);
 }
 
-void TuningPagesLoadPageLayouts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesLoadPageLayouts) {
   tp::LoadPageLayouts(base, ctx.r3.u32);
 }
 
-void TuningPagesFreeTexture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesFreeTexture) {
   const tp::TextureFreeFn free = [&ctx, base](uint32_t header_in, uint32_t data_in) -> uint64_t {
     if (ITC_FLAG(native_car_models) && NativeHeapActive() &&
         car_models::TextureFreeable(base, header_in)) {
@@ -240,44 +241,44 @@ void TuningPagesFreeTexture(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = tp::FreeTexture(base, ctx.r3.u64, ctx.r4.u64, free);
 }
 
-void TuningPagesRestoreVinylTexture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesRestoreVinylTexture) {
   ctx.r3.u64 = tp::RestoreVinylTexture(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
-void TuningPagesRestoreStickerTexture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesRestoreStickerTexture) {
   ctx.r3.u64 = tp::RestoreStickerTexture(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
-void TuningPagesBindVinylTexture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesBindVinylTexture) {
   ctx.r3.u64 = tp::BindVinylTexture(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
-void TuningPagesBindVinylTextures(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesBindVinylTextures) {
   ctx.r3.u64 = tp::BindVinylTextures(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void TuningPagesEnterEditor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesEnterEditor) {
   ctx.r3.u64 = tp::EnterEditor(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void TuningPagesRestoreMovieTexture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesRestoreMovieTexture) {
   ctx.r3.u64 = tp::RestoreMovieTexture(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
-void TuningPagesRestoreVinylMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesRestoreVinylMovie) {
   ctx.r3.u64 = tp::RestoreVinylMovie(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void TuningPagesRestoreStickerMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesRestoreStickerMovie) {
   ctx.r3.u64 = tp::RestoreStickerMovie(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void TuningPagesStoreVinyls(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesStoreVinyls) {
   ctx.fpscr.disableFlushMode();
   tp::StoreVinyls(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void TuningPagesLoadVinyls(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesLoadVinyls) {
   const uint64_t lr = ctx.lr;
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -288,33 +289,33 @@ void TuningPagesLoadVinyls(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void TuningPagesShowPricePanel(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesShowPricePanel) {
   ctx.r3.u64 = tp::ShowPricePanel(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void TuningPagesSetBrandLogo(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetBrandLogo) {
   ctx.r3.u64 = tp::SetBrandLogo(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void TuningPagesHsvToRgb(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesHsvToRgb) {
   ctx.fpscr.disableFlushMode();
   tp::HsvToRgb(base, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
-void TuningPagesIsSlotAvailable(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesIsSlotAvailable) {
   ctx.r3.u64 = tp::IsSlotAvailable(base, ctx.r3.u32, ctx.r4.u64);
 }
 
-void TuningPagesSetPaintGradients(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetPaintGradients) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = tp::SetPaintGradients(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void TuningPagesSetLightKind0Bars(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetLightKind0Bars) {
   ctx.r3.u64 = tp::SetLightKind0Bars(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void TuningPagesSetLightKind1Bar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetLightKind1Bar) {
   ctx.r3.u64 = tp::SetLightKind1Bar(base, ctx.r3.u32, ctx.r1.u32);
 }
 
@@ -322,7 +323,7 @@ namespace {
 
 // A step with the guest calls (hooks::StandModelsGuestCall), lr put back.
 template <typename Body>
-void WithCalls(PPCContext& ctx, uint8_t* base, Body body) {
+void WithCalls(lifted::Regs& ctx, uint8_t* base, Body body) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   const tuning_screen::GuestCall call = StandModelsGuestCall(ctx, base);
@@ -340,7 +341,7 @@ void WithCalls(PPCContext& ctx, uint8_t* base, Body body) {
 // before each later guest call and at the end; else none (its original
 // through the guest).
 template <typename Body>
-void WithFit(PPCContext& ctx, uint8_t* base, Body body) {
+void WithFit(lifted::Regs& ctx, uint8_t* base, Body body) {
   if (!ITC_FLAG(native_tuning_screen) || !TuningStandCalleesNative()) {
     WithCalls(ctx, base,
               [&](const tuning_screen::GuestCall& call) { return body(call, tp::StandFit{}); });
@@ -372,7 +373,7 @@ void WithFit(PPCContext& ctx, uint8_t* base, Body body) {
 
 }  // namespace
 
-void TuningPagesSetAeroAvailability(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetAeroAvailability) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const bool native_specs = ITC_FLAG(native_car_specs);
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -380,7 +381,7 @@ void TuningPagesSetAeroAvailability(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesSetCurrentChoice(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetCurrentChoice) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_specs = ITC_FLAG(native_car_specs);
@@ -389,9 +390,9 @@ void TuningPagesSetCurrentChoice(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesUpdateImages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesUpdateImages) {
   if (!NativeHeapActive()) {
-    __imp__sub_821FE628(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821FE628);
     return;
   }
   const uint64_t images = ctx.r3.u64;
@@ -401,9 +402,9 @@ void TuningPagesUpdateImages(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesUnloadAll(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesUnloadAll) {
   if (!NativeHeapActive()) {
-    __imp__sub_82208738(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82208738);
     return;
   }
   const uint64_t images = ctx.r3.u64;
@@ -414,7 +415,7 @@ void TuningPagesUnloadAll(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesLoadDecalImages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesLoadDecalImages) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -422,7 +423,7 @@ void TuningPagesLoadDecalImages(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesRequestImage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesRequestImage) {
   const uint64_t images = ctx.r3.u64, id = ctx.r4.u64, i = ctx.r5.u64;
   const uint32_t sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -430,7 +431,7 @@ void TuningPagesRequestImage(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesLoadImage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesLoadImage) {
   const uint64_t images = ctx.r3.u64, id = ctx.r4.u64, i = ctx.r5.u64;
   const uint32_t sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -438,7 +439,7 @@ void TuningPagesLoadImage(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesStepList(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesStepList) {
   const uint64_t menu = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -447,7 +448,7 @@ void TuningPagesStepList(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesLeaveEditor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesLeaveEditor) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -467,7 +468,7 @@ tp::PageFlags Flags() {
 
 }  // namespace
 
-void TuningPagesBackToItems(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesBackToItems) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
@@ -476,7 +477,7 @@ void TuningPagesBackToItems(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputWheelParts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputWheelParts) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -484,7 +485,7 @@ void TuningPagesInputWheelParts(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesAnimateWheelParts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesAnimateWheelParts) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -492,7 +493,7 @@ void TuningPagesAnimateWheelParts(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputInches(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputInches) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -500,7 +501,7 @@ void TuningPagesInputInches(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesAnimateInches(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesAnimateInches) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -508,7 +509,7 @@ void TuningPagesAnimateInches(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputItems(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputItems) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
@@ -517,7 +518,7 @@ void TuningPagesInputItems(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesMoveItem(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveItem) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -525,7 +526,7 @@ void TuningPagesMoveItem(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputOptions(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputOptions) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -533,7 +534,7 @@ void TuningPagesInputOptions(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesMoveOption(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveOption) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -541,7 +542,7 @@ void TuningPagesMoveOption(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesMoveLevel(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveLevel) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -549,7 +550,7 @@ void TuningPagesMoveLevel(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesMoveType(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveType) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -557,7 +558,7 @@ void TuningPagesMoveType(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputLevels(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputLevels) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -565,7 +566,7 @@ void TuningPagesInputLevels(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputTypes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputTypes) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -573,7 +574,7 @@ void TuningPagesInputTypes(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputWheels(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputWheels) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
@@ -582,7 +583,7 @@ void TuningPagesInputWheels(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesAnimateWheels(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesAnimateWheels) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -591,24 +592,24 @@ void TuningPagesAnimateWheels(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesFillPartRowsRight(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesFillPartRowsRight) {
   ctx.r3.u64 = tp::FillPartRowsRight(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void TuningPagesFillPartRowsLeft(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesFillPartRowsLeft) {
   ctx.r3.u64 = tp::FillPartRowsLeft(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void TuningPagesStoreOwnedParts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesStoreOwnedParts) {
   ctx.r3.u64 = tp::StoreOwnedParts(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void TuningPagesLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesLeave) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = tp::Leave(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32);
 }
 
-void TuningPagesOnDialogYes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesOnDialogYes) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_specs = ITC_FLAG(native_car_specs);
@@ -617,7 +618,7 @@ void TuningPagesOnDialogYes(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesOnStickerDialogYes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesOnStickerDialogYes) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -625,7 +626,7 @@ void TuningPagesOnStickerDialogYes(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputCategories(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputCategories) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   tp::PageFlags flags;
   flags.native_slots = ITC_FLAG(native_action_mappers);
@@ -636,11 +637,11 @@ void TuningPagesInputCategories(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesOnImageLoaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesOnImageLoaded) {
   tp::OnImageLoaded(base, ctx.r3.u32, ctx.r6.u32);
 }
 
-void TuningPagesReloadImage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesReloadImage) {
   const uint64_t images = ctx.r3.u64, id = ctx.r4.u64, i = ctx.r5.u64;
   const uint32_t sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -648,7 +649,7 @@ void TuningPagesReloadImage(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesLoadWindow(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesLoadWindow) {
   const uint64_t images = ctx.r3.u64, first = ctx.r4.u64, i = ctx.r5.u64, n = ctx.r6.u64,
                  list = ctx.r7.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -657,7 +658,7 @@ void TuningPagesLoadWindow(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesScrollImages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesScrollImages) {
   const uint64_t images = ctx.r3.u64, direction = ctx.r4.u64, i = ctx.r5.u64, n = ctx.r6.u64,
                  id = ctx.r7.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -667,7 +668,7 @@ void TuningPagesScrollImages(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesFreeKept(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesFreeKept) {
   const uint64_t images = ctx.r3.u64, k = ctx.r4.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_free = ITC_FLAG(native_car_models) && NativeHeapActive();
@@ -678,7 +679,7 @@ void TuningPagesFreeKept(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputVinylView(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputVinylView) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -687,7 +688,7 @@ void TuningPagesInputVinylView(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesLeaveVinylView(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesLeaveVinylView) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -696,11 +697,11 @@ void TuningPagesLeaveVinylView(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesSetLastImage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetLastImage) {
   tp::SetLastImage(base, ctx.r3.u32);
 }
 
-void TuningPagesMoveVinylMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveVinylMenu) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -709,7 +710,7 @@ void TuningPagesMoveVinylMenu(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputVinylPages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputVinylPages) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   WithFit(ctx, base, [&](const tuning_screen::GuestCall& call, const tp::StandFit& fit) {
@@ -719,7 +720,7 @@ void TuningPagesInputVinylPages(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputDecalPosition(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputDecalPosition) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
@@ -728,7 +729,7 @@ void TuningPagesInputDecalPosition(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputDecalAngle(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputDecalAngle) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
@@ -737,7 +738,7 @@ void TuningPagesInputDecalAngle(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputDecalScale(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputDecalScale) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
@@ -746,7 +747,7 @@ void TuningPagesInputDecalScale(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesMoveDecalPosition(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveDecalPosition) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -755,7 +756,7 @@ void TuningPagesMoveDecalPosition(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesMoveDecalAngle(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveDecalAngle) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -764,7 +765,7 @@ void TuningPagesMoveDecalAngle(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesMoveDecalScale(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveDecalScale) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -773,7 +774,7 @@ void TuningPagesMoveDecalScale(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputLayerEdit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputLayerEdit) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
@@ -782,7 +783,7 @@ void TuningPagesInputLayerEdit(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesMoveLayerEdit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveLayerEdit) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -791,7 +792,7 @@ void TuningPagesMoveLayerEdit(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputVinylLayers(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputVinylLayers) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
@@ -800,7 +801,7 @@ void TuningPagesInputVinylLayers(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesMoveVinylLayers(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveVinylLayers) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -809,7 +810,7 @@ void TuningPagesMoveVinylLayers(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputVinylImages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputVinylImages) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
@@ -818,16 +819,16 @@ void TuningPagesInputVinylImages(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesHighlightItem(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesHighlightItem) {
   ctx.r3.u64 =
       tuning_screen::HighlightItem(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32);
 }
 
-void TuningPagesHighlightSelected(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesHighlightSelected) {
   ctx.r3.u64 = tuning_screen::HighlightSelected(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32);
 }
 
-void TuningPagesMoveVinylImages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveVinylImages) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -836,7 +837,7 @@ void TuningPagesMoveVinylImages(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesInputLayerActions(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputLayerActions) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
@@ -845,7 +846,7 @@ void TuningPagesInputLayerActions(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesMoveLayerActions(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveLayerActions) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -854,11 +855,11 @@ void TuningPagesMoveLayerActions(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesBeginLayerOrder(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesBeginLayerOrder) {
   tp::BeginLayerOrder(base, ctx.r3.u64);
 }
 
-void TuningPagesInputLayerOrder(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputLayerOrder) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const tp::PageFlags flags = Flags();
@@ -867,11 +868,11 @@ void TuningPagesInputLayerOrder(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesSwapOrderTextures(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSwapOrderTextures) {
   ctx.r3.u64 = tp::SwapOrderTextures(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void TuningPagesSwapLayerRecords(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSwapLayerRecords) {
   const uint64_t screen = ctx.r3.u64, first = ctx.r4.u64, second = ctx.r5.u64;
   const uint32_t sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -879,15 +880,15 @@ void TuningPagesSwapLayerRecords(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesEndLayerOrder(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesEndLayerOrder) {
   tp::EndLayerOrder(base, ctx.r3.u64);
 }
 
-void TuningPagesShowOrderNodes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesShowOrderNodes) {
   ctx.r3.u64 = tp::ShowOrderNodes(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void TuningPagesMoveLayerOrder(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesMoveLayerOrder) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
@@ -896,19 +897,19 @@ void TuningPagesMoveLayerOrder(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesSetGroupImage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetGroupImage) {
   tp::SetGroupImage(base, ctx.r3.u64, ctx.r4.u64);
 }
 
-void TuningPagesSetImageGroup(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetImageGroup) {
   tp::SetImageGroup(base, ctx.r3.u64, ctx.r4.u64);
 }
 
-void TuningPagesResetStickerEditor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesResetStickerEditor) {
   ctx.r3.u64 = tp::ResetStickerEditor(base, ctx.r3.u64);
 }
 
-void TuningPagesRestoreAreaDecals(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesRestoreAreaDecals) {
   const uint64_t screen = ctx.r3.u64, area = ctx.r4.u64;
   const uint32_t sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -916,7 +917,7 @@ void TuningPagesRestoreAreaDecals(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesLoadStickers(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesLoadStickers) {
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -924,7 +925,7 @@ void TuningPagesLoadStickers(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesHandleInput(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesHandleInput) {
   ctx.fpscr.disableFlushMode();  // the sticker pages' floats (PlaceStickerNode, D's steps)
   const uint64_t screen = ctx.r3.u64, r4 = ctx.r4.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -940,7 +941,7 @@ namespace {
 // A sticker page's step: r3 the screen, flush-to-zero off.
 using StickerPage = uint64_t (*)(uint8_t*, const tuning_screen::GuestCall&, uint64_t, uint32_t,
                                  const tp::PageFlags&);
-void RunStickerPage(PPCContext& ctx, uint8_t* base, StickerPage page) {
+void RunStickerPage(lifted::Regs& ctx, uint8_t* base, StickerPage page) {
   ctx.fpscr.disableFlushMode();
   const uint64_t screen = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -952,7 +953,7 @@ void RunStickerPage(PPCContext& ctx, uint8_t* base, StickerPage page) {
 
 }  // namespace
 
-void TuningPagesUpdateSoloHold(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesUpdateSoloHold) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) -> uint64_t {
@@ -960,7 +961,7 @@ void TuningPagesUpdateSoloHold(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesUpdatePreviewHold(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesUpdatePreviewHold) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   const bool native_slots = ITC_FLAG(native_action_mappers);
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) -> uint64_t {
@@ -968,121 +969,121 @@ void TuningPagesUpdatePreviewHold(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void TuningPagesStepUnlockedSticker(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesStepUnlockedSticker) {
   ctx.r3.u64 = tp::StepUnlockedSticker(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64);
 }
 
-void TuningPagesShowSlotNode(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesShowSlotNode) {
   ctx.r3.u64 = tp::ShowSlotNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
 }
 
-void TuningPagesPlaceStickerNode(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesPlaceStickerNode) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 =
       tp::PlaceStickerNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
 }
 
-void TuningPagesSetSlot(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetSlot) {
   ctx.r3.u64 = tp::SetSlot(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                            ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, ctx.r1.u32);
 }
 
-void TuningPagesSetStickerEditTexts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesSetStickerEditTexts) {
   const uint32_t screen = ctx.r3.u32, sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
     return tp::SetStickerEditTexts(base, call, screen, sp);
   });
 }
 
-void TuningPagesShowSlotImage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesShowSlotImage) {
   ctx.r3.u64 = tp::ShowSlotImage(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
-void TuningPagesShowStickerListImage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesShowStickerListImage) {
   ctx.r3.u64 = tp::ShowStickerListImage(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
-void TuningPagesShowStickerOrder(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesShowStickerOrder) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = tp::ShowStickerOrder(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void TuningPagesAnimateStickerAreas(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesAnimateStickerAreas) {
   const uint32_t screen = ctx.r3.u32, show = ctx.r4.u32, sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
     return tp::AnimateStickerAreas(base, call, screen, show, sp);
   });
 }
 
-void TuningPagesAnimateStickerOperate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesAnimateStickerOperate) {
   const uint32_t screen = ctx.r3.u32, show = ctx.r4.u32, sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
     return tp::AnimateStickerOperate(base, call, screen, show, sp);
   });
 }
 
-void TuningPagesAnimateStickerSlots(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesAnimateStickerSlots) {
   const uint32_t screen = ctx.r3.u32, show = ctx.r4.u32, sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
     return tp::AnimateStickerSlots(base, call, screen, show, sp);
   });
 }
 
-void TuningPagesAnimateStickerEditMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesAnimateStickerEditMenu) {
   const uint32_t screen = ctx.r3.u32, show = ctx.r4.u32, sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
     return tp::AnimateStickerEditMenu(base, call, screen, show, sp);
   });
 }
 
-void TuningPagesShowStickerPicker(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesShowStickerPicker) {
   const uint32_t screen = ctx.r3.u32, show = ctx.r4.u32, sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
     return tp::ShowStickerPicker(base, call, screen, show, sp);
   });
 }
 
-void TuningPagesInputStickerAreas(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputStickerAreas) {
   RunStickerPage(ctx, base, tp::InputStickerAreas);
 }
 
-void TuningPagesInputStickerSlots(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputStickerSlots) {
   RunStickerPage(ctx, base, tp::InputStickerSlots);
 }
 
-void TuningPagesInputStickerOperate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputStickerOperate) {
   RunStickerPage(ctx, base, tp::InputStickerOperate);
 }
 
-void TuningPagesInputStickerEdit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputStickerEdit) {
   RunStickerPage(ctx, base, tp::InputStickerEdit);
 }
 
-void TuningPagesInputStickerView(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputStickerView) {
   RunStickerPage(ctx, base, tp::InputStickerView);
 }
 
-void TuningPagesInputStickerOrder(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputStickerOrder) {
   RunStickerPage(ctx, base, tp::InputStickerOrder);
 }
 
-void TuningPagesInputStickerPicker(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputStickerPicker) {
   RunStickerPage(ctx, base, tp::InputStickerPicker);
 }
 
-void TuningPagesInputStickerMove(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputStickerMove) {
   RunStickerPage(ctx, base, tp::InputStickerMove);
 }
 
-void TuningPagesInputStickerRotate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputStickerRotate) {
   RunStickerPage(ctx, base, tp::InputStickerRotate);
 }
 
-void TuningPagesInputStickerScale(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TuningPagesInputStickerScale) {
   RunStickerPage(ctx, base, tp::InputStickerScale);
 }
 
-void TuningPagesStickerCommand(PPCContext& ctx, uint8_t* base, uint32_t command) {
+void TuningPagesStickerCommand(lifted::Regs& ctx, uint8_t* base, uint32_t command) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
   WithCalls(ctx, base, [&](const tuning_screen::GuestCall& call) {
@@ -1094,12 +1095,7 @@ void TuningPagesStickerCommand(PPCContext& ctx, uint8_t* base, uint32_t command)
 
 // Defines an adapter: the flag, else the original.
 #define ITC_TUNING_PAGES(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_tuning_pages)) { \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_tuning_pages)) { \
     hooks::step(ctx, base);               \
   }
 

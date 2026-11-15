@@ -654,7 +654,7 @@ void TuningRefresh(Context& h) {
         const ui_movies_hooks::UpdateCalleeStandIn stand_in =
             ui_movies_hooks::g_update_callee_stand_in;
         ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
-        (v == 0 ? __imp__sub_821E6C50 : hooks::TuningUpdate)(t, base);
+        (v == 0 ? __imp__sub_821E6C50 : ITC_CONTEXT_FN(hooks::TuningUpdate))(t, base);
         ui_movies_hooks::g_update_callee_stand_in = stand_in;
         out[v].Word(uint32_t(g_updates.size()));
         for (const UpdateCall& call : g_updates) {
@@ -666,7 +666,7 @@ void TuningRefresh(Context& h) {
           out[v].Word(uint32_t(call.r4));
         }
       } else {
-        (v == 0 ? __imp__sub_821E3AD0 : hooks::TuningRefresh)(t, base);
+        (v == 0 ? __imp__sub_821E3AD0 : ITC_CONTEXT_FN(hooks::TuningRefresh))(t, base);
       }
       // The recompiled callee's frame (RefreshPaint's and RefreshMovie14's
       // 112 bytes with r30 and r31 saved inline, RefreshLightKits' 144 with

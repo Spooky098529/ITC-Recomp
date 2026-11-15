@@ -69,7 +69,7 @@ void LastError(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = 0xCDCDCDCDCDCDCDCDull;
       t.r11.u64 = 0xCDCDCDCDCDCDCDCDull;
-      (v == 0 ? __imp__sub_82296EC0 : i % 2 ? sub_82295F18 : NativeGetLastError)(t, base);
+      (v == 0 ? __imp__sub_82296EC0 : i % 2 ? sub_82295F18 : ITC_CONTEXT_FN(NativeGetLastError))(t, base);
       guest::StoreU32(base, pcr + 336, saved_dpc);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));

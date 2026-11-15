@@ -333,8 +333,8 @@ void Sampling(Context& h) {
     bool time;     // f1 = a step or a time
   };
   const Function functions[] = {
-      {"sub_825A6670 TrackSet::Clear", __imp__sub_825A6670, NativeClear, Result::kNone, 0},
-      {"sub_825A1B70 TrackSet::TrackSet", __imp__sub_825A1B70, NativeConstruct, Result::kR3, 0},
+      {"sub_825A6670 TrackSet::Clear", __imp__sub_825A6670, ITC_CONTEXT_FN(NativeClear), Result::kNone, 0},
+      {"sub_825A1B70 TrackSet::TrackSet", __imp__sub_825A1B70, ITC_CONTEXT_FN(NativeConstruct), Result::kR3, 0},
       {"sub_825A6690 TrackSet::View", __imp__sub_825A6690, NativeView, Result::kNone, 0},
       {"sub_825A66D8 TrackSet::Count", __imp__sub_825A66D8, NativeCount, Result::kR3, 0},
       {"sub_825A1F08 TrackSet::StartTime", __imp__sub_825A1F08, NativeStartTime, Result::kF1, 0},
@@ -455,7 +455,7 @@ void Lifetime(Context& h) {
   };
   const Function functions[] = {
       {"sub_825A11D0 TrackSet::ReleaseArray", __imp__sub_825A11D0, NativeReleaseArray, 0, 16, 0},
-      {"sub_825A1BA8 TrackSet::Release", __imp__sub_825A1BA8, NativeRelease, 0, 0, 0},
+      {"sub_825A1BA8 TrackSet::Release", __imp__sub_825A1BA8, ITC_CONTEXT_FN(NativeRelease), 0, 0, 0},
       {"sub_825A1E08 TrackSet::SetupFloat4", __imp__sub_825A1E08, NativeSetupFloat4, 16, 16, 12},
       {"sub_825A1BE8 TrackSet::SetupFloat", __imp__sub_825A1BE8, NativeSetupFloat, 4, 0, 0},
       {"sub_825A1218 TrackSet::Setup32", __imp__sub_825A1218, NativeSetup32, 32, 16, 16},
@@ -661,7 +661,7 @@ void Skeletons(Context& h) {
   const Function functions[] = {
       {"sub_8259A140 SkeletonBase::SkeletonBase", __imp__sub_8259A140, NativeBaseConstruct,
        Result::kR3, Target::kSkeleton, 0},
-      {"sub_82599758 Skeleton::Skeleton", __imp__sub_82599758, NativeSkeletonConstruct,
+      {"sub_82599758 Skeleton::Skeleton", __imp__sub_82599758, ITC_CONTEXT_FN(NativeSkeletonConstruct),
        Result::kR3, Target::kSkeleton, 0},
       {"sub_825A2068 SkeletonCursor::Clear", __imp__sub_825A2068, NativeCursorClear,
        Result::kNone, Target::kCursor, 0},
@@ -673,10 +673,10 @@ void Skeletons(Context& h) {
        Target::kSkeleton, 0},
       {"sub_825997E0 Skeleton::LoadNodeValues", __imp__sub_825997E0, NativeLoadNodeValues,
        Result::kNone, Target::kSkeleton, 0},
-      {"sub_825998A0 Skeleton::UpdateMatrices", __imp__sub_825998A0, NativeUpdateMatrices,
+      {"sub_825998A0 Skeleton::UpdateMatrices", __imp__sub_825998A0, ITC_CONTEXT_FN(NativeUpdateMatrices),
        Result::kNone, Target::kSkeleton, 0},
       {"sub_8259C3A8 Skeleton::UpdateNodeMatrices", __imp__sub_8259C3A8,
-       NativeUpdateNodeMatrices, Result::kNone, Target::kSkeleton, 0},
+       ITC_CONTEXT_FN(NativeUpdateNodeMatrices), Result::kNone, Target::kSkeleton, 0},
       {"sub_825998B8 Skeleton::ApplyAnimation", __imp__sub_825998B8, NativeApplyAnimation,
        Result::kNone, Target::kSkeleton, 0},
       // r3 isn't compared: it ends as Skeleton::ApplyAnimation leaves it (its

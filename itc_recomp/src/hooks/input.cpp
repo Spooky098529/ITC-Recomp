@@ -11,6 +11,7 @@
 // passes leaves what the logic pass set in place for them, as at 30 fps.
 
 #include "action_mappers/action_mappers.h"
+#include "hooks/native_entry.h"
 #include "debug/pause_menu_log.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
@@ -23,8 +24,8 @@ ITC_FLAG_BOOL(input_mappers_by_tick, true, "ITC",
               "Update the action mappers (sub_8210B018) on logic passes only, so menu "
               "input repeats at the game's rate at any frame rate");
 
-extern "C" REX_FUNC(sub_8210B018) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8210B018) {
+  
   if (ITC_FLAG(input_mappers_by_tick) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
     return;
   }
@@ -39,5 +40,5 @@ extern "C" REX_FUNC(sub_8210B018) {
     ctx.f1.f64 = f1;
     return;
   }
-  __imp__sub_8210B018(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8210B018);
 }

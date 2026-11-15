@@ -29,6 +29,7 @@
 // isn't native).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/guest_call.h"
@@ -90,12 +91,7 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
 
 #define ITC_POST_EFFECTS(address, ...)    \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_post_effects)) { \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_post_effects)) { \
     __VA_ARGS__;                          \
   }
 
@@ -123,12 +119,7 @@ ITC_POST_EFFECTS(82133A70, uint32_t r3 = 0; const uint64_t lr = ctx.lr;
 // --- The glow's setters: r3 = the glow, f1 = the value ---
 
 #define ITC_GLOW_SET(address, offset)                   \
-  extern "C" REX_FUNC(sub_##address) {                  \
-    REX_FUNC_PROLOGUE();                                \
-    if (!ITC_FLAG(native_post_effects)) {               \
-      __imp__sub_##address(ctx, base);                  \
-      return;                                           \
-    }                                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_post_effects)) { \
     ctx.fpscr.disableFlushMode();                       \
     GlowSet(base, ctx.r3.u32, offset, ctx.f1.f64);      \
   }
@@ -177,8 +168,8 @@ ITC_POST_EFFECTS(82135148, ctx.fpscr.disableFlushMode();
 
 // Runs the original when the plain C++ has no answer (the list full).
 #define ITC_POST_EFFECTS_RECORD(address, ...)                 \
-  extern "C" REX_FUNC(sub_##address) {                        \
-    REX_FUNC_PROLOGUE();                                      \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                        \
+    \
     std::optional<uint32_t> r3;                               \
     if (ITC_FLAG(native_post_effects)) {                      \
       r3 = __VA_ARGS__;                                       \
@@ -222,7 +213,7 @@ bool FreesNative() {
 // The video output, as the device's users reach it: `[0x8266D088]`'s vtable
 // slot 7, then that object's slot 3, as guest calls with the original's
 // return addresses. r3 = the video output after.
-uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
+uint32_t VideoOutputCall(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
   ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
@@ -243,13 +234,13 @@ uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_
 
 namespace hooks {
 
-void PostEffectsReleaseTexture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PostEffectsReleaseTexture) {
   std::optional<uint32_t> r3;
   if (FreesNative()) {
     r3 = RenderTexturesRelease(base, ctx.r3.u32);
   }
   if (!r3) {
-    __imp__sub_821332F0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821332F0);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -259,9 +250,9 @@ void PostEffectsReleaseTexture(PPCContext& ctx, uint8_t* base) {
 // pointer) natively, its guest calls from a frame like the original's (112
 // bytes), or the original without the native device lock; its adapter's
 // body, as ReleaseTexture.
-void PostEffectsReleaseSurface(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PostEffectsReleaseSurface) {
   if (!ITC_FLAG(native_video_output)) {
-    __imp__sub_82133C60(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82133C60);
     return;
   }
   const uint32_t at = ctx.r3.u32;
@@ -285,7 +276,7 @@ void PostEffectsReleaseSurface(PPCContext& ctx, uint8_t* base) {
 }
 
 // The destructors' calls: the two above, r3 = the field's address.
-DestroyCalls PostEffectsDestroyCalls(PPCContext& ctx, uint8_t* base) {
+DestroyCalls PostEffectsDestroyCalls(lifted::Regs& ctx, uint8_t* base) {
   return {[&ctx, base](uint32_t at) {
             ctx.r3.u64 = at;
             PostEffectsReleaseSurface(ctx, base);
@@ -308,7 +299,7 @@ namespace {
 
 // PostEffects::Create's guest calls (the video output's slots with the
 // original's return addresses; the constructors of kinds 1 and 4).
-CreateCalls MakeCreateCalls(PPCContext& ctx, uint8_t* base) {
+CreateCalls MakeCreateCalls(lifted::Regs& ctx, uint8_t* base) {
   return {[&ctx, base](int which) {
             return which == 0 ? VideoOutputCall(ctx, base, 0x82138A54, 0x82138A64)
                               : VideoOutputCall(ctx, base, 0x82138C18, 0x82138C28);
@@ -333,10 +324,10 @@ CreateCalls MakeCreateCalls(PPCContext& ctx, uint8_t* base) {
 // PostEffects::Create: r3 = the device or 0, r4 = the effect's index. The
 // guest calls from a frame like the original's (128 bytes); with the
 // allocation layer only.
-extern "C" REX_FUNC(sub_82138A18) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82138A18) {
+  
   if (!ITC_FLAG(native_post_effects) || !hooks::NativeHeapActive()) {
-    __imp__sub_82138A18(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82138A18);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -356,9 +347,9 @@ extern "C" REX_FUNC(sub_82138A18) {
 // frame like the original's (112 bytes; PostEffects::Create's below it, 128
 // bytes, and memcpy's, where CreateVertexDeclaration's plain C++ hands it
 // back, below CreateVertexDeclaration's, 160 bytes).
-void hooks::PostEffectsInitBoot(PPCContext& ctx, uint8_t* base) {
+void hooks::PostEffectsInitBoot(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_post_effects) || !hooks::NativeHeapActive()) {
-    __imp__sub_82138C38(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82138C38);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -396,7 +387,7 @@ void hooks::PostEffectsInitBoot(PPCContext& ctx, uint8_t* base) {
 
 namespace hooks {
 
-RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base) {
+RecordCalls PostEffectsRecordCalls(lifted::Regs& ctx, uint8_t* base) {
   RecordCalls calls;
   calls.call = [&ctx, base](uint32_t function, const uint64_t* regs, int count,
                             const double* fregs, int fcount, uint32_t sp,
@@ -404,12 +395,12 @@ RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
-    PPCRegister* gprs[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+    lifted::Temp* gprs[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
                             &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
     for (int i = 0; i < count; i++) {
       gprs[i]->u64 = regs[i];
     }
-    PPCRegister* fprs[4] = {&ctx.f1, &ctx.f2, &ctx.f3, &ctx.f4};
+    lifted::Temp* fprs[4] = {&ctx.f1, &ctx.f2, &ctx.f3, &ctx.f4};
     for (int i = 0; i < fcount; i++) {
       fprs[i]->f64 = fregs[i];
     }
@@ -436,8 +427,8 @@ RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base) {
 // r3 = the effect. The original where the plain C++ declines (a full list,
 // an open chunk), with r3 the effect again.
 #define ITC_POST_EFFECT_RECORD(address, Record)                                         \
-  extern "C" REX_FUNC(sub_##address) {                                                 \
-    REX_FUNC_PROLOGUE();                                                               \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                                 \
+    \
     std::optional<uint32_t> r3;                                                        \
     if (ITC_FLAG(native_post_effects)) {                                               \
       ctx.fpscr.disableFlushMode();                                                    \
@@ -454,7 +445,7 @@ RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = *r3;                                                                  \
   }
 
-void hooks::PostEffectsGlowRecord(PPCContext& ctx, uint8_t* base) {
+void hooks::PostEffectsGlowRecord(lifted::Regs& ctx, uint8_t* base) {
   std::optional<uint32_t> r3;
   if (ITC_FLAG(native_post_effects)) {
     ctx.fpscr.disableFlushMode();
@@ -465,7 +456,7 @@ void hooks::PostEffectsGlowRecord(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = glow;
   }
   if (!r3) {
-    __imp__sub_821379D8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821379D8);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -483,8 +474,8 @@ ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
 // The deleting destructors (vtable slot 1): r4 bit 0 = delete. The
 // original where the delete isn't native.
 #define ITC_POST_EFFECT_DELETE(address, kind)                                          \
-  extern "C" REX_FUNC(sub_##address) {                                                 \
-    REX_FUNC_PROLOGUE();                                                               \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                                 \
+    \
     if (!ITC_FLAG(native_post_effects) || ((ctx.r4.u32 & 1) != 0 && !FreesNative())) { \
       __imp__sub_##address(ctx, base);                                                 \
       return;                                                                          \

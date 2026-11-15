@@ -12,6 +12,7 @@
 // and +48, and stay recompiled. See B4 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "game_data/game_data.h"
 
@@ -69,7 +70,7 @@ void Reset(uint8_t* base, uint32_t source) {
 // moves +88 on; +48 = 1 when fewer bytes than asked were read (or none, at
 // the end). 0, or an error when the file can't be read. The looping Read
 // differs only in reading ahead past the end from the start.
-void Read(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Read) {
   const uint32_t source = ctx.r3.u32, destination = ctx.r4.u32, size = ctx.r5.u32,
                  read_out = ctx.r6.u32;
   const uint32_t handle = guest::LoadU32(base, source + 44);
@@ -112,8 +113,8 @@ void Read(PPCContext& ctx, uint8_t* base) {
 // what the source had open (+48), opens the file, +64 = its size, then the
 // set-up (+116) and its result. A missing file: 0x80070002 (as the SDK's
 // failure gave through the source's +32), +44 = -1.
-extern "C" REX_FUNC(sub_82487C48) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82487C48) {
+  
   const uint32_t source = ctx.r3.u32;
   const std::string path = GuestString(base, ctx.r4.u32);
   if (ITC_FLAG(log_file_opens)) {
@@ -122,7 +123,7 @@ extern "C" REX_FUNC(sub_82487C48) {
   auto relative = game_data::RelativePath(path);
   if (!relative) {
     ITC_LOG_WARN("movie source: \"{}\" isn't game data: opened by the recompiled OpenFile", path);
-    __imp__sub_82487C48(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82487C48);
     return;
   }
   const uint32_t blocks = ctx.r6.u32, block_size = ctx.r7.u32, count = ctx.r8.u32,
@@ -154,11 +155,11 @@ extern "C" REX_FUNC(sub_82487C48) {
 // them with reads; ours reads straight from the file, so only the fields the
 // reads and seeks use are set: +48 = 0, +104 the block size, +116 the blocks
 // ahead (1 for 0); no blocks (+108, +124 and +132 stay 0). 0.
-extern "C" REX_FUNC(sub_82487F68) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82487F68) {
+  
   const uint32_t source = ctx.r3.u32;
   if (!Ours(base, source)) {
-    __imp__sub_82487F68(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82487F68);
     return;
   }
   guest::StoreU32(base, source + 48, 0);
@@ -171,14 +172,14 @@ extern "C" REX_FUNC(sub_82487F68) {
 // source. Closes our handle (one the caller gave, flag 4, isn't ours) and
 // resets the source; 0. A source that's closed with no blocks is reset as
 // the recompiled one does; one on another handle, or with blocks, goes to it.
-extern "C" REX_FUNC(sub_824880D8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(824880D8) {
+  
   const uint32_t source = ctx.r3.u32;
   const uint32_t handle = guest::LoadU32(base, source + 44);
   const bool no_blocks =
       !guest::LoadU32(base, source + 124) && !guest::LoadU32(base, source + 132);
   if (!(game_data::IsHandle(handle) || handle == kClosed) || !no_blocks) {
-    __imp__sub_824880D8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_824880D8);
     return;
   }
   if (handle != kClosed && !(guest::LoadU32(base, source + 120) & 4)) {
@@ -189,10 +190,10 @@ extern "C" REX_FUNC(sub_824880D8) {
 }
 
 // Read (vtable +60).
-extern "C" REX_FUNC(sub_82488598) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82488598) {
+  
   if (!Ours(base, ctx.r3.u32)) {
-    __imp__sub_82488598(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82488598);
     return;
   }
   Read(ctx, base);
@@ -200,10 +201,10 @@ extern "C" REX_FUNC(sub_82488598) {
 
 // The looping Read (vtable +128, from Read when flag 8 is set; never in
 // play).
-extern "C" REX_FUNC(sub_82488A10) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82488A10) {
+  
   if (!Ours(base, ctx.r3.u32)) {
-    __imp__sub_82488A10(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82488A10);
     return;
   }
   Read(ctx, base);

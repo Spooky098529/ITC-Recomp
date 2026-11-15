@@ -161,7 +161,7 @@ void Wheels(Context& h, Random& r, uint32_t block) {
              t.r3.u64 = block + kOther;
              t.r4.u64 = block + kSmall + 4 * r.Below(16);
            },
-           __imp__sub_820D8EC0, hooks::LoadPollWheelsSetRecord, fmt::format("case {}", c));
+           __imp__sub_820D8EC0, ITC_CONTEXT_FN(hooks::LoadPollWheelsSetRecord), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -175,7 +175,7 @@ void Wheels(Context& h, Random& r, uint32_t block) {
              MakeModel(h.base, block, wheels + 2800, 1, r);
              t.r3.u64 = wheels;
            },
-           __imp__sub_820D8ED0, hooks::LoadPollWheelsSetCaliperTexture,
+           __imp__sub_820D8ED0, ITC_CONTEXT_FN(hooks::LoadPollWheelsSetCaliperTexture),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -201,7 +201,7 @@ void CarModels(Context& h, Random& r, uint32_t block) {
              Put(h.base, car + 3748, SlotState(r));
              t.r3.u64 = car;
            },
-           __imp__sub_820D4048, hooks::LoadPollCarModelIsReady, fmt::format("case {}", c));
+           __imp__sub_820D4048, ITC_CONTEXT_FN(hooks::LoadPollCarModelIsReady), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -218,7 +218,7 @@ void CarModels(Context& h, Random& r, uint32_t block) {
              Put(h.base, parts + 24, block + kCar);
              t.r3.u64 = parts;
            },
-           __imp__sub_820D72D8, hooks::LoadPollCarPartsSetVinylTextures,
+           __imp__sub_820D72D8, ITC_CONTEXT_FN(hooks::LoadPollCarPartsSetVinylTextures),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -237,7 +237,7 @@ void Interiors(Context& h, Random& r, uint32_t block) {
              t.r3.u64 = block + kObject + 400;
              t.r4.u64 = c < 10 ? kBlocks[c] : uint32_t(r.Next());
            },
-           __imp__sub_820E3040, hooks::LoadPollInteriorDialsSetBlock,
+           __imp__sub_820E3040, ITC_CONTEXT_FN(hooks::LoadPollInteriorDialsSetBlock),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -274,7 +274,7 @@ void Interiors(Context& h, Random& r, uint32_t block) {
     Results results("SceneInterior::SetGauges (sub_820E3938)");
     for (int c = 0; c < 16; c++) {
       Case(h, results, block, r, [&](PPCContext& t) { interior(t, c % 4 != 0); },
-           __imp__sub_820E3938, hooks::LoadPollSceneInteriorSetGauges,
+           __imp__sub_820E3938, ITC_CONTEXT_FN(hooks::LoadPollSceneInteriorSetGauges),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -289,7 +289,7 @@ void Interiors(Context& h, Random& r, uint32_t block) {
              t.r4.u64 = c < 14 ? uint32_t(c % 7) : 7 + r.Below(4);
              t.r5.u64 = r.Next();
            },
-           __imp__sub_820E32E8, hooks::LoadPollInteriorMetersSetGauge,
+           __imp__sub_820E32E8, ITC_CONTEXT_FN(hooks::LoadPollInteriorMetersSetGauge),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -317,7 +317,7 @@ void LightsAndTraffic(Context& h, Random& r, uint32_t block) {
     Results results("SceneLights::Finish (sub_820DDA60)");
     for (int c = 0; c < 16; c++) {
       Case(h, results, block, r, [&](PPCContext& t) { kit(t, c % 5 == 0); },
-           __imp__sub_820DDA60, hooks::LoadPollSceneLightsFinish, fmt::format("case {}", c));
+           __imp__sub_820DDA60, ITC_CONTEXT_FN(hooks::LoadPollSceneLightsFinish), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -329,7 +329,7 @@ void LightsAndTraffic(Context& h, Random& r, uint32_t block) {
              kit(t, false);
              t.r4.u64 = block + kSmall + 4 * r.Below(32);
            },
-           __imp__sub_820DCB70, hooks::LoadPollSceneLightsSetRecord, fmt::format("case {}", c));
+           __imp__sub_820DCB70, ITC_CONTEXT_FN(hooks::LoadPollSceneLightsSetRecord), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -341,7 +341,7 @@ void LightsAndTraffic(Context& h, Random& r, uint32_t block) {
              kit(t, false);
              t.r4.u64 = block + kSmall + 4 * r.Below(32);
            },
-           __imp__sub_820DCBC0, hooks::LoadPollSceneLightsApplyRecord,
+           __imp__sub_820DCBC0, ITC_CONTEXT_FN(hooks::LoadPollSceneLightsApplyRecord),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -366,7 +366,7 @@ void LightsAndTraffic(Context& h, Random& r, uint32_t block) {
              }
              t.r3.u64 = body;
            },
-           __imp__sub_820E5A68, hooks::LoadPollSceneTrafficFinish, fmt::format("case {}", c));
+           __imp__sub_820E5A68, ITC_CONTEXT_FN(hooks::LoadPollSceneTrafficFinish), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -452,7 +452,7 @@ void Paint(Context& h, Random& r, uint32_t block) {
              Put(h.base, model + 32, traffic ? 3 : r.Below(3));
              t.r3.u64 = model;
            },
-           __imp__sub_820D9B68, hooks::LoadPollSceneModelApplyPaint, fmt::format("case {}", c));
+           __imp__sub_820D9B68, ITC_CONTEXT_FN(hooks::LoadPollSceneModelApplyPaint), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -471,7 +471,7 @@ void Paint(Context& h, Random& r, uint32_t block) {
              }
              t.r3.u64 = model;
            },
-           __imp__sub_820D9C50, hooks::LoadPollSceneModelApplyWheelPaint,
+           __imp__sub_820D9C50, ITC_CONTEXT_FN(hooks::LoadPollSceneModelApplyWheelPaint),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -501,19 +501,19 @@ void Paint(Context& h, Random& r, uint32_t block) {
   };
   const Step steps[] = {
       {"SceneParts::ApplyPaint (sub_820E0908)", __imp__sub_820E0908,
-       hooks::LoadPollScenePartsApplyPaint, 0},
+       ITC_CONTEXT_FN(hooks::LoadPollScenePartsApplyPaint), 0},
       {"SceneInterior::ApplyPaint (sub_820E4250)", __imp__sub_820E4250,
-       hooks::LoadPollSceneInteriorApplyPaint, 1},
+       ITC_CONTEXT_FN(hooks::LoadPollSceneInteriorApplyPaint), 1},
       {"SceneCockpit::ApplyPaint (sub_820DC138)", __imp__sub_820DC138,
-       hooks::LoadPollSceneCockpitApplyPaint, 2},
+       ITC_CONTEXT_FN(hooks::LoadPollSceneCockpitApplyPaint), 2},
       {"SceneTraffic::ApplyPaint (sub_820E61D0)", __imp__sub_820E61D0,
-       hooks::LoadPollSceneTrafficApplyPaint, 3},
+       ITC_CONTEXT_FN(hooks::LoadPollSceneTrafficApplyPaint), 3},
       {"TrafficCar::SetPaint (sub_820D7E18)", __imp__sub_820D7E18,
-       hooks::LoadPollTrafficCarSetPaint, 4},
+       ITC_CONTEXT_FN(hooks::LoadPollTrafficCarSetPaint), 4},
       {"SceneWheels::ApplyPaint (sub_820E8A00)", __imp__sub_820E8A00,
-       hooks::LoadPollSceneWheelsApplyPaint, 5},
+       ITC_CONTEXT_FN(hooks::LoadPollSceneWheelsApplyPaint), 5},
       {"Wheels::ApplyPaint (sub_820D91E0)", __imp__sub_820D91E0,
-       hooks::LoadPollWheelsApplyPaint, 6},
+       ITC_CONTEXT_FN(hooks::LoadPollWheelsApplyPaint), 6},
   };
   for (const Step& step : steps) {
     Results results(step.name);
@@ -596,7 +596,7 @@ void Builds(Context& h, Random& r, uint32_t block) {
              Put(h.base, object + 11656, r.Below(2));
              t.r3.u64 = object;
            },
-           __imp__sub_820E4140, hooks::LoadPollSceneInteriorFinish, fmt::format("case {}", c));
+           __imp__sub_820E4140, ITC_CONTEXT_FN(hooks::LoadPollSceneInteriorFinish), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -643,7 +643,7 @@ void Builds(Context& h, Random& r, uint32_t block) {
              }
              t.r3.u64 = object;
            },
-           __imp__sub_820E8908, hooks::LoadPollSceneWheelsSetUpPoints,
+           __imp__sub_820E8908, ITC_CONTEXT_FN(hooks::LoadPollSceneWheelsSetUpPoints),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -673,7 +673,7 @@ void Builds(Context& h, Random& r, uint32_t block) {
   {
     Results results("SceneParts::Build (sub_820E05E0)");
     for (int c = 0; c < 12; c++) {
-      Case(h, results, block, r, parts, __imp__sub_820E05E0, hooks::LoadPollScenePartsBuild,
+      Case(h, results, block, r, parts, __imp__sub_820E05E0, ITC_CONTEXT_FN(hooks::LoadPollScenePartsBuild),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -688,7 +688,7 @@ void Builds(Context& h, Random& r, uint32_t block) {
                Put(h.base, block + kObject + 32 + 4 * k, ModelWord(h.base, block, r, true));
              }
            },
-           __imp__sub_820DF250, hooks::LoadPollScenePartsSetSelectedTexture,
+           __imp__sub_820DF250, ITC_CONTEXT_FN(hooks::LoadPollScenePartsSetSelectedTexture),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -714,7 +714,7 @@ void Finishers(Context& h, Random& r, uint32_t block) {
   {
     Results results("Wheels::BindTextures (sub_820D9638)");
     for (int c = 0; c < 12; c++) {
-      Case(h, results, block, r, wheels, __imp__sub_820D9638, hooks::LoadPollWheelsBindTextures,
+      Case(h, results, block, r, wheels, __imp__sub_820D9638, ITC_CONTEXT_FN(hooks::LoadPollWheelsBindTextures),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -730,14 +730,14 @@ void Finishers(Context& h, Random& r, uint32_t block) {
              Put(h.base, object + 16768, c % 5 == 0 ? 1 : 0);
              t.r3.u64 = object;
            },
-           __imp__sub_820E7328, hooks::LoadPollSceneWheelsFinish, fmt::format("case {}", c));
+           __imp__sub_820E7328, ITC_CONTEXT_FN(hooks::LoadPollSceneWheelsFinish), fmt::format("case {}", c));
     }
     results.Report();
   }
   {
     Results results("Wheels::ApplyPalette (sub_820D92A0)");
     for (int c = 0; c < 12; c++) {
-      Case(h, results, block, r, wheels, __imp__sub_820D92A0, hooks::LoadPollWheelsApplyPalette,
+      Case(h, results, block, r, wheels, __imp__sub_820D92A0, ITC_CONTEXT_FN(hooks::LoadPollWheelsApplyPalette),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -768,7 +768,7 @@ void Finishers(Context& h, Random& r, uint32_t block) {
              Put(h.base, scene + 4, r.Below(3));
              t.r3.u64 = object;
            },
-           __imp__sub_820E2E68, hooks::LoadPollScenePartsFinish, fmt::format("case {}", c));
+           __imp__sub_820E2E68, ITC_CONTEXT_FN(hooks::LoadPollScenePartsFinish), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -803,7 +803,7 @@ void Finishers(Context& h, Random& r, uint32_t block) {
              }
              t.r3.u64 = cockpit;
            },
-           __imp__sub_820DBFF8, hooks::LoadPollSceneCockpitFinish, fmt::format("case {}", c));
+           __imp__sub_820DBFF8, ITC_CONTEXT_FN(hooks::LoadPollSceneCockpitFinish), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -945,7 +945,7 @@ void Poll(Context& h, Random& r, uint32_t block) {
              PollWorld(h.base, block, model, r, c % 4 == 1);
              t.r3.u64 = model;
            },
-           __imp__sub_820D9EA0, hooks::LoadPollSceneModelApplyPalettes,
+           __imp__sub_820D9EA0, ITC_CONTEXT_FN(hooks::LoadPollSceneModelApplyPalettes),
            fmt::format("case {}", c));
     }
     results.Report();
@@ -959,7 +959,7 @@ void Poll(Context& h, Random& r, uint32_t block) {
              PollWorld(h.base, block, model, r, c % 4 == 1);
              t.r3.u64 = model;
            },
-           __imp__sub_820DA318, hooks::LoadPollSceneModelPollLoad, fmt::format("case {}", c));
+           __imp__sub_820DA318, ITC_CONTEXT_FN(hooks::LoadPollSceneModelPollLoad), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -1020,7 +1020,7 @@ void Applies(Context& h, Random& r, uint32_t block) {
              t.r3.u64 = object;
              t.r4.u64 = record;
            },
-           __imp__sub_820E08B0, hooks::SceneModelsPartsApply, fmt::format("case {}", c));
+           __imp__sub_820E08B0, ITC_CONTEXT_FN(hooks::SceneModelsPartsApply), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -1037,7 +1037,7 @@ void Applies(Context& h, Random& r, uint32_t block) {
              t.r3.u64 = object;
              t.r4.u64 = record;
            },
-           __imp__sub_820E4258, hooks::SceneModelsInteriorApply, fmt::format("case {}", c));
+           __imp__sub_820E4258, ITC_CONTEXT_FN(hooks::SceneModelsInteriorApply), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -1086,7 +1086,7 @@ void Applies(Context& h, Random& r, uint32_t block) {
              InteriorRecord(h.base, model + 3804, r);
              t.r3.u64 = model;
            },
-           __imp__sub_820DA758, hooks::SceneModelsApplyRecord, fmt::format("case {}", c),
+           __imp__sub_820DA758, ITC_CONTEXT_FN(hooks::SceneModelsApplyRecord), fmt::format("case {}", c),
            [&](const PPCContext& t) { applied += t.r3.u32 != 0 ? 1 : 0; });
     }
     ITC_LOG_INFO("harness: load_poll: ApplyRecord got past the poll in {} of 48 cases", applied);
@@ -1181,16 +1181,16 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
   };
   const Reapply reapplies[] = {
       {"GarageStage::ReapplyRecord (sub_82178DF8)", __imp__sub_82178DF8,
-       hooks::CarMakersReapplyRecord, false},
+       ITC_CONTEXT_FN(hooks::CarMakersReapplyRecord), false},
       {"GarageStage::ReapplyRecordNoDecals (sub_82178E60)", __imp__sub_82178E60,
-       hooks::CarMakersReapplyRecordNoDecals, false},
-      {"GarageStage::SetCar (sub_8217FD58)", __imp__sub_8217FD58, hooks::CarMakersSetCar, true},
+       ITC_CONTEXT_FN(hooks::CarMakersReapplyRecordNoDecals), false},
+      {"GarageStage::SetCar (sub_8217FD58)", __imp__sub_8217FD58, ITC_CONTEXT_FN(hooks::CarMakersSetCar), true},
       {"GarageStage::SetCarClass (sub_8217FDC8)", __imp__sub_8217FDC8,
-       hooks::CarMakersSetCarClass, true, false, true},
+       ITC_CONTEXT_FN(hooks::CarMakersSetCarClass), true, false, true},
       {"GarageStage::ShowCarById (sub_82182C90)", __imp__sub_82182C90,
-       hooks::CarMakersShowCarById, false, true, false},
+       ITC_CONTEXT_FN(hooks::CarMakersShowCarById), false, true, false},
       {"GarageStage::ShowCarByIdWithClass (sub_82182D30)", __imp__sub_82182D30,
-       hooks::CarMakersShowCarByIdWithClass, false, true, true},
+       ITC_CONTEXT_FN(hooks::CarMakersShowCarByIdWithClass), false, true, true},
       // The car list's (src/car_list/, docs/functions/car-list.md): its
       // world ShowCarByIdWithClass' with the set's base b in the car block
       // (+0xE800: the menu's selection +76, the scroll +64, +236 and +240
@@ -1199,7 +1199,7 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
       // slots the case's holder, the two-player word ([0x82815EAC]) 0 or 1;
       // r4 a color or below 0.
       {"PanelSetBase::ShowStandCar (sub_8224A490)", __imp__sub_8224A490,
-       hooks::CarListShowStandCar, false, true, true, true},
+       ITC_CONTEXT_FN(hooks::CarListShowStandCar), false, true, true, true},
       // SetUpColors in the same world: D (+1904) 0 (its panel calls need the
       // UI movie world: D's functions are car_list's), the rows shown
       // (+1924) 2 to 7, the colors' selection and scroll (+244, +248)
@@ -1211,7 +1211,7 @@ void Reapplies(Context& h, Random& r, uint32_t block) {
       // new block freed, both given markers; its own frame (+80 to +144,
       // +128 to +143 as floats) compared too.
       {"PanelSetBase::SetUpColors (sub_8224B248)", __imp__sub_8224B248,
-       hooks::CarListSetUpColors, false, true, true, true, true},
+       ITC_CONTEXT_FN(hooks::CarListSetUpColors), false, true, true, true, true},
   };
   constexpr uint32_t kParamsGlobal = 0x826C2E48, kHolderGlobal = 0x826D83E0,
                      kCarListGlobal = 0x826D83F4, kRandSeed = 0x82638188,

@@ -5,6 +5,7 @@
 // (src/frame_pacing/per_frame_logic.cpp), which runs them.
 
 #include "hooks/minimap.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "car_scene_draw/car_scene_draw.h"
@@ -49,79 +50,79 @@ ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 
 namespace hooks {
 
-void MinimapFindPlayerEntry(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapFindPlayerEntry) {
   ctx.r3.u64 = minimap::RaceFindPlayerEntry(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void MinimapRacerVehicle(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapRacerVehicle) {
   ctx.r3.u64 = minimap::RaceRacerVehicle(base, ctx.r3.u32);
 }
 
-void MinimapSetListPoint(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapSetListPoint) {
   minimap::SetListPoint(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
 }
 
-void MinimapRacerMarkerType(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapRacerMarkerType) {
   const auto type = minimap::RacerMarkerType(base, ctx.r3.u32, ctx.r4.s32);
   if (!type) {
-    __imp__sub_820F2D28(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820F2D28);
     return;
   }
   ctx.r3.s64 = *type;
 }
 
-void MinimapScaling(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapScaling) {
   if (!minimap::Scaling(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_820F2EF8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820F2EF8);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32;
 }
 
-void MinimapTriangleInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapTriangleInit) {
   minimap::TriangleInit(base, ctx.r3.u32);
 }
 
-void MinimapList80Insert(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapList80Insert) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = minimap::List80Insert(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void MinimapList80Copy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapList80Copy) {
   if (!minimap::List80Copy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_820F51A8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820F51A8);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32;
 }
 
-void MinimapRecordTransform(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapRecordTransform) {
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
       ITC_FLAG(log_recording_by_pass)) {
-    __imp__sub_8217AEA8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8217AEA8);
     return;
   }
   const auto slot = minimap::RecordTransform(base, ctx.r3.u32, ctx.r4.u32,
                                              ctx.r1.u32 - minimap::kTransformProduct);
   if (!slot) {
-    __imp__sub_8217AEA8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8217AEA8);
     return;
   }
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = *slot;
 }
 
-void MinimapTriangleRecordFlat(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapTriangleRecordFlat) {
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
       ITC_FLAG(log_recording_by_pass)) {
-    __imp__sub_8217C370(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8217C370);
     return;
   }
   const uint32_t key = ctx.r5.u32;
   const auto chunk = minimap::TriangleRecordFlat(
       base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - minimap::kRecordFlatFrame);
   if (!chunk) {
-    __imp__sub_8217C370(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8217C370);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -139,7 +140,7 @@ void MinimapTriangleRecordFlat(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
 }
 
-void MinimapTriangleRecord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapTriangleRecord) {
   switch (minimap::TriangleRecord(base, ctx.r3.u32)) {
     case minimap::TriangleRecording::kFlat:
       MinimapTriangleRecordFlat(ctx, base);
@@ -157,7 +158,7 @@ namespace {
 // A marker draw's guest calls (minimap::MarkerCalls), made from its frame
 // with the original's return addresses.
 struct MarkerContext {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   uint32_t frame;
   uint32_t record_return;
@@ -191,7 +192,7 @@ struct MarkerContext {
 using MarkerDraw = void (*)(uint8_t*, uint32_t, uint32_t, uint32_t, uint32_t,
                             const minimap::MarkerCalls&);
 
-void DrawMarker(PPCContext& ctx, uint8_t* base, MarkerDraw draw, uint32_t frame_bytes,
+void DrawMarker(lifted::Regs& ctx, uint8_t* base, MarkerDraw draw, uint32_t frame_bytes,
                 uint32_t record_return, uint32_t memcpy_return) {
   const uint64_t lr = ctx.lr;
   const uint32_t pass = ctx.r3.u32, color = ctx.r4.u32, matrix = ctx.r5.u32;
@@ -216,7 +217,7 @@ bool MinimapDrawNative() {
          !hooks::SceneryListsSlotDiagnostics();
 }
 
-void MinimapDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapDraw) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   constexpr uint32_t kFrame = 28336;
@@ -249,11 +250,11 @@ void MinimapDraw(PPCContext& ctx, uint8_t* base) {
 
 // r3 = the camera pass, r4 = the color, r5 = the matrix; r3 as the last
 // Triangle::Record leaves it.
-void MinimapDrawCarMarker(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapDrawCarMarker) {
   DrawMarker(ctx, base, minimap::DrawCarMarker, minimap::kCarMarkerFrame, 0x820F4B94,
              0x820F4B84);
 }
-void MinimapDrawPointMarker(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapDrawPointMarker) {
   DrawMarker(ctx, base, minimap::DrawPointMarker, minimap::kPointMarkerFrame, 0x820F5188,
              0x820F5178);
 }
@@ -271,12 +272,7 @@ void MinimapDrawPointMarker(PPCContext& ctx, uint8_t* base) {
 
 // Defines an adapter: the flag, else the original.
 #define ITC_MINIMAP(address, step)      \
-  extern "C" REX_FUNC(sub_##address) {  \
-    REX_FUNC_PROLOGUE();                \
-    if (!ITC_FLAG(native_minimap)) {    \
-      __imp__sub_##address(ctx, base);  \
-      return;                           \
-    }                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_minimap)) { \
     hooks::step(ctx, base);             \
   }
 

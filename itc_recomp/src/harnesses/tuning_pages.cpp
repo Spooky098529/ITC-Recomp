@@ -952,7 +952,7 @@ void LoadCases(Context& h, const World& w) {
           t.r3.u64 |= r.Next() << 32;
         }
       },
-      __imp__sub_821FEE10, hooks::TuningPagesLoadDecalImages, 40, {{128, 144}});
+      __imp__sub_821FEE10, ITC_CONTEXT_FN(hooks::TuningPagesLoadDecalImages), 40, {{128, 144}});
   // Request: entries in each of the id swaps' ranges (0 to 20, 21 to 50,
   // 51 to 79, 80 to 108, 109 to 120; now and then any word, with upper
   // bits), the id the range's "none" id half the time (now and then another
@@ -980,13 +980,13 @@ void LoadCases(Context& h, const World& w) {
                     r.Below(3) == 0 ? r.Below(3) : 0);
   };
   LoadGroup(h, w, "DecalImages::Request", 80, request, __imp__sub_821FE830,
-            hooks::TuningPagesRequestImage, 16, {});
+            ITC_CONTEXT_FN(hooks::TuningPagesRequestImage), 16, {});
   LoadGroup(h, w, "DecalImages::Load", 30, request, __imp__sub_821F6D40,
-            hooks::TuningPagesLoadImage, 16, {});
+            ITC_CONTEXT_FN(hooks::TuningPagesLoadImage), 16, {});
   // Reload: as Request (the same entries and ids), with no state check:
   // the entry's buffer +12 any word (passed to Archive::Load as it is).
   LoadGroup(h, w, "DecalImages::Reload", 80, request, __imp__sub_821FE960,
-            hooks::TuningPagesReloadImage, 16, {});
+            ITC_CONTEXT_FN(hooks::TuningPagesReloadImage), 16, {});
   // LoadWindow: the list 0 to 2 (now and then 3 or any word), the first id
   // around the list's range (so each move happens), the first entry 0 to
   // 41, the count 0 to 9 (now and then -1). __savegprlr_26 (56 bytes);
@@ -1007,7 +1007,7 @@ void LoadCases(Context& h, const World& w) {
           t.r3.u64 |= r.Next() << 32;
         }
       },
-      __imp__sub_821FEAF0, hooks::TuningPagesLoadWindow, 56, {{144, 160}});
+      __imp__sub_821FEAF0, ITC_CONTEXT_FN(hooks::TuningPagesLoadWindow), 56, {{144, 160}});
   // Scroll: the direction 1 or 0 (now and then another word), a window of
   // 9 at 12, 33 or 42 (now and then another first entry and count), an id
   // in the lists' ranges; the entry FreeTexture frees with its texture held
@@ -1039,7 +1039,7 @@ void LoadCases(Context& h, const World& w) {
           t.r3.u64 |= r.Next() << 32;
         }
       },
-      __imp__sub_821FED30, hooks::TuningPagesScrollImages, 40, {{128, 144}});
+      __imp__sub_821FED30, ITC_CONTEXT_FN(hooks::TuningPagesScrollImages), 40, {{128, 144}});
   // FreeKept: a kept texture 0 to 199 whose header an entry's +28 holds,
   // or a 0 header and data (Texture::Free frees nothing). No frame.
   LoadGroup(
@@ -1058,7 +1058,7 @@ void LoadCases(Context& h, const World& w) {
                           guest::LoadU32(w.base, images + 36 * r.Below(200) + 28));
         }
       },
-      __imp__sub_821FE740, hooks::TuningPagesFreeKept, 0, {});
+      __imp__sub_821FE740, ITC_CONTEXT_FN(hooks::TuningPagesFreeKept), 0, {});
   // OnLoaded: r3 the entry's handle +4 half the time, else another word;
   // r6 an entry.
   LoadGroup(
@@ -1068,7 +1068,7 @@ void LoadCases(Context& h, const World& w) {
         t.r6.u64 = e;
         t.r3.u64 = r.Below(2) == 0 ? guest::LoadU32(w.base, e + 4) : uint32_t(r.Next());
       },
-      __imp__sub_821FE608, hooks::TuningPagesOnImageLoaded, 0, {});
+      __imp__sub_821FE608, ITC_CONTEXT_FN(hooks::TuningPagesOnImageLoaded), 0, {});
 }
 
 }  // namespace
@@ -1082,17 +1082,17 @@ void TuningPages(Context& h) {
   }
   // The pages' counts and owned flags.
   Group(h, w, "TuningScreen::LevelCount", 30, kScreenOnly, __imp__sub_821CC728,
-        hooks::TuningPagesLevelCount);
+        ITC_CONTEXT_FN(hooks::TuningPagesLevelCount));
   Group(h, w, "TuningScreen::TypeCount", 30, kScreenOnly, __imp__sub_821CC7B8,
-        hooks::TuningPagesTypeCount);
+        ITC_CONTEXT_FN(hooks::TuningPagesTypeCount));
   Group(h, w, "TuningScreen::PageCursor", 30, kScreenOnly, __imp__sub_821CCD38,
-        hooks::TuningPagesPageCursor);
+        ITC_CONTEXT_FN(hooks::TuningPagesPageCursor));
   Group(h, w, "TuningScreen::PageItemCount", 30, kScreenOnly, __imp__sub_821CCDB0,
-        hooks::TuningPagesPageItemCount);
+        ITC_CONTEXT_FN(hooks::TuningPagesPageItemCount));
   Group(h, w, "TuningScreen::IsPickOwned", 50, kScreenOnly, __imp__sub_821CCE30,
-        hooks::TuningPagesIsPickOwned);
+        ITC_CONTEXT_FN(hooks::TuningPagesIsPickOwned));
   Group(h, w, "TuningScreen::MarkOwned", 50, kScreenOnly, __imp__sub_821CD498,
-        hooks::TuningPagesMarkOwned);
+        ITC_CONTEXT_FN(hooks::TuningPagesMarkOwned));
   // TestAndSetWheelFlag: wheel numbers -2 to 180, now and then any word
   // (with upper bits).
   Group(
@@ -1100,9 +1100,9 @@ void TuningPages(Context& h) {
       [](PPCContext& t, Random& r, const World&) {
         t.r4.u64 = r.Below(8) == 0 ? r.Next() : uint64_t(int64_t(Around(r, -2, 180)));
       },
-      __imp__sub_821CDF98, hooks::TuningPagesTestAndSetWheelFlag);
+      __imp__sub_821CDF98, ITC_CONTEXT_FN(hooks::TuningPagesTestAndSetWheelFlag));
   Group(h, w, "TuningScreen::SetWheelListEnd", 30, kScreenOnly, __imp__sub_821E7DB0,
-        hooks::TuningPagesSetWheelListEnd);
+        ITC_CONTEXT_FN(hooks::TuningPagesSetWheelListEnd));
   // InchListEnd: the selected car's id 0 to 25, now and then any word.
   Group(
       h, w, "TuningScreen::InchListEnd", 40,
@@ -1114,11 +1114,11 @@ void TuningPages(Context& h) {
           }
         }
       },
-      __imp__sub_821EF288, hooks::TuningPagesInchListEnd);
+      __imp__sub_821EF288, ITC_CONTEXT_FN(hooks::TuningPagesInchListEnd));
 
   // The vinyl editor's set-up.
   Group(h, w, "TuningScreen::SetUpVinylBusyIcon", 10, kScreenOnly, __imp__sub_821FE560,
-        hooks::TuningPagesSetUpVinylBusyIcon);
+        ITC_CONTEXT_FN(hooks::TuningPagesSetUpVinylBusyIcon));
   // AllLoaded: r3 the decal images; none loading a third of the time.
   Group(
       h, w, "DecalImages::AllLoaded", 30,
@@ -1133,13 +1133,13 @@ void TuningPages(Context& h) {
           }
         }
       },
-      __imp__sub_821FE5D8, hooks::TuningPagesAllLoaded);
+      __imp__sub_821FE5D8, ITC_CONTEXT_FN(hooks::TuningPagesAllLoaded));
   Group(h, w, "TuningScreen::KeepListTextures", 20, kScreenOnly, __imp__sub_821FE7D8,
-        hooks::TuningPagesKeepListTextures);
+        ITC_CONTEXT_FN(hooks::TuningPagesKeepListTextures));
   Group(h, w, "TuningScreen::SetEditorLimits", 30, kScreenOnly, __imp__sub_821FE420,
-        hooks::TuningPagesSetEditorLimits);
+        ITC_CONTEXT_FN(hooks::TuningPagesSetEditorLimits));
   Group(h, w, "TuningScreen::LoadPageLayouts", 20, kScreenOnly, __imp__sub_822045F8,
-        hooks::TuningPagesLoadPageLayouts);
+        ITC_CONTEXT_FN(hooks::TuningPagesLoadPageLayouts));
   // SetLastImage: category 5's item 6 (the vinyls) mostly, the page 0, 1 or
   // another word.
   Group(
@@ -1151,7 +1151,7 @@ void TuningPages(Context& h) {
         guest::StoreU8(w.base, s + 9660, uint8_t(vinyls ? 6 : r.Below(9)));
         guest::StoreU32(w.base, s + 30724, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
       },
-      __imp__sub_821FE498, hooks::TuningPagesSetLastImage);
+      __imp__sub_821FE498, ITC_CONTEXT_FN(hooks::TuningPagesSetLastImage));
 
   // The decal images' textures (r30, r31 and lr's saves 24 bytes,
   // __savegprlr_29's 32, r31 and lr's 16). r3 the images (now and then with
@@ -1169,13 +1169,13 @@ void TuningPages(Context& h) {
         guest::StoreU32(w.base, w.screen() + 9652, kStates[r.Below(8)]);
         guest::StoreU32(w.base, w.screen() + 25204, r.Below(3) == 0 ? 0 : r.Below(17));
       },
-      __imp__sub_821D9E68, hooks::TuningPagesShowPricePanel, 24);
+      __imp__sub_821D9E68, ITC_CONTEXT_FN(hooks::TuningPagesShowPricePanel), 24);
   Group(
       h, w, "TuningScreen::SetBrandLogo", 30,
       [](PPCContext&, Random& r, const World& w) {
         guest::StoreU32(w.base, w.screen() + 25204, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(18));
       },
-      __imp__sub_821EED98, hooks::TuningPagesSetBrandLogo, 16);
+      __imp__sub_821EED98, ITC_CONTEXT_FN(hooks::TuningPagesSetBrandLogo), 16);
   // HsvToRgb: r4 the out (four floats), r5 the in (h, s, v) in the screen's
   // block; h 0 to 1.25 mostly (now and then negative, infinite, a quiet
   // NaN), s 0.0 or -0.0 now and then, v 0 to 1.
@@ -1197,13 +1197,13 @@ void TuningPages(Context& h) {
         guest::StoreU32(w.base, in + 8, std::bit_cast<uint32_t>(float(r.Below(1001)) / 1000.0f));
         QuietRange(w.base, in + 12, 4);
       },
-      __imp__sub_8224AB50, hooks::TuningPagesHsvToRgb);
+      __imp__sub_8224AB50, ITC_CONTEXT_FN(hooks::TuningPagesHsvToRgb));
 
   // The vinyls' records (LoadVinyls' __savegprlr_27: 48 bytes).
   Group(h, w, "TuningScreen::StoreVinyls", 40, kVinyls, __imp__sub_82203F20,
-        hooks::TuningPagesStoreVinyls);
+        ITC_CONTEXT_FN(hooks::TuningPagesStoreVinyls));
   Group(h, w, "TuningScreen::LoadVinyls", 40, kVinyls, __imp__sub_822040A8,
-        hooks::TuningPagesLoadVinyls, 48);
+        ITC_CONTEXT_FN(hooks::TuningPagesLoadVinyls), 48);
   auto restore = [](PPCContext& t, Random& r, const World& w) {
     t.r3.u64 = w.screen() + 10048;
     if (r.Below(6) == 0) {
@@ -1213,9 +1213,9 @@ void TuningPages(Context& h) {
     t.r5.u64 = r.Below(200);
   };
   Group(h, w, "DecalImages::RestoreVinylTexture", 30, restore, __imp__sub_82204698,
-        hooks::TuningPagesRestoreVinylTexture, 24);
+        ITC_CONTEXT_FN(hooks::TuningPagesRestoreVinylTexture), 24);
   Group(h, w, "DecalImages::RestoreStickerTexture", 30, restore, __imp__sub_821F89B8,
-        hooks::TuningPagesRestoreStickerTexture, 24);
+        ITC_CONTEXT_FN(hooks::TuningPagesRestoreStickerTexture), 24);
   Group(
       h, w, "DecalImages::BindVinylTexture", 40,
       [](PPCContext& t, Random& r, const World& w) {
@@ -1223,7 +1223,7 @@ void TuningPages(Context& h) {
         t.r4.u64 = Around(r, -2, 45);
         t.r5.u64 = Around(r, -1, 2);
       },
-      __imp__sub_82204730, hooks::TuningPagesBindVinylTexture, 32);
+      __imp__sub_82204730, ITC_CONTEXT_FN(hooks::TuningPagesBindVinylTexture), 32);
   // The restores: RestoreMovieTexture's __savegprlr_29 (32 bytes) with its
   // callees' (24, 112 bytes below); RestoreVinylMovie's (32) with
   // RestoreStickerTexture's (24, 128 below); RestoreStickerMovie's r31 and
@@ -1242,13 +1242,13 @@ void TuningPages(Context& h) {
         t.r4.u64 = Around(r, -1, 4);
         t.r5.u64 = r.Below(200);
       },
-      __imp__sub_822081A0, hooks::TuningPagesRestoreMovieTexture, 32, {{112, 136}});
+      __imp__sub_822081A0, ITC_CONTEXT_FN(hooks::TuningPagesRestoreMovieTexture), 32, {{112, 136}});
   Group(h, w, "DecalImages::RestoreVinylMovie", 20, images, __imp__sub_822081D8,
-        hooks::TuningPagesRestoreVinylMovie, 32, {{128, 152}});
+        ITC_CONTEXT_FN(hooks::TuningPagesRestoreVinylMovie), 32, {{128, 152}});
   Group(h, w, "DecalImages::RestoreStickerMovie", 20, images, __imp__sub_821F6DD8,
-        hooks::TuningPagesRestoreStickerMovie, 16, {{96, 128}, {208, 232}});
+        ITC_CONTEXT_FN(hooks::TuningPagesRestoreStickerMovie), 16, {{96, 128}, {208, 232}});
   Group(h, w, "TuningScreen::BindVinylTextures", 20, kScreenOnly, __imp__sub_82203D40,
-        hooks::TuningPagesBindVinylTextures, 16);
+        ITC_CONTEXT_FN(hooks::TuningPagesBindVinylTextures), 16);
   // EnterEditor: the fades' counts 0 and the images loaded most of the
   // time, category 5's items 6 and 7 mostly; BindVinylTextures' saves (its
   // frame 96 bytes below) out too.
@@ -1276,7 +1276,7 @@ void TuningPages(Context& h) {
           t.r3.u64 |= r.Next() << 32;
         }
       },
-      __imp__sub_821D84F8, hooks::TuningPagesEnterEditor, 16, {{96, 112}});
+      __imp__sub_821D84F8, ITC_CONTEXT_FN(hooks::TuningPagesEnterEditor), 16, {{96, 112}});
 
   // The current choices: the body kit [+36588] 0 a quarter of the time,
   // else a level to 255 (r31 and lr's saves 16 bytes).
@@ -1285,7 +1285,7 @@ void TuningPages(Context& h) {
       [](PPCContext&, Random& r, const World& w) {
         guest::StoreU32(w.base, w.screen() + 36588, r.Below(4) == 0 ? 0 : r.Below(256));
       },
-      __imp__sub_821DE160, hooks::TuningPagesSetAeroAvailability, 16);
+      __imp__sub_821DE160, ITC_CONTEXT_FN(hooks::TuningPagesSetAeroAvailability), 16);
   // SetCurrentChoice: categories -1 to 7 and items 0 to 10 (now and then any
   // byte), the indices [+33900] and [+33576] small, the wheels' +25196 0
   // half the time, else 1 to 3; r3 now and then with upper bits (lr's save
@@ -1314,7 +1314,7 @@ void TuningPages(Context& h) {
           t.r3.u64 |= r.Next() << 32;
         }
       },
-      __imp__sub_821E1DB0, hooks::TuningPagesSetCurrentChoice, 8, {{96, 112}});
+      __imp__sub_821E1DB0, ITC_CONTEXT_FN(hooks::TuningPagesSetCurrentChoice), 8, {{96, 112}});
 
   // The confirm dialogs' yes answers (states 35 and 36, which fit the car on
   // the stand, are car_makers' cases: its world has the stand). Their
@@ -1327,11 +1327,11 @@ void TuningPages(Context& h) {
   Group(
       h, w, "TuningScreen::OnStickerDialogYes", 60,
       [](PPCContext& t, Random& r, const World& w) { ShapeDialog(t, r, w, true); },
-      __imp__sub_821FA230, hooks::TuningPagesOnStickerDialogYes, 16, {{96, 112}});
+      __imp__sub_821FA230, ITC_CONTEXT_FN(hooks::TuningPagesOnStickerDialogYes), 16, {{96, 112}});
   Group(
       h, w, "TuningScreen::OnDialogYes", 600,
       [](PPCContext& t, Random& r, const World& w) { ShapeDialog(t, r, w, false); },
-      __imp__sub_821E2660, hooks::TuningPagesOnDialogYes, 32, {{112, 128}, {208, 224}});
+      __imp__sub_821E2660, ITC_CONTEXT_FN(hooks::TuningPagesOnDialogYes), 32, {{112, 128}, {208, 224}});
 
   // The decal images' loads.
   LoadCases(h, w);

@@ -321,11 +321,11 @@ void BoundObjects(Context& h, uint32_t device) {
     return a.Below(4) == 0 ? 0 : h.data + kObjectBytes * a.Below(kObjects);
   };
   RunBound(h, device, "Device::GetViewport (sub_822A3740)", __imp__sub_822A3740,
-           NativeGetViewport, 32,
+           ITC_CONTEXT_FN(NativeGetViewport), 32,
            [&](PPCContext& t, Random& a, BoundCase&) { t.r4.u64 = h.data + kOut + a.Below(8); },
            false, true);
   RunBound(h, device, "Device::SetStreamSource (sub_822A3758)", __imp__sub_822A3758,
-           NativeSetStreamSource, 400, [&](PPCContext& t, Random& a, BoundCase& c) {
+           ITC_CONTEXT_FN(NativeSetStreamSource), 400, [&](PPCContext& t, Random& a, BoundCase& c) {
              const uint32_t stream = a.Below(16);
              t.r4.u64 = stream;
              t.r5.u64 = object(a);
@@ -343,17 +343,17 @@ void BoundObjects(Context& h, uint32_t device) {
            },
            true);
   RunBound(h, device, "Device::SetIndices (sub_822A3908)", __imp__sub_822A3908,
-           NativeSetIndices, 200,
+           ITC_CONTEXT_FN(NativeSetIndices), 200,
            [&](PPCContext& t, Random& a, BoundCase&) { t.r4.u64 = object(a); }, true);
   RunBound(h, device, "Device::SetTexture (sub_822A6008)", __imp__sub_822A6008,
-           NativeSetTexture, 400, [&](PPCContext& t, Random& a, BoundCase&) {
+           ITC_CONTEXT_FN(NativeSetTexture), 400, [&](PPCContext& t, Random& a, BoundCase&) {
              t.r4.u64 = a.Below(26);
              t.r5.u64 = object(a);
              t.r6.u64 = a.Next();
            },
            true);
   RunBound(h, device, "Device::SetBlendControl (sub_822A3B30)", __imp__sub_822A3B30,
-           NativeSetBlendControl, 200, [&](PPCContext& t, Random& a, BoundCase&) {
+           ITC_CONTEXT_FN(NativeSetBlendControl), 200, [&](PPCContext& t, Random& a, BoundCase&) {
              t.r4.u64 = a.Below(8) == 0 ? a.Below(200) : a.Below(4);
              t.r5.u64 = uint32_t(a.Next());
            },
@@ -363,7 +363,7 @@ void BoundObjects(Context& h, uint32_t device) {
              pixel ? "Device::SetPixelShaderConstantF (sub_822A8308)"
                    : "Device::SetVertexShaderConstantF (sub_822A81F8)",
              pixel ? __imp__sub_822A8308 : __imp__sub_822A81F8,
-             pixel ? NativeSetPixelShaderConstantF : NativeSetVertexShaderConstantF, 300,
+             pixel ? ITC_CONTEXT_FN(NativeSetPixelShaderConstantF) : ITC_CONTEXT_FN(NativeSetVertexShaderConstantF), 300,
              [&](PPCContext& t, Random& a, BoundCase&) {
                const uint32_t count = a.Below(4) == 0 ? a.Below(4) : a.Below(32);
                t.r4.u64 = a.Below(256 - count);
@@ -374,7 +374,7 @@ void BoundObjects(Context& h, uint32_t device) {
              false);
   }
   RunBound(h, device, "Device::SetPixelShaderConstantB (sub_822A8470)", __imp__sub_822A8470,
-           NativeSetPixelShaderConstantB, 200, [&](PPCContext& t, Random& a, BoundCase&) {
+           ITC_CONTEXT_FN(NativeSetPixelShaderConstantB), 200, [&](PPCContext& t, Random& a, BoundCase&) {
              const uint32_t count = 1 + a.Below(40);
              t.r4.u64 = a.Below(256 - count);
              t.r5.u64 = h.data + kConstants + 4 * a.Below(64);
@@ -626,20 +626,20 @@ void RunViewportCases(Context& h, uint32_t device, const char* name, GuestFuncti
 
 void ScissorAndViewport(Context& h, uint32_t device) {
   RunViewportCases(h, device, "Device::SetScissorRect (sub_822A3450)",
-                   Original<__imp__sub_822A3450>, NativeSetScissorRect, 300,
+                   Original<__imp__sub_822A3450>, ITC_CONTEXT_FN(NativeSetScissorRect), 300,
                    [&](PPCContext& t, Random& a) {
                      t.r4.u64 = a.Below(4) == 0 ? device + 12416 : h.data + kViewport;
                    });
   RunViewportCases(h, device, "Device::SetRenderState_ScissorTestEnable (sub_822A3D20)",
-                   Original<__imp__sub_822A3D20>, NativeSetScissorTestEnable, 200,
+                   Original<__imp__sub_822A3D20>, ITC_CONTEXT_FN(NativeSetScissorTestEnable), 200,
                    [&](PPCContext& t, Random& a) {
                      t.r4.u64 = a.Below(4) == 0 ? uint32_t(a.Next()) : a.Below(2);
                    });
   RunViewportCases(h, device, "Device::SetViewport (sub_822A3518)",
-                   Original<__imp__sub_822A3518>, NativeSetViewport, 400,
+                   Original<__imp__sub_822A3518>, ITC_CONTEXT_FN(NativeSetViewport), 400,
                    [&](PPCContext& t, Random&) { t.r4.u64 = h.data + kViewport; });
   RunViewportCases(h, device, "Device::SetSurfaceInfo (sub_822A3C88)",
-                   Original<__imp__sub_822A3C88>, NativeSetSurfaceInfo, 200,
+                   Original<__imp__sub_822A3C88>, ITC_CONTEXT_FN(NativeSetSurfaceInfo), 200,
                    [&](PPCContext& t, Random& a) {
                      t.r4.u64 = h.data + kObjectBytes * a.Below(kObjects);
                    });
@@ -679,13 +679,13 @@ void ScissorAndViewport(Context& h, uint32_t device) {
     t.r5.u64 = surface;
   };
   RunViewportCases(h, device, "Device::SetRenderTarget (sub_822A3D30)",
-                   Original<__imp__sub_822A3D30>, NativeSetRenderTarget, 600,
+                   Original<__imp__sub_822A3D30>, ITC_CONTEXT_FN(NativeSetRenderTarget), 600,
                    [&](PPCContext& t, Random& a) { surfaces(t, a); });
   RunViewportCases(h, device, "Device::SetRenderTarget_External (sub_822A4340)",
-                   Original<__imp__sub_822A4340>, NativeSetRenderTargetExternal, 100,
+                   Original<__imp__sub_822A4340>, ITC_CONTEXT_FN(NativeSetRenderTargetExternal), 100,
                    [&](PPCContext& t, Random& a) { surfaces(t, a); });
   RunViewportCases(h, device, "Device::SetDepthStencilSurface (sub_822A4060)",
-                   Original<__imp__sub_822A4060>, NativeSetDepthStencilSurface, 500,
+                   Original<__imp__sub_822A4060>, ITC_CONTEXT_FN(NativeSetDepthStencilSurface), 500,
                    [&](PPCContext& t, Random& a) {
                      t.r4.u64 = 0xFFFFFFFFu;
                      surfaces(t, a);
@@ -842,16 +842,16 @@ void PacketWriters(Context& h) {
   }
   auto none = [](PPCContext&, Random&, uint32_t) {};
   RunPacketCases(h, device, commands, "sub_8229B7D8", Original<__imp__sub_8229B7D8>,
-                 NativeSetRegisterF01Bits, 200, [](PPCContext& t, Random& a, uint32_t) {
+                 ITC_CONTEXT_FN(NativeSetRegisterF01Bits), 200, [](PPCContext& t, Random& a, uint32_t) {
                    t.r4.u64 = a.Below(4) == 0 ? uint32_t(a.Next()) : a.Below(4);
                  });
   RunPacketCases(h, device, commands, "Device::DirtyAllState (sub_822A3B90)",
-                 Original<__imp__sub_822A3B90>, NativeDirtyAllState, 200,
+                 Original<__imp__sub_822A3B90>, ITC_CONTEXT_FN(NativeDirtyAllState), 200,
                  [](PPCContext& t, Random& a, uint32_t) {
                    t.r4.u64 = a.Below(2) ? 0 : (a.Below(2) ? 1 : uint32_t(a.Next()));
                  });
   RunPacketCases(h, device, commands, "Device::SetShaderGprAllocation (sub_822A8A60)",
-                 Original<__imp__sub_822A8A60>, NativeSetShaderGprAllocation, 300,
+                 Original<__imp__sub_822A8A60>, ITC_CONTEXT_FN(NativeSetShaderGprAllocation), 300,
                  [](PPCContext& t, Random& a, uint32_t) {
                    static const uint32_t kSplits[][2] = {{0, 0}, {32, 96}, {96, 32}, {64, 64}};
                    const uint32_t pick = a.Below(6);
@@ -867,7 +867,7 @@ void PacketWriters(Context& h) {
   // The gamma ramp: the scratch area's start (1,536 bytes), and half the time
   // the device's already the result (nothing copied).
   RunPacketCases(h, device, commands, "Device::SetGammaRamp (sub_822A3A20)",
-                 Original<__imp__sub_822A3A20>, NativeSetGammaRamp, 60,
+                 Original<__imp__sub_822A3A20>, ITC_CONTEXT_FN(NativeSetGammaRamp), 60,
                  [&](PPCContext& t, Random& a, uint32_t dev) {
                    display::GammaRamp in;
                    for (int c = 0; c < 3; c++) {
@@ -897,7 +897,7 @@ void PacketWriters(Context& h) {
   // SetDefaultState: +13240 (the present interval) and +10808 (bit 7 skips
   // the register split) random with the rest.
   RunPacketCases(h, device, commands, "Device::SetDefaultState (sub_822ACB90)",
-                 Original<__imp__sub_822ACB90>, NativeSetDefaultState, 40, none);
+                 Original<__imp__sub_822ACB90>, ITC_CONTEXT_FN(NativeSetDefaultState), 40, none);
   memory::Free(commands);
   memory::Free(device);
 }
@@ -918,7 +918,7 @@ void DeviceState(Context& h) {
   }
   RunSetter(h, device,
             {"Device::GetRenderState_ViewportEnable (sub_822A2470)", __imp__sub_822A2470,
-             NativeGetViewportEnable},
+             ITC_CONTEXT_FN(NativeGetViewportEnable)},
             32);
   BoundObjects(h, device);
   Fvf(h, device);

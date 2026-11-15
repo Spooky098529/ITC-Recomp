@@ -1,4 +1,5 @@
 #include "game_messages.h"
+#include "hooks/native_entry.h"
 
 #include "debug/frame_state_diff.h"
 #include "debug/idle_timer_scan.h"
@@ -351,7 +352,7 @@ void LogRecording(uint32_t message, uint32_t handler, int slots) {
 }
 
 // Delivers one message to every handler, as the game does.
-void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t message,
+void Deliver(lifted::Regs& ctx, uint8_t* base, uint32_t dispatcher, uint32_t message,
              const std::string* only_targets = nullptr) {
   uint32_t handler_count = guest::LoadU32(base, dispatcher + kHandlerCountOffset);
   for (uint32_t i = 0; i < handler_count; i++) {
@@ -413,7 +414,7 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
   }
 }
 
-void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
+void DispatchMessages(lifted::Regs& ctx, uint8_t* base, uint32_t dispatcher) {
   guest::StackFrame frame(ctx, 144);
   uint32_t message = frame.Local(80);
   Counts& counts = GetCounts();
@@ -579,7 +580,7 @@ namespace {
 
 // --log_input: the input manager's objects (layout in
 // docs/pause-menu-fix.md, "Input::Update"), once a race.
-void LogInputManager(PPCContext& ctx, uint8_t* base, uint32_t manager) {
+void LogInputManager(lifted::Regs& ctx, uint8_t* base, uint32_t manager) {
   constexpr uint32_t kLogicalPads = 8, kLogicalPadBytes = 196;
   constexpr uint32_t kPhysicalPads = 988, kPhysicalPadBytes = 212;
   constexpr uint32_t kProcessors = 1840, kProcessorBytes = 416;
@@ -663,8 +664,8 @@ bool g_input_manager_logged = false;  // this race
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_820990F0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820990F0) {
+  
 #ifndef ITC_NO_HARNESSES
   {
     base::InHarnessScope in_harness;  // ITC_NATIVE_RUNNING's harness lines
@@ -713,21 +714,21 @@ extern "C" REX_FUNC(sub_820990F0) {
 // r31 isn't an argument: it's what the caller (sub_8215C770) left in it.
 // Its work: the plain C++ (src/race_update/draw_step.h) with
 // --native_race_draw_step, else the original.
-extern "C" REX_FUNC(sub_8215B4F8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8215B4F8) {
+  
   uint32_t r31_value = guest::LoadU32(base, ctx.r31.u32 + 588);
   frame_pacing::InputLog_PauseSigns(base, ctx.r31.u32, r31_value);
   frame_pacing::g_race_draw_step_seen = true;
   if (ITC_FLAG(native_race_draw_step)) {
     lifted_call::EnterR3<race_update::RaceDrawStep>(ctx, base);
   } else {
-    __imp__sub_8215B4F8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8215B4F8);
   }
 }
 
 // Message dispatcher: r3 = dispatcher object.
-extern "C" REX_FUNC(sub_821062E8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(821062E8) {
+  
   frame_pacing::DispatchMessages(ctx, base, ctx.r3.u32);
 }
 
@@ -743,8 +744,8 @@ std::chrono::steady_clock::time_point g_tick_handlers_logged{};
 }  // namespace
 
 // TickHandler_Invoke: r3 = app, r4 = (handler object in the low word).
-extern "C" REX_FUNC(sub_82099A98) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82099A98) {
+  
   if (frame_pacing::GameMessages_IsRenderOnlyPass() &&
       frame_pacing::SkipTickHandlerOnRenderOnlyPass(guest::LoadU32(base, ctx.r4.u32 + 8))) {
     return;
@@ -775,7 +776,7 @@ extern "C" REX_FUNC(sub_82099A98) {
   if (hooks::NativeFramework()) {
     hooks::TickHandlerInvoke(ctx, base);
   } else {
-    __imp__sub_82099A98(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82099A98);
   }
   frame_pacing::g_current_tick = 0;
   frame_pacing::InputWatch_After(base, frame_pacing::kTickRun, target);

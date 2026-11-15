@@ -242,7 +242,7 @@ void Interface(Context& h) {
       Case(
           h, results, [&](Blocks&) {},
           [&](PPCContext& t) { t.r3.u64 = c < 4 ? driver + fd::kDriverInterface : h.random.Next(); },
-          __imp__sub_824960E0, hooks::FrameDriverGetVideoOutput,
+          __imp__sub_824960E0, ITC_CONTEXT_FN(hooks::FrameDriverGetVideoOutput),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32);
             blocks.Out(out);
@@ -281,7 +281,7 @@ void Interface(Context& h) {
             t.r4.u64 = h.data + kKey;
             t.r5.u64 = ObjectAt(h, 0);
           },
-          __imp__sub_820922B8, hooks::FrameDriverAddListener,
+          __imp__sub_820922B8, ITC_CONTEXT_FN(hooks::FrameDriverAddListener),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             const uint32_t vector = driver + fd::kDriverRequests;
             const uint32_t first = Load(h.base, vector + 4);
@@ -326,7 +326,7 @@ void Interface(Context& h) {
             t.r4.u64 = (uint64_t(type) << 32) | h.random.Below(8);
             t.r5.u64 = h.random.Next();
           },
-          __imp__sub_82091FF0, hooks::FrameDriverApplyRequest,
+          __imp__sub_82091FF0, ITC_CONTEXT_FN(hooks::FrameDriverApplyRequest),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32 - t.r1.u32);
             DriverOut(h, out, blocks);
@@ -350,7 +350,7 @@ void Interface(Context& h) {
             t.r3.u64 = driver;
             t.r4.u64 = (uint64_t(h.random.Below(8)) << 32) | ObjectAt(h, h.random.Below(2));
           },
-          __imp__sub_82091A98, hooks::FrameDriverCallListener,
+          __imp__sub_82091A98, ITC_CONTEXT_FN(hooks::FrameDriverCallListener),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32);
             DriverOut(h, out, blocks);
@@ -386,7 +386,7 @@ void DrawFrames(Context& h) {
           BuildHandlerMap(h, driver + fd::kDriverListeners, h.random.Below(7), 4);
         },
         [&](PPCContext& t) { t.r3.u64 = driver; },
-        __imp__sub_82091E58, hooks::FrameDriverDrawFrame,
+        __imp__sub_82091E58, ITC_CONTEXT_FN(hooks::FrameDriverDrawFrame),
         [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
           out.Word(Load(h.base, device + vo::kDeviceThread));
           // The lock's guest bytes aren't written by the native lock.
@@ -428,7 +428,7 @@ void SceneUpdates(Context& h) {
           const uint32_t flips[] = {0, 1, 1, 2, uint32_t(h.random.Next())};
           Store(h.base, fd::kPrimitiveFlip, flips[h.random.Below(5)]);
         },
-        [&](PPCContext& t) { t.r3.u64 = scene; }, __imp__sub_820988C8, hooks::AppSceneUpdate,
+        [&](PPCContext& t) { t.r3.u64 = scene; }, __imp__sub_820988C8, ITC_CONTEXT_FN(hooks::AppSceneUpdate),
         [&](Outputs& out, const PPCContext&, Blocks& blocks) {
           out.Word(Load(h.base, fd::kPrimitiveFlip));
           DriverOut(h, out, blocks);
@@ -498,7 +498,7 @@ void SceneDraws(Context& h) {
           t.r4.u64 = ObjectAt(h, 0);
           t.r5.u64 = device;
         },
-        __imp__sub_82098940, hooks::AppSceneDraw,
+        __imp__sub_82098940, ITC_CONTEXT_FN(hooks::AppSceneDraw),
         [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
           out.Word(t.r3.u32);
           out.Word(Load(h.base, fd::kVblankCount));
@@ -538,7 +538,7 @@ void Threads(Context& h) {
     for (int c = 0; c < 10; c++) {
       Case(
           h, results, [&](Blocks&) { RandomScratch(h); },
-          [&](PPCContext& t) { t.r3.u64 = thread; }, __imp__sub_8258DE88, hooks::ThreadConstruct,
+          [&](PPCContext& t) { t.r3.u64 = thread; }, __imp__sub_8258DE88, ITC_CONTEXT_FN(hooks::ThreadConstruct),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32);
             DriverOut(h, out, blocks);
@@ -581,7 +581,7 @@ void Threads(Context& h) {
             t.r5.u64 = h.data + 96;
             t.r6.u64 = h.data + 100;
           },
-          __imp__sub_8258DF18, hooks::ThreadBegin,
+          __imp__sub_8258DF18, ITC_CONTEXT_FN(hooks::ThreadBegin),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32);
             for (uint32_t at = 0; at < 64; at += 4) {
@@ -611,7 +611,7 @@ void Threads(Context& h) {
             t.r8.u64 = c < 2 ? 0xFFFFFFFFu : h.random.Below(6);
             t.r9.u64 = c % 2 == 0 ? 0 : h.data + 96;
           },
-          __imp__sub_825BA380, hooks::CreateThreadStep,
+          __imp__sub_825BA380, ITC_CONTEXT_FN(hooks::CreateThreadStep),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(HandleKind(t.r3.u32));
             out.Word(Load(h.base, h.data + 96) != 0xCDCDCDCDu ? 1 : 0);  // an id stored
@@ -630,9 +630,9 @@ void Threads(Context& h) {
     GuestFunction recompiled, native;
   };
   const Failure failures[] = {
-      {"SetThreadPriority (sub_822977B0)", __imp__sub_822977B0, hooks::SetThreadPriorityStep},
-      {"XSetThreadProcessor (sub_82297888)", __imp__sub_82297888, hooks::XSetThreadProcessorStep},
-      {"ResumeThread (sub_825BA118)", __imp__sub_825BA118, hooks::ResumeThreadStep},
+      {"SetThreadPriority (sub_822977B0)", __imp__sub_822977B0, ITC_CONTEXT_FN(hooks::SetThreadPriorityStep)},
+      {"XSetThreadProcessor (sub_82297888)", __imp__sub_82297888, ITC_CONTEXT_FN(hooks::XSetThreadProcessorStep)},
+      {"ResumeThread (sub_825BA118)", __imp__sub_825BA118, ITC_CONTEXT_FN(hooks::ResumeThreadStep)},
   };
   for (const Failure& f : failures) {
     Results results(f.name);
@@ -690,7 +690,7 @@ void UnbindAlls(Context& h) {
           Fill(h.base, commands, kCommandBytes);
         },
         [&](PPCContext& t) { t.r3.u64 = video_output; }, __imp__sub_8258D9F8,
-        hooks::VideoOutputUnbindAll,
+        ITC_CONTEXT_FN(hooks::VideoOutputUnbindAll),
         [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
           out.Word(t.r3.u32);
           out.Bytes(Read(h.base, device, kDeviceBytes));
@@ -769,7 +769,7 @@ void SceneSetUps(Context& h) {
             t.r3.u64 = h.random.Next();
             t.r4.u64 = h.random.Next();
           },
-          __imp__sub_82178B28, hooks::ColorRectSetTargetsStep,
+          __imp__sub_82178B28, ITC_CONTEXT_FN(hooks::ColorRectSetTargetsStep),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32);
             out.Bytes(Read(h.base, 0x826D83D0, 8));
@@ -796,7 +796,7 @@ void SceneSetUps(Context& h) {
             t.r3.u64 = list;
             t.r4.u64 = h.random.Below(301);
           },
-          __imp__sub_8258CD28, hooks::CommandListInitStep,
+          __imp__sub_8258CD28, ITC_CONTEXT_FN(hooks::CommandListInitStep),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32);
             const uint32_t memory = Load(h.base, list + 20);
@@ -816,7 +816,7 @@ void SceneSetUps(Context& h) {
       Case(
           h, results, [&](Blocks&) { RandomScratch(h); },
           [&](PPCContext& t) { t.r3.u64 = h.random.Next(); }, __imp__sub_82591858,
-          hooks::PrimitiveDeclInitStep,
+          ITC_CONTEXT_FN(hooks::PrimitiveDeclInitStep),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32);
             DeclarationOut(h.base, out, Load(h.base, 0x82970BC8));
@@ -841,7 +841,7 @@ void SceneSetUps(Context& h) {
             t.r4.u64 = 0x2000;
             t.r5.u64 = c == 0 ? 0 : 4;
           },
-          __imp__sub_82589E78, hooks::DrawGlobalsInitStep,
+          __imp__sub_82589E78, ITC_CONTEXT_FN(hooks::DrawGlobalsInitStep),
           [&](Outputs& out, const PPCContext&, Blocks& blocks) {
             DrawGlobalsOut(h.base, out);
             DriverOut(h, out, blocks);
@@ -905,7 +905,7 @@ void SceneConstructs(Context& h) {
           t.r4.u64 = block;
           frame = t.r1.u32 - 192;
         },
-        __imp__sub_82098A98, hooks::SceneConstruct,
+        __imp__sub_82098A98, ITC_CONTEXT_FN(hooks::SceneConstruct),
         [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
           out.Word(t.r3.u32 - scene);
           for (uint32_t at = 0; at < 80; at += 4) {

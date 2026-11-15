@@ -6,11 +6,13 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 namespace hooks {
 
 // RaceFlow::Init sub_82160AE0: r3 = the race flow (race mode + 97548); r3
 // as the last StateMachine::Add leaves it.
 void RaceFlowInit(PPCContext& ctx, uint8_t* base);
+void RaceFlowInit(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

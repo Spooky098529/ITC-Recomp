@@ -9,6 +9,7 @@
 // docs/native-memory.md.
 
 #include "hooks/heap.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "guest.h"
@@ -93,20 +94,20 @@ RecompiledHeapScope::~RecompiledHeapScope() {
 }  // namespace hooks
 
 // HeapAlloc: r3 = heap, r4 = flags, r5 = size; returns the block.
-extern "C" REX_FUNC(sub_82299D60) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82299D60) {
+  
   if (!hooks::Native() || !hooks::IsProcessHeap(base, ctx.r3.u32, uint32_t(ctx.lr))) {
-    __imp__sub_82299D60(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82299D60);
     return;
   }
   ctx.r3.u64 = memory::Alloc(ctx.r5.u32, ctx.r4.u32);
 }
 
 // HeapFree: r3 = heap, r4 = flags, r5 = block; returns whether it was freed.
-extern "C" REX_FUNC(sub_8229A648) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8229A648) {
+  
   if (!hooks::Native() || !hooks::IsProcessHeap(base, ctx.r3.u32, uint32_t(ctx.lr))) {
-    __imp__sub_8229A648(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8229A648);
     return;
   }
   ctx.r3.u64 = memory::Free(ctx.r5.u32) ? 1 : 0;
@@ -114,20 +115,20 @@ extern "C" REX_FUNC(sub_8229A648) {
 
 // HeapReAlloc: r3 = heap, r4 = flags, r5 = block, r6 = size; returns the
 // block.
-extern "C" REX_FUNC(sub_8229A930) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8229A930) {
+  
   if (!hooks::Native() || !hooks::IsProcessHeap(base, ctx.r3.u32, uint32_t(ctx.lr))) {
-    __imp__sub_8229A930(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8229A930);
     return;
   }
   ctx.r3.u64 = memory::Realloc(ctx.r5.u32, ctx.r6.u32, ctx.r4.u32);
 }
 
 // HeapSize: r3 = heap, r4 = flags (unread), r5 = block; returns its size.
-extern "C" REX_FUNC(sub_82298FF8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82298FF8) {
+  
   if (!hooks::Native() || !hooks::IsProcessHeap(base, ctx.r3.u32, uint32_t(ctx.lr))) {
-    __imp__sub_82298FF8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82298FF8);
     return;
   }
   ctx.r3.u64 = memory::Size(ctx.r5.u32);
@@ -135,18 +136,18 @@ extern "C" REX_FUNC(sub_82298FF8) {
 
 // VirtualAlloc: r3 = address, r4 = size, r5 = type, r6 = protection;
 // returns the address.
-extern "C" REX_FUNC(sub_82295398) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82295398) {
+  
   const uint32_t address = ctx.r3.u32, size = ctx.r4.u32, type = ctx.r5.u32;
   const uint32_t caller = uint32_t(ctx.lr);
   if (!hooks::Native()) {
-    __imp__sub_82295398(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82295398);
     return;
   }
   if (address != 0 || !(type & hooks::kMemCommit) || (type & ~hooks::kTypesTaken)) {
     hooks::LogOnce(1, type, address != 0 ? "VirtualAlloc at an address, type" : "VirtualAlloc type",
                    caller);
-    __imp__sub_82295398(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82295398);
     return;
   }
   if (ctx.r6.u32 != 4) {
@@ -171,8 +172,8 @@ std::optional<uint32_t> hooks::VirtualFree(uint32_t address, uint32_t size, uint
   return memory::FreePages(address) ? 1 : 0;
 }
 
-extern "C" REX_FUNC(sub_82295330) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82295330) {
+  
   auto r3 = hooks::VirtualFree(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr));
   if (!r3) {
     lifted::original::c82295330(ctx, base);
@@ -184,10 +185,10 @@ extern "C" REX_FUNC(sub_82295330) {
 // XPhysicalAlloc: r3 = size, r4 = physical address (-1 for any), r5 =
 // alignment, r6 = protection; returns the address. A physical address asks
 // for exactly [address, address + size) with no alignment.
-extern "C" REX_FUNC(sub_822964C8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822964C8) {
+  
   if (!hooks::Native()) {
-    __imp__sub_822964C8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822964C8);
     return;
   }
   const uint32_t size = ctx.r3.u32, physical = ctx.r4.u32;
@@ -199,10 +200,10 @@ extern "C" REX_FUNC(sub_822964C8) {
 
 // XPhysicalAllocEx: r3 = size, r4 = lowest and r5 = highest physical
 // address, r6 = alignment, r7 = protection; returns the address.
-extern "C" REX_FUNC(sub_82296550) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82296550) {
+  
   if (!hooks::Native()) {
-    __imp__sub_82296550(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82296550);
     return;
   }
   ctx.r3.u64 = memory::AllocPhysical(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -210,10 +211,10 @@ extern "C" REX_FUNC(sub_82296550) {
 }
 
 // XPhysicalFree: r3 = the address.
-extern "C" REX_FUNC(sub_822965C8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822965C8) {
+  
   if (!hooks::Native()) {
-    __imp__sub_822965C8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822965C8);
     return;
   }
   memory::FreePhysical(ctx.r3.u32);

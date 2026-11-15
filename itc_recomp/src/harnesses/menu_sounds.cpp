@@ -165,20 +165,20 @@ uint64_t Setting(Random& r) {
 }  // namespace
 
 void MenuSounds(Context& h) {
-  Group(h, "MenuSound::Play (sub_821103F0)", 100, __imp__sub_821103F0, hooks::MenuSoundPlay, 112,
+  Group(h, "MenuSound::Play (sub_821103F0)", 100, __imp__sub_821103F0, ITC_CONTEXT_FN(hooks::MenuSoundPlay), 112,
         8, false, [&](Random& r, uint64_t& r3, uint64_t&) {
           r3 = r.Below(3) == 0 ? r.Next() : Pick(r, {0u, 2u, 4u, 5u, 8u, 9u, 10u});
         });
-  Group(h, "Sound::Play (sub_82175850)", 100, __imp__sub_82175850, hooks::SoundPlay, 96, 8,
+  Group(h, "Sound::Play (sub_82175850)", 100, __imp__sub_82175850, ITC_CONTEXT_FN(hooks::SoundPlay), 96, 8,
         false, [&](Random& r, uint64_t& r3, uint64_t& r4) {
           r3 = r.Next();
           r4 = r.Next();
         });
   Group(h, "SoundOptions::SetEffectsVolume (sub_821B9C20)", 200, __imp__sub_821B9C20,
-        hooks::SoundOptionsSetEffectsVolume, 112, 16, true,
+        ITC_CONTEXT_FN(hooks::SoundOptionsSetEffectsVolume), 112, 16, true,
         [&](Random& r, uint64_t& r3, uint64_t&) { r3 = Setting(r); });
   Group(h, "SoundOptions::SetMusicVolume (sub_821B9CF0)", 200, __imp__sub_821B9CF0,
-        hooks::SoundOptionsSetMusicVolume, 112, 16, true,
+        ITC_CONTEXT_FN(hooks::SoundOptionsSetMusicVolume), 112, 16, true,
         [&](Random& r, uint64_t& r3, uint64_t&) { r3 = Setting(r); });
 }
 

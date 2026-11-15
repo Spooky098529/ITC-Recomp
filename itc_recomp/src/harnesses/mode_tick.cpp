@@ -210,7 +210,7 @@ void Fades(Context& h) {
             t.r6.u64 = args[3];
             t.r7.u64 = args[4];
           },
-          out ? __imp__sub_8209D0C8 : __imp__sub_8209D038, out ? NativeFadeOut : NativeFadeIn,
+          out ? __imp__sub_8209D0C8 : __imp__sub_8209D038, out ? ITC_CONTEXT_FN(NativeFadeOut) : ITC_CONTEXT_FN(NativeFadeIn),
           fmt::format("case {} layer {}", c, args[4]));
     }
     results.Report();
@@ -235,7 +235,7 @@ void Players(Context& h) {
             }
             player = random.Below(4);
           },
-          [&](PPCContext& t) { t.r3.u64 = player; }, __imp__sub_8209F658, NativeSignedInSlot,
+          [&](PPCContext& t) { t.r3.u64 = player; }, __imp__sub_8209F658, ITC_CONTEXT_FN(NativeSignedInSlot),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -247,7 +247,7 @@ void Players(Context& h) {
       Case(
           h, results,
           [&](Random& random) { value = c < 2 ? uint32_t(c) : uint32_t(random.Next()); },
-          [&](PPCContext& t) { t.r3.u64 = value; }, __imp__sub_8209F318, NativeSetBlocked,
+          [&](PPCContext& t) { t.r3.u64 = value; }, __imp__sub_8209F318, ITC_CONTEXT_FN(NativeSetBlocked),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -301,7 +301,7 @@ void Settings(Context& h) {
             t.r3.u64 = h.data;
             t.r4.u64 = type;
           },
-          __imp__sub_82106868, NativeSetChecks, fmt::format("case {} type {}", c, int32_t(type)),
+          __imp__sub_82106868, ITC_CONTEXT_FN(NativeSetChecks), fmt::format("case {} type {}", c, int32_t(type)),
           [&](const PPCContext& t, Outputs& out) {
             out.Bytes(Read(h.base, t.r1.u32 - 96, 80));
           });
@@ -318,7 +318,7 @@ void Settings(Context& h) {
             t.r3.u64 = h.data;
             t.r4.u64 = type;
           },
-          __imp__sub_82106740, NativeSetSceneTargetMode,
+          __imp__sub_82106740, ITC_CONTEXT_FN(NativeSetSceneTargetMode),
           fmt::format("case {} type {}", c, int32_t(type)));
     }
     results.Report();
@@ -332,7 +332,7 @@ void Settings(Context& h) {
       const uint32_t type = Type(c, h.random);
       Case(
           h, results, [&](Random&) { guest::StoreU32(h.base, slot, 0xCDCDCDCD); },
-          [&](PPCContext& t) { t.r3.u64 = type; }, __imp__sub_822934B8, NativePresence,
+          [&](PPCContext& t) { t.r3.u64 = type; }, __imp__sub_822934B8, ITC_CONTEXT_FN(NativePresence),
           fmt::format("case {} type {}", c, int32_t(type)),
           [&](const PPCContext&, Outputs& out) { out.Word(guest::LoadU32(h.base, slot)); });
     }
@@ -372,7 +372,7 @@ void CheckIdle(Context& h) {
           guest::StoreU32(h.base, 0x826C795C,
                           random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(16));
         },
-        [](PPCContext&) {}, __imp__sub_8209ED58, NativeCheckIdle, fmt::format("case {}", c));
+        [](PPCContext&) {}, __imp__sub_8209ED58, ITC_CONTEXT_FN(NativeCheckIdle), fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -443,7 +443,7 @@ void WatchUpdate(Context& h) {
           t.r3.u64 = 0x826C5B9C;
           t.r4.u64 = h.data + 256;
         },
-        __imp__sub_8209EEC8, NativeSignInWatchUpdate, fmt::format("case {}", c),
+        __imp__sub_8209EEC8, ITC_CONTEXT_FN(NativeSignInWatchUpdate), fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& out) {
           out.Bytes(Read(h.base, t.r1.u32 - mt::kSignInWatchUpdateFrame + 80, 32));
         });
@@ -522,7 +522,7 @@ void FadesUpdate(Context& h) {
             }
           }
         },
-        [](PPCContext&) {}, __imp__sub_8209D130, hooks::ModeTickScreenFadesUpdate,
+        [](PPCContext&) {}, __imp__sub_8209D130, ITC_CONTEXT_FN(hooks::ModeTickScreenFadesUpdate),
         fmt::format("case {}", c), [&](const PPCContext& t, Outputs& out) {
           // The color rectangle in the frame (its +76 left as it was).
           out.Bytes(Read(h.base, t.r1.u32 - mt::kScreenFadesUpdateFrame + mt::kFadeRect, 112));
@@ -623,7 +623,7 @@ void Compares(Context& h) {
             t.r6.u64 = s2;
             t.r7.s64 = n2;
           },
-          __imp__sub_82297100, NativeCompareString, fmt::format("case {}", c), last_error);
+          __imp__sub_82297100, ITC_CONTEXT_FN(NativeCompareString), fmt::format("case {}", c), last_error);
     }
     results.Report();
   }
@@ -652,7 +652,7 @@ void Compares(Context& h) {
             t.r3.u64 = a;
             t.r4.u64 = b;
           },
-          __imp__sub_82296130, NativeLstrcmp, fmt::format("case {}", c), last_error);
+          __imp__sub_82296130, ITC_CONTEXT_FN(NativeLstrcmp), fmt::format("case {}", c), last_error);
     }
     results.Report();
   }
@@ -686,7 +686,7 @@ void Compares(Context& h) {
             t.r4.u64 = c >= 18 && c < 36 ? kMusicNames[c % 18] : h.data + 1024;
             t.r5.u64 = h.data + 516;
           },
-          __imp__sub_821063B0, hooks::ModeTickMusicPlay, fmt::format("case {}", c),
+          __imp__sub_821063B0, ITC_CONTEXT_FN(hooks::ModeTickMusicPlay), fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& out) {
             out.Word(guest::LoadU32(h.base, slot));
             out.Bytes(Read(h.base, t.r1.u32 - mt::kMusicPlayFrame + 80, 96));
@@ -726,7 +726,7 @@ void SignInWatchStaticInits(Context& h) {
       Write(h.base, kFrom, start.data(), kBytes);
       const uint32_t mark = exit_table::Mark(h.base);
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825D9518 : NativeSignInWatchStaticInit)(t, h.base);
+      (v == 0 ? __imp__sub_825D9518 : ITC_CONTEXT_FN(NativeSignInWatchStaticInit))(t, h.base);
       out[v].Bytes(Read(h.base, kFrom, kBytes));
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -814,7 +814,7 @@ void ModesTickGroup(Context& h) {
           t.r3.u64 = h.data + kHolder;
           t.r4.u64 = h.data + kLayer;
         },
-        __imp__sub_82107910, NativeModesTick, fmt::format("case {}", c),
+        __imp__sub_82107910, ITC_CONTEXT_FN(NativeModesTick), fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& out) {
           for (const Extra& e : kExtra) {
             out.Bytes(Read(h.base, e.address, e.bytes));

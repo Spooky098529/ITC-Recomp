@@ -146,13 +146,13 @@ void Handlers(Context& h, Random& r) {
     GuestFunction recompiled, native;
   } kFunctions[] = {
       {"CameraDirector::ToView4 (sub_82152400)", Original<__imp__sub_82152400>,
-       hooks::CameraModesStep82152400},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82152400)},
       {"CameraDirector::ToView5 (sub_821524B8)", Original<__imp__sub_821524B8>,
-       hooks::CameraModesStep821524B8},
+       ITC_CONTEXT_FN(hooks::CameraModesStep821524B8)},
       {"CameraDirector::ToView3 (sub_821524D8)", Original<__imp__sub_821524D8>,
-       hooks::CameraModesStep821524D8},
+       ITC_CONTEXT_FN(hooks::CameraModesStep821524D8)},
       {"CameraDirector::ToView3IfCourse (sub_82153160)", Original<__imp__sub_82153160>,
-       hooks::CameraModesStep82153160},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82153160)},
   };
   for (const auto& f : kFunctions) {
     Results results(f.name);
@@ -220,7 +220,7 @@ void Small(Context& h, Random& r) {
         guest::StoreU32(h.base, block + 0, block + 16);
         guest::StoreU32(h.base, block + 4, block + 16 + kViewportBytes);
         PPCContext t = CallContext(h);
-        (v == 0 ? Original<__imp__sub_821524F0> : hooks::CameraModesStep821524F0)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821524F0> : ITC_CONTEXT_FN(hooks::CameraModesStep821524F0))(t, h.base);
         out[v].Bytes(Read(h.base, block, viewports.bytes));
         out[v].Word(t.r3.u32);
         saved.Restore();
@@ -248,7 +248,7 @@ void Small(Context& h, Random& r) {
         PPCContext t = CallContext(h);
         t.f1.f64 = degrees;
         t.f2.f64 = width;
-        (v == 0 ? Original<__imp__sub_82152548> : hooks::CameraModesStep82152548)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82152548> : ITC_CONTEXT_FN(hooks::CameraModesStep82152548))(t, h.base);
         out[v].Double(t.f1.u64);
       }
       results.Check(out[0], out[1], fmt::format("degrees {} width {}", degrees, width));
@@ -277,7 +277,7 @@ void Small(Context& h, Random& r) {
         t.r3.u64 = out_at;
         t.r4.u64 = q;
         t.r5.u64 = vec;
-        (v == 0 ? Original<__imp__sub_821525F8> : hooks::CameraModesStep821525F8)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821525F8> : ITC_CONTEXT_FN(hooks::CameraModesStep821525F8))(t, h.base);
         out[v].Floats(h.base, h.data + 0x100, 24);
         out[v].Word(t.r3.u32);
       }
@@ -304,7 +304,7 @@ void Small(Context& h, Random& r) {
         t.r3.u64 = h.data + 0x100;
         t.r4.u64 = (uint64_t(q[0]) << 32) | q[1];
         t.r5.u64 = (uint64_t(q[2]) << 32) | q[3];
-        (v == 0 ? Original<__imp__sub_82152698> : hooks::CameraModesStep82152698)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82152698> : ITC_CONTEXT_FN(hooks::CameraModesStep82152698))(t, h.base);
         out[v].Floats(h.base, h.data + 0x100, 16);
         out[v].Bytes(Read(h.base, t.r1.u32 + 32, 16));
         out[v].Floats(h.base, t.r1.u32 - 16, 4);
@@ -342,7 +342,7 @@ void Small(Context& h, Random& r) {
         t.r8.u64 = pointers[4];
         t.r9.u64 = pointers[5];
         t.r10.u64 = pointers[6];
-        (v == 0 ? Original<__imp__sub_82090000> : hooks::CameraModesStep82090000)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82090000> : ITC_CONTEXT_FN(hooks::CameraModesStep82090000))(t, h.base);
         out[v].Floats(h.base, h.data + 0x100, 16);
         out[v].Word(t.r3.u32);
       }
@@ -396,17 +396,17 @@ void Lists(Context& h, Random& r) {
     Kind kind;
   } kFunctions[] = {
       {"List40::Link (sub_82153228)", Original<__imp__sub_82153228>,
-       hooks::CameraModesStep82153228, 40, kLink40},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82153228), 40, kLink40},
       {"List40::Insert (sub_821544E0)", Original<__imp__sub_821544E0>,
-       hooks::CameraModesStep821544E0, 40, kInsert40},
+       ITC_CONTEXT_FN(hooks::CameraModesStep821544E0), 40, kInsert40},
       {"List16::Insert20 (sub_82154458)", Original<__imp__sub_82154458>,
-       hooks::CameraModesStep82154458, 16, kInsert20},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82154458), 16, kInsert20},
       {"List16::Insert32 (sub_82154378)", Original<__imp__sub_82154378>,
-       hooks::CameraModesStep82154378, 16, kInsert32},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82154378), 16, kInsert32},
       {"List16::Insert608 (sub_821543E8)", Original<__imp__sub_821543E8>,
-       hooks::CameraModesStep821543E8, 16, kInsert608},
+       ITC_CONTEXT_FN(hooks::CameraModesStep821543E8), 16, kInsert608},
       {"List16::Copy32 (sub_82154300)", Original<__imp__sub_82154300>,
-       hooks::CameraModesStep82154300, 16, kCopy32},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82154300), 16, kCopy32},
   };
   constexpr uint32_t kBytes = 0x4000;
   Block memory(kBytes);
@@ -463,7 +463,7 @@ void Anims(Context& h, Random& r) {
       for (int v = 0; v < 2; v++) {
         guest::StoreU32(h.base, cm::kAnimCount, count);
         PPCContext t = CallContext(h);
-        (v == 0 ? Original<__imp__sub_82150078> : hooks::CameraModesStep82150078)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82150078> : ITC_CONTEXT_FN(hooks::CameraModesStep82150078))(t, h.base);
         out[v].Word(guest::LoadU32(h.base, cm::kAnimCount));
         out[v].Word(t.r3.u32);
       }
@@ -484,7 +484,7 @@ void Anims(Context& h, Random& r) {
       for (int v = 0; v < 2; v++) {
         PPCContext t = CallContext(h);
         t.r3.u64 = id;
-        (v == 0 ? Original<__imp__sub_82150300> : hooks::CameraModesStep82150300)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82150300> : ITC_CONTEXT_FN(hooks::CameraModesStep82150300))(t, h.base);
         out[v].Word(t.r3.u32);
       }
       results.Check(out[0], out[1], fmt::format("count {} id {}", count, id));
@@ -520,7 +520,7 @@ void Filter(Context& h, Random& r) {
         guest::StoreU32(h.base, h.data, style);
         PPCContext t = CallContext(h);
         t.r3.u64 = h.data;
-        (v == 0 ? Original<__imp__sub_82152108> : hooks::CameraModesStep82152108)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82152108> : ITC_CONTEXT_FN(hooks::CameraModesStep82152108))(t, h.base);
         out[v].Floats(h.base, filter.address + 8064, 16);
         saved.Restore();
       }
@@ -549,7 +549,7 @@ void Filter(Context& h, Random& r) {
         }
         PPCContext t = CallContext(h);
         t.r3.u64 = h.data;
-        (v == 0 ? Original<__imp__sub_82152290> : hooks::CameraModesStep82152290)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82152290> : ITC_CONTEXT_FN(hooks::CameraModesStep82152290))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, 32));
         out[v].Bytes(Read(h.base, kFades, kFadesBytes));
         saved.Restore();
@@ -774,7 +774,7 @@ void AnimFiles(Context& h, Random& r) {
         t.r4.u64 = data;
         t.r5.u64 = bytes;
         t.r6.u64 = record;
-        (v == 0 ? Original<__imp__sub_82150878> : hooks::CameraModesStep82150878)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82150878> : ITC_CONTEXT_FN(hooks::CameraModesStep82150878))(t, h.base);
         out[v].Word(guest::LoadU32(h.base, cm::kAnimCount));
         const uint32_t entry = cm::kAnims + cm::kAnimBytes * count;
         out[v].Word(guest::LoadU32(h.base, entry));
@@ -807,7 +807,7 @@ void AnimFiles(Context& h, Random& r) {
         ArchiveLoads loads(serials);
         PPCContext t = CallContext(h);
         t.r3.u64 = id;
-        (v == 0 ? Original<__imp__sub_82150B10> : hooks::CameraModesStep82150B10)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82150B10> : ITC_CONTEXT_FN(hooks::CameraModesStep82150B10))(t, h.base);
         const std::vector<uint32_t>& calls = loads.calls();
         out[v].Word(uint32_t(calls.size()));
         for (size_t i = 0; i + 6 <= calls.size(); i += 6) {
@@ -934,7 +934,7 @@ void AnimFrees(Context& h, Random& r) {
         guest::StoreU32(h.base, cm::kAnimCount, entries);
         PPCContext t = CallContext(h);
         t.r3.u64 = 0x5678;
-        (v == 0 ? Original<__imp__sub_821507D8> : hooks::CameraModesStep821507D8)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821507D8> : ITC_CONTEXT_FN(hooks::CameraModesStep821507D8))(t, h.base);
         out[v].Word(guest::LoadU32(h.base, cm::kAnimCount));
         out[v].Word(uint32_t(pages.size()));
         for (const uint32_t p : pages) {
@@ -1047,11 +1047,11 @@ void AnimEvaluation(Context& h, Random& r) {
        kTarget},
       {"CameraAnim::Matrix (sub_82150590)", Original<__imp__sub_82150590>, NativeMatrix, kMatrix},
       {"CameraAnims::Evaluate (sub_82150960)", Original<__imp__sub_82150960>,
-       hooks::CameraModesStep82150960, kEvaluate},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82150960), kEvaluate},
       {"CameraAnims::Duration (sub_82150A98)", Original<__imp__sub_82150A98>,
-       hooks::CameraModesStep82150A98, kDuration},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82150A98), kDuration},
       {"CameraAnims::ObjectMatrix (sub_82150A10)", Original<__imp__sub_82150A10>,
-       hooks::CameraModesStep82150A10, kObjectMatrix},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82150A10), kObjectMatrix},
   };
   for (const auto& f : kFunctions) {
     Results results(f.name);
@@ -1209,7 +1209,7 @@ void Paths(Context& h, Random& r) {
         PPCContext t = CallContext(h);
         t.r4.u64 = data;
         t.r6.u64 = buffer.address;
-        (v == 0 ? Original<__imp__sub_82152078> : hooks::CameraModesStep82152078)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82152078> : ITC_CONTEXT_FN(hooks::CameraModesStep82152078))(t, h.base);
         out[v].Bytes(Read(h.base, data, 0x7000));
         out[v].Bytes(Read(h.base, buffer.address, 32));
       }
@@ -1263,7 +1263,7 @@ void Paths(Context& h, Random& r) {
         t.r3.u64 = 0x9ABC;
         t.r4.u64 = buffer.address;
         t.r5.u64 = index;
-        (v == 0 ? Original<__imp__sub_82152E08> : hooks::CameraModesStep82152E08)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82152E08> : ITC_CONTEXT_FN(hooks::CameraModesStep82152E08))(t, h.base);
         const uint32_t now = guest::LoadU32(h.base, buffer.address + 20);
         out[v].Bytes(Read(h.base, buffer.address, 20));
         out[v].Word(guest::LoadU32(h.base, buffer.address + 24));
@@ -1307,7 +1307,7 @@ void RivalLogo(Context& h, Random& r) {
         Fill(h.base, h.data, kScratchBytes, uint8_t(c));
         PPCContext t = CallContext(h);
         t.r3.u64 = h.data + 0x100;
-        (v == 0 ? Original<__imp__sub_82211848> : hooks::CameraModesStep82211848)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82211848> : ITC_CONTEXT_FN(hooks::CameraModesStep82211848))(t, h.base);
         out[v].Bytes(Read(h.base, h.data + 0x100, 0x80));
       }
       results.Check(out[0], out[1], fmt::format("case {}", c));
@@ -1365,7 +1365,7 @@ void RivalLogo(Context& h, Random& r) {
         }
         PPCContext t = CallContext(h);
         t.r3.u64 = entry;
-        (v == 0 ? Original<__imp__sub_82211AB0> : hooks::CameraModesStep82211AB0)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82211AB0> : ITC_CONTEXT_FN(hooks::CameraModesStep82211AB0))(t, h.base);
         out[v].Bytes(Read(h.base, entry, 96));
         out[v].Bytes(Read(h.base, textures, 32));
         out[v].Word(t.r3.u32);
@@ -1431,7 +1431,7 @@ void Track(Context& h, Random& r) {
       PPCContext t = AlignedContext(h);
       t.r3.u64 = tracker.address;
       t.r4.u64 = the_vehicle;
-      (v == 0 ? Original<__imp__sub_82153290> : hooks::CameraModesStep82153290)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82153290> : ITC_CONTEXT_FN(hooks::CameraModesStep82153290))(t, h.base);
       out[v].Floats(h.base, tracker.address, 56);
       out[v].Bytes(Read(h.base, tracker.address + 224, 96));
       out[v].Word(t.r3.u32);
@@ -1449,12 +1449,12 @@ void Shakes(Context& h, Random& r) {
     Kind kind;
   } kFunctions[] = {
       {"Camera::Shake (sub_82152CD8)", Original<__imp__sub_82152CD8>,
-       hooks::CameraModesStep82152CD8, kShake},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82152CD8), kShake},
       {"Camera::ShakeRandom (sub_82152BD8)", Original<__imp__sub_82152BD8>, NativeShakeRandom,
        kShakeRandom},
       {"Viewport::Offset (sub_821529B0)", Original<__imp__sub_821529B0>, NativeOffset, kOffset},
       {"Viewport::PullBack (sub_82152788)", Original<__imp__sub_82152788>,
-       hooks::CameraModesStep82152788, kPullBack},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82152788), kPullBack},
   };
   Block viewport(kViewportBytes), camera(64), vehicle(64);
   Saved seed(h.base, kSeed, 4);
@@ -1542,7 +1542,7 @@ void IntroShots(Context& h, Random& r) {
         guest::StoreU32(h.base, kPaused, paused_value);
         PPCContext t = CallContext(h);
         t.r3.u64 = h.data;
-        (v == 0 ? Original<__imp__sub_82152E78> : hooks::CameraModesStep82152E78)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82152E78> : ITC_CONTEXT_FN(hooks::CameraModesStep82152E78))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, 20));
         out[v].Floats(h.base, viewport.address + 1600, 40);
         out[v].Word(t.r3.u32);
@@ -1674,7 +1674,7 @@ void IntroShots(Context& h, Random& r) {
         t.r3.u64 = camera.address;
         t.r4.u64 = viewport.address;
         t.r5.u64 = vehicles.address + 6272;
-        (v == 0 ? Original<__imp__sub_82158F70> : hooks::CameraModesStep82158F70)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82158F70> : ITC_CONTEXT_FN(hooks::CameraModesStep82158F70))(t, h.base);
         out[v].Bytes(Read(h.base, camera.address, 760));
         out[v].Floats(h.base, viewport.address + 1680, 20);
         out[v].Bytes(Read(h.base, kShotStatics, kShotStaticsBytes));
@@ -1719,7 +1719,7 @@ void DirectorStartRelease(Context& h, Random& r) {
           const uint32_t mark = exit_table::Mark(h.base);
           PPCContext t = CallContext(h);
           t.r3.u64 = director.address;
-          (v == 0 ? Original<__imp__sub_82152338> : hooks::CameraModesStep82152338)(t, h.base);
+          (v == 0 ? Original<__imp__sub_82152338> : ITC_CONTEXT_FN(hooks::CameraModesStep82152338))(t, h.base);
           const uint32_t block = guest::LoadU32(h.base, cm::kViewports);
           const uint32_t first = guest::LoadU32(h.base, block);
           const uint32_t second = guest::LoadU32(h.base, block + 4);
@@ -1778,7 +1778,7 @@ void DirectorStartRelease(Context& h, Random& r) {
           guest::StoreU32(h.base, cm::kViewports, block);
           PPCContext t = CallContext(h);
           t.r3.u64 = director.address;
-          (v == 0 ? Original<__imp__sub_82153098> : hooks::CameraModesStep82153098)(t, h.base);
+          (v == 0 ? Original<__imp__sub_82153098> : ITC_CONTEXT_FN(hooks::CameraModesStep82153098))(t, h.base);
           out[v].Word(guest::LoadU32(h.base, director.address + 9624));
           out[v].Word(guest::LoadU32(h.base, save.address + 0x1F85C + 24));
           out[v].Word(guest::LoadU32(h.base, cm::kViewports));
@@ -1820,7 +1820,7 @@ void Cutscenes(Context& h, Random& r) {
         PPCContext t = CallContext(h);
         t.r3.u64 = shot.address;
         t.r4.u64 = entry.address;
-        (v == 0 ? Original<__imp__sub_82156B68> : hooks::CameraModesStep82156B68)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82156B68> : ITC_CONTEXT_FN(hooks::CameraModesStep82156B68))(t, h.base);
         out[v].Bytes(Read(h.base, shot.address, 608));
         const std::vector<uint32_t>& calls = loads.calls();
         out[v].Word(uint32_t(calls.size()));
@@ -1884,7 +1884,7 @@ void Cutscenes(Context& h, Random& r) {
         t.r3.u64 = shot.address;
         t.r4.u64 = out_block.address;
         t.f1.u64 = 0x4045000000000000ull;
-        (v == 0 ? Original<__imp__sub_82155800> : hooks::CameraModesStep82155800)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82155800> : ITC_CONTEXT_FN(hooks::CameraModesStep82155800))(t, h.base);
         out[v].Bytes(Read(h.base, shot.address, 12));
         out[v].Bytes(Read(h.base, list, 76));
         for (uint32_t s = 0; s < 16; s++) {
@@ -2243,7 +2243,7 @@ void RoutePaths(Context& h, Random& r) {
         FillStackBytes(h.base, t.r1.u32, seed, 1024);
         t.r3.u64 = w;
         t.r4.u64 = w + 16;
-        (v == 0 ? Original<__imp__sub_820F9B48> : hooks::CameraModesStep820F9B48)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820F9B48> : ITC_CONTEXT_FN(hooks::CameraModesStep820F9B48))(t, h.base);
         out[v].Double(t.f1.u64);
         out[v].Bytes(Read(h.base, w, 32));
       }
@@ -2268,7 +2268,7 @@ void RoutePaths(Context& h, Random& r) {
         {"CameraPath::RoutePoint (sub_820ABDA8)", Original<__imp__sub_820ABDA8>,
          NativeRoutePoint, 1},
         {"CameraPath::Evaluate (sub_820AC248)", Original<__imp__sub_820AC248>,
-         hooks::CameraModesStep820AC248, 2},
+         ITC_CONTEXT_FN(hooks::CameraModesStep820AC248), 2},
     };
     if (!hooks::NativeAtexit()) {
       ITC_LOG_WARN("harness: camera_modes: TrackRoute::SplinePoint's static needs native atexit");
@@ -2392,7 +2392,7 @@ void RoutePaths(Context& h, Random& r) {
         PPCContext t = AlignedContext(h);
         t.r3.u64 = range;
         t.r4.u64 = w;
-        (v == 0 ? Original<__imp__sub_820FE830> : hooks::CameraModesStep820FE830)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820FE830> : ITC_CONTEXT_FN(hooks::CameraModesStep820FE830))(t, h.base);
         out[v].Bytes(Read(h.base, range, 1064));
         out[v].Word(guest::LoadU32(h.base, kSliceCountGlobal));
         out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -2443,7 +2443,7 @@ void RoutePaths(Context& h, Random& r) {
         PPCContext t = AlignedContext(h);
         t.r3.u64 = cam;
         t.r4.u64 = w;
-        (v == 0 ? Original<__imp__sub_82156980> : hooks::CameraModesStep82156980)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82156980> : ITC_CONTEXT_FN(hooks::CameraModesStep82156980))(t, h.base);
         out[v].Bytes(Read(h.base, cam, 43136));
         out[v].Word(guest::LoadU32(h.base, kSliceCountGlobal));
       }
@@ -2536,9 +2536,9 @@ void ChaseCameras(Context& h, Random& r) {
       {"ChaseCamera::Follow (sub_82153640)", Original<__imp__sub_82153640>, NativeFollow,
        kFollow},
       {"ChaseCamera::ChaseCamera (sub_82154548)", Original<__imp__sub_82154548>,
-       hooks::CameraModesStep82154548, kConstruct},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82154548), kConstruct},
       {"ChaseCamera::Update (sub_82154808)", Original<__imp__sub_82154808>,
-       hooks::CameraModesStep82154808, kUpdate},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82154808), kUpdate},
   };
   Saved seed(h.base, kSeed, 4);
   Saved shake(h.base, kShakeStatics, 8);
@@ -2635,13 +2635,13 @@ void ViewCameras(Context& h, Random& r) {
     Kind kind;
   } kFunctions[] = {
       {"ViewCamera1::ViewCamera1 (sub_82154A48)", Original<__imp__sub_82154A48>,
-       hooks::CameraModesStep82154A48, kConstruct},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82154A48), kConstruct},
       {"ViewCamera1::Update (sub_82153A50)", Original<__imp__sub_82153A50>,
-       hooks::CameraModesStep82153A50, kUpdate},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82153A50), kUpdate},
       {"ViewCamera2::ViewCamera2 (sub_82154D38)", Original<__imp__sub_82154D38>,
-       hooks::CameraModesStep82154D38, kConstruct},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82154D38), kConstruct},
       {"ViewCamera2::Update (sub_82153E58)", Original<__imp__sub_82153E58>,
-       hooks::CameraModesStep82153E58, kUpdate},
+       ITC_CONTEXT_FN(hooks::CameraModesStep82153E58), kUpdate},
   };
   constexpr uint32_t kManagerAddress = 0x826D82F4, kVehiclesAddress = 0x826C2E34;
   constexpr uint32_t kSceneAddress = 0x826C2E44, kFlagWord = 0x826C7824;
@@ -2786,7 +2786,7 @@ void IntroUpdates(Context& h, Random& r) {
       PPCContext t = AlignedContext(h);
       FillStackBytes(h.base, t.r1.u32, uint64_t(c) + 1, 2048);
       t.r3.u64 = w.camera.address;
-      (v == 0 ? Original<__imp__sub_82155E58> : hooks::CameraModesStep82155E58)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82155E58> : ITC_CONTEXT_FN(hooks::CameraModesStep82155E58))(t, h.base);
       w.Out(out[v], h.base);
       out[v].Bytes(Read(h.base, list, 412));
       out[v].Word(guest::LoadU32(h.base, kKept));
@@ -2876,7 +2876,7 @@ void RivalLogoOpenClose(Context& h, Random& r) {
         t.r3.u64 = entry;
         t.r4.u64 = logo;
         t.r5.u64 = texture;
-        (v == 0 ? Original<__imp__sub_822118E0> : hooks::CameraModesStep822118E0)(t, h.base);
+        (v == 0 ? Original<__imp__sub_822118E0> : ITC_CONTEXT_FN(hooks::CameraModesStep822118E0))(t, h.base);
         out[v].Bytes(Read(h.base, entry, 96));
         out[v].Word(t.r3.u32 == entry ? 1 : t.r3.u32);
         const std::vector<uint32_t>& calls = loads.calls();
@@ -2935,7 +2935,7 @@ void RivalLogoOpenClose(Context& h, Random& r) {
         guest::StoreU32(h.base, ui_movies::kMovieTable + 16, movie);
         PPCContext t = CallContext(h);
         t.r3.u64 = entry;
-        (v == 0 ? Original<__imp__sub_82211980> : hooks::CameraModesStep82211980)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82211980> : ITC_CONTEXT_FN(hooks::CameraModesStep82211980))(t, h.base);
         const uint32_t array = guest::LoadU32(h.base, ui_movies::kMovieTable);
         const uint32_t r3 = t.r3.u32;
         out[v].Bytes(Read(h.base, entry, 96));
@@ -3121,9 +3121,9 @@ void CutsceneSteps(Context& h, Random& r) {
         draws.clear();
         g_logo_draws_r1 = t.r1.u32;
         if (which == 0) {
-          (v == 0 ? Original<__imp__sub_82155A28> : hooks::CameraModesStep82155A28)(t, h.base);
+          (v == 0 ? Original<__imp__sub_82155A28> : ITC_CONTEXT_FN(hooks::CameraModesStep82155A28))(t, h.base);
         } else {
-          (v == 0 ? Original<__imp__sub_821561F8> : hooks::CameraModesStep821561F8)(t, h.base);
+          (v == 0 ? Original<__imp__sub_821561F8> : ITC_CONTEXT_FN(hooks::CameraModesStep821561F8))(t, h.base);
         }
         out[v].Bytes(Read(h.base, cutscene.address, kLogo));
         out[v].Bytes(Read(h.base, entry, 96));
@@ -3260,7 +3260,7 @@ void TvConstructs(Context& h, Random& r) {
       t.r3.u64 = w.camera.address;
       t.r4.u64 = w.chase.viewport.address;
       t.r5.u64 = w.chase.vehicle.address;
-      (v == 0 ? Original<__imp__sub_82155288> : hooks::CameraModesStep82155288)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82155288> : ITC_CONTEXT_FN(hooks::CameraModesStep82155288))(t, h.base);
       w.Out(out[v], h.base);
       out[v].Word(guest::LoadU32(h.base, kSeed));
       out[v].Floats(h.base, kChaseStatics, 8);
@@ -3403,9 +3403,9 @@ void TvSteps(Context& h, Random& r) {
     Kind kind;
   } kFunctions[] = {
       {"TvCamera::Step (sub_821562F8)", Original<__imp__sub_821562F8>,
-       hooks::CameraModesStep821562F8, kStep},
+       ITC_CONTEXT_FN(hooks::CameraModesStep821562F8), kStep},
       {"TvCamera::Update (sub_821593D8)", Original<__imp__sub_821593D8>,
-       hooks::CameraModesStep821593D8, kUpdate},
+       ITC_CONTEXT_FN(hooks::CameraModesStep821593D8), kUpdate},
   };
   for (const auto& f : kFunctions) {
     Results results(f.name);
@@ -3689,7 +3689,7 @@ void GarageCameras(Context& h, Random& r) {
       FillStackBytes(h.base, t.r1.u32, uint64_t(c) + 1, 2048);
       const uint32_t frame = t.r1.u32 - 272;
       t.r3.u64 = camera.address;
-      (v == 0 ? Original<__imp__sub_8217BE98> : hooks::CameraModesStep8217BE98)(t, h.base);
+      (v == 0 ? Original<__imp__sub_8217BE98> : ITC_CONTEXT_FN(hooks::CameraModesStep8217BE98))(t, h.base);
       out[v].Bytes(Read(h.base, camera.address, 108));
       out[v].Float(guest::LoadU32(h.base, camera.address + 108));
       out[v].Bytes(Read(h.base, camera.address + 112, kCameraBytes - 112));
@@ -3765,7 +3765,7 @@ void DirectorInitStates(Context& h, Random& r) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = director.address;
-      (v == 0 ? Original<__imp__sub_82159950> : hooks::CameraModesStep82159950)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82159950> : ITC_CONTEXT_FN(hooks::CameraModesStep82159950))(t, h.base);
       out[v].Bytes(Read(h.base, director.address, 9640));
       out[v].Bytes(Read(h.base, frame + 80, cm::kInitStatesFrame - 80 - 112));
       out[v].Word(t.r3.u32);
@@ -3975,7 +3975,7 @@ void CutsceneConstructs(Context& h, Random& r) {
       t.r4.u64 = w.viewport.address;
       t.r5.u64 = w.vehicle.address;
       t.lr = 0x821592B4;
-      (v == 0 ? Original<__imp__sub_82156CC0> : hooks::CameraModesStep82156CC0)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82156CC0> : ITC_CONTEXT_FN(hooks::CameraModesStep82156CC0))(t, h.base);
       const uint32_t cs = cutscene.address;
       out[v].Bytes(Read(h.base, cs, 32));
       out[v].Floats(h.base, cs + 32, 56);
@@ -4125,7 +4125,7 @@ void DirectorSetModes(Context& h, Random& r) {
       PPCContext t = CallContext(h);
       t.r3.u64 = director.address;
       t.r4.u64 = view;
-      (v == 0 ? Original<__imp__sub_821591F0> : hooks::CameraModesStep821591F0)(t, h.base);
+      (v == 0 ? Original<__imp__sub_821591F0> : ITC_CONTEXT_FN(hooks::CameraModesStep821591F0))(t, h.base);
       g_construct_calls = nullptr;
       out[v].Bytes(Read(h.base, director.address + cm::kView - 16, 32));
       out[v].Bytes(Read(h.base, director.address + cm::kCurrentCamera, 8));
@@ -4264,11 +4264,11 @@ void DirectorHandlers(Context& h, Random& r) {
   };
   const Handler handlers[] = {
       {"CameraDirector::OnRaceStart (sub_821596B0)", Original<__imp__sub_821596B0>,
-       hooks::CameraModesStep821596B0, 224, 160},
+       ITC_CONTEXT_FN(hooks::CameraModesStep821596B0), 224, 160},
       {"CameraDirector::Resume (sub_821597F0)", Original<__imp__sub_821597F0>,
-       hooks::CameraModesStep821597F0, 240, 160},
+       ITC_CONTEXT_FN(hooks::CameraModesStep821597F0), 240, 160},
       {"CameraDirector::Update (sub_821594B8)", Original<__imp__sub_821594B8>,
-       hooks::CameraModesStep821594B8, 176, 120},
+       ITC_CONTEXT_FN(hooks::CameraModesStep821594B8), 176, 120},
   };
   for (const Handler& handler : handlers) {
     Results results(handler.name);

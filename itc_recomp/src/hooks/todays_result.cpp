@@ -3,6 +3,7 @@
 // steps the harness shares (hooks/todays_result.h).
 
 #include "hooks/todays_result.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "todays_result/todays_result.h"
@@ -60,7 +61,7 @@ namespace tr = todays_result;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -70,7 +71,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -91,7 +92,7 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
@@ -99,7 +100,7 @@ class GuestCalls {
 // StateMachine::Add's r3: a new transition's address from the machine's
 // 64-bit r3, as the title screen's Inits.
 template <uint32_t (*InitStates)(uint8_t*, uint32_t, uint32_t, bool*)>
-void InitStatesStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(InitStatesStep) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
@@ -111,13 +112,13 @@ void InitStatesStep(PPCContext& ctx, uint8_t* base) {
 
 bool TodaysResultNative() { return ITC_FLAG(native_todays_result); }
 
-void ModeType9Init(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType9Init) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::ModeInit(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 // The delegate functions return the answer (r3 as it came).
 #define ITC_MODE_TYPE9_DELEGATE(name)                                       \
-  void ModeType9##name(PPCContext& ctx, uint8_t* base) {                    \
+  void ModeType9##name(lifted::Regs& ctx, uint8_t* base) {                    \
     const uint64_t answer = ctx.r3.u64;                                     \
     {                                                                       \
       GuestCalls guest(ctx, base);                                          \
@@ -131,34 +132,34 @@ ITC_MODE_TYPE9_DELEGATE(LeaveScreen)
 ITC_MODE_TYPE9_DELEGATE(WaitForShown)
 ITC_MODE_TYPE9_DELEGATE(Leaving)
 #undef ITC_MODE_TYPE9_DELEGATE
-void ModeType9IsLoaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType9IsLoaded) {
   ctx.r3.u64 = tr::IsLoaded(base, ctx.r3.u32);
 }
-void ModeType9FindShown(PPCContext& ctx, uint8_t* base) { tr::FindShown(base, ctx.r3.u32); }
-void TodaysEventKind(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType9FindShown) { tr::FindShown(base, ctx.r3.u32); }
+ITC_REGS_STEP(TodaysEventKind) {
   ctx.r3.u64 = tr::Kind(base, ctx.r1.u32);
 }
-void TodaysResultInitStates(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysResultInitStates) {
   InitStatesStep<tr::ResultInitStates>(ctx, base);
 }
-void TodaysEventInitStates(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventInitStates) {
   InitStatesStep<tr::EventInitStates>(ctx, base);
 }
 
-void TodaysResultCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysResultCreate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::ResultCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TodaysResultOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysResultOpenMovie) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::ResultOpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
-void TodaysResultWaitForMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysResultWaitForMovie) {
   ctx.r3.u64 = tr::ResultWaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
 }
 // The handlers and helpers with no argument but the frame.
 #define ITC_TODAYS_RESULT_FRAME(name, function)                     \
-  void name(PPCContext& ctx, uint8_t* base) {                       \
+  ITC_REGS_STEP(name) {                       \
     GuestCalls guest(ctx, base);                                    \
     ctx.r3.u64 = tr::function(base, ctx.r1.u32, guest.calls());     \
   }
@@ -170,17 +171,17 @@ ITC_TODAYS_RESULT_FRAME(TodaysResultUpdate, ResultUpdate)
 ITC_TODAYS_RESULT_FRAME(TodaysResultWaitPage, ResultWaitPage)
 ITC_TODAYS_RESULT_FRAME(TodaysResultQueueMovie, ResultQueueMovie)
 #undef ITC_TODAYS_RESULT_FRAME
-void TodaysResultDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysResultDraw) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::ResultDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
-void TodaysResultLeavePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysResultLeavePage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::ResultLeavePage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 // The transitions (r3 the started word).
 #define ITC_TODAYS_RESULT_TRANSITION(name, function)                           \
-  void name(PPCContext& ctx, uint8_t* base) {                                  \
+  ITC_REGS_STEP(name) {                                  \
     GuestCalls guest(ctx, base);                                               \
     ctx.r3.u64 = tr::function(base, ctx.r3.u32, ctx.r1.u32, guest.calls());    \
   }
@@ -190,80 +191,80 @@ ITC_TODAYS_RESULT_TRANSITION(TodaysResultFadeOut, ResultFadeOut)
 ITC_TODAYS_RESULT_TRANSITION(TodaysResultUnload, ResultUnload)
 ITC_TODAYS_RESULT_TRANSITION(TodaysResultDestroy, ResultDestroy)
 #undef ITC_TODAYS_RESULT_TRANSITION
-void TodaysResultUnloaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysResultUnloaded) {
   tr::ResultUnloaded(base, ctx.r3.u32);
 }
-void TodaysResultLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysResultLeave) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::ResultLeave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
-void TodaysEventCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventCreate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::EventCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TodaysEventMarkImages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventMarkImages) {
   ctx.r3.u64 = tr::MarkImages(base, ctx.r1.u32);
 }
-void TodaysEventOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventOpenMovie) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::EventOpenMovie(base, ctx.r1.u32, guest.calls());
 }
-void TodaysEventLoadImages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventLoadImages) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::LoadImages(base, ctx.r1.u32, guest.calls());
 }
-void TodaysEventLoadImagePair(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventLoadImagePair) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::LoadImagePair(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void TodaysEventWaitForMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventWaitForMovie) {
   ctx.r3.u64 = tr::EventWaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
 }
-void TodaysEventImagesLoadedA(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventImagesLoadedA) {
   ctx.r3.u64 = tr::ImagesLoadedA(base, ctx.r3.u32);
 }
-void TodaysEventImagesLoadedB(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventImagesLoadedB) {
   ctx.r3.u64 = tr::ImagesLoadedB(base, ctx.r3.u32);
 }
-void TodaysEventStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventStart) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::EventStart(base, ctx.r1.u32, guest.calls());
 }
-void TodaysEventSetUpTexts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventSetUpTexts) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::SetUpTexts(base, ctx.r1.u32, guest.calls());
 }
-void TodaysEventNextUnlockEntry(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventNextUnlockEntry) {
   ctx.r3.u64 = tr::NextUnlockEntry(base, ctx.r1.u32);
 }
-void TodaysEventUnload(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventUnload) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::EventUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TodaysEventUnloaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventUnloaded) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::EventUnloaded(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void TodaysEventLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventLeave) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::EventLeave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void TodaysEventDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventDestroy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::EventDestroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TodaysEventFreeImages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventFreeImages) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::FreeImages(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void TodaysEventDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventDraw) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::EventDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 #define ITC_TODAYS_EVENT_FRAME(name, function)                      \
-  void name(PPCContext& ctx, uint8_t* base) {                       \
+  ITC_REGS_STEP(name) {                       \
     GuestCalls guest(ctx, base);                                    \
     ctx.r3.u64 = tr::function(base, ctx.r1.u32, guest.calls());     \
   }
@@ -272,12 +273,12 @@ ITC_TODAYS_EVENT_FRAME(TodaysEventEventPage, EventPage)
 ITC_TODAYS_EVENT_FRAME(TodaysEventQueueEventMovies, QueueEventMovies)
 ITC_TODAYS_EVENT_FRAME(TodaysEventShowUnlock, ShowUnlock)
 #undef ITC_TODAYS_EVENT_FRAME
-void TodaysEventEndPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventEndPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = tr::EndPage(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 #define ITC_TODAYS_EVENT_TRANSITION(name, function)                            \
-  void name(PPCContext& ctx, uint8_t* base) {                                  \
+  ITC_REGS_STEP(name) {                                  \
     GuestCalls guest(ctx, base);                                               \
     ctx.r3.u64 = tr::function(base, ctx.r3.u32, ctx.r1.u32, guest.calls());    \
   }
@@ -286,19 +287,14 @@ ITC_TODAYS_EVENT_TRANSITION(TodaysEventFadeOut, EventFadeOut)
 ITC_TODAYS_EVENT_TRANSITION(TodaysEventNextUnlock, NextUnlock)
 ITC_TODAYS_EVENT_TRANSITION(TodaysEventNextPage, NextPage)
 #undef ITC_TODAYS_EVENT_TRANSITION
-void TodaysEventShowImages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TodaysEventShowImages) {
   ctx.r3.u64 = tr::ShowImages(base, ctx.r3.u32, ctx.r1.u32);
 }
 
 }  // namespace hooks
 
 #define ITC_TODAYS_RESULT(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {     \
-    REX_FUNC_PROLOGUE();                   \
-    if (!ITC_FLAG(native_todays_result)) { \
-      __imp__sub_##address(ctx, base);     \
-      return;                              \
-    }                                      \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_todays_result)) { \
     hooks::step(ctx, base);                \
   }
 

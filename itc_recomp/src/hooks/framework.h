@@ -4,6 +4,7 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "framework/main_loop.h"
 
@@ -16,28 +17,38 @@ bool NativeFramework();
 // 96-byte frame like the original's. For its Wrapped override in
 // src/frame_pacing/game_messages.cpp.
 void TickHandlerInvoke(PPCContext& ctx, uint8_t* base);
+void TickHandlerInvoke(lifted::Regs& ctx, uint8_t* base);
 // The delegate thunk sub_82096340 (r3 = the object): its slot 1 as a tail
 // call. For its Wrapped override in src/debug/frame_state_diff.cpp.
 void DelegateSlot1Thunk(PPCContext& ctx, uint8_t* base);
+void DelegateSlot1Thunk(lifted::Regs& ctx, uint8_t* base);
 
 // The main loop's guest calls made through `ctx` (src/framework/main_loop.h),
 // and the register steps of the entry and the main loop (their adapters'
 // work, the harness's native side): main (sub_82090108), sub_82090378,
 // sub_8209ABE8, App::Run (sub_8209A760), ForEachTickHandler (sub_82099D50)
 // and ForEachRequest (sub_82099EE8), each from a frame like the original's.
-framework::MainLoopCalls MainLoopCalls(PPCContext& ctx, uint8_t* base);
+framework::MainLoopCalls MainLoopCalls(lifted::Regs& ctx, uint8_t* base);
 void Main(PPCContext& ctx, uint8_t* base);
+void Main(lifted::Regs& ctx, uint8_t* base);
 void RunFrameworkAt(PPCContext& ctx, uint8_t* base);
+void RunFrameworkAt(lifted::Regs& ctx, uint8_t* base);
 void RunFramework(PPCContext& ctx, uint8_t* base);
+void RunFramework(lifted::Regs& ctx, uint8_t* base);
 void AppRun(PPCContext& ctx, uint8_t* base);
+void AppRun(lifted::Regs& ctx, uint8_t* base);
 void ForEachTickHandler(PPCContext& ctx, uint8_t* base);
+void ForEachTickHandler(lifted::Regs& ctx, uint8_t* base);
 void ForEachRequest(PPCContext& ctx, uint8_t* base);
+void ForEachRequest(lifted::Regs& ctx, uint8_t* base);
 
 // The debug font's register steps (the adapter's work, the harness's native
 // side): DebugText::LoadFont (sub_82090CC0; r3 the debug text) and
 // DebugFont::Init (sub_8258BD58; r3 the font's file, no adapter), each from
 // a frame like the original's; need --native_heap.
 void DebugTextLoadFontSteps(PPCContext& ctx, uint8_t* base);
+void DebugTextLoadFontSteps(lifted::Regs& ctx, uint8_t* base);
 void DebugFontInitSteps(PPCContext& ctx, uint8_t* base);
+void DebugFontInitSteps(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

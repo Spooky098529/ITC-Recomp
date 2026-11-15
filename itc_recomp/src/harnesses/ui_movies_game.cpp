@@ -324,7 +324,7 @@ void NodeCases(Context& h, const Block& block) {
       {"UiMovie::ShowNode (sub_8211AC00)", __imp__sub_8211AC00, sub_8211AC00},
       {"UiMovie::HideNode (sub_8211AC48)", __imp__sub_8211AC48, sub_8211AC48},
       {"UiMovie::SetPictureTexture (sub_8211AAA8)", __imp__sub_8211AAA8, sub_8211AAA8},
-      {"UiMovie::GetPictureTexture (sub_8211AB28)", __imp__sub_8211AB28, NativeGetPictureTexture},
+      {"UiMovie::GetPictureTexture (sub_8211AB28)", __imp__sub_8211AB28, ITC_CONTEXT_FN(NativeGetPictureTexture)},
       {"UiMovie::ResetNode (sub_8211A1E0)", __imp__sub_8211A1E0, sub_8211A1E0},
   };
   const Movie m(block.at);
@@ -335,7 +335,7 @@ void NodeCases(Context& h, const Block& block) {
       auto [sub, child] = Lookup(h.random);
       // The picture's texture: a leaf (entry 0 is the sub-scene, whose +108
       // isn't a texture entry).
-      if (s.native == sub_8211AAA8 || s.native == NativeGetPictureTexture) {
+      if (s.native == sub_8211AAA8 || s.native == ITC_CONTEXT_FN(NativeGetPictureTexture)) {
         child = 1 + h.random.Below(5);
       }
       const uint32_t r6 = s.native == sub_8211A5B8 || h.random.Below(3) == 0
@@ -398,7 +398,7 @@ void LeafSetterCases(Context& h, const Block& block) {
                 t.r4.u64 = node;
                 t.r5.u64 = n;
               },
-              __imp__sub_8211A660, NativeSetLayer, fmt::format("n {:X}", n));
+              __imp__sub_8211A660, ITC_CONTEXT_FN(NativeSetLayer), fmt::format("n {:X}", n));
     }
     results.Report();
   }
@@ -588,15 +588,15 @@ void AnimationListCases(Context& h, const Block& block) {
     GuestFunction recompiled, native;
   };
   const Op ops[] = {
-      {"sub_8211B230 (a free link linked in)", __imp__sub_8211B230, NativeLinkFree},
+      {"sub_8211B230 (a free link linked in)", __imp__sub_8211B230, ITC_CONTEXT_FN(NativeLinkFree)},
       {"AnimationList::Insert (sub_8211B4D0)", __imp__sub_8211B4D0, sub_8211B4D0},
       {"AnimationList::RemoveAt (sub_8211B080)", __imp__sub_8211B080, sub_8211B080},
-      {"AnimationList::Get (sub_8211B298)", __imp__sub_8211B298, NativeGet},
+      {"AnimationList::Get (sub_8211B298)", __imp__sub_8211B298, ITC_CONTEXT_FN(NativeGet)},
   };
   for (const Op& op : ops) {
     Results results(op.name);
     for (int i = 0; i < 400; i++) {
-      const bool links = op.native == NativeLinkFree || op.native == sub_8211B4D0;
+      const bool links = op.native == ITC_CONTEXT_FN(NativeLinkFree) || op.native == sub_8211B4D0;
       // Linking needs a free link; removing and getting a used one.
       const uint32_t used = links ? h.random.Below(32) : 1 + h.random.Below(32);
       const ListSpec spec(h.random, i == 0 ? (links ? 0 : 32) : used);
@@ -616,7 +616,7 @@ void AnimationListCases(Context& h, const Block& block) {
                 }
               },
               [&](PPCContext& t) {
-                if (op.native == NativeGet) {
+                if (op.native == ITC_CONTEXT_FN(NativeGet)) {
                   t.r3.u64 = other;
                   t.r4.u64 = list;
                   t.r5.u64 = position;
@@ -642,7 +642,7 @@ void AnimationListCases(Context& h, const Block& block) {
   const Lookup lookups[] = {
       {"UiMovie::AnimationTime (sub_8211BA00)", __imp__sub_8211BA00, sub_8211BA00},
       {"UiMovie::NamedAnimationTime (sub_8211BB18)", __imp__sub_8211BB18, sub_8211BB18},
-      {"UiMovie::IsNamedActive (sub_8211BC18)", __imp__sub_8211BC18, NativeIsNamedActive, false},
+      {"UiMovie::IsNamedActive (sub_8211BC18)", __imp__sub_8211BC18, ITC_CONTEXT_FN(NativeIsNamedActive), false},
   };
   const uint32_t movie = block.at;
   for (const Lookup& f : lookups) {
@@ -910,9 +910,9 @@ void TextCases(Context& h, const Block& block) {
   const Accessor accessors[] = {
       {"UiMovie::TextString (sub_8211B720)", __imp__sub_8211B720, sub_8211B720, false},
       {"sub_8211B770 (a text's +20)", __imp__sub_8211B770, sub_8211B770, false},
-      {"sub_8211B7B8 (a text's +24)", __imp__sub_8211B7B8, NativeTextField24, false},
-      {"sub_8211B9B8 (a text's +4)", __imp__sub_8211B9B8, NativeTextField4, false},
-      {"sub_8211B940 (a text's scroll counter)", __imp__sub_8211B940, NativeAdvanceTextScroll, true},
+      {"sub_8211B7B8 (a text's +24)", __imp__sub_8211B7B8, ITC_CONTEXT_FN(NativeTextField24), false},
+      {"sub_8211B9B8 (a text's +4)", __imp__sub_8211B9B8, ITC_CONTEXT_FN(NativeTextField4), false},
+      {"sub_8211B940 (a text's scroll counter)", __imp__sub_8211B940, ITC_CONTEXT_FN(NativeAdvanceTextScroll), true},
   };
   for (const Accessor& f : accessors) {
     Results results(f.name);
@@ -997,7 +997,7 @@ void MoveCases(Context& h, const Block& block) {
   const Move moves[] = {
       {"UiMovie::MoveAnimation (sub_8211DBE0)", __imp__sub_8211DBE0, sub_8211DBE0},
       {"UiMovie::MoveNamedAnimation (sub_8211DCE8)", __imp__sub_8211DCE8,
-       NativeMoveNamedAnimation},
+       ITC_CONTEXT_FN(NativeMoveNamedAnimation)},
       {"UiMovie::Loop (sub_8211DDD8)", __imp__sub_8211DDD8, sub_8211DDD8},
       {"UiMovie::LoopNamed (sub_8211DDE0)", __imp__sub_8211DDE0, sub_8211DDE0},
       {"UiMovie::LoopLast (sub_8211DDE8)", __imp__sub_8211DDE8, sub_8211DDE8},
@@ -1392,7 +1392,7 @@ void DrawTextsCases(Context& h, const Block& block) {
   const TextWorld world(block.at);
   std::vector<TextDraw> draws;
   g_text_draws = &draws;
-  hooks::g_text_draw_stand_in = TextDrawStandIn;
+  hooks::g_text_draw_stand_in = ITC_CONTEXT_FN(TextDrawStandIn);
   Results results("UiMovie::DrawTexts (sub_8211CD90)");
   for (int i = 0; i < 600; i++) {
     const Random start = h.random;

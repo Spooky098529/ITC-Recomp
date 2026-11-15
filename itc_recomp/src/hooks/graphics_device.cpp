@@ -4,6 +4,7 @@
 // functions, called as guest code. See B3 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "guest_call.h"
 
 #include <bit>
@@ -84,8 +85,8 @@ uint32_t StoredFrontBufferFormat(uint32_t format) {
 // default render target and depth surface, sets them, and keeps a copy of
 // the parameters. Returns 1, or 0 if a surface couldn't be made. The
 // display mode is ours (src/display/display.h) instead of VdQueryVideoMode.
-extern "C" REX_FUNC(sub_822ACE00) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822ACE00) {
+  
   const uint32_t device = ctx.r3.u32, parameters = ctx.r4.u32;
   auto parameter = [&](uint32_t offset) { return guest::LoadU32(base, parameters + offset); };
   const uint32_t width = parameter(0), height = parameter(4);
@@ -192,8 +193,8 @@ extern "C" REX_FUNC(sub_822ACE00) {
 // (ExGetXConfigSetting(3, 10)) are the SDK's answer, fixed (B5). Kept: the
 // rest, as calls to the library's own functions, and the critical sections
 // (the core).
-extern "C" REX_FUNC(sub_822AD298) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822AD298) {
+  
   const uint32_t device = ctx.r3.u32, parameters = ctx.r4.u32;
   bool made = false;
   InFrame(ctx, base, 128, 0x822AD2B8, [&](uint32_t) {
@@ -205,10 +206,10 @@ extern "C" REX_FUNC(sub_822AD298) {
     }
     ctx.r3.u64 = device + 13548;
     ctx.lr = 0x822AD2D0;
-    __imp__RtlInitializeCriticalSection(ctx, base);
+    lifted::Sdk(ctx, base, __imp__RtlInitializeCriticalSection);
     ctx.r3.u64 = device + 13576;
     ctx.lr = 0x822AD2D8;
-    __imp__RtlInitializeCriticalSection(ctx, base);
+    lifted::Sdk(ctx, base, __imp__RtlInitializeCriticalSection);
     guest::StoreU8(base, device + kDeviceFlags2, guest::LoadU8(base, device + kDeviceFlags2) | 8);
     guest::StoreU32(base, guest::LoadU32(base, kVdGlobalDeviceImport), device);
     guest::StoreU32(base, device + 15164, helpers::kVideoFlags);
@@ -300,14 +301,14 @@ uint32_t PhysicalAddress(uint32_t address) {
   return (address & 0x1FFFFFFF) + ((((address >> 20) & 0xFFF) + 512) & 0x1000);
 }
 
-void Free(PPCContext& ctx, uint8_t* base, uint32_t block, uint32_t return_address) {
+void Free(lifted::Regs& ctx, uint8_t* base, uint32_t block, uint32_t return_address) {
   ctx.r3.u64 = block;
   ctx.r4.u64 = 0xB1800000;
   ctx.lr = return_address;
   lifted::CallFromContext(ctx, base, 0x82297790);
 }
 
-uint32_t Allocate(PPCContext& ctx, uint8_t* base, uint32_t bytes, uint32_t flags,
+uint32_t Allocate(lifted::Regs& ctx, uint8_t* base, uint32_t bytes, uint32_t flags,
                   uint32_t return_address) {
   ctx.r3.u64 = bytes;
   ctx.r4.u64 = flags;
@@ -348,8 +349,8 @@ constexpr uint32_t kOutOfMemory = 0x8007000E;
 // and VdVerifyMEInitCommand, imported under the wrong name
 // KiApcNormalRoutineNop) and the ME_INIT packet written into the primary
 // ring, which nothing reads: our kick hands the GPU no ring.
-extern "C" REX_FUNC(sub_8229F280) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8229F280) {
+  
   const uint32_t device = ctx.r3.u32, parameters = ctx.r4.u32;
   auto field = [&](uint32_t offset) { return guest::LoadU32(base, device + offset); };
   auto set = [&](uint32_t offset, uint32_t value) { guest::StoreU32(base, device + offset, value); };
@@ -474,8 +475,8 @@ extern "C" REX_FUNC(sub_8229F280) {
 // ignores it) and VdGetCurrentDisplayInformation: the fields come from our
 // display mode (src/display/display.h), as the SDK's answer did (the front
 // buffer's color format 0).
-extern "C" REX_FUNC(sub_822AD0B0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822AD0B0) {
+  
   const uint32_t device = ctx.r3.u32, parameters = ctx.r4.u32;
   const bool set_mode = ctx.r5.u32 != 0;
   InFrame(ctx, base, 1744, 0x822AD0F4, [&](uint32_t frame) {
@@ -536,8 +537,8 @@ constexpr uint32_t kDeviceFenceBefore = 13544;      // the one before
 // write, the display persistence (REG_RMW 0x1E4E, VdPersistDisplay,
 // MmFreePhysicalMemory), RetrainEdram (dropped) and the frame statistics
 // for a debugger (sub_822B20D8). The flags those steps clear are cleared.
-extern "C" REX_FUNC(sub_822A08A0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A08A0) {
+  
   const uint32_t device = ctx.r3.u32, front_buffer = ctx.r4.u32;
   auto field = [&](uint32_t offset) { return guest::LoadU32(base, device + offset); };
   auto set = [&](uint32_t offset, uint32_t value) { guest::StoreU32(base, device + offset, value); };

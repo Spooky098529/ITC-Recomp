@@ -220,7 +220,7 @@ void Planes(Context& h) {
             t.r5.u64 = b;
             t.r6.u64 = c;
           },
-          __imp__sub_825976C8, hooks::CarSceneDrawPlaneIntersect3,
+          __imp__sub_825976C8, ITC_CONTEXT_FN(hooks::CarSceneDrawPlaneIntersect3),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             o.Floats(h.base, out, 4);
             o.Floats(h.base, t.r1.u32 - 80, 20);
@@ -271,7 +271,7 @@ void Planes(Context& h) {
             t.r5.u64 = b;
             t.r6.u64 = c;
           },
-          __imp__sub_82597E58, hooks::CarSceneDrawPlaneSegmentCrossing,
+          __imp__sub_82597E58, ITC_CONTEXT_FN(hooks::CarSceneDrawPlaneSegmentCrossing),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             o.Floats(h.base, out, 4);
             o.Floats(h.base, t.r1.u32 - 32, 8);
@@ -349,7 +349,7 @@ void Frustum(Context& h) {
           t.r3.u64 = out;
           t.r4.u64 = matrix;
         },
-        __imp__sub_82597878, hooks::CarSceneDrawFrustumFromMatrix,
+        __imp__sub_82597878, ITC_CONTEXT_FN(hooks::CarSceneDrawFrustumFromMatrix),
         [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
           const uint32_t f = t.r1.u32 - 336;
           o.Floats(h.base, out, 24);                   // the planes
@@ -393,7 +393,7 @@ void Box(Context& h) {
             t.r3.u64 = box;
             t.r4.u64 = point;
           },
-          __imp__sub_82597150, hooks::CarSceneDrawBoxExtend,
+          __imp__sub_82597150, ITC_CONTEXT_FN(hooks::CarSceneDrawBoxExtend),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             o.Floats(h.base, box, 8);
             o.Word(t.r3.u32);
@@ -422,7 +422,7 @@ void Box(Context& h) {
             Store(h.base, vector + 8, last);
           },
           [&](PPCContext& t) { t.r3.u64 = vector; }, __imp__sub_825971E8,
-          hooks::CarSceneDrawVector16Size,
+          ITC_CONTEXT_FN(hooks::CarSceneDrawVector16Size),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             o.Word(t.r3.u32);
             blocks.Out(o);
@@ -458,7 +458,7 @@ void Box(Context& h) {
             t.r3.u64 = box;
             t.r4.u64 = vector;
           },
-          __imp__sub_82597210, hooks::CarSceneDrawBoxFromPoints,
+          __imp__sub_82597210, ITC_CONTEXT_FN(hooks::CarSceneDrawBoxFromPoints),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             o.Floats(h.base, box, 8);
             o.Word(Load(h.base, t.r1.u32 - 128));  // the back chain
@@ -526,7 +526,7 @@ void Vector(Context& h) {
             t.r3.u64 = vector;
             t.r4.u64 = k % 10 == 0 ? 0 : h.random.Below(k % 3 == 0 ? 4000 : 40);
           },
-          __imp__sub_82598158, hooks::CarSceneDrawVector16Allocate,
+          __imp__sub_82598158, ITC_CONTEXT_FN(hooks::CarSceneDrawVector16Allocate),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             blocks.Add(t.r3.u32);
             o.Word(blocks.Of(t.r3.u32));
@@ -555,7 +555,7 @@ void Vector(Context& h) {
             t.r5.u64 = count;
             t.r6.u64 = value;
           },
-          __imp__sub_82598288, hooks::CarSceneDrawVector16InsertN,
+          __imp__sub_82598288, ITC_CONTEXT_FN(hooks::CarSceneDrawVector16InsertN),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             const uint32_t f = t.r1.u32 - 144;
             collect(o, blocks, {f, f + 80, f + 84, f + 88, f + 92, f - 112});
@@ -582,7 +582,7 @@ void Vector(Context& h) {
             t.r5.u64 = where;
             t.r6.u64 = value;
           },
-          __imp__sub_82598648, hooks::CarSceneDrawVector16Insert,
+          __imp__sub_82598648, ITC_CONTEXT_FN(hooks::CarSceneDrawVector16Insert),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             const uint32_t f = t.r1.u32 - 112;
             collect(o, blocks, {f, f - 144, f - 144 + 80, f - 144 + 92});
@@ -608,7 +608,7 @@ void Vector(Context& h) {
             t.r3.u64 = vector;
             t.r4.u64 = value;
           },
-          __imp__sub_825986B8, hooks::CarSceneDrawVector16PushBack,
+          __imp__sub_825986B8, ITC_CONTEXT_FN(hooks::CarSceneDrawVector16PushBack),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             const uint32_t f = t.r1.u32 - 96;
             collect(o, blocks, {f, f + 80, f - 112, f - 112 - 144, f - 112 - 144 + 80});
@@ -720,7 +720,7 @@ void Projectors(Context& h) {
             t.r5.u64 = target;
             t.r6.u64 = up;
           },
-          __imp__sub_82597378, hooks::CarSceneDrawLookAt,
+          __imp__sub_82597378, ITC_CONTEXT_FN(hooks::CarSceneDrawLookAt),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             o.Floats(h.base, out, 16);
             o.Floats(h.base, t.r1.u32 - 32, 8);
@@ -762,7 +762,7 @@ void Projectors(Context& h) {
             t.f3.f64 = f[2];
             t.f4.f64 = f[3];
           },
-          __imp__sub_825972A8, hooks::CarSceneDrawPerspective,
+          __imp__sub_825972A8, ITC_CONTEXT_FN(hooks::CarSceneDrawPerspective),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             o.Floats(h.base, out, 16);
             o.Word(Load(h.base, t.r1.u32 - 128));  // the back chain
@@ -824,7 +824,7 @@ void ProjectorBuilds(Context& h) {
             t.f4.f64 = f[3];
           },
           ortho ? __imp__sub_82597518 : __imp__sub_82597610,
-          ortho ? hooks::CarSceneDrawProjectorBuildOrtho : hooks::CarSceneDrawProjectorBuild,
+          ortho ? ITC_CONTEXT_FN(hooks::CarSceneDrawProjectorBuildOrtho) : ITC_CONTEXT_FN(hooks::CarSceneDrawProjectorBuild),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             const uint32_t fr = t.r1.u32 - frame;
             o.Floats(h.base, out, 16);
@@ -898,7 +898,7 @@ void Leaves(Context& h) {
             t.r4.u64 = shifted ? direction + 4 : direction;
             t.f1.f64 = distance;
           },
-          __imp__sub_820C4EB8, hooks::CarSceneDrawSetLight,
+          __imp__sub_820C4EB8, ITC_CONTEXT_FN(hooks::CarSceneDrawSetLight),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             const uint32_t f = t.r1.u32 - 192;
             o.Floats(h.base, pass, 48);
@@ -936,7 +936,7 @@ void Leaves(Context& h) {
             t.r3.u64 = out;
             t.r4.u64 = model;
           },
-          __imp__sub_820DAA38, hooks::CarSceneDrawBeamColor,
+          __imp__sub_820DAA38, ITC_CONTEXT_FN(hooks::CarSceneDrawBeamColor),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             const uint32_t f = t.r1.u32 - 112;
             if ((Load(h.base, model + 4292) & 0x40) != 0) {
@@ -961,9 +961,9 @@ void Leaves(Context& h) {
       GuestFunction recompiled;
       GuestFunction native;
     } beams[] = {
-        {"SceneModel::Beam (sub_820DAAC8)", __imp__sub_820DAAC8, hooks::CarSceneDrawBeam},
+        {"SceneModel::Beam (sub_820DAAC8)", __imp__sub_820DAAC8, ITC_CONTEXT_FN(hooks::CarSceneDrawBeam)},
         {"SceneModel::BeamShape (sub_820DAB10)", __imp__sub_820DAB10,
-         hooks::CarSceneDrawBeamShape},
+         ITC_CONTEXT_FN(hooks::CarSceneDrawBeamShape)},
     };
     for (const auto& beam : beams) {
       Results results(beam.name);
@@ -1006,7 +1006,7 @@ void Leaves(Context& h) {
                   h.random.Below(2) != 0 ? 0 : uint32_t(h.random.Next()));
           },
           [&](PPCContext& t) { t.r3.u64 = index; }, __imp__sub_820C4FB8,
-          hooks::CarSceneDrawPlayerModel,
+          ITC_CONTEXT_FN(hooks::CarSceneDrawPlayerModel),
           [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
             o.Word(t.r3.u32);
             o.Word(uint32_t(t.r3.u64 >> 32));
@@ -1151,7 +1151,7 @@ void Fit(Context& h) {
           t.f4.f64 = f[3];
           t.f5.f64 = f[4];
         },
-        __imp__sub_82598768, hooks::CarSceneDrawTextureProjectionFit,
+        __imp__sub_82598768, ITC_CONTEXT_FN(hooks::CarSceneDrawTextureProjectionFit),
         [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
           const uint32_t sp = t.r1.u32 - 1248;
           o.Floats(h.base, out, 16);

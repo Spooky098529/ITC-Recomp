@@ -475,7 +475,7 @@ uint32_t ProgressBits(Random& r) {
 }
 
 void Init(Context& h, const World& w) {
-  Run(h, w, {"RaceMenu::Init (sub_8218CE10)", 24, __imp__sub_8218CE10, hooks::RaceMenuInit,
+  Run(h, w, {"RaceMenu::Init (sub_8218CE10)", 24, __imp__sub_8218CE10, ITC_CONTEXT_FN(hooks::RaceMenuInit),
              {{-1232, -48}},
              [](PPCContext& t, Random& r, const World& w) {
                namespace gm = game_modes;
@@ -500,7 +500,7 @@ void Init(Context& h, const World& w) {
 
 void Handlers(Context& h, const World& w) {
   // Create: the three blocks VirtualAlloc made compared by content.
-  Run(h, w, {"RaceMenu::Create (sub_82188E20)", 60, __imp__sub_82188E20, hooks::RaceMenuCreate,
+  Run(h, w, {"RaceMenu::Create (sub_82188E20)", 60, __imp__sub_82188E20, ITC_CONTEXT_FN(hooks::RaceMenuCreate),
              {{-144, -56}}, Machine,
              [&h](PPCContext& t, const World&, Outputs& out) {
                // r3 the menu's address (the last VirtualAlloc's).
@@ -511,35 +511,35 @@ void Handlers(Context& h, const World& w) {
                Allocated(h.base, out, rm::kMenu, 68);
              }});
   Run(h, w, {"RaceMenu::OpenMovie (sub_821889E0)", 20, __imp__sub_821889E0,
-             hooks::RaceMenuOpenMovie, {{-96, -16}}, Machine});
+             ITC_CONTEXT_FN(hooks::RaceMenuOpenMovie), {{-96, -16}}, Machine});
   Run(h, w, {"RaceMenu::WaitForMovie (sub_821890D8)", 100, __imp__sub_821890D8,
-             hooks::RaceMenuWaitForMovie, {{-112, -24}}, Machine});
-  Run(h, w, {"RaceMenu::OnYes (sub_821895F0)", 40, __imp__sub_821895F0, hooks::RaceMenuOnYes,
+             ITC_CONTEXT_FN(hooks::RaceMenuWaitForMovie), {{-112, -24}}, Machine});
+  Run(h, w, {"RaceMenu::OnYes (sub_821895F0)", 40, __imp__sub_821895F0, ITC_CONTEXT_FN(hooks::RaceMenuOnYes),
              {{-112, -24}}, Machine});
-  Run(h, w, {"RaceMenu::OnNo (sub_82189648)", 40, __imp__sub_82189648, hooks::RaceMenuOnNo,
+  Run(h, w, {"RaceMenu::OnNo (sub_82189648)", 40, __imp__sub_82189648, ITC_CONTEXT_FN(hooks::RaceMenuOnNo),
              {{-112, -24}}, Machine});
   // OnBack: the page before the question 4, 5 or another.
   Run(h, w, {"RaceMenu::OnBack (sub_82188938)", 100, __imp__sub_82188938,
-             hooks::RaceMenuOnBack, {},
+             ITC_CONTEXT_FN(hooks::RaceMenuOnBack), {},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                guest::StoreU32(w.base, w.machine() + 9644, 3 + r.Below(4));
              }});
   // OnDialogClosed: answered or not.
   Run(h, w, {"RaceMenu::OnDialogClosed (sub_821896A0)", 100, __imp__sub_821896A0,
-             hooks::RaceMenuOnDialogClosed, {{-128, -32}},
+             ITC_CONTEXT_FN(hooks::RaceMenuOnDialogClosed), {{-128, -32}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                guest::StoreU32(w.base, w.machine() + 9788, r.Below(2));
              }});
-  Run(h, w, {"RaceMenu::Unload (sub_8218AF08)", 60, __imp__sub_8218AF08, hooks::RaceMenuUnload,
+  Run(h, w, {"RaceMenu::Unload (sub_8218AF08)", 60, __imp__sub_8218AF08, ITC_CONTEXT_FN(hooks::RaceMenuUnload),
              {{-128, -32}}, Machine});
   Run(h, w, {"RaceMenu::LeaveToHub (sub_8218AF80)", 40, __imp__sub_8218AF80,
-             hooks::RaceMenuLeaveToHub, {}, Machine});
+             ITC_CONTEXT_FN(hooks::RaceMenuLeaveToHub), {}, Machine});
   // Destroy: the three blocks the layer's pages (whether each was freed
   // compared); the day 2 or not, +9792 1 or not.
   Run(h, w, {"RaceMenu::Destroy (sub_82188FE0)", 60, __imp__sub_82188FE0,
-             hooks::RaceMenuDestroy, {{-112, -24}},
+             ITC_CONTEXT_FN(hooks::RaceMenuDestroy), {{-112, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                Machine(t, r, w);
@@ -550,13 +550,13 @@ void Handlers(Context& h, const World& w) {
                guest::StoreU32(base, w.machine() + 9792, r.Below(3));
              }});
   // Back: the history's depth 0 to 11.
-  Run(h, w, {"RaceMenu::Back (sub_82188A20)", 60, __imp__sub_82188A20, hooks::RaceMenuBack, {},
+  Run(h, w, {"RaceMenu::Back (sub_82188A20)", 60, __imp__sub_82188A20, ITC_CONTEXT_FN(hooks::RaceMenuBack), {},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                guest::StoreU8(w.base, w.machine() + 9776, uint8_t(r.Below(12)));
              }});
   Run(h, w, {"RaceMenu::SetEventRange (sub_82189158)", 60, __imp__sub_82189158,
-             hooks::RaceMenuSetEventRange, {},
+             ITC_CONTEXT_FN(hooks::RaceMenuSetEventRange), {},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                guest::StoreU32(w.base, w.machine() + 10148, ProgressBits(r));
@@ -626,7 +626,7 @@ void Pages(Context& h, const World& w) {
   // SetUpEvents: the progress bits' shapes; its frame's table words
   // (+80 to +199) compared.
   Run(h, w, {"RaceMenu::SetUpEvents (sub_821891C8)", 80, __imp__sub_821891C8,
-             hooks::RaceMenuSetUpEvents, {{-288, -88}},
+             ITC_CONTEXT_FN(hooks::RaceMenuSetUpEvents), {{-288, -88}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                guest::StoreU32(w.base, w.machine() + 10148, ProgressBits(r));
@@ -634,7 +634,7 @@ void Pages(Context& h, const World& w) {
   // Refresh: its words (RefreshWords). SetText's parameter area (+48 to +79:
   // r7 on, the original's leftovers) left out.
   Run(h, w, {"RaceMenu::Refresh (sub_8218BC18)", 300, __imp__sub_8218BC18,
-             hooks::RaceMenuRefresh, {{-224, -176}, {-144, -64}},
+             ITC_CONTEXT_FN(hooks::RaceMenuRefresh), {{-224, -176}, {-144, -64}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                RefreshWords(r, w, t.r1.u32);
@@ -684,7 +684,7 @@ void Start(Context& h, const World& w) {
   // compared; the callees' frames under them (FindNode's, which the native
   // code doesn't make) not. The recorder's r6 word (+336: StopCue reads r3
   // to r5 only, r6 the original's leftover) left out.
-  Run(h, w, {"RaceMenu::Start (sub_8218C9C8)", 200, __imp__sub_8218C9C8, hooks::RaceMenuStart,
+  Run(h, w, {"RaceMenu::Start (sub_8218C9C8)", 200, __imp__sub_8218C9C8, ITC_CONTEXT_FN(hooks::RaceMenuStart),
              {{-176, -64}, {-400, -352}, {-320, -264}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
@@ -746,28 +746,28 @@ void Transitions(Context& h, const World& w) {
   // Each frame compared up to its register saves (the callees' frames
   // below it, which the native code's plain C++ lookups don't make, not).
   Run(h, w, {"RaceMenu::Transition0 (sub_82189740)", 60, __imp__sub_82189740,
-             hooks::RaceMenuTransition0, {{-128, -32}}, TransitionWords});
+             ITC_CONTEXT_FN(hooks::RaceMenuTransition0), {{-128, -32}}, TransitionWords});
   Run(h, w, {"RaceMenu::Transition3 (sub_82189C28)", 100, __imp__sub_82189C28,
-             hooks::RaceMenuTransition3, {{-176, -88}}, TransitionWords});
+             ITC_CONTEXT_FN(hooks::RaceMenuTransition3), {{-176, -88}}, TransitionWords});
   Run(h, w, {"RaceMenu::Transition5 (sub_8218A7F0)", 60, __imp__sub_8218A7F0,
-             hooks::RaceMenuTransition5, {{-128, -32}}, TransitionWords});
+             ITC_CONTEXT_FN(hooks::RaceMenuTransition5), {{-128, -32}}, TransitionWords});
   Run(h, w, {"RaceMenu::Transition12 (sub_8218AE48)", 40, __imp__sub_8218AE48,
-             hooks::RaceMenuTransition12, {{-112, -16}}, TransitionWords});
+             ITC_CONTEXT_FN(hooks::RaceMenuTransition12), {{-112, -16}}, TransitionWords});
   // AskConfirm: player 0's save +0x1F870 0 or not. SetText's parameter area
   // (+48 to +79: r7 on, the original's leftovers) left out.
   Run(h, w, {"RaceMenu::AskConfirm (sub_8218ACE8)", 80, __imp__sub_8218ACE8,
-             hooks::RaceMenuAskConfirm, {{-128, -80}, {-48, -32}},
+             ITC_CONTEXT_FN(hooks::RaceMenuAskConfirm), {{-128, -80}, {-48, -32}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                guest::StoreU32(w.base, w.save + 0x1F870,
                                r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
              }});
   Run(h, w, {"RaceMenu::DebugKindPage (sub_8218BB68)", 20, __imp__sub_8218BB68,
-             hooks::RaceMenuDebugKindPage, {{-128, -32}}, Machine});
+             ITC_CONTEXT_FN(hooks::RaceMenuDebugKindPage), {{-128, -32}}, Machine});
   // DebugEventPage: the list's count (+9720) 0 or small, its entries (+9656)
   // small (the original reads its frame's strings by them).
   Run(h, w, {"RaceMenu::DebugEventPage (sub_82188A98)", 40, __imp__sub_82188A98,
-             hooks::RaceMenuDebugEventPage, {{-240, -96}},
+             ITC_CONTEXT_FN(hooks::RaceMenuDebugEventPage), {{-240, -96}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                guest::StoreU32(w.base, w.machine() + 9720, r.Below(3) == 0 ? 0 : r.Below(17));
@@ -777,7 +777,7 @@ void Transitions(Context& h, const World& w) {
              }});
   // DebugVariantPage: the menu's +8 0 or not.
   Run(h, w, {"RaceMenu::DebugVariantPage (sub_82188C00)", 40, __imp__sub_82188C00,
-             hooks::RaceMenuDebugVariantPage, {{-128, -40}},
+             ITC_CONTEXT_FN(hooks::RaceMenuDebugVariantPage), {{-128, -40}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                guest::StoreU32(w.base, w.at(kMenuAt) + 8, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
@@ -785,7 +785,7 @@ void Transitions(Context& h, const World& w) {
   // AnimateVariantPage: the mappers, the variant (+10100) and its flag
   // (+10104) 0 to 2, the cursor's row and its second pair word small or -1.
   Run(h, w, {"RaceMenu::AnimateVariantPage (sub_8218A928)", 200, __imp__sub_8218A928,
-             hooks::RaceMenuAnimateVariantPage, {{-128, -32}},
+             ITC_CONTEXT_FN(hooks::RaceMenuAnimateVariantPage), {{-128, -32}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                Machine(t, r, w);
@@ -834,7 +834,7 @@ void Update(Context& h, const World& w) {
   // small or -1. Only Update's own frame words compared (up to its f31 and
   // register saves; the callees' frames below it hold the recompiled
   // callees' register saves).
-  Run(h, w, {"RaceMenu::Update (sub_8218C678)", 400, __imp__sub_8218C678, hooks::RaceMenuUpdate,
+  Run(h, w, {"RaceMenu::Update (sub_8218C678)", 400, __imp__sub_8218C678, ITC_CONTEXT_FN(hooks::RaceMenuUpdate),
              {{-176, -88}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
@@ -969,17 +969,17 @@ void DrawPages(Context& h, const World& w) {
   // Each page's frame up to its register saves and its animation's frame
   // below it up to that one's (the callees' frames under them not).
   Run(h, w, {"RaceMenu::AnimateKindPage (sub_821898C0)", 200, __imp__sub_821898C0,
-             hooks::RaceMenuAnimateKindPage, {{-128, -32}}, KindWords});
+             ITC_CONTEXT_FN(hooks::RaceMenuAnimateKindPage), {{-128, -32}}, KindWords});
   Run(h, w, {"RaceMenu::KindPage (sub_8218AFD8)", 300, __imp__sub_8218AFD8,
-             hooks::RaceMenuKindPage, {{-112, -24}}, KindWords});
+             ITC_CONTEXT_FN(hooks::RaceMenuKindPage), {{-112, -24}}, KindWords});
   Run(h, w, {"RaceMenu::VariantPage (sub_8218B750)", 300, __imp__sub_8218B750,
-             hooks::RaceMenuVariantPage, {{-112, -24}}, VariantWords});
+             ITC_CONTEXT_FN(hooks::RaceMenuVariantPage), {{-112, -24}}, VariantWords});
   Run(h, w, {"RaceMenu::AnimateEventPage (sub_82189FE8)", 300, __imp__sub_82189FE8,
-             hooks::RaceMenuAnimateEventPage, {{-128, -32}}, EventWords});
+             ITC_CONTEXT_FN(hooks::RaceMenuAnimateEventPage), {{-128, -32}}, EventWords});
   // EventPage: SetText's parameter area (+48 to +79: r7 on, the original's
   // leftovers) left out.
   Run(h, w, {"RaceMenu::EventPage (sub_8218B2C8)", 400, __imp__sub_8218B2C8,
-             hooks::RaceMenuEventPage, {{-160, -112}, {-80, -64}}, EventWords});
+             ITC_CONTEXT_FN(hooks::RaceMenuEventPage), {{-160, -112}, {-80, -64}}, EventWords});
 }
 
 // The fades' counts: 0 three times in four, else one or both not.
@@ -1000,7 +1000,7 @@ void Draw(Context& h, const World& w) {
   // LeavePage: the sound manager, the fades' counts; its frame up to its
   // register saves (__savegprlr_26: from -56).
   Run(h, w, {"RaceMenu::LeavePage (sub_8218B9F0)", 200, __imp__sub_8218B9F0,
-             hooks::RaceMenuLeavePage, {{-176, -56}},
+             ITC_CONTEXT_FN(hooks::RaceMenuLeavePage), {{-176, -56}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                SoundManager(r, w);
@@ -1012,7 +1012,7 @@ void Draw(Context& h, const World& w) {
   // object's +0 7 now and then. Page 10 with a fade not done (StartPage's
   // StartEvent, with Career::SetUpEvent's world, is race_event's harness's).
   // Its own frame (+0 to +87) compared, the pages' under it not.
-  Run(h, w, {"RaceMenu::Draw (sub_8218C578)", 600, __imp__sub_8218C578, hooks::RaceMenuDraw,
+  Run(h, w, {"RaceMenu::Draw (sub_8218C578)", 600, __imp__sub_8218C578, ITC_CONTEXT_FN(hooks::RaceMenuDraw),
              {{-112, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                static constexpr uint32_t kPageList[] = {3, 4, 5, 7, 9, 10, 0, 1, 2, 6, 8, 11};

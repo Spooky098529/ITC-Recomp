@@ -3,6 +3,7 @@
 // shares (hooks/race_scene.h).
 
 #include "hooks/race_scene.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -27,7 +28,7 @@ namespace hooks {
 
 namespace rs = race_scene;
 
-void RaceSceneMachineInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSceneMachineInit) {
   ctx.fpscr.disableFlushMode();
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
@@ -44,14 +45,14 @@ void RaceSceneMachineInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = replaced ? *r3 : machine_r3 + (*r3 - machine);
 }
 
-void RaceSceneLightsSetUp(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSceneLightsSetUp) {
   ctx.fpscr.disableFlushMode();
   rs::LightsSetUp(base, ctx.r3.u32);
   ctx.r3.u64 = ctx.r3.u64 + 16 + 96 * 10;
   ctx.f1.f64 = rs::LightsLastF1(base);
 }
 
-void RaceSceneSetEffectParams(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSceneSetEffectParams) {
   ctx.fpscr.disableFlushMode();
   if (!rs::EffectParamsReady(base)) {
     __imp__sub_8228F5C0(ctx, base);
@@ -62,19 +63,19 @@ void RaceSceneSetEffectParams(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = f1;
 }
 
-void RaceSceneTogglePause(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSceneTogglePause) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::TogglePause(base, ctx.r3.u32);
 }
 
-void RaceSceneResume(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSceneResume) {
   ctx.fpscr.disableFlushMode();
   if (const auto r3 = rs::Resume(base, ctx.r3.u32)) {
     ctx.r3.u64 = *r3;
   }
 }
 
-void RaceSceneDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSceneDestroy) {
   ctx.fpscr.disableFlushMode();
   if (!NativeHeapActive() || !rs::DestroyReady(base)) {
     __imp__sub_8215D790(ctx, base);
@@ -89,12 +90,7 @@ void RaceSceneDestroy(PPCContext& ctx, uint8_t* base) {
 
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_SCENE(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {   \
-    REX_FUNC_PROLOGUE();                 \
-    if (!ITC_FLAG(native_race_scene)) {  \
-      __imp__sub_##address(ctx, base);   \
-      return;                            \
-    }                                    \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_scene)) { \
     hooks::step(ctx, base);              \
   }
 

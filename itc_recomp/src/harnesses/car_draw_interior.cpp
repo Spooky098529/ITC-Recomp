@@ -361,10 +361,10 @@ void InteriorDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
       {"InteriorPoints::DrawSeats (sub_820E3CF0)", __imp__sub_820E3CF0,
        NativeInteriorSeats, Takes::kGroup, kSeats, car_draw::kInteriorSeatsFrame, 256},
       {"InteriorPoints::DrawFrontEnd (sub_820E4078)", __imp__sub_820E4078,
-       NativeInteriorFrontEnd, Takes::kPoints, 0, car_draw::kInteriorFrontEndFrame, 256},
-      {"InteriorPoints::DrawRace (sub_820E5220)", __imp__sub_820E5220, NativeInteriorRace,
+       ITC_CONTEXT_FN(NativeInteriorFrontEnd), Takes::kPoints, 0, car_draw::kInteriorFrontEndFrame, 256},
+      {"InteriorPoints::DrawRace (sub_820E5220)", __imp__sub_820E5220, ITC_CONTEXT_FN(NativeInteriorRace),
        Takes::kPoints, 0, car_draw::kInteriorRaceFrame, 256},
-      {"SceneInterior::Draw (sub_820E53F0)", __imp__sub_820E53F0, hooks::CarDrawSceneInterior,
+      {"SceneInterior::Draw (sub_820E53F0)", __imp__sub_820E53F0, ITC_CONTEXT_FN(hooks::CarDrawSceneInterior),
        Takes::kInterior, 0, car_draw::kInteriorSmallFrame, 384},
   };
   std::vector<uint8_t> scene_bytes, records;
@@ -387,9 +387,9 @@ void InteriorDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
             // above 1 (nothing drawn).
             if (target.takes == Takes::kInterior) {
               set = r.Below(16) == 0 ? 2 + r.Below(4) : r.Below(2);
-            } else if (target.native == NativeInteriorRace) {
+            } else if (target.native == ITC_CONTEXT_FN(NativeInteriorRace)) {
               set = 1;
-            } else if (target.native == NativeInteriorFrontEnd) {
+            } else if (target.native == ITC_CONTEXT_FN(NativeInteriorFrontEnd)) {
               set = 0;
             } else {
               set = r.Below(2);

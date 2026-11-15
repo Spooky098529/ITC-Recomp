@@ -3,6 +3,7 @@
 // (hooks/save_data.h).
 
 #include "hooks/save_data.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
@@ -31,70 +32,70 @@ namespace hooks {
 
 namespace sd = save_data;
 
-void SaveDataStatsConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataStatsConstruct) {
   ctx.fpscr.disableFlushMode();
   sd::StatsConstruct(base, ctx.r3.u32);
 }
 
-void SaveDataStatsResetRecords(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataStatsResetRecords) {
   ctx.fpscr.disableFlushMode();
   sd::StatsResetRecords(base, ctx.r3.u32);
 }
 
-void SaveDataStatsReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataStatsReset) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = sd::StatsReset(base, ctx.r3.u32);
 }
 
-void SaveDataProgressClear(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataProgressClear) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = sd::ProgressClear(base, ctx.r3.u32);
 }
 
-void SaveDataBitSetAll(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataBitSetAll) {
   sd::BitSet400SetAll(base, ctx.r3.u32);
 }
 
-void SaveDataProgressSetDefaults(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataProgressSetDefaults) {
   if (!sd::SetDefaultsNative(ctx.r3.u32)) {
-    __imp__sub_82113E60(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82113E60);
     return;
   }
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = sd::ProgressSetDefaults(base, ctx.r3.u32);
 }
 
-void SaveDataControlMapSetDefault(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataControlMapSetDefault) {
   sd::ControlMapSetDefault(base, ctx.r3.u32);
 }
 
-void SaveDataOptionsSetDefaults(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataOptionsSetDefaults) {
   ctx.r7.u64 = ctx.r3.u64;
   ctx.r3.u64 = sd::OptionsSetDefaults(base, ctx.r3.u32);
 }
 
-void SaveDataCourseRecordsReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataCourseRecordsReset) {
   ctx.r3.u64 = sd::CourseRecordsReset(base, ctx.r3.u32);
 }
 
-void SaveDataCourseRecordsOf(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataCourseRecordsOf) {
   const uint64_t records = ctx.r3.u64;
   ctx.r10.u64 = guest::LoadU32(base, ctx.r4.u32 + 4);
   ctx.r3.u64 = sd::CourseRecordsOf(base, records, ctx.r4.u32);
   ctx.r11.u64 = ctx.r3.u64 - 20;
 }
 
-void SaveDataDelete(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataDelete) {
   if (hooks::NativeHeapActive()) {
     if (const auto block = sd::SaveDataDelete(base, ctx.r3.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  __imp__sub_821055D8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_821055D8);
 }
 
-void SaveDataCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataCreate) {
   if (hooks::StartUpRecorded(ctx, 0x821057C8)) {  // the data load's harness
     return;
   }
@@ -105,10 +106,10 @@ void SaveDataCreate(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_821057C8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_821057C8);
 }
 
-void SaveDataCreateTwoPlayerBlock(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataCreateTwoPlayerBlock) {
   if (hooks::NativeHeapActive()) {
     ctx.fpscr.disableFlushMode();
     if (const auto r3 = sd::CreateTwoPlayerBlock(base)) {
@@ -116,19 +117,19 @@ void SaveDataCreateTwoPlayerBlock(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_82105740(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82105740);
 }
 
-void SaveDataResetControllers(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataResetControllers) {
   sd::PlayersResetControllers(base);
   ctx.r9.u64 = 3;
   ctx.r10.u64 = 0xFFFFFFFF826C0000ull;
   ctx.r11.u64 = 1;
 }
 
-void SaveDataMenuListInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataMenuListInit) {
   if (!hooks::NativeHeapActive() || !sd::MenuListInitNative(base, ctx.r3.u32)) {
-    __imp__sub_8220BAC0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8220BAC0);
     return;
   }
   const sd::MenuListArgs args{ctx.r4.u32,
@@ -143,9 +144,9 @@ void SaveDataMenuListInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = sd::MenuListInit(base, ctx.r3.u32, args);
 }
 
-void SaveDataResetPlayer(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataResetPlayer) {
   if (!hooks::NativeHeapActive() || !sd::ResetPlayerNative(base)) {
-    __imp__sub_82221D00(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82221D00);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -161,7 +162,7 @@ void SaveDataResetPlayer(PPCContext& ctx, uint8_t* base) {
 }
 
 #define ITC_SAVE_DATA_TABLE(name)                        \
-  void SaveData##name(PPCContext& ctx, uint8_t*) {       \
+  void SaveData##name(lifted::Regs& ctx, uint8_t*) {       \
     ctx.r11.u64 = 0xFFFFFFFF826C0000ull;                 \
     ctx.r3.s64 = int32_t(sd::Defaults##name());          \
   }
@@ -174,7 +175,7 @@ ITC_SAVE_DATA_TABLE(Table50E4)
 
 #undef ITC_SAVE_DATA_TABLE
 
-void SaveDataTwoPlayerBlock(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDataTwoPlayerBlock) {
   ctx.r11.u64 = 0xFFFFFFFF826C0000ull;
   ctx.r3.u64 = sd::TwoPlayerBlock(base);
 }
@@ -192,12 +193,7 @@ void SaveDataTwoPlayerBlock(PPCContext& ctx, uint8_t* base) {
 // sub_82105D08.
 
 #define ITC_SAVE_DATA_ADAPTER(address, step) \
-  extern "C" REX_FUNC(sub_##address) {       \
-    REX_FUNC_PROLOGUE();                     \
-    if (!ITC_FLAG(native_save_data)) {       \
-      __imp__sub_##address(ctx, base);       \
-      return;                                \
-    }                                        \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_save_data)) { \
     hooks::step(ctx, base);                  \
   }
 
@@ -215,26 +211,26 @@ ITC_SAVE_DATA_ADAPTER(82105BF8, SaveDataCourseRecordsOf)
 ITC_SAVE_DATA_ADAPTER(82105678, SaveDataTwoPlayerBlock)
 // Players::ResetControllers' adapter written out: the app_start_up
 // harness's recorder first.
-extern "C" REX_FUNC(sub_8209F5E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209F5E0) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8209F5E0)) {
     return;
   }
   if (!ITC_FLAG(native_save_data)) {
-    __imp__sub_8209F5E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209F5E0);
     return;
   }
   hooks::SaveDataResetControllers(ctx, base);
 }
 // MenuList::Init hands its call to the harnesses' recorder first (the race
 // HUD object's).
-extern "C" REX_FUNC(sub_8220BAC0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8220BAC0) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8220BAC0)) {
     return;
   }
   if (!ITC_FLAG(native_save_data)) {
-    __imp__sub_8220BAC0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8220BAC0);
     return;
   }
   hooks::SaveDataMenuListInit(ctx, base);

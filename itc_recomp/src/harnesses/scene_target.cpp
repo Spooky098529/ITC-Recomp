@@ -231,12 +231,12 @@ void TargetCases(Context& h, uint32_t block) {
     bool bound;  // r3 = the list, the scene target from [0x8266D08C]
   };
   const Function functions[] = {
-      {"SceneTarget::RecordTargets (sub_8209AE48)", __imp__sub_8209AE48, NativeRecordTargets,
+      {"SceneTarget::RecordTargets (sub_8209AE48)", __imp__sub_8209AE48, ITC_CONTEXT_FN(NativeRecordTargets),
        false},
       {"SceneTarget::RecordTileTargets (sub_8209AF40)", __imp__sub_8209AF40,
-       NativeRecordTileTargets, false},
+       ITC_CONTEXT_FN(NativeRecordTileTargets), false},
       {"SceneTarget::RecordBoundTargets (sub_8209B058)", __imp__sub_8209B058,
-       NativeRecordBoundTargets, true},
+       ITC_CONTEXT_FN(NativeRecordBoundTargets), true},
   };
   for (const Function& f : functions) {
     Results results(f.name);
@@ -322,7 +322,7 @@ void TexturedRectCases(Context& h, uint32_t block) {
           t.r4.u64 = 0;
           t.r5.u64 = c % 3 == 0 ? 594 : c % 3 == 1 ? 150 : 2000;
         },
-        __imp__sub_8217C368, hooks::SceneTargetTexturedRect, fmt::format("case {}", c),
+        __imp__sub_8217C368, ITC_CONTEXT_FN(hooks::SceneTargetTexturedRect), fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& out) {
           // RecordFlat's frame: the integers at +80 to +111, the 1.0s at
           // +124 to +175.
@@ -386,7 +386,7 @@ void RecordPassesCases(Context& h, uint32_t block) {
           buckets[1] = 602;
           buckets[2] = 121;
         },
-        __imp__sub_8209B3D0, hooks::SceneTargetRecordPasses, fmt::format("case {}", c),
+        __imp__sub_8209B3D0, ITC_CONTEXT_FN(hooks::SceneTargetRecordPasses), fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& out) {
           // Its frame's words (the passes' bits at +80, the rectangles at
           // +96, +224 and +352), the last rectangle's RecordFlat words below

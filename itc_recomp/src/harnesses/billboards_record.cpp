@@ -419,12 +419,12 @@ void BillboardRecordCases(Context& h) {
           t.r4.u64 = b + kList;
           t.r5.u64 = b + kMaterial;
           t.lr = 0x8209CCB0;
-          (v == 0 ? __imp__sub_8209C1A0 : NativeRecordState)(t, h.base);
+          (v == 0 ? __imp__sub_8209C1A0 : ITC_CONTEXT_FN(NativeRecordState))(t, h.base);
           Collect(h.base, w, t, {{stack - kStateFrame, kStateTemps, true}}, out[v]);
         } else if (kind == 1) {
           t.r4.u64 = b + kMaterial;
           t.lr = 0x8209CDD4;
-          (v == 0 ? __imp__sub_8209CC38 : hooks::BillboardsRecord)(t, h.base);
+          (v == 0 ? __imp__sub_8209CC38 : ITC_CONTEXT_FN(hooks::BillboardsRecord))(t, h.base);
           const uint32_t f = stack - kRecordFrame;
           Collect(h.base, w, t,
                   {{f, kRecordTemps, false}}, out[v]);

@@ -695,16 +695,16 @@ void Helpers(Context& h, const World& w) {
   // ShapeGarage); SetNodeText's parameter area from +40 (its varargs, r6
   // on: the original's leftovers) left out.
   Run(h, w, {"GarageScreen::SetCarRow (sub_82193180)", 150, __imp__sub_82193180,
-             hooks::GarageScreenSetCarRow, {{-128, -88}, {-48, -40}},
+             ITC_CONTEXT_FN(hooks::GarageScreenSetCarRow), {{-128, -88}, {-48, -40}},
              [](PPCContext& t, Random& r, const World& w) {
                t.r3.u64 = w.node(r.Below(kNodeCount));
                t.r4.u64 = w.garage() + 212 + 1968 * r.Below(50);
              }});
   Run(h, w, {"GarageScreen::FillRows (sub_82194CD8; sub_82193180)", 150, __imp__sub_82194CD8,
-             hooks::GarageScreenFillRows, {{-144, -56}},
+             ITC_CONTEXT_FN(hooks::GarageScreenFillRows), {{-144, -56}},
              [](PPCContext&, Random& r, const World& w) { RowsWorld(r, w, true); }});
   Run(h, w, {"GarageScreen::SetPrompts (sub_821939A0)", 100, __imp__sub_821939A0,
-             hooks::GarageScreenSetPrompts, {{-176, -56}},
+             ITC_CONTEXT_FN(hooks::GarageScreenSetPrompts), {{-176, -56}},
              [](PPCContext& t, Random& r, const World&) {
                for (PPCRegister* reg : {&t.r3, &t.r4, &t.r5, &t.r6, &t.r7, &t.r8}) {
                  reg->u64 = r.Below(3) == 0 ? 0xFFFFFFFFFFFFFFFFull : Small(r, 4);
@@ -713,7 +713,7 @@ void Helpers(Context& h, const World& w) {
   // SetHelpLine: SetText's parameter area (+48 to +79: r7 on, the
   // original's leftovers) left out.
   Run(h, w, {"GarageScreen::SetHelpLine (sub_82193A90)", 100, __imp__sub_82193A90,
-             hooks::GarageScreenSetHelpLine, {{-112, -64}, {-32, -16}},
+             ITC_CONTEXT_FN(hooks::GarageScreenSetHelpLine), {{-112, -64}, {-32, -16}},
              [](PPCContext& t, Random& r, const World&) { t.r3.u64 = r.Below(8192); }});
 }
 
@@ -722,7 +722,7 @@ void Transitions(Context& h, const World& w) {
   // the data's +44 small.
   Run(h, w, {"GarageScreen::SetUpLists (sub_821956C0; sub_82194CD8, sub_821939A0, "
              "sub_82193A90)",
-             150, __imp__sub_821956C0, hooks::GarageScreenSetUpLists, {{-176, -64}},
+             150, __imp__sub_821956C0, ITC_CONTEXT_FN(hooks::GarageScreenSetUpLists), {{-176, -64}},
              [](PPCContext&, Random& r, const World& w) {
                MenuWorld(r, w);
                MenuBlocks(r, w);
@@ -734,7 +734,7 @@ void Transitions(Context& h, const World& w) {
              FreeMenuBlocks});
   // Transition0: SetUpLists' world, the started word.
   Run(h, w, {"GarageScreen::Transition0 (sub_82195BA0; sub_821956C0)", 150, __imp__sub_82195BA0,
-             hooks::GarageScreenTransition0, {{-112, -24}},
+             ITC_CONTEXT_FN(hooks::GarageScreenTransition0), {{-112, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                MenuWorld(r, w);
                MenuBlocks(r, w);
@@ -747,9 +747,9 @@ void Transitions(Context& h, const World& w) {
     Started(t, r, w);
   };
   Run(h, w, {"GarageScreen::Transition1 (sub_82192D60)", 100, __imp__sub_82192D60,
-             hooks::GarageScreenTransition1, {{-128, -32}}, plain});
+             ITC_CONTEXT_FN(hooks::GarageScreenTransition1), {{-128, -32}}, plain});
   Run(h, w, {"GarageScreen::Transition3 (sub_82192E20)", 100, __imp__sub_82192E20,
-             hooks::GarageScreenTransition3, {{-112, -24}}, plain});
+             ITC_CONTEXT_FN(hooks::GarageScreenTransition3), {{-112, -24}}, plain});
 }
 
 void Pages(Context& h, const World& w) {
@@ -757,7 +757,7 @@ void Pages(Context& h, const World& w) {
   // original, over the world's own stack and the drawless stand: the
   // selection among the linked cars, the scroll 0).
   Run(h, w, {"GarageScreen::CarListPage (sub_82194078)", 300, __imp__sub_82194078,
-             hooks::GarageScreenCarListPage, {{-96, -16}},
+             ITC_CONTEXT_FN(hooks::GarageScreenCarListPage), {{-96, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                MenuWorld(r, w);
                StandWorld(w.base, r, w);
@@ -774,13 +774,13 @@ void Pages(Context& h, const World& w) {
              },
              nullptr, true});
   Run(h, w, {"GarageScreen::LeavePage (sub_82192C18)", 60, __imp__sub_82192C18,
-             hooks::GarageScreenLeavePage, {},
+             ITC_CONTEXT_FN(hooks::GarageScreenLeavePage), {},
              [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.at(kModeAt); }});
   // UpdatePage: the page -1, 0 (CarListPage, through its adapter, over the
   // world's own stack and the drawless stand as its own cases) or 4
   // (LeavePage); r4 the mode.
   Run(h, w, {"GarageScreen::UpdatePage (sub_82194EA8; sub_82194078, sub_82192C18)", 150,
-             __imp__sub_82194EA8, hooks::GarageScreenUpdatePage, {{-112, -8}},
+             __imp__sub_82194EA8, ITC_CONTEXT_FN(hooks::GarageScreenUpdatePage), {{-112, -8}},
              [](PPCContext& t, Random& r, const World& w) {
                MenuWorld(r, w);
                StandWorld(w.base, r, w);
@@ -795,7 +795,7 @@ void Pages(Context& h, const World& w) {
   // the data's +72, +76 and +84 0 or not, its +44 and +48 among the linked
   // cars.
   Run(h, w, {"GarageScreen::Update (sub_82196230; sub_82195BA0, sub_82192D60, sub_82192E20)",
-             300, __imp__sub_82196230, hooks::GarageScreenUpdate, {{-272, -104}},
+             300, __imp__sub_82196230, ITC_CONTEXT_FN(hooks::GarageScreenUpdate), {{-272, -104}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                MenuWorld(r, w);
@@ -848,7 +848,7 @@ void SaveHeader(Random& r, const World& w) {
 // Init's (Add replaces those); its frame (but its saves, r27 on) compared.
 void InitStates(Context& h, const World& w) {
   Run(h, w, {"GarageScreen::InitStates (sub_82196520)", 24, __imp__sub_82196520,
-             hooks::GarageScreenInitStates, {{-1424, -48}},
+             ITC_CONTEXT_FN(hooks::GarageScreenInitStates), {{-1424, -48}},
              [](PPCContext& t, Random& r, const World& w) {
                namespace gm = game_modes;
                const uint32_t machine = w.at(kMachineAt);
@@ -874,7 +874,7 @@ void Handlers(Context& h, const World& w) {
   auto machine = [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.at(kMachineAt); };
   // Create: the four blocks VirtualAlloc made compared by content.
   Run(h, w, {"GarageScreen::Create (sub_82191C58)", 60, __imp__sub_82191C58,
-             hooks::GarageScreenCreate, {{-112, -24}}, machine,
+             ITC_CONTEXT_FN(hooks::GarageScreenCreate), {{-112, -24}}, machine,
              [&h](PPCContext& t, const World&, Outputs& out) {
                // r3 the data block's address (the last VirtualAlloc's).
                out.Word(t.r3.u32 == guest::LoadU32(h.base, gs::kData) ? 1 : 0);
@@ -885,11 +885,11 @@ void Handlers(Context& h, const World& w) {
                Allocated(h.base, out, gs::kData, 104);
              }});
   Run(h, w, {"GarageScreen::OpenMovie (sub_82191618)", 20, __imp__sub_82191618,
-             hooks::GarageScreenOpenMovie, {}, None});
+             ITC_CONTEXT_FN(hooks::GarageScreenOpenMovie), {}, None});
   Run(h, w, {"GarageScreen::WaitForLoad (sub_82191D70)", 100, __imp__sub_82191D70,
-             hooks::GarageScreenWaitForLoad, {{-96, -16}}, machine});
+             ITC_CONTEXT_FN(hooks::GarageScreenWaitForLoad), {{-96, -16}}, machine});
   Run(h, w, {"GarageScreen::ReadSave (sub_82191BB0)", 100, __imp__sub_82191BB0,
-             hooks::GarageScreenReadSave, {{-96, -16}},
+             ITC_CONTEXT_FN(hooks::GarageScreenReadSave), {{-96, -16}},
              [](PPCContext&, Random& r, const World& w) {
                SaveHeader(r, w);
                guest::StoreU32(w.base, w.save + 6116, uint32_t(r.Next()));
@@ -897,7 +897,7 @@ void Handlers(Context& h, const World& w) {
   // SetHeader: the name record, the money, the day and the weekday small;
   // SetText's parameter area from +56 (its r7 set) left out.
   Run(h, w, {"GarageScreen::SetHeader (sub_82192C80)", 100, __imp__sub_82192C80,
-             hooks::GarageScreenSetHeader, {{-112, -56}, {-32, -24}},
+             ITC_CONTEXT_FN(hooks::GarageScreenSetHeader), {{-112, -56}, {-32, -24}},
              [](PPCContext&, Random& r, const World& w) {
                const uint32_t data = w.data();
                NameRecord(w.base, data + 4, r);
@@ -906,15 +906,15 @@ void Handlers(Context& h, const World& w) {
                guest::StoreU32(w.base, data + 32, r.Below(7));
              }});
   Run(h, w, {"GarageScreen::Start (sub_82193DC0; sub_82191BB0, sub_82192C80)", 100,
-             __imp__sub_82193DC0, hooks::GarageScreenStart, {{-96, -8}},
+             __imp__sub_82193DC0, ITC_CONTEXT_FN(hooks::GarageScreenStart), {{-96, -8}},
              [](PPCContext&, Random& r, const World& w) {
                SaveHeader(r, w);
                guest::StoreU32(w.base, w.save + 6116, r.Below(100000));
              }});
   Run(h, w, {"GarageScreen::Unload (sub_821927E8)", 60, __imp__sub_821927E8,
-             hooks::GarageScreenUnload, {{-112, -16}}, machine});
+             ITC_CONTEXT_FN(hooks::GarageScreenUnload), {{-112, -16}}, machine});
   Run(h, w, {"GarageScreen::Close (sub_82192850)", 60, __imp__sub_82192850,
-             hooks::GarageScreenClose, {{-112, -16}},
+             ITC_CONTEXT_FN(hooks::GarageScreenClose), {{-112, -16}},
              [](PPCContext& t, Random&, const World& w) {
                t.r3.u64 = w.at(kMachineAt);
                t.r4.u64 = w.at(kModeAt);
@@ -922,7 +922,7 @@ void Handlers(Context& h, const World& w) {
   // Destroy: the page object, the first list and the data the layer's
   // pages (whether each was freed compared), the second list left.
   Run(h, w, {"GarageScreen::Destroy (sub_821915B0)", 60, __imp__sub_821915B0,
-             hooks::GarageScreenDestroy, {{-112, -32}},
+             ITC_CONTEXT_FN(hooks::GarageScreenDestroy), {{-112, -32}},
              [](PPCContext&, Random& r, const World& w) {
                uint8_t* base = w.base;
                guest::StoreU32(base, gs::kPages, MakePages(base, 28, r));
@@ -959,7 +959,7 @@ void ScratchOut(const World& w, Outputs& out, uint32_t bytes) {
 // The texts, markers and stand helpers never seen in play.
 void NeverSeenHelpers(Context& h, const World& w) {
   Run(h, w, {"GarageScreen::SetScrollArrows (sub_82193288)", 100, __imp__sub_82193288,
-             hooks::GarageScreenSetScrollArrows, {{-128, -40}},
+             ITC_CONTEXT_FN(hooks::GarageScreenSetScrollArrows), {{-128, -40}},
              [](PPCContext& t, Random& r, const World&) {
                t.r3.u64 = r.Below(4) == 0 ? 0 : Small(r, 12);
                t.r4.u64 = r.Below(3) == 0 ? t.r3.u64 + 4 : Small(r, 16);
@@ -969,14 +969,14 @@ void NeverSeenHelpers(Context& h, const World& w) {
     t.r3.u64 = r.Below(4) == 0 ? r.Next() : Small(r, 6);
   };
   Run(h, w, {"GarageScreen::SetActionMarker (sub_821936B0)", 60, __imp__sub_821936B0,
-             hooks::GarageScreenSetActionMarker, {{-112, -24}}, marker});
+             ITC_CONTEXT_FN(hooks::GarageScreenSetActionMarker), {{-112, -24}}, marker});
   Run(h, w, {"GarageScreen::SetOptionMarker (sub_82193720)", 60, __imp__sub_82193720,
-             hooks::GarageScreenSetOptionMarker, {{-112, -24}}, marker});
+             ITC_CONTEXT_FN(hooks::GarageScreenSetOptionMarker), {{-112, -24}}, marker});
   // ShowSpecTexts: a record of figures in the world's stack (its words small
   // or any; +20 a float now and then a NaN or an infinity); SetText's
   // parameter area (+48 to +79: r7 on, the original's leftovers) left out.
   Run(h, w, {"GarageScreen::ShowSpecTexts (sub_82193798)", 100, __imp__sub_82193798,
-             hooks::GarageScreenShowSpecTexts, {{-112, -64}, {-32, -24}},
+             ITC_CONTEXT_FN(hooks::GarageScreenShowSpecTexts), {{-112, -64}, {-32, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                static constexpr uint32_t kOdd[] = {0x7FC00000, 0xFF800000, 0x7F800000,
                                                    0x4F000000, 0xCF000001};
@@ -992,7 +992,7 @@ void NeverSeenHelpers(Context& h, const World& w) {
              },
              [](PPCContext&, const World& w, Outputs& out) { ScratchOut(w, out, 24); }});
   Run(h, w, {"GarageScreen::ShowCarNames (sub_82193910)", 60, __imp__sub_82193910,
-             hooks::GarageScreenShowCarNames, {{-112, -64}, {-32, -24}},
+             ITC_CONTEXT_FN(hooks::GarageScreenShowCarNames), {{-112, -64}, {-32, -24}},
              [](PPCContext& t, Random& r, const World&) {
                t.r3.u64 = r.Below(kSpecCount);
                t.r4.u64 = r.Below(256);
@@ -1000,11 +1000,11 @@ void NeverSeenHelpers(Context& h, const World& w) {
   // SetPlateQuestion: movie 16 the missing movie (movie 5's block);
   // SetNodeText's parameter area (+40 on, r6 on) left out.
   Run(h, w, {"GarageScreen::SetPlateQuestion (sub_82193320)", 40, __imp__sub_82193320,
-             hooks::GarageScreenSetPlateQuestion, {{-128, -88}, {-48, -40}}, None});
+             ITC_CONTEXT_FN(hooks::GarageScreenSetPlateQuestion), {{-128, -88}, {-48, -40}}, None});
   // CopyGarageCar: out the world's stack, the garage the save's, the index
   // among the linked cars.
   Run(h, w, {"GarageScreen::CopyGarageCar (sub_82192770)", 60, __imp__sub_82192770,
-             hooks::GarageScreenCopyGarageCar, {{-96, -16}},
+             ITC_CONTEXT_FN(hooks::GarageScreenCopyGarageCar), {{-96, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                WriteRandom(w.base, w.stack, 1968, r);
                const int32_t count = int16_t(guest::LoadU16(w.base, w.save + 6328));
@@ -1014,28 +1014,28 @@ void NeverSeenHelpers(Context& h, const World& w) {
              },
              [](PPCContext&, const World& w, Outputs& out) { ScratchOut(w, out, 1968); }});
   Run(h, w, {"GarageScreen::ShowBusy (sub_82193C58)", 30, __imp__sub_82193C58,
-             hooks::GarageScreenShowBusy, {{-112, -16}}, None});
+             ITC_CONTEXT_FN(hooks::GarageScreenShowBusy), {{-112, -16}}, None});
   Run(h, w, {"GarageScreen::HideBusy (sub_82193CE0)", 30, __imp__sub_82193CE0,
-             hooks::GarageScreenHideBusy, {{-112, -16}}, None});
+             ITC_CONTEXT_FN(hooks::GarageScreenHideBusy), {{-112, -16}}, None});
   Run(h, w, {"GarageScreen::HideBusyNow (sub_82193D48)", 30, __imp__sub_82193D48,
-             hooks::GarageScreenHideBusyNow, {{-112, -16}}, None});
+             ITC_CONTEXT_FN(hooks::GarageScreenHideBusyNow), {{-112, -16}}, None});
   auto stand = [](PPCContext&, Random& r, const World& w) { StageCommands(r, w); };
   Run(h, w, {"GarageScreen::ResetStand (sub_82191B20)", 100, __imp__sub_82191B20,
-             hooks::GarageScreenResetStand, {{-112, -32}}, stand});
+             ITC_CONTEXT_FN(hooks::GarageScreenResetStand), {{-112, -32}}, stand});
   // SetUpView: SetHelpLine's frame below (its SetText's leftovers) not
   // compared.
   Run(h, w, {"GarageScreen::SetUpView (sub_82194AC8; sub_82193A90)", 60, __imp__sub_82194AC8,
-             hooks::GarageScreenSetUpView, {{-96, -16}}, stand});
+             ITC_CONTEXT_FN(hooks::GarageScreenSetUpView), {{-96, -16}}, stand});
   Run(h, w, {"GarageScreen::ToggleTurn (sub_821918D0)", 60, __imp__sub_821918D0,
-             hooks::GarageScreenToggleTurn, {}, stand});
+             ITC_CONTEXT_FN(hooks::GarageScreenToggleTurn), {}, stand});
   Run(h, w, {"GarageScreen::ToggleDoors (sub_82191920)", 60, __imp__sub_82191920,
-             hooks::GarageScreenToggleDoors, {}, stand});
+             ITC_CONTEXT_FN(hooks::GarageScreenToggleDoors), {}, stand});
   Run(h, w, {"GarageScreen::ToggleDoors2 (sub_82191970)", 60, __imp__sub_82191970,
-             hooks::GarageScreenToggleDoors2, {}, stand});
+             ITC_CONTEXT_FN(hooks::GarageScreenToggleDoors2), {}, stand});
   Run(h, w, {"GarageScreen::TurnLeft (sub_821919C0)", 60, __imp__sub_821919C0,
-             hooks::GarageScreenTurnLeft, {{-96, -16}}, stand});
+             ITC_CONTEXT_FN(hooks::GarageScreenTurnLeft), {{-96, -16}}, stand});
   Run(h, w, {"GarageScreen::TurnRight (sub_82191A18)", 60, __imp__sub_82191A18,
-             hooks::GarageScreenTurnRight, {{-96, -16}}, stand});
+             ITC_CONTEXT_FN(hooks::GarageScreenTurnRight), {{-96, -16}}, stand});
   // CarValue and SalePrice: a garage car of the save (random words), its
   // part bits (+1904 on) sparse or dense, its count (+1900) small or any,
   // its float +1892 around the thresholds, now and then a NaN; f1 compared
@@ -1059,10 +1059,10 @@ void NeverSeenHelpers(Context& h, const World& w) {
     t.r3.u64 = c;
   };
   Run(h, w, {"GarageScreen::CarValue (sub_82192378)", 150, __imp__sub_82192378,
-             hooks::GarageScreenCarValue, {{-112, -104}}, car,
+             ITC_CONTEXT_FN(hooks::GarageScreenCarValue), {{-112, -104}}, car,
              [](PPCContext& t, const World&, Outputs& out) { out.Double(t.f1.u64); }});
   Run(h, w, {"GarageScreen::SalePrice (sub_82192690; sub_82192378)", 150, __imp__sub_82192690,
-             hooks::GarageScreenSalePrice, {{-112, -16}}, car});
+             ITC_CONTEXT_FN(hooks::GarageScreenSalePrice), {{-112, -16}}, car});
 }
 
 // The selected garage car (the data's +44 + +48) among the linked cars,
@@ -1129,7 +1129,7 @@ void CarObjects(Context& h, const World& w) {
   }
   auto settle = [&stand](PPCContext&, const World&, Outputs& out) { stand.Settle(out, 0, false); };
   Run(h, w, {"GarageScreen::ReloadStandCar (sub_82193B10; sub_82192770)", 40,
-             __imp__sub_82193B10, hooks::GarageScreenReloadStandCar, {{-100688, -24}},
+             __imp__sub_82193B10, ITC_CONTEXT_FN(hooks::GarageScreenReloadStandCar), {{-100688, -24}},
              [](PPCContext&, Random& r, const World& w) {
                StandWorld(w.base, r, w);
                const int32_t count = int16_t(guest::LoadU16(w.base, w.save + 6328));
@@ -1138,7 +1138,7 @@ void CarObjects(Context& h, const World& w) {
              },
              nullptr, true});
   Run(h, w, {"GarageScreen::PutCarOnStand (sub_82193BA8; sub_82192770)", 40,
-             __imp__sub_82193BA8, hooks::GarageScreenPutCarOnStand, {{-104592, -16}},
+             __imp__sub_82193BA8, ITC_CONTEXT_FN(hooks::GarageScreenPutCarOnStand), {{-104592, -16}},
              [&stand](PPCContext& t, Random& r, const World& w) {
                LayStandAndCar(stand, t, r, w);
              },
@@ -1152,23 +1152,23 @@ void CarObjects(Context& h, const World& w) {
     t.r3.u64 = stand.car();
   };
   Run(h, w, {"GarageScreen::ShowCarSpecs (sub_82194D90; sub_82193798, sub_82193910)", 40,
-             __imp__sub_82194D90, hooks::GarageScreenShowCarSpecs, {{-6976, -24}}, car,
+             __imp__sub_82194D90, ITC_CONTEXT_FN(hooks::GarageScreenShowCarSpecs), {{-6976, -24}}, car,
              settle, true});
   Run(h, w, {"GarageScreen::SetUseQuestion (sub_821933D0)", 40, __imp__sub_821933D0,
-             hooks::GarageScreenSetUseQuestion, {{-4064, -4024}, {-3984, -56}}, car, settle,
+             ITC_CONTEXT_FN(hooks::GarageScreenSetUseQuestion), {{-4064, -4024}, {-3984, -56}}, car, settle,
              true});
   Run(h, w, {"GarageScreen::SetSaleQuestion (sub_821934D0; sub_82192690)", 40,
-             __imp__sub_821934D0, hooks::GarageScreenSetSaleQuestion,
+             __imp__sub_821934D0, ITC_CONTEXT_FN(hooks::GarageScreenSetSaleQuestion),
              {{-4112, -4072}, {-4032, -112}}, car, settle, true});
   Run(h, w, {"GarageScreen::SetUpPlateEditor (sub_82191810)", 40, __imp__sub_82191810,
-             hooks::GarageScreenSetUpPlateEditor, {{-4000, -16}}, car,
+             ITC_CONTEXT_FN(hooks::GarageScreenSetUpPlateEditor), {{-4000, -16}}, car,
              [settle](PPCContext& t, const World& w, Outputs& out) {
                out.Bytes(Read(w.base, w.stack + kPlateAt, 64));
                settle(t, w, out);
              },
              true});
   Run(h, w, {"GarageScreen::SetUpSpecSheet (sub_82191628; sub_82191768)", 40,
-             __imp__sub_82191628, hooks::GarageScreenSetUpSpecSheet, {{-5104, -40}}, car,
+             __imp__sub_82191628, ITC_CONTEXT_FN(hooks::GarageScreenSetUpSpecSheet), {{-5104, -40}}, car,
              [settle](PPCContext& t, const World& w, Outputs& out) {
                out.Bytes(Read(w.base, w.stack + kSheetAt, kSheetBytes));
                settle(t, w, out);
@@ -1182,9 +1182,9 @@ void CarObjects(Context& h, const World& w) {
     guest::StoreU32(w.base, w.at(kStageAt) + 384, moved[r.Below(4)]);
   };
   Run(h, w, {"GarageScreen::CameraA (sub_82191A70; sub_821808F0)", 60, __imp__sub_82191A70,
-             hooks::GarageScreenCameraA, {{-96, -16}}, camera});
+             ITC_CONTEXT_FN(hooks::GarageScreenCameraA), {{-96, -16}}, camera});
   Run(h, w, {"GarageScreen::CameraB (sub_82191AC8; sub_821808F0)", 60, __imp__sub_82191AC8,
-             hooks::GarageScreenCameraB, {{-96, -16}}, camera});
+             ITC_CONTEXT_FN(hooks::GarageScreenCameraB), {{-96, -16}}, camera});
 }
 
 // The selected garage car among the linked cars (at least one), without a
@@ -1262,7 +1262,7 @@ void MenuTransitions(Context& h, const World& w) {
   // Transition2: ten cars, the list's scroll 1 to 5 and the one before it
   // one off or the same (the row scrolled in among the linked cars).
   Run(h, w, {"GarageScreen::Transition2 (sub_82194F30; sub_82194CD8, sub_82193180, sub_82193288)",
-             100, __imp__sub_82194F30, hooks::GarageScreenTransition2, {{-176, -80}},
+             100, __imp__sub_82194F30, ITC_CONTEXT_FN(hooks::GarageScreenTransition2), {{-176, -80}},
              [](PPCContext& t, Random& r, const World& w) {
                MenuWorld(r, w);
                ListMoves(r, w);
@@ -1276,11 +1276,11 @@ void MenuTransitions(Context& h, const World& w) {
                Started(t, r, w);
              }});
   Run(h, w, {"GarageScreen::Transition4 (sub_82195D10; sub_821958D0)", 40, __imp__sub_82195D10,
-             hooks::GarageScreenTransition4, {{-128, -32}}, with_car, settle, true});
+             ITC_CONTEXT_FN(hooks::GarageScreenTransition4), {{-128, -32}}, with_car, settle, true});
   Run(h, w, {"GarageScreen::Transition5 (sub_82192EF8)", 100, __imp__sub_82192EF8,
-             hooks::GarageScreenTransition5, {{-128, -40}}, plain});
+             ITC_CONTEXT_FN(hooks::GarageScreenTransition5), {{-128, -40}}, plain});
   Run(h, w, {"GarageScreen::Transition6 (sub_82194680; sub_821936B0, sub_82193A90)", 100,
-             __imp__sub_82194680, hooks::GarageScreenTransition6, {{-224, -64}},
+             __imp__sub_82194680, ITC_CONTEXT_FN(hooks::GarageScreenTransition6), {{-224, -64}},
              [plain](PPCContext& t, Random& r, const World& w) {
                plain(t, r, w);
                OneAction(r, w);
@@ -1288,7 +1288,7 @@ void MenuTransitions(Context& h, const World& w) {
   // Transition7: the second list's selection 0 and scroll the selected car
   // (ReloadStandCar over the stand's world, ShowCarSpecs).
   Run(h, w, {"GarageScreen::Transition7 (sub_821951A8; sub_82193B10, sub_82194D90)", 40,
-             __imp__sub_821951A8, hooks::GarageScreenTransition7, {{-2192, -56}},
+             __imp__sub_821951A8, ITC_CONTEXT_FN(hooks::GarageScreenTransition7), {{-2192, -56}},
              [with_car](PPCContext& t, Random& r, const World& w) {
                with_car(t, r, w);
                OneAction(r, w);
@@ -1298,7 +1298,7 @@ void MenuTransitions(Context& h, const World& w) {
              },
              settle, true});
   Run(h, w, {"GarageScreen::Transition8 (sub_82195E30; sub_821956C0)", 100, __imp__sub_82195E30,
-             hooks::GarageScreenTransition8, {{-128, -40}},
+             ITC_CONTEXT_FN(hooks::GarageScreenTransition8), {{-128, -40}},
              [](PPCContext& t, Random& r, const World& w) {
                MenuWorld(r, w);
                MenuBlocks(r, w);
@@ -1314,30 +1314,30 @@ void MenuTransitions(Context& h, const World& w) {
     Started(t, r, w);
   };
   Run(h, w, {"GarageScreen::Transition9 (sub_82195410; sub_82194AC8)", 60, __imp__sub_82195410,
-             hooks::GarageScreenTransition9, {{-112, -24}}, view});
+             ITC_CONTEXT_FN(hooks::GarageScreenTransition9), {{-112, -24}}, view});
   Run(h, w, {"GarageScreen::Transition10 (sub_82195530; sub_82194AC8)", 60, __imp__sub_82195530,
-             hooks::GarageScreenTransition10, {{-112, -24}}, view});
+             ITC_CONTEXT_FN(hooks::GarageScreenTransition10), {{-112, -24}}, view});
   auto options = [plain](PPCContext& t, Random& r, const World& w) {
     plain(t, r, w);
     MenuBlocks(r, w);
   };
   Run(h, w, {"GarageScreen::Transition12 (sub_821955E0; sub_82194B20)", 100, __imp__sub_821955E0,
-             hooks::GarageScreenTransition12, {{-128, -32}}, options, FreeMenuBlocks});
+             ITC_CONTEXT_FN(hooks::GarageScreenTransition12), {{-128, -32}}, options, FreeMenuBlocks});
   Run(h, w, {"GarageScreen::Transition13 (sub_82192FD0)", 100, __imp__sub_82192FD0,
-             hooks::GarageScreenTransition13, {{-128, -32}}, plain});
+             ITC_CONTEXT_FN(hooks::GarageScreenTransition13), {{-128, -32}}, plain});
   Run(h, w, {"GarageScreen::Transition14 (sub_821948B0; sub_82193720, sub_82192770)", 100,
-             __imp__sub_821948B0, hooks::GarageScreenTransition14, {{-2160, -64}}, plain});
+             __imp__sub_821948B0, ITC_CONTEXT_FN(hooks::GarageScreenTransition14), {{-2160, -64}}, plain});
   Run(h, w, {"GarageScreen::Transition16 (sub_821930D8)", 60, __imp__sub_821930D8,
-             hooks::GarageScreenTransition16, {{-128, -32}}, plain});
+             ITC_CONTEXT_FN(hooks::GarageScreenTransition16), {{-128, -32}}, plain});
   Run(h, w, {"GarageScreen::Transition17 (sub_82196170; sub_821958D0)", 40, __imp__sub_82196170,
-             hooks::GarageScreenTransition17, {{-128, -40}}, with_car, settle, true});
+             ITC_CONTEXT_FN(hooks::GarageScreenTransition17), {{-128, -40}}, with_car, settle, true});
   // The set-ups: their frames but the varargs calls' parameter areas (SetText
   // +48 to +79, SetNodeText +40 to +79: the originals' leftovers).
   Run(h, w, {"GarageScreen::SetUpActions (sub_821958D0; sub_82194D90)", 40, __imp__sub_821958D0,
-             hooks::GarageScreenSetUpActions, {{-2192, -2144}, {-2112, -56}}, with_car, settle,
+             ITC_CONTEXT_FN(hooks::GarageScreenSetUpActions), {{-2192, -2144}, {-2112, -56}}, with_car, settle,
              true});
   Run(h, w, {"GarageScreen::SetUpOptions (sub_82194B20)", 100, __imp__sub_82194B20,
-             hooks::GarageScreenSetUpOptions, {{-2160, -2120}, {-2080, -48}}, options,
+             ITC_CONTEXT_FN(hooks::GarageScreenSetUpOptions), {{-2160, -2120}, {-2080, -48}}, options,
              FreeMenuBlocks});
 }
 
@@ -1362,7 +1362,7 @@ void PagesAndHandlers(Context& h, const World& w) {
     }
   };
   Run(h, w, {"GarageScreen::ActionsPage (sub_821941A8; the questions, set-ups)", 300,
-             __imp__sub_821941A8, hooks::GarageScreenActionsPage, {{-144, -56}},
+             __imp__sub_821941A8, ITC_CONTEXT_FN(hooks::GarageScreenActionsPage), {{-144, -56}},
              [data_words](PPCContext& t, Random& r, const World& w) {
                MenuWorld(r, w);
                HeldSlots(w);
@@ -1395,26 +1395,26 @@ void PagesAndHandlers(Context& h, const World& w) {
     t.r3.u64 = w.at(kModeAt);
   };
   Run(h, w, {"GarageScreen::ViewPage (sub_82191DE0; sub_821808F0, the turns and cameras)", 200,
-             __imp__sub_82191DE0, hooks::GarageScreenViewPage, {{-112, -24}}, view});
+             __imp__sub_82191DE0, ITC_CONTEXT_FN(hooks::GarageScreenViewPage), {{-112, -24}}, view});
   Run(h, w, {"GarageScreen::ViewOptionsPage (sub_82192030; the toggles, turns and cameras)", 200,
-             __imp__sub_82192030, hooks::GarageScreenViewOptionsPage, {{-112, -24}}, view});
+             __imp__sub_82192030, ITC_CONTEXT_FN(hooks::GarageScreenViewOptionsPage), {{-112, -24}}, view});
   auto handler = [data_words](PPCContext& t, Random& r, const World& w) {
     data_words(r, w);
     t.r3.u64 = w.at(kMachineAt);
     t.r4.u64 = w.at(kModeAt);
   };
   Run(h, w, {"GarageScreen::OnSpecSheetClosed (sub_82193E38; sub_821939A0)", 60,
-             __imp__sub_82193E38, hooks::GarageScreenOnSpecSheetClosed, {}, handler});
+             __imp__sub_82193E38, ITC_CONTEXT_FN(hooks::GarageScreenOnSpecSheetClosed), {}, handler});
   Run(h, w, {"GarageScreen::OnPlateCancelled (sub_821928F8)", 60, __imp__sub_821928F8,
-             hooks::GarageScreenOnPlateCancelled, {}, handler});
+             ITC_CONTEXT_FN(hooks::GarageScreenOnPlateCancelled), {}, handler});
   Run(h, w, {"GarageScreen::OnPlateDone (sub_82193E80; sub_82193320)", 60, __imp__sub_82193E80,
-             hooks::GarageScreenOnPlateDone, {{-112, -24}}, handler});
+             ITC_CONTEXT_FN(hooks::GarageScreenOnPlateDone), {{-112, -24}}, handler});
   Run(h, w, {"GarageScreen::OnPlateEditorLeft (sub_82193F18; sub_821939A0)", 60,
-             __imp__sub_82193F18, hooks::GarageScreenOnPlateEditorLeft, {}, handler});
+             __imp__sub_82193F18, ITC_CONTEXT_FN(hooks::GarageScreenOnPlateEditorLeft), {}, handler});
   Run(h, w, {"GarageScreen::OnNo (sub_82192BA8)", 60, __imp__sub_82192BA8,
-             hooks::GarageScreenOnNo, {}, handler});
+             ITC_CONTEXT_FN(hooks::GarageScreenOnNo), {}, handler});
   Run(h, w, {"GarageScreen::OnDialogDone (sub_82193F80; sub_821939A0)", 100,
-             __imp__sub_82193F80, hooks::GarageScreenOnDialogDone, {{-96, -16}}, handler});
+             __imp__sub_82193F80, ITC_CONTEXT_FN(hooks::GarageScreenOnDialogDone), {{-96, -16}}, handler});
 }
 
 }  // namespace

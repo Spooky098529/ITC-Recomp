@@ -16,6 +16,7 @@
 // Our renderer draws from the command list replay instead.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "renderer.h"
 #include "state.h"
 
@@ -319,7 +320,7 @@ bool Compare(uint32_t function, uint32_t value, uint32_t reference) {
 // interrupt dispatch does: callbacks read it (sub_822B6A78 sets the event of
 // that CPU's worker thread, sub_822B69A8; the render thread's own CPU left
 // it unwoken, hanging loading screens).
-void Interrupt(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t mask) {
+void Interrupt(lifted::Regs& ctx, uint8_t* base, uint32_t device, uint32_t mask) {
   Effects& e = g_effects;
   uint32_t block = guest::LoadU32(base, device + kDeviceCallbackBlock);
   for (uint32_t cpu = 0; cpu < 6; cpu++) {
@@ -351,7 +352,7 @@ void Interrupt(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t mask) {
   }
 }
 
-void ApplyBuffer(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t address,
+void ApplyBuffer(lifted::Regs& ctx, uint8_t* base, uint32_t device, uint32_t address,
                  uint32_t size, int depth) {
   Effects& e = g_effects;
   e.words += size;
@@ -489,8 +490,8 @@ void LogEffects() {
 // The kick (see "Plan for milestone 6"): r3 device, r4 pairs of (size in
 // words, address), r5 pair count. Writes an INDIRECT_BUFFER per pair into
 // the primary ring and CP_RB_WPTR.
-extern "C" REX_FUNC(sub_8229E3F0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8229E3F0) {
+  
   using namespace native;
   if (ITC_FLAG(native_renderer_log_gpu)) {
     uint32_t device = ctx.r3.u32, pairs = ctx.r4.u32, count = ctx.r5.u32;
@@ -566,14 +567,14 @@ namespace {
 bool TilingLog() {
   return ITC_FLAG(native_renderer_log_gpu) && g_tiling_logs.fetch_sub(1) > 0;
 }
-uint32_t Cpu(PPCContext& ctx, uint8_t* base) {
+uint32_t Cpu(lifted::Regs& ctx, uint8_t* base) {
   return guest::LoadU8(base, ctx.r13.u32 + 268);
 }
 }  // namespace
 }  // namespace native
 
-extern "C" REX_FUNC(sub_822B6BF8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822B6BF8) {
+  
   if (native::TilingLog()) {
     ITC_LOG_INFO("native renderer: tiling: insert worker callback (822B6BF8) on cpu {}: r4 {:08X} "
                  "r5 {:08X}, lr {:08X}",
@@ -586,14 +587,14 @@ extern "C" REX_FUNC(sub_822B6BF8) {
 // Device::WakeWorker: its log kept; the work is its plain C++
 // (src/graphics/predicated_tiling.h, --native_tiling_worker), KeSetEvent
 // through its import as the original's tail call.
-extern "C" REX_FUNC(sub_822B6A78) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822B6A78) {
+  
   if (native::TilingLog()) {
     ITC_LOG_INFO("native renderer: tiling: callback 822B6A78({:08X}) on cpu {}", ctx.r3.u32,
                  native::Cpu(ctx, base));
   }
   if (!ITC_FLAG(native_tiling_worker)) {
-    __imp__sub_822B6A78(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822B6A78);
     return;
   }
   ctx.r3.u64 = graphics::predicated_tiling::WakeWorker(
@@ -602,13 +603,13 @@ extern "C" REX_FUNC(sub_822B6A78) {
         ctx.r3.u64 = event;
         ctx.r4.u64 = increment;
         ctx.r5.u64 = wait;
-        __imp__KeSetEvent(ctx, base);
+        lifted::Sdk(ctx, base, __imp__KeSetEvent);
         return ctx.r3.u32;
       });
 }
 
-extern "C" REX_FUNC(sub_822B6780) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822B6780) {
+  
   uint32_t block = ctx.r3.u32;
   bool log = native::TilingLog();
   uint32_t state = log ? guest::LoadU32(base, block) : 0;
@@ -626,7 +627,7 @@ extern "C" REX_FUNC(sub_822B6780) {
   // renderer draws the tiles from the command list replay. Never seen in
   // play: its wake is skipped.
   if (!ITC_FLAG(native_tiling_worker)) {
-    __imp__sub_822B6780(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822B6780);
   } else {
     ITC_NATIVE_RUNNING("sub_822B6780 Device::WorkerJob (dropped)");
   }
@@ -647,8 +648,8 @@ extern "C" REX_FUNC(sub_822B6780) {
 // straight away and leave the count at 0. (Delivering the interrupts at
 // the kick instead raced the worker against the render thread and drove
 // the count below 0, hanging loading screens.)
-extern "C" REX_FUNC(sub_8229E848) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8229E848) {
+  
   uint32_t device = ctx.r3.u32, result = ctx.r4.u32;
   PPCContext saved = ctx;
   {

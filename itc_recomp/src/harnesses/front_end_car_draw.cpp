@@ -333,7 +333,7 @@ void Small(Context& h, uint32_t block, Random& r) {
           h, results, block, r,
           [&](PPCContext& t) { t.r3.u64 = block + kParts + 176 + 4 * r.Below(16); },
           show ? __imp__sub_820DF180 : __imp__sub_820DF190,
-          show ? hooks::FrontEndCarDrawPlatesShow : hooks::FrontEndCarDrawPlatesHide, 0, {},
+          show ? ITC_CONTEXT_FN(hooks::FrontEndCarDrawPlatesShow) : ITC_CONTEXT_FN(hooks::FrontEndCarDrawPlatesHide), 0, {},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -347,7 +347,7 @@ void Small(Context& h, uint32_t block, Random& r) {
             const World w = Lay(h.base, block, r, false);
             t.r3.u64 = w.holder();
           },
-          __imp__sub_82179BE0, hooks::FrontEndCarDrawIsBusy, 16, {}, fmt::format("case {}", c),
+          __imp__sub_82179BE0, ITC_CONTEXT_FN(hooks::FrontEndCarDrawIsBusy), 16, {}, fmt::format("case {}", c),
           nullptr, GetBSaves(h, {96}));
     }
     results.Report();
@@ -361,7 +361,7 @@ void Small(Context& h, uint32_t block, Random& r) {
             const World w = Lay(h.base, block, r, true);
             t.r3.u64 = w.holder();
           },
-          __imp__sub_8217AFE8, hooks::FrontEndCarDrawSyncPlates, 24, {},
+          __imp__sub_8217AFE8, ITC_CONTEXT_FN(hooks::FrontEndCarDrawSyncPlates), 24, {},
           fmt::format("case {}", c), nullptr, GetBSaves(h, {112}));
     }
     results.Report();
@@ -376,7 +376,7 @@ void Small(Context& h, uint32_t block, Random& r) {
             t.r3.u64 = w.holder();
             t.r4.u64 = r.Next();
           },
-          __imp__sub_82178B40, hooks::FrontEndCarDrawSetDrawWord, 24, {},
+          __imp__sub_82178B40, ITC_CONTEXT_FN(hooks::FrontEndCarDrawSetDrawWord), 24, {},
           fmt::format("case {}", c), nullptr, GetBSaves(h, {112}));
     }
     results.Report();
@@ -399,7 +399,7 @@ void Commands(Context& h, uint32_t block, Random& r) {
             t.r4.u64 = r.Below(8) == 0 ? r.Next() : 7 + r.Below(9);
             t.r5.u64 = w.stage() + 32;
           },
-          __imp__sub_82179C88, hooks::FrontEndCarDrawStepAngles, 0, StageFloats(w),
+          __imp__sub_82179C88, ITC_CONTEXT_FN(hooks::FrontEndCarDrawStepAngles), 0, StageFloats(w),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -424,7 +424,7 @@ void Commands(Context& h, uint32_t block, Random& r) {
             t.f1.f64 = r.Below(6) == 0 ? double(std::bit_cast<float>(RandomFloat(r)))
                                        : double(steps[r.Below(4)]);
           },
-          __imp__sub_8217F9E0, hooks::FrontEndCarDrawAnimsAdd, 88, ListFloats(w, sp),
+          __imp__sub_8217F9E0, ITC_CONTEXT_FN(hooks::FrontEndCarDrawAnimsAdd), 88, ListFloats(w, sp),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -448,7 +448,7 @@ void Commands(Context& h, uint32_t block, Random& r) {
             t.r5.u64 = w.stage();
             t.r6.u64 = r.Below(3);
           },
-          __imp__sub_8217D2B0, hooks::FrontEndCarDrawApplyPreset, 40, StageFloats(w),
+          __imp__sub_8217D2B0, ITC_CONTEXT_FN(hooks::FrontEndCarDrawApplyPreset), 40, StageFloats(w),
           fmt::format("case {}", c), &floor);
     }
     results.Report();
@@ -474,7 +474,7 @@ void Commands(Context& h, uint32_t block, Random& r) {
             const bool preset = int32_t(t.r4.u32) >= 14 && int32_t(t.r4.u32) <= 64;
             floor_of = preset ? sp - 112 - 128 : sp - kStackBytes;
           },
-          __imp__sub_82180108, hooks::FrontEndCarDrawCommand, 32,
+          __imp__sub_82180108, ITC_CONTEXT_FN(hooks::FrontEndCarDrawCommand), 32,
           [&] {
             FloatRanges floats = ListFloats(w, sp);
             const FloatRanges stage = StageFloats(w);
@@ -538,12 +538,12 @@ void Anims(Context& h, uint32_t block, Random& r) {
     uint32_t type, saves, count, get_b;  // get_b: GetB's caller's r1 under sp
   };
   const Runner runners[] = {
-      {"GarageAnims::Turn (sub_82179D78)", __imp__sub_82179D78, hooks::FrontEndCarDrawAnimsTurn,
+      {"GarageAnims::Turn (sub_82179D78)", __imp__sub_82179D78, ITC_CONTEXT_FN(hooks::FrontEndCarDrawAnimsTurn),
        0, 0, 150, 0},
-      {"GarageAnims::Open (sub_82179DF0)", __imp__sub_82179DF0, hooks::FrontEndCarDrawAnimsOpen,
+      {"GarageAnims::Open (sub_82179DF0)", __imp__sub_82179DF0, ITC_CONTEXT_FN(hooks::FrontEndCarDrawAnimsOpen),
        2, 40, 150, 128},
       {"GarageAnims::Close (sub_82179EA8)", __imp__sub_82179EA8,
-       hooks::FrontEndCarDrawAnimsClose, 3, 24, 150, 112},
+       ITC_CONTEXT_FN(hooks::FrontEndCarDrawAnimsClose), 3, 24, 150, 112},
   };
   for (const Runner& runner : runners) {
     Results results(runner.name);
@@ -598,7 +598,7 @@ void Anims(Context& h, uint32_t block, Random& r) {
             floor_of = doors ? sp - 624 : sp - kStackBytes;
             t.r3.u64 = list;
           },
-          __imp__sub_8217D120, hooks::FrontEndCarDrawAnimsRun, 48,
+          __imp__sub_8217D120, ITC_CONTEXT_FN(hooks::FrontEndCarDrawAnimsRun), 48,
           [&] {
             FloatRanges floats = ListFloats(w, sp);
             const FloatRanges values = ValueFloats(w);
@@ -660,7 +660,7 @@ void LightKit(Context& h, uint32_t block, Random& r) {
             LayKit(h.base, w, r);
             t.r3.u64 = w.model(int(r.Below(2)));
           },
-          __imp__sub_820D9D10, hooks::FrontEndCarDrawApplyLightKit, 0, KitFloats(w),
+          __imp__sub_820D9D10, ITC_CONTEXT_FN(hooks::FrontEndCarDrawApplyLightKit), 0, KitFloats(w),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -685,7 +685,7 @@ void LightKit(Context& h, uint32_t block, Random& r) {
             t.f2.f64 = r.Below(10) == 0 ? 1e300 : double(std::bit_cast<float>(RandomFloat(r)));
             t.f3.f64 = double(std::bit_cast<float>(RandomFloat(r)));
           },
-          __imp__sub_82179678, hooks::FrontEndCarDrawSetLightKit, 56, KitFloats(w),
+          __imp__sub_82179678, ITC_CONTEXT_FN(hooks::FrontEndCarDrawSetLightKit), 56, KitFloats(w),
           fmt::format("case {}", c), nullptr, GetBSaves(h, {176}));
     }
     results.Report();
@@ -705,7 +705,7 @@ void LightKit(Context& h, uint32_t block, Random& r) {
             t.r4.u64 = r.Below(8) == 0 ? r.Next() : uint64_t(int64_t(r.Below(6)) - 1);
             t.f1.f64 = double(std::bit_cast<float>(RandomFloat(r)));
           },
-          __imp__sub_821795E0, hooks::FrontEndCarDrawClearLightKit, 16, KitFloats(w),
+          __imp__sub_821795E0, ITC_CONTEXT_FN(hooks::FrontEndCarDrawClearLightKit), 16, KitFloats(w),
           fmt::format("case {}", c), nullptr, GetBSaves(h, {96}));
     }
     results.Report();
@@ -758,7 +758,7 @@ void Lights(Context& h, uint32_t block, Random& r) {
           t.r3.u64 = lights;
           t.r4.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
         },
-        __imp__sub_8217BA20, hooks::FrontEndCarDrawSetLights, 208,
+        __imp__sub_8217BA20, ITC_CONTEXT_FN(hooks::FrontEndCarDrawSetLights), 208,
         {{sp - 368 + 80, 16}},
         fmt::format("case {}", c), nullptr, {},
         [&](Outputs& o) {
@@ -828,7 +828,7 @@ void Pose(Context& h, uint32_t block, Random& r) {
           t.r5.u64 = block + kOut;
           t.r6.u64 = 1 + r.Below(2);
         },
-        __imp__sub_8217CAB8, hooks::FrontEndCarDrawPoseCar, 128, floats,
+        __imp__sub_8217CAB8, ITC_CONTEXT_FN(hooks::FrontEndCarDrawPoseCar), 128, floats,
         fmt::format("case {}", c), nullptr, GetBSaves(h, {800}));
   }
   results.Report();
@@ -876,7 +876,7 @@ void Floors(Context& h, Random& r) {
           t.r5.u64 = r.Below(5) == 0 ? 0 : r.Next() | 1;
           t.r24.u64 = r.Next();
         },
-        __imp__sub_820C8480, hooks::FrontEndCarDrawFloorDraw, floats, fmt::format("case {}", c),
+        __imp__sub_820C8480, ITC_CONTEXT_FN(hooks::FrontEndCarDrawFloorDraw), floats, fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& o) {
           const uint32_t sp = t.r1.u32;
           o.Bytes(Read(h.base, sp - 144, 144 - 64));
@@ -1031,7 +1031,7 @@ void Draws(Context& h, uint32_t block, Random& r) {
           t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
           t.r24.u64 = r.Next();
         },
-        __imp__sub_8217FE60, hooks::FrontEndCarDrawDraw, 40,
+        __imp__sub_8217FE60, ITC_CONTEXT_FN(hooks::FrontEndCarDrawDraw), 40,
         {{w.stage() + 84, 1}, {w.model(0) + 4288 + 640, 1}, {w.model(1) + 4288 + 640, 1}},
         fmt::format("case {}", c), nullptr,
         // The 208 bytes under its frame: its callees' saved registers

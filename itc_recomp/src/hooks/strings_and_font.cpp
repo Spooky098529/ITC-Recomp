@@ -21,6 +21,7 @@
 // originals leave that a caller could read (r3) are left the same.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
@@ -85,7 +86,7 @@ ITC_FLAG_DECLARE(bool, log_recording_by_pass);
 // are on, else the original.
 
 // Strings::OnLoaded: r6 = the file's loaded flag.
-extern "C" REX_FUNC(sub_8210A850) {
+ITC_NATIVE_ENTRY_ALWAYS(8210A850) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210A850)
   StringsOnLoaded(base, ctx.r6.u32);
 }
@@ -94,16 +95,16 @@ extern "C" REX_FUNC(sub_8210A850) {
 // --native_heap routes VirtualFree to the allocation layer; the original
 // when a file it would free isn't the layer's. No caller reads r3 after it
 // (each calls sub_8211E370, which takes no arguments).
-extern "C" REX_FUNC(sub_8210A538) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8210A538) {
+  
   if (!ITC_FLAG(native_strings_and_font) || !hooks::NativeHeapActive() ||
       !StringsRelease(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_8210A538(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8210A538);
   }
 }
 
 // Text::IsLoaded: no arguments; r3 0 or 1.
-extern "C" REX_FUNC(sub_82211C90) {
+ITC_NATIVE_ENTRY_ALWAYS(82211C90) {
   ITC_STRINGS_AND_FONT_FALLBACK(82211C90)
   ctx.r3.u64 = TextIsLoaded(base);
 }
@@ -113,7 +114,7 @@ extern "C" REX_FUNC(sub_82211C90) {
 // the original does, the va_list from there; _woutput_l's frame where the
 // original's would be (96, 144 and 2,336 bytes down). r3 the count
 // (zero-extended; the original's can carry -1's upper bits).
-extern "C" REX_FUNC(sub_8210A490) {
+ITC_NATIVE_ENTRY_ALWAYS(8210A490) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210A490)
   const uint64_t registers[6] = {ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
                                  ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
@@ -124,7 +125,7 @@ extern "C" REX_FUNC(sub_8210A490) {
   int32_t count;
   if (!Swprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 + 32, ctx.r1.u32 - 96 - 144 - 2336,
                 &count)) {
-    __imp__sub_8210A490(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8210A490);
     return;
   }
   ctx.r3.u64 = uint32_t(count);
@@ -137,14 +138,14 @@ extern "C" REX_FUNC(sub_8210A490) {
 namespace {
 
 struct FormatGuest {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
 };
 
 uint32_t FormatCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint64_t r5,
                     uint32_t frame, uint32_t lr) {
   auto& guest = *static_cast<FormatGuest*>(user);
-  PPCContext& ctx = guest.ctx;
+  lifted::Regs& ctx = guest.ctx;
   uint8_t* base = guest.base;
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame;
@@ -169,12 +170,12 @@ uint32_t FormatGuestCall(void* user, uint32_t function, uint32_t r3, uint32_t r4
   return FormatCall(&guest, function, r3, r4, r5, frame, lr);
 }
 
-FormatGuestCalls::FormatGuestCalls(PPCContext& ctx, uint8_t* base)
+FormatGuestCalls::FormatGuestCalls(lifted::Regs& ctx, uint8_t* base)
     : ctx_(ctx), base_(base), calls_{this, FormatGuestCall} {}
 
 }  // namespace hooks
 
-void hooks::StringsFormatVSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::StringsFormatVSteps(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   FormatGuest guest{ctx, base};
@@ -185,13 +186,13 @@ void hooks::StringsFormatVSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = out;
 }
 
-extern "C" REX_FUNC(sub_8210A990) {
+ITC_NATIVE_ENTRY_ALWAYS(8210A990) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210A990)
   hooks::StringsFormatVSteps(ctx, base);
 }
 
 // Strings::Format: as FormatV with r6 to r10 the varargs; r3 the output.
-void hooks::StringsFormatSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::StringsFormatSteps(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   FormatGuest guest{ctx, base};
@@ -203,21 +204,21 @@ void hooks::StringsFormatSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = out;
 }
 
-extern "C" REX_FUNC(sub_8210ABC0) {
+ITC_NATIVE_ENTRY_ALWAYS(8210ABC0) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210ABC0)
   hooks::StringsFormatSteps(ctx, base);
 }
 
 // Strings::CopyPage: r4 = the output, r5 = the text, r6 = the page, r7 =
 // the lines to skip; r3 the output.
-extern "C" REX_FUNC(sub_8210A5E8) {
+ITC_NATIVE_ENTRY_ALWAYS(8210A5E8) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210A5E8)
   ctx.r3.u64 = StringsCopyPage(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32, ctx.r7.s32);
 }
 
 // The font's pixel shader entries: no arguments, from the C runtime's
 // start-up table.
-extern "C" REX_FUNC(sub_825D9590) {
+ITC_NATIVE_ENTRY_ALWAYS(825D9590) {
   ITC_STRINGS_AND_FONT_FALLBACK(825D9590)
   InitShaderEntries(base);
 }
@@ -234,7 +235,7 @@ bool SlotDiagnostics() {
 // font's +8, its vtable slot 4: r4 = the chunk, r5 = the parameters' +116
 // + 1, f1 = 0.0) and 0x826C5BFC cleared, as the original. False, with
 // nothing done that the original won't redo, where it must run.
-bool DrawPass(PPCContext& ctx, uint8_t* base, uint32_t font, uint32_t text) {
+bool DrawPass(lifted::Regs& ctx, uint8_t* base, uint32_t font, uint32_t text) {
   const DrawPassResult result = FontDrawPass(base, font, text);
   if (result.kind == DrawPassResult::kOriginal) {
     return false;
@@ -263,7 +264,7 @@ bool DrawPass(PPCContext& ctx, uint8_t* base, uint32_t font, uint32_t text) {
 // where it must run), from a frame like the original's (112 bytes). The
 // whole original where the second pass is on (never in play).
 template <typename SetUp>
-void FontDraw(PPCContext& ctx, uint8_t* base, SetUp set_up) {
+void FontDraw(lifted::Regs& ctx, uint8_t* base, SetUp set_up) {
   const uint32_t params = ctx.r4.u32, text = ctx.r5.u32;
   ctx.fpscr.disableFlushMode();
   const uint32_t font = set_up(params);
@@ -273,7 +274,7 @@ void FontDraw(PPCContext& ctx, uint8_t* base, SetUp set_up) {
       ctx.r3.u64 = font;
       ctx.r4.u64 = text;
       ctx.r5.u64 = 0;
-      __imp__sub_82109EF0(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_82109EF0);
     }
   });
   ctx.lr = lr;
@@ -284,27 +285,27 @@ void FontDraw(PPCContext& ctx, uint8_t* base, SetUp set_up) {
 // Font::DrawPass: r3 = the font, r4 = the text, r5 = the pass. The original
 // for pass 1 (never in play), with the command list's diagnostics on, and
 // where FontDrawPass says it must run.
-extern "C" REX_FUNC(sub_82109EF0) {
+ITC_NATIVE_ENTRY_ALWAYS(82109EF0) {
   ITC_STRINGS_AND_FONT_FALLBACK(82109EF0)
   if (ctx.r5.u32 != 0 || SlotDiagnostics()) {
-    __imp__sub_82109EF0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82109EF0);
     return;
   }
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   if (!DrawPass(ctx, base, ctx.r3.u32, ctx.r4.u32)) {
     ctx.lr = lr;
-    __imp__sub_82109EF0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82109EF0);
     return;
   }
   ctx.lr = lr;
 }
 
 // Font::Draw: r3 = the font, r4 = the draw parameters, r5 = the text.
-extern "C" REX_FUNC(sub_8210A400) {
+ITC_NATIVE_ENTRY_ALWAYS(8210A400) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210A400)
   if (guest::LoadU32(base, ctx.r4.u32 + 112) != 0 || SlotDiagnostics()) {
-    __imp__sub_8210A400(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8210A400);
     return;
   }
   const uint32_t font = ctx.r3.u32;
@@ -316,18 +317,18 @@ extern "C" REX_FUNC(sub_8210A400) {
 
 // Text::Draw: r4 = the draw parameters, r5 = the text: Font::Draw on
 // [0x826C5C00].
-extern "C" REX_FUNC(sub_8210A758) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8210A758) {
+  
   if (hooks::g_text_draw_stand_in != nullptr) {
     hooks::g_text_draw_stand_in(ctx, base);
     return;
   }
   if (!ITC_FLAG(native_strings_and_font)) {
-    __imp__sub_8210A758(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8210A758);
     return;
   }
   if (guest::LoadU32(base, ctx.r4.u32 + 112) != 0 || SlotDiagnostics()) {
-    __imp__sub_8210A758(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8210A758);
     return;
   }
   FontDraw(ctx, base, [&](uint32_t params) { return TextDrawSetUp(base, params); });
@@ -336,15 +337,15 @@ extern "C" REX_FUNC(sub_8210A758) {
 // XPR::Release of a slot (sub_82108860): r3 = the slot; r3 as the original
 // leaves it. Natively only where the model class's lifetime functions are
 // (hooks::ModelsNativeLifetime: XPR::~XPR puts its blocks off).
-extern "C" REX_FUNC(sub_82108860) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82108860) {
+  
   if (ITC_FLAG(native_strings_and_font) && hooks::ModelsNativeLifetime()) {
     if (const auto r3 = ReleaseXprSlot(base, ctx.r3.u32)) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  __imp__sub_82108860(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82108860);
 }
 
 // --- The loads ---
@@ -360,13 +361,13 @@ bool LoadsNative() {
 
 // Strings::Load: r3 = the string table, r4 = the mask; r3 the last load's
 // serial (left as it came when nothing was loaded).
-extern "C" REX_FUNC(sub_8210A8D0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8210A8D0) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8210A8D0)) {
     return;  // a harness's (the race HUD object's)
   }
   if (!LoadsNative()) {
-    __imp__sub_8210A8D0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8210A8D0);
     return;
   }
   if (const auto last = StringsLoad(base, ctx.r3.u32, ctx.r4.u32, hooks::NativeArchiveLoad(base))) {
@@ -374,26 +375,26 @@ extern "C" REX_FUNC(sub_8210A8D0) {
   }
 }
 
-void hooks::TextLoadSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::TextLoadSteps(lifted::Regs& ctx, uint8_t* base) {
   const int64_t r3 = TextLoad(base, hooks::NativeArchiveLoad(base), [&](uint32_t font,
                                                                          uint32_t mask) {
     guest_call::InFrame(ctx, base, 96, 0x8210AE14, [&](uint32_t) {
       ctx.r3.u64 = font;
       ctx.r4.u64 = mask;
-      __imp__sub_82109498(ctx, base);  // Font::Load
+      lifted::Sdk(ctx, base, __imp__sub_82109498);  // Font::Load
     });
   });
   hooks::SetArchiveSerial(ctx, r3);
 }
 
 // Text::Load: no arguments; r3 as the original leaves it.
-extern "C" REX_FUNC(sub_8210ADF8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8210ADF8) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8210ADF8)) {
     return;
   }
   if (!LoadsNative()) {
-    __imp__sub_8210ADF8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8210ADF8);
     return;
   }
   hooks::TextLoadSteps(ctx, base);

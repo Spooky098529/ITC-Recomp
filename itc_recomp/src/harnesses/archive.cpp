@@ -379,8 +379,8 @@ void StaticInits(Context& h) {
     GuestFunction native;
   };
   const Kind kKinds[] = {
-      {"sub_825D9160 RequestQueue::StaticInit", __imp__sub_825D9160, NativeQueueStaticInit},
-      {"sub_825D91B0 RequestSlots::StaticInit", __imp__sub_825D91B0, NativeSlotsStaticInit},
+      {"sub_825D9160 RequestQueue::StaticInit", __imp__sub_825D9160, ITC_CONTEXT_FN(NativeQueueStaticInit)},
+      {"sub_825D91B0 RequestSlots::StaticInit", __imp__sub_825D91B0, ITC_CONTEXT_FN(NativeSlotsStaticInit)},
   };
   QueueLock lock(h);
   std::lock_guard<std::recursive_mutex> exit_lock(c_runtime::ExitMutex());
@@ -475,7 +475,7 @@ void Finishes(Context& h) {
           guest::StoreU32(h.base, request + 88, pages);
         },
         [&](PPCContext& t) { t.r3.u64 = request; }, __imp__sub_8209D688,
-        hooks::ArchiveFinishRequest,
+        ITC_CONTEXT_FN(hooks::ArchiveFinishRequest),
         [&](const PPCContext&, Outputs& out) {
           out.Bytes(Read(h.base, h.data, kScratchBytes));
           out.Word(guest::LoadU32(h.base, archive::kCallbackSerial));
@@ -503,7 +503,7 @@ void Invokes(Context& h) {
           t.r3.u64 = functor;
           t.r4.u64 = argument;
         },
-        __imp__sub_8209DD80, hooks::ArchiveInvokeFunctor,
+        __imp__sub_8209DD80, ITC_CONTEXT_FN(hooks::ArchiveInvokeFunctor),
         [&](const PPCContext& t, Outputs& out) {
           out.Bytes(Read(h.base, h.data, kScratchBytes));
           out.Word(t.r11.u32);
@@ -654,9 +654,9 @@ void UclCase(Context& h, Results& results, const std::vector<uint8_t>& stream, u
     }
     ITC_FLAG(native_archive) = v == 1;
     if (block) {
-      (v == 0 ? __imp__sub_822947F8 : NativeUclBlock)(t, h.base);
+      (v == 0 ? __imp__sub_822947F8 : ITC_CONTEXT_FN(NativeUclBlock))(t, h.base);
     } else {
-      (v == 0 ? __imp__sub_82294610 : hooks::ArchiveUclUnpack)(t, h.base);
+      (v == 0 ? __imp__sub_82294610 : ITC_CONTEXT_FN(hooks::ArchiveUclUnpack))(t, h.base);
     }
     ITC_FLAG(native_archive) = true;
     out[v].Word(t.r3.u32);

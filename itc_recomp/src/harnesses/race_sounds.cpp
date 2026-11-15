@@ -526,7 +526,7 @@ void BeginCases(Context& h, uint32_t block) {
       }
       t.r3.u64 = machine;
       ArchiveLoads loads({1});
-      (v == 0 ? __imp__sub_82176618 : hooks::RaceSoundsBegin)(t, base);
+      (v == 0 ? __imp__sub_82176618 : ITC_CONTEXT_FN(hooks::RaceSoundsBegin))(t, base);
       const uint32_t buffer = guest::LoadU32(base, machine + rs::kEffectsBank);
       out[v].Word(buffer != 0);
       Store(base, machine + rs::kEffectsBank, 0);
@@ -660,7 +660,7 @@ void InitCases(Context& h, uint32_t block) {
       const uint32_t count = guest::LoadU32(base, mastering + 4);
       const uint32_t active = guest::LoadU32(base, mastering + 40);
       t.r3.u64 = machine;
-      (v == 0 ? __imp__sub_82177378 : hooks::RaceSoundsInit)(t, base);
+      (v == 0 ? __imp__sub_82177378 : ITC_CONTEXT_FN(hooks::RaceSoundsInit))(t, base);
       out[v].Word(t.r1.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Word(t.r3.u32);
@@ -831,7 +831,7 @@ void UnloadCases(Context& h, uint32_t block) {
         Store(base, sp - 0x400 + k, fill + k);
       }
       t.r3.u64 = machine;
-      (v == 0 ? __imp__sub_821772D8 : hooks::RaceSoundsUnload)(t, base);
+      (v == 0 ? __imp__sub_821772D8 : ITC_CONTEXT_FN(hooks::RaceSoundsUnload))(t, base);
       out[v].Word(t.r1.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Word(which(t.r3.u32));
@@ -875,37 +875,37 @@ void RaceSounds(Context& h) {
   const bool real = engine != 0 && MasteringVoice(base) != 0 && hooks::NativeHeapActive();
   const uint32_t machine = block + kMachineWords - 9600;
   Group(h, block, "RaceSounds::SetListener (sub_821758A0)", 60, __imp__sub_821758A0,
-        hooks::RaceSoundsSetListener, 112, 32, [](Random& r, uint64_t* regs) {
+        ITC_CONTEXT_FN(hooks::RaceSoundsSetListener), 112, 32, [](Random& r, uint64_t* regs) {
           regs[0] = r.Next();
         });
   Group(h, block, "RaceSounds::FadeMusic (sub_82175908)", 300, __imp__sub_82175908,
-        hooks::RaceSoundsFadeMusic, 112, 16, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsFadeMusic), 112, 16, Keep);
   Group(h, block, "RaceSounds::RestoreMusicVolume (sub_821759C8)", 100, __imp__sub_821759C8,
-        hooks::RaceSoundsRestoreMusicVolume, 112, 16, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsRestoreMusicVolume), 112, 16, Keep);
   Group(h, block, "RaceSounds::EndTick (sub_82175A40)", 60, __imp__sub_82175A40,
-        hooks::RaceSoundsEndTick, 112, 24, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsEndTick), 112, 24, Keep);
   Group(h, block, "RaceSounds::Pause (sub_82175AE8)", 40, __imp__sub_82175AE8,
-        hooks::RaceSoundsPause, 112, 24, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsPause), 112, 24, Keep);
   Group(h, block, "RaceSounds::Resume (sub_82175B80)", 40, __imp__sub_82175B80,
-        hooks::RaceSoundsResume, 112, 24, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsResume), 112, 24, Keep);
   Group(h, block, "RaceSounds::PauseCars (sub_82175C00)", 40, __imp__sub_82175C00,
-        hooks::RaceSoundsPauseCars, 112, 24, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsPauseCars), 112, 24, Keep);
   Group(h, block, "RaceSounds::ResumeCars (sub_82175C58)", 40, __imp__sub_82175C58,
-        hooks::RaceSoundsResumeCars, 112, 24, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsResumeCars), 112, 24, Keep);
   Group(h, block, "RaceSounds::OnStageCountdown (sub_82175D20)", 40, __imp__sub_82175D20,
-        hooks::RaceSoundsOnStageCountdown, 64, 0, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsOnStageCountdown), 64, 0, Keep);
   Group(h, block, "RaceSounds::OnRollingStartDone (sub_82175D48)", 60, __imp__sub_82175D48,
-        hooks::RaceSoundsOnRollingStartDone, 96, 16, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsOnRollingStartDone), 96, 16, Keep);
   Group(h, block, "RaceSounds::OnEffectsBankLoaded (sub_82175ED0)", 20, __imp__sub_82175ED0,
-        hooks::RaceSoundsOnEffectsBankLoaded, 64, 0, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsOnEffectsBankLoaded), 64, 0, Keep);
   if (!real) {
     ITC_LOG_ERROR("harness: race_sounds: no XAudio engine or native heap: SetUpCars' and "
                   "UpdateCars' cases skipped");
   } else {
   Group(h, block, "RaceSounds::SetUpCars (sub_82176188)", 60, __imp__sub_82176188,
-        hooks::RaceSoundsSetUpCars, 224, 144, Keep, true);
+        ITC_CONTEXT_FN(hooks::RaceSoundsSetUpCars), 224, 144, Keep, true);
   Group(h, block, "RaceSounds::UpdateCars (sub_82175F20)", 120, __imp__sub_82175F20,
-        hooks::RaceSoundsUpdateCars, 240, 160, [&](Random& r, uint64_t*) {
+        ITC_CONTEXT_FN(hooks::RaceSoundsUpdateCars), 240, 160, [&](Random& r, uint64_t*) {
           // Mostly past the wait with the cars set up.
           if (r.Below(4) != 0) {
             Store(base, machine + rs::kSetUpWait, 0);
@@ -916,7 +916,7 @@ void RaceSounds(Context& h) {
         true);
   }
   Group(h, block, "RaceSounds::PickRivalMusic (sub_821764F0)", 200, __imp__sub_821764F0,
-        hooks::RaceSoundsPickRivalMusic, 112, 24, [&](Random& r, uint64_t*) {
+        ITC_CONTEXT_FN(hooks::RaceSoundsPickRivalMusic), 112, 24, [&](Random& r, uint64_t*) {
           // The results' count (0 to 3) and the last one's item, its class
           // byte in the block (the item table's +16 pointed so it lands
           // there).
@@ -934,7 +934,7 @@ void RaceSounds(Context& h) {
                                           uint32_t(r.Next())})));
         });
   Group(h, block, "RaceSounds::PlayRivalMusic (sub_821762F8)", 200, __imp__sub_821762F8,
-        hooks::RaceSoundsPlayRivalMusic, 144, 40, [&](Random& r, uint64_t*) {
+        ITC_CONTEXT_FN(hooks::RaceSoundsPlayRivalMusic), 144, 40, [&](Random& r, uint64_t*) {
           // One flag mostly (as in play), sometimes several; the course 0 to
           // 3 or any word.
           const uint32_t one = 0x40u << r.Below(8);
@@ -944,17 +944,17 @@ void RaceSounds(Context& h) {
         });
   // The handlers above them.
   Group(h, block, "RaceSounds::StageTick (sub_82176F28)", 200, __imp__sub_82176F28,
-        hooks::RaceSoundsStageTick, 160, 40, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsStageTick), 160, 40, Keep);
   Group(h, block, "RaceSounds::RollingStartTick (sub_82177130)", 200, __imp__sub_82177130,
-        hooks::RaceSoundsRollingStartTick, 160, 40, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsRollingStartTick), 160, 40, Keep);
   Group(h, block, "RaceSounds::OnCountdown (sub_82176968)", 60, __imp__sub_82176968,
-        hooks::RaceSoundsOnCountdown, 96, 16, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsOnCountdown), 96, 16, Keep);
   Group(h, block, "RaceSounds::OnNextStage (sub_82176EC8)", 60, __imp__sub_82176EC8,
-        hooks::RaceSoundsOnNextStage, 96, 16, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsOnNextStage), 96, 16, Keep);
   Group(h, block, "RaceSounds::OnAbort (sub_82175CA0)", 60, __imp__sub_82175CA0,
-        hooks::RaceSoundsOnAbort, 96, 16, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsOnAbort), 96, 16, Keep);
   Group(h, block, "RaceSounds::OnAbortDone (sub_82175CF8)", 40, __imp__sub_82175CF8,
-        hooks::RaceSoundsOnAbortDone, 64, 0, Keep);
+        ITC_CONTEXT_FN(hooks::RaceSoundsOnAbortDone), 64, 0, Keep);
   if (real) {
     const auto steps = [&](Random& r, uint64_t*) {
       Store(base, machine + rs::kCarsStep, Pick(r, {1u, 2u, 2u, 2u, 0u, 3u}));
@@ -965,19 +965,19 @@ void RaceSounds(Context& h) {
       }
     };
     Group(h, block, "RaceSounds::RaceTick (sub_821769D0)", 200, __imp__sub_821769D0,
-          hooks::RaceSoundsRaceTick, 160, 40, steps, true);
+          ITC_CONTEXT_FN(hooks::RaceSoundsRaceTick), 160, 40, steps, true);
     Group(h, block, "RaceSounds::OnRaceEnd (sub_82176BA0)", 60, __imp__sub_82176BA0,
-          hooks::RaceSoundsOnRaceEnd, 96, 16, steps, true);
+          ITC_CONTEXT_FN(hooks::RaceSoundsOnRaceEnd), 96, 16, steps, true);
     Group(h, block, "RaceSounds::OnLeaveAfterRace (sub_82176E60)", 60, __imp__sub_82176E60,
-          hooks::RaceSoundsOnLeaveAfterRace, 96, 16, steps, true);
+          ITC_CONTEXT_FN(hooks::RaceSoundsOnLeaveAfterRace), 96, 16, steps, true);
     Group(h, block, "RaceSounds::OnRollingStart (sub_821770C0)", 60, __imp__sub_821770C0,
-          hooks::RaceSoundsOnRollingStart, 96, 16, steps, true);
+          ITC_CONTEXT_FN(hooks::RaceSoundsOnRollingStart), 96, 16, steps, true);
     const uint32_t big = memory::Alloc(kBigBytes, 0);
     if (big == 0) {
       ITC_LOG_ERROR("harness: race_sounds: no big block: AfterRaceTick's cases skipped");
     } else {
       Group(h, block, "RaceSounds::AfterRaceTick (sub_82176C10)", 200, __imp__sub_82176C10,
-            hooks::RaceSoundsAfterRaceTick, 176, 48,
+            ITC_CONTEXT_FN(hooks::RaceSoundsAfterRaceTick), 176, 48,
             [&](Random& r, uint64_t* regs) {
               steps(r, regs);
               // The race data's records at `big`: one or two, the last's
@@ -999,7 +999,7 @@ void RaceSounds(Context& h) {
   }
   // rand's callers (the seed set per case).
   Group(h, block, "RaceSounds::PlayStartMusic (sub_82175DB0)", 200, __imp__sub_82175DB0,
-        hooks::RaceSoundsPlayStartMusic, 144, 8, [&](Random& r, uint64_t*) {
+        ITC_CONTEXT_FN(hooks::RaceSoundsPlayStartMusic), 144, 8, [&](Random& r, uint64_t*) {
           Store(base, machine + rs::kKind,
                 Pick(r, {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 0xFFFFFFFFu, uint32_t(r.Next())}));
           if (g_seed != 0) {
@@ -1008,7 +1008,7 @@ void RaceSounds(Context& h) {
         });
   if (real) {
     Group(h, block, "RaceSounds::IdleTick (sub_821767A8)", 200, __imp__sub_821767A8,
-          hooks::RaceSoundsIdleTick, 160, 40,
+          ITC_CONTEXT_FN(hooks::RaceSoundsIdleTick), 160, 40,
           [&](Random& r, uint64_t*) {
             Store(base, machine + rs::kCarsStep, Pick(r, {1u, 2u, 2u, 2u, 0u, 3u}));
             if (r.Below(4) != 0) {

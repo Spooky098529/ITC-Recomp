@@ -3,6 +3,7 @@
 // the harness shares (hooks/frame_driver.h).
 
 #include "hooks/frame_driver.h"
+#include "hooks/native_entry.h"
 
 #include "app_states/app.h"
 #include "base/flags.h"
@@ -61,11 +62,11 @@ uint32_t High(uint64_t value) { return uint32_t(value >> 32); }
 
 bool NativeFrameDriver() { return ITC_FLAG(native_frame_driver); }
 
-void FrameDriverGetVideoOutput(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrameDriverGetVideoOutput) {
   ctx.r3.u64 = fd::GetVideoOutput(ctx.r3.u32);
 }
 
-void FrameDriverAddListener(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrameDriverAddListener) {
   const uint32_t interface = ctx.r3.u32;
   const uint32_t key = ctx.r4.u32;
   const uint32_t delegate = ctx.r5.u32;
@@ -78,21 +79,21 @@ void FrameDriverAddListener(PPCContext& ctx, uint8_t* base) {
       ctx.r3.u64 = vector;
       ctx.r4.u64 = request;
       ctx.lr = 0x82092300;
-      __imp__sub_8209A930(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_8209A930);
       return;
     }
     ctx.r3.u64 = *inserted ? frame - 16 : vector;
   });
 }
 
-void FrameDriverApplyRequest(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrameDriverApplyRequest) {
   std::optional<bool> inserted;
   const uint32_t type = High(ctx.r4.u64);
   if (type != 0 || (Heap() && framework::CanAllocate(base))) {
     inserted = fd::ApplyRequest(base, ctx.r3.u32, type, ctx.r4.u32, High(ctx.r5.u64));
   }
   if (!inserted) {
-    __imp__sub_82091FF0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82091FF0);
     return;
   }
   REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
@@ -102,7 +103,7 @@ void FrameDriverApplyRequest(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void FrameDriverCallListener(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrameDriverCallListener) {
   const uint32_t driver = ctx.r3.u32;
   const uint64_t entry = ctx.r4.u64;
   const app_states::AppCalls calls = AppStatesCalls(ctx, base);
@@ -113,9 +114,9 @@ void FrameDriverCallListener(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = answer;
 }
 
-void FrameDriverDrawFrame(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrameDriverDrawFrame) {
   if (!NativeFrameDriver() || !ITC_FLAG(native_video_output)) {
-    __imp__sub_82091E58(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82091E58);
     return;
   }
   const uint32_t driver = ctx.r3.u32;
@@ -125,13 +126,13 @@ void FrameDriverDrawFrame(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void AppSceneUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppSceneUpdate) {
   const uint32_t scene = ctx.r3.u32;
   const app_states::AppCalls calls = AppStatesCalls(ctx, base);
   calls.in_frame(112, uint32_t(ctx.lr), [&](uint32_t) { fd::SceneUpdate(base, scene, calls); });
 }
 
-void AppSceneDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AppSceneDraw) {
   const uint32_t scene = ctx.r3.u32, interface = ctx.r4.u32, device = ctx.r5.u32;
   const app_states::AppCalls calls = AppStatesCalls(ctx, base);
   // Device::SetShaderGprAllocation from VideoOutput::BeginFrame's 96-byte
@@ -145,7 +146,7 @@ void AppSceneDraw(PPCContext& ctx, uint8_t* base) {
         ctx.r5.u64 = vertex;
         ctx.r6.u64 = pixel;
         ctx.lr = 0x8258D978;
-        __imp__sub_822A8A60(ctx, base);
+        lifted::Sdk(ctx, base, __imp__sub_822A8A60);
         return;
       }
       guest_call::InFrame(ctx, base, 112, 0x822A8AF4, [&](uint32_t) {
@@ -163,7 +164,7 @@ void AppSceneDraw(PPCContext& ctx, uint8_t* base) {
 
 namespace {
 
-fd::ThreadCalls ThreadCallsOn(PPCContext& ctx, uint8_t* base) {
+fd::ThreadCalls ThreadCallsOn(lifted::Regs& ctx, uint8_t* base) {
   fd::ThreadCalls calls;
   calls.import = [&ctx, base](fd::Import import, std::initializer_list<uint64_t> args,
                               uint32_t return_address) {
@@ -174,22 +175,22 @@ fd::ThreadCalls ThreadCallsOn(PPCContext& ctx, uint8_t* base) {
     ctx.lr = return_address;
     switch (import) {
       case fd::Import::kExCreateThread:
-        __imp__ExCreateThread(ctx, base);
+        lifted::Sdk(ctx, base, __imp__ExCreateThread);
         break;
       case fd::Import::kObReferenceObjectByHandle:
-        __imp__ObReferenceObjectByHandle(ctx, base);
+        lifted::Sdk(ctx, base, __imp__ObReferenceObjectByHandle);
         break;
       case fd::Import::kKeSetBasePriorityThread:
-        __imp__KeSetBasePriorityThread(ctx, base);
+        lifted::Sdk(ctx, base, __imp__KeSetBasePriorityThread);
         break;
       case fd::Import::kObDereferenceObject:
-        __imp__ObDereferenceObject(ctx, base);
+        lifted::Sdk(ctx, base, __imp__ObDereferenceObject);
         break;
       case fd::Import::kKeSetAffinityThread:
-        __imp__KeSetAffinityThread(ctx, base);
+        lifted::Sdk(ctx, base, __imp__KeSetAffinityThread);
         break;
       case fd::Import::kNtResumeThread:
-        __imp__NtResumeThread(ctx, base);
+        lifted::Sdk(ctx, base, __imp__NtResumeThread);
         break;
     }
     return ctx.r3.u32;
@@ -213,45 +214,45 @@ fd::ThreadCalls ThreadCallsOn(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace
 
-void ThreadConstruct(PPCContext& ctx, uint8_t* base) { fd::ThreadConstruct(base, ctx.r3.u32); }
+ITC_REGS_STEP(ThreadConstruct) { fd::ThreadConstruct(base, ctx.r3.u32); }
 
-void ThreadBegin(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ThreadBegin) {
   const uint32_t thread = ctx.r3.u32, object = ctx.r4.u32, processor = ctx.r5.u32,
                  priority = ctx.r6.u32;
   const fd::ThreadCalls calls = ThreadCallsOn(ctx, base);
   ctx.r3.u64 = fd::ThreadBegin(base, thread, object, processor, priority, calls);
 }
 
-void CreateThreadStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CreateThreadStep) {
   const uint32_t stack = ctx.r4.u32, entry = ctx.r5.u32, parameter = ctx.r6.u32,
                  flags = ctx.r7.u32, processor = ctx.r8.u32, id = ctx.r9.u32;
   const fd::ThreadCalls calls = ThreadCallsOn(ctx, base);
   ctx.r3.u64 = fd::CreateThread(base, stack, entry, parameter, flags, processor, id, calls);
 }
 
-void SetThreadPriorityStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SetThreadPriorityStep) {
   const uint32_t handle = ctx.r3.u32;
   const int32_t priority = ctx.r4.s32;
   const fd::ThreadCalls calls = ThreadCallsOn(ctx, base);
   ctx.r3.u64 = fd::SetThreadPriority(base, handle, priority, calls);
 }
 
-void XSetThreadProcessorStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(XSetThreadProcessorStep) {
   const uint32_t handle = ctx.r3.u32, processor = ctx.r4.u32;
   const fd::ThreadCalls calls = ThreadCallsOn(ctx, base);
   ctx.r3.u64 = uint64_t(int64_t(int32_t(fd::XSetThreadProcessor(base, handle, processor, calls))));
 }
 
-void ResumeThreadStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ResumeThreadStep) {
   const uint32_t handle = ctx.r3.u32;
   const fd::ThreadCalls calls = ThreadCallsOn(ctx, base);
   ctx.r3.u64 = uint64_t(int64_t(int32_t(fd::ResumeThread(base, handle, calls))));
 }
 
-void VideoOutputUnbindAll(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VideoOutputUnbindAll) {
   const uint32_t video_output = ctx.r3.u32;
   fd::UnbindCalls calls;
-  auto setter = [&](void (*function)(PPCContext&, uint8_t*), uint32_t device, uint32_t return_address) {
+  auto setter = [&](void (*function)(lifted::Regs&, uint8_t*), uint32_t device, uint32_t return_address) {
     ctx.r3.u64 = device;
     ctx.lr = return_address;
     function(ctx, base);
@@ -296,9 +297,9 @@ void VideoOutputUnbindAll(PPCContext& ctx, uint8_t* base) {
 
 namespace {
 
-fd::SceneSetUpCalls SceneSetUpCallsOn(PPCContext& ctx, uint8_t* base) {
+fd::SceneSetUpCalls SceneSetUpCallsOn(lifted::Regs& ctx, uint8_t* base) {
   fd::SceneSetUpCalls calls;
-  auto call = [&ctx, base](void (*function)(PPCContext&, uint8_t*), uint32_t return_address) {
+  auto call = [&ctx, base](void (*function)(lifted::Regs&, uint8_t*), uint32_t return_address) {
     ctx.lr = return_address;
     function(ctx, base);
     return ctx.r3.u32;
@@ -360,9 +361,9 @@ fd::SceneSetUpCalls SceneSetUpCallsOn(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace
 
-void SceneConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneConstruct) {
   if (!ITC_FLAG(native_video_output)) {
-    __imp__sub_82098A98(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82098A98);
     return;
   }
   const uint32_t scene = ctx.r3.u32, block = ctx.r4.u32;
@@ -373,7 +374,7 @@ void SceneConstruct(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = scene;
 }
 
-void CommandListInitStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CommandListInitStep) {
   const uint32_t list = ctx.r3.u32, slots = ctx.r4.u32;
   const fd::SceneSetUpCalls calls = SceneSetUpCallsOn(ctx, base);
   uint32_t r3 = 0;
@@ -383,17 +384,17 @@ void CommandListInitStep(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void ColorRectSetTargetsStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ColorRectSetTargetsStep) {
   fd::ColorRectSetTargets(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void DrawGlobalsInitStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DrawGlobalsInitStep) {
   const uint32_t capacity = ctx.r4.u32, count = ctx.r5.u32;
   const fd::SceneSetUpCalls calls = SceneSetUpCallsOn(ctx, base);
   fd::DrawGlobalsInit(base, capacity, count, calls);
 }
 
-void PrimitiveDeclInitStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PrimitiveDeclInitStep) {
   const fd::SceneSetUpCalls calls = SceneSetUpCallsOn(ctx, base);
   ctx.r3.u64 = fd::PrimitiveDeclInit(base, calls);
 }
@@ -401,8 +402,8 @@ void PrimitiveDeclInitStep(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_FRAME_DRIVER_ADAPTER(address, step) \
-  extern "C" REX_FUNC(sub_##address) {              \
-    REX_FUNC_PROLOGUE();                            \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {              \
+    \
     if (!hooks::NativeFrameDriver()) {          \
       __imp__sub_##address(ctx, base);              \
       return;                                       \

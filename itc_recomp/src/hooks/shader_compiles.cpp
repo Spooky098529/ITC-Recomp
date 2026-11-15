@@ -10,6 +10,7 @@
 // compiles instead, dumping what's made (src/debug/shader_compile_dump.h).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include <string>
 
@@ -41,14 +42,14 @@ std::string LoadProfile(uint8_t* base, uint32_t address) {
 // the entry point, r8 the profile, r9 the flags, r10 where the shader buffer
 // goes; the caller's stack words +84 and +92 where the errors and the
 // constant table go. Returns 0, or D3DXCreateBuffer's failure.
-extern "C" REX_FUNC(sub_822B8F10) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822B8F10) {
+  
   if (debug::ShaderCompileDump_Active()) {
     debug::ShaderCompileDump_Compile(ctx, base);
     return;
   }
   if (!ITC_FLAG(use_hardcoded_shaders)) {
-    __imp__sub_822B8F10(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822B8F10);
     return;
   }
   namespace hs = graphics::hardcoded_shaders;
@@ -56,7 +57,7 @@ extern "C" REX_FUNC(sub_822B8F10) {
   if (!shader || ctx.r5.u32 != 0 || ctx.r6.u32 != 0 || ctx.r9.u32 != 0) {
     ITC_LOG_ERROR("hardcoded shaders: no stored shader for source {:08X} length {}, compiled",
                   ctx.r3.u32, ctx.r4.u32);
-    __imp__sub_822B8F10(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822B8F10);
     return;
   }
   ITC_NATIVE_RUNNING("sub_822B8F10 D3DXCompileShader");

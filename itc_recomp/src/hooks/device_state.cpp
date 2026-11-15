@@ -6,6 +6,7 @@
 // getter, which returns its value in r3.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 #include "guest_call.h"
 #include "hooks/device_state_calls.h"
@@ -37,12 +38,7 @@ namespace ds = graphics::device_state;
 // Written out one a line (not through ITC_RENDER_STATE_SETTERS) so
 // tools/check_function_statuses.py finds each override.
 #define ITC_DEVICE_STATE_SETTER(address, name, uses_float) \
-  extern "C" REX_FUNC(sub_##address) {                      \
-    REX_FUNC_PROLOGUE();                                    \
-    if (!ITC_FLAG(native_device_state)) {                   \
-      __imp__sub_##address(ctx, base);                      \
-      return;                                               \
-    }                                                       \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_device_state)) { \
     if (uses_float) {                                       \
       ctx.fpscr.disableFlushMode();                         \
     }                                                       \
@@ -136,12 +132,7 @@ ITC_DEVICE_STATE_SETTER(822A2A40, SetPresentInterval, false)
 ITC_DEVICE_STATE_SETTER(822A2A50, SetPresentImmediateThreshold, false)
 
 #define ITC_DEVICE_SAMPLER_SETTER(address, name, uses_float) \
-  extern "C" REX_FUNC(sub_##address) {                        \
-    REX_FUNC_PROLOGUE();                                      \
-    if (!ITC_FLAG(native_device_state)) {                     \
-      __imp__sub_##address(ctx, base);                        \
-      return;                                                 \
-    }                                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_device_state)) { \
     if (uses_float) {                                         \
       ctx.fpscr.disableFlushMode();                           \
     }                                                         \
@@ -169,12 +160,7 @@ ITC_DEVICE_SAMPLER_SETTER(822A3340, SetVGradientExpBias, false)
 ITC_DEVICE_SAMPLER_SETTER(822A3398, SetWhiteBorderColorW, false)
 ITC_DEVICE_SAMPLER_SETTER(822A33F0, SetPointBorderEnable, false)
 
-extern "C" REX_FUNC(sub_822A2470) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_device_state)) {
-    __imp__sub_822A2470(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(822A2470, ITC_FLAG(native_device_state)) {
   ctx.r3.u64 = ds::GetViewportEnable(base, ctx.r3.u32);
 }
 
@@ -182,12 +168,7 @@ extern "C" REX_FUNC(sub_822A2470) {
 // plain C++ returns false (GetViewport's copy left to memcpy's override, a
 // fence on a full fence list).
 #define ITC_DEVICE_STATE_CALL(address, ...)  \
-  extern "C" REX_FUNC(sub_##address) {       \
-    REX_FUNC_PROLOGUE();                     \
-    if (!ITC_FLAG(native_device_state)) {    \
-      __imp__sub_##address(ctx, base);       \
-      return;                                \
-    }                                        \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_device_state)) { \
     __VA_ARGS__;                             \
   }
 
@@ -233,10 +214,10 @@ ITC_DEVICE_STATE_CALL(822A8470, ds::SetPixelShaderConstantB(base, ctx.r3.u32, ct
 // takes the scissor from +11600 and +12416. Its recompiled callers
 // (Device::DirtyAllState, sub_8229F680, Device::Resolve) don't read r3 after
 // it. The original runs with the flag off.
-extern "C" REX_FUNC(sub_822A0F80) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A0F80) {
+  
   if (!ITC_FLAG(native_device_state)) {
-    __imp__sub_822A0F80(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822A0F80);
   }
 }
 

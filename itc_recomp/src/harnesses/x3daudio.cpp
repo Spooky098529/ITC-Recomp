@@ -165,11 +165,11 @@ void Vectors(Context& h, uint32_t block) {
     bool stores;
   };
   const Group groups[] = {
-      {"X3DVec::Sub (sub_824819E0)", __imp__sub_824819E0, hooks::CarSoundsX3DVecSub, true},
-      {"X3DVec::Length (sub_82481998)", __imp__sub_82481998, hooks::CarSoundsX3DVecLength,
+      {"X3DVec::Sub (sub_824819E0)", __imp__sub_824819E0, ITC_CONTEXT_FN(hooks::CarSoundsX3DVecSub), true},
+      {"X3DVec::Length (sub_82481998)", __imp__sub_82481998, ITC_CONTEXT_FN(hooks::CarSoundsX3DVecLength),
        false},
-      {"X3DVec::Dot (sub_824819B8)", __imp__sub_824819B8, hooks::CarSoundsX3DVecDot, false},
-      {"X3DVec::Cross (sub_82481A18)", __imp__sub_82481A18, hooks::CarSoundsX3DVecCross, true},
+      {"X3DVec::Dot (sub_824819B8)", __imp__sub_824819B8, ITC_CONTEXT_FN(hooks::CarSoundsX3DVecDot), false},
+      {"X3DVec::Cross (sub_82481A18)", __imp__sub_82481A18, ITC_CONTEXT_FN(hooks::CarSoundsX3DVecCross), true},
   };
   for (const Group& group : groups) {
     Results results(group.name);
@@ -252,7 +252,7 @@ void EvaluateCurves(Context& h, uint32_t block) {
                        : AnyDouble(random);
       }
     };
-    Case(h, results, block, __imp__sub_82480818, hooks::CarSoundsX3DEvaluateCurve, setup, {},
+    Case(h, results, block, __imp__sub_82480818, ITC_CONTEXT_FN(hooks::CarSoundsX3DEvaluateCurve), setup, {},
          f1, fmt::format("{} case {}", realistic ? "realistic" : "random", c));
   }
   results.Report();
@@ -335,7 +335,7 @@ void CurveSets(Context& h, uint32_t block) {
       t.r5.u64 = flags;
       t.r6.u64 = dsp;
     };
-    Case(h, results, block, __imp__sub_82480918, hooks::CarSoundsX3DCurves, setup, floats,
+    Case(h, results, block, __imp__sub_82480918, ITC_CONTEXT_FN(hooks::CarSoundsX3DCurves), setup, floats,
          frame, fmt::format("{} case {}", realistic ? "realistic" : "random", c));
   }
   results.Report();
@@ -484,7 +484,7 @@ void Pans(Context& h, uint32_t block) {
         t.fpscr.csr = _mm_getcsr();
       }
     };
-    Case(h, results, block, __imp__sub_82480F80, hooks::CarSoundsX3DPan, setup, MatrixFloats(),
+    Case(h, results, block, __imp__sub_82480F80, ITC_CONTEXT_FN(hooks::CarSoundsX3DPan), setup, MatrixFloats(),
          frame, fmt::format("{} case {}", realistic ? "realistic" : "random", c), kPanFrame);
   }
   results.Report();
@@ -626,7 +626,7 @@ void Matrices(Context& h, uint32_t block) {
       t.f30.u64 = random.Next();
       t.f23.u64 = random.Next();
     };
-    Case(h, results, block, __imp__sub_82481390, hooks::CarSoundsX3DMatrix, setup, floats, frame,
+    Case(h, results, block, __imp__sub_82481390, ITC_CONTEXT_FN(hooks::CarSoundsX3DMatrix), setup, floats, frame,
          fmt::format("{} case {}", realistic ? "realistic" : "random", c), kMatrixFrame);
   }
   results.Report();
@@ -889,7 +889,7 @@ void Cones(Context& h, uint32_t block) {
       t.r7.u64 = block + kMxDsp;
       CalleeSaved(random, t);
     };
-    Case(h, results, block, __imp__sub_82480BA8, hooks::CarSoundsX3DCone, setup, DspFloats(),
+    Case(h, results, block, __imp__sub_82480BA8, ITC_CONTEXT_FN(hooks::CarSoundsX3DCone), setup, DspFloats(),
          frame, fmt::format("{} case {}", realistic ? "realistic" : "random", c), kConeFrame);
   }
   results.Report();
@@ -966,7 +966,7 @@ void Dopplers(Context& h, uint32_t block) {
       t.r6.u64 = block + kMxDsp;
       CalleeSaved(random, t);
     };
-    Case(h, results, block, __imp__sub_82480E90, hooks::CarSoundsX3DDoppler, setup, DspFloats(),
+    Case(h, results, block, __imp__sub_82480E90, ITC_CONTEXT_FN(hooks::CarSoundsX3DDoppler), setup, DspFloats(),
          frame, fmt::format("{} case {}", realistic ? "realistic" : "random", c), kDopplerFrame);
   }
   results.Report();
@@ -1077,7 +1077,7 @@ void Calculates(Context& h, uint32_t block) {
       t.r7.u64 = block + kMxDsp;
       CalleeSaved(random, t);
     };
-    Case(h, results, block, __imp__sub_82481880, hooks::CarSoundsX3DCalculate, setup,
+    Case(h, results, block, __imp__sub_82481880, ITC_CONTEXT_FN(hooks::CarSoundsX3DCalculate), setup,
          DspFloats(), frame, fmt::format("{} case {}", realistic ? "realistic" : "random", c),
          kCalculateFrame);
   }

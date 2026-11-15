@@ -574,7 +574,7 @@ uint64_t Small(Random& r, uint32_t n) {
 // Init's (Add replaces those); its frame (but its saves, r25 on) compared.
 void InitStates(Context& h, const World& w) {
   Run(h, w, {"CarDealer::InitStates (sub_82185920)", 24, __imp__sub_82185920,
-             hooks::CarDealerInitStates, {{-1632, -64}},
+             ITC_CONTEXT_FN(hooks::CarDealerInitStates), {{-1632, -64}},
              [](PPCContext& t, Random& r, const World& w) {
                namespace gm = game_modes;
                const uint32_t machine = w.at(kMachineAt);
@@ -601,7 +601,7 @@ void Handlers(Context& h, const World& w) {
   if (hooks::NativeHeapActive()) {
     // Create: the four blocks VirtualAlloc made compared by content.
     Run(h, w, {"CarDealer::Create (sub_82180D68)", 60, __imp__sub_82180D68,
-               hooks::CarDealerCreate, {{-112, -24}}, machine,
+               ITC_CONTEXT_FN(hooks::CarDealerCreate), {{-112, -24}}, machine,
                [&h](PPCContext& t, const World&, Outputs& out) {
                  // r3 the data block's address (the last VirtualAlloc's).
                  out.Word(t.r3.u32 == guest::LoadU32(h.base, cd::kData) ? 1 : 0);
@@ -613,11 +613,11 @@ void Handlers(Context& h, const World& w) {
                }});
   }
   Run(h, w, {"CarDealer::OpenMovie (sub_82180C08)", 20, __imp__sub_82180C08,
-             hooks::CarDealerOpenMovie, {}, None});
+             ITC_CONTEXT_FN(hooks::CarDealerOpenMovie), {}, None});
   Run(h, w, {"CarDealer::WaitForLoad (sub_82180F20)", 100, __imp__sub_82180F20,
-             hooks::CarDealerWaitForLoad, {{-96, -16}}, machine});
+             ITC_CONTEXT_FN(hooks::CarDealerWaitForLoad), {{-96, -16}}, machine});
   Run(h, w, {"CarDealer::AfterDetail (sub_82180C48)", 100, __imp__sub_82180C48,
-             hooks::CarDealerAfterDetail, {},
+             ITC_CONTEXT_FN(hooks::CarDealerAfterDetail), {},
              [](PPCContext&, Random& r, const World& w) {
                guest::StoreU32(w.base, w.data() + 12, r.Below(3) == 0 ? 1 : 0);
                guest::StoreU32(w.base, w.data() + 44, r.Below(2));
@@ -625,37 +625,37 @@ void Handlers(Context& h, const World& w) {
                  guest::StoreU32(w.base, w.at(kPagesAt), r.Below(2) == 0 ? 2 : 0xFFFFFFFFu);
                }
              }});
-  Run(h, w, {"CarDealer::Page4 (sub_82181B98)", 50, __imp__sub_82181B98, hooks::CarDealerPage4,
+  Run(h, w, {"CarDealer::Page4 (sub_82181B98)", 50, __imp__sub_82181B98, ITC_CONTEXT_FN(hooks::CarDealerPage4),
              {}, [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.at(kModeAt); }});
 }
 
 void Helpers(Context& h, const World& w) {
   Run(h, w, {"CarDealer::CheckLimits (sub_821812B8)", 100, __imp__sub_821812B8,
-             hooks::CarDealerCheckLimits, {}, None});
+             ITC_CONTEXT_FN(hooks::CarDealerCheckLimits), {}, None});
   Run(h, w, {"CarDealer::ReloadStandModel (sub_82181330)", 60, __imp__sub_82181330,
-             hooks::CarDealerReloadStandModel, {{-96, -16}},
+             ITC_CONTEXT_FN(hooks::CarDealerReloadStandModel), {{-96, -16}},
              [](PPCContext&, Random& r, const World& w) { StandWorld(w.base, r, w); }});
   auto bar = [](PPCContext& t, Random& r, const World&) {
     t.r3.u64 = r.Below(4) == 0 ? r.Next() : r.Below(400);
   };
   Run(h, w, {"CarDealer::SetKindBar (sub_82182158)", 60, __imp__sub_82182158,
-             hooks::CarDealerSetKindBar, {{-112, -24}}, bar});
+             ITC_CONTEXT_FN(hooks::CarDealerSetKindBar), {{-112, -24}}, bar});
   Run(h, w, {"CarDealer::SetColorBar (sub_82182770)", 60, __imp__sub_82182770,
-             hooks::CarDealerSetColorBar, {{-112, -24}}, bar});
+             ITC_CONTEXT_FN(hooks::CarDealerSetColorBar), {{-112, -24}}, bar});
   Run(h, w, {"CarDealer::SetScrollArrows (sub_82182DD0)", 100, __imp__sub_82182DD0,
-             hooks::CarDealerSetScrollArrows, {{-128, -40}},
+             ITC_CONTEXT_FN(hooks::CarDealerSetScrollArrows), {{-128, -40}},
              [](PPCContext& t, Random& r, const World&) {
                t.r3.u64 = r.Below(3) == 0 ? 0 : Small(r, 8);
                t.r4.u64 = r.Below(2) == 0 ? t.r3.u64 + 4 : Small(r, 12);
              }});
   Run(h, w, {"CarDealer::SetHeader (sub_82182C28)", 60, __imp__sub_82182C28,
-             hooks::CarDealerSetHeader, {{-128, -40}},
+             ITC_CONTEXT_FN(hooks::CarDealerSetHeader), {{-128, -40}},
              [](PPCContext& t, Random& r, const World&) {
                t.r3.u64 = Small(r, 4);
                t.r4.u64 = Small(r, 4);
              }});
   Run(h, w, {"CarDealer::SetPrompts (sub_82182B30)", 100, __imp__sub_82182B30,
-             hooks::CarDealerSetPrompts, {{-176, -56}},
+             ITC_CONTEXT_FN(hooks::CarDealerSetPrompts), {{-176, -56}},
              [](PPCContext& t, Random& r, const World&) {
                for (PPCRegister* reg : {&t.r3, &t.r4, &t.r5, &t.r6, &t.r7, &t.r8}) {
                  reg->u64 = r.Below(3) == 0 ? 0xFFFFFFFFFFFFFFFFull : Small(r, 4);
@@ -663,7 +663,7 @@ void Helpers(Context& h, const World& w) {
              }});
   // HelpLine::Set: SetText's parameter area (+48 to +79: r7 on, the
   // original's leftovers) left out.
-  Run(h, w, {"HelpLine::Set (sub_82199B38)", 100, __imp__sub_82199B38, hooks::HelpLineSet,
+  Run(h, w, {"HelpLine::Set (sub_82199B38)", 100, __imp__sub_82199B38, ITC_CONTEXT_FN(hooks::HelpLineSet),
              {{-112, -64}, {-32, -16}},
              [](PPCContext& t, Random& r, const World&) { t.r3.u64 = r.Below(8192); }});
 }
@@ -781,14 +781,14 @@ void Lifecycle(Context& h, const World& w) {
   if (!hooks::NativeHeapActive()) {
     return;
   }
-  Run(h, w, {"CarDealer::Unload (sub_821816B8)", 80, __imp__sub_821816B8, hooks::CarDealerUnload,
+  Run(h, w, {"CarDealer::Unload (sub_821816B8)", 80, __imp__sub_821816B8, ITC_CONTEXT_FN(hooks::CarDealerUnload),
              {{-128, -32}},
              [machine](PPCContext& t, Random& r, const World& w) {
                PagedEntries(t, r, w);
                machine(t, r, w);
              },
              NormalizeEntries});
-  Run(h, w, {"CarDealer::Close (sub_82181838)", 80, __imp__sub_82181838, hooks::CarDealerClose,
+  Run(h, w, {"CarDealer::Close (sub_82181838)", 80, __imp__sub_82181838, ITC_CONTEXT_FN(hooks::CarDealerClose),
              {{-112, -24}},
              [machine](PPCContext& t, Random& r, const World& w) {
                PagedEntries(t, r, w);
@@ -799,7 +799,7 @@ void Lifecycle(Context& h, const World& w) {
   // Destroy: the page object, both menus and the data the layer's pages (the
   // list menu's +68 block one too, or none), their globals cleared.
   Run(h, w, {"CarDealer::Destroy (sub_82180E70)", 80, __imp__sub_82180E70,
-             hooks::CarDealerDestroy, {{-128, -40}},
+             ITC_CONTEXT_FN(hooks::CarDealerDestroy), {{-128, -40}},
              [machine](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                const uint32_t pages = MakePages(base, 28, r);
@@ -822,15 +822,15 @@ void Lifecycle(Context& h, const World& w) {
   // +771 (0, 1 or another) at random, the lists' counts small; the entries
   // VirtualAlloc made compared (their 8,436 bytes written) and freed.
   Run(h, w, {"CarDealer::BuildLists (sub_821813B0)", 60, __imp__sub_821813B0,
-             hooks::CarDealerBuildLists, {{-128, -48}},
+             ITC_CONTEXT_FN(hooks::CarDealerBuildLists), {{-128, -48}},
              [](PPCContext&, Random& r, const World& w) { ListsWorld(r, w, false); },
              FreeBuilt});
   // Buy: BuyWorld.
-  Run(h, w, {"CarDealer::Buy (sub_82182E68)", 80, __imp__sub_82182E68, hooks::CarDealerBuy,
+  Run(h, w, {"CarDealer::Buy (sub_82182E68)", 80, __imp__sub_82182E68, ITC_CONTEXT_FN(hooks::CarDealerBuy),
              {{-2112, -48}},
              [](PPCContext&, Random& r, const World& w) { BuyWorld(r, w); }});
   // OnYes: the dialog's step 2 or another.
-  Run(h, w, {"CarDealer::OnYes (sub_82181968)", 80, __imp__sub_82181968, hooks::CarDealerOnYes,
+  Run(h, w, {"CarDealer::OnYes (sub_82181968)", 80, __imp__sub_82181968, ITC_CONTEXT_FN(hooks::CarDealerOnYes),
              {{-112, -24}},
              [](PPCContext&, Random& r, const World& w) {
                guest::StoreU32(w.base, w.data() + 36, r.Below(2) == 0 ? 2 : r.Below(5));
@@ -838,7 +838,7 @@ void Lifecycle(Context& h, const World& w) {
   // UpdatePage: the page -1, 4 or 5 (the leaves' handlers: Page4's plain
   // C++ through its adapter, Page5 the original), r4 the mode.
   Run(h, w, {"CarDealer::UpdatePage (sub_82184AF0)", 60, __imp__sub_82184AF0,
-             hooks::CarDealerUpdatePage, {{-112, -8}},
+             ITC_CONTEXT_FN(hooks::CarDealerUpdatePage), {{-112, -8}},
              [](PPCContext& t, Random& r, const World& w) {
                const uint32_t pages[3] = {0xFFFFFFFFu, 4, 5};
                guest::StoreU32(w.base, w.at(kPagesAt), pages[r.Below(3)]);
@@ -868,7 +868,7 @@ void Info(Context& h, const World& w) {
     }
   };
   Run(h, w, {"CarDealer::ShowCarInfo (sub_82182620; sub_821824A8, sub_82182388, sub_82182418)",
-             100, __imp__sub_82182620, hooks::CarDealerShowCarInfo, {{-128, -16}},
+             100, __imp__sub_82182620, ITC_CONTEXT_FN(hooks::CarDealerShowCarInfo), {{-128, -16}},
              [shape_entries](PPCContext& t, Random& r, const World& w) {
                shape_entries(r, w);
                t.r3.u64 = r.Below(6);
@@ -876,7 +876,7 @@ void Info(Context& h, const World& w) {
   // The setters: their parameter areas (+48 to +79, or +56 on where the
   // last SetText's r7 is set) left out (the originals' leftovers).
   Run(h, w, {"CarDealer::SetSpecTexts (sub_821824A8)", 100, __imp__sub_821824A8,
-             hooks::CarDealerSetSpecTexts, {{-112, -64}, {-32, -24}},
+             ITC_CONTEXT_FN(hooks::CarDealerSetSpecTexts), {{-112, -64}, {-32, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                const uint32_t record = w.at(kColorsAt);
                WriteRandom(w.base, record, 24, r);
@@ -887,24 +887,24 @@ void Info(Context& h, const World& w) {
                t.r3.u64 = record;
              }});
   Run(h, w, {"CarDealer::SetNameTexts (sub_82182388)", 100, __imp__sub_82182388,
-             hooks::CarDealerSetNameTexts, {{-112, -64}, {-32, -24}},
+             ITC_CONTEXT_FN(hooks::CarDealerSetNameTexts), {{-112, -64}, {-32, -24}},
              [](PPCContext& t, Random& r, const World&) {
                t.r3.u64 = r.Below(80);
                t.r4.u64 = r.Below(256);
              }});
   Run(h, w, {"CarDealer::SetPriceTexts (sub_82182418)", 100, __imp__sub_82182418,
-             hooks::CarDealerSetPriceTexts, {{-112, -56}, {-32, -24}},
+             ITC_CONTEXT_FN(hooks::CarDealerSetPriceTexts), {{-112, -56}, {-32, -24}},
              [](PPCContext& t, Random& r, const World&) {
                t.r3.u64 = r.Below(2) == 0 ? r.Below(100000) : r.Next();
              }});
   Run(h, w, {"CarDealer::ShowSwatches (sub_821826C0; sub_82181270)", 100, __imp__sub_821826C0,
-             hooks::CarDealerShowSwatches, {{-144, -56}},
+             ITC_CONTEXT_FN(hooks::CarDealerShowSwatches), {{-144, -56}},
              [](PPCContext&, Random& r, const World& w) {
                guest::StoreU32(w.base, w.data() + 1192, uint32_t(int32_t(r.Below(14)) - 2));
                guest::StoreU32(w.base, w.at(kListMenuAt) + 4, r.Below(4));
              }});
   Run(h, w, {"CarDealer::SetSwatchColor (sub_82181270)", 60, __imp__sub_82181270,
-             hooks::CarDealerSetSwatchColor, {{-96, -16}},
+             ITC_CONTEXT_FN(hooks::CarDealerSetSwatchColor), {{-96, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                t.r3.u64 = w.node(r.Below(kNodeCount));
                t.r4.u64 = w.at(kColorsAt) + 32 * r.Below(16);
@@ -912,7 +912,7 @@ void Info(Context& h, const World& w) {
   // FillStatus: SetText's parameter area from +56 (its r7 set) left out;
   // SetPrompts' frame below (its saves left out).
   Run(h, w, {"CarDealer::FillStatus (sub_82183AC8; sub_82182B30)", 100, __imp__sub_82183AC8,
-             hooks::CarDealerFillStatus, {{-112, -56}, {-32, -24}, {-288, -168}},
+             ITC_CONTEXT_FN(hooks::CarDealerFillStatus), {{-112, -56}, {-32, -24}, {-288, -168}},
              [](PPCContext&, Random& r, const World& w) {
                // The weekday (+88, stored at node (15, 11)'s +108, its first
                // child's index) 0 to 6, so the walks after stay in the pool.
@@ -921,7 +921,7 @@ void Info(Context& h, const World& w) {
              }});
   // Leave: the garage not empty (the first car's path, StartFirstRace, is
   // race_event's).
-  Run(h, w, {"CarDealer::Leave (sub_821817C0)", 60, __imp__sub_821817C0, hooks::CarDealerLeave,
+  Run(h, w, {"CarDealer::Leave (sub_821817C0)", 60, __imp__sub_821817C0, ITC_CONTEXT_FN(hooks::CarDealerLeave),
              {},
              [](PPCContext& t, Random&, const World& w) {
                guest::StoreU32(w.base, w.data() + 4, 0);
@@ -931,7 +931,7 @@ void Info(Context& h, const World& w) {
   // Transition3: r3 the started word (0, 1 or any), the fades' counts 0 or
   // not.
   Run(h, w, {"CarDealer::Transition3 (sub_82181D68)", 100, __imp__sub_82181D68,
-             hooks::CarDealerTransition3, {{-112, -24}},
+             ITC_CONTEXT_FN(hooks::CarDealerTransition3), {{-112, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                const uint32_t step = w.at(kPagesAt) + 24;
                const uint32_t words[3] = {0, 1, uint32_t(r.Next())};
@@ -947,17 +947,17 @@ void Info(Context& h, const World& w) {
 void Updates(Context& h, const World& w) {
   // The busy marker's three (112-byte frames, r31 saved).
   Run(h, w, {"CarDealer::ShowBusy (sub_82181558)", 40, __imp__sub_82181558,
-             hooks::CarDealerShowBusy, {{-112, -16}}, None});
+             ITC_CONTEXT_FN(hooks::CarDealerShowBusy), {{-112, -16}}, None});
   Run(h, w, {"CarDealer::HideBusy (sub_821815D8)", 40, __imp__sub_821815D8,
-             hooks::CarDealerHideBusy, {{-112, -16}}, None});
+             ITC_CONTEXT_FN(hooks::CarDealerHideBusy), {{-112, -16}}, None});
   Run(h, w, {"CarDealer::HideBusyNow (sub_82181640)", 40, __imp__sub_82181640,
-             hooks::CarDealerHideBusyNow, {{-112, -16}}, None});
+             ITC_CONTEXT_FN(hooks::CarDealerHideBusyNow), {{-112, -16}}, None});
   // Update: the running transition -1, another negative or 3 (Transition3's
   // plain C++ through its adapter: the fades' counts 0 or not), the queued
   // one -1 or small, the page 4 or another; the stand drawless (as the car
   // list's harness lays it); the data's +20, +28 and +32 0 or not.
   Run(h, w, {"CarDealer::Update (sub_82185600; sub_82181558, sub_821815D8, sub_82181640)", 200,
-             __imp__sub_82185600, hooks::CarDealerUpdate, {{-320, -136}},
+             __imp__sub_82185600, ITC_CONTEXT_FN(hooks::CarDealerUpdate), {{-320, -136}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                StandWorld(base, r, w, true);
@@ -980,7 +980,7 @@ void Updates(Context& h, const World& w) {
   // Start: BuildLists' world (the day 0 or more) and the drawless stand;
   // the entries it made compared and freed.
   Run(h, w, {"CarDealer::Start (sub_82184B80; sub_821813B0, sub_82183AC8)", 60,
-             __imp__sub_82184B80, hooks::CarDealerStart, {{-96, -16}},
+             __imp__sub_82184B80, ITC_CONTEXT_FN(hooks::CarDealerStart), {{-96, -16}},
              [](PPCContext&, Random& r, const World& w) {
                ListsWorld(r, w, true);
                StandWorld(w.base, r, w, true);
@@ -990,7 +990,7 @@ void Updates(Context& h, const World& w) {
   // world; ShowDriveDialog (the original) on movie 4 (16 isn't in the
   // table: the missing movie's word is 4's).
   Run(h, w, {"CarDealer::OnDialogDone (sub_82183160; sub_82182E68)", 200, __imp__sub_82183160,
-             hooks::CarDealerOnDialogDone, {{-112, -24}},
+             ITC_CONTEXT_FN(hooks::CarDealerOnDialogDone), {{-112, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                BuyWorld(r, w);
                guest::StoreU32(w.base, w.data() + 36, r.Below(6) == 0 ? r.Below(9) : r.Below(4));
@@ -1064,7 +1064,7 @@ void MenuWorld(Random& r, const World& w, const std::vector<uint32_t>& selection
 
 void Pages(Context& h, const World& w) {
   auto mode = [](PPCContext& t, const World& w) { t.r3.u64 = w.at(kModeAt); };
-  Run(h, w, {"CarDealer::Page0 (sub_82180F90)", 300, __imp__sub_82180F90, hooks::CarDealerPage0,
+  Run(h, w, {"CarDealer::Page0 (sub_82180F90)", 300, __imp__sub_82180F90, ITC_CONTEXT_FN(hooks::CarDealerPage0),
              {{-96, -16}},
              [mode](PPCContext& t, Random& r, const World& w) {
                MenuWorld(r, w);
@@ -1073,7 +1073,7 @@ void Pages(Context& h, const World& w) {
                }
                mode(t, w);
              }});
-  Run(h, w, {"CarDealer::Page1 (sub_82183428)", 300, __imp__sub_82183428, hooks::CarDealerPage1,
+  Run(h, w, {"CarDealer::Page1 (sub_82183428)", 300, __imp__sub_82183428, ITC_CONTEXT_FN(hooks::CarDealerPage1),
              {{-112, -24}},
              [mode](PPCContext& t, Random& r, const World& w) {
                MenuWorld(r, w);
@@ -1086,7 +1086,7 @@ void Pages(Context& h, const World& w) {
   // other, the list +44 0 or 1, the selected car 43, 2 or another (the
   // press swaps them: ReloadStandModel over the stand's world);
   // SetText's parameter area (+48 to +79) left out.
-  Run(h, w, {"CarDealer::Page2 (sub_82183600)", 400, __imp__sub_82183600, hooks::CarDealerPage2,
+  Run(h, w, {"CarDealer::Page2 (sub_82183600)", 400, __imp__sub_82183600, ITC_CONTEXT_FN(hooks::CarDealerPage2),
              {{-144, -96}, {-64, -48}},
              [mode](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
@@ -1104,7 +1104,7 @@ void Pages(Context& h, const World& w) {
                }
                mode(t, w);
              }});
-  Run(h, w, {"CarDealer::Page3 (sub_82181A10)", 300, __imp__sub_82181A10, hooks::CarDealerPage3,
+  Run(h, w, {"CarDealer::Page3 (sub_82181A10)", 300, __imp__sub_82181A10, ITC_CONTEXT_FN(hooks::CarDealerPage3),
              {{-112, -24}},
              [mode](PPCContext& t, Random& r, const World& w) {
                MenuWorld(r, w);
@@ -1149,11 +1149,11 @@ void Openers(Context& h, const World& w) {
     }
   };
   Run(h, w, {"CarDealer::OpenListMenu (sub_82184338)", 100, __imp__sub_82184338,
-             hooks::CarDealerOpenListMenu, {{-160, -112}, {-80, -48}}, setup, FreeMenuBlocks});
+             ITC_CONTEXT_FN(hooks::CarDealerOpenListMenu), {{-160, -112}, {-80, -48}}, setup, FreeMenuBlocks});
   Run(h, w, {"CarDealer::OpenCarList (sub_82184488)", 100, __imp__sub_82184488,
-             hooks::CarDealerOpenCarList, {{-176, -128}, {-96, -64}}, setup, FreeMenuBlocks});
+             ITC_CONTEXT_FN(hooks::CarDealerOpenCarList), {{-176, -128}, {-96, -64}}, setup, FreeMenuBlocks});
   Run(h, w, {"CarDealer::OpenCar (sub_82184650)", 100, __imp__sub_82184650,
-             hooks::CarDealerOpenCar, {{-144, -96}, {-64, -40}}, setup, FreeMenuBlocks});
+             ITC_CONTEXT_FN(hooks::CarDealerOpenCar), {{-144, -96}, {-64, -40}}, setup, FreeMenuBlocks});
 }
 
 // The transitions: r3 the started word (the page object's +24: 0, 1 or
@@ -1188,15 +1188,15 @@ void Transitions(Context& h, const World& w) {
     };
   };
   Run(h, w, {"CarDealer::Transition0 (sub_82184C70; sub_82184338)", 100, __imp__sub_82184C70,
-             hooks::CarDealerTransition0, {{-112, -24}}, setup(false, false), FreeMenuBlocks});
+             ITC_CONTEXT_FN(hooks::CarDealerTransition0), {{-112, -24}}, setup(false, false), FreeMenuBlocks});
   Run(h, w, {"CarDealer::Transition4 (sub_82184DA0; sub_82184488)", 100, __imp__sub_82184DA0,
-             hooks::CarDealerTransition4, {{-128, -32}}, setup(true, false), FreeMenuBlocks});
+             ITC_CONTEXT_FN(hooks::CarDealerTransition4), {{-128, -32}}, setup(true, false), FreeMenuBlocks});
   Run(h, w, {"CarDealer::Transition5 (sub_82184E60; sub_82184488)", 100, __imp__sub_82184E60,
-             hooks::CarDealerTransition5, {{-112, -24}}, setup(true, false), FreeMenuBlocks});
+             ITC_CONTEXT_FN(hooks::CarDealerTransition5), {{-112, -24}}, setup(true, false), FreeMenuBlocks});
   Run(h, w, {"CarDealer::Transition8 (sub_82184FB8; sub_82184338)", 100, __imp__sub_82184FB8,
-             hooks::CarDealerTransition8, {{-128, -32}}, setup(false, false), FreeMenuBlocks});
+             ITC_CONTEXT_FN(hooks::CarDealerTransition8), {{-128, -32}}, setup(false, false), FreeMenuBlocks});
   Run(h, w, {"CarDealer::Transition9 (sub_821850B8; sub_82184650)", 100, __imp__sub_821850B8,
-             hooks::CarDealerTransition9, {{-112, -24}}, setup(true, true), FreeMenuBlocks});
+             ITC_CONTEXT_FN(hooks::CarDealerTransition9), {{-112, -24}}, setup(true, true), FreeMenuBlocks});
   // The animations' ones: the lists 0 to 7 cars (Transition1 colors by
   // them), the data's +28 any (Transition11 sets it).
   auto plain = [](PPCContext& t, Random& r, const World& w) {
@@ -1211,21 +1211,21 @@ void Transitions(Context& h, const World& w) {
     t.r3.u64 = step;
   };
   Run(h, w, {"CarDealer::Transition1 (sub_82181C38)", 100, __imp__sub_82181C38,
-             hooks::CarDealerTransition1, {{-128, -32}}, plain});
+             ITC_CONTEXT_FN(hooks::CarDealerTransition1), {{-128, -32}}, plain});
   Run(h, w, {"CarDealer::Transition6 (sub_82181E10)", 60, __imp__sub_82181E10,
-             hooks::CarDealerTransition6, {{-128, -32}}, plain});
+             ITC_CONTEXT_FN(hooks::CarDealerTransition6), {{-128, -32}}, plain});
   Run(h, w, {"CarDealer::Transition11 (sub_82181ED0)", 60, __imp__sub_82181ED0,
-             hooks::CarDealerTransition11, {{-128, -32}}, plain});
+             ITC_CONTEXT_FN(hooks::CarDealerTransition11), {{-128, -32}}, plain});
   Run(h, w, {"CarDealer::Transition16 (sub_821820C0)", 60, __imp__sub_821820C0,
-             hooks::CarDealerTransition16, {{-128, -32}}, plain});
+             ITC_CONTEXT_FN(hooks::CarDealerTransition16), {{-128, -32}}, plain});
   Run(h, w, {"CarDealer::Transition19 (sub_821841B0)", 60, __imp__sub_821841B0,
-             hooks::CarDealerTransition19, {{-112, -24}}, plain});
+             ITC_CONTEXT_FN(hooks::CarDealerTransition19), {{-112, -24}}, plain});
   // Transition7: the list menu's scroll 1 to 8, its scroll before the same
   // or one off (the card coming in stays among the list's entries), its
   // selection and previous selection 0 to 3; the frame without its saves
   // (r24 on).
   Run(h, w, {"CarDealer::Transition7 (sub_82183DE0)", 200, __imp__sub_82183DE0,
-             hooks::CarDealerTransition7, {{-160, -72}},
+             ITC_CONTEXT_FN(hooks::CarDealerTransition7), {{-160, -72}},
              [plain](PPCContext& t, Random& r, const World& w) {
                plain(t, r, w);
                uint8_t* base = w.base;
@@ -1326,16 +1326,16 @@ void StandCases(Context& h, const World& w) {
     FreeMenuBlocks(t, w, out);
   };
   Run(h, w, {"CarDealer::OpenColors (sub_821847A0)", 60, __imp__sub_821847A0,
-             hooks::CarDealerOpenColors, {{-240, -96}}, colors, settle_menus});
+             ITC_CONTEXT_FN(hooks::CarDealerOpenColors), {{-240, -96}}, colors, settle_menus});
   Run(h, w, {"CarDealer::Transition15 (sub_82185310; sub_821847A0)", 60, __imp__sub_82185310,
-             hooks::CarDealerTransition15, {{-112, -24}},
+             ITC_CONTEXT_FN(hooks::CarDealerTransition15), {{-112, -24}},
              [colors, step](PPCContext& t, Random& r, const World& w) {
                colors(t, r, w);
                step(t, r, w);
              },
              settle_menus});
   Run(h, w, {"CarDealer::Transition17 (sub_82184018)", 60, __imp__sub_82184018,
-             hooks::CarDealerTransition17, {{-160, -64}},
+             ITC_CONTEXT_FN(hooks::CarDealerTransition17), {{-160, -64}},
              [lay, step](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                MenuWorld(r, w);

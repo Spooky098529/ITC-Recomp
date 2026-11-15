@@ -3,6 +3,7 @@
 // vtables, so these adapters stay until their callers are native.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/heap.h"
@@ -59,7 +60,7 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
 
 // An adapter leaving `r3_expr` in r3 after `call`.
 #define ITC_XACT_VOID(address, call, r3_expr) \
-  extern "C" REX_FUNC(sub_##address) {       \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {       \
     ITC_XACT_FALLBACK(address)               \
     const uint32_t itc_r3_ = (r3_expr);      \
     call;                                    \
@@ -68,7 +69,7 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
 
 // An adapter returning a word in r3.
 #define ITC_XACT_WORD(address, expr)    \
-  extern "C" REX_FUNC(sub_##address) { \
+  ITC_NATIVE_ENTRY_ALWAYS(address) { \
     ITC_XACT_FALLBACK(address)         \
     ctx.r3.u64 = uint32_t(expr);       \
   }
@@ -76,7 +77,7 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
 // An adapter for a function allocating or freeing through the native
 // layer: the original unless --native_heap routes the game's heap there.
 #define ITC_XACT_HEAP_WORD(address, expr)                       \
-  extern "C" REX_FUNC(sub_##address) {                         \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                         \
     ITC_XACT_FALLBACK(address)                                 \
     if (!hooks::NativeHeapActive()) {                          \
       __imp__sub_##address(ctx, base);                         \
@@ -89,7 +90,7 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
 // running the original (a vtable slot that isn't the native function, or a
 // path the native version leaves to the original).
 #define ITC_XACT_OPTIONAL(address, expr)  \
-  extern "C" REX_FUNC(sub_##address) {   \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {   \
     ITC_XACT_FALLBACK(address)           \
     const auto itc_result_ = (expr);     \
     if (!itc_result_) {                  \
@@ -102,11 +103,11 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
 using namespace xact;
 
 // The name hash: the original where it traps (a table size of 0).
-extern "C" REX_FUNC(sub_825BFC50) {
+ITC_NATIVE_ENTRY_ALWAYS(825BFC50) {
   ITC_XACT_FALLBACK(825BFC50)
   uint32_t hash = 0;
   if (!HashName(base, ctx.r4.u32, ctx.r5.u32, &hash)) {
-    __imp__sub_825BFC50(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825BFC50);
     return;
   }
   ctx.r3.u64 = hash;
@@ -145,10 +146,10 @@ ITC_XACT_WORD(825C8398, WaveBankGetEntry(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_WORD(825C8580, WaveBankGetSeekTable(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_WORD(825C85B8, WaveBankGetName(base, ctx.r3.u32))
 ITC_XACT_WORD(825C85E8, WaveBankGetEntryCount(base, ctx.r3.u32))
-extern "C" REX_FUNC(sub_825CC320) {
+ITC_NATIVE_ENTRY_ALWAYS(825CC320) {
   ITC_XACT_FALLBACK(825CC320)
   if (!WaveBankGetWaveFormat(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_825CC320(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825CC320);
     return;
   }
   // The original leaves the entry's address (GetEntry's r3).
@@ -171,10 +172,10 @@ ITC_XACT_WORD(825C4D90, CueGetStateInternal(base, ctx.r3.u32))
 // XACTSoundBank::ForgetWaveBank (sub_825C72B0) has no adapter: its only
 // caller, sub_825C0408, is native.
 ITC_XACT_OPTIONAL(825C0408, EngineForgetWaveBank(base, ctx.r3.u32, ctx.r4.u32))
-extern "C" REX_FUNC(sub_825CA980) {
+ITC_NATIVE_ENTRY_ALWAYS(825CA980) {
   ITC_XACT_FALLBACK(825CA980)
   if (!SoundSetTrackParameter(base, ctx.r3.u32)) {
-    __imp__sub_825CA980(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825CA980);
   }
 }
 ITC_XACT_OPTIONAL(825CC1D0, FaderStep(base, ctx.r3.u32))
@@ -198,12 +199,12 @@ ITC_XACT_VOID(825C8310, WaveBankConstruct(base, ctx.r3.u32, ctx.r4.u32), ctx.r3.
 // The cue's constructor registers the cue with its bank (AddListener, which
 // allocates): the original unless --native_heap routes the game's heap to
 // the native layer, or where the bank's slot isn't AddListener.
-extern "C" REX_FUNC(sub_825C67E8) {
+ITC_NATIVE_ENTRY_ALWAYS(825C67E8) {
   ITC_XACT_FALLBACK(825C67E8)
   const uint32_t cue = ctx.r3.u32;
   if (!hooks::NativeHeapActive() ||
       !CueConstruct(base, cue, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32)) {
-    __imp__sub_825C67E8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825C67E8);
     return;
   }
   ctx.r3.u64 = cue;
@@ -217,14 +218,14 @@ extern "C" REX_FUNC(sub_825C67E8) {
 // isn't GetHeader.
 // XACTSoundBank::InitInstanceCounts (sub_825C7448) has no adapter: its only
 // caller, Load, is native.
-extern "C" REX_FUNC(sub_825C7E40) {
+ITC_NATIVE_ENTRY_ALWAYS(825C7E40) {
   ITC_XACT_FALLBACK(825C7E40)
   const auto result = hooks::NativeHeapActive()
                           ? SoundBankLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                           ctx.r7.u32)
                           : std::nullopt;
   if (!result) {
-    __imp__sub_825C7E40(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825C7E40);
     return;
   }
   ctx.r3.u64 = *result;
@@ -278,13 +279,13 @@ ITC_XACT_WORD(825C8540, WaveBankRemoveListener(base, ctx.r3.u32, ctx.r4.u32))
 // GetWaveBank registers with the wave bank (AddListener, which
 // allocates): the original unless --native_heap routes the game's heap to
 // the native layer.
-extern "C" REX_FUNC(sub_825C7218) {
+ITC_NATIVE_ENTRY_ALWAYS(825C7218) {
   ITC_XACT_FALLBACK(825C7218)
   const auto result = hooks::NativeHeapActive()
                           ? SoundBankGetWaveBank(base, ctx.r3.u32, ctx.r4.u32)
                           : std::nullopt;
   if (!result) {
-    __imp__sub_825C7218(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825C7218);
     return;
   }
   ctx.r3.u64 = *result;
@@ -296,11 +297,11 @@ ITC_XACT_HEAP_WORD(825C3EE0, VariableDeletingDestruct(base, ctx.r3.u32, ctx.r4.u
 // The sound's volume, the cue's variables, the sounds' track records and
 // RPC set-up. XACTCue::GetVariable (sub_825C5960) has no adapter: its only
 // caller, MakeInstanceVariable, is native.
-extern "C" REX_FUNC(sub_825CB5E8) {
+ITC_NATIVE_ENTRY_ALWAYS(825CB5E8) {
   ITC_XACT_FALLBACK(825CB5E8)
   const auto result = SoundGetVolume(base, ctx.r3.u32);
   if (!result) {
-    __imp__sub_825CB5E8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825CB5E8);
     return;
   }
   ctx.f1.f64 = result->f1;
@@ -308,12 +309,12 @@ extern "C" REX_FUNC(sub_825CB5E8) {
 }
 // MakeInstanceVariable may allocate: the original unless --native_heap
 // routes the game's heap to the native layer.
-extern "C" REX_FUNC(sub_825C5E28) {
+ITC_NATIVE_ENTRY_ALWAYS(825C5E28) {
   ITC_XACT_FALLBACK(825C5E28)
   const auto result =
       hooks::NativeHeapActive() ? CueMakeInstanceVariable(base, ctx.r3.u32) : std::nullopt;
   if (!result) {
-    __imp__sub_825C5E28(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825C5E28);
     return;
   }
   ctx.r3.u64 = *result;
@@ -325,14 +326,14 @@ ITC_XACT_OPTIONAL(825CB470, SoundSetUpRpcs(base, ctx.r3.u32))
 // --native_heap routes the game's heap to the native layer.
 // XACTGlobalSettings::MakeState (sub_825C3B68) has no adapter: its only
 // caller, Load, is native.
-extern "C" REX_FUNC(sub_825C26E0) {
+ITC_NATIVE_ENTRY_ALWAYS(825C26E0) {
   ITC_XACT_FALLBACK(825C26E0)
   const auto result = hooks::NativeHeapActive()
                           ? SettingsLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                          ctx.r7.u32)
                           : std::nullopt;
   if (!result) {
-    __imp__sub_825C26E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825C26E0);
     return;
   }
   ctx.r3.u64 = *result;
@@ -341,11 +342,11 @@ ITC_XACT_OPTIONAL(825C27C0, SettingsSetUpDspPreset(base, ctx.r3.u32))
 ITC_XACT_OPTIONAL(825C2910, SettingsSetUpRpcs(base, ctx.r3.u32))
 
 // The wave durations (stored at r5 and r6, r3 0), letting go of wave banks.
-extern "C" REX_FUNC(sub_825CC380) {
+ITC_NATIVE_ENTRY_ALWAYS(825CC380) {
   ITC_XACT_FALLBACK(825CC380)
   const auto result = WaveBankGetWaveDurations(base, ctx.r3.u32, ctx.r4.u32);
   if (!result) {
-    __imp__sub_825CC380(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825CC380);
     return;
   }
   guest::StoreU32(base, ctx.r5.u32, result->duration_ms);
@@ -354,12 +355,12 @@ extern "C" REX_FUNC(sub_825CC380) {
 }
 // ReleaseWaveBanks frees: the original unless --native_heap routes the
 // game's heap to the native layer.
-extern "C" REX_FUNC(sub_825C6A20) {
+ITC_NATIVE_ENTRY_ALWAYS(825C6A20) {
   ITC_XACT_FALLBACK(825C6A20)
   const auto result =
       hooks::NativeHeapActive() ? SoundBankReleaseWaveBanks(base, ctx.r3.u32) : std::nullopt;
   if (!result) {
-    __imp__sub_825C6A20(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825C6A20);
     return;
   }
   ctx.r3.u64 = *result;
@@ -375,11 +376,11 @@ ITC_XACT_OPTIONAL(825C8440, WaveBankGetWaveRegion(base, ctx.r3.u32, ctx.r4.u32, 
 
 // XACT's clock: the original where it traps. r3 as the original leaves it
 // (sign-extended from the counter, zero-extended from the tick count).
-extern "C" REX_FUNC(sub_825BFE28) {
+ITC_NATIVE_ENTRY_ALWAYS(825BFE28) {
   ITC_XACT_FALLBACK(825BFE28)
   const auto ms = GetTimeMs(base);
   if (!ms) {
-    __imp__sub_825BFE28(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825BFE28);
     return;
   }
   ctx.r3.u64 = *ms;

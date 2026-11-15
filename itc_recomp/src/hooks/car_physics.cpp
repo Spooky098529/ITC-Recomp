@@ -5,6 +5,7 @@
 // relies on callees leaving r3 as it was (sub_820B6498's row).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "hooks/car_physics.h"
@@ -36,22 +37,12 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
 // the work; VECTOR leaves it on after (the original's last step is the
 // vector unit's).
 #define ITC_CAR_PHYSICS(address, body)    \
-  extern "C" REX_FUNC(sub_##address) {   \
-    REX_FUNC_PROLOGUE();                 \
-    if (!ITC_FLAG(native_car_physics)) { \
-      __imp__sub_##address(ctx, base);   \
-      return;                            \
-    }                                    \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_physics)) { \
     ctx.fpscr.disableFlushMode();        \
     body;                                \
   }
 #define ITC_CAR_PHYSICS_VECTOR(address, body) \
-  extern "C" REX_FUNC(sub_##address) {       \
-    REX_FUNC_PROLOGUE();                     \
-    if (!ITC_FLAG(native_car_physics)) {     \
-      __imp__sub_##address(ctx, base);       \
-      return;                                \
-    }                                        \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_physics)) { \
     ctx.fpscr.disableFlushMode();            \
     body;                                    \
     ctx.fpscr.enableFlushMode();             \
@@ -102,18 +93,13 @@ ITC_CAR_PHYSICS(820B7658, ctx.r3.u64 = RigidBodyIntegrate(base, ctx.r3.u32, ctx.
 // r3 = body a, r4 = the point, r5 = the normal, r6 = body b; f1 = the
 // impulse. With a fixed body (whose term the original reads from its
 // stack's leftovers), the original.
-extern "C" REX_FUNC(sub_820B72C8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B72C8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820B72C8, ITC_FLAG(native_car_physics)) {
   ctx.fpscr.disableFlushMode();
   double f1 = 0.0;
   uint32_t r3 = 0;
   if (!RigidBodyContactImpulseWith(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                    ctx.r1.u32 - 272, &f1, &r3)) {
-    __imp__sub_820B72C8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820B72C8);
     return;
   }
   ctx.f1.f64 = f1;
@@ -188,8 +174,8 @@ ITC_CAR_PHYSICS(820B3D10, ctx.f1.f64 = VehicleSetSteering(base, ctx.r3.u32, ctx.
 // f1 = the target, f2 = dt, f3, r4 and r5 = the bytes; f1 comes back as the
 // curve. Where tan would fail, the original. r3 isn't kept (tan's _ctrlfp
 // leaves it; its caller sets it again).
-extern "C" REX_FUNC(sub_820B5FD8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820B5FD8) {
+  
   if (!ITC_FLAG(native_car_physics)) {
     lifted::original::c820B5FD8(ctx, base);
     return;
@@ -248,18 +234,13 @@ ITC_CAR_PHYSICS(820B85E8, ctx.r3.u64 = CollisionWorldReset(base))
 // native, the rest of the removals by the original (from the start: the
 // same as it would have done).
 // r3 = the object.
-extern "C" REX_FUNC(sub_820B9448) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B9448(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820B9448, ITC_FLAG(native_car_physics)) {
   const uint32_t object = ctx.r3.u32;
   uint32_t r3 = 0;
   if (!CollisionWorldRemoveObject(base, object, &r3)) {
     ctx.r3.u64 = object;
     ctx.r1.u64 = ctx.r1.u32 - 112;
-    __imp__sub_820B8BA8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820B8BA8);
     ctx.r1.u64 = ctx.r1.u32 + 112;
     return;
   }
@@ -279,8 +260,8 @@ ITC_CAR_PHYSICS(820AEF80, CarDataConstruct(base, ctx.r3.u32, ctx.r1.u32 - 96))
 // r3 = the car data, r4 = the car object; f1 comes back as CarData::Derive's,
 // r3 as its temporary body (r1 - 368 - 1008 + 352). Where ApplyTuning's
 // memcpy wouldn't be copied natively, the original.
-extern "C" REX_FUNC(sub_820C27E8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820C27E8) {
+  
   const uint32_t frame = ctx.r1.u32 - 368;
   if (!ITC_FLAG(native_car_physics)) {
     lifted::original::c820C27E8(ctx, base);
@@ -296,12 +277,7 @@ extern "C" REX_FUNC(sub_820C27E8) {
   ctx.r3.u64 = frame - 1008 + 352;
 }
 // r3 = the vehicle (left as it is); f1 comes back as Vehicle::Reset's.
-extern "C" REX_FUNC(sub_820B42C8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B42C8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820B42C8, ITC_FLAG(native_car_physics)) {
   ctx.fpscr.disableFlushMode();
   double f1 = 0.0;
   VehicleConstruct(base, ctx.r3.u32, ctx.r1.u32 - 112, &f1);
@@ -328,8 +304,8 @@ bool NativeLifetime() {
 // CollisionWorld::Callback (sub_820B8798) has no adapter: its callers in
 // play, Vehicle::ProbeGround and Unflip, are native.
 // r3 = the collision object; r3 comes back as its shape record (+32).
-extern "C" REX_FUNC(sub_820B7998) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820B7998) {
+  
   if (!ITC_FLAG(native_car_physics)) {
     lifted::original::c820B7998(ctx, base);
     return;
@@ -343,25 +319,25 @@ extern "C" REX_FUNC(sub_820B7998) {
   ctx.r3.u64 = object + 32;
 }
 // r3 = the vehicle.
-extern "C" REX_FUNC(sub_820B0E70) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820B0E70) {
+  
   if (!NativeLifetime()) {
-    __imp__sub_820B0E70(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820B0E70);
     return;
   }
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
   if (!VehicleDestroyPhysics(base, ctx.r3.u32, &r3)) {
-    __imp__sub_820B0E70(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820B0E70);
     return;
   }
   ctx.r3.u64 = r3;
 }
 // r3 = the vehicle; r3 comes back as UpdateWheelAxes'.
-extern "C" REX_FUNC(sub_820B62E8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820B62E8) {
+  
   if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown(base)) {
-    __imp__sub_820B62E8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820B62E8);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -371,8 +347,8 @@ extern "C" REX_FUNC(sub_820B62E8) {
 // than the ground's: the original. Where UpdateSteering or
 // UpdateTorqueSplit refuse, their originals from here (r3 the vehicle, r1
 // the step's frame), as the recompiled step's calls to their adapters.
-extern "C" REX_FUNC(sub_820B6498) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820B6498) {
+  
   if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown(base)) {
     lifted::original::c820B6498(ctx, base);
     return;
@@ -399,8 +375,8 @@ extern "C" REX_FUNC(sub_820B6498) {
 // r3 = the vehicle, r4 = the car data, r5 = the byte, r6 = the groups; f1
 // and r3 come back as ProbeGround's. Where a step wouldn't be native, the
 // original.
-extern "C" REX_FUNC(sub_820B5670) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820B5670) {
+  
   if (!NativeLifetime()) {
     lifted::original::c820B5670(ctx, base);
     return;
@@ -417,8 +393,8 @@ extern "C" REX_FUNC(sub_820B5670) {
   ctx.r3.u64 = r3;
 }
 // r3 = the vehicle, r4 = the car data, r5 = the groups; as SetUpPhysics.
-extern "C" REX_FUNC(sub_820B5B08) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820B5B08) {
+  
   if (!NativeLifetime()) {
     lifted::original::c820B5B08(ctx, base);
     return;
@@ -437,16 +413,16 @@ extern "C" REX_FUNC(sub_820B5B08) {
 // CollisionWorld::Create and SetQueryCapacity (sub_820B8D30, sub_820B9198)
 // have no adapters: their only caller, CollisionWorld::Setup, is native.
 // No arguments; r3 comes back as the query block (SetQueryCapacity's).
-extern "C" REX_FUNC(sub_820FF250) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820FF250) {
+  
   if (!NativeLifetime()) {
-    __imp__sub_820FF250(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820FF250);
     return;
   }
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
   if (!CollisionWorldSetup(base, &r3)) {
-    __imp__sub_820FF250(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820FF250);
     return;
   }
   ctx.r3.u64 = r3;
@@ -459,7 +435,7 @@ extern "C" REX_FUNC(sub_820FF250) {
 // Respond), and the queries' targets other than WallHits and GroundHits.
 namespace hooks {
 
-car_physics::CollisionGuestCall CollisionWorldUpdateCalls(PPCContext& ctx, uint8_t* base) {
+car_physics::CollisionGuestCall CollisionWorldUpdateCalls(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t address, uint32_t r3, uint32_t r4, uint32_t r5, uint32_t r6,
                       uint32_t r1, uint32_t lr) -> uint32_t {
     const uint64_t stack = ctx.r1.u64;
@@ -491,12 +467,7 @@ car_physics::CollisionGuestCall CollisionWorldUpdateCalls(PPCContext& ctx, uint8
 
 }  // namespace hooks
 
-extern "C" REX_FUNC(sub_820B92C8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B92C8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820B92C8, ITC_FLAG(native_car_physics)) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = CollisionWorldUpdate(base, ctx.f1.f64, ctx.r1.u32 - 176, ctx.r3.u32,
                                     hooks::CollisionWorldUpdateCalls(ctx, base));

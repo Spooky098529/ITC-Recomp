@@ -305,7 +305,7 @@ void UpdateCases(Context& h) {
       last_error::Set(h.base, t.r13.u32, uint32_t(r.Next()));
       after = r;
       ITC_FLAG(native_save_interface) = v == 1;
-      (v == 0 ? __imp__sub_820A4610 : hooks::SaveDevicesUpdateSteps)(t, h.base);
+      (v == 0 ? __imp__sub_820A4610 : ITC_CONTEXT_FN(hooks::SaveDevicesUpdateSteps))(t, h.base);
       ITC_FLAG(native_save_interface) = true;
       // SaveStep's and LoadStep's WaitClose under Update's frame (stwu
       // r1,-144).
@@ -334,17 +334,17 @@ void UpdateCases(Context& h) {
 
 void SaveHandlers(Context& h) {
   Run(h, {"SaveSlot::WaitForUser (sub_820A4870)", 24, __imp__sub_820A4870,
-          hooks::SlotWaitForUserSteps, Shape, NoArgs});
+          ITC_CONTEXT_FN(hooks::SlotWaitForUserSteps), Shape, NoArgs});
   Run(h, {"SaveSlot::WaitForDevice (sub_820A5878)", 24, __imp__sub_820A5878,
-          hooks::SlotWaitForDeviceSteps, Shape, NoArgs});
-  Run(h, {"SaveSlot::Failed (sub_820A4890)", 24, __imp__sub_820A4890, hooks::SlotFailedSteps,
+          ITC_CONTEXT_FN(hooks::SlotWaitForDeviceSteps), Shape, NoArgs});
+  Run(h, {"SaveSlot::Failed (sub_820A4890)", 24, __imp__sub_820A4890, ITC_CONTEXT_FN(hooks::SlotFailedSteps),
           Shape, NoArgs});
-  Run(h, {"SaveSlot::Ready (sub_820A58D8)", 48, __imp__sub_820A58D8, hooks::SlotReadySteps,
+  Run(h, {"SaveSlot::Ready (sub_820A58D8)", 48, __imp__sub_820A58D8, ITC_CONTEXT_FN(hooks::SlotReadySteps),
           Shape, NoArgs});
   Run(h, {"SaveSlot::EnumerateStep (sub_820A59C0)", 48, __imp__sub_820A59C0,
-          hooks::SlotEnumerateStepSteps, Shape, NoArgs});
+          ITC_CONTEXT_FN(hooks::SlotEnumerateStepSteps), Shape, NoArgs});
   Run(h, {"SaveDevices::OnEvent (sub_820A4800)", 24, __imp__sub_820A4800,
-          hooks::DevicesOnEventSteps,
+          ITC_CONTEXT_FN(hooks::DevicesOnEventSteps),
           [](uint8_t* base, const Layout& l, Random& r) {
             ShapeSlot(base, l, r);
             guest::StoreU32(base, l.loop, l.loop_vtable);
@@ -360,13 +360,13 @@ void SaveHandlers(Context& h) {
             t.r5.u64 = l.event;
           }});
   Run(h, {"Framework::DeviceList (sub_820908D8)", 8, __imp__sub_820908D8,
-          hooks::FrameworkDeviceListSteps, Shape,
+          ITC_CONTEXT_FN(hooks::FrameworkDeviceListSteps), Shape,
           [](PPCContext& t, const Layout& l) { t.r3.u64 = l.object; }});
   // The overlapped results: no wait, or a wait asked for without an event
   // (XGetOverlappedResult only: GetOverlappedResult would wait on the
   // handle). Their wait paths are never taken in play.
   Run(h, {"XGetOverlappedResult (sub_82295C98)", 48, __imp__sub_82295C98,
-          hooks::XGetOverlappedResultSteps,
+          ITC_CONTEXT_FN(hooks::XGetOverlappedResultSteps),
           [](uint8_t* base, const Layout& l, Random& r) { ShapeOverlapped(base, l, r); },
           [](PPCContext& t, const Layout& l) {
             const uint32_t pick = uint32_t(t.r27.u64) % 4;
@@ -382,35 +382,35 @@ void SaveHandlers(Context& h) {
   };
   for (const Entry& e : {
            Entry{"SaveSlot::WaitCloseItem (sub_820A4C08)", __imp__sub_820A4C08,
-                 hooks::SlotWaitCloseItemSteps},
+                 ITC_CONTEXT_FN(hooks::SlotWaitCloseItemSteps)},
            Entry{"SaveSlot::WaitDelete (sub_820A5290)", __imp__sub_820A5290,
-                 hooks::SlotWaitDeleteSteps},
+                 ITC_CONTEXT_FN(hooks::SlotWaitDeleteSteps)},
            Entry{"SaveSlot::WaitThumbnail (sub_820A5190)", __imp__sub_820A5190,
-                 hooks::SlotWaitThumbnailSteps},
+                 ITC_CONTEXT_FN(hooks::SlotWaitThumbnailSteps)},
            Entry{"SaveSlot::WaitClose (sub_820A5070)", __imp__sub_820A5070,
-                 hooks::SlotWaitCloseSteps, kWaitCloseFrame},
+                 ITC_CONTEXT_FN(hooks::SlotWaitCloseSteps), kWaitCloseFrame},
            Entry{"SaveSlot::WaitWrite (sub_820A4E68)", __imp__sub_820A4E68,
-                 hooks::SlotWaitWriteSteps},
+                 ITC_CONTEXT_FN(hooks::SlotWaitWriteSteps)},
            Entry{"SaveSlot::WaitRead (sub_820A4FF8)", __imp__sub_820A4FF8,
-                 hooks::SlotWaitReadSteps},
+                 ITC_CONTEXT_FN(hooks::SlotWaitReadSteps)},
        }) {
     Run(h, {e.name, 32, e.original, e.native, ShapeMachine, NoArgs, e.wait_close_below});
   }
   for (const Entry& e : {
            Entry{"SaveSlot::CheckStep (sub_820A5A88)", __imp__sub_820A5A88,
-                 hooks::SlotCheckStepSteps},
+                 ITC_CONTEXT_FN(hooks::SlotCheckStepSteps)},
            Entry{"SaveSlot::SaveStep (sub_820A5BE8)", __imp__sub_820A5BE8,
-                 hooks::SlotSaveStepSteps, kStepFrame + kWaitCloseFrame},
+                 ITC_CONTEXT_FN(hooks::SlotSaveStepSteps), kStepFrame + kWaitCloseFrame},
            Entry{"SaveSlot::LoadStep (sub_820A5E68)", __imp__sub_820A5E68,
-                 hooks::SlotLoadStepSteps, kStepFrame + kWaitCloseFrame},
+                 ITC_CONTEXT_FN(hooks::SlotLoadStepSteps), kStepFrame + kWaitCloseFrame},
            Entry{"SaveSlot::DeleteStep (sub_820A6010)", __imp__sub_820A6010,
-                 hooks::SlotDeleteStepSteps},
+                 ITC_CONTEXT_FN(hooks::SlotDeleteStepSteps)},
        }) {
     Run(h, {e.name, 96, e.original, e.native, ShapeMachine, NoArgs, e.wait_close_below});
   }
   UpdateCases(h);
   Run(h, {"GetOverlappedResult (sub_82295F20)", 48, __imp__sub_82295F20,
-          hooks::GetOverlappedResultSteps,
+          ITC_CONTEXT_FN(hooks::GetOverlappedResultSteps),
           [](uint8_t* base, const Layout& l, Random& r) { ShapeOverlapped(base, l, r); },
           [](PPCContext& t, const Layout& l) {
             t.r3.u64 = uint32_t(t.r28.u64);

@@ -2,6 +2,7 @@
 // src/race_overlays/race_overlays.cpp (docs/functions/race-overlays.md).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/heap.h"
@@ -34,12 +35,7 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
 // returns a word in r3: `address` the function's (sub_<address>), `expr` the
 // result (using `ctx` and `base`).
 #define ITC_OVERLAY_WORD(address, expr)      \
-  extern "C" REX_FUNC(sub_##address) {      \
-    REX_FUNC_PROLOGUE();                    \
-    if (!ITC_FLAG(native_race_overlays)) {  \
-      __imp__sub_##address(ctx, base);      \
-      return;                               \
-    }                                       \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_overlays)) { \
     ctx.r3.u64 = uint32_t(expr);            \
   }
 
@@ -51,12 +47,7 @@ ITC_OVERLAY_WORD(82126550, View(base, ctx.r3.u32, ctx.r4.u32))
 ITC_OVERLAY_WORD(821264A8, ViewportEntry(ctx.r4.u32))
 // OverlayView::SpeedKmh: r3 = a view. The original loads the vehicle into
 // r3 and tail-calls Vehicle::GetSpeedKmh, so r3 comes back as the vehicle.
-extern "C" REX_FUNC(sub_821268C0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_821268C0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(821268C0, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   const uint32_t view = ctx.r3.u32;
   ctx.r3.u64 = guest::LoadU32(base, view + 4);
@@ -76,24 +67,14 @@ ITC_OVERLAY_WORD(82126D18, RaceMode(base))
 ITC_OVERLAY_WORD(82127178, RacerFlags(base, ctx.r3.u32))
 
 // OverlayView::RacerId: r3 = a view; the racer's id or -1.
-extern "C" REX_FUNC(sub_82126AE0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_82126AE0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82126AE0, ITC_FLAG(native_race_overlays)) {
   ctx.r3.s64 = RacerId(base, ctx.r3.u32);
 }
 
 // Defines an adapter for a setter returning nothing (`call` uses `ctx` and
 // `base`).
 #define ITC_OVERLAY_SET(address, call)       \
-  extern "C" REX_FUNC(sub_##address) {      \
-    REX_FUNC_PROLOGUE();                    \
-    if (!ITC_FLAG(native_race_overlays)) {  \
-      __imp__sub_##address(ctx, base);      \
-      return;                               \
-    }                                       \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_overlays)) { \
     ctx.fpscr.disableFlushMode();           \
     call;                                   \
   }
@@ -125,12 +106,7 @@ ITC_OVERLAY_WORD(82293568, Rand(base))
 
 // Marker::Set: r3 = the marker, r4 = position, f1 = distance, r6 = view
 // mode, r7 = kind; returns 1.
-extern "C" REX_FUNC(sub_8212CCE0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_8212CCE0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8212CCE0, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 =
       MarkerSet(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32, ctx.r7.u32);
@@ -143,15 +119,10 @@ ITC_OVERLAY_SET(8212CBE0, MarkerUpdate(base, ctx.r3.u32))
 // Trail::Update (its vtable's slot 4, so the adapter stays while the update
 // loop calling it is recompiled): r3 = the trail. Where the native version
 // declines (a capacity of 0 or -1), the original runs.
-extern "C" REX_FUNC(sub_821292E8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_821292E8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(821292E8, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!TrailUpdate(base, ctx.r3.u32)) {
-    __imp__sub_821292E8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821292E8);
   }
 }
 
@@ -180,12 +151,7 @@ ITC_OVERLAY_WORD(8211F300, ModelSpriteEntry(base, ctx.r4.u32, ctx.r5.u32))
 // (a vector passed by value), r6 = streaking, r8 = a mode (r7 isn't read);
 // r3 and f1 are left the last rand() and RandomRange results, as the
 // original leaves them.
-extern "C" REX_FUNC(sub_8212E660) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_8212E660(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8212E660, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   const uint32_t position[4] = {uint32_t(ctx.r4.u64 >> 32), ctx.r4.u32,
                                 uint32_t(ctx.r5.u64 >> 32), ctx.r5.u32};
@@ -201,19 +167,14 @@ extern "C" REX_FUNC(sub_8212E660) {
 // (passed by value), f2 = strength (f1 isn't read); returns 1, or 0 when
 // full, with f1 left as the original leaves it. Where the native version
 // declines (a capacity of 0 or -1), the original runs.
-extern "C" REX_FUNC(sub_8212D818) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_8212D818(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8212D818, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   const uint32_t vector[4] = {uint32_t(ctx.r6.u64 >> 32), ctx.r6.u32,
                               uint32_t(ctx.r7.u64 >> 32), ctx.r7.u32};
   uint32_t result = 0;
   double last = ctx.f1.f64;
   if (!SparksEmit(base, ctx.r3.u32, ctx.r4.u32, ctx.f2.f64, vector, &result, &last)) {
-    __imp__sub_8212D818(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8212D818);
     return;
   }
   ctx.r3.u64 = result;
@@ -261,15 +222,10 @@ ITC_OVERLAY_SET(8212D6E0, SparksReset(base, ctx.r3.u32))
 
 // Sparks::Update: r3 = the sparks. Where the native version declines (the
 // original could trap or reach outside its entries), the original runs.
-extern "C" REX_FUNC(sub_8212DDC8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_8212DDC8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8212DDC8, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!SparksUpdate(base, ctx.r3.u32)) {
-    __imp__sub_8212DDC8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8212DDC8);
   }
 }
 
@@ -294,8 +250,8 @@ ITC_OVERLAY_SET(8212BFE8, ParticlesBConstruct(base, ctx.r3.u32))
 // call them. Only while the game's heap is the layer's, as operator delete
 // is then the layer's free.
 #define ITC_OVERLAY_DELETING(address, call)                          \
-  extern "C" REX_FUNC(sub_##address) {                               \
-    REX_FUNC_PROLOGUE();                                             \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                               \
+    \
     if (!ITC_FLAG(native_race_overlays) || !hooks::NativeHeapActive() || \
         !(call)) {                                                   \
       __imp__sub_##address(ctx, base);                               \
@@ -313,16 +269,11 @@ ITC_OVERLAY_SET(8212BA98, ParticlesBReset(base, ctx.r3.u32))
 // leaves it. SmokeEmitter::Reset and Smoke::InRegion are called as plain
 // C++. Where the native version declines (the original could trap or reach
 // outside its emitters), the original runs.
-extern "C" REX_FUNC(sub_8212AA78) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_8212AA78(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8212AA78, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = ctx.r3.u32;
   if (!SmokeUpdate(base, ctx.r3.u32, &r3)) {
-    __imp__sub_8212AA78(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8212AA78);
     return;
   }
   ctx.r3.u64 = r3;
@@ -332,15 +283,10 @@ extern "C" REX_FUNC(sub_8212AA78) {
 // update loop calling it is recompiled): r3 = the effect. ParticlesB's
 // ResetEntry is called as plain C++. Where the native version declines (the
 // original could trap or reach outside its entries), the original runs.
-extern "C" REX_FUNC(sub_8212B748) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_8212B748(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8212B748, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!ParticlesBUpdate(base, ctx.r3.u32)) {
-    __imp__sub_8212B748(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8212B748);
   }
 }
 
@@ -348,16 +294,11 @@ extern "C" REX_FUNC(sub_8212B748) {
 // update loop calling it is recompiled): r3 = the effect, left as the
 // original leaves it. rand is called as plain C++. Where the native version
 // declines (a capacity of 0, where the original traps), the original runs.
-extern "C" REX_FUNC(sub_8212C2F0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_8212C2F0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8212C2F0, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = ctx.r3.u32;
   if (!ParticlesCUpdate(base, ctx.r3.u32, &r3)) {
-    __imp__sub_8212C2F0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8212C2F0);
     return;
   }
   ctx.r3.u64 = r3;
@@ -394,15 +335,10 @@ ITC_OVERLAY_WORD(82126B50, RacerInCurrentStage(base, ctx.r4.u32))
 // original's own stack slot (r1 - 336 + 112, below the stack pointer).
 // Where the native version declines (a trail's capacity 0 or -1), the
 // original runs.
-extern "C" REX_FUNC(sub_82124EE0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_82124EE0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82124EE0, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!UpdateTrails(base, ctx.r3.u32, ctx.r1.u32 - 336 + 112)) {
-    __imp__sub_82124EE0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82124EE0);
   }
 }
 
@@ -415,36 +351,21 @@ ITC_OVERLAY_WORD(82122EA8, MarkerKind(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32))
 // originals' own stack frames (r1 - 256, or - 240 for UpdateParticlesC,
 // below the stack pointer). LightSprite::Show (sub_8211EAA0) and
 // sub_82126A90 have no adapters: UpdateLightSprites is their only caller.
-extern "C" REX_FUNC(sub_821251C0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_821251C0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(821251C0, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   UpdateLightSprites(base, ctx.r3.u32, ctx.r1.u32 - 256);
 }
 
 // Where the native version declines (an emitter's capacity 0 or -1), the
 // original runs.
-extern "C" REX_FUNC(sub_821252D0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_821252D0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(821252D0, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!UpdateParticlesB(base, ctx.r3.u32, ctx.r1.u32 - 256)) {
-    __imp__sub_821252D0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821252D0);
   }
 }
 
-extern "C" REX_FUNC(sub_82125798) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_82125798(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82125798, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   UpdateParticlesC(base, ctx.r3.u32, ctx.r1.u32 - 240);
 }
@@ -454,29 +375,19 @@ extern "C" REX_FUNC(sub_82125798) {
 // (EmitSmoke or Smoke::SetFrame would), the original runs. Smoke::SetFrame
 // (sub_8212B1B0), sub_82126A00 and sub_82126A38 have no adapters: it's
 // their only caller.
-extern "C" REX_FUNC(sub_82125B60) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_82125B60(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82125B60, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!UpdateSmoke(base, ctx.r3.u32, ctx.r1.u32 - 400)) {
-    __imp__sub_82125B60(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82125B60);
   }
 }
 
 // OverlayView::ModelMatrix: r3 = out, r4 = a view; returns out. Where the
 // native version declines (the copy wouldn't be memcpy's plain one), the
 // original runs.
-extern "C" REX_FUNC(sub_821270E8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_overlays)) {
-    __imp__sub_821270E8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(821270E8, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!ModelMatrix(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_821270E8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821270E8);
   }
 }

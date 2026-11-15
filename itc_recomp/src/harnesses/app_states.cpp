@@ -167,7 +167,7 @@ void MessageVector(Context& h) {
             t.r5.u64 = (uint64_t(tag) << 32) | first;
             t.r6.u64 = (uint64_t(tag) << 32) | last;
           },
-          __imp__sub_82092E70, hooks::AppMessagesErase,
+          __imp__sub_82092E70, ITC_CONTEXT_FN(hooks::AppMessagesErase),
           [&](Outputs& out, const PPCContext& t, const Blocks&) {
             out.Bytes(Read(h.base, h.data, 512));
             out.Word(t.r3.u32);
@@ -182,7 +182,7 @@ void MessageVector(Context& h) {
       Case(
           h, results, [&](Blocks&) { build(h.random.Below(40), h.random.Below(4)); },
           [&](PPCContext& t) { t.r3.u64 = vector; }, __imp__sub_82092F98,
-          hooks::AppMessagesClear,
+          ITC_CONTEXT_FN(hooks::AppMessagesClear),
           [&](Outputs& out, const PPCContext& t, const Blocks&) {
             out.Bytes(Read(h.base, h.data, 512));
             out.Word(t.r3.u32 - t.r1.u32);
@@ -203,8 +203,8 @@ void Allocators(Context& h) {
   };
   const Allocator allocators[] = {
       {"MessageVector::Allocate (sub_82092B78)", __imp__sub_82092B78,
-       hooks::AppMessagesAllocate},
-      {"OpList::AllocateNodes (sub_820ACF10)", __imp__sub_820ACF10, hooks::AppOpAllocateNodes},
+       ITC_CONTEXT_FN(hooks::AppMessagesAllocate)},
+      {"OpList::AllocateNodes (sub_820ACF10)", __imp__sub_820ACF10, ITC_CONTEXT_FN(hooks::AppOpAllocateNodes)},
   };
   for (const Allocator& a : allocators) {
     Results results(a.name);
@@ -247,7 +247,7 @@ void IncSize(Context& h) {
           t.r3.u64 = h.data;
           t.r4.u64 = Load(h.base, h.data + 64);
         },
-        __imp__sub_820AD768, hooks::AppOpIncSize,
+        __imp__sub_820AD768, ITC_CONTEXT_FN(hooks::AppOpIncSize),
         [&](Outputs& out, const PPCContext& t, const Blocks&) {
           out.Bytes(Read(h.base, h.data, 128));
           out.Word(t.r3.u32);
@@ -302,7 +302,7 @@ void Lists(Context& h) {
       Case(
           h, results,
           [&](Blocks& blocks) { BuildList(h, blocks, h.data, h.random.Below(12), node_bytes); },
-          [&](PPCContext& t) { t.r3.u64 = h.data; }, __imp__sub_820ACF88, hooks::AppListClear,
+          [&](PPCContext& t) { t.r3.u64 = h.data; }, __imp__sub_820ACF88, ITC_CONTEXT_FN(hooks::AppListClear),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             blocks.Words(h.base, out, h.data, 64);
             out.Word(blocks.Of(t.r3.u32));
@@ -340,7 +340,7 @@ void Lists(Context& h) {
             t.r4.u64 = list;
             t.r5.u64 = (uint64_t(iterator_list) << 32) | node;
           },
-          __imp__sub_82098E80, hooks::AppPtrListErase,
+          __imp__sub_82098E80, ITC_CONTEXT_FN(hooks::AppPtrListErase),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             blocks.Words(h.base, out, h.data, 64);
             out.Word(blocks.Of(t.r3.u32));
@@ -366,7 +366,7 @@ void Small(Context& h) {
               Store(h.base, h.data + at, uint32_t(h.random.Next()));
             }
           },
-          [&](PPCContext& t) { t.r3.u64 = h.data; }, __imp__sub_820ACA48, hooks::AppDelegateClone,
+          [&](PPCContext& t) { t.r3.u64 = h.data; }, __imp__sub_820ACA48, ITC_CONTEXT_FN(hooks::AppDelegateClone),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             blocks.Add(t.r3.u32);
             out.Word(blocks.Of(t.r3.u32));
@@ -393,7 +393,7 @@ void Small(Context& h) {
             Store(h.base, h.data + 28, c & 1 ? 0 : uint32_t(h.random.Next()) | 1);
             Store(h.base, h.data + 16, c & 2 ? 0 : 1 + h.random.Below(5));
           },
-          [&](PPCContext& t) { t.r3.u64 = h.data; }, __imp__sub_820ACE50, hooks::AppLayerIsEmpty,
+          [&](PPCContext& t) { t.r3.u64 = h.data; }, __imp__sub_820ACE50, ITC_CONTEXT_FN(hooks::AppLayerIsEmpty),
           [&](Outputs& out, const PPCContext& t, const Blocks&) {
             out.Word(t.r3.u32);
             out.Bytes(Read(h.base, h.data, 64));
@@ -433,7 +433,7 @@ void OpLists(Context& h) {
     for (int c = 0; c < 30; c++) {
       Case(
           h, results, [&](Blocks&) {}, [&](PPCContext& t) { t.r3.u64 = h.data; },
-          __imp__sub_820AD0B8, hooks::AppOpConstruct,
+          __imp__sub_820AD0B8, ITC_CONTEXT_FN(hooks::AppOpConstruct),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             blocks.Add(Load(h.base, h.data + as::kListHead));
             blocks.Words(h.base, out, h.data, 64);
@@ -460,7 +460,7 @@ void OpLists(Context& h) {
             t.r5.u64 = Load(h.base, h.data + 4);
             t.r6.u64 = h.data + 64;
           },
-          __imp__sub_820ACFF8, hooks::AppOpBuyNode,
+          __imp__sub_820ACFF8, ITC_CONTEXT_FN(hooks::AppOpBuyNode),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             blocks.Add(t.r3.u32);
             out.Word(blocks.Of(t.r3.u32));
@@ -491,7 +491,7 @@ void OpLists(Context& h) {
             t.r3.u64 = h.data;
             t.r4.u64 = uint32_t(h.random.Next());
           },
-          __imp__sub_820ADAD0, hooks::AppLayerPush,
+          __imp__sub_820ADAD0, ITC_CONTEXT_FN(hooks::AppLayerPush),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             MeetNodes(h.base, blocks, Load(h.base, h.data + as::kLayerOps + as::kListHead));
             blocks.Words(h.base, out, h.data, 64);
@@ -568,7 +568,7 @@ void MessageGrowth(Context& h) {
             t.r5.u64 = count;
             t.r6.u64 = value;
           },
-          __imp__sub_820938C0, hooks::AppMessagesInsertN,
+          __imp__sub_820938C0, ITC_CONTEXT_FN(hooks::AppMessagesInsertN),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Bytes(Read(h.base, t.r1.u32 + 24, 8));
             collect(out, blocks);
@@ -593,7 +593,7 @@ void MessageGrowth(Context& h) {
             t.r5.u64 = (uint64_t(vector) << 32) | where;
             t.r6.u64 = value;
           },
-          __imp__sub_82094110, hooks::AppMessagesInsert,
+          __imp__sub_82094110, ITC_CONTEXT_FN(hooks::AppMessagesInsert),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32);
             collect(out, blocks);
@@ -615,7 +615,7 @@ void MessageGrowth(Context& h) {
             t.r3.u64 = vector;
             t.r4.u64 = value;
           },
-          __imp__sub_820944E0, hooks::AppMessagesPushBack,
+          __imp__sub_820944E0, ITC_CONTEXT_FN(hooks::AppMessagesPushBack),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32 - t.r1.u32);
             collect(out, blocks);
@@ -639,7 +639,7 @@ void MessageGrowth(Context& h) {
             t.r3.u64 = vector - as::kInterfaceMessages;
             t.r4.u64 = value;
           },
-          __imp__sub_82094AB0, hooks::AppSendMessage,
+          __imp__sub_82094AB0, ITC_CONTEXT_FN(hooks::AppSendMessage),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32 - t.r1.u32);
             collect(out, blocks);
@@ -692,7 +692,7 @@ void Running(Context& h) {
     for (int c = 0; c < 100; c++) {
       Case(
           h, results, [&](Blocks&) { build(c); }, [&](PPCContext& t) { t.r3.u64 = states; },
-          __imp__sub_820AE1A0, hooks::AppStatesIsEmpty,
+          __imp__sub_820AE1A0, ITC_CONTEXT_FN(hooks::AppStatesIsEmpty),
           [&](Outputs& out, const PPCContext& t, const Blocks&) {
             out.Word(t.r3.u32);
             out.Bytes(Read(h.base, h.data, 1024));
@@ -706,7 +706,7 @@ void Running(Context& h) {
     for (int c = 0; c < 100; c++) {
       Case(
           h, results, [&](Blocks&) { build(c); }, [&](PPCContext& t) { t.r3.u64 = interface; },
-          __imp__sub_82092928, hooks::AppIsRunning,
+          __imp__sub_82092928, ITC_CONTEXT_FN(hooks::AppIsRunning),
           [&](Outputs& out, const PPCContext& t, const Blocks&) {
             out.Word(t.r3.u32);
             out.Word(t.r11.u32);
@@ -879,7 +879,7 @@ void Walks(Context& h) {
             t.r6.u64 = functor;
             t.r7.u64 = adjust;
           },
-          __imp__sub_82092BF0, hooks::AppHandlerMapForEach,
+          __imp__sub_82092BF0, ITC_CONTEXT_FN(hooks::AppHandlerMapForEach),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             MeetTree(h.base, blocks, AppMaps(h));
             blocks.Words(h.base, out, t.r1.u32 + 48, 16);
@@ -899,9 +899,9 @@ void Walks(Context& h) {
     uint32_t game;  // the game's functor
   };
   const VectorWalk walks[] = {
-      {"App::ForEachMessage (sub_82092CD0)", __imp__sub_82092CD0, hooks::AppForEachMessage, 4,
+      {"App::ForEachMessage (sub_82092CD0)", __imp__sub_82092CD0, ITC_CONTEXT_FN(hooks::AppForEachMessage), 4,
        as::kDeliverMessage},
-      {"App::ForEachRequest (sub_82091C48)", __imp__sub_82091C48, hooks::AppForEachRequest, 12,
+      {"App::ForEachRequest (sub_82091C48)", __imp__sub_82091C48, ITC_CONTEXT_FN(hooks::AppForEachRequest), 12,
        as::kApplyRequest},
   };
   for (const VectorWalk& w : walks) {
@@ -971,8 +971,8 @@ void Handlers(Context& h) {
     GuestFunction native;
   };
   const Runner runners[] = {
-      {"App::RunHandler (sub_82092968)", __imp__sub_82092968, hooks::AppRunHandler},
-      {"App::RunListener (sub_820929B0)", __imp__sub_820929B0, hooks::AppRunListener},
+      {"App::RunHandler (sub_82092968)", __imp__sub_82092968, ITC_CONTEXT_FN(hooks::AppRunHandler)},
+      {"App::RunListener (sub_820929B0)", __imp__sub_820929B0, ITC_CONTEXT_FN(hooks::AppRunListener)},
   };
   for (const Runner& r : runners) {
     Results results(r.name);
@@ -1018,7 +1018,7 @@ void Handlers(Context& h) {
             t.r3.u64 = app;
             t.r4.u64 = h.random.Below(8);
           },
-          __imp__sub_82092D50, hooks::AppDeliverMessage,
+          __imp__sub_82092D50, ITC_CONTEXT_FN(hooks::AppDeliverMessage),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32 - t.r1.u32);
             AppOut(h, out, blocks, AppMaps(h), 0);
@@ -1048,7 +1048,7 @@ void Handlers(Context& h) {
             t.r4.u64 = (uint64_t(type) << 32) | h.random.Below(24);
             t.r5.u64 = h.random.Next();
           },
-          __imp__sub_82093BE0, hooks::AppApplyRequest,
+          __imp__sub_82093BE0, ITC_CONTEXT_FN(hooks::AppApplyRequest),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32 - t.r1.u32);
             AppOut(h, out, blocks, AppMaps(h), 0);
@@ -1066,10 +1066,10 @@ void Handlers(Context& h) {
     GuestFunction native;
   };
   const Slot slots[] = {
-      {"App::AddHandler (sub_82094830)", __imp__sub_82094830, hooks::AppAddHandler},
-      {"App::AddToggledHandler (sub_820948D0)", __imp__sub_820948D0, hooks::AppAddToggledHandler},
-      {"App::AddAlwaysHandler (sub_82094970)", __imp__sub_82094970, hooks::AppAddAlwaysHandler},
-      {"App::AddListener (sub_82094A10)", __imp__sub_82094A10, hooks::AppAddListener},
+      {"App::AddHandler (sub_82094830)", __imp__sub_82094830, ITC_CONTEXT_FN(hooks::AppAddHandler)},
+      {"App::AddToggledHandler (sub_820948D0)", __imp__sub_820948D0, ITC_CONTEXT_FN(hooks::AppAddToggledHandler)},
+      {"App::AddAlwaysHandler (sub_82094970)", __imp__sub_82094970, ITC_CONTEXT_FN(hooks::AppAddAlwaysHandler)},
+      {"App::AddListener (sub_82094A10)", __imp__sub_82094A10, ITC_CONTEXT_FN(hooks::AppAddListener)},
   };
   for (const Slot& slot : slots) {
     Results results(slot.name);
@@ -1080,7 +1080,7 @@ void Handlers(Context& h) {
             for (uint32_t at = 0; at < 3072; at += 4) {
               Store(h.base, h.data + at, uint32_t(h.random.Next()));
             }
-            Objects(h, 1, c % 4 == 3 ? 0x82090770 : 0x820ACA48);  // the getter, or Delegate::Clone
+            Objects(h, 1, c % 4 == 3 ? 0x82090770 : 0x820ACA48);  // the getter, or ITC_CONTEXT_FN(Delegate)::Clone
             const uint32_t size = h.random.Below(5);
             const uint32_t capacity = size + h.random.Below(3);
             const uint32_t vector = app + as::kAppRequests;
@@ -1202,7 +1202,7 @@ void Update(Context& h) {
           Store(h.base, requests + 8, list + 12 * pending);
           Store(h.base, requests + 12, list + 12 * room);
         },
-        [&](PPCContext& t) { t.r3.u64 = app; }, __imp__sub_82093DC0, hooks::AppUpdate,
+        [&](PPCContext& t) { t.r3.u64 = app; }, __imp__sub_82093DC0, ITC_CONTEXT_FN(hooks::AppUpdate),
         [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
           // The vectors' blocks (old and new) by number, their words to last.
           for (uint32_t vector : {app + as::kAppMessages, app + as::kAppRequests}) {
@@ -1374,7 +1374,7 @@ void StackSetUp(Context& h) {
             t.r5.u64 = h.random.Next();
           },
           with_state ? __imp__sub_820ADBD8 : __imp__sub_820AD118,
-          with_state ? hooks::AppLayerConstructWithState : hooks::AppLayerConstruct,
+          with_state ? ITC_CONTEXT_FN(hooks::AppLayerConstructWithState) : ITC_CONTEXT_FN(hooks::AppLayerConstruct),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             std::vector<uint32_t> layers;
             MeetLayer(h.base, blocks, h.data + 64, layers);
@@ -1408,7 +1408,7 @@ void StackSetUp(Context& h) {
             t.r3.u64 = h.data + 64;
             t.r4.u64 = h.data + 512;
           },
-          __imp__sub_820ADA08, hooks::AppLayerAddChild,
+          __imp__sub_820ADA08, ITC_CONTEXT_FN(hooks::AppLayerAddChild),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             MeetNodes(h.base, blocks, Load(h.base, h.data + 64 + 12 + 4));
             blocks.Words(h.base, out, t.r1.u32 + 24, 8);
@@ -1446,7 +1446,7 @@ void StackSetUp(Context& h) {
             t.r3.u64 = h.data;
             t.r4.u64 = h.random.Next();
           },
-          __imp__sub_820AE130, hooks::AppStatesAddLayer,
+          __imp__sub_820AE130, ITC_CONTEXT_FN(hooks::AppStatesAddLayer),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             std::vector<uint32_t> layers;
             MeetLayer(h.base, blocks, Load(h.base, h.data + 8), layers);
@@ -1482,7 +1482,7 @@ void StackSetUp(Context& h) {
             }
           },
           create ? __imp__sub_820AE498 : __imp__sub_820AE348,
-          create ? hooks::AppStatesCreate : hooks::AppStatesConstruct,
+          create ? ITC_CONTEXT_FN(hooks::AppStatesCreate) : ITC_CONTEXT_FN(hooks::AppStatesConstruct),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             const uint32_t states = t.r3.u32;
             if (create && states != 0 && memory::IsHeapBlock(states)) {
@@ -1537,7 +1537,7 @@ void StackSetUp(Context& h) {
             Store(h.base, h.data + 8, GameLayer(h, blocks, uint32_t(h.random.Next())));
           },
           [&](PPCContext& t) { t.r3.u64 = AppAt(h) + as::kAppInterface; },
-          __imp__sub_82092878, hooks::AppStart,
+          __imp__sub_82092878, ITC_CONTEXT_FN(hooks::AppStart),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             std::vector<uint32_t> layers;
             MeetLayer(h.base, blocks, Load(h.base, h.data + 8), layers);
@@ -1644,7 +1644,7 @@ void LayerWalks(Context& h) {
             t.r7.u64 = adjust;
           },
           ops ? __imp__sub_820AD440 : __imp__sub_820AD3A0,
-          ops ? hooks::AppOpListForEach : hooks::AppPtrListForEach,
+          ops ? ITC_CONTEXT_FN(hooks::AppOpListForEach) : ITC_CONTEXT_FN(hooks::AppPtrListForEach),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             blocks.Words(h.base, out, t.r1.u32 + 24, 8);
             blocks.Words(h.base, out, t.r1.u32 + 48, 16);
@@ -1663,11 +1663,11 @@ void LayerWalks(Context& h) {
     GuestFunction native;
   };
   const Functor functors[] = {
-      {"StateLayer::Update's functor (sub_820ACD80)", __imp__sub_820ACD80, hooks::AppUpdateChild},
+      {"StateLayer::Update's functor (sub_820ACD80)", __imp__sub_820ACD80, ITC_CONTEXT_FN(hooks::AppUpdateChild)},
       {"StateLayer::UpdateToggled's functor (sub_820ACDE8)", __imp__sub_820ACDE8,
-       hooks::AppUpdateChildToggled},
+       ITC_CONTEXT_FN(hooks::AppUpdateChildToggled)},
       {"StateLayer::OnToggleOff's functor (sub_820ACD60)", __imp__sub_820ACD60,
-       hooks::AppToggleOffChild},
+       ITC_CONTEXT_FN(hooks::AppToggleOffChild)},
   };
   for (const Functor& f : functors) {
     Results results(f.name);
@@ -1719,7 +1719,7 @@ void LayerWalks(Context& h) {
             }
           },
           [&](PPCContext& t) { t.r3.u64 = layer; }, __imp__sub_820ADE68,
-          hooks::AppLayerApplyOps,
+          ITC_CONTEXT_FN(hooks::AppLayerApplyOps),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             std::vector<uint32_t> layers;
             MeetLayer(h.base, blocks, layer, layers);
@@ -1787,18 +1787,18 @@ void UpdateCases(Context& h, const char* name, GuestFunction recompiled, GuestFu
 
 void LayerUpdates(Context& h) {
   const uint32_t layer = h.data + 64;
-  UpdateCases(h, "StateLayer::Update (sub_820ADF00)", __imp__sub_820ADF00, hooks::AppLayerUpdate,
+  UpdateCases(h, "StateLayer::Update (sub_820ADF00)", __imp__sub_820ADF00, ITC_CONTEXT_FN(hooks::AppLayerUpdate),
               layer);
   UpdateCases(h, "StateLayer::UpdateToggled (sub_820AE010)", __imp__sub_820AE010,
-              hooks::AppLayerUpdateToggled, layer);
+              ITC_CONTEXT_FN(hooks::AppLayerUpdateToggled), layer);
   UpdateCases(h, "StateLayer state slot 8 (sub_820AE120)", __imp__sub_820AE120,
-              hooks::AppLayerStateUpdate, layer + 4);
+              ITC_CONTEXT_FN(hooks::AppLayerStateUpdate), layer + 4);
   UpdateCases(h, "StateLayer state slot 9 (sub_820AE128)", __imp__sub_820AE128,
-              hooks::AppLayerStateUpdateToggled, layer + 4);
+              ITC_CONTEXT_FN(hooks::AppLayerStateUpdateToggled), layer + 4);
   UpdateCases(h, "AppStates::OnUpdate (sub_820AE1B8)", __imp__sub_820AE1B8,
-              hooks::AppStatesOnUpdate, h.data);
+              ITC_CONTEXT_FN(hooks::AppStatesOnUpdate), h.data);
   UpdateCases(h, "AppStates::OnUpdateToggled (sub_820AE1C0)", __imp__sub_820AE1C0,
-              hooks::AppStatesOnUpdateToggled, h.data);
+              ITC_CONTEXT_FN(hooks::AppStatesOnUpdateToggled), h.data);
 }
 
 // --- The operations and the toggle's messages ---
@@ -1861,7 +1861,7 @@ void OpsAndToggles(Context& h) {
             t.r3.u64 = layer;
             t.r4.u64 = (uint64_t(type) << 32) | (ChildAt(h, h.random.Below(6)) + 4);
           },
-          __imp__sub_820ADC60, hooks::AppLayerApplyOp,
+          __imp__sub_820ADC60, ITC_CONTEXT_FN(hooks::AppLayerApplyOp),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) { TreeOut(h, out, blocks, t); },
           fmt::format("type {} case {}", int32_t(type), c));
     }
@@ -1878,7 +1878,7 @@ void OpsAndToggles(Context& h) {
             t.r3.u64 = layer;
           },
           off ? __imp__sub_820AD680 : __imp__sub_820AD4E0,
-          off ? hooks::AppLayerToggleOff : hooks::AppLayerToggleOn,
+          off ? ITC_CONTEXT_FN(hooks::AppLayerToggleOff) : ITC_CONTEXT_FN(hooks::AppLayerToggleOn),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32 - t.r1.u32);
             TreeOut(h, out, blocks, t);
@@ -1901,7 +1901,7 @@ void OpsAndToggles(Context& h) {
             t.r4.u64 = off ? uint32_t(h.random.Next()) : layer;
           },
           off ? __imp__sub_820AD760 : __imp__sub_820ACD38,
-          off ? hooks::AppLayerStateToggleOff : hooks::AppToggleOnChild,
+          off ? ITC_CONTEXT_FN(hooks::AppLayerStateToggleOff) : ITC_CONTEXT_FN(hooks::AppToggleOnChild),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32 - t.r1.u32);
             TreeOut(h, out, blocks, t);
@@ -1929,7 +1929,7 @@ void OpsAndToggles(Context& h) {
             t.r4.u64 = h.random.Next();
             t.r5.u64 = h.data + 32;
           },
-          __imp__sub_820AE1C8, hooks::AppStatesOnMessage,
+          __imp__sub_820AE1C8, ITC_CONTEXT_FN(hooks::AppStatesOnMessage),
           [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
             out.Word(t.r3.u32 - t.r1.u32);
             TreeOut(h, out, blocks, t);

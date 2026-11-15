@@ -321,28 +321,28 @@ void Panels(Context& h, uint32_t world) {
   Group(
       h, world, "PanelGroup8::PanelGroup8", 0x82239C10, 6, {112, 24},
       [](PPCContext& t, Random& r, uint32_t) { t.r4.u64 = r.Below(2) == 0 ? 4 : r.Next(); },
-      __imp__sub_82239C10, hooks::Type8PanelGroupConstruct);
+      __imp__sub_82239C10, ITC_CONTEXT_FN(hooks::Type8PanelGroupConstruct));
   Group(h, world, "Panel8F::Panel8F", 0x82239C70, 6, {112, 32}, ctor, __imp__sub_82239C70,
-        hooks::Type8Panel8FConstruct);
+        ITC_CONTEXT_FN(hooks::Type8Panel8FConstruct));
   Group(h, world, "Panel8E::Panel8E", 0x82239D58, 6, {112, 32}, ctor, __imp__sub_82239D58,
-        hooks::Type8Panel8EConstruct);
+        ITC_CONTEXT_FN(hooks::Type8Panel8EConstruct));
   Group(h, world, "Panel8C::Panel8C", 0x82239E78, 6, {128, 48}, ctor, __imp__sub_82239E78,
-        hooks::Type8Panel8CConstruct);
+        ITC_CONTEXT_FN(hooks::Type8Panel8CConstruct));
   Group(h, world, "Panel8D::Panel8D", 0x8223A100, 6, {112, 32}, ctor, __imp__sub_8223A100,
-        hooks::Type8Panel8DConstruct);
+        ITC_CONTEXT_FN(hooks::Type8Panel8DConstruct));
   Group(h, world, "ConfirmPanel8::ConfirmPanel8", 0x8223A208, 6, {112, 32}, ctor,
-        __imp__sub_8223A208, hooks::Type8ConfirmPanelConstruct);
+        __imp__sub_8223A208, ITC_CONTEXT_FN(hooks::Type8ConfirmPanelConstruct));
   // The deleting destructors with bit 0 of r4 clear, then set.
   const auto keep = [](PPCContext& t, Random& r, uint32_t) { t.r4.u64 = r.Next() & ~1ull; };
   Group(h, world, "PanelGroup8::DeletingDestructor", 0x8223A2A8, 4, {112, 24}, keep,
-        __imp__sub_8223A2A8, hooks::Type8PanelGroupDeletingDestruct);
+        __imp__sub_8223A2A8, ITC_CONTEXT_FN(hooks::Type8PanelGroupDeletingDestruct));
   Group(h, world, "Panel8C::DeletingDestructor", 0x8223A348, 4, {112, 24}, keep,
-        __imp__sub_8223A348, hooks::Type8Panel8CDeletingDestruct);
+        __imp__sub_8223A348, ITC_CONTEXT_FN(hooks::Type8Panel8CDeletingDestruct));
   const auto random = [](uint32_t, Random&) {};
   Deleting(h, "PanelGroup8::DeletingDestructor", 0x8223A2A8, 44, random, __imp__sub_8223A2A8,
-           hooks::Type8PanelGroupDeletingDestruct);
+           ITC_CONTEXT_FN(hooks::Type8PanelGroupDeletingDestruct));
   Deleting(h, "Panel8C::DeletingDestructor", 0x8223A348, 324, random, __imp__sub_8223A348,
-           hooks::Type8Panel8CDeletingDestruct);
+           ITC_CONTEXT_FN(hooks::Type8Panel8CDeletingDestruct));
 }
 
 void Leaves(Context& h, uint32_t world) {
@@ -354,7 +354,7 @@ void Leaves(Context& h, uint32_t world) {
     guest::StoreU32(base, w + kObjectAt + 9680, 16 + r.Below(4));
   };
   Group(h, world, "Type8ListScreen::IsLoaded", 0x8223F590, 4, {0, 0}, list_id,
-        __imp__sub_8223F590, hooks::Type8ListIsLoaded);
+        __imp__sub_8223F590, ITC_CONTEXT_FN(hooks::Type8ListIsLoaded));
   Group(
       h, world, "Type8ListScreen::OpenMovie", 0x8223F3E0, 4, {0, 0}, list_id,
       __imp__sub_8223F3E0, [](PPCContext& t, uint8_t* b) {
@@ -373,7 +373,7 @@ void Leaves(Context& h, uint32_t world) {
         t.r4.u64 = r.Below(4) == 0 ? (r.Below(2) == 0 ? 8 + r.Below(4) : r.Next()) : r.Below(8);
         t.r5.u64 = w + 0x7000 + 4 * r.Below(48);
       },
-      __imp__sub_8223F598, hooks::Type8ListItemInfo);
+      __imp__sub_8223F598, ITC_CONTEXT_FN(hooks::Type8ListItemInfo));
   // The color list screen's (color_list_screen.cpp): ItemInfo's r4 an
   // item (0 to 8 mostly, else 9 to 12 or any word), memcpy's tail call (its
   // plain C++ on both sides) leaving the stack below as it finds it.
@@ -389,26 +389,26 @@ void Leaves(Context& h, uint32_t world) {
         t.r4.u64 = r.Below(4) == 0 ? (r.Below(2) == 0 ? 9 + r.Below(4) : r.Next()) : r.Below(9);
         t.r5.u64 = (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0) | (w + 0x7000 + 4 * r.Below(48));
       },
-      __imp__sub_8223E4D0, hooks::Type8ColorListItemInfo);
+      __imp__sub_8223E4D0, ITC_CONTEXT_FN(hooks::Type8ColorListItemInfo));
   Group(h, world, "Type8PanelScreen::InitWords", 0x82238420, 4, {0, 0}, NoSetup,
-        __imp__sub_82238420, hooks::Type8InitWords);
+        __imp__sub_82238420, ITC_CONTEXT_FN(hooks::Type8InitWords));
   Group(h, world, "Type8PanelScreen::IsLoaded", 0x82238418, 2, {0, 0}, NoSetup,
-        __imp__sub_82238418, hooks::Type8IsLoaded);
+        __imp__sub_82238418, ITC_CONTEXT_FN(hooks::Type8IsLoaded));
   Group(h, world, "Type8PanelScreen::OpenMovies", 0x82238440, 4, {0, 0}, NoSetup,
         __imp__sub_82238440, Recording(t8::OpenMovies));
   Group(h, world, "Type8PanelScreen::DeleteMovies", 0x82238450, 4, {0, 0}, NoSetup,
         __imp__sub_82238450, Recording(t8::DeleteMovies));
   for (const auto& [name, address, recompiled, native] :
        {std::tuple{"Type8PanelScreen::OnMessage2", 0x82238458u, __imp__sub_82238458,
-                   hooks::Type8OnMessage2},
+                   ITC_CONTEXT_FN(hooks::Type8OnMessage2)},
         std::tuple{"Type8PanelScreen::OnSaveLoaded", 0x82238530u, __imp__sub_82238530,
-                   hooks::Type8OnSaveLoaded},
+                   ITC_CONTEXT_FN(hooks::Type8OnSaveLoaded)},
         std::tuple{"Type8PanelScreen::OnAnswer0", 0x82238540u, __imp__sub_82238540,
-                   hooks::Type8OnAnswer0},
+                   ITC_CONTEXT_FN(hooks::Type8OnAnswer0)},
         std::tuple{"Type8PanelScreen::OnAnswer1", 0x82238550u, __imp__sub_82238550,
-                   hooks::Type8OnAnswer1},
+                   ITC_CONTEXT_FN(hooks::Type8OnAnswer1)},
         std::tuple{"Type8PanelScreen::OnAnswer2", 0x82238560u, __imp__sub_82238560,
-                   hooks::Type8OnAnswer2}}) {
+                   ITC_CONTEXT_FN(hooks::Type8OnAnswer2)}}) {
     Group(h, world, name, address, 3, {0, 0}, NoSetup, recompiled, native);
   }
   Group(
@@ -417,7 +417,7 @@ void Leaves(Context& h, uint32_t world) {
         guest::StoreU32(base, w + kObjectAt + 15240, r.Below(2));
         t.r4.u64 = w + kDispatcherAt;
       },
-      __imp__sub_82238B10, hooks::Type8Leave);
+      __imp__sub_82238B10, ITC_CONTEXT_FN(hooks::Type8Leave));
 }
 
 // --- The handlers (the screen's world and the UI movie world) ---
@@ -511,11 +511,11 @@ void Handlers(Context& h, uint32_t world) {
       },
       __imp__sub_82238570, NativeShowPlayerNodes);
   Group(h, world, "Type8PanelScreen::FadeInGroup", 0x82238468, 10, {112, 24}, screen,
-        __imp__sub_82238468, hooks::Type8FadeInGroup);
+        __imp__sub_82238468, ITC_CONTEXT_FN(hooks::Type8FadeInGroup));
   Group(h, world, "Type8PanelScreen::UpdateOpening", 0x82238A00, 12, {112, 32}, screen,
-        __imp__sub_82238A00, hooks::Type8UpdateOpening);
+        __imp__sub_82238A00, ITC_CONTEXT_FN(hooks::Type8UpdateOpening));
   Group(h, world, "Type8PanelScreen::Show", 0x82238928, 8, {96, 16}, screen,
-        __imp__sub_82238928, hooks::Type8Show);
+        __imp__sub_82238928, ITC_CONTEXT_FN(hooks::Type8Show));
   Group(
       h, world, "Type8PanelScreen::AskQuit", 0x82238BA0, 6, {128, 40},
       [base](PPCContext& t, Random& r, uint32_t w) {
@@ -526,9 +526,9 @@ void Handlers(Context& h, uint32_t world) {
   Group(h, world, "Type8PanelScreen::DrawList", 0x82238DC8, 10, {112, 24}, screen,
         __imp__sub_82238DC8, NativeDrawList);
   Group(h, world, "Type8PanelScreen::Draw", 0x82238E78, 10, {112, 24}, screen,
-        __imp__sub_82238E78, hooks::Type8Draw);
+        __imp__sub_82238E78, ITC_CONTEXT_FN(hooks::Type8Draw));
   Group(h, world, "Type8PanelScreen::OnDialogClosed", 0x82238990, 8, {96, 16}, screen,
-        __imp__sub_82238990, hooks::Type8OnDialogClosed);
+        __imp__sub_82238990, ITC_CONTEXT_FN(hooks::Type8OnDialogClosed));
   g_movies = nullptr;
   saved.Restore();
 }
@@ -605,20 +605,20 @@ void LayMachine(uint8_t* base, uint32_t machine, Random& r) {
 void Screen(Context& h, uint32_t world) {
   uint8_t* const base = h.base;
   Group(h, world, "Type8PanelScreen::Type8PanelScreen", 0x822386F0, 6, {224, 112}, NoSetup,
-        __imp__sub_822386F0, hooks::Type8Construct);
+        __imp__sub_822386F0, ITC_CONTEXT_FN(hooks::Type8Construct));
   // The list screen's constructors (list_screen.cpp) on a random screen.
   Group(h, world, "Type8ListBase::Type8ListBase", 0x822574D0, 4, {96, 16}, NoSetup,
-        __imp__sub_822574D0, hooks::Type8ListBaseConstruct);
+        __imp__sub_822574D0, ITC_CONTEXT_FN(hooks::Type8ListBaseConstruct));
   Group(h, world, "Type8ListScreen::Type8ListScreen", 0x8223F140, 4, {112, 32}, NoSetup,
-        __imp__sub_8223F140, hooks::Type8ListScreenConstruct);
+        __imp__sub_8223F140, ITC_CONTEXT_FN(hooks::Type8ListScreenConstruct));
   const auto menus = [base](PPCContext& t, Random& r, uint32_t w) {
     Menus(base, w + kObjectAt, r);
     t.r4.u64 = r.Next() & ~1ull;
   };
   Group(h, world, "Type8PanelScreen::~Type8PanelScreen", 0x82238368, 6, {112, 24}, menus,
-        __imp__sub_82238368, hooks::Type8Destruct, Released);
+        __imp__sub_82238368, ITC_CONTEXT_FN(hooks::Type8Destruct), Released);
   Group(h, world, "Type8PanelScreen::DeletingDestructor", 0x822388D8, 4, {112, 24}, menus,
-        __imp__sub_822388D8, hooks::Type8DeletingDestruct, Released);
+        __imp__sub_822388D8, ITC_CONTEXT_FN(hooks::Type8DeletingDestruct), Released);
   Deleting(
       h, "Type8PanelScreen::DeletingDestructor", 0x822388D8, t8::kScreenBytes,
       [base](uint32_t object, Random&) {
@@ -627,7 +627,7 @@ void Screen(Context& h, uint32_t world) {
           guest::StoreU32(base, b + 132 + 68, 0);
         }
       },
-      __imp__sub_822388D8, hooks::Type8DeletingDestruct);
+      __imp__sub_822388D8, ITC_CONTEXT_FN(hooks::Type8DeletingDestruct));
   // The machine (+4) laid by LayMachine.
   const auto machine = [base](PPCContext&, Random& r, uint32_t w) {
     LayMachine(base, w + kObjectAt + 4, r);
@@ -636,21 +636,21 @@ void Screen(Context& h, uint32_t world) {
         __imp__sub_82238E98, NativeInitMachine);
   // The color list screen's (color_list_screen.cpp) on a random screen.
   Group(h, world, "Type8ColorListScreen::Type8ColorListScreen", 0x8223DFC0, 4, {144, 56},
-        NoSetup, __imp__sub_8223DFC0, hooks::Type8ColorListConstruct);
+        NoSetup, __imp__sub_8223DFC0, ITC_CONTEXT_FN(hooks::Type8ColorListConstruct));
   Group(h, world, "Type8ColorListScreen::InitMachine", 0x8223E9D8, 12, {992, 56}, machine,
-        __imp__sub_8223E9D8, hooks::Type8ColorListInitMachine);
+        __imp__sub_8223E9D8, ITC_CONTEXT_FN(hooks::Type8ColorListInitMachine));
   Group(
       h, world, "Type8ColorListScreen::DeletingDestructor", 0x8223E2B8, 6, {112, 24},
       [base](PPCContext& t, Random& r, uint32_t w) {
         ColorListMenus(base, w + kObjectAt, r, false);
         t.r4.u64 = r.Next() & ~1ull;
       },
-      __imp__sub_8223E2B8, hooks::Type8ColorListDeletingDestruct, Released);
+      __imp__sub_8223E2B8, ITC_CONTEXT_FN(hooks::Type8ColorListDeletingDestruct), Released);
   Deleting(
       h, "Type8ColorListScreen::DeletingDestructor", 0x8223E2B8,
       t8::kColorListPart + 788,
       [base](uint32_t object, Random& r) { ColorListMenus(base, object, r, true); },
-      __imp__sub_8223E2B8, hooks::Type8ColorListDeletingDestruct);
+      __imp__sub_8223E2B8, ITC_CONTEXT_FN(hooks::Type8ColorListDeletingDestruct));
 }
 
 // PickCar: both car list bases' words (+232 the tab 0 to 3, +236 to +248
@@ -726,7 +726,7 @@ void PickCar(Context& h, uint32_t world) {
         guest::StoreU32(base, kRandSeed, uint32_t(r.Next()));
         t.r4.u64 = w + kDispatcherAt;
       },
-      __imp__sub_82238C88, hooks::Type8PickCar,
+      __imp__sub_82238C88, ITC_CONTEXT_FN(hooks::Type8PickCar),
       [base, block](Outputs& out) {
         for (uint32_t player = 0; player < 2; player++) {
           out.Bytes(Read(base, block + kHalf * player + 6120, 0x400 + 3 * 1968));
@@ -975,114 +975,114 @@ void ListPart(Context& h, uint32_t world) {
   const R4 movie = R4::kMovie;
   const Function functions[] = {
       {"Type8PlayerBlock::Type8PlayerBlock", 0x822542B8, 4, {0, 0, false}, block, R4::kPlayer,
-       false, __imp__sub_822542B8, hooks::Type8BlockConstruct},
+       false, __imp__sub_822542B8, ITC_CONTEXT_FN(hooks::Type8BlockConstruct)},
       {"Type8PlayerBlock::SetUp", 0x822545D0, 8, {160, 48}, block, movie, true,
-       __imp__sub_822545D0, hooks::Type8BlockSetUp},
+       __imp__sub_822545D0, ITC_CONTEXT_FN(hooks::Type8BlockSetUp)},
       {"Type8PlayerBlock::PlayOpening", 0x822546F8, 4, {112, 24}, block, movie, false,
-       __imp__sub_822546F8, hooks::Type8BlockPlayOpening},
+       __imp__sub_822546F8, ITC_CONTEXT_FN(hooks::Type8BlockPlayOpening)},
       {"Type8PlayerBlock::ShowMenuMove", 0x82254798, 10, {144, 48}, block, movie, false,
-       __imp__sub_82254798, hooks::Type8BlockShowMenuMove},
+       __imp__sub_82254798, ITC_CONTEXT_FN(hooks::Type8BlockShowMenuMove)},
       {"Type8PlayerBlock::PlayReady", 0x822548B8, 4, {112, 24}, block, movie, false,
-       __imp__sub_822548B8, hooks::Type8BlockPlayReady},
+       __imp__sub_822548B8, ITC_CONTEXT_FN(hooks::Type8BlockPlayReady)},
       {"Type8PlayerBlock::PlaceCursor", 0x82254948, 6, {128, 32}, block, movie, false,
-       __imp__sub_82254948, hooks::Type8BlockPlaceCursor},
+       __imp__sub_82254948, ITC_CONTEXT_FN(hooks::Type8BlockPlaceCursor)},
       {"Type8PlayerBlock::ShowSelections", 0x82254AD8, 6, {128, 40}, block, movie, false,
-       __imp__sub_82254AD8, hooks::Type8BlockShowSelections},
+       __imp__sub_82254AD8, ITC_CONTEXT_FN(hooks::Type8BlockShowSelections)},
       {"Type8PlayerBlock::WhileReady", 0x82254A70, 8, {112, 24}, block, movie, false,
-       __imp__sub_82254A70, hooks::Type8BlockWhileReady},
+       __imp__sub_82254A70, ITC_CONTEXT_FN(hooks::Type8BlockWhileReady)},
       {"Type8PlayerBlock::Input", 0x82254EC8, 16, {128, 40}, block, movie, false,
-       __imp__sub_82254EC8, hooks::Type8BlockInput},
+       __imp__sub_82254EC8, ITC_CONTEXT_FN(hooks::Type8BlockInput)},
       {"Type8PlayerBlock::UpdateSetting", 0x82254DB8, 8, {112, 24}, block, movie, false,
-       __imp__sub_82254DB8, hooks::Type8BlockUpdateSetting},
+       __imp__sub_82254DB8, ITC_CONTEXT_FN(hooks::Type8BlockUpdateSetting)},
       {"Type8PlayerBlock::SettingMoved", 0x82254C50, 6, {144, 48}, block, movie, false,
-       __imp__sub_82254C50, hooks::Type8BlockSettingMoved},
+       __imp__sub_82254C50, ITC_CONTEXT_FN(hooks::Type8BlockSettingMoved)},
       {"Type8ListPartInner::Type8ListPartInner", 0x822543C0, 4, {96, 16}, inner, movie, false,
-       __imp__sub_822543C0, hooks::Type8ListInnerConstruct},
+       __imp__sub_822543C0, ITC_CONTEXT_FN(hooks::Type8ListInnerConstruct)},
       {"Type8ListPart::Type8ListPart", 0x82254488, 4, {112, 24}, part, movie, false,
-       __imp__sub_82254488, hooks::Type8ListPartConstruct},
+       __imp__sub_82254488, ITC_CONTEXT_FN(hooks::Type8ListPartConstruct)},
       {"Type8ListPartInner::~Type8ListPartInner", 0x82254418, 6, {112, 24}, inner, movie, true,
-       __imp__sub_82254418, hooks::Type8ListInnerDestruct},
+       __imp__sub_82254418, ITC_CONTEXT_FN(hooks::Type8ListInnerDestruct)},
       {"Type8ListPartInner::DeletingDestructor", 0x82254530, 4, {112, 24}, inner, R4::kNoDelete,
-       true, __imp__sub_82254530, hooks::Type8ListInnerDeletingDestruct},
+       true, __imp__sub_82254530, ITC_CONTEXT_FN(hooks::Type8ListInnerDeletingDestruct)},
       {"Type8ListPart::~Type8ListPart", 0x822544E8, 6, {96, 16}, part, movie, true,
-       __imp__sub_822544E8, hooks::Type8ListPartDestruct},
+       __imp__sub_822544E8, ITC_CONTEXT_FN(hooks::Type8ListPartDestruct)},
       {"Type8ListPart::DeletingDestructor", 0x82254580, 4, {112, 24}, part, R4::kNoDelete, true,
-       __imp__sub_82254580, hooks::Type8ListPartDeletingDestruct},
+       __imp__sub_82254580, ITC_CONTEXT_FN(hooks::Type8ListPartDeletingDestruct)},
       {"Type8ListPartInner::Open", 0x822549D8, 8, {128, 32}, inner, movie, true,
-       __imp__sub_822549D8, hooks::Type8ListInnerOpen},
+       __imp__sub_822549D8, ITC_CONTEXT_FN(hooks::Type8ListInnerOpen)},
       {"Type8ListPartInner::Step0", 0x82254D08, 8, {128, 32}, inner, movie, false,
-       __imp__sub_82254D08, hooks::Type8ListInnerStep0},
+       __imp__sub_82254D08, ITC_CONTEXT_FN(hooks::Type8ListInnerStep0)},
       {"Type8PartInner::Step1", 0x822538A8, 6, {112, 24}, inner, movie, false,
-       __imp__sub_822538A8, hooks::Type8PartInnerStep1},
+       __imp__sub_822538A8, ITC_CONTEXT_FN(hooks::Type8PartInnerStep1)},
       {"Type8PartInner::Page1", 0x82253108, 4, {0, 0}, inner, movie, false, __imp__sub_82253108,
-       hooks::Type8PartInnerPage1},
+       ITC_CONTEXT_FN(hooks::Type8PartInnerPage1)},
       {"Type8PartInner::Page2", 0x82253838, 6, {112, 16}, inner, movie, false,
-       __imp__sub_82253838, hooks::Type8PartInnerPage2},
+       __imp__sub_82253838, ITC_CONTEXT_FN(hooks::Type8PartInnerPage2)},
       {"Type8ListPartInner::Page0", 0x82254FB8, 16, {128, 40}, inner, movie, false,
-       __imp__sub_82254FB8, hooks::Type8ListInnerPage0},
+       __imp__sub_82254FB8, ITC_CONTEXT_FN(hooks::Type8ListInnerPage0)},
       {"Type8ListPartInner::Pick", 0x822550C0, 10, {0, 0, false}, inner, movie, false,
-       __imp__sub_822550C0, hooks::Type8ListInnerPick},
+       __imp__sub_822550C0, ITC_CONTEXT_FN(hooks::Type8ListInnerPick)},
       {"Type8ListPartInner::Input", 0x82254E18, 12, {128, 32}, inner, movie, false,
-       __imp__sub_82254E18, hooks::Type8ListInnerInput},
+       __imp__sub_82254E18, ITC_CONTEXT_FN(hooks::Type8ListInnerInput)},
       // The color list part.
       {"Type8ColorBlock::Type8ColorBlock", 0x82252EA0, 4, {0, 0, false}, block, R4::kPlayer,
-       false, __imp__sub_82252EA0, hooks::Type8ColorBlockConstruct, true},
+       false, __imp__sub_82252EA0, ITC_CONTEXT_FN(hooks::Type8ColorBlockConstruct), true},
       {"Type8ColorBlock::SetUp", 0x82253308, 8, {176, 72}, block, movie, true,
-       __imp__sub_82253308, hooks::Type8ColorBlockSetUp, true},
+       __imp__sub_82253308, ITC_CONTEXT_FN(hooks::Type8ColorBlockSetUp), true},
       {"Type8ColorBlock::PlaceCursorA", 0x82253728, 6, {112, 24}, block, movie, false,
-       __imp__sub_82253728, hooks::Type8ColorBlockPlaceCursorA, true},
+       __imp__sub_82253728, ITC_CONTEXT_FN(hooks::Type8ColorBlockPlaceCursorA), true},
       {"Type8ColorBlock::PlaceCursorB", 0x82253690, 4, {144, 48}, block, movie, false,
-       __imp__sub_82253690, hooks::Type8ColorBlockPlaceCursorB, true},
+       __imp__sub_82253690, ITC_CONTEXT_FN(hooks::Type8ColorBlockPlaceCursorB), true},
       {"Type8ColorBlock::PlaceCursorC", 0x82253600, 6, {128, 32}, block, movie, false,
-       __imp__sub_82253600, hooks::Type8ColorBlockPlaceCursorC, true},
+       __imp__sub_82253600, ITC_CONTEXT_FN(hooks::Type8ColorBlockPlaceCursorC), true},
       {"Type8ColorBlock::PlayOpening", 0x822539A8, 4, {128, 32}, block, movie, false,
-       __imp__sub_822539A8, hooks::Type8ColorBlockPlayOpening, true},
+       __imp__sub_822539A8, ITC_CONTEXT_FN(hooks::Type8ColorBlockPlayOpening), true},
       {"Type8ColorBlock::ShowSelections", 0x82253A50, 6, {128, 40}, block, movie, false,
-       __imp__sub_82253A50, hooks::Type8ColorBlockShowSelections, true},
+       __imp__sub_82253A50, ITC_CONTEXT_FN(hooks::Type8ColorBlockShowSelections), true},
       {"Type8ColorBlock::ShowMenuMove", 0x82253BF8, 12, {144, 56}, block, movie, false,
-       __imp__sub_82253BF8, hooks::Type8ColorBlockShowMenuMove, true},
+       __imp__sub_82253BF8, ITC_CONTEXT_FN(hooks::Type8ColorBlockShowMenuMove), true},
       {"Type8ColorBlock::PlayReady", 0x82253570, 4, {112, 24}, block, movie, false,
-       __imp__sub_82253570, hooks::Type8ColorBlockPlayReady, true},
+       __imp__sub_82253570, ITC_CONTEXT_FN(hooks::Type8ColorBlockPlayReady), true},
       {"Type8ColorBlock::SecondMoved", 0x822534F0, 6, {128, 32}, block, movie, false,
-       __imp__sub_822534F0, hooks::Type8ColorBlockSecondMoved, true},
+       __imp__sub_822534F0, ITC_CONTEXT_FN(hooks::Type8ColorBlockSecondMoved), true},
       {"Type8ColorBlock::UpdateSecond", 0x82253948, 8, {112, 24}, block, movie, false,
-       __imp__sub_82253948, hooks::Type8ColorBlockUpdateSecond, true},
+       __imp__sub_82253948, ITC_CONTEXT_FN(hooks::Type8ColorBlockUpdateSecond), true},
       {"Type8ColorBlock::ThirdMoved", 0x82253D90, 6, {144, 48}, block, movie, false,
-       __imp__sub_82253D90, hooks::Type8ColorBlockThirdMoved, true},
+       __imp__sub_82253D90, ITC_CONTEXT_FN(hooks::Type8ColorBlockThirdMoved), true},
       {"Type8ColorBlock::UpdateThird", 0x82253F60, 8, {112, 24}, block, movie, false,
-       __imp__sub_82253F60, hooks::Type8ColorBlockUpdateThird, true},
+       __imp__sub_82253F60, ITC_CONTEXT_FN(hooks::Type8ColorBlockUpdateThird), true},
       {"Type8ColorBlock::WhileReady", 0x82253EF8, 8, {112, 24}, block, movie, false,
-       __imp__sub_82253EF8, hooks::Type8ColorBlockWhileReady, true},
+       __imp__sub_82253EF8, ITC_CONTEXT_FN(hooks::Type8ColorBlockWhileReady), true},
       {"Type8ColorBlock::Input", 0x82254070, 16, {128, 40}, block, movie, false,
-       __imp__sub_82254070, hooks::Type8ColorBlockInput, true},
+       __imp__sub_82254070, ITC_CONTEXT_FN(hooks::Type8ColorBlockInput), true},
       {"Type8ColorPartInner::Type8ColorPartInner", 0x82253030, 4, {96, 16}, inner, movie, false,
-       __imp__sub_82253030, hooks::Type8ColorInnerConstruct, true},
+       __imp__sub_82253030, ITC_CONTEXT_FN(hooks::Type8ColorInnerConstruct), true},
       {"Type8ColorListPart::Type8ColorListPart", 0x82253190, 4, {112, 24}, part, movie, false,
-       __imp__sub_82253190, hooks::Type8ColorPartConstruct, true},
+       __imp__sub_82253190, ITC_CONTEXT_FN(hooks::Type8ColorPartConstruct), true},
       {"Type8ColorPartInner::~Type8ColorPartInner", 0x82253088, 6, {112, 24}, inner, movie,
-       true, __imp__sub_82253088, hooks::Type8ColorInnerDestruct, true},
+       true, __imp__sub_82253088, ITC_CONTEXT_FN(hooks::Type8ColorInnerDestruct), true},
       {"Type8ColorPartInner::DeletingDestructor", 0x82253268, 4, {112, 24}, inner,
-       R4::kNoDelete, true, __imp__sub_82253268, hooks::Type8ColorInnerDeletingDestruct, true},
+       R4::kNoDelete, true, __imp__sub_82253268, ITC_CONTEXT_FN(hooks::Type8ColorInnerDeletingDestruct), true},
       {"Type8ColorListPart::~Type8ColorListPart", 0x822531F0, 6, {96, 16}, part, movie, true,
-       __imp__sub_822531F0, hooks::Type8ColorPartDestruct, true},
+       __imp__sub_822531F0, ITC_CONTEXT_FN(hooks::Type8ColorPartDestruct), true},
       {"Type8ColorListPart::DeletingDestructor", 0x822532B8, 4, {112, 24}, part, R4::kNoDelete,
-       true, __imp__sub_822532B8, hooks::Type8ColorPartDeletingDestruct, true},
+       true, __imp__sub_822532B8, ITC_CONTEXT_FN(hooks::Type8ColorPartDeletingDestruct), true},
       {"Type8ColorPartInner::IsFirstChoice", 0x82253148, 4, {96, 8}, inner, R4::kPlayer, false,
-       __imp__sub_82253148, hooks::Type8ColorInnerIsFirstChoice, true},
+       __imp__sub_82253148, ITC_CONTEXT_FN(hooks::Type8ColorInnerIsFirstChoice), true},
       {"Type8ColorListPart::IsFirstChoice", 0x82253238, 4, {96, 8}, part, R4::kPlayer, false,
-       __imp__sub_82253238, hooks::Type8ColorPartIsFirstChoice, true},
+       __imp__sub_82253238, ITC_CONTEXT_FN(hooks::Type8ColorPartIsFirstChoice), true},
       {"Type8ColorListPart::ThirdChoice", 0x82253240, 4, {0, 0}, part, R4::kPlayer, false,
-       __imp__sub_82253240, hooks::Type8ColorPartThirdChoice, true},
+       __imp__sub_82253240, ITC_CONTEXT_FN(hooks::Type8ColorPartThirdChoice), true},
       {"Type8ColorPartInner::Open", 0x822537A0, 8, {128, 32}, inner, movie, true,
-       __imp__sub_822537A0, hooks::Type8ColorInnerOpen, true},
+       __imp__sub_822537A0, ITC_CONTEXT_FN(hooks::Type8ColorInnerOpen), true},
       {"Type8ColorPartInner::Step0", 0x82253E48, 8, {128, 32}, inner, movie, false,
-       __imp__sub_82253E48, hooks::Type8ColorInnerStep0, true},
+       __imp__sub_82253E48, ITC_CONTEXT_FN(hooks::Type8ColorInnerStep0), true},
       {"Type8ColorPartInner::Page0", 0x82254178, 16, {128, 40}, inner, movie, false,
-       __imp__sub_82254178, hooks::Type8ColorInnerPage0, true},
+       __imp__sub_82254178, ITC_CONTEXT_FN(hooks::Type8ColorInnerPage0), true},
       {"Type8ColorPartInner::Pick", 0x82254280, 10, {0, 0, false}, inner, movie, false,
-       __imp__sub_82254280, hooks::Type8ColorInnerPick, true},
+       __imp__sub_82254280, ITC_CONTEXT_FN(hooks::Type8ColorInnerPick), true},
       {"Type8ColorPartInner::Input", 0x82253FC0, 12, {128, 32}, inner, movie, false,
-       __imp__sub_82253FC0, hooks::Type8ColorInnerInput, true},
+       __imp__sub_82253FC0, ITC_CONTEXT_FN(hooks::Type8ColorInnerInput), true},
   };
   for (const Function& f : functions) {
     g_pages = f.pages;
@@ -1107,13 +1107,13 @@ void ListPart(Context& h, uint32_t world) {
     };
   };
   Deleting(h, "Type8ListPartInner::DeletingDestructor", 0x82254530, 504, shape(false),
-           __imp__sub_82254530, hooks::Type8ListInnerDeletingDestruct);
+           __imp__sub_82254530, ITC_CONTEXT_FN(hooks::Type8ListInnerDeletingDestruct));
   Deleting(h, "Type8ListPart::DeletingDestructor", 0x82254580, 524, shape(true),
-           __imp__sub_82254580, hooks::Type8ListPartDeletingDestruct);
+           __imp__sub_82254580, ITC_CONTEXT_FN(hooks::Type8ListPartDeletingDestruct));
   Deleting(h, "Type8ColorPartInner::DeletingDestructor", 0x82253268, 768, shape(false, true),
-           __imp__sub_82253268, hooks::Type8ColorInnerDeletingDestruct);
+           __imp__sub_82253268, ITC_CONTEXT_FN(hooks::Type8ColorInnerDeletingDestruct));
   Deleting(h, "Type8ColorListPart::DeletingDestructor", 0x822532B8, 788, shape(true, true),
-           __imp__sub_822532B8, hooks::Type8ColorPartDeletingDestruct);
+           __imp__sub_822532B8, ITC_CONTEXT_FN(hooks::Type8ColorPartDeletingDestruct));
   for (size_t i = 0; i < kMenuGlobals.size(); i++) {
     Write(base, kMenuGlobals[i].first, menu_globals[i].data(), kMenuGlobals[i].second);
   }

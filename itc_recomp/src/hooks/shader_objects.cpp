@@ -2,6 +2,7 @@
 // (docs/functions/shader-objects.md).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -42,10 +43,10 @@ bool NativeBlocks() {
 }  // namespace
 
 // Memory::AllocVirtual: r3 = bytes; returns the block or 0.
-extern "C" REX_FUNC(sub_8258DFF0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258DFF0) {
+  
   if (!NativeBlocks()) {
-    __imp__sub_8258DFF0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8258DFF0);
     return;
   }
   ctx.r3.u64 = models::AllocVirtual(base, ctx.r3.u32);
@@ -54,10 +55,10 @@ extern "C" REX_FUNC(sub_8258DFF0) {
 // Memory::AllocPhysicalEx: r3 = bytes, r4 and r5 the lowest and highest
 // physical address, r6 the alignment, r7 the protection; returns the block or
 // 0.
-extern "C" REX_FUNC(sub_8258E098) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258E098) {
+  
   if (!NativeBlocks()) {
-    __imp__sub_8258E098(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8258E098);
     return;
   }
   ctx.r3.u64 = models::AllocPhysicalEx(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -66,10 +67,10 @@ extern "C" REX_FUNC(sub_8258E098) {
 
 // PendingFrees::FreeDue: no arguments, no return value (r3 is the lock word's
 // address the original leaves, read by no caller).
-extern "C" REX_FUNC(sub_8258E1D8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258E1D8) {
+  
   if (!NativeBlocks() || !models::FreeDue(base)) {
-    __imp__sub_8258E1D8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8258E1D8);
   }
 }
 
@@ -78,7 +79,7 @@ extern "C" REX_FUNC(sub_8258E1D8) {
 namespace {
 
 struct CreateContext {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   // VertexShader::Init's original, from a frame as the create's own.
   static void Init(void* user, uint32_t object, uint32_t microcode) {
@@ -95,8 +96,8 @@ struct CreateContext {
 
 // VertexShader::Create and PixelShader::Create: r3 = the shader file;
 // returns the object or 0.
-extern "C" REX_FUNC(sub_822AA018) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822AA018) {
+  
   if (ITC_FLAG(native_shader_objects) && hooks::NativeHeapActive()) {
     const uint64_t lr = ctx.lr;
     CreateContext context{ctx, base};
@@ -110,16 +111,16 @@ extern "C" REX_FUNC(sub_822AA018) {
       return;
     }
   }
-  __imp__sub_822AA018(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_822AA018);
 }
 
-extern "C" REX_FUNC(sub_822A9EE8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A9EE8) {
+  
   if (ITC_FLAG(native_shader_objects) && hooks::NativeHeapActive()) {
     if (const auto object = shader_objects::PixelShaderCreate(base, ctx.r3.u32)) {
       ctx.r3.u64 = *object;
       return;
     }
   }
-  __imp__sub_822A9EE8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_822A9EE8);
 }

@@ -3,6 +3,7 @@
 // (hooks/race_setup.h).
 
 #include "hooks/race_setup.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -45,44 +46,44 @@ namespace hooks {
 
 namespace rs = race_setup;
 
-void RaceSetupResetDecals40(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupResetDecals40) {
   ctx.fpscr.disableFlushMode();
   rs::ResetDecals40(base, ctx.r3.u32);
 }
 
-void RaceSetupResetDecals6(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupResetDecals6) {
   ctx.fpscr.disableFlushMode();
   rs::ResetDecals6(base, ctx.r3.u32);
 }
 
-void RaceSetupResetSettings(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupResetSettings) {
   rs::ResetSettings(base, ctx.r3.u32);
 }
 
-void RaceSetupReset1568(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupReset1568) {
   rs::Reset1568(base, ctx.r3.u32);
 }
 
-void RaceSetupTuningReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupTuningReset) {
   rs::TuningReset(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceSetupDecalFromBuild(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupDecalFromBuild) {
   ctx.fpscr.disableFlushMode();
   rs::DecalFromBuild(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceSetupCarClear(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupCarClear) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::CarClear(base, ctx.r3.u32);
 }
 
-void RaceSetupCarInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupCarInit) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::CarInit(base, ctx.r3.u32);
 }
 
-void RaceSetupSetupVehicle(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupSetupVehicle) {
   const uint32_t frame = ctx.r1.u32 - 368;  // SetupFromCar's, from the same r1
   double f1 = 0.0;
   if (ITC_FLAG(native_car_physics)) {
@@ -100,78 +101,78 @@ void RaceSetupSetupVehicle(PPCContext& ctx, uint8_t* base) {
   lifted::original::c820C27E8(ctx, base);
 }
 
-void RaceSetupSetModel(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupSetModel) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::SetModel(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceSetupFromBuild(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupFromBuild) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::FromBuild(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceSetupRivalLocation(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRivalLocation) {
   ctx.r3.u64 = rs::RivalLocation(ctx.r3.s32, ctx.r4.u64);
 }
 
-void RaceSetupAddStage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupAddStage) {
   rs::AddStage(base, ctx.r3.u32);
 }
 
-void RaceSetupStagesAddRacer(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupStagesAddRacer) {
   rs::StagesAddRacer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32);
 }
 
-void RaceSetupRaceDataConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRaceDataConstruct) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::RaceDataConstruct(base, ctx.r3.u32);
 }
 
-void RaceSetupLapRecordReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupLapRecordReset) {
   rs::LapRecordReset(base, ctx.r3.u32);
 }
 
-void RaceSetupRunningMeanAdd(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRunningMeanAdd) {
   ctx.fpscr.disableFlushMode();
   rs::RunningMeanAdd(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32);
 }
 
-void RaceSetupTimePack(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupTimePack) {
   ctx.r3.u64 = rs::TimePack(ctx.r3.u64);
 }
 
-void RaceSetupCountRace(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupCountRace) {
   rs::CountRace(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceSetupEventFirstOwned(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupEventFirstOwned) {
   ctx.r3.s64 = rs::EventFirstOwned(base, ctx.r3.u32);
 }
 
-void RaceSetupEventCurrentFirstOwned(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupEventCurrentFirstOwned) {
   ctx.r3.s64 = rs::EventCurrentFirstOwned(base);
 }
 
-void RaceSetupEntryReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupEntryReset) {
   ctx.fpscr.disableFlushMode();
   rs::EntryReset(base, ctx.r3.u32);
   ctx.r3.u64 = ctx.r1.u64 - 144 + 80;
   ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
 }
 
-void RaceSetupCourseRecordReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupCourseRecordReset) {
   ctx.r3.u64 = rs::CourseRecordReset(base, ctx.r3.u32);
 }
 
-void RaceSetupEventCurrent(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupEventCurrent) {
   ctx.r3.u64 = rs::EventCurrent(base);
 }
 
-void RaceSetupEventCount(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupEventCount) {
   ctx.r3.u64 = rs::EventCount(base);
 }
 
-void RaceSetupCourseRoutesGet(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupCourseRoutesGet) {
   ctx.fpscr.disableFlushMode();
   uint32_t source = 0;
   uint64_t result = 0;
@@ -191,77 +192,77 @@ void RaceSetupCourseRoutesGet(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = result;
 }
 
-void RaceSetupRaceDataEntryConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRaceDataEntryConstruct) {
   ctx.fpscr.disableFlushMode();
   rs::RaceDataEntryConstruct(base, ctx.r3.u32);
 }
 
-void RaceSetupStagesReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupStagesReset) {
   ctx.r3.u64 = rs::StagesReset(base, ctx.r3.u32);
 }
 
-void RaceSetupRacerRecordInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRacerRecordInit) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::RacerRecordInit(base, ctx.r3.u32);
 }
 
-void RaceSetupRouteSet(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRouteSet) {
   ctx.fpscr.disableFlushMode();
   if (!rs::RouteSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                     ctx.r1.u32 - rs::kRouteFrameBytes)) {
-    __imp__sub_82101A10(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82101A10);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
 }
 
-void RaceSetupRouteReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRouteReset) {
   ctx.fpscr.disableFlushMode();
   if (!rs::RouteReset(base, ctx.r3.u32, ctx.r1.u32 - rs::kRouteFrameBytes)) {
-    __imp__sub_82101990(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82101990);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
 }
 
-void RaceSetupStartPosition(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupStartPosition) {
   ctx.fpscr.disableFlushMode();
   uint32_t result = 0;
   if (!rs::StartPosition(base, ctx.r3.u32, ctx.r1.u32 - rs::kStartFrameBytes, &result)) {
-    __imp__sub_82101A98(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82101A98);
     return;
   }
   ctx.r3.u64 = result;
 }
 
-void RaceSetupRacersReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRacersReset) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::RacersReset(base, ctx.r3.u32);
 }
 
-void RaceSetupRacersAdd(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRacersAdd) {
   ctx.fpscr.disableFlushMode();
   if (!rs::RacersAddNative(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_820FF860(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820FF860);
     return;
   }
   ctx.r3.s64 = rs::RacersAdd(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32);
 }
 
-void RaceSetupAddRacer(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupAddRacer) {
   ctx.fpscr.disableFlushMode();
   if (!rs::AddRacerNative(base, ctx.r3.u32)) {
-    __imp__sub_821017C0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821017C0);
     return;
   }
   ctx.r3.s64 = rs::AddRacer(base, ctx.r3.u32, ctx.r5.u32, ctx.f1.f64, ctx.r6.u32);
 }
 
-void RaceSetupRecordReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRecordReset) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 128;
   if (!rs::RecordReset(base, ctx.r3.u32, frame)) {
-    __imp__sub_82101F68(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82101F68);
     return;
   }
   // Route::Reset's r3 (its frame + 80), and f1 as the entries' resets leave
@@ -270,29 +271,29 @@ void RaceSetupRecordReset(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
 }
 
-void RaceSetupRaceSetRoute(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRaceSetRoute) {
   ctx.fpscr.disableFlushMode();
   if (!rs::RaceSetRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - rs::kRouteFrameBytes)) {
-    __imp__sub_82101D38(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82101D38);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
 }
 
-void RaceSetupStagesSetRoute(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupStagesSetRoute) {
   ctx.fpscr.disableFlushMode();
   if (!rs::StagesSetRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                           ctx.r1.u32 - rs::kRouteFrameBytes)) {
-    __imp__sub_82101E90(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82101E90);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
 }
 
-void RaceSetupRaceDataReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRaceDataReset) {
   ctx.fpscr.disableFlushMode();
   if (!rs::RaceDataReset(base, ctx.r1.u32 - 112)) {
-    __imp__sub_821020F0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821020F0);
     return;
   }
   // The last sub_82101F68's r3 (its Route::Reset's frame + 80) and f1.
@@ -300,13 +301,13 @@ void RaceSetupRaceDataReset(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
 }
 
-void RaceSetupRaceDataResetGlobal(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupRaceDataResetGlobal) {
   if (hooks::StartUpRecorded(ctx, 0x821021A8)) {  // the data load's harness
     return;
   }
   ctx.fpscr.disableFlushMode();
   if (!rs::RaceDataResetGlobal(base, ctx.r1.u32 - 112)) {
-    __imp__sub_821021A8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821021A8);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - 112 - 112 - 128 - rs::kRouteFrameBytes + 80;
@@ -326,7 +327,7 @@ struct RefreshCall {
 
 void GuestRefresh(void* user, uint32_t car) {
   RefreshCall& call = *static_cast<RefreshCall*>(user);
-  PPCContext& ctx = *call.ctx;
+  lifted::Regs& ctx = *call.ctx;
   const uint64_t r1 = ctx.r1.u64;
   ctx.r1.u64 = call.r1;
   ctx.r3.u64 = car;
@@ -337,33 +338,33 @@ void GuestRefresh(void* user, uint32_t car) {
 
 }  // namespace
 
-void RaceSetupSetStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupSetStart) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 4096;
   if (!rs::SetStartNative(base, ctx.r3.u32, ctx.r4.u32, frame)) {
-    __imp__sub_82101D50(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82101D50);
     return;
   }
   RefreshCall call{&ctx, base, frame, 0x82101DC8};
   ctx.r3.u64 = rs::SetStart(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame, GuestRefresh, &call);
 }
 
-void RaceSetupPlaceRacers(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupPlaceRacers) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 128;
   if (!rs::PlaceRacersNative(base, frame)) {
-    __imp__sub_82102048(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82102048);
     return;
   }
   RefreshCall call{&ctx, base, frame - 4096, 0x82101DC8};
   ctx.r3.u64 = rs::PlaceRacers(base, frame, GuestRefresh, &call);
 }
 
-void RaceSetupSetUpRival(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupSetUpRival) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 4112;
   if (!rs::SetUpRivalNative(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, frame)) {
-    __imp__sub_82112DB0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82112DB0);
     return;
   }
   RefreshCall call{&ctx, base, frame, 0x82112EC4};
@@ -381,7 +382,7 @@ struct SetUpCall {
 uint64_t SetUpGuestCall(void* user, uint32_t function, const uint64_t args[4], double f1,
                         uint32_t r1, uint32_t lr) {
   SetUpCall& call = *static_cast<SetUpCall*>(user);
-  PPCContext& ctx = *call.ctx;
+  lifted::Regs& ctx = *call.ctx;
   const uint64_t saved_r1 = ctx.r1.u64;
   ctx.r1.u64 = r1;
   ctx.r3.u64 = args[0];
@@ -419,14 +420,14 @@ uint64_t SetUpGuestCall(void* user, uint32_t function, const uint64_t args[4], d
 
 }  // namespace
 
-void RaceSetupSetUp(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupSetUp) {
   if (hooks::StartUpRecorded(ctx, 0x82115D98)) {
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 11984;
   if (!rs::SetUpNative(base, ctx.r3.u32, frame)) {
-    __imp__sub_82115D98(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82115D98);
     return;
   }
   SetUpCall call{&ctx, base};
@@ -435,7 +436,7 @@ void RaceSetupSetUp(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = save + 48;
 }
 
-void RaceSetupStagesClear(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceSetupStagesClear) {
   ctx.r3.u64 = rs::StagesClear(base, ctx.r3.u32);
 }
 
@@ -459,12 +460,7 @@ void RaceSetupStagesClear(PPCContext& ctx, uint8_t* base) {
 
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_SETUP(address, step)     \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_race_setup)) {   \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_setup)) { \
     hooks::step(ctx, base);               \
   }
 

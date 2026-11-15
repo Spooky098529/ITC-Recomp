@@ -4,7 +4,7 @@
 // so its cases shift no other function's inputs). The recompiled side runs
 // with --native_course_scenery and --native_car_scene_draw off (its callees
 // the originals where those flags switch them); the native side the register
-// step hooks::CourseSceneryRecordHeadlightProjectors.
+// step ITC_CONTEXT_FN(hooks::CourseSceneryRecordHeadlightProjectors).
 //
 // The world, in one allocation (the same addresses for both versions,
 // filled with the same bytes before each): the pass description (r4: +12

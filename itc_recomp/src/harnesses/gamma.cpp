@@ -140,12 +140,12 @@ void Pow(Context& h, Results& results, float x, double y) {
 void Gamma(Context& h) {
   {
     Results results("the 256-entry gamma ramp (sub_822B0910)");
-    Ramps(h, results, RecompiledRamp, NativeRamp, "256-entry");
+    Ramps(h, results, ITC_CONTEXT_FN(RecompiledRamp), ITC_CONTEXT_FN(NativeRamp), "256-entry");
     results.Report();
   }
   {
     Results results("the piecewise-linear gamma ramp (sub_822B0AB0)");
-    Ramps(h, results, RecompiledPwl, NativePwl, "piecewise-linear");
+    Ramps(h, results, ITC_CONTEXT_FN(RecompiledPwl), ITC_CONTEXT_FN(NativePwl), "piecewise-linear");
     results.Report();
   }
   {

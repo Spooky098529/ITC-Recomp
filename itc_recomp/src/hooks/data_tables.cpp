@@ -7,6 +7,7 @@
 // callbacks).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "data_tables/data_tables.h"
@@ -37,7 +38,7 @@ ITC_FLAG_BOOL(native_data_tables, true, "ITC",
 // An adapter whose original swaps words: r3 as the original leaves it (the
 // last word swapped).
 #define ITC_DATA_TABLES_SWAP(address, expr) \
-  extern "C" REX_FUNC(sub_##address) {     \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {     \
     ITC_DATA_TABLES_FALLBACK(address)      \
     ctx.fpscr.disableFlushMode();          \
     ctx.r3.u64 = uint32_t(expr);           \
@@ -49,11 +50,11 @@ ITC_DATA_TABLES_SWAP(821170F0, On56Loaded(base, ctx.r6.u32))
 ITC_DATA_TABLES_SWAP(82116FF0, On20Loaded(base, ctx.r6.u32))
 ITC_DATA_TABLES_SWAP(82117058, On40Loaded(base, ctx.r6.u32))
 
-extern "C" REX_FUNC(sub_821170D8) {
+ITC_NATIVE_ENTRY_ALWAYS(821170D8) {
   ITC_DATA_TABLES_FALLBACK(821170D8)
   OnItemsLoaded(base, ctx.r6.u32);
 }
-extern "C" REX_FUNC(sub_821170C0) {
+ITC_NATIVE_ENTRY_ALWAYS(821170C0) {
   ITC_DATA_TABLES_FALLBACK(821170C0)
   OnLoaded84(base);
 }
@@ -62,7 +63,7 @@ extern "C" REX_FUNC(sub_821170C0) {
 // arguments' upper halves, which the game's 32-bit code doesn't read), or
 // Find20's index (-1 sign-extended, as the original's li).
 #define ITC_DATA_TABLES_WORD(address, expr) \
-  extern "C" REX_FUNC(sub_##address) {     \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {     \
     ITC_DATA_TABLES_FALLBACK(address)      \
     ctx.r3.u64 = uint32_t(expr);           \
   }
@@ -75,14 +76,14 @@ ITC_DATA_TABLES_WORD(82117190, Entry56(base, ctx.r3.u32, ctx.r4.u32))
 ITC_DATA_TABLES_WORD(82117210, Entry20(base, ctx.r3.u32))
 ITC_DATA_TABLES_WORD(82117228, Entry40(base, ctx.r3.u32))
 
-extern "C" REX_FUNC(sub_821171B0) {
+ITC_NATIVE_ENTRY_ALWAYS(821171B0) {
   ITC_DATA_TABLES_FALLBACK(821171B0)
   ctx.r3.s64 = Find20(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // DataTables::Init: r3 as the original leaves it (Archive::Toc's, lwz's).
-extern "C" REX_FUNC(sub_82116DB0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82116DB0) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82116DB0)) {
     return;
   }
@@ -92,17 +93,17 @@ extern "C" REX_FUNC(sub_82116DB0) {
       return;
     }
   }
-  __imp__sub_82116DB0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82116DB0);
 }
 
 // DataTables::Load: the loads through the archive's queue's plain C++.
-extern "C" REX_FUNC(sub_82117240) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82117240) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82117240)) {
     return;
   }
   if (!ITC_FLAG(native_data_tables) || !hooks::NativeArchiveQueue()) {
-    __imp__sub_82117240(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82117240);
     return;
   }
   hooks::SetArchiveSerial(ctx, Load(base, hooks::NativeArchiveLoad(base)));

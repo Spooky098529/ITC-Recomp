@@ -289,7 +289,7 @@ void ModeAfterRaces(Context& h, const World& w) {
       Shape(h.base, w, r);
       t.r3.u64 = (r.Next() & 0xFFFFFFFF00000000ull) | (h.data + kAnswer);
       t.r4.u64 = r.Next();
-      Run(v, __imp__sub_82150E00, hooks::RaceModeModeAfterRace, t, h.base);
+      Run(v, __imp__sub_82150E00, ITC_CONTEXT_FN(hooks::RaceModeModeAfterRace), t, h.base);
       Take(h.base, w, out[v]);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       TakeFrame(h.base, sp - re::kModeAfterRaceFrame, out[v]);
@@ -362,7 +362,7 @@ void NextModes(Context& h, const World& w) {
       const ui_movies_hooks::UpdateCalleeStandIn saved_stand_in =
           ui_movies_hooks::g_update_callee_stand_in;
       ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
-      Run(v, __imp__sub_82151EF0, hooks::RaceModeNextMode, t, h.base);
+      Run(v, __imp__sub_82151EF0, ITC_CONTEXT_FN(hooks::RaceModeNextMode), t, h.base);
       ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
       g_updates = nullptr;
       Take(h.base, w, out[v]);

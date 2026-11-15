@@ -364,7 +364,7 @@ void TopDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
           t.r24.u64 = r.Next();
           t.r28.u64 = r.Next();
         },
-        __imp__sub_820E2EE8, hooks::CarDrawSceneParts, AlphaFloats(),
+        __imp__sub_820E2EE8, ITC_CONTEXT_FN(hooks::CarDrawSceneParts), AlphaFloats(),
         fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& o) {
           if (set == 0) {

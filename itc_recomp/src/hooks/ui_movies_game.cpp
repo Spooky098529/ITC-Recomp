@@ -2,6 +2,7 @@
 // src/ui_movies/game.cpp (docs/functions/ui-movies-game.md).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include <bit>
@@ -109,15 +110,15 @@ ITC_FLAG_DECLARE(bool, native_graphics_resources);
 
 // UiMovie::FindNode: r3 = movie, r4 = a sub-scene's index or -1, r5 = a
 // child's index; the node.
-extern "C" REX_FUNC(sub_8211A578) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211A578) {
+  
   NATIVE_OR_ORIGINAL(8211A578);
   ctx.r3.u64 = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // UiMovie::SetNodeColor: the lookup, then color r6; returns the node.
-extern "C" REX_FUNC(sub_8211A5B8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211A5B8) {
+  
   NATIVE_OR_ORIGINAL(8211A5B8);
   const uint32_t node = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
   ui_movies::SetColor(base, node, ctx.r6.u32);
@@ -125,22 +126,22 @@ extern "C" REX_FUNC(sub_8211A5B8) {
 }
 
 // sub_8211A630: r4 = a node, r5 = a color (r3 left).
-extern "C" REX_FUNC(sub_8211A630) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211A630) {
+  
   NATIVE_OR_ORIGINAL(8211A630);
   ui_movies::SetColor(base, ctx.r4.u32, ctx.r5.u32);
 }
 
 // sub_8211A6C0: r3 = movie (left).
-extern "C" REX_FUNC(sub_8211A6C0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211A6C0) {
+  
   NATIVE_OR_ORIGINAL(8211A6C0);
   ui_movies::ClearTextIds(base, ctx.r3.u32);
 }
 
 // UiMovie::SetNodeTexture: the lookup, then r6; returns the node.
-extern "C" REX_FUNC(sub_8211A708) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211A708) {
+  
   NATIVE_OR_ORIGINAL(8211A708);
   const uint32_t node = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
   ctx.r3.u64 = ui_movies::SetNodeTexture(base, node, ctx.r6.u32);
@@ -148,16 +149,16 @@ extern "C" REX_FUNC(sub_8211A708) {
 
 // UiMovie::ShowNode and HideNode: the lookup, then +80 = 1 or 0; return the
 // node.
-extern "C" REX_FUNC(sub_8211AC00) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211AC00) {
+  
   NATIVE_OR_ORIGINAL(8211AC00);
   const uint32_t node = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
   guest::StoreU32(base, node + 80, 1);
   ctx.r3.u64 = node;
 }
 
-extern "C" REX_FUNC(sub_8211AC48) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211AC48) {
+  
   NATIVE_OR_ORIGINAL(8211AC48);
   const uint32_t node = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
   guest::StoreU32(base, node + 80, 0);
@@ -166,8 +167,8 @@ extern "C" REX_FUNC(sub_8211AC48) {
 
 // UiMovie::SetPictureTexture: the lookup (a picture), then its texture in
 // the movie's array replaced with r6; returns the old one.
-extern "C" REX_FUNC(sub_8211AAA8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211AAA8) {
+  
   NATIVE_OR_ORIGINAL(8211AAA8);
   const uint32_t movie = ctx.r3.u32;
   const uint32_t picture = ui_movies::FindNode(base, movie, ctx.r4.u32, ctx.r5.u32);
@@ -182,8 +183,8 @@ extern "C" REX_FUNC(sub_8211AAA8) {
 // (FindNode and PictureTextureSlot's plain C++; the harness keeps its steps).
 
 // UiMovie::SwapTexture: r3 = movie, r4 = i, r5 = a texture; the old one.
-extern "C" REX_FUNC(sub_8211AB90) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211AB90) {
+  
   NATIVE_OR_ORIGINAL(8211AB90);
   ctx.r3.u64 = ui_movies::SwapTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
@@ -199,10 +200,10 @@ bool NativeRestorePose() {
 }  // namespace
 
 // UiMovie::ResetPose: r3 = movie.
-extern "C" REX_FUNC(sub_8211ABA8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211ABA8) {
+  
   if (!NativeRestorePose()) {
-    __imp__sub_8211ABA8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8211ABA8);
     return;
   }
   ctx.r3.u64 = ui_movies::ResetPose(base, ctx.r3.u32);
@@ -210,47 +211,47 @@ extern "C" REX_FUNC(sub_8211ABA8) {
 
 // UiMovie::ResetNode: r3 = movie, r4 = a sub-scene's index or -1, r5 = a
 // child's index.
-extern "C" REX_FUNC(sub_8211A1E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211A1E0) {
+  
   if (!NativeRestorePose()) {
-    __imp__sub_8211A1E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8211A1E0);
     return;
   }
   ctx.r3.u64 = ui_movies::ResetNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // Quad::Quad: r3 = the quad; returns it.
-extern "C" REX_FUNC(sub_8211A948) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211A948) {
+  
   NATIVE_OR_ORIGINAL(8211A948);
   ctx.r3.u64 = ui_movies::MakeQuad(base, ctx.r3.u32);
 }
 
 // TextItem::TextItem: r3 = the item; returns it.
-extern "C" REX_FUNC(sub_8211A818) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211A818) {
+  
   NATIVE_OR_ORIGINAL(8211A818);
   ctx.r3.u64 = ui_movies::MakeTextItem(base, ctx.r3.u32);
 }
 
 // TextItem::~TextItem: r3 = the item; r3 left at item + 16.
-extern "C" REX_FUNC(sub_8211A8C8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211A8C8) {
+  
   NATIVE_OR_ORIGINAL(8211A8C8);
   ctx.r3.u64 = ui_movies::ClearTextItem(base, ctx.r3.u32);
 }
 
 // sub_8211AED0: r3 = destination, r4 = a text item; returns r3.
-extern "C" REX_FUNC(sub_8211AED0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211AED0) {
+  
   if (!ITC_FLAG(native_ui_movies_game) || !ui_movies::CopyTextItem(base, ctx.r3.u32, ctx.r4.u32)) {
     lifted::original::c8211AED0(ctx, base);
   }
 }
 
 // sub_8211A9E8: r3 = movie (left).
-extern "C" REX_FUNC(sub_8211A9E8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211A9E8) {
+  
   NATIVE_OR_ORIGINAL(8211A9E8);
   ui_movies::InitAnimationLists(base, ctx.r3.u32);
 }
@@ -258,7 +259,7 @@ extern "C" REX_FUNC(sub_8211A9E8) {
 namespace {
 // The 40-byte slot copies: the host's where the two can't share memory,
 // else the game's memcpy (sub_825A7410) from a frame like the original's.
-void CopySlot(PPCContext& ctx, uint8_t* base, uint32_t to, uint32_t from, uint32_t frame_bytes,
+void CopySlot(lifted::Regs& ctx, uint8_t* base, uint32_t to, uint32_t from, uint32_t frame_bytes,
               uint32_t return_address) {
   if (c_runtime::Memcpy(base, to, from, 40)) {
     return;
@@ -276,8 +277,8 @@ void CopySlot(PPCContext& ctx, uint8_t* base, uint32_t to, uint32_t from, uint32
 
 // UiMovie::AnimationTime: r3 = movie (left), r4 = a sub-scene's index or -1,
 // r5 = an animation's index; the time in f1.
-extern "C" REX_FUNC(sub_8211BA00) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211BA00) {
+  
   NATIVE_OR_ORIGINAL(8211BA00);
   const uint32_t time = ui_movies::AnimationTime(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
   ctx.fpscr.disableFlushMode();
@@ -286,8 +287,8 @@ extern "C" REX_FUNC(sub_8211BA00) {
 
 // UiMovie::NamedAnimationTime: r3 = movie (left), r4 = a named animation's
 // index; the time in f1.
-extern "C" REX_FUNC(sub_8211BB18) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211BB18) {
+  
   NATIVE_OR_ORIGINAL(8211BB18);
   const uint32_t time = ui_movies::NamedAnimationTime(base, ctx.r3.u32, ctx.r4.u32);
   ctx.fpscr.disableFlushMode();
@@ -298,23 +299,23 @@ extern "C" REX_FUNC(sub_8211BB18) {
 // list's native panels reach it in play, calling its plain C++.
 
 // TextMap::Find: r3 = a movie's texts, r4 = an id's address.
-extern "C" REX_FUNC(sub_8211B310) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211B310) {
+  
   NATIVE_OR_ORIGINAL(8211B310);
   ctx.r3.u64 = ui_movies::TextMapFind(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // TextMap::Set: r3 = the texts (left), r4 = an id's address, r5 = a text's
 // address.
-extern "C" REX_FUNC(sub_8211B370) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211B370) {
+  
   NATIVE_OR_ORIGINAL(8211B370);
   ui_movies::TextMapSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // UiMovies::Find: r3 = a vector of pairs, r4 = the key's address.
-extern "C" REX_FUNC(sub_8211B3F0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211B3F0) {
+  
   NATIVE_OR_ORIGINAL(8211B3F0);
   ctx.r3.u64 = ui_movies::PairsFind(base, ctx.r3.u32, ctx.r4.u32);
 }
@@ -324,8 +325,8 @@ extern "C" REX_FUNC(sub_8211B3F0) {
 // list; slot 8, then slot 2 for the renderer), made as the original's from a
 // frame like its own; the rest natively. Returns the renderer (r3 as the
 // original leaves it).
-extern "C" REX_FUNC(sub_8211AD00) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211AD00) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8211AD00)) {
     return;  // a harness's (the race HUD object's)
   }
@@ -360,8 +361,8 @@ extern "C" REX_FUNC(sub_8211AD00) {
 
 // sub_8211BD10: r3 = movie, r4 = the scene, r5 = a group, r6 = a layer, r7
 // = 1 to number by bucket.
-extern "C" REX_FUNC(sub_8211BD10) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211BD10) {
+  
   if (!ITC_FLAG(native_ui_movies_game) || !ui_movies::LayersFit(base, ctx.r4.u32, ctx.r5.u32)) {
     lifted::original::c8211BD10(ctx, base);
     return;
@@ -371,15 +372,15 @@ extern "C" REX_FUNC(sub_8211BD10) {
 }
 
 // UiMovies::IsLoaded: r3 = a movie id; 1 or 0.
-extern "C" REX_FUNC(sub_8211BE98) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211BE98) {
+  
   NATIVE_OR_ORIGINAL(8211BE98);
   ctx.r3.u64 = ui_movies::IsLoaded(base, ctx.r3.u32);
 }
 
 // UiMovie::TextString: r3 = movie, r4 = a text id; the text's buffer.
-extern "C" REX_FUNC(sub_8211B720) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211B720) {
+  
   NATIVE_OR_ORIGINAL(8211B720);
   ctx.r3.u64 = ui_movies::TextString(base, ctx.r3.u32, ctx.r4.u32);
 }
@@ -387,8 +388,8 @@ extern "C" REX_FUNC(sub_8211B720) {
 // The text's +20: r3 = movie, r4 = a text id. (Its +24 and +4,
 // sub_8211B7B8 and sub_8211B9B8, and the scroll counter's sub_8211B940 have
 // no adapters: only DrawTexts' plain C++ calls them in play.)
-extern "C" REX_FUNC(sub_8211B770) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211B770) {
+  
   NATIVE_OR_ORIGINAL(8211B770);
   ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 20);
 }
@@ -419,8 +420,8 @@ uint64_t MovedR3(const ui_movies::Moved& moved, uint32_t r1, uint32_t movie) {
 
 // UiMovie::MoveAnimation: r3 = movie, r4 = a sub-scene's index or -1, r5 =
 // an animation's index, r6 = 1 to the looping list, 0 to the queue.
-extern "C" REX_FUNC(sub_8211DBE0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211DBE0) {
+  
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DBE0);
   const uint32_t movie = ctx.r3.u32;
   ctx.r3.u64 = MovedR3(
@@ -433,8 +434,8 @@ extern "C" REX_FUNC(sub_8211DBE0) {
 // and the race HUD object's), and the flag switches those.
 
 // UiMovie::LoopNamed: sub_8211DCE8 with r5 = 1.
-extern "C" REX_FUNC(sub_8211DDE0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211DDE0) {
+  
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DDE0);
   const uint32_t movie = ctx.r3.u32;
   ctx.r3.u64 = MovedR3(ui_movies::MoveNamedAnimation(base, movie, ctx.r4.u32, true), ctx.r1.u32,
@@ -443,8 +444,8 @@ extern "C" REX_FUNC(sub_8211DDE0) {
 
 // UiMovie::UnloopNamed: sub_8211DCE8 with r5 = 0 (a tail call: the frame
 // where its caller's ends).
-extern "C" REX_FUNC(sub_8211DE30) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211DE30) {
+  
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DE30);
   ctx.r5.s64 = 0;
   const uint32_t movie = ctx.r3.u32;
@@ -453,8 +454,8 @@ extern "C" REX_FUNC(sub_8211DE30) {
 
 // UiMovie::Unloop (not seen in play): sub_8211DBE0 with r6 = 0 (a tail
 // call: the frame where its caller's ends).
-extern "C" REX_FUNC(sub_8211DE28) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211DE28) {
+  
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DE28);
   ITC_NATIVE_RUNNING("sub_8211DE28 UiMovie::Unloop");
   ctx.r6.s64 = 0;
@@ -465,15 +466,15 @@ extern "C" REX_FUNC(sub_8211DE28) {
 
 // UiMovie::LoopLast: r3 = movie (its tail calls make their frames where
 // its caller's ends).
-extern "C" REX_FUNC(sub_8211DDE8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211DDE8) {
+  
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DDE8);
   const uint32_t movie = ctx.r3.u32;
   ctx.r3.u64 = MovedR3(ui_movies::LoopLast(base, movie), ctx.r1.u32, movie);
 }
 
 namespace ui_movies_game_hooks {
-void Insert(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Insert) {
   NATIVE_OR_ORIGINAL(8211B4D0);
   const uint32_t list = ctx.r3.u32, from = ctx.r4.u32, position = ctx.r5.u32;
   ui_movies::LinkFree(base, list, int16_t(uint16_t(position)));
@@ -482,24 +483,24 @@ void Insert(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = to;
 }
 
-void RemoveAt(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RemoveAt) {
   NATIVE_OR_ORIGINAL(8211B080);
   ui_movies::RemoveAt(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void Play(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Play) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211D978);
   ctx.r3.u64 = ui_movies::Play(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                                ctx.r8.u32, ctx.r9.u32);
 }
 
-void PlayNamed(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlayNamed) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DAC8);
   ctx.r3.u64 = ui_movies::PlayNamed(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                     ctx.r7.u32, ctx.r8.u32);
 }
 
-void DrawTexts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DrawTexts) {
   NATIVE_OR_ORIGINAL(8211CD90);
   const uint32_t movie = ctx.r3.u32, list = ctx.r4.u32;
   const bool draw_only = ctx.r5.u32 != 0;
@@ -532,7 +533,7 @@ void DrawTexts(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
 }
 
-void Loop(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Loop) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DDD8);
   const uint32_t movie = ctx.r3.u32;
   ctx.r3.u64 = MovedR3(ui_movies::MoveAnimation(base, movie, ctx.r4.u32, ctx.r5.u32, true),
@@ -546,7 +547,7 @@ void Loop(PPCContext& ctx, uint8_t* base) {
 // as the original leaves it: the move's, or the queue after the removal.
 namespace {
 template <typename Move, typename Find>
-void FinishIn(PPCContext& ctx, uint8_t* base, uint32_t movie, uint32_t frame_bytes,
+void FinishIn(lifted::Regs& ctx, uint8_t* base, uint32_t movie, uint32_t frame_bytes,
               uint32_t move_return, uint32_t apply_return, Move move, Find find) {
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, frame_bytes, move_return, [&](uint32_t frame) {
@@ -570,7 +571,7 @@ void FinishIn(PPCContext& ctx, uint8_t* base, uint32_t movie, uint32_t frame_byt
 }
 }  // namespace
 
-void Finish(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Finish) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DE38);
   const uint32_t movie = ctx.r3.u32, sub_scene = ctx.r4.u32, index = ctx.r5.u32;
   FinishIn(
@@ -579,7 +580,7 @@ void Finish(PPCContext& ctx, uint8_t* base) {
       [&] { return ui_movies::FindFinishing(base, movie, sub_scene, index); });
 }
 
-void FinishNamed(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FinishNamed) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DF20);
   const uint32_t movie = ctx.r3.u32, named = ctx.r4.u32;
   FinishIn(
@@ -594,8 +595,8 @@ void FinishNamed(PPCContext& ctx, uint8_t* base) {
 // sub_8259FA00, DrawTexts with r5 = 0, sub_8259DAC0 with 678 and 148), each
 // through its override from a frame like the original's (112 bytes) with
 // its return address. r3 as the last call leaves it.
-extern "C" REX_FUNC(sub_8211D280) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211D280) {
+  
   NATIVE_OR_ORIGINAL(8211D280);
   ITC_NATIVE_RUNNING("sub_8211D280 UiMovie::Draw");
   const uint32_t movie = ctx.r3.u32;
@@ -634,8 +635,8 @@ extern "C" REX_FUNC(sub_8211D280) {
 // advance, else draw only), its override (the frame pacing's); lr kept, so
 // the update sees the caller's return address as the original's jump leaves
 // it.
-extern "C" REX_FUNC(sub_8211E1B8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211E1B8) {
+  
   NATIVE_OR_ORIGINAL(8211E1B8);
   ITC_NATIVE_RUNNING("sub_8211E1B8 UiMovie::Run");
   lifted::CallFromContext(ctx, base, 0x8211D2F8);
@@ -650,8 +651,8 @@ extern "C" REX_FUNC(sub_8211E1B8) {
 // addresses; the copies the host's (the game's memcpy where they might
 // share memory). The counts are read once each, 16-bit, sign-extended, and
 // counted down to 0 as the original's. r3 as the last call leaves it.
-extern "C" REX_FUNC(sub_8211DFF8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211DFF8) {
+  
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DFF8);
   ITC_NATIVE_RUNNING("sub_8211DFF8 UiMovie::FinishAll");
   const uint32_t movie = ctx.r3.u32;
@@ -730,58 +731,58 @@ bool NativeHeap() {
   __imp__sub_##address(ctx, base);
 
 // sub_8211B0E8: r3 = a vector of pairs; returned.
-extern "C" REX_FUNC(sub_8211B0E8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211B0E8) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211B0E8, ui_movies::MakePairs(base, ctx.r3.u32));
 }
 
 // sub_8211C168: r3 = a vector of pairs, r4 = the key's address, r5 = the
 // value's address.
-extern "C" REX_FUNC(sub_8211C168) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211C168) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211C168,
                           ui_movies::PairsSet(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
                                               guest::LoadU32(base, ctx.r5.u32)));
 }
 
 // sub_8211AE68: r3 = a vector of words, r4 = the word's address.
-extern "C" REX_FUNC(sub_8211AE68) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211AE68) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211AE68,
                           ui_movies::WordsAppend(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)));
 }
 
 // UiMovie::UiMovie: r3 = movie; returned.
-extern "C" REX_FUNC(sub_8211E1C0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211E1C0) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211E1C0, ui_movies::ConstructMovie(base, ctx.r3.u32));
 }
 
 // UiMovie::~UiMovie: r3 = movie.
-extern "C" REX_FUNC(sub_8211E160) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211E160) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211E160, ui_movies::DestroyMovie(base, ctx.r3.u32));
 }
 
 // sub_8211AC90: r3 = movie.
-extern "C" REX_FUNC(sub_8211AC90) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211AC90) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211AC90, ui_movies::FreeTexts(base, ctx.r3.u32));
 }
 
 // UiMovie::GetText: r3 = movie, r4 = the address of a TXT node's id; the
 // text record.
-extern "C" REX_FUNC(sub_8211B660) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211B660) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211B660, ui_movies::GetText(base, ctx.r3.u32, ctx.r4.u32));
 }
 
 // sub_8211E378: r3 = movie, r4 = a scene; its temporaries in a frame like
 // the original's below r1.
-extern "C" REX_FUNC(sub_8211E378) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211E378) {
+  
   if (!NativeHeap() || !ui_movies::CanAllocate(base, 0)) {
-    __imp__sub_8211E378(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8211E378);
     return;
   }
   ctx.r3.u64 = ui_movies::AddNamedAnimations(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
@@ -791,8 +792,8 @@ extern "C" REX_FUNC(sub_8211E378) {
 // like the original's (1,248 bytes), CameraPasses::RenderTarget(0) and
 // sub_8259EBE8 through their overrides with its return addresses. r3 as the
 // last call leaves it.
-extern "C" REX_FUNC(sub_8211BEE8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211BEE8) {
+  
   NATIVE_OR_ORIGINAL(8211BEE8);
   const uint32_t primitive = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
@@ -818,8 +819,8 @@ extern "C" REX_FUNC(sub_8211BEE8) {
 // The text setters: r3 = movie, r4 = a sub-scene's index or -1, r5 = a
 // child's index (sub_8211C4F0: r6 = the delay, f1 = the speed;
 // UiMovie::ScrollText: r6 = scrolling).
-extern "C" REX_FUNC(sub_8211C470) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211C470) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8211C470)) {
     return;  // a harness's (the race HUD object's)
   }
@@ -827,21 +828,21 @@ extern "C" REX_FUNC(sub_8211C470) {
                           ui_movies::ClearText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
-extern "C" REX_FUNC(sub_8211C4F0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211C4F0) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211C4F0,
                           ui_movies::SetTextScrollSpeed(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                         ctx.r6.u32, ctx.f1.f64));
 }
 
-extern "C" REX_FUNC(sub_8211C570) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211C570) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211C570, ui_movies::ScrollText(base, ctx.r3.u32, ctx.r4.u32,
                                                           ctx.r5.u32, ctx.r6.u32));
 }
 
-extern "C" REX_FUNC(sub_8211C5F8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211C5F8) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211C5F8,
                           ui_movies::ResetTextScroll(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
@@ -851,38 +852,38 @@ extern "C" REX_FUNC(sub_8211C5F8) {
 // movie, r4 = a sub-scene's index or -1, r5 = a child's index);
 // UiMovie::ScrollNodeText (r4 = the node, r5 = scrolling) and
 // ResetNodeTextScroll (r4 = the node).
-extern "C" REX_FUNC(sub_8211C370) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211C370) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211C370, ui_movies::SetFirstLine(base, ctx.r3.u32, ctx.r4.u32,
                                                             ctx.r5.u32, ctx.r6.u32));
 }
 
-extern "C" REX_FUNC(sub_8211C3F8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211C3F8) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211C3F8,
                           ui_movies::FirstLine(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
-extern "C" REX_FUNC(sub_8211C680) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211C680) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211C680, ui_movies::LineCount(base, ctx.r1.u32, ctx.r3.u32,
                                                          ctx.r4.u32, ctx.r5.u32));
 }
 
-extern "C" REX_FUNC(sub_8211CCC0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211CCC0) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211CCC0,
                           ui_movies::ScrollNodeText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
 // UiMovie::ClearNodeText: r3 = movie, r4 = the node.
-extern "C" REX_FUNC(sub_8211CC50) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211CC50) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211CC50, ui_movies::ClearNodeText(base, ctx.r3.u32, ctx.r4.u32));
 }
 
-extern "C" REX_FUNC(sub_8211CD28) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211CD28) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211CD28,
                           ui_movies::ResetNodeTextScroll(base, ctx.r3.u32, ctx.r4.u32));
 }
@@ -890,8 +891,8 @@ extern "C" REX_FUNC(sub_8211CD28) {
 // UiMovie::SetText: r3 = movie, r4 = a sub-scene's index or -1, r5 = a
 // child's index, r6 = the string id, r7 to r10 its arguments; r3 the movie's
 // texts' map. FormatV's guest calls through this context, lr put back.
-extern "C" REX_FUNC(sub_8211C1F8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211C1F8) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8211C1F8)) {
     return;  // a harness's (the race HUD object's)
   }
@@ -908,11 +909,11 @@ extern "C" REX_FUNC(sub_8211C1F8) {
       return;
     }
   }
-  __imp__sub_8211C1F8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211C1F8);
 }
 
 namespace ui_movies_game_hooks {
-void SetNodeText(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SetNodeText) {
   if (hooks::StartUpRecorded(ctx, 0x8211C7E8)) {
     return;  // a harness's (the race HUD object's)
   }
@@ -929,14 +930,14 @@ void SetNodeText(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_8211C7E8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211C7E8);
 }
 }  // namespace ui_movies_game_hooks
 
 // UiMovie::SetNumberText: r3 = movie, r4 = a sub-scene's index or -1, r5 =
 // a child's index, r6 = the value; r3 the movie's texts' map.
-extern "C" REX_FUNC(sub_8211C740) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211C740) {
+  
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
@@ -949,13 +950,13 @@ extern "C" REX_FUNC(sub_8211C740) {
       return;
     }
   }
-  __imp__sub_8211C740(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211C740);
 }
 
 // UiMovie::SetNodeNumberText: r3 = movie, r4 = the node, r5 = the value;
 // r3 the movie's texts' map.
-extern "C" REX_FUNC(sub_8211CA18) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211CA18) {
+  
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
@@ -968,13 +969,13 @@ extern "C" REX_FUNC(sub_8211CA18) {
       return;
     }
   }
-  __imp__sub_8211CA18(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211CA18);
 }
 
 // UiMovie::SetNodeTextV: r3 = movie, r4 = the node, r5 = the string id, r6
 // = a va_list's address; r3 the movie's texts' map.
-extern "C" REX_FUNC(sub_8211CBD8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211CBD8) {
+  
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
@@ -987,13 +988,13 @@ extern "C" REX_FUNC(sub_8211CBD8) {
       return;
     }
   }
-  __imp__sub_8211CBD8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211CBD8);
 }
 
 // UiMovie::SetNodeCharText: r3 = movie, r4 = the node, r5 = an 8-bit
 // string; r3 the movie's texts' map.
-extern "C" REX_FUNC(sub_8211C8A0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211C8A0) {
+  
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
@@ -1006,15 +1007,15 @@ extern "C" REX_FUNC(sub_8211C8A0) {
       return;
     }
   }
-  __imp__sub_8211C8A0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211C8A0);
 }
 
 // UiMovie::SetChildNameText: r3 = movie, r4 = a sub-scene's index or -1,
 // r5 = a child's index, r6 = the name record; r3 as SetNameText
 // leaves it. With --log_pause_movie the original runs (its SetNodeText
 // logged).
-extern "C" REX_FUNC(sub_8211D930) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211D930) {
+  
   if (NativeHeap() && !ITC_FLAG(log_pause_movie)) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
@@ -1027,28 +1028,28 @@ extern "C" REX_FUNC(sub_8211D930) {
       return;
     }
   }
-  __imp__sub_8211D930(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211D930);
 }
 
 // UiMovie::RevealText and sub_8211D8D8: 1 or 0.
-extern "C" REX_FUNC(sub_8211D880) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211D880) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211D880,
                           ui_movies::RevealText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
-extern "C" REX_FUNC(sub_8211D8D8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211D8D8) {
+  
   NATIVE_HEAP_OR_ORIGINAL(8211D8D8,
                           ui_movies::HasMoreText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
 
 // UiMovie::Load: r3 = the movie, r4 = the asset id; r3 the serial.
-extern "C" REX_FUNC(sub_8211E798) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211E798) {
+  
   if (!ITC_FLAG(native_ui_movies_game) || !hooks::NativeHeapActive() ||
       !hooks::NativeArchiveQueue()) {
-    __imp__sub_8211E798(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8211E798);
     return;
   }
   hooks::SetArchiveSerial(
@@ -1062,7 +1063,7 @@ namespace {
 // Runs `call` with the stack pointer at `sp` (a native caller's frame for
 // the original's), then puts it back.
 template <typename Call>
-void AtStack(PPCContext& ctx, uint32_t sp, Call call) {
+void AtStack(lifted::Regs& ctx, uint32_t sp, Call call) {
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = sp;
   call();
@@ -1071,8 +1072,8 @@ void AtStack(PPCContext& ctx, uint32_t sp, Call call) {
 
 // A recompiled function called with r3 (and r4, r5) from a frame of
 // `bytes` below `sp`, returning to `back`; r3 after it.
-uint32_t CallFrom(PPCContext& ctx, uint8_t* base, uint32_t sp, uint32_t bytes, uint32_t back,
-                  void (*function)(PPCContext&, uint8_t*), uint32_t r3, uint32_t r4 = 0,
+uint32_t CallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t bytes, uint32_t back,
+                  void (*function)(lifted::Regs&, uint8_t*), uint32_t r3, uint32_t r4 = 0,
                   uint32_t r5 = 0) {
   AtStack(ctx, sp, [&] {
     guest_call::InFrame(ctx, base, bytes, back, [&](uint32_t) {
@@ -1087,7 +1088,7 @@ uint32_t CallFrom(PPCContext& ctx, uint8_t* base, uint32_t sp, uint32_t bytes, u
 
 // sub_8211C168 on the movie table, natively where PairsSet can, else the
 // original from the caller's frame; r3 as it leaves it.
-uint32_t SetPair(PPCContext& ctx, uint8_t* base, uint32_t sp, uint32_t back,
+uint32_t SetPair(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t back,
                  uint32_t key_address, uint32_t value_address) {
   if (const auto r3 = ui_movies::PairsSet(base, ui_movies::kMovieTable,
                                           guest::LoadU32(base, key_address),
@@ -1114,7 +1115,7 @@ bool OpenNative() {
   return NativeHeap() && hooks::NativeArchiveQueue();
 }
 
-ui_movies::OpenCalls OpenCalls(PPCContext& ctx, uint8_t* base, uint32_t sp) {
+ui_movies::OpenCalls OpenCalls(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
   ui_movies::OpenCalls calls;
   calls.make = [&ctx, base, sp]() -> uint32_t {
     uint32_t movie = 0;
@@ -1137,28 +1138,28 @@ ui_movies::OpenCalls OpenCalls(PPCContext& ctx, uint8_t* base, uint32_t sp) {
   return calls;
 }
 
-ui_movies::DeleteCalls DeleteCalls(PPCContext& ctx, uint8_t* base, uint32_t sp) {
+ui_movies::DeleteCalls DeleteCalls(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
   ui_movies::DeleteCalls calls;
   // Unload's frame (240 bytes) below Delete's (128), called from 0x8211E294.
   const uint32_t unload_sp = sp - 128;
-  auto from_unload = [&ctx, base, unload_sp](uint32_t back, void (*function)(PPCContext&, uint8_t*),
+  auto from_unload = [&ctx, base, unload_sp](uint32_t back, void (*function)(lifted::Regs&, uint8_t*),
                                              uint32_t r3, uint32_t r4 = 0, uint32_t r5 = 0) {
     return CallFrom(ctx, base, unload_sp, 240, back, function, r3, r4, r5);
   };
   calls.unload.virtual_free = [from_unload](uint32_t which, uint32_t address) {
     static constexpr uint32_t kBack[3] = {0x8211B568, 0x8211B578, 0x8211B588};
     if (!hooks::VirtualFree(address, 0, 0x8000, kBack[which])) {
-      from_unload(kBack[which], lifted::original::c82295330, address, 0, 0x8000);
+      from_unload(kBack[which], ITC_REGS_FN(lifted::original::c82295330), address, 0, 0x8000);
     }
   };
   calls.unload.free = [from_unload](uint32_t block) {
     if (!memory::crt::OperatorDelete(block)) {
-      from_unload(0x8211B5D8, lifted::original::c825A70E8, block);
+      from_unload(0x8211B5D8, ITC_REGS_FN(lifted::original::c825A70E8), block);
     }
   };
   calls.unload.copy_item = [from_unload, base](uint32_t to, uint32_t from) {
     if (!ui_movies::CopyTextItem(base, to, from)) {
-      from_unload(0x8211B614, lifted::original::c8211AED0, to, from);
+      from_unload(0x8211B614, ITC_REGS_FN(lifted::original::c8211AED0), to, from);
     }
   };
   calls.unload.release_xpr = [from_unload, base](uint32_t slot) {
@@ -1181,7 +1182,7 @@ ui_movies::DeleteCalls DeleteCalls(PPCContext& ctx, uint8_t* base, uint32_t sp) 
   };
   calls.free = [&ctx, base, sp](uint32_t movie) {
     if (!memory::crt::OperatorDelete(movie)) {
-      CallFrom(ctx, base, sp, 128, 0x8211E2A4, lifted::original::c825A70E8, movie);
+      CallFrom(ctx, base, sp, 128, 0x8211E2A4, ITC_REGS_FN(lifted::original::c825A70E8), movie);
     }
   };
   calls.set = [&ctx, base, sp](uint32_t key_address, uint32_t value_address) {
@@ -1190,11 +1191,11 @@ ui_movies::DeleteCalls DeleteCalls(PPCContext& ctx, uint8_t* base, uint32_t sp) 
   return calls;
 }
 
-ui_movies::OnLoadedCalls OnLoadedCalls(PPCContext& ctx, uint8_t* base, uint32_t sp) {
+ui_movies::OnLoadedCalls OnLoadedCalls(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
   ui_movies::OnLoadedCalls calls;
   // Each callee's original (or override) from OnLoaded's 192-byte frame
   // below `sp`, returning to `back`.
-  const auto call = [&ctx, base, sp](uint32_t back, void (*function)(PPCContext&, uint8_t*),
+  const auto call = [&ctx, base, sp](uint32_t back, void (*function)(lifted::Regs&, uint8_t*),
                                      uint32_t r3, uint32_t r4 = 0, uint32_t r5 = 0) {
     return CallFrom(ctx, base, sp, 192, back, function, r3, r4, r5);
   };
@@ -1270,7 +1271,7 @@ ui_movies::OnLoadedCalls OnLoadedCalls(PPCContext& ctx, uint8_t* base, uint32_t 
       graphics::TextureLevelDesc(base, texture, 0, desc);
       return;
     }
-    call(0x8211E740, lifted::original::c822A5B78, texture, 0, desc);
+    call(0x8211E740, ITC_REGS_FN(lifted::original::c822A5B78), texture, 0, desc);
   };
   calls.append = [call, base](uint32_t vector, uint32_t word_address) {
     if (!ui_movies::WordsAppend(base, vector, guest::LoadU32(base, word_address))) {
@@ -1281,7 +1282,7 @@ ui_movies::OnLoadedCalls OnLoadedCalls(PPCContext& ctx, uint8_t* base, uint32_t 
     if (const auto r3 = hooks::VirtualFree(archive, 0, 0x8000, 0x8211E77C)) {
       return *r3;
     }
-    return call(0x8211E77C, lifted::original::c82295330, archive, 0, 0x8000);
+    return call(0x8211E77C, ITC_REGS_FN(lifted::original::c82295330), archive, 0, 0x8000);
   };
   return calls;
 }
@@ -1289,13 +1290,13 @@ ui_movies::OnLoadedCalls OnLoadedCalls(PPCContext& ctx, uint8_t* base, uint32_t 
 }  // namespace ui_movies_game_hooks
 
 // UiMovies::Open: r3 = the movie id, r4 = the asset id; r3 = 1 or 0.
-extern "C" REX_FUNC(sub_8211E808) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211E808) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8211E808)) {
     return;  // a harness's (the race HUD object's)
   }
   if (!ui_movies_game_hooks::OpenNative()) {
-    __imp__sub_8211E808(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8211E808);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -1307,13 +1308,13 @@ extern "C" REX_FUNC(sub_8211E808) {
 }
 
 // UiMovies::Delete: r3 = the movie id; r3 as the original leaves it.
-extern "C" REX_FUNC(sub_8211E258) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211E258) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8211E258)) {
     return;  // a harness's (the options screen's)
   }
   if (!ui_movies_game_hooks::DeleteNative()) {
-    __imp__sub_8211E258(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8211E258);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -1325,10 +1326,10 @@ extern "C" REX_FUNC(sub_8211E258) {
 
 // UiMovie::OnLoaded: Archive::Load's callback (no direct callers): r4 =
 // the loaded XMD archive, r6 = the movie; r3 VirtualFree's.
-extern "C" REX_FUNC(sub_8211E500) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211E500) {
+  
   if (!ui_movies_game_hooks::OnLoadedNative()) {
-    __imp__sub_8211E500(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8211E500);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -1344,7 +1345,7 @@ extern "C" REX_FUNC(sub_8211E500) {
 // Each Delete from DeleteAll's 112-byte frame (the jump's tail call keeps
 // r1).
 namespace {
-void DeleteAllSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DeleteAllSteps) {
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32 - 112;
   ctx.r3.u64 = ui_movies::DeleteAll(base, sp, ui_movies_game_hooks::DeleteCalls(ctx, base, sp),
@@ -1353,10 +1354,10 @@ void DeleteAllSteps(PPCContext& ctx, uint8_t* base) {
 }
 }  // namespace
 
-extern "C" REX_FUNC(sub_8211E370) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211E370) {
+  
   if (!ui_movies_game_hooks::DeleteNative()) {
-    __imp__sub_8211E370(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8211E370);
     return;
   }
   ITC_NATIVE_RUNNING("sub_8211E370 UiMovies::DeleteAll's jump");

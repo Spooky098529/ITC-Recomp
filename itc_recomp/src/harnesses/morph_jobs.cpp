@@ -173,7 +173,7 @@ void Constructors(Context& h) {
                                : h.data + kRecord;
           },
           k == 0 ? __imp__sub_820ACC08 : __imp__sub_820ACAA8,
-          k == 0 ? NativeMorphConstruct : NativeSkinConstruct,
+          k == 0 ? ITC_CONTEXT_FN(NativeMorphConstruct) : ITC_CONTEXT_FN(NativeSkinConstruct),
           [&](Outputs& out, const PPCContext& t, int) {
             ScratchOut(h, out);
             out.Word(guest::LoadU32(h.base, t.r1.u32 - mj::kConstructFrame));
@@ -210,7 +210,7 @@ void Makers(Context& h) {
             t.r4.u64 = h.data + kRecord;
           },
           k == 0 ? __imp__sub_820AC7F0 : __imp__sub_820AC8A0,
-          k == 0 ? NativeMorphMake : NativeSkinMake,
+          k == 0 ? ITC_CONTEXT_FN(NativeMorphMake) : ITC_CONTEXT_FN(NativeSkinMake),
           [&](Outputs& out, const PPCContext& t, int) {
             const uint32_t job = t.r3.u32;
             const bool heap = job != 0 && memory::IsHeapBlock(job);
@@ -243,11 +243,11 @@ void Destructors(Context& h) {
     uint32_t offset;  // r3 past the object (the +4 interface's 4)
   };
   const Entry entries[] = {
-      {"MorphJob::~MorphJob (sub_820ACB90)", __imp__sub_820ACB90, hooks::MorphJobsDestroy, 0},
-      {"Job::~Job (sub_820AC9E8)", __imp__sub_820AC9E8, hooks::MorphJobsDestroyBase, 0},
-      {"WorkItem::~WorkItem (sub_82090E40)", __imp__sub_82090E40, hooks::MorphJobsWorkItemDestroy,
+      {"MorphJob::~MorphJob (sub_820ACB90)", __imp__sub_820ACB90, ITC_CONTEXT_FN(hooks::MorphJobsDestroy), 0},
+      {"Job::~Job (sub_820AC9E8)", __imp__sub_820AC9E8, ITC_CONTEXT_FN(hooks::MorphJobsDestroyBase), 0},
+      {"WorkItem::~WorkItem (sub_82090E40)", __imp__sub_82090E40, ITC_CONTEXT_FN(hooks::MorphJobsWorkItemDestroy),
        0},
-      {"sub_82090E38", __imp__sub_82090E38, hooks::MorphJobsWorkItemInterfaceDestroy, 4},
+      {"sub_82090E38", __imp__sub_82090E38, ITC_CONTEXT_FN(hooks::MorphJobsWorkItemInterfaceDestroy), 4},
   };
   for (const Entry& e : entries) {
     Results results(e.name);
@@ -300,18 +300,18 @@ void Leaves(Context& h) {
     uint32_t offset;
   };
   const Entry entries[] = {
-      {"MorphJob::IsReleased (sub_820AC9D0)", __imp__sub_820AC9D0, hooks::MorphJobsIsReleased, 0},
-      {"MorphJob::SetReleased (sub_820AC9D8)", __imp__sub_820AC9D8, hooks::MorphJobsSetReleased,
+      {"MorphJob::IsReleased (sub_820AC9D0)", __imp__sub_820AC9D0, ITC_CONTEXT_FN(hooks::MorphJobsIsReleased), 0},
+      {"MorphJob::SetReleased (sub_820AC9D8)", __imp__sub_820AC9D8, ITC_CONTEXT_FN(hooks::MorphJobsSetReleased),
        0},
-      {"WorkItem::Posted (sub_82090DD0)", __imp__sub_82090DD0, hooks::MorphJobsWorkItemPosted, 0},
-      {"WorkItem::Started (sub_82090DE8)", __imp__sub_82090DE8, hooks::MorphJobsWorkItemStarted,
+      {"WorkItem::Posted (sub_82090DD0)", __imp__sub_82090DD0, ITC_CONTEXT_FN(hooks::MorphJobsWorkItemPosted), 0},
+      {"WorkItem::Started (sub_82090DE8)", __imp__sub_82090DE8, ITC_CONTEXT_FN(hooks::MorphJobsWorkItemStarted),
        0},
-      {"WorkItem::Finished (sub_82090DF8)", __imp__sub_82090DF8, hooks::MorphJobsWorkItemFinished,
+      {"WorkItem::Finished (sub_82090DF8)", __imp__sub_82090DF8, ITC_CONTEXT_FN(hooks::MorphJobsWorkItemFinished),
        0},
-      {"WorkItem::Skip (sub_82090E08)", __imp__sub_82090E08, hooks::MorphJobsWorkItemSkip, 0},
-      {"WorkItem::IsSkipped (sub_82090CB8)", __imp__sub_82090CB8, hooks::MorphJobsWorkItemIsSkipped,
+      {"WorkItem::Skip (sub_82090E08)", __imp__sub_82090E08, ITC_CONTEXT_FN(hooks::MorphJobsWorkItemSkip), 0},
+      {"WorkItem::IsSkipped (sub_82090CB8)", __imp__sub_82090CB8, ITC_CONTEXT_FN(hooks::MorphJobsWorkItemIsSkipped),
        0},
-      {"sub_82090DC8", __imp__sub_82090DC8, hooks::MorphJobsWorkItemInterfaceIsSkipped, 4},
+      {"sub_82090DC8", __imp__sub_82090DC8, ITC_CONTEXT_FN(hooks::MorphJobsWorkItemInterfaceIsSkipped), 4},
   };
   for (const Entry& e : entries) {
     Results results(e.name);
@@ -359,7 +359,7 @@ void TailCalls(Context& h) {
             // The high word now and then set (r4 = r3 + 4, all 64 bits).
             t.r3.u64 = (r.Below(4) == 0 ? (r.Next() << 32) : 0) | item;
           },
-          __imp__sub_82090E18, hooks::MorphJobsWorkItemRun,
+          __imp__sub_82090E18, ITC_CONTEXT_FN(hooks::MorphJobsWorkItemRun),
           [&](Outputs& out, const PPCContext& t, int) { regs(out, t); },
           fmt::format("case {}", c));
     }
@@ -376,7 +376,7 @@ void TailCalls(Context& h) {
             guest::StoreU32(h.base, h.data + kVtable + 4, kStoreR4R5At60);
             t.r3.u64 = (r.Below(4) == 0 ? (r.Next() << 32) : 0) | item;
           },
-          __imp__sub_820ACA30, hooks::MorphJobsWorkItemCall,
+          __imp__sub_820ACA30, ITC_CONTEXT_FN(hooks::MorphJobsWorkItemCall),
           [&](Outputs& out, const PPCContext& t, int) { regs(out, t); },
           fmt::format("case {}", c));
     }
@@ -393,7 +393,7 @@ void TailCalls(Context& h) {
             guest::StoreU32(h.base, h.data + kVtable + 16, kStoreR4R5At60);
             t.r3.u64 = (r.Below(4) == 0 ? (r.Next() << 32) : 0) | job;
           },
-          __imp__sub_820AC9C0, hooks::MorphJobsRunThunk,
+          __imp__sub_820AC9C0, ITC_CONTEXT_FN(hooks::MorphJobsRunThunk),
           [&](Outputs& out, const PPCContext& t, int) { regs(out, t); },
           fmt::format("case {}", c));
     }
@@ -415,7 +415,7 @@ void TailCalls(Context& h) {
             guest::StoreU32(h.base, h.data + kVtable + 4, kStoreR4R5At60);
             t.r3.u64 = job;
           },
-          __imp__sub_820AC9B8, hooks::MorphJobsWait,
+          __imp__sub_820AC9B8, ITC_CONTEXT_FN(hooks::MorphJobsWait),
           [&](Outputs& out, const PPCContext& t, int) {
             ScratchOut(h, out);
             out.Word(t.r3.u32);
@@ -468,7 +468,7 @@ void RunCases(Context& h) {
           // came).
           t.r3.u64 = job;
         },
-        __imp__sub_820AC998, hooks::MorphJobsRun,
+        __imp__sub_820AC998, ITC_CONTEXT_FN(hooks::MorphJobsRun),
         [&](Outputs& out, const PPCContext& t, int) {
           out.Bytes(Read(h.base, h.data, kStreamOut));
           out.Floats(h.base, h.data + kStreamOut, 0x100 / 4);

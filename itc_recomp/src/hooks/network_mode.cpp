@@ -4,6 +4,7 @@
 // answered by plugging in data (the user's call, 2026-11-12).
 
 #include "hooks/network_mode.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "network_mode/network_mode.h"
@@ -75,7 +76,7 @@ namespace nm = network_mode;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -85,7 +86,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -106,7 +107,7 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
@@ -118,14 +119,14 @@ uint64_t AddR3(uint64_t machine_r3, uint32_t r3, bool replaced) {
 }
 
 template <uint32_t (*InitStates)(uint8_t*, uint32_t, uint32_t, bool*), uint32_t kFrame>
-void InitStatesStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(InitStatesStep) {
   bool replaced = false;
   const uint32_t r3 = InitStates(base, ctx.r3.u32, ctx.r1.u32 - kFrame, &replaced);
   ctx.r3.u64 = AddR3(ctx.r3.u64, r3, replaced);
 }
 
 template <uint32_t (*InitBase)(uint8_t*, uint32_t, uint32_t, uint32_t, bool*)>
-void InitBaseStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(InitBaseStep) {
   bool replaced = false;
   const uint32_t r3 =
       InitBase(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - nm::kInitBaseFrame, &replaced);
@@ -136,13 +137,13 @@ void InitBaseStep(PPCContext& ctx, uint8_t* base) {
 
 bool NetworkModeNative() { return ITC_FLAG(native_network_mode); }
 
-void ModeType12Init(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType12Init) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = nm::ModeInit(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 #define ITC_NET_INIT_STATES(name, function, frame) \
-  void name(PPCContext& ctx, uint8_t* base) { InitStatesStep<nm::function, nm::frame>(ctx, base); }
+  ITC_REGS_STEP(name) { InitStatesStep<nm::function, nm::frame>(ctx, base); }
 ITC_NET_INIT_STATES(NetModeSelectInitStates, ModeSelectInitStates, kModeSelectInitFrame)
 ITC_NET_INIT_STATES(Type12Screen1InitStates, Screen1InitStates, kScreen1InitFrame)
 ITC_NET_INIT_STATES(Type12Screen3InitStates, Screen3InitStates, kScreen3InitFrame)
@@ -160,7 +161,7 @@ ITC_NET_INIT_STATES(PowerGraphScreen12InitStates, PowerGraphInitStates, kPowerGr
 #undef ITC_NET_INIT_STATES
 
 #define ITC_NET_INIT_BASE(name, function) \
-  void name(PPCContext& ctx, uint8_t* base) { InitBaseStep<nm::function>(ctx, base); }
+  ITC_REGS_STEP(name) { InitBaseStep<nm::function>(ctx, base); }
 ITC_NET_INIT_BASE(Type12Screen6InitBase, Screen6InitBase)
 ITC_NET_INIT_BASE(Type12Screen7InitBase, Screen7InitBase)
 ITC_NET_INIT_BASE(Type12Screen8InitBase, Screen8InitBase)
@@ -172,7 +173,7 @@ ITC_NET_INIT_BASE(Type12Dialog13InitBase, Dialog13InitBase)
 #undef ITC_NET_INIT_BASE
 
 // r4 = r5 moved first; out of the table's range, r3 as it came.
-void NetScreenInitBase(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NetScreenInitBase) {
   bool replaced = false;
   uint32_t r3 = 0;
   if (nm::InitBase(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, &replaced, &r3)) {
@@ -180,23 +181,23 @@ void NetScreenInitBase(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void ModeType12Machine(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType12Machine) {
   const uint32_t machine = nm::Machine(ctx.r3.u32, ctx.r4.u32);
   // The original adds the offset to r3's 64 bits (case 0 returns r3).
   ctx.r3.u64 = machine == 0 ? 0 : ctx.r3.u64 + (machine - ctx.r3.u32);
 }
 // r3 left as the original's last Machine call leaves it.
-void ModeType12FindShown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType12FindShown) {
   ctx.r4.u64 = nm::FindShown(base, ctx.r3.u32);
   ModeType12Machine(ctx, base);
 }
-void ModeType12AllLoaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType12AllLoaded) {
   ctx.r3.u64 = nm::AllLoaded(base, ctx.r3.u32);
 }
 
 // The delegate functions return the answer (r3 as it came).
 #define ITC_MODE_TYPE12_DELEGATE(name)                                    \
-  void ModeType12##name(PPCContext& ctx, uint8_t* base) {                 \
+  void ModeType12##name(lifted::Regs& ctx, uint8_t* base) {                 \
     const uint64_t answer = ctx.r3.u64;                                   \
     {                                                                     \
       GuestCalls guest(ctx, base);                                        \
@@ -211,7 +212,7 @@ ITC_MODE_TYPE12_DELEGATE(WaitForShown)
 ITC_MODE_TYPE12_DELEGATE(Teardown)
 #undef ITC_MODE_TYPE12_DELEGATE
 
-void ModeType12ForceExit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType12ForceExit) {
   uint64_t r3;
   {
     GuestCalls guest(ctx, base);
@@ -219,10 +220,10 @@ void ModeType12ForceExit(PPCContext& ctx, uint8_t* base) {
   }
   ctx.r3.u64 = r3;
 }
-void ModeType12Resume(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType12Resume) {
   ctx.r3.u64 = nm::Resume(base, ctx.r3.u32, ctx.r1.u32);
 }
-void SessionFree(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SessionFree) {
   uint64_t r3;
   {
     GuestCalls guest(ctx, base);
@@ -232,7 +233,7 @@ void SessionFree(PPCContext& ctx, uint8_t* base) {
 }
 
 template <uint32_t kIndex>
-void NetMachineCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NetMachineCreate) {
   uint64_t r3;
   {
     GuestCalls guest(ctx, base);
@@ -241,7 +242,7 @@ void NetMachineCreate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 template <uint32_t kIndex>
-void NetMachineOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NetMachineOpenMovie) {
   uint64_t r3;
   {
     GuestCalls guest(ctx, base);
@@ -250,11 +251,11 @@ void NetMachineOpenMovie(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 template <uint32_t kIndex>
-void NetMachineWaitForMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NetMachineWaitForMovie) {
   ctx.r3.u64 = nm::MachineWaitForMovie(base, kIndex, ctx.r3.u64, ctx.r1.u32);
 }
 template <uint32_t kIndex>
-void NetMachineLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NetMachineLeave) {
   uint64_t r3;
   {
     GuestCalls guest(ctx, base);
@@ -263,7 +264,7 @@ void NetMachineLeave(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 template <uint32_t kIndex>
-void NetMachineDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NetMachineDestroy) {
   uint64_t r3;
   {
     GuestCalls guest(ctx, base);
@@ -272,11 +273,11 @@ void NetMachineDestroy(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 #define ITC_NET_MACHINE(index)                                       \
-  template void NetMachineCreate<index>(PPCContext&, uint8_t*);      \
-  template void NetMachineOpenMovie<index>(PPCContext&, uint8_t*);   \
-  template void NetMachineWaitForMovie<index>(PPCContext&, uint8_t*); \
-  template void NetMachineLeave<index>(PPCContext&, uint8_t*);       \
-  template void NetMachineDestroy<index>(PPCContext&, uint8_t*);
+  template void NetMachineCreate<index>(lifted::Regs&, uint8_t*);      \
+  template void NetMachineOpenMovie<index>(lifted::Regs&, uint8_t*);   \
+  template void NetMachineWaitForMovie<index>(lifted::Regs&, uint8_t*); \
+  template void NetMachineLeave<index>(lifted::Regs&, uint8_t*);       \
+  template void NetMachineDestroy<index>(lifted::Regs&, uint8_t*);
 ITC_NET_MACHINE(0)
 ITC_NET_MACHINE(1)
 ITC_NET_MACHINE(3)
@@ -292,7 +293,7 @@ ITC_NET_MACHINE(12)
 ITC_NET_MACHINE(13)
 #undef ITC_NET_MACHINE
 
-void Type12Screen1ResetData(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type12Screen1ResetData) {
   uint64_t r3;
   {
     GuestCalls guest(ctx, base);
@@ -301,7 +302,7 @@ void Type12Screen1ResetData(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void SessionMake(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SessionMake) {
   uint64_t r3;
   {
     GuestCalls guest(ctx, base);
@@ -309,14 +310,14 @@ void SessionMake(PPCContext& ctx, uint8_t* base) {
   }
   ctx.r3.u64 = r3;
 }
-void SessionInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SessionInit) {
   ctx.r3.u64 = nm::SessionInit(base, ctx.r3.u64, ctx.r1.u32);
 }
 
 // The mode select's steps: those making guest calls through GuestCalls,
 // r3 as the plain C++ answers; the leaves leave r3 as it came.
 #define ITC_NET_SELECT_CALLS(name, expression) \
-  void name(PPCContext& ctx, uint8_t* base) {  \
+  ITC_REGS_STEP(name) {  \
     uint64_t r3;                               \
     {                                          \
       GuestCalls guest(ctx, base);             \
@@ -349,34 +350,29 @@ ITC_NET_SELECT_CALLS(NetModeSelectFadeIn, nm::SelectFadeIn(base, ctx.r3.u32, ctx
 ITC_NET_SELECT_CALLS(NetModeSelectUnload, nm::SelectUnload(base, ctx.r3.u32, ctx.r1.u32, calls))
 #undef ITC_NET_SELECT_CALLS
 
-void NetModeSelectOpen(PPCContext& ctx, uint8_t* base) { nm::SelectOpen(base, ctx.r3.u32); }
-void NetModeSelectLeavePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NetModeSelectOpen) { nm::SelectOpen(base, ctx.r3.u32); }
+ITC_REGS_STEP(NetModeSelectLeavePage) {
   nm::SelectLeavePage(base, ctx.r3.u32);
 }
-void NetModeSelectBackPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NetModeSelectBackPage) {
   nm::SelectBackPage(base, ctx.r3.u32);
 }
-void NetModeSelectSetCursorY(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NetModeSelectSetCursorY) {
   ctx.r3.u64 = nm::SelectSetCursorY(base, ctx.r3.u32, ctx.r1.u32);
 }
-void NetModeSelectOnNo(PPCContext& ctx, uint8_t* base) { nm::SelectOnNo(base); }
-void NetModeSelectOnYes(PPCContext& ctx, uint8_t* base) { nm::SelectOnYes(base); }
-void NetModeSelectOnDialogClosed(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NetModeSelectOnNo) { nm::SelectOnNo(base); }
+ITC_REGS_STEP(NetModeSelectOnYes) { nm::SelectOnYes(base); }
+ITC_REGS_STEP(NetModeSelectOnDialogClosed) {
   nm::SelectOnDialogClosed(base);
 }
-void NetModeSelectUnloaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NetModeSelectUnloaded) {
   nm::SelectUnloaded(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
 }  // namespace hooks
 
 #define ITC_NETWORK_MODE(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_network_mode)) { \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_network_mode)) { \
     hooks::step(ctx, base);               \
   }
 

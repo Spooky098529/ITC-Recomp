@@ -157,11 +157,11 @@ void CockpitDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
        NativeCockpitDoorWindow, Takes::kGroup, kDoorWindow, car_draw::kCockpitSmallFrame, 128},
       {"CockpitPoints::DrawHeadlights (sub_820DBB88)", __imp__sub_820DBB88,
        NativeCockpitHeadlights, Takes::kGroup, kHeadlights, car_draw::kCockpitSmallFrame, 128},
-      {"CockpitPoints::Draw (sub_820DBD38)", __imp__sub_820DBD38, NativeCockpitPoints,
+      {"CockpitPoints::Draw (sub_820DBD38)", __imp__sub_820DBD38, ITC_CONTEXT_FN(NativeCockpitPoints),
        Takes::kPoints, 0, car_draw::kCockpitPointsFrame, 192},
-      {"SceneCockpit::DrawBody (sub_820DC350)", __imp__sub_820DC350, NativeCockpitBody,
+      {"SceneCockpit::DrawBody (sub_820DC350)", __imp__sub_820DC350, ITC_CONTEXT_FN(NativeCockpitBody),
        Takes::kCockpit, 0, car_draw::kCockpitBodyFrame, 256},
-      {"SceneCockpit::Draw (sub_820DC498)", __imp__sub_820DC498, hooks::CarDrawSceneCockpit,
+      {"SceneCockpit::Draw (sub_820DC498)", __imp__sub_820DC498, ITC_CONTEXT_FN(hooks::CarDrawSceneCockpit),
        Takes::kCockpit, 0, car_draw::kCockpitBodyFrame, 256},
   };
   std::vector<uint8_t> scene_bytes, records;

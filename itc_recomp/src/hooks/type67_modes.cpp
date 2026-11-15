@@ -5,6 +5,7 @@
 // their adapters stay.
 
 #include "hooks/type67_modes.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/archive.h"
@@ -126,7 +127,7 @@ bool Type67ModesNative() {
   return ITC_FLAG(native_type67_modes);
 }
 
-void Type67Init(PPCContext& ctx, uint8_t* base, uint32_t address) {
+void Type67Init(lifted::Regs& ctx, uint8_t* base, uint32_t address) {
   uint32_t frame_bytes = 0;
   for (const t67::InitInfo& info : t67::kInits) {
     if (info.address == address) {
@@ -144,22 +145,22 @@ void Type67Init(PPCContext& ctx, uint8_t* base, uint32_t address) {
 
 // --- The handlers without guest calls ---
 
-void GarageStageSetPlates(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(GarageStageSetPlates) {
   ctx.r3.u64 = t67::GarageStageSetPlates(base, ctx.r3.u64, ctx.r4.u32);
 }
-void GarageStageResetPose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(GarageStageResetPose) {
   ctx.r3.u64 = t67::GarageStageResetPose(base, ctx.r3.u64, ctx.r1.u32);
 }
-void CameraPresetConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraPresetConstruct) {
   ctx.r3.u64 = t67::CameraPresetConstruct(base, ctx.r3.u64, ctx.r1.u32);
 }
-void CameraPresetCopy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraPresetCopy) {
   ctx.r3.u64 = t67::CameraPresetCopy(base, ctx.r3.u32, ctx.r1.u32);
 }
 
 namespace {
 
-bool Set(PPCContext& ctx, const std::optional<uint64_t>& r3) {
+bool Set(lifted::Regs& ctx, const std::optional<uint64_t>& r3) {
   if (!r3) {
     return false;
   }
@@ -169,109 +170,109 @@ bool Set(PPCContext& ctx, const std::optional<uint64_t>& r3) {
 
 }  // namespace
 
-bool GarageCameraFreePresets(PPCContext& ctx, uint8_t* base) {
+bool GarageCameraFreePresets(lifted::Regs& ctx, uint8_t* base) {
   return Set(ctx, t67::GarageCameraFreePresets(base, ctx.r3.u64));
 }
-bool GarageCameraOnPresetsLoaded(PPCContext& ctx, uint8_t* base) {
+bool GarageCameraOnPresetsLoaded(lifted::Regs& ctx, uint8_t* base) {
   return Set(ctx, t67::GarageCameraOnPresetsLoaded(base, ctx.r4.u32, ctx.r6.u32, ctx.r1.u32));
 }
-bool StandSlotFree(PPCContext& ctx, uint8_t* base) {
+bool StandSlotFree(lifted::Regs& ctx, uint8_t* base) {
   return Set(ctx, t67::StandSlotFree(base, ctx.r3.u64));
 }
-void ControllerOptionsOnEnter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ControllerOptionsOnEnter) {
   ctx.r3.u64 = t67::ControllerOptionsOnEnter(base, ctx.r3.u32);
 }
-bool ControllerOptionsOnLeft(PPCContext& ctx, uint8_t* base) {
+bool ControllerOptionsOnLeft(lifted::Regs& ctx, uint8_t* base) {
   return Set(ctx, t67::ControllerOptionsOnLeft(base));
 }
-void ControllerOptionsShow(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ControllerOptionsShow) {
   ctx.r3.u64 = t67::ControllerOptionsShow(base, ctx.r3.u64);
 }
-void ControllerOptionsOpen(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ControllerOptionsOpen) {
   ctx.r3.u64 = t67::ControllerOptionsOpen(base, ctx.r3.u64);
 }
-void ControllerOptionsLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ControllerOptionsLeave) {
   ctx.r3.u64 = t67::ControllerOptionsLeave(base, ctx.r3.u64, ctx.r4.u32);
 }
-void ControllerOptionsStepSliders(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ControllerOptionsStepSliders) {
   ctx.r3.u64 = t67::ControllerOptionsStepSliders(base);
 }
-void ControllerOptionsStepButtons(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ControllerOptionsStepButtons) {
   ctx.r3.u64 = t67::ControllerOptionsStepSide(base, 672, 12);
 }
-void ControllerOptionsStepAnalog(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ControllerOptionsStepAnalog) {
   ctx.r3.u64 = t67::ControllerOptionsStepSide(base, 680, 6);
 }
-void ControllerOptionsSetMarkY(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ControllerOptionsSetMarkY) {
   ctx.r3.u64 = t67::ControllerOptionsSetMarkY(base, ctx.r3.u64, ctx.r1.u32);
 }
-void PanelScreenInitWords(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PanelScreenInitWords) {
   ctx.r3.u64 = t67::PanelScreenInitWords(base, ctx.r3.u64);
 }
-void ScreenMachineWait(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ScreenMachineWait) {
   ctx.r3.u64 = t67::ScreenMachineWait(base, ctx.r3.u64);
 }
-void ScreenReenter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ScreenReenter) {
   ctx.r3.u64 = t67::ScreenReenter(base, ctx.r3.u64);
 }
-void ScreenWait(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ScreenWait) {
   ctx.r3.u64 = t67::ScreenWait(base, ctx.r3.u64);
 }
-void DialogQueueReopen(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DialogQueueReopen) {
   ctx.r3.u64 = t67::DialogQueueReopen(base, ctx.r3.u64);
 }
-void Type6DialogShown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6DialogShown) {
   ctx.r3.u64 = t67::DialogShown(base, ctx.r3.u64, 9756);
 }
-void Type7DialogShown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7DialogShown) {
   ctx.r3.u64 = t67::DialogShown(base, ctx.r3.u64, 9760);
 }
-void Type6DialogOnEnter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6DialogOnEnter) {
   ctx.r3.u64 = t67::DialogOnEnter(base, ctx.r3.u64, 9756);
 }
-void Type7DialogOnEnter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7DialogOnEnter) {
   ctx.r3.u64 = t67::DialogOnEnter(base, ctx.r3.u64, 9760);
 }
-void Type6DialogWaitForMovies(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6DialogWaitForMovies) {
   ctx.r3.u64 = t67::DialogWaitForMovies(base, ctx.r3.u64, 9756);
 }
-void Type7DialogWaitForMovies(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7DialogWaitForMovies) {
   ctx.r3.u64 = t67::DialogWaitForMovies(base, ctx.r3.u64, 9760);
 }
-void Type6Screen0OnEnter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0OnEnter) {
   ctx.r3.u64 = t67::Screen0OnEnter(base, ctx.r3.u32, 0, 4);
 }
-void Type7Screen0OnEnter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0OnEnter) {
   ctx.r3.u64 = t67::Screen0OnEnter(base, ctx.r3.u32, 4, 3);
 }
-bool Type6Screen0OnLeft(PPCContext& ctx, uint8_t* base) {
+bool Type6Screen0OnLeft(lifted::Regs& ctx, uint8_t* base) {
   return Set(ctx, t67::Screen0OnLeft(base, ctx.r3.u32, 0));
 }
-bool Type7Screen0OnLeft(PPCContext& ctx, uint8_t* base) {
+bool Type7Screen0OnLeft(lifted::Regs& ctx, uint8_t* base) {
   return Set(ctx, t67::Screen0OnLeft(base, ctx.r3.u32, 4));
 }
-void Type6Screen0WaitForMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0WaitForMovie) {
   ctx.r3.u64 = t67::Screen0WaitForMovie(base, ctx.r3.u64, 0);
 }
-void Type7Screen0WaitForMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0WaitForMovie) {
   ctx.r3.u64 = t67::Screen0WaitForMovie(base, ctx.r3.u64, 4);
 }
-void Type6Screen0PickYes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0PickYes) {
   ctx.r3.u64 = t67::Screen0Pick(base, ctx.r3.u64, 9640, 1);
 }
-void Type6Screen0PickNo(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0PickNo) {
   ctx.r3.u64 = t67::Screen0Pick(base, ctx.r3.u64, 9640, 0);
 }
-void Type7Screen0PickYes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0PickYes) {
   ctx.r3.u64 = t67::Screen0Pick(base, ctx.r3.u64, 9644, 1);
 }
-void Type6Screen0GoOn(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0GoOn) {
   ctx.r3.u64 = t67::Type6Screen0GoOn(base, ctx.r3.u64);
 }
 
 // --- The guest calls and the modes' delegate functions ---
 
-t67::Calls Type67Calls(PPCContext& ctx, uint8_t* base) {
+t67::Calls Type67Calls(lifted::Regs& ctx, uint8_t* base) {
   t67::Calls calls;
   calls.native_action_slots = ITC_FLAG(native_action_mappers);
   calls.call = [&ctx, base](uint32_t target, uint32_t sp, uint32_t lr, uint64_t r3,
@@ -319,7 +320,7 @@ t67::Calls Type67Calls(PPCContext& ctx, uint8_t* base) {
                                 uint32_t lr) -> uint64_t {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = r1;
-    PPCRegister* registers[6] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7, &ctx.r8};
+    lifted::Temp* registers[6] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7, &ctx.r8};
     for (int i = 0; i < set; i++) {
       registers[i]->u64 = args[i];
     }
@@ -335,9 +336,9 @@ t67::Calls Type67Calls(PPCContext& ctx, uint8_t* base) {
 
 namespace {
 
-t67::Calls GuestCalls(PPCContext& ctx, uint8_t* base) { return Type67Calls(ctx, base); }
+t67::Calls GuestCalls(lifted::Regs& ctx, uint8_t* base) { return Type67Calls(ctx, base); }
 
-void NextMode(PPCContext& ctx, uint8_t* base, const t67::ModeLayout& layout) {
+void NextMode(lifted::Regs& ctx, uint8_t* base, const t67::ModeLayout& layout) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t answer = ctx.r3.u32, mode = ctx.r4.u32;
   t67::ModeNextMode(base, layout, answer, mode, ctx.r1.u32 - t67::kNextModeFrame,
@@ -345,7 +346,7 @@ void NextMode(PPCContext& ctx, uint8_t* base, const t67::ModeLayout& layout) {
   ctx.r3.u64 = r3;
 }
 
-void Leaving(PPCContext& ctx, uint8_t* base, const t67::ModeLayout& layout) {
+void Leaving(lifted::Regs& ctx, uint8_t* base, const t67::ModeLayout& layout) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t answer = ctx.r3.u32, mode = ctx.r4.u32;
   t67::ModeLeaving(base, layout, answer, mode, ctx.r1.u32 - t67::kLeavingFrame,
@@ -355,65 +356,65 @@ void Leaving(PPCContext& ctx, uint8_t* base, const t67::ModeLayout& layout) {
 
 }  // namespace
 
-void Type6ModeNextMode(PPCContext& ctx, uint8_t* base) { NextMode(ctx, base, t67::kType6Layout); }
-void Type7ModeNextMode(PPCContext& ctx, uint8_t* base) { NextMode(ctx, base, t67::kType7Layout); }
-void Type6ModeLeaving(PPCContext& ctx, uint8_t* base) { Leaving(ctx, base, t67::kType6Layout); }
-void Type7ModeLeaving(PPCContext& ctx, uint8_t* base) { Leaving(ctx, base, t67::kType7Layout); }
+ITC_REGS_STEP(Type6ModeNextMode) { NextMode(ctx, base, t67::kType6Layout); }
+ITC_REGS_STEP(Type7ModeNextMode) { NextMode(ctx, base, t67::kType7Layout); }
+ITC_REGS_STEP(Type6ModeLeaving) { Leaving(ctx, base, t67::kType6Layout); }
+ITC_REGS_STEP(Type7ModeLeaving) { Leaving(ctx, base, t67::kType7Layout); }
 
 // --- The handlers with guest calls ---
 
-void DialogOpenMovies(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DialogOpenMovies) {
   ctx.r3.u64 = t67::DialogOpenMovies(base, ctx.r1.u32, Type67Calls(ctx, base));
 }
-void Type6DialogLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6DialogLeave) {
   ctx.r3.u64 = t67::DialogLeave(base, ctx.r3.u32, ctx.r4.u32, false, ctx.r1.u32,
                                 Type67Calls(ctx, base));
 }
-void Type7DialogLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7DialogLeave) {
   ctx.r3.u64 = t67::DialogLeave(base, ctx.r3.u32, ctx.r4.u32, true, ctx.r1.u32,
                                 Type67Calls(ctx, base));
 }
-void Type6Screen0Leave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0Leave) {
   ctx.r3.u64 = t67::Screen0Leave(base, ctx.r3.u32, ctx.r4.u32, false, ctx.r1.u32,
                                  Type67Calls(ctx, base));
 }
-void Type7Screen0Leave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0Leave) {
   ctx.r3.u64 = t67::Screen0Leave(base, ctx.r3.u32, ctx.r4.u32, true, ctx.r1.u32,
                                  Type67Calls(ctx, base));
 }
-void ListScreenInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ListScreenInit) {
   ctx.r3.u64 = t67::ListScreenInit(base, ctx.r3.u64, ctx.r1.u32, Type67Calls(ctx, base));
 }
-void PanelScreenInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PanelScreenInit) {
   ctx.r3.u64 = t67::PanelScreenInit(base, ctx.r3.u64, ctx.r1.u32, Type67Calls(ctx, base));
 }
-void NodeScreenInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NodeScreenInit) {
   ctx.r3.u64 = t67::NodeScreenInit(base, ctx.r3.u64, ctx.r1.u32, Type67Calls(ctx, base));
 }
-void Type6Screen0Draw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0Draw) {
   ctx.r3.u64 = t67::Type6Screen0Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
                                      uint32_t(ctx.lr), Type67Calls(ctx, base));
 }
-void Type6DialogDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6DialogDraw) {
   ctx.r3.u64 = t67::DialogDraw(base, ctx.r3.u64, ctx.r4.u64, false, ctx.r1.u32,
                                Type67Calls(ctx, base));
 }
-void Type7DialogDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7DialogDraw) {
   ctx.r3.u64 = t67::DialogDraw(base, ctx.r3.u64, ctx.r4.u64, true, ctx.r1.u32,
                                Type67Calls(ctx, base));
 }
-void Type7Screen0Draw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0Draw) {
   ctx.r3.u64 = t67::Type7Screen0Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
                                      Type67Calls(ctx, base));
 }
-void ControllerOptionsDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ControllerOptionsDraw) {
   ctx.r3.u64 = t67::ControllerOptionsDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
                                           Type67Calls(ctx, base));
 }
 
 // --- The stand scene's teardown and the presets' load ---
 
-void GarageCameraLoadPresets(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(GarageCameraLoadPresets) {
   SetArchiveSerial(ctx, t67::GarageCameraLoadPresets(base, ctx.r3.u32, NativeArchiveLoad(base)));
 }
 namespace {
@@ -429,7 +430,7 @@ struct PanelNew {
     if (auto block = memory::crt::OperatorNew(p->base, size)) {
       return *block;
     }
-    PPCContext& ctx = *p->ctx;
+    lifted::Regs& ctx = *p->ctx;
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = frame;
     ctx.r3.u64 = size;
@@ -441,7 +442,7 @@ struct PanelNew {
   }
 };
 
-void ModeInit(PPCContext& ctx, uint8_t* base, bool type7) {
+void ModeInit(lifted::Regs& ctx, uint8_t* base, bool type7) {
   const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
   const t67::Calls screens = Type67Calls(ctx, base);
   PanelNew panel_new{&ctx, base};
@@ -477,12 +478,12 @@ void ModeInit(PPCContext& ctx, uint8_t* base, bool type7) {
 
 }  // namespace
 
-void Type6ModeInit(PPCContext& ctx, uint8_t* base) { ModeInit(ctx, base, false); }
-void Type7ModeInit(PPCContext& ctx, uint8_t* base) { ModeInit(ctx, base, true); }
+ITC_REGS_STEP(Type6ModeInit) { ModeInit(ctx, base, false); }
+ITC_REGS_STEP(Type7ModeInit) { ModeInit(ctx, base, true); }
 
-void StandSceneCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandSceneCreate) {
   const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
-  auto guest = [&](uint32_t frame, uint32_t link, void (*target)(PPCContext&, uint8_t*)) {
+  auto guest = [&](uint32_t frame, uint32_t link, void (*target)(lifted::Regs&, uint8_t*)) {
     ctx.r1.u64 = frame;
     ctx.lr = link;
     target(ctx, base);
@@ -497,7 +498,7 @@ void StandSceneCreate(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = scene;
     ctx.r4.u64 = record;
     ctx.r5.u64 = 0;
-    return guest(frame, 0x82180BF4, CarModelsSceneSetUp);
+    return guest(frame, 0x82180BF4, ITC_REGS_FN(CarModelsSceneSetUp));
   };
   ctx.fpscr.disableFlushMode();
   const uint64_t r3 = t67::StandSceneCreate(base, ctx.r3.u32, ctx.r1.u32, NativeArchiveLoad(base),
@@ -507,41 +508,41 @@ void StandSceneCreate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-bool StandSceneRelease(PPCContext& ctx, uint8_t* base) {
+bool StandSceneRelease(lifted::Regs& ctx, uint8_t* base) {
   return Set(ctx, t67::StandSceneRelease(base));
 }
 
-bool StandModeRelease(PPCContext& ctx, uint8_t* base) {
+bool StandModeRelease(lifted::Regs& ctx, uint8_t* base) {
   return Set(ctx, t67::StandModeRelease(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base)));
 }
 
 // --- The dialogs' confirm ---
 
-void Type6DialogOpenConfirm(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6DialogOpenConfirm) {
   ctx.r3.u64 = t67::DialogOpenConfirm(base, ctx.r3.u32, false, ctx.r1.u32);
 }
-void Type7DialogOpenConfirm(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7DialogOpenConfirm) {
   ctx.r3.u64 = t67::DialogOpenConfirm(base, ctx.r3.u32, true, ctx.r1.u32);
 }
-void DialogDrawWaiting(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DialogDrawWaiting) {
   if (const std::optional<uint64_t> r3 = t67::DialogDrawWaiting(base, ctx.r3.u32, ctx.r1.u32)) {
     ctx.r3.u64 = *r3;
   }
 }
-void DialogOpenConfirmStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DialogOpenConfirmStep) {
   ctx.r3.u64 = t67::DialogOpenConfirmStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
 }
-void DialogCloseConfirmStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DialogCloseConfirmStep) {
   ctx.r3.u64 = t67::DialogCloseConfirmStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
 }
-void DialogMoveCursorStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DialogMoveCursorStep) {
   ctx.r3.u64 = t67::DialogMoveCursorStep(base, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
 }
-void DialogOpenNoticeStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DialogOpenNoticeStep) {
   ctx.r3.u64 =
       t67::DialogNoticeStep(base, ctx.r3.u32, false, ctx.r1.u32, Type67Calls(ctx, base));
 }
-void DialogCloseNoticeStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DialogCloseNoticeStep) {
   ctx.r3.u64 = t67::DialogNoticeStep(base, ctx.r3.u32, true, ctx.r1.u32, Type67Calls(ctx, base));
 }
 
@@ -549,7 +550,7 @@ namespace {
 
 // The pages' and Updates' steps: the adapter's lr put back (their guest
 // calls set it).
-void ConfirmPage(PPCContext& ctx, uint8_t* base, bool type7) {
+void ConfirmPage(lifted::Regs& ctx, uint8_t* base, bool type7) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::DialogConfirmPage(base, ctx.r3.u64, ctx.r4.u32, type7, ctx.r1.u32,
                                       Type67Calls(ctx, base));
@@ -557,7 +558,7 @@ void ConfirmPage(PPCContext& ctx, uint8_t* base, bool type7) {
   ctx.fpscr.disableFlushMode();
 }
 
-void Update(PPCContext& ctx, uint8_t* base, bool type7) {
+void Update(lifted::Regs& ctx, uint8_t* base, bool type7) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::DialogUpdate(base, ctx.r3.u64, ctx.r4.u32, type7, ctx.r1.u32,
                                  Type67Calls(ctx, base));
@@ -566,10 +567,10 @@ void Update(PPCContext& ctx, uint8_t* base, bool type7) {
 
 }  // namespace
 
-void Type6DialogConfirmPage(PPCContext& ctx, uint8_t* base) { ConfirmPage(ctx, base, false); }
-void Type7DialogConfirmPage(PPCContext& ctx, uint8_t* base) { ConfirmPage(ctx, base, true); }
-void Type6DialogUpdate(PPCContext& ctx, uint8_t* base) { Update(ctx, base, false); }
-void Type7DialogUpdate(PPCContext& ctx, uint8_t* base) { Update(ctx, base, true); }
+ITC_REGS_STEP(Type6DialogConfirmPage) { ConfirmPage(ctx, base, false); }
+ITC_REGS_STEP(Type7DialogConfirmPage) { ConfirmPage(ctx, base, true); }
+ITC_REGS_STEP(Type6DialogUpdate) { Update(ctx, base, false); }
+ITC_REGS_STEP(Type7DialogUpdate) { Update(ctx, base, true); }
 
 // --- The first screens' helpers ---
 
@@ -580,7 +581,7 @@ bool Type67TextsNative(uint8_t* base) {
 
 namespace {
 
-void Confirm(PPCContext& ctx, uint8_t* base, const t67::ConfirmKind& kind) {
+void Confirm(lifted::Regs& ctx, uint8_t* base, const t67::ConfirmKind& kind) {
   ctx.fpscr.disableFlushMode();
   const uint32_t sp = ctx.r1.u32, dispatcher = ctx.r4.u32;
   const uint64_t lr = ctx.lr;
@@ -591,24 +592,24 @@ void Confirm(PPCContext& ctx, uint8_t* base, const t67::ConfirmKind& kind) {
 
 }  // namespace
 
-void Type6Screen0Confirm(PPCContext& ctx, uint8_t* base) { Confirm(ctx, base, t67::kType6Confirm); }
-void Type6Screen0ConfirmAgain(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0Confirm) { Confirm(ctx, base, t67::kType6Confirm); }
+ITC_REGS_STEP(Type6Screen0ConfirmAgain) {
   Confirm(ctx, base, t67::kType6ConfirmAgain);
 }
-void Type7Screen0Confirm(PPCContext& ctx, uint8_t* base) { Confirm(ctx, base, t67::kType7Confirm); }
-void Type6Screen0ShowPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0Confirm) { Confirm(ctx, base, t67::kType7Confirm); }
+ITC_REGS_STEP(Type6Screen0ShowPage) {
   ctx.r3.u64 = t67::Type6Screen0ShowPage(base, ctx.r4.u32, ctx.r1.u32);
 }
-void Type7Screen0ShowPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0ShowPage) {
   ctx.r3.u64 = t67::Type7Screen0ShowPage(base, ctx.r4.u32, ctx.r1.u32);
 }
 namespace {
 
-void PlaceCursor(PPCContext& ctx, uint8_t* base, bool type7) {
+void PlaceCursor(lifted::Regs& ctx, uint8_t* base, bool type7) {
   ctx.r3.u64 = t67::Screen0PlaceCursor(base, type7, ctx.r4.u64, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
-void ShowHelp(PPCContext& ctx, uint8_t* base, bool type7) {
+void ShowHelp(lifted::Regs& ctx, uint8_t* base, bool type7) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32, item = ctx.r4.u32;
@@ -616,20 +617,20 @@ void ShowHelp(PPCContext& ctx, uint8_t* base, bool type7) {
   ctx.r3.u64 = t67::Screen0ShowHelp(base, type7, item, sp, format.get());
   ctx.lr = lr;
 }
-void FadeOutStep(PPCContext& ctx, uint8_t* base, bool type7) {
+void FadeOutStep(lifted::Regs& ctx, uint8_t* base, bool type7) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 =
       t67::Screen0FadeOutStep(base, type7, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
   ctx.lr = lr;
 }
-void PlayItem(PPCContext& ctx, uint8_t* base, bool type7) {
+void PlayItem(lifted::Regs& ctx, uint8_t* base, bool type7) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Screen0PlayItem(base, type7, ctx.r3.u32, ctx.r1.u32, Type67Calls(ctx, base));
   ctx.lr = lr;
 }
 // The steps 0 to 2 (they call ShowHelp: the text setters native).
 enum class Step { kOpening, kBack, kCursor };
-void Screen0Step(PPCContext& ctx, uint8_t* base, bool type7, Step step) {
+void Screen0Step(lifted::Regs& ctx, uint8_t* base, bool type7, Step step) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32, screen = ctx.r3.u32;
@@ -649,7 +650,7 @@ void Screen0Step(PPCContext& ctx, uint8_t* base, bool type7, Step step) {
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
-void PowerGraphPage(PPCContext& ctx, uint8_t* base, bool type7) {
+void PowerGraphPage(lifted::Regs& ctx, uint8_t* base, bool type7) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Screen0PowerGraphPage(base, type7, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
                                           Type67Calls(ctx, base));
@@ -658,94 +659,94 @@ void PowerGraphPage(PPCContext& ctx, uint8_t* base, bool type7) {
 
 }  // namespace
 
-void Type6Screen0PlaceCursor(PPCContext& ctx, uint8_t* base) { PlaceCursor(ctx, base, false); }
-void Type7Screen0PlaceCursor(PPCContext& ctx, uint8_t* base) { PlaceCursor(ctx, base, true); }
-void Type6Screen0ShowHelp(PPCContext& ctx, uint8_t* base) { ShowHelp(ctx, base, false); }
-void Type7Screen0ShowHelp(PPCContext& ctx, uint8_t* base) { ShowHelp(ctx, base, true); }
-void Type6Screen0FadeOutStep(PPCContext& ctx, uint8_t* base) { FadeOutStep(ctx, base, false); }
-void Type7Screen0FadeOutStep(PPCContext& ctx, uint8_t* base) { FadeOutStep(ctx, base, true); }
-void Type6Screen0PlayItem(PPCContext& ctx, uint8_t* base) { PlayItem(ctx, base, false); }
-void Type7Screen0PlayItem(PPCContext& ctx, uint8_t* base) { PlayItem(ctx, base, true); }
-void Type6Screen0OpeningStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0PlaceCursor) { PlaceCursor(ctx, base, false); }
+ITC_REGS_STEP(Type7Screen0PlaceCursor) { PlaceCursor(ctx, base, true); }
+ITC_REGS_STEP(Type6Screen0ShowHelp) { ShowHelp(ctx, base, false); }
+ITC_REGS_STEP(Type7Screen0ShowHelp) { ShowHelp(ctx, base, true); }
+ITC_REGS_STEP(Type6Screen0FadeOutStep) { FadeOutStep(ctx, base, false); }
+ITC_REGS_STEP(Type7Screen0FadeOutStep) { FadeOutStep(ctx, base, true); }
+ITC_REGS_STEP(Type6Screen0PlayItem) { PlayItem(ctx, base, false); }
+ITC_REGS_STEP(Type7Screen0PlayItem) { PlayItem(ctx, base, true); }
+ITC_REGS_STEP(Type6Screen0OpeningStep) {
   Screen0Step(ctx, base, false, Step::kOpening);
 }
-void Type7Screen0OpeningStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0OpeningStep) {
   Screen0Step(ctx, base, true, Step::kOpening);
 }
-void Type6Screen0BackStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0BackStep) {
   Screen0Step(ctx, base, false, Step::kBack);
 }
-void Type7Screen0BackStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0BackStep) {
   Screen0Step(ctx, base, true, Step::kBack);
 }
-void Type6Screen0CursorStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0CursorStep) {
   Screen0Step(ctx, base, false, Step::kCursor);
 }
-void Type7Screen0CursorStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0CursorStep) {
   Screen0Step(ctx, base, true, Step::kCursor);
 }
-void Type6Screen0QuitPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0QuitPage) {
   ctx.r3.u64 = t67::Type6Screen0QuitPage(base, ctx.r3.u64, ctx.r1.u32);
 }
-void Type6Screen0ChosenPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0ChosenPage) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Type6Screen0ChosenPage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
                                            Type67Calls(ctx, base));
   ctx.lr = lr;
 }
-void Type6Screen0PowerGraphPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0PowerGraphPage) {
   PowerGraphPage(ctx, base, false);
 }
-void Type7Screen0PowerGraphPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0PowerGraphPage) {
   PowerGraphPage(ctx, base, true);
 }
-void Type6Screen0OpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0OpenMovie) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Screen0OpenMovie(base, false, ctx.r1.u32, Type67Calls(ctx, base));
   ctx.lr = lr;
 }
-void Type7Screen0OpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0OpenMovie) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Screen0OpenMovie(base, true, ctx.r1.u32, Type67Calls(ctx, base));
   ctx.lr = lr;
 }
-void Type6Screen0SetUpCar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0SetUpCar) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Screen0SetUpCar(base, false, ctx.r4.u64, ctx.r1.u32, Type67Calls(ctx, base));
   ctx.lr = lr;
 }
-void Type7Screen0SetUpCar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0SetUpCar) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Screen0SetUpCar(base, true, ctx.r4.u64, ctx.r1.u32, Type67Calls(ctx, base));
   ctx.lr = lr;
 }
-void Type6Screen0OnDialogClosed(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0OnDialogClosed) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Type6Screen0OnDialogClosed(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
                                                Type67Calls(ctx, base));
   ctx.lr = lr;
 }
-void Type7Screen0OnDialogClosed(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0OnDialogClosed) {
   ctx.r3.u64 = t67::Type7Screen0OnDialogClosed(base, ctx.r3.u64, ctx.r1.u32);
 }
-void ControllerOptionsUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ControllerOptionsUpdate) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::ControllerOptionsUpdate(base, ctx.r1.u32, Type67Calls(ctx, base));
   ctx.lr = lr;
 }
-void Type6ModeWaitForLoads(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6ModeWaitForLoads) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::ModeWaitForLoads(base, false, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
                                      Type67Calls(ctx, base));
   ctx.lr = lr;
 }
-void Type7ModeWaitForLoads(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7ModeWaitForLoads) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::ModeWaitForLoads(base, true, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32,
                                      Type67Calls(ctx, base));
   ctx.lr = lr;
 }
-void Type7Screen0ChosenPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0ChosenPage) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::Type7Screen0ChosenPage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
                                            Type67Calls(ctx, base));
@@ -754,26 +755,26 @@ void Type7Screen0ChosenPage(PPCContext& ctx, uint8_t* base) {
 
 // --- The garage camera's reset ---
 
-void QuaternionFromAngles(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(QuaternionFromAngles) {
   t67::QuaternionFromAngles(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
-void GarageCameraReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(GarageCameraReset) {
   const uint64_t camera = ctx.r3.u64;
   t67::GarageCameraReset(base, ctx.r3.u32, ctx.r1.u32 - t67::kGarageCameraResetFrame);
   ctx.r3.u64 = camera + 192;
   ctx.fpscr.disableFlushMode();
 }
-void GarageCameraCommand(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(GarageCameraCommand) {
   ctx.r3.u64 = t67::GarageCameraCommand(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
 // A tail call to Command: from the adapter's stack pointer.
-void GarageStageCameraCommand(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(GarageStageCameraCommand) {
   ctx.r3.u64 = t67::GarageStageCameraCommand(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32);
   ctx.fpscr.disableFlushMode();
 }
-void GarageLightsInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(GarageLightsInit) {
   const uint32_t frame = ctx.r1.u32 - t67::kGarageLightsFrame;
   t67::GarageLightsInit(base, ctx.r3.u32, frame);
   ctx.r3.u64 = ((ctx.r1.u64 & 0xFFFFFFFF00000000ull) | frame) + 96;
@@ -784,28 +785,28 @@ namespace {
 
 // r3 as GarageLights::Init leaves it, its frame below GarageStage::Init's
 // at `stage_frame`.
-uint64_t LightsR3(const PPCContext& ctx, uint32_t stage_frame) {
+uint64_t LightsR3(const lifted::Regs& ctx, uint32_t stage_frame) {
   return ((ctx.r1.u64 & 0xFFFFFFFF00000000ull) | (stage_frame - t67::kGarageLightsFrame)) + 96;
 }
 
 }  // namespace
 
-void GarageCameraInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(GarageCameraInit) {
   SetArchiveSerial(ctx, t67::GarageCameraInit(base, ctx.r3.u32, ctx.r1.u32, NativeArchiveLoad(base)));
   ctx.fpscr.disableFlushMode();
 }
-void StandScenePollTeardown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandScenePollTeardown) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::StandScenePollTeardown(base, ctx.r1.u32, Type67Calls(ctx, base));
   ctx.lr = lr;
 }
-void Type6ModeTearDown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6ModeTearDown) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::ModeTearDown(base, false, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
                                  Type67Calls(ctx, base));
   ctx.lr = lr;
 }
-void Type7ModeTearDown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7ModeTearDown) {
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = t67::ModeTearDown(base, true, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32,
                                  Type67Calls(ctx, base));
@@ -813,7 +814,7 @@ void Type7ModeTearDown(PPCContext& ctx, uint8_t* base) {
 }
 namespace {
 
-void Show(PPCContext& ctx, uint8_t* base, bool type7, bool info) {
+void Show(lifted::Regs& ctx, uint8_t* base, bool type7, bool info) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr, r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -827,12 +828,12 @@ void Show(PPCContext& ctx, uint8_t* base, bool type7, bool info) {
 
 }  // namespace
 
-void Type6Screen0Show(PPCContext& ctx, uint8_t* base) { Show(ctx, base, false, false); }
-void Type7Screen0Show(PPCContext& ctx, uint8_t* base) { Show(ctx, base, true, false); }
-void Type6Screen0ShowCarInfo(PPCContext& ctx, uint8_t* base) { Show(ctx, base, false, true); }
-void Type7Screen0ShowCarInfo(PPCContext& ctx, uint8_t* base) { Show(ctx, base, true, true); }
+ITC_REGS_STEP(Type6Screen0Show) { Show(ctx, base, false, false); }
+ITC_REGS_STEP(Type7Screen0Show) { Show(ctx, base, true, false); }
+ITC_REGS_STEP(Type6Screen0ShowCarInfo) { Show(ctx, base, false, true); }
+ITC_REGS_STEP(Type7Screen0ShowCarInfo) { Show(ctx, base, true, true); }
 
-void Type7Screen0MenuPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7Screen0MenuPage) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64;
@@ -846,7 +847,7 @@ void Type7Screen0MenuPage(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
-void Type6Screen0MenuPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0MenuPage) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64;
@@ -862,7 +863,7 @@ void Type6Screen0MenuPage(PPCContext& ctx, uint8_t* base) {
 }
 namespace {
 
-void Screen0Update(PPCContext& ctx, uint8_t* base, bool type7) {
+void Screen0Update(lifted::Regs& ctx, uint8_t* base, bool type7) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr, r3 = ctx.r3.u64, sp = ctx.r1.u64;
   ctx.r3.u64 = t67::Screen0Update(base, type7, r3, sp, Type67Calls(ctx, base));
@@ -872,14 +873,14 @@ void Screen0Update(PPCContext& ctx, uint8_t* base, bool type7) {
 
 }  // namespace
 
-void Type6Screen0Update(PPCContext& ctx, uint8_t* base) { Screen0Update(ctx, base, false); }
-void Type7Screen0Update(PPCContext& ctx, uint8_t* base) { Screen0Update(ctx, base, true); }
-void GarageStageInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6Screen0Update) { Screen0Update(ctx, base, false); }
+ITC_REGS_STEP(Type7Screen0Update) { Screen0Update(ctx, base, true); }
+ITC_REGS_STEP(GarageStageInit) {
   t67::GarageStageInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, NativeArchiveLoad(base));
   ctx.r3.u64 = LightsR3(ctx, ctx.r1.u32 - t67::kGarageStageInitFrame);
   ctx.fpscr.disableFlushMode();
 }
-void StandSlotInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandSlotInit) {
   if (t67::StandSlotInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, NativeArchiveLoad(base))) {
     ctx.r3.u64 = LightsR3(ctx, ctx.r1.u32 - t67::kStandSlotInitFrame - t67::kGarageStageInitFrame);
   }
@@ -890,12 +891,7 @@ void StandSlotInit(PPCContext& ctx, uint8_t* base) {
 
 // Defines an adapter: the flag, else the original.
 #define ITC_TYPE67_MODES(address, step, ...)  \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_type67_modes)) {     \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type67_modes)) { \
     hooks::step(ctx, base, ##__VA_ARGS__);    \
   }
 
@@ -916,8 +912,8 @@ ITC_TYPE67_MODES(822470A8, Type67Init, 0x822470A8)
 
 // An adapter whose step allocates: the original off the allocation layer.
 #define ITC_TYPE67_ALLOCATES(address, step)                         \
-  extern "C" REX_FUNC(sub_##address) {                              \
-    REX_FUNC_PROLOGUE();                                            \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                              \
+    \
     if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive()) { \
       __imp__sub_##address(ctx, base);                              \
       return;                                                       \
@@ -928,8 +924,8 @@ ITC_TYPE67_MODES(822470A8, Type67Init, 0x822470A8)
 // An adapter whose step frees: the original where it refuses (a block not
 // the layer's pages).
 #define ITC_TYPE67_FREES(address, step)                                     \
-  extern "C" REX_FUNC(sub_##address) {                                      \
-    REX_FUNC_PROLOGUE();                                                    \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                      \
+    \
     if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||     \
         !hooks::step(ctx, base)) {                                          \
       __imp__sub_##address(ctx, base);                                      \
@@ -1035,8 +1031,8 @@ ITC_TYPE67_MODES(82242218, Type7DialogUpdate)
 // Type6Screen0::ConfirmAgain (a guest call from OnDialogClosed, native):
 // natively while the UI movies' text setters are.
 #define ITC_TYPE67_TEXTS(address, step)                                         \
-  extern "C" REX_FUNC(sub_##address) {                                          \
-    REX_FUNC_PROLOGUE();                                                        \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                          \
+    \
     if (!ITC_FLAG(native_type67_modes) || !hooks::Type67TextsNative(base)) {    \
       __imp__sub_##address(ctx, base);                                          \
       return;                                                                   \
@@ -1120,29 +1116,29 @@ ITC_TYPE67_MODES(821808F0, GarageStageCameraCommand)
 // The modes' slot 0 (Type6Mode::Init, Type7Mode::Init, through their
 // vtables from Modes::Tick): over the layer only (their block is
 // VirtualAlloc's pages).
-extern "C" REX_FUNC(sub_82236880) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82236880) {
+  
   if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive()) {
-    __imp__sub_82236880(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82236880);
     return;
   }
   hooks::Type6ModeInit(ctx, base);
 }
-extern "C" REX_FUNC(sub_82246C90) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82246C90) {
+  
   if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive()) {
-    __imp__sub_82246C90(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82246C90);
     return;
   }
   hooks::Type7ModeInit(ctx, base);
 }
 // StandScene::Create (from the modes' slot 0, recompiled): over the layer
 // and the archive's native queue only.
-extern "C" REX_FUNC(sub_82180B00) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82180B00) {
+  
   if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||
       !hooks::NativeArchiveQueue()) {
-    __imp__sub_82180B00(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82180B00);
     return;
   }
   hooks::StandSceneCreate(ctx, base);

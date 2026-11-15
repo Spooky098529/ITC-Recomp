@@ -404,21 +404,21 @@ void Lists(Context& h, const World& w) {
   // Frames: the back chain and the words up to the register saves (96-byte
   // frames save r31 and lr, 112-byte ones r30 too, savegprlr r29 on).
   Run(h, w, {"BuildScreen::KeepGroupList (sub_8219BA50)", 100, __imp__sub_8219BA50,
-             hooks::BuildScreenKeepGroupList, {{-96, -16}}, None});
+             ITC_CONTEXT_FN(hooks::BuildScreenKeepGroupList), {{-96, -16}}, None});
   Run(h, w, {"BuildScreen::KeepBuildList (sub_8219BB20)", 100, __imp__sub_8219BB20,
-             hooks::BuildScreenKeepBuildList, {{-96, -16}}, None});
+             ITC_CONTEXT_FN(hooks::BuildScreenKeepBuildList), {{-96, -16}}, None});
   Run(h, w, {"BuildScreen::KeepStandList (sub_8219BBF0)", 100, __imp__sub_8219BBF0,
-             hooks::BuildScreenKeepStandList, {{-96, -16}}, None});
+             ITC_CONTEXT_FN(hooks::BuildScreenKeepStandList), {{-96, -16}}, None});
   Run(h, w, {"BuildScreen::RestoreBuildList (sub_8219BB80)", 100, __imp__sub_8219BB80,
-             hooks::BuildScreenRestoreBuildList, {{-112, -24}}, None});
+             ITC_CONTEXT_FN(hooks::BuildScreenRestoreBuildList), {{-112, -24}}, None});
   Run(h, w, {"BuildScreen::RestoreStandList (sub_8219BC50)", 100, __imp__sub_8219BC50,
-             hooks::BuildScreenRestoreStandList, {{-112, -24}}, None});
+             ITC_CONTEXT_FN(hooks::BuildScreenRestoreStandList), {{-112, -24}}, None});
   // InitGroupLists: its frame and RestoreGroupList's under it.
   Run(h, w, {"BuildScreen::InitGroupLists (sub_8219BF08; sub_8219BAB0)", 150,
-             __imp__sub_8219BF08, hooks::BuildScreenInitGroupLists,
+             __imp__sub_8219BF08, ITC_CONTEXT_FN(hooks::BuildScreenInitGroupLists),
              {{-128 - 112, -128 - 24}, {-128, -32}}, None});
   Run(h, w, {"BuildScreen::InitStandList (sub_8219C078)", 150, __imp__sub_8219C078,
-             hooks::BuildScreenInitStandList, {{-112, -8}},
+             ITC_CONTEXT_FN(hooks::BuildScreenInitStandList), {{-112, -8}},
              [](PPCContext&, Random& r, const World& w) {
                // A count MenuList::Init can make a block for.
                guest::StoreU16(w.base, w.at(kScreenAt) + bs::kBuildCount, uint16_t(r.Below(13)));
@@ -427,7 +427,7 @@ void Lists(Context& h, const World& w) {
   // ValueText: mostly 0 to 9, now and then below 0 or past the table (the
   // words above it, up to the caller's area).
   Run(h, w, {"BuildScreen::ValueText (sub_8219BCC0)", 150, __imp__sub_8219BCC0,
-             hooks::BuildScreenValueText, {{-48, 0}},
+             ITC_CONTEXT_FN(hooks::BuildScreenValueText), {{-48, 0}},
              [](PPCContext& t, Random& r, const World&) {
                switch (r.Below(6)) {
                  case 0: t.r3.u64 = 0xFFFFFFFF00000000ull | (0x80000000u + r.Below(1000)); break;
@@ -442,7 +442,7 @@ void BuildLists(Context& h, const World& w) {
   // Insert: a group's list or the screen's, a position within the count
   // (or a few past it), the pointer a build's address word.
   Run(h, w, {"BuildList::Insert (sub_8219C230; sub_8219C1C8)", 200, __imp__sub_8219C230,
-             hooks::BuildListInsert, {{-112, -32}},
+             ITC_CONTEXT_FN(hooks::BuildListInsert), {{-112, -32}},
              [](PPCContext& t, Random& r, const World& w) {
                const uint32_t screen = w.at(kScreenAt);
                t.r3.u64 = r.Below(4) == 0 ? screen + bs::kBuilds
@@ -455,9 +455,9 @@ void BuildLists(Context& h, const World& w) {
                }
              }});
   Run(h, w, {"BuildScreen::MarkGroups (sub_8219EC50)", 60, __imp__sub_8219EC50,
-             hooks::BuildScreenMarkGroups, {}, None});
+             ITC_CONTEXT_FN(hooks::BuildScreenMarkGroups), {}, None});
   Run(h, w, {"BuildScreen::FilterGroups (sub_8219CC70)", 150, __imp__sub_8219CC70,
-             hooks::BuildScreenFilterGroups, {{-192, -96}}, None});
+             ITC_CONTEXT_FN(hooks::BuildScreenFilterGroups), {{-192, -96}}, None});
 }
 
 void Stage(Context& h, const World& w) {
@@ -465,7 +465,7 @@ void Stage(Context& h, const World& w) {
   // it (its savegprlr saves above them left out); dark 0 or 1, now and then
   // another mode.
   Run(h, w, {"GarageStage::SetDark (sub_8217D0C8; sub_8217B7C8)", 100, __imp__sub_8217D0C8,
-             hooks::GarageStageSetDark, {{-112 - 208, -112 - 96}, {-112, -24}},
+             ITC_CONTEXT_FN(hooks::GarageStageSetDark), {{-112 - 208, -112 - 96}, {-112, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                t.r3.u64 = w.at(kHolderAt);
                t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(2);
@@ -483,18 +483,18 @@ void Rows(Context& h, const World& w) {
     };
   };
   Run(h, w, {"BuildScreen::GroupArrows (sub_8219D1B0)", 100, __imp__sub_8219D1B0,
-             hooks::BuildScreenGroupArrows, {{-128, -40}}, arrows(11)});
+             ITC_CONTEXT_FN(hooks::BuildScreenGroupArrows), {{-128, -40}}, arrows(11)});
   Run(h, w, {"BuildScreen::BuildArrows (sub_8219D4B8)", 100, __imp__sub_8219D4B8,
-             hooks::BuildScreenBuildArrows, {{-128, -40}}, arrows(6)});
+             ITC_CONTEXT_FN(hooks::BuildScreenBuildArrows), {{-128, -40}}, arrows(6)});
   Run(h, w, {"BuildScreen::StandArrows (sub_8219D7B0)", 100, __imp__sub_8219D7B0,
-             hooks::BuildScreenStandArrows, {{-96, -8}},
+             ITC_CONTEXT_FN(hooks::BuildScreenStandArrows), {{-96, -8}},
              [](PPCContext&, Random& r, const World& w) {
                if (r.Below(2) == 0) {
                  guest::StoreU16(w.base, w.at(kScreenAt) + bs::kBuildCount, 1);
                }
              }});
   Run(h, w, {"BuildScreen::ShowBuildMark (sub_8219D440)", 100, __imp__sub_8219D440,
-             hooks::BuildScreenShowBuildMark, {{-112, -16}},
+             ITC_CONTEXT_FN(hooks::BuildScreenShowBuildMark), {{-112, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                const uint32_t build = w.at(kBuildsAt) + 52 * r.Below(kBuildCount);
                if (r.Below(2) == 0) {
@@ -505,7 +505,7 @@ void Rows(Context& h, const World& w) {
   // SetPrompts: each of r3 to r8 -1 now and then; the slots' +100 (the
   // icon's and label's children) in the pool's range.
   Run(h, w, {"BuildScreen::SetPrompts (sub_8219DA58)", 150, __imp__sub_8219DA58,
-             hooks::BuildScreenSetPrompts, {{-176, -56}},
+             ITC_CONTEXT_FN(hooks::BuildScreenSetPrompts), {{-176, -56}},
              [](PPCContext& t, Random& r, const World& w) {
                const uint32_t movie = w.at(kMovieAt);
                for (uint32_t k = 0; k < 3; k++) {
@@ -524,12 +524,12 @@ void Rows(Context& h, const World& w) {
   // (+40 to +79: the original's register leftovers, 0 natively, the user's
   // call, 2026-10-30) left out, and its register saves.
   Run(h, w, {"BuildScreen::SetHelp (sub_8219DB50)", 100, __imp__sub_8219DB50,
-             hooks::BuildScreenSetHelp, {{-128, -88}, {-48, -32}},
+             ITC_CONTEXT_FN(hooks::BuildScreenSetHelp), {{-128, -88}, {-48, -32}},
              [](PPCContext& t, Random& r, const World&) { t.r3.u64 = StringId(r); }});
   // ShowNumber: 100 now and then, mostly 0 to 999, else any word; the
   // digits node's first child and count in the pool's range.
   Run(h, w, {"BuildScreen::ShowNumber (sub_8219D090; sub_8219BD30)", 200, __imp__sub_8219D090,
-             hooks::BuildScreenShowNumber, {{-176, -88}},
+             ITC_CONTEXT_FN(hooks::BuildScreenShowNumber), {{-176, -88}},
              [](PPCContext& t, Random& r, const World& w) {
                const uint32_t digits = ui_movies::FindNode(w.base, w.at(kMovieAt), 12, 3);
                guest::StoreU32(w.base, digits + 100, r.Below(40));
@@ -545,7 +545,7 @@ void Rows(Context& h, const World& w) {
   // each row's frame below (SetNodeText's parameter area and the saves left
   // out).
   Run(h, w, {"BuildScreen::DrawGroupRows (sub_8219FA28; sub_8219CE08)", 100,
-             __imp__sub_8219FA28, hooks::BuildScreenDrawGroupRows,
+             __imp__sub_8219FA28, ITC_CONTEXT_FN(hooks::BuildScreenDrawGroupRows),
              {{-112, -24}, {-256, -216}, {-176, -168}}, None});
 }
 
@@ -602,17 +602,17 @@ void Transitions(Context& h, const World& w) {
   };
   const T transitions[] = {
       {"BuildScreen::HighlightGroups (sub_8219C528)", __imp__sub_8219C528,
-       hooks::BuildScreenHighlightGroupsA, {{-128, -32}}},
+       ITC_CONTEXT_FN(hooks::BuildScreenHighlightGroupsA), {{-128, -32}}},
       {"BuildScreen::HighlightGroups2 (sub_8219C6D0)", __imp__sub_8219C6D0,
-       hooks::BuildScreenHighlightGroupsB, {{-128, -32}}},
+       ITC_CONTEXT_FN(hooks::BuildScreenHighlightGroupsB), {{-128, -32}}},
       {"BuildScreen::HighlightBuilds (sub_8219C8F8)", __imp__sub_8219C8F8,
-       hooks::BuildScreenHighlightBuilds, {{-128, -32}}},
+       ITC_CONTEXT_FN(hooks::BuildScreenHighlightBuilds), {{-128, -32}}},
       {"BuildScreen::HighlightStand (sub_8219CA08)", __imp__sub_8219CA08,
-       hooks::BuildScreenHighlightStand, {{-112, -24}}},
+       ITC_CONTEXT_FN(hooks::BuildScreenHighlightStand), {{-112, -24}}},
       {"BuildScreen::HighlightStand2 (sub_8219CB18)", __imp__sub_8219CB18,
-       hooks::BuildScreenHighlightStand2, {{-112, -24}}},
+       ITC_CONTEXT_FN(hooks::BuildScreenHighlightStand2), {{-112, -24}}},
       {"BuildScreen::HighlightDetails (sub_8219CBD8)", __imp__sub_8219CBD8,
-       hooks::BuildScreenHighlightDetails, {{-112, -24}}},
+       ITC_CONTEXT_FN(hooks::BuildScreenHighlightDetails), {{-112, -24}}},
   };
   ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
   for (const T& t : transitions) {
@@ -620,7 +620,7 @@ void Transitions(Context& h, const World& w) {
   }
   // FadeOut: the fades' counts set or not before.
   Run(h, w, {"BuildScreen::FadeOut (sub_8219C850)", 60, __imp__sub_8219C850,
-             hooks::BuildScreenFadeOut, {{-112, -24}},
+             ITC_CONTEXT_FN(hooks::BuildScreenFadeOut), {{-112, -24}},
              [step](PPCContext& t, Random& r, const World& w) {
                step(t, r, w);
                guest::StoreU32(w.base, 0x826A50E4, r.Below(2));
@@ -712,7 +712,7 @@ void StandWorld(PPCContext&, Random& r, const World& w) {
 
 void Builds(Context& h, const World& w) {
   Run(h, w, {"BuildScreen::InitBuildList (sub_8219BFE8)", 100, __imp__sub_8219BFE8,
-             hooks::BuildScreenInitBuildList, {{-112, -8}, {-224, -136}},
+             ITC_CONTEXT_FN(hooks::BuildScreenInitBuildList), {{-112, -8}, {-224, -136}},
              [](PPCContext&, Random& r, const World& w) {
                guest::StoreU16(w.base, w.at(kScreenAt) + bs::kBuildCount, uint16_t(r.Below(13)));
              }});
@@ -721,30 +721,30 @@ void Builds(Context& h, const World& w) {
     t.r3.u64 = r.Below(bs::kGroupCount);
   };
   Run(h, w, {"BuildScreen::CopyBuilds (sub_821A0128; BuildList::Insert)", 100,
-             __imp__sub_821A0128, hooks::BuildScreenCopyBuilds, {{-144, -48}, {-256, -176}},
+             __imp__sub_821A0128, ITC_CONTEXT_FN(hooks::BuildScreenCopyBuilds), {{-144, -48}, {-256, -176}},
              group_index});
   Run(h, w, {"BuildScreen::ListBuilds (sub_821A0D38)", 100, __imp__sub_821A0D38,
-             hooks::BuildScreenListBuilds, {{-192, -96}, {-336, -240}, {-448, -368}},
+             ITC_CONTEXT_FN(hooks::BuildScreenListBuilds), {{-192, -96}, {-336, -240}, {-448, -368}},
              group_index});
   // The rows: SetNodeText's parameter area (+40 to +79: the first call's
   // r6 is set, but the later calls store their register leftovers over it,
   // 0 natively) left out.
   Run(h, w, {"BuildScreen::DrawBuildRows (sub_8219D3E8; sub_8219D248)", 100, __imp__sub_8219D3E8,
-             hooks::BuildScreenDrawBuildRows, {{-112, -24}, {-272, -232}, {-192, -184}}, None});
+             ITC_CONTEXT_FN(hooks::BuildScreenDrawBuildRows), {{-112, -24}, {-272, -232}, {-192, -184}}, None});
   Run(h, w, {"BuildScreen::DrawStandRow (sub_8219D550)", 150, __imp__sub_8219D550,
-             hooks::BuildScreenDrawStandRow, {{-160, -120}, {-80, -72}},
+             ITC_CONTEXT_FN(hooks::BuildScreenDrawStandRow), {{-160, -120}, {-80, -72}},
              [](PPCContext& t, Random& r, const World&) {
                t.r3.u64 = r.Below(2);
                t.r4.u64 = r.Below(16);
              }});
   // ShowGroup: SetText's parameter area (+48 to +79) left out.
   Run(h, w, {"BuildScreen::ShowGroup (sub_8219CF08)", 150, __imp__sub_8219CF08,
-             hooks::BuildScreenShowGroup, {{-112, -64}, {-32, -24}},
+             ITC_CONTEXT_FN(hooks::BuildScreenShowGroup), {{-112, -64}, {-32, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                t.r3.u64 = w.at(kScreenAt) + bs::kGroups + bs::kGroupBytes * r.Below(bs::kGroupCount);
              }});
   Run(h, w, {"BuildScreen::SetUpBuilds (sub_821A1008)", 100, __imp__sub_821A1008,
-             hooks::BuildScreenSetUpBuilds, {{-128, -40}}, Counts});
+             ITC_CONTEXT_FN(hooks::BuildScreenSetUpBuilds), {{-128, -40}}, Counts});
 }
 
 
@@ -768,7 +768,7 @@ void Groups(Context& h, const World& w) {
     guest::StoreU32(w.base, w.at(kScreenAt) + bs::kNumber, r.Below(4) == 0 ? 100 : r.Below(1000));
   };
   Run(h, w, {"BuildScreen::SetUpGroups (sub_821A0060)", 80, __imp__sub_821A0060,
-             hooks::BuildScreenSetUpGroups, {{-112, -24}}, counts});
+             ITC_CONTEXT_FN(hooks::BuildScreenSetUpGroups), {{-112, -24}}, counts});
   auto step = [counts](PPCContext& t, Random& r, const World& w) {
     counts(t, r, w);
     AnimationWorld(w.base, w, r);
@@ -778,7 +778,7 @@ void Groups(Context& h, const World& w) {
     t.r3.u64 = w.at(kMachineAt) + 24;
   };
   ui_movies_hooks::g_update_callee_stand_in = UpdateStandIn;
-  Run(h, w, {"BuildScreen::Open (sub_821A08D8)", 50, __imp__sub_821A08D8, hooks::BuildScreenOpen,
+  Run(h, w, {"BuildScreen::Open (sub_821A08D8)", 50, __imp__sub_821A08D8, ITC_CONTEXT_FN(hooks::BuildScreenOpen),
              {{-128, -32}, {-128 - 112, -128 - 24}},
              [step](PPCContext& t, Random& r, const World& w) {
                step(t, r, w);
@@ -787,7 +787,7 @@ void Groups(Context& h, const World& w) {
                }
              }});
   Run(h, w, {"BuildScreen::BackToGroups (sub_821A0A38)", 50, __imp__sub_821A0A38,
-             hooks::BuildScreenBackToGroups, {{-128, -32}, {-128 - 112, -128 - 24}},
+             ITC_CONTEXT_FN(hooks::BuildScreenBackToGroups), {{-128, -32}, {-128 - 112, -128 - 24}},
              [step](PPCContext& t, Random& r, const World& w) {
                step(t, r, w);
                if (r.Below(3) == 0) {
@@ -797,7 +797,7 @@ void Groups(Context& h, const World& w) {
   // ChangeCategory: the list's step -1 or 1, group 0 of a category 0 to 4
   // with builds (so the walk ends: it loops until a category has groups).
   Run(h, w, {"BuildScreen::ChangeCategory (sub_8219FC60)", 50, __imp__sub_8219FC60,
-             hooks::BuildScreenChangeCategory, {{-160, -64}},
+             ITC_CONTEXT_FN(hooks::BuildScreenChangeCategory), {{-160, -64}},
              [step](PPCContext& t, Random& r, const World& w) {
                step(t, r, w);
                guest::StoreU32(w.base, w.at(kListAt) + 28, r.Below(2) == 0 ? 1 : 0xFFFFFFFFu);
@@ -812,7 +812,7 @@ void Groups(Context& h, const World& w) {
   // the pool for the nodes found through it after; its frame and
   // SetUpBuilds' (over KeepGroupList's) without their saves.
   Run(h, w, {"BuildScreen::OpenBuilds (sub_821A1138)", 50, __imp__sub_821A1138,
-             hooks::BuildScreenOpenBuilds, {{-128, -32}, {-128 - 128, -128 - 40}},
+             ITC_CONTEXT_FN(hooks::BuildScreenOpenBuilds), {{-128, -32}, {-128 - 128, -128 - 40}},
              [step](PPCContext& t, Random& r, const World& w) {
                step(t, r, w);
                guest::StoreU32(w.base, w.at(kListAt) + 4, r.Below(6));
@@ -831,11 +831,11 @@ void Groups(Context& h, const World& w) {
     }
   };
   Run(h, w, {"BuildScreen::BackToStand (sub_8219FF78; sub_8219F868)", 50, __imp__sub_8219FF78,
-             hooks::BuildScreenBackToStand, {{-112, -24}, {-112 - 96, -112 - 8}}, stand});
+             ITC_CONTEXT_FN(hooks::BuildScreenBackToStand), {{-112, -24}, {-112 - 96, -112 - 8}}, stand});
   // OpenStand: its frame (SetUpStand's and PutOnStand's below it compared
   // in their own cases); BackToStand's world with the stand's.
   Run(h, w, {"BuildScreen::OpenStand (sub_8219FE10; sub_8219F780, sub_8219D6F0)", 30,
-             __imp__sub_8219FE10, hooks::BuildScreenOpenStand, {{-128, -32}},
+             __imp__sub_8219FE10, ITC_CONTEXT_FN(hooks::BuildScreenOpenStand), {{-128, -32}},
              [stand](PPCContext& t, Random& r, const World& w) {
                stand(t, r, w);
                StandWorld(t, r, w);
@@ -845,7 +845,7 @@ void Groups(Context& h, const World& w) {
   // parameter area holds SetNodeText's register leftovers, cover
   // ShowDetails'; its own cases compare it).
   Run(h, w, {"BuildScreen::OpenDetails (sub_8219FEC8; sub_8219F8E0, sub_8219D820)", 40,
-             __imp__sub_8219FEC8, hooks::BuildScreenOpenDetails,
+             __imp__sub_8219FEC8, ITC_CONTEXT_FN(hooks::BuildScreenOpenDetails),
              {{-112, -24}, {-112 - 128, -112 - 24}},
              [step](PPCContext& t, Random& r, const World& w) {
                step(t, r, w);
@@ -853,21 +853,21 @@ void Groups(Context& h, const World& w) {
              }});
   ui_movies_hooks::g_update_callee_stand_in = nullptr;
   Run(h, w, {"BuildScreen::SetUpDetails (sub_8219F8E0; sub_8219D820)", 60, __imp__sub_8219F8E0,
-             hooks::BuildScreenSetUpDetails, {{-128, -24}}, Details});
+             ITC_CONTEXT_FN(hooks::BuildScreenSetUpDetails), {{-128, -24}}, Details});
   Run(h, w, {"BuildScreen::ShowDetails (sub_8219D820)", 80, __imp__sub_8219D820,
-             hooks::BuildScreenShowDetails, {{-144, -96}, {-64, -48}},
+             ITC_CONTEXT_FN(hooks::BuildScreenShowDetails), {{-144, -96}, {-64, -48}},
              [](PPCContext& t, Random& r, const World& w) {
                Details(t, r, w);
                t.r3.u64 = w.at(kBuildsAt) + 52 * r.Below(kBuildCount);
              }});
   Run(h, w, {"BuildScreen::SetUpStand (sub_8219F780; sub_8219D6F0)", 30, __imp__sub_8219F780,
-             hooks::BuildScreenSetUpStand, {{-112, -24}},
+             ITC_CONTEXT_FN(hooks::BuildScreenSetUpStand), {{-112, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                guest::StoreU16(w.base, w.at(kScreenAt) + bs::kBuildCount, uint16_t(r.Below(13)));
                StandWorld(t, r, w);
              }});
   Run(h, w, {"BuildScreen::PutOnStand (sub_8219D6F0)", 30, __imp__sub_8219D6F0,
-             hooks::BuildScreenPutOnStand, {{-128, -32}},
+             ITC_CONTEXT_FN(hooks::BuildScreenPutOnStand), {{-128, -32}},
              [](PPCContext& t, Random& r, const World& w) {
                StandWorld(t, r, w);
                t.r3.u64 = r.Below(400);
@@ -876,7 +876,7 @@ void Groups(Context& h, const World& w) {
                t.r4.u64 = r.Below(2) == 0 ? 0 : 2;
              }});
   Run(h, w, {"BuildScreen::RestoreStand (sub_8219F868)", 60, __imp__sub_8219F868,
-             hooks::BuildScreenRestoreStand, {{-96, -8}},
+             ITC_CONTEXT_FN(hooks::BuildScreenRestoreStand), {{-96, -8}},
              [](PPCContext&, Random& r, const World& w) {
                guest::StoreU16(w.base, w.at(kScreenAt) + bs::kBuildCount, uint16_t(r.Below(13)));
              }});

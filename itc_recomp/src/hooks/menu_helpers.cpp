@@ -4,6 +4,7 @@
 // front-end screens call them, so the adapters stay.
 
 #include "hooks/menu_helpers.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "menu_helpers/menu_helpers.h"
@@ -27,7 +28,7 @@ namespace {
 // back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -37,7 +38,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, uint64_t r3, uint64_t r4, uint32_t r1,
                        uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -49,7 +50,7 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
@@ -58,12 +59,12 @@ bool NativeSlots() { return ITC_FLAG(native_action_mappers); }
 
 }  // namespace
 
-void MenuStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MenuStep) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = menu_helpers::Step(base, ctx.r3.u32, ctx.r1.u32, NativeSlots(), guest.calls());
 }
 
-void MenuPressed(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MenuPressed) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       menu_helpers::Pressed(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, NativeSlots(), guest.calls());
@@ -73,12 +74,7 @@ void MenuPressed(PPCContext& ctx, uint8_t* base) {
 
 // Defines an adapter: the flag, else the original.
 #define ITC_MENU_HELPERS(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_menu_helpers)) { \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_menu_helpers)) { \
     hooks::step(ctx, base);               \
   }
 

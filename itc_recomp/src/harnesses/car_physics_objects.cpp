@@ -428,7 +428,7 @@ void SetFloat48Cases(Context& h, uint32_t region) {
       t.fpscr.disableFlushModeUnconditional();
       t.r3.u64 = region + kBody;
       t.r4.u64 = region + kBody + 0x80 + 4 * r.Below(16);
-      (v == 0 ? Original<__imp__sub_8259D5A8> : NativeSetFloat48)(t, h.base);
+      (v == 0 ? Original<__imp__sub_8259D5A8> : ITC_CONTEXT_FN(NativeSetFloat48))(t, h.base);
       out[v].Bytes(Read(h.base, region + kBody, 0x100));
       out[v].Word(t.r3.u32);
     }
@@ -470,7 +470,7 @@ void CallbackCases(Context& h, uint32_t region) {
         t.r3.u64 = region + kResult;
         t.r4.u64 = region + kPoint;
         t.r5.u64 = no_position ? 0 : position;
-        (v == 0 ? Original<__imp__sub_820B8798> : NativeCallback)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820B8798> : ITC_CONTEXT_FN(NativeCallback))(t, h.base);
         // The result: +0 the distance, +16 and +32 vectors (floats), +48 and
         // +52 words; the position's words as floats but +80 (its kind).
         out[v].Floats(h.base, region + kResult, 12);
@@ -526,7 +526,7 @@ void ResetTransformCases(Context& h, uint32_t region) {
         PPCContext t = CallContext(h);
         t.fpscr.disableFlushModeUnconditional();
         t.r3.u64 = object;
-        (v == 0 ? Original<__imp__sub_820B7998> : NativeResetTransform)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820B7998> : ITC_CONTEXT_FN(NativeResetTransform))(t, h.base);
         const Blocks none;
         ObjectOutputs(out[v], h.base, object, none);
         for (uint32_t box : {kTemplate, kCopyA, kCopyB}) {
@@ -588,12 +588,12 @@ void AddObjectCases(Context& h, uint32_t region, bool init) {
           t.r5.u64 = region + kTemplate;
           t.r6.u64 = groups;
           t.r7.u64 = given_memory ? region + kCopyA : 0;
-          (v == 0 ? Original<__imp__sub_820B7A00> : NativeInit)(t, h.base);
+          (v == 0 ? Original<__imp__sub_820B7A00> : ITC_CONTEXT_FN(NativeInit))(t, h.base);
         } else {
           t.r3.u64 = region + kBody;
           t.r4.u64 = region + kTemplate;
           t.r5.u64 = groups;
-          (v == 0 ? Original<__imp__sub_820B9570> : NativeAddObject)(t, h.base);
+          (v == 0 ? Original<__imp__sub_820B9570> : ITC_CONTEXT_FN(NativeAddObject))(t, h.base);
         }
         blocks.Note(guest::LoadU32(h.base, object + 36));
         blocks.Note(guest::LoadU32(h.base, object + 40));
@@ -669,7 +669,7 @@ void DestroyPhysicsCases(Context& h, uint32_t region) {
       PPCContext t = CallContext(h);
       t.fpscr.disableFlushModeUnconditional();
       t.r3.u64 = vehicle;
-      (v == 0 ? Original<__imp__sub_820B0E70> : NativeDestroyPhysics)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820B0E70> : ITC_CONTEXT_FN(NativeDestroyPhysics))(t, h.base);
       Outputs& o = out[v];
       for (uint32_t i = kWorld; i < kWorldEnd; i += 4) {
         o.Word(guest::LoadU32(h.base, region + i));
@@ -817,11 +817,11 @@ void VehicleGroundCases(Context& h, uint32_t region, uint32_t vehicle_region) {
     GuestFunction recompiled, native;
     Kind kind;
   } functions[] = {
-      {"Vehicle::ProbeGround (sub_820B4420)", Original<__imp__sub_820B4420>, NativeProbeGround,
+      {"Vehicle::ProbeGround (sub_820B4420)", Original<__imp__sub_820B4420>, ITC_CONTEXT_FN(NativeProbeGround),
        kProbe},
-      {"Vehicle::Unflip (sub_820AFE90)", Original<__imp__sub_820AFE90>, NativeUnflip, kUnflip},
+      {"Vehicle::Unflip (sub_820AFE90)", Original<__imp__sub_820AFE90>, ITC_CONTEXT_FN(NativeUnflip), kUnflip},
       {"Vehicle::RefreshFromBody (sub_820B62E8)", Original<__imp__sub_820B62E8>,
-       NativeRefreshFromBody, kRefresh},
+       ITC_CONTEXT_FN(NativeRefreshFromBody), kRefresh},
   };
   const uint32_t r1 = CallContext(h).r1.u32;
   for (const auto& f : functions) {
@@ -1001,7 +1001,7 @@ void PhysicsStepCases(Context& h, uint32_t region, uint32_t vehicle_region) {
         t.r3.u64 = vehicle_region;
         t.f1.f64 = r.Below(4) == 0 ? double(std::bit_cast<float>(NumberWord(r)))
                                     : double(1.0f / 30.0f);
-        (v == 0 ? Original<__imp__sub_820B6498> : NativePhysicsStep)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820B6498> : ITC_CONTEXT_FN(NativePhysicsStep))(t, h.base);
         {
           for (uint32_t i = 0; i < kCarData; i += 4) {
             const uint32_t w = guest::LoadU32(h.base, vehicle_region + i);
@@ -1092,11 +1092,11 @@ void SetUpCases(Context& h, uint32_t region, uint32_t vehicle_region, bool reset
         const uint32_t groups = r.Below(16) | (r.Below(3) == 0 ? 0x00F00000 : 0);
         if (reset) {
           t.r5.u64 = groups;
-          (v == 0 ? Original<__imp__sub_820B5B08> : NativeResetPhysics)(t, h.base);
+          (v == 0 ? Original<__imp__sub_820B5B08> : ITC_CONTEXT_FN(NativeResetPhysics))(t, h.base);
         } else {
           t.r5.u64 = r.Below(2);
           t.r6.u64 = groups;
-          (v == 0 ? Original<__imp__sub_820B5670> : NativeSetUpPhysics)(t, h.base);
+          (v == 0 ? Original<__imp__sub_820B5670> : ITC_CONTEXT_FN(NativeSetUpPhysics))(t, h.base);
         }
         const uint32_t body = guest::LoadU32(h.base, vehicle + 336);
         const uint32_t shape = guest::LoadU32(h.base, vehicle + 344);
@@ -1166,11 +1166,11 @@ void WorldSetUpCases(Context& h, uint32_t region) {
     GuestFunction recompiled, native;
     Kind kind;
   } functions[] = {
-      {"CollisionWorld::Create (sub_820B8D30)", Original<__imp__sub_820B8D30>, NativeWorldCreate,
+      {"CollisionWorld::Create (sub_820B8D30)", Original<__imp__sub_820B8D30>, ITC_CONTEXT_FN(NativeWorldCreate),
        kCreate},
       {"CollisionWorld::SetQueryCapacity (sub_820B9198)", Original<__imp__sub_820B9198>,
-       NativeSetQueryCapacity, kCapacity},
-      {"CollisionWorld::Setup (sub_820FF250)", Original<__imp__sub_820FF250>, NativeWorldSetup,
+       ITC_CONTEXT_FN(NativeSetQueryCapacity), kCapacity},
+      {"CollisionWorld::Setup (sub_820FF250)", Original<__imp__sub_820FF250>, ITC_CONTEXT_FN(NativeWorldSetup),
        kSetup},
   };
   constexpr uint32_t kSurfaceGlobals = 0x826C2DF0, kSurfaceBytes = 64;
@@ -1500,15 +1500,15 @@ void WorldUpdateCases(Context& h) {
     Kind kind;
     uint32_t frame;
   } functions[] = {
-      {"CollisionObject::Respond (sub_820B81C8)", Original<__imp__sub_820B81C8>, NativeRespond,
+      {"CollisionObject::Respond (sub_820B81C8)", Original<__imp__sub_820B81C8>, ITC_CONTEXT_FN(NativeRespond),
        kRespond, 416},
-      {"CollisionObject::Collide (sub_820B8548)", Original<__imp__sub_820B8548>, NativeCollide,
+      {"CollisionObject::Collide (sub_820B8548)", Original<__imp__sub_820B8548>, ITC_CONTEXT_FN(NativeCollide),
        kCollide, 128},
       {"CollisionWorld::CollideAll (sub_820B89F0)", Original<__imp__sub_820B89F0>,
-       NativeCollideAll, kCollideAll, 96},
+       ITC_CONTEXT_FN(NativeCollideAll), kCollideAll, 96},
       {"CollisionWorld::SolvePairs (sub_820B87B0)", Original<__imp__sub_820B87B0>,
-       NativeSolvePairs, kSolvePairs, 208},
-      {"CollisionWorld::Update (sub_820B92C8)", Original<__imp__sub_820B92C8>, NativeUpdate,
+       ITC_CONTEXT_FN(NativeSolvePairs), kSolvePairs, 208},
+      {"CollisionWorld::Update (sub_820B92C8)", Original<__imp__sub_820B92C8>, ITC_CONTEXT_FN(NativeUpdate),
        kUpdate, 176},
   };
   const uint32_t region = memory::Alloc(kUpdateRegionBytes, 0);

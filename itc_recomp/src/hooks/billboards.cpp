@@ -4,6 +4,7 @@
 // with the camera blend around it.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "car_scene_draw/car_scene_draw.h"
@@ -25,23 +26,13 @@ ITC_FLAG_BOOL(native_billboards, true, "ITC",
               "translated code (same results; checked by --run_harnesses=billboards)");
 
 // BillboardMaterial::Init: r3 = the material.
-extern "C" REX_FUNC(sub_8209F5A0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_billboards)) {
-    __imp__sub_8209F5A0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8209F5A0, ITC_FLAG(native_billboards)) {
   sprites::InitBillboardMaterial(base, ctx.r3.u32);
 }
 
 // BillboardMaterial::SetLights: r3 = the material, r4 = light count, r5 =
 // the lights.
-extern "C" REX_FUNC(sub_8209F5C8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_billboards)) {
-    __imp__sub_8209F5C8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8209F5C8, ITC_FLAG(native_billboards)) {
   sprites::SetBillboardLights(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
@@ -52,7 +43,7 @@ bool hooks::BillboardsNative() {
          !hooks::SceneryListsSlotDiagnostics();
 }
 
-void hooks::BillboardsRecord(PPCContext& ctx, uint8_t* base) {
+void hooks::BillboardsRecord(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
@@ -62,7 +53,7 @@ void hooks::BillboardsRecord(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
-void hooks::BillboardsDraw(PPCContext& ctx, uint8_t* base) {
+void hooks::BillboardsDraw(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
@@ -80,7 +71,7 @@ bool hooks::LightGroupsNative() {
          ITC_FLAG(native_course_scenery) && ITC_FLAG(native_scenery_lists);
 }
 
-void hooks::LightGroupsDraw(PPCContext& ctx, uint8_t* base) {
+void hooks::LightGroupsDraw(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);

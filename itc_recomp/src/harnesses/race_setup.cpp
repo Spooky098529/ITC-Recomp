@@ -140,15 +140,15 @@ void OnePointer(Context& h, const Block& block, const char* name, GuestFunction 
 
 void Parts(Context& h, const Block& block) {
   OnePointer(h, block, "Car::ResetDecals40 (sub_820CC4A0)", __imp__sub_820CC4A0,
-             hooks::RaceSetupResetDecals40, 1280);
+             ITC_CONTEXT_FN(hooks::RaceSetupResetDecals40), 1280);
   OnePointer(h, block, "Car::ResetDecals6 (sub_820CCBF0)", __imp__sub_820CCBF0,
-             hooks::RaceSetupResetDecals6, 192);
+             ITC_CONTEXT_FN(hooks::RaceSetupResetDecals6), 192);
   OnePointer(h, block, "Car::ResetSettings (sub_820CD760)", __imp__sub_820CD760,
-             hooks::RaceSetupResetSettings, 80);
-  OnePointer(h, block, "sub_820CCC70", __imp__sub_820CCC70, hooks::RaceSetupReset1568, 20);
+             ITC_CONTEXT_FN(hooks::RaceSetupResetSettings), 80);
+  OnePointer(h, block, "sub_820CCC70", __imp__sub_820CCC70, ITC_CONTEXT_FN(hooks::RaceSetupReset1568), 20);
   OnePointer(h, block, "Car::Clear (sub_820CD7F0)", __imp__sub_820CD7F0,
-             hooks::RaceSetupCarClear, 1888);
-  OnePointer(h, block, "Car::Init (sub_820CD5D8)", __imp__sub_820CD5D8, hooks::RaceSetupCarInit,
+             ITC_CONTEXT_FN(hooks::RaceSetupCarClear), 1888);
+  OnePointer(h, block, "Car::Init (sub_820CD5D8)", __imp__sub_820CD5D8, ITC_CONTEXT_FN(hooks::RaceSetupCarInit),
              3896);
 
   Results tuning("CarTuning::Reset (sub_820CD618)");
@@ -162,7 +162,7 @@ void Parts(Context& h, const Block& block) {
           t.r3.u64 = at;
           t.r4.u64 = uint64_t(high) << 32 | flag;
         },
-        __imp__sub_820CD618, hooks::RaceSetupTuningReset, {},
+        __imp__sub_820CD618, ITC_CONTEXT_FN(hooks::RaceSetupTuningReset), {},
         fmt::format("case {}: +{:X}, flag {:X}", c, at - block.address, flag));
   }
   tuning.Report();
@@ -186,7 +186,7 @@ void Decals(Context& h, const Block& block) {
           t.r3.u64 = block.address + kDecal;
           t.r4.u64 = block.address + kBuild;
         },
-        __imp__sub_820CDC18, hooks::RaceSetupDecalFromBuild,
+        __imp__sub_820CDC18, ITC_CONTEXT_FN(hooks::RaceSetupDecalFromBuild),
         {kDecal + 0, kDecal + 4, kDecal + 8, kDecal + 12, kDecal + 16},
         fmt::format("case {}", c));
   }
@@ -310,7 +310,7 @@ void SetModels(Context& h, const Block& block) {
           t.r3.u64 = block.address + kCar;
           t.r4.u64 = id;
         },
-        __imp__sub_820CD8A8, hooks::RaceSetupSetModel, fmt::format("case {}: car {}", c, id));
+        __imp__sub_820CD8A8, ITC_CONTEXT_FN(hooks::RaceSetupSetModel), fmt::format("case {}: car {}", c, id));
   }
   results.Report();
 }
@@ -357,7 +357,7 @@ void FromBuilds(Context& h, const Block& block) {
           t.r3.u64 = block.address + kCar;
           t.r4.u64 = block.address + kBuild;
         },
-        __imp__sub_820CDCE0, hooks::RaceSetupFromBuild, fmt::format("case {}: car {}", c, id));
+        __imp__sub_820CDCE0, ITC_CONTEXT_FN(hooks::RaceSetupFromBuild), fmt::format("case {}: car {}", c, id));
   }
   results.Report();
 }
@@ -418,7 +418,7 @@ void Leaves(Context& h, const Block& block) {
             t.r3.u64 = uint64_t(int64_t(location)) ^ (uint64_t(c % 3) << 40);
             t.r4.u64 = value;
           },
-          __imp__sub_82101630, hooks::RaceSetupRivalLocation, {},
+          __imp__sub_82101630, ITC_CONTEXT_FN(hooks::RaceSetupRivalLocation), {},
           fmt::format("case {}: location {}", c, location));
     }
     results.Report();
@@ -436,7 +436,7 @@ void Leaves(Context& h, const Block& block) {
             guest::StoreU32(h.base, block.address + 800, r.Below(11));
           },
           [&](PPCContext& t) { t.r3.u64 = type; }, __imp__sub_82101828,
-          hooks::RaceSetupAddStage, {}, fmt::format("case {}: type {:X}", c, type));
+          ITC_CONTEXT_FN(hooks::RaceSetupAddStage), {}, fmt::format("case {}: type {:X}", c, type));
     }
     results.Report();
   }
@@ -460,7 +460,7 @@ void Leaves(Context& h, const Block& block) {
             t.r5.u64 = word;
             t.r6.s64 = stage;
           },
-          __imp__sub_820FFAB8, hooks::RaceSetupStagesAddRacer, {},
+          __imp__sub_820FFAB8, ITC_CONTEXT_FN(hooks::RaceSetupStagesAddRacer), {},
           fmt::format("case {}: stage {}", c, stage));
     }
     results.Report();
@@ -471,7 +471,7 @@ void Leaves(Context& h, const Block& block) {
       const uint32_t at = block.address + 4 * h.random.Below(256);
       GlobalsCase(
           h, results, block, {}, [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = at; },
-          __imp__sub_820FF558, hooks::RaceSetupLapRecordReset, {}, fmt::format("case {}", c));
+          __imp__sub_820FF558, ITC_CONTEXT_FN(hooks::RaceSetupLapRecordReset), {}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -482,10 +482,10 @@ void Leaves(Context& h, const Block& block) {
       const uint32_t at = block.address + 4 * h.random.Below(256);
       GlobalsCase(
           h, entries, block, {}, [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = at; },
-          __imp__sub_82101EB0, hooks::RaceSetupEntryReset, {}, fmt::format("case {}", c));
+          __imp__sub_82101EB0, ITC_CONTEXT_FN(hooks::RaceSetupEntryReset), {}, fmt::format("case {}", c));
       GlobalsCase(
           h, courses, block, {}, [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = at; },
-          __imp__sub_82105C90, hooks::RaceSetupCourseRecordReset, {}, fmt::format("case {}", c));
+          __imp__sub_82105C90, ITC_CONTEXT_FN(hooks::RaceSetupCourseRecordReset), {}, fmt::format("case {}", c));
     }
     entries.Report();
     courses.Report();
@@ -496,7 +496,7 @@ void Leaves(Context& h, const Block& block) {
       const uint32_t at = block.address + 4 * h.random.Below(256);
       GlobalsCase(
           h, results, block, {}, [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = at; },
-          __imp__sub_82101D20, hooks::RaceSetupRaceDataEntryConstruct, {},
+          __imp__sub_82101D20, ITC_CONTEXT_FN(hooks::RaceSetupRaceDataEntryConstruct), {},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -534,7 +534,7 @@ void Leaves(Context& h, const Block& block) {
             t.r5.u64 = weight;
             t.f1.f64 = double(std::bit_cast<float>(value));
           },
-          __imp__sub_82101698, hooks::RaceSetupRunningMeanAdd, {0x100},
+          __imp__sub_82101698, ITC_CONTEXT_FN(hooks::RaceSetupRunningMeanAdd), {0x100},
           fmt::format("case {}: weight {:X}", c, weight));
     }
     results.Report();
@@ -559,7 +559,7 @@ void Leaves(Context& h, const Block& block) {
       }
       GlobalsCase(
           h, results, block, {}, [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = ms; },
-          __imp__sub_82101700, hooks::RaceSetupTimePack, {},
+          __imp__sub_82101700, ITC_CONTEXT_FN(hooks::RaceSetupTimePack), {},
           fmt::format("case {}: {:X}", c, ms));
     }
     results.Report();
@@ -583,7 +583,7 @@ void Leaves(Context& h, const Block& block) {
             t.r3.u64 = block.address;
             t.r4.u64 = mode;
           },
-          __imp__sub_82110AC0, hooks::RaceSetupCountRace, {},
+          __imp__sub_82110AC0, ITC_CONTEXT_FN(hooks::RaceSetupCountRace), {},
           fmt::format("case {}: mode {}", c, mode));
     }
     results.Report();
@@ -627,7 +627,7 @@ void Leaves(Context& h, const Block& block) {
       };
       GlobalsCase(
           h, first, block, globals, setup, [&](PPCContext& t) { t.r3.u64 = block.address; },
-          __imp__sub_821430A0, hooks::RaceSetupEventFirstOwned, {}, fmt::format("case {}", c));
+          __imp__sub_821430A0, ITC_CONTEXT_FN(hooks::RaceSetupEventFirstOwned), {}, fmt::format("case {}", c));
       GlobalsCase(
           h, current_first, block, globals,
           [&](Random& r) {
@@ -636,15 +636,15 @@ void Leaves(Context& h, const Block& block) {
               guest::StoreU32(h.base, race_setup::kEvent, 0);
             }
           },
-          [](PPCContext&) {}, __imp__sub_821434C8, hooks::RaceSetupEventCurrentFirstOwned, {},
+          [](PPCContext&) {}, __imp__sub_821434C8, ITC_CONTEXT_FN(hooks::RaceSetupEventCurrentFirstOwned), {},
           fmt::format("case {}", c));
       if (c < 16) {
         GlobalsCase(
             h, current, block, globals, setup, [](PPCContext&) {}, __imp__sub_821434E8,
-            hooks::RaceSetupEventCurrent, {}, fmt::format("case {}", c));
+            ITC_CONTEXT_FN(hooks::RaceSetupEventCurrent), {}, fmt::format("case {}", c));
         GlobalsCase(
             h, count, block, globals, setup, [](PPCContext&) {}, __imp__sub_821434F8,
-            hooks::RaceSetupEventCount, {}, fmt::format("case {}", c));
+            ITC_CONTEXT_FN(hooks::RaceSetupEventCount), {}, fmt::format("case {}", c));
       }
     }
     first.Report();
@@ -666,7 +666,7 @@ void RaceDataConstructs(Context& h) {
   for (int c = 0; c < 3; c++) {
     GlobalsCase(
         h, results, data, {}, [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = data.address; },
-        __imp__sub_821021B8, hooks::RaceSetupRaceDataConstruct, {}, fmt::format("case {}", c));
+        __imp__sub_821021B8, ITC_CONTEXT_FN(hooks::RaceSetupRaceDataConstruct), {}, fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -714,7 +714,7 @@ void CourseRoutes(Context& h, const Block& block) {
       t.r3.u64 = high | at;
       t.r4.u64 = index_high | index;
       ITC_FLAG(native_race_setup) = v == 1;
-      (v == 0 ? GuestFunction(__imp__sub_820FFF50) : hooks::RaceSetupCourseRoutesGet)(t, h.base);
+      (v == 0 ? GuestFunction(__imp__sub_820FFF50) : ITC_CONTEXT_FN(hooks::RaceSetupCourseRoutesGet))(t, h.base);
       ITC_FLAG(native_race_setup) = true;
       out[v].Bytes(Read(h.base, block.address, block.bytes));
       out[v].Bytes(Read(h.base, frame + 4, kSaves - 4));
@@ -844,7 +844,7 @@ void Routes(Context& h, const Block& block) {
             t.r4.u64 = high | index;
             t.r5.u64 = high | location;
           },
-          __imp__sub_82101A10, hooks::RaceSetupRouteSet,
+          __imp__sub_82101A10, ITC_CONTEXT_FN(hooks::RaceSetupRouteSet),
           fmt::format("case {}: route {}, location {}, at +{:X}", c, index, int32_t(location),
                       at - block.address));
     }
@@ -857,7 +857,7 @@ void Routes(Context& h, const Block& block) {
       RouteCase(
           h, results, block, race_setup::kRouteFrameBytes, 16,
           [&](PPCContext& t) { t.r3.u64 = at; }, __imp__sub_82101990,
-          hooks::RaceSetupRouteReset, fmt::format("case {}: at +{:X}", c, at - block.address));
+          ITC_CONTEXT_FN(hooks::RaceSetupRouteReset), fmt::format("case {}: at +{:X}", c, at - block.address));
     }
     results.Report();
   }
@@ -870,7 +870,7 @@ void Routes(Context& h, const Block& block) {
       RouteCase(
           h, results, block, race_setup::kStartFrameBytes, 8,
           [&](PPCContext& t) { t.r3.u64 = high | location; }, __imp__sub_82101A98,
-          hooks::RaceSetupStartPosition,
+          ITC_CONTEXT_FN(hooks::RaceSetupStartPosition),
           fmt::format("case {}: location {}", c, int32_t(location)));
     }
     results.Report();
@@ -896,7 +896,7 @@ void RouteCallers(Context& h, const Block& block, const Block& records) {
             t.r3.u64 = index;
             t.r4.u64 = location;
           },
-          __imp__sub_82101D38, hooks::RaceSetupRaceSetRoute, {},
+          __imp__sub_82101D38, ITC_CONTEXT_FN(hooks::RaceSetupRaceSetRoute), {},
           fmt::format("case {}: route {}, location {}", c, index, location));
     }
     results.Report();
@@ -916,7 +916,7 @@ void RouteCallers(Context& h, const Block& block, const Block& records) {
             t.r5.u64 = location;
             t.r6.u64 = stage;
           },
-          __imp__sub_82101E90, hooks::RaceSetupStagesSetRoute, {},
+          __imp__sub_82101E90, ITC_CONTEXT_FN(hooks::RaceSetupStagesSetRoute), {},
           fmt::format("case {}: route {}, location {}, stage {}", c, index, location,
                       int32_t(stage)));
     }
@@ -929,7 +929,7 @@ void RouteCallers(Context& h, const Block& block, const Block& records) {
       FramesCase(
           h, results, records, {{128, 48}, {race_setup::kRouteFrameBytes, 24}}, {},
           [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = at; }, __imp__sub_82101F68,
-          hooks::RaceSetupRecordReset, {},
+          ITC_CONTEXT_FN(hooks::RaceSetupRecordReset), {},
           fmt::format("case {}: at +{:X}", c, at - records.address));
     }
     results.Report();
@@ -952,7 +952,7 @@ void Racers(Context& h) {
       GlobalsCase(
           h, results, records, {}, [](Random&) {},
           [&](PPCContext& t) { t.r3.u64 = records.address; }, __imp__sub_820FF978,
-          hooks::RaceSetupRacersReset, {}, fmt::format("case {}", c));
+          ITC_CONTEXT_FN(hooks::RaceSetupRacersReset), {}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -984,7 +984,7 @@ void Racers(Context& h) {
           t.f1.f64 = double(std::bit_cast<float>(value));
           t.r6.u64 = word;
         },
-        __imp__sub_820FF860, hooks::RaceSetupRacersAdd, floats,
+        __imp__sub_820FF860, ITC_CONTEXT_FN(hooks::RaceSetupRacersAdd), floats,
         fmt::format("case {}: count {}, car {}, id {}", c, count, other, int32_t(id)));
     GlobalsCase(
         h, add_racer, records, {race_setup::kRaceData},
@@ -998,7 +998,7 @@ void Racers(Context& h) {
           t.f1.f64 = double(std::bit_cast<float>(value));
           t.r6.u64 = word;
         },
-        __imp__sub_821017C0, hooks::RaceSetupAddRacer, floats,
+        __imp__sub_821017C0, ITC_CONTEXT_FN(hooks::RaceSetupAddRacer), floats,
         fmt::format("case {}: count {}, car {}, id {}, added {}", c, count, other, int32_t(id),
                     int32_t(added)));
   }
@@ -1106,7 +1106,7 @@ void Start(Context& h) {
             t.r4.u64 = location;
             t.r5.u64 = type;
           },
-          __imp__sub_82101D50, hooks::RaceSetupSetStart, {},
+          __imp__sub_82101D50, ITC_CONTEXT_FN(hooks::RaceSetupSetStart), {},
           fmt::format("case {}: location {}, type {}", c, int32_t(location), int32_t(type)),
           false);
     }
@@ -1139,7 +1139,7 @@ void Start(Context& h) {
               guest::StoreU32(h.base, list + 80 * k, r.Below(6));
             }
           },
-          [](PPCContext&) {}, __imp__sub_82102048, hooks::RaceSetupPlaceRacers, {},
+          [](PPCContext&) {}, __imp__sub_82102048, ITC_CONTEXT_FN(hooks::RaceSetupPlaceRacers), {},
           fmt::format("case {}: kind {}", c, int32_t(kind)), false);
     }
     results.Report();
@@ -1153,7 +1153,7 @@ void Start(Context& h) {
           [&](Random&) { guest::StoreU32(h.base, race_setup::kRaceData, data.address); },
           [&](PPCContext& t) { t.r3.u64 = 0x1234567800000000ull * uint64_t(c) + 0x9ABC; },
           global ? GuestFunction(__imp__sub_821021A8) : GuestFunction(__imp__sub_821020F0),
-          global ? hooks::RaceSetupRaceDataResetGlobal : hooks::RaceSetupRaceDataReset, {},
+          global ? ITC_CONTEXT_FN(hooks::RaceSetupRaceDataResetGlobal) : ITC_CONTEXT_FN(hooks::RaceSetupRaceDataReset), {},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -1254,7 +1254,7 @@ void Rivals(Context& h) {
           t.r4.u64 = rival;
           t.r5.u64 = add;
         },
-        __imp__sub_82112DB0, hooks::RaceSetupSetUpRival, {},
+        __imp__sub_82112DB0, ITC_CONTEXT_FN(hooks::RaceSetupSetUpRival), {},
         fmt::format("case {}: rival {}, kind {}, location {}, add {:X}", c, rival, int32_t(kind),
                     location, add),
         false, int32_t(add) == 0);
@@ -1407,7 +1407,7 @@ void SetUps(Context& h) {
           t.r3.u64 = save.address;
           t.r4.u64 = rival;
         },
-        __imp__sub_82115D98, hooks::RaceSetupSetUp, {},
+        __imp__sub_82115D98, ITC_CONTEXT_FN(hooks::RaceSetupSetUp), {},
         fmt::format("case {}: rival {}, kind {}", c, int32_t(rival), int32_t(kind)), false, false,
         {&save}, split);
     leftovers.Check(tails[0], tails[1], fmt::format("case {}", c));
@@ -1551,7 +1551,7 @@ void NetworkModeTimeAttack(Context& h) {
           t.r3.u64 = answer.address;
           t.r4.u64 = mode.address;
         },
-        RecompiledNextMode, hooks::ModeType12NextMode, {}, fmt::format("case {}", c), false,
+        ITC_CONTEXT_FN(RecompiledNextMode), ITC_CONTEXT_FN(hooks::ModeType12NextMode), {}, fmt::format("case {}", c), false,
         false, {&mode, &block, &session, &answer},
         [&](int v) { SplitTraffic(h.base, data.address, holes, tails[v]); });
     leftovers.Check(tails[0], tails[1], fmt::format("case {}", c));
@@ -1640,7 +1640,7 @@ void Type67SetUpRace(Context& h) {
         [&](PPCContext& t) {
           t.r3.u64 = high | screen.address;
         },
-        RecompiledSetUpRace, hooks::Type6ListScreenSetUpRace, {}, fmt::format("case {}", c),
+        ITC_CONTEXT_FN(RecompiledSetUpRace), ITC_CONTEXT_FN(hooks::Type6ListScreenSetUpRace), {}, fmt::format("case {}", c),
         false, false, {&screen, &save},
         [&](int v) { SplitTraffic(h.base, data.address, holes, tails[v]); });
     leftovers.Check(tails[0], tails[1], fmt::format("case {}", c));
@@ -1734,7 +1734,7 @@ void Type67Type7SetUpRace(Context& h) {
         [&](PPCContext& t) {
           t.r3.u64 = high | screen.address;
         },
-        RecompiledType7SetUpRace, hooks::Type7ListScreenSetUpRace, {}, fmt::format("case {}", c),
+        ITC_CONTEXT_FN(RecompiledType7SetUpRace), ITC_CONTEXT_FN(hooks::Type7ListScreenSetUpRace), {}, fmt::format("case {}", c),
         false, false, {&screen, &save},
         [&](int v) { SplitTraffic(h.base, data.address, holes, tails[v]); });
     leftovers.Check(tails[0], tails[1], fmt::format("case {}", c));
@@ -1820,7 +1820,7 @@ void Type8SetUpRace(Context& h) {
           t.r3.u64 = high | screen.address;
           t.r4.u64 = screen.address + kDispatcher;
         },
-        RecompiledType8SetUpRace, hooks::Type8ListSetUpRace, {}, fmt::format("case {}", c),
+        ITC_CONTEXT_FN(RecompiledType8SetUpRace), ITC_CONTEXT_FN(hooks::Type8ListSetUpRace), {}, fmt::format("case {}", c),
         false, false, {&screen, &save},
         [&](int v) { SplitTraffic(h.base, data.address, holes, tails[v]); });
     leftovers.Check(tails[0], tails[1], fmt::format("case {}", c));
@@ -1912,7 +1912,7 @@ void Type8ColorSetUpRace(Context& h) {
           t.r3.u64 = high | screen.address;
           t.r4.u64 = screen.address + kDispatcher;
         },
-        RecompiledType8ColorSetUpRace, hooks::Type8ColorListSetUpRace, {},
+        ITC_CONTEXT_FN(RecompiledType8ColorSetUpRace), ITC_CONTEXT_FN(hooks::Type8ColorListSetUpRace), {},
         fmt::format("case {}", c), false, false, {&screen, &save},
         [&](int v) { SplitTraffic(h.base, data.address, holes, tails[v]); });
     leftovers.Check(tails[0], tails[1], fmt::format("case {}", c));
@@ -1946,11 +1946,11 @@ void RaceSetup(Context& h) {
   CourseRoutes(h, block);
   Routes(h, block);
   OnePointer(h, block, "Stages::Reset (sub_82101860)", __imp__sub_82101860,
-             hooks::RaceSetupStagesReset, 1224);
+             ITC_CONTEXT_FN(hooks::RaceSetupStagesReset), 1224);
   OnePointer(h, block, "Stages::Clear (sub_82101900)", __imp__sub_82101900,
-             hooks::RaceSetupStagesClear, 1224);
+             ITC_CONTEXT_FN(hooks::RaceSetupStagesClear), 1224);
   OnePointer(h, cars, "RacerRecord::Init (sub_820FF808)", __imp__sub_820FF808,
-             hooks::RaceSetupRacerRecordInit, 3936);
+             ITC_CONTEXT_FN(hooks::RaceSetupRacerRecordInit), 3936);
   RouteCallers(h, block, cars);
   Racers(h);
   Start(h);

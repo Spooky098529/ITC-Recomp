@@ -7,6 +7,7 @@
 // start, nothing having been done. B1's input update is in input_update.cpp.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -47,32 +48,32 @@ bool NativeLifetime() {
 // it runs the original, and the flag switches Insert).
 
 // AllocateNodes: r3 = the count; r3 the block.
-extern "C" REX_FUNC(sub_82099C08) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82099C08) {
+  
   if (NativeLifetime()) {
     if (const auto block = std_list::AllocateNodes(base, ctx.r3.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  __imp__sub_82099C08(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82099C08);
 }
 
 // PtrList: r3 = the list; r3 left as it came.
-extern "C" REX_FUNC(sub_820AD058) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820AD058) {
+  
   if (!NativeLifetime() || !std_list::Construct(base, ctx.r3.u32)) {
-    __imp__sub_820AD058(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AD058);
   }
 }
 
 // Insert: r3 = the list, r4 = the iterator by value (its node in the low
 // word), r5 = the value's address; r3 left as it came (the list).
-extern "C" REX_FUNC(sub_82095958) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82095958) {
+  
   if (!NativeLifetime() || !std_list::Insert(base, ctx.r3.u32, ctx.r4.u32,
                                              guest::LoadU32(base, ctx.r5.u32))) {
-    __imp__sub_82095958(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82095958);
   }
 }
 
@@ -93,15 +94,15 @@ extern "C" REX_FUNC(sub_82095958) {
 // mapper's constructor and InputProcessor's) call their plain C++.
 
 // The manager's slots 1, 2 and 5: r3 = the manager, r4 = the index's address.
-extern "C" REX_FUNC(sub_82098CB8) {
+ITC_NATIVE_ENTRY_ALWAYS(82098CB8) {
   ITC_INPUT_FALLBACK(82098CB8)
   ctx.r3.u64 = input::ManagerProcessor(ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32));
 }
-extern "C" REX_FUNC(sub_82098CD0) {
+ITC_NATIVE_ENTRY_ALWAYS(82098CD0) {
   ITC_INPUT_FALLBACK(82098CD0)
   ctx.r3.u64 = input::ManagerLogicalPad(ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32));
 }
-extern "C" REX_FUNC(sub_82098FE0) {
+ITC_NATIVE_ENTRY_ALWAYS(82098FE0) {
   ITC_INPUT_FALLBACK(82098FE0)
   ctx.r3.u64 = input::ManagerPhysicalPad(ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32));
 }
@@ -132,8 +133,8 @@ void NoteRead(uint32_t function, uint32_t caller, uint32_t object, uint32_t mask
 // (TestPressed, TestRepeat) calls theirs. The wrappers count their calls as the originals' did (from the
 // return addresses in the wrappers), the flag on or off.
 #define ITC_INPUT_WRAPPER(address, test, function, return_address)            \
-  extern "C" REX_FUNC(sub_##address) {                                         \
-    REX_FUNC_PROLOGUE();                                                       \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                         \
+    \
     const uint32_t caller = uint32_t(ctx.lr);                                  \
     const uint32_t processor = ctx.r3.u32;                                     \
     const uint32_t mask = guest::LoadU32(base, ctx.r4.u32);                    \
@@ -150,8 +151,8 @@ ITC_INPUT_WRAPPER(8258CEE0, 82592520, input::InputProcessorTestRepeat, 0x8258CF0
 #undef ITC_INPUT_WRAPPER
 
 #define ITC_INPUT_VALUES(address, function)                                    \
-  extern "C" REX_FUNC(sub_##address) {                                         \
-    REX_FUNC_PROLOGUE();                                                       \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                         \
+    \
     const uint32_t caller = uint32_t(ctx.lr);                                  \
     const uint32_t pad = ctx.r3.u32;                                           \
     if (ITC_FLAG(native_input)) {                                              \
@@ -179,7 +180,7 @@ constexpr uint32_t kMessage7Handler = 0x82098CE8;
 // with the dispatcher (block +0), each with a functor on the stack, in the
 // original's frame (192 bytes) at its offsets. False, with nothing done,
 // where the original must run.
-bool ConstructManager(PPCContext& ctx, uint8_t* base) {
+bool ConstructManager(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t manager = ctx.r3.u32;
   const uint32_t block = ctx.r4.u32;
   if (!NativeLifetime() || !input::ManagerConstructMembers(base, manager, block)) {
@@ -219,21 +220,21 @@ bool ConstructManager(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_820991E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820991E0) {
+  
   if (!ConstructManager(ctx, base)) {
-    __imp__sub_820991E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820991E0);
   }
 }
 
 // Input::Create: r3 = the argument block; r3 the manager, or 0 when the
 // allocation gave none. The manager's constructor is called in the
 // original's frame (96 bytes), from its call's return address.
-extern "C" REX_FUNC(sub_820993E8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820993E8) {
+  
   const auto manager = NativeLifetime() ? input::ManagerAllocate(base) : std::nullopt;
   if (!manager) {
-    __imp__sub_820993E8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820993E8);
     return;
   }
   if (*manager == 0) {
@@ -246,7 +247,7 @@ extern "C" REX_FUNC(sub_820993E8) {
     ctx.r3.u64 = *manager;
     ctx.r4.u64 = block;
     if (!ConstructManager(ctx, base)) {
-      __imp__sub_820991E0(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_820991E0);
     }
   });
   ctx.lr = saved_lr;
@@ -254,13 +255,13 @@ extern "C" REX_FUNC(sub_820993E8) {
 
 // AddListener (slot 3): r3 = the manager, r4 = the index's address, r5 = the
 // listener; r3 the listener.
-extern "C" REX_FUNC(sub_82099430) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82099430) {
+  
   const uint32_t listener = ctx.r5.u32;
   if (!NativeLifetime() || !input::ManagerAddListener(base, ctx.r3.u32,
                                                       guest::LoadU32(base, ctx.r4.u32),
                                                       listener)) {
-    __imp__sub_82099430(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82099430);
     return;
   }
   ctx.r3.u64 = listener;

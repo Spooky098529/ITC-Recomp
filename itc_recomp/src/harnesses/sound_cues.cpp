@@ -386,7 +386,7 @@ void CueList(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = d;
         ITC_FLAG(native_sound_cues) = v == 1;
-        (v == 0 ? __imp__sub_82118720 : NativeDelegateClone)(t, h.base);
+        (v == 0 ? __imp__sub_82118720 : ITC_CONTEXT_FN(NativeDelegateClone))(t, h.base);
         ITC_FLAG(native_sound_cues) = true;
         const uint32_t block = t.r3.u32;
         out[v].Word(block != 0 && block != 0xDEADDEAD ? 1 : 0);

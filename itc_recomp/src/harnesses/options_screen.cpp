@@ -499,13 +499,13 @@ void Leaves(Context& h, const World& w) {
                                                 (uint64_t(r.Next()) << 32);
   };
   Group(h, w, "Controls::ButtonIndex (sub_821BA950)", 120, code, __imp__sub_821BA950,
-        hooks::OptionsButtonIndex);
+        ITC_CONTEXT_FN(hooks::OptionsButtonIndex));
   Group(h, w, "Controls::ButtonCode (sub_821BAA18)", 120, code, __imp__sub_821BAA18,
-        hooks::OptionsButtonCode);
+        ITC_CONTEXT_FN(hooks::OptionsButtonCode));
   Group(h, w, "Controls::AnalogIndex (sub_821BAAE0)", 120, code, __imp__sub_821BAAE0,
-        hooks::OptionsAnalogIndex);
+        ITC_CONTEXT_FN(hooks::OptionsAnalogIndex));
   Group(h, w, "Controls::AnalogPicture (sub_821BAD08)", 120, code, __imp__sub_821BAD08,
-        hooks::OptionsAnalogPicture);
+        ITC_CONTEXT_FN(hooks::OptionsAnalogPicture));
   // The edits: values 0 to 5 (clashes likely), now and then any word; the
   // item 0 to 11 (or 0 to 5), now and then -1 to 16 (or 10): the frame's
   // neighbors, not any word (the original reads at sp - 48 + 4 item).
@@ -520,14 +520,14 @@ void Leaves(Context& h, const World& w) {
         edits(w, r, 284, 328);
         t.r3.u64 = r.Below(8) == 0 ? uint64_t(int64_t(r.Below(18)) - 1) : r.Below(12);
       },
-      __imp__sub_821BA7E0, hooks::OptionsIsButtonTaken, {{48, 0}});
+      __imp__sub_821BA7E0, ITC_CONTEXT_FN(hooks::OptionsIsButtonTaken), {{48, 0}});
   Group(
       h, w, "Options::IsAnalogTaken (sub_821BAB58)", 150,
       [&](PPCContext& t, Random& r, const World& w) {
         edits(w, r, 380, 400);
         t.r3.u64 = r.Below(8) == 0 ? uint64_t(int64_t(r.Below(12)) - 1) : r.Below(6);
       },
-      __imp__sub_821BAB58, hooks::OptionsIsAnalogTaken, {{32, 0}});
+      __imp__sub_821BAB58, ITC_CONTEXT_FN(hooks::OptionsIsAnalogTaken), {{32, 0}});
   // The steps: the menu's side -1, 0, 1 or any, its cursor around the
   // items, the OK/Default word 0, 1 or any.
   const auto step = [&h](int32_t last) {
@@ -540,13 +540,13 @@ void Leaves(Context& h, const World& w) {
     };
   };
   Group(h, w, "Options::StepButtons (sub_821BA550)", 120, step(12), __imp__sub_821BA550,
-        hooks::OptionsStepButtons);
+        ITC_CONTEXT_FN(hooks::OptionsStepButtons));
   Group(h, w, "Options::StepAnalog (sub_821BABD8)", 120, step(6), __imp__sub_821BABD8,
-        hooks::OptionsStepAnalog);
+        ITC_CONTEXT_FN(hooks::OptionsStepAnalog));
   Group(
       h, w, "Settings::Reset (sub_821B9DB8)", 30,
       [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.settings(); },
-      __imp__sub_821B9DB8, hooks::OptionsSettingsReset, {{112, 24}});
+      __imp__sub_821B9DB8, ITC_CONTEXT_FN(hooks::OptionsSettingsReset), {{112, 24}});
 }
 
 // --- The settings' read and write, and the machine's handlers ---
@@ -580,11 +580,11 @@ void Handlers(Context& h, const World& w) {
           guest::StoreU32(h.base, os::kModeType, 2);
         }
       },
-      __imp__sub_821BBF00, hooks::OptionsSettingsRead, {{272, 56}});
+      __imp__sub_821BBF00, ITC_CONTEXT_FN(hooks::OptionsSettingsRead), {{272, 56}});
   Group(
       h, w, "Settings::Write (sub_821BAE10)", 120,
       [&](PPCContext&, Random& r, const World& w) { slots(w, r); }, __imp__sub_821BAE10,
-      hooks::OptionsSettingsWrite, {{176, 32}});
+      ITC_CONTEXT_FN(hooks::OptionsSettingsWrite), {{176, 32}});
   Group(
       h, w, "Options::OnClosed (sub_821BCE38)", 80,
       [&](PPCContext& t, Random& r, const World& w) {
@@ -592,14 +592,14 @@ void Handlers(Context& h, const World& w) {
         t.r3.u64 = w.machine();
         t.r4.u64 = w.dispatcher();
       },
-      __imp__sub_821BCE38, hooks::OptionsOnClosed, {{112, 24}, {288, 144}});
+      __imp__sub_821BCE38, ITC_CONTEXT_FN(hooks::OptionsOnClosed), {{112, 24}, {288, 144}});
   Group(
       h, w, "Options::WaitForMovie (sub_821BBBA0)", 80,
       [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.machine(); }, __imp__sub_821BBBA0,
-      hooks::OptionsWaitForMovie, {{96, 16}});
+      ITC_CONTEXT_FN(hooks::OptionsWaitForMovie), {{96, 16}});
   Group(
       h, w, "Options::OpenMovie (sub_821B9F88)", 10, [](PPCContext&, Random&, const World&) {},
-      __imp__sub_821B9F88, hooks::OptionsOpenMovie);
+      __imp__sub_821B9F88, ITC_CONTEXT_FN(hooks::OptionsOpenMovie));
   // OnEnter allocates over the layer, as its adapter runs it: the seven
   // blocks compared and freed.
   if (!hooks::NativeHeapActive()) {
@@ -609,7 +609,7 @@ void Handlers(Context& h, const World& w) {
   Group(
       h, w, "Options::OnEnter (sub_821BB9A8)", 40,
       [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.machine(); }, __imp__sub_821BB9A8,
-      hooks::OptionsOnEnter, {{128, 40}},
+      ITC_CONTEXT_FN(hooks::OptionsOnEnter), {{128, 40}},
       [&h](PPCContext& t, const World& w, Outputs& out) {
         static constexpr uint32_t kBytes[7] = {28, 68, 716, 28, 28, 68, 28};
         out.Word(t.r3.u32 == guest::LoadU32(h.base, 0x826D8488));
@@ -643,7 +643,7 @@ void MovieHandlers(Context& h, const World& w) {
         machine(t, r, w);
         guest::StoreU32(h.base, w.machine() + 9616, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
       },
-      __imp__sub_821BCD28, hooks::OptionsClose, {{112, 24}});
+      __imp__sub_821BCD28, ITC_CONTEXT_FN(hooks::OptionsClose), {{112, 24}});
   Group(
       h, w, "Options::Leave (sub_821BCF08)", 80,
       [&](PPCContext& t, Random& r, const World& w) {
@@ -653,11 +653,11 @@ void MovieHandlers(Context& h, const World& w) {
           guest::StoreU32(h.base, kMissingMovie, 0);
         }
       },
-      __imp__sub_821BCF08, hooks::OptionsLeave, {{112, 16}});
+      __imp__sub_821BCF08, ITC_CONTEXT_FN(hooks::OptionsLeave), {{112, 16}});
   Group(
       h, w, "Options::ClosePage (sub_821BD330)", 60,
       [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.dispatcher(); },
-      __imp__sub_821BD330, hooks::OptionsClosePage);
+      __imp__sub_821BD330, ITC_CONTEXT_FN(hooks::OptionsClosePage));
   // The steps: r3 the page block's step word (+24), 0 or 1; the counter
   // +684 around 0 to 12.
   const auto step = [&h](PPCContext& t, Random& r, const World& w) {
@@ -665,7 +665,7 @@ void MovieHandlers(Context& h, const World& w) {
     guest::StoreU32(h.base, w.settings() + 684, Around(r, -1, 12));
     t.r3.u64 = w.page() + 24;
   };
-  Group(h, w, "Options::Wait (sub_821BD3C8)", 80, step, __imp__sub_821BD3C8, hooks::OptionsWait,
+  Group(h, w, "Options::Wait (sub_821BD3C8)", 80, step, __imp__sub_821BD3C8, ITC_CONTEXT_FN(hooks::OptionsWait),
         {{112, 24}});
   // The steps on the movie: the step word 0 or 1, the menu's cursor 0 to 5
   // (the animations' indexes stay in the world's nodes), the context 0 to
@@ -685,17 +685,17 @@ void MovieHandlers(Context& h, const World& w) {
   };
   const StepCase kSteps[] = {
       {"Options::OpenCategories (sub_821BD468)", __imp__sub_821BD468,
-       hooks::OptionsOpenCategories, 128, 32},
+       ITC_CONTEXT_FN(hooks::OptionsOpenCategories), 128, 32},
       {"Options::ReturnToCategories (sub_821BD5B0)", __imp__sub_821BD5B0,
-       hooks::OptionsReturnToCategories, 128, 32},
-      {"Options::EnterHud (sub_821BD728)", __imp__sub_821BD728, hooks::OptionsEnterHud, 128, 32},
-      {"Options::ChangeHudValue (sub_821BD800)", __imp__sub_821BD800, hooks::OptionsChangeHudValue,
+       ITC_CONTEXT_FN(hooks::OptionsReturnToCategories), 128, 32},
+      {"Options::EnterHud (sub_821BD728)", __imp__sub_821BD728, ITC_CONTEXT_FN(hooks::OptionsEnterHud), 128, 32},
+      {"Options::ChangeHudValue (sub_821BD800)", __imp__sub_821BD800, ITC_CONTEXT_FN(hooks::OptionsChangeHudValue),
        112, 24},
-      {"Options::EnterSound (sub_821BD908)", __imp__sub_821BD908, hooks::OptionsEnterSound, 112,
+      {"Options::EnterSound (sub_821BD908)", __imp__sub_821BD908, ITC_CONTEXT_FN(hooks::OptionsEnterSound), 112,
        24},
-      {"Options::EnterSliders (sub_821BD9A0)", __imp__sub_821BD9A0, hooks::OptionsEnterSliders,
+      {"Options::EnterSliders (sub_821BD9A0)", __imp__sub_821BD9A0, ITC_CONTEXT_FN(hooks::OptionsEnterSliders),
        112, 24},
-      {"Options::EnterButtons (sub_821BDAD0)", __imp__sub_821BDAD0, hooks::OptionsEnterButtons, 208,
+      {"Options::EnterButtons (sub_821BDAD0)", __imp__sub_821BDAD0, ITC_CONTEXT_FN(hooks::OptionsEnterButtons), 208,
        32},
   };
   for (const StepCase& c : kSteps) {
@@ -717,47 +717,47 @@ void NodeHelpers(Context& h, const World& w) {
   Group(
       h, w, "Options::SetCategoryArrow (sub_821BE218)", 60,
       [&](PPCContext& t, Random& r, const World&) { t.r3.u64 = value(r, -200, 200); },
-      __imp__sub_821BE218, hooks::OptionsSetCategoryArrow, {{112, 24}});
+      __imp__sub_821BE218, ITC_CONTEXT_FN(hooks::OptionsSetCategoryArrow), {{112, 24}});
   Group(
       h, w, "Options::ShowVolumeNumber (sub_821BE518)", 60,
       [&](PPCContext& t, Random& r, const World& w) {
         t.r3.u64 = w.leaf(r.Below(kLeaves));
         t.r4.u64 = value(r, -1, 17);
       },
-      __imp__sub_821BE518, hooks::OptionsShowVolumeNumber, {{128, 80}, {48, 32}});
+      __imp__sub_821BE518, ITC_CONTEXT_FN(hooks::OptionsShowVolumeNumber), {{128, 80}, {48, 32}});
   Group(
       h, w, "Options::ShowMusicName (sub_821BE930)", 40,
       [&](PPCContext& t, Random& r, const World&) { t.r3.u64 = value(r, 0, 6); },
-      __imp__sub_821BE930, hooks::OptionsShowMusicName, {{112, 64}, {32, 16}});
+      __imp__sub_821BE930, ITC_CONTEXT_FN(hooks::OptionsShowMusicName), {{112, 64}, {32, 16}});
   Group(
       h, w, "Options::ShowSlider (sub_821BE988)", 60,
       [&](PPCContext& t, Random& r, const World& w) {
         t.r3.u64 = w.leaf(r.Below(kLeaves));
         t.r4.u64 = value(r, -12, 12);
       },
-      __imp__sub_821BE988, hooks::OptionsShowSlider, {{128, 80}, {48, 40}});
+      __imp__sub_821BE988, ITC_CONTEXT_FN(hooks::OptionsShowSlider), {{128, 80}, {48, 40}});
   Group(
       h, w, "Options::ShowSliderMark (sub_821BEA48)", 60,
       [&](PPCContext& t, Random& r, const World& w) {
         t.r3.u64 = w.leaf(r.Below(kLeaves));
         t.r4.u64 = value(r, -12, 12);
       },
-      __imp__sub_821BEA48, hooks::OptionsShowSliderMark, {{112, 16}});
+      __imp__sub_821BEA48, ITC_CONTEXT_FN(hooks::OptionsShowSliderMark), {{112, 16}});
   Group(
       h, w, "Options::ShowButtonPicture (sub_821BF0F0)", 40,
       [&](PPCContext& t, Random& r, const World&) { t.r3.u64 = value(r, -2, 20); },
-      __imp__sub_821BF0F0, hooks::OptionsShowButtonPicture, {{128, 32}});
+      __imp__sub_821BF0F0, ITC_CONTEXT_FN(hooks::OptionsShowButtonPicture), {{128, 32}});
   Group(
       h, w, "Options::ShowAnalogPicture (sub_821BF630)", 40,
       [&](PPCContext& t, Random& r, const World&) { t.r3.u64 = value(r, -2, 14); },
-      __imp__sub_821BF630, hooks::OptionsShowAnalogPicture, {{128, 32}});
+      __imp__sub_821BF630, ITC_CONTEXT_FN(hooks::OptionsShowAnalogPicture), {{128, 32}});
   Group(
       h, w, "Options::ResetNode (sub_821BFA68)", 60,
       [&](PPCContext& t, Random& r, const World&) {
         t.r3.u64 = r.Below(3) == 0 ? ~uint64_t(0) : r.Below(6);
         t.r4.u64 = r.Below(10);
       },
-      __imp__sub_821BFA68, hooks::OptionsResetNode, {{128, 40}});
+      __imp__sub_821BFA68, ITC_CONTEXT_FN(hooks::OptionsResetNode), {{128, 40}});
 }
 
 
@@ -780,28 +780,28 @@ void PageHelpers(Context& h, const World& w) {
         t.r3.u64 = w.leaf(r.Below(kLeaves));
         t.r4.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(19)) - 1));
       },
-      __imp__sub_821BE5A8, hooks::OptionsShowVolumeBar, {{112, 32}});
+      __imp__sub_821BE5A8, ITC_CONTEXT_FN(hooks::OptionsShowVolumeBar), {{112, 32}});
   // ShowVolumeNumbers: ShowVolumeNumber's frame below its own (its varargs
   // words and register saves left out).
   Group(
       h, w, "Options::ShowVolumeNumbers (sub_821BE820)", 60,
       [&](PPCContext&, Random& r, const World& w) { edits(w, r, 252, 256, -1, 17); },
-      __imp__sub_821BE820, hooks::OptionsShowVolumeNumbers, {{112, 24}, {240, 192}, {160, 144}});
+      __imp__sub_821BE820, ITC_CONTEXT_FN(hooks::OptionsShowVolumeNumbers), {{112, 24}, {240, 192}, {160, 144}});
   Group(
       h, w, "Options::ShowSliderNumbers (sub_821BECA8)", 60,
       [&](PPCContext&, Random& r, const World& w) { edits(w, r, 260, 268, -12, 12); },
-      __imp__sub_821BECA8, hooks::OptionsShowSliderNumbers, {{144, 32}, {272, 224}, {192, 184}});
+      __imp__sub_821BECA8, ITC_CONTEXT_FN(hooks::OptionsShowSliderNumbers), {{144, 32}, {272, 224}, {192, 184}});
   Group(
       h, w, "Options::ShowSliderMarks (sub_821BED38)", 60,
       [&](PPCContext&, Random& r, const World& w) { edits(w, r, 260, 268, -12, 12); },
-      __imp__sub_821BED38, hooks::OptionsShowSliderMarks, {{144, 32}, {256, 160}});
+      __imp__sub_821BED38, ITC_CONTEXT_FN(hooks::OptionsShowSliderMarks), {{144, 32}, {256, 160}});
   Group(
       h, w, "Options::ShowHudValues (sub_821BE290)", 80,
       [&](PPCContext&, Random& r, const World& w) {
         edits(w, r, 236, 248, 0, 1);
         edits(w, r, 660, 660, 0, 1);
       },
-      __imp__sub_821BE290, hooks::OptionsShowHudValues, {{208, 88}});
+      __imp__sub_821BE290, ITC_CONTEXT_FN(hooks::OptionsShowHudValues), {{208, 88}});
   // The steps: the menu's side -1, 0, 1 or any, its cursor 0 to 4 (now and
   // then any), the edits around their bounds.
   const auto side = [&h, edit](const World& w, Random& r) {
@@ -817,14 +817,14 @@ void PageHelpers(Context& h, const World& w) {
         edits(w, r, 252, 256, -1, 16);
         edits(w, r, 688, 688, -1, 17);
       },
-      __imp__sub_821BE5F8, hooks::OptionsStepSound);
+      __imp__sub_821BE5F8, ITC_CONTEXT_FN(hooks::OptionsStepSound));
   Group(
       h, w, "Options::StepSliders (sub_821BEAC8)", 150,
       [&](PPCContext&, Random& r, const World& w) {
         side(w, r);
         edits(w, r, 260, 268, -11, 11);
       },
-      __imp__sub_821BEAC8, hooks::OptionsStepSliders, {{112, 16}});
+      __imp__sub_821BEAC8, ITC_CONTEXT_FN(hooks::OptionsStepSliders), {{112, 16}});
 
   // The lists: the edits 0 to `hi` only (stored into the picture nodes'
   // +108, the world's child index: any word would send later lookups out of
@@ -840,19 +840,19 @@ void PageHelpers(Context& h, const World& w) {
   Group(
       h, w, "Options::ShowButtonList (sub_821BEFE8)", 60,
       [&](PPCContext&, Random& r, const World& w) { small(w, r, 284, 328, 16); },
-      __imp__sub_821BEFE8, hooks::OptionsShowButtonList, {{208, 168}, {128, 56}});
+      __imp__sub_821BEFE8, ITC_CONTEXT_FN(hooks::OptionsShowButtonList), {{208, 168}, {128, 56}});
   Group(
       h, w, "Options::ShowAnalogList (sub_821BF520)", 60,
       [&](PPCContext&, Random& r, const World& w) { small(w, r, 380, 400, 10); },
-      __imp__sub_821BF520, hooks::OptionsShowAnalogList, {{208, 168}, {128, 48}});
+      __imp__sub_821BF520, ITC_CONTEXT_FN(hooks::OptionsShowAnalogList), {{208, 168}, {128, 48}});
   Group(
       h, w, "Options::ShowButtonClashes (sub_821BF158)", 80,
       [&](PPCContext&, Random& r, const World& w) { edits(w, r, 284, 328, 0, 5); },
-      __imp__sub_821BF158, hooks::OptionsShowButtonClashes, {{304, 40}});
+      __imp__sub_821BF158, ITC_CONTEXT_FN(hooks::OptionsShowButtonClashes), {{304, 40}});
   Group(
       h, w, "Options::ShowAnalogClashes (sub_821BF698)", 80,
       [&](PPCContext&, Random& r, const World& w) { edits(w, r, 380, 400, 0, 3); },
-      __imp__sub_821BF698, hooks::OptionsShowAnalogClashes, {{288, 40}});
+      __imp__sub_821BF698, ITC_CONTEXT_FN(hooks::OptionsShowAnalogClashes), {{288, 40}});
   // The steps: r3 the step word (0 or 1); the analog edit -2 to 20; the
   // dialog menu's cursors 0 to 3; the dialogs' states 0 to 3 or any.
   const auto dialog_step = [&h, edit](PPCContext& t, Random& r, const World& w) {
@@ -867,15 +867,15 @@ void PageHelpers(Context& h, const World& w) {
     }
   };
   Group(h, w, "Options::EnterAnalog (sub_821BDE88)", 80, dialog_step, __imp__sub_821BDE88,
-        hooks::OptionsEnterAnalog, {{176, 32}});
+        ITC_CONTEXT_FN(hooks::OptionsEnterAnalog), {{176, 32}});
   Group(h, w, "Options::MoveSaveDialogCursor (sub_821C09B0)", 60, dialog_step,
-        __imp__sub_821C09B0, hooks::OptionsMoveSaveDialogCursor, {{128, 32}});
+        __imp__sub_821C09B0, ITC_CONTEXT_FN(hooks::OptionsMoveSaveDialogCursor), {{128, 32}});
   Group(h, w, "Options::MoveCategory6DialogCursor (sub_821C0B50)", 60, dialog_step,
-        __imp__sub_821C0B50, hooks::OptionsMoveCategory6DialogCursor, {{128, 32}});
+        __imp__sub_821C0B50, ITC_CONTEXT_FN(hooks::OptionsMoveCategory6DialogCursor), {{128, 32}});
   Group(h, w, "Options::ChangeSaveDialog (sub_821C08B0)", 100, dialog_step, __imp__sub_821C08B0,
-        hooks::OptionsChangeSaveDialog, {{128, 32}});
+        ITC_CONTEXT_FN(hooks::OptionsChangeSaveDialog), {{128, 32}});
   Group(h, w, "Options::ChangeCategory6Dialog (sub_821C0A50)", 100, dialog_step,
-        __imp__sub_821C0A50, hooks::OptionsChangeCategory6Dialog, {{128, 32}});
+        __imp__sub_821C0A50, ITC_CONTEXT_FN(hooks::OptionsChangeCategory6Dialog), {{128, 32}});
 }
 
 
@@ -926,7 +926,7 @@ void Dispatch(Context& h, const World& w) {
         save_pages(w, r);
         t.r3.u64 = w.dispatcher();
       },
-      __imp__sub_821C6F58, hooks::OptionsSavePage, {{128, 8}});
+      __imp__sub_821C6F58, ITC_CONTEXT_FN(hooks::OptionsSavePage), {{128, 8}});
   Group(
       h, w, "Options::Category6Page (sub_821BD228)", 100,
       [&](PPCContext& t, Random& r, const World& w) {
@@ -934,7 +934,7 @@ void Dispatch(Context& h, const World& w) {
         t.r3.u64 = w.dispatcher();
         t.r4.u64 = w.dispatcher();
       },
-      __imp__sub_821BD228, hooks::OptionsCategory6Page, {{112, 8}});
+      __imp__sub_821BD228, ITC_CONTEXT_FN(hooks::OptionsCategory6Page), {{112, 8}});
   // Draw: no page, the close (14), or pages 9 and 10 (theirs as above).
   Group(
       h, w, "Options::Draw (sub_821C80F0)", 100,
@@ -944,7 +944,7 @@ void Dispatch(Context& h, const World& w) {
         t.r3.u64 = w.machine();
         t.r4.u64 = w.dispatcher();
       },
-      __imp__sub_821C80F0, hooks::OptionsDraw, {{224, 80}});
+      __imp__sub_821C80F0, ITC_CONTEXT_FN(hooks::OptionsDraw), {{224, 80}});
   // Update: the step none (-1, with the page 14 or not), other negatives,
   // or one the world runs (the native steps); the queued step -1 or one;
   // the steps' fields as their own cases shape them.
@@ -970,7 +970,7 @@ void Dispatch(Context& h, const World& w) {
           guest::StoreU32(h.base, w.settings() + f, r.Below(4));
         }
       },
-      __imp__sub_821C81E8, hooks::OptionsUpdate, {{480, 152}});
+      __imp__sub_821C81E8, ITC_CONTEXT_FN(hooks::OptionsUpdate), {{480, 152}});
   // StepHud: the side -1, 1, 0 or any; the cursor 0 to 4; the values 0, 1
   // or any. ShowHudValues' frame below its own.
   Group(
@@ -984,7 +984,7 @@ void Dispatch(Context& h, const World& w) {
                           r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2));
         }
       },
-      __imp__sub_821BE3E0, hooks::OptionsStepHud, {{112, 8}, {320, 200}});
+      __imp__sub_821BE3E0, ITC_CONTEXT_FN(hooks::OptionsStepHud), {{112, 8}, {320, 200}});
   Group(
       h, w, "Options::ShowVolumeBars (sub_821BE8A8)", 60,
       [&](PPCContext&, Random& r, const World& w) {
@@ -992,7 +992,7 @@ void Dispatch(Context& h, const World& w) {
           guest::StoreU32(h.base, w.settings() + f, Around(r, -1, 17));
         }
       },
-      __imp__sub_821BE8A8, hooks::OptionsShowVolumeBars, {{112, 24}, {224, 144}});
+      __imp__sub_821BE8A8, ITC_CONTEXT_FN(hooks::OptionsShowVolumeBars), {{112, 24}, {224, 144}});
   // ShowPrompts: each frame -1 or 0 to 8 (they land in the world's child
   // indexes).
   Group(
@@ -1003,7 +1003,7 @@ void Dispatch(Context& h, const World& w) {
           reg->u64 = r.Below(4) == 0 ? ~uint64_t(0) : r.Below(9);
         }
       },
-      __imp__sub_821C1068, hooks::OptionsShowPrompts, {{176, 56}});
+      __imp__sub_821C1068, ITC_CONTEXT_FN(hooks::OptionsShowPrompts), {{176, 56}});
   // Settings::Reload: the context 0 to 4 or any (1 runs ShowCareerInfo, the
   // original, on both sides). Settings::Read's frame below its own.
   Group(
@@ -1014,7 +1014,7 @@ void Dispatch(Context& h, const World& w) {
           guest::StoreU32(h.base, w.options() + f, r.Below(34));
         }
       },
-      __imp__sub_821C0FF0, hooks::OptionsSettingsReload, {{96, 8}, {368, 152}});
+      __imp__sub_821C0FF0, ITC_CONTEXT_FN(hooks::OptionsSettingsReload), {{96, 8}, {368, 152}});
   // OnLeft frees the seven blocks: each case gives it seven of the
   // allocation layer's pages (as OnEnter's), compared freed after.
   if (!hooks::NativeHeapActive()) {
@@ -1028,7 +1028,7 @@ void Dispatch(Context& h, const World& w) {
           guest::StoreU32(h.base, kGlobals + 4 * i, memory::AllocPages(64, 4096));
         }
       },
-      __imp__sub_821B9E70, hooks::OptionsOnLeft, {{160, 64}},
+      __imp__sub_821B9E70, ITC_CONTEXT_FN(hooks::OptionsOnLeft), {{160, 64}},
       [&h](PPCContext&, const World&, Outputs& out) {
         for (uint32_t i = 0; i < 7; i++) {
           out.Word(guest::LoadU32(h.base, kGlobals + 4 * i));
@@ -1058,7 +1058,7 @@ void CursorSteps(Context& h, const World& w) {
         menu(w, r);
         guest::StoreU32(h.base, w.page() + 0, r.Below(4) == 0 ? 14 : r.Below(3) - 1);
       },
-      __imp__sub_821BC670, hooks::OptionsCategoryPage, {{96, 16}});
+      __imp__sub_821BC670, ITC_CONTEXT_FN(hooks::OptionsCategoryPage), {{96, 16}});
   // SetUpMovie: the context 0 to 6 or any; type 2's name record's kinds 0
   // to 5 and small indexes, the day and weekday small.
   const auto set_up = [&h](const World& w, Random& r) {
@@ -1075,7 +1075,7 @@ void CursorSteps(Context& h, const World& w) {
   Group(
       h, w, "Options::SetUpMovie (sub_821BCFF0)", 100,
       [&](PPCContext&, Random& r, const World& w) { set_up(w, r); }, __imp__sub_821BCFF0,
-      hooks::OptionsSetUpMovie, {{160, 104}, {80, 56}});
+      ITC_CONTEXT_FN(hooks::OptionsSetUpMovie), {{160, 104}, {80, 56}});
   // Show: Settings::Read's records (codes 0 to 33) and the mode type (its
   // context) as ShapeWorld picks; r4 the dispatcher. SetUpMovie's and
   // Read's frames below its own.
@@ -1089,7 +1089,7 @@ void CursorSteps(Context& h, const World& w) {
         guest::StoreU32(h.base, w.page() + 0, r.Below(3) == 0 ? 0 : r.Below(15));
         t.r4.u64 = w.dispatcher();
       },
-      __imp__sub_821C1158, hooks::OptionsShow, {{112, 24}, {272, 216}, {192, 168}, {384, 272}});
+      __imp__sub_821C1158, ITC_CONTEXT_FN(hooks::OptionsShow), {{112, 24}, {272, 216}, {192, 168}, {384, 272}});
   // The cursor steps: the step word 0 or 1; the cursor and the cursor
   // before 0 to 5 (the last row 4, 2 or 3 by page), the direction -1, 0, 1
   // or any, the menu's last item 0 to 5; the context 0 to 4; OK/Default 0,
@@ -1116,16 +1116,16 @@ void CursorSteps(Context& h, const World& w) {
     guest::StoreU32(h.base, w.settings() + 688, r.Below(7));
   };
   Group(h, w, "Options::MoveCategoryCursor (sub_821C2BE0)", 150, cursor_step,
-        __imp__sub_821C2BE0, hooks::OptionsMoveCategoryCursor,
+        __imp__sub_821C2BE0, ITC_CONTEXT_FN(hooks::OptionsMoveCategoryCursor),
         {{160, 112}, {80, 64}, {272, 184}});
   Group(h, w, "Options::MoveHudCursor (sub_821C2E28)", 150, cursor_step, __imp__sub_821C2E28,
-        hooks::OptionsMoveHudCursor, {{160, 112}, {80, 64}});
+        ITC_CONTEXT_FN(hooks::OptionsMoveHudCursor), {{160, 112}, {80, 64}});
   Group(h, w, "Options::MoveSoundCursor (sub_821C3008)", 150, cursor_step, __imp__sub_821C3008,
-        hooks::OptionsMoveSoundCursor, {{144, 96}, {64, 56}});
+        ITC_CONTEXT_FN(hooks::OptionsMoveSoundCursor), {{144, 96}, {64, 56}});
   Group(h, w, "Options::ChangeSoundValue (sub_821C3278)", 100, cursor_step, __imp__sub_821C3278,
-        hooks::OptionsChangeSoundValue, {{128, 40}, {256, 208}, {160, 156}});
+        ITC_CONTEXT_FN(hooks::OptionsChangeSoundValue), {{128, 40}, {256, 208}, {160, 156}});
   Group(h, w, "Options::MoveSlidersCursor (sub_821C3398)", 150, cursor_step,
-        __imp__sub_821C3398, hooks::OptionsMoveSlidersCursor, {{144, 96}, {64, 56}});
+        __imp__sub_821C3398, ITC_CONTEXT_FN(hooks::OptionsMoveSlidersCursor), {{144, 96}, {64, 56}});
   // ChangeSlidersValue: ShowSliderNumbers' frame below its own.
   Group(
       h, w, "Options::ChangeSlidersValue (sub_821C35F0)", 100,
@@ -1136,7 +1136,7 @@ void CursorSteps(Context& h, const World& w) {
           guest::StoreU32(h.base, w.settings() + f, uint32_t(int32_t(r.Below(21)) - 10));
         }
       },
-      __imp__sub_821C35F0, hooks::OptionsChangeSlidersValue, {{112, 24}, {256, 144}});
+      __imp__sub_821C35F0, ITC_CONTEXT_FN(hooks::OptionsChangeSlidersValue), {{112, 24}, {256, 144}});
   // The leaves: the cursor 0 to the last row (now and then past it), the
   // first row shown 0 to 2, the edits and the current settings 0 to 16 (or
   // 10: they land in the world's child indexes), the counter around 0 to 12.
@@ -1158,9 +1158,9 @@ void CursorSteps(Context& h, const World& w) {
     };
   };
   Group(h, w, "Options::LeaveButtons (sub_821C2778)", 100, leave(12, 284, 92, 12, 16),
-        __imp__sub_821C2778, hooks::OptionsLeaveButtons, {{336, 40}, {640, 504}, {496, 380}});
+        __imp__sub_821C2778, ITC_CONTEXT_FN(hooks::OptionsLeaveButtons), {{336, 40}, {640, 504}, {496, 380}});
   Group(h, w, "Options::LeaveAnalog (sub_821C2A10)", 100, leave(6, 380, 188, 6, 10),
-        __imp__sub_821C2A10, hooks::OptionsLeaveAnalog, {{240, 40}, {528, 408}, {400, 284}});
+        __imp__sub_821C2A10, ITC_CONTEXT_FN(hooks::OptionsLeaveAnalog), {{240, 40}, {528, 408}, {400, 284}});
 }
 
 
@@ -1214,14 +1214,14 @@ void CategoryPages(Context& h, const World& w) {
         Random r = Mixed(from);
         ShapeEdits(h.base, w.settings() + 284, 12, 17, r);
       },
-      __imp__sub_821BA890, NativeHasButtonClash, {{48, 0}});
+      __imp__sub_821BA890, ITC_CONTEXT_FN(NativeHasButtonClash), {{48, 0}});
   Group(
       h, w, "Options::HasAnalogClash (sub_821BAC78)", 150,
       [&](PPCContext&, Random& from, const World& w) {
         Random r = Mixed(from);
         ShapeEdits(h.base, w.settings() + 380, 6, 11, r);
       },
-      __imp__sub_821BAC78, NativeHasAnalogClash, {{32, 0}});
+      __imp__sub_821BAC78, ITC_CONTEXT_FN(NativeHasAnalogClash), {{32, 0}});
   // The pages: the options' menu for Menu::Step (items 0 to `last`, the
   // cursor among them, its flags 0 or 1; the mappers as ShapeMappers makes
   // them); the page block's page this page, -1 or another; OK/Default 0, 1
@@ -1269,24 +1269,24 @@ void CategoryPages(Context& h, const World& w) {
   };
   Group(h, w, "Options::HudPage (sub_821C1270)", 200,
         page(1, 4, [&](const World& w, Random& r) { words(w, r, {44, 236, 428}, 4, 0, 1); }),
-        __imp__sub_821C1270, hooks::OptionsHudPage, {{96, 16}});
+        __imp__sub_821C1270, ITC_CONTEXT_FN(hooks::OptionsHudPage), {{96, 16}});
   Group(h, w, "Options::SlidersPage (sub_821C1888)", 200,
         page(3, 3, [&](const World& w, Random& r) { words(w, r, {68, 260, 452}, 3, -10, 10); }),
-        __imp__sub_821C1888, hooks::OptionsSlidersPage, {{96, 16}});
+        __imp__sub_821C1888, ITC_CONTEXT_FN(hooks::OptionsSlidersPage), {{96, 16}});
   Group(h, w, "Options::ButtonsPage (sub_821C1D08)", 200,
         page(5, 12,
              [&](const World& w, Random& r) {
                ShapeEdits(h.base, w.settings() + 284, 12, 17, r);
                words(w, r, {476}, 12, 0, 16);
              }),
-        __imp__sub_821C1D08, hooks::OptionsButtonsPage, {{112, 24}});
+        __imp__sub_821C1D08, ITC_CONTEXT_FN(hooks::OptionsButtonsPage), {{112, 24}});
   Group(h, w, "Options::AnalogPage (sub_821C21A8)", 200,
         page(7, 6,
              [&](const World& w, Random& r) {
                ShapeEdits(h.base, w.settings() + 380, 6, 11, r);
                words(w, r, {572}, 6, 0, 10);
              }),
-        __imp__sub_821C21A8, hooks::OptionsAnalogPage, {{96, 16}});
+        __imp__sub_821C21A8, ITC_CONTEXT_FN(hooks::OptionsAnalogPage), {{96, 16}});
   // The sound page: the volumes (edits, current, defaults) around 0 to 15,
   // the track picked and the one previewed 0 to 16 (the same half the
   // time), the menu music's cue 0 to 3. Its register saves (r28 to r31 and
@@ -1303,7 +1303,7 @@ void CategoryPages(Context& h, const World& w) {
                                r.Below(2) == 0 ? track : Around(r, -1, 16));
                guest::StoreU32(h.base, w.settings() + 704, r.Below(4));
              }),
-        __imp__sub_821C1498, hooks::OptionsSoundPage, {{160, 40}});
+        __imp__sub_821C1498, ITC_CONTEXT_FN(hooks::OptionsSoundPage), {{160, 40}});
   // The sound page's leave: the state +700 0 to 2 or another, the menu
   // music's cue 0 to 3; the sound manager's slot 8 (IsBankSlotEmpty) the
   // getter too. Its register saves (r29 to r31 and lr) left out.
@@ -1317,7 +1317,7 @@ void CategoryPages(Context& h, const World& w) {
         guest::StoreU32(h.base, w.manager() + 0x400 + 32, kGet60);
         guest::StoreU32(h.base, w.page() + 0, r.Below(2) == 0 ? 13 : 0xFFFFFFFFu);
       },
-      __imp__sub_821BA380, hooks::OptionsLeaveSoundPage, {{160, 32}});
+      __imp__sub_821BA380, ITC_CONTEXT_FN(hooks::OptionsLeaveSoundPage), {{160, 32}});
   // The set-ups: the context 0 to 4, the category cursor 0 to 6, the music
   // tracks' flag 1, 0 or any; the current settings as the pages' cases
   // shape them (the buttons 0 to 16, the analog inputs 0 to 10: they land
@@ -1337,17 +1337,17 @@ void CategoryPages(Context& h, const World& w) {
   };
   const auto set_up_case = [set_up](PPCContext&, Random& r, const World& w) { set_up(w, r); };
   Group(h, w, "Options::SetUpCategoryPage (sub_821C4BE0)", 100, set_up_case, __imp__sub_821C4BE0,
-        hooks::OptionsSetUpCategoryPage, {{144, 96}, {64, 48}});
+        ITC_CONTEXT_FN(hooks::OptionsSetUpCategoryPage), {{144, 96}, {64, 48}});
   Group(h, w, "Options::SetUpHudPage (sub_821C4DB0)", 100, set_up_case, __imp__sub_821C4DB0,
-        hooks::OptionsSetUpHudPage, {{144, 96}, {64, 48}});
+        ITC_CONTEXT_FN(hooks::OptionsSetUpHudPage), {{144, 96}, {64, 48}});
   Group(h, w, "Options::SetUpSoundPage (sub_821C4FD0)", 100, set_up_case, __imp__sub_821C4FD0,
-        hooks::OptionsSetUpSoundPage, {{128, 80}, {48, 32}});
+        ITC_CONTEXT_FN(hooks::OptionsSetUpSoundPage), {{128, 80}, {48, 32}});
   Group(h, w, "Options::SetUpSlidersPage (sub_821C51D0)", 100, set_up_case, __imp__sub_821C51D0,
-        hooks::OptionsSetUpSlidersPage, {{128, 80}, {48, 40}});
+        ITC_CONTEXT_FN(hooks::OptionsSetUpSlidersPage), {{128, 80}, {48, 40}});
   Group(h, w, "Options::SetUpButtonsPage (sub_821C5580)", 100, set_up_case, __imp__sub_821C5580,
-        hooks::OptionsSetUpButtonsPage, {{128, 80}, {48, 32}});
+        ITC_CONTEXT_FN(hooks::OptionsSetUpButtonsPage), {{128, 80}, {48, 32}});
   Group(h, w, "Options::SetUpAnalogPage (sub_821C57D0)", 100, set_up_case, __imp__sub_821C57D0,
-        hooks::OptionsSetUpAnalogPage, {{128, 80}, {48, 32}});
+        ITC_CONTEXT_FN(hooks::OptionsSetUpAnalogPage), {{128, 80}, {48, 32}});
   // The steps over the set-ups: the step word 0 or 1, the menu's cursor 0
   // to 5, OK/Default 0, 1 or any, the page 0 or another; the fades' counts
   // 0 or any (FadeIn's answer).
@@ -1364,17 +1364,17 @@ void CategoryPages(Context& h, const World& w) {
     }
   };
   Group(h, w, "Options::FadeIn (sub_821C7080)", 100, close_step, __imp__sub_821C7080,
-        hooks::OptionsFadeIn, {{112, 24}});
+        ITC_CONTEXT_FN(hooks::OptionsFadeIn), {{112, 24}});
   Group(h, w, "Options::CloseHud (sub_821C75E0)", 100, close_step, __imp__sub_821C75E0,
-        hooks::OptionsCloseHud, {{112, 24}});
+        ITC_CONTEXT_FN(hooks::OptionsCloseHud), {{112, 24}});
   Group(h, w, "Options::CloseSound (sub_821C7710)", 100, close_step, __imp__sub_821C7710,
-        hooks::OptionsCloseSound, {{112, 24}});
+        ITC_CONTEXT_FN(hooks::OptionsCloseSound), {{112, 24}});
   Group(h, w, "Options::CloseSliders (sub_821C7868)", 100, close_step, __imp__sub_821C7868,
-        hooks::OptionsCloseSliders, {{112, 24}});
+        ITC_CONTEXT_FN(hooks::OptionsCloseSliders), {{112, 24}});
   Group(h, w, "Options::CloseButtons (sub_821C7B08)", 100, close_step, __imp__sub_821C7B08,
-        hooks::OptionsCloseButtons, {{112, 24}});
+        ITC_CONTEXT_FN(hooks::OptionsCloseButtons), {{112, 24}});
   Group(h, w, "Options::CloseAnalog (sub_821C7D18)", 100, close_step, __imp__sub_821C7D18,
-        hooks::OptionsCloseAnalog, {{112, 24}});
+        ITC_CONTEXT_FN(hooks::OptionsCloseAnalog), {{112, 24}});
 }
 
 // --- The type 2 and 4 modes' Inits (as the type 6 and 7 modes' harness
@@ -1646,30 +1646,30 @@ void OptionsLoadSaveCases(Context& h, const World& w, const SaveSide& side) {
     t.r4.u64 = r.Below(8) == 0 ? r.Next() : (uint64_t(r.Next()) << 32) * r.Below(2) + r.Below(4);
   };
   Group(h, w, "LoadPage::SetDialog (sub_821BB858)", 100, dialog, __imp__sub_821BB858,
-        NativeLoadPageSetDialog, {}, after);
+        ITC_CONTEXT_FN(NativeLoadPageSetDialog), {}, after);
   Group(h, w, "SavePage::SetDialog (sub_821BB708)", 100, dialog, __imp__sub_821BB708,
-        NativeSavePageSetDialog, {}, after);
+        ITC_CONTEXT_FN(NativeSavePageSetDialog), {}, after);
   Group(h, w, "LoadPage::Close (sub_821B9FB0)", 40, plain, __imp__sub_821B9FB0,
-        hooks::LoadPageClose, {}, after);
+        ITC_CONTEXT_FN(hooks::LoadPageClose), {}, after);
   Group(h, w, "SavePage::Close (sub_821BA508)", 40, plain, __imp__sub_821BA508,
-        hooks::SavePageClose, {}, after);
+        ITC_CONTEXT_FN(hooks::SavePageClose), {}, after);
   Group(h, w, "OptionsSavePages::Cancel (sub_821B9FF8)", 20, plain, __imp__sub_821B9FF8,
-        hooks::SavePagesCancel, {}, after);
+        ITC_CONTEXT_FN(hooks::SavePagesCancel), {}, after);
   // The sub-pages.
   Group(h, w, "LoadPage::CheckDevice (sub_821BBC10)", 150, plain, __imp__sub_821BBC10,
-        hooks::LoadPageCheckDevice, {{96, 8}}, after);
+        ITC_CONTEXT_FN(hooks::LoadPageCheckDevice), {{96, 8}}, after);
   Group(h, w, "SavePage::CheckDevice (sub_821BBCC0)", 150, plain, __imp__sub_821BBCC0,
-        hooks::SavePageCheckDevice, {{96, 8}}, after);
+        ITC_CONTEXT_FN(hooks::SavePageCheckDevice), {{96, 8}}, after);
   Group(h, w, "LoadPage::DeviceAnswer (sub_821BBC68)", 150, plain, __imp__sub_821BBC68,
-        hooks::LoadPageDeviceAnswer, {{96, 8}}, after);
+        ITC_CONTEXT_FN(hooks::LoadPageDeviceAnswer), {{96, 8}}, after);
   Group(h, w, "LoadPage::Answer (sub_821BC7B0)", 400, plain, __imp__sub_821BC7B0,
-        hooks::LoadPageAnswer, {{112, 24}}, after);
+        ITC_CONTEXT_FN(hooks::LoadPageAnswer), {{112, 24}}, after);
   Group(h, w, "SavePage::Answer (sub_821BCA60)", 400, plain, __imp__sub_821BCA60,
-        hooks::SavePageAnswer, {{96, 16}}, after);
+        ITC_CONTEXT_FN(hooks::SavePageAnswer), {{96, 16}}, after);
   Group(h, w, "LoadPage::Note (sub_821BC940)", 300, plain, __imp__sub_821BC940,
-        hooks::LoadPageNote, {{112, 24}}, after);
+        ITC_CONTEXT_FN(hooks::LoadPageNote), {{112, 24}}, after);
   Group(h, w, "SavePage::Note (sub_821BCC10)", 300, plain, __imp__sub_821BCC10,
-        hooks::SavePageNote, {{112, 24}}, after);
+        ITC_CONTEXT_FN(hooks::SavePageNote), {{112, 24}}, after);
   // The waits: the kind 0, 1 to 8 or the others; the counter at 89 most
   // of the time (the checks run).
   const auto wait = [&h, &w, shape](PPCContext& t, Random&, const World&) {
@@ -1684,9 +1684,9 @@ void OptionsLoadSaveCases(Context& h, const World& w, const SaveSide& side) {
     }
   };
   Group(h, w, "LoadPage::Wait (sub_821C2620)", 400, wait, __imp__sub_821C2620,
-        hooks::LoadPageWait, {{96, 16}}, after);
+        ITC_CONTEXT_FN(hooks::LoadPageWait), {{96, 16}}, after);
   Group(h, w, "SavePage::Wait (sub_821BBD18)", 400, wait, __imp__sub_821BBD18,
-        hooks::SavePageWait, {{96, 16}}, after);
+        ITC_CONTEXT_FN(hooks::SavePageWait), {{96, 16}}, after);
   // The leaves: r3 the step word (0 or 1); the dialog menu's cursor 0 to 3;
   // the category page's set-up as the closes' cases shape it; the header the
   // layer's pages with no buffers (SaveBuffers::Destroy frees it: whether
@@ -1715,9 +1715,9 @@ void OptionsLoadSaveCases(Context& h, const World& w, const SaveSide& side) {
     after(t, w, out);
   };
   Group(h, w, "LoadPage::Leave (sub_821C6468)", 150, leave, __imp__sub_821C6468,
-        hooks::LoadPageLeave, {{128, 32}}, leave_after);
+        ITC_CONTEXT_FN(hooks::LoadPageLeave), {{128, 32}}, leave_after);
   Group(h, w, "SavePage::Leave (sub_821C6550)", 150, leave, __imp__sub_821C6550,
-        hooks::SavePageLeave, {{128, 32}}, leave_after);
+        ITC_CONTEXT_FN(hooks::SavePageLeave), {{128, 32}}, leave_after);
 }
 
 }  // namespace

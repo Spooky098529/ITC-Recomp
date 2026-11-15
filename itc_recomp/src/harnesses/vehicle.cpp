@@ -166,7 +166,7 @@ void Leaves(Context& h) {
         t.r5.u64 = h.data + 4 * r.Below(256);
         t.r6.u64 = h.data + 4 * r.Below(256);
         t.r7.u64 = h.data + 4 * r.Below(256);
-        (v == 0 ? Original<__imp__sub_820BFBB8> : hooks::VehicleMatrixFromRows)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820BFBB8> : ITC_CONTEXT_FN(hooks::VehicleMatrixFromRows))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Word(t.r3.u32);
       }
@@ -184,7 +184,7 @@ void Leaves(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = h.data + 8 * r.Below(256);
         t.r4.u64 = h.data + 2048 + 8 * r.Below(200);
-        (v == 0 ? Original<__imp__sub_820C2150> : hooks::VehicleTrackPositionCopy)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820C2150> : ITC_CONTEXT_FN(hooks::VehicleTrackPositionCopy))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Word(t.r3.u32);
       }
@@ -205,7 +205,7 @@ void Leaves(Context& h) {
         t.r3.u64 = h.data + 4 * r.Below(256);
         t.r4.u64 = seed % 4;
         t.r5.u64 = r.Next();
-        (v == 0 ? Original<__imp__sub_820BFCE8> : hooks::VehicleCameraCurveLoad)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820BFCE8> : ITC_CONTEXT_FN(hooks::VehicleCameraCurveLoad))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Word(t.r3.u32);
       }
@@ -251,7 +251,7 @@ void Steps(Context& h) {
       const int32_t steps[] = {-1, 1, 0, 2, -3};
       t.r4.u64 = uint64_t(int64_t(r.Below(4) == 0 ? int32_t(r.Below(40)) - 20 : steps[r.Below(5)]));
       t.r5.u64 = r.Below(4) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(12)) - 1));
-      (v == 0 ? Original<__imp__sub_82170F90> : hooks::VehicleRoutePositionStep)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82170F90> : ITC_CONTEXT_FN(hooks::VehicleRoutePositionStep))(t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Bytes(Read(h.base, area.address, area.bytes));
       // The kind on the stack (its frame + 80).
@@ -340,7 +340,7 @@ void TrackPositions(Context& h) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = v_;
-      (v == 0 ? Original<__imp__sub_820C1D78> : hooks::VehicleUpdateTrackPositions)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820C1D78> : ITC_CONTEXT_FN(hooks::VehicleUpdateTrackPositions))(t, h.base);
       PositionOutputs(out[v], h.base, v_ + 5232);
       for (uint32_t i = 0; i < 4; i++) {
         PositionOutputs(out[v], h.base, v_ + 5328 + 96 * i);
@@ -384,7 +384,7 @@ void Links(Context& h) {
       guest::StoreU32(h.base, object + 32 + 8, boxes + 496 * r.Below(3));
       PPCContext t = CallContext(h);
       t.r3.u64 = v_;
-      (v == 0 ? Original<__imp__sub_820C1D08> : hooks::VehicleLinkTrackPositions)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820C1D08> : ITC_CONTEXT_FN(hooks::VehicleLinkTrackPositions))(t, h.base);
       out[v].Bytes(Read(h.base, block.address, block.bytes));
       out[v].Word(t.r3.u32);
     }
@@ -413,7 +413,7 @@ void Refreshes(Context& h, uint32_t world, uint32_t region) {
         PPCContext t = CallContext(h);
         t.fpscr.disableFlushModeUnconditional();
         t.r3.u64 = region;
-        (v == 0 ? Original<__imp__sub_820C0118> : hooks::VehicleRefresh)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820C0118> : ITC_CONTEXT_FN(hooks::VehicleRefresh))(t, h.base);
         car_objects::VehicleRegionOutputs(out[v], h.base, region);
         out[v].Word(t.r3.u32);
         out[v].Double(t.f1.u64);
@@ -460,7 +460,7 @@ void Removals(Context& h, uint32_t world) {
       guest::StoreU32(h.base, v_ + 344, shape);
       PPCContext t = CallContext(h);
       t.r3.u64 = v_;
-      (v == 0 ? Original<__imp__sub_820C20E0> : hooks::VehicleRemoveFromWorld)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820C20E0> : ITC_CONTEXT_FN(hooks::VehicleRemoveFromWorld))(t, h.base);
       out[v].Bytes(Read(h.base, world, car_objects::WorldBytes()));
       out[v].Word(guest::LoadU32(h.base, v_ + 336));
       out[v].Word(blocks.Name(guest::LoadU32(h.base, v_ + 340)));
@@ -495,7 +495,7 @@ void Lifetime(Context& h, uint32_t world) {
         Random r(seed * 67 + 37);
         WriteRandom(h.base, h.data, kScratchBytes, r);
         PPCContext t = CallContext(h);
-        (v == 0 ? Original<__imp__sub_820C3BD0> : hooks::VehiclesCreate)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820C3BD0> : ITC_CONTEXT_FN(hooks::VehiclesCreate))(t, h.base);
         const uint32_t made = guest::LoadU32(h.base, vh::kVehicles);
         out[v].Word(made != 0 && memory::IsHeapBlock(made) ? 1 : 0);
         out[v].Word(t.r3.u32 == made ? 1 : 0);
@@ -551,7 +551,7 @@ void Lifetime(Context& h, uint32_t world) {
         const bool none = r.Below(8) == 0;
         guest::StoreU32(h.base, vh::kVehicles, none ? 0 : vehicles);
         PPCContext t = CallContext(h);
-        (v == 0 ? Original<__imp__sub_820C3B78> : hooks::VehiclesDestroy)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820C3B78> : ITC_CONTEXT_FN(hooks::VehiclesDestroy))(t, h.base);
         out[v].Bytes(Read(h.base, world, car_objects::WorldBytes()));
         for (uint32_t b : blocks.given) {
           out[v].Word(memory::IsHeapBlock(b) ? 1 : 0);
@@ -613,7 +613,7 @@ void Inputs(Context& h, uint32_t region) {
         t.fpscr.disableFlushModeUnconditional();
         t.r3.u64 = region;
         t.r4.u64 = input;
-        (v == 0 ? Original<__imp__sub_820BFD30> : hooks::VehicleApplyInput)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820BFD30> : ITC_CONTEXT_FN(hooks::VehicleApplyInput))(t, h.base);
         car_objects::VehicleRegionOutputs(out[v], h.base, region);
         out[v].Word(guest::LoadU8(h.base, region + 2424));
         out[v].Word(guest::LoadU8(h.base, region + 2249));
@@ -657,7 +657,7 @@ void Slips(Context& h, uint32_t region) {
         t.r3.u64 = region;
         t.f1.f64 = group == 1 && r.Below(8) == 0 ? double(std::bit_cast<float>(RandomFloat(r)))
                                                 : double(r.Below(200)) / 10.0;
-        (v == 0 ? Original<__imp__sub_820C0310> : hooks::VehicleSlipWheelValue)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820C0310> : ITC_CONTEXT_FN(hooks::VehicleSlipWheelValue))(t, h.base);
         car_objects::VehicleRegionOutputs(out[v], h.base, region);
         out[v].Word(guest::LoadU32(h.base, kFlag));
         out[v].Float(guest::LoadU32(h.base, kThreshold));
@@ -732,7 +732,7 @@ void Nearest(Context& h) {
         t.fpscr.disableFlushModeUnconditional();
         t.r3.u64 = point;
         t.r4.u64 = r.Below(8) == 0 ? r.Below(7) : r.Below(std::max(count, 1u));
-        (v == 0 ? Original<__imp__sub_820C2248> : hooks::VehicleNearestHuman)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820C2248> : ITC_CONTEXT_FN(hooks::VehicleNearestHuman))(t, h.base);
         out[v].Floats(h.base, frame + 80, 4);
         for (uint32_t k = 0; k < 8; k++) {
           out[v].Float(guest::LoadU32(h.base, frame + 96 + 8 * k));
@@ -824,7 +824,7 @@ void Curves(Context& h) {
           PPCContext t = CallContext(h);
           t.r3.u64 = curve;
           t.r4.u64 = r.Below(8) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(51)) - 25));
-          (v == 0 ? Original<__imp__sub_820CE1D8> : hooks::VehicleShiftPeak)(t, h.base);
+          (v == 0 ? Original<__imp__sub_820CE1D8> : ITC_CONTEXT_FN(hooks::VehicleShiftPeak))(t, h.base);
           CurveOutputs(out[v], h.base, curve);
           ShiftStackOutputs(out[v], h.base, r1);
           out[v].Word(t.r3.u32);
@@ -854,7 +854,7 @@ void Curves(Context& h) {
           t.r3.u64 = curve;
           t.r4.u64 = from_engine ? engine : engine + 24;
           (v == 0 ? (from_engine ? Original<__imp__sub_820CE7D8> : Original<__imp__sub_820CE430>)
-                  : (from_engine ? hooks::VehicleCurveFromEngine : hooks::VehicleBuildCurve))(
+                  : (from_engine ? ITC_CONTEXT_FN(hooks::VehicleCurveFromEngine) : ITC_CONTEXT_FN(hooks::VehicleBuildCurve)))(
               t, h.base);
           CurveOutputs(out[v], h.base, curve);
           out[v].Bytes(Read(h.base, r1 - 112 + 80, 16));
@@ -886,7 +886,7 @@ void Curves(Context& h) {
           PPCContext t = CallContext(h);
           t.r3.u64 = status;
           t.r4.u64 = vehicle;
-          (v == 0 ? Original<__imp__sub_820BFC48> : hooks::VehicleStatusReset)(t, h.base);
+          (v == 0 ? Original<__imp__sub_820BFC48> : ITC_CONTEXT_FN(hooks::VehicleStatusReset))(t, h.base);
           out[v].Float(guest::LoadU32(h.base, status + 0));
           out[v].Bytes(Read(h.base, status + 4, 72));
           out[v].Float(guest::LoadU32(h.base, status + 76));
@@ -944,7 +944,7 @@ void Grips(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = v_;
         t.r4.u64 = car;
-        (v == 0 ? Original<__imp__sub_820C1E00> : hooks::VehicleSurfaceGrip)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820C1E00> : ITC_CONTEXT_FN(hooks::VehicleSurfaceGrip))(t, h.base);
         out[v].Word(guest::LoadU32(h.base, v_ + 2496));
         out[v].Bytes(Read(h.base, v_ + 2668, 36));
         out[v].Bytes(Read(h.base, v_ + 2796, 36));
@@ -1172,9 +1172,9 @@ void SetUps(Context& h, uint32_t world, uint32_t region) {
           t.r3.u64 = v_;
           t.r4.u64 = car;
           if (reset) {
-            (v == 0 ? Original<__imp__sub_820C33B8> : hooks::VehicleResetForCar)(t, h.base);
+            (v == 0 ? Original<__imp__sub_820C33B8> : ITC_CONTEXT_FN(hooks::VehicleResetForCar))(t, h.base);
           } else {
-            (v == 0 ? Original<__imp__sub_820C3150> : hooks::VehicleSetUp)(t, h.base);
+            (v == 0 ? Original<__imp__sub_820C3150> : ITC_CONTEXT_FN(hooks::VehicleSetUp))(t, h.base);
           }
           Outputs& o = out[v];
           SetUpCaseOutputs(o, h, world, region, car, frame, blocks);
@@ -1282,13 +1282,13 @@ void Ticks(Context& h, uint32_t world, uint32_t region) {
           t.r4.u64 = racer | (uint64_t(r.Next()) & ~0xFFull);
           t.r5.u64 = car;
           t.r6.u64 = flag;
-          (v == 0 ? Original<__imp__sub_820C3020> : hooks::VehicleTick)(t, h.base);
+          (v == 0 ? Original<__imp__sub_820C3020> : ITC_CONTEXT_FN(hooks::VehicleTick))(t, h.base);
         } else {
           t.r3.u64 = region + 6160;
           t.r4.u64 = region;
           t.r5.u64 = car;
           t.r6.u64 = flag;
-          (v == 0 ? Original<__imp__sub_820C23E8> : hooks::VehicleStatusUpdate)(t, h.base);
+          (v == 0 ? Original<__imp__sub_820C23E8> : ITC_CONTEXT_FN(hooks::VehicleStatusUpdate))(t, h.base);
         }
         car_objects::VehicleRegionOutputs(out[v], h.base, region);
         out[v].Word(guest::LoadU32(h.base, region + 6160 + 8));
@@ -1398,7 +1398,7 @@ void Placements(Context& h, uint32_t world, uint32_t region) {
         t.f2.f64 = r.Below(2) == 0 ? 0.0 : -0.0;
         t.r6.u64 = uint64_t(int64_t(int32_t(r.Below(8)) - 3));
         t.r7.u64 = r.Below(2) == 0 ? 0 : (r.Next() | 1);
-        (v == 0 ? Original<__imp__sub_820C3608> : hooks::VehiclePlaceOnRoute)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820C3608> : ITC_CONTEXT_FN(hooks::VehiclePlaceOnRoute))(t, h.base);
         car_objects::VehicleRegionOutputs(out[v], h.base, region);
         // The object's and its boxes' words: floats where the code loads and
         // stores floats (as the car physics' harness's ObjectOutputs and

@@ -6,14 +6,15 @@
 // the recompiled function's order.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "hooks/guest_call.h"
 #include "lifted/sdk.h"
 
 using guest_call::InFrame;
 
 // r3 the mixer object, r4 (low byte) whether to read the volumes.
-extern "C" REX_FUNC(sub_8245B808) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245B808) {
+  
   const uint32_t object = ctx.r3.u32;
   const bool read_volumes = (ctx.r4.u32 & 0xFF) != 0;
   InFrame(ctx, base, 144, 0x8245B810, [&](uint32_t) {
@@ -33,7 +34,7 @@ extern "C" REX_FUNC(sub_8245B808) {
         ctx.r5.u64 = count - 1;
         ctx.r6.u64 = 0;
         ctx.lr = 0x8245B8B4;
-        __imp__KeReleaseSemaphore(ctx, base);
+        lifted::Sdk(ctx, base, __imp__KeReleaseSemaphore);
       }
     }
     ctx.r3.u64 = object;

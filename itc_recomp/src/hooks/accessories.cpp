@@ -6,6 +6,7 @@
 // have none (their register steps are the harness's).
 
 #include "hooks/accessories.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "accessories/accessories.h"
@@ -44,7 +45,7 @@ namespace {
 // table (its override when it has one) with r3, r4 set, from the frame at
 // `r1` with the link register `lr` (the original's return address); r1 and
 // lr put back after.
-void GuestCall(PPCContext& ctx, uint8_t* base, uint32_t function, uint32_t r1, uint32_t lr,
+void GuestCall(lifted::Regs& ctx, uint8_t* base, uint32_t function, uint32_t r1, uint32_t lr,
                uint64_t r3, uint64_t r4) {
   const uint64_t stack = ctx.r1.u64, link = ctx.lr;
   ctx.r1.u64 = r1;
@@ -58,7 +59,7 @@ void GuestCall(PPCContext& ctx, uint8_t* base, uint32_t function, uint32_t r1, u
 
 }  // namespace
 
-std::function<void(uint32_t, uint32_t)> AccessoriesSetDestructor(PPCContext& ctx,
+std::function<void(uint32_t, uint32_t)> AccessoriesSetDestructor(lifted::Regs& ctx,
                                                                  uint8_t* base) {
   return [&ctx, base](uint32_t set, uint32_t frame) {
     const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, set));
@@ -81,7 +82,7 @@ bool AccessoriesNativeLoads() {
 
 // The tail call to the file's callback (r3 to r5 as given, r6 its context,
 // lr the caller's): the guest function through the function table.
-void AccessoryFileOnArchiveDone(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AccessoryFileOnArchiveDone) {
   const accessories::Callback callback =
       accessories::FileOnArchiveDone(base, ctx.r3.u32, ctx.r6.u32);
   if (callback.function == 0) {
@@ -97,9 +98,9 @@ void AccessoryFileOnArchiveDone(PPCContext& ctx, uint8_t* base) {
 
 
 
-void AccessoriesCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AccessoriesCreate) {
   if (!NativeHeapActive()) {
-    __imp__sub_820F1038(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820F1038);
     return;
   }
   if (const auto r3 = accessories::SetCreate(base)) {
@@ -108,14 +109,14 @@ void AccessoriesCreate(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void AccessoriesSetScale(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AccessoriesSetScale) {
   accessories::SetScale(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 
-void AccessoriesDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AccessoriesDestroy) {
   if (!NativeHeapActive() || !AccessoriesSetFreeable(base, accessories::kSet)) {
-    __imp__sub_820F1078(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820F1078);
     return;
   }
   ctx.r3.u64 = accessories::SetDestroy(base, ctx.r1.u32, AccessoriesSetDestructor(ctx, base));
@@ -131,10 +132,10 @@ void AccessoriesDestroy(PPCContext& ctx, uint8_t* base) {
 
 
 
-void AccessoriesReleaseAll(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AccessoriesReleaseAll) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
       !accessories::SetReleasable(base, ctx.r3.u32)) {
-    __imp__sub_820F0AD8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820F0AD8);
     return;
   }
   if (const auto r3 = accessories::SetReleaseAll(base, ctx.r3.u32)) {
@@ -144,10 +145,10 @@ void AccessoriesReleaseAll(PPCContext& ctx, uint8_t* base) {
 }
 
 // Accessories::Release: r3 the set, r4 the index.
-void AccessoriesRelease(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AccessoriesRelease) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
       !accessories::SetReleaseNative(base, ctx.r3.u32, ctx.r4.s32)) {
-    __imp__sub_820F0A90(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820F0A90);
     return;
   }
   const uint32_t set = ctx.r3.u32;
@@ -168,11 +169,11 @@ void AccessoriesRelease(PPCContext& ctx, uint8_t* base) {
 
 
 
-void AccessoriesDestruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AccessoriesDestruct) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
       !accessories::SetReleasable(base, ctx.r3.u32) ||
       ((ctx.r4.u32 & 1) && !memory::IsHeapBlock(ctx.r3.u32))) {
-    __imp__sub_820F0FE0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820F0FE0);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -183,7 +184,7 @@ void AccessoriesDestruct(PPCContext& ctx, uint8_t* base) {
 
 // The texture provider's vtable +12 with r4 = 0, from SetTexture's frame,
 // returning to 0x820EF5A8.
-std::function<uint64_t(uint32_t, uint32_t)> AccessoryTextureSet(PPCContext& ctx,
+std::function<uint64_t(uint32_t, uint32_t)> AccessoryTextureSet(lifted::Regs& ctx,
                                                                 uint8_t* base) {
   return [&ctx, base](uint32_t provider, uint32_t frame) -> uint64_t {
     const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, provider) + 12);
@@ -192,7 +193,7 @@ std::function<uint64_t(uint32_t, uint32_t)> AccessoryTextureSet(PPCContext& ctx,
   };
 }
 
-void AccessorySetTexture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AccessorySetTexture) {
   ctx.r3.u64 = accessories::AccessorySetTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32,
                                                 ctx.r1.u32, AccessoryTextureSet(ctx, base));
 }
@@ -203,7 +204,7 @@ namespace {
 
 // Accessory::Finish's guest calls from its frame: Model::Load's original
 // (returning to 0x820EF3A8) and AccessorySkeleton::SetUp's (0x820EF3CC).
-accessories::FinishCalls FinishGuestCalls(PPCContext& ctx, uint8_t* base,
+accessories::FinishCalls FinishGuestCalls(lifted::Regs& ctx, uint8_t* base,
                                           ModelLoadGuest& model_load) {
   accessories::FinishCalls calls;
   calls.model_load = model_load.Calls();
@@ -238,9 +239,9 @@ bool AccessoriesFinishNative(uint8_t* base, uint32_t accessory) {
          accessories::Finishable(base, accessory);
 }
 
-void AccessoryFinish(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AccessoryFinish) {
   if (!AccessoriesFinishNative(base, ctx.r3.u32)) {
-    __imp__sub_820EF368(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820EF368);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -256,9 +257,9 @@ void AccessoryFinish(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void AccessoryEntryOnLoaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AccessoryEntryOnLoaded) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() || !native::Buffers_NativeMemcpy()) {
-    __imp__sub_820F0820(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820F0820);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -283,9 +284,9 @@ bool AccessoriesAcquireNative(uint8_t* base) {
 
 // Accessories::Acquire: r3 the set, r4 the index, r5 the texture index; r3
 // the accessory or 0.
-void AccessoriesAcquire(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AccessoriesAcquire) {
   if (!AccessoriesAcquireNative(base)) {
-    __imp__sub_820F0EB8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820F0EB8);
     return;
   }
   const uint32_t set = ctx.r3.u32;
@@ -297,9 +298,9 @@ void AccessoriesAcquire(PPCContext& ctx, uint8_t* base) {
                                        NativeArchiveLoad(base), AccessoryTextureSet(ctx, base));
 }
 
-void MatrixFromScaleRotationTranslation(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MatrixFromScaleRotationTranslation) {
   if (!native::Buffers_NativeMemcpy()) {
-    __imp__sub_820EF660(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820EF660);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -312,12 +313,7 @@ void MatrixFromScaleRotationTranslation(PPCContext& ctx, uint8_t* base) {
 
 // Defines an adapter: the flag, else the original.
 #define ITC_ACCESSORIES(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {   \
-    REX_FUNC_PROLOGUE();                 \
-    if (!ITC_FLAG(native_accessories)) { \
-      __imp__sub_##address(ctx, base);   \
-      return;                            \
-    }                                    \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_accessories)) { \
     hooks::step(ctx, base);              \
   }
 

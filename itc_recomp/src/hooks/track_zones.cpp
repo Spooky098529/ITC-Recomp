@@ -11,6 +11,7 @@
 // from TrackZones::Create.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
@@ -39,12 +40,7 @@ ITC_FLAG_BOOL(native_track_zones, true, "ITC",
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
 #define ITC_TRACK_ZONES(address, ...)      \
-  extern "C" REX_FUNC(sub_##address) {     \
-    REX_FUNC_PROLOGUE();                   \
-    if (!ITC_FLAG(native_track_zones)) {   \
-      __imp__sub_##address(ctx, base);     \
-      return;                              \
-    }                                      \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_track_zones)) { \
     __VA_ARGS__;                           \
   }
 
@@ -111,7 +107,7 @@ struct GuestCalls {
 // frame and one like Insert's.
 void CopyRange(void* user, uint32_t to, uint32_t from, uint32_t frame) {
   auto& call = *static_cast<GuestCalls*>(user);
-  PPCContext& ctx = *call.ctx;
+  lifted::Regs& ctx = *call.ctx;
   uint8_t* base = call.base;
   const uint64_t stack = ctx.r1.u64;
   const uint64_t lr = ctx.lr;
@@ -129,7 +125,7 @@ void CopyRange(void* user, uint32_t to, uint32_t from, uint32_t frame) {
 uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool set_r4,
                   uint32_t frame, uint32_t lr) {
   auto& call = *static_cast<GuestCalls*>(user);
-  PPCContext& ctx = *call.ctx;
+  lifted::Regs& ctx = *call.ctx;
   uint8_t* base = call.base;
   const uint64_t saved = ctx.r1.u64;
   ctx.r1.u64 = frame;
@@ -152,13 +148,13 @@ ITC_TRACK_ZONES(820C9718, ctx.r3.u64 = RacersVehicle(base, ctx.r3.u32))
 
 // TrackZones::Create: no arguments; r3 = the last set-up's. The original
 // where operator new can't be native.
-extern "C" REX_FUNC(sub_8228E788) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8228E788) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8228E788)) {
     return;  // a harness's (the race HUD object's)
   }
   if (!ITC_FLAG(native_track_zones)) {
-    __imp__sub_8228E788(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8228E788);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -167,7 +163,7 @@ extern "C" REX_FUNC(sub_8228E788) {
   const SetupCalls setup_calls{&user, CopyRange};
   uint64_t r3 = 0;
   if (!OwnerCreate(base, ctx.r1.u32, calls, setup_calls, &r3)) {
-    __imp__sub_8228E788(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8228E788);
     return;
   }
   ctx.lr = lr;
@@ -176,11 +172,11 @@ extern "C" REX_FUNC(sub_8228E788) {
 
 // TrackZones::Destroy: no arguments; r3 = the owner (as operator delete
 // leaves it). The original where operator delete can't be native.
-extern "C" REX_FUNC(sub_8228B500) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8228B500) {
+  
   uint32_t r3 = 0;
   if (!ITC_FLAG(native_track_zones) || !OwnerDestroy(base, &r3)) {
-    __imp__sub_8228B500(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8228B500);
     return;
   }
   ctx.r3.u64 = r3;
@@ -212,12 +208,7 @@ ITC_TRACK_ZONES(8228BDD0, {
 // last copy's destination. Reached through the zones' vtables (from
 // TrackZones::Create), so the adapters stay.
 #define ITC_ZONE_SETUP(address, number)                                                 \
-  extern "C" REX_FUNC(sub_##address) {                                                  \
-    REX_FUNC_PROLOGUE();                                                                \
-    if (!ITC_FLAG(native_track_zones)) {                                                \
-      __imp__sub_##address(ctx, base);                                                  \
-      return;                                                                           \
-    }                                                                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_track_zones)) { \
     GuestCalls user{&ctx, base};                                                        \
     const SetupCalls calls{&user, CopyRange};                                           \
     ctx.r3.u64 = ZoneSetup(base, number, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),  \

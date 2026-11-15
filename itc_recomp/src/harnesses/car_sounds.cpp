@@ -138,7 +138,7 @@ void WaveBankViews(Context& h, uint32_t block) {
     Results results("WaveBankView::Init (sub_8210C9D8)");
     for (int i = 0; i < 40; i++) {
       Case(
-          h, results, block, __imp__sub_8210C9D8, hooks::CarSoundsWaveBankViewInit,
+          h, results, block, __imp__sub_8210C9D8, ITC_CONTEXT_FN(hooks::CarSoundsWaveBankViewInit),
           [&](Random& random, PPCContext& t) {
             const uint32_t bank = block + 0x200;
             // The offsets: small ones, or any word (the sums wrap).
@@ -157,10 +157,10 @@ void WaveBankViews(Context& h, uint32_t block) {
     const char* name;
     GuestFunction recompiled, native;
   } getters[] = {
-      {"WaveBankView::Format (sub_8210C850)", __imp__sub_8210C850, hooks::CarSoundsWaveBankFormat},
-      {"WaveBankView::Length (sub_8210C920)", __imp__sub_8210C920, hooks::CarSoundsWaveBankLength},
-      {"WaveBankView::Data (sub_8210C958)", __imp__sub_8210C958, hooks::CarSoundsWaveBankData},
-      {"WaveBankView::Entry (sub_8210C998)", __imp__sub_8210C998, hooks::CarSoundsWaveBankEntry},
+      {"WaveBankView::Format (sub_8210C850)", __imp__sub_8210C850, ITC_CONTEXT_FN(hooks::CarSoundsWaveBankFormat)},
+      {"WaveBankView::Length (sub_8210C920)", __imp__sub_8210C920, ITC_CONTEXT_FN(hooks::CarSoundsWaveBankLength)},
+      {"WaveBankView::Data (sub_8210C958)", __imp__sub_8210C958, ITC_CONTEXT_FN(hooks::CarSoundsWaveBankData)},
+      {"WaveBankView::Entry (sub_8210C998)", __imp__sub_8210C998, ITC_CONTEXT_FN(hooks::CarSoundsWaveBankEntry)},
   };
   for (const auto& g : getters) {
     Results results(g.name);
@@ -195,7 +195,7 @@ void Objects(Context& h, uint32_t block) {
     }
     for (int c = 0; c < 40; c++) {
       Case(
-          h, results, block, __imp__sub_8210CB48, hooks::CarSoundsSetBanks,
+          h, results, block, __imp__sub_8210CB48, ITC_CONTEXT_FN(hooks::CarSoundsSetBanks),
           [&](Random& random, PPCContext& t) {
             const uint32_t i = random.Below(4);
             const uint32_t j = random.Below(4);
@@ -231,7 +231,7 @@ void Objects(Context& h, uint32_t block) {
     for (const double f1 : f1s) {
       for (int k = 0; k < 6; k++, c++) {
         Case(
-            h, results, block, __imp__sub_8210CA28, hooks::CarSoundsTireSoundAmount,
+            h, results, block, __imp__sub_8210CA28, ITC_CONTEXT_FN(hooks::CarSoundsTireSoundAmount),
             [&](Random& random, PPCContext& t) {
               // +72 below or above the threshold, now and then a NaN.
               const float amounts[] = {float(low) * 0.5f, float(low) * 2.0f, float(low), 0.0f,
@@ -252,7 +252,7 @@ void Objects(Context& h, uint32_t block) {
     Results results("EngineSound::EngineSound (sub_8210CBA0)");
     for (int c = 0; c < 4; c++) {
       Case(
-          h, results, block, __imp__sub_8210CBA0, hooks::CarSoundsEngineSoundConstruct,
+          h, results, block, __imp__sub_8210CBA0, ITC_CONTEXT_FN(hooks::CarSoundsEngineSoundConstruct),
           [&](Random& random, PPCContext& t) { t.r3.u64 = block + 4 * random.Below(64); }, {},
           fmt::format("case {}", c));
     }
@@ -262,7 +262,7 @@ void Objects(Context& h, uint32_t block) {
     Results results("CarSound::CarSound (sub_8210CC18)");
     for (int c = 0; c < 4; c++) {
       Case(
-          h, results, block, __imp__sub_8210CC18, hooks::CarSoundsCarSoundConstruct,
+          h, results, block, __imp__sub_8210CC18, ITC_CONTEXT_FN(hooks::CarSoundsCarSoundConstruct),
           [&](Random& random, PPCContext& t) { t.r3.u64 = block + 4 * random.Below(64); }, {},
           fmt::format("case {}", c));
     }
@@ -274,7 +274,7 @@ void Objects(Context& h, uint32_t block) {
     Results results("CarSounds::Destroy (sub_8210DCA8)");
     for (int c = 0; c < 24; c++) {
       Case(
-          h, results, block, __imp__sub_8210DCA8, hooks::CarSoundsDestroy,
+          h, results, block, __imp__sub_8210DCA8, ITC_CONTEXT_FN(hooks::CarSoundsDestroy),
           [&](Random& random, PPCContext& t) {
             const uint32_t sound = block + 16 + 4 * random.Below(4);
             Store(h.base, sound - 16, random.Below(5));
@@ -306,7 +306,7 @@ void Objects(Context& h, uint32_t block) {
         t.r3.u64 = sound;
         t.r4.u64 = array ? 3 : 1;
         ITC_FLAG(native_car_sounds) = v == 1;
-        (v == 0 ? __imp__sub_8210DCA8 : hooks::CarSoundsDestroy)(t, h.base);
+        (v == 0 ? __imp__sub_8210DCA8 : ITC_CONTEXT_FN(hooks::CarSoundsDestroy))(t, h.base);
         ITC_FLAG(native_car_sounds) = true;
         out[v].Word(t.r3.u32 - *made);
       }
@@ -338,7 +338,7 @@ void SetUps(Context& h, uint32_t block) {
         PPCContext t = CallContext(h);
         t.r3.u64 = sound;
         ITC_FLAG(native_car_sounds) = v == 1;
-        (v == 0 ? __imp__sub_8210DDC8 : hooks::CarSoundsSetUp)(t, h.base);
+        (v == 0 ? __imp__sub_8210DDC8 : ITC_CONTEXT_FN(hooks::CarSoundsSetUp))(t, h.base);
         ITC_FLAG(native_car_sounds) = true;
         const uint32_t matrix = t.r3.u32;
         out[v].Word(matrix != 0 && guest::LoadU32(h.base, sound + 176) == matrix);
@@ -379,7 +379,7 @@ void SetUps(Context& h, uint32_t block) {
         PPCContext t = CallContext(h);
         t.r3.u64 = player;
         ITC_FLAG(native_car_sounds) = v == 1;
-        (v == 0 ? __imp__sub_82110258 : hooks::CarSoundsGlobalsInit)(t, h.base);
+        (v == 0 ? __imp__sub_82110258 : ITC_CONTEXT_FN(hooks::CarSoundsGlobalsInit))(t, h.base);
         ITC_FLAG(native_car_sounds) = true;
         out[v].Word(t.r3.u32);
         const uint32_t buffers[] = {guest::LoadU32(h.base, 0x826C5C8C),
@@ -685,7 +685,7 @@ void Update3Ds(Context& h, uint32_t block) {
         std::memcpy(t.v127.u8 + i, &b, 8);
       }
       ITC_FLAG(native_car_sounds) = v == 1;
-      (v == 0 ? __imp__sub_8210F820 : hooks::CarSoundsUpdate3D)(t, h.base);
+      (v == 0 ? __imp__sub_8210F820 : ITC_CONTEXT_FN(hooks::CarSoundsUpdate3D))(t, h.base);
       ITC_FLAG(native_car_sounds) = true;
       if (v == 1 && passing) {
         float d2 = 0.0f;
@@ -850,7 +850,7 @@ void Holders(Context& h, uint32_t block) {
   {
     Results results("CarSound::SetPitch (sub_8210D158)");
     for (int c = 0; c < 200; c++) {
-      HolderCase(h, results, block, __imp__sub_8210D158, hooks::CarSoundsSetPitch,
+      HolderCase(h, results, block, __imp__sub_8210D158, ITC_CONTEXT_FN(hooks::CarSoundsSetPitch),
                  [&](Random& random, PPCContext& t) {
                    FakeHolder(h.base, block, holder, random, 1000000);
                    t.r3.u64 = holder;
@@ -865,7 +865,7 @@ void Holders(Context& h, uint32_t block) {
   {
     Results results("CarSound::SetPitchScaled (sub_8210D080)");
     for (int c = 0; c < 300; c++) {
-      HolderCase(h, results, block, __imp__sub_8210D080, hooks::CarSoundsSetPitchScaled,
+      HolderCase(h, results, block, __imp__sub_8210D080, ITC_CONTEXT_FN(hooks::CarSoundsSetPitchScaled),
                  [&](Random& random, PPCContext& t) {
                    FakeHolder(h.base, block, holder, random, 1000000);
                    t.r3.u64 = holder;
@@ -883,7 +883,7 @@ void Holders(Context& h, uint32_t block) {
   {
     Results results("CarSound::IsPlaying (sub_8210D1D8)");
     for (int c = 0; c < 120; c++) {
-      HolderCase(h, results, block, __imp__sub_8210D1D8, hooks::CarSoundsIsPlaying,
+      HolderCase(h, results, block, __imp__sub_8210D1D8, ITC_CONTEXT_FN(hooks::CarSoundsIsPlaying),
                  [&](Random& random, PPCContext& t) {
                    FakeHolder(h.base, block, holder, random, 3);
                    t.r3.u64 = holder;
@@ -896,7 +896,7 @@ void Holders(Context& h, uint32_t block) {
   {
     Results results("CarSound::UpdateVoices (sub_8210D378)");
     for (int c = 0; c < 120; c++) {
-      HolderCase(h, results, block, __imp__sub_8210D378, hooks::CarSoundsUpdateVoices,
+      HolderCase(h, results, block, __imp__sub_8210D378, ITC_CONTEXT_FN(hooks::CarSoundsUpdateVoices),
                  [&](Random& random, PPCContext& t) {
                    FakeHolder(h.base, block, holder, random, 3);
                    t.r3.u64 = holder;
@@ -913,13 +913,13 @@ void Holders(Context& h, uint32_t block) {
     bool sound;  // the car sound's 12 holders, else one
   };
   const Walk walks[] = {
-      {"CarSound::Clear (sub_8210D320)", __imp__sub_8210D320, hooks::CarSoundsClear, false},
-      {"CarSound::Pause (sub_8210D240)", __imp__sub_8210D240, hooks::CarSoundsPause, false},
-      {"CarSound::Resume (sub_8210D2C0)", __imp__sub_8210D2C0, hooks::CarSoundsResume, false},
-      {"CarSound::PauseAll (sub_8210E2B8)", __imp__sub_8210E2B8, hooks::CarSoundsPauseAll, true},
-      {"CarSound::ResumeAll (sub_8210E350)", __imp__sub_8210E350, hooks::CarSoundsResumeAll,
+      {"CarSound::Clear (sub_8210D320)", __imp__sub_8210D320, ITC_CONTEXT_FN(hooks::CarSoundsClear), false},
+      {"CarSound::Pause (sub_8210D240)", __imp__sub_8210D240, ITC_CONTEXT_FN(hooks::CarSoundsPause), false},
+      {"CarSound::Resume (sub_8210D2C0)", __imp__sub_8210D2C0, ITC_CONTEXT_FN(hooks::CarSoundsResume), false},
+      {"CarSound::PauseAll (sub_8210E2B8)", __imp__sub_8210E2B8, ITC_CONTEXT_FN(hooks::CarSoundsPauseAll), true},
+      {"CarSound::ResumeAll (sub_8210E350)", __imp__sub_8210E350, ITC_CONTEXT_FN(hooks::CarSoundsResumeAll),
        true},
-      {"CarSound::Stop (sub_8210E218)", __imp__sub_8210E218, hooks::CarSoundsStop, true},
+      {"CarSound::Stop (sub_8210E218)", __imp__sub_8210E218, ITC_CONTEXT_FN(hooks::CarSoundsStop), true},
   };
   for (const Walk& w : walks) {
     Results results(w.name);
@@ -950,7 +950,7 @@ void Releases(Context& h, uint32_t block) {
   for (int c = 0; c < 40; c++) {
     uint32_t matrix = 0;
     HolderCase(
-        h, results, block, __imp__sub_8210E170, hooks::CarSoundsRelease,
+        h, results, block, __imp__sub_8210E170, ITC_CONTEXT_FN(hooks::CarSoundsRelease),
         [&](Random& random, PPCContext& t) {
           for (const uint32_t offset : kSoundHolders) {
             FakeHolder(h.base, block, block + offset, random, 3);
@@ -990,7 +990,7 @@ void AllSounds(Context& h, uint32_t block) {
       uint32_t matrices[7] = {};
       HolderCase(
           h, results, block, release ? __imp__sub_8210F750 : __imp__sub_8210F7C8,
-          release ? hooks::CarSoundsReleaseAll : hooks::CarSoundsStopAll,
+          release ? ITC_CONTEXT_FN(hooks::CarSoundsReleaseAll) : ITC_CONTEXT_FN(hooks::CarSoundsStopAll),
           [&](Random& random, PPCContext&) {
             array = memory::crt::OperatorNewArray(h.base, kArrayBytes).value_or(0);
             if (array == 0) {
@@ -1250,7 +1250,7 @@ void RealVoices(Context& h, uint32_t block) {
   {
     Results results("CarSound::AddVoice (sub_8210CE38)");
     for (int c = 0; c < 48; c++) {
-      RealCase(h, results, block, __imp__sub_8210CE38, hooks::CarSoundsAddVoice, {holder}, 496,
+      RealCase(h, results, block, __imp__sub_8210CE38, ITC_CONTEXT_FN(hooks::CarSoundsAddVoice), {holder}, 496,
                [&](Random& random, PPCContext& t) {
                  RealHolder(h.base, holder, random);
                  if (random.Below(8) == 0) {
@@ -1270,7 +1270,7 @@ void RealVoices(Context& h, uint32_t block) {
   {
     Results results("CarSound::PlayOnce (sub_8210E3E8)");
     for (int c = 0; c < 48; c++) {
-      RealCase(h, results, block, __imp__sub_8210E3E8, hooks::CarSoundsPlayOnce, {holder}, 0,
+      RealCase(h, results, block, __imp__sub_8210E3E8, ITC_CONTEXT_FN(hooks::CarSoundsPlayOnce), {holder}, 0,
                [&](Random& random, PPCContext& t) {
                  RealHolder(h.base, holder, random);
                  t.r3.u64 = holder;
@@ -1287,7 +1287,7 @@ void RealVoices(Context& h, uint32_t block) {
   {
     Results results("EngineLayer::Start (sub_8210D410)");
     for (int c = 0; c < 16; c++) {
-      RealCase(h, results, block, __imp__sub_8210D410, hooks::CarSoundsEngineLayerStart,
+      RealCase(h, results, block, __imp__sub_8210D410, ITC_CONTEXT_FN(hooks::CarSoundsEngineLayerStart),
                {holder + 44}, 0,
                [&](Random& random, PPCContext& t) {
                  RealHolder(h.base, holder + 44, random);
@@ -1303,7 +1303,7 @@ void RealVoices(Context& h, uint32_t block) {
     // The views' pair at +0x17F0 (both the bank).
     Results results("EngineSound::Start (sub_8210D6C0)");
     for (int c = 0; c < 12; c++) {
-      RealCase(h, results, block, __imp__sub_8210D6C0, hooks::CarSoundsEngineSoundStart,
+      RealCase(h, results, block, __imp__sub_8210D6C0, ITC_CONTEXT_FN(hooks::CarSoundsEngineSoundStart),
                {holder + 44, holder + 84 + 44}, 0,
                [&](Random& random, PPCContext& t) {
                  RealHolder(h.base, holder + 44, random);
@@ -1321,7 +1321,7 @@ void RealVoices(Context& h, uint32_t block) {
   {
     Results results("TireSound::Start (sub_8210D7F8)");
     for (int c = 0; c < 16; c++) {
-      RealCase(h, results, block, __imp__sub_8210D7F8, hooks::CarSoundsTireSoundStart,
+      RealCase(h, results, block, __imp__sub_8210D7F8, ITC_CONTEXT_FN(hooks::CarSoundsTireSoundStart),
                {holder + 24}, 0,
                [&](Random& random, PPCContext& t) {
                  RealHolder(h.base, holder + 24, random);
@@ -1340,7 +1340,7 @@ void RealVoices(Context& h, uint32_t block) {
     const std::vector<uint32_t> holders = {block + 408 + 44, block + 408 + 128, block + 652 + 24,
                                            block + 792};
     for (int c = 0; c < 8; c++) {
-      RealCase(h, results, block, __imp__sub_8210E030, hooks::CarSoundsCarSoundStart, holders, 0,
+      RealCase(h, results, block, __imp__sub_8210E030, ITC_CONTEXT_FN(hooks::CarSoundsCarSoundStart), holders, 0,
                [&](Random& random, PPCContext& t) {
                  for (const uint32_t at : holders) {
                    RealHolder(h.base, at, random);
@@ -1385,7 +1385,7 @@ void RealVoices(Context& h, uint32_t block) {
         const uint32_t count = guest::LoadU32(h.base, mastering + 4);
         const uint32_t active = guest::LoadU32(h.base, mastering + 40);
         ITC_FLAG(native_car_sounds) = v == 1;
-        (v == 0 ? __imp__sub_8210FE00 : hooks::CarSoundsInit)(t, h.base);
+        (v == 0 ? __imp__sub_8210FE00 : ITC_CONTEXT_FN(hooks::CarSoundsInit))(t, h.base);
         ITC_FLAG(native_car_sounds) = true;
         const uint32_t array = guest::LoadU32(h.base, cs::kSounds);
         const uint32_t submix = guest::LoadU32(h.base, cs::kSubmix);
@@ -1812,13 +1812,13 @@ void Parts(Context& h, uint32_t block) {
     int cases;
   };
   const Part hit_parts[] = {
-      {"HitSounds::Impact (sub_8210E778)", __imp__sub_8210E778, hooks::CarSoundsHitImpact, 144,
+      {"HitSounds::Impact (sub_8210E778)", __imp__sub_8210E778, ITC_CONTEXT_FN(hooks::CarSoundsHitImpact), 144,
        56, 200},
-      {"HitSounds::Scrape (sub_8210E938)", __imp__sub_8210E938, hooks::CarSoundsHitScrape, 192,
+      {"HitSounds::Scrape (sub_8210E938)", __imp__sub_8210E938, ITC_CONTEXT_FN(hooks::CarSoundsHitScrape), 192,
        104, 200},
-      {"HitSounds::Wave9 (sub_8210EB90)", __imp__sub_8210EB90, hooks::CarSoundsHitWave9, 96, 16,
+      {"HitSounds::Wave9 (sub_8210EB90)", __imp__sub_8210EB90, ITC_CONTEXT_FN(hooks::CarSoundsHitWave9), 96, 16,
        40},
-      {"HitSounds::Update (sub_8210FD78)", __imp__sub_8210FD78, hooks::CarSoundsHitSoundsUpdate,
+      {"HitSounds::Update (sub_8210FD78)", __imp__sub_8210FD78, ITC_CONTEXT_FN(hooks::CarSoundsHitSoundsUpdate),
        112, 32, 120},
   };
   // A third of the cases an impact (+6152 bit 0, a contact of the mask
@@ -1866,7 +1866,7 @@ void Parts(Context& h, uint32_t block) {
   {
     Results results("CarSound::Part736Update (sub_8210EBF0)");
     for (int c = 0; c < 80; c++) {
-      PartCase(h, results, block, vehicle, __imp__sub_8210EBF0, hooks::CarSoundsPart736Update, 112, 24,
+      PartCase(h, results, block, vehicle, __imp__sub_8210EBF0, ITC_CONTEXT_FN(hooks::CarSoundsPart736Update), 112, 24,
                [&](Random& random, PPCContext&) {
                  Store(h.base, part + 48, random.Below(2) == 0 ? 0 : Counter(random));
                  Store(h.base, part + 52, Counter(random));
@@ -1879,7 +1879,7 @@ void Parts(Context& h, uint32_t block) {
     Results results("CarSound::Part840Update (sub_8210ECF0)");
     static constexpr uint8_t kLeft[] = {0, 0, 1, 2, 3, 0x7F, 0x80, 0x81, 0xFF};
     for (int c = 0; c < 80; c++) {
-      PartCase(h, results, block, vehicle, __imp__sub_8210ECF0, hooks::CarSoundsPart840Update, 128, 48,
+      PartCase(h, results, block, vehicle, __imp__sub_8210ECF0, ITC_CONTEXT_FN(hooks::CarSoundsPart840Update), 128, 48,
                [&](Random& random, PPCContext&) {
                  guest::StoreU8(h.base, part + 45, kLeft[random.Below(9)]);
                },
@@ -1891,7 +1891,7 @@ void Parts(Context& h, uint32_t block) {
     // +52's slot always a fake voice (its volume is set without a check).
     Results results("CarSound::Part888Update (sub_8210EEE0)");
     for (int c = 0; c < 120; c++) {
-      PartCase(h, results, block, vehicle, __imp__sub_8210EEE0, hooks::CarSoundsPart888Update, 144, 64,
+      PartCase(h, results, block, vehicle, __imp__sub_8210EEE0, ITC_CONTEXT_FN(hooks::CarSoundsPart888Update), 144, 64,
                [&](Random& random, PPCContext&) {
                  Store(h.base, part + 48, random.Below(2) == 0 ? 0 : Counter(random));
                  const uint32_t slot = Slot(random, 0);
@@ -1923,7 +1923,7 @@ void Parts(Context& h, uint32_t block) {
     Results results("WindSound::Update (sub_8210EDB0)");
     const float fast = Constant(h.base, 0x8200257C) / 3.6f;
     for (int c = 0; c < 80; c++) {
-      PartCase(h, results, block, vehicle, __imp__sub_8210EDB0, hooks::CarSoundsWindSoundUpdate, 128, 40,
+      PartCase(h, results, block, vehicle, __imp__sub_8210EDB0, ITC_CONTEXT_FN(hooks::CarSoundsWindSoundUpdate), 128, 40,
                [&](Random& random, PPCContext&) {
                  Store(h.base, part + 48, random.Below(4) == 0 ? Counter(random)
                                                                : random.Below(2));
@@ -1938,7 +1938,7 @@ void Parts(Context& h, uint32_t block) {
   {
     Results results("PassBySound::Update (sub_8210F088)");
     for (int c = 0; c < 60; c++) {
-      PartCase(h, results, block, vehicle, __imp__sub_8210F088, hooks::CarSoundsPassBySoundUpdate,
+      PartCase(h, results, block, vehicle, __imp__sub_8210F088, ITC_CONTEXT_FN(hooks::CarSoundsPassBySoundUpdate),
                112, 24,
                [&](Random& random, PPCContext& t) {
                  if (random.Below(6) == 0) {
@@ -1996,7 +1996,7 @@ void Parts(Context& h, uint32_t block) {
     };
     Results results("HornSound::Update (sub_8210F118)");
     for (int c = 0; c < 200; c++) {
-      PartCase(h, results, block, vehicle, __imp__sub_8210F118, hooks::CarSoundsHornSoundUpdate,
+      PartCase(h, results, block, vehicle, __imp__sub_8210F118, ITC_CONTEXT_FN(hooks::CarSoundsHornSoundUpdate),
                192, 88,
                [&](Random& random, PPCContext& t) {
                  if (random.Below(12) == 0) {
@@ -2042,7 +2042,7 @@ void Parts(Context& h, uint32_t block) {
     const float off = Constant(h.base, 0x82002A2C);
     Results results("TurboSound::Update (sub_8210F4E8)");
     for (int c = 0; c < 240; c++) {
-      PartCase(h, results, block, vehicle, __imp__sub_8210F4E8, hooks::CarSoundsTurboSoundUpdate,
+      PartCase(h, results, block, vehicle, __imp__sub_8210F4E8, ITC_CONTEXT_FN(hooks::CarSoundsTurboSoundUpdate),
                144, 56,
                [&](Random& random, PPCContext&) {
                  const float last = Near(random, {1.0f, off, 1.5f});
@@ -2291,7 +2291,7 @@ void Engine(Context& h, uint32_t block) {
   {
     Results results("EngineLayer::Update (sub_8210D478)");
     for (int c = 0; c < 300; c++) {
-      EngineCase(h, results, block, vehicle, __imp__sub_8210D478, hooks::CarSoundsEngineLayerUpdate,
+      EngineCase(h, results, block, vehicle, __imp__sub_8210D478, ITC_CONTEXT_FN(hooks::CarSoundsEngineLayerUpdate),
                  {272},
                  [&](Random& random, PPCContext& t, const std::vector<float>& xs, uint64_t output) {
                    t.r3.u64 = engine + kLayerOffsets[random.Below(2)];
@@ -2310,7 +2310,7 @@ void Engine(Context& h, uint32_t block) {
     const float threshold = Constant(h.base, 0x82007FE0), cap = Constant(h.base, 0x82007FC4);
     for (int c = 0; c < 200; c++) {
       EngineCase(h, results, block, vehicle, __imp__sub_8210D718,
-                 hooks::CarSoundsEngineLayerUpdatePitched, {144 + 272},
+                 ITC_CONTEXT_FN(hooks::CarSoundsEngineLayerUpdatePitched), {144 + 272},
                  [&](Random& random, PPCContext& t, const std::vector<float>& xs, uint64_t output) {
                    t.r3.u64 = engine;
                    t.r6.u64 = output;
@@ -2328,7 +2328,7 @@ void Engine(Context& h, uint32_t block) {
   {
     Results results("EngineSound::Update (sub_8210E470)");
     for (int c = 0; c < 200; c++) {
-      EngineCase(h, results, block, vehicle, __imp__sub_8210E470, hooks::CarSoundsEngineSoundUpdate,
+      EngineCase(h, results, block, vehicle, __imp__sub_8210E470, ITC_CONTEXT_FN(hooks::CarSoundsEngineSoundUpdate),
                  {160 + 144 + 272},
                  [&](Random& random, PPCContext& t, const std::vector<float>&, uint64_t output) {
                    t.r3.u64 = engine;
@@ -2521,7 +2521,7 @@ void Tires(Context& h, uint32_t block) {
   {
     Results results("TireLayer::Update (sub_8210D890)");
     for (int c = 0; c < 300; c++) {
-      TireCase(h, results, block, vehicle, __imp__sub_8210D890, hooks::CarSoundsTireLayerUpdate,
+      TireCase(h, results, block, vehicle, __imp__sub_8210D890, ITC_CONTEXT_FN(hooks::CarSoundsTireLayerUpdate),
                160, 8,
                [&](Random& random, PPCContext& t, uint64_t output) {
                  const uint32_t layer = part + (random.Below(4) == 0 ? 12 : 0);
@@ -2544,7 +2544,7 @@ void Tires(Context& h, uint32_t block) {
   {
     Results results("TireSound::Update (sub_8210E5C0)");
     for (int c = 0; c < 300; c++) {
-      TireCase(h, results, block, vehicle, __imp__sub_8210E5C0, hooks::CarSoundsTireSoundUpdate,
+      TireCase(h, results, block, vehicle, __imp__sub_8210E5C0, ITC_CONTEXT_FN(hooks::CarSoundsTireSoundUpdate),
                160, 8,
                [&](Random& random, PPCContext& t, uint64_t output) {
                  t.r3.u64 = part;
@@ -2558,7 +2558,7 @@ void Tires(Context& h, uint32_t block) {
   {
     Results results("RollSound::Update (sub_8210DB60)");
     for (int c = 0; c < 300; c++) {
-      TireCase(h, results, block, vehicle, __imp__sub_8210DB60, hooks::CarSoundsRollSoundUpdate,
+      TireCase(h, results, block, vehicle, __imp__sub_8210DB60, ITC_CONTEXT_FN(hooks::CarSoundsRollSoundUpdate),
                144, 16,
                [&](Random& random, PPCContext& t, uint64_t output) {
                  float speed;
@@ -2966,7 +2966,7 @@ void CarSoundUpdates(Context& h, uint32_t block) {
       const uint32_t active = guest::LoadU32(h.base, mastering + 40);
       const uint32_t state_before = guest::LoadU32(h.base, sound + 0);
       ITC_FLAG(native_car_sounds) = v == 1;
-      (v == 0 ? __imp__sub_82110048 : hooks::CarSoundsUpdate)(t, h.base);
+      (v == 0 ? __imp__sub_82110048 : ITC_CONTEXT_FN(hooks::CarSoundsUpdate))(t, h.base);
       ITC_FLAG(native_car_sounds) = true;
       // The voices made (not the fake ones in the main block).
       std::vector<RealVoice> made;

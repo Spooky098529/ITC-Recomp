@@ -3,6 +3,7 @@
 // shares (hooks/car_scene_draw.h).
 
 #include "hooks/car_scene_draw.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -44,38 +45,38 @@ namespace hooks {
 
 namespace csd = car_scene_draw;
 
-void CarSceneDrawFrustumFromMatrix(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawFrustumFromMatrix) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = csd::FrustumFromMatrix(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void CarSceneDrawPlaneIntersect3(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawPlaneIntersect3) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 =
       csd::PlaneIntersect3(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
 }
 
-void CarSceneDrawPlaneSegmentCrossing(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawPlaneSegmentCrossing) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = csd::PlaneSegmentCrossing(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                          ctx.r1.u32);
 }
 
-void CarSceneDrawBoxFromPoints(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawBoxFromPoints) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = csd::BoxFromPoints(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void CarSceneDrawBoxExtend(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawBoxExtend) {
   ctx.fpscr.disableFlushMode();
   csd::BoxExtend(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void CarSceneDrawVector16Size(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawVector16Size) {
   ctx.r3.u64 = csd::Vector16Size(base, ctx.r3.u32);
 }
 
-void CarSceneDrawVector16PushBack(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawVector16PushBack) {
   const auto r3 = csd::Vector16PushBack(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
   if (!r3) {
     lifted::original::c825986B8(ctx, base);
@@ -84,66 +85,66 @@ void CarSceneDrawVector16PushBack(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;
 }
 
-void CarSceneDrawVector16Insert(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawVector16Insert) {
   const auto r3 =
       csd::Vector16Insert(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
   if (!r3) {
-    __imp__sub_82598648(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82598648);
     return;
   }
   ctx.r3.u64 = *r3;
 }
 
-void CarSceneDrawVector16InsertN(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawVector16InsertN) {
   const auto r3 =
       csd::Vector16InsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
   if (!r3) {
-    __imp__sub_82598288(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82598288);
     return;
   }
   ctx.r3.u64 = *r3;
 }
 
-void CarSceneDrawVector16Allocate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawVector16Allocate) {
   const auto r3 = csd::Vector16Allocate(base, ctx.r4.u32, ctx.r1.u32);
   if (!r3) {
-    __imp__sub_82598158(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82598158);
     return;
   }
   ctx.r3.u64 = *r3;
 }
 
-void CarSceneDrawLookAt(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawLookAt) {
   ctx.fpscr.disableFlushMode();
   csd::LookAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
 }
 
-void CarSceneDrawPerspective(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawPerspective) {
   ctx.fpscr.disableFlushMode();
   if (!csd::Perspective(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.f4.f64,
                         ctx.r1.u32)) {
-    __imp__sub_825972A8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825972A8);
   }
 }
 
-void CarSceneDrawProjectorBuild(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawProjectorBuild) {
   ctx.fpscr.disableFlushMode();
   if (!csd::ProjectorBuild(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64,
                            ctx.f2.f64, ctx.f3.f64, ctx.f4.f64, ctx.r1.u32)) {
-    __imp__sub_82597610(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82597610);
     return;
   }
   ctx.fpscr.enableFlushMode();
 }
 
-void CarSceneDrawProjectorBuildOrtho(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawProjectorBuildOrtho) {
   ctx.fpscr.disableFlushMode();
   csd::ProjectorBuildOrtho(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64,
                            ctx.f2.f64, ctx.f3.f64, ctx.f4.f64, ctx.r1.u32);
   ctx.fpscr.enableFlushMode();
 }
 
-void CarSceneDrawSetLight(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawSetLight) {
   ctx.fpscr.disableFlushMode();
   const auto memcpy = [&](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp,
                           uint32_t lr) {
@@ -161,24 +162,24 @@ void CarSceneDrawSetLight(PPCContext& ctx, uint8_t* base) {
                                       memcpy);
 }
 
-void CarSceneDrawBeamColor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawBeamColor) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = csd::SceneModelBeamColor(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void CarSceneDrawBeam(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawBeam) {
   csd::SceneModelBeam(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void CarSceneDrawBeamShape(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawBeamShape) {
   csd::SceneModelBeamShape(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void CarSceneDrawPlayerModel(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawPlayerModel) {
   ctx.r3.u64 = csd::CarScenePlayerModel(base, ctx.r3.u32);
 }
 
-void CarSceneDrawTextureProjectionFit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawTextureProjectionFit) {
   ctx.fpscr.disableFlushMode();
   const auto push_back = [&](uint32_t vector, uint32_t value, uint32_t sp, uint32_t lr) {
     const uint64_t stack = ctx.r1.u64;
@@ -194,14 +195,14 @@ void CarSceneDrawTextureProjectionFit(PPCContext& ctx, uint8_t* base) {
   if (!csd::TextureProjectionFit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64,
                                  ctx.f2.f64, ctx.f3.f64, ctx.f4.f64, ctx.f5.f64, ctx.r1.u32,
                                  push_back, &r3)) {
-    __imp__sub_82598768(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82598768);
     return;
   }
   ctx.r3.u64 = r3;
   ctx.fpscr.enableFlushMode();
 }
 
-car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(PPCContext& ctx, uint8_t* base) {
+car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(lifted::Regs& ctx, uint8_t* base) {
   car_scene_draw::SceneDrawCalls calls;
   calls.call = [&ctx, base](uint32_t function, const uint64_t* regs, int count,
                             const double* fregs, int fcount, uint32_t sp,
@@ -209,7 +210,7 @@ car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(PPCContext& ctx, uint8_t* b
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
-    PPCRegister* gprs[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+    lifted::Temp* gprs[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
                             &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
     for (int i = 0; i < count; i++) {
       gprs[i]->u64 = regs[i];
@@ -217,7 +218,7 @@ car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(PPCContext& ctx, uint8_t* b
     if (fcount > 0) {
       ctx.fpscr.disableFlushMode();
     }
-    PPCRegister* fprs[5] = {&ctx.f1, &ctx.f2, &ctx.f3, &ctx.f4, &ctx.f5};
+    lifted::Temp* fprs[5] = {&ctx.f1, &ctx.f2, &ctx.f3, &ctx.f4, &ctx.f5};
     for (int i = 0; i < fcount; i++) {
       fprs[i]->f64 = fregs[i];
     }
@@ -261,7 +262,7 @@ car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(PPCContext& ctx, uint8_t* b
     if (ITC_FLAG(native_car_draw)) {
       CarDrawUpdate(ctx, base);
     } else {
-      __imp__sub_820DAC68(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_820DAC68);
     }
     ctx.r1.u64 = stack;
     ctx.r24.u64 = saved_r24;
@@ -270,13 +271,13 @@ car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(PPCContext& ctx, uint8_t* b
   return calls;
 }
 
-void CarSceneDrawRoot(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSceneDrawRoot) {
   // The callees' fallbacks the car draw also declines on (its
   // CarDraw*CalleesNative), and the command list's diagnostics.
   if (!ITC_FLAG(native_models) || !ITC_FLAG(native_matrix_math) ||
       !ITC_FLAG(native_vehicle_accessors) || ITC_FLAG(log_overlay_uploads) ||
       ITC_FLAG(log_slot_callers) || ITC_FLAG(log_recording_by_pass)) {
-    __imp__sub_820C5DE8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820C5DE8);
     return;
   }
   ctx.fpscr.disableFlushMode();

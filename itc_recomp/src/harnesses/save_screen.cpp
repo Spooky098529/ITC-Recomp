@@ -714,9 +714,9 @@ void Steps(Context& h, const World& w) {
     t.r3.u64 = w.step();
   };
   Group(h, w, "SaveScreen::MoveSelection (sub_821A5118)", 200, setup, __imp__sub_821A5118,
-        hooks::SaveScreenMoveSelection, {{128, 40}});
+        ITC_CONTEXT_FN(hooks::SaveScreenMoveSelection), {{128, 40}});
   Group(h, w, "SaveScreen::CloseDialog (sub_821A5038)", 200, setup, __imp__sub_821A5038,
-        hooks::SaveScreenCloseDialog, {{128, 32}});
+        ITC_CONTEXT_FN(hooks::SaveScreenCloseDialog), {{128, 32}});
 }
 
 // The pages: r3 the mode; the message (+12) one the page tests (or any);
@@ -740,27 +740,27 @@ SetupFn PageSetup(uint8_t* base, std::vector<uint32_t> messages, uint32_t wait =
 
 void KindZeroPages(Context& h, const World& w) {
   Group(h, w, "SaveScreen::Page0 (sub_821A28E0)", 400,
-        PageSetup(h.base, {1, 4, 5, 6, 11, 0, 2}), __imp__sub_821A28E0, hooks::SaveScreenPage0,
+        PageSetup(h.base, {1, 4, 5, 6, 11, 0, 2}), __imp__sub_821A28E0, ITC_CONTEXT_FN(hooks::SaveScreenPage0),
         {{128, 40}});
   Group(h, w, "SaveScreen::Page1 (sub_821A2AF8)", 300,
-        PageSetup(h.base, {2, 3, 7, 9, 10, 0}, 45), __imp__sub_821A2AF8, hooks::SaveScreenPage1,
+        PageSetup(h.base, {2, 3, 7, 9, 10, 0}, 45), __imp__sub_821A2AF8, ITC_CONTEXT_FN(hooks::SaveScreenPage1),
         {{96, 16}});
   Group(h, w, "SaveScreen::Page2 (sub_821A2C98)", 400, PageSetup(h.base, {0, 8, 1}, 90),
-        __imp__sub_821A2C98, hooks::SaveScreenPage2, {{96, 16}});
+        __imp__sub_821A2C98, ITC_CONTEXT_FN(hooks::SaveScreenPage2), {{96, 16}});
   Group(h, w, "SaveScreen::Page3 (sub_821A2EE8)", 200, PageSetup(h.base, {0, 11}),
-        __imp__sub_821A2EE8, hooks::SaveScreenPage3, {{96, 8}});
+        __imp__sub_821A2EE8, ITC_CONTEXT_FN(hooks::SaveScreenPage3), {{96, 8}});
 }
 
 void EndPages(Context& h, const World& w) {
   const SetupFn setup = PageSetup(h.base, {0});
   Group(h, w, "SaveScreen::Page4 (sub_821A4D30)", 100, setup, __imp__sub_821A4D30,
-        hooks::SaveScreenPage4, {});
+        ITC_CONTEXT_FN(hooks::SaveScreenPage4), {});
   Group(h, w, "SaveScreen::Page9 (sub_821A4DE0)", 100, setup, __imp__sub_821A4DE0,
-        hooks::SaveScreenPage9, {});
+        ITC_CONTEXT_FN(hooks::SaveScreenPage9), {});
   Group(h, w, "SaveScreen::Page16 (sub_821A4E60)", 100, setup, __imp__sub_821A4E60,
-        hooks::SaveScreenPage16, {});
+        ITC_CONTEXT_FN(hooks::SaveScreenPage16), {});
   Group(h, w, "SaveScreen::Page25 (sub_821A4FD8)", 100, setup, __imp__sub_821A4FD8,
-        hooks::SaveScreenPage25, {});
+        ITC_CONTEXT_FN(hooks::SaveScreenPage25), {});
 }
 
 // The players' presses for kind 7's pick: each controller's mapper (as
@@ -783,24 +783,24 @@ void KindOnePages(Context& h, const World& w) {
   // StoreSettings: no arguments; 224-byte frame, saves 48 and lr.
   Group(h, w, "SaveScreen::StoreSettings (sub_821A24B0)", 300,
         [](PPCContext&, Random&, const World&) {}, __imp__sub_821A24B0,
-        hooks::SaveScreenStoreSettings, {{224, 56}});
+        ITC_CONTEXT_FN(hooks::SaveScreenStoreSettings), {{224, 56}});
   // Page6 with StoreSettings' frame below its own.
   Group(h, w, "SaveScreen::Page6 (sub_821A32C0)", 400,
-        PageSetup(h.base, {0, 5, 6, 7, 11, 1}, 45), __imp__sub_821A32C0, hooks::SaveScreenPage6,
+        PageSetup(h.base, {0, 5, 6, 7, 11, 1}, 45), __imp__sub_821A32C0, ITC_CONTEXT_FN(hooks::SaveScreenPage6),
         {{96, 16}, {320, 152}});
   Group(h, w, "SaveScreen::Page7 (sub_821A33E8)", 500, PageSetup(h.base, {10, 9, 4, 0}, 90),
-        __imp__sub_821A33E8, hooks::SaveScreenPage7, {{96, 16}});
+        __imp__sub_821A33E8, ITC_CONTEXT_FN(hooks::SaveScreenPage7), {{96, 16}});
   Group(h, w, "SaveScreen::Page8 (sub_821A3728)", 300, PageSetup(h.base, {0}),
-        __imp__sub_821A3728, hooks::SaveScreenPage8, {{96, 8}});
+        __imp__sub_821A3728, ITC_CONTEXT_FN(hooks::SaveScreenPage8), {{96, 8}});
 }
 
 void ReplayPages(Context& h, const World& w) {
   Group(h, w, "SaveScreen::Page12 (sub_821A3A08)", 400,
-        PageSetup(h.base, {12, 6, 5, 3, 1, 0}), __imp__sub_821A3A08, hooks::SaveScreenPage12,
+        PageSetup(h.base, {12, 6, 5, 3, 1, 0}), __imp__sub_821A3A08, ITC_CONTEXT_FN(hooks::SaveScreenPage12),
         {{128, 48}});
   Group(h, w, "SaveScreen::Page13 (sub_821A3C60)", 400,
         PageSetup(h.base, {2, 4, 8, 9, 10, 11, 0}, 45), __imp__sub_821A3C60,
-        hooks::SaveScreenPage13, {{96, 16}});
+        ITC_CONTEXT_FN(hooks::SaveScreenPage13), {{96, 16}});
   // Page14: the header's lists 0 half the time (Replays::BuildList makes
   // new ones, compared and freed).
   const SetupFn page14 = PageSetup(h.base, {0, 7, 1}, 90);
@@ -825,9 +825,9 @@ void ReplayPages(Context& h, const World& w) {
           guest::StoreU32(h.base, w.buffers.address + field, list);
         }
       },
-      __imp__sub_821A67E8, hooks::SaveScreenPage14, {{96, 16}});
+      __imp__sub_821A67E8, ITC_CONTEXT_FN(hooks::SaveScreenPage14), {{96, 16}});
   Group(h, w, "SaveScreen::Page15 (sub_821A3DE8)", 300, PageSetup(h.base, {0}),
-        __imp__sub_821A3DE8, hooks::SaveScreenPage15, {{96, 8}});
+        __imp__sub_821A3DE8, ITC_CONTEXT_FN(hooks::SaveScreenPage15), {{96, 8}});
   const SetupFn page24 = PageSetup(h.base, {0});
   Group(
       h, w, "SaveScreen::Page24 (sub_821A4AC0)", 300,
@@ -835,7 +835,7 @@ void ReplayPages(Context& h, const World& w) {
         page24(t, r, w);
         Presses(h.base, r);
       },
-      __imp__sub_821A4AC0, hooks::SaveScreenPage24, {{128, 48}});
+      __imp__sub_821A4AC0, ITC_CONTEXT_FN(hooks::SaveScreenPage24), {{128, 48}});
 }
 
 // The menu list's item block (+68): 0, or a copy of the shaped one in the
@@ -941,34 +941,34 @@ void Handlers(Context& h, const World& w) {
     t.r4.u64 = w.mode();
   };
   Group(h, w, "SaveScreen::OnEnter (sub_821A2608)", 100, machine, __imp__sub_821A2608,
-        hooks::SaveScreenOnEnter, {{112, 24}}, [](uint8_t* base, const World& w, Outputs& out) {
+        ITC_CONTEXT_FN(hooks::SaveScreenOnEnter), {{112, 24}}, [](uint8_t* base, const World& w, Outputs& out) {
           MadeBlock(base, ss::kPages, 28, w.pages(), out);
           MadeBlock(base, ss::kList, 72, w.list(), out);
           MadeBlock(base, ss::kData, 68, w.data(), out);
         });
   Group(h, w, "SaveScreen::OpenMovie (sub_821A1D10)", 50, machine, __imp__sub_821A1D10,
-        hooks::SaveScreenOpenMovie, {});
+        ITC_CONTEXT_FN(hooks::SaveScreenOpenMovie), {});
   // WaitMovie: movie 44 loaded or not (its +0x9FD8... the table's pair kept).
   Group(h, w, "SaveScreen::WaitMovie (sub_821A26F0)", 200, machine, __imp__sub_821A26F0,
-        hooks::SaveScreenWaitMovie, {{96, 16}});
+        ITC_CONTEXT_FN(hooks::SaveScreenWaitMovie), {{96, 16}});
   const struct {
     const char* name;
     GuestFunction recompiled, native;
   } kOpens[] = {
-      {"SaveScreen::OpenKind0 (sub_821A2760)", __imp__sub_821A2760, hooks::SaveScreenOpenKind0},
-      {"SaveScreen::OpenKind1 (sub_821A2790)", __imp__sub_821A2790, hooks::SaveScreenOpenKind1},
-      {"SaveScreen::OpenKind2 (sub_821A2820)", __imp__sub_821A2820, hooks::SaveScreenOpenKind2},
-      {"SaveScreen::OpenKind3 (sub_821A27F0)", __imp__sub_821A27F0, hooks::SaveScreenOpenKind3},
-      {"SaveScreen::OpenKind4 (sub_821A2850)", __imp__sub_821A2850, hooks::SaveScreenOpenKind4},
-      {"SaveScreen::OpenKind5 (sub_821A2880)", __imp__sub_821A2880, hooks::SaveScreenOpenKind5},
-      {"SaveScreen::OpenKind6 (sub_821A27C0)", __imp__sub_821A27C0, hooks::SaveScreenOpenKind6},
-      {"SaveScreen::OpenKind7 (sub_821A28B0)", __imp__sub_821A28B0, hooks::SaveScreenOpenKind7},
+      {"SaveScreen::OpenKind0 (sub_821A2760)", __imp__sub_821A2760, ITC_CONTEXT_FN(hooks::SaveScreenOpenKind0)},
+      {"SaveScreen::OpenKind1 (sub_821A2790)", __imp__sub_821A2790, ITC_CONTEXT_FN(hooks::SaveScreenOpenKind1)},
+      {"SaveScreen::OpenKind2 (sub_821A2820)", __imp__sub_821A2820, ITC_CONTEXT_FN(hooks::SaveScreenOpenKind2)},
+      {"SaveScreen::OpenKind3 (sub_821A27F0)", __imp__sub_821A27F0, ITC_CONTEXT_FN(hooks::SaveScreenOpenKind3)},
+      {"SaveScreen::OpenKind4 (sub_821A2850)", __imp__sub_821A2850, ITC_CONTEXT_FN(hooks::SaveScreenOpenKind4)},
+      {"SaveScreen::OpenKind5 (sub_821A2880)", __imp__sub_821A2880, ITC_CONTEXT_FN(hooks::SaveScreenOpenKind5)},
+      {"SaveScreen::OpenKind6 (sub_821A27C0)", __imp__sub_821A27C0, ITC_CONTEXT_FN(hooks::SaveScreenOpenKind6)},
+      {"SaveScreen::OpenKind7 (sub_821A28B0)", __imp__sub_821A28B0, ITC_CONTEXT_FN(hooks::SaveScreenOpenKind7)},
   };
   for (const auto& open : kOpens) {
     Group(h, w, open.name, 40, machine, open.recompiled, open.native, {});
   }
   Group(h, w, "SaveScreen::Cancel (sub_821A1D20)", 20, machine, __imp__sub_821A1D20,
-        hooks::SaveScreenCancel, {});
+        ITC_CONTEXT_FN(hooks::SaveScreenCancel), {});
   // Show: the kind 0 to 7 (or any); the header's buffers none now and then
   // (SaveBuffers::Create makes them); the item block 0 or pages.
   auto show = [&h, machine](PPCContext& t, Random& r, const World& w) {
@@ -984,13 +984,13 @@ void Handlers(Context& h, const World& w) {
     MadeBuffers(base, w, out);
   };
   Group(h, w, "SaveScreen::Show (sub_821A6608)", 400, show, __imp__sub_821A6608,
-        hooks::SaveScreenShow, {{96, 8}}, show_after);
+        ITC_CONTEXT_FN(hooks::SaveScreenShow), {{96, 8}}, show_after);
   Group(h, w, "SaveScreen::ShowKind2 (sub_821A1D38)", 100, show, __imp__sub_821A1D38,
-        hooks::SaveScreenShowKind2, {{128, 24}}, show_after);
+        ITC_CONTEXT_FN(hooks::SaveScreenShowKind2), {{128, 24}}, show_after);
   Group(h, w, "SaveScreen::ShowKind7 (sub_821A2138)", 100, show, __imp__sub_821A2138,
-        hooks::SaveScreenShowKind7, {{128, 24}}, show_after);
+        ITC_CONTEXT_FN(hooks::SaveScreenShowKind7), {{128, 24}}, show_after);
   Group(h, w, "SaveScreen::Leave (sub_821A4C58)", 100, machine, __imp__sub_821A4C58,
-        hooks::SaveScreenLeave, {{112, 16}});
+        ITC_CONTEXT_FN(hooks::SaveScreenLeave), {{112, 16}});
   // OnLeft: the three blocks copies of the shaped ones in the layer's pages
   // (it frees them), the item block 0 or pages.
   Group(
@@ -1005,7 +1005,7 @@ void Handlers(Context& h, const World& w) {
         const uint32_t items = Pick(r, 2) == 0 ? GivePages(h.base, 0, 0x100) : 0;
         guest::StoreU32(h.base, guest::LoadU32(h.base, ss::kList) + 68, items);
       },
-      __imp__sub_821A1CA0, hooks::SaveScreenOnLeft, {{112, 32}},
+      __imp__sub_821A1CA0, ITC_CONTEXT_FN(hooks::SaveScreenOnLeft), {{112, 32}},
       [](uint8_t* base, const World& w, Outputs& out) {
         // Freed by the function: any still pages are freed here (counted).
         CheckGiven(base, out);
@@ -1108,7 +1108,7 @@ void UpdateAndDraw(Context& h, const World& w) {
         ItemBlock(h.base, w, r);
         t.r3.u64 = r.Next();
       },
-      __imp__sub_821A64A0, hooks::SaveScreenUpdate, {{144, 16}},
+      __imp__sub_821A64A0, ITC_CONTEXT_FN(hooks::SaveScreenUpdate), {{144, 16}},
       [](uint8_t* base, const World& w, Outputs& out) { FreeItemBlock(base, w, out); });
   // Draw: r3 the machine, r4 the mode; the page any of the 27 (those
   // seen in play more often) or -1 (the pages for the player at the data's
@@ -1150,7 +1150,7 @@ void UpdateAndDraw(Context& h, const World& w) {
         guest::StoreU32(base, header + 16, GivePages(base, from + 0x200, 4 * 304));
         guest::StoreU32(base, ss::kSaveBuffers, header);
       },
-      __imp__sub_821A6AF0, hooks::SaveScreenDraw, {{368, 152}},
+      __imp__sub_821A6AF0, ITC_CONTEXT_FN(hooks::SaveScreenDraw), {{368, 152}},
       [](uint8_t* base, const World& w, Outputs& out) {
         FreeItemBlock(base, w, out);
         // The header (0 once SaveBuffers::Destroy ran) and the lists

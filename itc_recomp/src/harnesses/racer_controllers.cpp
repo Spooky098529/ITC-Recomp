@@ -101,8 +101,8 @@ void StandInUpdateIdle(PPCContext& ctx, uint8_t* base) {
 // While alive, the stand-ins answer and the log starts empty.
 struct StandIns {
   StandIns() {
-    hooks::g_drive_car_stand_in = StandInDriveCar;
-    hooks::g_update_idle_stand_in = StandInUpdateIdle;
+    hooks::g_drive_car_stand_in = ITC_CONTEXT_FN(StandInDriveCar);
+    hooks::g_update_idle_stand_in = ITC_CONTEXT_FN(StandInUpdateIdle);
     Reset();
   }
   ~StandIns() {
@@ -370,9 +370,9 @@ void Recording(Context& h, Random& r) {
         t.r3.u64 = which == 0 ? record : player;
         t.r4.u64 = player;
         if (which == 0) {
-          (v == 0 ? Original<__imp__sub_821029A8> : NativeAppend)(t, h.base);
+          (v == 0 ? Original<__imp__sub_821029A8> : ITC_CONTEXT_FN(NativeAppend))(t, h.base);
         } else {
-          (v == 0 ? Original<__imp__sub_82102968> : NativeHasRoom)(t, h.base);
+          (v == 0 ? Original<__imp__sub_82102968> : ITC_CONTEXT_FN(NativeHasRoom))(t, h.base);
         }
         saved.Restore();
         for (uint32_t p = 0; p < 2; p++) {
@@ -426,7 +426,7 @@ void Inputs(Context& h, Random& r) {
         guest::StoreU32(h.base, rc::kRaceData, race);
         PPCContext t = CallContext(h);
         t.r3.u64 = kFlow;
-        (v == 0 ? Original<__imp__sub_8215F728> : NativeOnSetUp)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8215F728> : ITC_CONTEXT_FN(NativeOnSetUp))(t, h.base);
         uint32_t made[7];
         for (uint32_t i = 0; i < 7; i++) {
           made[i] = guest::LoadU32(h.base, rc::kInputs + 4 * i);
@@ -466,7 +466,7 @@ void Inputs(Context& h, Random& r) {
         }
         PPCContext t = CallContext(h);
         t.r3.u64 = flow;
-        (v == 0 ? Original<__imp__sub_8215F5E8> : NativeOnEnd)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8215F5E8> : ITC_CONTEXT_FN(NativeOnEnd))(t, h.base);
         for (uint32_t i = 0; i < 7; i++) {
           out[v].Word(guest::LoadU32(h.base, rc::kInputs + 4 * i) == made[i] ? 1 : 0);
           out[v].Word(made[i] != 0 && memory::IsHeapBlock(made[i]) ? 1 : 0);
@@ -527,15 +527,15 @@ void Handoff(Context& h, Random& r) {
     Kind kind;
     int cases;
   } functions[] = {
-      {"RacerControl::DriveByAi (sub_8215F968)", Original<__imp__sub_8215F968>, NativeDriveByAi,
+      {"RacerControl::DriveByAi (sub_8215F968)", Original<__imp__sub_8215F968>, ITC_CONTEXT_FN(NativeDriveByAi),
        kDriveByAi, 300},
-      {"RaceFlow::HoldAll (sub_8215FA10)", Original<__imp__sub_8215FA10>, NativeHoldAll, kHoldAll,
+      {"RaceFlow::HoldAll (sub_8215FA10)", Original<__imp__sub_8215FA10>, ITC_CONTEXT_FN(NativeHoldAll), kHoldAll,
        300},
-      {"RaceFlow::OnHold (sub_8215FC28)", Original<__imp__sub_8215FC28>, NativeOnHold, kOnHold,
+      {"RaceFlow::OnHold (sub_8215FC28)", Original<__imp__sub_8215FC28>, ITC_CONTEXT_FN(NativeOnHold), kOnHold,
        100},
-      {"RaceFlow::OnState16 (sub_8215FB90)", Original<__imp__sub_8215FB90>, NativeOnState16,
+      {"RaceFlow::OnState16 (sub_8215FB90)", Original<__imp__sub_8215FB90>, ITC_CONTEXT_FN(NativeOnState16),
        kOnState16, 300},
-      {"sub_8215F5F0 (never seen in play)", Original<__imp__sub_8215F5F0>, NativeClearAllRecords,
+      {"sub_8215F5F0 (never seen in play)", Original<__imp__sub_8215F5F0>, ITC_CONTEXT_FN(NativeClearAllRecords),
        kClearAllRecords, 100},
   };
   for (const auto& f : functions) {
@@ -646,7 +646,7 @@ void SetUp(Context& h, Random& r) {
       t.r3.u64 = args + 0;
       t.r4.u64 = args + 4;
       t.r5.u64 = args + 8;
-      (v == 0 ? Original<__imp__sub_82170FF8> : NativeSetup)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82170FF8> : ITC_CONTEXT_FN(NativeSetup))(t, h.base);
       saved.Restore();
       for (uint32_t i = 0; i < kTableBytes; i += 256) {
         out[v].Bytes(Bytes(h.base, table + i, std::min<uint32_t>(256, kTableBytes - i)));
@@ -715,12 +715,12 @@ void Controls(Context& h, Random& r) {
     Kind kind;
     int cases;
   } functions[] = {
-      {"PlayerInput::Read (sub_82102350)", Original<__imp__sub_82102350>, NativeRead, kRead, 1000},
-      {"PlayerInput::Control (sub_82102488)", Original<__imp__sub_82102488>, NativeControl,
+      {"PlayerInput::Read (sub_82102350)", Original<__imp__sub_82102350>, ITC_CONTEXT_FN(NativeRead), kRead, 1000},
+      {"PlayerInput::Control (sub_82102488)", Original<__imp__sub_82102488>, ITC_CONTEXT_FN(NativeControl),
        kControl, 2000},
-      {"Pad::IsConnected (sub_8209F340)", Original<__imp__sub_8209F340>, NativeIsConnected,
+      {"Pad::IsConnected (sub_8209F340)", Original<__imp__sub_8209F340>, ITC_CONTEXT_FN(NativeIsConnected),
        kIsConnected, 100},
-      {"Pad::IsWheel (sub_8209F3B8)", Original<__imp__sub_8209F3B8>, NativeIsWheel, kIsWheel, 100},
+      {"Pad::IsWheel (sub_8209F3B8)", Original<__imp__sub_8209F3B8>, ITC_CONTEXT_FN(NativeIsWheel), kIsWheel, 100},
   };
   const uint32_t out = h.data + 0x100;
   for (const auto& f : functions) {
@@ -821,29 +821,29 @@ void Pads(Context& h, Random& r) {
     Kind kind;
     int cases;
   } functions[] = {
-      {"PlayerControl::ReadPad (sub_8215FCA8)", Original<__imp__sub_8215FCA8>, NativeReadPad,
+      {"PlayerControl::ReadPad (sub_8215FCA8)", Original<__imp__sub_8215FCA8>, ITC_CONTEXT_FN(NativeReadPad),
        kReadPad, 2000},
-      {"PlayerControl::Update (sub_821604C8)", Original<__imp__sub_821604C8>, NativePlayerUpdate,
+      {"PlayerControl::Update (sub_821604C8)", Original<__imp__sub_821604C8>, ITC_CONTEXT_FN(NativePlayerUpdate),
        kUpdate, 2000},
       {"RacerControl::DriveByAiWithPad (sub_8215F7E8)", Original<__imp__sub_8215F7E8>,
-       NativeDriveByAiWithPad, kWithPad, 1000},
-      {"RaceFlow::AllByAi (sub_8215FA68)", Original<__imp__sub_8215FA68>, NativeAllByAi, kAllByAi,
+       ITC_CONTEXT_FN(NativeDriveByAiWithPad), kWithPad, 1000},
+      {"RaceFlow::AllByAi (sub_8215FA68)", Original<__imp__sub_8215FA68>, ITC_CONTEXT_FN(NativeAllByAi), kAllByAi,
        500},
       {"InputRecording::Next (sub_82102A28, never seen in play)", Original<__imp__sub_82102A28>,
-       NativeNext, kNext, 300},
+       ITC_CONTEXT_FN(NativeNext), kNext, 300},
       {"RaceFlow::PlayersAndHeldAi (sub_821606D0)", Original<__imp__sub_821606D0>,
-       NativePlayersAndHeldAi, kByRacer, 500},
+       ITC_CONTEXT_FN(NativePlayersAndHeldAi), kByRacer, 500},
       {"RaceFlow::OnState7 (sub_82160940)", Original<__imp__sub_82160940>,
-       NativeOnState7, kByRacer, 200},
+       ITC_CONTEXT_FN(NativeOnState7), kByRacer, 200},
       {"RaceFlow::PlayersAndAi (sub_821607A0)", Original<__imp__sub_821607A0>,
-       NativePlayersAndAi, kByRacer, 500},
+       ITC_CONTEXT_FN(NativePlayersAndAi), kByRacer, 500},
       {"sub_82160880 (never seen in play)", Original<__imp__sub_82160880>,
-       NativePlayersAndAiNoPause, kByRacer, 300},
-      {"RaceFlow::OnState22 (sub_82160948)", Original<__imp__sub_82160948>, NativeOnState22,
+       ITC_CONTEXT_FN(NativePlayersAndAiNoPause), kByRacer, 300},
+      {"RaceFlow::OnState22 (sub_82160948)", Original<__imp__sub_82160948>, ITC_CONTEXT_FN(NativeOnState22),
        kByRacer, 500},
-      {"RaceFlow::OnState23 (sub_821609E0)", Original<__imp__sub_821609E0>, NativeOnState23,
+      {"RaceFlow::OnState23 (sub_821609E0)", Original<__imp__sub_821609E0>, ITC_CONTEXT_FN(NativeOnState23),
        kByRacer, 1000},
-      {"RaceFlow::OnState34 (sub_8215FC38)", Original<__imp__sub_8215FC38>, NativeOnState34,
+      {"RaceFlow::OnState34 (sub_8215FC38)", Original<__imp__sub_8215FC38>, ITC_CONTEXT_FN(NativeOnState34),
        kByRacer, 500},
   };
   for (const auto& f : functions) {

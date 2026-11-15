@@ -16,6 +16,7 @@
 // system-services.md, and B5 in docs/rexglue-removal.md.
 
 #include "hooks/voice.h"
+#include "hooks/native_entry.h"
 
 #include "guest.h"
 
@@ -41,7 +42,7 @@ uint32_t SetUpWithoutEngine(uint8_t* base, uint32_t manager, uint32_t machine_id
 
 // r3 = the network manager (826C74A0), r4 = the machine id's address. From the
 // manager's set-up (sub_8214E190) once at boot.
-extern "C" REX_FUNC(sub_8214F6E8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8214F6E8) {
+  
   ctx.r3.u64 = voice::SetUpWithoutEngine(base, ctx.r3.u32, ctx.r4.u32);
 }

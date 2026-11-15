@@ -122,7 +122,7 @@ void VaryCars(Context& h) {
       t.r4.s64 = Argument(r);
       t.r5.s64 = Argument(r);
       t.r6.s64 = Argument(r);
-      (v == 0 ? Original<__imp__sub_8215B330> : hooks::RaceUpdateVaryCar)(t, h.base);
+      (v == 0 ? Original<__imp__sub_8215B330> : ITC_CONTEXT_FN(hooks::RaceUpdateVaryCar))(t, h.base);
       out[v].Bytes(Read(h.base, car.address, car.bytes));
       out[v].Word(t.r3.u32);
     }
@@ -197,7 +197,7 @@ void Lights(Context& h) {
         }
       }
       t.r3.u64 = set.address;
-      (v == 0 ? Original<__imp__sub_8215D008> : hooks::RaceUpdateLights)(t, h.base);
+      (v == 0 ? Original<__imp__sub_8215D008> : ITC_CONTEXT_FN(hooks::RaceUpdateLights))(t, h.base);
       out[v].Bytes(Read(h.base, set.address, set.bytes));
       out[v].Floats(h.base, kArrays, kArrayBytes / 4);
       out[v].Bytes(Read(h.base, ru::kOrigin, 16));
@@ -670,10 +670,10 @@ void TickUpdates(Context& h, bool whole) {
                          guest::LoadU32(h.base, slots), int32_t(remaker));
       if (whole) {
         t.r3.u64 = scene;
-        (v == 0 ? Original<__imp__sub_8215D2B0> : hooks::RaceUpdateUpdate)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8215D2B0> : ITC_CONTEXT_FN(hooks::RaceUpdateUpdate))(t, h.base);
       } else {
         t.r3.u64 = slots;
-        (v == 0 ? Original<__imp__sub_8215C780> : hooks::RaceUpdateTickUpdate)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8215C780> : ITC_CONTEXT_FN(hooks::RaceUpdateTickUpdate))(t, h.base);
       }
       // The block in order, its float ranges as floats.
       uint32_t at = 0;

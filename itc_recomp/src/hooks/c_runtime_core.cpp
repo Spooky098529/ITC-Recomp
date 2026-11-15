@@ -3,6 +3,7 @@
 // originals call them (B7's goal, the user's call, 2026-11-14).
 
 #include "hooks/c_runtime_core.h"
+#include "hooks/native_entry.h"
 
 #include "c_runtime/exit.h"
 #include "c_runtime/format.h"
@@ -105,8 +106,8 @@ namespace {
 
 bool NativeHeap() { return ITC_FLAG(native_c_runtime_heap) && hooks::NativeHeapActive(); }
 
-void SetArgs(PPCContext& ctx, std::initializer_list<uint64_t> args) {
-  PPCRegister* const r[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+void SetArgs(lifted::Regs& ctx, std::initializer_list<uint64_t> args) {
+  lifted::Temp* const r[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
                              &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
   int i = 0;
   for (uint64_t arg : args) {
@@ -116,31 +117,31 @@ void SetArgs(PPCContext& ctx, std::initializer_list<uint64_t> args) {
 
 }  // namespace
 
-cc::Calls hooks::CRuntimeCoreCalls(PPCContext& ctx, uint8_t* base) {
+cc::Calls hooks::CRuntimeCoreCalls(lifted::Regs& ctx, uint8_t* base) {
   cc::Calls calls;
   calls.import = [&ctx, base](cc::Import import, std::initializer_list<uint64_t> args) {
     const uint64_t lr = ctx.lr;
     SetArgs(ctx, args);
     switch (import) {
-      case cc::Import::kKeTlsAlloc: __imp__KeTlsAlloc(ctx, base); break;
-      case cc::Import::kKeTlsGetValue: __imp__KeTlsGetValue(ctx, base); break;
-      case cc::Import::kKeTlsSetValue: __imp__KeTlsSetValue(ctx, base); break;
-      case cc::Import::kKeTlsFree: __imp__KeTlsFree(ctx, base); break;
+      case cc::Import::kKeTlsAlloc: lifted::Sdk(ctx, base, __imp__KeTlsAlloc); break;
+      case cc::Import::kKeTlsGetValue: lifted::Sdk(ctx, base, __imp__KeTlsGetValue); break;
+      case cc::Import::kKeTlsSetValue: lifted::Sdk(ctx, base, __imp__KeTlsSetValue); break;
+      case cc::Import::kKeTlsFree: lifted::Sdk(ctx, base, __imp__KeTlsFree); break;
       case cc::Import::kRtlInitializeCriticalSection:
-        __imp__RtlInitializeCriticalSection(ctx, base);
+        lifted::Sdk(ctx, base, __imp__RtlInitializeCriticalSection);
         break;
-      case cc::Import::kRtlEnterCriticalSection: __imp__RtlEnterCriticalSection(ctx, base); break;
-      case cc::Import::kRtlLeaveCriticalSection: __imp__RtlLeaveCriticalSection(ctx, base); break;
-      case cc::Import::kNtClose: __imp__NtClose(ctx, base); break;
-      case cc::Import::kNtClearEvent: __imp__NtClearEvent(ctx, base); break;
-      case cc::Import::kRtlRaiseException: __imp__RtlRaiseException(ctx, base); break;
-      case cc::Import::kKeBugCheck: __imp__KeBugCheck(ctx, base); break;
-      case cc::Import::kExTerminateThread: __imp__ExTerminateThread(ctx, base); break;
-      case cc::Import::kNtFlushBuffersFile: __imp__NtFlushBuffersFile(ctx, base); break;
-      case cc::Import::kNtQueryInformationFile: __imp__NtQueryInformationFile(ctx, base); break;
-      case cc::Import::kNtSetInformationFile: __imp__NtSetInformationFile(ctx, base); break;
-      case cc::Import::kNtWriteFile: __imp__NtWriteFile(ctx, base); break;
-      case cc::Import::kNtWaitForSingleObjectEx: __imp__NtWaitForSingleObjectEx(ctx, base); break;
+      case cc::Import::kRtlEnterCriticalSection: lifted::Sdk(ctx, base, __imp__RtlEnterCriticalSection); break;
+      case cc::Import::kRtlLeaveCriticalSection: lifted::Sdk(ctx, base, __imp__RtlLeaveCriticalSection); break;
+      case cc::Import::kNtClose: lifted::Sdk(ctx, base, __imp__NtClose); break;
+      case cc::Import::kNtClearEvent: lifted::Sdk(ctx, base, __imp__NtClearEvent); break;
+      case cc::Import::kRtlRaiseException: lifted::Sdk(ctx, base, __imp__RtlRaiseException); break;
+      case cc::Import::kKeBugCheck: lifted::Sdk(ctx, base, __imp__KeBugCheck); break;
+      case cc::Import::kExTerminateThread: lifted::Sdk(ctx, base, __imp__ExTerminateThread); break;
+      case cc::Import::kNtFlushBuffersFile: lifted::Sdk(ctx, base, __imp__NtFlushBuffersFile); break;
+      case cc::Import::kNtQueryInformationFile: lifted::Sdk(ctx, base, __imp__NtQueryInformationFile); break;
+      case cc::Import::kNtSetInformationFile: lifted::Sdk(ctx, base, __imp__NtSetInformationFile); break;
+      case cc::Import::kNtWriteFile: lifted::Sdk(ctx, base, __imp__NtWriteFile); break;
+      case cc::Import::kNtWaitForSingleObjectEx: lifted::Sdk(ctx, base, __imp__NtWaitForSingleObjectEx); break;
     }
     ctx.lr = lr;
     return ctx.r3.u64;
@@ -211,251 +212,251 @@ cc::Calls hooks::CRuntimeCoreCalls(PPCContext& ctx, uint8_t* base) {
   return calls;
 }
 
-void hooks::CoreCrtTlsAlloc(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCrtTlsAlloc(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::CrtTlsAlloc(ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreSetFlsGetValue(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreSetFlsGetValue(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::SetFlsGetValue(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreGetptdNoexit(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreGetptdNoexit(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::GetptdNoexit(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreFreeFls(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFreeFls(lifted::Regs& ctx, uint8_t* base) {
   cc::FreeFls(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreMtDeleteLocks(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreMtDeleteLocks(lifted::Regs& ctx, uint8_t* base) {
   cc::MtDeleteLocks(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreMtTerm(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreMtTerm(lifted::Regs& ctx, uint8_t* base) {
   cc::MtTerm(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreErrno(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreErrno(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Errno(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreDosErrno(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreDosErrno(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::DosErrno(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreGetErrnoFromOsErr(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreGetErrnoFromOsErr(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::GetErrnoFromOsErr(base, ctx.r3.u32);
 }
 
-void hooks::CoreDosMapErr(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreDosMapErr(lifted::Regs& ctx, uint8_t* base) {
   cc::DosMapErr(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreFreePtd(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFreePtd(lifted::Regs& ctx, uint8_t* base) {
   cc::FreePtd(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreCritSecNoSpinCount(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCritSecNoSpinCount(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::CritSecNoSpinCount(ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreInitCritSecAndSpinCount(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreInitCritSecAndSpinCount(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 =
       cc::InitCritSecAndSpinCount(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreRegisterThreadNotifyRoutine(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreRegisterThreadNotifyRoutine(lifted::Regs& ctx, uint8_t* base) {
   cc::RegisterThreadNotifyRoutine(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreCallThreadNotifyRoutines(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCallThreadNotifyRoutines(lifted::Regs& ctx, uint8_t* base) {
   cc::CallThreadNotifyRoutines(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreMtInitLocks(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreMtInitLocks(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::MtInitLocks(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreThreadNotify(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreThreadNotify(lifted::Regs& ctx, uint8_t* base) {
   cc::ThreadNotify(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreMtInit(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreMtInit(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::MtInit(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreStrtol(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreStrtol(lifted::Regs& ctx, uint8_t* base) {
   uint64_t result = 0;
   if (!cc::Strtol(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, &result)) {
-    __imp__sub_825A85C0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825A85C0);
     return;
   }
   ctx.r3.u64 = result;
 }
 
-void hooks::CoreAtol(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreAtol(lifted::Regs& ctx, uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_825AAF08 atol");
   ctx.r4.u64 = 0;
   ctx.r5.u64 = 10;
   CoreStrtol(ctx, base);
 }
 
-void hooks::CoreStrrchr(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreStrrchr(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Strrchr(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void hooks::CoreInitterm(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreInitterm(lifted::Regs& ctx, uint8_t* base) {
   cc::Initterm(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreSetAbortBehavior(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreSetAbortBehavior(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::SetAbortBehavior(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void hooks::CoreGetSigabrt(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreGetSigabrt(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::GetSigabrt(base);
 }
 
-void hooks::CoreCrtDebuggerHook(PPCContext&, uint8_t* base) { cc::CrtDebuggerHook(base); }
+void hooks::CoreCrtDebuggerHook(lifted::Regs&, uint8_t* base) { cc::CrtDebuggerHook(base); }
 
-void hooks::CoreValidateExecute(PPCContext& ctx, uint8_t*) {
+void hooks::CoreValidateExecute(lifted::Regs& ctx, uint8_t*) {
   ctx.r3.u64 = cc::ValidateExecute(ctx.r3.u32);
 }
 
-void hooks::CoreSetUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreSetUnhandledExceptionFilter(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::SetUnhandledExceptionFilter(base, ctx.r3.u32);
 }
 
-void hooks::CoreGetCommandLineA(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreGetCommandLineA(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::GetCommandLineA(base);
 }
 
-void hooks::CorePositive(PPCContext& ctx, uint8_t* base) {
+void hooks::CorePositive(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = cc::Positive(base, ctx.r3.u32);
 }
 
-void hooks::CoreNmsgWrite(PPCContext& ctx, uint8_t* base) { cc::NmsgWrite(base, ctx.r3.u32); }
+void hooks::CoreNmsgWrite(lifted::Regs& ctx, uint8_t* base) { cc::NmsgWrite(base, ctx.r3.u32); }
 
-void hooks::CoreGetbuf(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreGetbuf(lifted::Regs& ctx, uint8_t* base) {
   cc::Getbuf(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreFreebuf(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFreebuf(lifted::Regs& ctx, uint8_t* base) {
   cc::Freebuf(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreCloseHandle(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCloseHandle(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::CloseHandle(ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreResetEvent(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreResetEvent(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::ResetEvent(ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreInittermE(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreInittermE(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::InittermE(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreIoInit(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreIoInit(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.s64 = int32_t(cc::IoInit(base, CRuntimeCoreCalls(ctx, base)));
 }
 
-void hooks::CoreInitStdio(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreInitStdio(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::InitStdio(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreFfMsgBanner(PPCContext&, uint8_t* base) { cc::FfMsgBanner(base); }
+void hooks::CoreFfMsgBanner(lifted::Regs&, uint8_t* base) { cc::FfMsgBanner(base); }
 
-void hooks::CoreLockFile(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreLockFile(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::LockFile(base, ctx.r3.u32, true, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreUnlockFile(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreUnlockFile(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::LockFile(base, ctx.r3.u32, false, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreLockFile2(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreLockFile2(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::LockFile2(ctx.r3.u32, ctx.r4.u32, true, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreUnlockFile2(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreUnlockFile2(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::LockFile2(ctx.r3.u32, ctx.r4.u32, false, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreUnlockFhandle(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreUnlockFhandle(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::UnlockFhandle(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreBugCheckStub(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreBugCheckStub(lifted::Regs& ctx, uint8_t* base) {
   cc::BugCheckStub(CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreRaiseException(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreRaiseException(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::RaiseException(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                    CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreCxxThrowException(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCxxThrowException(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::CxxThrowException(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreInvalidParameter(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreInvalidParameter(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::InvalidParameter(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                     ctx.r7.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreThreadStartup(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreThreadStartup(lifted::Regs& ctx, uint8_t* base) {
   cc::ThreadStartup(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreAmsgExit(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreAmsgExit(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::AmsgExit(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreGetptd(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreGetptd(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Getptd(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreFptrap(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFptrap(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Fptrap(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreUnhandledExceptionFilter(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.s64 = int32_t(cc::UnhandledExceptionFilter(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base)));
 }
 
-void hooks::CoreDebugMonitorNotify(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreDebugMonitorNotify(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   cc::DebugMonitorNotify(base, ctx.r3.u32, ctx.f1.f64, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreCxxRestoreUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCxxRestoreUnhandledExceptionFilter(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::CxxRestoreUnhandledExceptionFilter(base);
 }
 
-void hooks::CoreInvokeWatson(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreInvokeWatson(lifted::Regs& ctx, uint8_t* base) {
   cc::InvokeWatson(base, uint32_t(ctx.lr), CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreLockFhandle(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreLockFhandle(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::LockFhandle(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
 // The __finally funclets: r12 the parent's frame end (r31 = its frame), and
 // the parent's registers they reload or keep, as the originals leave them.
-void hooks::CoreLockFhandleFinally(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreLockFhandleFinally(lifted::Regs& ctx, uint8_t* base) {
   cc::LockFhandleFinally(CRuntimeCoreCalls(ctx, base));
   ctx.r11.u64 = cc::kPioinfo;
   ctx.r3.u64 = guest::LoadU32(base, ctx.r31.u32 + 148);
   ctx.r29.u64 = guest::LoadU32(base, ctx.r31.u32 + 80);
 }
 
-void hooks::CoreFreeOsfhnd(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFreeOsfhnd(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.s64 = int32_t(cc::FreeOsfhnd(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base)));
 }
 
-void hooks::CoreGetOsfhandle(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreGetOsfhandle(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t handle = ctx.r3.u32;
   const uint32_t result = cc::GetOsfhandle(base, handle, CRuntimeCoreCalls(ctx, base));
   // The OS handle as loaded (lwz, zero-extended); -1 as `li` (sign-extended).
@@ -468,7 +469,7 @@ void hooks::CoreGetOsfhandle(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = loaded ? uint64_t(result) : uint64_t(int64_t(int32_t(result)));
 }
 
-void hooks::CoreRaiseFinally(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreRaiseFinally(lifted::Regs& ctx, uint8_t* base) {
   bool called = false;
   const uint64_t r3 = cc::RaiseFinally(ctx.r28.u32, &called, CRuntimeCoreCalls(ctx, base));
   if (called) {
@@ -476,11 +477,11 @@ void hooks::CoreRaiseFinally(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void hooks::CoreUnlockStreamsFinally(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreUnlockStreamsFinally(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::UnlockStreamsFinally(CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreFlsallInnerFinally(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFlsallInnerFinally(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t index = ctx.r28.u32, piob_word = ctx.r29.u32;
   ctx.r4.u64 = guest::LoadU32(base, guest::LoadU32(base, piob_word) + 4 * index);
   ctx.r3.u64 = cc::FlsallInnerFinally(base, index, piob_word, CRuntimeCoreCalls(ctx, base));
@@ -489,47 +490,47 @@ void hooks::CoreFlsallInnerFinally(PPCContext& ctx, uint8_t* base) {
   ctx.r27.u64 = guest::LoadU32(base, ctx.r12.u32 + 20);
 }
 
-void hooks::CoreExp(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreExp(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = cc::Exp(base, ctx.r1.u32, ctx.f1.f64);
 }
 
-void hooks::CoreForcdecpt(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreForcdecpt(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.s64 = int32_t(cc::Forcdecpt(base, ctx.r3.u32));
 }
 
-void hooks::CoreCropzeros(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCropzeros(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Cropzeros(base, ctx.r3.u32);
 }
 
-void hooks::CoreAtodbl(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreAtodbl(lifted::Regs& ctx, uint8_t* base) {
   const auto r3 = cc::AtoNumber(base, ctx.r3.u32, ctx.r4.u32, true);
   if (!r3) {
-    __imp__sub_825B6098(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825B6098);
     return;
   }
   ctx.r3.u64 = *r3;
 }
 
-void hooks::CoreAtoflt(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreAtoflt(lifted::Regs& ctx, uint8_t* base) {
   const auto r3 = cc::AtoNumber(base, ctx.r3.u32, ctx.r4.u32, false);
   if (!r3) {
-    __imp__sub_825B6140(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825B6140);
     return;
   }
   ctx.r3.u64 = *r3;
 }
 
-void hooks::CoreFassign(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFassign(lifted::Regs& ctx, uint8_t* base) {
   const auto r3 = cc::Fassign(base, ctx.r3.s32 != 0, ctx.r4.u32, ctx.r5.u32);
   if (!r3) {
-    __imp__sub_825ADEB0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825ADEB0);
     return;
   }
   ctx.r3.u64 = *r3;
 }
 
-void hooks::CoreLd12ToFloat(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreLd12ToFloat(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t from = ctx.r3.u32;
   const c_runtime::LongDouble12 value{guest::LoadU16(base, from), guest::LoadU32(base, from + 2),
                                       guest::LoadU32(base, from + 6)};
@@ -539,25 +540,25 @@ void hooks::CoreLd12ToFloat(PPCContext& ctx, uint8_t* base) {
   ctx.r3.s64 = status;
 }
 
-void hooks::CoreFileno(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFileno(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Fileno(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
 // The __finally funclets over a file handle's lock: the handle in r30
 // (_close's, _write's) or r27 (_commit's).
-void hooks::CoreCloseFinally(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCloseFinally(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::UnlockFhandleFinally(base, ctx.r30.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreCommitFinally(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCommitFinally(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::UnlockFhandleFinally(base, ctx.r27.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreFcloseFinally(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFcloseFinally(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::UnlockFileFinally(base, ctx.r30.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreExitUnlockFinally(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreExitUnlockFinally(lifted::Regs& ctx, uint8_t* base) {
   bool called = false;
   const uint64_t r3 = cc::ExitUnlockFinally(ctx.r28.u32, &called, CRuntimeCoreCalls(ctx, base));
   if (called) {
@@ -565,184 +566,179 @@ void hooks::CoreExitUnlockFinally(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void hooks::CoreTerminate(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreTerminate(lifted::Regs& ctx, uint8_t* base) {
   cc::Terminate(base, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreCloseNolock(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCloseNolock(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.s64 = int32_t(cc::CloseNolock(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base)));
 }
 
-void hooks::CoreClose(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreClose(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Close(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreFlushFileBuffers(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFlushFileBuffers(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::FlushFileBuffers(ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreCommit(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCommit(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Commit(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreSetFilePointer(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreSetFilePointer(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::SetFilePointer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                   CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreLseekNolock(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreLseekNolock(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::LseekNolock(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreLseek(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreLseek(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Lseek(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreWriteFile(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreWriteFile(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::WriteFile(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                              CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreWriteNolock(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreWriteNolock(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::WriteNolock(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreWrite(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreWrite(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Write(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreFlush(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFlush(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Flush(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreCxxUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCxxUnhandledExceptionFilter(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::CxxUnhandledExceptionFilter(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreFcloseNolock(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFcloseNolock(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::FcloseNolock(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreFclose(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFclose(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Fclose(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreFcloseall(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFcloseall(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Fcloseall(base, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreFlsbuf(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFlsbuf(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Flsbuf(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreStbuf(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreStbuf(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Stbuf(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreFtbuf(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFtbuf(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Ftbuf(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreBsearch(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreBsearch(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Bsearch(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u32, ctx.r6.u64, ctx.r7.u32,
                            CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreCftoe2(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCftoe2(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Cftoe2(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, ctx.r6.u32, ctx.r7.u32,
                           int8_t(ctx.r8.u8), CRuntimeCoreCalls(ctx, base));
 }
 // _fassign, _forcdecpt and _cropzeros: the _l functions with no locale (r6
 // or r4 = 0), as the originals' tail calls.
-void hooks::CoreFassignNoLocale(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFassignNoLocale(lifted::Regs& ctx, uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_825ADF10 _fassign");
   ctx.r6.u64 = 0;
   CoreFassign(ctx, base);
 }
-void hooks::CoreForcdecptNoLocale(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreForcdecptNoLocale(lifted::Regs& ctx, uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_825ADF18 _forcdecpt");
   ctx.r4.u64 = 0;
   CoreForcdecpt(ctx, base);
 }
-void hooks::CoreCropzerosNoLocale(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCropzerosNoLocale(lifted::Regs& ctx, uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_825ADF20 _cropzeros");
   ctx.r4.u64 = 0;
   CoreCropzeros(ctx, base);
 }
-void hooks::CoreCxxSetUnhandledExceptionFilter(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCxxSetUnhandledExceptionFilter(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::CxxSetUnhandledExceptionFilter(base, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreFflushNolock(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFflushNolock(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::FflushNolock(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreFlsall(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFlsall(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Flsall(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreFflush(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFflush(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Fflush(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreFlushall(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFlushall(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Flushall(base, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreEndstdio(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreEndstdio(lifted::Regs& ctx, uint8_t* base) {
   cc::Endstdio(base, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreDoexit(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreDoexit(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Doexit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, CRuntimeCoreCalls(ctx, base));
 }
 // _exit and _cexit: doexit with (code, 1, 0) and (0, 0, 1), as the
 // originals' tail calls.
-void hooks::CoreExit(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreExit(lifted::Regs& ctx, uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_825AA378 _exit");
   ctx.r5.u64 = 0;
   ctx.r4.u64 = 1;
   CoreDoexit(ctx, base);
 }
-void hooks::CoreCexit(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCexit(lifted::Regs& ctx, uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_825AA388 _cexit");
   ctx.r5.u64 = 1;
   ctx.r4.u64 = 0;
   ctx.r3.u64 = 0;
   CoreDoexit(ctx, base);
 }
-void hooks::CoreRaise(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreRaise(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Raise(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreAbort(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreAbort(lifted::Regs& ctx, uint8_t* base) {
   cc::Abort(base, uint32_t(ctx.lr), CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CorePurecall(PPCContext& ctx, uint8_t* base) {
+void hooks::CorePurecall(lifted::Regs& ctx, uint8_t* base) {
   cc::Purecall(base, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreFwriteNolock(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFwriteNolock(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::FwriteNolock(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u64, ctx.r6.u32,
                                 CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreFputs(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreFputs(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Fputs(base, ctx.r3.u32, ctx.r4.u32, CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreThrow(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreThrow(lifted::Regs& ctx, uint8_t* base) {
   cc::Throw(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 // vsprintf: where the native version declines, the original (its
 // _vsprintf_l and _output_l the recompiled ones) runs.
-void hooks::CoreVsprintf(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreVsprintf(lifted::Regs& ctx, uint8_t* base) {
   const auto r3 = cc::Vsprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
                                CRuntimeCoreCalls(ctx, base));
   if (!r3) {
-    __imp__sub_825A71B0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825A71B0);
     return;
   }
   ctx.r3.u64 = *r3;
 }
-void hooks::CoreCftoe(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCftoe(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Cftoe(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32, ctx.r7.u32,
                          CRuntimeCoreCalls(ctx, base));
 }
-void hooks::CoreCftog(PPCContext& ctx, uint8_t* base) {
+void hooks::CoreCftog(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Cftog(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32, ctx.r7.u32,
                          ctx.r8.u32, CRuntimeCoreCalls(ctx, base));
 }
 #define ITC_C_RUNTIME_CORE(address, step)       \
-  extern "C" REX_FUNC(sub_##address) {          \
-    REX_FUNC_PROLOGUE();                        \
-    if (!ITC_FLAG(native_c_runtime_core)) {     \
-      __imp__sub_##address(ctx, base);          \
-      return;                                   \
-    }                                           \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_c_runtime_core)) { \
     hooks::step(ctx, base);                     \
   }
 

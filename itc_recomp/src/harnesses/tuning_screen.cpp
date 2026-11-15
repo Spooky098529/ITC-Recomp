@@ -301,32 +301,32 @@ void TuningScreen(Context& h) {
     return;
   }
   Group(h, w, "TuningScreen::CategoryItemCount", 24, kScreenOnly, __imp__sub_821CC6C0,
-        hooks::TuningCategoryItemCount, 0);
+        ITC_CONTEXT_FN(hooks::TuningCategoryItemCount), 0);
   Group(
       h, w, "TuningScreen::IsItemAvailable", 40,
       [](PPCContext& t, Random& r, const World&) { t.r4.u64 = SmallIndex(r, 12); },
-      __imp__sub_821CDB18, hooks::TuningIsItemAvailable, 0);
+      __imp__sub_821CDB18, ITC_CONTEXT_FN(hooks::TuningIsItemAvailable), 0);
   Group(
       h, w, "TuningScreen::WheelNumber", 30,
       [](PPCContext& t, Random& r, const World&) {
         t.r4.u64 = r.Below(5) == 0 ? r.Next() : r.Below(18);
         t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(40);
       },
-      __imp__sub_821CDED8, hooks::TuningWheelNumber, 0);
+      __imp__sub_821CDED8, ITC_CONTEXT_FN(hooks::TuningWheelNumber), 0);
   Group(h, w, "TuningScreen::GetPrice", 40, kScreenOnly, __imp__sub_821CD160,
-        hooks::TuningGetPrice, 0);
+        ITC_CONTEXT_FN(hooks::TuningGetPrice), 0);
   Group(h, w, "TuningScreen::GetCurrentChoice", 40, kScreenOnly, __imp__sub_821CD868,
-        hooks::TuningGetCurrentChoice, 0);
+        ITC_CONTEXT_FN(hooks::TuningGetCurrentChoice), 0);
   Group(
       h, w, "TuningScreen::GetChoiceFlag", 40,
       [](PPCContext& t, Random& r, const World&) { t.r4.u64 = SmallIndex(r, 10); },
-      __imp__sub_821CDC38, hooks::TuningGetChoiceFlag, 0);
+      __imp__sub_821CDC38, ITC_CONTEXT_FN(hooks::TuningGetChoiceFlag), 0);
 
   // The garage car: StoreToGarageCar's register saves (__savegprlr_25)
   // left out; its floats are stored with float instructions but compared
   // exactly (the products of ints, never NaN).
   Group(h, w, "TuningScreen::StoreToGarageCar", 40, kScreenOnly, __imp__sub_821DCC28,
-        hooks::TuningStoreToGarageCar, 64);
+        ITC_CONTEXT_FN(hooks::TuningStoreToGarageCar), 64);
   Group(
       h, w, "TuningScreen::EquipChoice", 40,
       [](PPCContext&, Random& r, const World& w) {
@@ -334,7 +334,7 @@ void TuningScreen(Context& h) {
         guest::StoreU32(w.base, w.screen() + ts::kState, r.Below(6) == 0 ? Around(r, 3, 12)
                                                                           : 5 + r.Below(4));
       },
-      __imp__sub_821DF448, hooks::TuningEquipChoice, 0);
+      __imp__sub_821DF448, ITC_CONTEXT_FN(hooks::TuningEquipChoice), 0);
 
   // AeroPartValue: the types 0 to 3 (r4 -1, the callers' type 0, reads a
   // word the original never writes as a pointer), the items 0 to 9, with
@@ -345,13 +345,13 @@ void TuningScreen(Context& h) {
         t.r4.u64 = SmallIndex(r, 3);
         t.r5.u64 = SmallIndex(r, 9);
       },
-      __imp__sub_821DE2D8, hooks::TuningAeroPartValue, 64);
+      __imp__sub_821DE2D8, ITC_CONTEXT_FN(hooks::TuningAeroPartValue), 64);
 
   // The part list's marks (__savegprlr_28's saves left out). ShowPartMarks:
   // a row node of the pool, a wheel, and the screen's front and rear wheel
   // numbers matching it half the time each.
   Group(h, w, "TuningScreen::HidePartMarks", 24, kScreenOnly, __imp__sub_821EE6D0,
-        hooks::TuningHidePartMarks, 40);
+        ITC_CONTEXT_FN(hooks::TuningHidePartMarks), 40);
   Group(
       h, w, "TuningScreen::ShowPartMarks", 40,
       [](PPCContext& t, Random& r, const World& w) {
@@ -366,7 +366,7 @@ void TuningScreen(Context& h) {
           }
         }
       },
-      __imp__sub_821EE760, hooks::TuningShowPartMarks, 40);
+      __imp__sub_821EE760, ITC_CONTEXT_FN(hooks::TuningShowPartMarks), 40);
 
   // Movie 2's node setters (savegprlr_29's, r31 and lr's, savegprlr_22's
   // saves left out). The states and categories they test, the tire's and
@@ -391,9 +391,9 @@ void TuningScreen(Context& h) {
         t.r5.u64 = r.Below(4);
         guest::StoreU8(w.base, w.screen() + ts::kType, uint8_t(r.Below(6)));
       },
-      __imp__sub_821DA3F8, hooks::TuningShowInteriorPicture, 32);
+      __imp__sub_821DA3F8, ITC_CONTEXT_FN(hooks::TuningShowInteriorPicture), 32);
   Group(h, w, "TuningScreen::HideTireMarks", 15, kScreenOnly, __imp__sub_821DFB20,
-        hooks::TuningHideTireMarks, 32);
+        ITC_CONTEXT_FN(hooks::TuningHideTireMarks), 32);
   Group(
       h, w, "TuningScreen::HideNode19", 25,
       [](PPCContext&, Random& r, const World& w) {
@@ -409,10 +409,10 @@ void TuningScreen(Context& h) {
         guest::StoreU32(w.base, s + 33548, r.Below(2));
         guest::StoreU32(w.base, s + 33564, 3 + r.Below(3));
       },
-      __imp__sub_821DFBE8, hooks::TuningHideNode19, 16);
+      __imp__sub_821DFBE8, ITC_CONTEXT_FN(hooks::TuningHideNode19), 16);
   // ShowTireMarks: HideTireMarks' saves (its frame 128 bytes below) out too.
   Group(h, w, "TuningScreen::ShowTireMarks", 25, tire, __imp__sub_821E22E8,
-        hooks::TuningShowTireMarks, 88, {{176, 176 + 32}});
+        ITC_CONTEXT_FN(hooks::TuningShowTireMarks), 88, {{176, 176 + 32}});
 
   // The lists on movies 2 and 13 (savegprlr_23's, r30, r31 and lr's,
   // savegprlr_29's, savegprlr_26's with f29 to f31, savegprlr_27's saves
@@ -428,7 +428,7 @@ void TuningScreen(Context& h) {
         guest::StoreU32(w.base, s + 25224, uint32_t(n));
         guest::StoreU32(w.base, s + 25220, n >= 0 ? r.Below(uint32_t(n) + 1) : 3 + r.Below(5));
       },
-      __imp__sub_821EE9B0, hooks::TuningUpdateListDots, 80);
+      __imp__sub_821EE9B0, ITC_CONTEXT_FN(hooks::TuningUpdateListDots), 80);
   // The sets 0 and 1 mostly, the marks' modes -1 to 3, the option 0 to 2.
   auto option_set = [](Random& r, const World& w) {
     const uint32_t s = w.screen();
@@ -442,7 +442,7 @@ void TuningScreen(Context& h) {
         t.r4.u64 = r.Below(3) == 0 ? (r.Below(2) == 0 ? 0 : r.Next() << 32) : r.Next() | 1;
         option_set(r, w);
       },
-      __imp__sub_82202F30, hooks::TuningShowOptionMarks, 24);
+      __imp__sub_82202F30, ITC_CONTEXT_FN(hooks::TuningShowOptionMarks), 24);
   Group(
       h, w, "TuningScreen::PlaceStateNodes", 20,
       [](PPCContext&, Random& r, const World& w) {
@@ -450,7 +450,7 @@ void TuningScreen(Context& h) {
         guest::StoreU32(w.base, s + ts::kState, r.Below(5) == 0 ? Around(r, 26, 34) : 29 + r.Below(3));
         guest::StoreU32(w.base, s + 30724, r.Below(8));
       },
-      __imp__sub_82202C08, hooks::TuningPlaceStateNodes, 32);
+      __imp__sub_82202C08, ITC_CONTEXT_FN(hooks::TuningPlaceStateNodes), 32);
   // LayOutItems: the records' +8 (copied with lfs and stfs) as ordinary
   // floats and infinities, never signaling NaNs; the rest random.
   Group(
@@ -474,7 +474,7 @@ void TuningScreen(Context& h) {
           }
         }
       },
-      __imp__sub_82203110, hooks::TuningLayOutItems, 80);
+      __imp__sub_82203110, ITC_CONTEXT_FN(hooks::TuningLayOutItems), 80);
   Group(
       h, w, "TuningScreen::ShowItems", 20,
       [option_set](PPCContext& t, Random& r, const World& w) {
@@ -485,7 +485,7 @@ void TuningScreen(Context& h) {
                           r.Below(2) == 0 ? 0xFFFFFFFFu : Around(r, -2, 3));
         }
       },
-      __imp__sub_82203B00, hooks::TuningShowItems, 48);
+      __imp__sub_82203B00, ITC_CONTEXT_FN(hooks::TuningShowItems), 48);
 
   // The debug state handlers: `saves` is each original's register saves
   // (__savegprlr_N's 8 x (32 - N) + 8 bytes, or its inline stores).
@@ -496,30 +496,30 @@ void TuningScreen(Context& h) {
     uint32_t saves;
   };
   const Handler handlers[] = {
-      {"TuningScreen::DebugMainMenu", __imp__sub_821CBE08, hooks::TuningDebugMainMenu, 32},
-      {"TuningScreen::DebugLevelSelect", __imp__sub_821CBEE8, hooks::TuningDebugLevelSelect, 40},
-      {"TuningScreen::DebugTypeSelect", __imp__sub_821CBFC0, hooks::TuningDebugTypeSelect, 40},
-      {"TuningScreen::DebugOptionSelect", __imp__sub_821CC248, hooks::TuningDebugOptionSelect,
+      {"TuningScreen::DebugMainMenu", __imp__sub_821CBE08, ITC_CONTEXT_FN(hooks::TuningDebugMainMenu), 32},
+      {"TuningScreen::DebugLevelSelect", __imp__sub_821CBEE8, ITC_CONTEXT_FN(hooks::TuningDebugLevelSelect), 40},
+      {"TuningScreen::DebugTypeSelect", __imp__sub_821CBFC0, ITC_CONTEXT_FN(hooks::TuningDebugTypeSelect), 40},
+      {"TuningScreen::DebugOptionSelect", __imp__sub_821CC248, ITC_CONTEXT_FN(hooks::TuningDebugOptionSelect),
        16},
-      {"TuningScreen::DebugConfirmBuy", __imp__sub_821CC3A8, hooks::TuningDebugConfirmBuy, 8},
-      {"TuningScreen::DebugConfirmEquip", __imp__sub_821CC488, hooks::TuningDebugConfirmEquip,
+      {"TuningScreen::DebugConfirmBuy", __imp__sub_821CC3A8, ITC_CONTEXT_FN(hooks::TuningDebugConfirmBuy), 8},
+      {"TuningScreen::DebugConfirmEquip", __imp__sub_821CC488, ITC_CONTEXT_FN(hooks::TuningDebugConfirmEquip),
        8},
-      {"TuningScreen::DebugCategoryMenu", __imp__sub_821CFCE8, hooks::TuningDebugCategoryMenu,
+      {"TuningScreen::DebugCategoryMenu", __imp__sub_821CFCE8, ITC_CONTEXT_FN(hooks::TuningDebugCategoryMenu),
        152},
       {"TuningScreen::DebugWheelPartSelect", __imp__sub_821E8068,
-       hooks::TuningDebugWheelPartSelect, 40},
+       ITC_CONTEXT_FN(hooks::TuningDebugWheelPartSelect), 40},
       {"TuningScreen::DebugWheelKindSelect", __imp__sub_821E8128,
-       hooks::TuningDebugWheelKindSelect, 104},
+       ITC_CONTEXT_FN(hooks::TuningDebugWheelKindSelect), 104},
       {"TuningScreen::DebugWheelInchSelect", __imp__sub_821E8298,
-       hooks::TuningDebugWheelInchSelect, 32},
-      {"TuningScreen::DebugDecalTopMenu", __imp__sub_821FD710, hooks::TuningDebugDecalTopMenu,
+       ITC_CONTEXT_FN(hooks::TuningDebugWheelInchSelect), 32},
+      {"TuningScreen::DebugDecalTopMenu", __imp__sub_821FD710, ITC_CONTEXT_FN(hooks::TuningDebugDecalTopMenu),
        32},
-      {"TuningScreen::DebugLayerSelect", __imp__sub_821FD880, hooks::TuningDebugLayerSelect, 56},
-      {"TuningScreen::DebugLayerEdit", __imp__sub_821FDCB8, hooks::TuningDebugLayerEdit, 48},
-      {"TuningScreen::DebugLayerSet", __imp__sub_821FE080, hooks::TuningDebugLayerSet, 24},
-      {"TuningScreen::DebugEditPosition", __imp__sub_821FE100, hooks::TuningDebugEditPosition, 0},
-      {"TuningScreen::DebugEditView", __imp__sub_821FE178, hooks::TuningDebugEditView, 0},
-      {"TuningScreen::DebugPaintConfirm", __imp__sub_821FE190, hooks::TuningDebugPaintConfirm,
+      {"TuningScreen::DebugLayerSelect", __imp__sub_821FD880, ITC_CONTEXT_FN(hooks::TuningDebugLayerSelect), 56},
+      {"TuningScreen::DebugLayerEdit", __imp__sub_821FDCB8, ITC_CONTEXT_FN(hooks::TuningDebugLayerEdit), 48},
+      {"TuningScreen::DebugLayerSet", __imp__sub_821FE080, ITC_CONTEXT_FN(hooks::TuningDebugLayerSet), 24},
+      {"TuningScreen::DebugEditPosition", __imp__sub_821FE100, ITC_CONTEXT_FN(hooks::TuningDebugEditPosition), 0},
+      {"TuningScreen::DebugEditView", __imp__sub_821FE178, ITC_CONTEXT_FN(hooks::TuningDebugEditView), 0},
+      {"TuningScreen::DebugPaintConfirm", __imp__sub_821FE190, ITC_CONTEXT_FN(hooks::TuningDebugPaintConfirm),
        32},
   };
   for (const Handler& handler : handlers) {
@@ -547,30 +547,30 @@ void TuningScreen(Context& h) {
         guest::StoreU8(w.base, w.screen() + ts::kItem,
                        pick == 2 ? kItems[r.Below(3)] : kItems[k]);
       },
-      __imp__sub_821CC078, hooks::TuningDebugColorSelect, 16);
+      __imp__sub_821CC078, ITC_CONTEXT_FN(hooks::TuningDebugColorSelect), 16);
   const Handler unseen[] = {
-      {"TuningScreen::DebugWarnMoney", __imp__sub_821CC430, hooks::TuningDebugWarnMoney, 8},
-      {"TuningScreen::DebugReflectSet", __imp__sub_821CC510, hooks::TuningDebugReflectSet, 8},
-      {"TuningScreen::DebugAnnulSet", __imp__sub_821CC598, hooks::TuningDebugAnnulSet, 8},
-      {"TuningScreen::DebugRemoveConfirm", __imp__sub_821CC620, hooks::TuningDebugRemoveConfirm, 32},
-      {"TuningScreen::DebugBodyColor", __imp__sub_821E8358, hooks::TuningDebugBodyColor, 24},
-      {"TuningScreen::DebugNeonPart", __imp__sub_821E8440, hooks::TuningDebugNeonPart, 32},
-      {"TuningScreen::DebugNeonKind", __imp__sub_821E84F8, hooks::TuningDebugNeonKind, 32},
-      {"TuningScreen::DebugNeonEdit", __imp__sub_821E85A0, hooks::TuningDebugNeonEdit, 24},
-      {"TuningScreen::DebugLedEdit", __imp__sub_821E8688, hooks::TuningDebugLedEdit, 24},
-      {"TuningScreen::DebugCockpitTop", __imp__sub_821E8758, hooks::TuningDebugCockpitTop, 32},
-      {"TuningScreen::DebugCockpitType", __imp__sub_821E8800, hooks::TuningDebugCockpitType, 32},
-      {"TuningScreen::DebugCockpitColor", __imp__sub_821E88C0, hooks::TuningDebugCockpitColor, 32},
-      {"TuningScreen::DebugMeterKind", __imp__sub_821E8998, hooks::TuningDebugMeterKind, 32},
-      {"TuningScreen::DebugMeterPoint", __imp__sub_821E8A88, hooks::TuningDebugMeterPoint, 40},
-      {"TuningScreen::DebugLayerOperate", __imp__sub_821FDA80, hooks::TuningDebugLayerOperate, 48},
-      {"TuningScreen::DebugLayerOrder", __imp__sub_821FDF10, hooks::TuningDebugLayerOrder, 40},
-      {"TuningScreen::DebugEditRotate", __imp__sub_821FE118, hooks::TuningDebugEditRotate, 0},
-      {"TuningScreen::DebugEditScale", __imp__sub_821FE130, hooks::TuningDebugEditScale, 0},
-      {"TuningScreen::DebugEditColor", __imp__sub_821FE148, hooks::TuningDebugEditColor, 0},
-      {"TuningScreen::DebugEditFlip", __imp__sub_821FE160, hooks::TuningDebugEditFlip, 0},
-      {"TuningScreen::DebugPaintCancelConfirm", __imp__sub_821FE230, hooks::TuningDebugPaintCancelConfirm, 32},
-      {"TuningScreen::DebugPaintRemoveConfirm", __imp__sub_821FE2D0, hooks::TuningDebugPaintRemoveConfirm, 32},
+      {"TuningScreen::DebugWarnMoney", __imp__sub_821CC430, ITC_CONTEXT_FN(hooks::TuningDebugWarnMoney), 8},
+      {"TuningScreen::DebugReflectSet", __imp__sub_821CC510, ITC_CONTEXT_FN(hooks::TuningDebugReflectSet), 8},
+      {"TuningScreen::DebugAnnulSet", __imp__sub_821CC598, ITC_CONTEXT_FN(hooks::TuningDebugAnnulSet), 8},
+      {"TuningScreen::DebugRemoveConfirm", __imp__sub_821CC620, ITC_CONTEXT_FN(hooks::TuningDebugRemoveConfirm), 32},
+      {"TuningScreen::DebugBodyColor", __imp__sub_821E8358, ITC_CONTEXT_FN(hooks::TuningDebugBodyColor), 24},
+      {"TuningScreen::DebugNeonPart", __imp__sub_821E8440, ITC_CONTEXT_FN(hooks::TuningDebugNeonPart), 32},
+      {"TuningScreen::DebugNeonKind", __imp__sub_821E84F8, ITC_CONTEXT_FN(hooks::TuningDebugNeonKind), 32},
+      {"TuningScreen::DebugNeonEdit", __imp__sub_821E85A0, ITC_CONTEXT_FN(hooks::TuningDebugNeonEdit), 24},
+      {"TuningScreen::DebugLedEdit", __imp__sub_821E8688, ITC_CONTEXT_FN(hooks::TuningDebugLedEdit), 24},
+      {"TuningScreen::DebugCockpitTop", __imp__sub_821E8758, ITC_CONTEXT_FN(hooks::TuningDebugCockpitTop), 32},
+      {"TuningScreen::DebugCockpitType", __imp__sub_821E8800, ITC_CONTEXT_FN(hooks::TuningDebugCockpitType), 32},
+      {"TuningScreen::DebugCockpitColor", __imp__sub_821E88C0, ITC_CONTEXT_FN(hooks::TuningDebugCockpitColor), 32},
+      {"TuningScreen::DebugMeterKind", __imp__sub_821E8998, ITC_CONTEXT_FN(hooks::TuningDebugMeterKind), 32},
+      {"TuningScreen::DebugMeterPoint", __imp__sub_821E8A88, ITC_CONTEXT_FN(hooks::TuningDebugMeterPoint), 40},
+      {"TuningScreen::DebugLayerOperate", __imp__sub_821FDA80, ITC_CONTEXT_FN(hooks::TuningDebugLayerOperate), 48},
+      {"TuningScreen::DebugLayerOrder", __imp__sub_821FDF10, ITC_CONTEXT_FN(hooks::TuningDebugLayerOrder), 40},
+      {"TuningScreen::DebugEditRotate", __imp__sub_821FE118, ITC_CONTEXT_FN(hooks::TuningDebugEditRotate), 0},
+      {"TuningScreen::DebugEditScale", __imp__sub_821FE130, ITC_CONTEXT_FN(hooks::TuningDebugEditScale), 0},
+      {"TuningScreen::DebugEditColor", __imp__sub_821FE148, ITC_CONTEXT_FN(hooks::TuningDebugEditColor), 0},
+      {"TuningScreen::DebugEditFlip", __imp__sub_821FE160, ITC_CONTEXT_FN(hooks::TuningDebugEditFlip), 0},
+      {"TuningScreen::DebugPaintCancelConfirm", __imp__sub_821FE230, ITC_CONTEXT_FN(hooks::TuningDebugPaintCancelConfirm), 32},
+      {"TuningScreen::DebugPaintRemoveConfirm", __imp__sub_821FE2D0, ITC_CONTEXT_FN(hooks::TuningDebugPaintRemoveConfirm), 32},
   };
   for (const Handler& handler : unseen) {
     Group(h, w, handler.name, 20, kScreenOnly, handler.recompiled, handler.native,

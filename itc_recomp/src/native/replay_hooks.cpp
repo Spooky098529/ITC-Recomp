@@ -2,6 +2,7 @@
 // docs/gpu-functions.md), wrapped to pass each command on before it runs.
 
 #include "native/replay_hooks.h"
+#include "hooks/native_entry.h"
 
 #include "debug/replay_stats.h"
 #include "draw_packets.h"
@@ -50,7 +51,7 @@ ITC_FLAG_BOOL(native_resolve, true, "ITC",
 namespace rc = graphics::replay_commands;
 namespace inline_draws = graphics::inline_draws;
 
-rc::GuestCall native::ReplayCall(PPCContext& ctx, uint8_t* base) {
+rc::GuestCall native::ReplayCall(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t function, uint32_t sp, uint32_t return_address,
                       std::initializer_list<uint64_t> args, std::optional<double> f1) {
     const uint64_t stack = ctx.r1.u64;
@@ -79,8 +80,8 @@ rc::GuestCall native::ReplayCall(PPCContext& ctx, uint8_t* base) {
 // call, with payload (r3), arg1 (r4), arg2 (r5), sp (r1) and call (the
 // guest calls) in scope; it leaves r3.
 #define REPLAY_COUNTED_HANDLER(address, id, body)                                 \
-  extern "C" REX_FUNC(sub_##address) {                                              \
-    REX_FUNC_PROLOGUE();                                                            \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                              \
+    \
     uint32_t payload = ctx.r3.u32, arg1 = ctx.r4.u32, arg2 = ctx.r5.u32;           \
     debug::ReplayStats_OnCommand(base, id, payload, arg1, arg2);                    \
     native::Renderer_OnCommand(base, id, payload, arg1, arg2);                      \
@@ -121,7 +122,7 @@ struct PatchCopyContext {
 };
 void PatchCopy(void* context, uint32_t destination, uint32_t source, uint32_t size) {
   PatchCopyContext& c = *static_cast<PatchCopyContext*>(context);
-  PPCContext& ctx = *c.ctx;
+  lifted::Regs& ctx = *c.ctx;
   uint8_t* base = c.base;
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = stack - 592;
@@ -132,7 +133,7 @@ void PatchCopy(void* context, uint32_t destination, uint32_t source, uint32_t si
   lifted::CallFromContext(ctx, base, 0x825A7410);
   ctx.r1.u64 = stack;
 }
-void NativePatchVertexShader(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NativePatchVertexShader) {
   PatchCopyContext context{&ctx, base};
   const uint32_t shader = ctx.r3.u32, microcode = ctx.r4.u32, declaration = ctx.r5.u32,
                  streams = ctx.r6.u32, sp = ctx.r1.u32;
@@ -147,8 +148,8 @@ void NativePatchVertexShader(PPCContext& ctx, uint8_t* base) {
 // (+48) and the id it's patched for (+24) as they were. The GPU then runs
 // the copy, and keeps running it while the shader isn't loaded again. So
 // the copy, once patched, is kept here for the native renderer.
-extern "C" REX_FUNC(sub_822AE340) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822AE340) {
+  
   uint32_t object = ctx.r3.u32, microcode = ctx.r4.u32, declaration = ctx.r5.u32;
   bool copy = microcode != guest::LoadU32(base, object + 48);
   native::g_vertex_shader_patches++;
@@ -159,7 +160,7 @@ extern "C" REX_FUNC(sub_822AE340) {
     ctx.fpscr.disableFlushMode();
     NativePatchVertexShader(ctx, base);
   } else {
-    __imp__sub_822AE340(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822AE340);
   }
   if (copy) {
     native::LoadedVertexShader& loaded = native::g_loaded_vertex_shader;
@@ -195,8 +196,8 @@ void LogOutside(const char* what, uint32_t function, uint32_t caller, uint32_t c
 }
 }  // namespace
 
-extern "C" REX_FUNC(sub_825BD8F0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825BD8F0) {
+  
   uint32_t type = ctx.r4.u32, count = ctx.r5.u32, stride = ctx.r6.u32;
   uint32_t caller = uint32_t(ctx.lr);
   if (ITC_FLAG(native_inline_draws)) {
@@ -206,13 +207,13 @@ extern "C" REX_FUNC(sub_825BD8F0) {
               a.f[0]};
     });
   } else {
-    __imp__sub_825BD8F0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825BD8F0);
   }
   g_pending_inline = {ctx.r3.u32 != 0, type, count, stride, ctx.r3.u32, caller};
 }
 
-extern "C" REX_FUNC(sub_825BDDA0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825BDDA0) {
+  
   PendingInline draw = g_pending_inline;
   g_pending_inline.pending = false;
   if (draw.pending) {
@@ -228,7 +229,7 @@ extern "C" REX_FUNC(sub_825BDDA0) {
     inline_draws::EndVertices(base, ctx.r3.u32);  // r3 left as the device, as the original
     return;
   }
-  __imp__sub_825BDDA0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825BDDA0);
 }
 
 REPLAY_COUNTED_HANDLER(8258FBD0, 1, rc::SetRenderStates(base, payload, arg1, sp, call))
@@ -275,15 +276,15 @@ REPLAY_COUNTED_HANDLER(82590AD0, 35, rc::RestoreSavedSurfaces(base, arg1))
 // the renderer reads anyway. Its body is native with
 // --native_single_commands (src/graphics/single_commands.h; RunSingles'
 // plain C++ calls it directly, marked the same way: hooks::SingleCommands).
-extern "C" REX_FUNC(sub_8258F5C0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258F5C0) {
+  
   if (ITC_FLAG(native_single_commands)) {
     hooks::NativeSingleDrawerDraw(ctx, base);
     return;
   }
   uint32_t outer_command = native::g_current_command;
   native::g_current_command = 15;
-  __imp__sub_8258F5C0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8258F5C0);
   native::g_current_command = outer_command;
 }
 
@@ -291,14 +292,14 @@ extern "C" REX_FUNC(sub_8258F5C0) {
 // sub_8258D998(video output) resolves render target 0 into one of two front
 // buffer textures (video output + 4 * (68 + *(+268))) with the library's
 // Resolve, outside command 25; the native renderer shows that target.
-extern "C" REX_FUNC(sub_8258D998) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258D998) {
+  
   uint32_t video_output = ctx.r3.u32;
   uint32_t front_buffer =
       guest::LoadU32(base, video_output + 4 * (68 + guest::LoadU32(base, video_output + 268)));
   native::Renderer_FrontBufferResolve(base, guest::LoadU32(base, video_output + 140), front_buffer);
   if (!ITC_FLAG(native_replay_commands)) {
-    __imp__sub_8258D998(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8258D998);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -310,13 +311,13 @@ extern "C" REX_FUNC(sub_8258D998) {
 // commands that are known to make them (18, 17, 27, 25). DrawVertices and
 // BeginIndexedVertices (never seen in play; our renderer draws neither) run
 // natively with --native_inline_draws.
-extern "C" REX_FUNC(sub_825BE300) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825BE300) {
+  
   if (native::g_current_command != 17) {
     LogOutside("DrawVertices", 0x825BE300, uint32_t(ctx.lr), native::g_current_command);
   }
   if (!ITC_FLAG(native_inline_draws)) {
-    __imp__sub_825BE300(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825BE300);
     return;
   }
   // r3 left as the device (its callers don't read it).
@@ -326,13 +327,13 @@ extern "C" REX_FUNC(sub_825BE300) {
     return {a.r[0], a.f[0]};
   });
 }
-extern "C" REX_FUNC(sub_825BDDC0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825BDDC0) {
+  
   if (native::g_current_command != 27) {
     LogOutside("BeginIndexedVertices", 0x825BDDC0, uint32_t(ctx.lr), native::g_current_command);
   }
   if (!ITC_FLAG(native_inline_draws)) {
-    __imp__sub_825BDDC0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825BDDC0);
     return;
   }
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
@@ -346,8 +347,8 @@ extern "C" REX_FUNC(sub_825BDDC0) {
 
 // DrawIndexedVertices: in exclusive mode without its packets (see
 // draw_packets.cpp).
-extern "C" REX_FUNC(sub_825BE708) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825BE708) {
+  
   if (native::g_current_command != 18) {
     LogOutside("DrawIndexedVertices", 0x825BE708, uint32_t(ctx.lr), native::g_current_command);
   }
@@ -359,8 +360,8 @@ extern "C" REX_FUNC(sub_825BE708) {
 // color as 4 floats, f1 clear Z). Command 25's are handled from its items;
 // command 33 (EndTiling, see "Predicated tiling" in docs/gpu-functions.md)
 // makes one per tile (the tile count at device +12488), passed on here.
-extern "C" REX_FUNC(sub_822AFA58) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822AFA58) {
+  
   static uint32_t serial = 0, tile = 0;
   uint32_t command = native::g_current_command;
   if (command == 33) {
@@ -376,7 +377,7 @@ extern "C" REX_FUNC(sub_822AFA58) {
     LogOutside("Resolve", 0x822AFA58, uint32_t(ctx.lr), command);
   }
   if (!ITC_FLAG(native_resolve)) {
-    __imp__sub_822AFA58(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822AFA58);
     return;
   }
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {

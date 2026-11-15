@@ -298,10 +298,10 @@ std::vector<int64_t> Serials(Random& r) {
 void Files(Context& h, const Block& block) {
   const uint32_t file = block.address + 0x100;
   Cases(h, block, "AccessoryFile::AccessoryFile (sub_820F0C50)", 8,
-        Original<__imp__sub_820F0C50>, NativeFileConstruct,
+        Original<__imp__sub_820F0C50>, ITC_CONTEXT_FN(NativeFileConstruct),
         [&](PPCContext& t, Random&) { t.r3.u64 = file; });
   Cases(h, block, "AccessoryFile::SetData (sub_820F0BF0)", 16, Original<__imp__sub_820F0BF0>,
-        NativeAccessoryFileSetData, [&](PPCContext& t, Random& r) {
+        ITC_CONTEXT_FN(NativeAccessoryFileSetData), [&](PPCContext& t, Random& r) {
           t.r3.u64 = file;
           t.r4.u64 = r.Next();
           t.r5.u64 = r.Below(2) ? r.Below(2) : r.Next();
@@ -310,7 +310,7 @@ void Files(Context& h, const Block& block) {
   // recorder, with the serial (r3) an address in the block for it.
   Cases(
       h, block, "AccessoryFile::OnArchiveDone (sub_820F0C20)", 48,
-      Original<__imp__sub_820F0C20>, hooks::AccessoryFileOnArchiveDone,
+      Original<__imp__sub_820F0C20>, ITC_CONTEXT_FN(hooks::AccessoryFileOnArchiveDone),
       [&](PPCContext& t, Random& r) {
         const uint32_t serial = block.address + 0x400 + 4 * r.Below(64);
         guest::StoreU32(h.base, file + 8, r.Below(4) == 0 ? serial + 4 : serial);
@@ -335,7 +335,7 @@ void Files(Context& h, const Block& block) {
   const uint32_t word = block.address + 0x200;
   Cases(
       h, block, "AccessoryFile::FreeData (sub_820F08D0)", 16, Original<__imp__sub_820F08D0>,
-      NativeAccessoryFileFreeData,
+      ITC_CONTEXT_FN(NativeAccessoryFileFreeData),
       [&](PPCContext& t, Random& r) {
         guest::StoreU32(h.base, word, r.Below(4) == 0 ? 0 : memory::AllocPages(4096, 4096));
         t.r3.u64 = word;
@@ -363,7 +363,7 @@ void FileLoads(Context& h, const Block& block) {
       t.r7.u64 = r.Next();
       std::optional<ArchiveLoads> loads;
       loads.emplace(Serials(r));
-      (v == 0 ? Original<__imp__sub_820F0C90> : NativeAccessoryFileLoad)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820F0C90> : ITC_CONTEXT_FN(NativeAccessoryFileLoad))(t, h.base);
       std::vector<uint32_t> calls = loads->calls();
       const uint32_t data = guest::LoadU32(h.base, file + 16);
       for (size_t k = 1; k < calls.size(); k += 6) {
@@ -390,14 +390,14 @@ void FileLoads(Context& h, const Block& block) {
 void Sets(Context& h, const Block& block) {
   const uint32_t set = block.address + 0x100;
   Cases(h, block, "AccessoriesBase::AccessoriesBase (sub_820F07B8)", 8,
-        Original<__imp__sub_820F07B8>, NativeSetBaseConstruct,
+        Original<__imp__sub_820F07B8>, ITC_CONTEXT_FN(NativeSetBaseConstruct),
         [&](PPCContext& t, Random&) { t.r3.u64 = set; });
   Cases(h, block, "Accessories::Accessories (sub_820F0E60)", 8, Original<__imp__sub_820F0E60>,
-        NativeSetConstruct, [&](PPCContext& t, Random&) { t.r3.u64 = set; });
+        ITC_CONTEXT_FN(NativeSetConstruct), [&](PPCContext& t, Random&) { t.r3.u64 = set; });
   // Each entry none or one in the block; the scale any 16 bytes (overlapping
   // an entry's +1072 now and then).
   Cases(h, block, "Accessories::SetScale (sub_820F0F00)", 32, Original<__imp__sub_820F0F00>,
-        hooks::AccessoriesSetScale, [&](PPCContext& t, Random& r) {
+        ITC_CONTEXT_FN(hooks::AccessoriesSetScale), [&](PPCContext& t, Random& r) {
           for (uint32_t i = 0; i < 3; i++) {
             guest::StoreU32(h.base, set + 4 + 4 * i,
                             r.Below(4) == 0 ? 0 : block.address + 0x200 + 0x480 * i);
@@ -411,7 +411,7 @@ void Sets(Context& h, const Block& block) {
   }
   Cases(
       h, block, "Accessories::New (sub_820F0F48)", 4, Original<__imp__sub_820F0F48>,
-      NativeSetNew, [&](PPCContext&, Random&) {},
+      ITC_CONTEXT_FN(NativeSetNew), [&](PPCContext&, Random&) {},
       [&](const PPCContext& t, Outputs& out) {
         guest::StoreU32(h.base, block.address, t.r3.u32);
         TakePages(h.base, block.address, ac::kSetBytes, out);
@@ -421,7 +421,7 @@ void Sets(Context& h, const Block& block) {
   const uint32_t saved = guest::LoadU32(h.base, ac::kSet);
   Cases(
       h, block, "Accessories::Create (sub_820F1038)", 8, Original<__imp__sub_820F1038>,
-      hooks::AccessoriesCreate,
+      ITC_CONTEXT_FN(hooks::AccessoriesCreate),
       [&](PPCContext& t, Random& r) {
         guest::StoreU32(h.base, ac::kSet, r.Below(2) ? 0 : uint32_t(r.Next()) | 1);
         t.r3.u64 = r.Next();
@@ -440,7 +440,7 @@ void FileResets(Context& h, const Block& block) {
   uint32_t pages = 0;
   Cases(
       h, block, "AccessoryFile::Reset (sub_820F0D30)", 32, Original<__imp__sub_820F0D30>,
-      NativeAccessoryFileReset,
+      ITC_CONTEXT_FN(NativeAccessoryFileReset),
       [&](PPCContext& t, Random& r) {
         guest::StoreU32(h.base, file + 24, r.Below(4) == 0 ? 0 : 1);
         guest::StoreU32(h.base, file + 12, r.Below(4));
@@ -485,7 +485,7 @@ void SetFrees(Context& h, const Block& block) {
   };
   Cases(
       h, block, "Accessories::Free (sub_820F0F90)", 16, Original<__imp__sub_820F0F90>,
-      NativeSetFree,
+      ITC_CONTEXT_FN(NativeSetFree),
       [&](PPCContext& t, Random& r) {
         set = lay(r, slot);
         t.r3.u64 = slot;
@@ -494,7 +494,7 @@ void SetFrees(Context& h, const Block& block) {
   const uint32_t saved = guest::LoadU32(h.base, ac::kSet);
   Cases(
       h, block, "Accessories::Destroy (sub_820F1078)", 16, Original<__imp__sub_820F1078>,
-      hooks::AccessoriesDestroy,
+      ITC_CONTEXT_FN(hooks::AccessoriesDestroy),
       [&](PPCContext& t, Random& r) {
         set = lay(r, ac::kSet);
         t.r3.u64 = r.Next();
@@ -533,12 +533,12 @@ void Constructors(Context& h, const Block& block) {
   };
   Cases(
       h, block, "AccessorySkeleton::AccessorySkeleton (sub_820F03F0)", 8,
-      Original<__imp__sub_820F03F0>, NativeSkeletonConstruct,
+      Original<__imp__sub_820F03F0>, ITC_CONTEXT_FN(NativeSkeletonConstruct),
       [&](PPCContext& t, Random&) { t.r3.u64 = object; },
       [&](const PPCContext& t, Outputs& out) { frame_words(t, 0, out); });
   Cases(
       h, block, "Accessory::Accessory (sub_820EF258)", 8, Original<__imp__sub_820EF258>,
-      NativeAccessoryConstruct, [&](PPCContext& t, Random&) { t.r3.u64 = object; },
+      ITC_CONTEXT_FN(NativeAccessoryConstruct), [&](PPCContext& t, Random&) { t.r3.u64 = object; },
       [&](const PPCContext& t, Outputs& out) {
         frame_words(t, 96, out);
         TakeTextures(h.base, object, out);
@@ -548,7 +548,7 @@ void Constructors(Context& h, const Block& block) {
   }
   Cases(
       h, block, "AccessoryEntry::New (sub_820F0920)", 8, Original<__imp__sub_820F0920>,
-      NativeAccessoryEntryNew, [&](PPCContext&, Random&) {},
+      ITC_CONTEXT_FN(NativeAccessoryEntryNew), [&](PPCContext&, Random&) {},
       [&](const PPCContext& t, Outputs& out) {
         frame_words(t, 192, out);
         const uint32_t entry = t.r3.u32;
@@ -582,13 +582,13 @@ void Destructors(Context& h, const Block& block) {
   };
   const Kind kinds[] = {
       {"AccessoryEntry::Destroy (sub_820F0988)", Original<__imp__sub_820F0988>,
-       NativeAccessoryEntryDestroy, 0},
+       ITC_CONTEXT_FN(NativeAccessoryEntryDestroy), 0},
       {"Accessory::~Accessory (sub_820EF310)", Original<__imp__sub_820EF310>,
-       NativeAccessoryDestruct, 1},
+       ITC_CONTEXT_FN(NativeAccessoryDestruct), 1},
       {"AccessorySkeleton::~AccessorySkeleton (sub_820EFFD8)", Original<__imp__sub_820EFFD8>,
-       NativeAccessorySkeletonDestruct, 2},
+       ITC_CONTEXT_FN(NativeAccessorySkeletonDestruct), 2},
       {"AccessoryFile::~AccessoryFile (sub_820F0DB8)", Original<__imp__sub_820F0DB8>,
-       NativeAccessoryFileDestruct, 3},
+       ITC_CONTEXT_FN(NativeAccessoryFileDestruct), 3},
   };
   const uint32_t slot = block.address + 0x40;
   for (const Kind& kind : kinds) {
@@ -680,7 +680,7 @@ void ReleaseAlls(Context& h, const Block& block) {
         guest::StoreU32(h.base, set + 4 + 4 * i, entry);
       }
       t.r3.u64 = set;
-      (v == 0 ? Original<__imp__sub_820F0AD8> : hooks::AccessoriesReleaseAll)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820F0AD8> : ITC_CONTEXT_FN(hooks::AccessoriesReleaseAll))(t, h.base);
       out[v].Word(t.r3.u32 == set ? kMarker : t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       for (uint32_t i = 0; i < 3; i++) {
@@ -724,7 +724,7 @@ void Releases(Context& h, const Block& block) {
       }
       t.r3.u64 = set;
       t.r4.u64 = r.Below(4);
-      (v == 0 ? Original<__imp__sub_820F0A90> : hooks::AccessoriesRelease)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820F0A90> : ITC_CONTEXT_FN(hooks::AccessoriesRelease))(t, h.base);
       out[v].Word(t.r3.u32 == set ? kMarker : t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       for (uint32_t i = 0; i < 3; i++) {
@@ -796,7 +796,7 @@ void SkeletonSetUps(Context& h, const Block& block) {
   };
   Cases(
       h, block, "AccessorySkeleton::Reset (sub_820EFB30)", 24, Original<__imp__sub_820EFB30>,
-      NativeAccessorySkeletonReset,
+      ITC_CONTEXT_FN(NativeAccessorySkeletonReset),
       [&](PPCContext& t, Random& r) {
         ac::SkeletonConstruct(h.base, skeleton, t.r1.u32);
         const int32_t nodes = r.Below(6) == 0 ? -1 : int32_t(r.Below(5));
@@ -813,7 +813,7 @@ void SkeletonSetUps(Context& h, const Block& block) {
       [&](const PPCContext& t, Outputs& out) { frame_rows(t.r1.u32, out); });
   Cases(
       h, block, "AccessorySkeleton::SetUp (sub_820F0070)", 32, Original<__imp__sub_820F0070>,
-      NativeAccessorySkeletonSetUp,
+      ITC_CONTEXT_FN(NativeAccessorySkeletonSetUp),
       [&](PPCContext& t, Random& r) {
         ac::SkeletonConstruct(h.base, skeleton, t.r1.u32);
         const int32_t nodes = r.Below(8) == 0 ? -1 : int32_t(r.Below(5));
@@ -854,9 +854,9 @@ void SetDestructors(Context& h, const Block& block) {
   };
   const Kind kinds[] = {
       {"AccessoriesBase::~AccessoriesBase (sub_820F0B58)", Original<__imp__sub_820F0B58>,
-       NativeAccessoriesBaseDestruct, false},
+       ITC_CONTEXT_FN(NativeAccessoriesBaseDestruct), false},
       {"Accessories::~Accessories (sub_820F0FE0)", Original<__imp__sub_820F0FE0>,
-       hooks::AccessoriesDestruct, true},
+       ITC_CONTEXT_FN(hooks::AccessoriesDestruct), true},
   };
   for (const Kind& kind : kinds) {
     Results results(kind.name);
@@ -921,7 +921,7 @@ void SetTextures(Context& h) {
   const uint32_t accessory = block.address;
   Cases(
       h, block, "Accessory::SetTexture (sub_820EF568)", 64, Original<__imp__sub_820EF568>,
-      hooks::AccessorySetTexture, [&](PPCContext& t, Random& r) {
+      ITC_CONTEXT_FN(hooks::AccessorySetTexture), [&](PPCContext& t, Random& r) {
         guest::StoreU32(h.base, accessory + 1048, r.Below(5) == 0 ? 0 : 1);
         guest::StoreU32(h.base, accessory + 80, block.address + 0x500);
         guest::StoreU32(h.base, block.address + 0x500 + 12, kGet60);
@@ -978,7 +978,7 @@ void FromScaleRotationTranslations(Context& h, const Block& block) {
       t.r4.u64 = inputs;
       t.r5.u64 = inputs + 16;
       t.r6.u64 = inputs + 32;
-      (v == 0 ? Original<__imp__sub_820EF660> : hooks::MatrixFromScaleRotationTranslation)(
+      (v == 0 ? Original<__imp__sub_820EF660> : ITC_CONTEXT_FN(hooks::MatrixFromScaleRotationTranslation))(
           t, h.base);
       out[v].Floats(h.base, out_at, 16);
       const uint32_t frame = t.r1.u32 - 208;
@@ -1139,7 +1139,7 @@ void Finishes(Context& h, const Block& block) {
       t.r3.u64 = accessory;
       t.r4.u64 = r.Below(4) == 0 ? 0 : 1;
       const pending_frees::ListState was = pending_frees::SaveList(h.base);
-      (v == 0 ? Original<__imp__sub_820EF368> : hooks::AccessoryFinish)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820EF368> : ITC_CONTEXT_FN(hooks::AccessoryFinish))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       const bool reset = !set_up && guest::LoadU32(h.base, accessory + 544 + 260) != 0;
@@ -1204,7 +1204,7 @@ void OnLoadeds(Context& h, const Block& block) {
       t.r5.u64 = r.Next();
       t.r6.u64 = entry;
       const pending_frees::ListState was = pending_frees::SaveList(h.base);
-      (v == 0 ? Original<__imp__sub_820F0820> : hooks::AccessoryEntryOnLoaded)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820F0820> : ITC_CONTEXT_FN(hooks::AccessoryEntryOnLoaded))(t, h.base);
       out[v].Word(t.r3.u32 == accessory ? kMarker : t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       if (loaded) {
@@ -1252,9 +1252,9 @@ void Acquires(Context& h, const Block& block) {
   };
   const Kind kinds[] = {
       {"Accessories::AcquireEntry (sub_820F09E0)", Original<__imp__sub_820F09E0>,
-       NativeAccessoriesAcquireEntry},
+       ITC_CONTEXT_FN(NativeAccessoriesAcquireEntry)},
       {"Accessories::Acquire (sub_820F0EB8)", Original<__imp__sub_820F0EB8>,
-       hooks::AccessoriesAcquire},
+       ITC_CONTEXT_FN(hooks::AccessoriesAcquire)},
   };
   const uint32_t set = block.address + 0x40;
   const uint32_t vtable = block.address + 0x100, texture_set = block.address + 0x140;

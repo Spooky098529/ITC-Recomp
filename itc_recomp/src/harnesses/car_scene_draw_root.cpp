@@ -3,7 +3,7 @@
 // harness, with a random generator of its own (it runs last, so its cases
 // shift no other function's inputs). The recompiled side runs with
 // --native_car_scene_draw off (its callees the originals); the native side
-// the register step hooks::CarSceneDrawRoot.
+// the register step ITC_CONTEXT_FN(hooks::CarSceneDrawRoot).
 //
 // The world, in one allocation (the same addresses for both versions, filled
 // with the same bytes before each): the scene ([0x826C2E44]) with its state
@@ -482,7 +482,7 @@ void CarSceneDrawRoot(Context& h) {
         if (v == 0) {
           off.emplace();
         }
-        (v == 0 ? __imp__sub_820C5DE8 : hooks::CarSceneDrawRoot)(t, h.base);
+        (v == 0 ? __imp__sub_820C5DE8 : ITC_CONTEXT_FN(hooks::CarSceneDrawRoot))(t, h.base);
       }
       Collect(h.base, w, t, stack, out[v]);
       if (v == 1) {

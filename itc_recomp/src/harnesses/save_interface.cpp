@@ -306,7 +306,7 @@ void SaveBuffers(Context& h) {
         // Case 3: a header already there (nothing done).
         guest::StoreU32(h.base, si::kSaveBuffers, c == 3 ? h.data + kHeader : 0);
         ITC_FLAG(native_save_interface) = v == 1;
-        (v == 0 ? __imp__sub_8228F6B0 : hooks::SaveInterfaceBuffersCreate)(t, h.base);
+        (v == 0 ? __imp__sub_8228F6B0 : ITC_CONTEXT_FN(hooks::SaveInterfaceBuffersCreate))(t, h.base);
         ITC_FLAG(native_save_interface) = true;
         const uint32_t header = guest::LoadU32(h.base, si::kSaveBuffers);
         out[v].Word(t.r3.u32 == 0x12345678 ? 1 : 0);
@@ -360,9 +360,9 @@ void SaveBuffers(Context& h) {
         guest::StoreU32(h.base, si::kSaveBuffers, header);
         ITC_FLAG(native_save_interface) = v == 1;
         if (which == 0) {
-          (v == 0 ? __imp__sub_8228F7E8 : hooks::SaveInterfaceBuffersFreeReplayList)(t, h.base);
+          (v == 0 ? __imp__sub_8228F7E8 : ITC_CONTEXT_FN(hooks::SaveInterfaceBuffersFreeReplayList))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_8228F8F8 : hooks::SaveInterfaceBuffersDestroy)(t, h.base);
+          (v == 0 ? __imp__sub_8228F8F8 : ITC_CONTEXT_FN(hooks::SaveInterfaceBuffersDestroy))(t, h.base);
         }
         ITC_FLAG(native_save_interface) = true;
         const uint32_t global = guest::LoadU32(h.base, si::kSaveBuffers);
@@ -503,7 +503,7 @@ void SaveDevicesCases(Context& h, const Block& block) {
         t.lr = 0x820A6400;
         after = random;
         ITC_FLAG(native_save_interface) = v == 1;
-        (v == 0 ? __imp__sub_820A6160 : hooks::SaveDevicesConstructSteps)(t, h.base);
+        (v == 0 ? __imp__sub_820A6160 : ITC_CONTEXT_FN(hooks::SaveDevicesConstructSteps))(t, h.base);
         ITC_FLAG(native_save_interface) = true;
         const uint32_t slots = guest::LoadU32(h.base, devices + 44);
         out[v].Bytes(Read(h.base, devices, 44));
@@ -578,7 +578,7 @@ void SaveDevicesCases(Context& h, const Block& block) {
         t.lr = 0x82090B00;
         after = random;
         ITC_FLAG(native_save_interface) = v == 1;
-        (v == 0 ? __imp__sub_820A63C8 : hooks::SaveDevicesCreateSteps)(t, h.base);
+        (v == 0 ? __imp__sub_820A63C8 : ITC_CONTEXT_FN(hooks::SaveDevicesCreateSteps))(t, h.base);
         ITC_FLAG(native_save_interface) = true;
         const uint32_t object = t.r3.u32;
         out[v].Word(Live(object) ? 1 : 0);
@@ -645,7 +645,7 @@ void SaveDevicesCases(Context& h, const Block& block) {
         t.lr = 0x820A62F8;
         after = random;
         ITC_FLAG(native_save_interface) = v == 1;
-        (v == 0 ? __imp__sub_820A4560 : hooks::SaveSlotAllocBuffersSteps)(t, h.base);
+        (v == 0 ? __imp__sub_820A4560 : ITC_CONTEXT_FN(hooks::SaveSlotAllocBuffersSteps))(t, h.base);
         ITC_FLAG(native_save_interface) = true;
         const uint32_t records = guest::LoadU32(h.base, slot + 80);
         const uint32_t words = guest::LoadU32(h.base, slot + 84);
@@ -708,7 +708,7 @@ void SaveDevicesCases(Context& h, const Block& block) {
         t.lr = 0x820A572C;
         after = random;
         ITC_FLAG(native_save_interface) = v == 1;
-        (v == 0 ? __imp__sub_820A55F0 : hooks::SlotArrayResetSteps)(t, h.base);
+        (v == 0 ? __imp__sub_820A55F0 : ITC_CONTEXT_FN(hooks::SlotArrayResetSteps))(t, h.base);
         ITC_FLAG(native_save_interface) = true;
         out[v].Word(guest::LoadU32(h.base, holder));
         out[v].Word(t.r3.u32 - (slots != 0 ? slots : holder));
@@ -746,7 +746,7 @@ void SaveDevicesCases(Context& h, const Block& block) {
         t.lr = 0x820A6130;
         after = random;
         ITC_FLAG(native_save_interface) = v == 1;
-        (v == 0 ? __imp__sub_820A56E8 : hooks::SaveDevicesDestroySteps)(t, h.base);
+        (v == 0 ? __imp__sub_820A56E8 : ITC_CONTEXT_FN(hooks::SaveDevicesDestroySteps))(t, h.base);
         ITC_FLAG(native_save_interface) = true;
         out[v].Bytes(Read(h.base, devices, 116));
         out[v].Word(t.r3.u32 - (slots != 0 ? slots : devices));
@@ -794,7 +794,7 @@ void SaveDevicesCases(Context& h, const Block& block) {
         t.lr = 0x82090000;
         after = random;
         ITC_FLAG(native_save_interface) = v == 1;
-        (v == 0 ? __imp__sub_820A6110 : hooks::SaveDevicesDeleteSteps)(t, h.base);
+        (v == 0 ? __imp__sub_820A6110 : ITC_CONTEXT_FN(hooks::SaveDevicesDeleteSteps))(t, h.base);
         ITC_FLAG(native_save_interface) = true;
         const bool live = Live(*object);
         out[v].Word(live ? 1 : 0);
@@ -838,17 +838,17 @@ void SaveInterface(Context& h) {
 
   // The getters.
   Run(h, block, "App::SaveDevices (sub_820943B0)", __imp__sub_820943B0,
-      hooks::SaveInterfaceAppDevices, 8,
+      ITC_CONTEXT_FN(hooks::SaveInterfaceAppDevices), 8,
       [&](PPCContext& t, uint32_t b, uint32_t, Random& random) { t.r3.u64 = b + kInterface; }, false, true);
-  Run(h, block, "App::Users (sub_820943C8)", __imp__sub_820943C8, hooks::SaveInterfaceAppUsers,
+  Run(h, block, "App::Users (sub_820943C8)", __imp__sub_820943C8, ITC_CONTEXT_FN(hooks::SaveInterfaceAppUsers),
       8, [&](PPCContext& t, uint32_t b, uint32_t, Random& random) { t.r3.u64 = b + kInterface; }, false, true);
   Run(h, block, "word +92 (sub_82493700)", __imp__sub_82493700,
-      hooks::SaveInterfaceFrameworkUsers, 4,
+      ITC_CONTEXT_FN(hooks::SaveInterfaceFrameworkUsers), 4,
       [&](PPCContext& t, uint32_t b, uint32_t, Random& random) { t.r3.u64 = b + 4 * random.Below(64); });
-  Run(h, block, "word +216 (sub_82490B08)", __imp__sub_82490B08, hooks::SaveInterfaceUsersCount,
+  Run(h, block, "word +216 (sub_82490B08)", __imp__sub_82490B08, ITC_CONTEXT_FN(hooks::SaveInterfaceUsersCount),
       4, [&](PPCContext& t, uint32_t b, uint32_t, Random& random) { t.r3.u64 = b + 4 * random.Below(64); });
   Run(h, block, "Users::SignedIn (sub_820996D8)", __imp__sub_820996D8,
-      hooks::SaveInterfaceUsersSignedIn, 24, [&](PPCContext& t, uint32_t b, uint32_t, Random& random) {
+      ITC_CONTEXT_FN(hooks::SaveInterfaceUsersSignedIn), 24, [&](PPCContext& t, uint32_t b, uint32_t, Random& random) {
         t.r3.u64 = b + kUsers;
         t.r4.u64 = random.Below(7);
       });
@@ -860,15 +860,15 @@ void SaveInterface(Context& h) {
     t.r5.u64 = random.Next();
   };
   Run(h, block, "SaveSlot::RequestDevice (sub_820A5750)", __imp__sub_820A5750,
-      hooks::SaveInterfaceSlotRequestDevice, 6, slot_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSlotRequestDevice), 6, slot_args);
   Run(h, block, "SaveSlot::Device (sub_820A5768)", __imp__sub_820A5768,
-      hooks::SaveInterfaceSlotDevice, 6, slot_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSlotDevice), 6, slot_args);
   Run(h, block, "SaveSlot::FreeBytes (sub_820A5780)", __imp__sub_820A5780,
-      hooks::SaveInterfaceSlotFreeBytes, 6, slot_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSlotFreeBytes), 6, slot_args);
   Run(h, block, "SaveSlot::SaveCount (sub_820A5798)", __imp__sub_820A5798,
-      hooks::SaveInterfaceSlotSaveCount, 6, slot_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSlotSaveCount), 6, slot_args);
   Run(h, block, "SaveSlot::SaveAt (sub_820A57B0)", __imp__sub_820A57B0,
-      hooks::SaveInterfaceSlotSaveAt, 12, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSlotSaveAt), 12, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
         t.r3.u64 = b + kDevices;
         t.r4.u64 = Slot(random);
         // Small indices, and whole random registers (the original adds in 64
@@ -876,9 +876,9 @@ void SaveInterface(Context& h) {
         t.r5.u64 = c % 2 == 0 ? random.Below(20) : random.Next();
       });
   Run(h, block, "SaveSlot::State (sub_820A57F0)", __imp__sub_820A57F0,
-      hooks::SaveInterfaceSlotState, 6, slot_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSlotState), 6, slot_args);
   Run(h, block, "SaveSlot::Pending (sub_820A5808)", __imp__sub_820A5808,
-      hooks::SaveInterfaceSlotPending, 8, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSlotPending), 8, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
         t.r3.u64 = b + kDevices;
         t.r4.u64 = Slot(random);
         if (c % 2 == 1) {  // big request words: the sum's carry past 32 bits
@@ -889,7 +889,7 @@ void SaveInterface(Context& h) {
         }
       });
   Run(h, block, "SaveDevices::SetRootName (sub_820A5580)", __imp__sub_820A5580,
-      hooks::SaveInterfaceSetRootName, 6,
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSetRootName), 6,
       [&](PPCContext& t, uint32_t b, uint32_t, Random& random) {
         t.r3.u64 = b + kDevices;
         t.r4.u64 = data + kFileName;
@@ -907,7 +907,7 @@ void SaveInterface(Context& h) {
     (void)b;
   };
   Run(h, block, "SaveSlot::RequestSave (sub_820A52E0)", __imp__sub_820A52E0,
-      hooks::SaveInterfaceSlotRequestSave, 12,
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSlotRequestSave), 12,
       [&](PPCContext& t, uint32_t b, uint32_t, Random& random) {
         t.r3.u64 = b + kDevices;
         t.r4.u64 = Slot(random);
@@ -916,7 +916,7 @@ void SaveInterface(Context& h) {
       },
       true);
   Run(h, block, "SaveSlot::RequestLoad (sub_820A53E8)", __imp__sub_820A53E8,
-      hooks::SaveInterfaceSlotRequestLoad, 12,
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSlotRequestLoad), 12,
       [&](PPCContext& t, uint32_t b, uint32_t, Random& random) {
         t.r3.u64 = b + kDevices;
         t.r4.u64 = Slot(random);
@@ -926,14 +926,14 @@ void SaveInterface(Context& h) {
 
   // The display name's copy and the content's size.
   Run(h, block, "the display name's copy (sub_82295D48)", __imp__sub_82295D48,
-      hooks::SaveInterfaceCopyDisplayName, 6,
+      ITC_CONTEXT_FN(hooks::SaveInterfaceCopyDisplayName), 6,
       [&](PPCContext& t, uint32_t b, uint32_t, Random& random) {
         t.r3.u64 = b + kSlots + 504 + 2 * random.Below(4);
         t.r4.u64 = data + kDisplayName;
       },
       true);
   Run(h, block, "XContentCalculateSize (sub_82295C18)", __imp__sub_82295C18,
-      hooks::SaveInterfaceContentSize, 24, [&](PPCContext& t, uint32_t, uint32_t c, Random& random) {
+      ITC_CONTEXT_FN(hooks::SaveInterfaceContentSize), 24, [&](PPCContext& t, uint32_t, uint32_t c, Random& random) {
         static constexpr uint32_t kBytes[] = {1231088, 129400, 0, 1, 4096, 0xFFFFFFFF};
         if (c < 6) {
           t.r3.u64 = kBytes[c];
@@ -946,61 +946,61 @@ void SaveInterface(Context& h) {
 
   // The interface's wrappers.
   Run(h, block, "SaveInterface::Init (sub_8209FFB8)", __imp__sub_8209FFB8,
-      hooks::SaveInterfaceInit, 4,
+      ITC_CONTEXT_FN(hooks::SaveInterfaceInit), 4,
       [&](PPCContext& t, uint32_t b, uint32_t, Random& random) { t.r3.u64 = b + kInterface; });
   const auto wrapper_args = [&](PPCContext& t, uint32_t, uint32_t, Random& random) {
     t.r3.u64 = Slot(random);
     t.r4.u64 = random.Below(20);
   };
   Run(h, block, "SaveInterface::SlotState (sub_820A0018)", __imp__sub_820A0018,
-      hooks::SaveInterfaceSlotStateOf, 16, wrapper_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSlotStateOf), 16, wrapper_args);
   Run(h, block, "SaveInterface::RequestDevice (sub_820A0208)", __imp__sub_820A0208,
-      hooks::SaveInterfaceRequestDevice, 8, wrapper_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfaceRequestDevice), 8, wrapper_args);
   Run(h, block, "SaveInterface::SaveCount (sub_820A02C8)", __imp__sub_820A02C8,
-      hooks::SaveInterfaceSaveCount, 8, wrapper_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSaveCount), 8, wrapper_args);
   Run(h, block, "SaveInterface::FreeBytes (sub_820A0320)", __imp__sub_820A0320,
-      hooks::SaveInterfaceFreeBytes, 8, wrapper_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfaceFreeBytes), 8, wrapper_args);
   Run(h, block, "SaveInterface::Pending (sub_820A0378)", __imp__sub_820A0378,
-      hooks::SaveInterfacePending, 8, wrapper_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfacePending), 8, wrapper_args);
   Run(h, block, "SaveInterface::Device (sub_820A03D0)", __imp__sub_820A03D0,
-      hooks::SaveInterfaceDevice, 8, wrapper_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfaceDevice), 8, wrapper_args);
   Run(h, block, "SaveInterface::SaveAt (sub_820A0428)", __imp__sub_820A0428,
-      hooks::SaveInterfaceSaveAt, 8, wrapper_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSaveAt), 8, wrapper_args);
   Run(h, block, "SaveInterface::Save (sub_820A0490)", __imp__sub_820A0490,
-      hooks::SaveInterfaceSave, 12,
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSave), 12,
       [&](PPCContext& t, uint32_t b, uint32_t, Random& random) {
         t.r3.u64 = Slot(random);
         request(t, b, 4, random);
       },
       true);
   Run(h, block, "SaveInterface::Load (sub_820A0510)", __imp__sub_820A0510,
-      hooks::SaveInterfaceLoad, 12,
+      ITC_CONTEXT_FN(hooks::SaveInterfaceLoad), 12,
       [&](PPCContext& t, uint32_t b, uint32_t, Random& random) {
         t.r3.u64 = Slot(random);
         request(t, b, 4, random);
       },
       true);
   Run(h, block, "SaveInterface::UserCount (sub_820A05D8)", __imp__sub_820A05D8,
-      hooks::SaveInterfaceUserCount, 8, wrapper_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfaceUserCount), 8, wrapper_args);
   Run(h, block, "SaveInterface::UserAt (sub_820A0620)", __imp__sub_820A0620,
-      hooks::SaveInterfaceUserAt, 16,
+      ITC_CONTEXT_FN(hooks::SaveInterfaceUserAt), 16,
       [&](PPCContext& t, uint32_t, uint32_t, Random& random) { t.r3.u64 = random.Below(7); });
 
   // The front end's save layer.
   Run(h, block, "SaveSlots::OfController (sub_8228F780)", __imp__sub_8228F780,
-      hooks::SaveInterfaceSlotOfController, 24,
+      ITC_CONTEXT_FN(hooks::SaveInterfaceSlotOfController), 24,
       [&](PPCContext& t, uint32_t, uint32_t, Random& random) { t.r3.u64 = random.Below(6); });
   const auto player_args = [&](PPCContext& t, uint32_t, uint32_t, Random& random) {
     t.r3.u64 = PlayerAt(h.base, data + 0x400 + 4 * random.Below(16), random);
   };
   Run(h, block, "SaveSlots::RequestDevice (sub_8228F9B0)", __imp__sub_8228F9B0,
-      hooks::SaveInterfacePlayerRequestDevice, 16, player_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfacePlayerRequestDevice), 16, player_args);
   Run(h, block, "SaveSlots::State (sub_8228F9E8)", __imp__sub_8228F9E8,
-      hooks::SaveInterfacePlayerSlotState, 16, player_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfacePlayerSlotState), 16, player_args);
   Run(h, block, "SaveSlots::Device (sub_8228FA90)", __imp__sub_8228FA90,
-      hooks::SaveInterfacePlayerDevice, 16, player_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfacePlayerDevice), 16, player_args);
   Run(h, block, "SaveSlots::Pending (sub_8228FAC8)", __imp__sub_8228FAC8,
-      hooks::SaveInterfacePlayerPending, 16, player_args);
+      ITC_CONTEXT_FN(hooks::SaveInterfacePlayerPending), 16, player_args);
   SaveBuffers(h);
   {
     CaseSetup sort;
@@ -1009,7 +1009,7 @@ void SaveInterface(Context& h) {
     sort.stack_bytes = 36;
     Run(
         h, block, "Replays::Sort (sub_8228F840)", __imp__sub_8228F840,
-        hooks::SaveInterfaceReplaysSort, 24,
+        ITC_CONTEXT_FN(hooks::SaveInterfaceReplaysSort), 24,
         [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
           const uint32_t count = c < 3 ? c : random.Below(13);
           guest::StoreU32(h.base, data + kHeader + 20, count);
@@ -1021,7 +1021,7 @@ void SaveInterface(Context& h) {
         false, false, sort);
   }
   Run(h, block, "PlayTime::Add (sub_821109B8)", __imp__sub_821109B8,
-      hooks::SaveInterfacePlayTimeAdd, 24, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
+      ITC_CONTEXT_FN(hooks::SaveInterfacePlayTimeAdd), 24, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
         const uint32_t stats = b + 0x200 * random.Below(4);
         if (c % 2 == 0) {  // the play time's fields in range, a short time since
           guest::StoreU8(h.base, stats + 6036, uint8_t(random.Below(60)));
@@ -1039,7 +1039,7 @@ void SaveInterface(Context& h) {
     update.stack_bytes = 8;
     Run(
         h, block, "PlayTime::Update (sub_82112838)", __imp__sub_82112838,
-        hooks::SaveInterfacePlayTimeUpdate, 12,
+        ITC_CONTEXT_FN(hooks::SaveInterfacePlayTimeUpdate), 12,
         [&](PPCContext& t, uint32_t b, uint32_t, Random& random) {
           t.r3.u64 = b + 0x100 * random.Below(4);
         },
@@ -1060,7 +1060,7 @@ void SaveInterface(Context& h) {
     save.save_data = block.address + 0x400;
     Run(
         h, block, "GameData::Save (sub_8228FB00)", __imp__sub_8228FB00,
-        hooks::SaveInterfaceGameDataSave, 12,
+        ITC_CONTEXT_FN(hooks::SaveInterfaceGameDataSave), 12,
         [&](PPCContext&, uint32_t b, uint32_t, Random& random) {
           const uint32_t stats = b + 0x400 + 48;
           guest::StoreU8(h.base, stats + 6036, uint8_t(random.Below(60)));
@@ -1079,7 +1079,7 @@ void SaveInterface(Context& h) {
     load.extra_bytes = si::kGameDataBytes;
     Run(
         h, block, "GameData::Load (sub_8228FBC0)", __imp__sub_8228FBC0,
-        hooks::SaveInterfaceGameDataLoad, 12,
+        ITC_CONTEXT_FN(hooks::SaveInterfaceGameDataLoad), 12,
         [&](PPCContext& t, uint32_t, uint32_t, Random& random) {
           guest::StoreU32(h.base, data + kHeader + 0, buffer);
           t.r3.u64 = PlayerAt(h.base, data + 0x400 + 4 * random.Below(16), random);
@@ -1088,12 +1088,12 @@ void SaveInterface(Context& h) {
     memory::Free(buffer);
   }
   Run(h, block, "Replays::Count (sub_822902A0)", __imp__sub_822902A0,
-      hooks::SaveInterfaceReplaysCount, 32, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
+      ITC_CONTEXT_FN(hooks::SaveInterfaceReplaysCount), 32, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
         Enumerated(h.base, b, c, random, true);
         t.r3.u64 = data + 0x600;
       });
   Run(h, block, "Replays::ReadEntry (sub_822900E0)", __imp__sub_822900E0,
-      hooks::SaveInterfaceReplaysReadEntry, 32,
+      ITC_CONTEXT_FN(hooks::SaveInterfaceReplaysReadEntry), 32,
       [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
         // No replays' names here: their parse, never seen in play, is the
         // original's on both sides (BuildList's cases reach it).
@@ -1135,7 +1135,7 @@ void SaveInterface(Context& h) {
         guest::StoreU32(h.base, si::kInterfaceGlobal, block.address + kInterface);
         guest::StoreU32(h.base, si::kSaveBuffers, header);
         ITC_FLAG(native_save_interface) = v == 1;
-        (v == 0 ? __imp__sub_82290378 : hooks::SaveInterfaceReplaysBuildList)(t, h.base);
+        (v == 0 ? __imp__sub_82290378 : ITC_CONTEXT_FN(hooks::SaveInterfaceReplaysBuildList))(t, h.base);
         ITC_FLAG(native_save_interface) = true;
         guest::StoreU32(h.base, si::kSaveBuffers, live);
         guest::StoreU32(h.base, si::kInterfaceGlobal, live_interface);
@@ -1180,7 +1180,7 @@ void SaveInterface(Context& h) {
     results.Report();
   }
   Run(h, block, "GameData::Check (sub_8228FC50)", __imp__sub_8228FC50,
-      hooks::SaveInterfaceGameDataCheck, 32, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
+      ITC_CONTEXT_FN(hooks::SaveInterfaceGameDataCheck), 32, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
         // Up to four enumerated saves at b + kRecords, each named SystemData.bin,
         // a replay's name, a prefix of it or random bytes; the free bytes
         // around the size (188,416).

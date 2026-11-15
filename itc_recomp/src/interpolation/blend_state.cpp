@@ -23,6 +23,7 @@
 // (amount 0) and the frames after it move towards the current one.
 
 #include "blend_state.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 #include "command_list/command_list.h"
 #include "debug/replay_stats.h"
@@ -4132,8 +4133,8 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
 // Matrix_Multiply: r3 = out, r4 = a, r5 = b; out = a * b (4x4). The work
 // natively (src/matrix_math/matrix_math.cpp, --native_matrix_math; the
 // translated code leaves flush-to-zero on) or translated, then noted.
-extern "C" REX_FUNC(sub_8209BD50) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209BD50) {
+  
   uint32_t out = ctx.r3.u32, a = ctx.r4.u32, b = ctx.r5.u32;
   uint32_t caller = uint32_t(ctx.lr);
   if (ITC_FLAG(native_matrix_math)) {
@@ -4167,7 +4168,7 @@ std::chrono::steady_clock::time_point g_slot_callers_logged{};
 namespace {
 // AllocateSlots' diagnostics, kept out of the override so its fast path needs
 // no stack frame (they made it reserve ~700 bytes and save six registers).
-[[gnu::noinline]] void AllocateSlots_Diagnostics(PPCContext& ctx, uint32_t count,
+[[gnu::noinline]] void AllocateSlots_Diagnostics(lifted::Regs& ctx, uint32_t count,
                                                  uint32_t caller) {
   if (ITC_FLAG(log_overlay_uploads) && ctx.r3.u32 != 0 &&
       std::this_thread::get_id() == interpolation::GetDrawState().main_thread()) {
@@ -4242,8 +4243,8 @@ namespace {
 }
 }  // namespace
 
-extern "C" REX_FUNC(sub_8258CAA0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258CAA0) {
+  
   uint32_t count = ctx.r4.u32;
   // The game makes ~50,000 of these calls a frame (most for one slot), and the
   // translated original spent ~45 cycles on each, mostly on its stack frame
@@ -4266,7 +4267,7 @@ extern "C" REX_FUNC(sub_8258CAA0) {
     ctx.r9.u64 = count << 4;
     ctx.r3.u64 = first;
   } else {
-    __imp__sub_8258CAA0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8258CAA0);
   }
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
       ITC_FLAG(log_recording_by_pass)) [[unlikely]] {
@@ -4275,8 +4276,8 @@ extern "C" REX_FUNC(sub_8258CAA0) {
 }
 
 // Matrix_Copy: r3 = destination, r4 = source; copies a 4x4 matrix.
-extern "C" REX_FUNC(sub_820A0AC0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820A0AC0) {
+  
   uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
   uint32_t caller = uint32_t(ctx.lr);
   uint32_t noted_src = src;
@@ -4293,7 +4294,7 @@ extern "C" REX_FUNC(sub_820A0AC0) {
     ctx.fpscr.disableFlushMode();
     matrix_math::Copy(base, dst, src);
   } else {
-    __imp__sub_820A0AC0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A0AC0);
   }
   interpolation::GetDrawState().OnCopy(base, dst, noted_src, caller);
 }
@@ -4305,7 +4306,7 @@ extern "C" REX_FUNC(sub_820A0AC0) {
 // the frame's camera blend and its undoing.
 namespace {
 struct BillboardSlots {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   uint32_t list;
 };
@@ -4334,8 +4335,8 @@ uint32_t interpolation::BlendState_BuildBillboardVertices(uint8_t* base, uint32_
   return counted;
 }
 
-extern "C" REX_FUNC(sub_8209C6E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209C6E0) {
+  
   if (ITC_FLAG(native_billboards)) {
     const uint32_t set = ctx.r3.u32, material = ctx.r5.u32;
     const uint64_t lr = ctx.lr;
@@ -4349,7 +4350,7 @@ extern "C" REX_FUNC(sub_8209C6E0) {
   }
   uint32_t pass = guest::LoadU32(base, ctx.r3.u32);
   interpolation::GetDrawState().BeforeBillboards(base, pass);
-  __imp__sub_8209C6E0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8209C6E0);
   interpolation::GetDrawState().AfterBillboards(base);
 }
 
@@ -4370,9 +4371,9 @@ void interpolation::BlendState_TakeReplayTimes(int64_t& blend_ns, int64_t& uploa
 // (src/graphics/replay_commands.h) with --native_replay_commands, else the
 // original.
 namespace {
-void SetShaderConstants(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SetShaderConstants) {
   if (!ITC_FLAG(native_replay_commands)) {
-    __imp__sub_8258FD48(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8258FD48);
     return;
   }
   const uint32_t payload = ctx.r3.u32, count = ctx.r4.u32, packed = ctx.r5.u32;
@@ -4383,8 +4384,8 @@ void SetShaderConstants(PPCContext& ctx, uint8_t* base) {
 }
 }  // namespace
 
-extern "C" REX_FUNC(sub_8258FD48) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258FD48) {
+  
   uint32_t payload = ctx.r3.u32, packed = ctx.r5.u32;
   debug::ReplayStats_OnCommand(base, 7, payload, ctx.r4.u32, packed);
   native::Renderer_OnCommand(base, 7, payload, ctx.r4.u32, packed);
@@ -4406,8 +4407,8 @@ extern "C" REX_FUNC(sub_8258FD48) {
 // The per-object recorder (~150 calls a pass in a race): r4 = camera
 // view-projection, r5 = the object's world matrix. Its interpolation hooks
 // stay here around the recording, native or translated.
-extern "C" REX_FUNC(sub_825953D0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825953D0) {
+  
   interpolation::BlendState_BeforeRecordObject(base, ctx.r4.u32, ctx.r5.u32);
   interpolation::g_record_context = {uint32_t(ctx.lr), ctx.r24.u32, ctx.r25.u32, ctx.r26.u32,
                                      ctx.r27.u32,      ctx.r28.u32, ctx.r29.u32, ctx.r30.u32,
@@ -4415,7 +4416,7 @@ extern "C" REX_FUNC(sub_825953D0) {
   // The recording natively (src/scenery_lists/model_draws.cpp,
   // --native_scenery_lists) or translated.
   if (!hooks::SceneryListsRecordObject(ctx, base)) {
-    __imp__sub_825953D0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825953D0);
   }
   interpolation::g_record_context = {};
   interpolation::BlendState_AfterRecordObject(base);

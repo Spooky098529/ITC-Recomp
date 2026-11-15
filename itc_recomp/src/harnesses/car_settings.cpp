@@ -281,16 +281,16 @@ void Transitions(PPCContext& t, Random& r, const World& w) {
 }
 
 void Inits(Context& h, const World& w) {
-  Run(h, w, {"CarSettings::Init (sub_821B6FC0)", 24, __imp__sub_821B6FC0, hooks::CarSettingsInit,
+  Run(h, w, {"CarSettings::Init (sub_821B6FC0)", 24, __imp__sub_821B6FC0, ITC_CONTEXT_FN(hooks::CarSettingsInit),
              {{-int32_t(cs::kInitFrame), -48}}, Transitions});
   Run(h, w, {"CarSettings::InitType5 (sub_821B7878)", 24, __imp__sub_821B7878,
-             hooks::CarSettingsInitType5, {{-int32_t(cs::kInitType5Frame), -48}}, Transitions});
+             ITC_CONTEXT_FN(hooks::CarSettingsInitType5), {{-int32_t(cs::kInitType5Frame), -48}}, Transitions});
 }
 
 void Handlers(Context& h, const World& w) {
   // Create: the three blocks VirtualAlloc made compared by content.
   Run(h, w, {"CarSettings::Create (sub_821AA2F8)", 60, __imp__sub_821AA2F8,
-             hooks::CarSettingsCreate, {{-112, -24}}, Machine,
+             ITC_CONTEXT_FN(hooks::CarSettingsCreate), {{-112, -24}}, Machine,
              [&h](PPCContext& t, const World&, Outputs& out) {
                // r3 the data's address (the last VirtualAlloc's).
                out.Word(t.r3.u32 == guest::LoadU32(h.base, cs::kData) ? 1 : 0);
@@ -301,13 +301,13 @@ void Handlers(Context& h, const World& w) {
              }});
   // OpenMovie: a tail call (no frame of its own).
   Run(h, w, {"CarSettings::OpenMovie (sub_821A8DD0)", 20, __imp__sub_821A8DD0,
-             hooks::CarSettingsOpenMovie, {}, Machine});
+             ITC_CONTEXT_FN(hooks::CarSettingsOpenMovie), {}, Machine});
   Run(h, w, {"CarSettings::WaitForMovie (sub_821AA490)", 100, __imp__sub_821AA490,
-             hooks::CarSettingsWaitForMovie, {{-96, -16}}, Machine});
+             ITC_CONTEXT_FN(hooks::CarSettingsWaitForMovie), {{-96, -16}}, Machine});
   // Close: the missing movie 0 or ours (Find answers it when the pair isn't
   // there).
   Run(h, w, {"CarSettings::Close (sub_821AAF70)", 100, __imp__sub_821AAF70,
-             hooks::CarSettingsClose, {{-112, -16}},
+             ITC_CONTEXT_FN(hooks::CarSettingsClose), {{-112, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                if (r.Below(2) == 0) {
@@ -317,7 +317,7 @@ void Handlers(Context& h, const World& w) {
   // Destroy: the three blocks the layer's pages (whether each was freed
   // compared), the data's +576 1 or not.
   Run(h, w, {"CarSettings::Destroy (sub_821AA408)", 60, __imp__sub_821AA408,
-             hooks::CarSettingsDestroy, {{-128, -40}},
+             ITC_CONTEXT_FN(hooks::CarSettingsDestroy), {{-128, -40}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                Machine(t, r, w);

@@ -14,6 +14,7 @@
 // InsertUnique, ~UvMap) went once those callers were native.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/guest_call.h"
@@ -71,10 +72,10 @@ bool Native() { return ITC_FLAG(native_screen_objects) && hooks::NativeHeapActiv
 // --- UvMap ---
 
 // UvMap: r3 = the map; r3 the head.
-extern "C" REX_FUNC(sub_82130198) {
+ITC_NATIVE_ENTRY_ALWAYS(82130198) {
   ITC_SCREEN_OBJECTS_FALLBACK(82130198)
   if (!so::CanAllocate(base)) {
-    __imp__sub_82130198(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82130198);
     return;
   }
   so::MapConstruct(base, ctx.r3.u32);
@@ -84,11 +85,11 @@ extern "C" REX_FUNC(sub_82130198) {
 // --- ScreenObject ---
 
 // BuildRings: r3 = the object; r3 as the last AddRingPoint leaves it.
-extern "C" REX_FUNC(sub_821329B8) {
+ITC_NATIVE_ENTRY_ALWAYS(821329B8) {
   ITC_SCREEN_OBJECTS_FALLBACK(821329B8)
   const auto r3 = so::BuildRings(base, ctx.r3.u32, ctx.r1.u32);
   if (!r3) {
-    __imp__sub_821329B8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821329B8);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -102,7 +103,7 @@ namespace {
 
 // The video output: [0x8266D088]'s slot 7, then that one's slot 3, with
 // the original's return addresses.
-uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
+uint32_t VideoOutputCall(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
   ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
@@ -117,7 +118,7 @@ uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_
 }
 
 // Release's guest calls, from its frame (ctx.r1 there).
-so::ReleaseCalls ReleaseCalls(PPCContext& ctx, uint8_t* base, int& releases) {
+so::ReleaseCalls ReleaseCalls(lifted::Regs& ctx, uint8_t* base, int& releases) {
   return {[&ctx, base](int which) {
             return which == 0 ? VideoOutputCall(ctx, base, 0x8212F0E0, 0x8212F0F0)
                               : VideoOutputCall(ctx, base, 0x8212F128, 0x8212F138);
@@ -133,7 +134,7 @@ so::ReleaseCalls ReleaseCalls(PPCContext& ctx, uint8_t* base, int& releases) {
 
 namespace hooks {
 
-void ScreenObjectRelease(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ScreenObjectRelease) {
   const uint32_t object = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
@@ -145,7 +146,7 @@ void ScreenObjectRelease(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void ScreenObjectDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ScreenObjectDestroy) {
   const uint32_t object = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
@@ -162,10 +163,10 @@ void ScreenObjectDestroy(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 // ~ScreenObject: r3 = the object; r3 the map's freed head.
-extern "C" REX_FUNC(sub_82132FC8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82132FC8) {
+  
   if (!Native() || !ITC_FLAG(native_video_output)) {
-    __imp__sub_82132FC8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82132FC8);
     return;
   }
   hooks::ScreenObjectDestroy(ctx, base);

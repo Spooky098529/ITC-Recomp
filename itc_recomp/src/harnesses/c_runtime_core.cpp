@@ -105,7 +105,7 @@ void TlsAllocCases(Context& h) {
     for (int v = 0; v < 2; v++) {
       PPCContext t = CallContext(h);
       t.r3.u64 = callback;
-      (v == 0 ? __imp__sub_825AA3F8 : hooks::CoreCrtTlsAlloc)(t, h.base);
+      (v == 0 ? __imp__sub_825AA3F8 : ITC_CONTEXT_FN(hooks::CoreCrtTlsAlloc))(t, h.base);
       out[v].Word(t.r3.u32);
       // The new slot reads 0 on this thread.
       out[v].Word(TlsGet(h, t.r3.u32));
@@ -145,7 +145,7 @@ void SetFlsGetValueCases(Context& h) {
     for (int v = 0; v < 2; v++) {
       TlsSet(h, slots.getter_index, value);
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825AA400 : hooks::CoreSetFlsGetValue)(t, h.base);
+      (v == 0 ? __imp__sub_825AA400 : ITC_CONTEXT_FN(hooks::CoreSetFlsGetValue))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Word(TlsGet(h, slots.getter_index));
     }
@@ -180,7 +180,7 @@ void GetptdNoexitCases(Context& h) {
         Store(h.base, cc::kFlsSetValue, kReturnsZero);
       }
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825AA4C0 : hooks::CoreGetptdNoexit)(t, h.base);
+      (v == 0 ? __imp__sub_825AA4C0 : ITC_CONTEXT_FN(hooks::CoreGetptdNoexit))(t, h.base);
       Store(h.base, cc::kFlsSetValue, set_value);
       const uint32_t data = t.r3.u32;
       const uint32_t slot = TlsGet(h, slots.data_index);
@@ -247,7 +247,7 @@ void FreeFlsCases(Context& h) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = data;
-      (v == 0 ? __imp__sub_825AA5C0 : hooks::CoreFreeFls)(t, h.base);
+      (v == 0 ? __imp__sub_825AA5C0 : ITC_CONTEXT_FN(hooks::CoreFreeFls))(t, h.base);
       for (uint32_t block : blocks) {
         const bool held = memory::IsHeapBlock(block);
         out[v].Word(held);
@@ -300,7 +300,7 @@ void MtDeleteLocksCases(Context& h) {
       std::vector<uint32_t> blocks;
       const std::vector<uint8_t> saved = TestLocks(h, mask, blocks);
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825B3260 : hooks::CoreMtDeleteLocks)(t, h.base);
+      (v == 0 ? __imp__sub_825B3260 : ITC_CONTEXT_FN(hooks::CoreMtDeleteLocks))(t, h.base);
       std::vector<uint8_t> after = Read(h.base, cc::kLockTable, 8 * cc::kLockCount);
       Write(h.base, cc::kLockTable, saved.data(), uint32_t(saved.size()));
       out[v].Bytes(after);
@@ -345,7 +345,7 @@ void MtTermCases(Context& h) {
       Store(h.base, cc::kFlsIndex, a);
       Store(h.base, cc::kGetValueIndex, b);
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825AA448 : hooks::CoreMtTerm)(t, h.base);
+      (v == 0 ? __imp__sub_825AA448 : ITC_CONTEXT_FN(hooks::CoreMtTerm))(t, h.base);
       const uint32_t fls_after = Load(h.base, cc::kFlsIndex);
       const uint32_t getter_after = Load(h.base, cc::kGetValueIndex);
       Store(h.base, cc::kFlsIndex, fls_index);
@@ -409,8 +409,8 @@ void ErrnoCases(Context& h) {
     const char* name;
     GuestFunction recompiled, native;
   };
-  for (const Fn& fn : {Fn{"_errno (sub_825A81E0)", __imp__sub_825A81E0, hooks::CoreErrno},
-                       Fn{"__doserrno (sub_825A8218)", __imp__sub_825A8218, hooks::CoreDosErrno}}) {
+  for (const Fn& fn : {Fn{"_errno (sub_825A81E0)", __imp__sub_825A81E0, ITC_CONTEXT_FN(hooks::CoreErrno)},
+                       Fn{"__doserrno (sub_825A8218)", __imp__sub_825A8218, ITC_CONTEXT_FN(hooks::CoreDosErrno)}}) {
     Results results(fn.name);
     for (int c = 0; c < 16; c++) {
       const int kind = c % 2 == 0 ? 0 : 2;
@@ -450,7 +450,7 @@ void OsErrCases(Context& h) {
     for (int v = 0; v < 2; v++) {
       PPCContext t = CallContext(h);
       t.r3.u64 = error;
-      (v == 0 ? __imp__sub_825A8178 : hooks::CoreGetErrnoFromOsErr)(t, h.base);
+      (v == 0 ? __imp__sub_825A8178 : ITC_CONTEXT_FN(hooks::CoreGetErrnoFromOsErr))(t, h.base);
       out[v].Word(t.r3.u32);
     }
     results.Check(out[0], out[1], "error " + std::to_string(error));
@@ -481,7 +481,7 @@ void DosMapErrCases(Context& h) {
       WithThreadData(h, slots, kind, [&] {
         PPCContext t = CallContext(h);
         t.r3.u64 = error;
-        (v == 0 ? __imp__sub_825A8250 : hooks::CoreDosMapErr)(t, h.base);
+        (v == 0 ? __imp__sub_825A8250 : ITC_CONTEXT_FN(hooks::CoreDosMapErr))(t, h.base);
       });
       for (uint32_t a : {slots.data + 8, slots.data + 12, cc::kErrnoFallback,
                          cc::kDosErrnoFallback}) {
@@ -550,7 +550,7 @@ void FreePtdCases(Context& h) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = kind == 0 || kind == 3 ? data : 0;
-      (v == 0 ? __imp__sub_825AA670 : hooks::CoreFreePtd)(t, h.base);
+      (v == 0 ? __imp__sub_825AA670 : ITC_CONTEXT_FN(hooks::CoreFreePtd))(t, h.base);
       Store(h.base, cc::kFlsIndex, fls_index);
       const uint32_t data_slot = TlsGet(h, slots.data_index);
       out[v].Word(data_slot == data ? 1 : data_slot == 0x1234 ? 2 : data_slot);
@@ -585,9 +585,9 @@ void CritSecCases(Context& h) {
         t.r3.u64 = section;
         t.r4.u64 = spin;
         if (which == 0) {
-          (v == 0 ? __imp__sub_825B35A0 : hooks::CoreInitCritSecAndSpinCount)(t, h.base);
+          (v == 0 ? __imp__sub_825B35A0 : ITC_CONTEXT_FN(hooks::CoreInitCritSecAndSpinCount))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_825B3570 : hooks::CoreCritSecNoSpinCount)(t, h.base);
+          (v == 0 ? __imp__sub_825B3570 : ITC_CONTEXT_FN(hooks::CoreCritSecNoSpinCount))(t, h.base);
         }
         out[v].Word(t.r3.u32);
         out[v].Bytes(Read(h.base, section, 28));
@@ -619,10 +619,10 @@ void RegisterNotifyCases(Context& h) {
     // Which side adds and which removes: bit 0 and bit 1.
     Outputs out[2];
     for (int v = 0; v < 2; v++) {
-      const GuestFunction add = (c & 1) ? hooks::CoreRegisterThreadNotifyRoutine : __imp__sub_82297B98;
-      const GuestFunction remove = (c & 2) ? hooks::CoreRegisterThreadNotifyRoutine : __imp__sub_82297B98;
+      const GuestFunction add = (c & 1) ? ITC_CONTEXT_FN(hooks::CoreRegisterThreadNotifyRoutine) : __imp__sub_82297B98;
+      const GuestFunction remove = (c & 2) ? ITC_CONTEXT_FN(hooks::CoreRegisterThreadNotifyRoutine) : __imp__sub_82297B98;
       const GuestFunction self =
-          v == 0 ? __imp__sub_82297B98 : hooks::CoreRegisterThreadNotifyRoutine;
+          v == 0 ? __imp__sub_82297B98 : ITC_CONTEXT_FN(hooks::CoreRegisterThreadNotifyRoutine);
       Store(h.base, block, uint32_t(h.random.Next()));
       Store(h.base, block + 4, uint32_t(h.random.Next()));
       Store(h.base, block + 8, kEmptyFunction);
@@ -672,7 +672,7 @@ void CallNotifyCases(Context& h) {
       Store(h.base, kFilter, 0x5EB71E11);
       PPCContext t = CallContext(h);
       t.r3.u64 = starting;
-      (v == 0 ? __imp__sub_82297B38 : hooks::CoreCallThreadNotifyRoutines)(t, h.base);
+      (v == 0 ? __imp__sub_82297B38 : ITC_CONTEXT_FN(hooks::CoreCallThreadNotifyRoutines))(t, h.base);
       out[v].Word(Load(h.base, kFilter));
       out[v].Bytes(Read(h.base, blocks, 36));
     }
@@ -728,7 +728,7 @@ void MtInitLocksCases(Context& h) {
       Store(h.base, cc::kCritSecInit,
             kind == 0 ? cc::kCritSecNoSpinCount : kind == 1 ? 0 : kReturnsZero);
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825B31D8 : hooks::CoreMtInitLocks)(t, h.base);
+      (v == 0 ? __imp__sub_825B31D8 : ITC_CONTEXT_FN(hooks::CoreMtInitLocks))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Bytes(Read(h.base, cc::kLockTable, 8 * cc::kLockCount));
       out[v].Bytes(Read(h.base, cc::kLockSections, 28 * n));
@@ -761,7 +761,7 @@ void ThreadNotifyCases(Context& h) {
       TlsSet(h, slots.getter_index, getter_empty ? 0 : slots.getter);
       PPCContext t = CallContext(h);
       t.r3.u64 = starting;
-      (v == 0 ? __imp__sub_825B3650 : hooks::CoreThreadNotify)(t, h.base);
+      (v == 0 ? __imp__sub_825B3650 : ITC_CONTEXT_FN(hooks::CoreThreadNotify))(t, h.base);
       const uint32_t data_slot = TlsGet(h, slots.data_index);
       out[v].Word(data_slot == data ? 1 : data_slot);
       out[v].Word(TlsGet(h, slots.getter_index));
@@ -811,7 +811,7 @@ void MtInitCases(Context& h) {
         Store(h.base, cc::kCritSecInit, uint32_t(h.random.Next()));
       }
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825AA708 : hooks::CoreMtInit)(t, h.base);
+      (v == 0 ? __imp__sub_825AA708 : ITC_CONTEXT_FN(hooks::CoreMtInit))(t, h.base);
       const uint32_t getter_index = Load(h.base, cc::kGetValueIndex);
       const uint32_t fls_index = Load(h.base, cc::kFlsIndex);
       const uint32_t data = TlsGet(h, fls_index);
@@ -878,9 +878,9 @@ void StrtolCases(Context& h) {
       t.r4.u64 = want_end ? end_out : 0;
       t.r5.u64 = uint64_t(int64_t(radix));
       if (atol) {
-        (v == 0 ? __imp__sub_825AAF08 : hooks::CoreAtol)(t, h.base);
+        (v == 0 ? __imp__sub_825AAF08 : ITC_CONTEXT_FN(hooks::CoreAtol))(t, h.base);
       } else {
-        (v == 0 ? __imp__sub_825A85C0 : hooks::CoreStrtol)(t, h.base);
+        (v == 0 ? __imp__sub_825A85C0 : ITC_CONTEXT_FN(hooks::CoreStrtol))(t, h.base);
       }
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Word(t.r3.u32);
@@ -914,7 +914,7 @@ void StrrchrCases(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = text;
       t.r4.u64 = ch;
-      (v == 0 ? __imp__sub_825A8630 : hooks::CoreStrrchr)(t, h.base);
+      (v == 0 ? __imp__sub_825A8630 : ITC_CONTEXT_FN(hooks::CoreStrrchr))(t, h.base);
       out[v].Word(t.r3.u32);
     }
     results.Check(out[0], out[1], "case " + std::to_string(c));
@@ -943,7 +943,7 @@ void InittermCases(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = table;
       t.r4.u64 = end;
-      (v == 0 ? __imp__sub_825AA1B8 : hooks::CoreInitterm)(t, h.base);
+      (v == 0 ? __imp__sub_825AA1B8 : ITC_CONTEXT_FN(hooks::CoreInitterm))(t, h.base);
       out[v].Word(Load(h.base, kFilter));
     }
     results.Check(out[0], out[1], "case " + std::to_string(c));
@@ -996,7 +996,7 @@ void PositiveCases(Context& h) {
       StoreU64(h.base, number, bits);
       PPCContext t = CallContext(h);
       t.r3.u64 = number;
-      (v == 0 ? __imp__sub_825ADE90 : hooks::CorePositive)(t, h.base);
+      (v == 0 ? __imp__sub_825ADE90 : ITC_CONTEXT_FN(hooks::CorePositive))(t, h.base);
       out[v].Word(t.r3.u32);
     }
     results.Check(out[0], out[1], "case " + std::to_string(c));
@@ -1016,7 +1016,7 @@ void NmsgWriteCases(Context& h) {
       Fill(h.base, h.data, 256);
       PPCContext t = CallContext(h);
       t.r3.u64 = number;
-      (v == 0 ? __imp__sub_825AEDA0 : hooks::CoreNmsgWrite)(t, h.base);
+      (v == 0 ? __imp__sub_825AEDA0 : ITC_CONTEXT_FN(hooks::CoreNmsgWrite))(t, h.base);
       out[v].Bytes(Read(h.base, h.data, 256));
     }
     results.Check(out[0], out[1], "case " + std::to_string(c));
@@ -1046,7 +1046,7 @@ void BufferCases(Context& h) {
       Store(h.base, 0x82971174, 7);
       PPCContext t = CallContext(h);
       t.r3.u64 = stream;
-      (v == 0 ? __imp__sub_825B4790 : hooks::CoreGetbuf)(t, h.base);
+      (v == 0 ? __imp__sub_825B4790 : ITC_CONTEXT_FN(hooks::CoreGetbuf))(t, h.base);
       const uint32_t buffer = Load(h.base, stream + 8);
       const bool held = buffer != 0 && memory::IsHeapBlock(buffer);
       out[v].Word(held ? 1 : buffer == stream + 20 ? 2 : buffer);
@@ -1081,7 +1081,7 @@ void BufferCases(Context& h) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = stream;
-      (v == 0 ? __imp__sub_825B0EE0 : hooks::CoreFreebuf)(t, h.base);
+      (v == 0 ? __imp__sub_825B0EE0 : ITC_CONTEXT_FN(hooks::CoreFreebuf))(t, h.base);
       std::vector<uint8_t> after = Read(h.base, stream, 32);
       if (block != 0 && Load(h.base, stream + 8) == block) {
         Store(h.base, stream + 8, 1);  // kept: the same on both sides
@@ -1124,9 +1124,9 @@ void HandleCases(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = event;
         if (which == 0) {
-          (v == 0 ? __imp__sub_82294E20 : hooks::CoreCloseHandle)(t, h.base);
+          (v == 0 ? __imp__sub_82294E20 : ITC_CONTEXT_FN(hooks::CoreCloseHandle))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_825BA168 : hooks::CoreResetEvent)(t, h.base);
+          (v == 0 ? __imp__sub_825BA168 : ITC_CONTEXT_FN(hooks::CoreResetEvent))(t, h.base);
         }
         out[v].Word(t.r3.u32);
         out[v].Word(GuestLastError(h));
@@ -1169,7 +1169,7 @@ void IoInitCases(Context& h) {
       Saved saved(h, {{cc::kNhandle, 4}, {cc::kPioinfo, 4}});
       Store(h.base, cc::kNhandle, uint32_t(h.random.Next()));
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825B4668 : hooks::CoreIoInit)(t, h.base);
+      (v == 0 ? __imp__sub_825B4668 : ITC_CONTEXT_FN(hooks::CoreIoInit))(t, h.base);
       const uint32_t block = Load(h.base, cc::kPioinfo);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Word(t.r3.u32);
@@ -1201,7 +1201,7 @@ void InittermECases(Context& h) {
                       {c_runtime::kExitTableEnd, 4},
                       {c_runtime::kExitTableBegin, 4}});
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_82297AC0 : hooks::CoreInittermE)(t, h.base);
+      (v == 0 ? __imp__sub_82297AC0 : ITC_CONTEXT_FN(hooks::CoreInittermE))(t, h.base);
       const uint32_t block = Load(h.base, cc::kPioinfo);
       const uint32_t table = Load(h.base, c_runtime::kExitTableBegin);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -1250,7 +1250,7 @@ void InitStdioCases(Context& h) {
         Store(h.base, handles + 44 * i, os[i]);
       }
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825AD4D0 : hooks::CoreInitStdio)(t, h.base);
+      (v == 0 ? __imp__sub_825AD4D0 : ITC_CONTEXT_FN(hooks::CoreInitStdio))(t, h.base);
       const uint32_t n = Load(h.base, cc::kNstream);
       const uint32_t piob = Load(h.base, cc::kPiob);
       out[v].Word(t.r3.u32);
@@ -1273,7 +1273,7 @@ void FfMsgBannerCases(Context& h) {
     for (int v = 0; v < 2; v++) {
       Fill(h.base, h.data, 256);
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825AEDE8 : hooks::CoreFfMsgBanner)(t, h.base);
+      (v == 0 ? __imp__sub_825AEDE8 : ITC_CONTEXT_FN(hooks::CoreFfMsgBanner))(t, h.base);
       out[v].Bytes(Read(h.base, h.data, 256));
     }
     results.Check(out[0], out[1], "case " + std::to_string(c));
@@ -1323,18 +1323,18 @@ void LockFileCases(Context& h) {
         t.r3.u64 = which == 0 ? target : index;
         t.r4.u64 = target;
         if (which == 0) {
-          (v == 0 ? __imp__sub_825AD638 : hooks::CoreLockFile)(t, h.base);
+          (v == 0 ? __imp__sub_825AD638 : ITC_CONTEXT_FN(hooks::CoreLockFile))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_825AD670 : hooks::CoreLockFile2)(t, h.base);
+          (v == 0 ? __imp__sub_825AD670 : ITC_CONTEXT_FN(hooks::CoreLockFile2))(t, h.base);
         }
         out[v].Bytes(Section(h, section));
         PPCContext u = CallContext(h);
         u.r3.u64 = which == 0 ? target : index;
         u.r4.u64 = target;
         if (which == 0) {
-          (v == 0 ? __imp__sub_825AD688 : hooks::CoreUnlockFile)(u, h.base);
+          (v == 0 ? __imp__sub_825AD688 : ITC_CONTEXT_FN(hooks::CoreUnlockFile))(u, h.base);
         } else {
-          (v == 0 ? __imp__sub_825AD6C0 : hooks::CoreUnlockFile2)(u, h.base);
+          (v == 0 ? __imp__sub_825AD6C0 : ITC_CONTEXT_FN(hooks::CoreUnlockFile2))(u, h.base);
         }
         out[v].Bytes(Section(h, section));
       }
@@ -1369,7 +1369,7 @@ void UnlockFhandleCases(Context& h) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = handle;
-      (v == 0 ? __imp__sub_825B7A58 : hooks::CoreUnlockFhandle)(t, h.base);
+      (v == 0 ? __imp__sub_825B7A58 : ITC_CONTEXT_FN(hooks::CoreUnlockFhandle))(t, h.base);
       out[v].Bytes(Read(h.base, entry, 44));
       saved.Restore();
     }
@@ -1405,7 +1405,7 @@ void AmsgExitCases(Context& h) {
       ExitStub exit(h, stub);
       PPCContext t = CallContext(h);
       t.r3.u64 = number;
-      (v == 0 ? __imp__sub_825AA158 : hooks::CoreAmsgExit)(t, h.base);
+      (v == 0 ? __imp__sub_825AA158 : ITC_CONTEXT_FN(hooks::CoreAmsgExit))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Word(Load(h.base, cc::kExitRoutine));
     }
@@ -1419,7 +1419,7 @@ void AmsgExitCases(Context& h) {
       ExitStub exit(h, c % 2 == 0 ? kReturnsZero : kValidateExecute);
       PPCContext t = CallContext(h);
       t.r3.u64 = uint32_t(h.random.Next());
-      (v == 0 ? __imp__sub_825B64F8 : hooks::CoreFptrap)(t, h.base);
+      (v == 0 ? __imp__sub_825B64F8 : ITC_CONTEXT_FN(hooks::CoreFptrap))(t, h.base);
       out[v].Word(t.r3.u32);
     }
     fptrap.Check(out[0], out[1], "case " + std::to_string(c));
@@ -1446,7 +1446,7 @@ void GetptdCases(Context& h) {
       ExitStub exit(h, c % 4 < 2 ? kReturnsZero : kValidateExecute);
       WithThreadData(h, slots, kind, [&] {
         PPCContext t = CallContext(h);
-        (v == 0 ? __imp__sub_825AA580 : hooks::CoreGetptd)(t, h.base);
+        (v == 0 ? __imp__sub_825AA580 : ITC_CONTEXT_FN(hooks::CoreGetptd))(t, h.base);
         out[v].Word(kind == 0 ? uint32_t(t.r3.u32 == slots.data) : t.r3.u32);
         out[v].Word(GuestLastError(h));
       });
@@ -1485,7 +1485,7 @@ void InvalidParameterCases(Context& h) {
       t.r5.u64 = r5;
       t.r6.u64 = r6;
       t.r7.u64 = r7;
-      (v == 0 ? __imp__sub_825AFCC8 : hooks::CoreInvalidParameter)(t, h.base);
+      (v == 0 ? __imp__sub_825AFCC8 : ITC_CONTEXT_FN(hooks::CoreInvalidParameter))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Bytes(Read(h.base, h.data, 256));
       Store(h.base, cc::kInvalidParameterHandler, saved);
@@ -1545,7 +1545,7 @@ void UnhandledFilterCases(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = pointers;
       t.r4.u64 = r4;
-      (v == 0 ? __imp__sub_82297940 : hooks::CoreUnhandledExceptionFilter)(t, h.base);
+      (v == 0 ? __imp__sub_82297940 : ITC_CONTEXT_FN(hooks::CoreUnhandledExceptionFilter))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Word(Load(h.base, kAbortBehavior));
@@ -1584,7 +1584,7 @@ void DebugMonitorCases(Context& h) {
       Store(h.base, t.r1.u32 + 28, 0xCDCDCDCDu);
       t.r3.u64 = code;
       t.f1.u64 = value;
-      (v == 0 ? __imp__sub_825B9BA8 : hooks::CoreDebugMonitorNotify)(t, h.base);
+      (v == 0 ? __imp__sub_825B9BA8 : ITC_CONTEXT_FN(hooks::CoreDebugMonitorNotify))(t, h.base);
       out[v].Word(Load(h.base, t.r1.u32 + 28));
       out[v].Word(Load(h.base, kAbortBehavior));
     }
@@ -1608,7 +1608,7 @@ void CxxRestoreFilterCases(Context& h) {
       Store(h.base, cc::kUnhandledFilter, filter);
       Store(h.base, cc::kCxxPreviousFilter, previous);
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825B4D90 : hooks::CoreCxxRestoreUnhandledExceptionFilter)(t, h.base);
+      (v == 0 ? __imp__sub_825B4D90 : ITC_CONTEXT_FN(hooks::CoreCxxRestoreUnhandledExceptionFilter))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Word(Load(h.base, cc::kUnhandledFilter));
       out[v].Word(Load(h.base, cc::kCxxPreviousFilter));
@@ -1657,7 +1657,7 @@ void LockFhandleCases(Context& h) {
       PPCContext t = CallContext(h);
       Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
       t.r3.u64 = handle;
-      (v == 0 ? __imp__sub_825B7958 : hooks::CoreLockFhandle)(t, h.base);
+      (v == 0 ? __imp__sub_825B7958 : ITC_CONTEXT_FN(hooks::CoreLockFhandle))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Bytes(Read(h.base, entry, 44));
       out[v].Word(Load(h.base, t.r1.u32 + 20));
@@ -1689,7 +1689,7 @@ void FinallyCases(Context& h) {
         PPCContext t = CallContext(h);
         t.r31.u64 = h.data + 512;
         t.r12.u64 = h.data + 640;
-        (v == 0 ? __imp__sub_825B7A20 : hooks::CoreLockFhandleFinally)(t, h.base);
+        (v == 0 ? __imp__sub_825B7A20 : ITC_CONTEXT_FN(hooks::CoreLockFhandleFinally))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(t.r29.u32);
         out[v].Word(t.r11.u32);
@@ -1714,7 +1714,7 @@ void FinallyCases(Context& h) {
         t.r28.u64 = locked;
         t.r31.u64 = 0x1234;
         t.r12.u64 = h.data + 640;
-        (v == 0 ? __imp__sub_825B4C8C : hooks::CoreRaiseFinally)(t, h.base);
+        (v == 0 ? __imp__sub_825B4C8C : ITC_CONTEXT_FN(hooks::CoreRaiseFinally))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(t.r28.u32);
         out[v].Word(t.r31.u32);
@@ -1735,7 +1735,7 @@ void FinallyCases(Context& h) {
       for (int v = 0; v < 2; v++) {
         GuestLock(h, 1, true);
         PPCContext t = CallContext(h);
-        (v == 0 ? fn.recompiled : hooks::CoreUnlockStreamsFinally)(t, h.base);
+        (v == 0 ? fn.recompiled : ITC_CONTEXT_FN(hooks::CoreUnlockStreamsFinally))(t, h.base);
         out[v].Word(t.r3.u32);
       }
       results.Check(out[0], out[1], "case " + std::to_string(c));
@@ -1764,7 +1764,7 @@ void FinallyCases(Context& h) {
         t.r29.u64 = cc::kPiob;
         t.r31.u64 = 0x5678;
         t.r12.u64 = h.data + 640;
-        (v == 0 ? __imp__sub_825ACF04 : hooks::CoreFlsallInnerFinally)(t, h.base);
+        (v == 0 ? __imp__sub_825ACF04 : ITC_CONTEXT_FN(hooks::CoreFlsallInnerFinally))(t, h.base);
         for (const PPCRegister* r : {&t.r3, &t.r4, &t.r10, &t.r11, &t.r27, &t.r28, &t.r29, &t.r31}) {
           out[v].Word(r->u32);
         }
@@ -1813,9 +1813,9 @@ void OsHandleCases(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = handle;
         if (which == 0) {
-          (v == 0 ? __imp__sub_825B77E8 : hooks::CoreFreeOsfhnd)(t, h.base);
+          (v == 0 ? __imp__sub_825B77E8 : ITC_CONTEXT_FN(hooks::CoreFreeOsfhnd))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_825B7880 : hooks::CoreGetOsfhandle)(t, h.base);
+          (v == 0 ? __imp__sub_825B7880 : ITC_CONTEXT_FN(hooks::CoreGetOsfhandle))(t, h.base);
         }
         Store(h.base, cc::kInvalidParameterHandler, handler);
         out[v].Word(t.r3.u32);
@@ -1861,7 +1861,7 @@ void ExpCases(Context& h) {
       PPCContext t = CallContext(h);
       Fill(h.base, t.r1.u32 - 32, 24);
       t.f1.u64 = bits;
-      (v == 0 ? __imp__sub_825ABE30 : hooks::CoreExp)(t, h.base);
+      (v == 0 ? __imp__sub_825ABE30 : ITC_CONTEXT_FN(hooks::CoreExp))(t, h.base);
       out[v].Double(t.f1.u64);
       out[v].Word(Load(h.base, t.r1.u32 - 32));
       out[v].Word(Load(h.base, t.r1.u32 - 28));
@@ -1916,12 +1916,12 @@ void NumberTextCases(Context& h) {
     GuestFunction recompiled, native;
     bool no_point;  // _forcdecpt_l's texts have no point yet
   };
-  for (const Fn& fn : {Fn{"_forcdecpt_l (sub_825ADD38)", __imp__sub_825ADD38, hooks::CoreForcdecpt, true},
-                       Fn{"_cropzeros_l (sub_825ADDD8)", __imp__sub_825ADDD8, hooks::CoreCropzeros, false},
+  for (const Fn& fn : {Fn{"_forcdecpt_l (sub_825ADD38)", __imp__sub_825ADD38, ITC_CONTEXT_FN(hooks::CoreForcdecpt), true},
+                       Fn{"_cropzeros_l (sub_825ADDD8)", __imp__sub_825ADDD8, ITC_CONTEXT_FN(hooks::CoreCropzeros), false},
                        Fn{"_forcdecpt (sub_825ADF18)", __imp__sub_825ADF18,
-                          hooks::CoreForcdecptNoLocale, true},
+                          ITC_CONTEXT_FN(hooks::CoreForcdecptNoLocale), true},
                        Fn{"_cropzeros (sub_825ADF20)", __imp__sub_825ADF20,
-                          hooks::CoreCropzerosNoLocale, false}}) {
+                          ITC_CONTEXT_FN(hooks::CoreCropzerosNoLocale), false}}) {
     Results results(fn.name);
     for (int c = 0; c < 300; c++) {
       std::string text = NumberText(h);
@@ -1997,7 +1997,7 @@ void Ld12ToFloatCases(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = from;
       t.r4.u64 = to;
-      (v == 0 ? __imp__sub_825B70D0 : hooks::CoreLd12ToFloat)(t, h.base);
+      (v == 0 ? __imp__sub_825B70D0 : ITC_CONTEXT_FN(hooks::CoreLd12ToFloat))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Float(Load(h.base, to));
@@ -2024,10 +2024,10 @@ void AtoNumberCases(Context& h) {
     int kind;  // 0 _atodbl_l, 1 _atoflt_l, 2 _fassign_l
   };
   const uint32_t at = h.data + 128, to = h.data + 64;
-  for (const Fn& fn : {Fn{"_atodbl_l (sub_825B6098)", __imp__sub_825B6098, hooks::CoreAtodbl, 0},
-                       Fn{"_atoflt_l (sub_825B6140)", __imp__sub_825B6140, hooks::CoreAtoflt, 1},
-                       Fn{"_fassign_l (sub_825ADEB0)", __imp__sub_825ADEB0, hooks::CoreFassign, 2},
-                       Fn{"_fassign (sub_825ADF10)", __imp__sub_825ADF10, hooks::CoreFassignNoLocale,
+  for (const Fn& fn : {Fn{"_atodbl_l (sub_825B6098)", __imp__sub_825B6098, ITC_CONTEXT_FN(hooks::CoreAtodbl), 0},
+                       Fn{"_atoflt_l (sub_825B6140)", __imp__sub_825B6140, ITC_CONTEXT_FN(hooks::CoreAtoflt), 1},
+                       Fn{"_fassign_l (sub_825ADEB0)", __imp__sub_825ADEB0, ITC_CONTEXT_FN(hooks::CoreFassign), 2},
+                       Fn{"_fassign (sub_825ADF10)", __imp__sub_825ADF10, ITC_CONTEXT_FN(hooks::CoreFassignNoLocale),
                           2}}) {
     Results results(fn.name);
     for (int c = 0; c < 200; c++) {
@@ -2097,7 +2097,7 @@ void FilenoCases(Context& h) {
       Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
       PPCContext t = CallContext(h);
       t.r3.u64 = null ? 0 : stream;
-      (v == 0 ? __imp__sub_825B0E88 : hooks::CoreFileno)(t, h.base);
+      (v == 0 ? __imp__sub_825B0E88 : ITC_CONTEXT_FN(hooks::CoreFileno))(t, h.base);
       Store(h.base, cc::kInvalidParameterHandler, handler);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -2124,11 +2124,11 @@ void StreamFinallyCases(Context& h) {
   };
   const uint32_t handles = Load(h.base, cc::kPioinfo);
   for (const Fn& fn : {Fn{"_close's __finally (sub_825B0E50)", __imp__sub_825B0E50,
-                          hooks::CoreCloseFinally, 30},
+                          ITC_CONTEXT_FN(hooks::CoreCloseFinally), 30},
                        Fn{"_write's __finally (sub_825B1304)", __imp__sub_825B1304,
-                          hooks::CoreCloseFinally, 30},
+                          ITC_CONTEXT_FN(hooks::CoreCloseFinally), 30},
                        Fn{"_commit's __finally (sub_825B4978)", __imp__sub_825B4978,
-                          hooks::CoreCommitFinally, 27}}) {
+                          ITC_CONTEXT_FN(hooks::CoreCommitFinally), 27}}) {
     Results results(fn.name);
     for (int c = 0; c < 16 && handles != 0; c++) {
       const uint32_t handle = h.random.Below(32);
@@ -2191,7 +2191,7 @@ void StreamFinallyCases(Context& h) {
         t.r30.u64 = stream;
         t.r31.u64 = 0x5678;
         t.r12.u64 = h.data + 640;
-        (v == 0 ? recompiled : hooks::CoreFcloseFinally)(t, h.base);
+        (v == 0 ? recompiled : ITC_CONTEXT_FN(hooks::CoreFcloseFinally))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(t.r30.u32);
         out[v].Word(t.r31.u32);
@@ -2216,7 +2216,7 @@ void StreamFinallyCases(Context& h) {
         t.r28.u64 = locked;
         t.r31.u64 = 0x9ABC;
         t.r12.u64 = h.data + 640;
-        (v == 0 ? __imp__sub_825AA338 : hooks::CoreExitUnlockFinally)(t, h.base);
+        (v == 0 ? __imp__sub_825AA338 : ITC_CONTEXT_FN(hooks::CoreExitUnlockFinally))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(t.r28.u32);
         out[v].Word(t.r31.u32);
@@ -2252,11 +2252,11 @@ void CloseCases(Context& h) {
     bool caller_frame;  // stores the handle at the caller's frame + 20
   };
   for (const Fn& fn : {Fn{"_close_nolock (sub_825B0C28)", __imp__sub_825B0C28,
-                          hooks::CoreCloseNolock, false},
-                       Fn{"_close (sub_825B0D10)", __imp__sub_825B0D10, hooks::CoreClose, true},
-                       Fn{"_commit (sub_825B4828)", __imp__sub_825B4828, hooks::CoreCommit, true}}) {
+                          ITC_CONTEXT_FN(hooks::CoreCloseNolock), false},
+                       Fn{"_close (sub_825B0D10)", __imp__sub_825B0D10, ITC_CONTEXT_FN(hooks::CoreClose), true},
+                       Fn{"_commit (sub_825B4828)", __imp__sub_825B4828, ITC_CONTEXT_FN(hooks::CoreCommit), true}}) {
     Results results(fn.name);
-    const bool nolock = fn.native == hooks::CoreCloseNolock;
+    const bool nolock = fn.native == ITC_CONTEXT_FN(hooks::CoreCloseNolock);
     for (int c = 0; c < 48; c++) {
       const uint32_t pick = h.random.Below(10);
       uint32_t handle = pick == 0   ? 0xFFFFFFFEu
@@ -2349,7 +2349,7 @@ void FlushCases(Context& h) {
       const uint32_t event = kind == 0 ? MakeEvent(h, 0, 0) : kind == 1 ? 0 : junk;
       PPCContext t = CallContext(h);
       t.r3.u64 = event;
-      (v == 0 ? __imp__sub_825BA510 : hooks::CoreFlushFileBuffers)(t, h.base);
+      (v == 0 ? __imp__sub_825BA510 : ITC_CONTEXT_FN(hooks::CoreFlushFileBuffers))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Word(GuestLastError(h));
@@ -2466,7 +2466,7 @@ void SetFilePointerCases(Context& h) {
       t.r4.u64 = uint32_t(offset);
       t.r5.u64 = with_high ? high_word : 0;
       t.r6.u64 = method;
-      (v == 0 ? __imp__sub_825B9DD8 : hooks::CoreSetFilePointer)(t, h.base);
+      (v == 0 ? __imp__sub_825B9DD8 : ITC_CONTEXT_FN(hooks::CoreSetFilePointer))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Word(Load(h.base, high_word));
@@ -2513,8 +2513,8 @@ void LseekCases(Context& h) {
     bool nolock;
   };
   for (const Fn& fn : {Fn{"_lseeki64_nolock (sub_825B6500)", __imp__sub_825B6500,
-                          hooks::CoreLseekNolock, true},
-                       Fn{"_lseeki64 (sub_825B65D0)", __imp__sub_825B65D0, hooks::CoreLseek, false}}) {
+                          ITC_CONTEXT_FN(hooks::CoreLseekNolock), true},
+                       Fn{"_lseeki64 (sub_825B65D0)", __imp__sub_825B65D0, ITC_CONTEXT_FN(hooks::CoreLseek), false}}) {
     Results results(fn.name);
     for (int c = 0; c < 64; c++) {
       const uint32_t pick = h.random.Below(10);
@@ -2588,7 +2588,7 @@ void LseekCases(Context& h) {
         t.r30.u64 = handle;
         t.r31.u64 = 0x1234;
         t.r12.u64 = h.data + 640;
-        (v == 0 ? __imp__sub_825B6730 : hooks::CoreCloseFinally)(t, h.base);
+        (v == 0 ? __imp__sub_825B6730 : ITC_CONTEXT_FN(hooks::CoreCloseFinally))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(t.r30.u32);
         out[v].Word(t.r31.u32);
@@ -2670,7 +2670,7 @@ void WriteFileCases(Context& h) {
       t.r5.u64 = size;
       t.r6.u64 = with_written ? written : 0;
       t.r7.u64 = with_overlapped ? overlapped : 0;
-      (v == 0 ? __imp__sub_82295D50 : hooks::CoreWriteFile)(t, h.base);
+      (v == 0 ? __imp__sub_82295D50 : ITC_CONTEXT_FN(hooks::CoreWriteFile))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Word(Load(h.base, written));
@@ -2722,8 +2722,8 @@ void WriteCases(Context& h) {
     return;
   }
   for (const Fn& fn : {Fn{"_write_nolock (sub_825B0F48)", __imp__sub_825B0F48,
-                          hooks::CoreWriteNolock, true},
-                       Fn{"_write (sub_825B11A8)", __imp__sub_825B11A8, hooks::CoreWrite, false}}) {
+                          ITC_CONTEXT_FN(hooks::CoreWriteNolock), true},
+                       Fn{"_write (sub_825B11A8)", __imp__sub_825B11A8, ITC_CONTEXT_FN(hooks::CoreWrite), false}}) {
     Results results(fn.name);
     for (int c = 0; c < 64; c++) {
       const uint32_t pick = h.random.Below(10);
@@ -2874,7 +2874,7 @@ void FlushStreamCases(Context& h) {
       Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
       PPCContext t = CallContext(h);
       t.r3.u64 = stream;
-      (v == 0 ? __imp__sub_825ACC78 : hooks::CoreFlush)(t, h.base);
+      (v == 0 ? __imp__sub_825ACC78 : ITC_CONTEXT_FN(hooks::CoreFlush))(t, h.base);
       Store(h.base, cc::kInvalidParameterHandler, handler);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -2925,7 +2925,7 @@ void CxxUnhandledFilterCases(Context& h) {
       Store(h.base, cc::kCxxPreviousFilter, filter);
       PPCContext t = CallContext(h);
       t.r3.u64 = pointers;
-      (v == 0 ? __imp__sub_825B4CD0 : hooks::CoreCxxUnhandledExceptionFilter)(t, h.base);
+      (v == 0 ? __imp__sub_825B4CD0 : ITC_CONTEXT_FN(hooks::CoreCxxUnhandledExceptionFilter))(t, h.base);
       Store(h.base, cc::kCxxPreviousFilter, previous);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -3092,8 +3092,8 @@ void FcloseCases(Context& h) {
     bool fclose;
   };
   for (const Fn& fn : {Fn{"_fclose_nolock (sub_825A94C0)", __imp__sub_825A94C0,
-                          hooks::CoreFcloseNolock, false},
-                       Fn{"fclose (sub_825A9580)", __imp__sub_825A9580, hooks::CoreFclose, true}}) {
+                          ITC_CONTEXT_FN(hooks::CoreFcloseNolock), false},
+                       Fn{"fclose (sub_825A9580)", __imp__sub_825A9580, ITC_CONTEXT_FN(hooks::CoreFclose), true}}) {
     Results results(fn.name);
     for (int c = 0; c < 64; c++) {
       const bool null = h.random.Below(12) == 0;
@@ -3205,7 +3205,7 @@ void FcloseallCases(Context& h) {
       SetLastError(h, last);
       Store(h.base, cc::kInvalidParameterHandler, kReturnsZero);
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825B4E78 : hooks::CoreFcloseall)(t, h.base);
+      (v == 0 ? __imp__sub_825B4E78 : ITC_CONTEXT_FN(hooks::CoreFcloseall))(t, h.base);
       Store(h.base, cc::kInvalidParameterHandler, handler);
       Store(h.base, cc::kNstream, nstream);
       Store(h.base, cc::kPiob, piob);
@@ -3289,9 +3289,9 @@ void StreamBufferCases(Context& h) {
     GuestFunction recompiled, native;
     Which which;
   };
-  for (const Fn& fn : {Fn{"_flsbuf (sub_825AEE28)", __imp__sub_825AEE28, hooks::CoreFlsbuf, kFlsbuf},
-                       Fn{"_stbuf (sub_825B40B8)", __imp__sub_825B40B8, hooks::CoreStbuf, kStbuf},
-                       Fn{"_ftbuf (sub_825B41A0)", __imp__sub_825B41A0, hooks::CoreFtbuf, kFtbuf}}) {
+  for (const Fn& fn : {Fn{"_flsbuf (sub_825AEE28)", __imp__sub_825AEE28, ITC_CONTEXT_FN(hooks::CoreFlsbuf), kFlsbuf},
+                       Fn{"_stbuf (sub_825B40B8)", __imp__sub_825B40B8, ITC_CONTEXT_FN(hooks::CoreStbuf), kStbuf},
+                       Fn{"_ftbuf (sub_825B41A0)", __imp__sub_825B41A0, ITC_CONTEXT_FN(hooks::CoreFtbuf), kFtbuf}}) {
     Results results(fn.name);
     for (int c = 0; c < 96; c++) {
       const uint32_t where = h.random.Below(8);
@@ -3446,7 +3446,7 @@ void BsearchCases(Context& h) {
       t.r5.u64 = count;
       t.r6.u64 = width_arg;
       t.r7.u64 = compare;
-      (v == 0 ? __imp__sub_825AC970 : hooks::CoreBsearch)(t, h.base);
+      (v == 0 ? __imp__sub_825AC970 : ITC_CONTEXT_FN(hooks::CoreBsearch))(t, h.base);
       Store(h.base, cc::kInvalidParameterHandler, handler);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -3524,7 +3524,7 @@ void Cftoe2Cases(Context& h) {
       t.r6.u64 = caps;
       t.r7.u64 = strflt;
       t.r8.u64 = uint32_t(g_format);
-      (v == 0 ? __imp__sub_825ADF28 : hooks::CoreCftoe2)(t, h.base);
+      (v == 0 ? __imp__sub_825ADF28 : ITC_CONTEXT_FN(hooks::CoreCftoe2))(t, h.base);
       Store(h.base, cc::kInvalidParameterHandler, handler);
       Store(h.base, 0x82971358, format);
       out[v].Word(t.r3.u32);
@@ -3564,7 +3564,7 @@ void CxxSetFilterCases(Context& h) {
       Store(h.base, kFilter, old_filter);
       Store(h.base, cc::kCxxPreviousFilter, old_previous);
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_825DAC58 : hooks::CoreCxxSetUnhandledExceptionFilter)(t, h.base);
+      (v == 0 ? __imp__sub_825DAC58 : ITC_CONTEXT_FN(hooks::CoreCxxSetUnhandledExceptionFilter))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       out[v].Word(Load(h.base, kFilter));
@@ -3622,11 +3622,11 @@ void FlushAllCases(Context& h) {
     Which which;
   };
   for (const Fn& fn :
-       {Fn{"_fflush_nolock (sub_825ACD10)", __imp__sub_825ACD10, hooks::CoreFflushNolock, kNolock},
-        Fn{"fflush (sub_825ACF70)", __imp__sub_825ACF70, hooks::CoreFflush, kFflush},
-        Fn{"flsall (sub_825ACD90)", __imp__sub_825ACD90, hooks::CoreFlsall, kFlsall},
-        Fn{"_flushall (sub_825AD068)", __imp__sub_825AD068, hooks::CoreFlushall, kFlushall},
-        Fn{"_endstdio (sub_825AD5F8)", __imp__sub_825AD5F8, hooks::CoreEndstdio, kEndstdio}}) {
+       {Fn{"_fflush_nolock (sub_825ACD10)", __imp__sub_825ACD10, ITC_CONTEXT_FN(hooks::CoreFflushNolock), kNolock},
+        Fn{"fflush (sub_825ACF70)", __imp__sub_825ACF70, ITC_CONTEXT_FN(hooks::CoreFflush), kFflush},
+        Fn{"flsall (sub_825ACD90)", __imp__sub_825ACD90, ITC_CONTEXT_FN(hooks::CoreFlsall), kFlsall},
+        Fn{"_flushall (sub_825AD068)", __imp__sub_825AD068, ITC_CONTEXT_FN(hooks::CoreFlushall), kFlushall},
+        Fn{"_endstdio (sub_825AD5F8)", __imp__sub_825AD5F8, ITC_CONTEXT_FN(hooks::CoreEndstdio), kEndstdio}}) {
     Results results(fn.name);
     for (int c = 0; c < 48; c++) {
       const uint32_t count = h.random.Below(fn.which == kEndstdio ? 21 : 33);
@@ -3744,8 +3744,8 @@ void DoexitCases(Context& h) {
     const char* name;
     GuestFunction recompiled, native;
   };
-  for (const Fn& fn : {Fn{"doexit (sub_825AA218)", __imp__sub_825AA218, hooks::CoreDoexit},
-                       Fn{"_cexit (sub_825AA388)", __imp__sub_825AA388, hooks::CoreCexit}}) {
+  for (const Fn& fn : {Fn{"doexit (sub_825AA218)", __imp__sub_825AA218, ITC_CONTEXT_FN(hooks::CoreDoexit)},
+                       Fn{"_cexit (sub_825AA388)", __imp__sub_825AA388, ITC_CONTEXT_FN(hooks::CoreCexit)}}) {
     Results results(fn.name);
     for (int c = 0; c < 24; c++) {
       const uint32_t code = uint32_t(h.random.Next());
@@ -3864,7 +3864,7 @@ void RaiseCases(Context& h) {
         PPCContext t = CallContext(h);
         Store(h.base, t.r1.u32 + 20, 0xCDCDCDCDu);
         t.r3.u64 = uint32_t(sig);
-        (v == 0 ? __imp__sub_825B49C8 : hooks::CoreRaise)(t, h.base);
+        (v == 0 ? __imp__sub_825B49C8 : ITC_CONTEXT_FN(hooks::CoreRaise))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
         out[v].Word(Load(h.base, t.r1.u32 + 20));
@@ -3985,13 +3985,13 @@ void FputsCases(Context& h) {
         if (fputs) {
           t.r3.u64 = null_string ? 0 : text;
           t.r4.u64 = stream;
-          (v == 0 ? __imp__sub_825AD280 : hooks::CoreFputs)(t, h.base);
+          (v == 0 ? __imp__sub_825AD280 : ITC_CONTEXT_FN(hooks::CoreFputs))(t, h.base);
         } else {
           t.r3.u64 = text;
           t.r4.u64 = item_size;
           t.r5.u64 = count_word;
           t.r6.u64 = stream;
-          (v == 0 ? __imp__sub_825A96A0 : hooks::CoreFwriteNolock)(t, h.base);
+          (v == 0 ? __imp__sub_825A96A0 : ITC_CONTEXT_FN(hooks::CoreFwriteNolock))(t, h.base);
         }
         Store(h.base, cc::kInvalidParameterHandler, handler);
         out[v].Word(t.r3.u32);
@@ -4116,9 +4116,9 @@ void CftoeCftogCases(Context& h) {
         t.r7.u64 = caps;
         t.r8.u64 = locale;
         if (g) {
-          (v == 0 ? __imp__sub_825AE9D0 : hooks::CoreCftog)(t, h.base);
+          (v == 0 ? __imp__sub_825AE9D0 : ITC_CONTEXT_FN(hooks::CoreCftog))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_825AE1A8 : hooks::CoreCftoe)(t, h.base);
+          (v == 0 ? __imp__sub_825AE1A8 : ITC_CONTEXT_FN(hooks::CoreCftoe))(t, h.base);
         }
         Store(h.base, cc::kInvalidParameterHandler, handler);
         Store(h.base, 0x82971358, format);
@@ -4156,17 +4156,17 @@ void CRuntimeCore(Context& h) {
   StrrchrCases(h);
   InittermCases(h);
   GlobalCases(h, "_set_abort_behavior (sub_825AD120)", 0x8266B7C4, __imp__sub_825AD120,
-              hooks::CoreSetAbortBehavior);
+              ITC_CONTEXT_FN(hooks::CoreSetAbortBehavior));
   GlobalCases(h, "__get_sigabrt (sub_825B49B0)", 0x82971340, __imp__sub_825B49B0,
-              hooks::CoreGetSigabrt);
+              ITC_CONTEXT_FN(hooks::CoreGetSigabrt));
   GlobalCases(h, "_crt_debugger_hook (sub_825B68B8)", 0x8297820C, __imp__sub_825B68B8,
-              hooks::CoreCrtDebuggerHook);
+              ITC_CONTEXT_FN(hooks::CoreCrtDebuggerHook));
   GlobalCases(h, "_ValidateExecute (sub_825B8910)", h.data + 64, __imp__sub_825B8910,
-              hooks::CoreValidateExecute);
+              ITC_CONTEXT_FN(hooks::CoreValidateExecute));
   GlobalCases(h, "SetUnhandledExceptionFilter (sub_82297870)", kFilter, __imp__sub_82297870,
-              hooks::CoreSetUnhandledExceptionFilter);
+              ITC_CONTEXT_FN(hooks::CoreSetUnhandledExceptionFilter));
   GlobalCases(h, "GetCommandLineA (sub_822979D0)", 0x820007EC, __imp__sub_822979D0,
-              hooks::CoreGetCommandLineA, false);
+              ITC_CONTEXT_FN(hooks::CoreGetCommandLineA), false);
   PositiveCases(h);
   NmsgWriteCases(h);
   BufferCases(h);

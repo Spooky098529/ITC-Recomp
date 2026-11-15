@@ -5,6 +5,7 @@
 // (sub_8209ED58), from SignInWatch::Update.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
@@ -45,12 +46,7 @@ ITC_FLAG_BOOL(native_mode_tick, true, "ITC",
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
 #define ITC_MODE_TICK(address, ...)     \
-  extern "C" REX_FUNC(sub_##address) {  \
-    REX_FUNC_PROLOGUE();                \
-    if (!ITC_FLAG(native_mode_tick)) {  \
-      __imp__sub_##address(ctx, base);  \
-      return;                           \
-    }                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_mode_tick)) { \
     __VA_ARGS__;                        \
   }
 
@@ -80,11 +76,11 @@ ITC_MODE_TICK(8209F318, ActionMappersSetBlocked(base, ctx.r3.u32))
 // for type 1, Stages::Copy's out (the frame's +80, from the original's r1,
 // whose high word its stwu leaves). Where Stages::Copy's plain C++ declines,
 // the original from the start.
-extern "C" REX_FUNC(sub_82106868) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82106868) {
+  
   const uint32_t frame = ctx.r1.u32 - kSetChecksFrame;
   if (!ITC_FLAG(native_mode_tick) || !ModesSetChecks(base, ctx.r4.u32, frame)) {
-    __imp__sub_82106868(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82106868);
     return;
   }
   if (ctx.r4.s32 == 1) {
@@ -104,11 +100,11 @@ ITC_MODE_TICK(822934B8, if (PresenceSetForMode(base, ctx.r13.u32, ctx.r3.u32)) c
 // prompts' handlers); r3 = the last name's address as wcscpy and memset
 // leave it (sign-extended, as the original's addi). Where the plain C++
 // says so (the prompts' states, CheckIdle's traps), the original.
-extern "C" REX_FUNC(sub_8209EEC8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209EEC8) {
+  
   if (!ITC_FLAG(native_mode_tick) ||
       !SignInWatchUpdate(base, ctx.r1.u32 - kSignInWatchUpdateFrame)) {
-    __imp__sub_8209EEC8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209EEC8);
     return;
   }
   ctx.r3.s64 = int32_t(kLastName);
@@ -129,7 +125,7 @@ constexpr uint32_t kScene = 0x826BABA0;
 // A call through slot `slot` of r3's vtable, returning to `return_address`.
 // (The render manager's slot 8 by its plain C++ where it's the game's,
 // hooks::DirectSlotCall.)
-void VtableCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_address) {
+void VtableCall(lifted::Regs& ctx, uint8_t* base, uint32_t slot, uint32_t return_address) {
   ctx.lr = return_address;
   const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot);
   if (!hooks::DirectSlotCall(ctx, base, function)) {
@@ -140,7 +136,7 @@ void VtableCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_a
 // A chunk handed to the render queue `queue` (its slot 4, sub_8258EDC8 in
 // play, which adds it to the queue's entries: r4 = the chunk, r5 = the key,
 // f1 = the depth's float at `depth`).
-void Submit(PPCContext& ctx, uint8_t* base, uint32_t queue, uint32_t chunk, uint32_t key,
+void Submit(lifted::Regs& ctx, uint8_t* base, uint32_t queue, uint32_t chunk, uint32_t key,
             uint32_t depth, uint32_t return_address) {
   ctx.r3.u64 = queue;
   ctx.r4.u64 = chunk;
@@ -155,7 +151,7 @@ void Submit(PPCContext& ctx, uint8_t* base, uint32_t queue, uint32_t chunk, uint
 // queue (four getters), then the two chunks natively, each handed on; where
 // they wouldn't fit, the original (whose getters are then called again,
 // never seen in play).
-void RecordScissor(PPCContext& ctx, uint8_t* base, uint32_t key) {
+void RecordScissor(lifted::Regs& ctx, uint8_t* base, uint32_t key) {
   bool fit = false;
   guest_call::InFrame(ctx, base, 160, 0x8209CE90, [&](uint32_t) {
     ctx.r3.u64 = guest::LoadU32(base, kScene);
@@ -180,7 +176,7 @@ void RecordScissor(PPCContext& ctx, uint8_t* base, uint32_t key) {
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = double(guest::LoadFloat(base, 0x82001C00));
     ctx.lr = 0x8209D348;
-    __imp__sub_8209CE68(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209CE68);
   }
 }
 
@@ -188,14 +184,14 @@ void RecordScissor(PPCContext& ctx, uint8_t* base, uint32_t key) {
 // key) natively, its chunk handed to the render queue at [0x826D83D0] from a
 // 368-byte frame like the original's; where the plain C++ declines, the
 // original.
-void RecordColorRect(PPCContext& ctx, uint8_t* base, uint32_t rect, uint32_t key) {
+void RecordColorRect(lifted::Regs& ctx, uint8_t* base, uint32_t rect, uint32_t key) {
   const auto chunk = mode_tick::ColorRectRecordFlat(base, rect);
   if (!chunk) {
     ctx.r3.u64 = rect;
     ctx.r4.u64 = mode_tick::kFadeCameraPass;
     ctx.r5.u64 = key;
     ctx.lr = 0x8209D35C;
-    __imp__sub_8217A370(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8217A370);
     return;
   }
   guest_call::InFrame(ctx, base, 368, 0x8217A74C, [&](uint32_t) {
@@ -206,10 +202,10 @@ void RecordColorRect(PPCContext& ctx, uint8_t* base, uint32_t rect, uint32_t key
 
 }  // namespace
 
-void hooks::ModeTickScreenFadesUpdate(PPCContext& ctx, uint8_t* base) {
+void hooks::ModeTickScreenFadesUpdate(lifted::Regs& ctx, uint8_t* base) {
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
       ITC_FLAG(log_recording_by_pass)) {
-    __imp__sub_8209D130(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209D130);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -230,7 +226,7 @@ ITC_MODE_TICK(8209D130, hooks::ModeTickScreenFadesUpdate(ctx, base))
 // Music::Play: r3, r5 = two pointers passed on, r4 = the music's name; r3 as
 // the call through [0x826C5C80]'s slot 4 leaves it, made from a 288-byte
 // frame like the original's (the ids its r7 and r8 point at in it).
-void hooks::ModesTickSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::ModesTickSteps(lifted::Regs& ctx, uint8_t* base) {
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
     return {mode_tick::ModesTick(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
                                  uint32_t(a.r[1])),
@@ -238,7 +234,7 @@ void hooks::ModesTickSteps(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void hooks::ModeTickMusicPlay(PPCContext& ctx, uint8_t* base) {
+void hooks::ModeTickMusicPlay(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t name = ctx.r4.u32;
   const uint64_t a = ctx.r3.u64, name64 = ctx.r4.u64, b = ctx.r5.u64;
   const uint64_t lr = ctx.lr;
@@ -259,10 +255,10 @@ void hooks::ModeTickMusicPlay(PPCContext& ctx, uint8_t* base) {
 ITC_MODE_TICK(821063B0, hooks::ModeTickMusicPlay(ctx, base))
 
 // SignInWatch::StaticInit: no arguments; r3 = atexit's.
-extern "C" REX_FUNC(sub_825D9518) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825D9518) {
+  
   if (!ITC_FLAG(native_mode_tick) || !hooks::NativeAtexit()) {
-    __imp__sub_825D9518(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825D9518);
     return;
   }
   hooks::GuestAtexit guest{ctx, base};

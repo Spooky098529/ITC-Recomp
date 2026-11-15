@@ -493,12 +493,12 @@ void WheelsTopDraws(Context& h, uint32_t block, uint32_t race, uint32_t top) {
   const uint32_t source = block + kSource;
   const uint32_t scene = race + 0x10000;
   const TopTarget targets[] = {
-      {"SceneWheels::Draw (sub_820ECE28)", __imp__sub_820ECE28, hooks::CarDrawSceneWheels, 192,
+      {"SceneWheels::Draw (sub_820ECE28)", __imp__sub_820ECE28, ITC_CONTEXT_FN(hooks::CarDrawSceneWheels), 192,
        TopKind::kScene},
-      {"WheelPoints::Draw (sub_820ECA30)", __imp__sub_820ECA30, NativeWheelsPointsDraw, 128,
+      {"WheelPoints::Draw (sub_820ECA30)", __imp__sub_820ECA30, ITC_CONTEXT_FN(NativeWheelsPointsDraw), 128,
        TopKind::kDraw},
       {"WheelPoints::DrawMorphed (sub_820ECB68)", __imp__sub_820ECB68,
-       NativeWheelsPointsDrawMorphed, 128, TopKind::kDrawMorphed},
+       ITC_CONTEXT_FN(NativeWheelsPointsDrawMorphed), 128, TopKind::kDrawMorphed},
   };
   for (const TopTarget& target : targets) {
     Results results(target.name);

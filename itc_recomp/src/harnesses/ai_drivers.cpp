@@ -814,7 +814,7 @@ void AiDrivers(Context& h) {
        NativePickTargetBehind, kPickTargetBehind, 3000},
       {"AiDriver::KeepsGapFrom (sub_82145048)", Original<__imp__sub_82145048>,
        NativeKeepsGapFrom, kKeepsGapFrom, 3000},
-      {"AiDriver::SetParams (sub_82138D00)", Original<__imp__sub_82138D00>, NativeSetParams,
+      {"AiDriver::SetParams (sub_82138D00)", Original<__imp__sub_82138D00>, ITC_CONTEXT_FN(NativeSetParams),
        kSetParams, 500},
       {"AiDriver::SetSkill (sub_821393D8)", Original<__imp__sub_821393D8>, NativeSetSkill,
        kSetSkill, 1000},
@@ -822,7 +822,7 @@ void AiDrivers(Context& h) {
        kClearPlan, 500},
       {"AiDriver::LimitSpeedBlend (sub_82139B40)", Original<__imp__sub_82139B40>,
        NativeLimitSpeedBlend, kLimitSpeedBlend, 3000},
-      {"AiPath::SetMode (sub_8213D508)", Original<__imp__sub_8213D508>, NativeSetMode,
+      {"AiPath::SetMode (sub_8213D508)", Original<__imp__sub_8213D508>, ITC_CONTEXT_FN(NativeSetMode),
        kSetMode, 500},
       {"AiPath::ResetFor (sub_8213E658)", Original<__imp__sub_8213E658>, NativeResetFor,
        kResetFor, 300},
@@ -858,7 +858,7 @@ void AiDrivers(Context& h) {
        kStartRace, 500},
       {"AiDriver::ResetFollow (sub_821467B8)", Original<__imp__sub_821467B8>,
        NativeResetFollow, kResetFollow, 200},
-      {"AiDrivers::AllSettled (sub_8213ADF8)", Original<__imp__sub_8213ADF8>, NativeAllSettled,
+      {"AiDrivers::AllSettled (sub_8213ADF8)", Original<__imp__sub_8213ADF8>, ITC_CONTEXT_FN(NativeAllSettled),
        kAllSettled, 1000},
       {"AiDriver::AccumulateSteer (sub_82138F00)", Original<__imp__sub_82138F00>,
        NativeAccumulateSteer, kAccumulateSteer, 3000},
@@ -879,7 +879,7 @@ void AiDrivers(Context& h) {
       {"AiDriver::Reset (sub_8213AAA8)", Original<__imp__sub_8213AAA8>, NativeResetDriver,
        kResetDriver, 300},
       {"AiDriver::UpdateSteerInput (sub_8213AC70)", Original<__imp__sub_8213AC70>,
-       NativeUpdateSteerInput, kUpdateSteerInput, 3000},
+       ITC_CONTEXT_FN(NativeUpdateSteerInput), kUpdateSteerInput, 3000},
       {"AiPath::DropPassedSections (sub_8213BA48)", Original<__imp__sub_8213BA48>,
        NativeDropPassedSections, kDropPassedSections, 3000},
       {"AiPath::SharesSections (sub_8213C010)", Original<__imp__sub_8213C010>,
@@ -889,7 +889,7 @@ void AiDrivers(Context& h) {
       {"AiPathEntry::NarrowToOther (sub_8213C420)", Original<__imp__sub_8213C420>,
        NativeNarrowToOther, kNarrowToOther, 3000},
       {"AiPath::AdvanceCorners (sub_8213D020)", Original<__imp__sub_8213D020>,
-       NativeAdvanceCorners, kAdvanceCorners, 3000},
+       ITC_CONTEXT_FN(NativeAdvanceCorners), kAdvanceCorners, 3000},
       {"AiDriver::Restart (sub_821395D0)", Original<__imp__sub_821395D0>, NativeRestart,
        kRestart, 300},
       {"AiDrivers::ResetAll (sub_82139750)", Original<__imp__sub_82139750>, NativeResetAll,
@@ -907,9 +907,9 @@ void AiDrivers(Context& h) {
       {"AiPath::JoinCornersShort (sub_8213BF28)", Original<__imp__sub_8213BF28>,
        NativeJoinCornersShort, kJoinCornersShort, 3000},
       {"AiPath::JoinCornerPair (sub_8213DD40)", Original<__imp__sub_8213DD40>,
-       NativeJoinCornerPair, kJoinCornerPair, 3000},
+       ITC_CONTEXT_FN(NativeJoinCornerPair), kJoinCornerPair, 3000},
       {"AiPath::AddCornersAt (sub_8213E970)", Original<__imp__sub_8213E970>,
-       NativeAddCornersAt, kAddCornersAt, 3000},
+       ITC_CONTEXT_FN(NativeAddCornersAt), kAddCornersAt, 3000},
       {"AiDriver::UpdateState2 (sub_82145F48)", Original<__imp__sub_82145F48>,
        NativeUpdateState2, kUpdateState2, 3000},
       {"AiDriver::UpdateState3 (sub_821460C8)", Original<__imp__sub_821460C8>,
@@ -925,7 +925,7 @@ void AiDrivers(Context& h) {
       {"AiDriver::UpdateSpeed (sub_8213ACD0)", Original<__imp__sub_8213ACD0>, NativeUpdateSpeed,
        kUpdateSpeed, 3000},
       {"AiDriver::SteerToTarget (sub_82138D78)", Original<__imp__sub_82138D78>,
-       NativeSteerToTarget, kSteerToTarget, 3000},
+       ITC_CONTEXT_FN(NativeSteerToTarget), kSteerToTarget, 3000},
       {"AiDriver::UpdatePedals (sub_8213A428)", Original<__imp__sub_8213A428>,
        NativeUpdatePedals, kUpdatePedals, 3000},
       {"AiPath::ApplyCornerLine (sub_8213BB58)", Original<__imp__sub_8213BB58>,
@@ -984,7 +984,7 @@ void AiDrivers(Context& h) {
        Original<__imp__sub_8213AB40>, NativeSteerIntoCorner, kSteerIntoCorner, 3000},
       {"AiDriver::UpdateSteering (sub_8213AEF0)", Original<__imp__sub_8213AEF0>,
        NativeUpdateSteering, kUpdateSteering, 3000},
-      {"AiDriver::Drive (sub_8213B058)", Original<__imp__sub_8213B058>, NativeDrive, kDrive,
+      {"AiDriver::Drive (sub_8213B058)", Original<__imp__sub_8213B058>, ITC_CONTEXT_FN(NativeDrive), kDrive,
        3000},
       {"AiPath::ContinueLine (sub_8213DB08)", Original<__imp__sub_8213DB08>, NativeContinueLine,
        kContinueLine, 2000},
@@ -1012,7 +1012,7 @@ void AiDrivers(Context& h) {
        NativeFollowLeaderBranch, kFollowLeaderBranch, 1000},
       {"AiDriver::CompareWith (sub_82145B08)", Original<__imp__sub_82145B08>, NativeCompareWith,
        kCompareWith, 2000},
-      {"AiDrivers::UpdateAll (sub_82139628)", Original<__imp__sub_82139628>, NativeUpdateAll,
+      {"AiDrivers::UpdateAll (sub_82139628)", Original<__imp__sub_82139628>, ITC_CONTEXT_FN(NativeUpdateAll),
        kUpdateAll, 500},
       {"AiOther::PlanReaction (sub_821456F8)", Original<__imp__sub_821456F8>, NativePlanReaction,
        kPlanReaction, 3000},
@@ -1032,17 +1032,17 @@ void AiDrivers(Context& h) {
        kKeepBranch, 3000},
       {"AiPath::LeftEntry (sub_8213F140)", Original<__imp__sub_8213F140>, NativeLeftEntry,
        kLeftEntry, 3000},
-      {"AiPath::DropPassed (sub_8213F2E0)", Original<__imp__sub_8213F2E0>, NativeDropPassed,
+      {"AiPath::DropPassed (sub_8213F2E0)", Original<__imp__sub_8213F2E0>, ITC_CONTEXT_FN(NativeDropPassed),
        kDropPassed, 3000},
-      {"AiPath::Extend (sub_8213ECF8)", Original<__imp__sub_8213ECF8>, NativeExtend, kExtend,
+      {"AiPath::Extend (sub_8213ECF8)", Original<__imp__sub_8213ECF8>, ITC_CONTEXT_FN(NativeExtend), kExtend,
        2000},
-      {"AiPath::Update (sub_8213F530)", Original<__imp__sub_8213F530>, NativeUpdatePath,
+      {"AiPath::Update (sub_8213F530)", Original<__imp__sub_8213F530>, ITC_CONTEXT_FN(NativeUpdatePath),
        kUpdatePath, 2000},
-      {"AiDriver::Update (sub_8213B310)", Original<__imp__sub_8213B310>, NativeUpdateDriver,
+      {"AiDriver::Update (sub_8213B310)", Original<__imp__sub_8213B310>, ITC_CONTEXT_FN(NativeUpdateDriver),
        kUpdateDriver, 2000},
-      {"AiDriver::DriveCar (sub_8215F678)", Original<__imp__sub_8215F678>, NativeDriveCar,
+      {"AiDriver::DriveCar (sub_8215F678)", Original<__imp__sub_8215F678>, ITC_CONTEXT_FN(NativeDriveCar),
        kDriveCar, 2000},
-      {"AiDriver::UpdateIdle (sub_821399A8)", Original<__imp__sub_821399A8>, NativeUpdateIdle,
+      {"AiDriver::UpdateIdle (sub_821399A8)", Original<__imp__sub_821399A8>, ITC_CONTEXT_FN(NativeUpdateIdle),
        kUpdateIdle, 2000},
       // Last, so the cases before them keep the shared generator's inputs
       // (a different stream makes AiDriver::DriveCar's case 540 fault on the
@@ -3482,7 +3482,7 @@ void AiDrivers(Context& h) {
         guest::StoreU32(h.base, kVehiclesGlobal, array);
         PPCContext t = CallContext(h);
         t.fpscr.disableFlushModeUnconditional();
-        (v == 0 ? Original<__imp__sub_8213B1E0> : NativeCreate)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8213B1E0> : ITC_CONTEXT_FN(NativeCreate))(t, h.base);
         const uint32_t made = guest::LoadU32(h.base, ai::kDrivers);
         guest::StoreU32(h.base, ai::kDrivers, saved_drivers);
         guest::StoreU32(h.base, kVehiclesGlobal, saved_vehicles);
@@ -3539,7 +3539,7 @@ void AiDrivers(Context& h) {
         guest::StoreU32(h.base, ai::kDrivers, made);
         PPCContext t = CallContext(h);
         t.r3.u64 = r3;
-        (v == 0 ? Original<__imp__sub_8213B2B8> : NativeDestroy)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8213B2B8> : ITC_CONTEXT_FN(NativeDestroy))(t, h.base);
         out[v].Word(guest::LoadU32(h.base, ai::kDrivers));
         out[v].Word(made == 0 ? 2 : memory::IsHeapBlock(made) ? 1 : 0);
         out[v].Word(uint32_t(t.r3.u64 >> 32));

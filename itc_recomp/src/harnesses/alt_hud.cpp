@@ -462,7 +462,7 @@ void SetUps(Context& h, const World& w) {
           t.r3.u64 = r.Next();
           t.r4.u64 = car;
         },
-        __imp__sub_82216B08, hooks::AltHudPowerClass, spec);
+        __imp__sub_82216B08, ITC_CONTEXT_FN(hooks::AltHudPowerClass), spec);
   }
   {
     Spec spec;
@@ -480,7 +480,7 @@ void SetUps(Context& h, const World& w) {
           t.r3.u64 = w.holder();
           t.f1.f64 = AnyDouble(r, 10.0f);
         },
-        __imp__sub_82216C40, hooks::AltHudSetUpGauges, spec);
+        __imp__sub_82216C40, ITC_CONTEXT_FN(hooks::AltHudSetUpGauges), spec);
   }
   {
     // The build's five entries' types 0 to 5 (or any) and its +12 now and
@@ -498,7 +498,7 @@ void SetUps(Context& h, const World& w) {
           guest::StoreU32(h.base, w.build() + 12, r.Below(4) == 0 ? 10 : r.Below(12));
           t.r3.u64 = w.holder();
         },
-        __imp__sub_822178A0, hooks::AltHudSetUpExtraGauges, spec);
+        __imp__sub_822178A0, ITC_CONTEXT_FN(hooks::AltHudSetUpExtraGauges), spec);
   }
   {
     Spec spec;
@@ -511,7 +511,7 @@ void SetUps(Context& h, const World& w) {
           t.r4.u64 = r.Below(3);
           t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
         },
-        __imp__sub_82217380, hooks::AltHudShowGauge, spec);
+        __imp__sub_82217380, ITC_CONTEXT_FN(hooks::AltHudShowGauge), spec);
   }
   {
     Spec spec;
@@ -520,7 +520,7 @@ void SetUps(Context& h, const World& w) {
     Group(
         h, w, "AltHud::ShowPanels (sub_82216D78)", 100,
         [&](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.holder(); },
-        __imp__sub_82216D78, hooks::AltHudShowPanels, spec);
+        __imp__sub_82216D78, ITC_CONTEXT_FN(hooks::AltHudShowPanels), spec);
   }
   {
     // The player 0 to 3 (r4); the record's car as PowerClass's cases, the
@@ -544,7 +544,7 @@ void SetUps(Context& h, const World& w) {
           t.r4.u64 = player;
           t.f1.f64 = AnyDouble(r, 10.0f);
         },
-        __imp__sub_82217C70, hooks::AltHudSetUp, spec);
+        __imp__sub_82217C70, ITC_CONTEXT_FN(hooks::AltHudSetUp), spec);
   }
 }
 
@@ -562,7 +562,7 @@ void Setters(Context& h, const World& w) {
           t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(1100);
           t.f1.f64 = AnyDouble(r, 10.0f);
         },
-        __imp__sub_82216E00, hooks::AltHudSetSpeed, spec);
+        __imp__sub_82216E00, ITC_CONTEXT_FN(hooks::AltHudSetSpeed), spec);
   }
   {
     // The slots 0 to 2 or other words; the digits' originals run.
@@ -578,7 +578,7 @@ void Setters(Context& h, const World& w) {
           t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(200);
           t.r6.u64 = r.Below(3) == 0 ? r.Next() : r.Below(200);
         },
-        __imp__sub_82217A30, hooks::AltHudUpdateExtraGauges, spec);
+        __imp__sub_82217A30, ITC_CONTEXT_FN(hooks::AltHudUpdateExtraGauges), spec);
   }
   for (int which = 0; which < 2; which++) {
     Spec spec;
@@ -592,7 +592,7 @@ void Setters(Context& h, const World& w) {
           t.r4.u64 = r.Below(4) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(10)) - 2));
         },
         which ? __imp__sub_822174E0 : __imp__sub_82217460,
-        which ? hooks::AltHudSetNode25 : hooks::AltHudSetGear, spec);
+        which ? ITC_CONTEXT_FN(hooks::AltHudSetNode25) : ITC_CONTEXT_FN(hooks::AltHudSetGear), spec);
   }
   for (int boost = 0; boost < 2; boost++) {
     Spec spec;
@@ -606,7 +606,7 @@ void Setters(Context& h, const World& w) {
           t.f1.f64 = AnyDouble(r, 120.0f);
         },
         boost ? __imp__sub_82217538 : __imp__sub_822173E8,
-        boost ? hooks::AltHudSetBoost : hooks::AltHudSetTach, spec);
+        boost ? ITC_CONTEXT_FN(hooks::AltHudSetBoost) : ITC_CONTEXT_FN(hooks::AltHudSetTach), spec);
   }
   {
     // +232 and +236 (the range) floats or anything.
@@ -621,16 +621,16 @@ void Setters(Context& h, const World& w) {
           t.r3.u64 = w.holder();
           t.f1.f64 = AnyDouble(r, 100.0f);
         },
-        __imp__sub_822175A0, hooks::AltHudSetBar, spec);
+        __imp__sub_822175A0, ITC_CONTEXT_FN(hooks::AltHudSetBar), spec);
   }
   {
     static constexpr struct {
       const char* name;
       GuestFunction recompiled, native;
     } kInputs[3] = {
-        {"AltHud::SetThrottle (sub_82217638)", __imp__sub_82217638, hooks::AltHudSetThrottle},
-        {"AltHud::SetBrake (sub_82217690)", __imp__sub_82217690, hooks::AltHudSetBrake},
-        {"AltHud::SetSteering (sub_822176E8)", __imp__sub_822176E8, hooks::AltHudSetSteering},
+        {"AltHud::SetThrottle (sub_82217638)", __imp__sub_82217638, ITC_CONTEXT_FN(hooks::AltHudSetThrottle)},
+        {"AltHud::SetBrake (sub_82217690)", __imp__sub_82217690, ITC_CONTEXT_FN(hooks::AltHudSetBrake)},
+        {"AltHud::SetSteering (sub_822176E8)", __imp__sub_822176E8, ITC_CONTEXT_FN(hooks::AltHudSetSteering)},
     };
     for (const auto& in : kInputs) {
       Spec spec;
@@ -681,7 +681,7 @@ void Ticks(Context& h, const World& w) {
           guest::StoreU32(h.base, w.object() + 236, Bits(AnyFloat(r, 100.0f)));
           t.r3.u64 = w.holder();
         },
-        __imp__sub_82217AC8, hooks::AltHudTick, spec);
+        __imp__sub_82217AC8, ITC_CONTEXT_FN(hooks::AltHudTick), spec);
   }
   {
     // UiMovie::Run's update recorded (its r1, lr, r3 and r4 compared).
@@ -691,7 +691,7 @@ void Ticks(Context& h, const World& w) {
     Group(
         h, w, "AltHud::RunMovie (sub_82216C00)", 100,
         [&](PPCContext& t, Random& r, const World&) { t.r3.u64 = r.Next(); },
-        __imp__sub_82216C00, hooks::AltHudRunMovie, spec);
+        __imp__sub_82216C00, ITC_CONTEXT_FN(hooks::AltHudRunMovie), spec);
   }
   {
     // MenuList::PressedX alone.
@@ -701,7 +701,7 @@ void Ticks(Context& h, const World& w) {
     Group(
         h, w, "MenuList::PressedX (sub_8220BF00)", 300,
         [&](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.list(); },
-        __imp__sub_8220BF00, hooks::AltHudMenuListPressedX, spec);
+        __imp__sub_8220BF00, ITC_CONTEXT_FN(hooks::AltHudMenuListPressedX), spec);
   }
 }
 
@@ -730,7 +730,7 @@ void Releases(Context& h) {
       WriteRandom(h.base, sp - kStackBytes, kStackBytes, r);
       t.r3.u64 = list.address;
       ITC_FLAG(native_alt_hud) = v == 1;
-      (v == 0 ? __imp__sub_8220BBB0 : hooks::AltHudMenuListRelease)(t, h.base);
+      (v == 0 ? __imp__sub_8220BBB0 : ITC_CONTEXT_FN(hooks::AltHudMenuListRelease))(t, h.base);
       ITC_FLAG(native_alt_hud) = true;
       out[v].Word(pages != 0 ? 1 : 0);
       out[v].Word(pages != 0 && memory::IsPages(pages) ? 1 : 0);
@@ -783,7 +783,7 @@ void Destroys(Context& h) {
       WriteRandom(h.base, sp - kStackBytes, kStackBytes, r);
       t.r3.u64 = holder.address;
       ITC_FLAG(native_alt_hud) = v == 1;
-      (v == 0 ? __imp__sub_82216BA8 : hooks::AltHudDestroy)(t, h.base);
+      (v == 0 ? __imp__sub_82216BA8 : ITC_CONTEXT_FN(hooks::AltHudDestroy))(t, h.base);
       ITC_FLAG(native_alt_hud) = true;
       out[v].Word(object != 0 ? 1 : 0);
       out[v].Word(pages != 0 ? 1 : 0);

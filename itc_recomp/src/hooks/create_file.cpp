@@ -6,6 +6,7 @@
 // shows the dirty disc error.)
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -26,7 +27,7 @@ namespace hooks {
 
 // CreateFile's register steps (the adapter's and the harness's): r3 the
 // path, r4 the access, r5 the sharing, r7 the disposition, r8 the flags.
-void CreateFileSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CreateFileSteps) {
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
     return {game_data::CreateFile(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
                                   uint32_t(a.r[1]), uint32_t(a.r[2]), uint32_t(a.r[4]),
@@ -38,8 +39,8 @@ void CreateFileSteps(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 // CreateFile: r3 = path; returns the handle, or -1.
-extern "C" REX_FUNC(sub_82295508) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82295508) {
+  
   std::string path;
   for (uint32_t p = ctx.r3.u32; p && path.size() < 260; p++) {
     char c = char(guest::LoadU8(base, p));
@@ -54,6 +55,6 @@ extern "C" REX_FUNC(sub_82295508) {
   if (ITC_FLAG(native_create_file)) {
     hooks::CreateFileSteps(ctx, base);
   } else {
-    __imp__sub_82295508(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82295508);
   }
 }

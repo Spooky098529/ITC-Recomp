@@ -103,7 +103,7 @@ void CreateFile(Context& h) {
       t.r6.u64 = 0;
       t.r7.u64 = c.disposition;
       t.r8.u64 = c.flags;
-      (v == 0 ? __imp__sub_82295508 : hooks::CreateFileSteps)(t, h.base);
+      (v == 0 ? __imp__sub_82295508 : ITC_CONTEXT_FN(hooks::CreateFileSteps))(t, h.base);
       const bool failed = t.r3.u32 == 0xFFFFFFFFu;
       if (!failed) {
         PPCContext close = CallContext(h);

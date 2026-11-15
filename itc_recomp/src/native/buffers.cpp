@@ -26,6 +26,7 @@
 // Every 5 s, a summary by caller.
 
 #include "buffers.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "frame_pacing/game_messages.h"
@@ -716,8 +717,8 @@ bool Buffers_Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32
 // The copy itself is native (c_runtime::Memcpy, --native_memcpy) where the
 // ranges don't share memory; r3 stays the destination either way, and the
 // other registers the original changes are read by no caller.
-extern "C" REX_FUNC(sub_825A7410) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A7410) {
+  
   native::CopyWithRecords(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr), [&] {
     if (!ITC_FLAG(native_memcpy) ||
         !c_runtime::Memcpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {

@@ -220,7 +220,7 @@ void Lists(Context& h, Random& r, uint32_t block) {
           }
           t.r3.u64 = list;
         },
-        __imp__sub_82147FB8, hooks::SceneryListsModelListRelease, {},
+        __imp__sub_82147FB8, ITC_CONTEXT_FN(hooks::SceneryListsModelListRelease), {},
         fmt::format("case {}", c));
   }
   results.Report();
@@ -234,7 +234,7 @@ void DrawState(Context& h, Random& r, uint32_t block) {
     for (int c = 0; c < 16; c++) {
       Case(
           h, results, block, r, [&](PPCContext& t) { t.r3.u64 = block + 16 * r.Below(64); },
-          __imp__sub_82146AA8, hooks::SceneryListsResetDrawState, {}, fmt::format("case {}", c));
+          __imp__sub_82146AA8, ITC_CONTEXT_FN(hooks::SceneryListsResetDrawState), {}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -261,7 +261,7 @@ void DrawState(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = set;
             t.r4.u64 = index;
           },
-          __imp__sub_82146B80, hooks::SceneryListsAnimationCurrentFrame, {},
+          __imp__sub_82146B80, ITC_CONTEXT_FN(hooks::SceneryListsAnimationCurrentFrame), {},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -277,7 +277,7 @@ void DrawState(Context& h, Random& r, uint32_t block) {
             t.r5.u64 = r.Next();
             t.r6.u64 = r.Next();
           },
-          __imp__sub_82148650, hooks::SceneryListsSetBillboardPass, {},
+          __imp__sub_82148650, ITC_CONTEXT_FN(hooks::SceneryListsSetBillboardPass), {},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -291,7 +291,7 @@ void DrawState(Context& h, Random& r, uint32_t block) {
             RandomBytes(h.base, 0x8296B8B8, 0x20, r);
             t.r3.u64 = r.Below(4) == 0 ? r.Next() : uint64_t(r.Below(2) ? 11 : r.Below(16));
           },
-          __imp__sub_82589970, hooks::SceneryListsDepthVertexDeclaration, {},
+          __imp__sub_82589970, ITC_CONTEXT_FN(hooks::SceneryListsDepthVertexDeclaration), {},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -309,13 +309,13 @@ void Picks(Context& h, Random& r, uint32_t block) {
   };
   const Pick picks[] = {
       {"ModelList::IsBEntryOn (sub_82147850)", __imp__sub_82147850,
-       hooks::SceneryListsIsBEntryOn, 14},
+       ITC_CONTEXT_FN(hooks::SceneryListsIsBEntryOn), 14},
       {"ModelList::IsCEntryOn (sub_82147958)", __imp__sub_82147958,
-       hooks::SceneryListsIsCEntryOn, 27},
+       ITC_CONTEXT_FN(hooks::SceneryListsIsCEntryOn), 27},
       {"Race::CourseLayout (sub_8228F408)", __imp__sub_8228F408,
-       hooks::SceneryListsCourseLayout, 1},
+       ITC_CONTEXT_FN(hooks::SceneryListsCourseLayout), 1},
       {"PointList::IsEntryOn (sub_82147B18)", __imp__sub_82147B18,
-       hooks::SceneryListsPointListIsEntryOn, 22},
+       ITC_CONTEXT_FN(hooks::SceneryListsPointListIsEntryOn), 22},
   };
   for (const Pick& pick : picks) {
     Results results(pick.name);
@@ -364,7 +364,7 @@ void Provider(Context& h, Random& r, uint32_t block) {
     for (int c = 0; c < 64; c++) {
       Case(
           h, results, block, r, [&](PPCContext& t) { setup(t, false); }, __imp__sub_82594328,
-          hooks::SceneryListsTextureProviderClearAll, {}, fmt::format("case {}", c));
+          ITC_CONTEXT_FN(hooks::SceneryListsTextureProviderClearAll), {}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -383,7 +383,7 @@ void Provider(Context& h, Random& r, uint32_t block) {
                      t.r4.u32 >= (guest::LoadU32(h.base, block + 0x20C) -
                                   guest::LoadU32(h.base, block + 0x208)) / 4);
           },
-          __imp__sub_82594718, hooks::SceneryListsTextureProviderSet, {},
+          __imp__sub_82594718, ITC_CONTEXT_FN(hooks::SceneryListsTextureProviderSet), {},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -467,7 +467,7 @@ void Visibility(Context& h, Random& r, uint32_t block) {
           t.r5.u64 = world;
           t.r6.u64 = shape;
         },
-        __imp__sub_825951E0, hooks::SceneryListsIsShapeVisible, {}, fmt::format("case {}", c),
+        __imp__sub_825951E0, ITC_CONTEXT_FN(hooks::SceneryListsIsShapeVisible), {}, fmt::format("case {}", c),
         false, [&](const PPCContext& t, Outputs& out) {
           // The product the original leaves in its frame.
           out.Floats(h.base, t.r1.u32 - 96, 16);
@@ -516,7 +516,7 @@ void Recorders(Context& h, Random& r, uint32_t block) {
             t.r4.u64 = view_projection;
             t.r5.u64 = world;
           },
-          __imp__sub_825953D0, hooks::SceneryListsRecordObjectSteps,
+          __imp__sub_825953D0, ITC_CONTEXT_FN(hooks::SceneryListsRecordObjectSteps),
           {{slots + 16 - block, 32}}, fmt::format("case {}", c));
     }
     results.Report();
@@ -541,7 +541,7 @@ void Recorders(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = block + 0x100;
             t.r4.u64 = block + 0x500;
           },
-          __imp__sub_82595490, hooks::SceneryListsRecordSceneLights,
+          __imp__sub_82595490, ITC_CONTEXT_FN(hooks::SceneryListsRecordSceneLights),
           {{slots + 16 + 80 - block, 12}, {slots + 16 + 384 - block, 32},
            {slots + 16 + 640 - block, 92}},
           fmt::format("case {}", c));
@@ -605,7 +605,7 @@ void DepthDraws(Context& h, Random& r, uint32_t block) {
             t.r7.u64 = r.Below(2) ? 0 : 1u << r.Below(4);
             t.r8.u64 = r.Next();
           },
-          __imp__sub_825960D0, hooks::SceneryListsRecordShapeDepth, {},
+          __imp__sub_825960D0, ITC_CONTEXT_FN(hooks::SceneryListsRecordShapeDepth), {},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -648,7 +648,7 @@ void DepthDraws(Context& h, Random& r, uint32_t block) {
             t.r8.u64 = r.Below(2) ? 0 : 1u << r.Below(4);
             t.r9.u64 = r.Next();
           },
-          __imp__sub_82596D48, hooks::SceneryListsDrawShapeDepth,
+          __imp__sub_82596D48, ITC_CONTEXT_FN(hooks::SceneryListsDrawShapeDepth),
           {{0x8000 + 16, 32}, {0x400, 16}, {0x500, 16}}, fmt::format("case {}", c), false,
           [&](const PPCContext& t, Outputs& out) {
             // The product IsShapeVisible leaves in its frame (r1 - 256).
@@ -771,7 +771,7 @@ void SceneryShapes(Context& h, Random& r, uint32_t block) {
             t.r8.u64 = r.Below(2) ? 0 : block + 0x610;
             t.r9.u64 = r.Below(3);
           },
-          __imp__sub_82146BD0, hooks::SceneryListsRecordShape, {}, fmt::format("case {}", c),
+          __imp__sub_82146BD0, ITC_CONTEXT_FN(hooks::SceneryListsRecordShape), {}, fmt::format("case {}", c),
           false, [&](const PPCContext& t, Outputs& out) {
             // The original's stack temporaries (r1 - 304 + 80 to + 128).
             out.Bytes(Read(h.base, t.r1.u32 - 304 + 80, 48));
@@ -814,7 +814,7 @@ void SceneryShapes(Context& h, Random& r, uint32_t block) {
             t.r9.u64 = r.Below(2) ? 0 : block + 0x610;
             t.r10.u64 = r.Below(3);
           },
-          __imp__sub_82147D88, hooks::SceneryListsDrawShape, {}, fmt::format("case {}", c),
+          __imp__sub_82147D88, ITC_CONTEXT_FN(hooks::SceneryListsDrawShape), {}, fmt::format("case {}", c),
           false, [&](const PPCContext& t, Outputs& out) {
             // IsShapeVisible's product (r1 - 208 - 96) and RecordShape's
             // stack temporaries (r1 - 208 - 304 + 80 to + 128).
@@ -877,7 +877,7 @@ void ModelShapes(Context& h, Random& r, uint32_t block) {
             t.r7.u64 = r.Below(2) ? 0 : block + 0x600;
             t.r8.u64 = r.Below(2) ? 0 : block + 0x610;
           },
-          __imp__sub_82595550, hooks::SceneryListsModelRecordShape, {},
+          __imp__sub_82595550, ITC_CONTEXT_FN(hooks::SceneryListsModelRecordShape), {},
           fmt::format("case {}", c), false,
           [&](const PPCContext& t, Outputs& out) {
             // The stack temporaries (r1 - 304 + 80 to + 128) and the
@@ -931,7 +931,7 @@ void ModelShapes(Context& h, Random& r, uint32_t block) {
             t.r8.u64 = r.Below(2) ? 0 : block + 0x600;
             t.r9.u64 = r.Below(2) ? 0 : block + 0x610;
           },
-          __imp__sub_82596B18, hooks::SceneryListsModelDrawShape, {}, fmt::format("case {}", c),
+          __imp__sub_82596B18, ITC_CONTEXT_FN(hooks::SceneryListsModelDrawShape), {}, fmt::format("case {}", c),
           false, [&](const PPCContext& t, Outputs& out) {
             ITC_FLAG(native_models) = models_flag;
             // IsShapeVisible's product (r1 - 208 - 96) when no RecordShape
@@ -1029,7 +1029,7 @@ void CarMaterials(Context& h, Random& r, uint32_t block) {
           t.r5.u64 = r.Below(2);
           t.r6.u64 = r.Below(4) == 0 ? 0 : 1;
         },
-        __imp__sub_820CECA0, hooks::SceneryListsModelRecordMaterials, {},
+        __imp__sub_820CECA0, ITC_CONTEXT_FN(hooks::SceneryListsModelRecordMaterials), {},
         fmt::format("case {}", c), false,
         [&](const PPCContext& t, Outputs& out) {
           // The stack temporaries (r1 - 288 + 80 to + 112) and the
@@ -1106,7 +1106,7 @@ void PointLists(Context& h, Random& r, uint32_t block, uint32_t slots) {
           t.r4.u64 = entry;
           t.r5.u64 = pass;
         },
-        __imp__sub_82148058, hooks::SceneryListsPointListDraw, {}, fmt::format("case {}", c),
+        __imp__sub_82148058, ITC_CONTEXT_FN(hooks::SceneryListsPointListDraw), {}, fmt::format("case {}", c),
         false,
         [&](const PPCContext& t, Outputs& out) {
           const uint32_t record = guest::LoadU32(h.base, scenery_lists::kRecordList);
@@ -1235,7 +1235,7 @@ void DrawSetListsCases(Context& h, Random& r, uint32_t block, uint32_t slots) {
           t.r3.u64 = manager;
           t.r4.u64 = pass;
         },
-        __imp__sub_820F52A8, hooks::CourseSceneryDrawSetLists, {}, fmt::format("case {}", c),
+        __imp__sub_820F52A8, ITC_CONTEXT_FN(hooks::CourseSceneryDrawSetLists), {}, fmt::format("case {}", c),
         true,
         [&](const PPCContext& t, Outputs& out) {
           const uint32_t record = guest::LoadU32(h.base, scenery_lists::kRecordList);
@@ -1474,7 +1474,7 @@ void DrawAreaCases(Context& h, uint32_t block, uint32_t slots) {
           t.r24.u64 = uint32_t(r.Next());
           t.r28.u64 = uint32_t(r.Next());
         },
-        RecompiledDrawArea, NativeDrawArea, {}, fmt::format("case {}", c), false,
+        ITC_CONTEXT_FN(RecompiledDrawArea), ITC_CONTEXT_FN(NativeDrawArea), {}, fmt::format("case {}", c), false,
         [&](const PPCContext& t, Outputs& out) {
           const uint32_t record = guest::LoadU32(h.base, scenery_lists::kRecordList);
           const uint32_t end = guest::LoadU32(h.base, record + 44);
@@ -1817,7 +1817,7 @@ void SceneryDrawCases(Context& h, uint32_t block, uint32_t slots) {
           t.r24.u64 = uint32_t(r.Next());
           t.r28.u64 = uint32_t(r.Next());
         },
-        RecompiledSceneryDraw, NativeSceneryDraw, {}, fmt::format("case {}", c), true,
+        ITC_CONTEXT_FN(RecompiledSceneryDraw), ITC_CONTEXT_FN(NativeSceneryDraw), {}, fmt::format("case {}", c), true,
         [&](const PPCContext& t, Outputs& out) {
           const uint32_t record = guest::LoadU32(h.base, scenery_lists::kRecordList);
           const uint32_t end = guest::LoadU32(h.base, record + 44);
@@ -1956,9 +1956,9 @@ void ModelListLoads(Context& h, Random& r) {
       t.r3.u64 = list;
       t.r4.u64 = container;
       if (points) {
-        (v == 0 ? __imp__sub_82148528 : hooks::SceneryListsModelListLoadPoints)(t, h.base);
+        (v == 0 ? __imp__sub_82148528 : ITC_CONTEXT_FN(hooks::SceneryListsModelListLoadPoints))(t, h.base);
       } else {
-        (v == 0 ? __imp__sub_82148428 : hooks::SceneryListsModelListLoad)(t, h.base);
+        (v == 0 ? __imp__sub_82148428 : ITC_CONTEXT_FN(hooks::SceneryListsModelListLoad))(t, h.base);
       }
       const uint32_t frame = t.r1.u32 - (points ? 192 + 160 : 160);
       // The models, by the list's order (its data slots).

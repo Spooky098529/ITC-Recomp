@@ -5,6 +5,7 @@
 // data the game reads from it. See B5 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "guest_call.h"
 
 #include "user/network.h"
@@ -17,30 +18,30 @@ using guest_call::InFrame;
 
 // WSAStartup: r3 = version, r4 = the WSADATA (out, in the caller's frame,
 // never read). Returns 0, as the SDK did.
-extern "C" REX_FUNC(sub_82459B68) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82459B68) {
+  
   ctx.r3.u64 = user::kWsaStarted;
 }
 
 // Makes the system link socket (UDP, port 1000, non-blocking): not made, so
 // the handle is INVALID_SOCKET and system link stays off.
-extern "C" REX_FUNC(sub_82148958) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82148958) {
+  
   user::SystemLinkSocketNotMade(base);
 }
 
 // XNetGetTitleXnAddr: r3 = the XNADDR (36 bytes, out). The SDK's: the
 // loopback address, no online address or port, CC for each Ethernet address
 // byte, no online id.
-extern "C" REX_FUNC(sub_82459D50) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82459D50) {
+  
   ctx.r3.u64 = user::XNetGetTitleXnAddr(base, ctx.r3.u32);
 }
 
 // XNetXnAddrToMachineId: r3 = the XNADDR, r4 = the id (out, left alone).
 // Returns 1 (not signed in to Live), as the SDK did.
-extern "C" REX_FUNC(sub_82459D40) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82459D40) {
+  
   ctx.r3.u64 = user::kNoMachineId;
 }
 
@@ -151,8 +152,8 @@ uint32_t ProfileUser(uint8_t* base) {
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_8214E268) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8214E268) {
+  
   if (guest::LoadU32(base, kProfileOverlapped) != 997) {
     if (guest::LoadU32(base, kProfileWasRead)) {
       CopyRegion(base);

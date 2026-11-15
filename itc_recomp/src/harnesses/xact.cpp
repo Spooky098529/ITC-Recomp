@@ -377,7 +377,7 @@ void Hash(Context& h) {
             Write(h.base, d + 64, name, length + 1);
           },
           [&](PPCContext& t) { t.r3.u64 = 0x12345678; t.r4.u64 = d + 64; t.r5.u64 = size; },
-          __imp__sub_825BFC50, NativeHashName, {},
+          __imp__sub_825BFC50, ITC_CONTEXT_FN(NativeHashName), {},
           fmt::format("XACTHashName \"{}\" {:#x}", name, size));
     }
   }
@@ -396,7 +396,7 @@ void Hash(Context& h) {
           guest::StoreU8(h.base, d + 64 + length, 0);
         },
         [&](PPCContext& t) { t.r4.u64 = d + 64; t.r5.u64 = size; }, __imp__sub_825BFC50,
-        NativeHashName, {}, fmt::format("XACTHashName random {} ({} bytes)", i, length));
+        ITC_CONTEXT_FN(NativeHashName), {}, fmt::format("XACTHashName random {} ({} bytes)", i, length));
   }
   results.Report();
 }
@@ -844,7 +844,7 @@ void WaveBanks(Context& h) {
     Case(h, results, setup, args, __imp__sub_825C85E8, NativeWaveBankGetEntryCount, {},
          fmt::format("XACTWaveBank::GetEntryCount {}", i));
     if (index % 0x10000 < 40) {
-      Case(h, results, setup, args, __imp__sub_825CC320, NativeWaveBankGetWaveFormat, {},
+      Case(h, results, setup, args, __imp__sub_825CC320, ITC_CONTEXT_FN(NativeWaveBankGetWaveFormat), {},
            fmt::format("XACTWaveBank::GetWaveFormat {}", i));
     }
   }
@@ -860,7 +860,7 @@ void WaveBanks(Context& h) {
     auto args = [&](PPCContext& t) { t.r3.u64 = d + kEntry; t.r4.u64 = index; t.r5.u64 = d; };
     Case(h, results, setup, args, __imp__sub_825CED88, NativeWaveEntryConstruct, {},
          fmt::format("XACTWaveEntry::XACTWaveEntry {}", i));
-    Case(h, results, setup, args, __imp__sub_825CED98, NativeWaveEntrySet, {},
+    Case(h, results, setup, args, __imp__sub_825CED98, ITC_CONTEXT_FN(NativeWaveEntrySet), {},
          fmt::format("XACTWaveEntry::Set {}", i));
     Case(h, results, setup, args, __imp__sub_825CEDF8, NativeWaveEntryGetLoopRegion, {},
          fmt::format("XACTWaveEntry::GetLoopRegion {}", i));
@@ -880,7 +880,7 @@ void WaveBanks(Context& h) {
       }
     };
     Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d + kEntry; t.r4.u64 = samples; },
-         __imp__sub_825CEE70, NativeWaveEntrySamplesToMs, {},
+         __imp__sub_825CEE70, ITC_CONTEXT_FN(NativeWaveEntrySamplesToMs), {},
          fmt::format("XACTWaveEntry::SamplesToMs {}", i));
   }
   // FindXmaBlock: a seek table at +2048 (count 1-12; some unsorted), the
@@ -1034,7 +1034,7 @@ void CuesAndSounds(Context& h) {
       guest::StoreU32(h.base, d + 40, d + 36);
     };
     Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = d + 1024; },
-         __imp__sub_825CA980, NativeSoundSetTrackParameter, {},
+         __imp__sub_825CA980, ITC_CONTEXT_FN(NativeSoundSetTrackParameter), {},
          fmt::format("XACTSound::SetTrackParameter {}", i));
     const uint32_t state = i < 10 ? uint32_t(i) : uint32_t(h.random.Next());
     if (state != 1 && state != 2) {
@@ -1048,7 +1048,7 @@ void CuesAndSounds(Context& h) {
     CheckDeclines(h, results, NativeFaderStep, d, 0, fmt::format("XACTFader::Step {}", state));
   }
   guest::StoreU32(h.base, d + 40, d + 512);
-  CheckDeclines(h, results, NativeSoundSetTrackParameter, d, 0, "XACTSound::SetTrackParameter");
+  CheckDeclines(h, results, ITC_CONTEXT_FN(NativeSoundSetTrackParameter), d, 0, "XACTSound::SetTrackParameter");
   results.Report();
 }
 
@@ -1133,9 +1133,9 @@ void Constructors(Context& h) {
         t.r6.u64 = record;
         t.r7.u64 = index;
       };
-      Case(h, results, setup, args, __imp__sub_825C5E58, NativeCueBaseConstruct,
+      Case(h, results, setup, args, __imp__sub_825C5E58, ITC_CONTEXT_FN(NativeCueBaseConstruct),
            {{28, 32}, {44, 48}}, fmt::format("XACTCueBase::XACTCueBase {}", i));
-      Case(h, results, setup, args, __imp__sub_825C67E8, NativeCueConstruct,
+      Case(h, results, setup, args, __imp__sub_825C67E8, ITC_CONTEXT_FN(NativeCueConstruct),
            {{28, 32}, {44, 48}}, fmt::format("XACTCue::XACTCue {}", i));
     }
     Fill(h.base, d, kScratchBytes);
@@ -1371,7 +1371,7 @@ void GlobalSettings(Context& h) {
                    : double(std::bit_cast<float>(FloatWord(h.random)));
     Case(h, results, setup,
          [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = volume_index; t.f1.f64 = volume; },
-         __imp__sub_825C4070, NativeSettingsSetCategoryVolume, {{704, 768}},
+         __imp__sub_825C4070, ITC_CONTEXT_FN(NativeSettingsSetCategoryVolume), {{704, 768}},
          fmt::format("XACTGlobalSettings::SetCategoryVolume {} ({:#x})", i, volume_index));
     const uint32_t variable = i % 4 == 0 ? uint32_t(h.random.Next()) : h.random.Below(24);
     for (const Accessor& a : engine_wrappers) {
@@ -1386,7 +1386,7 @@ void GlobalSettings(Context& h) {
     // Its arrays are read at the category before the walk (not for none).
     Case(h, results, setup,
          [&](PPCContext& t) { t.r3.u64 = d + kEngine; t.r4.u64 = volume_index; },
-         __imp__sub_825C04D8, NativeEngineGetCategoryVolume, {},
+         __imp__sub_825C04D8, ITC_CONTEXT_FN(NativeEngineGetCategoryVolume), {},
          fmt::format("XACTEngine GetCategoryVolume {} ({:#x}{})", i, volume_index,
                      engine_has ? "" : ", no settings"),
          true);
@@ -1401,7 +1401,7 @@ void GlobalSettings(Context& h) {
       {4, NativeSettingsGetVolumeByte},     {4, NativeSettingsGetCategoryFlag},
       {48, NativeSettingsGetNameEntryIndex}, {24, NativeSettingsIsInCategory},
       {24, NativeSettingsAddInstance},      {24, NativeSettingsRemoveInstance},
-      {28, NativeSettingsSetCategoryVolume}, {44, NativeSettingsSetCategoryVolume},
+      {28, ITC_CONTEXT_FN(NativeSettingsSetCategoryVolume)}, {44, ITC_CONTEXT_FN(NativeSettingsSetCategoryVolume)},
   };
   for (const auto& [slot, native] : declines) {
     Fill(h.base, d, kScratchBytes);
@@ -1412,7 +1412,7 @@ void GlobalSettings(Context& h) {
   const std::pair<uint32_t, GuestFunction> engine_declines[] = {
       {32, NativeEngineGetCategoryFlag},   {24, NativeEngineAddInstance},
       {24, NativeEngineRemoveInstance},    {8, NativeEngineGetVariableRecord},
-      {44, NativeEngineGetVariableRecord}, {24, NativeEngineGetCategoryVolume},
+      {44, NativeEngineGetVariableRecord}, {24, ITC_CONTEXT_FN(NativeEngineGetCategoryVolume)},
   };
   for (const auto& [slot, native] : engine_declines) {
     Fill(h.base, d, kScratchBytes);
@@ -1702,7 +1702,7 @@ void SoundsAndCueVariables(Context& h) {
       }
     };
     Case(h, results, setup, [&](PPCContext& t) { t.r3.u64 = d + kSound; }, __imp__sub_825CB5E8,
-         NativeSoundGetVolume, {},
+         ITC_CONTEXT_FN(NativeSoundGetVolume), {},
          fmt::format("XACTSound::GetVolume {} ({:#x}{})", i, category,
                      engine_has ? "" : ", no settings"),
          true);
@@ -1937,13 +1937,13 @@ void WaveDurationsAndReleases(Context& h) {
     };
     Case(h, results, setup,
          [&](PPCContext& t) { t.r3.u64 = d; t.r4.u64 = index; t.r5.u64 = d + 3584; t.r6.u64 = d + 3588; },
-         __imp__sub_825CC380, NativeWaveBankGetWaveDurations, {},
+         __imp__sub_825CC380, ITC_CONTEXT_FN(NativeWaveBankGetWaveDurations), {},
          fmt::format("XACTWaveBank::GetWaveDurations {} (index {:#x})", i, index));
   }
   Fill(h.base, d, kScratchBytes);
   WaveBank(h, 4);
   guest::StoreU32(h.base, d + 1024 + 4, 0);
-  CheckDeclines(h, results, NativeWaveBankGetWaveDurations, d, 0,
+  CheckDeclines(h, results, ITC_CONTEXT_FN(NativeWaveBankGetWaveDurations), d, 0,
                 "XACTWaveBank::GetWaveDurations, a rate of 0");
   // OnWaveBankGone through the sound bank's +8 interface (the bank at
   // +1600), the wave bank's +4 interface at +4 (its pool at +24 holding the

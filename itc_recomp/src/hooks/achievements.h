@@ -6,18 +6,23 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 namespace hooks {
 
 // Time::Less sub_820FF708: r3, r4 = &the two packed times.
 void TimeLessSteps(PPCContext& ctx, uint8_t* base);
+void TimeLessSteps(lifted::Regs& ctx, uint8_t* base);
 // Achievements::Check sub_82290788: r3 = the kind, r4 = the 27 words out.
 void AchievementsCheckSteps(PPCContext& ctx, uint8_t* base);
+void AchievementsCheckSteps(lifted::Regs& ctx, uint8_t* base);
 // Achievements::Write sub_82290A30: r3 = the 27 words; XUserWriteAchievements
 // through the function table.
 void AchievementsWriteSteps(PPCContext& ctx, uint8_t* base);
+void AchievementsWriteSteps(lifted::Regs& ctx, uint8_t* base);
 // XUserWriteAchievements sub_82294E58 (r3 the count, r4 the list, r5 the
 // overlapped): XAPI's wrapper natively, entered through lifted::Enter.
 void WriteAchievementsSteps(PPCContext& ctx, uint8_t* base);
+void WriteAchievementsSteps(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

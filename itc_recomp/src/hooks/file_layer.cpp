@@ -2,6 +2,7 @@
 // (docs/functions/file-layer.md).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -31,24 +32,14 @@ ITC_FLAG_BOOL(native_file_layer, true, "ITC",
 // callers in play are the open by name and GamePath::SetGame, whose native
 // code calls theirs.
 #define ITC_FILE_LAYER_OBJECT(address, function) \
-  extern "C" REX_FUNC(sub_##address) {          \
-    REX_FUNC_PROLOGUE();                        \
-    if (!ITC_FLAG(native_file_layer)) {         \
-      __imp__sub_##address(ctx, base);          \
-      return;                                   \
-    }                                           \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_file_layer)) { \
     file_layer::function(base, ctx.r3.u32);     \
   }
 
 // File::GetSize: r3 = the file object; its size (+12). From the debug
 // font's loader (recompiled) and, as the XMD archive's count, from
 // UiMovie::OnLoaded.
-extern "C" REX_FUNC(sub_822B80D8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_file_layer)) {
-    __imp__sub_822B80D8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(822B80D8, ITC_FLAG(native_file_layer)) {
   ctx.r3.u64 = file_layer::FileGetSize(base, ctx.r3.u32);
 }
 
@@ -57,12 +48,12 @@ ITC_FILE_LAYER_OBJECT(820A6A40, GameFileDestruct)
 ITC_FILE_LAYER_OBJECT(820A6BE0, GamePathConstruct)
 
 // GamePath::SetGame: r3 = the path buffer, r4 = the name; r3 its text.
-extern "C" REX_FUNC(sub_820A6BF0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820A6BF0) {
+  
   uint32_t result;
   if (!ITC_FLAG(native_file_layer) ||
       !file_layer::GamePathSetGame(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, &result)) {
-    __imp__sub_820A6BF0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A6BF0);
     return;
   }
   ctx.r3.u64 = result;
@@ -72,14 +63,14 @@ extern "C" REX_FUNC(sub_820A6BF0) {
 // on. Its Path natively, then File::OpenRead (its adapter, through ctx: B4's
 // file class) from the original's 640-byte frame with its return address;
 // r3 1 when the open did (its low byte not 0), else 0.
-extern "C" REX_FUNC(sub_820A6AB8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820A6AB8) {
+  
   const uint32_t file = ctx.r3.u32;
   const uint64_t flag = ctx.r5.u64;
   uint32_t text;
   if (!ITC_FLAG(native_file_layer) ||
       !file_layer::OpenPathBuild(base, ctx.r4.u32, ctx.r1.u32, &text)) {
-    __imp__sub_820A6AB8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A6AB8);
     return;
   }
   ITC_NATIVE_RUNNING("sub_820A6AB8 GameFile::OpenRead (by name)");

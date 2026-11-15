@@ -293,7 +293,7 @@ void TidyCases(Context& h) {
       t.r3.u64 = string;
       t.r4.u64 = built;
       t.r5.u64 = new_length;
-      (v == 0 ? __imp__sub_82091328 : NativeTidy)(t, h.base);
+      (v == 0 ? __imp__sub_82091328 : ITC_CONTEXT_FN(NativeTidy))(t, h.base);
       Collect(h, out[v], t, blocks, {});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -315,7 +315,7 @@ void AllocateCases(Context& h) {
       const uint32_t count = i < int(std::size(kCounts)) ? kCounts[i] : h.random.Below(5000);
       PPCContext t = CallContext(h);
       t.r3.u64 = count;
-      (v == 0 ? __imp__sub_820912B0 : NativeAllocate)(t, h.base);
+      (v == 0 ? __imp__sub_820912B0 : ITC_CONTEXT_FN(NativeAllocate))(t, h.base);
       Blocks blocks;
       blocks.Add(t.r3.u32);
       Collect(h, out[v], t, blocks, {});
@@ -387,7 +387,7 @@ void CopyCases(Context& h) {
       t.r3.u64 = string;
       t.r4.u64 = new_length;
       t.r5.u64 = keep;
-      (v == 0 ? __imp__sub_82091458 : NativeCopy)(t, h.base);
+      (v == 0 ? __imp__sub_82091458 : ITC_CONTEXT_FN(NativeCopy))(t, h.base);
       Collect(h, out[v], t, blocks, {string});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -417,7 +417,7 @@ void GrowCases(Context& h) {
       t.r3.u64 = string;
       t.r4.u64 = new_length;
       t.r5.u64 = kTrim[h.random.Below(4)];
-      (v == 0 ? __imp__sub_82091540 : NativeGrow)(t, h.base);
+      (v == 0 ? __imp__sub_82091540 : ITC_CONTEXT_FN(NativeGrow))(t, h.base);
       Collect(h, out[v], t, blocks, {string});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -461,7 +461,7 @@ void AssignFromCases(Context& h) {
       t.r4.u64 = source;
       t.r5.u64 = offset;
       t.r6.u64 = count;
-      (v == 0 ? __imp__sub_82091720 : NativeAssignFrom)(t, h.base);
+      (v == 0 ? __imp__sub_82091720 : ITC_CONTEXT_FN(NativeAssignFrom))(t, h.base);
       Collect(h, out[v], t, blocks, {string, source});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -493,9 +493,9 @@ void FromTextCases(Context& h, bool append) {
       t.r4.u64 = text;
       t.r5.u64 = count;
       if (append) {
-        (v == 0 ? __imp__sub_820A6F60 : NativeAppend)(t, h.base);
+        (v == 0 ? __imp__sub_820A6F60 : ITC_CONTEXT_FN(NativeAppend))(t, h.base);
       } else {
-        (v == 0 ? __imp__sub_82091808 : NativeAssignText)(t, h.base);
+        (v == 0 ? __imp__sub_82091808 : ITC_CONTEXT_FN(NativeAssignText))(t, h.base);
       }
       Collect(h, out[v], t, blocks, {string});
     }
@@ -519,7 +519,7 @@ void ConstructCases(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = string;
       t.r4.u64 = h.random.Next();
-      (v == 0 ? __imp__sub_825929E8 : NativeConstruct)(t, h.base);
+      (v == 0 ? __imp__sub_825929E8 : ITC_CONTEXT_FN(NativeConstruct))(t, h.base);
       Collect(h, out[v], t, {}, {});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -550,9 +550,9 @@ void ConstructFromTextCases(Context& h, bool allocator) {
       t.r4.u64 = text;
       t.r5.u64 = h.random.Next();
       if (allocator) {
-        (v == 0 ? __imp__sub_82593248 : NativeConstructFromTextWithAllocator)(t, h.base);
+        (v == 0 ? __imp__sub_82593248 : ITC_CONTEXT_FN(NativeConstructFromTextWithAllocator))(t, h.base);
       } else {
-        (v == 0 ? __imp__sub_825931D0 : NativeConstructFromText)(t, h.base);
+        (v == 0 ? __imp__sub_825931D0 : ITC_CONTEXT_FN(NativeConstructFromText))(t, h.base);
       }
       Collect(h, out[v], t, {}, {string});
     }
@@ -589,7 +589,7 @@ void ConstructFromCases(Context& h) {
       t.r5.u64 = offset;
       t.r6.u64 = count;
       t.r7.u64 = h.random.Next();
-      (v == 0 ? __imp__sub_82593040 : NativeConstructFrom)(t, h.base);
+      (v == 0 ? __imp__sub_82593040 : ITC_CONTEXT_FN(NativeConstructFrom))(t, h.base);
       Collect(h, out[v], t, blocks, {string, source});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -658,7 +658,7 @@ void WildcardSearchCases(Context& h) {
       t.r4.u64 = p;
       t.r5.u64 = h.random.Below(4) == 0 ? 0 : outs;
       t.r6.u64 = h.random.Below(4) == 0 ? 0 : outs + 4;
-      (v == 0 ? __imp__sub_82592740 : NativeWildcardSearch)(t, h.base);
+      (v == 0 ? __imp__sub_82592740 : ITC_CONTEXT_FN(NativeWildcardSearch))(t, h.base);
       Collect(h, out[v], t, {}, {});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -692,7 +692,7 @@ void FindCases(Context& h) {
       t.r6.u64 = h.random.Below(4) == 0 ? 0 : outs + 4;
       t.r7.u64 = h.random.Below(length + 1);
       guest::StoreU32(h.base, outs, h.random.Below(3) == 0 ? 0 : uint32_t(h.random.Next()));
-      (v == 0 ? __imp__sub_82592970 : NativeFind)(t, h.base);
+      (v == 0 ? __imp__sub_82592970 : ITC_CONTEXT_FN(NativeFind))(t, h.base);
       Collect(h, out[v], t, blocks, {string});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));
@@ -739,7 +739,7 @@ void ReplaceAllCases(Context& h) {
       t.r4.u64 = p;
       t.r5.u64 = replacement;
       t.r6.u64 = h.random.Below(3);
-      (v == 0 ? __imp__sub_82593088 : NativeReplaceAll)(t, h.base);
+      (v == 0 ? __imp__sub_82593088 : ITC_CONTEXT_FN(NativeReplaceAll))(t, h.base);
       Collect(h, out[v], t, blocks, {string});
     }
     results.Check(out[0], out[1], fmt::format("case {}", i));

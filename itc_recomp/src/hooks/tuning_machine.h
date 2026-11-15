@@ -7,37 +7,59 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 namespace hooks {
 
 // The machine's handlers (r3 the screen, r4 the mode where read).
 void TuningMachineCreate(PPCContext& ctx, uint8_t* base);
+void TuningMachineCreate(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineZeroRecord16(PPCContext& ctx, uint8_t* base);
+void TuningMachineZeroRecord16(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineResetImages(PPCContext& ctx, uint8_t* base);
+void TuningMachineResetImages(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineOpenMovies(PPCContext& ctx, uint8_t* base);
+void TuningMachineOpenMovies(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineWaitForMovies(PPCContext& ctx, uint8_t* base);
+void TuningMachineWaitForMovies(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineOnDialogClosed(PPCContext& ctx, uint8_t* base);
+void TuningMachineOnDialogClosed(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineUnload(PPCContext& ctx, uint8_t* base);
+void TuningMachineUnload(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineClose(PPCContext& ctx, uint8_t* base);
+void TuningMachineClose(lifted::Regs& ctx, uint8_t* base);
 // The no answers and the notice's close (r3 the screen); StickerDialogNo's
 // step is the harness's (its only caller, OnDialogNo, calls its plain C++).
 void TuningMachineOnDialogNo(PPCContext& ctx, uint8_t* base);
+void TuningMachineOnDialogNo(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineStickerDialogNo(PPCContext& ctx, uint8_t* base);
+void TuningMachineStickerDialogNo(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineOnNoticeClosed(PPCContext& ctx, uint8_t* base);
+void TuningMachineOnNoticeClosed(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineDestroy(PPCContext& ctx, uint8_t* base);
+void TuningMachineDestroy(lifted::Regs& ctx, uint8_t* base);
 // The decal images' placeholders (r3 the decal images).
 void TuningMachineSavePlaceholders(PPCContext& ctx, uint8_t* base);
+void TuningMachineSavePlaceholders(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineSavePlaceholders14(PPCContext& ctx, uint8_t* base);
+void TuningMachineSavePlaceholders14(lifted::Regs& ctx, uint8_t* base);
 // Init (r3 the machine).
 void TuningMachineInit(PPCContext& ctx, uint8_t* base);
+void TuningMachineInit(lifted::Regs& ctx, uint8_t* base);
 // The screen's set-up's callees (r3 the screen).
 void TuningMachineLoadInteriorSlots(PPCContext& ctx, uint8_t* base);
+void TuningMachineLoadInteriorSlots(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineLoadCurrentChoices(PPCContext& ctx, uint8_t* base);
+void TuningMachineLoadCurrentChoices(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineLoadOwnedParts(PPCContext& ctx, uint8_t* base);
+void TuningMachineLoadOwnedParts(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineSetPrices(PPCContext& ctx, uint8_t* base);
+void TuningMachineSetPrices(lifted::Regs& ctx, uint8_t* base);
 void TuningMachineLoadUnlockedParts(PPCContext& ctx, uint8_t* base);
+void TuningMachineLoadUnlockedParts(lifted::Regs& ctx, uint8_t* base);
 // The screen's set-up (r3 the screen).
 void TuningMachineSetUp(PPCContext& ctx, uint8_t* base);
+void TuningMachineSetUp(lifted::Regs& ctx, uint8_t* base);
 // Start (r3 the screen; r3 FadeIn's, f1 as the refresh leaves it), with
 // TuningMachineStartNative: --native_tuning_screen, the tuning screen's stand
 // and car stats callees (TuningStandCalleesNative,
@@ -45,5 +67,6 @@ void TuningMachineSetUp(PPCContext& ctx, uint8_t* base);
 // conditions.
 bool TuningMachineStartNative();
 void TuningMachineStart(PPCContext& ctx, uint8_t* base);
+void TuningMachineStart(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

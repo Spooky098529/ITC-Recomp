@@ -3,6 +3,7 @@
 // steps the harness shares (hooks/save_interface.h).
 
 #include "hooks/save_interface.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
@@ -70,11 +71,11 @@ namespace {
 
 // The registers from r4 up (PPCContext keeps r3 first, then r0 to r2, then
 // r4 on).
-uint32_t Reg(PPCContext& ctx, int n) { return (&ctx.r4)[n - 4].u32; }
+uint32_t Reg(lifted::Regs& ctx, int n) { return (&ctx.r4)[n - 4].u32; }
 
 // A request's arguments from the register of the display name (r4 for the
 // interface's wrappers, r5 for the slots').
-si::Request RequestFrom(PPCContext& ctx, int first, uint32_t thumbnail_size) {
+si::Request RequestFrom(lifted::Regs& ctx, int first, uint32_t thumbnail_size) {
   return si::Request{Reg(ctx, first),     Reg(ctx, first + 1), Reg(ctx, first + 2),
                      Reg(ctx, first + 3), Reg(ctx, first + 4), Reg(ctx, first + 5),
                      thumbnail_size};
@@ -82,97 +83,97 @@ si::Request RequestFrom(PPCContext& ctx, int first, uint32_t thumbnail_size) {
 
 }  // namespace
 
-void SaveInterfaceAppDevices(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceAppDevices) {
   if (const auto devices = si::AppDevices(base, ctx.r3.u32)) {
     ctx.r3.u64 = *devices;
     return;
   }
-  __imp__sub_820943B0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820943B0);
 }
 
-void SaveInterfaceAppUsers(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceAppUsers) {
   if (const auto users = si::AppUsers(base, ctx.r3.u32)) {
     ctx.r3.u64 = *users;
     return;
   }
-  __imp__sub_820943C8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820943C8);
 }
 
-void SaveInterfaceFrameworkUsers(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceFrameworkUsers) {
   ctx.r3.u64 = si::FrameworkUsers(base, ctx.r3.u32);
 }
 
-void SaveInterfaceUsersCount(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceUsersCount) {
   ctx.r3.u64 = si::UsersCount(base, ctx.r3.u32);
 }
 
-void SaveInterfaceUsersSignedIn(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceUsersSignedIn) {
   ctx.r3.u64 = si::UsersSignedIn(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SaveInterfaceSlotRequestDevice(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceSlotRequestDevice) {
   si::SlotRequestDevice(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SaveInterfaceSlotDevice(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceSlotDevice) {
   ctx.r3.u64 = si::SlotDevice(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SaveInterfaceSlotFreeBytes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceSlotFreeBytes) {
   ctx.r3.u64 = si::SlotFreeBytes(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SaveInterfaceSlotSaveCount(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceSlotSaveCount) {
   ctx.r3.u64 = si::SlotSaveCount(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SaveInterfaceSlotSaveAt(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceSlotSaveAt) {
   ctx.r3.u64 = si::SlotSaveAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u64);
 }
 
-void SaveInterfaceSlotState(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceSlotState) {
   ctx.r3.u64 = si::SlotState(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SaveInterfaceSlotPending(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceSlotPending) {
   ctx.r3.u64 = si::SlotPending(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SaveInterfaceSetRootName(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceSetRootName) {
   si::SetRootName(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SaveInterfaceSlotRequestSave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceSlotRequestSave) {
   const auto answer = si::SlotRequestSave(base, ctx.r3.u32, ctx.r4.u32,
                                           RequestFrom(ctx, 5, guest::LoadU32(base, ctx.r1.u32 + 84)));
   if (!answer) {
-    __imp__sub_820A52E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A52E0);
     return;
   }
   ctx.r3.u64 = *answer;
 }
 
-void SaveInterfaceSlotRequestLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceSlotRequestLoad) {
   const auto answer = si::SlotRequestLoad(base, ctx.r3.u32, ctx.r4.u32, RequestFrom(ctx, 5, 0));
   if (!answer) {
-    __imp__sub_820A53E8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A53E8);
     return;
   }
   ctx.r3.u64 = *answer;
 }
 
-void SaveInterfaceCopyDisplayName(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceCopyDisplayName) {
   si::CopyDisplayName(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SaveInterfaceContentSize(PPCContext& ctx, uint8_t*) {
+void SaveInterfaceContentSize(lifted::Regs& ctx, uint8_t*) {
   ctx.r3.u64 = si::ContentSize(ctx.r3.u32, ctx.r4.u32);
 }
 
 
 // A wrapper of r3 (and r4) whose plain C++ answers r3, or nullopt.
 #define ITC_SAVE_INTERFACE_WRAPPER(address, step, call) \
-  void step(PPCContext& ctx, uint8_t* base) {           \
+  ITC_REGS_STEP(step) {           \
     if (const auto answer = call) {                     \
       ctx.r3.u64 = *answer;                             \
       return;                                           \
@@ -218,9 +219,9 @@ ITC_SAVE_INTERFACE_WRAPPER(8228FC50, SaveInterfaceGameDataCheck,
 
 #undef ITC_SAVE_INTERFACE_WRAPPER
 
-void SaveInterfaceBuffersCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceBuffersCreate) {
   if (!hooks::NativeHeapActive()) {
-    __imp__sub_8228F6B0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8228F6B0);
     return;
   }
   if (const auto r3 = si::SaveBuffersCreate(base)) {
@@ -228,10 +229,10 @@ void SaveInterfaceBuffersCreate(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void SaveInterfaceBuffersFreeReplayList(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceBuffersFreeReplayList) {
   const uint32_t records = guest::LoadU32(base, guest::LoadU32(base, si::kSaveBuffers) + 12);
   if (!hooks::NativeHeapActive() || (records != 0 && !memory::IsPages(records))) {
-    __imp__sub_8228F7E8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8228F7E8);
     return;
   }
   if (const auto r3 = si::SaveBuffersFreeReplayList(base)) {
@@ -239,15 +240,15 @@ void SaveInterfaceBuffersFreeReplayList(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void SaveInterfaceBuffersDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceBuffersDestroy) {
   if (!si::SaveBuffersDestroyNative(base)) {
-    __imp__sub_8228F8F8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8228F8F8);
     return;
   }
   ctx.r3.u64 = si::SaveBuffersDestroy(base);
 }
 
-void SaveInterfaceGameDataSave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceGameDataSave) {
   const uint64_t stack = ctx.r1.u64;
   const uint32_t frame = ctx.r1.u32 - 368;
   guest::StoreU32(base, frame, ctx.r1.u32);  // the frame's back chain, as the original's
@@ -281,12 +282,12 @@ void SaveInterfaceGameDataSave(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = *r3;
     return;
   }
-  __imp__sub_8228FB00(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8228FB00);
 }
 
-void SaveInterfaceReplaysBuildList(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceReplaysBuildList) {
   if (!si::ReplaysBuildListNative(base)) {
-    __imp__sub_82290378(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82290378);
     return;
   }
   const uint64_t stack = ctx.r1.u64;
@@ -306,12 +307,12 @@ void SaveInterfaceReplaysBuildList(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = *r3;
     return;
   }
-  __imp__sub_82290378(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82290378);
 }
 
-void SaveInterfaceReplaysSort(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfaceReplaysSort) {
   if (!native::Buffers_NativeMemcpy()) {
-    __imp__sub_8228F840(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8228F840);
     return;
   }
   if (const auto r3 = si::ReplaysSort(base, ctx.r3.u32, ctx.r1.u32 - 176 + 80)) {
@@ -319,11 +320,11 @@ void SaveInterfaceReplaysSort(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void SaveInterfacePlayTimeAdd(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfacePlayTimeAdd) {
   si::PlayTimeAdd(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SaveInterfacePlayTimeUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveInterfacePlayTimeUpdate) {
   ctx.r4.u64 = ctx.r3.u64 + 48;
   ctx.r3.u64 = si::PlayTimeUpdate(base, ctx.r3.u32, ctx.r1.u32 - 96 + 80);
 }
@@ -349,8 +350,8 @@ void Prologue(uint8_t* base, uint32_t sp, uint32_t lr, uint32_t frame_bytes, int
 }
 
 // r`first` to r31 of `ctx` (r14 to r31 are consecutive in PPCContext).
-std::vector<uint64_t> Regs(const PPCContext& ctx, int first) {
-  static_assert(offsetof(PPCContext, r31) - offsetof(PPCContext, r14) == 17 * sizeof(PPCRegister));
+std::vector<uint64_t> Regs(const lifted::Regs& ctx, int first) {
+  static_assert(offsetof(PPCContext, r31) - offsetof(PPCContext, r14) == 17 * sizeof(lifted::Temp));
   std::vector<uint64_t> regs;
   for (int n = first; n < 32; n++) {
     regs.push_back((&ctx.r14)[n - 14].u64);
@@ -361,7 +362,7 @@ std::vector<uint64_t> Regs(const PPCContext& ctx, int first) {
 // The first slot's vtable slot 0 with r4 = 3 (the slots' vector deleting
 // destructor), a guest call from SlotArray::Reset's frame at `sp` (its
 // return address 0x820A5638); r3 its answer.
-std::function<uint32_t(uint32_t)> DestroySlots(PPCContext& ctx, uint8_t* base, uint32_t sp) {
+std::function<uint32_t(uint32_t)> DestroySlots(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
   return [&ctx, base, sp](uint32_t slots) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
@@ -397,13 +398,13 @@ uint32_t DestroyPrologues(uint8_t* base, uint32_t sp, uint32_t lr, uint64_t r31,
 
 }  // namespace
 
-void SaveDevicesConstructSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDevicesConstructSteps) {
   const uint64_t self = ctx.r3.u64;
   const uint32_t devices = ctx.r3.u32;
   const uint32_t block = ctx.r4.u32;
   const uint32_t saves = ctx.r5.u32;
   if (!hooks::NativeHeapActive() || !si::CanAllocBuffers(base, saves)) {
-    __imp__sub_820A6160(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A6160);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -427,11 +428,11 @@ void SaveDevicesConstructSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = self;  // the original's mr r3,r31
 }
 
-void SaveDevicesCreateSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDevicesCreateSteps) {
   const uint32_t block = ctx.r3.u32;
   const uint32_t saves = ctx.r4.u32;
   if (!hooks::NativeHeapActive()) {
-    __imp__sub_820A63C8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A63C8);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -456,7 +457,7 @@ void SaveDevicesCreateSteps(PPCContext& ctx, uint8_t* base) {
     ctx.lr = lr;
   });
   if (!devices) {
-    __imp__sub_820A63C8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A63C8);
     return;
   }
   if (*devices == 0) {
@@ -465,9 +466,9 @@ void SaveDevicesCreateSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *devices;
 }
 
-void SaveSlotAllocBuffersSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveSlotAllocBuffersSteps) {
   if (!hooks::NativeHeapActive() || !si::CanAllocBuffers(base, ctx.r4.u32)) {
-    __imp__sub_820A4560(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A4560);
     return;
   }
   const auto regs = Regs(ctx, 29);
@@ -477,9 +478,9 @@ void SaveSlotAllocBuffersSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = guest::LoadU32(base, slot + 84);  // the second operator new[]'s answer
 }
 
-void SaveDevicesDeleteSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDevicesDeleteSteps) {
   if (!hooks::NativeHeapActive()) {
-    __imp__sub_820A6110(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A6110);
     return;
   }
   const uint32_t devices = ctx.r3.u32;
@@ -496,9 +497,9 @@ void SaveDevicesDeleteSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = self;  // the original's mr r3,r31
 }
 
-void SaveDevicesDestroySteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDevicesDestroySteps) {
   if (!hooks::NativeHeapActive()) {
-    __imp__sub_820A56E8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A56E8);
     return;
   }
   const uint32_t devices = ctx.r3.u32;
@@ -507,9 +508,9 @@ void SaveDevicesDestroySteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = si::SaveDevicesDestroy(base, devices, DestroySlots(ctx, base, slots_sp));
 }
 
-void SlotArrayResetSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotArrayResetSteps) {
   if (!hooks::NativeHeapActive()) {
-    __imp__sub_820A55F0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A55F0);
     return;
   }
   const uint32_t frame = ResetPrologue(base, ctx.r1.u32, uint32_t(ctx.lr), ctx.r31.u64);
@@ -520,7 +521,7 @@ namespace {
 
 // The call into an adapter as a CallSite: its stack pointer, return address
 // and r27 to r31.
-si::CallSite Site(const PPCContext& ctx) {
+si::CallSite Site(const lifted::Regs& ctx) {
   return si::CallSite{ctx.r1.u32, uint32_t(ctx.lr), ctx.r27.u64, ctx.r28.u64,
                       ctx.r29.u64,  ctx.r30.u64,     ctx.r31.u64};
 }
@@ -529,7 +530,7 @@ si::CallSite Site(const PPCContext& ctx) {
 // return address and nonvolatile registers as the original's call has
 // them); r3 and the other argument registers set by the caller. The stack
 // pointer and r27 to r31 put back after.
-void GuestCallAt(PPCContext& ctx, uint8_t* base, uint32_t function, const si::CallSite& at) {
+void GuestCallAt(lifted::Regs& ctx, uint8_t* base, uint32_t function, const si::CallSite& at) {
   const uint64_t r1 = ctx.r1.u64, r27 = ctx.r27.u64, r28 = ctx.r28.u64, r29 = ctx.r29.u64,
                  r30 = ctx.r30.u64, r31 = ctx.r31.u64;
   ctx.r1.u64 = at.sp;
@@ -550,27 +551,27 @@ void GuestCallAt(PPCContext& ctx, uint8_t* base, uint32_t function, const si::Ca
 
 }  // namespace
 
-void SlotWaitForUserSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotWaitForUserSteps) {
   ctx.r3.u64 = si::SlotWaitForUser(base, ctx.r4.u32);
 }
 
-void SlotWaitForDeviceSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotWaitForDeviceSteps) {
   ctx.r3.u64 = si::SlotWaitForDevice(base, ctx.r4.u32, Site(ctx));
 }
 
-void SlotFailedSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotFailedSteps) {
   ctx.r3.u64 = si::SlotFailed(base, ctx.r4.u32);
 }
 
-void SlotReadySteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotReadySteps) {
   ctx.r3.u64 = si::SlotReady(base, ctx.r4.u32, Site(ctx));
 }
 
-void SlotEnumerateStepSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotEnumerateStepSteps) {
   ctx.r3.u64 = si::SlotEnumerateStep(base, ctx.r3.u32, ctx.r4.u32, Site(ctx));
 }
 
-void DevicesOnEventSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DevicesOnEventSteps) {
   const uint32_t loop = ctx.r4.u32;
   si::DevicesOnEvent(base, ctx.r3.u32, loop, ctx.r5.u32, Site(ctx),
                      [&](uint32_t offset, uint32_t key, const si::CallSite& at) {
@@ -581,11 +582,11 @@ void DevicesOnEventSteps(PPCContext& ctx, uint8_t* base) {
                      });
 }
 
-void FrameworkDeviceListSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrameworkDeviceListSteps) {
   ctx.r3.u64 = si::FrameworkDeviceList(base, ctx.r3.u32);
 }
 
-save_interface::KernelCalls KernelCallsOf(PPCContext& ctx, uint8_t* base) {
+save_interface::KernelCalls KernelCallsOf(lifted::Regs& ctx, uint8_t* base) {
   si::KernelCalls kernel;
   kernel.pcr = ctx.r13.u32;
   kernel.wait = [&ctx, base](uint32_t handle, const si::CallSite& at) {
@@ -607,80 +608,80 @@ save_interface::KernelCalls KernelCallsOf(PPCContext& ctx, uint8_t* base) {
   return kernel;
 }
 
-void XGetOverlappedResultSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(XGetOverlappedResultSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t overlapped = ctx.r3.u32, result = ctx.r4.u32, wait = ctx.r5.u32;
   ctx.r3.u64 = si::XGetOverlappedResult(base, overlapped, result, wait, Site(ctx), kernel);
 }
 
-void GetOverlappedResultSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(GetOverlappedResultSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t handle = ctx.r3.u32, overlapped = ctx.r4.u32, bytes = ctx.r5.u32,
                  wait = ctx.r6.u32;
   ctx.r3.u64 = si::GetOverlappedResult(base, handle, overlapped, bytes, wait, Site(ctx), kernel);
 }
 
-void SlotWaitCloseItemSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotWaitCloseItemSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t slot = ctx.r4.u32;
   ctx.r3.s64 = si::SlotWaitCloseItem(base, slot, Site(ctx), kernel);
 }
 
-void SlotWaitDeleteSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotWaitDeleteSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t slot = ctx.r4.u32;
   ctx.r3.s64 = si::SlotWaitDelete(base, slot, Site(ctx), kernel);
 }
 
-void SlotWaitThumbnailSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotWaitThumbnailSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t slot = ctx.r4.u32;
   ctx.r3.s64 = si::SlotWaitThumbnail(base, slot, Site(ctx), kernel);
 }
 
-void SlotWaitCloseSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotWaitCloseSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t slot = ctx.r4.u32;
   ctx.r3.s64 = si::SlotWaitClose(base, slot, Site(ctx), kernel);
 }
 
-void SlotWaitWriteSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotWaitWriteSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t slot = ctx.r4.u32;
   ctx.r3.s64 = si::SlotWaitWrite(base, slot, Site(ctx), kernel);
 }
 
-void SlotWaitReadSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotWaitReadSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t slot = ctx.r4.u32;
   ctx.r3.s64 = si::SlotWaitRead(base, slot, Site(ctx), kernel);
 }
 
-void SlotCheckStepSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotCheckStepSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
   ctx.r3.u64 = si::SlotCheckStep(base, devices, slot, Site(ctx), kernel);
 }
 
-void SlotSaveStepSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotSaveStepSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
   ctx.r3.u64 = si::SlotSaveStep(base, devices, slot, Site(ctx), kernel);
 }
 
-void SlotLoadStepSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotLoadStepSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
   ctx.r3.u64 = si::SlotLoadStep(base, devices, slot, Site(ctx), kernel);
 }
 
-void SlotDeleteStepSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SlotDeleteStepSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   const uint32_t devices = ctx.r3.u32, slot = ctx.r4.u32;
   ctx.r3.u64 = si::SlotDeleteStep(base, devices, slot, Site(ctx), kernel);
 }
 
-void SaveDevicesUpdateSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveDevicesUpdateSteps) {
   const auto kernel = KernelCallsOf(ctx, base);
   ctx.r3.u64 = si::DevicesUpdate(
       base, ctx.r3.u64, ctx.r4.u64, Site(ctx), kernel,
@@ -731,12 +732,7 @@ void SaveDevicesUpdateSteps(PPCContext& ctx, uint8_t* base) {
 // for SaveInterface::RequestDevice sub_820A0208.
 
 #define ITC_SAVE_INTERFACE_ADAPTER(address, step) \
-  extern "C" REX_FUNC(sub_##address) {            \
-    REX_FUNC_PROLOGUE();                          \
-    if (!ITC_FLAG(native_save_interface)) {       \
-      __imp__sub_##address(ctx, base);            \
-      return;                                     \
-    }                                             \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_save_interface)) { \
     hooks::step(ctx, base);                       \
   }
 
@@ -758,13 +754,13 @@ ITC_SAVE_INTERFACE_ADAPTER(820A53E8, SaveInterfaceSlotRequestLoad)
 ITC_SAVE_INTERFACE_ADAPTER(82295C18, SaveInterfaceContentSize)
 // SaveInterface::Init's adapter written out: the app_start_up harness's
 // recorder first.
-extern "C" REX_FUNC(sub_8209FFB8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209FFB8) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8209FFB8)) {
     return;
   }
   if (!ITC_FLAG(native_save_interface)) {
-    __imp__sub_8209FFB8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209FFB8);
     return;
   }
   hooks::SaveInterfaceInit(ctx, base);

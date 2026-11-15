@@ -7,6 +7,7 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "second_set/finds.h"
 #include "second_set/objects.h"
 #include "second_set/wheels.h"
@@ -17,109 +18,193 @@ namespace hooks {
 // the harness's) and SetShape sub_820CE900: r3 = the record (left), r4 =
 // the string.
 void SecondSetPointSetNode(PPCContext& ctx, uint8_t* base);
+void SecondSetPointSetNode(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPointSetShape(PPCContext& ctx, uint8_t* base);
+void SecondSetPointSetShape(lifted::Regs& ctx, uint8_t* base);
 // PointRecord::Clear sub_820CEA08 (r3 = the record; r3 = +80) and
 // PointRecord::PointRecord sub_820D0270 (r3 = the record, left).
 void SecondSetPointClear(PPCContext& ctx, uint8_t* base);
+void SecondSetPointClear(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPointConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetPointConstruct(lifted::Regs& ctx, uint8_t* base);
 // ModelPoint::FindShape sub_820CEB30: r3 = the record, r4 = the part model;
 // r3 = 1 or 0.
 void SecondSetFindShape(PPCContext& ctx, uint8_t* base);
+void SecondSetFindShape(lifted::Regs& ctx, uint8_t* base);
 
 // The point groups' resets and inits (src/second_set/point_groups.h): r3 =
 // the group or record; r3 as the original leaves it. ResetRightDoor
 // natively only with --native_material_passes (else the original).
 void SecondSetPartsResetFrontBumper(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetFrontBumper(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetRearBumper(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetRearBumper(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetRearSpoiler(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetRearSpoiler(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetBonnet(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetBonnet(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetLeftDoor(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetLeftDoor(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetRightDoor(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetRightDoor(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetDoors(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetDoors(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetHeadlights(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetHeadlights(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetTailLights(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetTailLights(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetFenders(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetFenders(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetCabin(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetCabin(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetEngine(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetEngine(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetMufflers(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetMufflers(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsResetShadows(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetShadows(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsInitCooling(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsInitCooling(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsInitSideSkirts(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsInitSideSkirts(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsInitLeftMirror(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsInitLeftMirror(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsInitRightMirror(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsInitRightMirror(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsInitMirror(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsInitMirror(lifted::Regs& ctx, uint8_t* base);
 void SecondSetCockpitInitBonnet(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitInitBonnet(lifted::Regs& ctx, uint8_t* base);
 void SecondSetCockpitInitMirror(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitInitMirror(lifted::Regs& ctx, uint8_t* base);
 void SecondSetCockpitResetFenders(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitResetFenders(lifted::Regs& ctx, uint8_t* base);
 void SecondSetCockpitResetCabin(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitResetCabin(lifted::Regs& ctx, uint8_t* base);
 void SecondSetCockpitResetDoors(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitResetDoors(lifted::Regs& ctx, uint8_t* base);
 void SecondSetCockpitResetHeadlights(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitResetHeadlights(lifted::Regs& ctx, uint8_t* base);
 void SecondSetInteriorInitBody(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorInitBody(lifted::Regs& ctx, uint8_t* base);
 void SecondSetInteriorResetDials(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorResetDials(lifted::Regs& ctx, uint8_t* base);
 void SecondSetInteriorResetMeters(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorResetMeters(lifted::Regs& ctx, uint8_t* base);
 void SecondSetInteriorResetSteering(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorResetSteering(lifted::Regs& ctx, uint8_t* base);
 void SecondSetInteriorResetSeats(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorResetSeats(lifted::Regs& ctx, uint8_t* base);
 void SecondSetInteriorResetRollCage(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorResetRollCage(lifted::Regs& ctx, uint8_t* base);
 void SecondSetLightsResetFront(PPCContext& ctx, uint8_t* base);
+void SecondSetLightsResetFront(lifted::Regs& ctx, uint8_t* base);
 void SecondSetLightsResetSides(PPCContext& ctx, uint8_t* base);
+void SecondSetLightsResetSides(lifted::Regs& ctx, uint8_t* base);
 void SecondSetLightsResetRear(PPCContext& ctx, uint8_t* base);
+void SecondSetLightsResetRear(lifted::Regs& ctx, uint8_t* base);
 void SecondSetTrafficResetBody(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficResetBody(lifted::Regs& ctx, uint8_t* base);
 void SecondSetTrafficResetHeadlights(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficResetHeadlights(lifted::Regs& ctx, uint8_t* base);
 void SecondSetTrafficResetTailLights(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficResetTailLights(lifted::Regs& ctx, uint8_t* base);
 // The point blocks' constructors and resets (src/second_set/blocks.h): r3 =
 // the block; r3 as the original leaves it. The parts' natively only with
 // --native_material_passes (else the original).
 void SecondSetPartsPointsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsPointsConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsPointsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsPointsReset(lifted::Regs& ctx, uint8_t* base);
 void SecondSetCockpitPointsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitPointsConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetCockpitPointsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitPointsReset(lifted::Regs& ctx, uint8_t* base);
 void SecondSetInteriorPointsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorPointsConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetInteriorPointsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorPointsReset(lifted::Regs& ctx, uint8_t* base);
 void SecondSetLightPointsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetLightPointsConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetLightPointsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetLightPointsReset(lifted::Regs& ctx, uint8_t* base);
 void SecondSetTrafficPointsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficPointsConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetTrafficPointsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficPointsReset(lifted::Regs& ctx, uint8_t* base);
 // The wheels' group resets (point_groups.h) and the objects' resets
 // (objects.h): r3 = the group or object; r3 as the original leaves it.
 // SceneParts::Reset natively only with --native_material_passes,
 // SceneCarModel::Release only where ScenePools::ReleaseA's plain C++ runs
 // (hooks::SceneLoadersReleaseANative; else the original).
 void SecondSetWheelsResetTire(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsResetTire(lifted::Regs& ctx, uint8_t* base);
 void SecondSetWheelsResetRimA(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsResetRimA(lifted::Regs& ctx, uint8_t* base);
 void SecondSetWheelsResetRimB(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsResetRimB(lifted::Regs& ctx, uint8_t* base);
 void SecondSetWheelsResetBrakes(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsResetBrakes(lifted::Regs& ctx, uint8_t* base);
 void SecondSetScenePartsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetScenePartsReset(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneCockpitReset(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCockpitReset(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneInteriorReset(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneInteriorReset(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneLightsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneLightsReset(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneTrafficReset(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneTrafficReset(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneCarModelRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCarModelRelease(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneModelBlockConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneModelBlockConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneModelBlockReset(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneModelBlockReset(lifted::Regs& ctx, uint8_t* base);
 // The wheels' block and inits (blocks.h), SceneWheels::Reset, the releases
 // (natively where ReleaseA's plain C++ runs, the parts' with
 // --native_material_passes) and the constructors (r4 the list; the parts'
 // with --native_material_passes) (objects.h): r3 as the original leaves it.
 void SecondSetSceneWheelsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneWheelsReset(lifted::Regs& ctx, uint8_t* base);
 void SecondSetWheelPointsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelPointsReset(lifted::Regs& ctx, uint8_t* base);
 void SecondSetWheelPointsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelPointsConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetWheelsInitTire(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsInitTire(lifted::Regs& ctx, uint8_t* base);
 void SecondSetWheelsInitRimA(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsInitRimA(lifted::Regs& ctx, uint8_t* base);
 void SecondSetWheelsInitRimB(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsInitRimB(lifted::Regs& ctx, uint8_t* base);
 void SecondSetWheelsInitBrakes(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsInitBrakes(lifted::Regs& ctx, uint8_t* base);
 void SecondSetScenePartsRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetScenePartsRelease(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneInteriorRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneInteriorRelease(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneLightsRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneLightsRelease(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneWheelsRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneWheelsRelease(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneTrafficRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneTrafficRelease(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneCarModelConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCarModelConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetScenePartsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetScenePartsConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneCockpitConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCockpitConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneInteriorConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneInteriorConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneLightsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneLightsConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneWheelsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneWheelsConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneTrafficConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneTrafficConstruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneModelConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneModelConstruct(lifted::Regs& ctx, uint8_t* base);
 // The morph and the tire's helpers (morph.h): the shape accessors (r3 the
 // model, r4 the shape; r3 the word), Morph::SetUp (r3 the model, r4 the
 // record, r5 the base shape, r6 and r7 the indices and weights, r8 the
@@ -129,14 +214,23 @@ void SecondSetSceneModelConstruct(PPCContext& ctx, uint8_t* base);
 // index, r4 the entries, r5 to r7 the outputs); the flush mode as the
 // originals leave it.
 void SecondSetModelStreamData(PPCContext& ctx, uint8_t* base);
+void SecondSetModelStreamData(lifted::Regs& ctx, uint8_t* base);
 void SecondSetModelStreamSize(PPCContext& ctx, uint8_t* base);
+void SecondSetModelStreamSize(lifted::Regs& ctx, uint8_t* base);
 void SecondSetModelStreamData2(PPCContext& ctx, uint8_t* base);
+void SecondSetModelStreamData2(lifted::Regs& ctx, uint8_t* base);
 void SecondSetModelStreamSize2(PPCContext& ctx, uint8_t* base);
+void SecondSetModelStreamSize2(lifted::Regs& ctx, uint8_t* base);
 void SecondSetMorphSetUp(PPCContext& ctx, uint8_t* base);
+void SecondSetMorphSetUp(lifted::Regs& ctx, uint8_t* base);
 void SecondSetMorphBlend(PPCContext& ctx, uint8_t* base);
+void SecondSetMorphBlend(lifted::Regs& ctx, uint8_t* base);
 void SecondSetMorphRun(PPCContext& ctx, uint8_t* base);
+void SecondSetMorphRun(lifted::Regs& ctx, uint8_t* base);
 void SecondSetTireFillEntries(PPCContext& ctx, uint8_t* base);
+void SecondSetTireFillEntries(lifted::Regs& ctx, uint8_t* base);
 void SecondSetTireReadEntry(PPCContext& ctx, uint8_t* base);
+void SecondSetTireReadEntry(lifted::Regs& ctx, uint8_t* base);
 // ScenePools::ReleaseB sub_820C5C88 (r3 the set, r4 the pool, r5 the
 // index; its adapter is the diagnostics' wrap, src/debug/frame_state_diff.cpp),
 // SceneCockpit::Release sub_820DBF88 and SceneModel::Release sub_820DA5D0
@@ -145,38 +239,62 @@ void SecondSetTireReadEntry(PPCContext& ctx, uint8_t* base);
 // nested ReleaseB's original where its plain C++ declines. r3 as the original
 // leaves it.
 bool SecondSetReleaseNative(uint32_t pool);
-second_set::ReleaseCalls SecondSetReleaseCalls(PPCContext& ctx, uint8_t* base);
+second_set::ReleaseCalls SecondSetReleaseCalls(lifted::Regs& ctx, uint8_t* base);
 void SecondSetReleaseB(PPCContext& ctx, uint8_t* base);
+void SecondSetReleaseB(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneCockpitRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCockpitRelease(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneModelRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneModelRelease(lifted::Regs& ctx, uint8_t* base);
 // SceneCockpit::~SceneCockpit sub_820DC2F8 (no adapter: only its deleting
 // destructor calls it; the harness's) and the deleting destructor
 // sub_820DC448 (r3 the object, left; r4 the flags, bit 0 to the original):
 // natively where pool 2's release is (else the original).
 void SecondSetSceneCockpitDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCockpitDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneCockpitDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCockpitDeletingDestruct(lifted::Regs& ctx, uint8_t* base);
 // The destructors and deleting destructors (objects.h; r3 the object, left;
 // r4 the flags), natively where their releases are (else the original), and
 // the point blocks' destructors (blocks.h; r3 as the original leaves it).
 void SecondSetSceneCarModelDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCarModelDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetScenePartsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetScenePartsDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneInteriorDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneInteriorDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneLightsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneLightsDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneWheelsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneWheelsDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneTrafficDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneTrafficDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneCarModelDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCarModelDeletingDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetScenePartsDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetScenePartsDeletingDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneInteriorDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneInteriorDeletingDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneLightsDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneLightsDeletingDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneWheelsDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneWheelsDeletingDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetSceneTrafficDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneTrafficDeletingDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPoolObjectDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetPoolObjectDeletingDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetPartsPointsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsPointsDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetCockpitPointsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitPointsDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetInteriorPointsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorPointsDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetLightPointsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetLightPointsDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetWheelPointsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelPointsDestruct(lifted::Regs& ctx, uint8_t* base);
 void SecondSetTrafficPointsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficPointsDestruct(lifted::Regs& ctx, uint8_t* base);
 
 
 // The point set-ups (src/second_set/finds.h): r3 = the group or block, r4 =
@@ -191,15 +309,20 @@ using FindFunction = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t,
 bool SecondSetFindsNative();
 // The guest calls the set-ups' plain C++ makes (Skeleton::UpdateMatrices'
 // original from ModelPoint::Find's frame), for native callers.
-second_set::FindCalls SecondSetFindCalls(PPCContext& ctx, uint8_t* base);
+second_set::FindCalls SecondSetFindCalls(lifted::Regs& ctx, uint8_t* base);
 // One set-up's plain C++ (nothing done unless SecondSetFindsNative()), for
 // the adapters and the harness.
-void SecondSetFindStep(PPCContext& ctx, uint8_t* base, FindFunction find);
+void SecondSetFindStep(lifted::Regs& ctx, uint8_t* base, FindFunction find);
 void SecondSetPartsFind(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsFind(lifted::Regs& ctx, uint8_t* base);
 void SecondSetCockpitFind(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitFind(lifted::Regs& ctx, uint8_t* base);
 void SecondSetInteriorFind(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorFind(lifted::Regs& ctx, uint8_t* base);
 void SecondSetLightsFind(PPCContext& ctx, uint8_t* base);
+void SecondSetLightsFind(lifted::Regs& ctx, uint8_t* base);
 void SecondSetTrafficFind(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficFind(lifted::Regs& ctx, uint8_t* base);
 
 
 // The wheels' set-up (src/second_set/wheels.h): WheelPoints::SetUp
@@ -212,8 +335,9 @@ void SecondSetTrafficFind(PPCContext& ctx, uint8_t* base);
 // Morph::Run, memcpy and FreePagesIn where their plain C++ declines.
 using WheelFunction = uint64_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t, second_set::WheelCalls&);
 bool SecondSetWheelsNative();
-second_set::WheelCalls SecondSetWheelCalls(PPCContext& ctx, uint8_t* base);
-void SecondSetWheelStep(PPCContext& ctx, uint8_t* base, WheelFunction step);
+second_set::WheelCalls SecondSetWheelCalls(lifted::Regs& ctx, uint8_t* base);
+void SecondSetWheelStep(lifted::Regs& ctx, uint8_t* base, WheelFunction step);
 void SecondSetWheelPointsSetUp(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelPointsSetUp(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -520,7 +520,7 @@ void InitStates(Context& h, const World& w) {
   // numbers, some the Init's (Add replaces those); its frame but its saves
   // (r27 on) compared.
   Run(h, w, {"UserInfo::InitStates (sub_8220B408)", 24, __imp__sub_8220B408,
-             hooks::UserInfoInitStates, {{-912, -48}},
+             ITC_CONTEXT_FN(hooks::UserInfoInitStates), {{-912, -48}},
              [](PPCContext& t, Random& r, const World& w) {
                namespace gm = game_modes;
                const uint32_t machine = w.machine();
@@ -544,7 +544,7 @@ void InitStates(Context& h, const World& w) {
 
 void Handlers(Context& h, const World& w) {
   // Create: the three blocks VirtualAlloc made compared by content.
-  Run(h, w, {"UserInfo::Create (sub_8220AA50)", 60, __imp__sub_8220AA50, hooks::UserInfoCreate,
+  Run(h, w, {"UserInfo::Create (sub_8220AA50)", 60, __imp__sub_8220AA50, ITC_CONTEXT_FN(hooks::UserInfoCreate),
              {{-112, -24}}, Machine,
              [&h](PPCContext& t, const World&, Outputs& out) {
                // r3 the data's address (the last VirtualAlloc's).
@@ -557,7 +557,7 @@ void Handlers(Context& h, const World& w) {
   // Destroy: the three blocks the layer's pages (whether each was freed
   // compared).
   Run(h, w, {"UserInfo::Destroy (sub_8220A9D8)", 60, __imp__sub_8220A9D8,
-             hooks::UserInfoDestroy, {{-112, -32}},
+             ITC_CONTEXT_FN(hooks::UserInfoDestroy), {{-112, -32}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                Machine(t, r, w);
@@ -566,19 +566,19 @@ void Handlers(Context& h, const World& w) {
                guest::StoreU32(base, ui::kData, MakePages(base, 60, r));
              }});
   Run(h, w, {"UserInfo::OpenMovie (sub_8220AA40)", 20, __imp__sub_8220AA40,
-             hooks::UserInfoOpenMovie, {}, Machine});
+             ITC_CONTEXT_FN(hooks::UserInfoOpenMovie), {}, Machine});
   Run(h, w, {"UserInfo::WaitForLoad (sub_8220B070)", 100, __imp__sub_8220B070,
-             hooks::UserInfoWaitForLoad, {{-96, -16}}, Machine});
+             ITC_CONTEXT_FN(hooks::UserInfoWaitForLoad), {{-96, -16}}, Machine});
   // Reenter: the page 0 or not.
   Run(h, w, {"UserInfo::Reenter (sub_8220AB60)", 100, __imp__sub_8220AB60,
-             hooks::UserInfoReenter, {},
+             ITC_CONTEXT_FN(hooks::UserInfoReenter), {},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                if (r.Below(3) == 0) {
                  guest::StoreU32(w.base, w.at(kPagesAt), 0);
                }
              }});
-  Run(h, w, {"UserInfo::Close (sub_8220ABB8)", 60, __imp__sub_8220ABB8, hooks::UserInfoClose,
+  Run(h, w, {"UserInfo::Close (sub_8220ABB8)", 60, __imp__sub_8220ABB8, ITC_CONTEXT_FN(hooks::UserInfoClose),
              {{-112, -16}}, Machine});
 }
 
@@ -591,12 +591,12 @@ void Pages(Context& h, const World& w) {
                     r.Below(2) == 0 ? 9990 + r.Below(20) : uint32_t(r.Next()));
   };
   Run(h, w, {"UserInfo::SetPlayTimeText (sub_8220AFC0)", 100, __imp__sub_8220AFC0,
-             hooks::UserInfoSetPlayTimeText, {{-112, -64}, {-32, -16}},
+             ITC_CONTEXT_FN(hooks::UserInfoSetPlayTimeText), {{-112, -64}, {-32, -16}},
              [time](PPCContext&, Random& r, const World& w) { time(r, w); }});
   // MenuPage: the menu's input (PageInput); SetPlayTimeText's frame under
   // its own (without SetText's parameter area and its r31 save).
   Run(h, w, {"UserInfo::MenuPage (sub_8220B0D8; sub_8220AFC0)", 300, __imp__sub_8220B0D8,
-             hooks::UserInfoMenuPage, {{-112, -24}, {-224, -176}, {-144, -128}},
+             ITC_CONTEXT_FN(hooks::UserInfoMenuPage), {{-112, -24}, {-224, -176}, {-144, -128}},
              [time](PPCContext& t, Random& r, const World& w) {
                PageInput(r, w);
                time(r, w);
@@ -605,7 +605,7 @@ void Pages(Context& h, const World& w) {
   // UpdatePage: the page -1, 0 or 1 (MenuPage, the empty function), r4 the
   // mode; only its own frame compared.
   Run(h, w, {"UserInfo::UpdatePage (sub_8220B260)", 200, __imp__sub_8220B260,
-             hooks::UserInfoUpdatePage, {{-96, -8}},
+             ITC_CONTEXT_FN(hooks::UserInfoUpdatePage), {{-96, -8}},
              [time](PPCContext& t, Random& r, const World& w) {
                PageInput(r, w);
                time(r, w);
@@ -618,18 +618,18 @@ void Transitions(Context& h, const World& w) {
   // SetTexts: its frame without SetText's parameter area (+48 to +79 but
   // the last call's r7 and r8, +48 to +63) and the saves (f31, r29 on).
   Run(h, w, {"UserInfo::SetTexts (sub_8220AD08)", 100, __imp__sub_8220AD08,
-             hooks::UserInfoSetTexts, {{-192, -128}, {-112, -40}},
+             ITC_CONTEXT_FN(hooks::UserInfoSetTexts), {{-192, -128}, {-112, -40}},
              [](PPCContext&, Random&, const World&) {}});
   // Opening: SetTexts' frame under its own.
   Run(h, w, {"UserInfo::Opening (sub_8220B1C8; sub_8220AD08)", 100, __imp__sub_8220B1C8,
-             hooks::UserInfoOpening, {{-112, -24}, {-304, -240}, {-224, -152}}, Started});
+             ITC_CONTEXT_FN(hooks::UserInfoOpening), {{-112, -24}, {-304, -240}, {-224, -152}}, Started});
   Run(h, w, {"UserInfo::Closing (sub_8220AC60)", 100, __imp__sub_8220AC60,
-             hooks::UserInfoClosing, {{-112, -24}}, Started});
+             ITC_CONTEXT_FN(hooks::UserInfoClosing), {{-112, -24}}, Started});
   // Update: the running transition -1, 0, 1 or another negative, the queued
   // one -1 or 0 to 1, the started word 0 or not, the data's +4 21 or a
   // state; only its own frame compared (the transitions' frames below it
   // hold the recompiled ones' register saves).
-  Run(h, w, {"UserInfo::Update (sub_8220B2C0)", 300, __imp__sub_8220B2C0, hooks::UserInfoUpdate,
+  Run(h, w, {"UserInfo::Update (sub_8220B2C0)", 300, __imp__sub_8220B2C0, ITC_CONTEXT_FN(hooks::UserInfoUpdate),
              {{-112, -24}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;

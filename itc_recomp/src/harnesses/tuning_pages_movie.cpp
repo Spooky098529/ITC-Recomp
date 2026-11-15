@@ -1866,7 +1866,7 @@ Spec HandleInputSpec(const char* name, int cases, std::vector<uint32_t> states,
   return {name,
           cases,
           __imp__sub_821E6950,
-          hooks::TuningPagesHandleInput,
+          ITC_CONTEXT_FN(hooks::TuningPagesHandleInput),
           24,
           holes,
           [fields, states](PPCContext& t, Random& r, const World& w) {
@@ -2067,16 +2067,16 @@ void StickerCommandCases(Context& h, const World& w) {
 void StickerCases(Context& h, const World& w) {
   // UpdateSoloHold and UpdatePreviewHold: r31 and lr saved (16 bytes).
   Run(h, w,
-      {"TuningScreen::UpdateSoloHold", 60, __imp__sub_821F7298, hooks::TuningPagesUpdateSoloHold,
+      {"TuningScreen::UpdateSoloHold", 60, __imp__sub_821F7298, ITC_CONTEXT_FN(hooks::TuningPagesUpdateSoloHold),
        16, {}, StickerFields});
   Run(h, w,
       {"TuningScreen::UpdatePreviewHold", 60, __imp__sub_821F7348,
-       hooks::TuningPagesUpdatePreviewHold, 16, {}, StickerFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesUpdatePreviewHold), 16, {}, StickerFields});
   // StepUnlockedSticker: r4 an id (-1 to 198, now and then any word), r5 a
   // step count -8 to 8 (now and then 0); leaf.
   Run(h, w,
       {"TuningScreen::StepUnlockedSticker", 150, __imp__sub_821F73F8,
-       hooks::TuningPagesStepUnlockedSticker, 0, {},
+       ITC_CONTEXT_FN(hooks::TuningPagesStepUnlockedSticker), 0, {},
        [](PPCContext& t, Random& r, const World& w) {
          StickerFields(t, r, w);
          t.r4.u64 = r.Below(8) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(200)) - 1));
@@ -2086,7 +2086,7 @@ void StickerCases(Context& h, const World& w) {
   // ShowSlotNode: r4 an id (-1 to 198), r5 a slot 0 to 4, r6 the current 0
   // to 6; __savegprlr_28: 40 bytes.
   Run(h, w,
-      {"TuningScreen::ShowSlotNode", 100, __imp__sub_821F8070, hooks::TuningPagesShowSlotNode, 40,
+      {"TuningScreen::ShowSlotNode", 100, __imp__sub_821F8070, ITC_CONTEXT_FN(hooks::TuningPagesShowSlotNode), 40,
        {}, [](PPCContext& t, Random& r, const World& w) {
          StickerFields(t, r, w);
          t.r4.u64 = uint64_t(int64_t(int32_t(r.Below(200)) - 1));
@@ -2097,7 +2097,7 @@ void StickerCases(Context& h, const World& w) {
   // record or D; __savegprlr_27: 48 bytes.
   Run(h, w,
       {"TuningScreen::PlaceStickerNode", 150, __imp__sub_821F8160,
-       hooks::TuningPagesPlaceStickerNode, 48, {}, [](PPCContext& t, Random& r, const World& w) {
+       ITC_CONTEXT_FN(hooks::TuningPagesPlaceStickerNode), 48, {}, [](PPCContext& t, Random& r, const World& w) {
          StickerFields(t, r, w);
          t.r4.u64 = uint64_t(int64_t(int32_t(r.Below(200)) - 1));
          t.r5.u64 = r.Below(5);
@@ -2107,7 +2107,7 @@ void StickerCases(Context& h, const World& w) {
   // and r6 nodes, r7 and r8 texture slots below 200, r9 an entry -1 to 198,
   // r10 a flag (0, 1, now and then any word); __savegprlr_23: 80 bytes.
   Run(h, w,
-      {"DecalImages::SetSlot", 100, __imp__sub_821F8868, hooks::TuningPagesSetSlot, 80, {},
+      {"DecalImages::SetSlot", 100, __imp__sub_821F8868, ITC_CONTEXT_FN(hooks::TuningPagesSetSlot), 80, {},
        [](PPCContext& t, Random& r, const World& w) {
          StickerFields(t, r, w);
          static constexpr uint32_t kSubs[] = {0xFFFFFFFFu, 29, 30};
@@ -2128,15 +2128,15 @@ void StickerCases(Context& h, const World& w) {
   // original), the native version's registers not the original's.
   Run(h, w,
       {"TuningScreen::SetStickerEditTexts", 60, __imp__sub_821F7F20,
-       hooks::TuningPagesSetStickerEditTexts, 24, {{32, 64}, {112, 152}}, StickerFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesSetStickerEditTexts), 24, {{32, 64}, {112, 152}}, StickerFields});
   // ShowSlotImage and ShowStickerListImage: tail calls into SetSlot, whose
   // saves (80 bytes) are the top of the stack; r4 an id -1 to 198, r5 a slot
   // or an index 0 to 4.
   for (const auto& [name, recompiled, native] :
        {std::tuple{"TuningScreen::ShowSlotImage", __imp__sub_821FA408,
-                   hooks::TuningPagesShowSlotImage},
+                   ITC_CONTEXT_FN(hooks::TuningPagesShowSlotImage)},
         std::tuple{"TuningScreen::ShowStickerListImage", __imp__sub_821FA460,
-                   hooks::TuningPagesShowStickerListImage}}) {
+                   ITC_CONTEXT_FN(hooks::TuningPagesShowStickerListImage)}}) {
     Run(h, w,
         {name, 80, recompiled, native, 80, {}, [](PPCContext& t, Random& r, const World& w) {
            StickerFields(t, r, w);
@@ -2157,22 +2157,22 @@ void StickerCases(Context& h, const World& w) {
   // registers fill differently; left out with SetSlot's saves.
   Run(h, w,
       {"TuningScreen::AnimateStickerAreas", 100, __imp__sub_821FA508,
-       hooks::TuningPagesAnimateStickerAreas, 56, {{144, 800}}, show});
+       ITC_CONTEXT_FN(hooks::TuningPagesAnimateStickerAreas), 56, {{144, 800}}, show});
   Run(h, w,
       {"TuningScreen::AnimateStickerOperate", 100, __imp__sub_821F7518,
-       hooks::TuningPagesAnimateStickerOperate, 56, {{64, 96}, {144, 184}}, show});
+       ITC_CONTEXT_FN(hooks::TuningPagesAnimateStickerOperate), 56, {{64, 96}, {144, 184}}, show});
   Run(h, w,
       {"TuningScreen::AnimateStickerSlots", 100, __imp__sub_821F8A50,
-       hooks::TuningPagesAnimateStickerSlots, 56, {{144, 184}}, show});
+       ITC_CONTEXT_FN(hooks::TuningPagesAnimateStickerSlots), 56, {{144, 184}}, show});
   Run(h, w,
       {"TuningScreen::AnimateStickerEditMenu", 100, __imp__sub_821F8D68,
-       hooks::TuningPagesAnimateStickerEditMenu, 64, {{80, 112}, {160, 224}, {272, 312}}, show});
+       ITC_CONTEXT_FN(hooks::TuningPagesAnimateStickerEditMenu), 64, {{80, 112}, {160, 224}, {272, 312}}, show});
   Run(h, w,
       {"TuningScreen::ShowStickerOrder", 100, __imp__sub_821FBA40,
-       hooks::TuningPagesShowStickerOrder, 48, {{144, 224}}, show});
+       ITC_CONTEXT_FN(hooks::TuningPagesShowStickerOrder), 48, {{144, 224}}, show});
   Run(h, w,
       {"TuningScreen::ShowStickerPicker", 100, __imp__sub_821FBB60,
-       hooks::TuningPagesShowStickerPicker, 64, {{80, 112}, {160, 240}}, show});
+       ITC_CONTEXT_FN(hooks::TuningPagesShowStickerPicker), 64, {{80, 112}, {160, 240}}, show});
   // The input pages: r3 the screen (its high word now and then set). Below
   // their frames, the helpers' register saves and holes (the native helpers
   // write neither), shifted by the page's frame: AnimateStickerAreas' 56
@@ -2187,16 +2187,16 @@ void StickerCases(Context& h, const World& w) {
   };
   Run(h, w,
       {"TuningScreen::InputStickerAreas", 200, __imp__sub_821FBD40,
-       hooks::TuningPagesInputStickerAreas, 16, {{96, 152}, {240, 896}}, page});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputStickerAreas), 16, {{96, 152}, {240, 896}}, page});
   Run(h, w,
       {"TuningScreen::InputStickerSlots", 200, __imp__sub_821F9050,
-       hooks::TuningPagesInputStickerSlots, 32, {{112, 168}, {256, 296}}, page});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputStickerSlots), 32, {{112, 168}, {256, 296}}, page});
   Run(h, w,
       {"TuningScreen::InputStickerOperate", 200, __imp__sub_821F9328,
-       hooks::TuningPagesInputStickerOperate, 32, {{112, 168}, {176, 208}, {256, 296}}, page});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputStickerOperate), 32, {{112, 168}, {176, 208}, {256, 296}}, page});
   Run(h, w,
       {"TuningScreen::InputStickerEdit", 300, __imp__sub_821F9608,
-       hooks::TuningPagesInputStickerEdit, 32,
+       ITC_CONTEXT_FN(hooks::TuningPagesInputStickerEdit), 32,
        {{112, 176}, {192, 224}, {272, 336}, {384, 424}}, page});
   // InputStickerView: the view's held buttons (163, 164, 171 to 174) never
   // read set on the player's mapper (whichever slot reads them), as this
@@ -2212,7 +2212,7 @@ void StickerCases(Context& h, const World& w) {
   };
   Run(h, w,
       {"TuningScreen::InputStickerView", 150, __imp__sub_821F7000,
-       hooks::TuningPagesInputStickerView, 24, {}, view});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputStickerView), 24, {}, view});
   // HandleInput on those states: the pages' saves and holes 112 deeper.
   Run(h, w,
       HandleInputSpec("TuningScreen::HandleInput (38)", 60, {38}, 16, {{96, 152}, {240, 896}},
@@ -2272,19 +2272,19 @@ void StickerCases(Context& h, const World& w) {
   // edits' ShowSlotNode (40) under their 112-byte frames.
   Run(h, w,
       {"TuningScreen::InputStickerOrder", 200, __imp__sub_821FBF18,
-       hooks::TuningPagesInputStickerOrder, 40, {{272, 320}, {416, 496}}, edit});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputStickerOrder), 40, {{272, 320}, {416, 496}}, edit});
   Run(h, w,
       {"TuningScreen::InputStickerPicker", 300, __imp__sub_821FC270,
-       hooks::TuningPagesInputStickerPicker, 48, {{128, 192}, {208, 240}, {288, 368}}, edit});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputStickerPicker), 48, {{128, 192}, {208, 240}, {288, 368}}, edit});
   Run(h, w,
       {"TuningScreen::InputStickerMove", 200, __imp__sub_821F99A8,
-       hooks::TuningPagesInputStickerMove, 32, {{112, 152}}, edit});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputStickerMove), 32, {{112, 152}}, edit});
   Run(h, w,
       {"TuningScreen::InputStickerRotate", 300, __imp__sub_821F9D30,
-       hooks::TuningPagesInputStickerRotate, 32, {{112, 152}}, edit});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputStickerRotate), 32, {{112, 152}}, edit});
   Run(h, w,
       {"TuningScreen::InputStickerScale", 150, __imp__sub_821F9FB8,
-       hooks::TuningPagesInputStickerScale, 32, {{112, 152}}, edit});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputStickerScale), 32, {{112, 152}}, edit});
   Run(h, w,
       HandleInputSpec("TuningScreen::HandleInput (42)", 60, {42}, 40, {{272, 320}, {416, 496}},
                       asks));
@@ -2307,7 +2307,7 @@ void TuningPagesMovie(Context& h) {
   // mappers, the menu's fields and the player (above). __savegprlr_27: 48
   // bytes.
   Run(h, w,
-      {"Menu::StepList", 60, __imp__sub_821CE1D0, hooks::TuningPagesStepList, 48, {},
+      {"Menu::StepList", 60, __imp__sub_821CE1D0, ITC_CONTEXT_FN(hooks::TuningPagesStepList), 48, {},
        [](PPCContext& t, Random& r, const World& w) {
          t.r3.u64 = w.menu();
          HighWord(t, r);
@@ -2315,7 +2315,7 @@ void TuningPagesMovie(Context& h) {
   // LeaveEditor: the fades' counts (above; one set now and then, for the
   // early return), r3's high word; __savegprlr_28: 40 bytes.
   Run(h, w,
-      {"TuningScreen::LeaveEditor", 40, __imp__sub_821D8670, hooks::TuningPagesLeaveEditor, 40,
+      {"TuningScreen::LeaveEditor", 40, __imp__sub_821D8670, ITC_CONTEXT_FN(hooks::TuningPagesLeaveEditor), 40,
        {}, [](PPCContext& t, Random& r, const World& w) {
          if (r.Below(4) == 0) {
            guest::StoreU32(w.base, r.Below(2) == 0 ? kFadeIn : kFadeOut, 1 + r.Below(30));
@@ -2330,7 +2330,7 @@ void TuningPagesMovie(Context& h) {
   // went, B7 loop, 2026-11-11, so the recompiled side runs its original).
   Run(h, w,
       {"TuningScreen::InputCategories", 80, __imp__sub_821D6AD0,
-       hooks::TuningPagesInputCategories, 24,
+       ITC_CONTEXT_FN(hooks::TuningPagesInputCategories), 24,
        {{112, 144}, {224, 256}, {320, 376}, {432, 456}},
        [](PPCContext& t, Random& r, const World&) {
          t.r4.u64 = r.Next();
@@ -2341,7 +2341,7 @@ void TuningPagesMovie(Context& h) {
   // the wrap at bytes 64 to 69). Its r31 and lr (16 bytes); UnloadAll's
   // saves (96 to 120 below) and its callees' (as InputCategories').
   Run(h, w,
-      {"TuningScreen::BackToItems", 60, __imp__sub_821D87C0, hooks::TuningPagesBackToItems, 16,
+      {"TuningScreen::BackToItems", 60, __imp__sub_821D87C0, ITC_CONTEXT_FN(hooks::TuningPagesBackToItems), 16,
        {{96, 120}, {208, 240}, {304, 360}, {416, 440}},
        [](PPCContext& t, Random& r, const World& w) {
          const uint32_t s = w.screen();
@@ -2359,26 +2359,26 @@ void TuningPagesMovie(Context& h) {
   // (the part row any); __savegprlr_29: 32 bytes.
   Run(h, w,
       {"TuningScreen::AnimateWheelParts", 120, __imp__sub_821E8CE0,
-       hooks::TuningPagesAnimateWheelParts, 32, {},
+       ITC_CONTEXT_FN(hooks::TuningPagesAnimateWheelParts), 32, {},
        [](PPCContext& t, Random& r, const World& w) { WheelFields(t, r, w, true); }});
   Run(h, w,
-      {"TuningScreen::AnimateInches", 120, __imp__sub_821E9110, hooks::TuningPagesAnimateInches,
+      {"TuningScreen::AnimateInches", 120, __imp__sub_821E9110, ITC_CONTEXT_FN(hooks::TuningPagesAnimateInches),
        32, {}, [](PPCContext& t, Random& r, const World& w) { WheelFields(t, r, w, true); }});
   // InputWheelParts: __savegprlr_27: 48 bytes; AnimateWheelParts' saves
   // (128 to 160 below).
   Run(h, w,
       {"TuningScreen::InputWheelParts", 100, __imp__sub_821EE390,
-       hooks::TuningPagesInputWheelParts, 48, {{128, 160}},
+       ITC_CONTEXT_FN(hooks::TuningPagesInputWheelParts), 48, {{128, 160}},
        [](PPCContext& t, Random& r, const World& w) { WheelFields(t, r, w, false); }});
   // InputInches: its r30, r31 and lr (24 bytes); AnimateInches' saves (112
   // to 144 below).
   Run(h, w,
-      {"TuningScreen::InputInches", 100, __imp__sub_821EEEA8, hooks::TuningPagesInputInches, 24,
+      {"TuningScreen::InputInches", 100, __imp__sub_821EEEA8, ITC_CONTEXT_FN(hooks::TuningPagesInputInches), 24,
        {{112, 144}},
        [](PPCContext& t, Random& r, const World& w) { WheelFields(t, r, w, false); }});
   // MoveItem: state 4's fields (above); __savegprlr_29: 32 bytes.
   Run(h, w,
-      {"TuningScreen::MoveItem", 300, __imp__sub_821D0CC0, hooks::TuningPagesMoveItem, 32, {},
+      {"TuningScreen::MoveItem", 300, __imp__sub_821D0CC0, ITC_CONTEXT_FN(hooks::TuningPagesMoveItem), 32, {},
        ItemFields});
   // InputItems: its saves (__savegprlr_28: 40 bytes); StepList's,
   // MoveItem's and LoadVinyls' (128 to 176 below: their plain C++ doesn't
@@ -2390,7 +2390,7 @@ void TuningPagesMovie(Context& h) {
   // 2026-11-12; its saves fall in StoreToGarageCar's); Archive::Load
   // recorded.
   Run(h, w,
-      {"TuningScreen::InputItems", 500, __imp__sub_821DFD48, hooks::TuningPagesInputItems, 40,
+      {"TuningScreen::InputItems", 500, __imp__sub_821DFD48, ITC_CONTEXT_FN(hooks::TuningPagesInputItems), 40,
        {{128, 224}, {236, 240}, {256, 272}, {304, 336}}, ItemFields, true});
   // The sticker editor's set-up under InputItems (the item fields' world:
   // the garage list, the cars' decal records): ResetStickerEditor a leaf;
@@ -2400,54 +2400,54 @@ void TuningPagesMovie(Context& h) {
   // below its frame (176 to 208), which its plain C++ doesn't write.
   Run(h, w,
       {"TuningScreen::ResetStickerEditor", 100, __imp__sub_821F8440,
-       hooks::TuningPagesResetStickerEditor, 0, {}, ItemFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesResetStickerEditor), 0, {}, ItemFields});
   Run(h, w,
       {"TuningScreen::RestoreAreaDecals", 100, __imp__sub_821F6C90,
-       hooks::TuningPagesRestoreAreaDecals, 32, {},
+       ITC_CONTEXT_FN(hooks::TuningPagesRestoreAreaDecals), 32, {},
        [](PPCContext& t, Random& r, const World& w) {
          ItemFields(t, r, w);
          t.r4.u64 = r.Below(8);
        }});
   Run(h, w,
-      {"TuningScreen::LoadStickers", 200, __imp__sub_821F86C0, hooks::TuningPagesLoadStickers, 96,
+      {"TuningScreen::LoadStickers", 200, __imp__sub_821F86C0, ITC_CONTEXT_FN(hooks::TuningPagesLoadStickers), 96,
        {{176, 208}}, ItemFields});
   // MoveOption: state 8's fields (above); __savegprlr_28: 40 bytes.
   Run(h, w,
-      {"TuningScreen::MoveOption", 300, __imp__sub_821D5610, hooks::TuningPagesMoveOption, 40, {},
+      {"TuningScreen::MoveOption", 300, __imp__sub_821D5610, ITC_CONTEXT_FN(hooks::TuningPagesMoveOption), 40, {},
        OptionFields});
   // InputOptions: its r30, r31 and lr (24 bytes); MoveOption's saves (112 to
   // 152 below: its plain C++ doesn't write them).
   Run(h, w,
-      {"TuningScreen::InputOptions", 400, __imp__sub_821D8160, hooks::TuningPagesInputOptions, 24,
+      {"TuningScreen::InputOptions", 400, __imp__sub_821D8160, ITC_CONTEXT_FN(hooks::TuningPagesInputOptions), 24,
        {{112, 152}}, OptionFields});
   // MoveLevel: state 5's fields (above); __savegprlr_28: 40 bytes.
   Run(h, w,
-      {"TuningScreen::MoveLevel", 800, __imp__sub_821D1A18, hooks::TuningPagesMoveLevel, 40, {},
+      {"TuningScreen::MoveLevel", 800, __imp__sub_821D1A18, ITC_CONTEXT_FN(hooks::TuningPagesMoveLevel), 40, {},
        LevelFields});
   // MoveType: state 6's fields (above); __savegprlr_28: 40 bytes.
   Run(h, w,
-      {"TuningScreen::MoveType", 800, __imp__sub_821D32C8, hooks::TuningPagesMoveType, 40, {},
+      {"TuningScreen::MoveType", 800, __imp__sub_821D32C8, ITC_CONTEXT_FN(hooks::TuningPagesMoveType), 40, {},
        TypeFields});
   // InputLevels: its r30, r31 and lr (24 bytes); StepList's and MoveLevel's
   // saves (112 to 160 below: their plain C++ doesn't write them).
   Run(h, w,
-      {"TuningScreen::InputLevels", 800, __imp__sub_821D6E20, hooks::TuningPagesInputLevels, 24,
+      {"TuningScreen::InputLevels", 800, __imp__sub_821D6E20, ITC_CONTEXT_FN(hooks::TuningPagesInputLevels), 24,
        {{112, 160}}, LevelInputFields});
   // InputTypes: its r30, r31 and lr (24 bytes); MoveType's saves (112 to
   // 160 below: its plain C++ doesn't write them).
   Run(h, w,
-      {"TuningScreen::InputTypes", 800, __imp__sub_821D74A0, hooks::TuningPagesInputTypes, 24,
+      {"TuningScreen::InputTypes", 800, __imp__sub_821D74A0, ITC_CONTEXT_FN(hooks::TuningPagesInputTypes), 24,
        {{112, 160}}, TypeInputFields});
   // StoreOwnedParts: state 59's fields (above); its r30, r31 and lr (24
   // bytes).
   Run(h, w,
       {"TuningScreen::StoreOwnedParts", 300, __imp__sub_821DD408,
-       hooks::TuningPagesStoreOwnedParts, 24, {}, OwnedFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesStoreOwnedParts), 24, {}, OwnedFields});
   // Leave: its r30, r31 and lr (24 bytes); StoreToGarageCar's saves (112 to
   // 176 below: its plain C++ doesn't write them) but StoreOwnedParts' table
   // (144 to 160), which both write over them.
   Run(h, w,
-      {"TuningScreen::Leave", 400, __imp__sub_821E25B0, hooks::TuningPagesLeave, 24,
+      {"TuningScreen::Leave", 400, __imp__sub_821E25B0, ITC_CONTEXT_FN(hooks::TuningPagesLeave), 24,
        {{112, 144}, {160, 176}}, OwnedFields});
   // The wheel list's rows after a step right or left: r23 to r31 and lr
   // saved (80 bytes); HidePartMarks' and ShowPartMarks' saves (176 to 216
@@ -2455,11 +2455,11 @@ void TuningPagesMovie(Context& h) {
   // went, 2026-11-07, and their plain C++ doesn't write them).
   Run(h, w,
       {"TuningScreen::FillPartRowsRight", 150, __imp__sub_821F40B8,
-       hooks::TuningPagesFillPartRowsRight, 80, {{176, 216}},
+       ITC_CONTEXT_FN(hooks::TuningPagesFillPartRowsRight), 80, {{176, 216}},
        [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, false); }});
   Run(h, w,
       {"TuningScreen::FillPartRowsLeft", 150, __imp__sub_821F4768,
-       hooks::TuningPagesFillPartRowsLeft, 80, {{176, 216}},
+       ITC_CONTEXT_FN(hooks::TuningPagesFillPartRowsLeft), 80, {{176, 216}},
        [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, false); }});
   // AnimateWheels: __savegprlr_29 (32 bytes); FillPartRowsRight's and
   // Left's saves (128 to 208 below), which their plain C++ doesn't write.
@@ -2470,7 +2470,7 @@ void TuningPagesMovie(Context& h) {
   // parameter area, the r7 to r10 its calls leave unset, passed as 0
   // natively, the user's call of 2026-10-30).
   Run(h, w,
-      {"TuningScreen::AnimateWheels", 300, __imp__sub_821F60E0, hooks::TuningPagesAnimateWheels,
+      {"TuningScreen::AnimateWheels", 300, __imp__sub_821F60E0, ITC_CONTEXT_FN(hooks::TuningPagesAnimateWheels),
        32, {{128, 208}, {304, 344}, {896, 928}},
        [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, false); }});
   // InputWheels: __savegprlr_29 (32 bytes); its frame's +48 to +79
@@ -2480,18 +2480,18 @@ void TuningPagesMovie(Context& h) {
   // AnimateWheels' own (2026-11-07), 128 deeper: the part marks' saves (432
   // to 472) and SetPartName's SetText parameter area (1024 to 1056).
   Run(h, w,
-      {"TuningScreen::InputWheels", 600, __imp__sub_821F6688, hooks::TuningPagesInputWheels, 32,
+      {"TuningScreen::InputWheels", 600, __imp__sub_821F6688, ITC_CONTEXT_FN(hooks::TuningPagesInputWheels), 32,
        {{48, 80}, {128, 160}, {256, 336}, {432, 472}, {1024, 1056}},
        [](PPCContext& t, Random& r, const World& w) { WheelsFields(t, r, w, true); }});
   // The decal edits' movie sides: __savegprlr_29 (32 bytes).
   Run(h, w,
       {"TuningScreen::MoveDecalPosition", 200, __imp__sub_82200DC0,
-       hooks::TuningPagesMoveDecalPosition, 32, {}, DecalEditFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesMoveDecalPosition), 32, {}, DecalEditFields});
   Run(h, w,
-      {"TuningScreen::MoveDecalAngle", 150, __imp__sub_822012E8, hooks::TuningPagesMoveDecalAngle,
+      {"TuningScreen::MoveDecalAngle", 150, __imp__sub_822012E8, ITC_CONTEXT_FN(hooks::TuningPagesMoveDecalAngle),
        32, {}, DecalEditFields});
   Run(h, w,
-      {"TuningScreen::MoveDecalScale", 150, __imp__sub_82201620, hooks::TuningPagesMoveDecalScale,
+      {"TuningScreen::MoveDecalScale", 150, __imp__sub_82201620, ITC_CONTEXT_FN(hooks::TuningPagesMoveDecalScale),
        32, {}, DecalEditFields});
   // Their pages: r30, r31 and lr (24 bytes); the movie side's saves and
   // HighlightSelected's (its r29 to r31, lr, f30, f31: 48 bytes) and
@@ -2500,21 +2500,21 @@ void TuningPagesMovie(Context& h) {
   // C++ doesn't write them).
   Run(h, w,
       {"TuningScreen::InputDecalPosition", 300, __imp__sub_82206A50,
-       hooks::TuningPagesInputDecalPosition, 24, {{112, 160}}, DecalEditFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputDecalPosition), 24, {{112, 160}}, DecalEditFields});
   Run(h, w,
       {"TuningScreen::InputDecalAngle", 200, __imp__sub_82206F48,
-       hooks::TuningPagesInputDecalAngle, 24, {{112, 160}}, DecalEditFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputDecalAngle), 24, {{112, 160}}, DecalEditFields});
   Run(h, w,
       {"TuningScreen::InputDecalScale", 200, __imp__sub_82207320,
-       hooks::TuningPagesInputDecalScale, 24, {{112, 160}}, DecalEditFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputDecalScale), 24, {{112, 160}}, DecalEditFields});
   // The layer's edit menu: MoveLayerEdit's __savegprlr_29 (32 bytes);
   // InputLayerEdit's r30, r31 and lr (24) with its callees' saves as the
   // decal edits' (112 to 160 below).
   Run(h, w,
-      {"TuningScreen::MoveLayerEdit", 300, __imp__sub_82200760, hooks::TuningPagesMoveLayerEdit,
+      {"TuningScreen::MoveLayerEdit", 300, __imp__sub_82200760, ITC_CONTEXT_FN(hooks::TuningPagesMoveLayerEdit),
        32, {}, LayerEditFields});
   Run(h, w,
-      {"TuningScreen::InputLayerEdit", 400, __imp__sub_82205110, hooks::TuningPagesInputLayerEdit,
+      {"TuningScreen::InputLayerEdit", 400, __imp__sub_82205110, ITC_CONTEXT_FN(hooks::TuningPagesInputLayerEdit),
        24, {{112, 160}}, LayerEditFields});
   // The items' highlights (tuning_screen's plain C++): the decal edits'
   // fields (the page 0 or 1 mostly, now and then 2 or -1; the layer 0 to
@@ -2522,7 +2522,7 @@ void TuningPagesMovie(Context& h) {
   // and then any word). Their saves: r28 to r31, lr, f30 and f31 (56
   // bytes), r29 to r31, lr, f30 and f31 (48).
   Run(h, w,
-      {"TuningScreen::HighlightItem", 120, __imp__sub_82203400, hooks::TuningPagesHighlightItem,
+      {"TuningScreen::HighlightItem", 120, __imp__sub_82203400, ITC_CONTEXT_FN(hooks::TuningPagesHighlightItem),
        56, {}, [](PPCContext& t, Random& r, const World& w) {
          DecalEditFields(t, r, w);
          t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(2);
@@ -2530,7 +2530,7 @@ void TuningPagesMovie(Context& h) {
        }});
   Run(h, w,
       {"TuningScreen::HighlightSelected", 120, __imp__sub_82203570,
-       hooks::TuningPagesHighlightSelected, 48, {},
+       ITC_CONTEXT_FN(hooks::TuningPagesHighlightSelected), 48, {},
        [](PPCContext& t, Random& r, const World& w) {
          DecalEditFields(t, r, w);
          t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(2);
@@ -2545,14 +2545,14 @@ void TuningPagesMovie(Context& h) {
   // 336); Archive::Load recorded.
   Run(h, w,
       {"TuningScreen::MoveVinylLayers", 300, __imp__sub_821FFB20,
-       hooks::TuningPagesMoveVinylLayers, 32, {}, VinylLayerFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesMoveVinylLayers), 32, {}, VinylLayerFields});
   Run(h, w,
       {"TuningScreen::InputVinylLayers", 400, __imp__sub_82208CE0,
-       hooks::TuningPagesInputVinylLayers, 88, {{176, 232}, {320, 336}}, VinylLayerFields, true});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputVinylLayers), 88, {{176, 232}, {320, 336}}, VinylLayerFields, true});
   // The image picker's movie side: __savegprlr_29 (32 bytes).
   Run(h, w,
       {"TuningScreen::MoveVinylImages", 200, __imp__sub_82202530,
-       hooks::TuningPagesMoveVinylImages, 32, {}, VinylImageFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesMoveVinylImages), 32, {}, VinylImageFields});
   // Its page: __savegprlr_14 (152 bytes) with its callees' saves its native
   // version doesn't write: MoveVinylImages' (32), Scroll's (40),
   // LoadWindow's (56), Reload's (16) and BindVinylTexture's (32) below its
@@ -2560,7 +2560,7 @@ void TuningPagesMovie(Context& h) {
   // LoadWindow's frames (368 to 400); Archive::Load recorded.
   Run(h, w,
       {"TuningScreen::InputVinylImages", 500, __imp__sub_822058F8,
-       hooks::TuningPagesInputVinylImages, 152, {{240, 296}, {368, 400}}, VinylPickFields, true});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputVinylImages), 152, {{240, 296}, {368, 400}}, VinylPickFields, true});
   // The operate select: BeginLayerOrder a leaf (no saves);
   // MoveLayerActions' __savegprlr_29 (32 bytes); InputLayerActions'
   // __savegprlr_22 (88) with its callees' saves its native version doesn't
@@ -2569,20 +2569,20 @@ void TuningPagesMovie(Context& h) {
   // 336); Archive::Load recorded.
   Run(h, w,
       {"TuningScreen::BeginLayerOrder", 100, __imp__sub_821FE370,
-       hooks::TuningPagesBeginLayerOrder, 0, {}, LayerActionFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesBeginLayerOrder), 0, {}, LayerActionFields});
   Run(h, w,
       {"TuningScreen::MoveLayerActions", 300, __imp__sub_82200230,
-       hooks::TuningPagesMoveLayerActions, 32, {}, LayerActionFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesMoveLayerActions), 32, {}, LayerActionFields});
   Run(h, w,
       {"TuningScreen::InputLayerActions", 500, __imp__sub_82209738,
-       hooks::TuningPagesInputLayerActions, 88, {{176, 232}, {320, 336}}, LayerActionFields,
+       ITC_CONTEXT_FN(hooks::TuningPagesInputLayerActions), 88, {{176, 232}, {320, 336}}, LayerActionFields,
        true});
   // The sticker editor's group helpers: leaves.
   Run(h, w,
-      {"TuningScreen::SetGroupImage", 100, __imp__sub_821FD5C0, hooks::TuningPagesSetGroupImage,
+      {"TuningScreen::SetGroupImage", 100, __imp__sub_821FD5C0, ITC_CONTEXT_FN(hooks::TuningPagesSetGroupImage),
        0, {}, GroupFields});
   Run(h, w,
-      {"TuningScreen::SetImageGroup", 100, __imp__sub_821FD658, hooks::TuningPagesSetImageGroup,
+      {"TuningScreen::SetImageGroup", 100, __imp__sub_821FD658, ITC_CONTEXT_FN(hooks::TuningPagesSetImageGroup),
        0, {}, GroupFields});
   // The layer order: EndLayerOrder a leaf; SwapLayerRecords' and
   // SwapOrderTextures' __savegprlr_29 (32 bytes); ShowOrderNodes'
@@ -2592,23 +2592,23 @@ void TuningPagesMovie(Context& h) {
   // MoveLayerOrder's, SwapLayerRecords', SwapOrderTextures' and
   // ShowOptionMarks').
   Run(h, w,
-      {"TuningScreen::EndLayerOrder", 100, __imp__sub_821FE3C8, hooks::TuningPagesEndLayerOrder,
+      {"TuningScreen::EndLayerOrder", 100, __imp__sub_821FE3C8, ITC_CONTEXT_FN(hooks::TuningPagesEndLayerOrder),
        0, {}, LayerOrderFields});
   Run(h, w,
       {"TuningScreen::SwapLayerRecords", 150, __imp__sub_821FD518,
-       hooks::TuningPagesSwapLayerRecords, 32, {}, LayerOrderFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesSwapLayerRecords), 32, {}, LayerOrderFields});
   Run(h, w,
       {"TuningScreen::SwapOrderTextures", 150, __imp__sub_82207F38,
-       hooks::TuningPagesSwapOrderTextures, 32, {}, LayerOrderFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesSwapOrderTextures), 32, {}, LayerOrderFields});
   Run(h, w,
-      {"TuningScreen::ShowOrderNodes", 150, __imp__sub_82203A30, hooks::TuningPagesShowOrderNodes,
+      {"TuningScreen::ShowOrderNodes", 150, __imp__sub_82203A30, ITC_CONTEXT_FN(hooks::TuningPagesShowOrderNodes),
        48, {}, LayerOrderFields});
   Run(h, w,
-      {"TuningScreen::MoveLayerOrder", 200, __imp__sub_82201DB8, hooks::TuningPagesMoveLayerOrder,
+      {"TuningScreen::MoveLayerOrder", 200, __imp__sub_82201DB8, ITC_CONTEXT_FN(hooks::TuningPagesMoveLayerOrder),
        24, {}, LayerOrderFields});
   Run(h, w,
       {"TuningScreen::InputLayerOrder", 800, __imp__sub_8220A1C8,
-       hooks::TuningPagesInputLayerOrder, 80, {{176, 224}}, LayerOrderFields});
+       ITC_CONTEXT_FN(hooks::TuningPagesInputLayerOrder), 80, {{176, 224}}, LayerOrderFields});
   // TuningScreen::Command21 (tuning_screen's plain C++, the update's
   // command 21): the layer order's fields with the layer +30732 and the
   // position +30756 0 to 2 (up to two moves either way). __savegprlr_27 (48
@@ -2616,7 +2616,7 @@ void TuningPagesMovie(Context& h) {
   // SwapOrderTextures', Command20's and LayOutItems', their plain C++ not
   // writing them).
   Run(h, w,
-      {"TuningScreen::Command21", 300, __imp__sub_822087C8, hooks::TuningCommand21, 48,
+      {"TuningScreen::Command21", 300, __imp__sub_822087C8, ITC_CONTEXT_FN(hooks::TuningCommand21), 48,
        {{144, 224}}, [](PPCContext& t, Random& r, const World& w) {
          LayerOrderFields(t, r, w);
          // The layer and the position 0 to 2, as play leaves them: the moves

@@ -158,7 +158,7 @@ void Leaves(Context& h, const Block& manager) {
         guest::StoreU32(h.base, rw::kManager, seed % 25 == 0 ? 0 : manager.address);
         PPCContext t = CallContext(h);
         t.r3.u64 = r.Below(8) == 0 ? r.Next() : r.Below(12);
-        (v == 0 ? Original<__imp__sub_821705A8> : hooks::RaceWorldEntryOfRecord)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821705A8> : ITC_CONTEXT_FN(hooks::RaceWorldEntryOfRecord))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
       }
@@ -178,7 +178,7 @@ void Leaves(Context& h, const Block& manager) {
           PPCContext t = CallContext(h);
           t.r3.u64 = a | high_a;
           t.r4.u64 = b | high_b;
-          (v == 0 ? Original<__imp__sub_82170860> : hooks::RaceWorldBranchesMeet)(t, h.base);
+          (v == 0 ? Original<__imp__sub_82170860> : ITC_CONTEXT_FN(hooks::RaceWorldBranchesMeet))(t, h.base);
           out[v].Word(t.r3.u32);
           out[v].Word(uint32_t(t.r3.u64 >> 32));
         }
@@ -199,7 +199,7 @@ void Leaves(Context& h, const Block& manager) {
         WriteRandom(h.base, sp - 512, 512, r);
         t.r3.u64 = r.Below(4) == 0 ? r.Next() : r.Below(200);
         t.r4.u64 = r.Below(8) == 0 ? r.Next() : r.Below(20);
-        (v == 0 ? Original<__imp__sub_82171070> : hooks::RaceWorldPickModel)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82171070> : ITC_CONTEXT_FN(hooks::RaceWorldPickModel))(t, h.base);
         out[v].Bytes(Read(h.base, sp - 400, 336));
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -220,7 +220,7 @@ void Leaves(Context& h, const Block& manager) {
                                                 : uint32_t(r.Next()));
         PPCContext t = CallContext(h);
         t.r3.u64 = word - 6092;
-        (v == 0 ? Original<__imp__sub_82112190> : hooks::RaceWorldFirstUnsetFlag)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82112190> : ITC_CONTEXT_FN(hooks::RaceWorldFirstUnsetFlag))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
       }
@@ -239,7 +239,7 @@ void Leaves(Context& h, const Block& manager) {
         t.r3.u64 = r.Next();
         t.r4.u64 = r.Next();
         t.r11.u64 = r.Next();
-        (v == 0 ? Original<__imp__sub_82170560> : hooks::RaceWorldOnPausedTick)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82170560> : ITC_CONTEXT_FN(hooks::RaceWorldOnPausedTick))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         for (uint64_t value : {t.r3.u64, t.r4.u64, t.r5.u64, t.r6.u64, t.r11.u64}) {
           out[v].Word(uint32_t(value));
@@ -285,7 +285,7 @@ void SortedLists(Context& h) {
           t.r3.u64 = list;
           t.r4.u64 = items[i];
           t.f1.u64 = key_bits[i];
-          (v == 0 ? Original<__imp__sub_82170AA0> : hooks::RaceWorldSortedListInsert)(t, h.base);
+          (v == 0 ? Original<__imp__sub_82170AA0> : ITC_CONTEXT_FN(hooks::RaceWorldSortedListInsert))(t, h.base);
           out[v].Word(t.r3.u32);
         }
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
@@ -303,7 +303,7 @@ void SortedLists(Context& h) {
         WriteRandom(h.base, h.data, kScratchBytes, r);
         PPCContext t = CallContext(h);
         t.r3.u64 = h.data + 4 * r.Below(500);
-        (v == 0 ? Original<__imp__sub_82170A88> : hooks::RaceWorldSortedListClear)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82170A88> : ITC_CONTEXT_FN(hooks::RaceWorldSortedListClear))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Word(t.r3.u32);
       }
@@ -337,7 +337,7 @@ void Release(Context& h, const Block& manager, const Block& vehicles) {
       guest::StoreU32(h.base, kVehicles, vehicles.address);
       PPCContext t = CallContext(h);
       t.r3.u64 = h.data;
-      (v == 0 ? Original<__imp__sub_82171360> : hooks::RaceWorldRelease)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82171360> : ITC_CONTEXT_FN(hooks::RaceWorldRelease))(t, h.base);
       out[v].Bytes(Read(h.base, vehicles.address, vehicles.bytes));
       out[v].Bytes(Read(h.base, manager.address, 4096));
       out[v].Word(t.r3.u32);  // Vehicle::Get's high word is the multiply's
@@ -385,7 +385,7 @@ void Routes(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = position;
         t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
-        (v == 0 ? Original<__imp__sub_82143608> : hooks::RaceWorldToMainRoad)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82143608> : ITC_CONTEXT_FN(hooks::RaceWorldToMainRoad))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Bytes(Read(h.base, area.address, area.bytes));
         out[v].Word(t.r3.u32);
@@ -412,7 +412,7 @@ void Routes(Context& h) {
         t.r4.u64 =
             uint64_t(int64_t(r.Below(4) == 0 ? int32_t(r.Below(40)) - 20 : steps[r.Below(5)]));
         t.r5.u64 = r.Below(4) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(12)) - 1));
-        (v == 0 ? Original<__imp__sub_82170F18> : hooks::RaceWorldStepToMainRoad)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82170F18> : ITC_CONTEXT_FN(hooks::RaceWorldStepToMainRoad))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Bytes(Read(h.base, area.address, area.bytes));
         out[v].Word(guest::LoadU32(h.base, CallContext(h).r1.u32 - 112 + 80));  // the kind
@@ -451,7 +451,7 @@ void Routes(Context& h) {
         t.r6.u64 = position;
         t.r7.u64 = step;
         t.r8.u64 = masks[r.Below(5)];
-        (v == 0 ? Original<__imp__sub_82143150> : hooks::RaceWorldPlaceEntry)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82143150> : ITC_CONTEXT_FN(hooks::RaceWorldPlaceEntry))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Bytes(Read(h.base, area.address, area.bytes));
         out[v].Word(t.r3.u32);
@@ -474,7 +474,7 @@ void Routes(Context& h) {
         guest::StoreU32(h.base, index, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(40));
         PPCContext t = CallContext(h);
         t.r3.u64 = index;
-        (v == 0 ? Original<__imp__sub_82143508> : hooks::RaceWorldRaceEventEntry)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82143508> : ITC_CONTEXT_FN(hooks::RaceWorldRaceEventEntry))(t, h.base);
         out[v].Word(t.r3.u32);
       }
       results.Check(out[0], out[1], fmt::format("seed {}", seed));
@@ -577,7 +577,7 @@ void Placements(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = kind;
         t.r4.u64 = player;
-        (v == 0 ? Original<__imp__sub_82144A38> : hooks::RaceWorldPlaceStartsCurrent)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82144A38> : ITC_CONTEXT_FN(hooks::RaceWorldPlaceStartsCurrent))(t, h.base);
         common(out[v]);
         stack(out[v], sp - 176 + 24, 16);
         stack(out[v], sp - 176 + 80, 32);
@@ -600,7 +600,7 @@ void Placements(Context& h) {
         t.r3.u64 = event;
         t.r4.u64 = kind;
         t.r5.u64 = player;
-        (v == 0 ? Original<__imp__sub_82144798> : hooks::RaceWorldPlaceStarts)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82144798> : ITC_CONTEXT_FN(hooks::RaceWorldPlaceStarts))(t, h.base);
         common(out[v]);
         stack(out[v], sp - 176 + 24, 16);
         stack(out[v], sp - 176 + 80, 32);
@@ -624,7 +624,7 @@ void Placements(Context& h) {
         t.r3.u64 = event;
         t.r4.u64 = step;
         t.r5.u64 = group;
-        (v == 0 ? Original<__imp__sub_821443B0> : hooks::RaceWorldPlaceGroupFixed)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821443B0> : ITC_CONTEXT_FN(hooks::RaceWorldPlaceGroupFixed))(t, h.base);
         common(out[v]);
         stack(out[v], sp - 96 + 24, 16);
         stack(out[v], sp - 96 + 80, 8);
@@ -652,7 +652,7 @@ void Placements(Context& h) {
         t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(8);
         t.r6.u64 = group;
         t.r7.u64 = flag;
-        (v == 0 ? Original<__imp__sub_82143A40> : hooks::RaceWorldPlaceGroup)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82143A40> : ITC_CONTEXT_FN(hooks::RaceWorldPlaceGroup))(t, h.base);
         common(out[v]);
         stack(out[v], sp - 192 + 80, 4);
         stack(out[v], sp + 38, 2);
@@ -680,7 +680,7 @@ void Placements(Context& h) {
         t.r5.u64 = guest::LoadU32(h.base, positions + 4);
         t.r6.u64 = step;
         t.r7.u64 = group;
-        (v == 0 ? Original<__imp__sub_82143B78> : hooks::RaceWorldPlaceGroupTwoRows)(t,
+        (v == 0 ? Original<__imp__sub_82143B78> : ITC_CONTEXT_FN(hooks::RaceWorldPlaceGroupTwoRows))(t,
                                                                                      h.base);
         common(out[v]);
         stack(out[v], sp + 28, 12);
@@ -708,7 +708,7 @@ void Placements(Context& h) {
         t.r5.u64 = step;
         t.r6.u64 = group;
         t.r7.u64 = row;
-        (v == 0 ? Original<__imp__sub_82143920> : hooks::RaceWorldPlaceGroupSplit)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82143920> : ITC_CONTEXT_FN(hooks::RaceWorldPlaceGroupSplit))(t, h.base);
         common(out[v]);
         stack(out[v], sp + 28, 4);
       }
@@ -734,7 +734,7 @@ void Create(Context& h) {
     for (int v = 0; v < 2; v++) {
       Globals globals(h.base, {rw::kManager});
       PPCContext t = CallContext(h);
-      (v == 0 ? Original<__imp__sub_821715B8> : hooks::RaceWorldCreate)(t, h.base);
+      (v == 0 ? Original<__imp__sub_821715B8> : ITC_CONTEXT_FN(hooks::RaceWorldCreate))(t, h.base);
       const uint32_t block = guest::LoadU32(h.base, rw::kManager);
       out[v].Word(block == t.r3.u32 ? 1 : 0);
       out[v].Word(block != 0 ? 1 : 0);
@@ -814,7 +814,7 @@ void Tables(Context& h, const Block& manager, const Block& vehicles) {
         guest::StoreU32(h.base, kVehicles, vehicles.address);
         guest::StoreU32(h.base, rw::kRaceData, race.address);
         PPCContext t = CallContext(h);
-        (v == 0 ? Original<__imp__sub_82172F90> : hooks::RaceWorldNoteMarkedRacer)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82172F90> : ITC_CONTEXT_FN(hooks::RaceWorldNoteMarkedRacer))(t, h.base);
         out[v].Bytes(Read(h.base, kMarkedRacer, 12));
         out[v].Bytes(Read(h.base, sp - 144 + 80, 16));
       }
@@ -851,7 +851,7 @@ void Tables(Context& h, const Block& manager, const Block& vehicles) {
         t.r4.u64 = point;
         t.f1.f64 = r.Below(8) == 0 ? double(std::bit_cast<float>(RandomFloat(r, 300.0f)))
                                    : double(r.Below(300));
-        (v == 0 ? Original<__imp__sub_82170BC0> : hooks::RaceWorldNearSegment)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82170BC0> : ITC_CONTEXT_FN(hooks::RaceWorldNearSegment))(t, h.base);
         hits += v == 1 && t.r3.u32 == 1 ? 1 : 0;
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Floats(h.base, sp - 208 + 80, 20);
@@ -880,7 +880,7 @@ void Tables(Context& h, const Block& manager, const Block& vehicles) {
         const uint32_t sp = stack(r);
         PPCContext t = CallContext(h);
         t.r3.u64 = manager.address;
-        (v == 0 ? Original<__imp__sub_82170CB8> : hooks::RaceWorldBuildNeighbors)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82170CB8> : ITC_CONTEXT_FN(hooks::RaceWorldBuildNeighbors))(t, h.base);
         for (uint32_t i = 0; v == 1 && i < route.sections; i++) {
           neighbors += guest::LoadU32(h.base, manager.address + 360000 + 4 * i) > 1 ? 1 : 0;
         }
@@ -923,7 +923,7 @@ void Tables(Context& h, const Block& manager, const Block& vehicles) {
         PPCContext t = CallContext(h);
         t.r3.u64 = manager.address;
         t.r4.u64 = index;
-        (v == 0 ? Original<__imp__sub_82170920> : hooks::RaceWorldNeighbours)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82170920> : ITC_CONTEXT_FN(hooks::RaceWorldNeighbours))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -987,7 +987,7 @@ void Tables(Context& h, const Block& manager, const Block& vehicles) {
         t.r6.u64 = h.data + 164;
         t.r7.u64 = h.data + 168;
         const uint32_t flags = guest::LoadU32(h.base, h.data + 164) | guest::LoadU32(h.base, h.data + 168);
-        (v == 0 ? Original<__imp__sub_821737F8> : hooks::RaceWorldJumpSections)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821737F8> : ITC_CONTEXT_FN(hooks::RaceWorldJumpSections))(t, h.base);
         jumps += v == 1 && flags != (guest::LoadU32(h.base, h.data + 164) |
                                      guest::LoadU32(h.base, h.data + 168)) ? 1 : 0;
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
@@ -1082,7 +1082,7 @@ void VehicleLoops(Context& h, const Block& manager) {
         racer_up(r, seed % 10 == 0 ? 0 : 1, k, record);
         PPCContext t = CallContext(h);
         t.fpscr.disableFlushModeUnconditional();
-        (v == 0 ? Original<__imp__sub_821714D8> : hooks::RaceWorldTickVehicles)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821714D8> : ITC_CONTEXT_FN(hooks::RaceWorldTickVehicles))(t, h.base);
         car_objects::VehicleRegionOutputs(out[v], h.base, region.address);
         out[v].Word(guest::LoadU32(h.base, region.address + 6160 + 8));
         out[v].Bytes(Read(h.base, input, 20));
@@ -1109,7 +1109,7 @@ void VehicleLoops(Context& h, const Block& manager) {
         racer_up(r, seed % 10 == 0 ? 0 : 1, k, 0);
         PPCContext t = CallContext(h);
         t.fpscr.disableFlushModeUnconditional();
-        (v == 0 ? Original<__imp__sub_82171560> : hooks::RaceWorldRefreshVehicles)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82171560> : ITC_CONTEXT_FN(hooks::RaceWorldRefreshVehicles))(t, h.base);
         car_objects::VehicleRegionOutputs(out[v], h.base, region.address);
       }
       results.Check(out[0], out[1], fmt::format("seed {}: vehicle {}", seed, k));
@@ -1245,7 +1245,7 @@ void Inits(Context& h) {
       guest::StoreU32(h.base, rw::kRaceData, race.address);
       PPCContext t = CallContext(h);
       t.r3.u64 = world.address;
-      (v == 0 ? Original<__imp__sub_82174D28> : hooks::RaceWorldInit)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82174D28> : ITC_CONTEXT_FN(hooks::RaceWorldInit))(t, h.base);
       out[v].Bytes(Read(h.base, world.address, 9612));
       out[v].Bytes(Read(h.base, frame + 80, kFrame - 80 - 64));
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
@@ -1304,7 +1304,7 @@ void ReleasesForStage(Context& h, const Block& manager, const Block& vehicles) {
       guest::StoreU32(h.base, rw::kRaceData, race.address);
       PPCContext t = CallContext(h);
       t.r3.u64 = h.data;
-      (v == 0 ? Original<__imp__sub_821713C0> : hooks::RaceWorldReleaseForStage)(t, h.base);
+      (v == 0 ? Original<__imp__sub_821713C0> : ITC_CONTEXT_FN(hooks::RaceWorldReleaseForStage))(t, h.base);
       for (uint32_t i = 0; i < 7; i++) {
         out[v].Bytes(Read(h.base, vehicles.address + 6272 * i + 2384, 1));
         held += v == 1 && guest::LoadU8(h.base, vehicles.address + 6272 * i + 2384) == 1 ? 1 : 0;
@@ -1359,7 +1359,7 @@ void AddDistances(Context& h) {
       t.r3.u64 = save.address;
       t.f1.f64 = wild ? double(std::bit_cast<float>(RandomFloat(r, 1e6f)))
                       : double(r.Below(200000)) / 3.0;
-      (v == 0 ? Original<__imp__sub_82116C38> : hooks::RaceWorldAddDistance)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82116C38> : ITC_CONTEXT_FN(hooks::RaceWorldAddDistance))(t, h.base);
       std::vector<uint8_t> bytes = Read(h.base, save.address, save.bytes);
       for (uint32_t at : {save.address + 4908, save.address + 6040, picked}) {
         out[v].Float(guest::LoadU32(h.base, at));
@@ -1462,7 +1462,7 @@ void ResetWorlds(Context& h, const Block& manager, const Block& vehicles) {
       PPCContext t = CallContext(h);
       t.fpscr.disableFlushModeUnconditional();
       t.r3.u64 = manager.address;
-      (v == 0 ? Original<__imp__sub_82170668> : hooks::RaceWorldResetWorld)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82170668> : ITC_CONTEXT_FN(hooks::RaceWorldResetWorld))(t, h.base);
       const auto name = [&](uint32_t w) {
         for (size_t i = 0; i < shapes.size(); i++) {
           if (w == shapes[i]) {
@@ -1600,7 +1600,7 @@ void ResetVehicleCases(Context& h, const Block& manager) {
       t.fpscr.disableFlushModeUnconditional();
       t.r3.u64 = manager.address;
       t.r4.u64 = flag;
-      (v == 0 ? Original<__imp__sub_82171718> : hooks::RaceWorldResetVehicles)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82171718> : ITC_CONTEXT_FN(hooks::RaceWorldResetVehicles))(t, h.base);
       const uint32_t body = guest::LoadU32(h.base, region.address + 336);
       const uint32_t shape = guest::LoadU32(h.base, region.address + 344);
       const auto name = [&](uint32_t w) {
@@ -1741,7 +1741,7 @@ void Unloads(Context& h) {
       PPCContext t = CallContext(h);
       t.fpscr.disableFlushModeUnconditional();
       t.r3.u64 = uint32_t(r.Next());
-      (v == 0 ? Original<__imp__sub_82171250> : hooks::RaceWorldUnload)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82171250> : ITC_CONTEXT_FN(hooks::RaceWorldUnload))(t, h.base);
       const auto name = [&](uint32_t w) {
         for (size_t i = 0; i < heap.size(); i++) {
           if (w == heap[i]) {
@@ -1836,7 +1836,7 @@ void StandInGiveVehicle(PPCContext& ctx, uint8_t* base) {
 }
 struct GiveVehicleStandIn {
   GiveVehicleStandIn() {
-    hooks::g_give_vehicle_stand_in = StandInGiveVehicle;
+    hooks::g_give_vehicle_stand_in = ITC_CONTEXT_FN(StandInGiveVehicle);
     g_give_log.clear();
     g_give_calls = 0;
   }
@@ -1989,7 +1989,7 @@ void ManagerLists(Context& h, const Block& manager, const Block& vehicles) {
         PPCContext t = CallContext(h);
         t.fpscr.disableFlushModeUnconditional();
         t.r3.u64 = manager.address;
-        (v == 0 ? Original<__imp__sub_82171E50> : hooks::RaceWorldListRacers)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82171E50> : ITC_CONTEXT_FN(hooks::RaceWorldListRacers))(t, h.base);
         const auto name = [&](uint32_t w) {
           for (size_t i = 0; i < shapes.size(); i++) {
             if (w == shapes[i]) {
@@ -2174,7 +2174,7 @@ void ManagerLists(Context& h, const Block& manager, const Block& vehicles) {
           t.fpscr.disableFlushModeUnconditional();
           t.r3.u64 = manager.address;
           t.r4.u64 = records;
-          (v == 0 ? Original<__imp__sub_82173050> : hooks::RaceWorldAddRacers)(t, h.base);
+          (v == 0 ? Original<__imp__sub_82173050> : ITC_CONTEXT_FN(hooks::RaceWorldAddRacers))(t, h.base);
           if (v == 1) {
             racers += guest::LoadU32(h.base, manager.address + 2372);
             traffic += guest::LoadU32(h.base, manager.address + 2376);
@@ -2280,7 +2280,7 @@ void ManagerLists(Context& h, const Block& manager, const Block& vehicles) {
         t.f1.f64 = double(spawn);
         t.f2.f64 = double(despawn);
         GiveVehicleStandIn stand_in;
-        (v == 0 ? Original<__imp__sub_82172118> : hooks::RaceWorldStreamOpponents)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82172118> : ITC_CONTEXT_FN(hooks::RaceWorldStreamOpponents))(t, h.base);
         out[v].Word(uint32_t(g_give_log.size()));
         for (uint32_t w : g_give_log) {
           out[v].Word(w);
@@ -2407,7 +2407,7 @@ void ManagerLists(Context& h, const Block& manager, const Block& vehicles) {
         t.fpscr.disableFlushModeUnconditional();
         t.r3.u64 = manager.address;
         GiveVehicleStandIn stand_in;
-        (v == 0 ? Original<__imp__sub_82171978> : hooks::RaceWorldRefresh)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82171978> : ITC_CONTEXT_FN(hooks::RaceWorldRefresh))(t, h.base);
         out[v].Word(uint32_t(g_give_log.size()));
         for (uint32_t w : g_give_log) {
           out[v].Word(w);
@@ -2561,7 +2561,7 @@ void ManagerLists(Context& h, const Block& manager, const Block& vehicles) {
         for (uint32_t i = 0; i < count && v == 1; i++) {
           before.push_back(guest::LoadU32(h.base, manager.address + 4 + 28 * i + 8));
         }
-        (v == 0 ? Original<__imp__sub_82173E28> : hooks::RaceWorldMoveUnseen)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82173E28> : ITC_CONTEXT_FN(hooks::RaceWorldMoveUnseen))(t, h.base);
         for (uint32_t i = 0; i < count && v == 1; i++) {
           const uint32_t entry = manager.address + 4 + 28 * i;
           steps += (guest::LoadU32(h.base, entry) & 0xE0) == 0 &&
@@ -2718,7 +2718,7 @@ void ManagerLists(Context& h, const Block& manager, const Block& vehicles) {
         t.f1.f64 = double(inner);
         t.f2.f64 = double(outer);
         const uint32_t ticks = guest::LoadU32(h.base, manager.address + 2388);
-        (v == 0 ? Original<__imp__sub_821724F8> : hooks::RaceWorldStreamTraffic)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821724F8> : ITC_CONTEXT_FN(hooks::RaceWorldStreamTraffic))(t, h.base);
         if (v == 1) {
           for (uint32_t i = 0; i < 3; i++) {
             removed += guest::LoadU32(h.base, manager.address + 2160 + 28 * i + 20) ==
@@ -3004,17 +3004,17 @@ void ManagerLists(Context& h, const Block& manager, const Block& vehicles) {
           GiveVehicleStandIn stand_in;
           switch (which) {
             case kNear:
-              (v == 0 ? Original<__imp__sub_82172E60> : hooks::RaceWorldStreamNear)(t, h.base);
+              (v == 0 ? Original<__imp__sub_82172E60> : ITC_CONTEXT_FN(hooks::RaceWorldStreamNear))(t, h.base);
               break;
             case kCruise:
-              (v == 0 ? Original<__imp__sub_82174200> : hooks::RaceWorldStreamCruise)(t, h.base);
+              (v == 0 ? Original<__imp__sub_82174200> : ITC_CONTEXT_FN(hooks::RaceWorldStreamCruise))(t, h.base);
               break;
             case kTwo:
-              (v == 0 ? Original<__imp__sub_82172D20> : hooks::RaceWorldStreamTwoPlayers)(
+              (v == 0 ? Original<__imp__sub_82172D20> : ITC_CONTEXT_FN(hooks::RaceWorldStreamTwoPlayers))(
                   t, h.base);
               break;
             case kStream:
-              (v == 0 ? Original<__imp__sub_82174338> : hooks::RaceWorldStream)(t, h.base);
+              (v == 0 ? Original<__imp__sub_82174338> : ITC_CONTEXT_FN(hooks::RaceWorldStream))(t, h.base);
               break;
           }
           if (v == 1) {
@@ -3141,8 +3141,8 @@ void StartUpdateAll(PPCContext& ctx, uint8_t* base) {
 // While alive, the stand-ins answer and the log starts empty.
 struct StartStandIns {
   StartStandIns() {
-    hooks::g_drive_car_stand_in = StartDriveCar;
-    hooks::g_update_all_stand_in = StartUpdateAll;
+    hooks::g_drive_car_stand_in = ITC_CONTEXT_FN(StartDriveCar);
+    hooks::g_update_all_stand_in = ITC_CONTEXT_FN(StartUpdateAll);
     Reset();
   }
   ~StartStandIns() {
@@ -3387,7 +3387,7 @@ void StartCases(Context& h) {
         PPCContext t = CallContext(h);
         t.fpscr.disableFlushModeUnconditional();
         t.r3.u64 = h.data;
-        (v == 0 ? Original<__imp__sub_82173A90> : hooks::RaceWorldOnLoaded)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82173A90> : ITC_CONTEXT_FN(hooks::RaceWorldOnLoaded))(t, h.base);
         if (v == 1) {
           const uint32_t manager = guest::LoadU32(h.base, rw::kManager);
           racers += manager != 0 ? guest::LoadU32(h.base, manager + 2364) : 0;
@@ -3477,9 +3477,9 @@ void StartCases(Context& h) {
         t.r4.u64 = settle;
         t.r5.u64 = back;
         if (rolling) {
-          (v == 0 ? Original<__imp__sub_821662E0> : hooks::RaceWorldPlaceRolling)(t, h.base);
+          (v == 0 ? Original<__imp__sub_821662E0> : ITC_CONTEXT_FN(hooks::RaceWorldPlaceRolling))(t, h.base);
         } else {
-          (v == 0 ? Original<__imp__sub_82165E20> : hooks::RaceWorldPlace)(t, h.base);
+          (v == 0 ? Original<__imp__sub_82165E20> : ITC_CONTEXT_FN(hooks::RaceWorldPlace))(t, h.base);
         }
         if (v == 1) {
           ticks += settle;
@@ -3690,9 +3690,9 @@ void StartCases(Context& h) {
                            "RaceReplay::RestoreEnd (sub_82104898)"};
     const GuestFunction originals[] = {__imp__sub_82104D40, __imp__sub_82104E68,
                                        __imp__sub_821046F8, __imp__sub_82104898};
-    const GuestFunction natives[] = {hooks::RaceReplaySaveStart, hooks::RaceReplaySaveEnd,
-                                     hooks::RaceReplayRestoreStart,
-                                     hooks::RaceReplayRestoreEnd};
+    const GuestFunction natives[] = {ITC_CONTEXT_FN(hooks::RaceReplaySaveStart), ITC_CONTEXT_FN(hooks::RaceReplaySaveEnd),
+                                     ITC_CONTEXT_FN(hooks::RaceReplayRestoreStart),
+                                     ITC_CONTEXT_FN(hooks::RaceReplayRestoreEnd)};
     const auto run = [&](GuestFunction f) {
       PPCContext t = CallContext(h);
       t.fpscr.disableFlushModeUnconditional();
@@ -3904,7 +3904,7 @@ void StartCases(Context& h) {
         t.r4.u64 = player;
         t.f1.f64 = double(spawns[radius]);
         t.f2.f64 = double(despawns[radius]);
-        (v == 0 ? Original<__imp__sub_82172118> : hooks::RaceWorldStreamOpponents)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82172118> : ITC_CONTEXT_FN(hooks::RaceWorldStreamOpponents))(t, h.base);
         if (v == 1) {
           uint32_t empty_after = 0;
           for (uint32_t k = 0; k < 7; k++) {
@@ -4105,7 +4105,7 @@ void StartCases(Context& h) {
         for (uint32_t k = 0; k < 7; k++) {
           slot_words.push_back(guest::LoadU32(h.base, manager + 2336 + 4 * k));
         }
-        (v == 0 ? Original<__imp__sub_821724F8> : hooks::RaceWorldStreamTraffic)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821724F8> : ITC_CONTEXT_FN(hooks::RaceWorldStreamTraffic))(t, h.base);
         // The bodies Vehicle::SetUp replaced, freed.
         for (const auto& [k, old] : bodies) {
           const uint32_t now = guest::LoadU32(h.base, vehicles + 6272 * k + 336);
@@ -4246,7 +4246,7 @@ void StartCases(Context& h) {
         PPCContext t = CallContext(h);
         t.fpscr.disableFlushModeUnconditional();
         t.r3.u64 = tick_world.address;
-        (v == 0 ? Original<__imp__sub_82174BC0> : hooks::RaceWorldTick)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82174BC0> : ITC_CONTEXT_FN(hooks::RaceWorldTick))(t, h.base);
         for (const auto& [k, old] : bodies) {
           const uint32_t now = guest::LoadU32(h.base, vehicles + 6272 * k + 336);
           if (now != old && old != 0 && memory::IsHeapBlock(old)) {

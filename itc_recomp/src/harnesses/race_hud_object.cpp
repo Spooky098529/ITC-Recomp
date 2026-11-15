@@ -531,7 +531,7 @@ void Helpers(Context& h, const World& w) {
             t.f1.f64 = AnyDouble(r, 300.0f);
           }
         },
-        __imp__sub_82212118, hooks::RaceHudObjectCurveEval, spec);
+        __imp__sub_82212118, ITC_CONTEXT_FN(hooks::RaceHudObjectCurveEval), spec);
   }
   {
     Spec spec;
@@ -555,7 +555,7 @@ void Helpers(Context& h, const World& w) {
               break;
           }
         },
-        __imp__sub_82213C40, hooks::RaceHudObjectPowInt, spec);
+        __imp__sub_82213C40, ITC_CONTEXT_FN(hooks::RaceHudObjectPowInt), spec);
   }
   {
     // A bar at the HUD's +244 (the racers' first): value, steps, trail,
@@ -585,7 +585,7 @@ void Helpers(Context& h, const World& w) {
           t.r3.u64 = bar;
           t.r4.u64 = r.Below(4) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(260)) - 30));
         },
-        __imp__sub_82211FB8, hooks::RaceHudObjectBarStep, spec);
+        __imp__sub_82211FB8, ITC_CONTEXT_FN(hooks::RaceHudObjectBarStep), spec);
   }
 }
 
@@ -600,7 +600,7 @@ void Setters(Context& h, const World& w) {
           t.r3.u64 = w.hud.address;
           t.r4.u64 = r.Below(4) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(12)) - 3));
         },
-        __imp__sub_82212DB0, hooks::RaceHudObjectSetGear, spec);
+        __imp__sub_82212DB0, ITC_CONTEXT_FN(hooks::RaceHudObjectSetGear), spec);
   }
   {
     Spec spec;
@@ -619,7 +619,7 @@ void Setters(Context& h, const World& w) {
           t.r3.u64 = hud;
           t.f1.f64 = ordinary ? double(r.Below(150)) - 10.0 : AnyDouble(r, 200.0f);
         },
-        __imp__sub_82214698, hooks::RaceHudObjectSetBar, spec);
+        __imp__sub_82214698, ITC_CONTEXT_FN(hooks::RaceHudObjectSetBar), spec);
   }
   {
     Spec spec;
@@ -631,12 +631,12 @@ void Setters(Context& h, const World& w) {
           guest::StoreFloat(h.base, car + 2420, AnyFloat(r, 300.0f));
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_82212668, hooks::RaceHudObjectResetBar, spec);
+        __imp__sub_82212668, ITC_CONTEXT_FN(hooks::RaceHudObjectResetBar), spec);
   }
   Group(
       h, w, "RaceHud::ClearWarning (sub_822122A0)", 20,
       [&](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.hud.address; },
-      __imp__sub_822122A0, hooks::RaceHudObjectClearWarning, Spec{});
+      __imp__sub_822122A0, ITC_CONTEXT_FN(hooks::RaceHudObjectClearWarning), Spec{});
   {
     Spec spec;
     spec.frame = 96;
@@ -650,7 +650,7 @@ void Setters(Context& h, const World& w) {
             guest::StoreU32(h.base, kVehicles, 0);  // no vehicles: 0
           }
         },
-        __imp__sub_82212690, hooks::RaceHudObjectSetPlayer, spec);
+        __imp__sub_82212690, ITC_CONTEXT_FN(hooks::RaceHudObjectSetPlayer), spec);
   }
   {
     Spec spec;
@@ -662,7 +662,7 @@ void Setters(Context& h, const World& w) {
           t.r3.u64 = r.Next();
           t.r4.u64 = r.Below(kVehicleCount);
         },
-        __imp__sub_82215820, hooks::RaceHudObjectTouching, spec);
+        __imp__sub_82215820, ITC_CONTEXT_FN(hooks::RaceHudObjectTouching), spec);
   }
 }
 
@@ -693,7 +693,7 @@ void Dashboard(Context& h, const World& w) {
           t.f1.f64 = AnyDouble(r, 120.0f);
         },
         boost ? __imp__sub_82212E18 : __imp__sub_82212D58,
-        boost ? hooks::RaceHudObjectSetBoost : hooks::RaceHudObjectSetTach, spec);
+        boost ? ITC_CONTEXT_FN(hooks::RaceHudObjectSetBoost) : ITC_CONTEXT_FN(hooks::RaceHudObjectSetTach), spec);
   }
   {
     Spec spec;
@@ -708,7 +708,7 @@ void Dashboard(Context& h, const World& w) {
           t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(1100);
           t.f1.f64 = AnyDouble(r, 10.0f);
         },
-        __imp__sub_82214260, hooks::RaceHudObjectSetSpeed, spec);
+        __imp__sub_82214260, ITC_CONTEXT_FN(hooks::RaceHudObjectSetSpeed), spec);
   }
   {
     Spec spec;
@@ -734,7 +734,7 @@ void Dashboard(Context& h, const World& w) {
           t.r3.u64 = w.hud.address;
           t.r4.u64 = time;
         },
-        __imp__sub_82213750, hooks::RaceHudObjectSetTime, spec);
+        __imp__sub_82213750, ITC_CONTEXT_FN(hooks::RaceHudObjectSetTime), spec);
   }
   {
     Spec spec;
@@ -748,7 +748,7 @@ void Dashboard(Context& h, const World& w) {
           t.f1.f64 = r.Below(2) == 0 ? double(r.Below(20000)) / 100.0 - 5.0
                                      : AnyDouble(r, 2000.0f);
         },
-        __imp__sub_82214A50, hooks::RaceHudObjectSetDistance, spec);
+        __imp__sub_82214A50, ITC_CONTEXT_FN(hooks::RaceHudObjectSetDistance), spec);
   }
   {
     Spec spec;
@@ -760,7 +760,7 @@ void Dashboard(Context& h, const World& w) {
           ShapeGroup(h.base, DashboardNode(h.base, w, 0xFFFFFFFFu, 1), r);
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_822121C0, hooks::RaceHudObjectReset, spec);
+        __imp__sub_822121C0, ITC_CONTEXT_FN(hooks::RaceHudObjectReset), spec);
   }
   {
     Spec spec;
@@ -773,7 +773,7 @@ void Dashboard(Context& h, const World& w) {
           t.r4.u64 = r.Below(3);
           t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
         },
-        __imp__sub_82212D08, hooks::RaceHudObjectShowGauge, spec);
+        __imp__sub_82212D08, ITC_CONTEXT_FN(hooks::RaceHudObjectShowGauge), spec);
   }
   {
     // ShowGauge's frames below its own are compared too (their back chains
@@ -794,7 +794,7 @@ void Dashboard(Context& h, const World& w) {
                                                                      : r.Below(2));
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_82213DB0, hooks::RaceHudObjectSetUpExtraGauges, spec);
+        __imp__sub_82213DB0, ITC_CONTEXT_FN(hooks::RaceHudObjectSetUpExtraGauges), spec);
   }
   {
     Spec spec;
@@ -806,7 +806,7 @@ void Dashboard(Context& h, const World& w) {
           guest::StoreU32(h.base, w.hud.address + 472, r.Below(2));
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_82212768, hooks::RaceHudObjectApplyOptions, spec);
+        __imp__sub_82212768, ITC_CONTEXT_FN(hooks::RaceHudObjectApplyOptions), spec);
   }
   {
     Spec spec;
@@ -820,7 +820,7 @@ void Dashboard(Context& h, const World& w) {
           guest::StoreU32(h.base, w.hud.address + 12, r.Below(2));
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_82212B68, hooks::RaceHudObjectUpdateView, spec);
+        __imp__sub_82212B68, ITC_CONTEXT_FN(hooks::RaceHudObjectUpdateView), spec);
   }
 }
 
@@ -848,7 +848,7 @@ void SetUps(Context& h, const World& w) {
                           r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(10));
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_82213C90, hooks::RaceHudObjectSetUpGauges, spec);
+        __imp__sub_82213C90, ITC_CONTEXT_FN(hooks::RaceHudObjectSetUpGauges), spec);
   }
   {
     // Render target 11 the game's own (or none at the harness's time).
@@ -863,7 +863,7 @@ void SetUps(Context& h, const World& w) {
           guest::StoreU32(h.base, w.hud.address + 588, r.Below(3) == 0 ? 0 : uint32_t(r.Next()));
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_822135B0, hooks::RaceHudObjectSetUpMirror, spec);
+        __imp__sub_822135B0, ITC_CONTEXT_FN(hooks::RaceHudObjectSetUpMirror), spec);
   }
   {
     // No track zones' owner (nothing to delete).
@@ -877,7 +877,7 @@ void SetUps(Context& h, const World& w) {
           guest::StoreU32(h.base, w.hud.address + 588, r.Below(3) == 0 ? 0 : uint32_t(r.Next()));
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_822141A0, hooks::RaceHudObjectTearDown, spec);
+        __imp__sub_822141A0, ITC_CONTEXT_FN(hooks::RaceHudObjectTearDown), spec);
   }
   {
     // TrackZones::Create recorded (its r1 and lr compared).
@@ -887,7 +887,7 @@ void SetUps(Context& h, const World& w) {
     Group(
         h, w, "RaceHud::SetUpSigns (sub_822122B0)", 300,
         [&](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.hud.address; },
-        __imp__sub_822122B0, hooks::RaceHudObjectSetUpSigns, spec);
+        __imp__sub_822122B0, ITC_CONTEXT_FN(hooks::RaceHudObjectSetUpSigns), spec);
   }
   {
     // The slots 0 to 2 or other words; the digits' originals run.
@@ -906,7 +906,7 @@ void SetUps(Context& h, const World& w) {
           t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(200);
           t.r6.u64 = r.Below(3) == 0 ? r.Next() : r.Below(200);
         },
-        __imp__sub_82215160, hooks::RaceHudObjectUpdateExtraGauges, spec);
+        __imp__sub_82215160, ITC_CONTEXT_FN(hooks::RaceHudObjectUpdateExtraGauges), spec);
   }
 }
 
@@ -968,7 +968,7 @@ void Ticks(Context& h, const World& w) {
           t.r4.u64 = r.Below(3) == 0 ? 1 : 0;
           t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
         },
-        __imp__sub_822153A0, hooks::RaceHudObjectTick, spec);
+        __imp__sub_822153A0, ITC_CONTEXT_FN(hooks::RaceHudObjectTick), spec);
   }
   {
     // The racers (+444): the ticks (+3932), the start's float (+828), the
@@ -1004,7 +1004,7 @@ void Ticks(Context& h, const World& w) {
           guest::StoreU32(h.base, hud + 464, r.Below(3) == 0 ? animation : r.Below(7) - 1);
           t.r3.u64 = hud;
         },
-        __imp__sub_82214D78, hooks::RaceHudObjectTickTimer, spec);
+        __imp__sub_82214D78, ITC_CONTEXT_FN(hooks::RaceHudObjectTickTimer), spec);
   }
 }
 
@@ -1023,21 +1023,21 @@ void Signs(Context& h, const World& w) {
     spec.frame = 224;
     spec.saves = 144;
     Group(h, w, "RaceHud::UpdateSign (sub_82212F00)", 800, setup, __imp__sub_82212F00,
-          hooks::RaceHudObjectUpdateSign, spec);
+          ITC_CONTEXT_FN(hooks::RaceHudObjectUpdateSign), spec);
   }
   {
     Spec spec;
     spec.frame = 128;
     spec.saves = 40;
     Group(h, w, "RaceHud::UpdatePlaceName (sub_82213510)", 400, setup, __imp__sub_82213510,
-          hooks::RaceHudObjectUpdatePlaceName, spec);
+          ITC_CONTEXT_FN(hooks::RaceHudObjectUpdatePlaceName), spec);
   }
   {
     Spec spec;
     spec.frame = 112;
     spec.saves = 24;
     Group(h, w, "RaceHud::UpdateSigns (sub_82214718)", 400, setup, __imp__sub_82214718,
-          hooks::RaceHudObjectUpdateSigns, spec);
+          ITC_CONTEXT_FN(hooks::RaceHudObjectUpdateSigns), spec);
   }
 }
 
@@ -1131,7 +1131,7 @@ void Movies(Context& h, const World& w) {
           ShapeAnimations(h.base, w, hud_movie(612), r);
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_82212270, hooks::RaceHudObjectStartCountdown, spec);
+        __imp__sub_82212270, ITC_CONTEXT_FN(hooks::RaceHudObjectStartCountdown), spec);
   }
   {
     Spec spec;
@@ -1143,7 +1143,7 @@ void Movies(Context& h, const World& w) {
           ShapeAnimations(h.base, w, hud_movie(628), r);
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_82212718, hooks::RaceHudObjectStartMovie1, spec);
+        __imp__sub_82212718, ITC_CONTEXT_FN(hooks::RaceHudObjectStartMovie1), spec);
   }
   {
     Spec spec;
@@ -1153,7 +1153,7 @@ void Movies(Context& h, const World& w) {
           ShapeAnimations(h.base, w, hud_movie(628), r);
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_82212878, hooks::RaceHudObjectFinishMovie1, spec);
+        __imp__sub_82212878, ITC_CONTEXT_FN(hooks::RaceHudObjectFinishMovie1), spec);
   }
   {
     Spec spec;
@@ -1163,14 +1163,14 @@ void Movies(Context& h, const World& w) {
           guest::StoreU32(h.base, w.hud.address + 468, r.Below(2) == 0 ? 0 : r.Below(3));
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_82212AC8, hooks::RaceHudObjectDrawWarning, spec);
+        __imp__sub_82212AC8, ITC_CONTEXT_FN(hooks::RaceHudObjectDrawWarning), spec);
   }
   {
     Spec spec;
     Group(
         h, w, "RaceHud::RunMovie1 (sub_82212AF8)", 40,
         [&](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.hud.address; },
-        __imp__sub_82212AF8, hooks::RaceHudObjectRunMovie1, spec);
+        __imp__sub_82212AF8, ITC_CONTEXT_FN(hooks::RaceHudObjectRunMovie1), spec);
   }
   {
     Spec spec;
@@ -1183,7 +1183,7 @@ void Movies(Context& h, const World& w) {
                           r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(3) == 0 ? r.Next() : r.Below(40));
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_82212B08, hooks::RaceHudObjectRunItem, spec);
+        __imp__sub_82212B08, ITC_CONTEXT_FN(hooks::RaceHudObjectRunItem), spec);
   }
   {
     Spec spec;
@@ -1193,7 +1193,7 @@ void Movies(Context& h, const World& w) {
           t.r3.u64 = w.hud.address;
           t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(13);
         },
-        __imp__sub_82211BE8, hooks::RaceHudObjectMovieMask, spec);
+        __imp__sub_82211BE8, ITC_CONTEXT_FN(hooks::RaceHudObjectMovieMask), spec);
   }
   {
     Spec spec;
@@ -1205,7 +1205,7 @@ void Movies(Context& h, const World& w) {
           ShapeMovieTable(h.base, w, r);
           t.r3.u64 = w.hud.address;
         },
-        __imp__sub_82215260, hooks::RaceHudObjectInit, spec);
+        __imp__sub_82215260, ITC_CONTEXT_FN(hooks::RaceHudObjectInit), spec);
   }
   {
     // The mirror's node (19) a primitive of up to 4 vertices from up to 3
@@ -1225,7 +1225,7 @@ void Movies(Context& h, const World& w) {
           guest::StoreU32(h.base, mirror + 116, r.Below(5));
           t.r3.u64 = hud;
         },
-        __imp__sub_822128A8, hooks::RaceHudObjectDraw, spec);
+        __imp__sub_822128A8, ITC_CONTEXT_FN(hooks::RaceHudObjectDraw), spec);
   }
   {
     // The car's +6168 against +468, each 0 or not.
@@ -1242,7 +1242,7 @@ void Movies(Context& h, const World& w) {
           guest::StoreU32(h.base, hud + 468, r.Below(2) == 0 ? 0 : 1);
           t.r3.u64 = hud;
         },
-        __imp__sub_82212C50, hooks::RaceHudObjectUpdateWarning, spec);
+        __imp__sub_82212C50, ITC_CONTEXT_FN(hooks::RaceHudObjectUpdateWarning), spec);
   }
   {
     // HasRoom's 0, 1 or anything; +492 0 or not.
@@ -1258,7 +1258,7 @@ void Movies(Context& h, const World& w) {
           t.r3.u64 = hud;
           t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
         },
-        __imp__sub_82212E60, hooks::RaceHudObjectUpdateRecordingFull, spec);
+        __imp__sub_82212E60, ITC_CONTEXT_FN(hooks::RaceHudObjectUpdateRecordingFull), spec);
   }
   {
     // The racers' movie's live scene a chunk list (ShapeChunks); the item
@@ -1275,7 +1275,7 @@ void Movies(Context& h, const World& w) {
           PointItems(h.base, w, t.r4.u32);
           t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
         },
-        __imp__sub_82213638, hooks::RaceHudObjectShowItem, spec);
+        __imp__sub_82213638, ITC_CONTEXT_FN(hooks::RaceHudObjectShowItem), spec);
   }
   {
     // The race progress's +7240 against +460 (now and then the same).
@@ -1294,7 +1294,7 @@ void Movies(Context& h, const World& w) {
           t.r3.u64 = w.hud.address;
           t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
         },
-        __imp__sub_82214238, hooks::RaceHudObjectUpdateItem, spec);
+        __imp__sub_82214238, ITC_CONTEXT_FN(hooks::RaceHudObjectUpdateItem), spec);
   }
   {
     // operator new answered with blocks of the misc block (the list's now
@@ -1314,7 +1314,7 @@ void Movies(Context& h, const World& w) {
             news(r, w);
             t.r3.u64 = w.hud.address + 1004;
           },
-          __imp__sub_82216A60, hooks::RaceHudObjectMake1004, spec);
+          __imp__sub_82216A60, ITC_CONTEXT_FN(hooks::RaceHudObjectMake1004), spec);
     }
     {
       // The holder the HUD block (the HUD at its +16), the race kind 0 to
@@ -1330,7 +1330,7 @@ void Movies(Context& h, const World& w) {
             t.r3.u64 = w.hud.address;
             t.r4.u64 = r.Below(5) == 0 ? r.Next() : r.Below(13);
           },
-          __imp__sub_82211DA0, hooks::RaceHudObjectScreensInit, spec);
+          __imp__sub_82211DA0, ITC_CONTEXT_FN(hooks::RaceHudObjectScreensInit), spec);
     }
     {
       // Create: the race kind as Init's cases; RaceScreens::Init's world as
@@ -1373,7 +1373,7 @@ void Movies(Context& h, const World& w) {
             ShapeMovieTable(h.base, w, r);
             t.r3.u64 = r.Below(5) == 0 ? r.Next() : r.Below(13);
           },
-          __imp__sub_82211F40, hooks::RaceHudObjectScreensCreate, spec);
+          __imp__sub_82211F40, ITC_CONTEXT_FN(hooks::RaceHudObjectScreensCreate), spec);
       // The race HUD machine's CreateScreens (race-hud-machine.md), whose
       // callee Create runs for real in its world: the machine a block of the
       // race data's (+0x10000, its +9600 to +9620 compared), the race data
@@ -1413,7 +1413,7 @@ void Movies(Context& h, const World& w) {
                             r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(6));
             t.r3.u64 = machine;
           },
-          __imp__sub_8216CA28, hooks::RaceHudMachineCreateScreens, machine_spec);
+          __imp__sub_8216CA28, ITC_CONTEXT_FN(hooks::RaceHudMachineCreateScreens), machine_spec);
     }
   }
 }
@@ -1486,7 +1486,7 @@ void Sounds(Context& h, const World& w) {
           t.r3.u64 = w.hud.address;
           t.f1.f64 = AnyDouble(r, 10.0f);
         },
-        __imp__sub_822129A8, hooks::RaceHudObjectRunCountdown, spec);
+        __imp__sub_822129A8, ITC_CONTEXT_FN(hooks::RaceHudObjectRunCountdown), spec);
   }
   {
     // A bar (0 to 3, mostly 0 for the sound) of the HUD's four at +244:
@@ -1536,7 +1536,7 @@ void Sounds(Context& h, const World& w) {
           t.r4.u64 = index;
           t.r5.u64 = racer;
         },
-        __imp__sub_82214790, hooks::RaceHudObjectUpdateRacerBar, spec);
+        __imp__sub_82214790, ITC_CONTEXT_FN(hooks::RaceHudObjectUpdateRacerBar), spec);
   }
   {
     // The warning's flag (+468) 0, 1 or any word; the warning movie's (+616)
@@ -1557,7 +1557,7 @@ void Sounds(Context& h, const World& w) {
           ShapeSoundManager(h.base, w, r);
           t.r3.u64 = hud;
         },
-        __imp__sub_82212A48, hooks::RaceHudObjectRunWarning, spec);
+        __imp__sub_82212A48, ITC_CONTEXT_FN(hooks::RaceHudObjectRunWarning), spec);
   }
 }
 
@@ -1619,7 +1619,7 @@ void Panels(Context& h, const World& w) {
           ShapeSoundManager(h.base, w, r);
           t.r3.u64 = hud;
         },
-        __imp__sub_822151F8, hooks::RaceHudObjectTickRacers, spec);
+        __imp__sub_822151F8, ITC_CONTEXT_FN(hooks::RaceHudObjectTickRacers), spec);
   }
   {
     // The mode (+448) 0, 1, 3 or 5 and up; modes 2 and 4 (sub_82214E78,
@@ -1659,7 +1659,7 @@ void Panels(Context& h, const World& w) {
           ShapeSoundManager(h.base, w, r);
           t.r3.u64 = hud;
         },
-        __imp__sub_82215488, hooks::RaceHudObjectTickPanel, spec);
+        __imp__sub_82215488, ITC_CONTEXT_FN(hooks::RaceHudObjectTickPanel), spec);
   }
 }
 
@@ -1752,7 +1752,7 @@ void PanelSetUps(Context& h, const World& w) {
           t.r3.u64 = w.hud.address;
           t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
         },
-        __imp__sub_822123C8, hooks::RaceHudObjectSetUpTimer, spec);
+        __imp__sub_822123C8, ITC_CONTEXT_FN(hooks::RaceHudObjectSetUpTimer), spec);
   }
   {
     // __savegprlr_26 and f29 to f31: the 80 bytes below sp.
@@ -1767,7 +1767,7 @@ void PanelSetUps(Context& h, const World& w) {
           t.r3.u64 = w.hud.address;
           t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
         },
-        __imp__sub_82213F20, hooks::RaceHudObjectSetUpRacers, spec);
+        __imp__sub_82213F20, ITC_CONTEXT_FN(hooks::RaceHudObjectSetUpRacers), spec);
   }
   {
     // The mode 0, 1, 4 (sub_822125B8, never seen in play: the original on
@@ -1791,7 +1791,7 @@ void PanelSetUps(Context& h, const World& w) {
           t.r4.u64 = mode;
           t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
         },
-        __imp__sub_822157A8, hooks::RaceHudObjectSetMode, spec);
+        __imp__sub_822157A8, ITC_CONTEXT_FN(hooks::RaceHudObjectSetMode), spec);
   }
 }
 
@@ -1891,7 +1891,7 @@ void ScreensDestructs(Context& h) {
       t.r3.u64 = holder.address;
       t.lr = 0x82000000 | (r.Below(0x10000) << 2);
       ITC_FLAG(native_race_hud_object) = v == 1;
-      (v == 0 ? __imp__sub_82211B98 : hooks::RaceHudObjectScreensDestruct)(t, h.base);
+      (v == 0 ? __imp__sub_82211B98 : ITC_CONTEXT_FN(hooks::RaceHudObjectScreensDestruct))(t, h.base);
       ITC_FLAG(native_race_hud_object) = true;
       out[v].Bytes(Read(h.base, holder.address, holder.bytes));
       out[v].Bytes(Read(h.base, textures.address, textures.bytes));
@@ -2139,9 +2139,9 @@ void RaceHudObject(Context& h) {
   PanelSetUps(h, w);
   ScreensDestructs(h);
   ScreensDestroys(h, "RaceScreens::Destroy (sub_82211D18)", __imp__sub_82211D18,
-                  hooks::RaceHudObjectScreensDestroy);
+                  ITC_CONTEXT_FN(hooks::RaceHudObjectScreensDestroy));
   ScreensDestroys(h, "RaceHudMachine::DestroyScreens (sub_8216C208)", __imp__sub_8216C208,
-                  hooks::RaceHudMachineDestroyScreens);
+                  ITC_CONTEXT_FN(hooks::RaceHudMachineDestroyScreens));
 }
 
 }  // namespace harness

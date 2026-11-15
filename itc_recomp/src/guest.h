@@ -184,9 +184,16 @@ inline void StoreFloat(uint8_t* base, uint32_t address, float value) {
 
 // Reserves space on the guest stack for the lifetime of the object, for
 // guest functions that take pointers to locals. Mirrors a guest prologue.
+// A step named as a value, in its form on the SDK's context (a harness's
+// table or std::function; the step's other form is on our register view,
+// hooks/native_entry.h's ITC_REGS_FN).
+#define ITC_CONTEXT_FN(name) static_cast<void (*)(PPCContext&, uint8_t*)>(&name)
+
+// `Context` is the SDK's context or our register view (lifted::Regs).
+template <typename Context>
 class StackFrame {
  public:
-  StackFrame(PPCContext& ctx, uint32_t size) : ctx_(ctx), size_(size) {
+  StackFrame(Context& ctx, uint32_t size) : ctx_(ctx), size_(size) {
     ctx_.r1.u32 -= size_;
   }
   ~StackFrame() { ctx_.r1.u32 += size_; }
@@ -198,7 +205,7 @@ class StackFrame {
   uint32_t Local(uint32_t offset) const { return ctx_.r1.u32 + offset; }
 
  private:
-  PPCContext& ctx_;
+  Context& ctx_;
   uint32_t size_;
 };
 

@@ -7,6 +7,7 @@
 // directly), and for the error paths the plain C++ leaves to it.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -35,94 +36,89 @@ bool Native() {
 }  // namespace
 
 // GetProcessHeap: returns the process heap's handle.
-extern "C" REX_FUNC(sub_8229B670) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime_heap)) {
-    __imp__sub_8229B670(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8229B670, ITC_FLAG(native_c_runtime_heap)) {
   ctx.r3.u64 = memory::crt::GetProcessHeap(base);
 }
 
 // malloc: r3 = size; returns the block.
-extern "C" REX_FUNC(sub_825A9A90) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A9A90) {
+  
   if (Native()) {
     if (auto block = memory::crt::Malloc(base, ctx.r3.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  __imp__sub_825A9A90(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825A9A90);
 }
 
 // free: r3 = block.
-extern "C" REX_FUNC(sub_825A9B58) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A9B58) {
+  
   if (!Native() || !memory::crt::Free(ctx.r3.u32)) {
-    __imp__sub_825A9B58(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825A9B58);
   }
 }
 
 // calloc: r3 = count, r4 = size; returns the block.
-extern "C" REX_FUNC(sub_825AC320) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825AC320) {
+  
   if (Native()) {
     if (auto block = memory::crt::Calloc(ctx.r3.u32, ctx.r4.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  __imp__sub_825AC320(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825AC320);
 }
 
 // realloc: r3 = block, r4 = size; returns the block.
-extern "C" REX_FUNC(sub_825AEBC8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825AEBC8) {
+  
   if (Native()) {
     if (auto block = memory::crt::Realloc(base, ctx.r3.u32, ctx.r4.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  __imp__sub_825AEBC8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825AEBC8);
 }
 
 // _msize: r3 = block; returns its size.
-extern "C" REX_FUNC(sub_825AED30) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825AED30) {
+  
   if (Native()) {
     if (auto size = memory::crt::Msize(ctx.r3.u32)) {
       ctx.r3.u64 = *size;
       return;
     }
   }
-  __imp__sub_825AED30(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825AED30);
 }
 
 // XMemAlloc: r3 = size, r4 = attributes; returns the block.
-extern "C" REX_FUNC(sub_822976F8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822976F8) {
+  
   if (!Native()) {
-    __imp__sub_822976F8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822976F8);
     return;
   }
   ctx.r3.u64 = memory::crt::XMemAlloc(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // XMemFree: r3 = block, r4 = attributes.
-extern "C" REX_FUNC(sub_82297790) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82297790) {
+  
   if (!Native()) {
-    __imp__sub_82297790(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82297790);
     return;
   }
   ctx.r3.u64 = memory::crt::XMemFree(ctx.r3.u32, ctx.r4.u32);
 }
 
 // operator new: r3 = size; returns the block.
-extern "C" REX_FUNC(sub_825A6880) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A6880) {
+  
   if (hooks::StartUpRecorded(ctx, 0x825A6880)) {
     return;  // a harness's (the race HUD object's)
   }
@@ -132,33 +128,33 @@ extern "C" REX_FUNC(sub_825A6880) {
       return;
     }
   }
-  __imp__sub_825A6880(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825A6880);
 }
 
 // operator new[]: r3 = size; returns the block.
-extern "C" REX_FUNC(sub_825A6940) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A6940) {
+  
   if (Native()) {
     if (auto block = memory::crt::OperatorNewArray(base, ctx.r3.u32)) {
       ctx.r3.u64 = *block;
       return;
     }
   }
-  __imp__sub_825A6940(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825A6940);
 }
 
 // operator delete: r3 = block.
-extern "C" REX_FUNC(sub_825A70E8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A70E8) {
+  
   if (!Native() || !memory::crt::OperatorDelete(ctx.r3.u32)) {
     lifted::original::c825A70E8(ctx, base);
   }
 }
 
 // operator delete[]: r3 = block.
-extern "C" REX_FUNC(sub_825A71C0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A71C0) {
+  
   if (!Native() || !memory::crt::OperatorDeleteArray(ctx.r3.u32)) {
-    __imp__sub_825A71C0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825A71C0);
   }
 }

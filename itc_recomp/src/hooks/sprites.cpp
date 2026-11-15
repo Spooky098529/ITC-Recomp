@@ -2,6 +2,7 @@
 // src/sprites/sprites.cpp (docs/functions/sprites.md).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include <bit>
@@ -38,46 +39,26 @@ constexpr uint32_t kZero = 0x82000A34;  // the float 0.0, the chunk's depth
 }  // namespace
 
 // SpriteList::Reset: r3 = a sprite list (500 sprites).
-extern "C" REX_FUNC(sub_821298C0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_sprites)) {
-    __imp__sub_821298C0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(821298C0, ITC_FLAG(native_sprites)) {
   ctx.fpscr.disableFlushMode();
   sprites::ResetSprites(base, ctx.r3.u32, sprites::kListCorners);
 }
 
 // Sprite::Reset: r3 = a single sprite.
-extern "C" REX_FUNC(sub_8211EB60) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_sprites)) {
-    __imp__sub_8211EB60(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8211EB60, ITC_FLAG(native_sprites)) {
   ctx.fpscr.disableFlushMode();
   sprites::ResetSprites(base, ctx.r3.u32, sprites::kSpriteCorners);
 }
 
 // Overlay::LayerFor: r4 = camera pass index (r3, the overlay, isn't read);
 // returns the render queue layer.
-extern "C" REX_FUNC(sub_82126630) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_sprites)) {
-    __imp__sub_82126630(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82126630, ITC_FLAG(native_sprites)) {
   ctx.r3.u64 = sprites::LayerFor(ctx.r4.u32);
 }
 
 // Vec4::Equal: r3, r4 = two 4-float vectors; returns 1 if all four
 // components are equal, else 0.
-extern "C" REX_FUNC(sub_82123300) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_sprites)) {
-    __imp__sub_82123300(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82123300, ITC_FLAG(native_sprites)) {
   ctx.fpscr.disableFlushMode();
   float a[4], b[4];
   for (int i = 0; i < 4; i++) {
@@ -89,12 +70,7 @@ extern "C" REX_FUNC(sub_82123300) {
 
 // Trail::TurnSide: r3-r4 and r5-r6 = two 4-float directions in registers (two
 // floats a register, the first in the high word); returns 0, 1 or -1.
-extern "C" REX_FUNC(sub_82129940) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_sprites)) {
-    __imp__sub_82129940(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82129940, ITC_FLAG(native_sprites)) {
   ctx.fpscr.disableFlushMode();
   auto unpack = [](uint64_t high_pair, uint64_t low_pair, float out[4]) {
     out[0] = std::bit_cast<float>(uint32_t(high_pair >> 32));
@@ -114,7 +90,7 @@ namespace {
 // (slot 4: r3 = the queue, r4 = the chunk, r5 = the layer, f1 = 0.0) from a
 // frame like the original's (272 bytes), with its return address. False,
 // with nothing done, where the original must run instead.
-bool RecordScreenRect(PPCContext& ctx, uint8_t* base) {
+bool RecordScreenRect(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint32_t layer = ctx.r5.u32;
   const std::optional<uint32_t> chunk =
@@ -138,8 +114,8 @@ bool RecordScreenRect(PPCContext& ctx, uint8_t* base) {
 
 // ScreenRect::Record: r3 = a screen rectangle, r5 = the render queue layer
 // (r4, the camera pass, isn't read).
-extern "C" REX_FUNC(sub_82128E70) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82128E70) {
+  
   if (!ITC_FLAG(native_sprites) || SlotDiagnostics() || !RecordScreenRect(ctx, base)) {
     lifted::original::c82128E70(ctx, base);
   }
@@ -147,10 +123,10 @@ extern "C" REX_FUNC(sub_82128E70) {
 
 // ScreenRect::Draw: r3 = a screen rectangle, r4 = camera pass, r5 = layer:
 // recorded unless its +64 is set (the original tail-calls ScreenRect::Record).
-extern "C" REX_FUNC(sub_82129280) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82129280) {
+  
   if (!ITC_FLAG(native_sprites) || SlotDiagnostics()) {
-    __imp__sub_82129280(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82129280);
     return;
   }
   ctx.r11.u64 = guest::LoadU32(base, ctx.r3.u32 + 64);

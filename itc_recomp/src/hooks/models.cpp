@@ -16,6 +16,7 @@
 // and Mesh::Parse (sub_825963F0), from Mesh::Parse and Model::Load.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "app_start_up/start_up.h"
@@ -121,8 +122,8 @@ bool NativeLifetime() { return hooks::ModelsNativeLifetime(); }
 
 // ScopedLock::ScopedLock: r3 = the lock word, r4 = the critical section; r3
 // left as it came.
-extern "C" REX_FUNC(sub_8258E580) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258E580) {
+  
   if (ctx.r4.u32 == models::kMemoryBlocksLock && hooks::ModelsHostLock()) {
     models::ScopedLockEnter(base, ctx.r3.u32, ctx.r4.u32);
     return;
@@ -133,13 +134,13 @@ extern "C" REX_FUNC(sub_8258E580) {
     app_start_up::MovieWrapperLockEnter(base, ctx.r3.u32, ctx.r4.u32);
     return;
   }
-  __imp__sub_8258E580(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8258E580);
 }
 
 // ScopedLock::~ScopedLock: r3 = the lock word; r3 = the critical section (the
 // original's load before its LeaveCriticalSection).
-extern "C" REX_FUNC(sub_8258E5B8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258E5B8) {
+  
   if (hooks::ModelsHostLock() &&
       guest::LoadU32(base, ctx.r3.u32) == models::kMemoryBlocksLock) {
     ctx.r3.u64 = models::ScopedLockLeave(base, ctx.r3.u32);
@@ -149,25 +150,20 @@ extern "C" REX_FUNC(sub_8258E5B8) {
     ctx.r3.u64 = app_start_up::MovieWrapperLockLeave(base, ctx.r3.u32);
     return;
   }
-  __imp__sub_8258E5B8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8258E5B8);
 }
 
 // --- The XPR object ---
 
 // XPR::XPR: r3 = the object (left).
-extern "C" REX_FUNC(sub_82596E68) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_82596E68(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82596E68, ITC_FLAG(native_models)) {
   models::XprConstruct(base, ctx.r3.u32);
 }
 
 // XPR::Release and XPR::~XPR: r3 = the object; r3 as the original leaves it.
 #define ITC_MODELS_LIFETIME(address, function)                       \
-  extern "C" REX_FUNC(sub_##address) {                               \
-    REX_FUNC_PROLOGUE();                                             \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                               \
+    \
     if (NativeLifetime()) {                                          \
       if (const auto r3 = models::function(base, ctx.r3.u32)) {      \
         ctx.r3.u64 = *r3;                                            \
@@ -184,7 +180,7 @@ ITC_MODELS_LIFETIME(82597148, XprDestruct)
 
 namespace {
 
-void SetR3(PPCContext& ctx, const models::R3& r3) {
+void SetR3(lifted::Regs& ctx, const models::R3& r3) {
   if (!r3.kept) {
     ctx.r3.u64 = r3.value;
   }
@@ -199,8 +195,8 @@ void SetR3(PPCContext& ctx, const models::R3& r3) {
 
 // TextureProvider::InsertN: r3 = the vector, r4 = where, r5 = the count, r6 =
 // the value's address.
-extern "C" REX_FUNC(sub_82590EF0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82590EF0) {
+  
   if (NativeLifetime()) {
     if (const auto r3 = models::PointersInsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                 guest::LoadU32(base, ctx.r6.u32))) {
@@ -208,16 +204,11 @@ extern "C" REX_FUNC(sub_82590EF0) {
       return;
     }
   }
-  __imp__sub_82590EF0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82590EF0);
 }
 
 // TextureProvider::Clear: r3 = the vector; r3 = its first element.
-extern "C" REX_FUNC(sub_82590D68) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_82590D68(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82590D68, ITC_FLAG(native_models)) {
   ctx.r3.u64 = models::PointersClear(base, ctx.r3.u32);
 }
 
@@ -225,7 +216,7 @@ extern "C" REX_FUNC(sub_82590D68) {
 // has no adapter: only Get calls it.
 namespace {
 
-models::ProviderCall ProviderGuestCall(PPCContext& ctx, uint8_t* base) {
+models::ProviderCall ProviderGuestCall(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t function, uint32_t frame, uint32_t lr, uint64_t r3,
                       uint64_t r4) -> uint64_t {
     const uint64_t stack = ctx.r1.u64;
@@ -243,43 +234,28 @@ models::ProviderCall ProviderGuestCall(PPCContext& ctx, uint8_t* base) {
 }  // namespace
 
 // TextureProvider::Get: r3 = the provider, r4 = the slot; r3 the texture set.
-extern "C" REX_FUNC(sub_825946B8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_825946B8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825946B8, ITC_FLAG(native_models)) {
   ctx.r3.u64 = models::TextureProviderGet(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // Slots 5 to 7 and 8 to 10: r3 = the provider, r4 = the slot, r5 = the
 // index (or the name).
-extern "C" REX_FUNC(sub_825941D0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_825941D0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825941D0, ITC_FLAG(native_models)) {
   ctx.r3.u64 = models::TextureProviderXprTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                  ctx.r1.u32, ProviderGuestCall(ctx, base));
 }
 
-extern "C" REX_FUNC(sub_82594230) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_82594230(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82594230, ITC_FLAG(native_models)) {
   ctx.r3.u64 = models::TextureProviderFindXprTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                      ctx.r1.u32, ProviderGuestCall(ctx, base));
 }
 
 // TextureProvider::TextureProvider: r3 = the provider (left), r4 = the slot
 // count (-1: 64).
-extern "C" REX_FUNC(sub_82594850) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82594850) {
+  
   if (!NativeLifetime() || !models::TextureProviderConstruct(base, ctx.r3.u32, ctx.r4.s32)) {
-    __imp__sub_82594850(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82594850);
   }
 }
 
@@ -289,15 +265,15 @@ ITC_MODELS_LIFETIME(825943E0, TextureProviderDestruct)
 // --- The model ---
 
 // Model::Model: r3 = the model (left).
-extern "C" REX_FUNC(sub_825948C0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825948C0) {
+  
   if (NativeLifetime()) {
     ctx.fpscr.disableFlushMode();
     if (models::ModelConstruct(base, ctx.r3.u32)) {
       return;
     }
   }
-  __imp__sub_825948C0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825948C0);
 }
 
 // Model::Release and Model::~Model: r3 = the model; r3 as the original
@@ -308,48 +284,33 @@ ITC_MODELS_LIFETIME(82594F58, ModelDestruct)
 // --- The car part model ---
 
 // The part model's constructor: r3 = the model (left).
-extern "C" REX_FUNC(sub_820CE928) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820CE928) {
+  
   if (NativeLifetime()) {
     ctx.fpscr.disableFlushMode();  // as Model::Model's adapter
     if (models::PartModelConstruct(base, ctx.r3.u32)) {
       return;
     }
   }
-  __imp__sub_820CE928(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820CE928);
 }
 
 // The part model's destructor: r3 = the model; r3 as Model::~Model leaves it.
 ITC_MODELS_LIFETIME(820CE990, PartModelDestruct)
 
 // sub_820CE9C8: r3 = the model (left).
-extern "C" REX_FUNC(sub_820CE9C8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_820CE9C8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820CE9C8, ITC_FLAG(native_models)) {
   models::PartModelClear(base, ctx.r3.u32);
 }
 
 // Model::SetVinylTextures: r3 = the part model, r4 and r5 the words.
-extern "C" REX_FUNC(sub_820CE9F8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_820CE9F8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820CE9F8, ITC_FLAG(native_models)) {
   models::PartModelSetVinylTextures(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // Skeleton::ResetPose: r3 = the skeleton (left). Flush-to-zero off after
 // Skeleton::ApplyAnimation, as its adapter leaves it.
-extern "C" REX_FUNC(sub_82599AF0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_82599AF0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82599AF0, ITC_FLAG(native_models)) {
   if (model_animation::SkeletonResetPose(base, ctx.r3.u32)) {
     ctx.fpscr.disableFlushMode();
   }
@@ -357,12 +318,7 @@ extern "C" REX_FUNC(sub_82599AF0) {
 
 // Skeleton::LocalMatrices: r3 = the skeleton (r3 left: no caller reads
 // it). Flush-to-zero off when it did float work, as the original leaves it.
-extern "C" REX_FUNC(sub_82599C58) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_82599C58(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82599C58, ITC_FLAG(native_models)) {
   const uint32_t mode = ctx.fpscr.csr;
   ctx.fpscr.disableFlushMode();
   if (!model_animation::SkeletonLocalMatrices(base, ctx.r3.u32, ctx.r1.u32)) {
@@ -374,27 +330,27 @@ extern "C" REX_FUNC(sub_82599C58) {
 
 namespace hooks {
 
-void ModelsMaterialCount(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModelsMaterialCount) {
   ctx.r3.u64 = models::MaterialCount(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32);
 }
 
-void ModelsMaterial(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModelsMaterial) {
   ctx.r3.u64 = models::Material(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32);
 }
 
-void ModelsSharedVertexShader(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModelsSharedVertexShader) {
   ctx.r3.u64 = models::SharedVertexShader(base, ctx.r3.u32);
 }
 
-void ModelsSetSharedShaders(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModelsSetSharedShaders) {
   models::SetSharedShaders(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void ModelsSharedPixelShader(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModelsSharedPixelShader) {
   ctx.r3.u64 = models::SharedPixelShader(base, ctx.r3.u32);
 }
 
-bool TextureProviderSlotDirect(PPCContext& ctx, uint8_t* base, uint32_t function) {
+bool TextureProviderSlotDirect(lifted::Regs& ctx, uint8_t* base, uint32_t function) {
   if (!ITC_FLAG(native_models)) {
     return false;
   }
@@ -413,12 +369,7 @@ bool TextureProviderSlotDirect(PPCContext& ctx, uint8_t* base, uint32_t function
 }  // namespace hooks
 
 #define ITC_MODELS_ACCESSOR(address, steps)  \
-  extern "C" REX_FUNC(sub_##address) {       \
-    REX_FUNC_PROLOGUE();                     \
-    if (!ITC_FLAG(native_models)) {          \
-      __imp__sub_##address(ctx, base);       \
-      return;                                \
-    }                                        \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_models)) { \
     hooks::steps(ctx, base);                 \
   }
 
@@ -437,51 +388,46 @@ ITC_MODELS_ACCESSOR(82589700, ModelsSharedPixelShader)
 
 // Resource::Relocate: r3 = the resource, r4 = the address; r3 as the
 // original leaves it.
-extern "C" REX_FUNC(sub_8235A9F8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_8235A9F8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8235A9F8, ITC_FLAG(native_models)) {
   ctx.r3.u64 = models::RelocateResource(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // XPR::Create: r3 = the XPR object, r4 = the XPR2 file; returns 0 or
 // 0x80004005.
-extern "C" REX_FUNC(sub_82596F68) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82596F68) {
+  
   if (NativeLifetime()) {
     if (const auto r3 = models::XprCreate(base, ctx.r3.u32, ctx.r4.u32)) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  __imp__sub_82596F68(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82596F68);
 }
 
 // SkeletonBase::SetUp: r3 = the skeleton, r4 = the node file, r5 = the
 // matrices or 0, r6 = the instance count. Skeleton::Bind: r3 to r5 the same.
 // No return value read. Flush-to-zero off, as the originals leave it.
-extern "C" REX_FUNC(sub_8259A9E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8259A9E0) {
+  
   if (NativeLifetime()) {
     ctx.fpscr.disableFlushMode();
     if (model_animation::SkeletonSetUp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
       return;
     }
   }
-  __imp__sub_8259A9E0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8259A9E0);
 }
 
-extern "C" REX_FUNC(sub_82599A20) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82599A20) {
+  
   if (NativeLifetime()) {
     ctx.fpscr.disableFlushMode();
     if (model_animation::SkeletonBind(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
       return;
     }
   }
-  __imp__sub_82599A20(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82599A20);
 }
 
 namespace {
@@ -499,7 +445,7 @@ void ModelLoadInit(void* user, uint32_t object, uint32_t microcode) {
 void ModelLoadCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5,
                    uint32_t return_address) {
   auto& c = *static_cast<hooks::ModelLoadGuest*>(user);
-  PPCContext& ctx = c.ctx;
+  lifted::Regs& ctx = c.ctx;
   uint8_t* base = c.base;
   guest_call::InFrame(ctx, base, 512, return_address, [&](uint32_t) {
     ctx.r3.u64 = r3;
@@ -522,8 +468,8 @@ models::LoadCalls hooks::ModelLoadGuest::Calls() {
 // Model::Load: r3 = the model, r4 = the part file, r5 = an XPR2 file or 0;
 // r3 = the model's shape count (the original's loop counter). Flush-to-zero
 // off, as the original leaves it.
-extern "C" REX_FUNC(sub_82596920) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82596920) {
+  
   if (NativeLifetime()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
@@ -546,13 +492,13 @@ extern "C" REX_FUNC(sub_82596920) {
 // table's address, sign-extended as lis/addi leave it). Each pair through
 // Shaders::LoadPair's plain C++, the original (from LoadAll's frame) where it
 // hands back.
-extern "C" REX_FUNC(sub_820A08A0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820A08A0) {
+  
   if (hooks::StartUpRecorded(ctx, 0x820A08A0)) {
     return;
   }
   if (!ITC_FLAG(native_models) || !hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
-    __imp__sub_820A08A0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A08A0);
     return;
   }
   const archive::LoadCall load = hooks::NativeArchiveLoad(base);
@@ -564,7 +510,7 @@ extern "C" REX_FUNC(sub_820A08A0) {
     guest_call::InFrame(ctx, base, 112, at, [&](uint32_t) {
       ctx.r3.u64 = asset;
       ctx.r4.u64 = pair;
-      __imp__sub_820A07F0(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_820A07F0);
     });
   });
   ctx.r3.s64 = int32_t(r3);
@@ -574,7 +520,7 @@ namespace {
 
 // VertexShader::Init's original, from a frame as the callback's own.
 struct PairLoadedCalls {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   static void Init(void* user, uint32_t object, uint32_t microcode) {
     auto& c = *static_cast<PairLoadedCalls*>(user);
@@ -591,8 +537,8 @@ struct PairLoadedCalls {
 // Shaders::OnPairLoaded (Archive::Load's callback; reached through the
 // request's function pointer, so the adapter stays): r6 = the pair's
 // context; r3 = the context, as operator delete leaves it.
-extern "C" REX_FUNC(sub_820A06D0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820A06D0) {
+  
   if (hooks::ModelsNativeLifetime()) {
     const uint64_t lr = ctx.lr;
     const uint64_t r6 = ctx.r6.u64;
@@ -615,5 +561,5 @@ extern "C" REX_FUNC(sub_820A06D0) {
       return;
     }
   }
-  __imp__sub_820A06D0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820A06D0);
 }

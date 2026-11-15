@@ -6,6 +6,7 @@
 // on render-only passes. Found with --find_per_frame_state.
 
 #include "game_messages.h"
+#include "hooks/native_entry.h"
 #include "guest.h"
 #include "frame_pacer.h"
 #include "course_scenery/course_scenery.h"
@@ -78,8 +79,8 @@ ITC_FLAG_BOOL(log_replays, false, "ITC",
 // past its duration. Drives the flashing sprites above cars.
 // The advance itself natively under --native_car_draw (src/car_draw/; its
 // native caller honors the skip through hooks::CarDrawBlinkTimersHeld).
-extern "C" REX_FUNC(sub_820DC958) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820DC958) {
+  
   if (hooks::CarDrawBlinkTimersHeld()) {
     return;
   }
@@ -87,15 +88,15 @@ extern "C" REX_FUNC(sub_820DC958) {
     hooks::CarDrawBlinkTimersAdvance(ctx, base);
     return;
   }
-  __imp__sub_820DC958(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820DC958);
 }
 
 // Texture animations (sub_820F11A8, from the draw step part sub_820F6068):
 // advances every flipbook animation in the set at r3+1060 (sub_82146B20,
 // one sub_82146AC0 each). Drives the flashing building lights; the light
 // groups pick their frame's texture with sub_82146B80.
-extern "C" REX_FUNC(sub_820F11A8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820F11A8) {
+  
   if (frame_pacing::GameMessages_IsRenderOnlyPass() &&
       ITC_FLAG(per_tick_texture_animations)) {
     return;
@@ -105,7 +106,7 @@ extern "C" REX_FUNC(sub_820F11A8) {
     ctx.r3.u64 = course_scenery::AdvanceTextureAnimations(base, ctx.r3.u32);
     return;
   }
-  __imp__sub_820F11A8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820F11A8);
 }
 
 // Minimap blink clock (sub_820F5740, from the draw step part sub_820F6068):
@@ -117,17 +118,17 @@ extern "C" REX_FUNC(sub_820F11A8) {
 // Minimap::Draw's body is native under --native_minimap (src/minimap/draw.cpp,
 // hooks::MinimapDraw), inside the same wrap.
 namespace {
-void MinimapDrawBody(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MinimapDrawBody) {
   if (hooks::MinimapDrawNative()) {
     hooks::MinimapDraw(ctx, base);
   } else {
-    __imp__sub_820F5740(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820F5740);
   }
 }
 }  // namespace
 
-extern "C" REX_FUNC(sub_820F5740) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820F5740) {
+  
   constexpr uint32_t kBlinkFrames = 0x826C5AA4, kBlinkPhase = 0x826C5AA8;
   if (!frame_pacing::GameMessages_IsRenderOnlyPass() || !ITC_FLAG(per_tick_minimap_blink)) {
     MinimapDrawBody(ctx, base);
@@ -146,8 +147,8 @@ extern "C" REX_FUNC(sub_820F5740) {
 // the counter advances once per tick and the call sees the logic pass's
 // value. The tick's work: its plain C++ (src/mode_tick/modes_tick.h) with
 // --native_modes_tick, else the original.
-extern "C" REX_FUNC(sub_82107910) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82107910) {
+  
   constexpr uint32_t kPlayTimeFrames = 0x826C5B90;
   if (frame_pacing::GameMessages_IsRenderOnlyPass() && ITC_FLAG(per_tick_play_time)) {
     guest::StoreU32(base, kPlayTimeFrames, guest::LoadU32(base, kPlayTimeFrames) - 1);
@@ -155,7 +156,7 @@ extern "C" REX_FUNC(sub_82107910) {
   if (ITC_FLAG(native_modes_tick)) {
     hooks::ModesTickSteps(ctx, base);
   } else {
-    __imp__sub_82107910(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82107910);
   }
 }
 
@@ -280,7 +281,7 @@ ReplayFromLogicPass g_ui_movies("UI movies", 0xA000);
 
 namespace {
 // The update's work: natively with --native_ui_movies (src/hooks/ui_movies.cpp).
-void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UpdateUiMovie) {
   if (ctx.r4.u32 != 0 || !ITC_FLAG(per_tick_ui_movies)) {
     ui_movies_hooks::Update(ctx, base);
     return;
@@ -352,8 +353,8 @@ void NotePutBackTargets(uint8_t* base, uint32_t movie, const std::vector<AddedTa
 }
 }  // namespace
 
-extern "C" REX_FUNC(sub_825A0548) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A0548) {
+  
   if (guest::LoadU8(base, kTrackPropertiesReady) == 0) {
     ui_movies_hooks::ApplyTrack(ctx, base);
     return;
@@ -392,8 +393,8 @@ extern "C" REX_FUNC(sub_825A0548) {
   }
 }
 
-extern "C" REX_FUNC(sub_8211D2F8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211D2F8) {
+  
   if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
       ui_movies_hooks::g_update_callee_stand_in(0x8211D2F8, ctx, base)) {
     return;
@@ -449,8 +450,8 @@ constexpr uint32_t kCameraPassesBytes = 21 * 592;
 std::vector<uint8_t> g_overlay_cameras;  // as of the logic pass's overlays
 }  // namespace
 
-extern "C" REX_FUNC(sub_8215DEA0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8215DEA0) {
+  
   constexpr uint32_t kOverlayCount = 25;
   constexpr uint32_t kUpdateSlot = 16;  // vtable offset of slot 4
   constexpr uint32_t kRecordSlot = 20;  // vtable offset of slot 5
@@ -515,10 +516,10 @@ bool g_in_rival_cutscene = false;
 uint32_t g_rival_logo = 0;  // the entry the last logic pass drew, or 0
 }  // namespace
 
-void (*race_hud_hooks::g_rival_logo_draw_stand_in)(PPCContext&, uint8_t*) = nullptr;
+void (*race_hud_hooks::g_rival_logo_draw_stand_in)(lifted::Regs&, uint8_t*) = nullptr;
 
-extern "C" REX_FUNC(sub_82211A28) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82211A28) {
+  
   if (g_in_rival_cutscene) {
     g_rival_logo = ctx.r3.u32;
   }
@@ -529,8 +530,8 @@ extern "C" REX_FUNC(sub_82211A28) {
   race_hud_hooks::DrawRivalLogo(ctx, base);
 }
 
-extern "C" REX_FUNC(sub_821594B8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(821594B8) {
+  
   if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
     g_rival_logo = 0;
     g_in_rival_cutscene = true;
@@ -695,9 +696,9 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
 // The recorders' work: their plain C++ (src/sprites/world_sprites.h) with
 // --native_world_sprites, else the originals.
 namespace {
-void RecordSpriteList(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RecordSpriteList) {
   if (!ITC_FLAG(native_world_sprites)) {
-    __imp__sub_82128750(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82128750);
     return;
   }
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
@@ -706,9 +707,9 @@ void RecordSpriteList(PPCContext& ctx, uint8_t* base) {
             a.f[0]};
   });
 }
-void RecordSprite(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RecordSprite) {
   if (!ITC_FLAG(native_world_sprites)) {
-    __imp__sub_821281A8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821281A8);
     return;
   }
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
@@ -721,8 +722,8 @@ void RecordSprite(PPCContext& ctx, uint8_t* base) {
 
 // World-space sprite recorder (sub_82128750: r3 = sprite list, r4 = camera;
 // the light trails): blends the corners around the original.
-extern "C" REX_FUNC(sub_82128750) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82128750) {
+  
   if (debug::IsHidden(0x82128750)) {
     return;
   }
@@ -735,8 +736,8 @@ extern "C" REX_FUNC(sub_82128750) {
 ITC_FLAG_BOOL(log_camera_pass_records, false, "ITC",
               "Log which camera passes are recorded on logic and render-only passes");
 
-extern "C" REX_FUNC(sub_820A3978) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820A3978) {
+  
   if (ITC_FLAG(log_camera_pass_records) && frame_pacing::GameMessages_InRace()) {
     static std::map<std::tuple<uint32_t, uint32_t, uint32_t>, std::pair<int, int>> counts;
     static auto last = std::chrono::steady_clock::now();
@@ -765,7 +766,7 @@ extern "C" REX_FUNC(sub_820A3978) {
   // The work natively (src/cameras/cameras.cpp, --native_cameras) or
   // translated.
   if (!hooks::CameraPassUpdate(ctx, base)) {
-    __imp__sub_820A3978(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A3978);
   }
 }
 
@@ -799,8 +800,8 @@ uint64_t g_single_sprite_pass = ~0ull;
 std::map<std::pair<uint32_t, uint32_t>, int> g_single_sprite_occurrences;
 }  // namespace
 
-extern "C" REX_FUNC(sub_821281A8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(821281A8) {
+  
   uint32_t sprite = ctx.r3.u32, caller = uint32_t(ctx.lr);
   bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
   uint64_t pass = frame_pacing::GameMessages_PassNumber();

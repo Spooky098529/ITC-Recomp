@@ -132,7 +132,7 @@ void InlineVertices(Context& h, Runner& run) {
     // The minimap's triangle: 3 vertices; then edges and random counts.
     const uint32_t count = i == 0 ? 3 : EdgeOrRandom(r);
     c.scratch[(slot + 4) / 4] = count;
-    run.Run(results, c, h.data + slot, __imp__sub_8258E8E8, hooks::NativeSingleInlineVertices,
+    run.Run(results, c, h.data + slot, __imp__sub_8258E8E8, ITC_CONTEXT_FN(hooks::NativeSingleInlineVertices),
             fmt::format("case {}: count {:08X}", i, count));
   }
   results.Report();
@@ -152,7 +152,7 @@ void SetUpDrawer(Context& h, Runner& run) {
     } else {
       for (uint32_t k = 1; k < 4; k++) c.scratch[(slot + 4 * k) / 4] = EdgeOrRandom(r);
     }
-    run.Run(results, c, h.data + slot, __imp__sub_8258E958, hooks::NativeSingleSetUpDrawer,
+    run.Run(results, c, h.data + slot, __imp__sub_8258E958, ITC_CONTEXT_FN(hooks::NativeSingleSetUpDrawer),
             fmt::format("case {}: slot +{}, set-shaders {:08X}", i, slot,
                         c.scratch[(kDrawerVtable + 8) / 4]));
   }
@@ -191,7 +191,7 @@ void SetShaderConstants(Context& h, Runner& run) {
       at(slot + 16) = r.Below(4) == 0 ? EdgeOrRandom(r) : uint32_t(r.Next());
       at(slot + 20) = 1 + r.Below(36);
     }
-    run.Run(results, c, h.data + slot, __imp__sub_8258F0F0, hooks::NativeSingleSetShaderConstants,
+    run.Run(results, c, h.data + slot, __imp__sub_8258F0F0, ITC_CONTEXT_FN(hooks::NativeSingleSetShaderConstants),
             fmt::format("case {}: shader {}, type {}, first {}, count {}", i, shader, type,
                         first, count));
   }
@@ -227,7 +227,7 @@ void DrawerDraw(Context& h, Runner& run) {
       at(kState + 4) = 0;
       at(kState + 16) = 3;
     }
-    run.Run(results, c, h.data + kSlots, __imp__sub_8258F5C0, hooks::NativeSingleDrawerDraw,
+    run.Run(results, c, h.data + kSlots, __imp__sub_8258F5C0, ITC_CONTEXT_FN(hooks::NativeSingleDrawerDraw),
             fmt::format("case {}: count {:08X}, vertex shader {:08X}, draw {:08X}", i,
                         at(kState + 16), at(kState + 4), at(kDrawerVtable + 12)));
   }
@@ -248,7 +248,7 @@ void Callback(Context& h, Runner& run) {
     at(kCallbackObject + 0) = h.data + kCallbackVtable;
     at(kCallbackObject + 4) = h.data + kToggle;
     at(kCallbackVtable) = r.Below(2) == 0 ? kRecorder : kFlip;
-    run.Run(results, c, h.data + slot, __imp__sub_8258E9B8, hooks::NativeSingleCallback,
+    run.Run(results, c, h.data + slot, __imp__sub_8258E9B8, ITC_CONTEXT_FN(hooks::NativeSingleCallback),
             fmt::format("case {}: slot +{}, slot 0 {:08X}", i, slot, at(kCallbackVtable)));
   }
   results.Report();

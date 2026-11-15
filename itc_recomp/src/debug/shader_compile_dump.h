@@ -10,6 +10,7 @@
 #include <cstdint>
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 namespace debug {
 
@@ -19,5 +20,6 @@ bool ShaderCompileDump_Active();
 // Compiles through the recompiled sub_822B8F10 (ctx as the game called it;
 // r3 its result), then dumps and logs the shader.
 void ShaderCompileDump_Compile(PPCContext& ctx, uint8_t* base);
+void ShaderCompileDump_Compile(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace debug

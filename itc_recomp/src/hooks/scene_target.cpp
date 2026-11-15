@@ -5,12 +5,13 @@
 // RecordBoundTargets' plain C++ call them; nor RecordBoundTargets
 // (sub_8209B058): only Glow::Record's plain C++ (--native_post_effects)
 // calls it; nor TexturedRect::Record
-// (sub_8217C368, its work hooks::SceneTargetTexturedRect, which
+// (sub_8217C368, its work ITC_REGS_FN(hooks::SceneTargetTexturedRect), which
 // RecordPasses' adapter calls) and RecordFlat (sub_8217AA98). With the
 // command list's diagnostics on (they name who allocates slots by the
 // return address), the originals run.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -47,7 +48,7 @@ bool Native() {
 }  // namespace
 
 
-void hooks::SceneTargetTexturedRect(PPCContext& ctx, uint8_t* base) {
+void hooks::SceneTargetTexturedRect(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t rect = ctx.r3.u32;
   const uint64_t bucket = ctx.r5.u64;
   const uint64_t lr = ctx.lr;
@@ -76,7 +77,7 @@ void hooks::SceneTargetTexturedRect(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void hooks::SceneTargetRecordPasses(PPCContext& ctx, uint8_t* base) {
+void hooks::SceneTargetRecordPasses(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t scene = ctx.r3.u32, list = ctx.r4.u32;
   const uint32_t bucket5 = ctx.r5.u32, bucket6 = ctx.r6.u32, bucket7 = ctx.r7.u32;
   const uint64_t lr = ctx.lr;
@@ -118,7 +119,7 @@ void hooks::SceneTargetRecordPasses(PPCContext& ctx, uint8_t* base) {
       });
   ctx.lr = lr;
   if (!done) {
-    __imp__sub_8209B3D0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209B3D0);
   }
 }
 
@@ -126,9 +127,9 @@ void hooks::SceneTargetRecordPasses(PPCContext& ctx, uint8_t* base) {
 // r5, r6, r7 = the buckets; r3 as the last guest call leaves it (the scene
 // target when no pass is recorded). No adapter: only FramePasses::Record's
 // adapter calls this.
-void hooks::SceneTargetRecordPassesOrOriginal(PPCContext& ctx, uint8_t* base) {
+void hooks::SceneTargetRecordPassesOrOriginal(lifted::Regs& ctx, uint8_t* base) {
   if (!Native()) {
-    __imp__sub_8209B3D0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209B3D0);
     return;
   }
   hooks::SceneTargetRecordPasses(ctx, base);

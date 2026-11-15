@@ -65,3 +65,8 @@
     name(scope.regs, base);                                                              \
   }                                                                                      \
   void name([[maybe_unused]] lifted::Regs& ctx, [[maybe_unused]] uint8_t* base)
+
+// A step or an original named as a value (a table, a ternary, a
+// std::function): its form on our register view, or on the SDK's context
+// (a harness's).
+#define ITC_REGS_FN(name) static_cast<void (*)(lifted::Regs&, uint8_t*)>(&name)

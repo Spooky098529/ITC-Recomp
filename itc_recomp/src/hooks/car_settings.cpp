@@ -3,6 +3,7 @@
 // shares (hooks/car_settings.h).
 
 #include "hooks/car_settings.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "car_settings/car_settings.h"
@@ -32,7 +33,7 @@ namespace cs = car_settings;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -42,7 +43,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -63,44 +64,44 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
-void CarSettingsCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSettingsCreate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cs::Create(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 // A tail call: UiMovies::Open runs with the adapter's own sp and lr.
-void CarSettingsOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSettingsOpenMovie) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cs::OpenMovie(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
-void CarSettingsWaitForMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSettingsWaitForMovie) {
   ctx.r3.u64 = cs::WaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
 }
-void CarSettingsClose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSettingsClose) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cs::Close(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void CarSettingsDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSettingsDestroy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cs::Destroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the race menu's Init.
-void CarSettingsInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSettingsInit) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
   const uint32_t r3 = cs::Init(base, machine, ctx.r1.u32 - cs::kInitFrame, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
-void CarSettingsInitType5(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSettingsInitType5) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
@@ -111,12 +112,7 @@ void CarSettingsInitType5(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_CAR_SETTINGS(address, step)  \
-  extern "C" REX_FUNC(sub_##address) {   \
-    REX_FUNC_PROLOGUE();                 \
-    if (!ITC_FLAG(native_car_settings)) { \
-      __imp__sub_##address(ctx, base);   \
-      return;                            \
-    }                                    \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_settings)) { \
     hooks::step(ctx, base);              \
   }
 

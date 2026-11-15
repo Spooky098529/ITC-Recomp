@@ -20,6 +20,7 @@
 // whenever a setting track writes them.
 
 #include "debug/pause_movie_log.h"
+#include "hooks/native_entry.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "hooks/ui_movies.h"
@@ -334,7 +335,7 @@ void LogMovingTargets(uint8_t* base, uint32_t movie, const char* when) {
 int g_call_lines = 0;
 std::chrono::steady_clock::time_point g_call_lines_since{};
 
-void LogCall(const char* name, PPCContext& ctx) {
+void LogCall(const char* name, lifted::Regs& ctx) {
   if (ITC_FLAG(log_pause_movie) && frame_pacing::GameMessages_Paused()) {
     g_trace_until_pass = frame_pacing::GameMessages_PassNumber() + kTracePasses;
   }
@@ -450,7 +451,7 @@ void PauseMovieLog_Skipped(uint32_t movie, uint32_t property, uint32_t target) {
 // moved words it changes (to find what puts the arrow's track back after
 // the update applies it).
 template <typename Call>
-void WatchMovingTargets(const char* name, PPCContext& ctx, uint8_t* base, Call&& call) {
+void WatchMovingTargets(const char* name, lifted::Regs& ctx, uint8_t* base, Call&& call) {
   if (g_moving_targets.empty() || !PauseMovieLog_TracksWanted()) {
     call();
     return;
@@ -480,8 +481,8 @@ void WatchMovingTargets(const char* name, PPCContext& ctx, uint8_t* base, Call&&
 //
 // UiMovie::DrawTexts; its work (natively with --native_ui_movies_game) is in
 // src/hooks/ui_movies_game.cpp.
-extern "C" REX_FUNC(sub_8211CD90) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211CD90) {
+  
   if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
       ui_movies_hooks::g_update_callee_stand_in(0x8211CD90, ctx, base)) {
     return;
@@ -496,8 +497,8 @@ extern "C" REX_FUNC(sub_8211CD90) {
 
 // UiMovie::Draw, watched as the others; its work (natively with
 // --native_ui_movies) is in src/hooks/ui_movies.cpp.
-extern "C" REX_FUNC(sub_8259FA00) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8259FA00) {
+  
   if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
       ui_movies_hooks::g_update_callee_stand_in(0x8259FA00, ctx, base)) {
     return;
@@ -511,8 +512,8 @@ extern "C" REX_FUNC(sub_8259FA00) {
 
 // AnimationList::Insert and RemoveAt, watched as the others; their work
 // (natively with --native_ui_movies_game) is in src/hooks/ui_movies_game.cpp.
-extern "C" REX_FUNC(sub_8211B4D0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211B4D0) {
+  
   if (!ITC_FLAG(log_pause_movie)) {
     ui_movies_game_hooks::Insert(ctx, base);
     return;
@@ -521,8 +522,8 @@ extern "C" REX_FUNC(sub_8211B4D0) {
                             [&] { ui_movies_game_hooks::Insert(ctx, base); });
 }
 
-extern "C" REX_FUNC(sub_8211B080) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211B080) {
+  
   if (!ITC_FLAG(log_pause_movie)) {
     ui_movies_game_hooks::RemoveAt(ctx, base);
     return;
@@ -534,8 +535,8 @@ extern "C" REX_FUNC(sub_8211B080) {
 // UiMovie::RestorePose (sub_82119B80), natively with --native_ui_movies
 // (src/hooks/ui_movies.cpp); with --log_pause_movie the original runs,
 // watched as the others (its recursive calls come back here, each watched).
-extern "C" REX_FUNC(sub_82119B80) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82119B80) {
+  
   if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
       ui_movies_hooks::g_update_callee_stand_in(0x82119B80, ctx, base)) {
     return;
@@ -544,13 +545,13 @@ extern "C" REX_FUNC(sub_82119B80) {
     ui_movies_hooks::RestorePose(ctx, base);
     return;
   }
-  debug::WatchMovingTargets("82119B80", ctx, base, [&] { __imp__sub_82119B80(ctx, base); });
+  debug::WatchMovingTargets("82119B80", ctx, base, [&] { lifted::Sdk(ctx, base, __imp__sub_82119B80); });
 }
 
 // sub_8259DAC0, watched as the others; its work (natively with
 // --native_ui_movies) is in src/hooks/ui_movies.cpp.
-extern "C" REX_FUNC(sub_8259DAC0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8259DAC0) {
+  
   if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
       ui_movies_hooks::g_update_callee_stand_in(0x8259DAC0, ctx, base)) {
     return;
@@ -570,21 +571,21 @@ extern "C" REX_FUNC(sub_8259DAC0) {
 // sub_8220BA68 (r3 = the screen state [0x826D84D8]) switches sub-screens.
 // Its work (natively with --native_ui_movies_game and the C runtime's heap)
 // is in src/hooks/ui_movies_game.cpp; logged, the original runs.
-extern "C" REX_FUNC(sub_8211C7E8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211C7E8) {
+  
   if (!ITC_FLAG(log_pause_movie)) {
     ui_movies_game_hooks::SetNodeText(ctx, base);
     return;
   }
   debug::LogCall("8211C7E8 movie node", ctx);
-  __imp__sub_8211C7E8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211C7E8);
 }
 
 // sub_821BE5A8 (Options::ShowVolumeBar) natively under
 // --native_options_screen (src/options_screen/nodes.cpp), the log kept
 // around it.
-extern "C" REX_FUNC(sub_821BE5A8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(821BE5A8) {
+  
   if (ITC_FLAG(log_pause_movie)) {
     debug::LogCall("821BE5A8 flags by selection", ctx);
   }
@@ -592,20 +593,20 @@ extern "C" REX_FUNC(sub_821BE5A8) {
     hooks::OptionsShowVolumeBar(ctx, base);
     return;
   }
-  __imp__sub_821BE5A8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_821BE5A8);
 }
 
 // PauseMenu::ShowVolume: natively with --native_race_screens
 // (src/race_screens/transitions.cpp), inside the log's wrap.
-extern "C" REX_FUNC(sub_8220D040) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8220D040) {
+  
   if (ITC_FLAG(log_pause_movie)) {
     debug::LogCall("8220D040 node and flags by selection", ctx);
   }
   if (ITC_FLAG(native_race_screens)) {
     hooks::RaceScreensPauseMenuShowVolume(ctx, base);
   } else {
-    __imp__sub_8220D040(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8220D040);
   }
 }
 
@@ -616,72 +617,72 @@ extern "C" REX_FUNC(sub_8220D040) {
 // then updates the movie once (from 8220DF24). The work of sub_8211DAC8 and
 // sub_8211D978 (natively with --native_ui_movies_game) is in
 // src/hooks/ui_movies_game.cpp; logged, the originals run.
-extern "C" REX_FUNC(sub_8211DAC8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211DAC8) {
+  
   if (!ITC_FLAG(log_pause_movie)) {
     ui_movies_game_hooks::PlayNamed(ctx, base);
     return;
   }
   debug::LogCall("8211DAC8 start animation", ctx);
-  __imp__sub_8211DAC8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211DAC8);
 }
 
-extern "C" REX_FUNC(sub_8211D978) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211D978) {
+  
   if (!ITC_FLAG(log_pause_movie)) {
     ui_movies_game_hooks::Play(ctx, base);
     return;
   }
   debug::LogCall("8211D978 start item animation", ctx);
-  __imp__sub_8211D978(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211D978);
 }
 
 // Its work (natively with --native_ui_movies_game) is in
 // src/hooks/ui_movies_game.cpp; logged, the original runs.
-extern "C" REX_FUNC(sub_8211DE38) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211DE38) {
+  
   if (!ITC_FLAG(log_pause_movie)) {
     ui_movies_game_hooks::Finish(ctx, base);
     return;
   }
   debug::LogCall("8211DE38", ctx);
-  __imp__sub_8211DE38(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211DE38);
 }
 
 // Its work (natively with --native_ui_movies_game) is in
 // src/hooks/ui_movies_game.cpp; logged, the original runs.
-extern "C" REX_FUNC(sub_8211DDD8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211DDD8) {
+  
   if (!ITC_FLAG(log_pause_movie)) {
     ui_movies_game_hooks::Loop(ctx, base);
     return;
   }
   debug::LogCall("8211DDD8", ctx);
-  __imp__sub_8211DDD8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211DDD8);
 }
 
 // Its work (natively with --native_ui_movies_game) is in
 // src/hooks/ui_movies_game.cpp; logged, the original runs.
-extern "C" REX_FUNC(sub_8211DF20) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8211DF20) {
+  
   if (!ITC_FLAG(log_pause_movie)) {
     ui_movies_game_hooks::FinishNamed(ctx, base);
     return;
   }
   debug::LogCall("8211DF20", ctx);
-  __imp__sub_8211DF20(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8211DF20);
 }
 
 // ScreenPages::Go (natively with --native_race_screens: the adapter's step,
 // hooks/race_screens.h), logged first.
-extern "C" REX_FUNC(sub_8220BA68) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8220BA68) {
+  
   if (ITC_FLAG(log_pause_movie)) {
     debug::LogCall("8220BA68 screen switch", ctx);
   }
   if (ITC_FLAG(native_race_screens)) {
     hooks::RaceScreensPagesGo(ctx, base);
   } else {
-    __imp__sub_8220BA68(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8220BA68);
   }
 }

@@ -6,6 +6,7 @@
 // r3 but State's: the rest leave r3 as it came. See docs/native-movies.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/title_screen.h"
@@ -19,12 +20,7 @@ ITC_FLAG_BOOL(play_movies_with_ffmpeg, true, "ITC",
 namespace mv = movies::movie;
 
 #define ITC_MOVIE(address, ...)                 \
-  extern "C" REX_FUNC(sub_##address) {          \
-    REX_FUNC_PROLOGUE();                        \
-    if (!ITC_FLAG(play_movies_with_ffmpeg)) {   \
-      __imp__sub_##address(ctx, base);          \
-      return;                                   \
-    }                                           \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(play_movies_with_ffmpeg)) { \
     __VA_ARGS__;                                \
   }
 
@@ -40,12 +36,12 @@ ITC_MOVIE(820AE528, mv::Release(base, ctx.r3.u32))
 
 // Movie::RenderFrame, on the render thread from command 28. --skip_intro
 // waits for it to have returned once (hooks/title_screen.cpp).
-extern "C" REX_FUNC(sub_820AE958) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820AE958) {
+  
   if (ITC_FLAG(play_movies_with_ffmpeg)) {
     mv::RenderFrame(base, ctx.r3.u32);
   } else {
-    __imp__sub_820AE958(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AE958);
   }
   hooks::TitleScreen_MovieRendered();
 }

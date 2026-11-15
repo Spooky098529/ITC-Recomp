@@ -64,7 +64,7 @@ void DataFile(Context& h) {
       t.r3.u64 = container;
       t.r4.u64 = index;
       t.r5.u64 = r5;
-      (v == 0 ? __imp__sub_82294730 : NativeGetEntry)(t, h.base);
+      (v == 0 ? __imp__sub_82294730 : ITC_CONTEXT_FN(NativeGetEntry))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Bytes(Read(h.base, container, kBytes));
     }

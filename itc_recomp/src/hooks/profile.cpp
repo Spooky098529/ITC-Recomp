@@ -3,6 +3,7 @@
 // settings with an overlapped). See B5 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "user/profile.h"
 #include "user/user.h"
@@ -31,8 +32,8 @@ uint32_t Answer(uint8_t* base, uint32_t overlapped, uint32_t result) {
 // buffer, r9 an overlapped (or 0); the title (r3), the count (r5) and the ids
 // (r6) are always the network manager's. Returns ERROR_INSUFFICIENT_BUFFER
 // with the size for the first read, then ERROR_IO_PENDING with the settings.
-extern "C" REX_FUNC(sub_82576E78) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82576E78) {
+  
   const uint32_t user_index = ctx.r4.u32, size_address = ctx.r7.u32, buffer = ctx.r8.u32;
   const uint32_t overlapped = ctx.r9.u32;
   const uint32_t size = guest::LoadU32(base, size_address);

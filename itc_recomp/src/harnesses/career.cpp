@@ -241,15 +241,15 @@ void Accessors(Context& h, const World& w) {
     t.r4.u64 = SmallOrAny(r);
   };
   Group(h, w, "PlayTime::Mark (sub_82111628)", 8, none, save_r3, __imp__sub_82111628,
-        hooks::CareerPlayTimeMark);
+        ITC_CONTEXT_FN(hooks::CareerPlayTimeMark));
   Group(h, w, "DayBlock::WinStreak (sub_82110580)", 8, none, block_r3, __imp__sub_82110580,
-        hooks::CareerDayBlockWinStreak);
+        ITC_CONTEXT_FN(hooks::CareerDayBlockWinStreak));
   Group(h, w, "DayBlock::AddWord4832 (sub_82110590)", 16, none, block_r3, __imp__sub_82110590,
-        hooks::CareerDayBlockAddWord4832);
+        ITC_CONTEXT_FN(hooks::CareerDayBlockAddWord4832));
   Group(h, w, "DayBlock::Word4832 (sub_821105A0)", 8, none, block_r3, __imp__sub_821105A0,
-        hooks::CareerDayBlockWord4832);
+        ITC_CONTEXT_FN(hooks::CareerDayBlockWord4832));
   Group(h, w, "Stats::WinStreak (sub_82110B10)", 8, none, block_r3, __imp__sub_82110B10,
-        hooks::CareerStatsWinStreak);
+        ITC_CONTEXT_FN(hooks::CareerStatsWinStreak));
   Group(
       h, w, "Stats::AddPoints (sub_82110B18)", 32, none,
       [base](PPCContext& t, Random& r, const World& w) {
@@ -260,7 +260,7 @@ void Accessors(Context& h, const World& w) {
           guest::StoreU32(base, t.r3.u32 + 6024, 9999990 + r.Below(20));
         }
       },
-      __imp__sub_82110B18, hooks::CareerStatsAddPoints);
+      __imp__sub_82110B18, ITC_CONTEXT_FN(hooks::CareerStatsAddPoints));
   Group(
       h, w, "ItemFlags::Set (sub_82112860)", 32, none,
       [](PPCContext& t, Random& r, const World& w) {
@@ -268,7 +268,7 @@ void Accessors(Context& h, const World& w) {
         t.r4.u64 = r.Below(4) == 0 ? SmallOrAny(r) : 0;
         t.r5.u64 = r.Below(8) == 0 ? uint64_t(-int64_t(r.Below(40))) : r.Below(400);
       },
-      __imp__sub_82112860, hooks::CareerItemFlagsSet);
+      __imp__sub_82112860, ITC_CONTEXT_FN(hooks::CareerItemFlagsSet));
   Group(
       h, w, "Car::SpecWord744 (sub_821104B0)", 16, none,
       [base](PPCContext& t, Random& r, const World& w) {
@@ -276,7 +276,7 @@ void Accessors(Context& h, const World& w) {
         guest::StoreU32(base, t.r3.u32 + 12, r.Below(4));
         WriteRandom(base, w.specs.address + 0x40, 4 * 8432, r);
       },
-      __imp__sub_821104B0, hooks::CareerCarSpecWord744);
+      __imp__sub_821104B0, ITC_CONTEXT_FN(hooks::CareerCarSpecWord744));
   // The garage: its free list and head as a list of up to 8 nodes over 8
   // slots, the selected car below the count.
   Group(
@@ -298,7 +298,7 @@ void Accessors(Context& h, const World& w) {
         guest::StoreU32(base, save + cr::kSelectedCar, r.Below(count));
         t.r3.u64 = save;
       },
-      __imp__sub_82115CC0, hooks::CareerPickFromCar);
+      __imp__sub_82115CC0, ITC_CONTEXT_FN(hooks::CareerPickFromCar));
   Group(
       h, w, "RunningMean::Merge (sub_82111CB0)", 64, none,
       [base](PPCContext& t, Random& r, const World& w) {
@@ -312,14 +312,14 @@ void Accessors(Context& h, const World& w) {
         const uint32_t mean_bits = r.Below(8) == 0 ? uint32_t(r.Next()) : std::bit_cast<uint32_t>(mean);
         t.r4.u64 = (uint64_t(mean_bits) << 32) | counts[r.Below(8)];
       },
-      __imp__sub_82111CB0, hooks::CareerRunningMeanMerge, {.save_floats = {4800}});
+      __imp__sub_82111CB0, ITC_CONTEXT_FN(hooks::CareerRunningMeanMerge), {.save_floats = {4800}});
   Group(
       h, w, "Stage::Of (sub_821121F8)", 32, none,
       [base](PPCContext& t, Random& r, const World& w) {
         t.r3.u64 = w.save.address;
         guest::StoreU32(base, w.save.address + 6092, (1u << r.Below(8)) - 1);
       },
-      __imp__sub_821121F8, hooks::CareerStageOf);
+      __imp__sub_821121F8, ITC_CONTEXT_FN(hooks::CareerStageOf));
   Group(
       h, w, "Entry56::Allows (sub_82111BA8)", 128, none,
       [base](PPCContext& t, Random& r, const World& w) {
@@ -339,7 +339,7 @@ void Accessors(Context& h, const World& w) {
         t.r6.u64 = r.Below(8) == 0 ? r.Below(40) : r.Below(5);
         t.r7.u64 = r.Below(2);
       },
-      __imp__sub_82111BA8, hooks::CareerEntry56Allows);
+      __imp__sub_82111BA8, ITC_CONTEXT_FN(hooks::CareerEntry56Allows));
   Group(
       h, w, "Items::AnyWonKind3Stage1 (sub_82111780)", 32,
       [base](Random& r, const World& w) {
@@ -347,7 +347,7 @@ void Accessors(Context& h, const World& w) {
         ShapeRecords(base, w, r, 1 + r.Below(40));
       },
       [](PPCContext&, Random&, const World&) {}, __imp__sub_82111780,
-      hooks::CareerAnyWonKind3Stage1);
+      ITC_CONTEXT_FN(hooks::CareerAnyWonKind3Stage1));
 }
 
 
@@ -507,9 +507,9 @@ void Outcomes(Context& h, const World& w) {
   };
   const Spec frame{.frame_ranges = {{-int32_t(cr::kItemRecordsFrame) + 80, 12}}};
   Group(h, w, "ItemRecords::AddWin (sub_82114B88)", 48, none, records_args, __imp__sub_82114B88,
-        hooks::CareerItemRecordsAddWin, frame);
+        ITC_CONTEXT_FN(hooks::CareerItemRecordsAddWin), frame);
   Group(h, w, "ItemRecords::AddLoss (sub_82114B08)", 48, none, records_args,
-        __imp__sub_82114B08, hooks::CareerItemRecordsAddLoss, frame);
+        __imp__sub_82114B08, ITC_CONTEXT_FN(hooks::CareerItemRecordsAddLoss), frame);
   Group(h, w, "ItemRecords::AddOutcome3 (sub_82114A88)", 48, none, records_args,
         __imp__sub_82114A88, NativeItemRecordsAddOutcome3, frame);
 }
@@ -551,7 +551,7 @@ void LastResults(Context& h, const World& w) {
         guest::StoreU32(base, t.r3.u32, counts[r.Below(6)]);
         t.r4.u64 = w.race.address;
       },
-      __imp__sub_82111FC8, hooks::CareerResultsPush);
+      __imp__sub_82111FC8, ITC_CONTEXT_FN(hooks::CareerResultsPush));
   const uint32_t stats = cr::kStats;
   Group(
       h, w, "DayLog::Push (sub_82112028)", 32, none,
@@ -569,7 +569,7 @@ void LastResults(Context& h, const World& w) {
         t.r4.u64 = r.Below(4) == 0 ? 0 : r.Below(8);
         guest::StoreU32(base, t.r3.u32 + 5672, r.Below(12));
       },
-      __imp__sub_82112088, hooks::CareerStatsStartDay, {.save_floats = {stats + 5672 + 8}});
+      __imp__sub_82112088, ITC_CONTEXT_FN(hooks::CareerStatsStartDay), {.save_floats = {stats + 5672 + 8}});
 }
 
 // --- The garage's list ---
@@ -620,7 +620,7 @@ void Garage(Context& h, const World& w) {
         t.r4.u64 = data + 16;
         t.r5.u64 = r.Below(count + 1);
       },
-      __imp__sub_821154E0, hooks::CareerGarageInsertCar);
+      __imp__sub_821154E0, ITC_CONTEXT_FN(hooks::CareerGarageInsertCar));
   // Car::SetModelAndClass and Garage::Add: the four specs at random, their
   // byte +708 0 to 9 (above 7, the frame's word the original reads unwritten:
   // filled at random above and below r1 alike for both runs).
@@ -639,7 +639,7 @@ void Garage(Context& h, const World& w) {
         t.r4.u64 = r.Below(4);
         guest::StoreU32(base, t.r3.u32 + 1884, r.Below(3) == 0 ? 3 : r.Below(6));
       },
-      __imp__sub_821104D8, hooks::CareerCarSetModelAndClass,
+      __imp__sub_821104D8, ITC_CONTEXT_FN(hooks::CareerCarSetModelAndClass),
       {.frame_ranges = {{-int32_t(cr::kSetModelAndClassFrame) + 80, 4}}});
   Group(
       h, w, "Garage::Add (sub_82116CE0)", 48, specs,
@@ -657,7 +657,7 @@ void Garage(Context& h, const World& w) {
           }
         }
       },
-      __imp__sub_82116CE0, hooks::CareerGarageAdd,
+      __imp__sub_82116CE0, ITC_CONTEXT_FN(hooks::CareerGarageAdd),
       {.frame_ranges = {{-int32_t(cr::kGarageAddFrame + cr::kSetModelAndClassFrame) + 80, 4}}});
 }
 
@@ -715,7 +715,7 @@ void Unlocks(Context& h, const World& w) {
         }
         t.r5.u64 = mask;
       },
-      __imp__sub_82112950, hooks::CareerConditionTest,
+      __imp__sub_82112950, ITC_CONTEXT_FN(hooks::CareerConditionTest),
       {.frame_ranges = {{-int32_t(cr::kConditionTestFrame) + 80, 3008}}});
   Group(
       h, w, "Rewards::Grant (sub_82114C08, with sub_82114C7C)", 320,
@@ -736,7 +736,7 @@ void Unlocks(Context& h, const World& w) {
           }
         }
       },
-      __imp__sub_82114C08, hooks::CareerRewardsGrant);
+      __imp__sub_82114C08, ITC_CONTEXT_FN(hooks::CareerRewardsGrant));
 }
 
 // --- A race's result ---
@@ -821,7 +821,7 @@ void RaceResult(Context& h, const World& w) {
         t.r3.u64 = w.save.address;
         t.r4.u64 = w.race.address;
       },
-      __imp__sub_82115190, hooks::CareerAddRaceResult,
+      __imp__sub_82115190, ITC_CONTEXT_FN(hooks::CareerAddRaceResult),
       {.save_floats = {4936, 4940, 5928, 5936, 5944, 5952, 5960, 5968, 6024, 6028, 6032, 6036},
        .frame_ranges = {{frame + 24, 8},
                         {frame + 80, 16},
@@ -841,7 +841,7 @@ void RaceResult(Context& h, const World& w) {
           guest::StoreU32(base, save + 6100, uint32_t(2 - int32_t(r.Below(1000))));
         }
       },
-      __imp__sub_821159B0, hooks::CareerPickNext);
+      __imp__sub_821159B0, ITC_CONTEXT_FN(hooks::CareerPickNext));
 }
 
 // --- The progress after a race, the day ---
@@ -998,7 +998,7 @@ void Progress(Context& h, const World& w) {
         guest::StoreU16(base, save + 70, uint16_t(r.Below(15)));
         guest::StoreU32(base, save + cr::kStats + 5672, r.Below(12));
       },
-      __imp__sub_82116AF0, hooks::CareerNextDay,
+      __imp__sub_82116AF0, ITC_CONTEXT_FN(hooks::CareerNextDay),
       // Stats::CloseDay's running mean at its frame's +80 is left out: the
       // original's later callees (Career::PickNext, Stats::StartDay) save
       // their registers over it, which native code doesn't do.
@@ -1008,7 +1008,7 @@ void Progress(Context& h, const World& w) {
       h, w, "Progress::AfterRace (sub_82116588)", 160,
       [base](Random& r, const World& w) { ShapeAfterRace(base, w, r); },
       [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.save.address; },
-      __imp__sub_82116588, hooks::CareerAfterRace,
+      __imp__sub_82116588, ITC_CONTEXT_FN(hooks::CareerAfterRace),
       // Condition::Test's last item copy, without the words at r1 - 272 and
       // r1 - 256: the back chains the original's stage tests (112-byte
       // frames) and Stage::Of (96 bytes) store there below
@@ -1026,7 +1026,7 @@ void Progress(Context& h, const World& w) {
       h, w, "Progress::CheckUnlocks (sub_821162B0)", 160,
       [base](Random& r, const World& w) { ShapeAfterRace(base, w, r); },
       [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.save.address; },
-      __imp__sub_821162B0, hooks::CareerCheckUnlocks,
+      __imp__sub_821162B0, ITC_CONTEXT_FN(hooks::CareerCheckUnlocks),
       {.frame_ranges = {{copy, uint32_t(-240 - copy)}, {-240 + 4, 12}}});
 }
 

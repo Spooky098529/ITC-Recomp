@@ -222,7 +222,7 @@ void PrimitiveResetCases(Context& h, uint32_t block) {
           // then).
           ListWithRoom(h, block, r, 5, r.Below(8) == 0 ? 1 + r.Below(2) : 0);
         },
-        [&](PPCContext&) {}, __imp__sub_82589990, hooks::FramePassesRecordPrimitiveReset, fmt::format("case {}", c));
+        [&](PPCContext&) {}, __imp__sub_82589990, ITC_CONTEXT_FN(hooks::FramePassesRecordPrimitiveReset), fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -296,7 +296,7 @@ void JobWaitCases(Context& h, uint32_t block) {
           t.r3.u64 = block + kObject;
           t.r4.u64 = r4;
         },
-        __imp__sub_82094B10, hooks::FramePassesJobWait, fmt::format("case {}", c));
+        __imp__sub_82094B10, ITC_CONTEXT_FN(hooks::FramePassesJobWait), fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -339,7 +339,7 @@ void ConstructCases(Context& h, uint32_t block) {
           t.r4.u64 = block + 0x2E40;
           guest::StoreU32(h.base, t.r1.u32 - fp::kConstructFrame + 164, stack_word);
         },
-        __imp__sub_82098630, hooks::FramePassesConstruct, fmt::format("case {}", c),
+        __imp__sub_82098630, ITC_CONTEXT_FN(hooks::FramePassesConstruct), fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& out) {
           out.Bytes(Read(h.base, t.r1.u32 - fp::kConstructFrame + 80, 52));
         });
@@ -459,7 +459,7 @@ void RecordCases(Context& h) {
       Fill(h.base, t.r1.u32 - 4096, 4096, 0xA5);
       t.r3.u64 = block + rec::kPasses;
       ITC_FLAG(native_frame_passes) = v == 1;
-      (v == 0 ? __imp__sub_82096418 : hooks::FramePassesRecord)(t, h.base);
+      (v == 0 ? __imp__sub_82096418 : ITC_CONTEXT_FN(hooks::FramePassesRecord))(t, h.base);
       ITC_FLAG(native_frame_passes) = true;
       // Each slot an entry of its own first (a difference names the first
       // wrong slot: entry k is slot k from the chunk's first), then the
@@ -541,7 +541,7 @@ void BootCases(Context& h, uint32_t block) {
       Fill(h.base, t.r1.u32 - 2048, 2048, 0xA5);
       t.r3.u64 = passes;
       ITC_FLAG(native_frame_passes) = v == 1;
-      (v == 0 ? __imp__sub_820962B8 : hooks::FramePassesBoot)(t, h.base);
+      (v == 0 ? __imp__sub_820962B8 : ITC_CONTEXT_FN(hooks::FramePassesBoot))(t, h.base);
       ITC_FLAG(native_frame_passes) = true;
       out[v].Word(guest::LoadU32(h.base, t.r1.u32 - fp::kBootFrame + 80));
       const uint32_t device = guest::LoadU32(h.base, video_output + 140);

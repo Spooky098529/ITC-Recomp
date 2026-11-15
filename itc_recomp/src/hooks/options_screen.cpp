@@ -3,6 +3,7 @@
 // shares (hooks/options_screen.h).
 
 #include "hooks/options_screen.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/heap.h"
@@ -79,7 +80,7 @@ namespace {
 // The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -89,7 +90,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -110,443 +111,443 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
-void OptionsButtonIndex(PPCContext& ctx, uint8_t*) {
+void OptionsButtonIndex(lifted::Regs& ctx, uint8_t*) {
   ctx.r3.u64 = uint64_t(int64_t(int32_t(options_screen::ButtonIndex(ctx.r3.u32))));
 }
 
-void OptionsButtonCode(PPCContext& ctx, uint8_t*) {
+void OptionsButtonCode(lifted::Regs& ctx, uint8_t*) {
   ctx.r3.u64 = options_screen::ButtonCode(ctx.r3.u32);
 }
 
-void OptionsAnalogIndex(PPCContext& ctx, uint8_t*) {
+void OptionsAnalogIndex(lifted::Regs& ctx, uint8_t*) {
   ctx.r3.u64 = uint64_t(int64_t(int32_t(options_screen::AnalogIndex(ctx.r3.u32))));
 }
 
-void OptionsAnalogPicture(PPCContext& ctx, uint8_t*) {
+void OptionsAnalogPicture(lifted::Regs& ctx, uint8_t*) {
   ctx.r3.u64 = uint64_t(int64_t(int32_t(options_screen::AnalogPicture(ctx.r3.u32))));
 }
 
-void OptionsIsButtonTaken(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsIsButtonTaken) {
   ctx.r3.u64 = options_screen::IsButtonTaken(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void OptionsIsAnalogTaken(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsIsAnalogTaken) {
   ctx.r3.u64 = options_screen::IsAnalogTaken(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void OptionsStepButtons(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsStepButtons) {
   ctx.r3.u64 = options_screen::StepButtons(base);
 }
 
-void OptionsStepAnalog(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsStepAnalog) {
   ctx.r3.u64 = options_screen::StepAnalog(base);
 }
 
-void OptionsSettingsReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSettingsReset) {
   ctx.r3.u64 = options_screen::SettingsReset(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void OptionsSettingsRead(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSettingsRead) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SettingsRead(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsSettingsWrite(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSettingsWrite) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SettingsWrite(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsOnEnter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsOnEnter) {
   ctx.r3.u64 = options_screen::OnEnter(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void OptionsWaitForMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsWaitForMovie) {
   ctx.r3.u64 = options_screen::WaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void OptionsOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsOpenMovie) {
   const uint32_t lr = uint32_t(ctx.lr);
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::OpenMovie(ctx.r1.u32, lr, guest.calls());
 }
 
-void OptionsOnClosed(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsOnClosed) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::OnClosed(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsClose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsClose) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::Close(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsLeave) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::Leave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsClosePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsClosePage) {
   ctx.r3.u64 = options_screen::ClosePage(base, ctx.r3.u64);
 }
 
-void OptionsWait(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsWait) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::Wait(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsOpenCategories(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsOpenCategories) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::OpenCategories(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsReturnToCategories(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsReturnToCategories) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ReturnToCategories(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsEnterHud(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsEnterHud) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::EnterHud(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsChangeHudValue(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsChangeHudValue) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ChangeHudValue(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsEnterSound(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsEnterSound) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::EnterSound(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsEnterSliders(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsEnterSliders) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::EnterSliders(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsEnterButtons(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsEnterButtons) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::EnterButtons(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsSetCategoryArrow(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSetCategoryArrow) {
   ctx.r3.u64 = options_screen::SetCategoryArrow(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void OptionsShowVolumeNumber(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowVolumeNumber) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       options_screen::ShowVolumeNumber(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
-void OptionsShowMusicName(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowMusicName) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ShowMusicName(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 
-void OptionsShowSlider(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowSlider) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ShowSlider(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
-void OptionsShowSliderMark(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowSliderMark) {
   ctx.r3.u64 = options_screen::ShowSliderMark(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32);
 }
 
-void OptionsShowButtonPicture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowButtonPicture) {
   ctx.r3.u64 = options_screen::ShowButtonPicture(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void OptionsShowAnalogPicture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowAnalogPicture) {
   ctx.r3.u64 = options_screen::ShowAnalogPicture(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void OptionsResetNode(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsResetNode) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       options_screen::ResetNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsShowVolumeBar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowVolumeBar) {
   ctx.r3.u64 = options_screen::ShowVolumeBar(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32);
 }
 
-void OptionsShowVolumeNumbers(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowVolumeNumbers) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ShowVolumeNumbers(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsShowSliderNumbers(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowSliderNumbers) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ShowSliderNumbers(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsShowSliderMarks(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowSliderMarks) {
   ctx.r3.u64 = options_screen::ShowSliderMarks(base, ctx.r1.u32);
 }
 
-void OptionsShowHudValues(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowHudValues) {
   ctx.r3.u64 = options_screen::ShowHudValues(base, ctx.r1.u32);
 }
 
-void OptionsStepSound(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsStepSound) {
   ctx.r3.u64 = options_screen::StepSound(base);
 }
 
-void OptionsStepSliders(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsStepSliders) {
   ctx.r3.u64 = options_screen::StepSliders(base, ctx.r1.u32);
 }
 
-void OptionsShowButtonList(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowButtonList) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ShowButtonList(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsShowAnalogList(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowAnalogList) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ShowAnalogList(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsShowButtonClashes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowButtonClashes) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ShowButtonClashes(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsShowAnalogClashes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowAnalogClashes) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ShowAnalogClashes(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsEnterAnalog(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsEnterAnalog) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::EnterAnalog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsMoveSaveDialogCursor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsMoveSaveDialogCursor) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::MoveSaveDialogCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsMoveCategory6DialogCursor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsMoveCategory6DialogCursor) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::MoveCategory6DialogCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsChangeSaveDialog(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsChangeSaveDialog) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ChangeSaveDialog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsChangeCategory6Dialog(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsChangeCategory6Dialog) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ChangeCategory6Dialog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsDraw) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::Draw(base, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
-void OptionsUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::Update(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsSavePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSavePage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SavePage(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 
-void OptionsCategory6Page(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsCategory6Page) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       options_screen::Category6Page(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
-void OptionsStepHud(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsStepHud) {
   ctx.r3.u64 = options_screen::StepHud(base, ctx.r1.u32);
 }
 
-void OptionsShowVolumeBars(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowVolumeBars) {
   ctx.r3.u64 = options_screen::ShowVolumeBars(base, ctx.r1.u32);
 }
 
-void OptionsShowPrompts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShowPrompts) {
   const uint64_t values[6] = {ctx.r3.u64, ctx.r4.u64, ctx.r5.u64,
                               ctx.r6.u64, ctx.r7.u64, ctx.r8.u64};
   ctx.r3.u64 = options_screen::ShowPrompts(base, values, ctx.r1.u32);
 }
 
-void OptionsSettingsReload(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSettingsReload) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SettingsReload(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsOnLeft(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsOnLeft) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::OnLeft(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsCategoryPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsCategoryPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::CategoryPage(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsSetUpMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSetUpMovie) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SetUpMovie(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsShow(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsShow) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::Show(base, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsMoveCategoryCursor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsMoveCategoryCursor) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::MoveCategoryCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsMoveHudCursor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsMoveHudCursor) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::MoveHudCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsMoveSoundCursor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsMoveSoundCursor) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::MoveSoundCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsChangeSoundValue(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsChangeSoundValue) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ChangeSoundValue(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsMoveSlidersCursor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsMoveSlidersCursor) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::MoveSlidersCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsChangeSlidersValue(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsChangeSlidersValue) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ChangeSlidersValue(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsLeaveButtons(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsLeaveButtons) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::LeaveButtons(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsLeaveAnalog(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsLeaveAnalog) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::LeaveAnalog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsHudPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsHudPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::HudPage(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsSlidersPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSlidersPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SlidersPage(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsButtonsPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsButtonsPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::ButtonsPage(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsAnalogPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsAnalogPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::AnalogPage(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsSoundPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSoundPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SoundPage(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsLeaveSoundPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsLeaveSoundPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::LeaveSoundPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 
-void OptionsSetUpCategoryPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSetUpCategoryPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SetUpCategoryPage(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsSetUpHudPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSetUpHudPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SetUpHudPage(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsSetUpSoundPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSetUpSoundPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SetUpSoundPage(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsSetUpSlidersPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSetUpSlidersPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SetUpSlidersPage(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsSetUpButtonsPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSetUpButtonsPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SetUpButtonsPage(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsSetUpAnalogPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsSetUpAnalogPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SetUpAnalogPage(base, ctx.r1.u32, guest.calls());
 }
 
-void OptionsFadeIn(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsFadeIn) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::FadeIn(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsCloseHud(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsCloseHud) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::CloseHud(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsCloseSound(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsCloseSound) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::CloseSound(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsCloseSliders(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsCloseSliders) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::CloseSliders(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsCloseButtons(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsCloseButtons) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::CloseButtons(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsCloseAnalog(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(OptionsCloseAnalog) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::CloseAnalog(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void LoadPageClose(PPCContext&, uint8_t* base) { options_screen::LoadPageClose(base); }
+void LoadPageClose(lifted::Regs&, uint8_t* base) { options_screen::LoadPageClose(base); }
 
-void SavePageClose(PPCContext&, uint8_t* base) { options_screen::SavePageClose(base); }
+void SavePageClose(lifted::Regs&, uint8_t* base) { options_screen::SavePageClose(base); }
 
-void SavePagesCancel(PPCContext&, uint8_t* base) { options_screen::SavePagesCancel(base); }
+void SavePagesCancel(lifted::Regs&, uint8_t* base) { options_screen::SavePagesCancel(base); }
 
 #define ITC_LOAD_SAVE_PAGE(name)                                                \
-  void name(PPCContext& ctx, uint8_t* base) {                                   \
+  ITC_REGS_STEP(name) {                                   \
     GuestCalls guest(ctx, base);                                                \
     ctx.r3.u64 = options_screen::name(base, ctx.r1.u32, guest.calls());         \
   }
@@ -561,17 +562,17 @@ ITC_LOAD_SAVE_PAGE(SavePageNote)
 ITC_LOAD_SAVE_PAGE(SavePageWait)
 #undef ITC_LOAD_SAVE_PAGE
 
-void LoadPageLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPageLeave) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::LoadPageLeave(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void SavePageLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SavePageLeave) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = options_screen::SavePageLeave(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void OptionsInit(PPCContext& ctx, uint8_t* base, uint32_t address) {
+void OptionsInit(lifted::Regs& ctx, uint8_t* base, uint32_t address) {
   const uint64_t object_r3 = ctx.r3.u64;
   const options_screen::InitResult result =
       options_screen::RunInit(base, address, ctx.r3.u32, ctx.r1.u32);
@@ -600,12 +601,7 @@ void OptionsInit(PPCContext& ctx, uint8_t* base, uint32_t address) {
 // register steps stay for the harness.
 
 #define ITC_OPTIONS_SCREEN(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {      \
-    REX_FUNC_PROLOGUE();                    \
-    if (!ITC_FLAG(native_options_screen)) { \
-      __imp__sub_##address(ctx, base);      \
-      return;                               \
-    }                                       \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_options_screen)) { \
     hooks::step(ctx, base);                 \
   }
 
@@ -665,12 +661,7 @@ ITC_OPTIONS_SCREEN(821C7B08, OptionsCloseButtons)
 ITC_OPTIONS_SCREEN(821C7D18, OptionsCloseAnalog)
 // The type 2 and 4 modes' Inits.
 #define ITC_OPTIONS_INIT(address)            \
-  extern "C" REX_FUNC(sub_##address) {      \
-    REX_FUNC_PROLOGUE();                    \
-    if (!ITC_FLAG(native_options_screen)) { \
-      __imp__sub_##address(ctx, base);      \
-      return;                               \
-    }                                       \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_options_screen)) { \
     hooks::OptionsInit(ctx, base, 0x##address); \
   }
 ITC_OPTIONS_INIT(821C9E00)
@@ -684,10 +675,10 @@ ITC_OPTIONS_INIT(821C8A60)
 
 // An adapter whose step allocates: the original where the native heap isn't
 // active.
-extern "C" REX_FUNC(sub_821BB9A8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(821BB9A8) {
+  
   if (!ITC_FLAG(native_options_screen) || !hooks::NativeHeapActive()) {
-    __imp__sub_821BB9A8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821BB9A8);
     return;
   }
   hooks::OptionsOnEnter(ctx, base);
@@ -695,10 +686,10 @@ extern "C" REX_FUNC(sub_821BB9A8) {
 
 // Options::OnLeft frees the blocks OnEnter took from the allocation layer:
 // the original where the native heap isn't active.
-extern "C" REX_FUNC(sub_821B9E70) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(821B9E70) {
+  
   if (!ITC_FLAG(native_options_screen) || !hooks::NativeHeapActive()) {
-    __imp__sub_821B9E70(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821B9E70);
     return;
   }
   hooks::OptionsOnLeft(ctx, base);
@@ -709,12 +700,7 @@ extern "C" REX_FUNC(sub_821B9E70) {
 // C++) for LoadPage::SetDialog and SavePage::SetDialog; the flag switches
 // only their callers.
 #define ITC_OPTIONS_LOAD_SAVE(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {         \
-    REX_FUNC_PROLOGUE();                       \
-    if (!ITC_FLAG(native_options_load_save)) { \
-      __imp__sub_##address(ctx, base);         \
-      return;                                  \
-    }                                          \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_options_load_save)) { \
     hooks::step(ctx, base);                    \
   }
 

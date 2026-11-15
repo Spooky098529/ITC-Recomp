@@ -135,7 +135,7 @@ void Inits(Context& h) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = machine.address;
-      (v == 0 ? Original<__imp__sub_8215D808> : hooks::RaceSceneMachineInit)(t, h.base);
+      (v == 0 ? Original<__imp__sub_8215D808> : ITC_CONTEXT_FN(hooks::RaceSceneMachineInit))(t, h.base);
       const uint32_t block = guest::LoadU32(h.base, rs::kScene);
       out[v].Word(block != 0 && block == probe ? 1 : 0);
       out[v].Bytes(Read(h.base, machine.address, machine.bytes));
@@ -204,7 +204,7 @@ void Lights(Context& h) {
         WriteRandom(h.base, set.address, kSetBytes, r);
         PPCContext t = CallContext(h);
         t.r3.u64 = set.address;
-        (v == 0 ? Original<__imp__sub_8215CF78> : hooks::RaceSceneLightsSetUp)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8215CF78> : ITC_CONTEXT_FN(hooks::RaceSceneLightsSetUp))(t, h.base);
         out[v].Bytes(Read(h.base, set.address, 16));
         for (uint32_t i = 0; i < 11; i++) {
           entry_out(out[v], set.address + 16 + 96 * i);
@@ -307,7 +307,7 @@ void EffectParams(Context& h) {
           PPCContext t = CallContext(h);
           t.r3.s64 = kind;
           t.r4.u64 = index;
-          (v == 0 ? Original<__imp__sub_8228F5C0> : hooks::RaceSceneSetEffectParams)(t, h.base);
+          (v == 0 ? Original<__imp__sub_8228F5C0> : ITC_CONTEXT_FN(hooks::RaceSceneSetEffectParams))(t, h.base);
           effects_out(out[v]);
           out[v].Word(t.r3.u32);
           out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -377,9 +377,9 @@ void Toggles(Context& h) {
   };
   const Function functions[] = {
       {"RaceSceneMachine::TogglePause (sub_8215C750)", Original<__imp__sub_8215C750>,
-       hooks::RaceSceneTogglePause},
+       ITC_CONTEXT_FN(hooks::RaceSceneTogglePause)},
       {"RaceSceneMachine::Resume (sub_8215D0D8)", Original<__imp__sub_8215D0D8>,
-       hooks::RaceSceneResume},
+       ITC_CONTEXT_FN(hooks::RaceSceneResume)},
   };
   for (const Function& f : functions) {
     Results results(f.name);
@@ -445,7 +445,7 @@ void Destroys(Context& h) {
       guest::StoreU32(h.base, rs::kScene, block);
       PPCContext t = CallContext(h);
       t.r3.u64 = 0x1234;
-      (v == 0 ? Original<__imp__sub_8215D790> : hooks::RaceSceneDestroy)(t, h.base);
+      (v == 0 ? Original<__imp__sub_8215D790> : ITC_CONTEXT_FN(hooks::RaceSceneDestroy))(t, h.base);
       const bool freed = block != 0 && !memory::IsHeapBlock(block);
       out[v].Word(block != 0 ? 1 : 0);
       out[v].Word(freed ? 1 : 0);

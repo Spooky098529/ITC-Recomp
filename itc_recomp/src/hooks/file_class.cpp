@@ -8,6 +8,7 @@
 // See B4 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "guest_call.h"
 
 #include "game_data/game_data.h"
@@ -37,7 +38,7 @@ std::string GuestString(uint8_t* base, uint32_t address, uint32_t max = 260) {
 
 // The read error report (sub_8209AC78), as the recompiled class calls it
 // (from its own frame).
-void ReportError(PPCContext& ctx, uint8_t* base, uint32_t return_address) {
+void ReportError(lifted::Regs& ctx, uint8_t* base, uint32_t return_address) {
   InFrame(ctx, base, 112, return_address, [&](uint32_t) { lifted::CallFromContext(ctx, base, 0x8209AC78); });
 }
 
@@ -46,15 +47,15 @@ void ReportError(PPCContext& ctx, uint8_t* base, uint32_t return_address) {
 // File::OpenRead: r3 = file, r4 = path. Fails (the error report, 0) when the
 // file is already open or isn't found; else +4 = the handle, +12 = the size
 // (the low word, as GetFileSize gave), 1.
-extern "C" REX_FUNC(sub_8258C688) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258C688) {
+  
   const uint32_t file = ctx.r3.u32;
   const std::string path = GuestString(base, ctx.r4.u32);
   auto relative = game_data::RelativePath(path);
   if (!relative) {
     ITC_LOG_WARN("file class: \"{}\" isn't game data: opened by the recompiled File::OpenRead",
                  path);
-    __imp__sub_8258C688(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8258C688);
     return;
   }
   if (guest::LoadU32(base, file + 4) != kClosed) {
@@ -78,12 +79,12 @@ extern "C" REX_FUNC(sub_8258C688) {
 // File::Read: r3 = file, r4 = buffer, r5 = the size (a pointer). Reads at the
 // handle's position, adds the bytes read to +8 and returns them; the error
 // report and 0 when the read fails.
-extern "C" REX_FUNC(sub_8258C820) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258C820) {
+  
   const uint32_t file = ctx.r3.u32, buffer = ctx.r4.u32;
   const uint32_t handle = guest::LoadU32(base, file + 4);
   if (!game_data::IsHandle(handle)) {
-    __imp__sub_8258C820(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8258C820);
     return;
   }
   const uint32_t size = guest::LoadU32(base, ctx.r5.u32);
@@ -110,12 +111,12 @@ extern "C" REX_FUNC(sub_8258C820) {
 // pointer: 0 the start, 1 the current position, 2 the end). Moves the handle's
 // position; the game's own (+8) is set for 0 and moved by the offset for 1
 // and 2, as the recompiled one does. The error report and 0 when it fails.
-extern "C" REX_FUNC(sub_8258C768) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258C768) {
+  
   const uint32_t file = ctx.r3.u32;
   const uint32_t handle = guest::LoadU32(base, file + 4);
   if (!game_data::IsHandle(handle)) {
-    __imp__sub_8258C768(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8258C768);
     return;
   }
   const int32_t offset = int32_t(guest::LoadU32(base, ctx.r4.u32));
@@ -134,12 +135,12 @@ extern "C" REX_FUNC(sub_8258C768) {
 }
 
 // File::Close: r3 = file. Closes the handle (+4 = -1) and clears +8 and +12.
-extern "C" REX_FUNC(sub_8258C718) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258C718) {
+  
   const uint32_t file = ctx.r3.u32;
   const uint32_t handle = guest::LoadU32(base, file + 4);
   if (!game_data::IsHandle(handle)) {
-    __imp__sub_8258C718(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8258C718);
     return;
   }
   game_data::Close(handle);

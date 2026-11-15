@@ -5,14 +5,15 @@
 // docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "display/display.h"
 #include "display/gamma.h"
 
 // The 256-entry ramp: r3 = out, r4 = in (three channels of 256 16-bit
 // values each; may be the same), r5 = inverse.
-extern "C" REX_FUNC(sub_822B0910) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822B0910) {
+  
   const uint32_t out = ctx.r3.u32, in = ctx.r4.u32;
   display::GammaRamp ramp;
   for (int c = 0; c < 3; c++) {
@@ -31,8 +32,8 @@ extern "C" REX_FUNC(sub_822B0910) {
 
 // The 128-entry piecewise-linear ramp: r3 = out, r4 = in (three channels
 // of 128 (base, delta) pairs), r5 = inverse.
-extern "C" REX_FUNC(sub_822B0AB0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822B0AB0) {
+  
   const uint32_t out = ctx.r3.u32, in = ctx.r4.u32;
   display::GammaRampPwl ramp;
   for (int c = 0; c < 3; c++) {

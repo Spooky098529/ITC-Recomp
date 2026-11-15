@@ -5,6 +5,7 @@
 // do.
 
 #include "hooks/predicated_tiling.h"
+#include "hooks/native_entry.h"
 
 #include "guest.h"
 
@@ -28,7 +29,7 @@ ITC_FLAG_BOOL(native_predicated_tiling, true, "ITC",
 namespace pt = graphics::predicated_tiling;
 namespace cb = graphics::command_buffer;
 
-pt::GuestCalls hooks::PredicatedTilingCalls(PPCContext& ctx, uint8_t* base) {
+pt::GuestCalls hooks::PredicatedTilingCalls(lifted::Regs& ctx, uint8_t* base) {
   pt::GuestCalls calls;
   calls.end_segment = [&ctx, base](uint32_t device) {
     guest_call::InFrame(ctx, base, 128, 0x822B6AEC, [&](uint32_t) {
@@ -41,8 +42,8 @@ pt::GuestCalls hooks::PredicatedTilingCalls(PPCContext& ctx, uint8_t* base) {
 }
 
 #define ITC_PREDICATED_TILING(address, ...)                                          \
-  extern "C" REX_FUNC(sub_##address) {                                             \
-    REX_FUNC_PROLOGUE();                                                           \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                             \
+    \
     if (!ITC_FLAG(native_predicated_tiling) || cb::Recording(base, ctx.r3.u32)) {  \
       __imp__sub_##address(ctx, base);                                             \
       return;                                                                      \
@@ -59,9 +60,9 @@ ITC_PREDICATED_TILING(822B6AD8, {
   ctx.r3.u64 = pt::BeginTiledSegments(base, device, hooks::PredicatedTilingCalls(ctx, base));
 })
 
-void hooks::EndTiledSegments(PPCContext& ctx, uint8_t* base) {
+void hooks::EndTiledSegments(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_predicated_tiling) || cb::Recording(base, ctx.r3.u32)) {
-    __imp__sub_822B6BF8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822B6BF8);
     return;
   }
   const uint32_t device = ctx.r3.u32, tiles = ctx.r4.u32, cpus = ctx.r5.u32;
@@ -71,7 +72,7 @@ void hooks::EndTiledSegments(PPCContext& ctx, uint8_t* base) {
 // Device::CreateWorkers: the threads made and their priority set through the
 // kernel's imports, as the original (the user's call for XAudio's threads,
 // 2026-10-29), from a frame like the original's (176 bytes).
-pt::WorkerCalls hooks::PredicatedTilingWorkerCalls(PPCContext& ctx, uint8_t* base) {
+pt::WorkerCalls hooks::PredicatedTilingWorkerCalls(lifted::Regs& ctx, uint8_t* base) {
   pt::WorkerCalls calls;
   calls.end_segment = PredicatedTilingCalls(ctx, base).end_segment;
   calls.create_thread = [&ctx, base](uint32_t handle, uint32_t stack, uint32_t id,
@@ -85,19 +86,19 @@ pt::WorkerCalls hooks::PredicatedTilingWorkerCalls(PPCContext& ctx, uint8_t* bas
     ctx.r8.u64 = parameter;
     ctx.r9.u64 = flags;
     ctx.lr = 0x822B6ED4;
-    __imp__ExCreateThread(ctx, base);
+    lifted::Sdk(ctx, base, __imp__ExCreateThread);
     return ctx.r3.u32;
   };
   calls.set_priority = [&ctx, base](uint32_t thread, uint32_t priority) {
     ctx.r3.u64 = thread;
     ctx.r4.u64 = priority;
     ctx.lr = 0x822B6EE8;
-    __imp__KeSetBasePriorityThread(ctx, base);
+    lifted::Sdk(ctx, base, __imp__KeSetBasePriorityThread);
   };
   return calls;
 }
 
-void hooks::NativeCreateWorkers(PPCContext& ctx, uint8_t* base) {
+void hooks::NativeCreateWorkers(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t device = ctx.r3.u32;
   uint32_t r3 = 0;
   guest_call::InFrame(ctx, base, 176, 0x822B6ED4, [&](uint32_t) {
@@ -114,7 +115,7 @@ void hooks::NativeCreateWorkers(PPCContext& ctx, uint8_t* base) {
 // Device::WorkerThread: the kernel's waits and the event's reset through
 // their imports, as the original; the job and the present as guest calls;
 // from a frame like the original's (160 bytes; the timeout at its +80).
-pt::WorkerLoopCalls hooks::PredicatedTilingWorkerLoopCalls(PPCContext& ctx, uint8_t* base) {
+pt::WorkerLoopCalls hooks::PredicatedTilingWorkerLoopCalls(lifted::Regs& ctx, uint8_t* base) {
   pt::WorkerLoopCalls calls;
   calls.wait = [&ctx, base](uint32_t object, uint32_t reason, uint32_t mode, uint32_t alertable,
                             uint32_t timeout) {
@@ -124,13 +125,13 @@ pt::WorkerLoopCalls hooks::PredicatedTilingWorkerLoopCalls(PPCContext& ctx, uint
     ctx.r6.u64 = alertable;
     ctx.r7.u64 = timeout;
     ctx.lr = 0x822B6A44;
-    __imp__KeWaitForSingleObject(ctx, base);
+    lifted::Sdk(ctx, base, __imp__KeWaitForSingleObject);
     return ctx.r3.u32;
   };
   calls.reset_event = [&ctx, base](uint32_t event) {
     ctx.r3.u64 = event;
     ctx.lr = 0x822B6A54;
-    __imp__KeResetEvent(ctx, base);
+    lifted::Sdk(ctx, base, __imp__KeResetEvent);
     return ctx.r3.u32;
   };
   calls.job = [&ctx, base](uint32_t block) {
@@ -151,7 +152,7 @@ pt::WorkerLoopCalls hooks::PredicatedTilingWorkerLoopCalls(PPCContext& ctx, uint
   return calls;
 }
 
-void hooks::NativeWorkerThread(PPCContext& ctx, uint8_t* base) {
+void hooks::NativeWorkerThread(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t block = ctx.r3.u32;
   uint32_t r3 = 0;
   guest_call::InFrame(ctx, base, 160, 0x822B6A44, [&](uint32_t frame) {
@@ -161,11 +162,6 @@ void hooks::NativeWorkerThread(PPCContext& ctx, uint8_t* base) {
 }
 
 // The thread's entry point (ExCreateThread's, CreateWorkers').
-extern "C" REX_FUNC(sub_822B69A8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_predicated_tiling)) {
-    __imp__sub_822B69A8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(822B69A8, ITC_FLAG(native_predicated_tiling)) {
   hooks::NativeWorkerThread(ctx, base);
 }

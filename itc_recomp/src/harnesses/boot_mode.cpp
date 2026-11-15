@@ -186,7 +186,7 @@ void ScreenMachines(Context& h, Random& random) {
       WriteRandom(h.base, machine.address, machine.bytes, r);
       PPCContext t = CallContext(h);
       t.r3.u64 = machine.address;
-      (v == 0 ? Original<__imp__sub_82107358> : hooks::ScreenMachineConstruct)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82107358> : ITC_CONTEXT_FN(hooks::ScreenMachineConstruct))(t, h.base);
       out[v].Bytes(Read(h.base, machine.address, machine.bytes));
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -248,7 +248,7 @@ void Inits(Context& h, Random& random) {
         RandomMachine(h.base, machine, c, r);
         PPCContext t = CallContext(h);
         t.r3.u64 = machine;
-        (v == 0 ? Original<__imp__sub_82107DD0> : hooks::BootMachineInit)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82107DD0> : ITC_CONTEXT_FN(hooks::BootMachineInit))(t, h.base);
         out[v].Bytes(Read(h.base, mode.address, mode.bytes));
         out[v].Bytes(Stack(h, frame + 4, r1 - 40));  // __savegprlr_28: -40 to -8
         out[v].Word(t.r3.u32);
@@ -274,7 +274,7 @@ void Inits(Context& h, Random& random) {
         Put(h.base, mode.address + bm::kDispatcher + bm::kHandlerCount, r.Below(40));
         PPCContext t = CallContext(h);
         t.r3.u64 = mode.address;
-        (v == 0 ? Original<__imp__sub_82107F68> : hooks::BootModeInit)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82107F68> : ITC_CONTEXT_FN(hooks::BootModeInit))(t, h.base);
         out[v].Bytes(Read(h.base, mode.address, mode.bytes));
         out[v].Bytes(Stack(h, machine_frame + 4, frame - 40));
         out[v].Bytes(Stack(h, frame + 4, r1 - 24));  // r30, r31 at -24, lr at -8
@@ -315,7 +315,7 @@ void Handlers(Context& h, Random& random) {
         PPCContext t = CallContext(h);
         t.r3.u64 = machine.address;
         t.r4.u64 = dispatcher;
-        (v == 0 ? Original<__imp__sub_82107B90> : hooks::BootStartMovie)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82107B90> : ITC_CONTEXT_FN(hooks::BootStartMovie))(t, h.base);
         WorldOut(h, world.address, globals, out[v]);
         out[v].Bytes(Stack(h, r1 - bm::kStartMovieFrame + 4, r1 - 16));
         out[v].Word(t.r3.u32);
@@ -338,7 +338,7 @@ void Handlers(Context& h, Random& random) {
         PPCContext t = CallContext(h);
         t.r3.u64 = machine.address;
         t.r4.u64 = dispatcher;
-        (v == 0 ? Original<__imp__sub_82107BF8> : hooks::BootEndMovie)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82107BF8> : ITC_CONTEXT_FN(hooks::BootEndMovie))(t, h.base);
         WorldOut(h, world.address, globals, out[v]);
         out[v].Bytes(Stack(h, r1 - bm::kEndMovieFrame + 4, r1 - 8));
         out[v].Word(t.r3.u32);
@@ -458,7 +458,7 @@ void NextModes(Context& h, Random& random) {
         PPCContext t = CallContext(h);
         t.r3.u64 = answer;
         t.r4.u64 = mode.address;
-        (v == 0 ? Original<__imp__sub_82108018> : hooks::BootModeNextMode)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82108018> : ITC_CONTEXT_FN(hooks::BootModeNextMode))(t, h.base);
         WorldOut(h, world.address, globals, out[v]);
         mode_out(out[v]);
         out[v].Bytes(Stack(h, frame + 4, r1 - 56));  // __savegprlr_26: -56 to -8
@@ -482,7 +482,7 @@ void NextModes(Context& h, Random& random) {
         PPCContext t = CallContext(h);
         t.r3.u64 = answer;
         t.r4.u64 = mode.address;
-        (v == 0 ? Original<__imp__sub_82235C08> : hooks::ModeNextModeThunk)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82235C08> : ITC_CONTEXT_FN(hooks::ModeNextModeThunk))(t, h.base);
         WorldOut(h, world.address, globals, out[v]);
         mode_out(out[v]);
         out[v].Bytes(Stack(h, frame + 4, r1 - 56));
@@ -507,7 +507,7 @@ void NextModes(Context& h, Random& random) {
         PPCContext t = CallContext(h);
         t.r3.u64 = answer;
         t.r4.u64 = world.address + kDelegate;
-        (v == 0 ? Original<__imp__sub_8223D440> : hooks::ModeDelegateInvoke)(t, h.base);
+        (v == 0 ? Original<__imp__sub_8223D440> : ITC_CONTEXT_FN(hooks::ModeDelegateInvoke))(t, h.base);
         WorldOut(h, world.address, globals, out[v]);
         mode_out(out[v]);
         out[v].Bytes(Stack(h, next_frame + 4, frame - 56));
@@ -540,7 +540,7 @@ void Destructors(Context& h, Random& random) {
         WriteRandom(h.base, block.address, block.bytes, r);
         PPCContext t = CallContext(h);
         t.r3.u64 = block.address;
-        (v == 0 ? Original<__imp__sub_82106D08> : hooks::BootModeDestruct)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82106D08> : ITC_CONTEXT_FN(hooks::BootModeDestruct))(t, h.base);
         out[v].Bytes(Read(h.base, block.address, block.bytes));
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -557,9 +557,9 @@ void Destructors(Context& h, Random& random) {
   };
   const Kind kinds[] = {
       {"BootMode::DeletingDestructor (sub_82106D68)", Original<__imp__sub_82106D68>,
-       hooks::BootModeDeletingDestructor, bm::kMode3Bytes},
+       ITC_CONTEXT_FN(hooks::BootModeDeletingDestructor), bm::kMode3Bytes},
       {"Mode::DeletingDestructor (sub_82106E38)", Original<__imp__sub_82106E38>,
-       hooks::ModeDeletingDestructor, game_modes::kModeBytes},
+       ITC_CONTEXT_FN(hooks::ModeDeletingDestructor), game_modes::kModeBytes},
   };
   for (const Kind& kind : kinds) {
     Results results(kind.name);

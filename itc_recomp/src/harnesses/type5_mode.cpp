@@ -523,20 +523,20 @@ void Dialog(Context& h, const World& w) {
   };
   const Case steps[] = {
       {"Type5Dialog::OpenConfirmStep (sub_822261E0)", __imp__sub_822261E0,
-       hooks::Type5DialogOpenConfirmStep, 128, 32, Started},
+       ITC_CONTEXT_FN(hooks::Type5DialogOpenConfirmStep), 128, 32, Started},
       {"Type5Dialog::CloseConfirmStep (sub_822262B8)", __imp__sub_822262B8,
-       hooks::Type5DialogCloseConfirmStep, 112, 24, Started},
+       ITC_CONTEXT_FN(hooks::Type5DialogCloseConfirmStep), 112, 24, Started},
       {"Type5Dialog::CloseNoticeStep (sub_82226370)", __imp__sub_82226370,
-       hooks::Type5DialogCloseNoticeStep, 112, 24, Started},
+       ITC_CONTEXT_FN(hooks::Type5DialogCloseNoticeStep), 112, 24, Started},
       {"Type5Dialog::OpenConfirm2Step (sub_82226420)", __imp__sub_82226420,
-       hooks::Type5DialogOpenConfirm2Step, 112, 24, Started},
+       ITC_CONTEXT_FN(hooks::Type5DialogOpenConfirm2Step), 112, 24, Started},
       {"Type5Dialog::CloseConfirm2Step (sub_822264B8)", __imp__sub_822264B8,
-       hooks::Type5DialogCloseConfirm2Step, 112, 24, Started},
+       ITC_CONTEXT_FN(hooks::Type5DialogCloseConfirm2Step), 112, 24, Started},
       {"Type5Dialog::CloseNotice2Step (sub_82226568)", __imp__sub_82226568,
-       hooks::Type5DialogCloseNotice2Step, 112, 24, Started},
+       ITC_CONTEXT_FN(hooks::Type5DialogCloseNotice2Step), 112, 24, Started},
       {"Type5Dialog::MoveCursorStep (sub_82226618)", __imp__sub_82226618,
-       hooks::Type5DialogMoveCursorStep, 128, 40, Started},
-      {"Type5Dialog::Step9 (sub_822266D0)", __imp__sub_822266D0, hooks::Type5DialogStep9, 96,
+       ITC_CONTEXT_FN(hooks::Type5DialogMoveCursorStep), 128, 40, Started},
+      {"Type5Dialog::Step9 (sub_822266D0)", __imp__sub_822266D0, ITC_CONTEXT_FN(hooks::Type5DialogStep9), 96,
        8, Started},
   };
   for (const Case& c : steps) {
@@ -544,39 +544,39 @@ void Dialog(Context& h, const World& w) {
   }
   const Case others[] = {
       {"Type5Dialog::ConfirmPage (sub_82225D10)", __imp__sub_82225D10,
-       hooks::Type5DialogConfirmPage, 144, 64, DispatcherR3},
+       ITC_CONTEXT_FN(hooks::Type5DialogConfirmPage), 144, 64, DispatcherR3},
       {"Type5Dialog::NoticePage (sub_82225F30)", __imp__sub_82225F30,
-       hooks::Type5DialogNoticePage, 144, 64, DispatcherR3},
+       ITC_CONTEXT_FN(hooks::Type5DialogNoticePage), 144, 64, DispatcherR3},
       {"Type5Dialog::Notice2Page (sub_82226088)", __imp__sub_82226088,
-       hooks::Type5DialogNotice2Page, 144, 64, DispatcherR3},
+       ITC_CONTEXT_FN(hooks::Type5DialogNotice2Page), 144, 64, DispatcherR3},
       {"Type5Dialog::WaitForMovies (sub_82226978)", __imp__sub_82226978,
-       hooks::Type5DialogWaitForMovies, 96, 16, Machine},
+       ITC_CONTEXT_FN(hooks::Type5DialogWaitForMovies), 96, 16, Machine},
       {"Type5Dialog::OnInterrupt (sub_82225860)", __imp__sub_82225860,
-       hooks::Type5DialogOnInterrupt, 0, 0, Machine},
+       ITC_CONTEXT_FN(hooks::Type5DialogOnInterrupt), 0, 0, Machine},
       {"Type5Dialog::OpenConfirm (sub_82225A90)", __imp__sub_82225A90,
-       hooks::Type5DialogOpenConfirm, 112, 24, Machine},
+       ITC_CONTEXT_FN(hooks::Type5DialogOpenConfirm), 112, 24, Machine},
       {"Type5Dialog::OpenNotice (sub_82225980)", __imp__sub_82225980,
-       hooks::Type5DialogOpenNotice, 0, 0, Machine},
+       ITC_CONTEXT_FN(hooks::Type5DialogOpenNotice), 0, 0, Machine},
       {"Type5Dialog::OpenConfirm2 (sub_82225B88)", __imp__sub_82225B88,
-       hooks::Type5DialogOpenConfirm2, 112, 16, Machine},
+       ITC_CONTEXT_FN(hooks::Type5DialogOpenConfirm2), 112, 16, Machine},
       {"Type5Dialog::OpenNotice2 (sub_82225A08)", __imp__sub_82225A08,
-       hooks::Type5DialogOpenNotice2, 0, 0, Machine},
+       ITC_CONTEXT_FN(hooks::Type5DialogOpenNotice2), 0, 0, Machine},
   };
   for (const Case& c : others) {
     Run(h, w, {c.name, 128, c.recompiled, c.native, DialogStack(c.frame, c.saves), c.setup});
   }
   Run(h, w, {"Type5Dialog::Draw (sub_822266F8)", 128, __imp__sub_822266F8,
-             hooks::Type5DialogDraw, DialogStack(112, 8), Machine, nullptr, true});
+             ITC_CONTEXT_FN(hooks::Type5DialogDraw), DialogStack(112, 8), Machine, nullptr, true});
   // Update: below its frame, the steps' saves of Update's registers (up to
   // MoveCursorStep's 40 bytes) left out.
   Run(h, w, {"Type5Dialog::Update (sub_82226788)", 128, __imp__sub_82226788,
-             hooks::Type5DialogUpdate, DialogStack(208, 64, 40), Machine, nullptr, true});
+             ITC_CONTEXT_FN(hooks::Type5DialogUpdate), DialogStack(208, 64, 40), Machine, nullptr, true});
   Run(h, w, {"Type5Dialog::OnEnter (sub_82225878)", 128, __imp__sub_82225878,
-             hooks::Type5DialogOnEnter, DialogStack(112, 32), Machine, EnterBlocks});
+             ITC_CONTEXT_FN(hooks::Type5DialogOnEnter), DialogStack(112, 32), Machine, EnterBlocks});
   // OnLeft: the globals pointing at blocks of the layer's pages the case
   // made (none now and then), whether each was freed compared.
   Run(h, w, {"Type5Dialog::OnLeft (sub_822257A8)", 128, __imp__sub_822257A8,
-             hooks::Type5DialogOnLeft, DialogStack(112, 32),
+             ITC_CONTEXT_FN(hooks::Type5DialogOnLeft), DialogStack(112, 32),
              [](PPCContext& t, Random& r, const World& w) {
                for (const uint32_t global : {t5::kPages, t5::kMenu, t5::kData}) {
                  uint32_t made = 0;
@@ -593,7 +593,7 @@ void Dialog(Context& h, const World& w) {
   // small numbers (states below 12, messages below 52), so some match the
   // Init's (Add replaces those).
   Run(h, w, {"Type5Dialog::Init (sub_82226A10)", 128, __imp__sub_82226A10,
-             hooks::Type5DialogInit, DialogStack(1104, 48),
+             ITC_CONTEXT_FN(hooks::Type5DialogInit), DialogStack(1104, 48),
              [](PPCContext& t, Random& r, const World& w) {
                namespace gm = game_modes;
                uint8_t* base = w.base;
@@ -659,33 +659,33 @@ void NormalizePointers(uint8_t* base, uint32_t at, uint32_t bytes, uint32_t lo, 
 
 void Mode(Context& h, const World& w) {
   Run(h, w, {"ModeType5::FindShown (sub_8222FD08)", 60, __imp__sub_8222FD08,
-             hooks::ModeType5FindShown, {{-int32_t(kBelow), 0}},
+             ITC_CONTEXT_FN(hooks::ModeType5FindShown), {{-int32_t(kBelow), 0}},
              [](PPCContext& t, Random& r, const World& w) {
                t.r3.u64 = w.type_block() | High(r);
              }});
   Run(h, w, {"ModeType5::WaitForLoads (sub_82230050)", 100, __imp__sub_82230050,
-             hooks::ModeType5WaitForLoads, {{-128, -32}}, Delegate, nullptr, false, true});
+             ITC_CONTEXT_FN(hooks::ModeType5WaitForLoads), {{-128, -32}}, ITC_CONTEXT_FN(Delegate), nullptr, false, true});
   Run(h, w, {"ModeType5::NextMode (sub_82230458)", 300, __imp__sub_82230458,
-             hooks::ModeType5NextMode, {{-160, -64}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType5NextMode), {{-160, -64}}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType5::LeaveScreen (sub_82230260)", 60, __imp__sub_82230260,
-             hooks::ModeType5LeaveScreen, {{-128, -32}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType5LeaveScreen), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType5::WaitForShown (sub_82230168)", 100, __imp__sub_82230168,
-             hooks::ModeType5WaitForShown, {{-112, -16}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType5WaitForShown), {{-112, -16}}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType5::Leaving (sub_82230328)", 100, __imp__sub_82230328,
-             hooks::ModeType5Leaving, {{-128, -32}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType5Leaving), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
   // The slot 14 thunk: the mode's vtable this mode's (its slot 14 Leaving).
-  Run(h, w, {"Mode::Slot14Thunk (sub_8222FC50)", 60, __imp__sub_8222FC50, hooks::ModeSlot14Thunk,
+  Run(h, w, {"Mode::Slot14Thunk (sub_8222FC50)", 60, __imp__sub_8222FC50, ITC_CONTEXT_FN(hooks::ModeSlot14Thunk),
              {{-128, -32}},
              [](PPCContext& t, Random& r, const World& w) {
                Delegate(t, r, w);
                guest::StoreU32(w.base, w.mode(), 0x82006C24);
              }});
   Run(h, w, {"ModeType5::Interrupt (sub_8222FED0)", 150, __imp__sub_8222FED0,
-             hooks::ModeType5Interrupt, {{-int32_t(kBelow), 0}}, Interface});
+             ITC_CONTEXT_FN(hooks::ModeType5Interrupt), {{-int32_t(kBelow), 0}}, Interface});
   Run(h, w, {"ModeType5::ForceExit (sub_8222FF60)", 60, __imp__sub_8222FF60,
-             hooks::ModeType5ForceExit, {{-int32_t(kBelow), 0}}, Interface});
+             ITC_CONTEXT_FN(hooks::ModeType5ForceExit), {{-int32_t(kBelow), 0}}, Interface});
   Run(h, w, {"ModeType5::Resume (sub_8222FC38)", 20, __imp__sub_8222FC38,
-             hooks::ModeType5Resume, {{-int32_t(kBelow), 0}}, Interface});
+             ITC_CONTEXT_FN(hooks::ModeType5Resume), {{-int32_t(kBelow), 0}}, Interface});
 }
 
 // ModeType5::Init: the mode random words (its dispatcher's count 0 to 7),

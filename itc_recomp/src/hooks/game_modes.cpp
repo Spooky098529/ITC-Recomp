@@ -5,7 +5,7 @@
 // (sub_82106040), from StateMachine::IndexOf; StateMachine::IndexOf
 // (sub_821060A0), from StateMachine::Add and Find; StateMachine::Find
 // (sub_821061F0), from StateMachine::Handle (its register step,
-// hooks::GameModesFind, kept for the harness); Buffer28::~Buffer28
+// ITC_REGS_FN(hooks::GameModesFind), kept for the harness); Buffer28::~Buffer28
 // (sub_82152D28), from sub_82106A00; Mode::Mode (sub_82106C20), from the
 // modes' constructors; sub_82106A00, from
 // RaceModeMember::~RaceModeMember; RaceModeMember::RaceModeMember
@@ -17,6 +17,7 @@
 // (sub_82155118), from RaceModeMember::RaceModeMember.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "game_modes/game_modes.h"
@@ -62,12 +63,7 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
 #define ITC_GAME_MODES(address, ...)     \
-  extern "C" REX_FUNC(sub_##address) {   \
-    REX_FUNC_PROLOGUE();                 \
-    if (!ITC_FLAG(native_game_modes)) {  \
-      __imp__sub_##address(ctx, base);   \
-      return;                            \
-    }                                    \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_game_modes)) { \
     __VA_ARGS__;                         \
   }
 
@@ -96,7 +92,7 @@ namespace {
 
 // The functor part's r3 as the original leaves it: a transition's is the
 // machine's register plus the offset, the default's address sign-extended.
-void SetPartR3(PPCContext& ctx, uint64_t machine_r3, uint32_t machine, uint32_t part,
+void SetPartR3(lifted::Regs& ctx, uint64_t machine_r3, uint32_t machine, uint32_t part,
                bool found) {
   if (found) {
     ctx.r3.u64 = machine_r3 + (part - machine);
@@ -107,7 +103,7 @@ void SetPartR3(PPCContext& ctx, uint64_t machine_r3, uint32_t machine, uint32_t 
 
 }  // namespace
 
-void hooks::GameModesAdd(PPCContext& ctx, uint8_t* base) {
+void hooks::GameModesAdd(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
@@ -115,7 +111,7 @@ void hooks::GameModesAdd(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
-void hooks::GameModesRaceOverlaysMachineInit(PPCContext& ctx, uint8_t* base) {
+void hooks::GameModesRaceOverlaysMachineInit(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
@@ -124,7 +120,7 @@ void hooks::GameModesRaceOverlaysMachineInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
-void hooks::GameModesFind(PPCContext& ctx, uint8_t* base) {
+void hooks::GameModesFind(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool found = false;
@@ -132,7 +128,7 @@ void hooks::GameModesFind(PPCContext& ctx, uint8_t* base) {
   SetPartR3(ctx, machine_r3, machine, part, found);
 }
 
-void hooks::GameModesHandle(PPCContext& ctx, uint8_t* base) {
+void hooks::GameModesHandle(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool found = false;
@@ -149,8 +145,8 @@ ITC_GAME_MODES(8215E6C8, hooks::GameModesRaceOverlaysMachineInit(ctx, base))
 // only when the blocks are its pages (else the originals, whose VirtualFree
 // takes its other paths).
 #define ITC_GAME_MODES_FREE(address, freeable, function)                    \
-  extern "C" REX_FUNC(sub_##address) {                                     \
-    REX_FUNC_PROLOGUE();                                                   \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                     \
+    \
     if (!ITC_FLAG(native_game_modes) || !hooks::NativeHeapActive() ||      \
         !freeable(base, ctx.r3.u32)) {                                     \
       __imp__sub_##address(ctx, base);                                     \
@@ -164,7 +160,7 @@ ITC_GAME_MODES_FREE(82152D38, Buffer28Freeable, Buffer28Reset)
 
 // sub_8215DE10's work with its virtual calls (each overlay's slot 3) made
 // from a frame like the original's (112 bytes, returning to 0x8215DE4C).
-void hooks::GameModesResetOverlays(PPCContext& ctx, uint8_t* base) {
+void hooks::GameModesResetOverlays(lifted::Regs& ctx, uint8_t* base) {
   OverlaysReset(base, ctx.r3.u32, [&](uint32_t overlay, uint32_t target) {
     guest_call::InFrame(ctx, base, 112, 0x8215DE4C, [&](uint32_t) {
       ctx.r3.u64 = overlay;
@@ -184,27 +180,27 @@ ITC_GAME_MODES(821067F8, ModesConstruct(base, ctx.r3.u32, ctx.r4.u32))
 // it. Over the allocation layer and the memory blocks' host lock only (XPR::~XPR
 // puts its blocks on the pending frees under that lock), and only when the
 // plain C++'s checks pass (else the original, from the start).
-extern "C" REX_FUNC(sub_82106AF0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82106AF0) {
+  
   if (ITC_FLAG(native_game_modes) && hooks::NativeHeapActive() && hooks::ModelsHostLock()) {
     if (const auto r3 = RaceModeMemberDestruct(base, ctx.r3.u32)) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  __imp__sub_82106AF0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82106AF0);
 }
 
 // Mode::Create: r3 = the holder (unused), r4 = the type; r3 = the mode or 0.
 // Over the allocation layer only (operator new's plain C++), and the
 // original from the start where the plain C++ says so.
-extern "C" REX_FUNC(sub_821077A8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(821077A8) {
+  
   if (ITC_FLAG(native_game_modes) && hooks::NativeHeapActive()) {
     if (const auto r3 = ModeCreate(base, ctx.r4.u32)) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  __imp__sub_821077A8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_821077A8);
 }

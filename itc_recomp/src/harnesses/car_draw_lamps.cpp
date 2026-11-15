@@ -205,15 +205,15 @@ void LampsDraws(Context& h, Random& shared, uint32_t block, uint32_t race) {
   const uint32_t scene = race + 0x10000;
   const Target targets[] = {
       {"PartsPoints::DrawTailLights (sub_820DF8B0)", __imp__sub_820DF8B0,
-       NativeTailLights, car_draw::kPartsTailLightsFrame, false, 512, false},
+       ITC_CONTEXT_FN(NativeTailLights), car_draw::kPartsTailLightsFrame, false, 512, false},
       {"PartsPoints::DrawHeadlights (sub_820E1690)", __imp__sub_820E1690,
-       NativeHeadlights, car_draw::kPartsHeadlightsFrame, true, 512, false},
+       ITC_CONTEXT_FN(NativeHeadlights), car_draw::kPartsHeadlightsFrame, true, 512, false},
       // The traffic's groups (12 and 7 records) in the same world: no
       // pop-up matrix.
       {"TrafficPoints::DrawTailLights (sub_820E5B08)", __imp__sub_820E5B08,
-       NativeTrafficTailLights, car_draw::kTrafficTailLightsFrame, false, 384, true},
+       ITC_CONTEXT_FN(NativeTrafficTailLights), car_draw::kTrafficTailLightsFrame, false, 384, true},
       {"TrafficPoints::DrawHeadlights (sub_820E61D8)", __imp__sub_820E61D8,
-       NativeTrafficHeadlights, car_draw::kTrafficHeadlightsFrame, false, 384, true},
+       ITC_CONTEXT_FN(NativeTrafficHeadlights), car_draw::kTrafficHeadlightsFrame, false, 384, true},
   };
   for (const Target& target : targets) {
     Random& r = target.traffic ? traffic : shared;

@@ -556,30 +556,30 @@ void Helpers(Context& h, const World& w) {
           t.r3.u64 = SmallOrAny(r);
           t.r4.u64 = SmallOrAny(r);
         },
-        __imp__sub_8228F0A0, hooks::LocationScreenSceneryConfig);
+        __imp__sub_8228F0A0, ITC_CONTEXT_FN(hooks::LocationScreenSceneryConfig));
   Group(h, w, "LocationScreen::KindText (sub_82227690)", 200, none,
         [](PPCContext& t, Random& r, const World&) {
           t.r3.u64 = r.Below(4) == 0 ? SmallOrAny(r) : r.Below(9);
           t.r4.u64 = SmallOrAny(r);
         },
-        __imp__sub_82227690, hooks::LocationScreenKindText);
+        __imp__sub_82227690, ITC_CONTEXT_FN(hooks::LocationScreenKindText));
   const SetupFn pictures = [base](Random& r, const World& w) { ShapePictures(base, w, r); };
   const ArgsFn id = [](PPCContext& t, Random& r, const World&) {
     t.r3.u64 = r.Below(8) == 0 ? r.Next() : r.Below(40);
   };
   Group(h, w, "LocationScreen::IsPictureQueued (sub_822291E8)", 300, pictures, id,
-        __imp__sub_822291E8, hooks::LocationScreenIsPictureQueued);
+        __imp__sub_822291E8, ITC_CONTEXT_FN(hooks::LocationScreenIsPictureQueued));
   Group(h, w, "LocationScreen::PictureA (sub_82229108)", 300, pictures, id, __imp__sub_82229108,
-        hooks::LocationScreenPictureA);
+        ITC_CONTEXT_FN(hooks::LocationScreenPictureA));
   Group(h, w, "LocationScreen::PictureB (sub_82229158)", 300, pictures, id, __imp__sub_82229158,
-        hooks::LocationScreenPictureB);
+        ITC_CONTEXT_FN(hooks::LocationScreenPictureB));
   Group(h, w, "LocationScreen::OnMessage14 (sub_82227158)", 200,
         [base](Random& r, const World& w) {
           guest::StoreU32(base, w.screen.address + kMenuAt,
                           r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(6));
         },
         [](PPCContext&, Random&, const World&) {}, __imp__sub_82227158,
-        hooks::LocationScreenOnMessage14);
+        ITC_CONTEXT_FN(hooks::LocationScreenOnMessage14));
 }
 
 void Lists(Context& h, const World& w) {
@@ -592,7 +592,7 @@ void Lists(Context& h, const World& w) {
                           r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(8));
         },
         [](PPCContext&, Random&, const World&) {}, __imp__sub_822281D8,
-        hooks::LocationScreenHasMoreUnlocks);
+        ITC_CONTEXT_FN(hooks::LocationScreenHasMoreUnlocks));
   Group(h, w, "LocationScreen::NextUnlockEntry (sub_82227618)", 300,
         [base](Random& r, const World& w) {
           guest::StoreU32(base, w.screen.address + 876, r.Below(kTables56));
@@ -606,7 +606,7 @@ void Lists(Context& h, const World& w) {
           }
         },
         [](PPCContext&, Random&, const World&) {}, __imp__sub_82227618,
-        hooks::LocationScreenNextUnlockEntry);
+        ITC_CONTEXT_FN(hooks::LocationScreenNextUnlockEntry));
   // The item's halfword +88 (4, 5 or another).
   const Spec item_frame{{{-int32_t(ls::kItemFrame) + 80, 3024}}};
   Group(h, w, "LocationScreen::OpponentHasCard (sub_82227708)", 300,
@@ -620,7 +620,7 @@ void Lists(Context& h, const World& w) {
           }
         },
         [](PPCContext&, Random&, const World&) {}, __imp__sub_82227708,
-        hooks::LocationScreenOpponentHasCard, item_frame);
+        ITC_CONTEXT_FN(hooks::LocationScreenOpponentHasCard), item_frame);
   // Racer 0's item (+980), the human racer's (the last record's) +980 and
   // +3924, the item's +88 (3 or not), the item records' halfword +2, the
   // 20-byte entries' keys (the case's +872 an offset from the found one).
@@ -642,7 +642,7 @@ void Lists(Context& h, const World& w) {
           guest::StoreU32(base, w.records() + kRecordCount, 1 + r.Below(4));
         },
         [](PPCContext&, Random&, const World&) {}, __imp__sub_822271F8,
-        hooks::LocationScreenNextResultText, {{{-int32_t(ls::kItemFrame) + 80, 3008}}});
+        ITC_CONTEXT_FN(hooks::LocationScreenNextResultText), {{{-int32_t(ls::kItemFrame) + 80, 3008}}});
 }
 
 void Movies(Context& h, const World& w) {
@@ -655,22 +655,22 @@ void Movies(Context& h, const World& w) {
   const Spec frame96{{{-96 + 80, 8}}};
   const Spec frame128{{{-128 + 80, 8}}};
   Group(h, w, "LocationScreen::ShowPictures (sub_8222A060)", 300, none, no_args,
-        __imp__sub_8222A060, hooks::LocationScreenShowPictures, frame112);
+        __imp__sub_8222A060, ITC_CONTEXT_FN(hooks::LocationScreenShowPictures), frame112);
   Group(h, w, "LocationScreen::HidePictures (sub_8222A150)", 300, none, no_args,
-        __imp__sub_8222A150, hooks::LocationScreenHidePictures, frame112);
+        __imp__sub_8222A150, ITC_CONTEXT_FN(hooks::LocationScreenHidePictures), frame112);
   Group(h, w, "LocationScreen::SetCarColor (sub_8222AC18)", 300,
         [base](Random& r, const World& w) {
           guest::StoreU32(base, w.screen.address + 892,
                           r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(3));
         },
-        no_args, __imp__sub_8222AC18, hooks::LocationScreenSetCarColor, frame96);
+        no_args, __imp__sub_8222AC18, ITC_CONTEXT_FN(hooks::LocationScreenSetCarColor), frame96);
   const ArgsFn value = [](PPCContext& t, Random& r, const World&) {
     t.r3.u64 = r.Below(3) == 0 ? r.Next() : r.Below(200);
   };
   Group(h, w, "LocationScreen::SetCursor (sub_8222BFE8)", 300, none, value, __imp__sub_8222BFE8,
-        hooks::LocationScreenSetCursor, frame112);
+        ITC_CONTEXT_FN(hooks::LocationScreenSetCursor), frame112);
   Group(h, w, "LocationScreen::ListNode (sub_8222C058)", 300, none, value, __imp__sub_8222C058,
-        hooks::LocationScreenListNode, frame112);
+        ITC_CONTEXT_FN(hooks::LocationScreenListNode), frame112);
   Group(h, w, "LocationScreen::ShowArrows (sub_8222C0C8)", 300,
         [base](Random& r, const World& w) {
           const uint32_t count = r.Below(5);
@@ -678,9 +678,9 @@ void Movies(Context& h, const World& w) {
           guest::StoreU32(base, w.screen.address + 800,
                           r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(count + 1));
         },
-        no_args, __imp__sub_8222C0C8, hooks::LocationScreenShowArrows, frame112);
+        no_args, __imp__sub_8222C0C8, ITC_CONTEXT_FN(hooks::LocationScreenShowArrows), frame112);
   Group(h, w, "LocationScreen::RunCardMovie (sub_822291A8)", 200, none, no_args,
-        __imp__sub_822291A8, hooks::LocationScreenRunCardMovie, frame96);
+        __imp__sub_822291A8, ITC_CONTEXT_FN(hooks::LocationScreenRunCardMovie), frame96);
   // The step word in the screen block; the fades' words 0 or not.
   const SetupFn fades = [base](Random& r, const World& w) {
     guest::StoreU32(base, w.screen.address + 0x700, r.Below(2) == 0 ? 0 : r.Below(3));
@@ -692,9 +692,9 @@ void Movies(Context& h, const World& w) {
     t.r3.u64 = w.screen.address + 0x700;
   };
   Group(h, w, "LocationScreen::Transition1 (sub_8222AD50)", 300, fades, step,
-        __imp__sub_8222AD50, hooks::LocationScreenTransition1, frame112);
+        __imp__sub_8222AD50, ITC_CONTEXT_FN(hooks::LocationScreenTransition1), frame112);
   Group(h, w, "LocationScreen::Transition18 (sub_8222BE60)", 300, fades, step,
-        __imp__sub_8222BE60, hooks::LocationScreenTransition18, frame128);
+        __imp__sub_8222BE60, ITC_CONTEXT_FN(hooks::LocationScreenTransition18), frame128);
 }
 
 // The screen's state: Reenter on a machine (the movies block's start: its
@@ -715,14 +715,14 @@ void State(Context& h, const World& w) {
           guest::StoreU32(base, w.movies.address + 9608, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
         },
         [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.movies.address; },
-        __imp__sub_822895E0, hooks::LocationScreenReenter);
+        __imp__sub_822895E0, ITC_CONTEXT_FN(hooks::LocationScreenReenter));
   Group(h, w, "LocationScreen::Reset (sub_822279A8, with sub_82227818)", 100,
         [](Random&, const World&) {},
         [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.screen.address; },
-        __imp__sub_822279A8, hooks::LocationScreenReset);
+        __imp__sub_822279A8, ITC_CONTEXT_FN(hooks::LocationScreenReset));
   Group(h, w, "LocationScreen::ResetView (sub_82227818)", 100, [](Random&, const World&) {},
         [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.screen.address + 560; },
-        __imp__sub_82227818, hooks::LocationScreenResetView);
+        __imp__sub_82227818, ITC_CONTEXT_FN(hooks::LocationScreenResetView));
   const SetupFn queued = [base, small_or_none](Random& r, const World& w) {
     const uint32_t screen = w.screen.address;
     guest::StoreU32(base, screen + 880, r.Below(3) == 0 ? 0 : small_or_none(r));
@@ -734,7 +734,7 @@ void State(Context& h, const World& w) {
     guest::StoreU32(base, pages + 12, small_or_none(r));
   };
   Group(h, w, "LocationScreen::ApplyQueuedPage (sub_8222C9B0)", 300, queued, no_args,
-        __imp__sub_8222C9B0, hooks::LocationScreenApplyQueuedPage, {{{-96 - 112 + 80, 8}}});
+        __imp__sub_8222C9B0, ITC_CONTEXT_FN(hooks::LocationScreenApplyQueuedPage), {{{-96 - 112 + 80, 8}}});
   Group(h, w, "LocationScreen::UpdatePage (sub_8222EC08)", 300,
         [base, queued](Random& r, const World& w) {
           queued(r, w);
@@ -754,7 +754,7 @@ void State(Context& h, const World& w) {
           t.r3.u64 = r.Next();
           t.r4.u64 = w.movies.address + kDispatcherAt;
         },
-        __imp__sub_8222EC08, hooks::LocationScreenUpdatePage, {{{-240 + 80, 64}}});
+        __imp__sub_8222EC08, ITC_CONTEXT_FN(hooks::LocationScreenUpdatePage), {{{-240 + 80, 64}}});
 }
 
 // InitStates on a machine at the movies block's start: emptied
@@ -776,7 +776,7 @@ void InitStates(Context& h, const World& w) {
           }
         },
         [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.movies.address; },
-        __imp__sub_8222F258, hooks::LocationScreenInitStates,
+        __imp__sub_8222F258, ITC_CONTEXT_FN(hooks::LocationScreenInitStates),
         {{{-int32_t(ls::kInitStatesFrame) + 80, 1232}}});
 }
 
@@ -796,9 +796,9 @@ void RacePages(Context& h, const World& w) {
     t.r4.u64 = w.movies.address;
   };
   Group(h, w, "LocationScreen::Page9 (sub_822280D8)", 100, opponent, machine,
-        __imp__sub_822280D8, hooks::LocationScreenPage9, {{{-112 + 80, 8}}});
+        __imp__sub_822280D8, ITC_CONTEXT_FN(hooks::LocationScreenPage9), {{{-112 + 80, 8}}});
   Group(h, w, "LocationScreen::Page11 (sub_82228138)", 200, opponent, machine,
-        __imp__sub_82228138, hooks::LocationScreenPage11, {{{-3136 + 80, 3024}}});
+        __imp__sub_82228138, ITC_CONTEXT_FN(hooks::LocationScreenPage11), {{{-3136 + 80, 3024}}});
 }
 
 // NextOpponentText: the picked opponent's item (+0 its id, 0 to 9; +88 3
@@ -836,7 +836,7 @@ void Opponents(Context& h, const World& w) {
           guest::StoreU32(base, w.screen.address + 872, r.Below(4));
         },
         [](PPCContext&, Random&, const World&) {}, __imp__sub_82227430,
-        hooks::LocationScreenNextOpponentText,
+        ITC_CONTEXT_FN(hooks::LocationScreenNextOpponentText),
         {{{-int32_t(ls::kNextOpponentTextFrame) + 80, 6016}}});
 }
 
@@ -871,7 +871,7 @@ void Pictures(Context& h, const World& w) {
           t.r4.u64 = id;
           t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
         },
-        __imp__sub_8222C270, hooks::LocationScreenLoadPicture, load_spec);
+        __imp__sub_8222C270, ITC_CONTEXT_FN(hooks::LocationScreenLoadPicture), load_spec);
   g_loads = nullptr;
 
   // Picture::Free: the picture at the screen block's +0x700 (+8 a record,
@@ -913,7 +913,7 @@ void Pictures(Context& h, const World& w) {
                  }};
   Group(h, w, "Picture::Free (sub_82228438)", 200, picture,
         [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.screen.address + 0x700; },
-        __imp__sub_82228438, hooks::LocationScreenPictureFree, free_spec);
+        __imp__sub_82228438, ITC_CONTEXT_FN(hooks::LocationScreenPictureFree), free_spec);
 
   // FreePictures: each list's pictures (pages) and their blocks.
   std::vector<uint32_t> pictures;
@@ -957,7 +957,7 @@ void Pictures(Context& h, const World& w) {
                   }};
   Group(h, w, "LocationScreen::FreePictures (sub_82228498)", 200, lists,
         [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.screen.address; },
-        __imp__sub_82228498, hooks::LocationScreenFreePictures, lists_spec);
+        __imp__sub_82228498, ITC_CONTEXT_FN(hooks::LocationScreenFreePictures), lists_spec);
 
   // OnPictureLoadedA and B: an XPR2 file of 1 to 4 records (the first a
   // texture with random words, the others textures or not) in VirtualAlloc's
@@ -1027,7 +1027,7 @@ void Pictures(Context& h, const World& w) {
           list == 0 ? "LocationScreen::OnPictureLoadedA (sub_82228E88)"
                     : "LocationScreen::OnPictureLoadedB (sub_82228FC8)",
           60, file, file_args, list == 0 ? __imp__sub_82228E88 : __imp__sub_82228FC8,
-          list == 0 ? hooks::LocationScreenOnPictureLoadedA : hooks::LocationScreenOnPictureLoadedB,
+          list == 0 ? ITC_CONTEXT_FN(hooks::LocationScreenOnPictureLoadedA) : ITC_CONTEXT_FN(hooks::LocationScreenOnPictureLoadedB),
           loaded_spec);
   }
 }
@@ -1144,21 +1144,21 @@ void Texts(Context& h, const World& w) {
     return spec;
   };
   Group(h, w, "LocationScreen::ResetMovie (sub_8222CD60)", 200, screen, none,
-        __imp__sub_8222CD60, hooks::LocationScreenResetMovie, texts(192, 80));
+        __imp__sub_8222CD60, ITC_CONTEXT_FN(hooks::LocationScreenResetMovie), texts(192, 80));
   Group(h, w, "LocationScreen::Transition29 (sub_8222CFF0)", 200, screen, step,
-        __imp__sub_8222CFF0, hooks::LocationScreenTransition29, texts(112, 8));
+        __imp__sub_8222CFF0, ITC_CONTEXT_FN(hooks::LocationScreenTransition29), texts(112, 8));
   Group(h, w, "LocationScreen::ShowUnlockEntry (sub_8222A978)", 300, screen, none,
-        __imp__sub_8222A978, hooks::LocationScreenShowUnlockEntry, texts(128, 8));
+        __imp__sub_8222A978, ITC_CONTEXT_FN(hooks::LocationScreenShowUnlockEntry), texts(128, 8));
   Group(h, w, "LocationScreen::Transition25 (sub_8222D1A8)", 300, screen, step,
-        __imp__sub_8222D1A8, hooks::LocationScreenTransition25, texts(112, 8));
+        __imp__sub_8222D1A8, ITC_CONTEXT_FN(hooks::LocationScreenTransition25), texts(112, 8));
   Group(h, w, "LocationScreen::ShowListEntry (sub_8222B048)", 300, screen, none,
-        __imp__sub_8222B048, hooks::LocationScreenShowListEntry, texts(288, 128));
+        __imp__sub_8222B048, ITC_CONTEXT_FN(hooks::LocationScreenShowListEntry), texts(288, 128));
   Group(h, w, "LocationScreen::Transition2 (sub_8222D610)", 300, screen, step,
-        __imp__sub_8222D610, hooks::LocationScreenTransition2, texts(160, 40));
+        __imp__sub_8222D610, ITC_CONTEXT_FN(hooks::LocationScreenTransition2), texts(160, 40));
   Group(h, w, "LocationScreen::Transition14 (sub_8222E6E0)", 300, screen, step,
-        __imp__sub_8222E6E0, hooks::LocationScreenTransition14, texts(176, 48));
+        __imp__sub_8222E6E0, ITC_CONTEXT_FN(hooks::LocationScreenTransition14), texts(176, 48));
   Group(h, w, "LocationScreen::Transition16 (sub_8222E8D8)", 300, screen, step,
-        __imp__sub_8222E8D8, hooks::LocationScreenTransition16, texts(160, 32));
+        __imp__sub_8222E8D8, ITC_CONTEXT_FN(hooks::LocationScreenTransition16), texts(160, 32));
 }
 
 // After a race (Transition23, Transition33): the racer records (1 to 4;
@@ -1213,11 +1213,11 @@ void AfterRace(Context& h, const World& w) {
     return spec;
   };
   Group(h, w, "LocationScreen::Transition23 (sub_8222A470)", 300, results, step,
-        __imp__sub_8222A470, hooks::LocationScreenTransition23, texts(3168, 3024));
+        __imp__sub_8222A470, ITC_CONTEXT_FN(hooks::LocationScreenTransition23), texts(3168, 3024));
   Group(h, w, "LocationScreen::Transition33 (sub_8222A718)", 300, results, step,
-        __imp__sub_8222A718, hooks::LocationScreenTransition33, texts(3168, 3024));
+        __imp__sub_8222A718, ITC_CONTEXT_FN(hooks::LocationScreenTransition33), texts(3168, 3024));
   Group(h, w, "LocationScreen::Transition7 (sub_8222AE00)", 300, results, step,
-        __imp__sub_8222AE00, hooks::LocationScreenTransition7, texts(288, 128));
+        __imp__sub_8222AE00, ITC_CONTEXT_FN(hooks::LocationScreenTransition7), texts(288, 128));
   Group(h, w, "LocationScreen::ShowOpponentPictures (sub_8222B200)", 300,
         [base](Random& r, const World& w) {
           ShapeResults(base, w, r);
@@ -1239,7 +1239,7 @@ void AfterRace(Context& h, const World& w) {
             }
           }
         },
-        none, __imp__sub_8222B200, hooks::LocationScreenShowOpponentPictures,
+        none, __imp__sub_8222B200, ITC_CONTEXT_FN(hooks::LocationScreenShowOpponentPictures),
         {{{-6224 + 80, 6072}}});
   Group(h, w, "LocationScreen::UpdateView (sub_82227E20)", 100,
         [base](Random& r, const World& w) {
@@ -1249,7 +1249,7 @@ void AfterRace(Context& h, const World& w) {
             guest::StoreU32(base, kLights + i, uint32_t(r.Next()));
           }
         },
-        none, __imp__sub_82227E20, hooks::LocationScreenUpdateView, {{{-304 + 80, 192}}});
+        none, __imp__sub_82227E20, ITC_CONTEXT_FN(hooks::LocationScreenUpdateView), {{{-304 + 80, 192}}});
 }
 
 // The opponents' pages: the items' chains as Opponents' (+0 the id 0 to 9,
@@ -1310,13 +1310,13 @@ void OpponentPages(Context& h, const World& w) {
     return spec;
   };
   Group(h, w, "LocationScreen::ShowOpponentInfo (sub_8222B438)", 300, opponents, none,
-        __imp__sub_8222B438, hooks::LocationScreenShowOpponentInfo, texts(6240, 6072, true));
+        __imp__sub_8222B438, ITC_CONTEXT_FN(hooks::LocationScreenShowOpponentInfo), texts(6240, 6072, true));
   Group(h, w, "LocationScreen::Transition12 (sub_8222B8A8)", 300, opponents, step,
-        __imp__sub_8222B8A8, hooks::LocationScreenTransition12, texts(6192, 6032, false));
+        __imp__sub_8222B8A8, ITC_CONTEXT_FN(hooks::LocationScreenTransition12), texts(6192, 6032, false));
   Group(h, w, "LocationScreen::ShowCard (sub_8222BBD0)", 200, opponents, none,
-        __imp__sub_8222BBD0, hooks::LocationScreenShowCard, texts(3232, 3032, true));
+        __imp__sub_8222BBD0, ITC_CONTEXT_FN(hooks::LocationScreenShowCard), texts(3232, 3032, true));
   Group(h, w, "LocationScreen::Transition17 (sub_8222EAD0)", 200, opponents, step,
-        __imp__sub_8222EAD0, hooks::LocationScreenTransition17, texts(3152, 3024, true));
+        __imp__sub_8222EAD0, ITC_CONTEXT_FN(hooks::LocationScreenTransition17), texts(3152, 3024, true));
 }
 
 // A float word: an ordinary value now and then negative, else any word (NaNs
@@ -1454,9 +1454,9 @@ void ViewPages(Context& h, const World& w) {
     return spec;
   };
   Group(h, w, "LocationScreen::Transition4 (sub_8222D828)", 300, view, step,
-        __imp__sub_8222D828, hooks::LocationScreenTransition4, camera(208));
+        __imp__sub_8222D828, ITC_CONTEXT_FN(hooks::LocationScreenTransition4), camera(208));
   Group(h, w, "LocationScreen::Transition5 (sub_8222DA10)", 300, view, step,
-        __imp__sub_8222DA10, hooks::LocationScreenTransition5, camera(224));
+        __imp__sub_8222DA10, ITC_CONTEXT_FN(hooks::LocationScreenTransition5), camera(224));
   // Transition8's node reset (UiMovie::ResetNode of the root's child 11):
   // the sub-scenes' ranges (+100 the first, +104 the count) within the
   // root's children.
@@ -1469,13 +1469,13 @@ void ViewPages(Context& h, const World& w) {
     }
   };
   Group(h, w, "LocationScreen::Transition8 (sub_8222DC08)", 200, back, step,
-        __imp__sub_8222DC08, hooks::LocationScreenTransition8, texts(112, 8));
+        __imp__sub_8222DC08, ITC_CONTEXT_FN(hooks::LocationScreenTransition8), texts(112, 8));
   Group(h, w, "LocationScreen::Transition24 (sub_8222D2E8)", 200, view, step,
-        __imp__sub_8222D2E8, hooks::LocationScreenTransition24, texts(112, 8));
+        __imp__sub_8222D2E8, ITC_CONTEXT_FN(hooks::LocationScreenTransition24), texts(112, 8));
   Group(h, w, "LocationScreen::Transition34 (sub_8222D108)", 200, view, step,
-        __imp__sub_8222D108, hooks::LocationScreenTransition34, texts(112, 8));
+        __imp__sub_8222D108, ITC_CONTEXT_FN(hooks::LocationScreenTransition34), texts(112, 8));
   Group(h, w, "LocationScreen::Start (sub_8222F0B0)", 300, start, none, __imp__sub_8222F0B0,
-        hooks::LocationScreenStart, texts(128, 0));
+        ITC_CONTEXT_FN(hooks::LocationScreenStart), texts(128, 0));
 }
 
 // --- PoseCar ---
@@ -1623,7 +1623,7 @@ void OpponentView(Context& h, const World& w) {
   Spec texts{{{-3152 + 80, 3024}}};
   texts.texts = true;
   Group(h, w, "LocationScreen::ShowOpponentSpecs (sub_8222C188)", 200, specs, none,
-        __imp__sub_8222C188, hooks::LocationScreenShowOpponentSpecs, texts);
+        __imp__sub_8222C188, ITC_CONTEXT_FN(hooks::LocationScreenShowOpponentSpecs), texts);
   constexpr int32_t kFrame = 240;
   Spec camera{{{-kFrame + 80, 88}}};
   camera.texts = true;
@@ -1644,7 +1644,7 @@ void OpponentView(Context& h, const World& w) {
     guest::StoreU32(base, screen + 668, 0);
   };
   Group(h, w, "LocationScreen::Transition9 (sub_8222DEE0)", 200, view, step, __imp__sub_8222DEE0,
-        hooks::LocationScreenTransition9, camera);
+        ITC_CONTEXT_FN(hooks::LocationScreenTransition9), camera);
 }
 
 // PoseCar: its frame (the callees' 2,048 bytes below it, and up to its
@@ -1684,7 +1684,7 @@ void Poses(Context& h, const World& w) {
     out.Bytes(Read(base, model_block, 0x400));
   };
   Group(h, w, "LocationScreen::PoseCar (sub_82228588)", 200, pose, args, __imp__sub_82228588,
-        hooks::LocationScreenPoseCar, spec);
+        ITC_CONTEXT_FN(hooks::LocationScreenPoseCar), spec);
 }
 
 // PollLoad: the screen, the opponents, PoseCar's world (Poses') and the
@@ -1803,7 +1803,7 @@ void PollLoads(Context& h, const World& w) {
     seed = (seed ^ (seed >> 30)) * 0xBF58476D1CE4E5B9ull;
     seed = (seed ^ (seed >> 27)) * 0x94D049BB133111EBull;
     seed ^= seed >> 31;
-    Case(h, results, w, seed, setup, args, __imp__sub_82229238, hooks::LocationScreenPollLoad,
+    Case(h, results, w, seed, setup, args, __imp__sub_82229238, ITC_CONTEXT_FN(hooks::LocationScreenPollLoad),
          spec, fmt::format("case {}", c));
   }
   ITC_LOG_INFO("harness: location_screen: PollLoad's runs that reached the end: {} of {}",

@@ -3,6 +3,7 @@
 // shares (hooks/type2_dialog.h).
 
 #include "hooks/type2_dialog.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "type2_dialog/type2_dialog.h"
@@ -42,7 +43,7 @@ namespace t2d = type2_dialog;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -52,7 +53,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -73,128 +74,123 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
-void Type2DialogOpenConfirmStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogOpenConfirmStep) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::OpenConfirmStep(base, ctx.r3.u32, false, ctx.r1.u32, guest.calls());
 }
-void Type2DialogCloseConfirmStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogCloseConfirmStep) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::CloseConfirmStep(base, ctx.r3.u32, false, ctx.r1.u32, guest.calls());
 }
-void Type2DialogOpenNoticeStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogOpenNoticeStep) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::NoticeStep(base, ctx.r3.u32, false, false, ctx.r1.u32, guest.calls());
 }
-void Type2DialogCloseNoticeStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogCloseNoticeStep) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::NoticeStep(base, ctx.r3.u32, false, true, ctx.r1.u32, guest.calls());
 }
-void Type2DialogOpenConfirm2Step(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogOpenConfirm2Step) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::OpenConfirmStep(base, ctx.r3.u32, true, ctx.r1.u32, guest.calls());
 }
-void Type2DialogCloseConfirm2Step(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogCloseConfirm2Step) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::CloseConfirmStep(base, ctx.r3.u32, true, ctx.r1.u32, guest.calls());
 }
-void Type2DialogOpenNotice2Step(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogOpenNotice2Step) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::NoticeStep(base, ctx.r3.u32, true, false, ctx.r1.u32, guest.calls());
 }
-void Type2DialogCloseNotice2Step(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogCloseNotice2Step) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::NoticeStep(base, ctx.r3.u32, true, true, ctx.r1.u32, guest.calls());
 }
-void Type2DialogMoveCursorStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogMoveCursorStep) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::MoveCursorStep(base, ctx.r3.u32, false, ctx.r1.u32, guest.calls());
 }
-void Type2DialogMoveCursor2Step(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogMoveCursor2Step) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::MoveCursorStep(base, ctx.r3.u32, true, ctx.r1.u32, guest.calls());
 }
-void Type2DialogConfirmPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogConfirmPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::ConfirmPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void Type2DialogNoticePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogNoticePage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::NoticePage(base, ctx.r3.u64, false, ctx.r1.u32, guest.calls());
 }
-void Type2DialogConfirm2Page(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogConfirm2Page) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::Confirm2Page(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void Type2DialogNotice2Page(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogNotice2Page) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::NoticePage(base, ctx.r3.u64, true, ctx.r1.u32, guest.calls());
 }
-void Type2DialogDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogDraw) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
-void Type2DialogUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::Update(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void Type2DialogOnEnter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogOnEnter) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::OnEnter(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void Type2DialogWaitForMovies(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogWaitForMovies) {
   ctx.r3.u64 = t2d::WaitForMovies(base, ctx.r3.u64, ctx.r1.u32);
 }
-void Type2DialogShown(PPCContext&, uint8_t* base) { t2d::Shown(base); }
-void Type2DialogWait(PPCContext& ctx, uint8_t* base) { t2d::Wait(base, ctx.r3.u32); }
-void Type2DialogCancel(PPCContext& ctx, uint8_t* base) {
+void Type2DialogShown(lifted::Regs&, uint8_t* base) { t2d::Shown(base); }
+ITC_REGS_STEP(Type2DialogWait) { t2d::Wait(base, ctx.r3.u32); }
+ITC_REGS_STEP(Type2DialogCancel) {
   ctx.r3.u64 = t2d::Cancel(base, ctx.r3.u64, ctx.r4.u32);
 }
-void Type2DialogOpenConfirm(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogOpenConfirm) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::OpenConfirm(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void Type2DialogOpenNotice(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogOpenNotice) {
   t2d::OpenNotice(base, ctx.r3.u32, false);
 }
-void Type2DialogOpenConfirm2(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogOpenConfirm2) {
   ctx.r3.u64 = t2d::OpenConfirm2(base, ctx.r3.u32, ctx.r1.u32);
 }
-void Type2DialogOpenNotice2(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogOpenNotice2) {
   t2d::OpenNotice(base, ctx.r3.u32, true);
 }
-void Type2DialogOnLeft(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogOnLeft) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2d::OnLeft(base, ctx.r1.u32, guest.calls());
 }
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 screens' Inits.
-void Type2DialogInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogInit) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
   const uint32_t r3 = t2d::Init(base, machine, ctx.r1.u32 - t2d::kInitFrame, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
-void Type2DialogTakesInput(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2DialogTakesInput) {
   ctx.r3.u64 = t2d::TakesInput(base);
 }
 
 }  // namespace hooks
 
 #define ITC_TYPE2_DIALOG(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {     \
-    REX_FUNC_PROLOGUE();                   \
-    if (!ITC_FLAG(native_type2_dialog)) {  \
-      __imp__sub_##address(ctx, base);     \
-      return;                              \
-    }                                      \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type2_dialog)) { \
     hooks::step(ctx, base);                \
   }
 

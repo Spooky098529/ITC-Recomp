@@ -3,6 +3,7 @@
 // shares (hooks/race_update.h).
 
 #include "hooks/race_update.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/course_scenery.h"
@@ -24,18 +25,18 @@ namespace hooks {
 
 namespace ru = race_update;
 
-void RaceUpdateVaryCar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceUpdateVaryCar) {
   ctx.fpscr.disableFlushMode();
   ru::VaryCar(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.s32, ctx.r6.s32);
 }
 
-void RaceUpdateLights(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceUpdateLights) {
   ctx.fpscr.disableFlushMode();
   ctx.r4.u64 = ru::LightsUpdate(base, ctx.r3.u32, ctx.r1.u32 - ru::kLightsFrame);
   ctx.r3.u64 = ctx.r3.u64 + 16 + 96 * 11;
 }
 
-void RaceUpdateLoadScenery(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceUpdateLoadScenery) {
   CourseSceneryGuest guest{&ctx, base};
   const course_scenery::Calls calls = CourseSceneryCalls(&guest);
   const uint64_t lr = ctx.lr;
@@ -45,11 +46,11 @@ void RaceUpdateLoadScenery(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-race_update::GuestCall RaceUpdateGuestCall(PPCContext& ctx, uint8_t* base) {
+race_update::GuestCall RaceUpdateGuestCall(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t function, std::initializer_list<uint64_t> args, uint32_t frame,
                       uint32_t lr) {
     const uint64_t stack = ctx.r1.u64;
-    PPCRegister* registers[5] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7};
+    lifted::Temp* registers[5] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7};
     int i = 0;
     for (const uint64_t arg : args) {
       registers[i++]->u64 = arg;
@@ -63,7 +64,7 @@ race_update::GuestCall RaceUpdateGuestCall(PPCContext& ctx, uint8_t* base) {
   };
 }
 
-void RaceUpdateRemakeCarModel(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceUpdateRemakeCarModel) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   const race_update::GuestCall call = RaceUpdateGuestCall(ctx, base);
@@ -73,7 +74,7 @@ void RaceUpdateRemakeCarModel(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void RaceUpdateTickUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceUpdateTickUpdate) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   const race_update::GuestCall call = RaceUpdateGuestCall(ctx, base);
@@ -82,7 +83,7 @@ void RaceUpdateTickUpdate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void RaceUpdateUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceUpdateUpdate) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   race_update::UpdateCalls calls;
@@ -122,12 +123,7 @@ void RaceUpdateUpdate(PPCContext& ctx, uint8_t* base) {
 
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_UPDATE(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_race_update)) {  \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_update)) { \
     hooks::step(ctx, base);               \
   }
 
@@ -149,10 +145,10 @@ ITC_RACE_UPDATE(8215D2B0, RaceUpdateUpdate)
 // RaceScene::LoadScenery: r3 = the race scene; from RaceSceneMachine::OnStart
 // (recompiled). The original where the course scenery's set-up can't run
 // natively.
-extern "C" REX_FUNC(sub_8215B790) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8215B790) {
+  
   if (!ITC_FLAG(native_race_update) || !hooks::CourseScenerySetUpNative()) {
-    __imp__sub_8215B790(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8215B790);
     return;
   }
   hooks::RaceUpdateLoadScenery(ctx, base);

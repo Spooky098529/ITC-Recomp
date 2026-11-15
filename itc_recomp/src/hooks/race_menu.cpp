@@ -3,6 +3,7 @@
 // (hooks/race_menu.h).
 
 #include "hooks/race_menu.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "race_menu/race_menu.h"
@@ -51,7 +52,7 @@ namespace rm = race_menu;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -61,7 +62,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -82,138 +83,138 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
-void RaceMenuCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuCreate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Create(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuOpenMovie) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::OpenMovie(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuWaitForMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuWaitForMovie) {
   ctx.r3.u64 = rm::WaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
 }
-void RaceMenuOnYes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuOnYes) {
   ctx.r3.u64 = rm::OnAnswer(base, ctx.r3.u32, true, ctx.r1.u32);
 }
-void RaceMenuOnNo(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuOnNo) {
   ctx.r3.u64 = rm::OnAnswer(base, ctx.r3.u32, false, ctx.r1.u32);
 }
-void RaceMenuOnBack(PPCContext& ctx, uint8_t* base) { rm::OnBack(base, ctx.r3.u32); }
-void RaceMenuOnDialogClosed(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuOnBack) { rm::OnBack(base, ctx.r3.u32); }
+ITC_REGS_STEP(RaceMenuOnDialogClosed) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::OnDialogClosed(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuUnload(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuUnload) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Unload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuLeaveToHub(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuLeaveToHub) {
   rm::LeaveToHub(base, ctx.r3.u32, ctx.r4.u32);
 }
-void RaceMenuDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuDestroy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Destroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuStart) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Start(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void RaceMenuBack(PPCContext& ctx, uint8_t* base) { rm::Back(base, ctx.r3.u32); }
-void RaceMenuSetEventRange(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuBack) { rm::Back(base, ctx.r3.u32); }
+ITC_REGS_STEP(RaceMenuSetEventRange) {
   rm::SetEventRange(base, ctx.r3.u32);
 }
-void RaceMenuSetUpEvents(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuSetUpEvents) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::SetUpEvents(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void RaceMenuRefresh(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuRefresh) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Refresh(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void RaceMenuTransition0(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuTransition0) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Transition0(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuTransition3(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuTransition3) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Transition3(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuTransition5(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuTransition5) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Transition5(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuAskConfirm(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuAskConfirm) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::AskConfirm(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuTransition12(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuTransition12) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Transition12(base, ctx.r1.u32, guest.calls());
 }
-void RaceMenuDebugKindPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuDebugKindPage) {
   ctx.r3.u64 = rm::DebugKindPage(base, ctx.r1.u32);
 }
-void RaceMenuDebugEventPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuDebugEventPage) {
   ctx.r3.u64 = rm::DebugEventPage(base, ctx.r3.u32, ctx.r1.u32);
 }
-void RaceMenuDebugVariantPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuDebugVariantPage) {
   ctx.r3.u64 = rm::DebugVariantPage(base, ctx.r1.u32);
 }
-void RaceMenuAnimateVariantPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuAnimateVariantPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::AnimateVariantPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuKindPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuKindPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::KindPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuAnimateKindPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuAnimateKindPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::AnimateKindPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuVariantPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuVariantPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::VariantPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuEventPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuEventPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::EventPage(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuAnimateEventPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuAnimateEventPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::AnimateEventPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Update(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
-void RaceMenuStartEvent(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuStartEvent) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::StartEvent(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuStartPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuStartPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::StartPage(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void RaceMenuLeavePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuLeavePage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::LeavePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void RaceMenuDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuDraw) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rm::Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 dialog's Init.
-void RaceMenuInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceMenuInit) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
@@ -224,12 +225,7 @@ void RaceMenuInit(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_RACE_MENU(address, step)     \
-  extern "C" REX_FUNC(sub_##address) {   \
-    REX_FUNC_PROLOGUE();                 \
-    if (!ITC_FLAG(native_race_menu)) {   \
-      __imp__sub_##address(ctx, base);   \
-      return;                            \
-    }                                    \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_menu)) { \
     hooks::step(ctx, base);              \
   }
 

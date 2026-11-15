@@ -1,4 +1,5 @@
 #include "last_error.h"
+#include "hooks/native_entry.h"
 
 #include "base/log.h"
 #include "guest.h"
@@ -31,20 +32,20 @@ uint32_t SetFromStatus(uint8_t* base, uint32_t pcr, uint32_t status) {
 }  // namespace last_error
 
 // SetLastError: r3 = the error (kept in r3).
-extern "C" REX_FUNC(sub_82296E70) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82296E70) {
+  
   last_error::Set(base, ctx.r13.u32, ctx.r3.u32);
 }
 
 // The same, reached by a jump (16 callers).
-extern "C" REX_FUNC(sub_82296FD0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82296FD0) {
+  
   last_error::Set(base, ctx.r13.u32, ctx.r3.u32);
 }
 
 // SetLastError from an NTSTATUS: r3 = the status; returns the DOS error.
-extern "C" REX_FUNC(sub_82296E88) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82296E88) {
+  
   ctx.r3.u64 = last_error::SetFromStatus(base, ctx.r13.u32, ctx.r3.u32);
 }
 
@@ -52,8 +53,8 @@ extern "C" REX_FUNC(sub_82296E88) {
 // allocation calls): r3 the error; r11 left as the original leaves it
 // ([PCR+336], or the current thread when that's 0). sub_82296EC0 itself has
 // no adapter: its only caller in play is this one.
-extern "C" REX_FUNC(sub_82295F18) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82295F18) {
+  
   const uint32_t in_dpc = guest::LoadU32(base, ctx.r13.u32 + 336);
   ctx.r11.u64 = in_dpc ? in_dpc : guest::LoadU32(base, ctx.r13.u32 + 256);
   ctx.r3.u64 = last_error::Get(base, ctx.r13.u32);

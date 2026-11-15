@@ -395,45 +395,45 @@ struct Machine {
 
 const Machine kMachines[] = {
     {"NetModeSelect::InitStates", 0x8227D680, __imp__sub_8227D680,
-     hooks::NetModeSelectInitStates, nm::kModeSelectAt, nm::kModeSelectInitFrame},
+     ITC_CONTEXT_FN(hooks::NetModeSelectInitStates), nm::kModeSelectAt, nm::kModeSelectInitFrame},
     {"Type12Screen1::InitStates", 0x82276510, __imp__sub_82276510,
-     hooks::Type12Screen1InitStates, nm::kScreen1At, nm::kScreen1InitFrame},
+     ITC_CONTEXT_FN(hooks::Type12Screen1InitStates), nm::kScreen1At, nm::kScreen1InitFrame},
     {"Type12Screen3::InitStates", 0x8225F330, __imp__sub_8225F330,
-     hooks::Type12Screen3InitStates, nm::kScreen3At, nm::kScreen3InitFrame},
-    {"NetRanking::InitStates", 0x822873A0, __imp__sub_822873A0, hooks::NetRankingInitStates,
+     ITC_CONTEXT_FN(hooks::Type12Screen3InitStates), nm::kScreen3At, nm::kScreen3InitFrame},
+    {"NetRanking::InitStates", 0x822873A0, __imp__sub_822873A0, ITC_CONTEXT_FN(hooks::NetRankingInitStates),
      nm::kRankingAt, nm::kRankingInitFrame},
-    {"NetTaCourse::InitStates", 0x82281858, __imp__sub_82281858, hooks::NetTaCourseInitStates,
+    {"NetTaCourse::InitStates", 0x82281858, __imp__sub_82281858, ITC_CONTEXT_FN(hooks::NetTaCourseInitStates),
      nm::kTaCourseAt, nm::kTaCourseInitFrame},
     {"PowerGraphScreen12::InitStates", 0x821B96B8, __imp__sub_821B96B8,
-     hooks::PowerGraphScreen12InitStates, nm::kPowerGraphAt, nm::kPowerGraphInitFrame},
+     ITC_CONTEXT_FN(hooks::PowerGraphScreen12InitStates), nm::kPowerGraphAt, nm::kPowerGraphInitFrame},
     {"Type12Screen6::InitStates", 0x82268410, __imp__sub_82268410,
-     hooks::Type12Screen6InitStates, nm::kScreen6At, nm::kScreen6InitFrame, 6,
-     "Type12Screen6::InitBase", 0x82278C20, __imp__sub_82278C20, hooks::Type12Screen6InitBase},
+     ITC_CONTEXT_FN(hooks::Type12Screen6InitStates), nm::kScreen6At, nm::kScreen6InitFrame, 6,
+     "Type12Screen6::InitBase", 0x82278C20, __imp__sub_82278C20, ITC_CONTEXT_FN(hooks::Type12Screen6InitBase)},
     {"Type12Screen7::InitStates", 0x8226EB40, __imp__sub_8226EB40,
-     hooks::Type12Screen7InitStates, nm::kScreen7At, nm::kScreen7InitFrame, 7,
-     "Type12Screen7::InitBase", 0x82279118, __imp__sub_82279118, hooks::Type12Screen7InitBase},
+     ITC_CONTEXT_FN(hooks::Type12Screen7InitStates), nm::kScreen7At, nm::kScreen7InitFrame, 7,
+     "Type12Screen7::InitBase", 0x82279118, __imp__sub_82279118, ITC_CONTEXT_FN(hooks::Type12Screen7InitBase)},
     {"Type12Screen8::InitStates", 0x82262A88, __imp__sub_82262A88,
-     hooks::Type12Screen8InitStates, nm::kScreen8At, nm::kScreen8InitFrame, 8,
-     "Type12Screen8::InitBase", 0x8227A000, __imp__sub_8227A000, hooks::Type12Screen8InitBase},
+     ITC_CONTEXT_FN(hooks::Type12Screen8InitStates), nm::kScreen8At, nm::kScreen8InitFrame, 8,
+     "Type12Screen8::InitBase", 0x8227A000, __imp__sub_8227A000, ITC_CONTEXT_FN(hooks::Type12Screen8InitBase)},
     {"Type12Screen9::InitStates", 0x822646B0, __imp__sub_822646B0,
-     hooks::Type12Screen9InitStates, nm::kScreen9At, nm::kScreen9InitFrame, 9,
-     "Type12Screen9::InitBase", 0x8227A4F8, __imp__sub_8227A4F8, hooks::Type12Screen9InitBase},
+     ITC_CONTEXT_FN(hooks::Type12Screen9InitStates), nm::kScreen9At, nm::kScreen9InitFrame, 9,
+     "Type12Screen9::InitBase", 0x8227A4F8, __imp__sub_8227A4F8, ITC_CONTEXT_FN(hooks::Type12Screen9InitBase)},
     {"Type12Dialog10::InitStates", 0x82288600, __imp__sub_82288600,
-     hooks::Type12Dialog10InitStates, nm::kDialog10At, nm::kDialog10InitFrame, 10,
+     ITC_CONTEXT_FN(hooks::Type12Dialog10InitStates), nm::kDialog10At, nm::kDialog10InitFrame, 10,
      "Type12Dialog10::InitBase", 0x82279610, __imp__sub_82279610,
-     hooks::Type12Dialog10InitBase},
+     ITC_CONTEXT_FN(hooks::Type12Dialog10InitBase)},
     {"Type12Dialog11::InitStates", 0x82277B18, __imp__sub_82277B18,
-     hooks::Type12Dialog11InitStates, nm::kDialog11At, nm::kDialog11InitFrame, 11,
+     ITC_CONTEXT_FN(hooks::Type12Dialog11InitStates), nm::kDialog11At, nm::kDialog11InitFrame, 11,
      "Type12Dialog11::InitBase", 0x82279B08, __imp__sub_82279B08,
-     hooks::Type12Dialog11InitBase},
+     ITC_CONTEXT_FN(hooks::Type12Dialog11InitBase)},
     {"Type12Dialog12::InitStates", 0x8227F6C8, __imp__sub_8227F6C8,
-     hooks::Type12Dialog12InitStates, nm::kDialog12At, nm::kDialog12InitFrame, 12,
+     ITC_CONTEXT_FN(hooks::Type12Dialog12InitStates), nm::kDialog12At, nm::kDialog12InitFrame, 12,
      "Type12Dialog12::InitBase", 0x8227A9F0, __imp__sub_8227A9F0,
-     hooks::Type12Dialog12InitBase},
+     ITC_CONTEXT_FN(hooks::Type12Dialog12InitBase)},
     {"Type12Dialog13::InitStates", 0x8227EA50, __imp__sub_8227EA50,
-     hooks::Type12Dialog13InitStates, nm::kDialog13At, nm::kDialog13InitFrame, 13,
+     ITC_CONTEXT_FN(hooks::Type12Dialog13InitStates), nm::kDialog13At, nm::kDialog13InitFrame, 13,
      "Type12Dialog13::InitBase", 0x8227AEE8, __imp__sub_8227AEE8,
-     hooks::Type12Dialog13InitBase},
+     ITC_CONTEXT_FN(hooks::Type12Dialog13InitBase)},
 };
 
 // Another machine of the block than `m`'s, for the base Inits' r4 now and
@@ -481,7 +481,7 @@ void Inits(Context& h, const World& w) {
       continue;
     }
     Run(h, w, {fmt::format("NetScreen::InitBase (sub_8227B3E0) index {}", m.index), 12,
-               __imp__sub_8227B3E0, hooks::NetScreenInitBase, {BaseFrame(0)},
+               __imp__sub_8227B3E0, ITC_CONTEXT_FN(hooks::NetScreenInitBase), {BaseFrame(0)},
                [&m](PPCContext& t, Random& r, const World& w) {
                  InitMachine(r, w.base, w.at(m.at));
                  t.r3.u64 = w.at(m.at);
@@ -562,37 +562,37 @@ void ShapeObject(PPCContext& t, Random& r, const World& w) {
 
 void Delegates(Context& h, const World& w) {
   Run(h, w, {"ModeType12::Machine (sub_82277E10)", 48, __imp__sub_82277E10,
-             hooks::ModeType12Machine, {},
+             ITC_CONTEXT_FN(hooks::ModeType12Machine), {},
              [](PPCContext& t, Random& r, const World& w) {
                t.r3.u64 = w.block | (uint64_t(r.Below(2)) << 32);
                t.r4.u64 = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(17);
              }});
   Run(h, w, {"ModeType12::FindShown (sub_82277FF0)", 60, __imp__sub_82277FF0,
-             hooks::ModeType12FindShown, {},
+             ITC_CONTEXT_FN(hooks::ModeType12FindShown), {},
              [](PPCContext& t, Random& r, const World& w) {
                Shape(t, r, w);
                t.r3.u64 = w.block | (uint64_t(r.Below(2)) << 32);
              }});
   Run(h, w, {"ModeType12::AllLoaded (sub_82277EE0)", 60, __imp__sub_82277EE0,
-             hooks::ModeType12AllLoaded, {},
+             ITC_CONTEXT_FN(hooks::ModeType12AllLoaded), {},
              [](PPCContext& t, Random& r, const World& w) {
                Shape(t, r, w);
                t.r3.u64 = w.block;
              }});
   Run(h, w, {"ModeType12::WaitForLoads (sub_8227B440)", 150, __imp__sub_8227B440,
-             hooks::ModeType12WaitForLoads, {{-176, -48}}, Shape, true});
+             ITC_CONTEXT_FN(hooks::ModeType12WaitForLoads), {{-176, -48}}, Shape, true});
   Run(h, w, {"ModeType12::NextMode (sub_8227B930)", 300, __imp__sub_8227B930,
-             hooks::ModeType12NextMode, {{-4112, -104}}, Shape});
+             ITC_CONTEXT_FN(hooks::ModeType12NextMode), {{-4112, -104}}, Shape});
   Run(h, w, {"ModeType12::LeaveScreen (sub_8227B868)", 60, __imp__sub_8227B868,
-             hooks::ModeType12LeaveScreen, {{-128, -32}}, Shape});
+             ITC_CONTEXT_FN(hooks::ModeType12LeaveScreen), {{-128, -32}}, Shape});
   Run(h, w, {"ModeType12::WaitForShown (sub_8227B770)", 100, __imp__sub_8227B770,
-             hooks::ModeType12WaitForShown, {{-112, -16}}, Shape});
+             ITC_CONTEXT_FN(hooks::ModeType12WaitForShown), {{-112, -16}}, Shape});
   Run(h, w, {"ModeType12::ForceExit (sub_822788D8)", 100, __imp__sub_822788D8,
-             hooks::ModeType12ForceExit, {{-240, -64}, {-336, -256}, {-432, -352}},
+             ITC_CONTEXT_FN(hooks::ModeType12ForceExit), {{-240, -64}, {-336, -256}, {-432, -352}},
              ShapeObject});
   Run(h, w, {"ModeType12::Resume (sub_82278B98)", 40, __imp__sub_82278B98,
-             hooks::ModeType12Resume, {{-96, -8}}, ShapeObject});
-  Run(h, w, {"Session::Free (sub_82292710)", 40, __imp__sub_82292710, hooks::SessionFree,
+             ITC_CONTEXT_FN(hooks::ModeType12Resume), {{-96, -8}}, ShapeObject});
+  Run(h, w, {"Session::Free (sub_82292710)", 40, __imp__sub_82292710, ITC_CONTEXT_FN(hooks::SessionFree),
              {{-96, -16}, {-192, -112}}, Shape});
 }
 
@@ -796,7 +796,7 @@ void MachineHandlers(Context& h, const World& w) {
   // Type12Screen1::ResetData on a data block of the layer's pages.
   Run(h, w,
       {"Type12Screen1::ResetData (sub_82272030)", 20, __imp__sub_82272030,
-       hooks::Type12Screen1ResetData, {{-112, -32}},
+       ITC_CONTEXT_FN(hooks::Type12Screen1ResetData), {{-112, -32}},
        [](PPCContext& t, Random& r, const World& w) {
          ShapeHandlers(t, r, w, 1, false);
          const uint32_t data = MakePages(w.base, 2820, r);

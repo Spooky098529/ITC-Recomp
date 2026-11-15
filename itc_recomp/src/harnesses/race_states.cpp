@@ -104,7 +104,7 @@ void Progress(Context& h, const Block& progress, const Block& vehicles, const Bl
       for (int v = 0; v < 2; v++) {
         Globals globals(h.base, {rs::kProgress});
         PPCContext t = CallContext(h);
-        (v == 0 ? Original<__imp__sub_821698B0> : hooks::RaceStatesProgressCreate)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821698B0> : ITC_CONTEXT_FN(hooks::RaceStatesProgressCreate))(t, h.base);
         const uint32_t block = guest::LoadU32(h.base, rs::kProgress);
         out[v].Word(block == t.r3.u32 ? 1 : 0);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -130,7 +130,7 @@ void Progress(Context& h, const Block& progress, const Block& vehicles, const Bl
         PPCContext t = CallContext(h);
         WriteRandom(h.base, t.r1.u32 - 1024, 1024, r);
         t.r3.u64 = progress.address;
-        (v == 0 ? Original<__imp__sub_821648E0> : hooks::RaceStatesProgressReset)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821648E0> : ITC_CONTEXT_FN(hooks::RaceStatesProgressReset))(t, h.base);
         out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
       }
       results.Check(out[0], out[1], fmt::format("seed {}", seed));
@@ -149,7 +149,7 @@ void Progress(Context& h, const Block& progress, const Block& vehicles, const Bl
         t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(8);
         t.r5.u64 = r.Below(8) == 0 ? r.Next() : r.Below(6);
         t.r6.u64 = r.Below(2) == 0 ? 0 : r.Next();
-        (v == 0 ? Original<__imp__sub_821649B8> : hooks::RaceStatesSetChecks)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821649B8> : ITC_CONTEXT_FN(hooks::RaceStatesSetChecks))(t, h.base);
         out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
         out[v].Word(t.r3.u32);
       }
@@ -210,7 +210,7 @@ void Progress(Context& h, const Block& progress, const Block& vehicles, const Bl
         }
         PPCContext t = CallContext(h);
         t.r3.u64 = progress.address;
-        (v == 0 ? Original<__imp__sub_82163440> : hooks::RaceStatesReleaseRacers)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82163440> : ITC_CONTEXT_FN(hooks::RaceStatesReleaseRacers))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, 64));
         out[v].Bytes(Read(h.base, manager.address, 2400));
       }
@@ -234,7 +234,7 @@ void Progress(Context& h, const Block& progress, const Block& vehicles, const Bl
         t.r3.u64 = h.data + 4 * r.Below(64);
         t.r4.u64 = progress.address;
         t.r5.u64 = index;
-        (v == 0 ? Original<__imp__sub_82162E08> : hooks::RaceStatesCountTime)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82162E08> : ITC_CONTEXT_FN(hooks::RaceStatesCountTime))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, 512));
         out[v].Bytes(Read(h.base, progress.address + 2188, 4 * 972));
         out[v].Word(t.r3.u32);
@@ -274,7 +274,7 @@ void Progress(Context& h, const Block& progress, const Block& vehicles, const Bl
         t.r3.u64 = progress.address;
         t.r4.u64 = index;
         t.r5.u64 = time;
-        (v == 0 ? Original<__imp__sub_82163140> : hooks::RaceStatesTickFraction)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82163140> : ITC_CONTEXT_FN(hooks::RaceStatesTickFraction))(t, h.base);
         out[v].Word(guest::LoadU32(h.base, time));
         out[v].Word(guest::LoadU32(h.base, t.r1.u32 - 112 + 80));  // fctiwz's word
       }
@@ -303,7 +303,7 @@ void Progress(Context& h, const Block& progress, const Block& vehicles, const Bl
                           r.Below(2) == 0 ? keys[r.Below(8)] : RandomFloat(r, 5000.0f));
         }
         t.r3.u64 = progress.address;
-        (v == 0 ? Original<__imp__sub_82162D80> : hooks::RaceStatesRank)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82162D80> : ITC_CONTEXT_FN(hooks::RaceStatesRank))(t, h.base);
         out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
         out[v].Bytes(Read(h.base, frame + 80, 1616));
       }
@@ -363,7 +363,7 @@ void Sections(Context& h) {
         pick(r, route, a, b);
         t.r3.u64 = a | (r.Below(4) == 0 ? r.Next() << 32 : 0);
         t.r4.u64 = b;
-        (v == 0 ? Original<__imp__sub_82162F78> : hooks::RaceStatesSectionsBeside)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82162F78> : ITC_CONTEXT_FN(hooks::RaceStatesSectionsBeside))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
         out[v].Bytes(Read(h.base, t.r1.u32 - 64, 64));
@@ -388,7 +388,7 @@ void Sections(Context& h) {
         pick(r, route, a, b);
         t.r3.u64 = a | (r.Below(4) == 0 ? r.Next() << 32 : 0);
         t.r4.u64 = b;
-        (v == 0 ? Original<__imp__sub_82162E70> : hooks::RaceStatesSectionsBefore)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82162E70> : ITC_CONTEXT_FN(hooks::RaceStatesSectionsBefore))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
         out[v].Bytes(Read(h.base, t.r1.u32 - 64, 64));
@@ -415,7 +415,7 @@ void Sections(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = a;
         t.r4.u64 = b;
-        (v == 0 ? Original<__imp__sub_821622A8> : hooks::RaceStatesPositionNotAfter)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821622A8> : ITC_CONTEXT_FN(hooks::RaceStatesPositionNotAfter))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
       }
@@ -473,7 +473,7 @@ void Checks(Context& h, const Block& progress, const Block& vehicles) {
         PPCContext t = CallContext(h);
         t.r3.u64 = h.data;
         t.r4.u64 = h.data + 4;
-        (v == 0 ? __imp__sub_82162230 : NativeTimeSub)(t, h.base);
+        (v == 0 ? __imp__sub_82162230 : ITC_CONTEXT_FN(NativeTimeSub))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
       }
@@ -517,7 +517,7 @@ void Checks(Context& h, const Block& progress, const Block& vehicles) {
         t.r3.u64 = h.data + 512;
         t.r4.u64 = progress.address;
         t.r5.u64 = index;
-        (v == 0 ? Original<__imp__sub_82164F08> : hooks::RaceStatesCountHits)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82164F08> : ITC_CONTEXT_FN(hooks::RaceStatesCountHits))(t, h.base);
         out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
         out[v].Bytes(Read(h.base, h.data + 512, 8));
         out[v].Word(t.r3.u32);
@@ -563,7 +563,7 @@ void Checks(Context& h, const Block& progress, const Block& vehicles) {
         t.r3.u64 = h.data + 512;
         t.r4.u64 = progress.address;
         t.r5.u64 = index;
-        (v == 0 ? Original<__imp__sub_82164228> : hooks::RaceStatesDamage)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82164228> : ITC_CONTEXT_FN(hooks::RaceStatesDamage))(t, h.base);
         out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
         out[v].Bytes(Read(h.base, h.data + 512, 8));
         out[v].Bytes(Read(h.base, frame + 80, 16));
@@ -603,7 +603,7 @@ void Checks(Context& h, const Block& progress, const Block& vehicles) {
         }
         t.r3.u64 = h.data + 512;
         t.r4.u64 = progress.address;
-        (v == 0 ? Original<__imp__sub_821650A0> : hooks::RaceStatesDrainSp)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821650A0> : ITC_CONTEXT_FN(hooks::RaceStatesDrainSp))(t, h.base);
         out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
         out[v].Bytes(Read(h.base, h.data, 128));
         out[v].Bytes(Read(h.base, h.data + 512, 8));
@@ -677,7 +677,7 @@ void RouteChecks(Context& h, const Block& progress, const Block& vehicles) {
         }
         t.r3.u64 = section;
         t.r4.u64 = position;
-        (v == 0 ? Original<__imp__sub_82163930> : hooks::RaceStatesMapToSection)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82163930> : ITC_CONTEXT_FN(hooks::RaceStatesMapToSection))(t, h.base);
         out[v].Word(guest::LoadU32(h.base, position));
         out[v].Bytes(Read(h.base, t.r1.u32 - 96, 64));
         out[v].Word(t.r3.u32);
@@ -739,7 +739,7 @@ void RouteChecks(Context& h, const Block& progress, const Block& vehicles) {
         t.r3.u64 = h.data + 512;
         t.r4.u64 = progress.address;
         t.r5.u64 = index;
-        (v <= 0 ? Original<__imp__sub_82164090> : hooks::RaceStatesCheckLap)(t, h.base);
+        (v <= 0 ? Original<__imp__sub_82164090> : ITC_CONTEXT_FN(hooks::RaceStatesCheckLap))(t, h.base);
         if (v < 0) {
           const uint32_t next = done + 1;
           lap_position = next < 5 ? guest::LoadU32(h.base, frame + 96 + 4 * next) : 0xFFFFFFFFu;
@@ -792,7 +792,7 @@ void RouteChecks(Context& h, const Block& progress, const Block& vehicles) {
         t.r3.u64 = h.data + 512;
         t.r4.u64 = progress.address;
         t.r5.u64 = index;
-        (v == 0 ? Original<__imp__sub_82164E18> : hooks::RaceStatesCheckFinish)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82164E18> : ITC_CONTEXT_FN(hooks::RaceStatesCheckFinish))(t, h.base);
         finished += v == 1 && guest::LoadU32(h.base, h.data + 512) == 1 ? 1 : 0;
         out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
         out[v].Bytes(Read(h.base, h.data + 512, 8));
@@ -883,7 +883,7 @@ void FollowRouteCases(Context& h, const Block& progress, const Block& vehicles,
         t.r4.u64 = near(route, near(route, t.r3.u32, r), r);
         t.r5.u64 = h.data + 512;
         t.r6.u64 = h.data + 516;
-        (v == 0 ? __imp__sub_82163000 : hooks::RaceStatesSectionsJoin)(t, h.base);
+        (v == 0 ? __imp__sub_82163000 : ITC_CONTEXT_FN(hooks::RaceStatesSectionsJoin))(t, h.base);
         out[v].Bytes(Read(h.base, h.data + 512, 8));
         out[v].Bytes(Read(h.base, t.r1.u32 - 96, 36));
         out[v].Word(t.r3.u32);
@@ -944,7 +944,7 @@ void FollowRouteCases(Context& h, const Block& progress, const Block& vehicles,
         t.r3.u64 = h.data + 600;
         t.r4.u64 = progress.address;
         t.r5.u64 = index;
-        (v == 0 ? Original<__imp__sub_82163C50> : hooks::RaceStatesFollowRoute)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82163C50> : ITC_CONTEXT_FN(hooks::RaceStatesFollowRoute))(t, h.base);
         if (v == 1) {
           off_route += guest::LoadU32(h.base, h.data + 600) == 1 ? 1 : 0;
           along += guest::LoadU32(h.base, h.data + 600) == 0 &&
@@ -1082,7 +1082,7 @@ void FollowRouteCases(Context& h, const Block& progress, const Block& vehicles,
         }
         t.r3.u64 = machine.address;
         t.r4.u64 = dispatcher.address;
-        (v == 0 ? Original<__imp__sub_82167610> : hooks::RaceStatesRaceTick)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82167610> : ITC_CONTEXT_FN(hooks::RaceStatesRaceTick))(t, h.base);
         if (v == 1) {
           ended += guest::LoadU32(h.base, p + 6104) != 0 ? 1 : 0;
         }
@@ -1149,7 +1149,7 @@ void FollowRouteCases(Context& h, const Block& progress, const Block& vehicles,
           guest::StoreU32(h.base, e + 2984, r.Below(1000));
         }
         t.r3.u64 = machine.address;
-        (v == 0 ? Original<__imp__sub_82164458> : hooks::RaceStatesOnGo)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82164458> : ITC_CONTEXT_FN(hooks::RaceStatesOnGo))(t, h.base);
         uint32_t at = p;
         for (uint32_t i = 0; i < 4; i++) {
           const uint32_t e = p + 972 * i;
@@ -1508,7 +1508,7 @@ void RouteStart(Context& h, const Block& progress, const Block& vehicles) {
         WriteRandom(h.base, frame, 656, r);
         t.r3.u64 = progress.address;
         t.r4.u64 = index;
-        (v == 0 ? Original<__imp__sub_82162330> : hooks::RaceStatesRouteDistance)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82162330> : ITC_CONTEXT_FN(hooks::RaceStatesRouteDistance))(t, h.base);
         if (v == 1 && index > 10 && int32_t(path.size()) > 1) {
           // A side link taken: the path's section isn't the copy's.
           for (size_t k = 1; k + 1 < path.size(); k++) {
@@ -1576,7 +1576,7 @@ void RouteStart(Context& h, const Block& progress, const Block& vehicles) {
         const uint32_t frame = t.r1.u32 - 496;
         WriteRandom(h.base, frame - 656, 656 + 496, r);
         t.r3.u64 = machine.address;
-        (v == 0 ? Original<__imp__sub_821635D0> : hooks::RaceStatesStartRoute)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821635D0> : ITC_CONTEXT_FN(hooks::RaceStatesStartRoute))(t, h.base);
         if (v == 1 && (type == 1 || type == 3)) {
           walked++;
           matched += pick < 3 ? 1 : 0;
@@ -1645,7 +1645,7 @@ void RouteStart(Context& h, const Block& progress, const Block& vehicles) {
         const uint32_t frame = t.r1.u32 - 112 - 496;
         WriteRandom(h.base, frame - 656, 656 + 496 + 112, r);
         t.r3.u64 = machine.address;
-        (v == 0 ? Original<__imp__sub_82164458> : hooks::RaceStatesOnGo)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82164458> : ITC_CONTEXT_FN(hooks::RaceStatesOnGo))(t, h.base);
         ProgressOutputs(out[v], h.base, p);
         out[v].Bytes(Read(h.base, frame + 80, 392));
         out[v].Bytes(Read(h.base, frame - 656 + 80, 472));
@@ -1722,18 +1722,18 @@ void Handlers(Context& h, const Block& progress, const Block& vehicles, const Bl
     GuestFunction step;
   };
   const Simple simple[] = {
-      {"RaceStates::FadeInFree (sub_82163398)", __imp__sub_82163398, hooks::RaceStatesFadeInFree},
-      {"RaceStates::FadeOut (sub_82162310)", __imp__sub_82162310, hooks::RaceStatesFadeOut},
+      {"RaceStates::FadeInFree (sub_82163398)", __imp__sub_82163398, ITC_CONTEXT_FN(hooks::RaceStatesFadeInFree)},
+      {"RaceStates::FadeOut (sub_82162310)", __imp__sub_82162310, ITC_CONTEXT_FN(hooks::RaceStatesFadeOut)},
       {"RaceStates::EndWhenFaded (sub_82168F50)", __imp__sub_82168F50,
-       hooks::RaceStatesEndWhenFaded},
+       ITC_CONTEXT_FN(hooks::RaceStatesEndWhenFaded)},
       {"RaceStates::OnRollingStart (sub_821632C8)", __imp__sub_821632C8,
-       hooks::RaceStatesOnRollingStart},
-      {"RaceStates::ClearStep (sub_82163348)", __imp__sub_82163348, hooks::RaceStatesClearStep},
-      {"RaceStates::OnQuit (sub_82163378)", __imp__sub_82163378, hooks::RaceStatesOnQuit},
-      {"RaceStates::OnReplay (sub_821647B0)", __imp__sub_821647B0, hooks::RaceStatesOnReplay},
-      {"RaceStates::QuitTick (sub_82168500)", __imp__sub_82168500, hooks::RaceStatesQuitTick},
+       ITC_CONTEXT_FN(hooks::RaceStatesOnRollingStart)},
+      {"RaceStates::ClearStep (sub_82163348)", __imp__sub_82163348, ITC_CONTEXT_FN(hooks::RaceStatesClearStep)},
+      {"RaceStates::OnQuit (sub_82163378)", __imp__sub_82163378, ITC_CONTEXT_FN(hooks::RaceStatesOnQuit)},
+      {"RaceStates::OnReplay (sub_821647B0)", __imp__sub_821647B0, ITC_CONTEXT_FN(hooks::RaceStatesOnReplay)},
+      {"RaceStates::QuitTick (sub_82168500)", __imp__sub_82168500, ITC_CONTEXT_FN(hooks::RaceStatesQuitTick)},
       {"RaceStates::AfterRaceTick (sub_82167970)", __imp__sub_82167970,
-       hooks::RaceStatesAfterRaceTick},
+       ITC_CONTEXT_FN(hooks::RaceStatesAfterRaceTick)},
   };
   for (const Simple& f : simple) {
     Results results(f.name);
@@ -1773,7 +1773,7 @@ void Handlers(Context& h, const Block& progress, const Block& vehicles, const Bl
         guest::StoreU32(h.base, rw::kManager, manager.address);
         PPCContext t = CallContext(h);
         t.r3.u64 = machine.address;
-        (v == 0 ? Original<__imp__sub_821643B0> : hooks::RaceStatesOnStandingStart)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821643B0> : ITC_CONTEXT_FN(hooks::RaceStatesOnStandingStart))(t, h.base);
         outputs(out[v]);
         out[v].Word(t.r3.u32);
       }
@@ -1794,7 +1794,7 @@ void Handlers(Context& h, const Block& progress, const Block& vehicles, const Bl
         PPCContext t = CallContext(h);
         t.r3.u64 = machine.address;
         t.r4.u64 = dispatcher.address;
-        (v == 0 ? Original<__imp__sub_82164DC0> : hooks::RaceStatesBegin)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82164DC0> : ITC_CONTEXT_FN(hooks::RaceStatesBegin))(t, h.base);
         outputs(out[v]);
         out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
       }
@@ -1815,7 +1815,7 @@ void Handlers(Context& h, const Block& progress, const Block& vehicles, const Bl
         guest::StoreU32(h.base, rs::kProgress, seed == 0 ? 0 : p);
         PPCContext t = CallContext(h);
         t.r3.u64 = machine.address;
-        (v == 0 ? Original<__imp__sub_82163920> : hooks::RaceStatesUnload)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82163920> : ITC_CONTEXT_FN(hooks::RaceStatesUnload))(t, h.base);
         const bool freed = p == 0 || !memory::IsHeapBlock(p);
         out[v].Word(freed ? 1 : 0);
         if (!freed) {
@@ -1860,7 +1860,7 @@ void Handlers(Context& h, const Block& progress, const Block& vehicles, const Bl
         PPCContext t = CallContext(h);
         t.r3.u64 = machine.address;
         t.r4.u64 = dispatcher.address;
-        (v == 0 ? Original<__imp__sub_82168B80> : hooks::RaceStatesFreeStartTick)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82168B80> : ITC_CONTEXT_FN(hooks::RaceStatesFreeStartTick))(t, h.base);
         outputs(out[v]);
       }
       results.Check(out[0], out[1], fmt::format("seed {}", seed));
@@ -1948,7 +1948,7 @@ void Racers(Context& h, const Block& vehicles, const Block& manager) {
         set_up(r);
         PPCContext t = CallContext(h);
         WriteRandom(h.base, t.r1.u32 - 208, 208, r);
-        (v == 0 ? Original<__imp__sub_82165AB0> : hooks::RaceStatesRacersNear)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82165AB0> : ITC_CONTEXT_FN(hooks::RaceStatesRacersNear))(t, h.base);
         near += v == 1 ? t.r3.u32 : 0;
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -1970,7 +1970,7 @@ void Racers(Context& h, const Block& vehicles, const Block& manager) {
         set_up(r);
         PPCContext t = CallContext(h);
         WriteRandom(h.base, t.r1.u32 - 208, 208, r);
-        (v == 0 ? Original<__imp__sub_82165C78> : hooks::RaceStatesRacersClose)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82165C78> : ITC_CONTEXT_FN(hooks::RaceStatesRacersClose))(t, h.base);
         close += v == 1 ? t.r3.u32 : 0;
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -1994,7 +1994,7 @@ void Racers(Context& h, const Block& vehicles, const Block& manager) {
         guest::StoreU32(h.base, count, counts[r.Below(6)]);
         PPCContext t = CallContext(h);
         t.r3.u64 = count;
-        (v == 0 ? Original<__imp__sub_82164A90> : hooks::RaceStatesRacersStill)(t, h.base);
+        (v == 0 ? Original<__imp__sub_82164A90> : ITC_CONTEXT_FN(hooks::RaceStatesRacersStill))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
         out[v].Word(guest::LoadU32(h.base, count));
@@ -2021,7 +2021,7 @@ void Racers(Context& h, const Block& vehicles, const Block& manager) {
         WriteRandom(h.base, t.r1.u32 - 512, 512, r);
         t.r3.u64 = machine.address;
         t.r4.u64 = dispatcher.address;
-        (v == 0 ? Original<__imp__sub_821674A0> : hooks::RaceStatesCountdownTick)(t, h.base);
+        (v == 0 ? Original<__imp__sub_821674A0> : ITC_CONTEXT_FN(hooks::RaceStatesCountdownTick))(t, h.base);
         out[v].Bytes(Read(h.base, machine.address + 9600, 64));
         out[v].Bytes(Read(h.base, dispatcher.address, 1024));
         out[v].Word(guest::LoadU32(h.base, race.address + 0x59AE4));
@@ -2094,7 +2094,7 @@ void Inits(Context& h) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = machine.address;
-      (v == 0 ? Original<__imp__sub_82169920> : hooks::RaceStatesInit)(t, h.base);
+      (v == 0 ? Original<__imp__sub_82169920> : ITC_CONTEXT_FN(hooks::RaceStatesInit))(t, h.base);
       const uint32_t block = guest::LoadU32(h.base, rs::kProgress);
       out[v].Word(block != 0 && block == probe ? 1 : 0);
       out[v].Word(guest::LoadU32(h.base, machine.address + 9624) == block ? 1 : 0);
@@ -2252,7 +2252,7 @@ void CourseRecord(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = h.data;
         t.r4.u64 = h.data + 4;
-        (v == 0 ? Original<__imp__sub_820FF458> : hooks::RaceStatesTimeAdd)(t, h.base);
+        (v == 0 ? Original<__imp__sub_820FF458> : ITC_CONTEXT_FN(hooks::RaceStatesTimeAdd))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
       }
@@ -2267,12 +2267,12 @@ void CourseRecord(Context& h) {
     int cases;
   };
   const Group groups[] = {
-      {"CourseEntry::Clear (sub_82105BC8)", __imp__sub_82105BC8, NativeCourseEntryClear, 8},
-      {"CourseRecord::Place (sub_82105EA0)", __imp__sub_82105EA0, NativeCoursePlace, 120},
-      {"CourseRecord::Link (sub_82105D60)", __imp__sub_82105D60, NativeCourseLink, 80},
-      {"CourseRecord::Unlink (sub_82105DC8)", __imp__sub_82105DC8, NativeCourseUnlink, 80},
-      {"CourseRecord::Insert (sub_82105E30)", __imp__sub_82105E30, NativeCourseInsert, 80},
-      {"CourseRecord::Add (sub_82105F50)", __imp__sub_82105F50, NativeCourseAdd, 160},
+      {"CourseEntry::Clear (sub_82105BC8)", __imp__sub_82105BC8, ITC_CONTEXT_FN(NativeCourseEntryClear), 8},
+      {"CourseRecord::Place (sub_82105EA0)", __imp__sub_82105EA0, ITC_CONTEXT_FN(NativeCoursePlace), 120},
+      {"CourseRecord::Link (sub_82105D60)", __imp__sub_82105D60, ITC_CONTEXT_FN(NativeCourseLink), 80},
+      {"CourseRecord::Unlink (sub_82105DC8)", __imp__sub_82105DC8, ITC_CONTEXT_FN(NativeCourseUnlink), 80},
+      {"CourseRecord::Insert (sub_82105E30)", __imp__sub_82105E30, ITC_CONTEXT_FN(NativeCourseInsert), 80},
+      {"CourseRecord::Add (sub_82105F50)", __imp__sub_82105F50, ITC_CONTEXT_FN(NativeCourseAdd), 160},
   };
   for (const Group& g : groups) {
     Results results(g.name);
@@ -2289,28 +2289,28 @@ void CourseRecord(Context& h) {
         PPCContext t = CallContext(h);
         const uint32_t sp = t.r1.u32;
         WriteRandom(h.base, sp - 1024, 1024 + 64, r);
-        t.r3.u64 = g.native == NativeCourseEntryClear ? entry : list;
-        if (g.native == NativeCoursePlace) {
+        t.r3.u64 = g.native == ITC_CONTEXT_FN(NativeCourseEntryClear) ? entry : list;
+        if (g.native == ITC_CONTEXT_FN(NativeCoursePlace)) {
           t.r4.u64 = r.Below(3) == 0 ? guest::LoadU32(h.base, list + 52 + 28 * r.Below(10) + 20)
                                      : PackedTime(r);
-        } else if (g.native == NativeCourseLink) {
+        } else if (g.native == ITC_CONTEXT_FN(NativeCourseLink)) {
           // A place up to the count (the free list's first linked in).
           t.r4.u64 = count < 10 ? r.Below(count + 1) : 0;
           if (count == 10) {
             guest::StoreU16(h.base, list + 48, 9);
           }
-        } else if (g.native == NativeCourseUnlink) {
+        } else if (g.native == ITC_CONTEXT_FN(NativeCourseUnlink)) {
           t.r4.u64 = count > 0 ? r.Below(count) : 0;
           if (count == 0) {
             MakeCourseList(h.base, list, 1, r);
           }
-        } else if (g.native == NativeCourseInsert) {
+        } else if (g.native == ITC_CONTEXT_FN(NativeCourseInsert)) {
           t.r4.u64 = entry;
           if (count == 10) {
             MakeCourseList(h.base, list, 9, r);
           }
           t.r5.u64 = r.Below(std::min<uint32_t>(count, 9) + 1);
-        } else if (g.native == NativeCourseAdd) {
+        } else if (g.native == ITC_CONTEXT_FN(NativeCourseAdd)) {
           t.r4.u64 = entry;
           t.r5.u64 = source;
         }
@@ -2322,7 +2322,7 @@ void CourseRecord(Context& h) {
         out[v].Word(guest::LoadU32(h.base, sp - 128 + 80));
         out[v].Word(guest::LoadU32(h.base, sp - 256 + 80));
         out[v].Word(t.r1.u32);
-        if (g.native == NativeCoursePlace || g.native == NativeCourseAdd) {
+        if (g.native == ITC_CONTEXT_FN(NativeCoursePlace) || g.native == ITC_CONTEXT_FN(NativeCourseAdd)) {
           out[v].Word(t.r3.u32);
           out[v].Word(uint32_t(t.r3.u64 >> 32));
         }
@@ -2360,7 +2360,7 @@ void CourseRecord(Context& h) {
         t.r3.u64 = records.address;
         t.r4.u64 = race.address;
         t.lr = 0x82000000 | r.Below(0x10000) << 2;
-        (v == 0 ? __imp__sub_82105C18 : NativeCourseSave)(t, h.base);
+        (v == 0 ? __imp__sub_82105C18 : ITC_CONTEXT_FN(NativeCourseSave))(t, h.base);
         out[v].Bytes(Read(h.base, records.address, records.bytes));
         out[v].Bytes(Read(h.base, stages, 812 + 408));
         out[v].Word(t.r1.u32);
@@ -2496,7 +2496,7 @@ void RaceEnd(Context& h, const Block& progress, const Block& vehicles) {
       g_write_base = h.base;
       g_write_chained = hooks::g_start_up_recorder;
       hooks::g_start_up_recorder = RecordAchievementWrite;
-      (v == 0 ? Original<__imp__sub_821644D8> : hooks::RaceStatesOnRaceEnd)(t, h.base);
+      (v == 0 ? Original<__imp__sub_821644D8> : ITC_CONTEXT_FN(hooks::RaceStatesOnRaceEnd))(t, h.base);
       hooks::g_start_up_recorder = g_write_chained;
       g_write_chained = nullptr;
       if (v == 1) {

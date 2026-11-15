@@ -1,6 +1,7 @@
 // Finds the pause menu's selection (--find_menu_selection).
 
 #include "menu_selection_scan.h"
+#include "hooks/native_entry.h"
 
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
@@ -239,8 +240,8 @@ void MenuSelectionScan_After(uint8_t* base, const char* kind, uint32_t id) {
 // its plain C++ (`step`, src/sound_cues/manager_update.h) with
 // --native_audio_manager_update, else the original.
 #define ITC_MENU_SCAN_WRAP(address, step)                   \
-  extern "C" REX_FUNC(sub_##address) {                      \
-    REX_FUNC_PROLOGUE();                                    \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                      \
+    \
     debug::MenuSelectionScan_Before(base);                  \
     if (ITC_FLAG(native_audio_manager_update)) {            \
       lifted_call::EnterR3<sound_cues::step>(ctx, base);    \
@@ -259,8 +260,8 @@ ITC_MENU_SCAN_WRAP(82118C18, ManagerRemoveStoppedSounds)
 
 // Job::Wait: its native body (src/hooks/frame_passes.cpp, --native_frame_passes)
 // inside the wrap.
-extern "C" REX_FUNC(sub_82094B10) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82094B10) {
+  
   debug::MenuSelectionScan_Before(base);
   hooks::FramePassesJobWait(ctx, base);
   debug::MenuSelectionScan_After(base, "call", 0x82094B10);

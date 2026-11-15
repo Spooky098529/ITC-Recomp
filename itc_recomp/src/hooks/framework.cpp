@@ -7,6 +7,7 @@
 // DebugText::SetPosition's plain C++ call them.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -71,7 +72,7 @@ namespace fw = framework;
 
 // A function of r3 answering a word in r3.
 #define ITC_FRAMEWORK_WORD(address, function) \
-  extern "C" REX_FUNC(sub_##address) {        \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {        \
     ITC_FRAMEWORK_FALLBACK(address)           \
     ctx.r3.u64 = fw::function(base, ctx.r3.u32); \
   }
@@ -92,7 +93,7 @@ ITC_FRAMEWORK_WORD(82090908, SceneFrom36)
 
 // DebugText::SetPosition: r4, r5 = pointers to x and y; r3, r4 the words
 // and r11 as the original leaves them.
-extern "C" REX_FUNC(sub_82091050) {
+ITC_NATIVE_ENTRY_ALWAYS(82091050) {
   ITC_FRAMEWORK_FALLBACK(82091050)
   const uint32_t x = guest::LoadU32(base, ctx.r4.u32);
   const uint32_t y = guest::LoadU32(base, ctx.r5.u32);
@@ -122,7 +123,7 @@ fw::Iterator IteratorAt(uint8_t* base, uint32_t address) {
 }  // namespace
 
 // The map iterator's operator++: r3 = the iterator; r3 left.
-extern "C" REX_FUNC(sub_82099B18) {
+ITC_NATIVE_ENTRY_ALWAYS(82099B18) {
   ITC_FRAMEWORK_FALLBACK(82099B18)
   fw::Iterator it = IteratorAt(base, ctx.r3.u32);
   if (!fw::MapIncrement(base, it)) {
@@ -133,15 +134,15 @@ extern "C" REX_FUNC(sub_82099B18) {
 }
 
 // HandlerMap: r3 = the map; r3 the head.
-extern "C" REX_FUNC(sub_82099FB0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82099FB0) {
+  
   // The app's start-up harness's recorder first (hooks/app_start_up.h:
   // App::App's callees).
   if (hooks::StartUpRecorded(ctx, 0x82099FB0)) {
     return;
   }
   if (!NativeHeap() || !fw::CanAllocate(base)) {
-    __imp__sub_82099FB0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82099FB0);
     return;
   }
   ctx.r3.u64 = fw::MapConstruct(base, ctx.r3.u32);
@@ -149,14 +150,14 @@ extern "C" REX_FUNC(sub_82099FB0) {
 
 // Insert: r3 = the result (an iterator and the inserted byte), r4 = the
 // map, r5 = the value; r3 the result.
-extern "C" REX_FUNC(sub_82093740) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82093740) {
+  
   std::optional<fw::InsertResult> result;
   if (NativeHeap()) {
     result = fw::MapInsertUnique(base, ctx.r4.u32, ctx.r5.u32);
   }
   if (!result) {
-    __imp__sub_82093740(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82093740);
     return;
   }
   guest::StoreU32(base, ctx.r3.u32 + 0, result->where.container);
@@ -166,7 +167,7 @@ extern "C" REX_FUNC(sub_82093740) {
 
 // RequestVector::Clear: r3 = the vector; r3 the result in its 96-byte frame
 // (r1 - 16), as the original leaves it.
-extern "C" REX_FUNC(sub_8209A080) {
+ITC_NATIVE_ENTRY_ALWAYS(8209A080) {
   ITC_FRAMEWORK_FALLBACK(8209A080)
   if (!fw::RequestsClear(base, ctx.r3.u32)) {
     lifted::original::c8209A080(ctx, base);
@@ -178,14 +179,14 @@ extern "C" REX_FUNC(sub_8209A080) {
 // RequestVector::PushBack: r3 = the vector, r4 = the request; r3 the
 // vector, or Insert's result in its 96-byte frame (r1 - 16) when it took
 // Insert, as the original leaves it.
-extern "C" REX_FUNC(sub_8209A930) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209A930) {
+  
   std::optional<bool> inserted;
   if (NativeHeap()) {
     inserted = fw::RequestsPushBack(base, ctx.r3.u32, ctx.r4.u32);
   }
   if (!inserted) {
-    __imp__sub_8209A930(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209A930);
     return;
   }
   if (*inserted) {
@@ -197,15 +198,15 @@ extern "C" REX_FUNC(sub_8209A930) {
 // key, r5 = the delegate (high word), both also stored in the caller's
 // frame (r1 + 32, + 40) as the original does; r3 HandlerMap::Insert's
 // result in its 128-byte frame (r1 - 32) when it inserted, else left.
-extern "C" REX_FUNC(sub_8209A458) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209A458) {
+  
   std::optional<bool> inserted;
   if (NativeHeap()) {
     inserted = fw::RunLoopApplyRequest(base, ctx.r3.u32, uint32_t(ctx.r4.u64 >> 32), ctx.r4.u32,
                                        uint32_t(ctx.r5.u64 >> 32));
   }
   if (!inserted) {
-    __imp__sub_8209A458(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209A458);
     return;
   }
   REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
@@ -220,7 +221,7 @@ extern "C" REX_FUNC(sub_8209A458) {
 namespace {
 
 // A tail call: r3 = the object, the target through ctr, lr left.
-void TailCall(PPCContext& ctx, uint8_t* base, fw::VirtualCall call) {
+void TailCall(lifted::Regs& ctx, uint8_t* base, fw::VirtualCall call) {
   ctx.r3.u64 = call.object;
   ctx.ctr.u64 = call.target;
   lifted::CallFromContext(ctx, base, ctx.ctr.u32);
@@ -230,7 +231,7 @@ void TailCall(PPCContext& ctx, uint8_t* base, fw::VirtualCall call) {
 
 bool hooks::NativeFramework() { return ITC_FLAG(native_framework); }
 
-void hooks::TickHandlerInvoke(PPCContext& ctx, uint8_t* base) {
+void hooks::TickHandlerInvoke(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t loop = ctx.r3.u32;
   const uint32_t delegate = ctx.r4.u32;
   REX_STORE_U64(ctx.r1.u32 + 24, ctx.r4.u64);
@@ -243,20 +244,20 @@ void hooks::TickHandlerInvoke(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void hooks::DelegateSlot1Thunk(PPCContext& ctx, uint8_t* base) {
+void hooks::DelegateSlot1Thunk(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t target = fw::DelegateSlot1Target(base, ctx.r3.u32);
   TailCall(ctx, base, {ctx.r3.u32, target});
 }
 
 // The delegate thunk sub_82096330 (FrameStart's tick handler 4): r3 = the
 // object; its slot 0 as a tail call.
-extern "C" REX_FUNC(sub_82096330) {
+ITC_NATIVE_ENTRY_ALWAYS(82096330) {
   ITC_FRAMEWORK_FALLBACK(82096330)
   TailCall(ctx, base, {ctx.r3.u32, fw::DelegateSlot0Target(base, ctx.r3.u32)});
 }
 
 // Framework::Start: r3 = the framework; the app's slot +36 as a tail call.
-extern "C" REX_FUNC(sub_820902B0) {
+ITC_NATIVE_ENTRY_ALWAYS(820902B0) {
   ITC_FRAMEWORK_FALLBACK(820902B0)
   TailCall(ctx, base, fw::FrameworkStartCall(base, ctx.r3.u32));
 }
@@ -265,7 +266,7 @@ namespace {
 
 // The app's input source: InputManagerFrom36's plain C++ when that's the
 // target (in play), else a tail call.
-void AppInputSource(PPCContext& ctx, uint8_t* base, fw::VirtualCall call) {
+void AppInputSource(lifted::Regs& ctx, uint8_t* base, fw::VirtualCall call) {
   if (call.target == 0x82090830) {
     ctx.r3.u64 = fw::InputManagerFrom36(base, call.object);
     return;
@@ -276,13 +277,13 @@ void AppInputSource(PPCContext& ctx, uint8_t* base, fw::VirtualCall call) {
 }  // namespace
 
 // sub_82094350: r3 = app + 4; r3 the input source's answer.
-extern "C" REX_FUNC(sub_82094350) {
+ITC_NATIVE_ENTRY_ALWAYS(82094350) {
   ITC_FRAMEWORK_FALLBACK(82094350)
   AppInputSource(ctx, base, fw::AppInputSourceCall(base, ctx.r3.u32));
 }
 
 // sub_820944C8: r3 = app + 16; as sub_82094350 from app + 4.
-extern "C" REX_FUNC(sub_820944C8) {
+ITC_NATIVE_ENTRY_ALWAYS(820944C8) {
   ITC_FRAMEWORK_FALLBACK(820944C8)
   AppInputSource(ctx, base, fw::AppInputSourceFrom16Call(base, ctx.r3.u32));
 }
@@ -290,7 +291,7 @@ extern "C" REX_FUNC(sub_820944C8) {
 // Framework::OnTick: r3 = the framework, r4 = the run loop; its guest calls
 // from a 128-byte frame like the original's (the key at r1 + 80 there), with
 // the original's return addresses. r3 as the last call leaves it.
-extern "C" REX_FUNC(sub_820902C8) {
+ITC_NATIVE_ENTRY_ALWAYS(820902C8) {
   ITC_FRAMEWORK_FALLBACK(820902C8)
   const uint32_t framework = ctx.r3.u32;
   const uint32_t loop = ctx.r4.u32;
@@ -323,7 +324,7 @@ namespace {
 // address, r5 = the delegate; the copy made with its slot 2 and the request
 // pushed, from a 112-byte frame like the original's (the request at r1 + 80
 // there). r3 as PushBack leaves it.
-void AddRequest(PPCContext& ctx, uint8_t* base, uint32_t type, uint32_t clone_return,
+void AddRequest(lifted::Regs& ctx, uint8_t* base, uint32_t type, uint32_t clone_return,
                 uint32_t push_return) {
   const uint32_t loop = ctx.r3.u32;
   const uint32_t key = ctx.r4.u32;
@@ -342,7 +343,7 @@ void AddRequest(PPCContext& ctx, uint8_t* base, uint32_t type, uint32_t clone_re
       ctx.r3.u64 = loop + fw::kRequests;
       ctx.r4.u64 = request;
       ctx.lr = push_return;
-      __imp__sub_8209A930(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_8209A930);
       return;
     }
     ctx.r3.u64 = *inserted ? frame - 16 : loop + fw::kRequests;
@@ -352,19 +353,19 @@ void AddRequest(PPCContext& ctx, uint8_t* base, uint32_t type, uint32_t clone_re
 }  // namespace
 
 // RunLoop::AddTickHandler (vtable slot 2) and AddListener (slot 1).
-extern "C" REX_FUNC(sub_8209AAA8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209AAA8) {
+  
   if (!NativeHeap()) {
-    __imp__sub_8209AAA8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209AAA8);
     return;
   }
   AddRequest(ctx, base, 0, 0x8209AAE0, 0x8209AAF0);
 }
 
-extern "C" REX_FUNC(sub_8209AB48) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209AB48) {
+  
   if (!NativeHeap()) {
-    __imp__sub_8209AB48(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209AB48);
     return;
   }
   AddRequest(ctx, base, 2, 0x8209AB80, 0x8209AB90);
@@ -381,7 +382,7 @@ namespace {
 
 // A guest call of `object`'s slot at `offset` with the original's return
 // address; r3 its answer.
-uint32_t VirtualCallFrom(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t offset,
+uint32_t VirtualCallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t offset,
                          uint32_t return_address) {
   ctx.r3.u64 = object;
   ctx.ctr.u64 = fw::VirtualTarget(base, object, offset);
@@ -392,7 +393,7 @@ uint32_t VirtualCallFrom(PPCContext& ctx, uint8_t* base, uint32_t object, uint32
 
 // The PoolMakers: r3 = the maker, r4 = the interface; its slot 1 from a
 // 96-byte frame; r3 the maker.
-void PoolMaker(PPCContext& ctx, uint8_t* base, uint32_t vtable, uint32_t return_address) {
+void PoolMaker(lifted::Regs& ctx, uint8_t* base, uint32_t vtable, uint32_t return_address) {
   const uint32_t maker = ctx.r3.u32;
   const uint32_t interface = ctx.r4.u32;
   guest_call::InFrame(ctx, base, 96, return_address, [&](uint32_t) {
@@ -405,12 +406,12 @@ void PoolMaker(PPCContext& ctx, uint8_t* base, uint32_t vtable, uint32_t return_
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_820AC8F8) {
+ITC_NATIVE_ENTRY_ALWAYS(820AC8F8) {
   ITC_FRAMEWORK_FALLBACK(820AC8F8)
   PoolMaker(ctx, base, 0x82002848, 0x820AC92C);
 }
 
-extern "C" REX_FUNC(sub_820AC848) {
+ITC_NATIVE_ENTRY_ALWAYS(820AC848) {
   ITC_FRAMEWORK_FALLBACK(820AC848)
   PoolMaker(ctx, base, 0x82002840, 0x820AC87C);
 }
@@ -418,7 +419,7 @@ extern "C" REX_FUNC(sub_820AC848) {
 // FrameStart::FrameStart: r3 = it, r4 = the block; the run loop's slots
 // from a 144-byte frame (the key and delegates there, as the original's);
 // r3 it.
-extern "C" REX_FUNC(sub_82092710) {
+ITC_NATIVE_ENTRY_ALWAYS(82092710) {
   ITC_FRAMEWORK_FALLBACK(82092710)
   const uint32_t frame_start = ctx.r3.u32;
   const uint32_t block = ctx.r4.u32;
@@ -437,10 +438,10 @@ extern "C" REX_FUNC(sub_82092710) {
 // DebugText::Create: r3 = the block; operator new(52) and the constructor,
 // its post from the constructor's 160-byte frame below Create's 96-byte one
 // (the stack word read there); r3 the debug text or 0.
-extern "C" REX_FUNC(sub_82091160) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82091160) {
+  
   if (!NativeHeap()) {
-    __imp__sub_82091160(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82091160);
     return;
   }
   const uint32_t stack_word = guest::LoadU32(base, ctx.r1.u32 - 96 - 160 + 100);
@@ -455,7 +456,7 @@ extern "C" REX_FUNC(sub_82091160) {
         });
       });
   if (!text) {
-    __imp__sub_82091160(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82091160);
     return;
   }
   ctx.r3.u64 = *text;
@@ -465,7 +466,7 @@ extern "C" REX_FUNC(sub_82091160) {
 // r3 to r5 and lr set, the function run through the function table (its
 // override), r1 put back.
 namespace {
-fw::GuestCall DebugFontCall(PPCContext& ctx, uint8_t* base) {
+fw::GuestCall DebugFontCall(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t function, uint32_t r1, uint32_t lr, uint64_t r3, uint64_t r4,
                       uint64_t r5) -> uint64_t {
     const uint64_t stack = ctx.r1.u64;
@@ -481,14 +482,14 @@ fw::GuestCall DebugFontCall(PPCContext& ctx, uint8_t* base) {
 }
 }  // namespace
 
-void hooks::DebugTextLoadFontSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::DebugTextLoadFontSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = fw::DebugTextLoadFont(base, ctx.r3.u32, ctx.r1.u32, DebugFontCall(ctx, base));
   ctx.lr = lr;
 }
 
-void hooks::DebugFontInitSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::DebugFontInitSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = fw::DebugFontInit(base, ctx.r3.u32, ctx.r1.u32, DebugFontCall(ctx, base));
@@ -498,10 +499,10 @@ void hooks::DebugFontInitSteps(PPCContext& ctx, uint8_t* base) {
 // DebugText::LoadFont: r3 = the debug text (the job's delegate calls it;
 // no direct callers). DebugFont::Init has no adapter: only its plain C++
 // calls it.
-extern "C" REX_FUNC(sub_82090CC0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82090CC0) {
+  
   if (!NativeHeap() || !ITC_FLAG(native_file_layer)) {
-    __imp__sub_82090CC0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82090CC0);
     return;
   }
   hooks::DebugTextLoadFontSteps(ctx, base);
@@ -516,7 +517,7 @@ extern "C" REX_FUNC(sub_82090CC0) {
 // flag switches them through main. Their register steps stay for the
 // harness.
 
-fw::MainLoopCalls hooks::MainLoopCalls(PPCContext& ctx, uint8_t* base) {
+fw::MainLoopCalls hooks::MainLoopCalls(lifted::Regs& ctx, uint8_t* base) {
   fw::MainLoopCalls calls;
   calls.call = [&ctx, base](uint32_t target, uint32_t r3, std::optional<uint64_t> r4,
                             std::optional<uint64_t> r5, uint32_t return_address) {
@@ -562,7 +563,7 @@ fw::MainLoopCalls hooks::MainLoopCalls(PPCContext& ctx, uint8_t* base) {
     }
     ctx.r3.u64 = loop;
     ctx.lr = 0x8209AC04;
-    __imp__sub_8209A9F0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209A9F0);
   };
   calls.create_framework = [&ctx, base](uint32_t holder) {
     if (NativeHeap() && fw::FrameworkCreate(base, holder)) {
@@ -570,7 +571,7 @@ fw::MainLoopCalls hooks::MainLoopCalls(PPCContext& ctx, uint8_t* base) {
     }
     ctx.r3.u64 = holder;
     ctx.lr = 0x82090120;
-    __imp__sub_820909B8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820909B8);
   };
   calls.destroy_run_loop = [&ctx, base](uint32_t loop) {
     ctx.r3.u64 = loop;
@@ -585,7 +586,7 @@ fw::MainLoopCalls hooks::MainLoopCalls(PPCContext& ctx, uint8_t* base) {
   return calls;
 }
 
-void hooks::ForEachTickHandler(PPCContext& ctx, uint8_t* base) {
+void hooks::ForEachTickHandler(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t result = ctx.r3.u32;
   const uint64_t first = ctx.r4.u64, last = ctx.r5.u64, functor = ctx.r6.u64;
   const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
@@ -595,7 +596,7 @@ void hooks::ForEachTickHandler(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = result;
 }
 
-void hooks::ForEachRequest(PPCContext& ctx, uint8_t* base) {
+void hooks::ForEachRequest(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t result = ctx.r3.u32;
   const uint64_t first = ctx.r4.u64, last = ctx.r5.u64, functor = ctx.r6.u64;
   const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
@@ -605,7 +606,7 @@ void hooks::ForEachRequest(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = result;
 }
 
-void hooks::AppRun(PPCContext& ctx, uint8_t* base) {
+void hooks::AppRun(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t loop = ctx.r3.u32;
   const uint32_t framework = ctx.r4.u32;
   const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
@@ -616,7 +617,7 @@ void hooks::AppRun(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = answer;
 }
 
-void hooks::RunFramework(PPCContext& ctx, uint8_t* base) {
+void hooks::RunFramework(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t framework = ctx.r3.u32;
   const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
   uint32_t answer = 0;
@@ -626,13 +627,13 @@ void hooks::RunFramework(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = answer;
 }
 
-void hooks::RunFrameworkAt(PPCContext& ctx, uint8_t* base) {
+void hooks::RunFrameworkAt(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t holder = ctx.r3.u32;
   const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
   ctx.r3.u64 = fw::RunFrameworkAt(base, holder, calls);
 }
 
-void hooks::Main(PPCContext& ctx, uint8_t* base) {
+void hooks::Main(lifted::Regs& ctx, uint8_t* base) {
   const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
   uint32_t answer = 0;
   guest_call::InFrame(ctx, base, 112, uint32_t(ctx.lr),
@@ -642,7 +643,7 @@ void hooks::Main(PPCContext& ctx, uint8_t* base) {
 
 // main: the guest's entry on the main thread (from xstart); r3 the run's
 // answer (never, in play).
-extern "C" REX_FUNC(sub_82090108) {
+ITC_NATIVE_ENTRY_ALWAYS(82090108) {
   ITC_FRAMEWORK_FALLBACK(82090108)
   hooks::Main(ctx, base);
 }

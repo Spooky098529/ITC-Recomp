@@ -290,7 +290,7 @@ void Math(Context& h) {
           [&](size_t i, PPCContext& t) { t.f1.f64 = values[i]; },
           [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.r3.u64); },
           [&](size_t i) { return "x " + Bits(values[i]); });
-    Cases(h, "_decomp (sub_825AFF80)", __imp__sub_825AFF80, NativeDecomp, values.size(),
+    Cases(h, "_decomp (sub_825AFF80)", __imp__sub_825AFF80, ITC_CONTEXT_FN(NativeDecomp), values.size(),
           [&](size_t i, PPCContext& t) {
             t.f1.f64 = values[i];
             t.r4.u64 = h.data;

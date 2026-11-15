@@ -907,23 +907,23 @@ void TuningScreenPages(Context& h) {
   // (+48 to +79, the varargs SetText stores: the user's call for the unset
   // ones, 2026-10-30).
   Run(h, w, {"TuningScreen::UpdateListCounter", 20, __imp__sub_821EED00,
-             hooks::TuningUpdateListCounter, {{-112, -112 + 48}, {-112 + 80, -24}}});
-  Run(h, w, {"TuningScreen::SetPartName", 20, __imp__sub_821F2068, hooks::TuningSetPartName,
+             ITC_CONTEXT_FN(hooks::TuningUpdateListCounter), {{-112, -112 + 48}, {-112 + 80, -24}}});
+  Run(h, w, {"TuningScreen::SetPartName", 20, __imp__sub_821F2068, ITC_CONTEXT_FN(hooks::TuningSetPartName),
              {{-848, -848 + 48}, {-848 + 80, -24}}});
   Run(h, w, {"TuningScreen::PlayGroupAnimation", 25, __imp__sub_821EE880,
-             hooks::TuningPlayGroupAnimation, {{-112, -24}}});
-  Run(h, w, {"TuningScreen::Command31", 15, __imp__sub_82202880, hooks::TuningCommand31,
+             ITC_CONTEXT_FN(hooks::TuningPlayGroupAnimation), {{-112, -24}}});
+  Run(h, w, {"TuningScreen::Command31", 15, __imp__sub_82202880, ITC_CONTEXT_FN(hooks::TuningCommand31),
              {{-112, -24}}});
-  Run(h, w, {"TuningScreen::Command9", 20, __imp__sub_821E9050, hooks::TuningCommand9,
+  Run(h, w, {"TuningScreen::Command9", 20, __imp__sub_821E9050, ITC_CONTEXT_FN(hooks::TuningCommand9),
              {{-128, -32}}});
   // savegprlr_28: 40 bytes.
-  Run(h, w, {"TuningScreen::ShowDialog", 25, __imp__sub_821D6230, hooks::TuningShowDialog,
+  Run(h, w, {"TuningScreen::ShowDialog", 25, __imp__sub_821D6230, ITC_CONTEXT_FN(hooks::TuningShowDialog),
              {{-128, -128 + 48}, {-128 + 80, -40}}, Dialog(kShowDialogStates)});
-  Run(h, w, {"TuningScreen::Command30", 20, __imp__sub_82202750, hooks::TuningCommand30,
+  Run(h, w, {"TuningScreen::Command30", 20, __imp__sub_82202750, ITC_CONTEXT_FN(hooks::TuningCommand30),
              {{-128, -128 + 48}, {-128 + 80, -32}}, Dialog(kCommand30States)});
   // Command7: the wheel x mostly 0 to 3, now and then to 599 (415 + x a
   // named animation).
-  Run(h, w, {"TuningScreen::Command7", 20, __imp__sub_821E8B68, hooks::TuningCommand7,
+  Run(h, w, {"TuningScreen::Command7", 20, __imp__sub_821E8B68, ITC_CONTEXT_FN(hooks::TuningCommand7),
              {{-128, -32}}, [](PPCContext&, Random& r, const World& w) {
                NamedAnimations(w, r);
                guest::StoreU32(w.base, w.screen() + 25196,
@@ -931,7 +931,7 @@ void TuningScreenPages(Context& h) {
              }});
   // Command23: the movie's +28 table pointing into the block, the set 0 to
   // 2, the pick 0 to 3.
-  Run(h, w, {"TuningScreen::Command23", 20, __imp__sub_82202368, hooks::TuningCommand23,
+  Run(h, w, {"TuningScreen::Command23", 20, __imp__sub_82202368, ITC_CONTEXT_FN(hooks::TuningCommand23),
              {{-112, -24}}, [](PPCContext&, Random& r, const World& w) {
                NamedAnimations(w, r);
                guest::StoreU32(w.base, w.at(kMovieAt) + 28, w.at(kTableAt));
@@ -946,7 +946,7 @@ void TuningScreenPages(Context& h) {
              }});
   // Command18: the slot's word 28 half the time, +30748 mostly small (130
   // on a named animation).
-  Run(h, w, {"TuningScreen::Command18", 20, __imp__sub_82200600, hooks::TuningCommand18,
+  Run(h, w, {"TuningScreen::Command18", 20, __imp__sub_82200600, ITC_CONTEXT_FN(hooks::TuningCommand18),
              {{-128, -32}}, [](PPCContext&, Random& r, const World& w) {
                NamedAnimations(w, r);
                const uint32_t s = w.screen();
@@ -958,7 +958,7 @@ void TuningScreenPages(Context& h) {
                guest::StoreU32(w.base, s + 30748, r.Below(4) == 0 ? r.Below(890) : r.Below(8));
              }});
   // Command25: PlaceStateNodes' states now and then, its rows 0 to 7.
-  Run(h, w, {"TuningScreen::Command25", 20, __imp__sub_82204888, hooks::TuningCommand25,
+  Run(h, w, {"TuningScreen::Command25", 20, __imp__sub_82204888, ITC_CONTEXT_FN(hooks::TuningCommand25),
              {{-128, -128 + 48}, {-128 + 80, -32}}, [](PPCContext&, Random& r, const World& w) {
                NamedAnimations(w, r);
                const uint32_t s = w.screen();
@@ -968,12 +968,12 @@ void TuningScreenPages(Context& h) {
                guest::StoreU32(w.base, s + 30724, r.Below(8));
              }});
   // PlayIntro: the scene's and sub-scene 9's animation 0.
-  Run(h, w, {"TuningScreen::PlayIntro", 20, __imp__sub_821D06B0, hooks::TuningPlayIntro,
+  Run(h, w, {"TuningScreen::PlayIntro", 20, __imp__sub_821D06B0, ITC_CONTEXT_FN(hooks::TuningPlayIntro),
              {{-128, -32}}, [](PPCContext&, Random& r, const World& w) {
                SceneAnimations(w, r);
              }});
   // OpenItems: aero (+9656 4) half the time, the named 976, 1012 and 1013.
-  Run(h, w, {"TuningScreen::OpenItems", 25, __imp__sub_821D0A48, hooks::TuningOpenItems,
+  Run(h, w, {"TuningScreen::OpenItems", 25, __imp__sub_821D0A48, ITC_CONTEXT_FN(hooks::TuningOpenItems),
              {{-128, -32}}, [](PPCContext&, Random& r, const World& w) {
                SceneAnimations(w, r);
                NamedAnimations(w, r);
@@ -981,7 +981,7 @@ void TuningScreenPages(Context& h) {
              }});
   // Command15: +30724 mostly small (6 on a named animation), now and then
   // negative.
-  Run(h, w, {"TuningScreen::Command15", 20, __imp__sub_821FF1D0, hooks::TuningCommand15,
+  Run(h, w, {"TuningScreen::Command15", 20, __imp__sub_821FF1D0, ITC_CONTEXT_FN(hooks::TuningCommand15),
              {{-128, -128 + 48}, {-128 + 80, -32}}, [](PPCContext&, Random& r, const World& w) {
                NamedAnimations(w, r);
                const uint32_t v = r.Below(6) == 0 ? uint32_t(-int32_t(r.Below(5))) : r.Below(8);
@@ -989,7 +989,7 @@ void TuningScreenPages(Context& h) {
              }});
   // Command22: the set 0 to 2, +30732 0 to 2, the word it picks -1 half the
   // time; the movie's +28 table pointing into the block.
-  Run(h, w, {"TuningScreen::Command22", 25, __imp__sub_82202090, hooks::TuningCommand22,
+  Run(h, w, {"TuningScreen::Command22", 25, __imp__sub_82202090, ITC_CONTEXT_FN(hooks::TuningCommand22),
              {{-128, -128 + 48}, {-128 + 80, -32}}, [](PPCContext&, Random& r, const World& w) {
                NamedAnimations(w, r);
                guest::StoreU32(w.base, w.at(kMovieAt) + 28, w.at(kTableAt));
@@ -1008,13 +1008,13 @@ void TuningScreenPages(Context& h) {
                }
              }});
   // MoveCategory: the menu's step and wrap, the player's mapper (above).
-  Run(h, w, {"TuningScreen::MoveCategory", 25, __imp__sub_821D07D8, hooks::TuningMoveCategory,
+  Run(h, w, {"TuningScreen::MoveCategory", 25, __imp__sub_821D07D8, ITC_CONTEXT_FN(hooks::TuningMoveCategory),
              {{-128, -32}}, [](PPCContext&, Random& r, const World& w) {
                MoveCategoryWorld(w, r);
              }});
   // MarkPick: states 4 and 53 mostly, [+33548] 0 to 4 (3 the far marks);
   // r28 to r31, f30 and f31 saved (56 bytes).
-  Run(h, w, {"TuningScreen::MarkPick", 25, __imp__sub_821D6420, hooks::TuningMarkPick,
+  Run(h, w, {"TuningScreen::MarkPick", 25, __imp__sub_821D6420, ITC_CONTEXT_FN(hooks::TuningMarkPick),
              {{-144, -56}}, [](PPCContext&, Random& r, const World& w) {
                ListPage(w, r);
                const uint32_t s = w.screen();
@@ -1023,7 +1023,7 @@ void TuningScreenPages(Context& h) {
                guest::StoreU32(w.base, s + 33548, r.Below(3) == 0 ? 3 : Small(r, 5));
              }});
   // Command16: +30732 0 to 6, the set 0 half the time.
-  Run(h, w, {"TuningScreen::Command16", 20, __imp__sub_821FF6F0, hooks::TuningCommand16,
+  Run(h, w, {"TuningScreen::Command16", 20, __imp__sub_821FF6F0, ITC_CONTEXT_FN(hooks::TuningCommand16),
              {{-128, -128 + 48}, {-128 + 80, -32}}, [](PPCContext&, Random& r, const World& w) {
                NamedAnimations(w, r);
                const uint32_t s = w.screen();
@@ -1033,7 +1033,7 @@ void TuningScreenPages(Context& h) {
   // ShowOptions: tire, aero and exterior mostly (items 4 and 1 half the
   // time), the tire's pairs, [+36612] small; r26 to r31 and f31 saved (64
   // bytes).
-  Run(h, w, {"TuningScreen::ShowOptions", 25, __imp__sub_821D5028, hooks::TuningShowOptions,
+  Run(h, w, {"TuningScreen::ShowOptions", 25, __imp__sub_821D5028, ITC_CONTEXT_FN(hooks::TuningShowOptions),
              {{-160, -64}}, [](PPCContext&, Random& r, const World& w) {
                ListPage(w, r);
                const uint32_t s = w.screen();
@@ -1048,7 +1048,7 @@ void TuningScreenPages(Context& h) {
   // ShowLevels: power, power train, body and tire mostly (the extended
   // levels' items half the time), the byte +9677 0 to 12, +25100 0 to 7, the
   // tire's pair.
-  Run(h, w, {"TuningScreen::ShowLevels", 25, __imp__sub_821D12C0, hooks::TuningShowLevels,
+  Run(h, w, {"TuningScreen::ShowLevels", 25, __imp__sub_821D12C0, ITC_CONTEXT_FN(hooks::TuningShowLevels),
              {{-160, -64}}, [](PPCContext&, Random& r, const World& w) {
                ListPage(w, r);
                const uint32_t s = w.screen();
@@ -1063,7 +1063,7 @@ void TuningScreenPages(Context& h) {
              }});
   // UpdateItems: the mappers' slots 8 and 11, the states and the set
   // (above); r29 to r31 saved (32 bytes).
-  Run(h, w, {"TuningScreen::UpdateItems", 25, __imp__sub_822036E8, hooks::TuningUpdateItems,
+  Run(h, w, {"TuningScreen::UpdateItems", 25, __imp__sub_822036E8, ITC_CONTEXT_FN(hooks::TuningUpdateItems),
              {{-128, -32}}, [](PPCContext& t, Random& r, const World& w) {
                UpdateItemsWorld(w, r);
                if (r.Below(4) == 0) {
@@ -1072,24 +1072,24 @@ void TuningScreenPages(Context& h) {
              }});
   // ShowTypes: the pages and the aero parts (above); r27 to r31 and f31
   // saved (56 bytes), SetText's parameter area left out.
-  Run(h, w, {"TuningScreen::ShowTypes", 25, __imp__sub_821D2A80, hooks::TuningShowTypes,
+  Run(h, w, {"TuningScreen::ShowTypes", 25, __imp__sub_821D2A80, ITC_CONTEXT_FN(hooks::TuningShowTypes),
              {{-320, -320 + 48}, {-320 + 80, -56}}, [](PPCContext&, Random& r, const World& w) {
                ShowTypesWorld(w, r);
              }});
   // SetStateTexts: r27 to r31 and f31 saved (56 bytes); SetNodeText's and
   // SetText's parameter area (+40 to +79) left out.
   Run(h, w, {"TuningScreen::SetStateTexts", 25, __imp__sub_821F1DE0,
-             hooks::TuningSetStateTexts, {{-224, -224 + 40}, {-224 + 80, -56}},
+             ITC_CONTEXT_FN(hooks::TuningSetStateTexts), {{-224, -224 + 40}, {-224 + 80, -56}},
              [](PPCContext&, Random& r, const World& w) { StateTextsWorld(w, r); }});
   // RefreshMenu: its world (above); r25 to r31 and f31 saved (72 bytes);
   // SetNodeText's and SetText's parameter area (+40 to +79) left out; f1
   // compared.
-  Run(h, w, {"TuningScreen::RefreshMenu", 40, __imp__sub_821D8978, hooks::TuningRefreshMenu,
+  Run(h, w, {"TuningScreen::RefreshMenu", 40, __imp__sub_821D8978, ITC_CONTEXT_FN(hooks::TuningRefreshMenu),
              {{-240, -240 + 40}, {-240 + 80, -72}},
              [](PPCContext&, Random& r, const World& w) { RefreshMenuWorld(w, r); }, true});
   // Command8: FillPartRows' world and the named 1007 and 1011; r29 to r31
   // saved (32 bytes); r3's high word now and then set.
-  Run(h, w, {"TuningScreen::Command8", 25, __imp__sub_821F5F70, hooks::TuningCommand8,
+  Run(h, w, {"TuningScreen::Command8", 25, __imp__sub_821F5F70, ITC_CONTEXT_FN(hooks::TuningCommand8),
              {{-128, -32}}, [](PPCContext& t, Random& r, const World& w) {
                Command8World(w, r);
                if (r.Below(4) == 0) {
@@ -1098,7 +1098,7 @@ void TuningScreenPages(Context& h) {
              }});
   // FillPartRows: r23 to r31 saved (80 bytes); r3's high word now and then
   // set.
-  Run(h, w, {"TuningScreen::FillPartRows", 25, __imp__sub_821F4BF8, hooks::TuningFillPartRows,
+  Run(h, w, {"TuningScreen::FillPartRows", 25, __imp__sub_821F4BF8, ITC_CONTEXT_FN(hooks::TuningFillPartRows),
              {{-176, -80}}, [](PPCContext& t, Random& r, const World& w) {
                PartRowsWorld(w, r);
                if (r.Below(4) == 0) {
@@ -1109,13 +1109,13 @@ void TuningScreenPages(Context& h) {
   // (above); r29 to r31 saved (32 bytes); SetNodeText's and SetText's
   // parameter area (+40 to +79) left out; f1 compared.
   Run(h, w, {"TuningScreen::RefreshMovie13", 40, __imp__sub_822076E8,
-             hooks::TuningRefreshMovie13, {{-128, -128 + 40}, {-128 + 80, -32}},
+             ITC_CONTEXT_FN(hooks::TuningRefreshMovie13), {{-128, -128 + 40}, {-128 + 80, -32}},
              [](PPCContext&, Random& r, const World& w) { Movie13World(w, r); }, true});
   // Movie 2's command runners never seen in play (after the groups above,
   // so they keep their seeds): the command pages (above). Command5: f31 and
   // r29 to r31 saved (40 bytes).
   const Setup command_page = [](PPCContext&, Random& r, const World& w) { CommandPage(w, r); };
-  Run(h, w, {"TuningScreen::Command5", 50, __imp__sub_821D4180, hooks::TuningCommand5,
+  Run(h, w, {"TuningScreen::Command5", 50, __imp__sub_821D4180, ITC_CONTEXT_FN(hooks::TuningCommand5),
              {{-128, -40}}, [](PPCContext&, Random& r, const World& w) {
                // Its three pages (body's item 3, aero's 4, interior's 0) two
                // times in three, their set-up (+9716) half of those.
@@ -1132,16 +1132,16 @@ void TuningScreenPages(Context& h) {
              }});
   // Command11: r28 to r31 saved (40 bytes), SetText's parameter area left
   // out.
-  Run(h, w, {"TuningScreen::Command11", 25, __imp__sub_821E9730, hooks::TuningCommand11,
+  Run(h, w, {"TuningScreen::Command11", 25, __imp__sub_821E9730, ITC_CONTEXT_FN(hooks::TuningCommand11),
              {{-128, -128 + 48}, {-128 + 80, -40}}, command_page});
   // Command12: r29 to r31 saved (32 bytes).
-  Run(h, w, {"TuningScreen::Command12", 25, __imp__sub_821E9CA0, hooks::TuningCommand12,
+  Run(h, w, {"TuningScreen::Command12", 25, __imp__sub_821E9CA0, ITC_CONTEXT_FN(hooks::TuningCommand12),
              {{-128, -32}}, command_page});
   // Command54, Command56 and Command58: r28 to r31 saved (40 bytes).
-  Run(h, w, {"TuningScreen::Command54", 20, __imp__sub_821EB8E8, hooks::TuningCommand54,
+  Run(h, w, {"TuningScreen::Command54", 20, __imp__sub_821EB8E8, ITC_CONTEXT_FN(hooks::TuningCommand54),
              {{-128, -40}}, command_page});
   // Command55: f31 and r28 to r31 saved (48 bytes).
-  Run(h, w, {"TuningScreen::Command55", 40, __imp__sub_821EBDC8, hooks::TuningCommand55,
+  Run(h, w, {"TuningScreen::Command55", 40, __imp__sub_821EBDC8, ITC_CONTEXT_FN(hooks::TuningCommand55),
              {{-144, -48}}, [](PPCContext&, Random& r, const World& w) {
                // The current choice 3 or small two times in three (body's,
                // [+35708]), the set-up (+9716) half of those.
@@ -1155,19 +1155,19 @@ void TuningScreenPages(Context& h) {
                  }
                }
              }});
-  Run(h, w, {"TuningScreen::Command56", 25, __imp__sub_821EC6A0, hooks::TuningCommand56,
+  Run(h, w, {"TuningScreen::Command56", 25, __imp__sub_821EC6A0, ITC_CONTEXT_FN(hooks::TuningCommand56),
              {{-128, -40}}, command_page});
   // Command57: f31 and r23 to r31 saved (88 bytes), SetNodeText's
   // parameter area (+40 to +79) left out; f1 compared.
-  Run(h, w, {"TuningScreen::Command57", 40, __imp__sub_821ECC68, hooks::TuningCommand57,
+  Run(h, w, {"TuningScreen::Command57", 40, __imp__sub_821ECC68, ITC_CONTEXT_FN(hooks::TuningCommand57),
              {{-176, -176 + 40}, {-176 + 80, -88}}, command_page, true});
-  Run(h, w, {"TuningScreen::Command58", 25, __imp__sub_821EDB70, hooks::TuningCommand58,
+  Run(h, w, {"TuningScreen::Command58", 25, __imp__sub_821EDB70, ITC_CONTEXT_FN(hooks::TuningCommand58),
              {{-128, -40}}, command_page});
   // The editors' runners never seen in play (movies 13 and 14; after the
   // groups above, so they keep their seeds). Command17: r29 to r31 saved
   // (32 bytes); +30740 mostly small, now and then to 974 (49 + it a named
   // animation).
-  Run(h, w, {"TuningScreen::Command17", 25, __imp__sub_82200100, hooks::TuningCommand17,
+  Run(h, w, {"TuningScreen::Command17", 25, __imp__sub_82200100, ITC_CONTEXT_FN(hooks::TuningCommand17),
              {{-128, -32}}, [](PPCContext&, Random& r, const World& w) {
                EditorPage(w, r);
                guest::StoreU32(w.base, w.screen() + 30740,
@@ -1175,7 +1175,7 @@ void TuningScreenPages(Context& h) {
              }});
   // Command19: the set 0 or 1 mostly, +30732 mostly small, now and then to
   // 205; SetText's parameter area left out.
-  Run(h, w, {"TuningScreen::Command19", 30, __imp__sub_82201C58, hooks::TuningCommand19,
+  Run(h, w, {"TuningScreen::Command19", 30, __imp__sub_82201C58, ITC_CONTEXT_FN(hooks::TuningCommand19),
              {{-128, -128 + 48}, {-128 + 80, -32}}, [](PPCContext&, Random& r, const World& w) {
                EditorPage(w, r);
                const uint32_t s = w.screen();
@@ -1185,7 +1185,7 @@ void TuningScreenPages(Context& h) {
              }});
   // Command20: r4 and r5 mostly small (now and then to 204), their high
   // words now and then set; the set 0 or 1 mostly.
-  Run(h, w, {"TuningScreen::Command20", 30, __imp__sub_82201FA0, hooks::TuningCommand20,
+  Run(h, w, {"TuningScreen::Command20", 30, __imp__sub_82201FA0, ITC_CONTEXT_FN(hooks::TuningCommand20),
              {{-128, -32}}, [](PPCContext& t, Random& r, const World& w) {
                EditorPage(w, r);
                guest::StoreU32(w.base, w.screen() + 30724,
@@ -1207,33 +1207,33 @@ void TuningScreenPages(Context& h) {
     }
     guest::StoreU32(w.base, s + 30724, r.Below(8));
   };
-  Run(h, w, {"TuningScreen::Command26", 20, __imp__sub_82204980, hooks::TuningCommand26,
+  Run(h, w, {"TuningScreen::Command26", 20, __imp__sub_82204980, ITC_CONTEXT_FN(hooks::TuningCommand26),
              {{-128, -128 + 48}, {-128 + 80, -32}}, place});
-  Run(h, w, {"TuningScreen::Command27", 20, __imp__sub_82204A78, hooks::TuningCommand27,
+  Run(h, w, {"TuningScreen::Command27", 20, __imp__sub_82204A78, ITC_CONTEXT_FN(hooks::TuningCommand27),
              {{-128, -128 + 48}, {-128 + 80, -32}}, place});
   // Command32Done: r31 and lr saved below the frame (16 bytes); [+33508] 0
   // half the time.
   Run(h, w, {"TuningScreen::Command32Done", 20, __imp__sub_821F7498,
-             hooks::TuningCommand32Done, {{-112, -16}}, [](PPCContext&, Random& r, const World& w) {
+             ITC_CONTEXT_FN(hooks::TuningCommand32Done), {{-112, -16}}, [](PPCContext&, Random& r, const World& w) {
                EditorPage(w, r);
                if (r.Below(2) == 0) {
                  guest::StoreU32(w.base, w.screen() + 33508, 0);
                }
              }});
   // Command42: its world (above); r29 to r31 saved (32 bytes).
-  Run(h, w, {"TuningScreen::Command42", 40, __imp__sub_821F7618, hooks::TuningCommand42,
+  Run(h, w, {"TuningScreen::Command42", 40, __imp__sub_821F7618, ITC_CONTEXT_FN(hooks::TuningCommand42),
              {{-128, -32}}, [](PPCContext&, Random& r, const World& w) { Command42World(w, r); }});
   // Command52: the dialogs' world with the states 50 to 52 mostly and the
   // editors' pairs; r27 to r31 saved (48 bytes), SetText's parameter area
   // left out.
-  Run(h, w, {"TuningScreen::Command52", 25, __imp__sub_821F77F0, hooks::TuningCommand52,
+  Run(h, w, {"TuningScreen::Command52", 25, __imp__sub_821F77F0, ITC_CONTEXT_FN(hooks::TuningCommand52),
              {{-144, -144 + 48}, {-144 + 80, -48}}, [](PPCContext& t, Random& r, const World& w) {
                Dialog(kCommand52States)(t, r, w);
                NamedAnimations(w, r);
                EditorPairs(w);
              }});
   // Command53: a leaf (the stack below r1 untouched).
-  Run(h, w, {"TuningScreen::Command53", 15, __imp__sub_821F7948, hooks::TuningCommand53,
+  Run(h, w, {"TuningScreen::Command53", 15, __imp__sub_821F7948, ITC_CONTEXT_FN(hooks::TuningCommand53),
              {{-128, 0}}, [](PPCContext&, Random& r, const World& w) { EditorPage(w, r); }});
   // The paint and light kit pages' runners and their callees, never seen in
   // play (B7 loop, 2026-11-13; after the groups above, so they keep their
@@ -1244,29 +1244,29 @@ void TuningScreenPages(Context& h) {
   };
   // Command10: f30, f31 and r28 to r31 saved (56 bytes), SetText's
   // parameter area left out.
-  Run(h, w, {"TuningScreen::Command10", 20, __imp__sub_821F35C0, hooks::TuningCommand10,
+  Run(h, w, {"TuningScreen::Command10", 20, __imp__sub_821F35C0, ITC_CONTEXT_FN(hooks::TuningCommand10),
              {{-144, -144 + 48}, {-144 + 80, -56}}, paint_page});
   // Command13: the same saves.
-  Run(h, w, {"TuningScreen::Command13", 20, __imp__sub_821EA460, hooks::TuningCommand13,
+  Run(h, w, {"TuningScreen::Command13", 20, __imp__sub_821EA460, ITC_CONTEXT_FN(hooks::TuningCommand13),
              {{-144, -56}}, paint_page});
   // Command14: the same, SetNodeText's parameter area (+40 to +79) left
   // out.
-  Run(h, w, {"TuningScreen::Command14", 20, __imp__sub_821EAFA0, hooks::TuningCommand14,
+  Run(h, w, {"TuningScreen::Command14", 20, __imp__sub_821EAFA0, ITC_CONTEXT_FN(hooks::TuningCommand14),
              {{-144, -144 + 40}, {-144 + 80, -56}}, paint_page});
   // SetPaintGradients: r26 to r31 and f29 to f31 saved (80 bytes);
   // HsvToRgb's 16 bytes under the frame compared.
   Run(h, w, {"TuningScreen::SetPaintGradients", 15, __imp__sub_821E9488,
-             hooks::TuningPagesSetPaintGradients, {{-208 - 16, -80}}, paint_page});
+             ITC_CONTEXT_FN(hooks::TuningPagesSetPaintGradients), {{-208 - 16, -80}}, paint_page});
   // SetLightKind0Bars: the same saves; SetLightKind1Bar: r27 to r31 (48).
   Run(h, w, {"TuningScreen::SetLightKind0Bars", 10, __imp__sub_821EA130,
-             hooks::TuningPagesSetLightKind0Bars, {{-176, -80}}, paint_page});
+             ITC_CONTEXT_FN(hooks::TuningPagesSetLightKind0Bars), {{-176, -80}}, paint_page});
   Run(h, w, {"TuningScreen::SetLightKind1Bar", 10, __imp__sub_821EAE68,
-             hooks::TuningPagesSetLightKind1Bar, {{-144, -48}}, paint_page});
+             ITC_CONTEXT_FN(hooks::TuningPagesSetLightKind1Bar), {{-144, -48}}, paint_page});
   // IsSlotAvailable: a leaf; the category 6, item 3 and mode 1 each half
   // the time, the slot 0 to 4 mostly (now and then to 255, r4's high word
   // set).
   Run(h, w, {"TuningScreen::IsSlotAvailable", 20, __imp__sub_821CE188,
-             hooks::TuningPagesIsSlotAvailable, {{-128, 0}},
+             ITC_CONTEXT_FN(hooks::TuningPagesIsSlotAvailable), {{-128, 0}},
              [](PPCContext& t, Random& r, const World& w) {
                const uint32_t s = w.screen();
                guest::StoreU32(w.base, s + ts::kCategory, r.Below(2) == 0 ? 6 : r.Below(8));

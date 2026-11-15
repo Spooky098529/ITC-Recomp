@@ -4,6 +4,7 @@
 // their callers are native.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/heap.h"
@@ -32,7 +33,7 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
 
 // An adapter leaving `r3_expr` in r3 after `call`.
 #define ITC_SOUND_VOID(address, call, r3_expr) \
-  extern "C" REX_FUNC(sub_##address) {        \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {        \
     ITC_SOUND_FALLBACK(address)               \
     const uint32_t itc_r3_ = (r3_expr);       \
     call;                                     \
@@ -41,14 +42,14 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
 
 // An adapter returning a word in r3.
 #define ITC_SOUND_WORD(address, expr)    \
-  extern "C" REX_FUNC(sub_##address) {  \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {  \
     ITC_SOUND_FALLBACK(address)         \
     ctx.r3.u64 = uint32_t(expr);        \
   }
 
 // An adapter for a bank slot's function: the original where it traps.
 #define ITC_SOUND_SLOT(address, function)                                 \
-  extern "C" REX_FUNC(sub_##address) {                                   \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                   \
     ITC_SOUND_FALLBACK(address)                                          \
     uint32_t result = 0;                                                 \
     if (!function(base, ctx.r3.u32, ctx.r4.u32, &result)) {              \
@@ -97,11 +98,11 @@ ITC_SOUND_WORD(82118B58, ManagerIsCuePlaying(base, ctx.r3.u32, ctx.r4.u32, ctx.r
 // The delegate clone allocates through the native heap: the original runs
 // unless --native_heap routes the game's heap there, and where operator new
 // fails.
-extern "C" REX_FUNC(sub_82118720) {
+ITC_NATIVE_ENTRY_ALWAYS(82118720) {
   ITC_SOUND_FALLBACK(82118720)
   uint32_t copy = 0;
   if (!hooks::NativeHeapActive() || !DelegateClone(base, ctx.r3.u32, &copy)) {
-    __imp__sub_82118720(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82118720);
     return;
   }
   ctx.r3.u64 = copy;
@@ -111,7 +112,7 @@ extern "C" REX_FUNC(sub_82118720) {
 // value's address (sub_821193C0, its allocation, has no adapter: only this
 // one's plain C++ calls it in play). The original without --native_heap or
 // where the allocation hands back.
-extern "C" REX_FUNC(sub_821194A0) {
+ITC_NATIVE_ENTRY_ALWAYS(821194A0) {
   ITC_SOUND_FALLBACK(821194A0)
   if (hooks::NativeHeapActive()) {
     if (const auto r3 = WordVectorFill(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
@@ -119,7 +120,7 @@ extern "C" REX_FUNC(sub_821194A0) {
       return;
     }
   }
-  __imp__sub_821194A0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_821194A0);
 }
 
 ITC_SOUND_WORD(82480710, X3DAudioInitialize(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32))
@@ -131,7 +132,7 @@ ITC_SOUND_WORD(8259CE10, AudioEngineStart3D(base, ctx.r3.u32))
 // WaveBankHolder::~WaveBankHolder (sub_8259D438) has no adapter: its caller
 // in play, sub_82117AD8, is native.
 #define ITC_SOUND_HOLDER_DELETE(address, function)                         \
-  extern "C" REX_FUNC(sub_##address) {                                    \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                    \
     ITC_SOUND_FALLBACK(address)                                           \
     uint32_t r3 = 0;                                                      \
     if (!hooks::NativeHeapActive() || !function(base, ctx.r3.u32, &r3)) { \

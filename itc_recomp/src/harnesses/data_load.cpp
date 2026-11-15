@@ -273,7 +273,7 @@ void MovieSets(Context& h) {
           (loading ? __imp__sub_82247B98 : __imp__sub_82291328)(t, h.base);
           ITC_FLAG(native_ui_movies_game) = true;
         } else {
-          (loading ? hooks::LoadingScreenLoadSteps : hooks::OtherMoviesLoadSteps)(t, h.base);
+          (loading ? ITC_CONTEXT_FN(hooks::LoadingScreenLoadSteps) : ITC_CONTEXT_FN(hooks::OtherMoviesLoadSteps))(t, h.base);
         }
         const uint32_t count = guest::LoadU32(h.base, list + 64);
         const uint32_t first = loading ? 0 : old_count;
@@ -376,9 +376,9 @@ void Load(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = r3;
         if (load) {
-          (v == 0 ? __imp__sub_82106618 : hooks::BootDataLoadSteps)(t, h.base);
+          (v == 0 ? __imp__sub_82106618 : ITC_CONTEXT_FN(hooks::BootDataLoadSteps))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_82105868 : hooks::CreateObjectsSteps)(t, h.base);
+          (v == 0 ? __imp__sub_82105868 : ITC_CONTEXT_FN(hooks::CreateObjectsSteps))(t, h.base);
         }
         hooks::g_start_up_recorder = saved_recorder;
         g_boot_calls = nullptr;

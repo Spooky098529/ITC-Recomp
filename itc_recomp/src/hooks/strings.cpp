@@ -4,6 +4,7 @@
 // last_error::Set.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "guest_call.h"
 #include "last_error.h"
 
@@ -26,8 +27,8 @@ constexpr uint32_t kErrorInsufficientBuffer = 122;
 // MultiByteToWideChar: r3 = code page, r4 = flags (unused), r5 = source,
 // r6 = its length (-1: terminated), r7 = destination, r8 = its room in
 // characters; returns the characters converted (or needed), 0 on error.
-extern "C" REX_FUNC(sub_82296648) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82296648) {
+  
   const uint32_t code_page = ctx.r3.u32;
   const uint32_t source = ctx.r5.u32;
   const int32_t source_length = ctx.r6.s32;
@@ -78,8 +79,8 @@ extern "C" REX_FUNC(sub_82296648) {
 // r6 = its length (-1: terminated), r7 = destination, r8 = its room in bytes,
 // r9 = the default character (unused), r10 = "default used" (out, always 0;
 // may be 0); returns the bytes converted (or needed), 0 on error.
-extern "C" REX_FUNC(sub_82296720) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82296720) {
+  
   const uint32_t code_page = ctx.r3.u32;
   const uint32_t source = ctx.r5.u32;
   const int32_t source_length = ctx.r6.s32;
@@ -133,8 +134,8 @@ extern "C" REX_FUNC(sub_82296720) {
 // characters written (without the terminator), -1 for no buffer or format.
 // Only one call site, with a format of no conversions (see
 // helpers::FormatWithoutArguments).
-extern "C" REX_FUNC(sub_82296870) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82296870) {
+  
   const uint32_t buffer = ctx.r3.u32;
   const uint32_t format_address = ctx.r4.u32;
   if (!buffer || !format_address) {

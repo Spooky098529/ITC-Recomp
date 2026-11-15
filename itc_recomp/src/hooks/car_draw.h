@@ -10,6 +10,7 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "car_draw/car_draw.h"
 #include "hooks/scenery_lists.h"
@@ -47,16 +48,20 @@ bool CarDrawBlinkTimersHeld();
 
 // CarPart::Draw (sub_820D06F0): r3 = the point record, r4, r5, r6, r7.
 void CarDrawCarPartDraw(PPCContext& ctx, uint8_t* base);
+void CarDrawCarPartDraw(lifted::Regs& ctx, uint8_t* base);
 // BlinkTimers::Advance (sub_820DC958): r3 = the point block (no skip here).
 void CarDrawBlinkTimersAdvance(PPCContext& ctx, uint8_t* base);
+void CarDrawBlinkTimersAdvance(lifted::Regs& ctx, uint8_t* base);
 // SceneModel::IsNearPlayerHeight (sub_820DAB58): r3 = the pass
 // description, r4 = the position.
 void CarDrawIsNearPlayerHeight(PPCContext& ctx, uint8_t* base);
+void CarDrawIsNearPlayerHeight(lifted::Regs& ctx, uint8_t* base);
 
 // SceneLights::Draw (sub_820DDE58): r3 = the light kit, r4 = the block
 // (inside the diagnostics' wrap, src/debug/frame_state_diff.cpp; it skips
 // BlinkTimers::Advance as CarDrawBlinkTimersHeld says).
 void CarDrawSceneLightsDraw(PPCContext& ctx, uint8_t* base);
+void CarDrawSceneLightsDraw(lifted::Regs& ctx, uint8_t* base);
 
 // The shadows' callees' plain C++ native (the parts' and the lighting's).
 bool CarDrawShadowsCalleesNative();
@@ -64,6 +69,7 @@ bool CarDrawShadowsCalleesNative();
 // wrap, src/debug/frame_state_diff.cpp; the shadows' callees native): r3 =
 // the parts object, r4 = the block.
 void CarDrawSceneParts(PPCContext& ctx, uint8_t* base);
+void CarDrawSceneParts(lifted::Regs& ctx, uint8_t* base);
 
 // The interior's callees' plain C++ native (the parts' draws').
 bool CarDrawInteriorCalleesNative();
@@ -72,6 +78,7 @@ bool CarDrawInteriorCalleesNative();
 // native, with --native_accessories and --native_scene_models for the
 // accessory): r3 = the interior, r4 = the block.
 void CarDrawSceneInterior(PPCContext& ctx, uint8_t* base);
+void CarDrawSceneInterior(lifted::Regs& ctx, uint8_t* base);
 
 // The cockpit's callees' plain C++ native (the interior's with
 // --native_accessories and --native_scene_models, and the lighting's).
@@ -80,11 +87,13 @@ bool CarDrawCockpitCalleesNative();
 // diagnostics' wrap, src/debug/frame_state_diff.cpp; the cockpit's callees
 // native): r3 = the cockpit, r4 = the block.
 void CarDrawSceneCockpit(PPCContext& ctx, uint8_t* base);
+void CarDrawSceneCockpit(lifted::Regs& ctx, uint8_t* base);
 
 // The traffic body's top, SceneTraffic::Draw (sub_820E6A40; inside the
 // diagnostics' wrap, src/debug/frame_state_diff.cpp; the shadows' callees
 // native): r3 = the traffic body, r4 = the block.
 void CarDrawSceneTraffic(PPCContext& ctx, uint8_t* base);
+void CarDrawSceneTraffic(lifted::Regs& ctx, uint8_t* base);
 
 // The wheels' callees' plain C++ native (the parts' and the morph's).
 bool CarDrawWheelsCalleesNative();
@@ -92,6 +101,7 @@ bool CarDrawWheelsCalleesNative();
 // wrap, src/debug/frame_state_diff.cpp; the wheels' callees native): r3 =
 // the wheels object, r4 = the block (r24 its leaves').
 void CarDrawSceneWheels(PPCContext& ctx, uint8_t* base);
+void CarDrawSceneWheels(lifted::Regs& ctx, uint8_t* base);
 
 // Every callee of the root natively: the height cull's, the light kit's,
 // the shadows' (the parts' and the traffic body's), the cockpit's (with the
@@ -102,5 +112,6 @@ bool CarDrawUpdateCalleesNative();
 // src/debug/frame_state_diff.cpp; every callee native): r3 = the scene
 // model (r24 the caller's, handed to the draws that take it).
 void CarDrawUpdate(PPCContext& ctx, uint8_t* base);
+void CarDrawUpdate(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

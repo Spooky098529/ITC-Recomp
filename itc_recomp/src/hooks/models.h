@@ -3,6 +3,7 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "models/model_load.h"
 
 namespace hooks {
@@ -22,7 +23,7 @@ bool ModelsNativeLifetime();
 // each from a 512-byte frame below r1 (room for the original's own frames
 // and a native caller's).
 struct ModelLoadGuest {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   models::LoadCalls Calls();
 };
@@ -34,17 +35,22 @@ struct ModelLoadGuest {
 // = the pair). (The vertex declaration's, sub_82589728, are the harness's:
 // its adapter is gone.)
 void ModelsMaterialCount(PPCContext& ctx, uint8_t* base);
+void ModelsMaterialCount(lifted::Regs& ctx, uint8_t* base);
 void ModelsMaterial(PPCContext& ctx, uint8_t* base);
+void ModelsMaterial(lifted::Regs& ctx, uint8_t* base);
 void ModelsSharedVertexShader(PPCContext& ctx, uint8_t* base);
+void ModelsSharedVertexShader(lifted::Regs& ctx, uint8_t* base);
 void ModelsSharedPixelShader(PPCContext& ctx, uint8_t* base);
+void ModelsSharedPixelShader(lifted::Regs& ctx, uint8_t* base);
 // sub_825896C0 (r3, r4 the tables; r3 left).
 void ModelsSetSharedShaders(PPCContext& ctx, uint8_t* base);
+void ModelsSetSharedShaders(lifted::Regs& ctx, uint8_t* base);
 
 // A guest call of `function` (r3 the provider, r4 the slot, r5 the index;
 // lr the caller's, r1 its frame) made natively when it's the texture
 // provider's slot 3 (TextureProvider::Get) or slots 5 to 7 and
 // models::CallGet or CallXprTexture answers: r3 as the adapter leaves it.
 // False where the caller makes the guest call.
-bool TextureProviderSlotDirect(PPCContext& ctx, uint8_t* base, uint32_t function);
+bool TextureProviderSlotDirect(lifted::Regs& ctx, uint8_t* base, uint32_t function);
 
 }  // namespace hooks

@@ -3,6 +3,7 @@
 // register steps the harness shares (hooks/power_graph_screen.h).
 
 #include "hooks/power_graph_screen.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "power_graph_screen/power_graph_screen.h"
@@ -41,7 +42,7 @@ namespace pgs = power_graph_screen;
 // The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -51,7 +52,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -72,83 +73,83 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
-void PowerGraphScreen6PostLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreen6PostLeave) {
   pgs::SlotPost(base, ctx.r4.u32, 0x82237A88);
 }
-void PowerGraphScreen6PostClosing(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreen6PostClosing) {
   pgs::SlotPost(base, ctx.r4.u32, 0x82237AD8);
 }
-void PowerGraphScreen6PostClosed(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreen6PostClosed) {
   pgs::SlotPost(base, ctx.r4.u32, 0x82237B28);
 }
-void PowerGraphScreen7PostLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreen7PostLeave) {
   pgs::SlotPost(base, ctx.r4.u32, 0x82246FB8);
 }
-void PowerGraphScreen7PostClosing(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreen7PostClosing) {
   pgs::SlotPost(base, ctx.r4.u32, 0x82247008);
 }
-void PowerGraphScreenOnEnter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenOnEnter) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = pgs::OnEnter(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PowerGraphScreenWaitForLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenWaitForLoad) {
   ctx.r3.u64 = pgs::WaitForLoad(base, ctx.r3.u64, ctx.r1.u32);
 }
-void PowerGraphScreenShown(PPCContext&, uint8_t* base) { pgs::Shown(base); }
-void PowerGraphScreenOpen(PPCContext& ctx, uint8_t* base) { pgs::Open(base, ctx.r3.u32); }
-void PowerGraphScreenLeave(PPCContext& ctx, uint8_t* base) {
+void PowerGraphScreenShown(lifted::Regs&, uint8_t* base) { pgs::Shown(base); }
+ITC_REGS_STEP(PowerGraphScreenOpen) { pgs::Open(base, ctx.r3.u32); }
+ITC_REGS_STEP(PowerGraphScreenLeave) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = pgs::Leave(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
-void PowerGraphScreenOnLeft(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenOnLeft) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = pgs::OnLeft(base, ctx.r1.u32, guest.calls());
 }
-void PowerGraphScreenStep0(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenStep0) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = pgs::Step0(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void PowerGraphScreenStep1(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenStep1) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = pgs::Step1(base, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void PowerGraphScreenSetTexts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenSetTexts) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = pgs::SetTexts(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void PowerGraphScreenSetParts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenSetParts) {
   ctx.r3.u64 = pgs::SetParts(base, ctx.r4.u32, ctx.r1.u32);
 }
-void PowerGraphScreenSetPartIcon(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenSetPartIcon) {
   ctx.r3.u64 = pgs::SetPartIcon(base, ctx.r4.u32, ctx.r1.u32);
 }
-void PowerGraphScreenSetPartRow2(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenSetPartRow2) {
   ctx.r3.u64 = pgs::SetPartRow2(base, ctx.r4.u32, ctx.r1.u32);
 }
-void PowerGraphScreenSetPartRow1(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenSetPartRow1) {
   ctx.r3.u64 = pgs::SetPartRow1(base, ctx.r4.u32, ctx.r1.u32);
 }
-void PowerGraphScreenMenuPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenMenuPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = pgs::MenuPage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
-void PowerGraphScreenClosedPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenClosedPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = pgs::ClosedPage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, uint32_t(ctx.lr),
                                guest.calls());
 }
-void PowerGraphScreenDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenDraw) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = pgs::Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
-void PowerGraphScreenUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PowerGraphScreenUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = pgs::Update(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
@@ -156,12 +157,7 @@ void PowerGraphScreenUpdate(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_POWER_GRAPH_SCREEN(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {           \
-    REX_FUNC_PROLOGUE();                         \
-    if (!ITC_FLAG(native_power_graph_screen)) {  \
-      __imp__sub_##address(ctx, base);           \
-      return;                                    \
-    }                                            \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_power_graph_screen)) { \
     hooks::step(ctx, base);                      \
   }
 

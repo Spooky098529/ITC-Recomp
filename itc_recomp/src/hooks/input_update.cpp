@@ -17,6 +17,7 @@
 // docs/pause-menu-fix.md for the layout.
 
 #include "input_update.h"
+#include "hooks/native_entry.h"
 
 #include "input/input_processor.h"
 #include "input/logical_pad.h"
@@ -93,7 +94,7 @@ void ReadPhysicalPad(uint8_t* base, uint32_t address, uint32_t user) {
 }
 
 // A device's values' address: its vtable slot 1 (r3 = device).
-uint32_t DeviceValues(PPCContext& ctx, uint8_t* base, uint32_t device) {
+uint32_t DeviceValues(lifted::Regs& ctx, uint8_t* base, uint32_t device) {
   uint32_t function = guest::LoadU32(base, guest::LoadU32(base, device) + 4);
   if (function == kPhysicalPadValues) {
     return device + 8;
@@ -109,7 +110,7 @@ uint32_t DeviceValues(PPCContext& ctx, uint8_t* base, uint32_t device) {
 
 // A logical pad (196 bytes): four bindings {u8 enabled at +4 + 8k, device at
 // +8 + 8k}, values at +36.
-void BuildLogicalPad(PPCContext& ctx, uint8_t* base, uint32_t pad) {
+void BuildLogicalPad(lifted::Regs& ctx, uint8_t* base, uint32_t pad) {
   float values[input::kPadValues] = {};
   for (uint32_t k = 0; k < 4; k++) {
     uint32_t device = guest::LoadU32(base, pad + 8 + 8 * k);
@@ -163,7 +164,7 @@ void StoreProcessor(uint8_t* base, uint32_t object, const input::InputProcessor&
 // pad's values' address, which the original leaves in r3. The original
 // stores the directions with stvx, which drops the address's low 4 bits;
 // objects are 16-byte aligned, and any that isn't is left to the original.
-bool UpdateProcessor(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t pad,
+bool UpdateProcessor(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t pad,
                      uint32_t* values_address) {
   if (object & 0xF) {
     return false;
@@ -179,7 +180,7 @@ bool UpdateProcessor(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t p
 }
 
 // Calls `object`'s vtable slot 1 with r4 = its logical pad.
-void UpdateWithPad(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t pad,
+void UpdateWithPad(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t pad,
                    uint32_t return_address) {
   uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + 4);
   uint32_t values_address;
@@ -194,7 +195,7 @@ void UpdateWithPad(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t pad
 
 }  // namespace
 
-void InputUpdate_Run(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(InputUpdate_Run) {
   uint32_t manager = ctx.r3.u32;
   uint64_t saved_lr = ctx.lr;
   // The recompiled function's frame, so the guest code called finds the
@@ -232,12 +233,12 @@ void InputUpdate_Run(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace input_hooks
 
-extern "C" REX_FUNC(sub_82592188) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82592188) {
+  
   uint32_t values_address;
   if (input_hooks::UpdateProcessor(ctx, base, ctx.r3.u32, ctx.r4.u32, &values_address)) {
     ctx.r3.u64 = values_address;
   } else {
-    __imp__sub_82592188(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82592188);
   }
 }

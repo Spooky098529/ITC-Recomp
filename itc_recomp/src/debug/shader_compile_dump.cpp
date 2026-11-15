@@ -1,4 +1,5 @@
 #include "shader_compile_dump.h"
+#include "hooks/native_entry.h"
 
 #include "guest.h"
 
@@ -34,7 +35,7 @@ std::string LoadString(uint8_t* base, uint32_t address) {
 
 // An ID3DXBuffer's bytes, through its vtable: slot 3 GetBufferPointer, slot
 // 4 GetBufferSize (the callers release it through slot 2).
-std::vector<uint8_t> LoadBuffer(PPCContext& ctx, uint8_t* base, uint32_t buffer) {
+std::vector<uint8_t> LoadBuffer(lifted::Regs& ctx, uint8_t* base, uint32_t buffer) {
   uint32_t vtable = guest::LoadU32(base, buffer);
   ctx.r3.u64 = buffer;
   lifted::CallFromContext(ctx, base, guest::LoadU32(base, vtable + 12));
@@ -67,7 +68,7 @@ bool debug::ShaderCompileDump_Active() { return !ITC_FLAG(dump_shader_compiles).
 // include handler, r7 the entry point, r8 the profile, r9 the flags, r10
 // where the shader buffer goes; the caller's stack words +84 and +92 where
 // the errors and the constant table go.
-void debug::ShaderCompileDump_Compile(PPCContext& ctx, uint8_t* base) {
+void debug::ShaderCompileDump_Compile(lifted::Regs& ctx, uint8_t* base) {
   std::string dir = ITC_FLAG(dump_shader_compiles);
   uint32_t caller = ctx.lr;
   uint32_t source = ctx.r3.u32;
@@ -85,7 +86,7 @@ void debug::ShaderCompileDump_Compile(PPCContext& ctx, uint8_t* base) {
     source_bytes[i] = guest::LoadU8(base, source + i);
   }
 
-  __imp__sub_822B8F10(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_822B8F10);
   uint32_t result = ctx.r3.u32;
 
   std::filesystem::create_directories(dir);

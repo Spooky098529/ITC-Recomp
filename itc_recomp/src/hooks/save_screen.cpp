@@ -3,6 +3,7 @@
 // shares (hooks/save_screen.h).
 
 #include "hooks/save_screen.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "save_screen/save_screen.h"
@@ -42,7 +43,7 @@ namespace ss = save_screen;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -52,7 +53,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -73,7 +74,7 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
@@ -81,50 +82,50 @@ class GuestCalls {
 using Step = uint64_t (*)(uint8_t*, uint32_t, uint32_t, const ss::Calls&);
 using Page = uint64_t (*)(uint8_t*, uint64_t, uint32_t, const ss::Calls&);
 
-void RunStep(PPCContext& ctx, uint8_t* base, Step step) {
+void RunStep(lifted::Regs& ctx, uint8_t* base, Step step) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = step(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void RunPage(PPCContext& ctx, uint8_t* base, Page page) {
+void RunPage(lifted::Regs& ctx, uint8_t* base, Page page) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = page(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 
 }  // namespace
 
-void SaveScreenMoveSelection(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenMoveSelection) {
   RunStep(ctx, base, ss::MoveSelection);
 }
-void SaveScreenCloseDialog(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenCloseDialog) {
   RunStep(ctx, base, ss::CloseDialog);
 }
-void SaveScreenPage0(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page0); }
-void SaveScreenPage1(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page1); }
-void SaveScreenPage2(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page2); }
-void SaveScreenPage3(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page3); }
-void SaveScreenPage4(PPCContext& ctx, uint8_t* base) { ctx.r3.u64 = ss::Page4(base, ctx.r3.u64); }
-void SaveScreenPage9(PPCContext& ctx, uint8_t* base) { ctx.r3.u64 = ss::Page9(base, ctx.r3.u64); }
-void SaveScreenPage16(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenPage0) { RunPage(ctx, base, ss::Page0); }
+ITC_REGS_STEP(SaveScreenPage1) { RunPage(ctx, base, ss::Page1); }
+ITC_REGS_STEP(SaveScreenPage2) { RunPage(ctx, base, ss::Page2); }
+ITC_REGS_STEP(SaveScreenPage3) { RunPage(ctx, base, ss::Page3); }
+ITC_REGS_STEP(SaveScreenPage4) { ctx.r3.u64 = ss::Page4(base, ctx.r3.u64); }
+ITC_REGS_STEP(SaveScreenPage9) { ctx.r3.u64 = ss::Page9(base, ctx.r3.u64); }
+ITC_REGS_STEP(SaveScreenPage16) {
   ctx.r3.u64 = ss::Page16(base, ctx.r3.u64);
 }
-void SaveScreenPage25(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenPage25) {
   ctx.r3.u64 = ss::Page25(base, ctx.r3.u64);
 }
 
-void SaveScreenPage6(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page6); }
-void SaveScreenPage7(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page7); }
-void SaveScreenPage8(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page8); }
-void SaveScreenPage12(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page12); }
-void SaveScreenPage13(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page13); }
-void SaveScreenPage14(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page14); }
-void SaveScreenPage15(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page15); }
-void SaveScreenPage24(PPCContext& ctx, uint8_t* base) { RunPage(ctx, base, ss::Page24); }
-void SaveScreenStoreSettings(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenPage6) { RunPage(ctx, base, ss::Page6); }
+ITC_REGS_STEP(SaveScreenPage7) { RunPage(ctx, base, ss::Page7); }
+ITC_REGS_STEP(SaveScreenPage8) { RunPage(ctx, base, ss::Page8); }
+ITC_REGS_STEP(SaveScreenPage12) { RunPage(ctx, base, ss::Page12); }
+ITC_REGS_STEP(SaveScreenPage13) { RunPage(ctx, base, ss::Page13); }
+ITC_REGS_STEP(SaveScreenPage14) { RunPage(ctx, base, ss::Page14); }
+ITC_REGS_STEP(SaveScreenPage15) { RunPage(ctx, base, ss::Page15); }
+ITC_REGS_STEP(SaveScreenPage24) { RunPage(ctx, base, ss::Page24); }
+ITC_REGS_STEP(SaveScreenStoreSettings) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::StoreSettings(base, ctx.r1.u32, guest.calls());
 }
 
-void SaveScreenInit(PPCContext& ctx, uint8_t* base, uint32_t address) {
+void SaveScreenInit(lifted::Regs& ctx, uint8_t* base, uint32_t address) {
   uint32_t frame_bytes = 0;
   for (const ss::InitInfo& info : ss::kInits) {
     if (info.address == address) {
@@ -140,52 +141,52 @@ void SaveScreenInit(PPCContext& ctx, uint8_t* base, uint32_t address) {
   ctx.r3.u64 = result.replaced ? result.r3 : machine_r3 + (result.r3 - result.machine);
 }
 
-void SaveScreenOnEnter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenOnEnter) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::OnEnter(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void SaveScreenOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenOpenMovie) {
   // A tail call: UiMovies::Open runs on the caller's frame with its lr.
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::OpenMovie(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
-void SaveScreenWaitMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenWaitMovie) {
   ctx.r3.u64 = ss::WaitMovie(base, ctx.r3.u64, ctx.r1.u32);
 }
-void SaveScreenOpenKind0(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 0); }
-void SaveScreenOpenKind1(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 1); }
-void SaveScreenOpenKind2(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 2); }
-void SaveScreenOpenKind3(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 3); }
-void SaveScreenOpenKind4(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 4); }
-void SaveScreenOpenKind5(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 5); }
-void SaveScreenOpenKind6(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 6); }
-void SaveScreenOpenKind7(PPCContext& ctx, uint8_t* base) { ss::OpenKind(base, ctx.r3.u32, 7); }
-void SaveScreenShow(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenOpenKind0) { ss::OpenKind(base, ctx.r3.u32, 0); }
+ITC_REGS_STEP(SaveScreenOpenKind1) { ss::OpenKind(base, ctx.r3.u32, 1); }
+ITC_REGS_STEP(SaveScreenOpenKind2) { ss::OpenKind(base, ctx.r3.u32, 2); }
+ITC_REGS_STEP(SaveScreenOpenKind3) { ss::OpenKind(base, ctx.r3.u32, 3); }
+ITC_REGS_STEP(SaveScreenOpenKind4) { ss::OpenKind(base, ctx.r3.u32, 4); }
+ITC_REGS_STEP(SaveScreenOpenKind5) { ss::OpenKind(base, ctx.r3.u32, 5); }
+ITC_REGS_STEP(SaveScreenOpenKind6) { ss::OpenKind(base, ctx.r3.u32, 6); }
+ITC_REGS_STEP(SaveScreenOpenKind7) { ss::OpenKind(base, ctx.r3.u32, 7); }
+ITC_REGS_STEP(SaveScreenShow) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::Show(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void SaveScreenUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::Update(base, ctx.r1.u32, guest.calls());
 }
-void SaveScreenDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenDraw) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::Draw(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void SaveScreenShowKind2(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenShowKind2) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::ShowKind2(base, ctx.r1.u32, guest.calls());
 }
-void SaveScreenShowKind7(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenShowKind7) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::ShowKind7(base, ctx.r1.u32, guest.calls());
 }
-void SaveScreenCancel(PPCContext&, uint8_t* base) { ss::Cancel(base); }
-void SaveScreenLeave(PPCContext& ctx, uint8_t* base) {
+void SaveScreenCancel(lifted::Regs&, uint8_t* base) { ss::Cancel(base); }
+ITC_REGS_STEP(SaveScreenLeave) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::Leave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void SaveScreenOnLeft(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SaveScreenOnLeft) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ss::OnLeft(base, ctx.r1.u32, guest.calls());
 }
@@ -193,22 +194,12 @@ void SaveScreenOnLeft(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_SAVE_SCREEN_INIT(address)                  \
-  extern "C" REX_FUNC(sub_##address) {                 \
-    REX_FUNC_PROLOGUE();                               \
-    if (!ITC_FLAG(native_save_screen)) {               \
-      __imp__sub_##address(ctx, base);                 \
-      return;                                          \
-    }                                                  \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_save_screen)) { \
     hooks::SaveScreenInit(ctx, base, 0x##address);     \
   }
 
 #define ITC_SAVE_SCREEN(address, step)      \
-  extern "C" REX_FUNC(sub_##address) {      \
-    REX_FUNC_PROLOGUE();                    \
-    if (!ITC_FLAG(native_save_screen)) {    \
-      __imp__sub_##address(ctx, base);      \
-      return;                               \
-    }                                       \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_save_screen)) { \
     hooks::step(ctx, base);                 \
   }
 

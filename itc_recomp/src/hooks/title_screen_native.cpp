@@ -4,6 +4,7 @@
 // keeps its wrap in hooks/title_screen.cpp (--attract_after_s).
 
 #include "hooks/title_screen_native.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "title_screen/title_screen.h"
@@ -77,7 +78,7 @@ namespace ts = title_screen;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -87,7 +88,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -108,14 +109,14 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 screens' Inits.
-void InitSteps(PPCContext& ctx, uint8_t* base,
+void InitSteps(lifted::Regs& ctx, uint8_t* base,
                uint32_t (*init)(uint8_t*, uint32_t, uint32_t, bool*), uint32_t frame_bytes) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
@@ -128,213 +129,213 @@ void InitSteps(PPCContext& ctx, uint8_t* base,
 
 bool TitleScreenNative() { return ITC_FLAG(native_title_screen); }
 
-void TitleLoadCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadCreate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LoadCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleLoadOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadOpenMovie) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LoadOpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
-void TitleLoadWaitForMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadWaitForMovie) {
   ctx.r3.u64 = ts::LoadWaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
 }
-void TitleLoadStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadStart) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LoadStart(base, ctx.r1.u32, guest.calls());
 }
-void TitleLoadDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadDraw) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LoadDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
-void TitleLoadUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LoadUpdate(base, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void TitleLoadPlayLogo(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadPlayLogo) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LoadPlayLogo(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleLoadWaitForArchive(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadWaitForArchive) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LoadWaitForArchive(base, ctx.r1.u32, guest.calls());
 }
-void TitleLoadPostClose(PPCContext& ctx, uint8_t* base) { ts::LoadPostClose(base, ctx.r3.u32); }
-void TitleLoadUnload(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadPostClose) { ts::LoadPostClose(base, ctx.r3.u32); }
+ITC_REGS_STEP(TitleLoadUnload) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LoadUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleLoadOpenTitle(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadOpenTitle) {
   ts::LoadOpenTitle(base, ctx.r3.u32, ctx.r4.u32);
 }
-void TitleLoadLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadLeave) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LoadLeave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void TitleLoadDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadDestroy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LoadDestroy(base, ctx.r1.u32, guest.calls());
 }
-void TitleLoadInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadInit) {
   InitSteps(ctx, base, ts::LoadInit, ts::kLoadInitFrame);
 }
-void TitleScreenInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenInit) {
   InitSteps(ctx, base, ts::ScreenInit, ts::kScreenInitFrame);
 }
 
-void TitleScreenCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenCreate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ScreenCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenOpenMovie) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ScreenOpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
-void TitleScreenWaitForMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenWaitForMovie) {
   ctx.r3.u64 = ts::ScreenWaitForMovie(base, ctx.r3.u64, ctx.r1.u32);
 }
-void TitleScreenStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenStart) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ScreenStart(base, ctx.r1.u32, guest.calls());
 }
-void TitleScreenSetUp(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenSetUp) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ScreenSetUp(base, ctx.r1.u32, guest.calls());
 }
-void TitleScreenDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenDraw) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ScreenDraw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
-void TitleScreenUpdateTransitions(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenUpdateTransitions) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ScreenUpdate(base, ctx.r1.u32, guest.calls());
 }
-void TitleScreenOnGameDataLoaded(PPCContext&, uint8_t* base) { ts::ScreenOnGameDataLoaded(base); }
-void TitleScreenOnInterrupt(PPCContext&, uint8_t* base) { ts::ScreenOnInterrupt(base); }
-void TitleScreenOnResume(PPCContext&, uint8_t* base) { ts::ScreenOnResume(base); }
-void TitleScreenUnload(PPCContext& ctx, uint8_t* base) {
+void TitleScreenOnGameDataLoaded(lifted::Regs&, uint8_t* base) { ts::ScreenOnGameDataLoaded(base); }
+void TitleScreenOnInterrupt(lifted::Regs&, uint8_t* base) { ts::ScreenOnInterrupt(base); }
+void TitleScreenOnResume(lifted::Regs&, uint8_t* base) { ts::ScreenOnResume(base); }
+ITC_REGS_STEP(TitleScreenUnload) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ScreenUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenOpenNext(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenOpenNext) {
   ctx.r3.u64 = ts::ScreenOpenNext(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
-void TitleScreenLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenLeave) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ScreenLeave(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenDestroy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ScreenDestroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenLoadGameData(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenLoadGameData) {
   ts::ScreenLoadGameData(base, ctx.r3.u32);
 }
-void TitleScreenLeavePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenLeavePage) {
   ts::ScreenLeavePage(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void TitleScreenIntro(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenIntro) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::Intro(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenPressStartLoop(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenPressStartLoop) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::PressStartLoop(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenTransition2(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenTransition2) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::BackToPressStart(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenLeavePressStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenLeavePressStart) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LeavePressStart(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenShowMainMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenShowMainMenu) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ShowMainMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenShowMainMenuAtOnce(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenShowMainMenuAtOnce) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ShowMainMenuAtOnce(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenHighlightMain(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenHighlightMain) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::HighlightMain(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenMoveMainCursor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenMoveMainCursor) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::MoveMainCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenTransition9(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenTransition9) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::RefreshSaveItem(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenTransition10(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenTransition10) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::RefreshPadItem(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenShowCareerMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenShowCareerMenu) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ShowCareerMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenHighlightCareer(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenHighlightCareer) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::HighlightCareer(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenMoveCareerCursor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenMoveCareerCursor) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::MoveCareerCursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenBackFromCareer(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenBackFromCareer) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::BackFromCareer(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenShowMenu4(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenShowMenu4) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ShowMenu4(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenBackFromMenu4(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenBackFromMenu4) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::BackFromMenu4(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenMoveMenu4Cursor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenMoveMenu4Cursor) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::MoveMenu4Cursor(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void TitleScreenSetUpMainMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenSetUpMainMenu) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::SetUpMainMenu(base, ctx.r1.u32, guest.calls());
 }
-void TitleScreenSetUpCareerMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenSetUpCareerMenu) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::SetUpCareerMenu(base, ctx.r1.u32, guest.calls());
 }
-void TitleScreenSetUpMenu4(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenSetUpMenu4) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::SetUpMenu4(base, ctx.r1.u32, guest.calls());
 }
-void TitleScreenCareerMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenCareerMenu) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::CareerMenu(base, ctx.r1.u32, guest.calls());
 }
-void TitleScreenMenu4(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenMenu4) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::Menu4(base, ctx.r1.u32, guest.calls());
 }
-void TitleScreenMainMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenMainMenu) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::MainMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls(),
                             ITC_FLAG(multiplayer_menu_items));
 }
 
-void ModeType4Init(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType4Init) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::ModeInit(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 // The delegate functions return the answer (r3 as it came).
 #define ITC_MODE_TYPE4_DELEGATE(name)                                       \
-  void ModeType4##name(PPCContext& ctx, uint8_t* base) {                    \
+  void ModeType4##name(lifted::Regs& ctx, uint8_t* base) {                    \
     const uint64_t answer = ctx.r3.u64;                                     \
     {                                                                       \
       GuestCalls guest(ctx, base);                                          \
@@ -348,73 +349,68 @@ ITC_MODE_TYPE4_DELEGATE(LeaveScreen)
 ITC_MODE_TYPE4_DELEGATE(WaitForLeave)
 ITC_MODE_TYPE4_DELEGATE(Leaving)
 #undef ITC_MODE_TYPE4_DELEGATE
-void ModeType4NextModeAnswer(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType4NextModeAnswer) {
   ts::NextModeAnswer(base, ctx.r3.u32, ctx.r4.u32);
 }
-void ModeType4Interrupt(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType4Interrupt) {
   ctx.r3.u64 = ts::Interrupt(base, ctx.r3.u32, ctx.r1.u32);
 }
-void ModeType4ForceExit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType4ForceExit) {
   ts::ForceExit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
-void ModeType4Resume(PPCContext& ctx, uint8_t* base) { ts::Resume(base, ctx.r3.u32); }
-void ModeType4MachineOf(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType4Resume) { ts::Resume(base, ctx.r3.u32); }
+ITC_REGS_STEP(ModeType4MachineOf) {
   (void)base;
   ctx.r3.u64 = ts::MachineOf(ctx.r3.u64, ctx.r4.u64);
 }
-void ModeType4AllLoaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType4AllLoaded) {
   ctx.r3.u64 = ts::AllLoaded(base, ctx.r3.u32);
 }
-void ModeType4FindShown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType4FindShown) {
   ctx.r3.u64 = ts::FindShown(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void TitleScreenPressStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenPressStart) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::PressStart(base, ctx.r1.u32, guest.calls());
 }
-void TitleScreenOnControllerPicked(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleScreenOnControllerPicked) {
   ctx.r3.u64 = ts::ScreenOnControllerPicked(base, ctx.r3.u64);
 }
-void PlayersAssignController(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlayersAssignController) {
   ts::AssignController(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 template <uint32_t kWhich>
-void TitleLoadDebugPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadDebugPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LoadDebugPage(base, kWhich, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 template <uint32_t kWhich>
-void TitleLoadDebugStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TitleLoadDebugStep) {
   ctx.r3.u64 = ts::LoadDebugStep(base, kWhich, ctx.r3.u32, ctx.r1.u32);
 }
-template void TitleLoadDebugPage<0>(PPCContext&, uint8_t*);
-template void TitleLoadDebugPage<1>(PPCContext&, uint8_t*);
-template void TitleLoadDebugPage<2>(PPCContext&, uint8_t*);
-template void TitleLoadDebugPage<3>(PPCContext&, uint8_t*);
-template void TitleLoadDebugStep<0>(PPCContext&, uint8_t*);
-template void TitleLoadDebugStep<1>(PPCContext&, uint8_t*);
-template void TitleLoadDebugStep<2>(PPCContext&, uint8_t*);
-template void TitleLoadDebugStep<3>(PPCContext&, uint8_t*);
-template void TitleLoadDebugStep<4>(PPCContext&, uint8_t*);
-template void TitleLoadDebugStep<5>(PPCContext&, uint8_t*);
-template void TitleLoadDebugStep<6>(PPCContext&, uint8_t*);
-template void TitleLoadDebugStep<7>(PPCContext&, uint8_t*);
-template void TitleLoadDebugStep<8>(PPCContext&, uint8_t*);
-template void TitleLoadDebugStep<9>(PPCContext&, uint8_t*);
-template void TitleLoadDebugStep<10>(PPCContext&, uint8_t*);
-template void TitleLoadDebugStep<11>(PPCContext&, uint8_t*);
+template void TitleLoadDebugPage<0>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugPage<1>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugPage<2>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugPage<3>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugStep<0>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugStep<1>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugStep<2>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugStep<3>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugStep<4>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugStep<5>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugStep<6>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugStep<7>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugStep<8>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugStep<9>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugStep<10>(lifted::Regs&, uint8_t*);
+template void TitleLoadDebugStep<11>(lifted::Regs&, uint8_t*);
 
 }  // namespace hooks
 
 #define ITC_TITLE_SCREEN(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_title_screen)) { \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_title_screen)) { \
     hooks::step(ctx, base);               \
   }
 

@@ -146,7 +146,7 @@ void Slots(Context& h, uint32_t block) {
       Case(
           h, results, block, h.random.Next(),
           [&](int, PPCContext& t, Random& r) { t.r3.u64 = block + 4 * r.Below(64); }, nullptr,
-          __imp__sub_820D0730, hooks::CarModelsLoadSlotReset, fmt::format("case {}", c));
+          __imp__sub_820D0730, ITC_CONTEXT_FN(hooks::CarModelsLoadSlotReset), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -180,7 +180,7 @@ void Slots(Context& h, uint32_t block) {
               memory::FreePages(pages[v]);
             }
           },
-          __imp__sub_820D0758, hooks::CarModelsLoadSlotReleaseBuffer, fmt::format("case {}", c));
+          __imp__sub_820D0758, ITC_CONTEXT_FN(hooks::CarModelsLoadSlotReleaseBuffer), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -211,7 +211,7 @@ void Slots(Context& h, uint32_t block) {
               memory::FreePages(pages[v]);
             }
           },
-          __imp__sub_820C3CE0, NativeFreePagesAt, fmt::format("case {}", c));
+          __imp__sub_820C3CE0, ITC_CONTEXT_FN(NativeFreePagesAt), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -248,7 +248,7 @@ void DeferReleases(Context& h, uint32_t block) {
           t.r6.u64 = r.Next();
           t.r7.u64 = r.Next();
         },
-        nullptr, __imp__sub_820C3F50, NativeDeferRelease, fmt::format("case {}", c));
+        nullptr, __imp__sub_820C3F50, ITC_CONTEXT_FN(NativeDeferRelease), fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -301,7 +301,7 @@ void Releases(Context& h, uint32_t block) {
       t.r3.u64 = car;
       ITC_FLAG(native_scene_loaders) = v == 1;
       ITC_FLAG(native_car_models) = v == 1;
-      (v == 0 ? __imp__sub_820D4508 : hooks::CarModelsCarModelRelease)(t, h.base);
+      (v == 0 ? __imp__sub_820D4508 : ITC_CONTEXT_FN(hooks::CarModelsCarModelRelease))(t, h.base);
       ITC_FLAG(native_scene_loaders) = true;
       ITC_FLAG(native_car_models) = true;
       pending_frees::TakeAddedNodes(h.base, was, out[v]);
@@ -392,7 +392,7 @@ void TextureCreates(Context& h, uint32_t block) {
       t.r5.u64 = height;
       t.r6.u64 = header_out;
       t.r7.u64 = data_out;
-      (v == 0 ? __imp__sub_820ECF08 : hooks::CarModelsTextureCreate)(t, h.base);
+      (v == 0 ? __imp__sub_820ECF08 : ITC_CONTEXT_FN(hooks::CarModelsTextureCreate))(t, h.base);
       const uint32_t header = guest::LoadU32(h.base, header_out);
       const uint32_t data = guest::LoadU32(h.base, data_out);
       const std::vector<Known> known = {{header, 52}, {data, bytes}};
@@ -437,7 +437,7 @@ void TextureFrees(Context& h, uint32_t block) {
       PPCContext t = CallContext(h);
       t.r3.u64 = header_in;
       t.r4.u64 = data_in;
-      (v == 0 ? __imp__sub_820ECFC8 : hooks::CarModelsTextureFree)(t, h.base);
+      (v == 0 ? __imp__sub_820ECFC8 : ITC_CONTEXT_FN(hooks::CarModelsTextureFree))(t, h.base);
       const std::vector<Known> known = {{header, 52}, {data, data_bytes}};
       Address(out[v], t.r3.u32, known);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -510,7 +510,7 @@ void VinylCompresses(Context& h, uint32_t block) {
       t.r6.u64 = data_in;
       ITC_FLAG(native_car_models) = v == 1;
       ITC_FLAG(native_texture_compression) = v == 1;
-      (v == 0 ? __imp__sub_820ED090 : NativeVinylCompress)(t, h.base);
+      (v == 0 ? __imp__sub_820ED090 : ITC_CONTEXT_FN(NativeVinylCompress))(t, h.base);
       ITC_FLAG(native_car_models) = true;
       ITC_FLAG(native_texture_compression) = true;
       const uint32_t header = guest::LoadU32(h.base, header_in);
@@ -609,7 +609,7 @@ void PlateCases(Context& h, uint32_t block) {
       t.r9.u64 = (uint64_t(words[4]) << 32) | words[5];
       t.r10.u64 = (uint64_t(words[6]) << 32) | words[7];
       ITC_FLAG(native_car_models) = v == 1;
-      (v == 0 ? __imp__sub_820ED6D0 : hooks::CarModelsMakePlate)(t, h.base);
+      (v == 0 ? __imp__sub_820ED6D0 : ITC_CONTEXT_FN(hooks::CarModelsMakePlate))(t, h.base);
       ITC_FLAG(native_car_models) = true;
       const uint32_t bytes = TextureBytes(h.base, cm::kSheetFormat, 300, 150);
       const uint32_t header_a = guest::LoadU32(h.base, block), data_a = guest::LoadU32(h.base, block + 4);
@@ -849,7 +849,7 @@ void FileLoadedCases(Context& h) {
         t.r6.u64 = car;
         ITC_FLAG(native_car_models) = v == 1;
         (v == 0 ? (a ? __imp__sub_820D47A8 : __imp__sub_820D4F80)
-                : (a ? NativeOnFileLoaded : NativeOnFileLoadedB))(t, h.base);
+                : (a ? ITC_CONTEXT_FN(NativeOnFileLoaded) : ITC_CONTEXT_FN(NativeOnFileLoadedB)))(t, h.base);
         ITC_FLAG(native_car_models) = true;
         // The allocations.
         const uint32_t texture_bytes = TextureBytes(h.base, cm::kSheetFormat, 300, 150);
@@ -927,7 +927,7 @@ void TgaHeaderClears(Context& h, uint32_t block) {
     Case(
         h, results, block, h.random.Next(),
         [&](int, PPCContext& t, Random& r) { t.r3.u64 = block + r.Below(0x200); }, nullptr,
-        __imp__sub_820EEBC0, hooks::CarModelsTgaHeaderClear, fmt::format("case {}", c));
+        __imp__sub_820EEBC0, ITC_CONTEXT_FN(hooks::CarModelsTgaHeaderClear), fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -992,7 +992,7 @@ void TgaCreateImages(Context& h, uint32_t block) {
       t.r5.u64 = buffer_at;
       t.r6.u64 = pixels_out;
       ITC_FLAG(native_car_models) = v == 1;
-      (v == 0 ? __imp__sub_820ED020 : hooks::CarModelsTgaCreateImage)(t, h.base);
+      (v == 0 ? __imp__sub_820ED020 : ITC_CONTEXT_FN(hooks::CarModelsTgaCreateImage))(t, h.base);
       ITC_FLAG(native_car_models) = true;
       const uint32_t pixels = guest::LoadU32(h.base, pixels_out);
       const uint32_t bytes = width * height * 4;
@@ -1144,7 +1144,7 @@ void TexelCases(Context& h, uint32_t block) {
       t.f1.f64 = double(RasterFloat(r, float(z.image_w), c % 4 == 3));
       t.f2.f64 = double(RasterFloat(r, float(z.image_h), c % 4 == 3));
       ITC_FLAG(native_car_models) = v == 1;
-      (v == 0 ? __imp__sub_820ED2A0 : NativeSampleTexel)(t, h.base);
+      (v == 0 ? __imp__sub_820ED2A0 : ITC_CONTEXT_FN(NativeSampleTexel))(t, h.base);
       ITC_FLAG(native_car_models) = true;
       out[v].Word(t.r3.u32);
       out[v].Bytes(Read(h.base, t.r1.u32 - 80, 16));
@@ -1176,7 +1176,7 @@ void BlendCases(Context& h, uint32_t block) {
       t.r7.u64 = r.Below(z.canvas_h);
       t.r8.u64 = block + kUv;
       ITC_FLAG(native_car_models) = v == 1;
-      (v == 0 ? __imp__sub_820ED498 : NativeBlendPixel)(t, h.base);
+      (v == 0 ? __imp__sub_820ED498 : ITC_CONTEXT_FN(NativeBlendPixel))(t, h.base);
       ITC_FLAG(native_car_models) = true;
       out[v].Bytes(Read(h.base, block, kBlockBytes));
       out[v].Bytes(Read(h.base, frame - 80, 16));
@@ -1217,7 +1217,7 @@ void SpanCases(Context& h, uint32_t block) {
       t.r9.u64 = block + kVertices + 16;
       t.r10.u64 = block + kImage;
       ITC_FLAG(native_car_models) = v == 1;
-      (v == 0 ? __imp__sub_820EDE00 : NativeDrawSpan)(t, h.base);
+      (v == 0 ? __imp__sub_820EDE00 : ITC_CONTEXT_FN(NativeDrawSpan))(t, h.base);
       ITC_FLAG(native_car_models) = true;
       out[v].Bytes(Read(h.base, block, kBlockBytes));
       out[v].Bytes(Read(h.base, frame + 80, 64));
@@ -1259,7 +1259,7 @@ void TriangleCases(Context& h, uint32_t block) {
       t.r7.u64 = block + kImage;
       t.r8.u64 = r.Below(2) ? uint32_t(r.Next()) : 0;
       ITC_FLAG(native_car_models) = v == 1;
-      (v == 0 ? __imp__sub_820EE0C8 : NativeDrawTriangle)(t, h.base);
+      (v == 0 ? __imp__sub_820EE0C8 : ITC_CONTEXT_FN(NativeDrawTriangle))(t, h.base);
       ITC_FLAG(native_car_models) = true;
       out[v].Bytes(Read(h.base, block, kBlockBytes));
       out[v].Bytes(Read(h.base, frame + 84, 240 - 84));
@@ -1292,7 +1292,7 @@ void CornerCases(Context& h, uint32_t block) {
       t.r8.u64 = block + 24;
       t.f1.f64 = double(odd ? RasterFloat(r, 7.0f, true, 2) : RasterFloat(r, 12.0f, false) - 6);
       ITC_FLAG(native_car_models) = v == 1;
-      (v == 0 ? __imp__sub_820ED1E8 : NativeDecalCorner)(t, h.base);
+      (v == 0 ? __imp__sub_820ED1E8 : ITC_CONTEXT_FN(NativeDecalCorner))(t, h.base);
       ITC_FLAG(native_car_models) = true;
       out[v].Floats(h.base, block, 2);
       out[v].Floats(h.base, block + 64, 2);
@@ -1386,7 +1386,7 @@ void DecalCases(Context& h) {
         t.f1.f64 = double(float(int32_t(r.Below(2000000)) - 1000000));
       }
       ITC_FLAG(native_car_models) = v == 1;
-      (v == 0 ? __imp__sub_820EE638 : hooks::CarModelsDrawDecal)(t, h.base);
+      (v == 0 ? __imp__sub_820EE638 : ITC_CONTEXT_FN(hooks::CarModelsDrawDecal))(t, h.base);
       ITC_FLAG(native_car_models) = true;
       out[v].Word(t.r3.u32);
       out[v].Bytes(Read(h.base, sheet, sheet_bytes));
@@ -1554,7 +1554,7 @@ void DecalLoadCases(Context& h) {
       t.r6.u64 = car;
       ITC_FLAG(native_car_models) = v == 1;
       ITC_FLAG(native_texture_compression) = v == 1;
-      (v == 0 ? __imp__sub_820D5750 : hooks::CarModelsOnDecalLoaded)(t, h.base);
+      (v == 0 ? __imp__sub_820D5750 : ITC_CONTEXT_FN(hooks::CarModelsOnDecalLoaded))(t, h.base);
       ITC_FLAG(native_car_models) = true;
       ITC_FLAG(native_texture_compression) = true;
       const uint32_t header = guest::LoadU32(h.base, car + cm::kSheetHeader);
@@ -1794,13 +1794,13 @@ void Loads(Context& h, uint32_t block) {
   };
   {
     Results results("LoadSlot::LoadShared (sub_820D0860)");
-    run(results, 48, __imp__sub_820D0860, hooks::CarModelsLoadSlotLoadShared, shared, {},
+    run(results, 48, __imp__sub_820D0860, ITC_CONTEXT_FN(hooks::CarModelsLoadSlotLoadShared), shared, {},
         "shared");
     results.Report();
   }
   {
     Results results("CarModel::LoadDecals (sub_820D5B50)");
-    run(results, 24, __imp__sub_820D5B50, NativeLoadDecals,
+    run(results, 24, __imp__sub_820D5B50, ITC_CONTEXT_FN(NativeLoadDecals),
         [&](PPCContext& t, Random& r) {
           DecalRecords(h.base, block + 0x100 + 208, r, r.Below(5) == 0);
           guest::StoreU32(h.base, set + car_models::kSharedBufferSize,
@@ -1813,7 +1813,7 @@ void Loads(Context& h, uint32_t block) {
   {
     // A scene model with its car model at +24 (both in the block).
     Results results("CarModel::SetVinylTextures (sub_820D5F88)");
-    run(results, 16, __imp__sub_820D5F88, hooks::CarModelsSetVinylTextures,
+    run(results, 16, __imp__sub_820D5F88, ITC_CONTEXT_FN(hooks::CarModelsSetVinylTextures),
         [&](PPCContext& t, Random& r) {
           const uint32_t scene_model = block + 0x40 + 4 * r.Below(16);
           guest::StoreU32(h.base, scene_model + 24, block + 0x1000 + 4 * r.Below(256));
@@ -1833,7 +1833,7 @@ void Loads(Context& h, uint32_t block) {
             t.r3.u64 = block;
           },
           nullptr, c % 2 ? __imp__sub_820D8C50 : __imp__sub_820D8BA8,
-          c % 2 ? NativeWheelsBrakes : NativeWheelsRims,
+          c % 2 ? ITC_CONTEXT_FN(NativeWheelsBrakes) : ITC_CONTEXT_FN(NativeWheelsRims),
           fmt::format("case {}", c));
     }
     rims.Report();
@@ -1845,7 +1845,7 @@ void Loads(Context& h, uint32_t block) {
     Results results("Wheels::SetUp (sub_820D9110)");
     const uint32_t wheels = block + 0x100;
     const uint32_t setup = block + 0x3000;
-    run(results, 32, __imp__sub_820D9110, hooks::CarModelsWheelsSetUp,
+    run(results, 32, __imp__sub_820D9110, ITC_CONTEXT_FN(hooks::CarModelsWheelsSetUp),
         [&](PPCContext& t, Random& r) {
           WheelFields(h.base, wheels, setup, block + 0x3E00, block + 0x3D00, r);
           Put(h.base, setup + 116, r.Below(2) ? 0 : r.Below(3));
@@ -1866,7 +1866,7 @@ void Loads(Context& h, uint32_t block) {
   }
   {
     Results results("LoadSlot::Load (sub_820D07C8)");
-    run(results, 32, __imp__sub_820D07C8, hooks::CarModelsLoadSlotLoad, shared, {slot + 16},
+    run(results, 32, __imp__sub_820D07C8, ITC_CONTEXT_FN(hooks::CarModelsLoadSlotLoad), shared, {slot + 16},
         "own");
     results.Report();
   }
@@ -1888,7 +1888,7 @@ void Loads(Context& h, uint32_t block) {
     const uint32_t object = block + 0x100;
     const uint32_t setup = block + 0x3000;
     int c = 0;
-    run(results, 32, __imp__sub_820D67E8, hooks::CarModelsCockpitLoadSetC,
+    run(results, 32, __imp__sub_820D67E8, ITC_CONTEXT_FN(hooks::CarModelsCockpitLoadSetC),
         [&](PPCContext& t, Random& r) {
           Put(h.base, object + 24, block + 0x3E00);
           const bool empty = empty_block != 0 && (c++ / 2) % 4 == 3;
@@ -1915,7 +1915,7 @@ void Loads(Context& h, uint32_t block) {
     static constexpr uint32_t kCalls[3][3] = {{891, 226, 219}, {11061, 197, 190}, {19926, 55, 49}};
     Results results("CarInterior::LoadParts (sub_820D7730)");
     const uint32_t object = block + 0x100;
-    run(results, 24, __imp__sub_820D7730, NativeInteriorLoadParts,
+    run(results, 24, __imp__sub_820D7730, ITC_CONTEXT_FN(NativeInteriorLoadParts),
         [&](PPCContext& t, Random& r) {
           Put(h.base, object + 24, block + 0x3E00);
           Put(h.base, block + 0x3E20,
@@ -1942,7 +1942,7 @@ void Loads(Context& h, uint32_t block) {
     const uint32_t setup = block + 0x3000;
     const uint32_t stand_in = block + 0x3800;
     int c = 0;
-    run(results, 32, __imp__sub_820D79B0, hooks::CarModelsInteriorLoad,
+    run(results, 32, __imp__sub_820D79B0, ITC_CONTEXT_FN(hooks::CarModelsInteriorLoad),
         [&](PPCContext& t, Random& r) {
           guest::StoreU32(h.base, scene_models::kAccessories, stand_in);
           Put(h.base, stand_in, block + 0x3C00);
@@ -1973,13 +1973,13 @@ void Loads(Context& h, uint32_t block) {
   };
   {
     Results results("CarModel::LoadSetA (sub_820D59D8)");
-    run(results, 24, __imp__sub_820D59D8, NativeLoadSetA, car_model,
+    run(results, 24, __imp__sub_820D59D8, ITC_CONTEXT_FN(NativeLoadSetA), car_model,
         {car + 3744, car + 3968}, "set a");
     results.Report();
   }
   {
     Results results("CarModel::LoadSetB (sub_820D5AC0)");
-    run(results, 24, __imp__sub_820D5AC0, NativeLoadSetB, car_model, {car + 3744},
+    run(results, 24, __imp__sub_820D5AC0, ITC_CONTEXT_FN(NativeLoadSetB), car_model, {car + 3744},
         "set b");
     results.Report();
   }
@@ -1998,7 +1998,7 @@ void TeamEmblems(Context& h) {
       t.r3.u64 = 0x1234;
       t.r4.u64 = block;
       t.r5.u64 = 0x5678;
-      (v == 0 ? __imp__sub_820D3CF8 : NativeTeamEmblem)(t, h.base);
+      (v == 0 ? __imp__sub_820D3CF8 : ITC_CONTEXT_FN(NativeTeamEmblem))(t, h.base);
       for (const uint64_t word : {t.r3.u64, t.r11.u64, t.r0.u64, t.r12.u64, t.ctr.u64}) {
         out[v].Word(uint32_t(word));
         out[v].Word(uint32_t(word >> 32));
@@ -2060,7 +2060,7 @@ void Exteriors(Context& h, uint32_t block) {
       loads.emplace(std::vector<int64_t>{1, 2, -1, 4});
       t.r3.u64 = car;
       t.r4.u64 = setup;
-      (v == 0 ? __imp__sub_820D5EC8 : hooks::CarModelsLoadExterior)(t, h.base);
+      (v == 0 ? __imp__sub_820D5EC8 : ITC_CONTEXT_FN(hooks::CarModelsLoadExterior))(t, h.base);
       const uint32_t header = guest::LoadU32(h.base, car + 6684);
       const uint32_t data = guest::LoadU32(h.base, car + 6688);
       const uint32_t bytes =
@@ -2140,7 +2140,7 @@ void ReloadDecalCases(Context& h, uint32_t block) {
       // (The callees' adapters on for both sides, as LoadExterior's cases:
       // their originals save registers into the frames below, which their
       // plain C++ doesn't; their own cases compare them.)
-      (v == 0 ? __imp__sub_820D5D20 : hooks::CarModelsReloadDecals)(t, h.base);
+      (v == 0 ? __imp__sub_820D5D20 : ITC_CONTEXT_FN(hooks::CarModelsReloadDecals))(t, h.base);
       const uint32_t header = guest::LoadU32(h.base, car + 6684);
       const uint32_t data = guest::LoadU32(h.base, car + 6688);
       const uint32_t bytes =
@@ -2220,7 +2220,7 @@ void SceneReloadDecalCases(Context& h, uint32_t block) {
       std::optional<ArchiveLoads> loads;
       loads.emplace(std::vector<int64_t>{1, 2, -1, 4});
       t.r3.u64 = model;
-      (v == 0 ? __imp__sub_820D9D48 : hooks::SceneModelsReloadDecals)(t, h.base);
+      (v == 0 ? __imp__sub_820D9D48 : ITC_CONTEXT_FN(hooks::SceneModelsReloadDecals))(t, h.base);
       const uint32_t header = guest::LoadU32(h.base, car + 6684);
       const bool made = header != old_header;
       const uint32_t data = guest::LoadU32(h.base, car + 6688);
@@ -2541,7 +2541,7 @@ void ScenePoolsSetUps(Context& h) {
       t.r6.u64 = record;
       std::optional<ArchiveLoads> loads;
       loads.emplace(Serials(r));
-      (v == 0 ? __imp__sub_820C4338 : hooks::ScenePoolsSetUp)(t, h.base);
+      (v == 0 ? __imp__sub_820C4338 : ITC_CONTEXT_FN(hooks::ScenePoolsSetUp))(t, h.base);
       // The traffic car's allocations.
       const uint32_t header = guest::LoadU32(h.base, object + 3728);
       const uint32_t data = guest::LoadU32(h.base, object + 3732);
@@ -2933,19 +2933,19 @@ void SetUpBCases(Context& h) {
           t.r4.u64 = pool;
           t.r5.u64 = r.Below(4) == 0 ? 1 : 0;
           t.r6.u64 = pool > 7 ? record : record + kRecordOf[pool];
-          (v == 0 ? __imp__sub_820C5B28 : hooks::ScenePoolsSetUpB)(t, h.base);
+          (v == 0 ? __imp__sub_820C5B28 : ITC_CONTEXT_FN(hooks::ScenePoolsSetUpB))(t, h.base);
         } else if (which == 1) {
           t.r3.u64 = model;
-          (v == 0 ? __imp__sub_820D9870 : hooks::SceneModelBuild)(t, h.base);
+          (v == 0 ? __imp__sub_820D9870 : ITC_CONTEXT_FN(hooks::SceneModelBuild))(t, h.base);
         } else if (which == 2) {
           t.r3.u64 = model;
-          (v == 0 ? __imp__sub_820D9E00 : hooks::StandModelsSceneAddSecondWheels)(t, h.base);
+          (v == 0 ? __imp__sub_820D9E00 : ITC_CONTEXT_FN(hooks::StandModelsSceneAddSecondWheels))(t, h.base);
         } else if (which == 3) {
           t.r3.u64 = holder;
-          (v == 0 ? __imp__sub_82179998 : hooks::StandModelsAddSecondWheels)(t, h.base);
+          (v == 0 ? __imp__sub_82179998 : ITC_CONTEXT_FN(hooks::StandModelsAddSecondWheels))(t, h.base);
         } else {
           t.r3.u64 = screen;
-          (v == 0 ? __imp__sub_821CC890 : hooks::StandModelsStepSecondWheels)(t, h.base);
+          (v == 0 ? __imp__sub_821CC890 : ITC_CONTEXT_FN(hooks::StandModelsStepSecondWheels))(t, h.base);
         }
         what = fmt::format("case {} pool {} kind {} scene +4 {}", c, pool, kind,
                            guest::LoadU32(h.base, scene + 4));

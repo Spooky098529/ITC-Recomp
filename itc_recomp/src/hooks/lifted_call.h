@@ -9,6 +9,7 @@
 
 #include "guest.h"
 #include "lifted/lifted.h"
+#include "lifted/regs.h"
 #include "lifted/sdk.h"
 
 #include <initializer_list>
@@ -68,6 +69,12 @@ void EnterR3(PPCContext& ctx, uint8_t* base) {
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
     return {function(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0])), a.f[0]};
   });
+}
+
+// The same for an adapter body on our register view.
+template <uint64_t (*function)(uint8_t*, uint32_t, uint64_t, uint32_t)>
+void EnterR3(lifted::Regs& ctx, uint8_t* base) {
+  ctx.r3.u64 = function(base, ctx.r1.u32, ctx.r13.u64, ctx.r3.u32);
 }
 
 }  // namespace lifted_call

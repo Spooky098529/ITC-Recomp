@@ -17,6 +17,7 @@
 // --native_renderer_library_packets turns the replacement off.
 
 #include "draw_packets.h"
+#include "hooks/native_entry.h"
 #include "guest.h"
 #include "renderer.h"
 #include "state.h"
@@ -157,8 +158,8 @@ void LogCheck() {
 // exclusive mode flush with them). With the check flag, or the drop flag
 // off, the originals run.
 #define NATIVE_CHECKED_HELPER(address, helper, mark, dropped)                             \
-  extern "C" REX_FUNC(sub_##address) {                                                    \
-    REX_FUNC_PROLOGUE();                                                                  \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                                    \
+    \
     mark;                                                                                 \
     if (!native::Checking()) {                                                            \
       if (ITC_FLAG(native_draw_packets)) {                                                \
@@ -189,8 +190,8 @@ NATIVE_CHECKED_HELPER(822ADC08, native::kHiz, native::MarkRegistersDirty(0x2203,
 // Ends the command segment when the buffer is full (kicking it); counted
 // so the check can leave those calls out. The work is the command buffer's
 // (native with --native_command_buffer, src/hooks/command_buffer.cpp).
-extern "C" REX_FUNC(sub_8229EF48) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8229EF48) {
+  
   native::t_segment_ends++;
   hooks::EndCommandSegment(ctx, base);
 }
@@ -199,7 +200,7 @@ extern "C" REX_FUNC(sub_8229EF48) {
 // device, r4 primitive type, r5 base vertex, r6 start index, r7 index
 // count. Writes the dirty state's packets (five masks at device +0..+32)
 // and DRAW_INDX.
-void native::DrawPackets_IndexedDraw(PPCContext& ctx, uint8_t* base) {
+void native::DrawPackets_IndexedDraw(lifted::Regs& ctx, uint8_t* base) {
   uint32_t device = ctx.r3.u32;
   bool predicated = guest::LoadU8(base, device + kDeviceTilingFlags) & 0x2;
   if (Checking()) {
@@ -215,14 +216,14 @@ void native::DrawPackets_IndexedDraw(PPCContext& ctx, uint8_t* base) {
       }
     }
     if (shader_load) {
-      __imp__sub_825BE708(ctx, base);  // its writes are expected
+      lifted::Sdk(ctx, base, __imp__sub_825BE708);  // its writes are expected
     } else {
-      Checked(kDraw, base, device, [&] { __imp__sub_825BE708(ctx, base); });
+      Checked(kDraw, base, device, [&] { lifted::Sdk(ctx, base, __imp__sub_825BE708); });
     }
     return;
   }
   if (ITC_FLAG(native_renderer_library_packets) || predicated) {
-    __imp__sub_825BE708(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825BE708);
     return;
   }
   REX_STORE_U64(device + kDeviceVertexConstantsDirty, 0);

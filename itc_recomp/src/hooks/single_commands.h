@@ -5,6 +5,7 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "graphics/render_queue.h"
 #include "graphics/single_commands.h"
@@ -14,20 +15,25 @@ namespace hooks {
 // Guest calls for the single commands' plain C++, made through `ctx` (r1,
 // lr and the registers given set, r1 put back; the flush mode turned off
 // again after each).
-graphics::single_commands::GuestCall SingleCommandsCall(PPCContext& ctx, uint8_t* base);
+graphics::single_commands::GuestCall SingleCommandsCall(lifted::Regs& ctx, uint8_t* base);
 
 // The single commands RunSingles runs natively: their plain C++ for the
 // handlers that are ours while --native_single_commands is on, else nullopt
 // (the guest call runs).
-graphics::render_queue::SingleCommand SingleCommands(PPCContext& ctx, uint8_t* base);
+graphics::render_queue::SingleCommand SingleCommands(lifted::Regs& ctx, uint8_t* base);
 
 // The adapters' native paths, without the flag: r3 as the original's.
 void NativeSingleInlineVertices(PPCContext& ctx, uint8_t* base);
+void NativeSingleInlineVertices(lifted::Regs& ctx, uint8_t* base);
 void NativeSingleSetUpDrawer(PPCContext& ctx, uint8_t* base);
+void NativeSingleSetUpDrawer(lifted::Regs& ctx, uint8_t* base);
 void NativeSingleSetShaderConstants(PPCContext& ctx, uint8_t* base);
+void NativeSingleSetShaderConstants(lifted::Regs& ctx, uint8_t* base);
 // Command 15 marked as command 15 (native::g_current_command) around it, as
 // its wrap in src/native/replay_hooks.cpp does.
 void NativeSingleDrawerDraw(PPCContext& ctx, uint8_t* base);
+void NativeSingleDrawerDraw(lifted::Regs& ctx, uint8_t* base);
 void NativeSingleCallback(PPCContext& ctx, uint8_t* base);
+void NativeSingleCallback(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

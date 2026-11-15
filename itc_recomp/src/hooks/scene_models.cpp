@@ -3,6 +3,7 @@
 // shares (hooks/scene_models.h). Each leaves r3 as the original does.
 
 #include "hooks/scene_models.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/car_models.h"
@@ -33,43 +34,43 @@ namespace hooks {
 
 namespace sm = scene_models;
 
-void SceneModelsAccessories(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsAccessories) {
   ctx.r3.u64 = sm::Accessories(base);
 }
 
-void SceneModelsAccessory(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsAccessory) {
   ctx.r3.u64 = sm::Accessory(base, ctx.r3.u32);
 }
 
-void SceneModelsOnSoundLoaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsOnSoundLoaded) {
   sm::OnSoundLoaded(base, ctx.r6.u32);
 }
 
-void SceneModelsWheelsSetRecord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsWheelsSetRecord) {
   sm::WheelsSetRecord(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SceneModelsSetCarModel(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsSetCarModel) {
   sm::SetCarModel(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SceneModelsPartsLink(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsPartsLink) {
   sm::PartsLink(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SceneModelsPartsSetRecord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsPartsSetRecord) {
   sm::PartsSetRecord(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SceneModelsInteriorLink(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsInteriorLink) {
   sm::InteriorLink(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SceneModelsSetWord11452(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsSetWord11452) {
   sm::SetWord11452(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SceneModelsCarModelSetRecord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsCarModelSetRecord) {
   if (!sm::CarModelSetRecord(base, ctx.r3.u32, ctx.r4.u32)) {
     __imp__sub_820D3C70(ctx, base);
     return;
@@ -77,7 +78,7 @@ void SceneModelsCarModelSetRecord(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ctx.r3.u32 + 32;
 }
 
-void SceneModelsCarRecordCopy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsCarRecordCopy) {
   if (!sm::CarRecordCopy(base, ctx.r3.u32, ctx.r4.u32)) {
     __imp__sub_820D7EE8(ctx, base);
     return;
@@ -86,7 +87,7 @@ void SceneModelsCarRecordCopy(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ctx.r3.u32;
 }
 
-void SceneModelsSceneModelRecordCopy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsSceneModelRecordCopy) {
   if (!sm::SceneModelRecordCopy(base, ctx.r3.u32, ctx.r4.u32)) {
     __imp__sub_820DB290(ctx, base);
     return;
@@ -95,64 +96,64 @@ void SceneModelsSceneModelRecordCopy(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ctx.r3.u32;
 }
 
-void SceneModelsSceneModelRecordConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsSceneModelRecordConstruct) {
   ctx.fpscr.disableFlushMode();
   sm::SceneModelRecordConstruct(base, ctx.r3.u32);
   ctx.r3.u64 = ctx.r3.u32;
 }
 
-void SceneModelsCockpitRecordReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsCockpitRecordReset) {
   ctx.r3.u64 = sm::CockpitRecordReset(base, ctx.r3.u32);
 }
 
-void SceneModelsCarRecordSetW(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsCarRecordSetW) {
   ctx.fpscr.disableFlushMode();
   sm::CarRecordSetW(base, ctx.r3.u32);
 }
 
-void SceneModelsRecord12Reset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsRecord12Reset) {
   ctx.fpscr.disableFlushMode();
   sm::Record12Reset(base, ctx.r3.u32);
 }
 
-void SceneModelsLayerReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsLayerReset) {
   ctx.fpscr.disableFlushMode();
   sm::LayerReset(base, ctx.r3.u32);
 }
 
-void SceneModelsCarRecordReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsCarRecordReset) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = sm::CarRecordReset(base, ctx.r3.u32);
 }
 
-void SceneModelsPartsRecordReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsPartsRecordReset) {
   sm::PartsRecordReset(base, ctx.r3.u32);
 }
 
-void SceneModelsInteriorRecordReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsInteriorRecordReset) {
   sm::InteriorRecordReset(base, ctx.r3.u32);
 }
 
-void SceneModelsWheelsRecordReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsWheelsRecordReset) {
   ctx.fpscr.disableFlushMode();
   sm::WheelsRecordReset(base, ctx.r3.u32);
 }
 
-void SceneModelsPool4RecordReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsPool4RecordReset) {
   ctx.fpscr.disableFlushMode();
   sm::Pool4RecordReset(base, ctx.r3.u32);
 }
 
-void SceneModelsSceneModelRecordReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsSceneModelRecordReset) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = sm::SceneModelRecordReset(base, ctx.r3.u32);
 }
 
-void SceneModelsAllocPages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsAllocPages) {
   ctx.r3.u64 = sm::AllocPages(base, ctx.r4.u32, ctx.r5.u32);
 }
 
-void SceneModelsApplyRecord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsApplyRecord) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   const sm::ApplyCall call = StandModelsGuestCall(ctx, base);
@@ -165,7 +166,7 @@ void SceneModelsApplyRecord(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;
 }
 
-void SceneModelsReloadDecals(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsReloadDecals) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   const sm::ApplyCall call = StandModelsGuestCall(ctx, base);
@@ -174,7 +175,7 @@ void SceneModelsReloadDecals(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void SceneModelsPartsApply(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsPartsApply) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   const sm::ApplyCall call = StandModelsGuestCall(ctx, base);
@@ -183,7 +184,7 @@ void SceneModelsPartsApply(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void SceneModelsInteriorApply(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelsInteriorApply) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   const sm::ApplyCall call = StandModelsGuestCall(ctx, base);
@@ -193,7 +194,7 @@ void SceneModelsInteriorApply(PPCContext& ctx, uint8_t* base) {
 }
 
 
-void SceneModelUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelUpdate) {
   const uint64_t lr = ctx.lr;
   const auto call = StandModelsGuestCall(ctx, base);
   sm::ModelUpdateCalls calls;
@@ -233,12 +234,7 @@ void SceneModelUpdate(PPCContext& ctx, uint8_t* base) {
 
 // Defines an adapter: the flag, else the original.
 #define ITC_SCENE_MODELS(address, step)     \
-  extern "C" REX_FUNC(sub_##address) {      \
-    REX_FUNC_PROLOGUE();                    \
-    if (!ITC_FLAG(native_scene_models)) {   \
-      __imp__sub_##address(ctx, base);      \
-      return;                               \
-    }                                       \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_scene_models)) { \
     hooks::step(ctx, base);                 \
   }
 
@@ -280,10 +276,10 @@ ITC_SCENE_MODELS(820D34E0, SceneModelsPool4RecordReset)
 
 // The car model's pages: only while --native_heap routes VirtualAlloc to the
 // allocation layer.
-extern "C" REX_FUNC(sub_820C3CA0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820C3CA0) {
+  
   if (!ITC_FLAG(native_scene_models) || !hooks::NativeHeapActive()) {
-    __imp__sub_820C3CA0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820C3CA0);
     return;
   }
   hooks::SceneModelsAllocPages(ctx, base);

@@ -264,13 +264,13 @@ void TrafficDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
   const uint32_t source = block + kSource;
   const uint32_t scene = race + 0x10000;
   const Target targets[] = {
-      {"TrafficPoints::DrawBody (sub_820E55A0)", __imp__sub_820E55A0, NativeBody,
+      {"TrafficPoints::DrawBody (sub_820E55A0)", __imp__sub_820E55A0, ITC_CONTEXT_FN(NativeBody),
        car_draw::kTrafficBodyFrame, On::kRecords, 256},
-      {"TrafficPoints::DrawWindow (sub_820E5668)", __imp__sub_820E5668, NativeWindow,
+      {"TrafficPoints::DrawWindow (sub_820E5668)", __imp__sub_820E5668, ITC_CONTEXT_FN(NativeWindow),
        car_draw::kTrafficWindowFrame, On::kRecords, 256},
-      {"TrafficPoints::Draw (sub_820E6820)", __imp__sub_820E6820, NativePoints,
+      {"TrafficPoints::Draw (sub_820E6820)", __imp__sub_820E6820, ITC_CONTEXT_FN(NativePoints),
        car_draw::kTrafficPointsFrame, On::kPoints, 256},
-      {"SceneTraffic::Draw (sub_820E6A40)", __imp__sub_820E6A40, hooks::CarDrawSceneTraffic,
+      {"SceneTraffic::Draw (sub_820E6A40)", __imp__sub_820E6A40, ITC_CONTEXT_FN(hooks::CarDrawSceneTraffic),
        car_draw::kSceneTrafficFrame, On::kObject, 384},
   };
   for (const Target& target : targets) {

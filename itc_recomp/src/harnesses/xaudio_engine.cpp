@@ -90,7 +90,7 @@ void Leaves(Context& h, uint32_t block) {
   {
     Results results("XAudioFactory::TableSize (sub_8245D9E8)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_8245D9E8, hooks::XAudioFactoryTableSize,
+      Case(h, results, block, __imp__sub_8245D9E8, ITC_CONTEXT_FN(hooks::XAudioFactoryTableSize),
            [&](Random& random, PPCContext& t) {
              ClassTable(h.base, block, random, i);
              t.r3.u64 = i == 2 ? 0 : block;
@@ -102,7 +102,7 @@ void Leaves(Context& h, uint32_t block) {
   {
     Results results("XAudioFactory::SizeOf (sub_8245DBD0)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_8245DBD0, hooks::XAudioFactorySizeOf,
+      Case(h, results, block, __imp__sub_8245DBD0, ITC_CONTEXT_FN(hooks::XAudioFactorySizeOf),
            [&](Random& random, PPCContext& t) {
              ClassTable(h.base, block, random, i);
              t.r3.u64 = i == 2 ? 0 : block;
@@ -120,16 +120,16 @@ void Leaves(Context& h, uint32_t block) {
   };
   const Simple simple[] = {
       {"XAudioBuffer::GetFormat (sub_8245F6F0)", __imp__sub_8245F6F0,
-       hooks::XAudioBufferGetFormat, false},
+       ITC_CONTEXT_FN(hooks::XAudioBufferGetFormat), false},
       {"XAudioBuffer::GetFormatThunk (sub_8245F718)", __imp__sub_8245F718,
-       hooks::XAudioBufferGetFormatThunk, false},
-      {"sub_8245F8D0 (a buffer's interface)", __imp__sub_8245F8D0, hooks::XAudioBufferInterface,
+       ITC_CONTEXT_FN(hooks::XAudioBufferGetFormatThunk), false},
+      {"sub_8245F8D0 (a buffer's interface)", __imp__sub_8245F8D0, ITC_CONTEXT_FN(hooks::XAudioBufferInterface),
        true},
       {"XAudioAllocator::Remaining (sub_82460388)", __imp__sub_82460388,
-       hooks::XAudioAllocatorRemaining, false},
+       ITC_CONTEXT_FN(hooks::XAudioAllocatorRemaining), false},
       {"sub_82460370 (the interface's AddRef)", __imp__sub_82460370,
-       hooks::XAudioInterfaceAddRef, false},
-      {"sub_82461EF8 (an object's info)", __imp__sub_82461EF8, hooks::XAudioObjectInfo, true},
+       ITC_CONTEXT_FN(hooks::XAudioInterfaceAddRef), false},
+      {"sub_82461EF8 (an object's info)", __imp__sub_82461EF8, ITC_CONTEXT_FN(hooks::XAudioObjectInfo), true},
   };
   for (const Simple& s : simple) {
     Results results(s.name);
@@ -176,7 +176,7 @@ void Stats(Context& h) {
         Store(h.base, xa::kStats + k, uint32_t(random.Next()));
       }
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_8245F678 : hooks::XAudioTakeStats)(t, h.base);
+      (v == 0 ? __imp__sub_8245F678 : ITC_CONTEXT_FN(hooks::XAudioTakeStats))(t, h.base);
       out[v].Bytes(Read(h.base, xa::kStats, kBytes));
       out[v].Word(t.r3.u32);
       h.random = random;
@@ -201,7 +201,7 @@ void Frees(Context& h) {
       t.r3.u64 = 0x82954F20;
       t.r4.u64 = block;
       t.r5.u64 = attributes;
-      (v == 0 ? __imp__sub_8245EF90 : hooks::XAudioFree)(t, h.base);
+      (v == 0 ? __imp__sub_8245EF90 : ITC_CONTEXT_FN(hooks::XAudioFree))(t, h.base);
       out[v].Word(block != 0);
       out[v].Word(t.r3.u32 == block ? 1 : t.r3.u32 == 0 ? 0 : 2);
     }
@@ -220,7 +220,7 @@ void Calls(Context& h, uint32_t block) {
   {
     Results results("XAudioAllocator::Alloc (sub_82460288)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_82460288, hooks::XAudioAllocatorAlloc,
+      Case(h, results, block, __imp__sub_82460288, ITC_CONTEXT_FN(hooks::XAudioAllocatorAlloc),
            [&](Random& random, PPCContext& t) {
              const uint32_t allocator = block + 0x200;
              Store(h.base, allocator, block + kVtable);
@@ -239,7 +239,7 @@ void Calls(Context& h, uint32_t block) {
   {
     Results results("sub_8245AAB8 (an object's deleting destructor)");
     for (int i = 0; i < 24; i++) {
-      Case(h, results, block, __imp__sub_8245AAB8, hooks::XAudioDeleteObject,
+      Case(h, results, block, __imp__sub_8245AAB8, ITC_CONTEXT_FN(hooks::XAudioDeleteObject),
            [&](Random& random, PPCContext& t) {
              const uint32_t object = block + 0x200;
              Store(h.base, object, block + kVtable);
@@ -262,7 +262,7 @@ void Barriers(Context& h, uint32_t block) {
   // word (a processor from 8) with the word clear; without threads, nothing.
   Results results("XAudioEngine::Barrier (sub_8245A940)");
   for (int i = 0; i < 48; i++) {
-    Case(h, results, block, __imp__sub_8245A940, hooks::XAudioBarrier,
+    Case(h, results, block, __imp__sub_8245A940, ITC_CONTEXT_FN(hooks::XAudioBarrier),
          [&](Random& random, PPCContext& t) {
            const uint32_t engine = block;
            const uint32_t barrier = block + 0x400;
@@ -386,7 +386,7 @@ void Making(Context& h, uint32_t block) {
   {
     Results results("XAudioFactory::XAudioFactory (sub_8245DA48)");
     for (int i = 0; i < 32; i++) {
-      Case(h, results, block, __imp__sub_8245DA48, hooks::XAudioFactoryConstruct,
+      Case(h, results, block, __imp__sub_8245DA48, ITC_CONTEXT_FN(hooks::XAudioFactoryConstruct),
            [&](Random& random, PPCContext& t) {
              Allocator(h.base, block, 0x400);
              Classes(h.base, block, random, i % 8 == 0 ? 0 : 1 + random.Below(24));
@@ -401,7 +401,7 @@ void Making(Context& h, uint32_t block) {
   {
     Results results("XAudioFactory::Create (sub_8245DC10)");
     for (int i = 0; i < 32; i++) {
-      Case(h, results, block, __imp__sub_8245DC10, hooks::XAudioFactoryCreateObject,
+      Case(h, results, block, __imp__sub_8245DC10, ITC_CONTEXT_FN(hooks::XAudioFactoryCreateObject),
            [&](Random& random, PPCContext& t) {
              // Room for the factory and its entries, or not even for the
              // factory (E_OUTOFMEMORY).
@@ -425,9 +425,9 @@ void Making(Context& h, uint32_t block) {
     GuestFunction native;
   } slots[] = {
       {"XAudioFactory's create slot (sub_8245D650)", __imp__sub_8245D650,
-       hooks::XAudioFactoryCreateSlot},
+       ITC_CONTEXT_FN(hooks::XAudioFactoryCreateSlot)},
       {"XAudioFactory's size slot (sub_8245D6D8)", __imp__sub_8245D6D8,
-       hooks::XAudioFactorySizeSlot},
+       ITC_CONTEXT_FN(hooks::XAudioFactorySizeSlot)},
   };
   for (const auto& slot : slots) {
     Results results(slot.name);
@@ -466,7 +466,7 @@ void Making(Context& h, uint32_t block) {
       for (int v = 0; v < 2; v++) {
         PPCContext t = CallContext(h);
         Fill(h.base, t.r1.u32 - 0x100, 0x100);
-        (v == 0 ? __imp__sub_8245F588 : hooks::XAudioRegisterStats)(t, h.base);
+        (v == 0 ? __imp__sub_8245F588 : ITC_CONTEXT_FN(hooks::XAudioRegisterStats))(t, h.base);
         out[v].Bytes(Read(h.base, t.r1.u32 - 0x100, 0x100 - 8));
         out[v].Word(t.r3.u32);
       }
@@ -478,7 +478,7 @@ void Making(Context& h, uint32_t block) {
     // The kernel answers the title's process (1) here, as in play.
     Results results("XAudio::SetUpProcessors (sub_8245A828)");
     for (int i = 0; i < 80; i++) {
-      Case(h, results, block, __imp__sub_8245A828, hooks::XAudioSetUpProcessors,
+      Case(h, results, block, __imp__sub_8245A828, ITC_CONTEXT_FN(hooks::XAudioSetUpProcessors),
            [&](Random& random, PPCContext& t) {
              t.r3.u64 = i < 64 ? uint64_t(i) : random.Next();
              t.r4.u64 = block + 0x100 + random.Below(64);
@@ -490,7 +490,7 @@ void Making(Context& h, uint32_t block) {
   {
     Results results("XAudioEngine::Size (sub_8245B2C0)");
     for (int i = 0; i < 48; i++) {
-      Case(h, results, block, __imp__sub_8245B2C0, hooks::XAudioEngineSize,
+      Case(h, results, block, __imp__sub_8245B2C0, ITC_CONTEXT_FN(hooks::XAudioEngineSize),
            [&](Random& random, PPCContext& t) {
              Classes(h.base, block + 0x400, random, 1 + random.Below(24));
              const uint32_t params = block + 0x200;
@@ -612,7 +612,7 @@ void MasteringVoice(Context& h, uint32_t block) {
   {
     Results results("XAudioMasteringVoice::Size (sub_8245FF68)");
     for (int i = 0; engine != 0 && i < 24; i++) {
-      StackCase(h, results, block, __imp__sub_8245FF68, hooks::XAudioMasteringSize, 0,
+      StackCase(h, results, block, __imp__sub_8245FF68, ITC_CONTEXT_FN(hooks::XAudioMasteringSize), 0,
                 [&](Random& random, PPCContext& t, uint32_t) {
                   const uint32_t description = block + 0x100;
                   // No effects: the chain none, or one with none.
@@ -628,7 +628,7 @@ void MasteringVoice(Context& h, uint32_t block) {
   {
     Results results("AudioRenderDriver::AudioRenderDriver (sub_82465938)");
     for (int i = 0; i < 16; i++) {
-      Case(h, results, block, __imp__sub_82465938, hooks::XAudioRenderDriverConstruct,
+      Case(h, results, block, __imp__sub_82465938, ITC_CONTEXT_FN(hooks::XAudioRenderDriverConstruct),
            [&](Random&, PPCContext& t) {
              t.r3.u64 = block + 0x200;
              t.r4.u64 = block + 0x300;
@@ -645,7 +645,7 @@ void MasteringVoice(Context& h, uint32_t block) {
     // for the buffer now and then.
     Results results("XAudioMasteringVoice::Init (sub_8245FCA0)");
     for (int i = 0; engine != 0 && hooks::NativeHeapActive() && i < 16; i++) {
-      StackCase(h, results, block, __imp__sub_8245FCA0, hooks::XAudioMasteringInit,
+      StackCase(h, results, block, __imp__sub_8245FCA0, ITC_CONTEXT_FN(hooks::XAudioMasteringInit),
                 i % 4 == 3 ? 64 : 0x3000,
                 [&](Random& random, PPCContext& t, uint32_t allocator) {
                   MasteringVtable(h.base, block);
@@ -669,7 +669,7 @@ void MasteringVoice(Context& h, uint32_t block) {
     // sub_82460000, finds no stage).
     Results results("XAudioMasteringVoice::Create (sub_824600F0)");
     for (int i = 0; engine != 0 && hooks::NativeHeapActive() && i < 8; i++) {
-      StackCase(h, results, block, __imp__sub_824600F0, hooks::XAudioMasteringCreate, 0,
+      StackCase(h, results, block, __imp__sub_824600F0, ITC_CONTEXT_FN(hooks::XAudioMasteringCreate), 0,
                 [&](Random&, PPCContext& t, uint32_t) {
                   const uint32_t description = block + 0x100;
                   Store(h.base, description, 0);
@@ -699,7 +699,7 @@ void MasteringVoice(Context& h, uint32_t block) {
     // Playing or not (+61), under the live spin lock (Play's).
     Results results("XAudioMasteringVoice::Start (sub_8245FE20)");
     for (int i = 0; engine != 0 && i < 24; i++) {
-      StackCase(h, results, block, __imp__sub_8245FE20, hooks::XAudioMasteringStart, 0,
+      StackCase(h, results, block, __imp__sub_8245FE20, ITC_CONTEXT_FN(hooks::XAudioMasteringStart), 0,
                 [&](Random& random, PPCContext& t, uint32_t) {
                   MasteringVtable(h.base, block);
                   const uint32_t voice = block + kVoice;
@@ -717,7 +717,7 @@ void MasteringVoice(Context& h, uint32_t block) {
     // tail's passes (+64) 0 to 2.
     Results results("XAudioMasteringVoice::Pass (sub_8245FDC8)");
     for (int i = 0; i < 32; i++) {
-      StackCase(h, results, block, __imp__sub_8245FDC8, hooks::XAudioMasteringPass, 0,
+      StackCase(h, results, block, __imp__sub_8245FDC8, ITC_CONTEXT_FN(hooks::XAudioMasteringPass), 0,
                 [&](Random& random, PPCContext& t, uint32_t) {
                   MasteringVtable(h.base, block);
                   const uint32_t voice = block + kVoice;
@@ -738,7 +738,7 @@ void MasteringVoice(Context& h, uint32_t block) {
     // driver at +0x1400; [inout] at +0x1E00.
     Results results("XAudioMasteringVoice::Process (sub_8245FB80)");
     for (int i = 0; engine != 0 && i < 32; i++) {
-      StackCase(h, results, block, __imp__sub_8245FB80, hooks::XAudioMasteringProcess, 0,
+      StackCase(h, results, block, __imp__sub_8245FB80, ITC_CONTEXT_FN(hooks::XAudioMasteringProcess), 0,
                 [&](Random& random, PPCContext& t, uint32_t) {
                   MasteringVtable(h.base, block);
                   const uint32_t voice = block + kVoice;
@@ -850,7 +850,7 @@ void Locked(Context& h, uint32_t block) {
   {
     Results results("XAudioStage::Swap (sub_8245B208)");
     for (int i = 0; i < 16; i++) {
-      LockedCase(h, results, block, __imp__sub_8245B208, hooks::XAudioStageSwap, i % 2 == 0,
+      LockedCase(h, results, block, __imp__sub_8245B208, ITC_CONTEXT_FN(hooks::XAudioStageSwap), i % 2 == 0,
                  [&](Random&, PPCContext& t) { t.r3.u64 = block + 0x100; }, none,
                  fmt::format("case {}", i));
     }
@@ -859,7 +859,7 @@ void Locked(Context& h, uint32_t block) {
   {
     Results results("XAudioEngine::SwapStageLists (sub_8245B720)");
     for (int i = 0; i < 24; i++) {
-      LockedCase(h, results, block, __imp__sub_8245B720, hooks::XAudioSwapStageLists, i % 2 == 0,
+      LockedCase(h, results, block, __imp__sub_8245B720, ITC_CONTEXT_FN(hooks::XAudioSwapStageLists), i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    Store(h.base, block + 124, block + 0x300);
                    guest::StoreU8(h.base, block + 128, uint8_t(random.Below(5)));
@@ -876,7 +876,7 @@ void Locked(Context& h, uint32_t block) {
     // the live counters (debugger statistics), alike for both.
     Results results("XAudioEngine::RunStage (sub_8245B480)");
     for (int i = 0; i < 32; i++) {
-      LockedCase(h, results, block, __imp__sub_8245B480, hooks::XAudioRunStage, i % 2 == 0,
+      LockedCase(h, results, block, __imp__sub_8245B480, ITC_CONTEXT_FN(hooks::XAudioRunStage), i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    MasteringVtable(h.base, block);
                    Store(h.base, block + kVtable + 68,
@@ -909,7 +909,7 @@ void Locked(Context& h, uint32_t block) {
     // +444 and +448; the contexts the voices) or none.
     Results results("XAudioEngine::RunCallbacks (sub_8245ACE0)");
     for (int i = 0; i < 32; i++) {
-      LockedCase(h, results, block, __imp__sub_8245ACE0, hooks::XAudioRunCallbacks, i % 2 == 0,
+      LockedCase(h, results, block, __imp__sub_8245ACE0, ITC_CONTEXT_FN(hooks::XAudioRunCallbacks), i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    const uint32_t stage = random.Below(2);
                    for (uint32_t k = 0; k < 8; k++) {
@@ -928,7 +928,7 @@ void Locked(Context& h, uint32_t block) {
   {
     Results results("XAudioEngine::RegisterCallback (sub_8245AB60)");
     for (int i = 0; i < 32; i++) {
-      LockedCase(h, results, block, __imp__sub_8245AB60, hooks::XAudioRegisterCallback,
+      LockedCase(h, results, block, __imp__sub_8245AB60, ITC_CONTEXT_FN(hooks::XAudioRegisterCallback),
                  i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    const uint32_t stage = random.Below(2);
@@ -957,7 +957,7 @@ void Locked(Context& h, uint32_t block) {
     const bool usable = offset < 0x100 && (offset + 8 <= 60 || offset >= 80);
     Results results("XAudioEngine::Commit (sub_8245B638)");
     for (int i = 0; usable && i < 24; i++) {
-      LockedCase(h, results, block, __imp__sub_8245B638, hooks::XAudioEngineCommit, i % 2 == 0,
+      LockedCase(h, results, block, __imp__sub_8245B638, ITC_CONTEXT_FN(hooks::XAudioEngineCommit), i % 2 == 0,
                  [&](Random& random, PPCContext& t) {
                    MasteringVtable(h.base, block);
                    Store(h.base, block + kVtable + 48,
@@ -986,7 +986,7 @@ void Locked(Context& h, uint32_t block) {
     // Slot +52 the real GetType (the type byte +12, 0 to 3).
     Results results("XAudioEngine::StageOf (sub_8245FBF0)");
     for (int i = 0; i < 24; i++) {
-      LockedCase(h, results, block, __imp__sub_8245FBF0, hooks::XAudioStageOf, false,
+      LockedCase(h, results, block, __imp__sub_8245FBF0, ITC_CONTEXT_FN(hooks::XAudioStageOf), false,
                  [&](Random& random, PPCContext& t) {
                    MasteringVtable(h.base, block);
                    Store(h.base, block + kVtable + 52, 0x8245E318);
@@ -1009,7 +1009,7 @@ void Locked(Context& h, uint32_t block) {
     for (int i = 0; i < 24; i++) {
       const uint32_t type = stages != 0 ? i % 4 : (i % 4 == 1 ? 0 : i % 4);
       uint32_t list = 0;
-      LockedCase(h, results, block, __imp__sub_82460000, hooks::XAudioJoinMix, true,
+      LockedCase(h, results, block, __imp__sub_82460000, ITC_CONTEXT_FN(hooks::XAudioJoinMix), true,
                  [&](Random&, PPCContext& t) {
                    MasteringVtable(h.base, block);
                    Store(h.base, block + kVtable + 52, 0x8245E318);
@@ -1064,7 +1064,7 @@ void Allocators(Context& h, uint32_t block) {
         Store(h.base, allocator + 24, freed);
         PPCContext t = CallContext(h);
         t.r3.u64 = allocator;
-        (v == 0 ? __imp__sub_824602F8 : hooks::XAudioAllocatorDestroy)(t, h.base);
+        (v == 0 ? __imp__sub_824602F8 : ITC_CONTEXT_FN(hooks::XAudioAllocatorDestroy))(t, h.base);
         out[v].Bytes(Read(h.base, block, kBlockBytes));
         out[v].Word(r3_of(t.r3.u32, freed, allocator));
         h.random = random;
@@ -1080,8 +1080,8 @@ void Allocators(Context& h, uint32_t block) {
     uint32_t offset;  // r3 from the allocator
   } defaults[] = {
       {"sub_824604E8 (the default allocator's destructor)", __imp__sub_824604E8,
-       hooks::XAudioDefaultAllocatorDestroy, 0},
-      {"sub_824603A0 (its thunk)", __imp__sub_824603A0, hooks::XAudioDefaultAllocatorThunk, 4},
+       ITC_CONTEXT_FN(hooks::XAudioDefaultAllocatorDestroy), 0},
+      {"sub_824603A0 (its thunk)", __imp__sub_824603A0, ITC_CONTEXT_FN(hooks::XAudioDefaultAllocatorThunk), 4},
   };
   for (const auto& d : defaults) {
     Results results(d.name);
@@ -1114,7 +1114,7 @@ void Allocators(Context& h, uint32_t block) {
         Store(h.base, object + 12, xa::kMasteringAttributes);
         PPCContext t = CallContext(h);
         t.r3.u64 = object + 4;
-        (v == 0 ? __imp__sub_824603A8 : hooks::XAudioInterfaceFree)(t, h.base);
+        (v == 0 ? __imp__sub_824603A8 : ITC_CONTEXT_FN(hooks::XAudioInterfaceFree))(t, h.base);
         out[v].Bytes(Read(h.base, block, kBlockBytes));
         out[v].Word(r3_of(t.r3.u32, object, object + 4));
         h.random = random;
@@ -1341,7 +1341,7 @@ void MixAndThreads(Context& h, uint32_t block) {
   {
     Results results("XAudioEngine::Mix (sub_8245BF80)");
     for (int i = 0; i < 48; i++) {
-      ObjectCase(h, results, block, timeout, __imp__sub_8245BF80, hooks::XAudioMix,
+      ObjectCase(h, results, block, timeout, __imp__sub_8245BF80, ITC_CONTEXT_FN(hooks::XAudioMix),
                  [&](Random& random, PPCContext& t, uint32_t processor) {
                    t.r3.u64 = mix_world(random, processor);
                  },
@@ -1352,7 +1352,7 @@ void MixAndThreads(Context& h, uint32_t block) {
   {
     Results results("XAudio::MixerCallback (sub_8245FBE0)");
     for (int i = 0; i < 24; i++) {
-      ObjectCase(h, results, block, timeout, __imp__sub_8245FBE0, hooks::XAudioMixerCallback,
+      ObjectCase(h, results, block, timeout, __imp__sub_8245FBE0, ITC_CONTEXT_FN(hooks::XAudioMixerCallback),
                  [&](Random& random, PPCContext& t, uint32_t processor) {
                    mix_world(random, processor);
                    t.r3.u64 = random.Next();
@@ -1369,7 +1369,7 @@ void MixAndThreads(Context& h, uint32_t block) {
     // notification event so the second wait returns too.
     Results results("XAudio::MasterThread (sub_8245BE08)");
     for (int i = 0; i < 32; i++) {
-      ObjectCase(h, results, block, timeout, __imp__sub_8245BE08, hooks::XAudioMasterThread,
+      ObjectCase(h, results, block, timeout, __imp__sub_8245BE08, ITC_CONTEXT_FN(hooks::XAudioMasterThread),
                  [&](Random& random, PPCContext& t, uint32_t processor) {
                    const uint32_t engine =
                        MixEngine(h.base, block, random, 1 + random.Below(3), processor);
@@ -1398,7 +1398,7 @@ void MixAndThreads(Context& h, uint32_t block) {
     // more so the second wait returns.
     Results results("XAudio::WorkerThread (sub_8245BED0)");
     for (int i = 0; i < 32; i++) {
-      ObjectCase(h, results, block, timeout, __imp__sub_8245BED0, hooks::XAudioWorkerThread,
+      ObjectCase(h, results, block, timeout, __imp__sub_8245BED0, ITC_CONTEXT_FN(hooks::XAudioWorkerThread),
                  [&](Random& random, PPCContext& t, uint32_t processor) {
                    const uint32_t engine =
                        MixEngine(h.base, block, random, 1 + random.Below(3), processor);
@@ -1619,7 +1619,7 @@ void Making2(Context& h, uint32_t block) {
     // for some of what Init makes).
     Results results("XAudioEngine::Init (sub_8245C198)");
     for (int i = 0; i < 32; i++) {
-      MakingCase(h, results, block, arena, timeout, __imp__sub_8245C198, hooks::XAudioEngineInit,
+      MakingCase(h, results, block, arena, timeout, __imp__sub_8245C198, ITC_CONTEXT_FN(hooks::XAudioEngineInit),
                  [&](Random& random, PPCContext& t, bool&) {
                    // Too small for the first allocation one time in three
                    // (a failure between the factory's two allocations
@@ -1649,7 +1649,7 @@ void Making2(Context& h, uint32_t block) {
     Results results("XAudioEngine::Create (sub_8245C538)");
     for (int i = 0; i < 24; i++) {
       MakingCase(h, results, block, arena, timeout, __imp__sub_8245C538,
-                 hooks::XAudioEngineCreate,
+                 ITC_CONTEXT_FN(hooks::XAudioEngineCreate),
                  [&](Random& random, PPCContext& t, bool& default_allocator) {
                    uint32_t params = 0, allocator = 0;
                    const xa::MakingStandIn stand_in =
@@ -1667,7 +1667,7 @@ void Making2(Context& h, uint32_t block) {
     Results results("XAudio::CreateEngine (sub_82459D60)");
     for (int i = 0; i < 16; i++) {
       MakingCase(h, results, block, arena, timeout, __imp__sub_82459D60,
-                 hooks::XAudioCreateEngine,
+                 ITC_CONTEXT_FN(hooks::XAudioCreateEngine),
                  [&](Random& random, PPCContext& t, bool& default_allocator) {
                    uint32_t params = 0, allocator = 0;
                    const xa::MakingStandIn stand_in =
@@ -1724,7 +1724,7 @@ void Initialize(Context& h, uint32_t block) {
       }
       t.r3.u64 = params ? block + 0x200 : 0;
       t.r4.u64 = random.Next();
-      (v == 0 ? __imp__sub_8245A760 : hooks::XAudioApiInitialize)(t, h.base);
+      (v == 0 ? __imp__sub_8245A760 : ITC_CONTEXT_FN(hooks::XAudioApiInitialize))(t, h.base);
       out[v].Bytes(Read(h.base, block, kBlockBytes));
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));

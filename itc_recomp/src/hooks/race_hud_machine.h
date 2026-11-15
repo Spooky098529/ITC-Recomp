@@ -8,56 +8,89 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 namespace hooks {
 
 // RaceHudMachine::Init sub_8216E6E8: r3 = the machine (race mode +
 // 128664); r3 as the last StateMachine::Add leaves it.
 void RaceHudMachineInit(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineInit(lifted::Regs& ctx, uint8_t* base);
 // The handlers: r3 = the machine, r4 = the race mode's dispatcher.
-void RaceHudMachinePreRaceUpdate(PPCContext& ctx, uint8_t* base);   // sub_8216C210
-void RaceHudMachinePreRaceDraw(PPCContext& ctx, uint8_t* base);     // sub_8216C2A0
-void RaceHudMachineCountdownDraw(PPCContext& ctx, uint8_t* base);   // sub_8216C330
-void RaceHudMachineStartIntro(PPCContext& ctx, uint8_t* base);      // sub_8216C510
-void RaceHudMachineEndIntro(PPCContext& ctx, uint8_t* base);        // sub_8216C520
-void RaceHudMachineIntroUpdate(PPCContext& ctx, uint8_t* base);     // sub_8216C530
-void RaceHudMachineIntroDraw(PPCContext& ctx, uint8_t* base);       // sub_8216C5B8
-void RaceHudMachineCountdownUpdate(PPCContext& ctx, uint8_t* base); // sub_8216CB98
-void RaceHudMachineRaceDraw(PPCContext& ctx, uint8_t* base);        // sub_8216CE00
-void RaceHudMachineRaceUpdate(PPCContext& ctx, uint8_t* base);      // sub_8216D918
-void RaceHudMachineSetUp(PPCContext& ctx, uint8_t* base);           // sub_8216D450
-void RaceHudMachineCloseResults(PPCContext& ctx, uint8_t* base);    // sub_8216D198
-void RaceHudMachineResultsUpdate(PPCContext& ctx, uint8_t* base);   // sub_8216DFD0
-void RaceHudMachinePauseUpdate(PPCContext& ctx, uint8_t* base);     // sub_8216DB70
-void RaceHudMachineAfterRaceUpdate(PPCContext& ctx, uint8_t* base); // sub_8216DD88
+void RaceHudMachinePreRaceUpdate(PPCContext& ctx, uint8_t* base);
+void RaceHudMachinePreRaceUpdate(lifted::Regs& ctx, uint8_t* base);   // sub_8216C210
+void RaceHudMachinePreRaceDraw(PPCContext& ctx, uint8_t* base);
+void RaceHudMachinePreRaceDraw(lifted::Regs& ctx, uint8_t* base);     // sub_8216C2A0
+void RaceHudMachineCountdownDraw(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineCountdownDraw(lifted::Regs& ctx, uint8_t* base);   // sub_8216C330
+void RaceHudMachineStartIntro(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineStartIntro(lifted::Regs& ctx, uint8_t* base);      // sub_8216C510
+void RaceHudMachineEndIntro(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineEndIntro(lifted::Regs& ctx, uint8_t* base);        // sub_8216C520
+void RaceHudMachineIntroUpdate(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineIntroUpdate(lifted::Regs& ctx, uint8_t* base);     // sub_8216C530
+void RaceHudMachineIntroDraw(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineIntroDraw(lifted::Regs& ctx, uint8_t* base);       // sub_8216C5B8
+void RaceHudMachineCountdownUpdate(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineCountdownUpdate(lifted::Regs& ctx, uint8_t* base); // sub_8216CB98
+void RaceHudMachineRaceDraw(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineRaceDraw(lifted::Regs& ctx, uint8_t* base);        // sub_8216CE00
+void RaceHudMachineRaceUpdate(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineRaceUpdate(lifted::Regs& ctx, uint8_t* base);      // sub_8216D918
+void RaceHudMachineSetUp(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineSetUp(lifted::Regs& ctx, uint8_t* base);           // sub_8216D450
+void RaceHudMachineCloseResults(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineCloseResults(lifted::Regs& ctx, uint8_t* base);    // sub_8216D198
+void RaceHudMachineResultsUpdate(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineResultsUpdate(lifted::Regs& ctx, uint8_t* base);   // sub_8216DFD0
+void RaceHudMachinePauseUpdate(PPCContext& ctx, uint8_t* base);
+void RaceHudMachinePauseUpdate(lifted::Regs& ctx, uint8_t* base);     // sub_8216DB70
+void RaceHudMachineAfterRaceUpdate(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineAfterRaceUpdate(lifted::Regs& ctx, uint8_t* base); // sub_8216DD88
 // CreateScreens sub_8216CA28 (r3 = the machine), ClosePause sub_8216C658,
 // ResultsDraw sub_8216D6D0 and AfterRaceDraw sub_8216C6D8.
-void RaceHudMachineCreateScreens(PPCContext& ctx, uint8_t* base);   // sub_8216CA28
-void RaceHudMachineClosePause(PPCContext& ctx, uint8_t* base);      // sub_8216C658
-void RaceHudMachineResultsDraw(PPCContext& ctx, uint8_t* base);     // sub_8216D6D0
-void RaceHudMachineAfterRaceDraw(PPCContext& ctx, uint8_t* base);   // sub_8216C6D8
+void RaceHudMachineCreateScreens(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineCreateScreens(lifted::Regs& ctx, uint8_t* base);   // sub_8216CA28
+void RaceHudMachineClosePause(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineClosePause(lifted::Regs& ctx, uint8_t* base);      // sub_8216C658
+void RaceHudMachineResultsDraw(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineResultsDraw(lifted::Regs& ctx, uint8_t* base);     // sub_8216D6D0
+void RaceHudMachineAfterRaceDraw(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineAfterRaceDraw(lifted::Regs& ctx, uint8_t* base);   // sub_8216C6D8
 // PauseDraw sub_8216CF08 and RacePauseDraw sub_8216CFE0 (r3 = the machine).
-void RaceHudMachinePauseDraw(PPCContext& ctx, uint8_t* base);       // sub_8216CF08
-void RaceHudMachineRacePauseDraw(PPCContext& ctx, uint8_t* base);   // sub_8216CFE0
+void RaceHudMachinePauseDraw(PPCContext& ctx, uint8_t* base);
+void RaceHudMachinePauseDraw(lifted::Regs& ctx, uint8_t* base);       // sub_8216CF08
+void RaceHudMachineRacePauseDraw(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineRacePauseDraw(lifted::Regs& ctx, uint8_t* base);   // sub_8216CFE0
 // DestroyScreens sub_8216C208 (r3 = the machine; a tail call with the
 // caller's lr).
-void RaceHudMachineDestroyScreens(PPCContext& ctx, uint8_t* base);  // sub_8216C208
+void RaceHudMachineDestroyScreens(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineDestroyScreens(lifted::Regs& ctx, uint8_t* base);  // sub_8216C208
 // StartCountdown sub_8216CC60 (r3 = the machine).
-void RaceHudMachineStartCountdown(PPCContext& ctx, uint8_t* base);  // sub_8216CC60
+void RaceHudMachineStartCountdown(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineStartCountdown(lifted::Regs& ctx, uint8_t* base);  // sub_8216CC60
 // OnRaceEnd sub_8216E5B0 and AwardPrize sub_8216E150 (r3 = the machine).
-void RaceHudMachineOnRaceEnd(PPCContext& ctx, uint8_t* base);       // sub_8216E5B0
-void RaceHudMachineAwardPrize(PPCContext& ctx, uint8_t* base);      // sub_8216E150
+void RaceHudMachineOnRaceEnd(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineOnRaceEnd(lifted::Regs& ctx, uint8_t* base);       // sub_8216E5B0
+void RaceHudMachineAwardPrize(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineAwardPrize(lifted::Regs& ctx, uint8_t* base);      // sub_8216E150
 // The helpers: IsFirstDay sub_8216D3F0 (no arguments), OpponentPrize
 // sub_8216C820 and ItemBonus sub_8216C938 (r4 = the item id).
 void RaceHudMachineIsFirstDay(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineIsFirstDay(lifted::Regs& ctx, uint8_t* base);
 void RaceHudMachineOpponentPrize(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineOpponentPrize(lifted::Regs& ctx, uint8_t* base);
 void RaceHudMachineItemBonus(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineItemBonus(lifted::Regs& ctx, uint8_t* base);
 // The pause menu's openers: OpenPause sub_8216D600 and OpenRacePause
 // sub_8216DA40 (r3 the machine, tail calls with the caller's lr),
 // OpenCareerPause sub_8216D8C8 (no adapter: its only caller,
 // OpenRacePause's plain C++, calls it directly; the step for the harness).
 void RaceHudMachineOpenPause(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineOpenPause(lifted::Regs& ctx, uint8_t* base);
 void RaceHudMachineOpenRacePause(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineOpenRacePause(lifted::Regs& ctx, uint8_t* base);
 void RaceHudMachineOpenCareerPause(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineOpenCareerPause(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

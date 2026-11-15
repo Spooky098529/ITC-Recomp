@@ -637,10 +637,10 @@ void InitMachine(PPCContext& t, Random& r, const World& w) {
 void Theater(Context& h, const World& w) {
   // InitStates: its frame but its saves (r27 on) compared.
   Run(h, w, {"ReplayTheater::InitStates (sub_8228AC48)", 24, __imp__sub_8228AC48,
-             hooks::ReplayTheaterInitStates, {{-1296, -48}}, InitMachine});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterInitStates), {{-1296, -48}}, InitMachine});
   // Create: the three blocks VirtualAlloc made compared by content.
   Run(h, w, {"ReplayTheater::Create (sub_82289408)", 60, __imp__sub_82289408,
-             hooks::ReplayTheaterCreate, {{-112, -24}}, Machine,
+             ITC_CONTEXT_FN(hooks::ReplayTheaterCreate), {{-112, -24}}, Machine,
              [](PPCContext& t, const World& w, Outputs& out) {
                // r3 the data's address (the last VirtualAlloc's).
                out.Word(t.r3.u32 == guest::LoadU32(w.base, t10::kData) ? 1 : 0);
@@ -652,7 +652,7 @@ void Theater(Context& h, const World& w) {
   // Destroy: the three blocks the layer's pages (whether each was freed
   // compared).
   Run(h, w, {"ReplayTheater::Destroy (sub_822894E8)", 60, __imp__sub_822894E8,
-             hooks::ReplayTheaterDestroy, {{-128, -40}},
+             ITC_CONTEXT_FN(hooks::ReplayTheaterDestroy), {{-128, -40}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                Machine(t, r, w);
@@ -663,20 +663,20 @@ void Theater(Context& h, const World& w) {
                guest::StoreU32(base, t10::kData, data);
              }});
   Run(h, w, {"ReplayTheater::OpenMovie (sub_822891F8)", 20, __imp__sub_822891F8,
-             hooks::ReplayTheaterOpenMovie, {}, Machine});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterOpenMovie), {}, Machine});
   Run(h, w, {"ReplayTheater::WaitForMovie (sub_82289570)", 100, __imp__sub_82289570,
-             hooks::ReplayTheaterWaitForMovie, {{-96, -16}}, Machine});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterWaitForMovie), {{-96, -16}}, Machine});
   // Start: SaveBuffers::Create finds the header there (nothing made); its
   // frame, StartPage's and SetPrompts' below without their saves.
   Run(h, w, {"ReplayTheater::Start (sub_8228AA58; sub_8228A508, sub_8228A3B8)", 100,
-             __imp__sub_8228AA58, hooks::ReplayTheaterStart,
+             __imp__sub_8228AA58, ITC_CONTEXT_FN(hooks::ReplayTheaterStart),
              {{-96, -8}, {-192, -104}, {-368, -248}}, Machine});
   Run(h, w, {"ReplayTheater::StartPage (sub_8228A508; sub_8228A3B8)", 60, __imp__sub_8228A508,
-             hooks::ReplayTheaterStartPage, {{-96, -8}, {-272, -152}}, Machine});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterStartPage), {{-96, -8}, {-272, -152}}, Machine});
   // Draw: the page -1 or 1 to 5 (0, ListPage, has its own cases); only its
   // own frame compared.
   Run(h, w, {"ReplayTheater::Draw (sub_8228A868)", 150, __imp__sub_8228A868,
-             hooks::ReplayTheaterDraw, {{-112, -8}},
+             ITC_CONTEXT_FN(hooks::ReplayTheaterDraw), {{-112, -8}},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                const uint32_t pick = r.Below(6);
@@ -686,7 +686,7 @@ void Theater(Context& h, const World& w) {
   // queued one -1 or small, the started word 0 or not, the page 3 or not;
   // only its own frame compared.
   Run(h, w, {"ReplayTheater::Update (sub_8228A8F8)", 400, __imp__sub_8228A8F8,
-             hooks::ReplayTheaterUpdate, {{-144, -16}},
+             ITC_CONTEXT_FN(hooks::ReplayTheaterUpdate), {{-144, -16}},
              [](PPCContext&, Random& r, const World& w) {
                uint8_t* base = w.base;
                ListWorld(r, w);
@@ -704,35 +704,35 @@ void Theater(Context& h, const World& w) {
   // world), interrupted or not; OnDone's and OnRetry's BuildList with the
   // list's block made after.
   Run(h, w, {"ReplayTheater::OnDone (sub_8228AAB0)", 200, __imp__sub_8228AAB0,
-             hooks::ReplayTheaterOnDone, {{-96, -8}},
+             ITC_CONTEXT_FN(hooks::ReplayTheaterOnDone), {{-96, -8}},
              [](PPCContext& t, Random& r, const World& w) {
                ListWorld(r, w);
                Machine(t, r, w);
              },
              ListBlock});
   Run(h, w, {"ReplayTheater::OnFailed (sub_82289208)", 150, __imp__sub_82289208,
-             hooks::ReplayTheaterOnFailed, {}, Machine});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterOnFailed), {}, Machine});
   Run(h, w, {"ReplayTheater::OnRetry (sub_8228ABE0)", 100, __imp__sub_8228ABE0,
-             hooks::ReplayTheaterOnRetry, {{-96, -8}},
+             ITC_CONTEXT_FN(hooks::ReplayTheaterOnRetry), {{-96, -8}},
              [](PPCContext& t, Random& r, const World& w) {
                ListWorld(r, w);
                Machine(t, r, w);
              },
              ListBlock});
   Run(h, w, {"ReplayTheater::OnBack (sub_82289308)", 60, __imp__sub_82289308,
-             hooks::ReplayTheaterOnBack, {}, Machine});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterOnBack), {}, Machine});
   Run(h, w, {"ReplayTheater::OnInterrupt (sub_82289358)", 60, __imp__sub_82289358,
-             hooks::ReplayTheaterOnInterrupt, {}, Machine});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterOnInterrupt), {}, Machine});
   Run(h, w, {"ReplayTheater::OnResume (sub_822893A8)", 60, __imp__sub_822893A8,
-             hooks::ReplayTheaterOnResume, {}, Machine});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterOnResume), {}, Machine});
   Run(h, w, {"ReplayTheater::Unload (sub_82289600)", 60, __imp__sub_82289600,
-             hooks::ReplayTheaterUnload, {{-112, -16}}, Machine});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterUnload), {{-112, -16}}, Machine});
   Run(h, w, {"ReplayTheater::Wait (sub_82289668)", 40, __imp__sub_82289668,
-             hooks::ReplayTheaterWait, {}, Machine});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterWait), {}, Machine});
   // Leave: the save layer's header and its buffers the layer's pages or 0
   // (whether each was freed compared).
   Run(h, w, {"ReplayTheater::Leave (sub_822896C0)", 60, __imp__sub_822896C0,
-             hooks::ReplayTheaterLeave, {{-112, -16}},
+             ITC_CONTEXT_FN(hooks::ReplayTheaterLeave), {{-112, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                Machine(t, r, w);
@@ -748,24 +748,24 @@ void Theater(Context& h, const World& w) {
 void Pages(Context& h, const World& w) {
   // ListPage: the menus' input; its frame without its saves (r25 on).
   Run(h, w, {"ReplayTheater::ListPage (sub_82289768)", 400, __imp__sub_82289768,
-             hooks::ReplayTheaterListPage, {{-144, -64}},
+             ITC_CONTEXT_FN(hooks::ReplayTheaterListPage), {{-144, -64}},
              [](PPCContext& t, Random& r, const World& w) {
                MenuInput(r, w);
                Dispatcher(t, r, w);
              }});
   Run(h, w, {"ReplayTheater::AskList (sub_82289958)", 60, __imp__sub_82289958,
-             hooks::ReplayTheaterAskList, {}, Dispatcher});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterAskList), {}, Dispatcher});
   Run(h, w, {"ReplayTheater::AskLoad (sub_822899E0)", 60, __imp__sub_822899E0,
-             hooks::ReplayTheaterAskLoad, {}, Dispatcher});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterAskLoad), {}, Dispatcher});
   Run(h, w, {"ReplayTheater::LeavePage (sub_82289A70)", 40, __imp__sub_82289A70,
-             hooks::ReplayTheaterLeavePage, {}, Dispatcher});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterLeavePage), {}, Dispatcher});
   // WaitPage: the save screen's +56 0, 1 or any; SetPrompts' frame (its
   // tail call's) without its saves.
   Run(h, w, {"ReplayTheater::WaitPage (sub_8228A4B0; sub_8228A3B8)", 100, __imp__sub_8228A4B0,
-             hooks::ReplayTheaterWaitPage, {{-176, -56}}, Dispatcher});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterWaitPage), {{-176, -56}}, Dispatcher});
   // SetPrompts: each pair's values -1 or small.
   Run(h, w, {"ReplayTheater::SetPrompts (sub_8228A3B8)", 150, __imp__sub_8228A3B8,
-             hooks::ReplayTheaterSetPrompts, {{-176, -56}},
+             ITC_CONTEXT_FN(hooks::ReplayTheaterSetPrompts), {{-176, -56}},
              [](PPCContext& t, Random& r, const World&) {
                for (PPCRegister* reg : {&t.r3, &t.r4, &t.r5, &t.r6, &t.r7, &t.r8}) {
                  reg->u64 = r.Below(3) == 0 ? 0xFFFFFFFFull : r.Below(4);
@@ -781,23 +781,23 @@ void Transitions(Context& h, const World& w) {
     std::vector<Range> stack;
   };
   const Case cases[] = {
-      {"ReplayTheater::Intro (sub_82289AC0)", __imp__sub_82289AC0, hooks::ReplayTheaterIntro,
+      {"ReplayTheater::Intro (sub_82289AC0)", __imp__sub_82289AC0, ITC_CONTEXT_FN(hooks::ReplayTheaterIntro),
        {{-112, -24}}},
-      {"ReplayTheater::FadeOut (sub_82289BD0)", __imp__sub_82289BD0, hooks::ReplayTheaterFadeOut,
+      {"ReplayTheater::FadeOut (sub_82289BD0)", __imp__sub_82289BD0, ITC_CONTEXT_FN(hooks::ReplayTheaterFadeOut),
        {{-112, -24}}},
       {"ReplayTheater::FadeInList (sub_82289CC0)", __imp__sub_82289CC0,
-       hooks::ReplayTheaterFadeInList, {{-112, -24}}},
+       ITC_CONTEXT_FN(hooks::ReplayTheaterFadeInList), {{-112, -24}}},
       {"ReplayTheater::ShowCursor (sub_82289D70)", __imp__sub_82289D70,
-       hooks::ReplayTheaterShowCursor, {{-128, -32}}},
+       ITC_CONTEXT_FN(hooks::ReplayTheaterShowCursor), {{-128, -32}}},
       // MoveCursor: without SetNodeText's parameter area and its saves (r23
       // on, f31); ShowRecord's and ShowListPage's frames have their own
       // cases.
       {"ReplayTheater::MoveCursor (sub_8228A658)", __imp__sub_8228A658,
-       hooks::ReplayTheaterMoveCursor, {{-176, -128}, {-96, -88}}},
+       ITC_CONTEXT_FN(hooks::ReplayTheaterMoveCursor), {{-176, -128}, {-96, -88}}},
       {"ReplayTheater::HideCursor (sub_82289E08)", __imp__sub_82289E08,
-       hooks::ReplayTheaterHideCursor, {{-112, -24}}},
+       ITC_CONTEXT_FN(hooks::ReplayTheaterHideCursor), {{-112, -24}}},
       {"ReplayTheater::PickReplay (sub_82289EB8)", __imp__sub_82289EB8,
-       hooks::ReplayTheaterPickReplay, {{-112, -24}}},
+       ITC_CONTEXT_FN(hooks::ReplayTheaterPickReplay), {{-112, -24}}},
   };
   for (const Case& c : cases) {
     Run(h, w, {c.name, 200, c.recompiled, c.native, c.stack, Started, ListBlock});
@@ -805,15 +805,15 @@ void Transitions(Context& h, const World& w) {
   auto list = [](PPCContext&, Random& r, const World& w) { ListWorld(r, w); };
   // BuildList: its frame without its saves (r29 on, f31).
   Run(h, w, {"ReplayTheater::BuildList (sub_8228A560)", 200, __imp__sub_8228A560,
-             hooks::ReplayTheaterBuildList, {{-144, -40}}, list, ListBlock});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterBuildList), {{-144, -40}}, list, ListBlock});
   // ShowListPage: without the setters' parameter area and its saves (r23
   // on).
   Run(h, w, {"ReplayTheater::ShowListPage (sub_82289F48)", 200, __imp__sub_82289F48,
-             hooks::ReplayTheaterShowListPage, {{-176, -128}, {-96, -80}}, list});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterShowListPage), {{-176, -128}, {-96, -80}}, list});
   // ShowRecord: r3 a record (now and then 0), its +28 0 now and then; its
   // frame without the setters' parameter area and its saves (r28 on).
   Run(h, w, {"ReplayTheater::ShowRecord (sub_8228A0D8)", 300, __imp__sub_8228A0D8,
-             hooks::ReplayTheaterShowRecord, {{-192, -144}, {-112, -40}},
+             ITC_CONTEXT_FN(hooks::ReplayTheaterShowRecord), {{-192, -144}, {-112, -40}},
              [](PPCContext& t, Random& r, const World& w) {
                t.r3.u64 = r.Below(8) == 0 ? 0 : w.at(kRecordsAt) + 36 * r.Below(kRecords);
              }});
@@ -865,37 +865,37 @@ void NormalizePointers(uint8_t* base, uint32_t at, uint32_t bytes, uint32_t lo, 
 
 void Mode(Context& h, const World& w) {
   Run(h, w, {"ModeType10::FindShown (sub_822888F0)", 60, __imp__sub_822888F0,
-             hooks::ModeType10FindShown, {},
+             ITC_CONTEXT_FN(hooks::ModeType10FindShown), {},
              [](PPCContext& t, Random& r, const World& w) {
                ModeWorld(r, w);
                t.r3.u64 = w.machine() | (uint64_t(r.Below(2)) << 32);
              }});
   Run(h, w, {"ModeType10::WaitForLoads (sub_82288B70)", 100, __imp__sub_82288B70,
-             hooks::ModeType10WaitForLoads, {{-112, -16}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType10WaitForLoads), {{-112, -16}}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType10::NextMode (sub_82288E68)", 300, __imp__sub_82288E68,
-             hooks::ModeType10NextMode, {{-128, -40}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType10NextMode), {{-128, -40}}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType10::LeaveScreen (sub_82288DA0)", 60, __imp__sub_82288DA0,
-             hooks::ModeType10LeaveScreen, {{-128, -32}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType10LeaveScreen), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType10::WaitForShown (sub_82288CA0)", 100, __imp__sub_82288CA0,
-             hooks::ModeType10WaitForShown, {{-128, -32}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType10WaitForShown), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType10::Leaving (sub_822890D8)", 100, __imp__sub_822890D8,
-             hooks::ModeType10Leaving, {{-128, -32}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType10Leaving), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType9::NextModeAnswer (sub_8225D638)", 20, __imp__sub_8225D638,
-             hooks::ModeType10NextModeAnswer, {}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType10NextModeAnswer), {}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType10::Interrupt (sub_82288A68)", 150, __imp__sub_82288A68,
-             hooks::ModeType10Interrupt, {{-96, -16}}, Interface});
+             ITC_CONTEXT_FN(hooks::ModeType10Interrupt), {{-96, -16}}, Interface});
   Run(h, w, {"ModeType9::ForceExit (sub_8225D828)", 60, __imp__sub_8225D828,
-             hooks::ModeType10ForceExit, {{-16, -8}}, Interface});
+             ITC_CONTEXT_FN(hooks::ModeType10ForceExit), {{-16, -8}}, Interface});
   Run(h, w, {"ModeType10::Resume (sub_82288B20)", 20, __imp__sub_82288B20,
-             hooks::ModeType10Resume, {}, Interface});
+             ITC_CONTEXT_FN(hooks::ModeType10Resume), {}, Interface});
   Run(h, w, {"ReplayTheater::OnList (sub_822893E8)", 20, __imp__sub_822893E8,
-             hooks::ReplayTheaterOnList, {}, Interface});
+             ITC_CONTEXT_FN(hooks::ReplayTheaterOnList), {}, Interface});
   // Init: the mode random words (its dispatcher's count 0 to 7); the UI
   // movies' start and Strings::Load recorded; the block VirtualAlloc made
   // compared by content and freed, its addresses in it and in the mode made
   // offsets; its frame's +80 to +87 compared (the machines' Inits' frames
   // below hold the machines' addresses).
-  Run(h, w, {"ModeType10::Init (sub_82288940)", 12, __imp__sub_82288940, hooks::ModeType10Init,
+  Run(h, w, {"ModeType10::Init (sub_82288940)", 12, __imp__sub_82288940, ITC_CONTEXT_FN(hooks::ModeType10Init),
              {{-112 + 80, -112 + 88}},
              [](PPCContext& t, Random& r, const World& w) {
                guest::StoreU32(w.base, w.dispatcher() + 200, r.Below(8));

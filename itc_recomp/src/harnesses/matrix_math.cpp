@@ -205,9 +205,9 @@ void StaticMatrices(Context& h) {
     const char* name;
     GuestFunction recompiled, native;
   } inits[] = {
-      {"sub_825D8F88 ZeroMatrix::StaticInit", __imp__sub_825D8F88, NativeZeroMatrixStaticInit},
+      {"sub_825D8F88 ZeroMatrix::StaticInit", __imp__sub_825D8F88, ITC_CONTEXT_FN(NativeZeroMatrixStaticInit)},
       {"sub_825D9060 IdentityMatrix::StaticInit", __imp__sub_825D9060,
-       NativeIdentityMatrixStaticInit},
+       ITC_CONTEXT_FN(NativeIdentityMatrixStaticInit)},
   };
   for (const auto& f : inits) {
     Results results(f.name);
@@ -278,7 +278,7 @@ void MatrixMath(Context& h) {
     bool object_in_r3 = false;  // r3 = an object at the block's start
   } functions[] = {
       {"Matrix::Multiply (sub_8209BD50)", __imp__sub_8209BD50, NativeMultiply, false},
-      {"Matrix::Copy (sub_820A0AC0)", __imp__sub_820A0AC0, NativeCopy, false},
+      {"Matrix::Copy (sub_820A0AC0)", __imp__sub_820A0AC0, ITC_CONTEXT_FN(NativeCopy), false},
       {"Matrix::Inverse (sub_820A9988)", __imp__sub_820A9988, NativeInverse, false},
       // r5 = &angle (a word of the block).
       {"Matrix::RotateX (sub_820A65F0)", __imp__sub_820A65F0, NativeRotateX, false, true},

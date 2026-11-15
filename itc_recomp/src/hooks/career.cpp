@@ -3,6 +3,7 @@
 // (hooks/career.h).
 
 #include "hooks/career.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "career/career.h"
@@ -54,78 +55,78 @@ namespace hooks {
 
 namespace cr = career;
 
-void CareerPlayTimeMark(PPCContext& ctx, uint8_t* base) { cr::PlayTimeMark(base, ctx.r3.u32); }
+ITC_REGS_STEP(CareerPlayTimeMark) { cr::PlayTimeMark(base, ctx.r3.u32); }
 
-void CareerDayBlockWinStreak(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerDayBlockWinStreak) {
   ctx.r3.u64 = cr::DayBlockWinStreak(base, ctx.r3.u32);
 }
 
-void CareerDayBlockAddWord4832(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerDayBlockAddWord4832) {
   cr::DayBlockAddWord4832(base, ctx.r3.u32, ctx.r4.u64);
 }
 
-void CareerDayBlockWord4832(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerDayBlockWord4832) {
   ctx.r3.u64 = cr::DayBlockWord4832(base, ctx.r3.u32);
 }
 
-void CareerStatsWinStreak(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerStatsWinStreak) {
   ctx.r3.u64 = cr::StatsWinStreak(base, ctx.r3.u32);
 }
 
-void CareerStatsAddPoints(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerStatsAddPoints) {
   cr::StatsAddPoints(base, ctx.r3.u32, ctx.r4.u64);
 }
 
-void CareerItemFlagsSet(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerItemFlagsSet) {
   cr::ItemFlagsSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void CareerCarSpecWord744(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerCarSpecWord744) {
   ctx.r3.u64 = cr::CarSpecWord744(base, ctx.r3.u32);
 }
 
-void CareerPickFromCar(PPCContext& ctx, uint8_t* base) { cr::PickFromCar(base, ctx.r3.u32); }
+ITC_REGS_STEP(CareerPickFromCar) { cr::PickFromCar(base, ctx.r3.u32); }
 
-void CareerRunningMeanMerge(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerRunningMeanMerge) {
   ctx.fpscr.disableFlushMode();
   cr::RunningMeanMerge(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32);
 }
 
-void CareerStageOf(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerStageOf) {
   ctx.r3.u64 = cr::StageOf(base, ctx.r3.u32);
 }
 
-void CareerEntry56Allows(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerEntry56Allows) {
   ctx.r3.u64 = cr::Entry56Allows(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                  ctx.r7.u32);
 }
 
-void CareerAnyWonKind3Stage1(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerAnyWonKind3Stage1) {
   ctx.r3.u64 = cr::AnyWonKind3Stage1(base);
 }
 
-void CareerItemRecordsAddWin(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerItemRecordsAddWin) {
   ctx.r3.u64 = cr::ItemRecordsAddWin(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void CareerItemRecordsAddLoss(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerItemRecordsAddLoss) {
   ctx.r3.u64 = cr::ItemRecordsAddLoss(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void CareerResultsPush(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerResultsPush) {
   if (!cr::ResultsPushNative(ctx.r3.u32)) {
-    __imp__sub_82111FC8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82111FC8);
     return;
   }
   ctx.r3.u64 = cr::ResultsPush(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void CareerStatsStartDay(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerStatsStartDay) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = cr::StatsStartDay(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void CareerGarageInsertCar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerGarageInsertCar) {
   const uint32_t car = ctx.r4.u32;
   uint32_t destination = 0;
   if (!cr::GarageInsertCar(base, ctx.r3.u32, car, ctx.r5.u32, &destination)) {
@@ -138,47 +139,47 @@ void CareerGarageInsertCar(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = destination;
 }
 
-void CareerConditionTest(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerConditionTest) {
   if (const auto r3 =
           cr::ConditionTest(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  __imp__sub_82112950(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82112950);
 }
 
-void CareerRewardsGrant(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerRewardsGrant) {
   ctx.r3.u64 = cr::RewardsGrant(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
 }
 
-void CareerAddRaceResult(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerAddRaceResult) {
   ctx.fpscr.disableFlushMode();
   if (!cr::AddRaceResultNative(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32)) {
-    __imp__sub_82115190(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82115190);
     return;
   }
   ctx.r3.u64 = cr::StatsAddRaceResult(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void CareerPickNext(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerPickNext) {
   if (!cr::PickNextSkips(base, ctx.r3.u32)) {
-    __imp__sub_821159B0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821159B0);
   }
 }
 
-void CareerAfterRace(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerAfterRace) {
   ctx.fpscr.disableFlushMode();
   if (!cr::AfterRaceNative(base, ctx.r1.u32)) {
-    __imp__sub_82116588(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82116588);
     return;
   }
   ctx.r3.s64 = int32_t(cr::ProgressAfterRace(base, ctx.r3.u32, ctx.r1.u32));
 }
 
-void CareerCheckUnlocks(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerCheckUnlocks) {
   ctx.fpscr.disableFlushMode();
   if (!cr::CheckUnlocksNative(base, ctx.r1.u32)) {
-    __imp__sub_821162B0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821162B0);
     return;
   }
   ctx.r3.u64 = cr::ProgressCheckUnlocks(base, ctx.r3.u32, ctx.r1.u32);
@@ -187,7 +188,7 @@ void CareerCheckUnlocks(PPCContext& ctx, uint8_t* base) {
 namespace {
 
 struct GuestPickNext {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
 };
 
@@ -195,7 +196,7 @@ struct GuestPickNext {
 // the original).
 void PickNextThrough(void* user, uint32_t save) {
   auto& guest = *static_cast<GuestPickNext*>(user);
-  PPCContext& ctx = guest.ctx;
+  lifted::Regs& ctx = guest.ctx;
   guest_call::InFrame(ctx, guest.base, cr::kNextDayFrame, 0x82116BA8, [&](uint32_t) {
     ctx.r3.u64 = save;
     ctx.r4.u64 = 0;
@@ -205,7 +206,7 @@ void PickNextThrough(void* user, uint32_t save) {
 
 }  // namespace
 
-void CareerNextDay(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerNextDay) {
   ctx.fpscr.disableFlushMode();
   GuestPickNext guest{ctx, base};
   const uint32_t save = ctx.r3.u32;
@@ -213,7 +214,7 @@ void CareerNextDay(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cr::CareerNextDay(base, save, sp, PickNextThrough, &guest);
 }
 
-void CareerEventQuery(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerEventQuery) {
   if (hooks::StartUpRecorded(ctx, 0x82111638)) {
     return;
   }
@@ -223,7 +224,7 @@ void CareerEventQuery(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cr::EventQuery(base, flag, guest.get());
 }
 
-void CareerEventLocation(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerEventLocation) {
   ctx.fpscr.disableFlushMode();
   const uint32_t save = ctx.r3.u32;
   RaceEventGuest guest(ctx, base);
@@ -233,7 +234,7 @@ void CareerEventLocation(PPCContext& ctx, uint8_t* base) {
 namespace {
 
 struct GuestMake {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   uint32_t sp;
 };
@@ -243,7 +244,7 @@ struct GuestMake {
 // frame, r5 = the frame's locations).
 uint64_t MakeThrough(void* user, uint32_t) {
   auto& guest = *static_cast<GuestMake*>(user);
-  PPCContext& ctx = guest.ctx;
+  lifted::Regs& ctx = guest.ctx;
   guest_call::InFrame(ctx, guest.base, cr::kSetUpEventFrame, 0x82114A7C, [&](uint32_t frame) {
     ctx.r3.u64 = guest.sp + 28;
     ctx.r4.u64 = guest.sp + 36;
@@ -256,12 +257,12 @@ uint64_t MakeThrough(void* user, uint32_t) {
 
 }  // namespace
 
-void CareerSetUpEvent(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerSetUpEvent) {
   ctx.fpscr.disableFlushMode();
   const uint32_t save = ctx.r3.u32, mode = ctx.r4.u32, location = ctx.r5.u32;
   const uint32_t sp = ctx.r1.u32;
   if (!cr::SetUpEventNative(base, sp)) {
-    __imp__sub_82114268(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82114268);
     return;
   }
   RaceEventGuest guest(ctx, base);
@@ -269,7 +270,7 @@ void CareerSetUpEvent(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cr::SetUpEvent(base, save, mode, location, sp, guest.get(), MakeThrough, &make);
 }
 
-void CareerCarSetModelAndClass(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerCarSetModelAndClass) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = cr::CarSetModelAndClass(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
@@ -277,7 +278,7 @@ void CareerCarSetModelAndClass(PPCContext& ctx, uint8_t* base) {
 namespace {
 
 struct GuestCopy {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
 };
 
@@ -285,7 +286,7 @@ struct GuestCopy {
 // where the plain C++ can't copy.
 void CopyThrough(void* user, uint32_t destination, uint32_t car) {
   auto& guest = *static_cast<GuestCopy*>(user);
-  PPCContext& ctx = guest.ctx;
+  lifted::Regs& ctx = guest.ctx;
   guest_call::InFrame(ctx, guest.base, cr::kGarageAddFrame + 112, 0x82115548, [&](uint32_t) {
     ctx.r3.u64 = destination;
     ctx.r4.u64 = car;
@@ -297,7 +298,7 @@ void CopyThrough(void* user, uint32_t destination, uint32_t car) {
 
 }  // namespace
 
-void CareerGarageAdd(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CareerGarageAdd) {
   ctx.fpscr.disableFlushMode();
   const uint32_t save = ctx.r3.u32, car = ctx.r4.u32, sp = ctx.r1.u32;
   GuestCopy copy{ctx, base};
@@ -307,12 +308,7 @@ void CareerGarageAdd(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define CAREER_ADAPTER(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {  \
-    REX_FUNC_PROLOGUE();                \
-    if (!ITC_FLAG(native_career)) {     \
-      __imp__sub_##address(ctx, base);  \
-      return;                           \
-    }                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_career)) { \
     hooks::step(ctx, base);             \
   }
 
@@ -339,13 +335,13 @@ CAREER_ADAPTER(821159B0, CareerPickNext)
 // are the harness's.
 // Career::NextDay asks the harness recorder first (the title screen's
 // harness records it: its career menu's third item).
-extern "C" REX_FUNC(sub_82116AF0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82116AF0) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82116AF0)) {
     return;
   }
   if (!ITC_FLAG(native_career)) {
-    __imp__sub_82116AF0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82116AF0);
     return;
   }
   hooks::CareerNextDay(ctx, base);

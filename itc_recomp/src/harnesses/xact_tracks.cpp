@@ -249,50 +249,50 @@ struct Entry {
 void Batch1(Context& h, uint32_t block) {
   const Entry entries[] = {
       {"XACTTrackInstance::XACTTrackInstance (sub_825D57D0)", __imp__sub_825D57D0,
-       hooks::XactTrackInstanceConstruct, kInstance},
+       ITC_CONTEXT_FN(hooks::XactTrackInstanceConstruct), kInstance},
       {"XACTTrackInstance::CheckDone (sub_825D55E0)", __imp__sub_825D55E0,
-       hooks::XactTrackInstanceCheckDone, kInstance},
+       ITC_CONTEXT_FN(hooks::XactTrackInstanceCheckDone), kInstance},
       {"XACTTrackInstance::SetVolume (sub_825D5678)", __imp__sub_825D5678,
-       hooks::XactTrackInstanceSetVolume, kInstance, true},
+       ITC_CONTEXT_FN(hooks::XactTrackInstanceSetVolume), kInstance, true},
       {"XACTTrackInstance::IsBusy (sub_825D5780)", __imp__sub_825D5780,
-       hooks::XactTrackInstanceIsBusy, kInstance},
+       ITC_CONTEXT_FN(hooks::XactTrackInstanceIsBusy), kInstance},
       {"XACTTrackInstance::Pause (sub_825D57A8)", __imp__sub_825D57A8,
-       hooks::XactTrackInstancePause, kInstance},
-      {"XACTTrack::Pause (sub_825D05A8)", __imp__sub_825D05A8, hooks::XactTrackPause, kTrack},
-      {"XACTTrack::IsBusy (sub_825D0590)", __imp__sub_825D0590, hooks::XactTrackIsBusy, kTrack},
-      {"XACTEvent::XACTEvent (sub_825D1760)", __imp__sub_825D1760, hooks::XactEventConstruct,
+       ITC_CONTEXT_FN(hooks::XactTrackInstancePause), kInstance},
+      {"XACTTrack::Pause (sub_825D05A8)", __imp__sub_825D05A8, ITC_CONTEXT_FN(hooks::XactTrackPause), kTrack},
+      {"XACTTrack::IsBusy (sub_825D0590)", __imp__sub_825D0590, ITC_CONTEXT_FN(hooks::XactTrackIsBusy), kTrack},
+      {"XACTEvent::XACTEvent (sub_825D1760)", __imp__sub_825D1760, ITC_CONTEXT_FN(hooks::XactEventConstruct),
        kEvent},
-      {"XACTEvent::~XACTEvent (sub_825D0EF0)", __imp__sub_825D0EF0, hooks::XactEventDestruct,
+      {"XACTEvent::~XACTEvent (sub_825D0EF0)", __imp__sub_825D0EF0, ITC_CONTEXT_FN(hooks::XactEventDestruct),
        kEvent},
-      {"XACTEvent::Fire (sub_825D1358)", __imp__sub_825D1358, hooks::XactEventFire, kEvent,
+      {"XACTEvent::Fire (sub_825D1358)", __imp__sub_825D1358, ITC_CONTEXT_FN(hooks::XactEventFire), kEvent,
        false, true},
       {"XACTPlayWaveEvent::XACTPlayWaveEvent (sub_825D82E8)", __imp__sub_825D82E8,
-       hooks::XactPlayWaveConstruct, kEvent},
+       ITC_CONTEXT_FN(hooks::XactPlayWaveConstruct), kEvent},
       {"XACTPlayWaveEvent::SetQueued (sub_825D8530)", __imp__sub_825D8530,
-       hooks::XactPlayWaveSetQueued, kEvent, false, true},
+       ITC_CONTEXT_FN(hooks::XactPlayWaveSetQueued), kEvent, false, true},
       {"XACTPlayWaveEvent::GetLoopCount (sub_825D8358)", __imp__sub_825D8358,
-       hooks::XactPlayWaveGetLoopCount, kEvent},
+       ITC_CONTEXT_FN(hooks::XactPlayWaveGetLoopCount), kEvent},
       {"XACTPlayWaveEvent::SetWave (sub_82483208)", __imp__sub_82483208,
-       hooks::XactPlayWaveSetWave, kEvent},
+       ITC_CONTEXT_FN(hooks::XactPlayWaveSetWave), kEvent},
       {"XACTWaveVariationEvent::SetWave (sub_825D7B78)", __imp__sub_825D7B78,
-       hooks::XactWaveVariationSetWave, kEvent},
+       ITC_CONTEXT_FN(hooks::XactWaveVariationSetWave), kEvent},
       {"XACTPlayWaveEvent::GetVariationRecord (sub_825D8920)", __imp__sub_825D8920,
-       hooks::XactPlayWaveGetVariationRecord, kEvent},
+       ITC_CONTEXT_FN(hooks::XactPlayWaveGetVariationRecord), kEvent},
       {"XACTPlayWaveEvent::ForgetWave (sub_825D8360)", __imp__sub_825D8360,
-       hooks::XactPlayWaveForgetWave, kEvent},
+       ITC_CONTEXT_FN(hooks::XactPlayWaveForgetWave), kEvent},
       {"XACTPlayWaveEvent::GetWaveBank (sub_825D84C0)", __imp__sub_825D84C0,
-       hooks::XactPlayWaveGetWaveBank, kEvent},
+       ITC_CONTEXT_FN(hooks::XactPlayWaveGetWaveBank), kEvent},
       {"XACTPlayWaveEvent::IsPrepared (sub_825D76A0)", __imp__sub_825D76A0,
-       hooks::XactPlayWaveIsPrepared, kEvent},
+       ITC_CONTEXT_FN(hooks::XactPlayWaveIsPrepared), kEvent},
       {"XACTPlayWaveEvent::IsPlaying (sub_825D7708)", __imp__sub_825D7708,
-       hooks::XactPlayWaveIsPlaying, kEvent},
+       ITC_CONTEXT_FN(hooks::XactPlayWaveIsPlaying), kEvent},
       {"XACTPlayWaveEvent::IsBusy (sub_825D81E8)", __imp__sub_825D81E8,
-       hooks::XactPlayWaveIsBusy, kEvent},
-      {"XACTPlayWaveEvent::Pause (sub_825D8268)", __imp__sub_825D8268, hooks::XactPlayWavePause,
+       ITC_CONTEXT_FN(hooks::XactPlayWaveIsBusy), kEvent},
+      {"XACTPlayWaveEvent::Pause (sub_825D8268)", __imp__sub_825D8268, ITC_CONTEXT_FN(hooks::XactPlayWavePause),
        kEvent},
       {"XACTPlayWaveEvent::SetVolume (sub_825D7FE0)", __imp__sub_825D7FE0,
-       hooks::XactPlayWaveSetVolume, kEvent, true},
-      {"XACTWave::SetVolume (sub_825D1CC8)", __imp__sub_825D1CC8, hooks::XactWaveSetVolume, kWave,
+       ITC_CONTEXT_FN(hooks::XactPlayWaveSetVolume), kEvent, true},
+      {"XACTWave::SetVolume (sub_825D1CC8)", __imp__sub_825D1CC8, ITC_CONTEXT_FN(hooks::XactWaveSetVolume), kWave,
        true},
   };
   for (const Entry& entry : entries) {
@@ -384,27 +384,27 @@ void Batch2(Context& h, uint32_t block) {
     uint32_t object;
   };
   const Function functions[] = {
-      {"XACTTrack::SetVolume (sub_825D0BF8)", __imp__sub_825D0BF8, hooks::XactTrackSetVolume,
+      {"XACTTrack::SetVolume (sub_825D0BF8)", __imp__sub_825D0BF8, ITC_CONTEXT_FN(hooks::XactTrackSetVolume),
        kTrack},
       {"XACTTrack::UpdateVolume (sub_825D0428)", __imp__sub_825D0428,
-       hooks::XactTrackUpdateVolume, kTrack},
-      {"XACTTrack::CreateRpcs (sub_825D06B8)", __imp__sub_825D06B8, hooks::XactTrackCreateRpcs,
+       ITC_CONTEXT_FN(hooks::XactTrackUpdateVolume), kTrack},
+      {"XACTTrack::CreateRpcs (sub_825D06B8)", __imp__sub_825D06B8, ITC_CONTEXT_FN(hooks::XactTrackCreateRpcs),
        kTrack},
-      {"XACTTrack::StartRpcs (sub_825D0800)", __imp__sub_825D0800, hooks::XactTrackStartRpcs,
+      {"XACTTrack::StartRpcs (sub_825D0800)", __imp__sub_825D0800, ITC_CONTEXT_FN(hooks::XactTrackStartRpcs),
        kTrack},
-      {"XACTTrack::XACTTrack (sub_825D0CE0)", __imp__sub_825D0CE0, hooks::XactTrackConstruct,
+      {"XACTTrack::XACTTrack (sub_825D0CE0)", __imp__sub_825D0CE0, ITC_CONTEXT_FN(hooks::XactTrackConstruct),
        kTrack2},
-      {"XACTTrack::Update (sub_825D0E30)", __imp__sub_825D0E30, hooks::XactTrackUpdate, kTrack},
-      {"XACTTrack::~XACTTrack (sub_825D0110)", __imp__sub_825D0110, hooks::XactTrackDestruct,
+      {"XACTTrack::Update (sub_825D0E30)", __imp__sub_825D0E30, ITC_CONTEXT_FN(hooks::XactTrackUpdate), kTrack},
+      {"XACTTrack::~XACTTrack (sub_825D0110)", __imp__sub_825D0110, ITC_CONTEXT_FN(hooks::XactTrackDestruct),
        kTrack},
       {"XACTTrack::~XACTTrack, deleting, kept (sub_825D0978)", __imp__sub_825D0978,
-       hooks::XactTrackDeletingDestruct, kTrack},
+       ITC_CONTEXT_FN(hooks::XactTrackDeletingDestruct), kTrack},
       {"XACTPlayWaveEvent::~XACTPlayWaveEvent, deleting, kept (sub_825D8660)",
-       __imp__sub_825D8660, hooks::XactPlayWaveDeletingDestruct, kEvent},
+       __imp__sub_825D8660, ITC_CONTEXT_FN(hooks::XactPlayWaveDeletingDestruct), kEvent},
       {"XACTPlayWaveEvent::ApplyVariation (sub_825D7558)", __imp__sub_825D7558,
-       hooks::XactPlayWaveApplyVariation, kEvent},
+       ITC_CONTEXT_FN(hooks::XactPlayWaveApplyVariation), kEvent},
       {"XACTPlayWaveEvent::GetDuration (sub_825D8870)", __imp__sub_825D8870,
-       hooks::XactPlayWaveGetDuration, kEvent},
+       ITC_CONTEXT_FN(hooks::XactPlayWaveGetDuration), kEvent},
   };
   for (const Function& f : functions) {
     Results results(f.name);
@@ -436,10 +436,10 @@ void Batch2(Context& h, uint32_t block) {
     results.Report();
   }
   FreeCases(h, block, "XACTTrack::~XACTTrack, deleting, freed (sub_825D0978)",
-            __imp__sub_825D0978, hooks::XactTrackDeletingDestruct, 64, xact::kTrackAttributes,
+            __imp__sub_825D0978, ITC_CONTEXT_FN(hooks::XactTrackDeletingDestruct), 64, xact::kTrackAttributes,
             kTrack);
   FreeCases(h, block, "XACTPlayWaveEvent::~XACTPlayWaveEvent, deleting, freed (sub_825D8660)",
-            __imp__sub_825D8660, hooks::XactPlayWaveDeletingDestruct, 72,
+            __imp__sub_825D8660, ITC_CONTEXT_FN(hooks::XactPlayWaveDeletingDestruct), 72,
             xact::kPlayWaveAttributes, kEvent);
 }
 
@@ -482,7 +482,7 @@ void Batch3(Context& h, uint32_t block) {
     // The record's time against offsets before, at and after it.
     Results results("XACTPlayWaveEvent::Prepare (sub_825D86F8)");
     for (int c = 0; c < 128; c++) {
-      CaseWith(h, results, block, __imp__sub_825D86F8, hooks::XactPlayWavePrepare,
+      CaseWith(h, results, block, __imp__sub_825D86F8, ITC_CONTEXT_FN(hooks::XactPlayWavePrepare),
                [&](Random& random, PPCContext& t) {
                  FakeBank(h.base, block, random, true);
                  const uint32_t time = (Load(h.base, block + kRecord) >> 5) & 0xFFFFFF;
@@ -509,7 +509,7 @@ void Batch3(Context& h, uint32_t block) {
     // does).
     Results results("XACTTrackInstance::PrepareSimple (sub_825D53D8)");
     for (int c = 0; c < 64; c++) {
-      CaseWith(h, results, block, __imp__sub_825D53D8, hooks::XactTrackInstancePrepareSimple,
+      CaseWith(h, results, block, __imp__sub_825D53D8, ITC_CONTEXT_FN(hooks::XactTrackInstancePrepareSimple),
                [&](Random& random, PPCContext& t) {
                  FakeBank(h.base, block, random, false);
                  t.r3.u64 = block + kInstance;
@@ -550,7 +550,7 @@ void Batch3(Context& h, uint32_t block) {
     // critical section initialized for each version).
     Results results("XACTTrack::PrepareSimple (sub_825D09D0)");
     for (int c = 0; c < 64; c++) {
-      CaseWith(h, results, block, __imp__sub_825D09D0, hooks::XactTrackPrepareSimple,
+      CaseWith(h, results, block, __imp__sub_825D09D0, ITC_CONTEXT_FN(hooks::XactTrackPrepareSimple),
                [&](Random& random, PPCContext& t) {
                  FakeBank(h.base, block, random, false);
                  Store(h.base, block + kTrack + 12, block + kEngine2);
@@ -628,7 +628,7 @@ void Batch4(Context& h, uint32_t block) {
   {
     Results results("XACTTrackInstance::CancelEvents (sub_825D5520)");
     for (int c = 0; c < 96; c++) {
-      CaseWith(h, results, block, __imp__sub_825D5520, hooks::XactTrackInstanceCancelEvents,
+      CaseWith(h, results, block, __imp__sub_825D5520, ITC_CONTEXT_FN(hooks::XactTrackInstanceCancelEvents),
                [&](Random& random, PPCContext& t) {
                  InstanceWorld(h, block, random, t, block + kEventArray);
                  t.r3.u64 = block + kInstance;
@@ -641,7 +641,7 @@ void Batch4(Context& h, uint32_t block) {
     // Stop: every state, the first immediate stop or not, immediate or not.
     Results results("XACTTrackInstance::Stop (sub_825D5D18)");
     for (int c = 0; c < 128; c++) {
-      CaseWith(h, results, block, __imp__sub_825D5D18, hooks::XactTrackInstanceStop,
+      CaseWith(h, results, block, __imp__sub_825D5D18, ITC_CONTEXT_FN(hooks::XactTrackInstanceStop),
                [&](Random& random, PPCContext& t) {
                  InstanceWorld(h, block, random, t, block + kEventArray);
                  Store(h.base, block + kInstance + 40, random.Below(8));
@@ -658,7 +658,7 @@ void Batch4(Context& h, uint32_t block) {
     // (kNext, or none) linked into the engine's list.
     Results results("XACTTrack::Stop (sub_825D01D8)");
     for (int c = 0; c < 128; c++) {
-      CaseWith(h, results, block, __imp__sub_825D01D8, hooks::XactTrackStop,
+      CaseWith(h, results, block, __imp__sub_825D01D8, ITC_CONTEXT_FN(hooks::XactTrackStop),
                [&](Random& random, PPCContext& t) {
                  InstanceWorld(h, block, random, t, block + kEventArray);
                  Store(h.base, block + kInstance + 40, random.Below(8));
@@ -704,9 +704,9 @@ void Batch4(Context& h, uint32_t block) {
     results.Report();
   };
   destruct("XACTTrackInstance::~XACTTrackInstance (sub_825D5838)", __imp__sub_825D5838,
-           hooks::XactTrackInstanceDestruct, false);
+           ITC_CONTEXT_FN(hooks::XactTrackInstanceDestruct), false);
   destruct("XACTTrackInstance::~XACTTrackInstance, deleting, kept (sub_825D5E58)",
-           __imp__sub_825D5E58, hooks::XactTrackInstanceDeletingDestruct, true);
+           __imp__sub_825D5E58, ITC_CONTEXT_FN(hooks::XactTrackInstanceDeletingDestruct), true);
   {
     // Deleting with bit 0: the instance from the allocation layer (no
     // events, its node and helper list linked to itself), freed.
@@ -732,7 +732,7 @@ void Batch4(Context& h, uint32_t block) {
         t.r3.u64 = instance;
         t.r4.u64 = 1 | (uint32_t(random.Next()) & ~1u);
         ITC_FLAG(native_xact_tracks) = v == 1;
-        (v == 0 ? __imp__sub_825D5E58 : hooks::XactTrackInstanceDeletingDestruct)(t, h.base);
+        (v == 0 ? __imp__sub_825D5E58 : ITC_CONTEXT_FN(hooks::XactTrackInstanceDeletingDestruct))(t, h.base);
         ITC_FLAG(native_xact_tracks) = true;
         out[v].Word(t.r3.u32 == instance);
       }
@@ -756,7 +756,7 @@ void Batch5(Context& h, uint32_t block) {
   Results results("XACTEvent::Create (sub_825D0F00)");
   for (int c = 0; c < 128; c++) {
     uint32_t type = 0;
-    CaseWith(h, results, block, __imp__sub_825D0F00, hooks::XactEventCreate,
+    CaseWith(h, results, block, __imp__sub_825D0F00, ITC_CONTEXT_FN(hooks::XactEventCreate),
              [&](Random& random, PPCContext& t) {
                type = Pick(random, {1, 2, 4, 5, 1, 4, 20, 20, 21, 31, 0});
                Store(h.base, block + kRecord, (Load(h.base, block + kRecord) & ~0x1Fu) | type);
@@ -956,7 +956,7 @@ void Batch6(Context& h, uint32_t block) {
   {
     Results results("XACTTrackInstance::Prepare (sub_825D5A48)");
     for (int c = 0; c < 128; c++) {
-      CaseWith(h, results, block, __imp__sub_825D5A48, hooks::XactTrackInstancePrepare,
+      CaseWith(h, results, block, __imp__sub_825D5A48, ITC_CONTEXT_FN(hooks::XactTrackInstancePrepare),
                [&](Random& random, PPCContext& t) {
                  uint32_t offset = 0;
                  t.r4.u64 = TrackRecords(h.base, block, random, offset);
@@ -1015,8 +1015,8 @@ void Batch6(Context& h, uint32_t block) {
     results.Report();
   };
   track_cases("XACTTrack::CreateInstance (sub_825D02F8)", __imp__sub_825D02F8,
-              hooks::XactTrackCreateInstance, true);
-  track_cases("XACTTrack::Prepare (sub_825D0AA0)", __imp__sub_825D0AA0, hooks::XactTrackPrepare,
+              ITC_CONTEXT_FN(hooks::XactTrackCreateInstance), true);
+  track_cases("XACTTrack::Prepare (sub_825D0AA0)", __imp__sub_825D0AA0, ITC_CONTEXT_FN(hooks::XactTrackPrepare),
               false);
 }
 
@@ -1027,7 +1027,7 @@ void Batch6(Context& h, uint32_t block) {
 void Batch7(Context& h, uint32_t block) {
   Results results("XACTSound::ScheduleEvent (sub_825CB0C8)");
   for (int c = 0; c < 128; c++) {
-    Case(h, results, block, __imp__sub_825CB0C8, hooks::XactSoundScheduleEvent,
+    Case(h, results, block, __imp__sub_825CB0C8, ITC_CONTEXT_FN(hooks::XactSoundScheduleEvent),
          [&](Random& random, PPCContext& t) {
            uint8_t* base = h.base;
            const uint32_t sound = block + kSound, event = block + kEvent;
@@ -1123,7 +1123,7 @@ void Batch8(Context& h, uint32_t block) {
   {
     Results results("XACTEvent::Schedule (sub_825D1918)");
     for (int c = 0; c < 160; c++) {
-      Case(h, results, block, __imp__sub_825D1918, hooks::XactEventSchedule,
+      Case(h, results, block, __imp__sub_825D1918, ITC_CONTEXT_FN(hooks::XactEventSchedule),
            [&](Random& random, PPCContext& t) {
              event_world(random);
              const uint32_t sound = block + kSound;
@@ -1156,7 +1156,7 @@ void Batch8(Context& h, uint32_t block) {
   {
     Results results("XACTEvent::Done (sub_825D13F0)");
     for (int c = 0; c < 128; c++) {
-      Case(h, results, block, __imp__sub_825D13F0, hooks::XactEventDone,
+      Case(h, results, block, __imp__sub_825D13F0, ITC_CONTEXT_FN(hooks::XactEventDone),
            [&](Random& random, PPCContext& t) {
              event_world(random);
              // The helper list (+48): empty, or a helper (kNext) holding the
@@ -1186,7 +1186,7 @@ void Batch8(Context& h, uint32_t block) {
     for (int c = 0; c < 128; c++) {
       // r3 in full (its upper word too: the time sign-extended). One time in
       // two a time past 2^31 ms, so the counter's low word is negative.
-      CaseWith(h, results, block, __imp__sub_825D8378, hooks::XactPlayWaveFire,
+      CaseWith(h, results, block, __imp__sub_825D8378, ITC_CONTEXT_FN(hooks::XactPlayWaveFire),
                [&](Random& random, PPCContext& t) {
                  event_world(random);
                  if (random.Below(2) == 0) {
@@ -1205,7 +1205,7 @@ void Batch8(Context& h, uint32_t block) {
   {
     Results results("XACTPlayWaveEvent::Stop (sub_825D83F8)");
     for (int c = 0; c < 128; c++) {
-      Case(h, results, block, __imp__sub_825D83F8, hooks::XactPlayWaveStop,
+      Case(h, results, block, __imp__sub_825D83F8, ITC_CONTEXT_FN(hooks::XactPlayWaveStop),
            [&](Random& random, PPCContext& t) {
              event_world(random);
              guest::StoreU8(base, block + kRecord + 7, uint8_t(random.Next()));
@@ -1317,12 +1317,12 @@ void Batch9(Context& h, uint32_t block) {
   };
   const Function functions[] = {
       {"XACTTrackInstance::Play (sub_825D5980)", __imp__sub_825D5980,
-       hooks::XactTrackInstancePlay, kInstance},
+       ITC_CONTEXT_FN(hooks::XactTrackInstancePlay), kInstance},
       {"XACTTrackInstance::AudioUpdate (sub_825D5EB0)", __imp__sub_825D5EB0,
-       hooks::XactTrackInstanceAudioUpdate, kInstance},
-      {"XACTTrack::AudioUpdate (sub_825D0D88)", __imp__sub_825D0D88, hooks::XactTrackAudioUpdate,
+       ITC_CONTEXT_FN(hooks::XactTrackInstanceAudioUpdate), kInstance},
+      {"XACTTrack::AudioUpdate (sub_825D0D88)", __imp__sub_825D0D88, ITC_CONTEXT_FN(hooks::XactTrackAudioUpdate),
        kTrack},
-      {"XACTTrack::Play (sub_825D01D0)", __imp__sub_825D01D0, hooks::XactTrackPlay, kTrack},
+      {"XACTTrack::Play (sub_825D01D0)", __imp__sub_825D01D0, ITC_CONTEXT_FN(hooks::XactTrackPlay), kTrack},
   };
   for (const Function& f : functions) {
     Results results(f.name);

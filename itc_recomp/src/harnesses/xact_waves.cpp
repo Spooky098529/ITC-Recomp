@@ -184,7 +184,7 @@ void VoiceMethods(Context& h, uint32_t block) {
     Results results("XACTVoice::GetState (sub_825C9DB8)");
     stack_compared = 32;
     for (int c = 0; c < 64; c++) {
-      VoiceCase(h, results, block, __imp__sub_825C9DB8, hooks::XactVoiceGetState,
+      VoiceCase(h, results, block, __imp__sub_825C9DB8, ITC_CONTEXT_FN(hooks::XactVoiceGetState),
                 [&](Random& random, PPCContext& t) {
                   FakeXactVoice(h.base, block, random, 0);
                   t.r3.u64 = voice;
@@ -198,7 +198,7 @@ void VoiceMethods(Context& h, uint32_t block) {
   {
     Results results("XACTVoice::SetVolume (sub_825C9BE8)");
     for (int c = 0; c < 64; c++) {
-      VoiceCase(h, results, block, __imp__sub_825C9BE8, hooks::XactVoiceSetVolume,
+      VoiceCase(h, results, block, __imp__sub_825C9BE8, ITC_CONTEXT_FN(hooks::XactVoiceSetVolume),
                 [&](Random& random, PPCContext& t) {
                   FakeXactVoice(h.base, block, random, 0);
                   t.r3.u64 = voice;
@@ -211,7 +211,7 @@ void VoiceMethods(Context& h, uint32_t block) {
   {
     Results results("XACTVoice::SetPitch (sub_825C9BF0)");
     for (int c = 0; c < 64; c++) {
-      VoiceCase(h, results, block, __imp__sub_825C9BF0, hooks::XactVoiceSetPitch,
+      VoiceCase(h, results, block, __imp__sub_825C9BF0, ITC_CONTEXT_FN(hooks::XactVoiceSetPitch),
                 [&](Random& random, PPCContext& t) {
                   FakeXactVoice(h.base, block, random, 0);
                   t.r3.u64 = voice;
@@ -227,7 +227,7 @@ void VoiceMethods(Context& h, uint32_t block) {
     Results results("XACTVoice::SubmitPacket (sub_825C9E08)");
     stack_compared = 32;
     for (int c = 0; c < 64; c++) {
-      VoiceCase(h, results, block, __imp__sub_825C9E08, hooks::XactVoiceSubmitPacket,
+      VoiceCase(h, results, block, __imp__sub_825C9E08, ITC_CONTEXT_FN(hooks::XactVoiceSubmitPacket),
                 [&](Random& random, PPCContext& t) {
                   FakeXactVoice(h.base, block, random, 0);
                   if (random.Below(3) == 0) {
@@ -249,7 +249,7 @@ void VoiceMethods(Context& h, uint32_t block) {
     // then answers E_UNEXPECTED without touching the engine's pending list.
     Results results("XACTVoice::Start (sub_825C9BF8)");
     for (int c = 0; c < 64; c++) {
-      VoiceCase(h, results, block, __imp__sub_825C9BF8, hooks::XactVoiceStart,
+      VoiceCase(h, results, block, __imp__sub_825C9BF8, ITC_CONTEXT_FN(hooks::XactVoiceStart),
                 [&](Random& random, PPCContext& t) {
                   FakeXactVoice(h.base, block, random, 0);
                   t.r3.u64 = voice;
@@ -266,7 +266,7 @@ void VoiceMethods(Context& h, uint32_t block) {
   {
     Results results("XACTVoice::Stop (sub_825C9C10)");
     for (int c = 0; c < 64; c++) {
-      VoiceCase(h, results, block, __imp__sub_825C9C10, hooks::XactVoiceStop,
+      VoiceCase(h, results, block, __imp__sub_825C9C10, ITC_CONTEXT_FN(hooks::XactVoiceStop),
                 [&](Random& random, PPCContext& t) {
                   FakeXactVoice(h.base, block, random, 0);
                   t.r3.u64 = voice;
@@ -279,7 +279,7 @@ void VoiceMethods(Context& h, uint32_t block) {
   {
     Results results("XACTVoice::FlushPackets (sub_825C9C28)");
     for (int c = 0; c < 32; c++) {
-      VoiceCase(h, results, block, __imp__sub_825C9C28, hooks::XactVoiceFlushPackets,
+      VoiceCase(h, results, block, __imp__sub_825C9C28, ITC_CONTEXT_FN(hooks::XactVoiceFlushPackets),
                 [&](Random& random, PPCContext& t) {
                   FakeXactVoice(h.base, block, random, 0);
                   t.r3.u64 = voice;
@@ -298,7 +298,7 @@ void VoiceMethods(Context& h, uint32_t block) {
     Results results("XACTVoice::~XACTVoice, deleting (sub_825CA448)");
     for (int c = 0; c < 64; c++) {
       uint32_t made = 0;
-      VoiceCase(h, results, block, __imp__sub_825CA448, hooks::XactVoiceDeletingDestruct,
+      VoiceCase(h, results, block, __imp__sub_825CA448, ITC_CONTEXT_FN(hooks::XactVoiceDeletingDestruct),
                 [&](Random& random, PPCContext& t) {
                   FakeXactVoice(h.base, block, random, 3);
                   t.r4.u64 = random.Below(2) == 0 ? random.Next() & ~1ull : random.Next() | 1;
@@ -405,7 +405,7 @@ void Creates(Context& h, uint32_t block) {
       PPCContext lock = t;
       hooks::XAudioSpinTake(lock, h.base);
       ITC_FLAG(native_xact_waves) = v == 1;
-      (v == 0 ? __imp__sub_825C9C40 : hooks::XactVoiceCreate)(t, h.base);
+      (v == 0 ? __imp__sub_825C9C40 : ITC_CONTEXT_FN(hooks::XactVoiceCreate))(t, h.base);
       ITC_FLAG(native_xact_waves) = true;
       out[v].Word(t.r3.u32);
       const uint32_t xact_voice = Load(h.base, out_word);
@@ -512,7 +512,7 @@ void Waves(Context& h, uint32_t block) {
                               : "XACTWave::XACTWave (sub_825D23F0)");
     for (int c = 0; c < 64; c++) {
       WaveCase(h, results, block, in_memory ? __imp__sub_825D37A8 : __imp__sub_825D23F0,
-               in_memory ? hooks::XactInMemoryWaveConstruct : hooks::XactWaveConstruct,
+               in_memory ? ITC_CONTEXT_FN(hooks::XactInMemoryWaveConstruct) : ITC_CONTEXT_FN(hooks::XactWaveConstruct),
                [&](Random& random, PPCContext& t) {
                  const uint32_t bank = block + kBank;
                  Store(h.base, bank + 4, block + 0x700);
@@ -553,7 +553,7 @@ void Waves(Context& h, uint32_t block) {
   {
     Results results("XACTTrack::GetVolume (sub_825D0268)");
     for (int c = 0; c < 64; c++) {
-      WaveCase(h, results, block, __imp__sub_825D0268, hooks::XactTrackGetVolume,
+      WaveCase(h, results, block, __imp__sub_825D0268, ITC_CONTEXT_FN(hooks::XactTrackGetVolume),
                [&](Random& random, PPCContext& t) {
                  track_floats(random, block + kOwnerBlock);
                  t.r3.u64 = block + kOwnerBlock;
@@ -565,7 +565,7 @@ void Waves(Context& h, uint32_t block) {
   {
     Results results("XACTTrack::GetPitch (sub_825D02B0)");
     for (int c = 0; c < 64; c++) {
-      WaveCase(h, results, block, __imp__sub_825D02B0, hooks::XactTrackGetPitch,
+      WaveCase(h, results, block, __imp__sub_825D02B0, ITC_CONTEXT_FN(hooks::XactTrackGetPitch),
                [&](Random& random, PPCContext& t) {
                  track_floats(random, block + kOwnerBlock);
                  t.r3.u64 = block + kOwnerBlock;
@@ -583,7 +583,7 @@ void Waves(Context& h, uint32_t block) {
   {
     Results results("XACTWave::GetStartPosition (sub_825D2170)");
     for (int c = 0; c < 400; c++) {
-      WaveCase(h, results, block, __imp__sub_825D2170, hooks::XactWaveGetStartPosition,
+      WaveCase(h, results, block, __imp__sub_825D2170, ITC_CONTEXT_FN(hooks::XactWaveGetStartPosition),
                [&](Random& random, PPCContext& t) {
                  const uint32_t entry = block + 0x800;
                  static constexpr uint32_t kRates[] = {48000, 44100, 22050, 1, 0x3FFFF};
@@ -621,7 +621,7 @@ void Waves(Context& h, uint32_t block) {
   {
     Results results("XACTWave::RequestNext (sub_825D1C30)");
     for (int c = 0; c < 32; c++) {
-      WaveCase(h, results, block, __imp__sub_825D1C30, hooks::XactWaveRequestNext,
+      WaveCase(h, results, block, __imp__sub_825D1C30, ITC_CONTEXT_FN(hooks::XactWaveRequestNext),
                [&](Random& random, PPCContext& t) {
                  t.r3.u64 = block + kWave;
                  t.r4.u64 = random.Next();
@@ -638,7 +638,7 @@ void Waves(Context& h, uint32_t block) {
     Results results("XACTEngine::RequestCommit (sub_825D1C78)");
     for (int c = 0; c < 16; c++) {
       bool held = false;
-      WaveCase(h, results, block, __imp__sub_825D1C78, hooks::XactEngineRequestCommit,
+      WaveCase(h, results, block, __imp__sub_825D1C78, ITC_CONTEXT_FN(hooks::XactEngineRequestCommit),
                [&](Random& random, PPCContext& t) {
                  const uint32_t engine = block + 0x1800;
                  PPCContext c2 = t;
@@ -745,7 +745,7 @@ void WaveCalls(Context& h, uint32_t block) {
     // none (XACT's methods at +28, +32 and +48 aren't native).
     Results results("XACTWave::SetVoice (sub_825D1DF8)");
     for (int c = 0; c < 96; c++) {
-      WaveCase(h, results, block, __imp__sub_825D1DF8, hooks::XactWaveSetVoice,
+      WaveCase(h, results, block, __imp__sub_825D1DF8, ITC_CONTEXT_FN(hooks::XactWaveSetVoice),
                [&](Random& random, PPCContext& t) {
                  CallWorld(h, block, random, t, false);
                  for (const uint32_t at : {348u, 316u, 72u}) {
@@ -760,7 +760,7 @@ void WaveCalls(Context& h, uint32_t block) {
   {
     Results results("XACTInMemoryWave::Play (sub_825D3938)");
     for (int c = 0; c < 128; c++) {
-      WaveCase(h, results, block, __imp__sub_825D3938, hooks::XactInMemoryWavePlay,
+      WaveCase(h, results, block, __imp__sub_825D3938, ITC_CONTEXT_FN(hooks::XactInMemoryWavePlay),
                [&](Random& random, PPCContext& t) {
                  const uint32_t deferred = random.Below(2) == 0 ? 0 : uint32_t(random.Next());
                  CallWorld(h, block, random, t, deferred != 0);
@@ -778,7 +778,7 @@ void WaveCalls(Context& h, uint32_t block) {
   {
     Results results("XACTWave::Pause (sub_825D1ED8)");
     for (int c = 0; c < 128; c++) {
-      WaveCase(h, results, block, __imp__sub_825D1ED8, hooks::XactWavePause,
+      WaveCase(h, results, block, __imp__sub_825D1ED8, ITC_CONTEXT_FN(hooks::XactWavePause),
                [&](Random& random, PPCContext& t) {
                  CallWorld(h, block, random, t, true);
                  const uint32_t r = random.Below(4);
@@ -795,7 +795,7 @@ void WaveCalls(Context& h, uint32_t block) {
     // the bank's recorders leave them.
     Results results("XACTWave::PrepareNext (sub_825D2778)");
     for (int c = 0; c < 128; c++) {
-      WaveCase(h, results, block, __imp__sub_825D2778, hooks::XactWavePrepareNext,
+      WaveCase(h, results, block, __imp__sub_825D2778, ITC_CONTEXT_FN(hooks::XactWavePrepareNext),
                [&](Random& random, PPCContext& t) {
                  CallWorld(h, block, random, t, false);
                  if (Load(h.base, block + kWave + 48) == 0) {
@@ -826,7 +826,7 @@ void WaveCalls(Context& h, uint32_t block) {
     // set as for PrepareNext.
     Results results("XACTInMemoryWave::Update (sub_825D3890)");
     for (int c = 0; c < 128; c++) {
-      WaveCase(h, results, block, __imp__sub_825D3890, hooks::XactInMemoryWaveUpdate,
+      WaveCase(h, results, block, __imp__sub_825D3890, ITC_CONTEXT_FN(hooks::XactInMemoryWaveUpdate),
                [&](Random& random, PPCContext& t) {
                  CallWorld(h, block, random, t, false);
                  const uint32_t wave = block + kWave;
@@ -938,7 +938,7 @@ void Notifications(Context& h, uint32_t block) {
         t.r6.u64 = random.Next();
         t.r7.u64 = random.Next();
         ITC_FLAG(native_xact) = v == 1;
-        (v == 0 ? __imp__sub_825C1388 : hooks::XactEngineSendNotification)(t, base);
+        (v == 0 ? __imp__sub_825C1388 : ITC_CONTEXT_FN(hooks::XactEngineSendNotification))(t, base);
         ITC_FLAG(native_xact) = true;
         BlockOutputs(out[v], base, block, floats);
         out[v].Word(t.r3.u32);
@@ -968,7 +968,7 @@ void Notifications(Context& h, uint32_t block) {
   {
     Results results("XACTWave::Notify (sub_825D2030)");
     for (int c = 0; c < 160; c++) {
-      WaveCase(h, results, block, __imp__sub_825D2030, hooks::XactWaveNotify,
+      WaveCase(h, results, block, __imp__sub_825D2030, ITC_CONTEXT_FN(hooks::XactWaveNotify),
                [&](Random& random, PPCContext& t) {
                  const uint8_t type = uint8_t(Pick(random, {12, 13, random.Below(16)}));
                  wave_world(random, t, type);
@@ -981,7 +981,7 @@ void Notifications(Context& h, uint32_t block) {
   {
     Results results("XACTWave::SetState (sub_825D24D8)");
     for (int c = 0; c < 160; c++) {
-      WaveCase(h, results, block, __imp__sub_825D24D8, hooks::XactWaveSetState,
+      WaveCase(h, results, block, __imp__sub_825D24D8, ITC_CONTEXT_FN(hooks::XactWaveSetState),
                [&](Random& random, PPCContext& t) {
                  wave_world(random, t, uint8_t(Pick(random, {12, 13})));
                  Store(base, block + kWave + 40,
@@ -1062,12 +1062,12 @@ void Releases(Context& h, uint32_t block) {
     uint32_t notify_frame;  // Notify's frame below the stack pointer
   };
   const Function functions[] = {
-      {"XACTWave::Release (sub_825D28D0)", __imp__sub_825D28D0, hooks::XactWaveRelease,
+      {"XACTWave::Release (sub_825D28D0)", __imp__sub_825D28D0, ITC_CONTEXT_FN(hooks::XactWaveRelease),
        112 + 160},
-      {"XACTWave::~XACTWave (sub_825D29E8)", __imp__sub_825D29E8, hooks::XactWaveDestruct,
+      {"XACTWave::~XACTWave (sub_825D29E8)", __imp__sub_825D29E8, ITC_CONTEXT_FN(hooks::XactWaveDestruct),
        96 + 112 + 160},
       {"XACTInMemoryWave::~XACTInMemoryWave, deleting, kept (sub_825D3820)", __imp__sub_825D3820,
-       hooks::XactInMemoryWaveDeletingDestruct, 112 + 96 + 112 + 160},
+       ITC_CONTEXT_FN(hooks::XactInMemoryWaveDeletingDestruct), 112 + 96 + 112 + 160},
   };
   for (const Function& f : functions) {
     Results results(f.name);
@@ -1089,7 +1089,7 @@ void Releases(Context& h, uint32_t block) {
     Results results("XACTInMemoryWave::~XACTInMemoryWave, deleting, freed (sub_825D3820)");
     if (hooks::NativeHeapActive()) {
       for (int c = 0; c < 48; c++) {
-        WaveCase(h, results, block, __imp__sub_825D3820, hooks::XactInMemoryWaveDeletingDestruct,
+        WaveCase(h, results, block, __imp__sub_825D3820, ITC_CONTEXT_FN(hooks::XactInMemoryWaveDeletingDestruct),
                  [&](Random& random, PPCContext& t) {
                    world(random, t);
                    const uint32_t object =
@@ -1114,7 +1114,7 @@ void Releases(Context& h, uint32_t block) {
   {
     Results results("XACTInMemoryWave::Stop (sub_825D3A28)");
     for (int c = 0; c < 192; c++) {
-      WaveCase(h, results, block, __imp__sub_825D3A28, hooks::XactInMemoryWaveStop,
+      WaveCase(h, results, block, __imp__sub_825D3A28, ITC_CONTEXT_FN(hooks::XactInMemoryWaveStop),
                [&](Random& random, PPCContext& t) {
                  world(random, t);
                  if (Load(base, wave + 44) == 0) {
@@ -1267,7 +1267,7 @@ void Prepares(Context& h, uint32_t block) {
   {
     Results results("XACTInMemoryWave::Prepare (sub_825D3B10)");
     for (int c = 0; c < 256; c++) {
-      WaveCase(h, results, block, __imp__sub_825D3B10, hooks::XactInMemoryWavePrepare,
+      WaveCase(h, results, block, __imp__sub_825D3B10, ITC_CONTEXT_FN(hooks::XactInMemoryWavePrepare),
                prepare_world,
                [&](Outputs& out, PPCContext& t) {
                  out.Bytes(Read(base, t.r1.u32 - 320 + 80, 120));
@@ -1281,7 +1281,7 @@ void Prepares(Context& h, uint32_t block) {
   {
     Results results("XACTWave::AudioUpdate (sub_825D2560)");
     for (int c = 0; c < 256; c++) {
-      WaveCase(h, results, block, __imp__sub_825D2560, hooks::XactWaveAudioUpdate,
+      WaveCase(h, results, block, __imp__sub_825D2560, ITC_CONTEXT_FN(hooks::XactWaveAudioUpdate),
                [&](Random& random, PPCContext& t) {
                  CallWorld(h, block, random, t, false);
                  clocks(random);

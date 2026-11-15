@@ -24,7 +24,7 @@
 // what went to the command list, r3, r24 and r28. The recompiled side runs
 // with --native_car_draw off (its callees the originals; the load poll's
 // and ScenePools::ReleaseB's natively on both sides, as their wraps run
-// them); the native side the register step hooks::CarDrawUpdate.
+// them); the native side the register step ITC_CONTEXT_FN(hooks::CarDrawUpdate).
 
 #include "harness.h"
 #include "harnesses/car_draw_shared.h"
@@ -329,7 +329,7 @@ void RootDraws(Context& h, uint32_t block, uint32_t race) {
           t.r24.u64 = r.Next();
           t.r28.u64 = r.Next();
         },
-        __imp__sub_820DAC68, hooks::CarDrawUpdate, floats, fmt::format("case {}", c),
+        __imp__sub_820DAC68, ITC_CONTEXT_FN(hooks::CarDrawUpdate), floats, fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& o) {
           const uint32_t frame = t.r1.u32 - car_draw::kCarDrawUpdateFrame;
           o.Word(guest::LoadU32(h.base, frame));

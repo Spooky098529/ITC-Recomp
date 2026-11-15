@@ -14,6 +14,7 @@
 // are left the same.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/c_runtime.h"
@@ -48,14 +49,14 @@ bool NativeLifetime() {
 // The original leaves r3 as operator delete leaves it when it frees the
 // block (the block: free's plain C++ keeps r3), else the string; a few
 // callers return right after it, so r3 is kept the same.
-extern "C" REX_FUNC(sub_82091328) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82091328) {
+  
   const uint32_t string = ctx.r3.u32;
   const bool built = (ctx.r4.u32 & 0xFF) != 0;
   const bool frees = built && guest::LoadU32(base, string + kCapacity) >= kInPlace;
   const uint32_t block = guest::LoadU32(base, string + kText);
   if (!NativeLifetime() || !Tidy(base, string, built, ctx.r5.u32)) {
-    __imp__sub_82091328(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82091328);
     return;
   }
   if (frees) {
@@ -65,69 +66,64 @@ extern "C" REX_FUNC(sub_82091328) {
 
 // assign(const string&, size_t, size_t): r3 = the string, r4 = the source,
 // r5 = the offset, r6 = the count; r3 the string (left as it came).
-extern "C" REX_FUNC(sub_82091720) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82091720) {
+  
   if (!NativeLifetime() ||
       !AssignFrom(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
-    __imp__sub_82091720(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82091720);
   }
 }
 
 // assign(const char*, size_t): r3 = the string, r4 = the text, r5 = the
 // count; r3 the string (left as it came).
-extern "C" REX_FUNC(sub_82091808) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82091808) {
+  
   if (!NativeLifetime() || !AssignText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_82091808(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82091808);
   }
 }
 
 // append(const char*, size_t): r3 = the string, r4 = the text, r5 = the
 // count; r3 the string (left as it came).
-extern "C" REX_FUNC(sub_820A6F60) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820A6F60) {
+  
   if (!NativeLifetime() || !Append(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_820A6F60(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A6F60);
   }
 }
 
 // string(): r3 = the string, returned (r4, the allocator, not read). It
 // neither allocates nor frees.
-extern "C" REX_FUNC(sub_825929E8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_std_string)) {
-    __imp__sub_825929E8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825929E8, ITC_FLAG(native_std_string)) {
   Construct(base, ctx.r3.u32);
 }
 
 // string(const char*): r3 = the string, r4 = the text; r3 the string (left
 // as it came).
-extern "C" REX_FUNC(sub_825931D0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825931D0) {
+  
   if (!NativeLifetime() || !ConstructFromText(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_825931D0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825931D0);
   }
 }
 
 // string(const char*, const allocator&): r3 = the string, r4 = the text (r5,
 // the allocator, not read); r3 the string (left as it came).
-extern "C" REX_FUNC(sub_82593248) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82593248) {
+  
   if (!NativeLifetime() || !ConstructFromTextWithAllocator(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_82593248(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82593248);
   }
 }
 
 // string(const string&, size_t, size_t): r3 = the string, r4 = the source,
 // r5 = the offset, r6 = the count (r7, the allocator, not read); r3 the
 // string (left as it came).
-extern "C" REX_FUNC(sub_82593040) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82593040) {
+  
   if (!NativeLifetime() ||
       !ConstructFrom(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
-    __imp__sub_82593040(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82593040);
   }
 }
 
@@ -135,21 +131,21 @@ extern "C" REX_FUNC(sub_82593040) {
 // replacement, r6 = how many (0 for all); r3 the string's text. Its frame
 // where the original's would be (144 bytes down). A match (replace, never in
 // play) runs the original.
-extern "C" REX_FUNC(sub_82593088) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82593088) {
+  
   if (ITC_FLAG(native_std_string)) {
     if (const auto text = ReplaceAll(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 144)) {
       ctx.r3.u64 = *text;
       return;
     }
   }
-  __imp__sub_82593088(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82593088);
 }
 
 // The global strings' static set-ups: no arguments; r3 = atexit's.
 #define ITC_STD_STRING_STATIC_INIT(address, function)                    \
-  extern "C" REX_FUNC(sub_##address) {                                   \
-    REX_FUNC_PROLOGUE();                                                 \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                   \
+    \
     if (NativeLifetime() && hooks::NativeAtexit()) {                     \
       hooks::GuestAtexit guest{ctx, base};                               \
       if (const auto result = function(base, guest.Call())) {            \

@@ -1399,10 +1399,10 @@ void EncodeRow(Context& h) {
       x.r3.u64 = codec;
       x.r4.u64 = destructor == 0 ? 1 : 2;
       if (destructor == 2) {
-        (v == 0 ? GuestFunction(__imp__sub_823EA770) : NativeDxtCodecDestruct)(
+        (v == 0 ? GuestFunction(__imp__sub_823EA770) : ITC_CONTEXT_FN(NativeDxtCodecDestruct))(
             x, h.base);
       } else {
-        (v == 0 ? GuestFunction(__imp__sub_823F6BC0) : hooks::TextureCompressionDxtCodecDelete)(
+        (v == 0 ? GuestFunction(__imp__sub_823F6BC0) : ITC_CONTEXT_FN(hooks::TextureCompressionDxtCodecDelete))(
             x, h.base);
       }
       ITC_FLAG(native_texture_compression) = true;
@@ -1485,10 +1485,10 @@ void ImageCodecDestructors(Context& h) {
       x.r4.u64 = destructor == 0 ? 1 : 0;
       ITC_FLAG(native_texture_compression) = v == 1;
       if (destructor == 2) {
-        (v == 0 ? GuestFunction(__imp__sub_823EA070) : NativeImageCodecDestruct)(
+        (v == 0 ? GuestFunction(__imp__sub_823EA070) : ITC_CONTEXT_FN(NativeImageCodecDestruct))(
             x, h.base);
       } else {
-        (v == 0 ? GuestFunction(__imp__sub_823F6B70) : hooks::TextureCompressionImageCodecDelete)(
+        (v == 0 ? GuestFunction(__imp__sub_823F6B70) : ITC_CONTEXT_FN(hooks::TextureCompressionImageCodecDelete))(
             x, h.base);
       }
       ITC_FLAG(native_texture_compression) = true;
@@ -2386,10 +2386,10 @@ void BlitterRows(Context& h) {
         t = CallContext(h);
         t.r3.u64 = area + kBlit;
         if (copy) {
-          (v == 0 ? GuestFunction(__imp__sub_82369860) : NativeCopyRows)(
+          (v == 0 ? GuestFunction(__imp__sub_82369860) : ITC_CONTEXT_FN(NativeCopyRows))(
               t, h.base);
         } else {
-          (v == 0 ? GuestFunction(__imp__sub_823699F8) : NativeConvertRows)(
+          (v == 0 ? GuestFunction(__imp__sub_823699F8) : ITC_CONTEXT_FN(NativeConvertRows))(
               t, h.base);
         }
         out[v].Word(t.r3.u32);
@@ -2410,7 +2410,7 @@ void BlitterRows(Context& h) {
       }
       t = CallContext(h);
       t.r3.u64 = area + kBlit;
-      (v == 0 ? GuestFunction(__imp__sub_82368D30) : NativeBlitterRelease)(
+      (v == 0 ? GuestFunction(__imp__sub_82368D30) : ITC_CONTEXT_FN(NativeBlitterRelease))(
           t, h.base);
       ITC_FLAG(native_texture_compression) = true;
       blocks.Put(out[v], t.r3.u32, area, kBlitAreaBytes);

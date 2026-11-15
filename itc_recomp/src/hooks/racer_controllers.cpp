@@ -25,6 +25,7 @@
 // per-racer states and Update.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/ai_drivers.h"
@@ -59,12 +60,7 @@ ITC_FLAG_BOOL(native_racer_controllers, true, "ITC",
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
 #define ITC_RACER_CONTROLLERS(address, ...)    \
-  extern "C" REX_FUNC(sub_##address) {         \
-    REX_FUNC_PROLOGUE();                       \
-    if (!ITC_FLAG(native_racer_controllers)) { \
-      __imp__sub_##address(ctx, base);         \
-      return;                                  \
-    }                                          \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_racer_controllers)) { \
     __VA_ARGS__;                               \
   }
 
@@ -80,7 +76,7 @@ struct GuestCalls {
 void CallDriveCar(void* user, uint32_t input, uint32_t index, uint32_t flag, uint32_t frame,
                   uint32_t lr) {
   auto& call = *static_cast<GuestCalls*>(user);
-  PPCContext& ctx = *call.ctx;
+  lifted::Regs& ctx = *call.ctx;
   const uint64_t saved = ctx.r1.u64;
   ctx.r1.u64 = frame;
   ctx.lr = lr;
@@ -93,7 +89,7 @@ void CallDriveCar(void* user, uint32_t input, uint32_t index, uint32_t flag, uin
 
 void CallUpdateIdle(void* user, uint64_t driver, uint32_t frame, uint32_t lr, const double* f1) {
   auto& call = *static_cast<GuestCalls*>(user);
-  PPCContext& ctx = *call.ctx;
+  lifted::Regs& ctx = *call.ctx;
   const uint64_t saved = ctx.r1.u64;
   ctx.r1.u64 = frame;
   ctx.lr = lr;
@@ -108,7 +104,7 @@ void CallUpdateIdle(void* user, uint64_t driver, uint32_t frame, uint32_t lr, co
 uint64_t CallGuest(void* user, uint32_t function, uint64_t r3, uint64_t r4, bool set_r4,
                    uint32_t frame, uint32_t lr, double* f1) {
   auto& call = *static_cast<GuestCalls*>(user);
-  PPCContext& ctx = *call.ctx;
+  lifted::Regs& ctx = *call.ctx;
   uint8_t* base = call.base;
   const uint64_t saved = ctx.r1.u64;
   ctx.r1.u64 = frame;
@@ -147,7 +143,7 @@ ITC_RACER_CONTROLLERS(8215F728, {
     ctx.r3.u64 = r3;
     return;
   }
-  __imp__sub_8215F728(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8215F728);
 })
 // r3 left at the last record, as operator delete leaves it. The original
 // where a record isn't the layer's.
@@ -157,7 +153,7 @@ ITC_RACER_CONTROLLERS(8215F5E8, {
     ctx.r3.u64 = last;
     return;
   }
-  __imp__sub_8215F5E8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8215F5E8);
 })
 
 // --- The AI drivers' hand-off (r3 as the originals leave it; f1 DriveCar's) ---

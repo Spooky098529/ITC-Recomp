@@ -641,7 +641,7 @@ void Updates(Context& h) {
       [&](PPCContext& t, int) { t.r3.u64 = m; });
   // ActionMappers::Update on a client list in the area holding the mapper
   // (bound count 0 or 1).
-  run("sub_8210B018 ActionMappers::Update", 100, __imp__sub_8210B018, NativeUpdateAll,
+  run("sub_8210B018 ActionMappers::Update", 100, __imp__sub_8210B018, ITC_CONTEXT_FN(NativeUpdateAll),
       [&](PPCContext& t, int i) {
         const uint32_t list = h.data + kList;
         guest::StoreU32(h.base, list, 0x82007F18);
@@ -780,7 +780,7 @@ void Slots(Context& h) {
             }
           },
           [&](PPCContext& t) { t.r3.u64 = i < 4 ? index : uint32_t(i - 4); },
-          __imp__sub_8209F228, NativeConfigure, setters, fmt::format("index {}", i < 4 ? index : uint32_t(i - 4)));
+          __imp__sub_8209F228, ITC_CONTEXT_FN(NativeConfigure), setters, fmt::format("index {}", i < 4 ? index : uint32_t(i - 4)));
       Write(h.base, kTable, table.data(), 32);
       guest::StoreU32(h.base, kIndex, index);
     }
@@ -1258,7 +1258,7 @@ void ActionMappersBinding(Context& h) {
         if (f.all) {
           (v == 0 ? __imp__sub_8210AF08 : sub_8210AF08)(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_8210B270 : NativeBind)(t, h.base);
+          (v == 0 ? __imp__sub_8210B270 : ITC_CONTEXT_FN(NativeBind))(t, h.base);
         }
         ITC_FLAG(native_action_mappers) = true;
         ITC_FLAG(native_input) = true;

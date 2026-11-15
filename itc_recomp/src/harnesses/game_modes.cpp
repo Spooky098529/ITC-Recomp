@@ -57,9 +57,9 @@ void NativeModeConstruct(PPCContext& ctx, uint8_t* base) {
 // Add, Find and Handle: their r3 steps are hooks' (the whole registers).
 // Transition::Make and Assign (sub_82106100, sub_82105FE0) are merged into
 // StateMachine::Add, whose cases cover them.
-constexpr GuestFunction NativeStateMachineAdd = hooks::GameModesAdd;
-constexpr GuestFunction NativeStateMachineFind = hooks::GameModesFind;
-constexpr GuestFunction NativeStateMachineHandle = hooks::GameModesHandle;
+constexpr GuestFunction NativeStateMachineAdd = ITC_CONTEXT_FN(hooks::GameModesAdd);
+constexpr GuestFunction NativeStateMachineFind = ITC_CONTEXT_FN(hooks::GameModesFind);
+constexpr GuestFunction NativeStateMachineHandle = ITC_CONTEXT_FN(hooks::GameModesHandle);
 
 void NativeOverlaysSetFlags(PPCContext& ctx, uint8_t* base) {
   gm::OverlaysSetFlags(base, ctx.r3.u32);
@@ -207,7 +207,7 @@ void Keys(Context& h, const Block& block) {
           t.r3.u64 = h.data;
           t.r4.u64 = h.data + 16;
         },
-        __imp__sub_82106040, NativeStateKeyEquals, fmt::format("case {}", c));
+        __imp__sub_82106040, ITC_CONTEXT_FN(NativeStateKeyEquals), fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -240,7 +240,7 @@ void IndexOf(Context& h, const Block& block) {
           t.r3.u64 = block.address;
           t.r4.u64 = h.data;
         },
-        __imp__sub_821060A0, NativeStateMachineIndexOf, fmt::format("case {}", c));
+        __imp__sub_821060A0, ITC_CONTEXT_FN(NativeStateMachineIndexOf), fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -256,7 +256,7 @@ void Constructors(Context& h, const Block& block) {
           }
         },
         [&](PPCContext& t) { t.r3.u64 = block.address; }, __imp__sub_82107108,
-        NativeStateMachineConstruct, fmt::format("case {}", c));
+        ITC_CONTEXT_FN(NativeStateMachineConstruct), fmt::format("case {}", c));
   }
   machine.Report();
   Results mode("Mode::Mode (sub_82106C20)");
@@ -265,7 +265,7 @@ void Constructors(Context& h, const Block& block) {
         h, mode, block,
         [&](Random& random) { WriteRandom(h.base, h.data, 128, random); },
         [&](PPCContext& t) { t.r3.u64 = h.data + 4 * c; }, __imp__sub_82106C20,
-        NativeModeConstruct, fmt::format("case {}", c));
+        ITC_CONTEXT_FN(NativeModeConstruct), fmt::format("case {}", c));
   }
   mode.Report();
 }
@@ -383,13 +383,13 @@ void Handlers(Context& h, const Block& block) {
     GuestFunction native;
   };
   const Handler handlers[] = {
-      {"sub_8215DD58 RaceOverlaysMachine::SetFlags", __imp__sub_8215DD58, NativeOverlaysSetFlags},
+      {"sub_8215DD58 RaceOverlaysMachine::SetFlags", __imp__sub_8215DD58, ITC_CONTEXT_FN(NativeOverlaysSetFlags)},
       {"sub_8215DD90 RaceOverlaysMachine::ClearFlags", __imp__sub_8215DD90,
-       NativeOverlaysClearFlags},
+       ITC_CONTEXT_FN(NativeOverlaysClearFlags)},
       {"sub_8215DDD0 RaceOverlaysMachine::SetFlag820", __imp__sub_8215DDD0,
-       NativeOverlaysSetFlag820},
+       ITC_CONTEXT_FN(NativeOverlaysSetFlag820)},
       {"sub_8215DE10 RaceOverlaysMachine::ResetOverlays", __imp__sub_8215DE10,
-       hooks::GameModesResetOverlays},
+       ITC_CONTEXT_FN(hooks::GameModesResetOverlays)},
   };
   const uint32_t vtable = block.address + kOverlayArea - 64;
   for (const Handler& handler : handlers) {
@@ -421,7 +421,7 @@ void Member67760(Context& h, const Block& block) {
         h, results, block,
         [&](Random& random) { WriteRandom(h.base, block.address, 800 / 4, random); },
         [&](PPCContext& t) { t.r3.u64 = block.address + 4 * c; }, __imp__sub_82155D90,
-        NativeMember67760Construct, fmt::format("case {}", c));
+        ITC_CONTEXT_FN(NativeMember67760Construct), fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -434,7 +434,7 @@ void Member13360(Context& h) {
         h, results, block,
         [&](Random& random) { WriteRandom(h.base, block.address, block.bytes / 4, random); },
         [&](PPCContext& t) { t.r3.u64 = block.address + 4 * c; }, __imp__sub_82155118,
-        NativeMember13360Construct, fmt::format("case {}", c));
+        ITC_CONTEXT_FN(NativeMember13360Construct), fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -471,7 +471,7 @@ void RaceOverlaysInit(Context& h, const Block& block) {
       PPCContext t = CallContext(h);
       t.r3.u64 = block.address;
       ITC_FLAG(native_game_modes) = v == 1;
-      (v == 0 ? GuestFunction(__imp__sub_8215E6C8) : hooks::GameModesRaceOverlaysMachineInit)(
+      (v == 0 ? GuestFunction(__imp__sub_8215E6C8) : ITC_CONTEXT_FN(hooks::GameModesRaceOverlaysMachineInit))(
           t, h.base);
       ITC_FLAG(native_game_modes) = true;
       out[v].Bytes(Read(h.base, block.address, gm::kOverlays + 4 * gm::kOverlaySlots));
@@ -568,7 +568,7 @@ void XprHolders(Context& h, const Block& block) {
         h, results, block,
         [&](Random& random) { WriteRandom(h.base, block.address, 128 / 4, random); },
         [&](PPCContext& t) { t.r3.u64 = block.address + 4 * c; }, __imp__sub_821067A0,
-        NativeXprHolderConstruct, fmt::format("case {}", c));
+        ITC_CONTEXT_FN(NativeXprHolderConstruct), fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -585,11 +585,11 @@ void RaceModeConstructors(Context& h) {
   };
   const Constructor constructors[] = {
       {"sub_82106A50 Member56896::Member56896", 10840, __imp__sub_82106A50,
-       NativeMember56896Construct, 16},
+       ITC_CONTEXT_FN(NativeMember56896Construct), 16},
       {"sub_82107168 RaceModeMember::RaceModeMember", gm::kRaceModeMemberBytes,
-       __imp__sub_82107168, NativeRaceModeMemberConstruct, 8},
+       __imp__sub_82107168, ITC_CONTEXT_FN(NativeRaceModeMemberConstruct), 8},
       {"sub_821073B8 RaceMode::RaceMode", gm::kRaceModeBytes, __imp__sub_821073B8,
-       NativeRaceModeConstruct, 6},
+       ITC_CONTEXT_FN(NativeRaceModeConstruct), 6},
   };
   for (const Constructor& f : constructors) {
     Results results(f.name);
@@ -669,7 +669,7 @@ void RaceModeMembers(Context& h) {
       t.r3.u64 = member;
       ITC_FLAG(native_game_modes) = v == 1;
       ITC_FLAG(native_models) = v == 1;
-      (v == 0 ? GuestFunction(__imp__sub_82106AF0) : NativeRaceModeMemberDestruct)(t, h.base);
+      (v == 0 ? GuestFunction(__imp__sub_82106AF0) : ITC_CONTEXT_FN(NativeRaceModeMemberDestruct))(t, h.base);
       ITC_FLAG(native_game_modes) = true;
       ITC_FLAG(native_models) = true;
       pending_frees::TakeAddedNodes(h.base, was, out[v]);
@@ -744,7 +744,7 @@ void ModeConstructors(Context& h) {
           }
         },
         [&](PPCContext& t) { t.r3.u64 = block.address + 4 * c; }, __imp__sub_82108160,
-        NativeMachineMemberConstruct, fmt::format("case {}", c));
+        ITC_CONTEXT_FN(NativeMachineMemberConstruct), fmt::format("case {}", c));
   }
   machine.Report();
 }
@@ -781,7 +781,7 @@ void ModeCreates(Context& h) {
         ITC_FLAG(native_game_modes) = v == 1;
         ITC_FLAG(native_models) = v == 1;
         ITC_FLAG(native_race_overlays) = v == 1;
-        (v == 0 ? GuestFunction(__imp__sub_821077A8) : NativeModeCreate)(t, h.base);
+        (v == 0 ? GuestFunction(__imp__sub_821077A8) : ITC_CONTEXT_FN(NativeModeCreate))(t, h.base);
         ITC_FLAG(native_game_modes) = true;
         ITC_FLAG(native_models) = true;
         ITC_FLAG(native_race_overlays) = true;

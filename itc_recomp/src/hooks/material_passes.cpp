@@ -3,6 +3,7 @@
 // register steps the harness shares (hooks/material_passes.h).
 
 #include "hooks/material_passes.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -29,28 +30,28 @@ namespace hooks {
 
 namespace mp = material_passes;
 
-void MaterialPassesHsvToRgb(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesHsvToRgb) {
   ctx.fpscr.disableFlushMode();
   mp::HsvToRgb(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void MaterialPassesTableVector(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesTableVector) {
   mp::TableVector(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void MaterialPassesIsBlockSetA(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesIsBlockSetA) {
   ctx.r3.u64 = mp::IsBlockSetA(ctx.r3.s32);
 }
 
-void MaterialPassesIsBlockSetB(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesIsBlockSetB) {
   ctx.r3.u64 = mp::IsBlockSetB(ctx.r3.s32);
 }
 
-void MaterialPassesRecordAt(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesRecordAt) {
   ctx.r3.u64 = mp::RecordAt(ctx.r3.u64);
 }
 
-void MaterialPassesTransposeRotation(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesTransposeRotation) {
   if (!mp::TransposeRotation(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32)) {
     __imp__sub_820D1CB0(ctx, base);
     return;
@@ -58,30 +59,30 @@ void MaterialPassesTransposeRotation(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
-void MaterialPassesSetTexture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesSetTexture) {
   ctx.r3.u64 = mp::SetTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, ctx.r1.u32);
 }
 
-void MaterialPassesFlipCulling(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesFlipCulling) {
   ctx.r3.u64 = mp::FlipCulling(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void MaterialPassesScaleBlended(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesScaleBlended) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = mp::ScaleBlended(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
-void MaterialPassesSetPair1002Alpha(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesSetPair1002Alpha) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = mp::SetPair1002Alpha(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
-void MaterialPassesSetAlpha(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesSetAlpha) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = mp::SetAlpha(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
-void MaterialPassesSetMaterials(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesSetMaterials) {
   const uint64_t regs[7] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
                             ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
   std::optional<uint64_t> r3;
@@ -95,33 +96,33 @@ void MaterialPassesSetMaterials(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void MaterialPassesSetPaint(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesSetPaint) {
   const uint64_t regs[6] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64,
                             ctx.r7.u64, ctx.r8.u64, ctx.r9.u64};
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = mp::SetPaint(base, ctx.r3.u32, regs, ctx.r1.u32);
 }
 
-void MaterialPassesSetPaintBody(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesSetPaintBody) {
   const uint64_t regs[6] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64,
                             ctx.r7.u64, ctx.r8.u64, ctx.r9.u64};
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = mp::SetPaintBody(base, ctx.r3.u32, regs, ctx.r1.u32);
 }
 
-void MaterialPassesApplyPalette(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesApplyPalette) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = mp::ApplyPalette(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void MaterialPassesPaintPaletteInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesPaintPaletteInit) {
   ctx.fpscr.disableFlushMode();
   if (const auto r3 = mp::PaintPaletteInit(base, ctx.r1.u32)) {
     ctx.r3.u64 = *r3;
   }
 }
 
-void MaterialPassesProjectorMatrices(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(MaterialPassesProjectorMatrices) {
   const mp::ProjectorArgs args{ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                ctx.r6.u32, ctx.r7.u32, ctx.r9.u32};
   ctx.fpscr.disableFlushMode();
@@ -140,12 +141,7 @@ void MaterialPassesProjectorMatrices(PPCContext& ctx, uint8_t* base) {
 // off.
 
 #define ITC_MATERIAL_PASSES(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_material_passes)) {  \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_material_passes)) { \
     hooks::step(ctx, base);                   \
   }
 

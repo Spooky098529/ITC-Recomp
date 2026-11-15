@@ -4,6 +4,7 @@
 // their adapters stay until every caller is native.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "action_mappers/action_mappers.h"
 #include "base/flags.h"
@@ -42,14 +43,14 @@ ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
 
 // An adapter returning a word in r3.
 #define ITC_MAPPERS_WORD(address, expr)  \
-  extern "C" REX_FUNC(sub_##address) {  \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {  \
     ITC_MAPPERS_FALLBACK(address)       \
     ctx.r3.u64 = uint32_t(expr);        \
   }
 
 using namespace action_mappers;
 
-extern "C" REX_FUNC(sub_8210B5B8) {
+ITC_NATIVE_ENTRY_ALWAYS(8210B5B8) {
   ITC_MAPPERS_FALLBACK(8210B5B8)
   ctx.f1.f64 = CurveApply(base, ctx.r3.u32, ctx.f1.f64);
 }
@@ -57,28 +58,28 @@ ITC_MAPPERS_WORD(8210B568, RepeatUpdate(base, ctx.r3.u32, ctx.r4.u32))
 
 // The held tests, also counted for --log_input_reads (as the wrappers in
 // src/frame_pacing/game_messages.cpp count the other button tests).
-extern "C" REX_FUNC(sub_825924E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825924E0) {
+  
   const uint32_t caller = uint32_t(ctx.lr);
   const uint32_t listener = ctx.r3.u32;
   const uint32_t mask = guest::LoadU32(base, ctx.r4.u32);
   if (ITC_FLAG(native_action_mappers)) {
     ctx.r3.u64 = ListenerHeld(base, listener, mask);
   } else {
-    __imp__sub_825924E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825924E0);
   }
   if (frame_pacing::GameMessages_LogInputReads()) {
     frame_pacing::GameMessages_NoteInputRead(0x825924E0, caller, listener, mask,
                                              ctx.r3.u32 & 0xFF);
   }
 }
-extern "C" REX_FUNC(sub_8258CF10) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258CF10) {
+  
   const uint32_t caller = uint32_t(ctx.lr);
   const uint32_t listener = ctx.r3.u32;
   const uint32_t mask = guest::LoadU32(base, ctx.r4.u32);
   if (!ITC_FLAG(native_action_mappers)) {
-    __imp__sub_8258CF10(ctx, base);  // its call to sub_825924E0 is counted there
+    lifted::Sdk(ctx, base, __imp__sub_8258CF10);  // its call to sub_825924E0 is counted there
     if (frame_pacing::GameMessages_LogInputReads()) {
       frame_pacing::GameMessages_NoteInputRead(0x8258CF10, caller, listener, mask,
                                                ctx.r3.u32 & 0xFF);
@@ -105,8 +106,8 @@ extern "C" REX_FUNC(sub_8258CF10) {
 
 // The mapper's update, also logged for --log_pause_menu (moved from
 // src/debug/pause_menu_log.cpp).
-extern "C" REX_FUNC(sub_8210C370) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8210C370) {
+  
   const uint32_t mapper = ctx.r3.u32;
   const uint32_t caller = uint32_t(ctx.lr);
   const uint32_t fired_before = debug::PauseMenuLog_BeforeMapperUpdate(base, mapper);
@@ -116,7 +117,7 @@ extern "C" REX_FUNC(sub_8210C370) {
     ctx.r3.u64 = MapperUpdate(base, mapper, uint32_t(ctx.r25.u64 >> 32), &f1);
     ctx.f1.f64 = f1;
   } else {
-    __imp__sub_8210C370(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8210C370);
   }
   debug::PauseMenuLog_AfterMapperUpdate(base, mapper, caller, fired_before);
 }
@@ -125,8 +126,8 @@ extern "C" REX_FUNC(sub_8210C370) {
 // src/debug/pause_menu_log.cpp): reached through the mapper's vtable from
 // the menus, the pause menu and the car.
 #define ITC_MAPPERS_READ_SLOT(address, slot, function)                          \
-  extern "C" REX_FUNC(sub_##address) {                                         \
-    REX_FUNC_PROLOGUE();                                                       \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                         \
+    \
     const uint32_t mapper = ctx.r3.u32;                                        \
     const uint32_t action = ctx.r4.u32;                                        \
     const uint32_t caller = uint32_t(ctx.lr);                                  \
@@ -149,8 +150,8 @@ ITC_MAPPERS_READ_SLOT(8210BFA8, 11, Released)
 
 // Slot 5 (the analog value in f1; r3 left as IndexOf's result), logged the
 // same way with its f1.
-extern "C" REX_FUNC(sub_8210BA68) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8210BA68) {
+  
   const uint32_t mapper = ctx.r3.u32;
   const uint32_t action = ctx.r4.u32;
   const uint32_t caller = uint32_t(ctx.lr);
@@ -160,7 +161,7 @@ extern "C" REX_FUNC(sub_8210BA68) {
     ctx.r3.u64 = AnalogValue(base, mapper, action, &f1);
     ctx.f1.f64 = f1;
   } else {
-    __imp__sub_8210BA68(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8210BA68);
   }
   debug::PauseMenuLog_NoteSlotRead(5, mapper, action, caller, ctx.f1.f64);
 }
@@ -200,7 +201,7 @@ ITC_MAPPERS_WORD(8210BE30, SetCurve(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ct
 // (natively when MapperBindKnown, else the original Bind) and the bound
 // count up. Run in the original's frame (112 bytes); its own work is the
 // client list's plain C++.
-extern "C" REX_FUNC(sub_8210AF08) {
+ITC_NATIVE_ENTRY_ALWAYS(8210AF08) {
   ITC_MAPPERS_FALLBACK(8210AF08)
   ITC_NATIVE_RUNNING("sub_8210AF08 InputClientList::BindAll");
   const uint32_t list = ctx.r3.u32;
@@ -219,7 +220,7 @@ extern "C" REX_FUNC(sub_8210AF08) {
         ctx.r3.u64 = mapper;
         ctx.r4.u64 = object;
         ctx.lr = 0x8210AF64;
-        __imp__sub_8210B270(ctx, base);
+        lifted::Sdk(ctx, base, __imp__sub_8210B270);
       }
       ClientListBoundCount(base, list, 2, 1);
     }
@@ -234,7 +235,7 @@ extern "C" REX_FUNC(sub_8210AF08) {
 // Configure, in the original's frame (112 bytes). The original unless the
 // heap is the allocation layer's, the mappers' constructor runs natively and
 // operator new gives every block. r3 and f1-f3 are Configure's.
-extern "C" REX_FUNC(sub_8209F430) {
+ITC_NATIVE_ENTRY_ALWAYS(8209F430) {
   ITC_MAPPERS_FALLBACK(8209F430)
   if (hooks::StartUpRecorded(ctx, 0x8209F430)) {
     return;
@@ -242,7 +243,7 @@ extern "C" REX_FUNC(sub_8209F430) {
   uint32_t list = 0;
   if (!hooks::NativeHeapActive() || !MapperConstructKnown(base) ||
       !InitCreate(base, ctx.r3.u32, &list)) {
-    __imp__sub_8209F430(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209F430);
     return;
   }
   const uint32_t index = ctx.r4.u32;

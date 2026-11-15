@@ -3,6 +3,7 @@
 // shares (hooks/race_screens.h).
 
 #include "hooks/race_screens.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/heap.h"
@@ -59,7 +60,7 @@ namespace {
 // The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -69,7 +70,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -90,7 +91,7 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
@@ -99,51 +100,51 @@ bool NativeSlots() { return ITC_FLAG(native_action_mappers); }
 
 }  // namespace
 
-void RaceScreensPagesInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPagesInit) {
   race_screens::PagesInit(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceScreensPagesGo(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPagesGo) {
   race_screens::PagesGo(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
 }
 
-void RaceScreensPagesFinish(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPagesFinish) {
   race_screens::PagesFinish(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceScreensListSelection(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensListSelection) {
   ctx.r3.u64 = race_screens::ListSelection(base, ctx.r3.u32);
 }
 
-void RaceScreensListSetSelection(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensListSetSelection) {
   race_screens::ListSetSelection(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceScreensListSetEnabled(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensListSetEnabled) {
   race_screens::ListSetEnabled(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void RaceScreensListIsEnabled(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensListIsEnabled) {
   ctx.r3.u64 = race_screens::ListIsEnabled(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceScreensListFit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensListFit) {
   race_screens::ListFit(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void RaceScreensListFired(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensListFired) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::ListFired(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, NativeSlots(),
                                        guest.calls());
 }
 
-void RaceScreensListUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensListUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::ListUpdate(base, ctx.r3.u32, ctx.r1.u32, NativeSlots(), guest.calls());
 }
 
 #define ITC_RACE_SCREENS_PRESSED(name)                                                         \
-  void RaceScreensList##name(PPCContext& ctx, uint8_t* base) {                                \
+  void RaceScreensList##name(lifted::Regs& ctx, uint8_t* base) {                                \
     GuestCalls guest(ctx, base);                                                               \
     ctx.r3.u64 =                                                                               \
         race_screens::List##name(base, ctx.r3.u32, ctx.r1.u32, NativeSlots(), guest.calls()); \
@@ -155,7 +156,7 @@ ITC_RACE_SCREENS_PRESSED(Pressed166)
 #undef ITC_RACE_SCREENS_PRESSED
 
 #define ITC_RACE_SCREENS_CREATE(name, address)                       \
-  void RaceScreens##name##Create(PPCContext& ctx, uint8_t* base) {   \
+  void RaceScreens##name##Create(lifted::Regs& ctx, uint8_t* base) {   \
     if (!NativeHeapActive()) {                                       \
       __imp__sub_##address(ctx, base);                               \
       return;                                                        \
@@ -173,7 +174,7 @@ ITC_RACE_SCREENS_CREATE(Kind6Menu, 8221BDD0)
 #undef ITC_RACE_SCREENS_CREATE
 
 #define ITC_RACE_SCREENS_FREE(function, address)                           \
-  void RaceScreens##function(PPCContext& ctx, uint8_t* base) {             \
+  void RaceScreens##function(lifted::Regs& ctx, uint8_t* base) {             \
     if (NativeHeapActive()) {                                              \
       if (const auto r3 = race_screens::function(base, ctx.r1.u32)) {      \
         ctx.r3.u64 = *r3;                                                  \
@@ -193,59 +194,59 @@ ITC_RACE_SCREENS_FREE(Kind6MenuDestroy, 8221BE30)
 ITC_RACE_SCREENS_FREE(AfterRaceMenuClose, 8221A498)
 #undef ITC_RACE_SCREENS_FREE
 
-void RaceScreensPauseMenuLoadData(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuLoadData) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuLoadData(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensPauseMenuSaveOptions(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuSaveOptions) {
   ctx.r3.u64 = race_screens::PauseMenuSaveOptions(base, ctx.r1.u32);
 }
 
-void RaceScreensPauseMenuClose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuClose) {
   ctx.r3.u64 = race_screens::PauseMenuClose(base, ctx.r1.u32);
 }
 
-void RaceScreensPauseMenuSaveHudOptions(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuSaveHudOptions) {
   ctx.r3.u64 = race_screens::PauseMenuSaveHudOptions(base, ctx.r1.u32);
 }
 
-void RaceScreensPauseMenuAnswerPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuAnswerPage) {
   ctx.r3.u64 = race_screens::PauseMenuAnswerPage(base);
 }
 
-void RaceScreensAfterRaceMenuAnswerPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensAfterRaceMenuAnswerPage) {
   ctx.r3.u64 = race_screens::AfterRaceMenuAnswerPage(base);
 }
 
-void RaceScreensRaceDialogAnswer(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensRaceDialogAnswer) {
   ctx.r3.u64 = race_screens::RaceDialogAnswer(base);
 }
 
-void RaceScreensPauseMenuUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       race_screens::PauseMenuUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensCareerResultsUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensCareerResultsUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::CareerResultsUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64,
                                                  ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensAfterRaceMenuUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensAfterRaceMenuUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::AfterRaceMenuUpdate(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensRaceDialogUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensRaceDialogUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::RaceDialogUpdate(base, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensRaceDialogSetText(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensRaceDialogSetText) {
   GuestCalls guest(ctx, base);
   const uint64_t varargs[7] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
                                ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
@@ -253,27 +254,27 @@ void RaceScreensRaceDialogSetText(PPCContext& ctx, uint8_t* base) {
                                                guest.calls());
 }
 
-void RaceScreensRaceDialogOpen(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensRaceDialogOpen) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::RaceDialogOpen(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32,
                                             guest.calls());
 }
 
-void RaceScreensCareerResultsStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensCareerResultsStart) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::CareerResultsStart(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensPauseMenuStepVolume(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuStepVolume) {
   ctx.r3.u64 = race_screens::PauseMenuStepVolume(base, ctx.r1.u32);
 }
 
-void RaceScreensPauseMenuStepAdjust(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuStepAdjust) {
   ctx.r3.u64 = race_screens::PauseMenuStepAdjust(base, ctx.r1.u32);
 }
 
 #define ITC_RACE_SCREENS_TRANSITION(name)                                                  \
-  void RaceScreensPauseMenu##name(PPCContext& ctx, uint8_t* base) {                          \
+  void RaceScreensPauseMenu##name(lifted::Regs& ctx, uint8_t* base) {                          \
     GuestCalls guest(ctx, base);                                                             \
     ctx.r3.u64 = race_screens::PauseMenu##name(base, ctx.r3.u32, ctx.r1.u32, guest.calls()); \
   }
@@ -297,87 +298,87 @@ ITC_RACE_SCREENS_TRANSITION(OpenVolume)
 ITC_RACE_SCREENS_TRANSITION(OpenAdjust)
 #undef ITC_RACE_SCREENS_TRANSITION
 
-void RaceScreensPauseMenuConfirmPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuConfirmPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuConfirmPage(base, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensPauseMenuShowItems(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuShowItems) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuShowItems(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensPauseMenuSetArrowA(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuSetArrowA) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = race_screens::PauseMenuSetArrowA(base, ctx.r3.u64, ctx.r1.u32);
 }
 
-void RaceScreensPauseMenuShowOptions(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuShowOptions) {
   ctx.r3.u64 = race_screens::PauseMenuShowOptions(base, ctx.r1.u32);
 }
 
-void RaceScreensPauseMenuShowVolumes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuShowVolumes) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuShowVolumes(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensPauseMenuShowVolume(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuShowVolume) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       race_screens::PauseMenuShowVolume(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensPauseMenuShowSlider(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuShowSlider) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       race_screens::PauseMenuShowSlider(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensPauseMenuRestoreNodes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuRestoreNodes) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       race_screens::PauseMenuRestoreNodes(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensPauseMenuColorItems(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuColorItems) {
   ctx.r3.u64 = race_screens::PauseMenuColorItems(base, ctx.r1.u32);
 }
 
-void RaceScreensPauseMenuShowAdjust(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuShowAdjust) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuShowAdjust(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensPauseMenuOpen(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuOpen) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuOpen(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32,
                                            guest.calls());
 }
 
-void RaceScreensPauseMenuToggleOption(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuToggleOption) {
   ctx.r3.u64 = race_screens::PauseMenuToggleOption(base, ctx.r1.u32);
 }
 
-void RaceScreensPauseMenuOptionsPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuOptionsPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuOptionsPage(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensPauseMenuMainPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuMainPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuMainPage(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensAfterRaceMenuMainPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensAfterRaceMenuMainPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::AfterRaceMenuMainPage(base, ctx.r1.u32, guest.calls());
 }
 
 #define ITC_RACE_SCREENS_STEP(name)                                                \
-  void RaceScreens##name(PPCContext& ctx, uint8_t* base) {                       \
+  void RaceScreens##name(lifted::Regs& ctx, uint8_t* base) {                       \
     GuestCalls guest(ctx, base);                                                 \
     ctx.r3.u64 = race_screens::name(base, ctx.r1.u32, guest.calls());            \
   }
@@ -391,13 +392,13 @@ ITC_RACE_SCREENS_STEP(PauseMenuSetUpAdjust)
 ITC_RACE_SCREENS_STEP(PauseMenuVolumePage)
 #undef ITC_RACE_SCREENS_STEP
 
-void RaceScreensPauseMenuSetUpOptions(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuSetUpOptions) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuSetUpOptions(base, ctx.r1.u32, guest.calls());
 }
 
 #define ITC_AFTER_RACE_TRANSITION(name)                                                          \
-  void RaceScreensAfterRaceMenu##name(PPCContext& ctx, uint8_t* base) {                          \
+  void RaceScreensAfterRaceMenu##name(lifted::Regs& ctx, uint8_t* base) {                          \
     GuestCalls guest(ctx, base);                                                                 \
     ctx.r3.u64 = race_screens::AfterRaceMenu##name(base, ctx.r3.u32, ctx.r1.u32, guest.calls()); \
   }
@@ -407,94 +408,94 @@ ITC_AFTER_RACE_TRANSITION(CloseMain)
 ITC_AFTER_RACE_TRANSITION(Move)
 #undef ITC_AFTER_RACE_TRANSITION
 
-void RaceScreensAfterRaceMenuConfirmPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensAfterRaceMenuConfirmPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       race_screens::AfterRaceMenuConfirmPage(base, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensAfterRaceMenuShowItems(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensAfterRaceMenuShowItems) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::AfterRaceMenuShowItems(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensAfterRaceMenuSetUpItems(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensAfterRaceMenuSetUpItems) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::AfterRaceMenuSetUpItems(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensAfterRaceMenuColorItems(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensAfterRaceMenuColorItems) {
   ctx.r3.u64 = race_screens::AfterRaceMenuColorItems(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void RaceScreensAfterRaceMenuStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensAfterRaceMenuStart) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::AfterRaceMenuStart(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensAfterRaceMenuOpen(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensAfterRaceMenuOpen) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::AfterRaceMenuOpen(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64,
                                                ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensRaceDialogShowSaving(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensRaceDialogShowSaving) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::RaceDialogShowSaving(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensRaceDialogStartSave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensRaceDialogStartSave) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::RaceDialogStartSave(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensRaceDialogSetNote(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensRaceDialogSetNote) {
   GuestCalls guest(ctx, base);
   const uint64_t varargs[7] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
                                ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
   ctx.r3.u64 = race_screens::RaceDialogSetNote(base, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensRaceDialogQuestion(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensRaceDialogQuestion) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::RaceDialogQuestion(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensRaceDialogOpenAnim(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensRaceDialogOpenAnim) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::RaceDialogOpenAnim(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensRaceDialogMove(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensRaceDialogMove) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::RaceDialogMove(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensRaceDialogShowMessage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensRaceDialogShowMessage) {
   std::optional<uint64_t> r3;
   {
     GuestCalls guest(ctx, base);
     r3 = race_screens::RaceDialogShowMessage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
   }
   if (!r3) {
-    __imp__sub_82218C10(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82218C10);
     return;
   }
   ctx.r3.u64 = *r3;
 }
 
-void RaceScreensRaceDialogDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensRaceDialogDraw) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::RaceDialogDraw(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensPauseMenuOpenOptions(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensPauseMenuOpenOptions) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuOpenOptions(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
 #define ITC_RACE_SCREENS_DRAW(name)                                                         \
-  void RaceScreens##name##Draw(PPCContext& ctx, uint8_t* base) {                            \
+  void RaceScreens##name##Draw(lifted::Regs& ctx, uint8_t* base) {                            \
     GuestCalls guest(ctx, base);                                                            \
     ctx.r3.u64 = race_screens::name##Draw(base, ctx.r3.u32, ctx.r1.u32, guest.calls());     \
   }
@@ -504,7 +505,7 @@ ITC_RACE_SCREENS_DRAW(CareerResults)
 #undef ITC_RACE_SCREENS_DRAW
 
 #define ITC_CAREER_RESULTS_TRANSITION(name)                                                      \
-  void RaceScreensCareerResults##name(PPCContext& ctx, uint8_t* base) {                          \
+  void RaceScreensCareerResults##name(lifted::Regs& ctx, uint8_t* base) {                          \
     GuestCalls guest(ctx, base);                                                                 \
     ctx.r3.u64 = race_screens::CareerResults##name(base, ctx.r3.u32, ctx.r1.u32, guest.calls()); \
   }
@@ -513,19 +514,19 @@ ITC_CAREER_RESULTS_TRANSITION(Show)
 ITC_CAREER_RESULTS_TRANSITION(Close1)
 #undef ITC_CAREER_RESULTS_TRANSITION
 
-void RaceScreensCareerResultsPage1(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensCareerResultsPage1) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       race_screens::CareerResultsPage1(base, ctx.r1.u32, NativeSlots(), guest.calls());
 }
 
-void RaceScreensCareerResultsSetTexts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensCareerResultsSetTexts) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::CareerResultsSetTexts(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceScreensCareerResultsOpen(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceScreensCareerResultsOpen) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
@@ -563,12 +564,7 @@ void RaceScreensCareerResultsOpen(PPCContext& ctx, uint8_t* base) {
 // AfterRaceUpdate); their register steps stay for the harness.
 
 #define ITC_RACE_SCREENS(address, step)       \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_race_screens)) {     \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_screens)) { \
     hooks::step(ctx, base);                   \
   }
 

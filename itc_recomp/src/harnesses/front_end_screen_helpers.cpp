@@ -686,31 +686,31 @@ void Dialogs(Context& h, const World& w) {
       [](PPCContext& t, Random& r, const World&) {
         StringId(t, r, {62, 61, 71, 72, 65, 66, 63, 64, 67, 70, 102, 59});
       },
-      __imp__sub_821A51C8, hooks::FrontEndSaveScreenSetText, text26);
+      __imp__sub_821A51C8, ITC_CONTEXT_FN(hooks::FrontEndSaveScreenSetText), text26);
   Group(
       h, w, "SaveScreen::SetNote (sub_821A52C0)", 100,
       [](PPCContext& t, Random& r, const World&) { StringId(t, r, {62, 69, 70, 61}); },
-      __imp__sub_821A52C0, hooks::FrontEndSaveScreenSetNote, note);
+      __imp__sub_821A52C0, ITC_CONTEXT_FN(hooks::FrontEndSaveScreenSetNote), note);
   Group(
       h, w, "SaveScreen::SetMessage (sub_821A5360)", 100,
       [](PPCContext& t, Random& r, const World&) { StringId(t, r, {107}); }, __imp__sub_821A5360,
-      hooks::FrontEndSaveScreenSetMessage, text26);
+      ITC_CONTEXT_FN(hooks::FrontEndSaveScreenSetMessage), text26);
   Group(
       h, w, "Options::SetSaveDialogText (sub_821C0D70)", 100,
       [](PPCContext& t, Random& r, const World&) { StringId(t, r, {62, 83, 69, 70, 84, 104}); },
-      __imp__sub_821C0D70, hooks::FrontEndOptionsSetSaveDialogText, text27);
+      __imp__sub_821C0D70, ITC_CONTEXT_FN(hooks::FrontEndOptionsSetSaveDialogText), text27);
   Group(
       h, w, "Options::SetSaveDialogNote (sub_821C0E50)", 100,
       [](PPCContext& t, Random& r, const World&) { StringId(t, r, {62, 69, 70}); },
-      __imp__sub_821C0E50, hooks::FrontEndOptionsSetSaveDialogNote, note);
+      __imp__sub_821C0E50, ITC_CONTEXT_FN(hooks::FrontEndOptionsSetSaveDialogNote), note);
   Group(
       h, w, "Options::SetCategory6DialogText (sub_821C0BF0)", 100,
       [](PPCContext& t, Random& r, const World&) { StringId(t, r, {62, 61, 71, 72, 65}); },
-      __imp__sub_821C0BF0, hooks::FrontEndOptionsSetCategory6DialogText, text27);
+      __imp__sub_821C0BF0, ITC_CONTEXT_FN(hooks::FrontEndOptionsSetCategory6DialogText), text27);
   Group(
       h, w, "Options::SetCategory6DialogNote (sub_821C0CD0)", 100,
       [](PPCContext& t, Random& r, const World&) { StringId(t, r, {62, 69, 70}); },
-      __imp__sub_821C0CD0, hooks::FrontEndOptionsSetCategory6DialogNote, note);
+      __imp__sub_821C0CD0, ITC_CONTEXT_FN(hooks::FrontEndOptionsSetCategory6DialogNote), note);
   // ShowNotice: r3 the step word (in the misc block, 0 or 1 or any); its
   // frame's +24 to +79 left out (SetMessage's varargs stores: UiMovies::
   // Find's leftovers in the original, 0 in ours), and SetMessage's frame
@@ -723,7 +723,7 @@ void Dialogs(Context& h, const World& w) {
         guest::StoreU32(h.base, step, words[r.Below(3)]);
         t.r3.u64 = step;
       },
-      __imp__sub_821A63B0, hooks::FrontEndSaveScreenShowNotice,
+      __imp__sub_821A63B0, ITC_CONTEXT_FN(hooks::FrontEndSaveScreenShowNotice),
       {{144, 120}, {64, 32}, {288, 248}, {208, 200}});
 }
 
@@ -734,15 +734,15 @@ void Starts(Context& h, const World& w) {
   // setters' frames below (their +40 to +79 and register saves left out).
   const auto none = [](PPCContext&, Random&, const World&) {};
   Group(h, w, "SaveScreen::StartCheck (sub_821A5450)", 200, none, __imp__sub_821A5450,
-        hooks::FrontEndSaveScreenStartCheck, {{128, 104}, {48, 32}, {240, 152}});
+        ITC_CONTEXT_FN(hooks::FrontEndSaveScreenStartCheck), {{128, 104}, {48, 32}, {240, 152}});
   Group(h, w, "SaveScreen::Start (sub_821A5540)", 200, none, __imp__sub_821A5540,
-        hooks::FrontEndSaveScreenStart,
+        ITC_CONTEXT_FN(hooks::FrontEndSaveScreenStart),
         {{144, 120}, {64, 40}, {288, 248}, {208, 200}});
   // The options' set-ups (144, saves 40), the note's frame below theirs.
   Group(h, w, "Options::SetUpSavePage (sub_821C6D48)", 200, none, __imp__sub_821C6D48,
-        hooks::FrontEndOptionsSetUpSavePage, {{144, 120}, {64, 40}, {256, 168}});
+        ITC_CONTEXT_FN(hooks::FrontEndOptionsSetUpSavePage), {{144, 120}, {64, 40}, {256, 168}});
   Group(h, w, "Options::SetUpCategory6Page (sub_821C6E50)", 200, none, __imp__sub_821C6E50,
-        hooks::FrontEndOptionsSetUpCategory6Page, {{144, 120}, {64, 40}, {256, 168}});
+        ITC_CONTEXT_FN(hooks::FrontEndOptionsSetUpCategory6Page), {{144, 120}, {64, 40}, {256, 168}});
 }
 
 // A small word: 0 to `n` - 1 mostly, now and then any.
@@ -772,11 +772,11 @@ void Shows(Context& h, const World& w) {
     };
   };
   Group(h, w, "SaveScreen::ShowMessage (sub_821A5668)", 300, save(12), __imp__sub_821A5668,
-        hooks::FrontEndSaveScreenShowMessage, frames);
+        ITC_CONTEXT_FN(hooks::FrontEndSaveScreenShowMessage), frames);
   Group(h, w, "SaveScreen::ShowMessage3 (sub_821A5980)", 300, save(17), __imp__sub_821A5980,
-        hooks::FrontEndSaveScreenShowMessage3, frames);
+        ITC_CONTEXT_FN(hooks::FrontEndSaveScreenShowMessage3), frames);
   Group(h, w, "SaveScreen::ShowMessage4 (sub_821A5D00)", 300, save(13), __imp__sub_821A5D00,
-        hooks::FrontEndSaveScreenShowMessage4, frames);
+        ITC_CONTEXT_FN(hooks::FrontEndSaveScreenShowMessage4), frames);
   auto options = [&h](uint32_t words, uint32_t kinds) {
     return [&h, words, kinds](PPCContext& t, Random& r, const World& w) {
       const uint32_t step = w.save_data() + 0x80;
@@ -789,9 +789,9 @@ void Shows(Context& h, const World& w) {
     };
   };
   Group(h, w, "Options::ShowSaveDialog (sub_821C6638)", 300, options(620, 13),
-        __imp__sub_821C6638, hooks::FrontEndOptionsShowSaveDialog, frames);
+        __imp__sub_821C6638, ITC_CONTEXT_FN(hooks::FrontEndOptionsShowSaveDialog), frames);
   Group(h, w, "Options::ShowCategory6Dialog (sub_821C69D0)", 300, options(640, 12),
-        __imp__sub_821C69D0, hooks::FrontEndOptionsShowCategory6Dialog, frames);
+        __imp__sub_821C69D0, ITC_CONTEXT_FN(hooks::FrontEndOptionsShowCategory6Dialog), frames);
 }
 
 void CarCards(Context& h, const World& w) {
@@ -799,7 +799,7 @@ void CarCards(Context& h, const World& w) {
   // out).
   Group(
       h, w, "CarCards::FillAll (sub_821822F8)", 200, [](PPCContext&, Random&, const World&) {},
-      __imp__sub_821822F8, hooks::FrontEndCarCardsFillAll,
+      __imp__sub_821822F8, ITC_CONTEXT_FN(hooks::FrontEndCarCardsFillAll),
       {{144, 56}, {272, 232}, {192, 176}});
   // Fill: r3 a leaf (TXT nodes all), r4 one of the entries.
   Group(
@@ -808,16 +808,16 @@ void CarCards(Context& h, const World& w) {
         t.r3.u64 = w.leaf(r.Below(kLeaves));
         t.r4.u64 = w.entry(r.Below(kEntryCount));
       },
-      __imp__sub_821821C8, hooks::FrontEndCarCardFill, {{128, 88}, {48, 32}});
+      __imp__sub_821821C8, ITC_CONTEXT_FN(hooks::FrontEndCarCardFill), {{128, 88}, {48, 32}});
   Group(
       h, w, "CarCard::FillDetail (sub_821827E0)", 200,
       [](PPCContext&, Random&, const World&) {}, __imp__sub_821827E0,
-      hooks::FrontEndCarCardFillDetail, {{192, 152}, {112, 96}});
+      ITC_CONTEXT_FN(hooks::FrontEndCarCardFillDetail), {{192, 152}, {112, 96}});
   // Open: r4 the mode; FillDetail's frame below Open's.
   Group(
       h, w, "CarDetail::Open (sub_821830C0)", 200,
       [](PPCContext& t, Random&, const World& w) { t.r4.u64 = w.mode(); }, __imp__sub_821830C0,
-      hooks::FrontEndCarDetailOpen, {{112, 24}, {304, 264}, {224, 208}});
+      ITC_CONTEXT_FN(hooks::FrontEndCarDetailOpen), {{112, 24}, {304, 264}, {224, 208}});
 }
 
 }  // namespace

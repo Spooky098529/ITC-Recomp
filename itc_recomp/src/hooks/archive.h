@@ -4,6 +4,7 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "archive/archive.h"
 #include "archive/semaphores.h"
@@ -27,17 +28,22 @@ bool NativeArchiveQueue();
 // their calls (the callbacks, VirtualAlloc and VirtualFree where the native
 // layer can't) through `ctx`.
 void ArchiveSetUp(PPCContext& ctx, uint8_t* base);
+void ArchiveSetUp(lifted::Regs& ctx, uint8_t* base);
 void ArchiveNextRequest(PPCContext& ctx, uint8_t* base);
+void ArchiveNextRequest(lifted::Regs& ctx, uint8_t* base);
 
 // The request finish (sub_8209D688) without its flag: archive::FinishRequest
 // with the callback and the fallback VirtualFree called through `ctx`.
 void ArchiveFinishRequest(PPCContext& ctx, uint8_t* base);
+void ArchiveFinishRequest(lifted::Regs& ctx, uint8_t* base);
 // LoaderFunctor::Invoke (sub_8209DD80) without its flag: the functor's +4
 // called with r4 as r3.
 void ArchiveInvokeFunctor(PPCContext& ctx, uint8_t* base);
+void ArchiveInvokeFunctor(lifted::Regs& ctx, uint8_t* base);
 // Ucl::Unpack (sub_82294610) without its flag: archive::UclUnpack with
 // memcpy's fallback called through `ctx`.
 void ArchiveUclUnpack(PPCContext& ctx, uint8_t* base);
+void ArchiveUclUnpack(lifted::Regs& ctx, uint8_t* base);
 
 // Archive::Load for native callers (needs NativeArchiveQueue()): the request
 // queued through the archive's plain C++ (Queue(BuildLoad(...)), r7 = r8 =
@@ -46,6 +52,6 @@ void ArchiveUclUnpack(PPCContext& ctx, uint8_t* base);
 archive::LoadCall NativeArchiveLoad(uint8_t* base);
 // r3 as Archive::Load's adapter leaves a serial: lwz's (zero-extended), or -1
 // (li's).
-void SetArchiveSerial(PPCContext& ctx, int64_t serial);
+void SetArchiveSerial(lifted::Regs& ctx, int64_t serial);
 
 }  // namespace hooks

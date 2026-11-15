@@ -6,6 +6,7 @@
 // function); they read this flag too.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/c_runtime.h"
@@ -26,34 +27,19 @@ ITC_FLAG_BOOL(native_matrix_math, true, "ITC",
 // as the translated code leaves it: off before scalar work (SCALAR), on
 // after the vector unit's (VECTOR).
 #define ITC_MATRIX_SCALAR(address, call)       \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_matrix_math)) {      \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_matrix_math)) { \
     ctx.fpscr.disableFlushMode();             \
     call;                                     \
   }
 #define ITC_MATRIX_VECTOR(address, call)       \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_matrix_math)) {      \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_matrix_math)) { \
     call;                                     \
     ctx.fpscr.enableFlushMode();              \
   }
 
 // Scalar work first, the vector unit's (Matrix::Multiply's) last.
 #define ITC_MATRIX_MIXED(address, call)        \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_matrix_math)) {      \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_matrix_math)) { \
     ctx.fpscr.disableFlushMode();             \
     call;                                     \
     ctx.fpscr.enableFlushMode();              \
@@ -95,40 +81,30 @@ ITC_MATRIX_SCALAR(820B0E10, ctx.f1.f64 = SinCos(base, ctx.f1.f64, ctx.r4.u32, ct
 
 // The static matrices' set-ups (no arguments; r3 = atexit's) and their
 // clean-ups (empty), reached through _cinit's table and atexit's.
-extern "C" REX_FUNC(sub_825D8F88) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825D8F88) {
+  
   if (!ITC_FLAG(native_matrix_math) || !hooks::NativeAtexit()) {
-    __imp__sub_825D8F88(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825D8F88);
     return;
   }
   hooks::GuestAtexit guest{ctx, base};
   ctx.r3.s64 = ZeroMatrixStaticInit(base, ctx.r1.u32, guest.Call());
 }
 
-extern "C" REX_FUNC(sub_825D9060) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825D9060) {
+  
   if (!ITC_FLAG(native_matrix_math) || !hooks::NativeAtexit()) {
-    __imp__sub_825D9060(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825D9060);
     return;
   }
   hooks::GuestAtexit guest{ctx, base};
   ctx.r3.s64 = IdentityMatrixStaticInit(base, ctx.r1.u32, guest.Call());
 }
 
-extern "C" REX_FUNC(sub_825DACA0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_matrix_math)) {
-    __imp__sub_825DACA0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825DACA0, ITC_FLAG(native_matrix_math)) {
   ZeroMatrixExit();
 }
 
-extern "C" REX_FUNC(sub_825DAC98) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_matrix_math)) {
-    __imp__sub_825DAC98(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825DAC98, ITC_FLAG(native_matrix_math)) {
   IdentityMatrixExit();
 }

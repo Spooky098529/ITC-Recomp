@@ -5,6 +5,7 @@
 // exit lock in src/c_runtime/exit.cpp.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 #include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
@@ -93,29 +94,29 @@ bool hooks::NativeAtexit() {
 
 // _lock: r3 = the lock number; r3 = its critical section (the original's
 // argument to RtlEnterCriticalSection, which leaves r3).
-extern "C" REX_FUNC(sub_825B3430) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825B3430) {
+  
   if (hooks::CRuntimeExitHostLock() && ctx.r3.u32 == c_runtime::kExitLock) {
     ctx.r3.u64 = c_runtime::LockExit(base);
     return;
   }
-  __imp__sub_825B3430(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825B3430);
 }
 
 // _unlock: r3 = the lock number; r3 = its critical section, as _lock's.
-extern "C" REX_FUNC(sub_825B32D0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825B32D0) {
+  
   if (hooks::CRuntimeExitHostLock() && ctx.r3.u32 == c_runtime::kExitLock) {
     ctx.r3.u64 = c_runtime::UnlockExit(base);
     return;
   }
-  __imp__sub_825B32D0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825B32D0);
 }
 
 // atexit: r3 = the function; returns 0, or -1 when the table can't take it.
 // _onexit (sub_825A6F60) has no adapter: only atexit calls it.
-extern "C" REX_FUNC(sub_825A7068) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A7068) {
+  
   if (hooks::NativeAtexit()) {
     if (const auto result = c_runtime::Atexit(base, ctx.r3.u32)) {
       ctx.r3.s64 = *result;
@@ -128,8 +129,8 @@ extern "C" REX_FUNC(sub_825A7068) {
 // __onexitinit: no arguments; r3 = 0, or 24 when calloc fails. Natively
 // with --native_c_runtime and the C runtime's heap on the layer (the native
 // calloc).
-extern "C" REX_FUNC(sub_825A6F00) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A6F00) {
+  
   if (ITC_FLAG(native_c_runtime) && ITC_FLAG(native_c_runtime_heap) &&
       hooks::NativeHeapActive()) {
     if (const auto result = c_runtime::InitExitTable(base)) {
@@ -137,7 +138,7 @@ extern "C" REX_FUNC(sub_825A6F00) {
       return;
     }
   }
-  __imp__sub_825A6F00(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825A6F00);
 }
 
 int32_t hooks::GuestAtexit::Run(void* self, uint32_t function) {
@@ -152,19 +153,14 @@ int32_t hooks::GuestAtexit::Run(void* self, uint32_t function) {
 // pages on the 360; the guest stack here is ordinary memory, so the reads do
 // nothing and are left out. The callers only use r12 and r1 after it, both
 // unchanged either way. Dropped: no fallback to the original.
-extern "C" REX_FUNC(sub_825A9934) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A9934) {
+  
 }
 
 // memset: r3 = destination, r4 = the value (its low byte), r5 = the count
 // (32 bits); returns r3. The original stores bytes up to a word boundary,
 // then words, then bytes: the same bytes in the end.
-extern "C" REX_FUNC(sub_825A71D0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A71D0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A71D0, ITC_FLAG(native_c_runtime)) {
   const uint8_t value = ctx.r4.u8;
   guest::ForEachHostPart(base, ctx.r3.u32, ctx.r5.u32,
                          [&](uint8_t* host, uint32_t, uint32_t bytes) {
@@ -176,12 +172,7 @@ extern "C" REX_FUNC(sub_825A71D0) {
 // value (its low byte), r5 = the count (32 bits); r3 comes back unchanged.
 // The original's scratch below r1 (its vector and counters, dead after it
 // returns) isn't written.
-extern "C" REX_FUNC(sub_822962B0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_822962B0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(822962B0, ITC_FLAG(native_c_runtime)) {
   c_runtime::XMemSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
@@ -190,72 +181,47 @@ extern "C" REX_FUNC(sub_822962B0) {
 // memory, and a byte loop step that never counts down to 0, go to the
 // original. Its scratch below r1 isn't written; like the original, its copies
 // aren't recorded for the renderer's mirrors (memcpy's wrapper does that).
-extern "C" REX_FUNC(sub_82295890) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82295890) {
+  
   if (!ITC_FLAG(native_c_runtime) ||
       !c_runtime::XMemCpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_82295890(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82295890);
   }
 }
 
 // wcscpy: r3 = destination, r4 = source; returns r3 (left as it is).
-extern "C" REX_FUNC(sub_825A7F30) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A7F30(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A7F30, ITC_FLAG(native_c_runtime)) {
   c_runtime::Wcscpy(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // wcscat: r3 = destination, r4 = source; returns r3 (left as it is).
-extern "C" REX_FUNC(sub_825A7EF8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A7EF8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A7EF8, ITC_FLAG(native_c_runtime)) {
   c_runtime::Wcscat(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // strncpy: r3 = destination, r4 = source, r5 = count; returns r3.
-extern "C" REX_FUNC(sub_825A7F50) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A7F50(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A7F50, ITC_FLAG(native_c_runtime)) {
   c_runtime::Strncpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 // strncmp: r3, r4 = strings, r5 = count.
-extern "C" REX_FUNC(sub_825AACD0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AACD0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825AACD0, ITC_FLAG(native_c_runtime)) {
   ctx.r3.s64 = c_runtime::Strncmp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32);
 }
 
 // _stricmp: r3, r4 = strings.
-extern "C" REX_FUNC(sub_825AA100) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AA100(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825AA100, ITC_FLAG(native_c_runtime)) {
   ctx.r3.s64 = c_runtime::Stricmp(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // _strnicmp: r3, r4 = strings, r5 = count. A null string or a count above
 // INT_MAX (EINVAL through _errno, never seen in play) stays on the
 // recompiled path.
-extern "C" REX_FUNC(sub_825AC710) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825AC710) {
+  
   if (!ITC_FLAG(native_c_runtime) || ctx.r3.u32 == 0 || ctx.r4.u32 == 0 ||
       ctx.r5.u32 > 0x7FFFFFFFu) {
-    __imp__sub_825AC710(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825AC710);
     return;
   }
   ctx.r3.s64 = c_runtime::AsciiStrnicmp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
@@ -263,12 +229,7 @@ extern "C" REX_FUNC(sub_825AC710) {
 
 // strstr: r3 = string, r4 = what to find; returns the match (r3 moved on by
 // its offset, as the original's register is) or 0.
-extern "C" REX_FUNC(sub_825A98A8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A98A8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A98A8, ITC_FLAG(native_c_runtime)) {
   const int64_t offset = c_runtime::Strstr(base, ctx.r3.u32, ctx.r4.u32);
   ctx.r3.u64 = offset < 0 ? 0 : ctx.r3.u64 + uint64_t(offset);
 }
@@ -276,12 +237,7 @@ extern "C" REX_FUNC(sub_825A98A8) {
 // The second memcpy: r3 = destination, r4 = source, r5 = count; returns r3.
 // Like the original, not seen by the native renderer's memory mirrors
 // (unlike sub_825A7410's wrapper).
-extern "C" REX_FUNC(sub_825A7830) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A7830(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A7830, ITC_FLAG(native_c_runtime)) {
   c_runtime::CopyForward(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
@@ -292,12 +248,7 @@ extern "C" REX_FUNC(sub_825A7830) {
 // copy natively where c_runtime::MemmoveDown can tell it gives the same
 // bytes, else the original. The original also leaves r0, r4, r5, r7 to r10,
 // ctr and cr0 changed; no caller reads them before setting them.
-extern "C" REX_FUNC(sub_825AA840) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AA840(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825AA840, ITC_FLAG(native_c_runtime)) {
   if (ctx.r3.s32 == ctx.r4.s32) {
     return;
   }
@@ -306,7 +257,7 @@ extern "C" REX_FUNC(sub_825AA840) {
     return;
   }
   if (!c_runtime::MemmoveDown(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_825AA840(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825AA840);
   }
 }
 
@@ -314,8 +265,8 @@ extern "C" REX_FUNC(sub_825AA840) {
 // 0. The paths c_runtime::MemmoveS leaves to the original (its errors, a
 // copy memcpy's override records for the mirrors, a copy its checks refuse)
 // run it from the start, nothing having been copied.
-extern "C" REX_FUNC(sub_825A7348) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A7348) {
+  
   if (ITC_FLAG(native_c_runtime)) {
     if (const auto r3 = c_runtime::MemmoveS(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                             ctx.r6.u32)) {
@@ -323,7 +274,7 @@ extern "C" REX_FUNC(sub_825A7348) {
       return;
     }
   }
-  __imp__sub_825A7348(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825A7348);
 }
 
 // memcpy_s: r3 = destination, r4 = its size, r5 = source, r6 = count;
@@ -333,18 +284,13 @@ extern "C" REX_FUNC(sub_825A7348) {
 // count above the size (memset, then EINVAL or ERANGE through _errno and
 // _invalid_parameter, never seen in play) stays on the recompiled path. Its
 // callers read no register but r3 after it.
-extern "C" REX_FUNC(sub_825A7270) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A7270(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A7270, ITC_FLAG(native_c_runtime)) {
   if (ctx.r6.u32 == 0) {
     ctx.r3.u64 = 0;
     return;
   }
   if (ctx.r3.u32 == 0 || ctx.r5.u32 == 0 || ctx.r4.u32 < ctx.r6.u32) {
-    __imp__sub_825A7270(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825A7270);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -358,59 +304,29 @@ extern "C" REX_FUNC(sub_825A7270) {
 
 // toupper and tolower: r3 = character; the step added to the whole
 // register, as the originals do.
-extern "C" REX_FUNC(sub_825A8600) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A8600(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A8600, ITC_FLAG(native_c_runtime)) {
   ctx.r3.u64 += uint64_t(int64_t(c_runtime::ToUpperStep(ctx.r3.s32)));
 }
 
-extern "C" REX_FUNC(sub_825A8618) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A8618(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A8618, ITC_FLAG(native_c_runtime)) {
   ctx.r3.u64 += uint64_t(int64_t(c_runtime::ToLowerStep(ctx.r3.s32)));
 }
 
 // isalpha, isdigit and isalnum: r3 = character; the C locale's table.
-extern "C" REX_FUNC(sub_825AB020) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AB020(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825AB020, ITC_FLAG(native_c_runtime)) {
   ctx.r3.u64 = c_runtime::CTypeC(base, ctx.r3.u32, 0x103);
 }
 
-extern "C" REX_FUNC(sub_825AB040) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AB040(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825AB040, ITC_FLAG(native_c_runtime)) {
   ctx.r3.u64 = c_runtime::CTypeC(base, ctx.r3.u32, 4);
 }
 
-extern "C" REX_FUNC(sub_825AB0A0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AB0A0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825AB0A0, ITC_FLAG(native_c_runtime)) {
   ctx.r3.u64 = c_runtime::CTypeC(base, ctx.r3.u32, 0x107);
 }
 
 // isleadbyte: r3 = character; the current locale's table.
-extern "C" REX_FUNC(sub_825B6898) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825B6898(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825B6898, ITC_FLAG(native_c_runtime)) {
   ctx.r3.u64 = c_runtime::IsLeadByte(base, ctx.r3.u32);
 }
 
@@ -435,12 +351,12 @@ bool StrToXl(uint8_t* base, uint32_t string, uint32_t end_out, int32_t radix, ui
 }  // namespace
 
 // strtoul: r3 = string, r4 = end pointer out, r5 = base; strtoxl unsigned.
-extern "C" REX_FUNC(sub_825A85E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A85E0) {
+  
   uint64_t result = 0;
   if (!ITC_FLAG(native_c_runtime) ||
       !StrToXl(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, 1, &result)) {
-    __imp__sub_825A85E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825A85E0);
     return;
   }
   ctx.r3.u64 = result;
@@ -452,7 +368,7 @@ extern "C" REX_FUNC(sub_825A85E0) {
 // after it (the original leaves r3 pointing into its finished frame).
 namespace {
 
-bool Atof(PPCContext& ctx, uint8_t* base) {
+bool Atof(lifted::Regs& ctx, uint8_t* base) {
   uint64_t bits;
   if (!ITC_FLAG(native_c_runtime) || !c_runtime::AtofL(base, ctx.r3.u32, &bits)) {
     return false;
@@ -464,10 +380,10 @@ bool Atof(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_825AB1C0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825AB1C0) {
+  
   if (!Atof(ctx, base)) {
-    __imp__sub_825AB1C0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825AB1C0);
   }
 }
 
@@ -481,9 +397,9 @@ extern "C" REX_FUNC(sub_825AB1C0) {
 // tail calls, so _output_l) read none of them. (Its frame, with _fltout2's
 // result and digits, is below the caller's stack pointer: not written.)
 namespace {
-void CftofL(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CftofL) {
   if (!c_runtime::Cftof(base, REX_LOAD_U64(ctx.r3.u32), ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
-    __imp__sub_825AE8E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825AE8E0);
     return;
   }
   ctx.r3.u64 = 0;
@@ -497,12 +413,7 @@ void CftofL(PPCContext& ctx, uint8_t* base) {
 // sub_825AE2C0, the rest ('g', 'G') to sub_825AE9D0; only 'f' was seen in
 // play, the others stay recompiled. Its one caller, _output_l's indirect
 // call through the table at 0x8266BA5C, reads no register after it.
-extern "C" REX_FUNC(sub_825AEB20) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AEB20(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825AEB20, ITC_FLAG(native_c_runtime)) {
   const int32_t format = ctx.r6.s32;
   ctx.r11.u64 = ctx.r6.u64;
   ctx.r6.u64 = ctx.r7.u64;
@@ -523,15 +434,10 @@ extern "C" REX_FUNC(sub_825AEB20) {
 // write_char: r3 = the character, r4 = the stream, r5 = the count. Where
 // the original would call _flsbuf (no room left; never seen in play), the
 // original runs instead. r3 as the original leaves it: the byte when stored.
-extern "C" REX_FUNC(sub_825AF000) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AF000(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825AF000, ITC_FLAG(native_c_runtime)) {
   const int32_t done = c_runtime::WriteChar(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
   if (done < 0) {
-    __imp__sub_825AF000(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825AF000);
     return;
   }
   if (done == 1) {
@@ -544,12 +450,12 @@ extern "C" REX_FUNC(sub_825AF000) {
 // play), or the buffer lands on the stream or the count, the original runs.
 // r3 is left as the original leaves it (the last character written, when
 // any); its callers read no register it changes.
-extern "C" REX_FUNC(sub_825AF098) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825AF098) {
+  
   int32_t last;
   if (!ITC_FLAG(native_c_runtime) ||
       !c_runtime::WriteMultiChar(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32, ctx.r6.u32, &last)) {
-    __imp__sub_825AF098(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825AF098);
     return;
   }
   if (last >= 0) {
@@ -563,12 +469,7 @@ extern "C" REX_FUNC(sub_825AF098) {
 // original's would be (144 and 1,328 bytes down). r3 the count
 // (zero-extended, as the original's lwz leaves it). Where the native
 // version declines (format.h), the original runs.
-extern "C" REX_FUNC(sub_825A93D0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A93D0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A93D0, ITC_FLAG(native_c_runtime)) {
   const uint64_t registers[6] = {ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
                                  ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
   for (uint32_t i = 0; i < 6; i++) {
@@ -578,7 +479,7 @@ extern "C" REX_FUNC(sub_825A93D0) {
   int32_t count;
   if (!c_runtime::Sprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 + 32,
                           ctx.r1.u32 - 144 - 1328, &count)) {
-    __imp__sub_825A93D0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825A93D0);
     return;
   }
   ctx.r3.u64 = uint32_t(count);
@@ -589,13 +490,13 @@ extern "C" REX_FUNC(sub_825A93D0) {
 // _output_l's frame is 144 and 1,328 bytes down). r3 the count
 // (zero-extended). Where the native version declines (format.h), the
 // original runs.
-extern "C" REX_FUNC(sub_825AB010) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825AB010) {
+  
   int32_t count;
   if (!ITC_FLAG(native_c_runtime) ||
       !c_runtime::Vsnprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                             ctx.r1.u32 - 144 - 1328, &count)) {
-    __imp__sub_825AB010(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825AB010);
     return;
   }
   ctx.r3.u64 = uint32_t(count);
@@ -603,24 +504,14 @@ extern "C" REX_FUNC(sub_825AB010) {
 
 // __iob_func: returns the stream table (sign-extended, as the original's
 // lis and addi leave it).
-extern "C" REX_FUNC(sub_825AD4C0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AD4C0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825AD4C0, ITC_FLAG(native_c_runtime)) {
   ctx.r3.s64 = int32_t(c_runtime::kStreams);
 }
 
 // The start-up's pieces (src/c_runtime/start_up.cpp), each run once at boot.
 
 // Branches to _cfltcvt_init.
-extern "C" REX_FUNC(sub_825A6E48) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A6E48(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A6E48, ITC_FLAG(native_c_runtime)) {
   c_runtime::InitFloatConversions(base);
 }
 
@@ -630,33 +521,18 @@ extern "C" REX_FUNC(sub_825A6E48) {
 
 // _init_pointers: no arguments; r3 left 0, as the original's last setter
 // call leaves it.
-extern "C" REX_FUNC(sub_825AA398) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AA398(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825AA398, ITC_FLAG(native_c_runtime)) {
   c_runtime::InitPointers(base);
   ctx.r3.u64 = 0;
 }
 
 // The empty destructor (blr): every register left.
-extern "C" REX_FUNC(sub_82106540) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_82106540(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82106540, ITC_FLAG(native_c_runtime)) {
   c_runtime::EmptyDestructor();
 }
 
 // __initmbctable: returns 0.
-extern "C" REX_FUNC(sub_825B6958) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825B6958(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825B6958, ITC_FLAG(native_c_runtime)) {
   ctx.r3.s64 = c_runtime::InitMbcTable(base);
 }
 
@@ -677,7 +553,7 @@ struct ArrayCall {
 // like the original's (128 bytes, its back chain written), r3 = the element.
 void CallElement(void* user, uint64_t function, uint64_t element) {
   auto& call = *static_cast<ArrayCall*>(user);
-  PPCContext& ctx = *call.ctx;
+  lifted::Regs& ctx = *call.ctx;
   uint8_t* base = call.base;
   guest_call::InFrame(ctx, base, 128, call.return_address, [&](uint32_t) {
     ctx.r3.u64 = element;
@@ -690,12 +566,7 @@ void CallElement(void* user, uint64_t function, uint64_t element) {
 
 // `vector constructor iterator': r3 = the array, r4 = the element size,
 // r5 = the count, r6 = the constructor.
-extern "C" REX_FUNC(sub_820911A8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_820911A8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820911A8, ITC_FLAG(native_c_runtime)) {
   ArrayCall call{&ctx, base, 0x820911D4};
   c_runtime::VectorConstruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, CallElement,
                              &call);
@@ -703,12 +574,7 @@ extern "C" REX_FUNC(sub_820911A8) {
 
 // `vector destructor iterator': r3 = the array, r4 = the element size,
 // r5 = the count, r6 = the destructor.
-extern "C" REX_FUNC(sub_820900C0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_820900C0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820900C0, ITC_FLAG(native_c_runtime)) {
   ArrayCall call{&ctx, base, 0x820900F4};
   c_runtime::VectorDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, CallElement,
                             &call);
@@ -718,13 +584,13 @@ extern "C" REX_FUNC(sub_820900C0) {
 // table (r1, r3 and r4 as set, lr), r1 and lr put back.
 namespace {
 struct ThreadDataUser {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
 };
 uint64_t ThreadDataGuest(void* user, uint32_t function, uint32_t r1, uint32_t lr, int set,
                          uint64_t r3, uint64_t r4) {
   auto& self = *static_cast<ThreadDataUser*>(user);
-  PPCContext& ctx = self.ctx;
+  lifted::Regs& ctx = self.ctx;
   uint8_t* base = self.base;
   const uint64_t stack = ctx.r1.u64, saved_lr = ctx.lr;
   ctx.r1.u64 = r1;
@@ -742,18 +608,13 @@ uint64_t ThreadDataGuest(void* user, uint32_t function, uint32_t r1, uint32_t lr
 }
 }  // namespace
 
-void hooks::CRuntimeRand(PPCContext& ctx, uint8_t* base) {
+void hooks::CRuntimeRand(lifted::Regs& ctx, uint8_t* base) {
   ThreadDataUser user{ctx, base};
   const c_runtime::ThreadDataCall call{&ThreadDataGuest, &user};
   const uint64_t r3 = c_runtime::Rand(base, ctx.r1.u32, call);
   ctx.r3.u64 = r3;
 }
 
-extern "C" REX_FUNC(sub_825A9BB8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A9BB8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A9BB8, ITC_FLAG(native_c_runtime)) {
   hooks::CRuntimeRand(ctx, base);
 }

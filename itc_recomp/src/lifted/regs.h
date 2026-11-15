@@ -76,6 +76,12 @@ inline void CallFromContext(Regs& regs, uint8_t* base, uint32_t address) {
   regs.Apply(Call(base, address, regs.ToArgs()));
 }
 
+// Runs an entry on a view's registers (as Enter does on the context): its
+// r3 and f1 back in them.
+inline void Enter(Regs& regs, uint8_t* base, Entry entry) {
+  regs.Apply(entry(base, regs.ToArgs()));
+}
+
 // The flag of entries registered always on.
 inline constexpr bool kAlwaysOn = true;
 

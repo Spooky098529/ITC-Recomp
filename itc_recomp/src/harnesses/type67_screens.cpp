@@ -818,13 +818,13 @@ void ScreenBlocks(Context& h) {
   };
   const Function functions[] = {
       {"Type6Screens::~Type6Screens", 0x822367C0, false, false, 4, __imp__sub_822367C0,
-       hooks::Type6ScreensDestruct},
+       ITC_CONTEXT_FN(hooks::Type6ScreensDestruct)},
       {"Type6Screens::DeletingDestructor", 0x82236830, false, true, 6, __imp__sub_82236830,
-       hooks::Type6ScreensDeletingDestruct},
+       ITC_CONTEXT_FN(hooks::Type6ScreensDeletingDestruct)},
       {"Type7Screens::~Type7Screens", 0x82246BE0, true, false, 4, __imp__sub_82246BE0,
-       hooks::Type7ScreensDestruct},
+       ITC_CONTEXT_FN(hooks::Type7ScreensDestruct)},
       {"Type7Screens::DeletingDestructor", 0x82246C40, true, true, 6, __imp__sub_82246C40,
-       hooks::Type7ScreensDeletingDestruct},
+       ITC_CONTEXT_FN(hooks::Type7ScreensDeletingDestruct)},
   };
   for (const Function& f : functions) {
     Results results(fmt::format("{} (sub_{:08X})", f.name, f.address));

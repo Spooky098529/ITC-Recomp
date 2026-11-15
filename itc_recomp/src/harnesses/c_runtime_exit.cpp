@@ -63,7 +63,7 @@ void Calls(int v, Context& h, const std::vector<uint32_t>& functions, Outputs& o
   for (uint32_t function : functions) {
     PPCContext t = CallContext(h);
     t.r3.u64 = function;
-    (v == 0 ? __imp__sub_825A7068 : NativeAtexit)(t, h.base);
+    (v == 0 ? __imp__sub_825A7068 : ITC_CONTEXT_FN(NativeAtexit))(t, h.base);
     out.Word(t.r3.u32);
     out.Word(uint32_t(t.r3.u64 >> 32));
   }
@@ -282,7 +282,7 @@ void Locks(Context& h) {
         for (int d = 0; d < depth; d++) {
           PPCContext t = CallContext(h);
           t.r3.u64 = number;
-          (v == 0 ? __imp__sub_825B3430 : NativeLock)(t, h.base);
+          (v == 0 ? __imp__sub_825B3430 : ITC_CONTEXT_FN(NativeLock))(t, h.base);
           out[v].Word(t.r3.u32);
           out[v].Word(uint32_t(t.r3.u64 >> 32));
           out[v].Word(Held(h.base, v, number, critical_section));
@@ -290,7 +290,7 @@ void Locks(Context& h) {
         for (int d = 0; d < depth; d++) {
           PPCContext t = CallContext(h);
           t.r3.u64 = number;
-          (v == 0 ? __imp__sub_825B32D0 : NativeUnlock)(t, h.base);
+          (v == 0 ? __imp__sub_825B32D0 : ITC_CONTEXT_FN(NativeUnlock))(t, h.base);
           out[v].Word(t.r3.u32);
           out[v].Word(uint32_t(t.r3.u64 >> 32));
           out[v].Word(Held(h.base, v, number, critical_section));
@@ -330,7 +330,7 @@ void InitCases(Context& h) {
       Store(h.base, c_runtime::kExitTableEnd, end);
       PPCContext t = CallContext(h);
       t.r3.u64 = h.random.Next();  // not read
-      (v == 0 ? __imp__sub_825A6F00 : NativeInitExitTable)(t, h.base);
+      (v == 0 ? __imp__sub_825A6F00 : ITC_CONTEXT_FN(NativeInitExitTable))(t, h.base);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       const uint32_t table = Load(h.base, c_runtime::kExitTableBegin);

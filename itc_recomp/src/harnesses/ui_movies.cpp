@@ -407,9 +407,9 @@ void KeyCases(Context& h) {
     bool integer_values, result_in_f1;
   };
   const KeyFunction functions[] = {
-      {"EaseInteger (sub_8259FA20)", __imp__sub_8259FA20, NativeEaseInteger, true, false},
-      {"CubicFloat (sub_8259FB30)", __imp__sub_8259FB30, NativeCubicFloat, false, true},
-      {"CubicInteger (sub_8259FC18)", __imp__sub_8259FC18, NativeCubicInteger, true, false},
+      {"EaseInteger (sub_8259FA20)", __imp__sub_8259FA20, ITC_CONTEXT_FN(NativeEaseInteger), true, false},
+      {"CubicFloat (sub_8259FB30)", __imp__sub_8259FB30, ITC_CONTEXT_FN(NativeCubicFloat), false, true},
+      {"CubicInteger (sub_8259FC18)", __imp__sub_8259FC18, ITC_CONTEXT_FN(NativeCubicInteger), true, false},
   };
   const double odd_t[] = {0.0, 1.0, -0.0, 0.5, 1e-40, -1.0, 2.0, 1.0000001, std::nan(""),
                           std::numeric_limits<double>::infinity(), 0.1, 1.0 / 3.0};
@@ -606,9 +606,9 @@ void HeaderCases(Context& h) {
     uint8_t bytes[8];
   };
   const Header headers[] = {
-      {"IsXmd (sub_825A0C60)", __imp__sub_825A0C60, NativeIsXmd, 0, {'X', 'M', 'D', 0, '0', '0', '1', 0}},
+      {"IsXmd (sub_825A0C60)", __imp__sub_825A0C60, ITC_CONTEXT_FN(NativeIsXmd), 0, {'X', 'M', 'D', 0, '0', '0', '1', 0}},
       {"CheckXmd (sub_825A0CF8)", __imp__sub_825A0CF8, sub_825A0CF8, 0, {'X', 'M', 'D', 0, '0', '0', '1', 0}},
-      {"IsMovieFile (sub_825A0E40)", __imp__sub_825A0E40, NativeIsMovieFile, 8, {'X', '2', 'D', 0, '0', '0', '5', 0}},
+      {"IsMovieFile (sub_825A0E40)", __imp__sub_825A0E40, ITC_CONTEXT_FN(NativeIsMovieFile), 8, {'X', '2', 'D', 0, '0', '0', '5', 0}},
   };
   for (const Header& f : headers) {
     Results results(f.name);
@@ -681,7 +681,7 @@ void FixUpAnimationCases(Context& h) {
            t.r3.u64 = animation;
            t.r4.u64 = file;
          },
-         __imp__sub_825A6570, NativeFixUpAnimation, h.data, kScratchBytes,
+         __imp__sub_825A6570, ITC_CONTEXT_FN(NativeFixUpAnimation), h.data, kScratchBytes,
          fmt::format("case {}: start {} entries {} first {} subs {}", i, start, entries, first, subs));
   }
   results.Report();
@@ -773,7 +773,7 @@ void FixUpSceneCases(Context& h) {
            t.r3.u64 = scene;
            t.r4.u64 = file;
          },
-         __imp__sub_8259D688, NativeFixUpScene, h.data, kScratchBytes,
+         __imp__sub_8259D688, ITC_CONTEXT_FN(NativeFixUpScene), h.data, kScratchBytes,
          fmt::format("case {}: start {} top {} children ({} from {}) inner {} ({} from {})", i,
                      start, top.children, top.count, top.first, inner.children, inner.count,
                      inner.first));
@@ -794,7 +794,7 @@ void FixUpSceneCases(Context& h) {
            t.r3.u64 = h.data;
            t.r4.u64 = index;
          },
-         __imp__sub_825A0ED8, NativeFileAnimation, h.data, kScratchBytes,
+         __imp__sub_825A0ED8, ITC_CONTEXT_FN(NativeFileAnimation), h.data, kScratchBytes,
          fmt::format("start {:X} index {:X}", start, index));
   }
   animation_results.Report();
@@ -1088,7 +1088,7 @@ void ApplyTransformCases(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = context;
       t.r4.u64 = node;
-      (v == 0 ? __imp__sub_8259E6C8 : NativeApplyTransform)(t, h.base);
+      (v == 0 ? __imp__sub_8259E6C8 : ITC_CONTEXT_FN(NativeApplyTransform))(t, h.base);
       out[v].Floats(h.base, context, 16);
       out[v].Bytes(Read(h.base, context + 64, 16));
       out[v].Floats(h.base, context + 80, 4);
@@ -1322,7 +1322,7 @@ void DrawWalkCases(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = context;
         t.r4.u64 = parent;
-        (v == 0 ? __imp__sub_8259D9F8 : NativeCopyDrawContext)(t, h.base);
+        (v == 0 ? __imp__sub_8259D9F8 : ITC_CONTEXT_FN(NativeCopyDrawContext))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, 512));
         out[v].Word(uint32_t(t.r3.u64 >> 32));
         out[v].Word(t.r3.u32);
@@ -1353,7 +1353,7 @@ void DrawWalkCases(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = to;
         t.r4.u64 = from;
-        (v == 0 ? __imp__sub_8259E620 : NativeCopyQueuedText)(t, h.base);
+        (v == 0 ? __imp__sub_8259E620 : ITC_CONTEXT_FN(NativeCopyQueuedText))(t, h.base);
         out[v].Bytes(Read(h.base, h.data, to + 80 - h.data));
         out[v].Float(guest::LoadU32(h.base, to + 80));
         out[v].Bytes(Read(h.base, to + 84, h.data + 1024 - (to + 84)));
@@ -1386,7 +1386,7 @@ void DrawWalkCases(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = h.data;
         t.r4.u64 = h.data + 1536;
-        (v == 0 ? __imp__sub_8259F700 : NativeAppendText)(t, h.base);
+        (v == 0 ? __imp__sub_8259F700 : ITC_CONTEXT_FN(NativeAppendText))(t, h.base);
         const uint32_t slot = h.data + 128 + 128 * count;
         out[v].Bytes(Read(h.base, h.data, slot + 80 - h.data));
         out[v].Float(guest::LoadU32(h.base, slot + 80));
@@ -1457,7 +1457,7 @@ void DrawWalkCases(Context& h) {
         t.r3.u64 = h.data;
         t.r5.u64 = h.data + 192;
         t.r6.u64 = r6;
-        (v == 0 ? __imp__sub_8259F770 : NativeQueueText)(t, h.base);
+        (v == 0 ? __imp__sub_8259F770 : ITC_CONTEXT_FN(NativeQueueText))(t, h.base);
         out[v].Floats(h.base, h.data, 16);
         out[v].Bytes(Read(h.base, h.data + 64, 16));
         out[v].Floats(h.base, h.data + 80, 4);
@@ -1757,7 +1757,7 @@ void TrackPropertyCases(Context& h) {
       Write(h.base, t.r1.u32 - 128, frame.data(), 128);
       const uint32_t mark = exit_table::Mark(h.base);
       t.r3.u64 = id;
-      (v == 0 ? __imp__sub_8259FE68 : NativeTrackProperty)(t, h.base);
+      (v == 0 ? __imp__sub_8259FE68 : ITC_CONTEXT_FN(NativeTrackProperty))(t, h.base);
       out[v].Bytes(Read(h.base, table, 64 * 12));
       out[v].Word(guest::LoadU32(h.base, kGuard));
       out[v].Bytes(Read(h.base, kFilled, 4));
@@ -2105,18 +2105,18 @@ void ApplyAnimationCases(Context& h) {
 
 void UiMovies(Context& h) {
   const Function arithmetic[] = {
-      {"NodeTrack (sub_825A6508)", __imp__sub_825A6508, NativeNodeTrack},
-      {"Key (sub_825A6518)", __imp__sub_825A6518, NativeKey},
-      {"VertexOffset (sub_8259D600)", __imp__sub_8259D600, NativeVertexOffset},
+      {"NodeTrack (sub_825A6508)", __imp__sub_825A6508, ITC_CONTEXT_FN(NativeNodeTrack)},
+      {"Key (sub_825A6518)", __imp__sub_825A6518, ITC_CONTEXT_FN(NativeKey)},
+      {"VertexOffset (sub_8259D600)", __imp__sub_8259D600, ITC_CONTEXT_FN(NativeVertexOffset)},
       {"PrimitiveTexture (sub_8259D618)", __imp__sub_8259D618, sub_8259D618},
       {"PictureTexture (sub_8259D648)", __imp__sub_8259D648, sub_8259D648},
   };
   for (const Function& f : arithmetic) {
     Arithmetic(h, f);
   }
-  Indexed(h, {"NodeTrackList (sub_825A6528)", __imp__sub_825A6528, NativeNodeTrackList}, 64, 32);
-  Indexed(h, {"KeyList (sub_825A6540)", __imp__sub_825A6540, NativeKeyList}, 64, 40);
-  Indexed(h, {"SubAnimation (sub_825A6558)", __imp__sub_825A6558, NativeSubAnimation}, 64, 48);
+  Indexed(h, {"NodeTrackList (sub_825A6528)", __imp__sub_825A6528, ITC_CONTEXT_FN(NativeNodeTrackList)}, 64, 32);
+  Indexed(h, {"KeyList (sub_825A6540)", __imp__sub_825A6540, ITC_CONTEXT_FN(NativeKeyList)}, 64, 40);
+  Indexed(h, {"SubAnimation (sub_825A6558)", __imp__sub_825A6558, ITC_CONTEXT_FN(NativeSubAnimation)}, 64, 48);
   Indexed(h, {"UiMovie::Child (sub_8259D658)", __imp__sub_8259D658, sub_8259D658}, 128, 108);
   Indexed(h, {"SceneAnimation (sub_8259D670)", __imp__sub_8259D670, sub_8259D670}, 128, 116);
   PrimitiveVertex(h);

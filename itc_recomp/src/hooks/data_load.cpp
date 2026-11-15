@@ -2,6 +2,7 @@
 // (docs/functions/data-load.md).
 
 #include "base/flags.h"
+#include "hooks/native_entry.h"
 #include "data_load/data_load.h"
 #include "guest.h"
 #include "hooks/app_start_up.h"
@@ -33,21 +34,21 @@ ITC_FLAG_BOOL(native_data_load, true, "ITC",
 
 namespace dl = data_load;
 
-extern "C" REX_FUNC(sub_820CCDC0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820CCDC0) {
+  
   if (hooks::StartUpRecorded(ctx, 0x820CCDC0)) {
     return;
   }
   if (!ITC_FLAG(native_data_load)) {
-    __imp__sub_820CCDC0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820CCDC0);
     return;
   }
   // r3 as lis and addi leave the address: sign-extended.
   ctx.r3.s64 = int32_t(dl::DefaultsInit(base, ctx.r1.u32 - 128));
 }
 
-extern "C" REX_FUNC(sub_82102208) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82102208) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82102208)) {
     return;
   }
@@ -58,11 +59,11 @@ extern "C" REX_FUNC(sub_82102208) {
       return;
     }
   }
-  __imp__sub_82102208(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82102208);
 }
 
-extern "C" REX_FUNC(sub_82105508) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82105508) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82105508)) {
     return;
   }
@@ -73,11 +74,11 @@ extern "C" REX_FUNC(sub_82105508) {
       return;
     }
   }
-  __imp__sub_82105508(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82105508);
 }
 
-extern "C" REX_FUNC(sub_82105560) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82105560) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82105560)) {
     return;
   }
@@ -88,15 +89,15 @@ extern "C" REX_FUNC(sub_82105560) {
       return;
     }
   }
-  __imp__sub_82105560(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82105560);
 }
 
 // The static replays' set-ups (no direct callers: _cinit's initializer
 // tables, so the adapters stay): no arguments; r3 atexit's.
-extern "C" REX_FUNC(sub_825D9E60) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825D9E60) {
+  
   if (!ITC_FLAG(native_data_load) || !hooks::NativeAtexit()) {
-    __imp__sub_825D9E60(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825D9E60);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -104,10 +105,10 @@ extern "C" REX_FUNC(sub_825D9E60) {
   ctx.r3.s64 = dl::StaticReplayAInit(base, guest.Call());
 }
 
-extern "C" REX_FUNC(sub_825D9F68) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825D9F68) {
+  
   if (!ITC_FLAG(native_data_load) || !hooks::NativeAtexit()) {
-    __imp__sub_825D9F68(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825D9F68);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -130,7 +131,7 @@ bool BootNative() {
 // address.
 // (The render manager's slot 8 by its plain C++ where it's the game's,
 // hooks::DirectSlotCall.)
-void SlotCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_address) {
+void SlotCall(lifted::Regs& ctx, uint8_t* base, uint32_t slot, uint32_t return_address) {
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot);
   ctx.lr = return_address;
   if (hooks::DirectSlotCall(ctx, base, ctx.ctr.u32)) {
@@ -141,7 +142,7 @@ void SlotCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_add
 
 // The movie sets' calls, from the adder's frame (112 bytes, `construct_at`
 // the original's return address after UiMovie::UiMovie) or the load's.
-dl::MovieCalls MovieCalls(PPCContext& ctx, uint8_t* base, uint32_t construct_at) {
+dl::MovieCalls MovieCalls(lifted::Regs& ctx, uint8_t* base, uint32_t construct_at) {
   dl::MovieCalls calls;
   calls.construct = [&ctx, base, construct_at](uint32_t movie) {
     if (ITC_FLAG(native_ui_movies_game) && ITC_FLAG(native_c_runtime_heap)) {
@@ -169,7 +170,7 @@ dl::MovieCalls MovieCalls(PPCContext& ctx, uint8_t* base, uint32_t construct_at)
 
 }  // namespace
 
-void hooks::LoadingScreenLoadSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::LoadingScreenLoadSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   const int64_t r3 = dl::LoadingScreenLoad(base, [&](uint32_t id) -> int64_t {
     const uint32_t at = id == 22575 ? 0x82247BC8 : id == 22574 ? 0x82247BD0 : 0x82247BD8;
@@ -178,7 +179,7 @@ void hooks::LoadingScreenLoadSteps(PPCContext& ctx, uint8_t* base) {
     }
     guest_call::InFrame(ctx, base, 96, at, [&](uint32_t) {
       ctx.r3.u64 = id;
-      __imp__sub_82247AA0(ctx, base);  // LoadingScreen::AddMovie
+      lifted::Sdk(ctx, base, __imp__sub_82247AA0);  // LoadingScreen::AddMovie
     });
     return ctx.r3.s32 < 0 ? -1 : int64_t(ctx.r3.u32);
   });
@@ -186,7 +187,7 @@ void hooks::LoadingScreenLoadSteps(PPCContext& ctx, uint8_t* base) {
   hooks::SetArchiveSerial(ctx, r3);
 }
 
-void hooks::OtherMoviesLoadSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::OtherMoviesLoadSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   const dl::MovieCalls calls = MovieCalls(ctx, base, 0x822912D0);
   const uint32_t r3 = dl::OtherMoviesLoad(
@@ -197,7 +198,7 @@ void hooks::OtherMoviesLoadSteps(PPCContext& ctx, uint8_t* base) {
         }
         guest_call::InFrame(ctx, base, 112, 0x82291350, [&](uint32_t) {
           ctx.r3.u64 = id;
-          __imp__sub_822912A0(ctx, base);
+          lifted::Sdk(ctx, base, __imp__sub_822912A0);
         });
         return ctx.r3.s32 < 0 ? -1 : int64_t(ctx.r3.u32);
       },
@@ -207,26 +208,26 @@ void hooks::OtherMoviesLoadSteps(PPCContext& ctx, uint8_t* base) {
 }
 
 // LoadingScreen::Load: no arguments; r3 the last serial.
-extern "C" REX_FUNC(sub_82247B98) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82247B98) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82247B98)) {
     return;
   }
   if (!BootNative()) {
-    __imp__sub_82247B98(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82247B98);
     return;
   }
   hooks::LoadingScreenLoadSteps(ctx, base);
 }
 
 // sub_82291328: no arguments; r3 the renderer.
-extern "C" REX_FUNC(sub_82291328) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82291328) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82291328)) {
     return;
   }
   if (!BootNative()) {
-    __imp__sub_82291328(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82291328);
     return;
   }
   hooks::OtherMoviesLoadSteps(ctx, base);
@@ -237,7 +238,7 @@ namespace {
 // The callees through their adapters, from a frame of `frame_bytes` as the
 // original's (its link register kept above it, as its prologue does).
 template <typename Body>
-void InBootFrame(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Body body) {
+void InBootFrame(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, Body body) {
   const uint64_t lr = ctx.lr;
   guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
   guest_call::InFrame(ctx, base, frame_bytes, 0, [&](uint32_t frame) {
@@ -257,7 +258,7 @@ void InBootFrame(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Body body
 
 }  // namespace
 
-void hooks::CreateObjectsSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::CreateObjectsSteps(lifted::Regs& ctx, uint8_t* base) {
   uint32_t r3 = 0;
   InBootFrame(ctx, base, 96, [&](uint32_t, const dl::BootCall& call) {
     r3 = dl::CreateObjects(base, call);
@@ -265,7 +266,7 @@ void hooks::CreateObjectsSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void hooks::BootDataLoadSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::BootDataLoadSteps(lifted::Regs& ctx, uint8_t* base) {
   std::optional<uint32_t> r3;
   InBootFrame(ctx, base, 128, [&](uint32_t frame, const dl::BootCall& call) {
     r3 = dl::BootDataLoad(base, frame, call);
@@ -276,26 +277,26 @@ void hooks::BootDataLoadSteps(PPCContext& ctx, uint8_t* base) {
 }
 
 // BootData::CreateObjects: no arguments; r3 DataTables::Load's.
-extern "C" REX_FUNC(sub_82105868) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82105868) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82105868)) {
     return;
   }
   if (!BootNative()) {
-    __imp__sub_82105868(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82105868);
     return;
   }
   hooks::CreateObjectsSteps(ctx, base);
 }
 
 // BootData::Load: r3 not read; r3 as the original leaves it.
-extern "C" REX_FUNC(sub_82106618) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82106618) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82106618)) {  // the title screen's harness
     return;
   }
   if (!BootNative()) {
-    __imp__sub_82106618(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82106618);
     return;
   }
   hooks::BootDataLoadSteps(ctx, base);

@@ -852,7 +852,7 @@ void MovieWrapperCases(Context& h) {
       t.lr = 0x820AEB1C;
       const uint32_t stack = t.r1.u32;
       StartUpSide(v, [&] {
-        (v == 0 ? __imp__sub_82593DC0 : hooks::MovieWrapperSteps)(t, h.base);
+        (v == 0 ? __imp__sub_82593DC0 : ITC_CONTEXT_FN(hooks::MovieWrapperSteps))(t, h.base);
       });
       const uint32_t block = guest::LoadU32(h.base, wrapper + 4);
       out[v].Word(guest::LoadU32(h.base, wrapper));
@@ -917,7 +917,7 @@ void MovieConstructCases(Context& h) {
       t.lr = 0x820947A0;
       const uint32_t stack = t.r1.u32;
       StartUpSide(v, [&] {
-        (v == 0 ? __imp__sub_820AEA88 : hooks::MovieConstructSteps)(t, h.base);
+        (v == 0 ? __imp__sub_820AEA88 : ITC_CONTEXT_FN(hooks::MovieConstructSteps))(t, h.base);
       });
       const uint32_t wrapper = guest::LoadU32(h.base, movie + 8);
       const uint32_t wrapper_block = wrapper != 0 ? guest::LoadU32(h.base, wrapper + 4) : 0;
@@ -987,7 +987,7 @@ void StartXAudioCases(Context& h, LiveEngine& live) {
       t.lr = 0x821198F0;
       const uint32_t stack = t.r1.u32;
       live.Before(h.base);
-      (v == 0 ? __imp__sub_8259CD50 : hooks::StartXAudioSteps)(t, h.base);
+      (v == 0 ? __imp__sub_8259CD50 : ITC_CONTEXT_FN(hooks::StartXAudioSteps))(t, h.base);
       out[v].Word(live.After(h.base));
       out[v].Bytes(Read(h.base, stack - 144 + 80, 36));
       out[v].Bytes(Read(h.base, stack - 24, 24));
@@ -1107,7 +1107,7 @@ void AudioManagerCases(Context& h, LiveEngine& live) {
       const uint32_t frame = stack - 112 - 256;
       live.Before(h.base);
       StartUpSide(v, [&] {
-        (v == 0 ? __imp__sub_82119B38 : hooks::AudioManagerCreateSteps)(t, h.base);
+        (v == 0 ? __imp__sub_82119B38 : ITC_CONTEXT_FN(hooks::AudioManagerCreateSteps))(t, h.base);
       });
       out[v].Word(live.After(h.base));
       const uint32_t manager = t.r3.u32;
@@ -1221,7 +1221,7 @@ void AppCameraCases(Context& h) {
         t.r31.u64 = r31;
         t.lr = 0x820A8C64;
         const uint32_t stack = t.r1.u32;
-        (v == 0 ? __imp__sub_820A98C0 : hooks::AppCameraListConstructSteps)(t, h.base);
+        (v == 0 ? __imp__sub_820A98C0 : ITC_CONTEXT_FN(hooks::AppCameraListConstructSteps))(t, h.base);
         Blocks blocks;
         const uint32_t vector = guest::LoadU32(h.base, h.data + 8 * c + 4);
         blocks.Add(vector, 16);
@@ -1256,7 +1256,7 @@ void AppCameraCases(Context& h) {
         t.r31.u64 = r31;
         t.lr = 0x820A8C40;
         const uint32_t stack = t.r1.u32;
-        (v == 0 ? __imp__sub_820A9E28 : hooks::AppCameraCameraConstructSteps)(t, h.base);
+        (v == 0 ? __imp__sub_820A9E28 : ITC_CONTEXT_FN(hooks::AppCameraCameraConstructSteps))(t, h.base);
         out[v].Word(t.r3.u32);
         out[v].Bytes(Read(h.base, camera, asu::kAppCameraCameraBytes));
         out[v].Bytes(Read(h.base, stack - 144 + 80, 48));
@@ -1313,7 +1313,7 @@ void AppCameraCases(Context& h) {
       const uint32_t stack = t.r1.u32;
       const uint32_t frame = stack - 224;
       StartUpSide(v, [&] {
-        (v == 0 ? __imp__sub_820A8B88 : hooks::AppCameraSteps)(t, h.base);
+        (v == 0 ? __imp__sub_820A8B88 : ITC_CONTEXT_FN(hooks::AppCameraSteps))(t, h.base);
       });
       Blocks blocks;
       const uint32_t camera = guest::LoadU32(h.base, object + 28);
@@ -1462,7 +1462,7 @@ void AppConstructCases(Context& h) {
       g_app_calls = 0;
       hooks::g_start_up_recorder = RecordAppCall;
       StartUpSide(v, [&] {
-        (v == 0 ? __imp__sub_82094590 : hooks::AppConstructSteps)(t, h.base);
+        (v == 0 ? __imp__sub_82094590 : ITC_CONTEXT_FN(hooks::AppConstructSteps))(t, h.base);
       });
       hooks::g_start_up_recorder = nullptr;
       if (c == 0 && v == 1) {
@@ -1531,7 +1531,7 @@ void AppCreateCases(Context& h) {
       g_create_log.clear();
       hooks::g_start_up_recorder = RecordAppConstruct;
       StartUpSide(v, [&] {
-        (v == 0 ? __imp__sub_82094AB8 : hooks::AppCreateSteps)(t, h.base);
+        (v == 0 ? __imp__sub_82094AB8 : ITC_CONTEXT_FN(hooks::AppCreateSteps))(t, h.base);
       });
       hooks::g_start_up_recorder = nullptr;
       for (const uint32_t word : g_create_log) {

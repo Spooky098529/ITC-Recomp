@@ -142,9 +142,9 @@ void Builds(Context& h) {
         }
         ITC_FLAG(native_file_layer) = v == 1;
         if (which == 0) {
-          (v == 0 ? __imp__sub_82593CA0 : NativePathBuild)(t, h.base);
+          (v == 0 ? __imp__sub_82593CA0 : ITC_CONTEXT_FN(NativePathBuild))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_820A6BF0 : NativeSetGame)(t, h.base);
+          (v == 0 ? __imp__sub_820A6BF0 : ITC_CONTEXT_FN(NativeSetGame))(t, h.base);
         }
         ITC_FLAG(native_file_layer) = true;
         out[v].Word(t.r3.u32);
@@ -213,13 +213,13 @@ void FileLayer(Context& h) {
       {"GameFile::~GameFile", __imp__sub_820A6A40, NativeGameFileDestruct},
       {"AsyncFile::AsyncFile", __imp__sub_82593AC0, NativeAsyncFileConstruct},
       {"AsyncFile::~AsyncFile", __imp__sub_82593B00, NativeAsyncFileDestruct},
-      {"File::File", __imp__sub_8258C938, NativeFileConstruct},
+      {"File::File", __imp__sub_8258C938, ITC_CONTEXT_FN(NativeFileConstruct)},
       {"File::~File", __imp__sub_8258C5F8, NativeFileDestruct},
       {"Path::Path", __imp__sub_82593C28, NativePathConstruct},
       {"Path::~Path", __imp__sub_82593C48, NativePathDestruct},
       {"GamePath::GamePath", __imp__sub_820A6BE0, NativeGamePathConstruct},
       // r3 the object's size (+12), the whole of r3 compared.
-      {"File::GetSize (sub_822B80D8)", __imp__sub_822B80D8, NativeFileGetSize},
+      {"File::GetSize (sub_822B80D8)", __imp__sub_822B80D8, ITC_CONTEXT_FN(NativeFileGetSize)},
   };
   for (const Function& f : functions) {
     Results results(f.name);

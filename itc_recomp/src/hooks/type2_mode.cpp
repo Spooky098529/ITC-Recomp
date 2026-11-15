@@ -3,6 +3,7 @@
 // (hooks/type2_mode.h).
 
 #include "hooks/type2_mode.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "type2_mode/type2_mode.h"
@@ -39,7 +40,7 @@ namespace t2m = type2_mode;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -49,7 +50,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -70,21 +71,21 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
 // A delegate function's step: r3 the answer, left as it is.
 template <void (*Function)(uint8_t*, uint32_t, uint32_t, uint32_t, const t2m::Calls&)>
-void Delegate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Delegate) {
   const uint64_t answer = ctx.r3.u64;
   GuestCalls guest(ctx, base);
   Function(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
   ctx.r3.u64 = answer;
 }
 
-void Thunk(PPCContext& ctx, uint8_t* base, uint32_t slot) {
+void Thunk(lifted::Regs& ctx, uint8_t* base, uint32_t slot) {
   const uint32_t lr = uint32_t(ctx.lr);
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2m::SlotThunk(base, slot, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, lr, guest.calls());
@@ -92,41 +93,41 @@ void Thunk(PPCContext& ctx, uint8_t* base, uint32_t slot) {
 
 }  // namespace
 
-void Type2ModeMachineOf(PPCContext& ctx, uint8_t*) {
+void Type2ModeMachineOf(lifted::Regs& ctx, uint8_t*) {
   ctx.r3.u64 = t2m::MachineOf(ctx.r3.u64, ctx.r4.u64);
 }
-void Type2ModeAllLoaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2ModeAllLoaded) {
   ctx.r3.u64 = t2m::AllLoaded(base, ctx.r3.u32);
 }
-void Type2ModeFindShown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2ModeFindShown) {
   ctx.r3.u64 = t2m::FindShown(base, ctx.r3.u64, ctx.r1.u32);
 }
-void Type2ModeTearDown(PPCContext& ctx, uint8_t* base) { Delegate<t2m::TearDown>(ctx, base); }
-void Type2ModeLeaveScreen(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2ModeTearDown) { Delegate<t2m::TearDown>(ctx, base); }
+ITC_REGS_STEP(Type2ModeLeaveScreen) {
   Delegate<t2m::LeaveScreen>(ctx, base);
 }
-void Type2ModeAfterLeaveScreen(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2ModeAfterLeaveScreen) {
   t2m::AfterLeaveScreen(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
-void Type2ModeRestart(PPCContext& ctx, uint8_t* base) { Delegate<t2m::Restart>(ctx, base); }
-void Type2ModeLeaving(PPCContext& ctx, uint8_t* base) { Delegate<t2m::Leaving>(ctx, base); }
-void Type2ModeNextMode(PPCContext& ctx, uint8_t* base) { Delegate<t2m::NextMode>(ctx, base); }
-void Type2ModeWaitForLoads(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2ModeRestart) { Delegate<t2m::Restart>(ctx, base); }
+ITC_REGS_STEP(Type2ModeLeaving) { Delegate<t2m::Leaving>(ctx, base); }
+ITC_REGS_STEP(Type2ModeNextMode) { Delegate<t2m::NextMode>(ctx, base); }
+ITC_REGS_STEP(Type2ModeWaitForLoads) {
   Delegate<t2m::WaitForLoads>(ctx, base);
 }
-void ModeSlot8Thunk(PPCContext& ctx, uint8_t* base) { Thunk(ctx, base, 8); }
-void ModeSlot9Thunk(PPCContext& ctx, uint8_t* base) { Thunk(ctx, base, 9); }
-void ModeSlot10Thunk(PPCContext& ctx, uint8_t* base) { Thunk(ctx, base, 10); }
-void ModeSlot11Thunk(PPCContext& ctx, uint8_t* base) { Thunk(ctx, base, 11); }
-void ModeSlot12Thunk(PPCContext& ctx, uint8_t* base) { Thunk(ctx, base, 12); }
-void ModeSlot13Thunk(PPCContext& ctx, uint8_t* base) { Thunk(ctx, base, 13); }
-void Type2ModeInterrupt(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeSlot8Thunk) { Thunk(ctx, base, 8); }
+ITC_REGS_STEP(ModeSlot9Thunk) { Thunk(ctx, base, 9); }
+ITC_REGS_STEP(ModeSlot10Thunk) { Thunk(ctx, base, 10); }
+ITC_REGS_STEP(ModeSlot11Thunk) { Thunk(ctx, base, 11); }
+ITC_REGS_STEP(ModeSlot12Thunk) { Thunk(ctx, base, 12); }
+ITC_REGS_STEP(ModeSlot13Thunk) { Thunk(ctx, base, 13); }
+ITC_REGS_STEP(Type2ModeInterrupt) {
   ctx.r3.u64 = t2m::Interrupt(base, ctx.r3.u32, ctx.r1.u32);
 }
-void Type2ModeForceExit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2ModeForceExit) {
   t2m::ForceExit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
-void Type2ModeInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type2ModeInit) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2m::Init(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
@@ -134,12 +135,7 @@ void Type2ModeInit(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_TYPE2_MODE(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {   \
-    REX_FUNC_PROLOGUE();                 \
-    if (!ITC_FLAG(native_type2_mode)) {  \
-      __imp__sub_##address(ctx, base);   \
-      return;                            \
-    }                                    \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type2_mode)) { \
     hooks::step(ctx, base);              \
   }
 

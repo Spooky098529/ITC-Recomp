@@ -116,14 +116,14 @@ void ScopedLocks(Context& h) {
       t.r3.u64 = lock;
       t.r4.s64 = int32_t(models::kMemoryBlocksLock);
       Side(v, [&] {
-        (v == 0 ? __imp__sub_8258E580 : NativeScopedLockEnter)(t, h.base);
+        (v == 0 ? __imp__sub_8258E580 : ITC_CONTEXT_FN(NativeScopedLockEnter))(t, h.base);
       });
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));
       t.r3.u64 = lock;
       Side(v, [&] {
-        (v == 0 ? __imp__sub_8258E5B8 : NativeScopedLockLeave)(t, h.base);
+        (v == 0 ? __imp__sub_8258E5B8 : ITC_CONTEXT_FN(NativeScopedLockLeave))(t, h.base);
       });
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
@@ -163,7 +163,7 @@ void IncSizes(Context& h, const Block& block) {
       t.r3.u64 = block.address;
       t.r4.u64 = count;
       Side(v, [&] {
-        (v == 0 ? __imp__sub_8258E2F8 : NativePendingFreesIncSize)(t, h.base);
+        (v == 0 ? __imp__sub_8258E2F8 : ITC_CONTEXT_FN(NativePendingFreesIncSize))(t, h.base);
       });
       out[v].Bytes(Read(h.base, block.address, 64));
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
@@ -230,7 +230,7 @@ void Inserts(Context& h, const Block& block) {
         continue;
       }
       Side(v, [&] {
-        (v == 0 ? __imp__sub_8258E398 : NativePendingFreesInsert)(t, h.base);
+        (v == 0 ? __imp__sub_8258E398 : ITC_CONTEXT_FN(NativePendingFreesInsert))(t, h.base);
       });
       TakeNewNode(h.base, where, old_previous, out[v]);
       out[v].Bytes(Read(h.base, block.address, block.bytes));
@@ -280,9 +280,9 @@ void FreesLater(Context& h, const Block& block) {
       t.r4.s64 = int32_t(attributes);
       Side(v, [&] {
         if (physical) {
-          (v == 0 ? __imp__sub_8258E498 : NativeFreePhysicalLater)(t, h.base);
+          (v == 0 ? __imp__sub_8258E498 : ITC_CONTEXT_FN(NativeFreePhysicalLater))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_8258E410 : NativeFreeLater)(t, h.base);
+          (v == 0 ? __imp__sub_8258E410 : ITC_CONTEXT_FN(NativeFreeLater))(t, h.base);
         }
       });
       TakeAddedNodes(h.base, was, out[v]);
@@ -328,7 +328,7 @@ void XprConstructs(Context& h, const Block& block) {
       Fill(h.base, block.address, block.bytes);
       PPCContext t = CallContext(h);
       t.r3.u64 = xpr;
-      Side(v, [&] { (v == 0 ? __imp__sub_82596E68 : NativeXprConstruct)(t, h.base); });
+      Side(v, [&] { (v == 0 ? __imp__sub_82596E68 : ITC_CONTEXT_FN(NativeXprConstruct))(t, h.base); });
       out[v].Bytes(Read(h.base, block.address, block.bytes));
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
@@ -375,7 +375,7 @@ void XprGetTextures(Context& h, const Block& block) {
       PPCContext t = CallContext(h);
       t.r3.u64 = xpr;
       t.r4.u64 = index;
-      Side(v, [&] { (v == 0 ? __imp__sub_82597118 : NativeXprGetTexture)(t, h.base); });
+      Side(v, [&] { (v == 0 ? __imp__sub_82597118 : ITC_CONTEXT_FN(NativeXprGetTexture))(t, h.base); });
       out[v].Bytes(Read(h.base, block.address, block.bytes));
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
@@ -426,9 +426,9 @@ void XprReleases(Context& h, const Block& block) {
       t.r3.u64 = xpr;
       Side(v, [&] {
         if (destructor) {
-          (v == 0 ? __imp__sub_82597148 : NativeXprDestruct)(t, h.base);
+          (v == 0 ? __imp__sub_82597148 : ITC_CONTEXT_FN(NativeXprDestruct))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_825970A8 : NativeXprRelease)(t, h.base);
+          (v == 0 ? __imp__sub_825970A8 : ITC_CONTEXT_FN(NativeXprRelease))(t, h.base);
         }
       });
       TakeAddedNodes(h.base, was, out[v]);
@@ -572,7 +572,7 @@ void Allocates(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = 0x12345678;
       t.r4.u64 = count;
-      Side(v, [&] { (v == 0 ? __imp__sub_825942B8 : NativeAllocate)(t, h.base); });
+      Side(v, [&] { (v == 0 ? __imp__sub_825942B8 : ITC_CONTEXT_FN(NativeAllocate))(t, h.base); });
       const uint32_t block = t.r3.u32;
       out[v].Word(block != 0 && memory::IsHeapBlock(block));
       out[v].Word(block != 0 ? memory::Size(block) : 0);
@@ -681,7 +681,7 @@ void InsertNs(Context& h, int& handed) {
           t.r5.u64 = count;
           t.r6.u64 = h.data + 64;
         },
-        __imp__sub_82590EF0, NativeInsertN,
+        __imp__sub_82590EF0, ITC_CONTEXT_FN(NativeInsertN),
         fmt::format("case {} (capacity {}, size {}, at {}, count {})", c, capacity, size, at,
                     count));
   }
@@ -717,7 +717,7 @@ void Clears(Context& h) {
     VectorCase(
         h, results, capacity, size,
         [&](PPCContext& t, uint32_t vector, uint32_t, Random&) { t.r3.u64 = vector; },
-        __imp__sub_82590D68, NativeClear,
+        __imp__sub_82590D68, ITC_CONTEXT_FN(NativeClear),
         fmt::format("case {} (capacity {}, size {})", c, capacity, size));
   }
   results.Report();
@@ -1266,10 +1266,10 @@ void Accessors(Context& h, const Block& block) {
     GuestFunction native;
   };
   const Accessor accessors[] = {
-      {"Model::MaterialCount (sub_82594AD8)", __imp__sub_82594AD8, hooks::ModelsMaterialCount},
-      {"Model::Material (sub_82594B20)", __imp__sub_82594B20, hooks::ModelsMaterial},
-      {"SharedVertexShader (sub_825896D8)", __imp__sub_825896D8, hooks::ModelsSharedVertexShader},
-      {"SharedPixelShader (sub_82589700)", __imp__sub_82589700, hooks::ModelsSharedPixelShader},
+      {"Model::MaterialCount (sub_82594AD8)", __imp__sub_82594AD8, ITC_CONTEXT_FN(hooks::ModelsMaterialCount)},
+      {"Model::Material (sub_82594B20)", __imp__sub_82594B20, ITC_CONTEXT_FN(hooks::ModelsMaterial)},
+      {"SharedVertexShader (sub_825896D8)", __imp__sub_825896D8, ITC_CONTEXT_FN(hooks::ModelsSharedVertexShader)},
+      {"SharedPixelShader (sub_82589700)", __imp__sub_82589700, ITC_CONTEXT_FN(hooks::ModelsSharedPixelShader)},
       {"VertexDeclaration (sub_82589728)", __imp__sub_82589728, NativeVertexDeclaration},
   };
   // The tables they read (the shared shaders' at 0x8296B7B4 and 0x8296B7B8,
@@ -1607,7 +1607,7 @@ void SharedShaderSets(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = r3;
       t.r4.u64 = r4;
-      (v == 0 ? __imp__sub_825896C0 : hooks::ModelsSetSharedShaders)(t, h.base);
+      (v == 0 ? __imp__sub_825896C0 : ITC_CONTEXT_FN(hooks::ModelsSetSharedShaders))(t, h.base);
       out[v].Bytes(Read(h.base, 0x8296B7B0, 16));
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));

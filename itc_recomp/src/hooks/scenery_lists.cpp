@@ -11,6 +11,7 @@
 // (src/course_scenery/collect.cpp); their register steps are the harness's.
 
 #include "hooks/scenery_lists.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -66,7 +67,7 @@ namespace {
 // ModelList::Release's guest calls, from its frame with the original's
 // return addresses.
 struct ReleaseContext {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   uint32_t frame;
 
@@ -94,7 +95,7 @@ struct ReleaseContext {
 
 }  // namespace
 
-void SceneryListsModelListRelease(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsModelListRelease) {
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 128;
   guest::StoreU32(base, frame, ctx.r1.u32);  // the back chain, as stwu
@@ -113,7 +114,7 @@ namespace {
 // ModelList::Load's guest calls where a callee's plain C++ declines, with
 // the original's return addresses.
 struct ModelListLoadGuest {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
 
   static uint32_t Allocate(void* self, uint32_t size) {
@@ -143,7 +144,7 @@ struct ModelListLoadGuest {
 };
 
 template <typename Run>
-void ModelListLoadSteps(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Run run) {
+void ModelListLoadSteps(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, Run run) {
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - frame_bytes;
   guest::StoreU32(base, frame, ctx.r1.u32);  // the back chain, as stwu
@@ -163,9 +164,9 @@ void ModelListLoadSteps(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Ru
 
 }  // namespace
 
-void SceneryListsModelListLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsModelListLoad) {
   if (!ModelsNativeLifetime()) {
-    __imp__sub_82148428(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82148428);
     return;
   }
   ModelListLoadSteps(ctx, base, 160, [&](uint32_t list, uint32_t container, uint32_t frame,
@@ -174,9 +175,9 @@ void SceneryListsModelListLoad(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void SceneryListsModelListLoadPoints(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsModelListLoadPoints) {
   if (!ModelsNativeLifetime()) {
-    __imp__sub_82148528(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82148528);
     return;
   }
   ModelListLoadSteps(ctx, base, 192, [&](uint32_t list, uint32_t container, uint32_t frame,
@@ -185,45 +186,45 @@ void SceneryListsModelListLoadPoints(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void SceneryListsResetDrawState(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsResetDrawState) {
   scenery_lists::ResetDrawState(base, ctx.r3.u32);
 }
 
-void SceneryListsAnimationCurrentFrame(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsAnimationCurrentFrame) {
   ctx.r3.u64 = scenery_lists::AnimationCurrentFrame(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void SceneryListsIsBEntryOn(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsIsBEntryOn) {
   ctx.r3.u64 = scenery_lists::IsBEntryOn(base, ctx.r4.s32);
 }
 
-void SceneryListsIsCEntryOn(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsIsCEntryOn) {
   ctx.r3.u64 = scenery_lists::IsCEntryOn(base, ctx.r4.u32);
 }
 
-void SceneryListsPointListIsEntryOn(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsPointListIsEntryOn) {
   ctx.r3.u64 = scenery_lists::PointListIsEntryOn(base, ctx.r4.s32);
 }
 
-void SceneryListsCourseLayout(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsCourseLayout) {
   ctx.r3.s64 = scenery_lists::CourseLayout(base);
 }
 
-void SceneryListsSetBillboardPass(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsSetBillboardPass) {
   scenery_lists::SetBillboardPass(base, ctx.r3.u32, ctx.r4.u32, ctx.r6.u32);
 }
 
-void SceneryListsDepthVertexDeclaration(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsDepthVertexDeclaration) {
   ctx.r3.u64 = scenery_lists::DepthVertexDeclaration(base, ctx.r3.s32);
 }
 
-void SceneryListsTextureProviderClearAll(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsTextureProviderClearAll) {
   scenery_lists::TextureProviderClearAll(base, ctx.r3.u32);
 }
 
-void SceneryListsTextureProviderSet(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsTextureProviderSet) {
   if (!scenery_lists::TextureProviderSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_82594718(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82594718);
   }
 }
 
@@ -236,27 +237,27 @@ bool SlotDiagnostics() {
 
 }  // namespace
 
-void SceneryListsIsShapeVisible(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsIsShapeVisible) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = scenery_lists::IsShapeVisible(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                              ctx.r6.u32, ctx.r1.u32 - 96);
   ctx.fpscr.disableFlushMode();
 }
 
-void SceneryListsRecordObjectSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsRecordObjectSteps) {
   ctx.fpscr.disableFlushMode();
   const auto header = SlotDiagnostics()
                           ? std::nullopt
                           : scenery_lists::RecordObject(base, ctx.r4.u32, ctx.r5.u32);
   if (!header) {
-    __imp__sub_825953D0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825953D0);
     return;
   }
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = *header;
 }
 
-bool SceneryListsRecordObject(PPCContext& ctx, uint8_t* base) {
+bool SceneryListsRecordObject(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_scenery_lists) || SlotDiagnostics()) {
     return false;
   }
@@ -270,31 +271,31 @@ bool SceneryListsRecordObject(PPCContext& ctx, uint8_t* base) {
   return true;
 }
 
-void SceneryListsRecordSceneLights(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsRecordSceneLights) {
   ctx.fpscr.disableFlushMode();
   const auto header =
       SlotDiagnostics() ? std::nullopt : scenery_lists::RecordSceneLights(base);
   if (!header) {
-    __imp__sub_82595490(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82595490);
     return;
   }
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = *header;
 }
 
-void SceneryListsRecordShapeDepth(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsRecordShapeDepth) {
   const auto first =
       SlotDiagnostics() ? std::nullopt
                         : scenery_lists::RecordShapeDepth(base, ctx.r3.u32, ctx.r4.u32,
                                                           ctx.r5.s32, ctx.r7.u32, ctx.r8.u32);
   if (!first) {
-    __imp__sub_825960D0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825960D0);
     return;
   }
   ctx.r3.u64 = *first;
 }
 
-void SceneryListsDrawShapeDepth(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsDrawShapeDepth) {
   // The plain C++'s scalar float work expects flush-to-zero off, as the
   // original sets it.
   ctx.fpscr.disableFlushMode();
@@ -312,7 +313,7 @@ void SceneryListsDrawShapeDepth(PPCContext& ctx, uint8_t* base) {
                                           ctx.r7.u32, ctx.r8.u32, ctx.r9.u32,
                                           ctx.r1.u32 - kFrame, context);
   if (!draw) {
-    __imp__sub_82596D48(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82596D48);
     return;
   }
   if (!draw->submit) {
@@ -345,12 +346,12 @@ struct DrawContext {
   static uint32_t Call(void* self, uint32_t function, const uint32_t* args, int count,
                        uint32_t frame, uint32_t lr) {
     auto& d = *static_cast<SceneryDrawGuest*>(self);
-    PPCContext& ctx = d.ctx;
+    lifted::Regs& ctx = d.ctx;
     uint8_t* base = d.base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = frame;
     ctx.lr = lr;
-    PPCRegister* registers[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+    lifted::Temp* registers[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
                                  &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
     for (int i = 0; i < count; i++) {
       registers[i]->u64 = args[i];
@@ -365,7 +366,7 @@ struct DrawContext {
   static uint32_t Submit(void* self, uint32_t entry, uint32_t key, double depth, uint32_t frame,
                          uint32_t lr) {
     auto& d = *static_cast<SceneryDrawGuest*>(self);
-    PPCContext& ctx = d.ctx;
+    lifted::Regs& ctx = d.ctx;
     uint8_t* base = d.base;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = frame;
@@ -398,9 +399,9 @@ scenery_lists::DrawCalls SceneryListsDrawCalls(SceneryDrawGuest* guest) {
   return calls;
 }
 
-void SceneryListsRecordShape(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsRecordShape) {
   if (SlotDiagnostics()) {
-    __imp__sub_82146BD0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82146BD0);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -421,7 +422,7 @@ void SceneryListsRecordShape(PPCContext& ctx, uint8_t* base) {
                                                        set_shaders, c76, range, pair_offset);
   if (!first) {
     guest::StoreU32(base, frame, chain);
-    __imp__sub_82146BD0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82146BD0);
     return;
   }
   ctx.lr = lr;
@@ -429,9 +430,9 @@ void SceneryListsRecordShape(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *first;
 }
 
-void SceneryListsDrawShape(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsDrawShape) {
   if (SlotDiagnostics()) {
-    __imp__sub_82147D88(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82147D88);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -449,7 +450,7 @@ void SceneryListsDrawShape(PPCContext& ctx, uint8_t* base) {
       ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, ctx.r24.u32);
   if (!draw) {
     guest::StoreU32(base, frame, chain);
-    __imp__sub_82147D88(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82147D88);
     return;
   }
   ctx.lr = lr;
@@ -463,9 +464,9 @@ void SceneryListsDrawShape(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void SceneryListsModelRecordShape(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsModelRecordShape) {
   if (SlotDiagnostics()) {
-    __imp__sub_82595550(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82595550);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -484,7 +485,7 @@ void SceneryListsModelRecordShape(PPCContext& ctx, uint8_t* base) {
                                                      ctx.r8.u32);
   if (!first) {
     guest::StoreU32(base, frame, chain);
-    __imp__sub_82595550(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82595550);
     return;
   }
   ctx.lr = lr;
@@ -492,9 +493,9 @@ void SceneryListsModelRecordShape(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *first;
 }
 
-void SceneryListsModelRecordMaterials(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsModelRecordMaterials) {
   if (SlotDiagnostics()) {
-    __imp__sub_820CECA0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820CECA0);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -509,7 +510,7 @@ void SceneryListsModelRecordMaterials(PPCContext& ctx, uint8_t* base) {
                                                          ctx.r4.u32, ctx.r5.s32, ctx.r6.u32);
   if (!first) {
     guest::StoreU32(base, frame, chain);
-    __imp__sub_820CECA0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820CECA0);
     return;
   }
   ctx.lr = lr;
@@ -517,9 +518,9 @@ void SceneryListsModelRecordMaterials(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *first;
 }
 
-void SceneryListsModelDrawShape(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsModelDrawShape) {
   if (SlotDiagnostics()) {
-    __imp__sub_82596B18(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82596B18);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -537,7 +538,7 @@ void SceneryListsModelDrawShape(PPCContext& ctx, uint8_t* base) {
                                                   ctx.r8.u32, ctx.r9.u32, ctx.r24.u32);
   if (!draw) {
     guest::StoreU32(base, frame, chain);
-    __imp__sub_82596B18(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82596B18);
     return;
   }
   ctx.lr = lr;
@@ -551,9 +552,9 @@ void SceneryListsModelDrawShape(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneryListsPointListDraw) {
   if (SlotDiagnostics()) {
-    __imp__sub_82148058(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82148058);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -570,7 +571,7 @@ void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base) {
                                                ctx.r5.u32, ctx.r24.u32, ctx.r3.u32);
   if (!r3) {
     guest::StoreU32(base, frame, chain);
-    __imp__sub_82148058(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82148058);
     return;
   }
   ctx.lr = lr;
@@ -581,12 +582,7 @@ void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_SCENERY_LISTS(address, steps)    \
-  extern "C" REX_FUNC(sub_##address) {       \
-    REX_FUNC_PROLOGUE();                     \
-    if (!ITC_FLAG(native_scenery_lists)) {   \
-      __imp__sub_##address(ctx, base);       \
-      return;                                \
-    }                                        \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_scenery_lists)) { \
     hooks::steps(ctx, base);                 \
   }
 
@@ -615,21 +611,11 @@ ITC_SCENERY_LISTS(82594718, SceneryListsTextureProviderSet)
 
 // Model::RecordShape's row is in docs/functions/models.md: behind that file's
 // flag.
-extern "C" REX_FUNC(sub_82595550) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_82595550(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82595550, ITC_FLAG(native_models)) {
   hooks::SceneryListsModelRecordShape(ctx, base);
 }
 
 // Model::RecordMaterials' row is in docs/functions/models.md too.
-extern "C" REX_FUNC(sub_820CECA0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_820CECA0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820CECA0, ITC_FLAG(native_models)) {
   hooks::SceneryListsModelRecordMaterials(ctx, base);
 }

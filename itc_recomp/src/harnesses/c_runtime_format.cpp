@@ -284,7 +284,7 @@ void SprintfCase(Context& h, Results& results, const Block& block, const FormatC
       case Where::kOverFormat: t.r3.u64 = t.r4.u64 - 2; break;
       case Where::kOverString: t.r3.u64 = h.data + kStrings + 64 * 2 + 3; break;
     }
-    Run(v, __imp__sub_825A93D0, NativeSprintf, t, h.base);
+    Run(v, __imp__sub_825A93D0, ITC_CONTEXT_FN(NativeSprintf), t, h.base);
     out[v].Bytes(Read(h.base, block.address, block.bytes));
     out[v].Bytes(Read(h.base, h.data, kScratchBytes));
     out[v].Bytes(Read(h.base, t.r1.u32 + 24, 200));
@@ -310,7 +310,7 @@ void VsnprintfCase(Context& h, Results& results, const Block& block, const Forma
     t.r4.u64 = size;
     t.r5.u64 = h.data + kFormat;
     t.r6.u64 = h.data + kVaList;
-    Run(v, __imp__sub_825AB010, NativeVsnprintf, t, h.base);
+    Run(v, __imp__sub_825AB010, ITC_CONTEXT_FN(NativeVsnprintf), t, h.base);
     out[v].Bytes(Read(h.base, block.address, block.bytes));
     out[v].Bytes(Read(h.base, h.data, kScratchBytes));
     out[v].Word(t.r3.u32);
@@ -346,7 +346,7 @@ void VsprintfCase(Context& h, Results& results, const Block& block, const Format
     t.r3.u64 = null_kind == 1 ? 0 : block.address;
     t.r4.u64 = null_kind == 2 ? 0 : h.data + kFormat;
     t.r5.u64 = h.data + kVaList;
-    Run(v, __imp__sub_825A71B0, hooks::CoreVsprintf, t, h.base);
+    Run(v, __imp__sub_825A71B0, ITC_CONTEXT_FN(hooks::CoreVsprintf), t, h.base);
     guest::StoreU32(h.base, c_runtime::core::kInvalidParameterHandler, handler);
     out[v].Bytes(Read(h.base, block.address, block.bytes));
     out[v].Bytes(Read(h.base, h.data, kScratchBytes));

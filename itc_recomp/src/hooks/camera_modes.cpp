@@ -5,6 +5,7 @@
 // its state machine's functors, so their adapters stay.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -85,12 +86,7 @@ namespace cm = camera_modes;
 // An adapter: the step (hooks::CameraModesStep<address>, shared with the
 // harness) behind the flag.
 #define ITC_CAMERA_MODES(address)                       \
-  extern "C" REX_FUNC(sub_##address) {                  \
-    REX_FUNC_PROLOGUE();                                \
-    if (!ITC_FLAG(native_camera_modes)) {               \
-      __imp__sub_##address(ctx, base);                  \
-      return;                                           \
-    }                                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_camera_modes)) { \
     hooks::CameraModesStep##address(ctx, base);         \
   }
 
@@ -108,8 +104,8 @@ void hooks::SetCameraConstructStandIn(CameraConstructStandIn stand_in) {
 // A view's camera constructor's adapter: the stand-in while the harness
 // asks, else as ITC_CAMERA_MODES.
 #define ITC_CAMERA_MODES_CONSTRUCT(address)                                              \
-  extern "C" REX_FUNC(sub_##address) {                                                   \
-    REX_FUNC_PROLOGUE();                                                                 \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                                   \
+    \
     if (g_construct_stand_in) {                                                          \
       ctx.r3.u64 = g_construct_stand_in(0x##address, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, \
                                         ctx.r1.u32, uint32_t(ctx.lr));                   \
@@ -127,7 +123,7 @@ namespace {
 // memcpy (sub_825A7410) through the translated code, for a copy
 // c_runtime::Memcpy refuses: from a frame like the original's (`frame`
 // bytes) with its return address. r3 = the destination, as memcpy leaves it.
-void GuestMemcpy(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t return_address,
+void GuestMemcpy(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t return_address,
                  uint32_t destination, uint32_t source, uint32_t size) {
   guest_call::InFrame(ctx, base, frame, return_address, [&](uint32_t) {
     ctx.r3.u64 = destination;
@@ -139,7 +135,7 @@ void GuestMemcpy(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t return
 
 // XMemCpy (sub_82295890) through the translated code, for a copy
 // c_runtime::XMemCpy refuses, as GuestMemcpy.
-void GuestXMemCpy(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t return_address,
+void GuestXMemCpy(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t return_address,
                   uint32_t destination, uint32_t source, uint32_t size) {
   guest_call::InFrame(ctx, base, frame, return_address, [&](uint32_t) {
     ctx.r3.u64 = destination;
@@ -152,7 +148,7 @@ void GuestXMemCpy(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t retur
 // A guest call from the frame at `frame` (the calling original's r1,
 // `frame_bytes` below its caller's) with the return address `back`.
 template <typename Call>
-void CallFrom(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t frame_bytes,
+void CallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t frame_bytes,
               uint32_t back, Call call) {
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame + frame_bytes;
@@ -164,7 +160,7 @@ void CallFrom(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t frame_byt
 // CameraPath::Request (r3 the TV camera, r4 the buffer, r5 the index)
 // through its step from a TV camera function's frame at `frame`
 // (`frame_bytes`) with the return address `back`.
-void PathRequestFrom(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t frame_bytes,
+void PathRequestFrom(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t frame_bytes,
                      uint32_t back, uint32_t camera, uint32_t buffer, uint32_t index) {
   CallFrom(ctx, base, frame, frame_bytes, back, [&] {
     ctx.r3.u64 = camera;
@@ -182,23 +178,23 @@ namespace hooks {
 
 // ToView4: r3 = the last racer record when the split screen ended (its
 // RacerRecords::At), else the director.
-void CameraModesStep82152400(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82152400) {
   ctx.r3.u64 = cm::ToView4(base, ctx.r3.u32);
 }
-void CameraModesStep821524B8(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821524B8) {
   cm::ToView5(base, ctx.r3.u32);
 }
-void CameraModesStep821524D8(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821524D8) {
   cm::ToView3(base);
 }
-void CameraModesStep82153160(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82153160) {
   cm::ToView3IfCourse(base, ctx.r3.u32);
 }
 
 // --- Small helpers ---
 
 // Viewports::ResetRoll: r3 = viewport 1, as SetRoll leaves it.
-void CameraModesStep821524F0(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821524F0) {
   ctx.fpscr.disableFlushMode();
   cm::ResetRoll(base);
   ctx.r3.u64 = guest::LoadU32(base, guest::LoadU32(base, cm::kViewports) + 4);
@@ -206,11 +202,11 @@ void CameraModesStep821524F0(PPCContext& ctx, uint8_t* base) {
 
 // Camera::ZoomFromFov: f1 = degrees, f2 = the width; f1 = the zoom. Where
 // tan's native form can't stand in, the original runs.
-void CameraModesStep82152548(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82152548) {
   ctx.fpscr.disableFlushMode();
   const auto zoom = cm::ZoomFromFov(base, ctx.f1.f64, ctx.f2.f64);
   if (!zoom) {
-    __imp__sub_82152548(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82152548);
     return;
   }
   ctx.f1.f64 = *zoom;
@@ -218,7 +214,7 @@ void CameraModesStep82152548(PPCContext& ctx, uint8_t* base) {
 
 // Quat::Rotate (no adapter: only ChaseCamera::Follow's plain C++ calls it; the
 // step kept for the harness): r3 = out, r4 = the quaternion, r5 = the vector.
-void CameraModesStep821525F8(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821525F8) {
   ctx.fpscr.disableFlushMode();
   cm::QuatRotate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
@@ -229,9 +225,9 @@ void CameraModesStep821525F8(PPCContext& ctx, uint8_t* base) {
 // the caller's r1 + 32 to + 47 as the original does; its vector load reads
 // them back from there, so a stack pointer not 16-byte aligned runs the
 // original).
-void CameraModesStep82152698(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82152698) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    __imp__sub_82152698(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82152698);
     return;
   }
   guest::StoreU32(base, ctx.r1.u32 + 32, uint32_t(ctx.r4.u64 >> 32));
@@ -248,7 +244,7 @@ void CameraModesStep82152698(PPCContext& ctx, uint8_t* base) {
 // static matrices' plain C++ call it in play; the step kept for the
 // harness): r3 = the matrix, r4 to r10 the first seven pointers, the other
 // nine on the caller's stack (r1 + 84, + 92, ... + 148).
-void CameraModesStep82090000(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82090000) {
   uint32_t from[16] = {ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                        ctx.r8.u32, ctx.r9.u32, ctx.r10.u32};
   for (uint32_t i = 7; i < 16; i++) {
@@ -262,29 +258,29 @@ void CameraModesStep82090000(PPCContext& ctx, uint8_t* base) {
 
 // List40::Link (no adapter: only List40::Insert's plain C++ calls it): r3 =
 // the list, r4 = the position; the step kept for the harness.
-void CameraModesStep82153228(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82153228) {
   cm::List40Link(base, ctx.r3.u32, int16_t(ctx.r4.u16));
 }
 // List40::Insert: r4 = &the word, r5 = the position.
-void CameraModesStep821544E0(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821544E0) {
   cm::List40Insert(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32), ctx.r5.u32);
 }
 // List16::Insert20 (no adapter: only IntroCamera::IntroCamera's plain C++ calls it; the
 // step kept for the harness).
 // List16::Insert20: r4 = the record, r5 = the position.
-void CameraModesStep82154458(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82154458) {
   cm::List16Insert20(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 // List16::Insert32 and Insert608: r4 = the record, r5 = the position; r3 =
 // the record's slot (memcpy's).
-void CameraModesStep82154378(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82154378) {
   uint32_t to = 0;
   if (!cm::List16Insert(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, 32, &to)) {
     GuestMemcpy(ctx, base, 112, 0x821543E0, to, ctx.r4.u32, 32);
   }
   ctx.r3.u64 = to;
 }
-void CameraModesStep821543E8(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821543E8) {
   uint32_t to = 0;
   if (!cm::List16Insert(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, 608, &to)) {
     GuestMemcpy(ctx, base, 112, 0x82154450, to, ctx.r4.u32, 608);
@@ -294,7 +290,7 @@ void CameraModesStep821543E8(PPCContext& ctx, uint8_t* base) {
 // List16::Copy32 (no adapter: only CutsceneShot::Init's plain C++ calls it; the step kept
 // for the harness).
 // List16::Copy32: r3 = out (returned), r4 = the list, r5 = the position.
-void CameraModesStep82154300(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82154300) {
   const uint32_t out = ctx.r3.u32;
   uint32_t from = 0;
   if (!cm::List16Copy32(base, out, ctx.r4.u32, ctx.r5.u32, &from)) {
@@ -305,11 +301,11 @@ void CameraModesStep82154300(PPCContext& ctx, uint8_t* base) {
 
 // --- The camera animations' table ---
 
-void CameraModesStep82150078(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82150078) {
   cm::AnimsClear(base);
 }
 // CameraAnims::Find: r3 = the asset id; r3 = its objects or 0.
-void CameraModesStep82150300(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82150300) {
   ctx.r3.u64 = cm::AnimsFind(base, ctx.r3.u32);
 }
 
@@ -318,10 +314,10 @@ void CameraModesStep82150300(PPCContext& ctx, uint8_t* base) {
 // ColorFilter::SetStyle (no adapter: only TvCamera::Update's plain C++ calls
 // it; the step kept for the harness): r3 = &the style. The original runs where the
 // filter's slots aren't its own functions.
-void CameraModesStep82152108(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82152108) {
   ctx.fpscr.disableFlushMode();
   if (!cm::ColorFilterSetStyle(base, ctx.r3.u32)) {
-    __imp__sub_82152108(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82152108);
   }
 }
 
@@ -329,7 +325,7 @@ void CameraModesStep82152108(PPCContext& ctx, uint8_t* base) {
 // for the harness).
 // FadeCue::Step: r3 = the cue (its caller, CutsceneShot::Step, doesn't read
 // r3 after it).
-void CameraModesStep82152290(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82152290) {
   cm::FadeCueStep(base, ctx.r3.u32);
 }
 
@@ -337,9 +333,9 @@ void CameraModesStep82152290(PPCContext& ctx, uint8_t* base) {
 
 // CameraAnims::Load: r3 = the asset id; r3 = the serial (as Archive::Load
 // leaves it). The original without --native_heap or the archive's queue.
-void CameraModesStep82150B10(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82150B10) {
   if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
-    __imp__sub_82150B10(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82150B10);
     return;
   }
   hooks::SetArchiveSerial(ctx, cm::AnimsLoad(base, ctx.r3.u32, hooks::NativeArchiveLoad(base)));
@@ -350,9 +346,9 @@ void CameraModesStep82150B10(PPCContext& ctx, uint8_t* base) {
 // copies the native layer refuses go through the guest from it (memcpy's
 // return addresses 0x821508F4 and 0x8215092C; XMemCpy from ParseObject's
 // frame below it, 0x821502B8).
-void CameraModesStep82150878(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82150878) {
   if (!hooks::NativeHeapActive()) {
-    __imp__sub_82150878(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82150878);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -366,7 +362,7 @@ void CameraModesStep82150878(PPCContext& ctx, uint8_t* base) {
         GuestXMemCpy(ctx, base, 672 + 144, 0x821502B8, to, from, size);
       });
   if (!done) {
-    __imp__sub_82150878(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82150878);
     return;
   }
   ctx.r3.u64 = 1;
@@ -374,9 +370,9 @@ void CameraModesStep82150878(PPCContext& ctx, uint8_t* base) {
 
 // CameraAnims::FreeAll: no arguments; r3 as the original leaves it (1, its
 // memcpy's frame + 80, or unchanged).
-void CameraModesStep821507D8(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821507D8) {
   if (!hooks::NativeHeapActive() || !cm::AnimsFreeable(base)) {
-    __imp__sub_821507D8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821507D8);
     return;
   }
   if (const auto r3 = cm::AnimsFreeAll(base, ctx.r1.u32 - 384 + 80)) {
@@ -388,7 +384,7 @@ void CameraModesStep821507D8(PPCContext& ctx, uint8_t* base) {
 // 0, f1 the last EvalCamera's. EvalCamera's original runs from a frame like
 // Evaluate's (144 bytes, returning to 0x821509C4) where its native form
 // can't.
-void CameraModesStep82150960(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82150960) {
   ctx.fpscr.disableFlushMode();
   const uint32_t out = ctx.r3.u32, time = ctx.r5.u32;
   std::optional<double> f1;
@@ -415,7 +411,7 @@ void CameraModesStep82150960(PPCContext& ctx, uint8_t* base) {
 // step kept for the harness).
 // CameraAnims::Duration: r3 = the id; f1 = the duration, r3 the objects'
 // slot the original stopped at.
-void CameraModesStep82150A98(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82150A98) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
   ctx.f1.f64 = cm::AnimsDuration(base, ctx.r3.u32, &r3);
@@ -425,9 +421,9 @@ void CameraModesStep82150A98(PPCContext& ctx, uint8_t* base) {
 // CameraAnims::ObjectMatrix: r3 = out, r4 = the id, r5 = the frame; r3 = 1
 // or 0. CameraAnim::Matrix's frame is the original's (r1 - 96 - 320), so a
 // stack pointer not 16-byte aligned runs the original.
-void CameraModesStep82150A10(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82150A10) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    __imp__sub_82150A10(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82150A10);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -443,10 +439,10 @@ void CameraModesStep82150A10(PPCContext& ctx, uint8_t* base) {
 // CameraPath::Request: r4 = the path buffer, r5 = the index; r3 = the
 // serial when a load was queued, else unchanged. The original without
 // --native_heap, the archive's queue, or a block the layer didn't give.
-void CameraModesStep82152E08(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82152E08) {
   if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue() ||
       !game_modes::Buffer28Freeable(base, ctx.r4.u32)) {
-    __imp__sub_82152E08(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82152E08);
     return;
   }
   if (const auto serial =
@@ -457,22 +453,22 @@ void CameraModesStep82152E08(PPCContext& ctx, uint8_t* base) {
 
 // CameraPath::OnLoaded (the archive's callback): r4 = the data, r6 = the
 // buffer.
-void CameraModesStep82152078(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82152078) {
   cm::PathOnLoaded(base, ctx.r4.u32, ctx.r6.u32);
 }
 
 // --- The rival logo ---
 
 // RivalLogo::RivalLogo: r3 = the entry (its caller sets r3 again after).
-void CameraModesStep82211848(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82211848) {
   cm::RivalLogoConstruct(base, ctx.r3.u32);
 }
 
 // RivalLogo::Play: r3 = the entry; r3 as the original leaves it. With
 // --log_pause_movie the original runs (PlayNamed's override logs it).
-void CameraModesStep82211AB0(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82211AB0) {
   if (ITC_FLAG(log_pause_movie)) {
-    __imp__sub_82211AB0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82211AB0);
     return;
   }
   ctx.r3.u64 = cm::RivalLogoPlay(base, ctx.r3.u32, ctx.r1.u32 - 144 + 80);
@@ -484,9 +480,9 @@ void CameraModesStep82211AB0(PPCContext& ctx, uint8_t* base) {
 // 224 (TrackPosition::Copy's) when it tracked. Its frame (256 bytes) and
 // Matrix::FromQuat's scratch below it are the original's, so a stack
 // pointer not 16-byte aligned runs the original.
-void CameraModesStep82153290(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82153290) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    __imp__sub_82153290(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82153290);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -500,7 +496,7 @@ void CameraModesStep82153290(PPCContext& ctx, uint8_t* base) {
 // Camera::Shake (no adapter: only ChaseCamera::Update's plain C++ calls it; the
 // step kept for the harness): r3 = the camera; r3 = its viewport, as Offset
 // leaves it.
-void CameraModesStep82152CD8(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82152CD8) {
   ctx.fpscr.disableFlushMode();
   const uint32_t camera = ctx.r3.u32;
   cm::Shake(base, camera, ctx.r1.u32 - 96);
@@ -510,14 +506,14 @@ void CameraModesStep82152CD8(PPCContext& ctx, uint8_t* base) {
 // Viewport::PullBack (no adapter: only ChaseCamera::Update's plain C++ calls
 // it; the step kept for the harness): r3 = the viewport, f1 = the amount, r5 =
 // the offset.
-void CameraModesStep82152788(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82152788) {
   ctx.fpscr.disableFlushMode();
   cm::ViewportPullBack(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32, ctx.r1.u32);
 }
 
 // IntroCamera::StepShot (no adapter: only IntroCamera::Update's plain C++
 // calls it; the step kept for the harness): r3 = the shot; r3 = 0 or 1.
-void CameraModesStep82152E78(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82152E78) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = cm::IntroStepShot(base, ctx.r3.u32, ctx.r1.u32 - 272);
 }
@@ -529,7 +525,7 @@ namespace {
 // atexit for IntroCamera::MakeShot where the native one can't: the game's,
 // from MakeShot's frame (`sp`) with its return address.
 struct MakeShotAtexit {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   uint32_t sp;
   c_runtime::AtexitCall Call() { return {&MakeShotAtexit::Run, this}; }
@@ -554,9 +550,9 @@ namespace hooks {
 // vehicle; r3 = the camera. Stages::Copy's original from the original's
 // frame (368 bytes) where its plain C++ refuses; MakeShot's frame below it.
 // The original without native atexit.
-void CameraModesStep82158F70(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82158F70) {
   if (!hooks::NativeAtexit()) {
-    __imp__sub_82158F70(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82158F70);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -579,7 +575,7 @@ void CameraModesStep82158F70(PPCContext& ctx, uint8_t* base) {
 // CameraDirector::Start (a handler): r3 = the director. Viewports::Init
 // natively (with --native_heap and native atexit) from a frame like the
 // original's (144 bytes), else its original.
-void CameraModesStep82152338(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82152338) {
   ctx.fpscr.disableFlushMode();
   cm::DirectorStart(base, ctx.r3.u32, [&] {
     guest_call::InFrame(ctx, base, 144, 0x82152358, [&](uint32_t) {
@@ -590,7 +586,7 @@ void CameraModesStep82152338(PPCContext& ctx, uint8_t* base) {
       if (viewport) {
         ctx.r3.u64 = *viewport;
       } else {
-        __imp__sub_820AB358(ctx, base);
+        lifted::Sdk(ctx, base, __imp__sub_820AB358);
       }
     });
     ctx.fpscr.disableFlushMode();
@@ -601,7 +597,7 @@ void CameraModesStep82152338(PPCContext& ctx, uint8_t* base) {
 // Viewports::Release leaves it. CameraAnims::FreeAll and Viewports::Release
 // natively where their adapters would (--native_heap, the layer's pages),
 // else their originals from a frame like the original's (96 bytes).
-void CameraModesStep82153098(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82153098) {
   ctx.fpscr.disableFlushMode();
   cm::DirectorRelease(
       base, ctx.r3.u32,
@@ -613,7 +609,7 @@ void CameraModesStep82153098(PPCContext& ctx, uint8_t* base) {
           return;
         }
         guest_call::InFrame(ctx, base, 96, 0x821530B0,
-                            [&](uint32_t) { __imp__sub_821507D8(ctx, base); });
+                            [&](uint32_t) { lifted::Sdk(ctx, base, __imp__sub_821507D8); });
         ctx.fpscr.disableFlushMode();
       },
       [&] {
@@ -622,7 +618,7 @@ void CameraModesStep82153098(PPCContext& ctx, uint8_t* base) {
           return;
         }
         guest_call::InFrame(ctx, base, 96, 0x82153138,
-                            [&](uint32_t) { __imp__sub_820AA430(ctx, base); });
+                            [&](uint32_t) { lifted::Sdk(ctx, base, __imp__sub_820AA430); });
         ctx.fpscr.disableFlushMode();
       });
 }
@@ -637,7 +633,7 @@ namespace {
 // Insert32's frames below Init's (192 bytes); CameraAnims::Load natively
 // where its adapter would (--native_heap, the archive's queue), else its
 // original.
-cm::CutsceneCalls ShotInitCalls(PPCContext& ctx, uint8_t* base) {
+cm::CutsceneCalls ShotInitCalls(lifted::Regs& ctx, uint8_t* base) {
   cm::CutsceneCalls calls;
   calls.copy32 = [&ctx, base](uint32_t to, uint32_t from, uint32_t size) {
     guest_call::InFrame(ctx, base, 192, 0x82156C90, [&](uint32_t) {
@@ -656,7 +652,7 @@ cm::CutsceneCalls ShotInitCalls(PPCContext& ctx, uint8_t* base) {
     }
     guest_call::InFrame(ctx, base, 192, 0x82156CB8, [&](uint32_t) {
       ctx.r3.u64 = id;
-      __imp__sub_82150B10(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_82150B10);
     });
   };
   return calls;
@@ -668,7 +664,7 @@ namespace hooks {
 
 // CutsceneShot::Init: r3 = the shot, r4 = the script entry; r3 as
 // CameraAnims::Load leaves it (the serial). Its calls: ShotInitCalls.
-void CameraModesStep82156B68(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82156B68) {
   ctx.fpscr.disableFlushMode();
   cm::CutsceneInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192, ShotInitCalls(ctx, base));
 }
@@ -681,7 +677,7 @@ namespace {
 // frame at `frame`: the original's r1, 304 bytes) where its native form
 // can't: from frames like Step's and Evaluate's (144 bytes). f1 as it
 // leaves it.
-void ShotCameraOriginal(PPCContext& ctx, uint8_t* base, uint32_t shot, uint32_t frame,
+void ShotCameraOriginal(lifted::Regs& ctx, uint8_t* base, uint32_t shot, uint32_t frame,
                         uint32_t object) {
   const uint32_t time = guest::LoadU32(base, shot + 600);
   const uint64_t stack = ctx.r1.u64;
@@ -706,7 +702,7 @@ namespace hooks {
 // CutsceneShot::Step: r3 = the shot, r4 = where the view goes; r3 = its
 // +604, f1 the last f1 (Duration's). EvalCamera's original runs from frames
 // like Step's (304 bytes) and Evaluate's (144) where its native form can't.
-void CameraModesStep82155800(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82155800) {
   ctx.fpscr.disableFlushMode();
   const uint32_t shot = ctx.r3.u32;
   const uint32_t frame = ctx.r1.u32 - 304;
@@ -732,7 +728,7 @@ namespace {
 // native one can't: from its frame (`sp`, the original's r1 there) with its
 // return address.
 struct SplineAtexit {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   uint32_t sp;
   c_runtime::AtexitCall Call() { return {&SplineAtexit::Run, this}; }
@@ -756,14 +752,14 @@ namespace hooks {
 // RouteRange::CameraAt (no adapter: only TvCamera::Step's plain C++ calls it;
 // the step kept for the harness): r3 = the range, r4 = &the position; r3 = the
 // slices counted (0x82603274's word) or -1.
-void CameraModesStep820FE830(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep820FE830) {
   ctx.r3.s64 = cm::RangeCameraAt(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // TrackRoute::SliceFraction (no adapter: only TvCamera::Step's plain C++
 // calls it; the step kept for the harness): r3 = &the position, r4 = the point; f1 the
 // fraction. Its caller doesn't read r3.
-void CameraModesStep820F9B48(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep820F9B48) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = cm::SliceFraction(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
@@ -772,7 +768,7 @@ void CameraModesStep820F9B48(PPCContext& ctx, uint8_t* base) {
 // doesn't read r3 after). CameraPath::Request through its step (which runs
 // its original where it can't) from a frame like the original's (496
 // bytes).
-void CameraModesStep82156980(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82156980) {
   ctx.fpscr.disableFlushMode();
   const uint32_t camera = ctx.r3.u32;
   const uint32_t frame = ctx.r1.u32 - 496;
@@ -787,9 +783,9 @@ void CameraModesStep82156980(PPCContext& ctx, uint8_t* base) {
 // f1 after). The original without native atexit (TrackRoute::SplinePoint's
 // static); the atexit's fallback from SplinePoint's frame (272 + 208 + 720
 // bytes below).
-void CameraModesStep820AC248(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep820AC248) {
   if (!hooks::NativeAtexit()) {
-    __imp__sub_820AC248(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AC248);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -809,7 +805,7 @@ namespace {
 // two slot calls (`[0x8266D088]`'s slot 7, then that object's slot 3, as
 // Viewport::Init's adapter makes them) with the original's return
 // addresses. Returns the video output.
-uint32_t VideoOutputFrom(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t back) {
+uint32_t VideoOutputFrom(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t back) {
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame;
   ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
@@ -827,7 +823,7 @@ uint32_t VideoOutputFrom(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_
   return ctx.r3.u32;
 }
 
-cm::VideoOutputCall VideoOutput(PPCContext& ctx, uint8_t* base) {
+cm::VideoOutputCall VideoOutput(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t frame, uint32_t back) {
     return VideoOutputFrom(ctx, base, frame, back);
   };
@@ -836,7 +832,7 @@ cm::VideoOutputCall VideoOutput(PPCContext& ctx, uint8_t* base) {
 // ChaseCamera::ChaseCamera's atexit through the translated code when the
 // native one can't: from its frame (`sp`) with its return addresses.
 struct ChaseAtexit {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   uint32_t sp;
   c_runtime::AtexitCall Call() { return {&ChaseAtexit::Run, this}; }
@@ -857,7 +853,7 @@ struct ChaseAtexit {
 // native one can't: from the constructor's frame (`sp`), the return address
 // by the function registered.
 struct ViewAtexit {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   uint32_t sp;
   c_runtime::AtexitCall Call() { return {&ViewAtexit::Run, this}; }
@@ -888,7 +884,7 @@ struct ViewAtexit {
 // Whether the chase camera's plain C++ can stand in: a 16-byte aligned
 // stack pointer (CameraTarget::Track's and the vector loads' frames) and
 // ZoomFromFov's tan.
-bool ChaseNative(PPCContext& ctx, uint8_t* base) {
+bool ChaseNative(lifted::Regs& ctx, uint8_t* base) {
   return (ctx.r1.u32 & 0xF) == 0 && cm::ChaseReady(base);
 }
 
@@ -899,9 +895,9 @@ namespace hooks {
 // ChaseCamera::Place (no adapter: only ChaseCamera::ChaseCamera's plain C++
 // calls it; the step kept for the harness): r3 = the camera, r4 to r7 the
 // four vectors. A stack pointer not 16-byte aligned runs the original.
-void CameraModesStep82153478(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82153478) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    __imp__sub_82153478(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82153478);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -913,9 +909,9 @@ void CameraModesStep82153478(PPCContext& ctx, uint8_t* base) {
 // Update's plain C++ call it; the step kept for the harness): r3 = the
 // camera, f1 = the rate, f2 = the least. The original where ChaseNative
 // says no.
-void CameraModesStep82153640(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82153640) {
   if (!ChaseNative(ctx, base)) {
-    __imp__sub_82153640(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82153640);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -926,9 +922,9 @@ void CameraModesStep82153640(PPCContext& ctx, uint8_t* base) {
 // ChaseCamera::ChaseCamera: r3 = the camera, r4 = the viewport, r5 = the
 // vehicle; r3 = the camera. The original where ChaseNative says no or
 // without native atexit.
-void CameraModesStep82154548(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82154548) {
   if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    __imp__sub_82154548(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82154548);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -940,9 +936,9 @@ void CameraModesStep82154548(PPCContext& ctx, uint8_t* base) {
 
 // ChaseCamera::Update (vtable slot 0; its caller reads neither r3 nor f1
 // after): r3 = the camera. The original where ChaseNative says no.
-void CameraModesStep82154808(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82154808) {
   if (!ChaseNative(ctx, base)) {
-    __imp__sub_82154808(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82154808);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -952,9 +948,9 @@ void CameraModesStep82154808(PPCContext& ctx, uint8_t* base) {
 // TvCamera::TvCamera: r3 = the camera, r4 = the viewport, r5 = the vehicle;
 // r3 = the camera. The original where ChaseNative says no or without native
 // atexit (the fallback chase camera's statics).
-void CameraModesStep82155288(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82155288) {
   if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    __imp__sub_82155288(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82155288);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -972,9 +968,9 @@ namespace hooks {
 // ViewCamera1::ViewCamera1 and ViewCamera2::ViewCamera2: r3 = the camera,
 // r4 = the viewport, r5 = the vehicle; r3 = the camera. The original where
 // ChaseNative says no or without native atexit.
-void CameraModesStep82154A48(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82154A48) {
   if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    __imp__sub_82154A48(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82154A48);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -983,9 +979,9 @@ void CameraModesStep82154A48(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cm::View1Construct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
                                   VideoOutput(ctx, base), atexit.Call());
 }
-void CameraModesStep82154D38(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82154D38) {
   if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    __imp__sub_82154D38(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82154D38);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -998,17 +994,17 @@ void CameraModesStep82154D38(PPCContext& ctx, uint8_t* base) {
 // ViewCamera1::Update and ViewCamera2::Update (vtable slot 0; their caller
 // reads neither r3 nor f1 after): r3 = the camera. The original where
 // ChaseNative says no.
-void CameraModesStep82153A50(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82153A50) {
   if (!ChaseNative(ctx, base)) {
-    __imp__sub_82153A50(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82153A50);
     return;
   }
   ctx.fpscr.disableFlushMode();
   cm::View1Update(base, ctx.r3.u32, ctx.r1.u32 - 352, VideoOutput(ctx, base));
 }
-void CameraModesStep82153E58(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82153E58) {
   if (!ChaseNative(ctx, base)) {
-    __imp__sub_82153E58(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82153E58);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1022,9 +1018,9 @@ namespace hooks {
 // IntroCamera::Update (vtable slot 0; its caller reads neither r3 nor f1
 // after): r3 = the camera. A stack pointer not 16-byte aligned runs the
 // original (CameraTarget::Track's frame).
-void CameraModesStep82155E58(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82155E58) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    __imp__sub_82155E58(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82155E58);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1080,7 +1076,7 @@ struct RivalLogoOpenCalls {
   std::function<uint32_t(uint32_t, uint32_t)> open;
   std::function<uint32_t(uint32_t, uint32_t)> load_xpr;
 };
-RivalLogoOpenCalls RivalLogoOpenCallsAt(PPCContext& ctx, uint8_t* base, uint32_t sp) {
+RivalLogoOpenCalls RivalLogoOpenCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
   RivalLogoOpenCalls calls;
   calls.open = [&ctx, base, sp](uint32_t id, uint32_t asset) -> uint32_t {
     if (ui_movies_game_hooks::OpenNative()) {
@@ -1111,7 +1107,7 @@ namespace hooks {
 
 // RivalLogo::Open: r3 = the entry, r4 = the logo, r5 = the texture; r3 as
 // the original leaves it. Its calls: RivalLogoOpenCallsAt.
-void CameraModesStep822118E0(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep822118E0) {
   const RivalLogoOpenCalls calls = RivalLogoOpenCallsAt(ctx, base, ctx.r1.u32 - 112);
   ctx.r3.u64 = cm::RivalLogoOpen(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, calls.open,
                                  calls.load_xpr);
@@ -1126,8 +1122,8 @@ namespace {
 // (never run in play) through the translated code, UiMovies::Delete
 // natively where its adapter would, else its adapter, from frames like the
 // original's.
-cm::RivalLogoCloseCalls RivalLogoCloseCallsAt(PPCContext& ctx, uint8_t* base, uint32_t sp) {
-  auto call = [&ctx, base, sp](uint32_t back, void (*function)(PPCContext&, uint8_t*),
+cm::RivalLogoCloseCalls RivalLogoCloseCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
+  auto call = [&ctx, base, sp](uint32_t back, void (*function)(lifted::Regs&, uint8_t*),
                                uint32_t r3) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp + 128;
@@ -1156,7 +1152,7 @@ cm::RivalLogoCloseCalls RivalLogoCloseCallsAt(PPCContext& ctx, uint8_t* base, ui
 // 128; RivalLogo::Play's original with --log_pause_movie (as its adapter);
 // RivalLogo::Draw through its override (sub_82211A28, which frame
 // interpolation's --redraw_rival_logo notes) with Step's return address.
-cm::CutsceneTickCalls CutsceneTickCallsAt(PPCContext& ctx, uint8_t* base, uint32_t frame) {
+cm::CutsceneTickCalls CutsceneTickCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t frame) {
   cm::CutsceneTickCalls calls;
   calls.camera_original = [&ctx, base, frame](uint32_t shot, uint32_t object) {
     ShotCameraOriginal(ctx, base, shot, frame - 304, object);
@@ -1166,7 +1162,7 @@ cm::CutsceneTickCalls CutsceneTickCallsAt(PPCContext& ctx, uint8_t* base, uint32
     calls.play_original = [&ctx, base, frame](uint32_t entry) {
       CallFrom(ctx, base, frame, 192, 0x82155A64, [&] {
         ctx.r3.u64 = entry;
-        __imp__sub_82211AB0(ctx, base);
+        lifted::Sdk(ctx, base, __imp__sub_82211AB0);
       });
     };
   }
@@ -1184,7 +1180,7 @@ cm::CutsceneTickCalls CutsceneTickCallsAt(PPCContext& ctx, uint8_t* base, uint32
 namespace hooks {
 
 // RivalLogo::Close: r3 = the entry; r3 as the original leaves it.
-void CameraModesStep82211980(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82211980) {
   const uint32_t sp = ctx.r1.u32 - 128;
   ctx.r3.u64 = cm::RivalLogoClose(base, ctx.r3.u32, sp, RivalLogoCloseCallsAt(ctx, base, sp));
 }
@@ -1192,7 +1188,7 @@ void CameraModesStep82211980(PPCContext& ctx, uint8_t* base) {
 // Cutscene::Step: r3 = the cutscene; r3 = 1 while running, 0 at its last
 // shot; lr put back as the original's epilogue does (its only caller,
 // Cutscene::Update, reads neither f1 nor the stack after).
-void CameraModesStep82155A28(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82155A28) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 192;
@@ -1204,7 +1200,7 @@ void CameraModesStep82155A28(PPCContext& ctx, uint8_t* base) {
 // Cutscene::Update (vtable slot 0; CameraDirector::Update reads neither r3
 // nor f1 after): r3 = the cutscene; r3 as the original leaves it, lr put
 // back. Step's frame (192 bytes) below Update's (96).
-void CameraModesStep821561F8(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821561F8) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 96;
@@ -1223,7 +1219,7 @@ ITC_CAMERA_MODES(821561F8)
 namespace {
 
 // TvCamera::Step's guest calls from its frame at `frame` (720 bytes).
-cm::TvStepCalls TvStepCallsAt(PPCContext& ctx, uint8_t* base, uint32_t frame,
+cm::TvStepCalls TvStepCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t frame,
                               uint32_t camera) {
   cm::TvStepCalls calls;
   calls.copy = [&ctx, base, frame](uint32_t to, uint32_t from, uint32_t size) {
@@ -1249,9 +1245,9 @@ namespace hooks {
 // with a stack pointer not 16-byte aligned (CameraTarget::Track's frame) or
 // without native atexit (CameraPath::Evaluate's spline static; its fallback
 // from SplinePoint's frame, 272 + 208 + 720 bytes below Step's).
-void CameraModesStep821562F8(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821562F8) {
   if ((ctx.r1.u32 & 0xF) != 0 || !hooks::NativeAtexit()) {
-    __imp__sub_821562F8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821562F8);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1268,9 +1264,9 @@ void CameraModesStep821562F8(PPCContext& ctx, uint8_t* base) {
 // camera's update natively (its frame 144 bytes below Update's 128), else
 // its slot 0 through the translated code; Step's frame 720 bytes below.
 // The original where ChaseNative says no or without native atexit.
-void CameraModesStep821593D8(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821593D8) {
   if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    __imp__sub_821593D8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821593D8);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1290,7 +1286,7 @@ void CameraModesStep821593D8(PPCContext& ctx, uint8_t* base) {
   calls.set_style_original = [&ctx, base, frame](uint32_t style) {
     CallFrom(ctx, base, frame, 128, 0x821594A0, [&] {
       ctx.r3.u64 = style;
-      __imp__sub_82152108(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_82152108);
     });
   };
   cm::TvUpdate(base, camera, frame, calls, atexit.Call());
@@ -1308,7 +1304,7 @@ namespace hooks {
 // CameraDirector::InitStates: r3 = the director; r3 as the last
 // StateMachine::Add leaves it (its adapter's: a new transition's address
 // from the machine's 64-bit r3, src/hooks/game_modes.cpp).
-void CameraModesStep82159950(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82159950) {
   ctx.fpscr.disableFlushMode();
   const uint64_t machine_r3 = ctx.r3.u64 + cm::kMachine;
   const uint32_t machine = ctx.r3.u32 + cm::kMachine;
@@ -1323,13 +1319,13 @@ void CameraModesStep82159950(PPCContext& ctx, uint8_t* base) {
 // 176 bytes): the view's camera object made through its adapter's step
 // (which falls back to its original itself) with the call site's return
 // address, or the harness's stand-in.
-cm::SetModeCalls SetModeCallsAt(PPCContext& ctx, uint8_t* base, uint32_t frame) {
+cm::SetModeCalls SetModeCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t frame) {
   cm::SetModeCalls calls;
   calls.construct = [&ctx, base, frame](uint32_t view, uint32_t object, uint32_t viewport,
                                         uint32_t vehicle, uint32_t back) -> uint32_t {
-    static constexpr void (*kSteps[6])(PPCContext&, uint8_t*) = {
-        CameraModesStep82154548, CameraModesStep82154A48, CameraModesStep82154D38,
-        CameraModesStep82158F70, CameraModesStep82155288, CameraModesStep82156CC0};
+    static constexpr void (*kSteps[6])(lifted::Regs&, uint8_t*) = {
+        ITC_REGS_FN(CameraModesStep82154548), ITC_REGS_FN(CameraModesStep82154A48), ITC_REGS_FN(CameraModesStep82154D38),
+        ITC_REGS_FN(CameraModesStep82158F70), ITC_REGS_FN(CameraModesStep82155288), ITC_REGS_FN(CameraModesStep82156CC0)};
     static constexpr uint32_t kFunctions[6] = {0x82154548, 0x82154A48, 0x82154D38,
                                                0x82158F70, 0x82155288, 0x82156CC0};
     if (g_construct_stand_in) {
@@ -1350,7 +1346,7 @@ cm::SetModeCalls SetModeCallsAt(PPCContext& ctx, uint8_t* base, uint32_t frame) 
 }
 
 // SetMode natively from a handler's frame at `frame` (its 176 bytes below).
-std::function<void(uint32_t)> SetModeFrom(PPCContext& ctx, uint8_t* base, uint32_t director,
+std::function<void(uint32_t)> SetModeFrom(lifted::Regs& ctx, uint8_t* base, uint32_t director,
                                           uint32_t frame) {
   return [&ctx, base, director, frame](uint32_t view) {
     cm::DirectorSetMode(base, director, view, frame - 176,
@@ -1360,7 +1356,7 @@ std::function<void(uint32_t)> SetModeFrom(PPCContext& ctx, uint8_t* base, uint32
 
 // Stages::Copy's original from a handler's frame (`frame_bytes`) with the
 // return address `back`, where its plain C++ refuses.
-cm::StagesCopyCall StagesCopyFrom(PPCContext& ctx, uint8_t* base, uint32_t frame,
+cm::StagesCopyCall StagesCopyFrom(lifted::Regs& ctx, uint8_t* base, uint32_t frame,
                                   uint32_t frame_bytes, uint32_t back) {
   return [&ctx, base, frame, frame_bytes, back](uint32_t out, uint32_t stages, uint32_t stage) {
     CallFrom(ctx, base, frame, frame_bytes, back, [&] {
@@ -1374,7 +1370,7 @@ cm::StagesCopyCall StagesCopyFrom(PPCContext& ctx, uint8_t* base, uint32_t frame
 
 // CameraDirector::SetMode: r3 = the director, r4 = the view; r3 as the
 // original leaves it; lr put back.
-void CameraModesStep821591F0(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821591F0) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 176;
@@ -1386,7 +1382,7 @@ void CameraModesStep821591F0(PPCContext& ctx, uint8_t* base) {
 // CameraDirector::OnRaceStart (a handler; r3 not kept: the state machine's
 // handler call doesn't read it): r3 = the director; lr put back. SetMode
 // natively from its 224-byte frame.
-void CameraModesStep821596B0(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821596B0) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 224;
@@ -1400,9 +1396,9 @@ void CameraModesStep821596B0(PPCContext& ctx, uint8_t* base) {
 // CameraDirector::Resume (a handler; r3 and f1 not kept): r3 = the
 // director; lr put back. The original where the color filter's slots aren't
 // the ones done natively.
-void CameraModesStep821597F0(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821597F0) {
   if (!cm::DirectorResumeReady(base)) {
-    __imp__sub_821597F0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821597F0);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1420,7 +1416,7 @@ void CameraModesStep821597F0(PPCContext& ctx, uint8_t* base) {
 // camera objects' slot 0 through the translated code (their adapters), from
 // its 176-byte frame with the original's return addresses; SetMode
 // natively.
-void CameraModesStep821594B8(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep821594B8) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - 176;
@@ -1448,9 +1444,9 @@ void CameraModesStep821594B8(PPCContext& ctx, uint8_t* base) {
 
 // The director's update as frame interpolation's wrapper runs it on logic
 // passes: natively with --native_camera_modes, else the original.
-void CameraModesUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesUpdate) {
   if (!ITC_FLAG(native_camera_modes)) {
-    __imp__sub_821594B8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821594B8);
     return;
   }
   CameraModesStep821594B8(ctx, base);
@@ -1475,9 +1471,9 @@ namespace hooks {
 // below it, as FromViewport's adapter makes it. The original with a stack
 // pointer not 16-byte aligned (the vector loads and stores on its frame) or
 // where tan's native form can't stand in.
-void CameraModesStep8217BE98(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep8217BE98) {
   if ((ctx.r1.u32 & 0xF) != 0 || !cm::GarageReady(base, ctx.r3.u32)) {
-    __imp__sub_8217BE98(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8217BE98);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1537,9 +1533,9 @@ namespace hooks {
 // Init's own lr save below the frame would hold it); RivalLogo::Open's from
 // its frame (RivalLogoOpenCallsAt). The original where ChaseNative says no
 // (CameraTarget::Track's frame, ZoomFromFov's tan of the same angle).
-void CameraModesStep82156CC0(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraModesStep82156CC0) {
   if (!ChaseNative(ctx, base)) {
-    __imp__sub_82156CC0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82156CC0);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1557,7 +1553,7 @@ void CameraModesStep82156CC0(PPCContext& ctx, uint8_t* base) {
       cm::AnimsFreeAll(base, frame - 384 + 80);
       return;
     }
-    from_frame(0x82156E6C, [&] { __imp__sub_821507D8(ctx, base); });
+    from_frame(0x82156E6C, [&] { lifted::Sdk(ctx, base, __imp__sub_821507D8); });
   };
   calls.stages_copy = [&](uint32_t out, uint32_t stages, uint32_t stage) {
     from_frame(0x82156ED0, [&] {

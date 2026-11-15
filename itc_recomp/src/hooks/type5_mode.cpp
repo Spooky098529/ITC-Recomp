@@ -3,6 +3,7 @@
 // shares (hooks/type5_mode.h).
 
 #include "hooks/type5_mode.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "type5_mode/type5_mode.h"
@@ -45,7 +46,7 @@ namespace t5 = type5_mode;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -55,7 +56,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -76,19 +77,19 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
-void Simple(PPCContext& ctx, uint8_t* base, t5::Simple which) {
+void Simple(lifted::Regs& ctx, uint8_t* base, t5::Simple which) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::SimpleStep(base, ctx.r3.u32, which, ctx.r1.u32, guest.calls());
 }
 
 // A delegate function: r3 the answer (returned as it came), r4 the mode.
 template <void (*Function)(uint8_t*, uint32_t, uint32_t, uint32_t, const t5::Calls&)>
-void Delegate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Delegate) {
   const uint64_t answer = ctx.r3.u64;
   GuestCalls guest(ctx, base);
   Function(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
@@ -97,82 +98,82 @@ void Delegate(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace
 
-void Type5DialogOpenConfirmStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogOpenConfirmStep) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::OpenConfirmStep(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void Type5DialogCloseConfirmStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogCloseConfirmStep) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::CloseConfirmStep(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void Type5DialogCloseNoticeStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogCloseNoticeStep) {
   Simple(ctx, base, t5::Simple::kCloseNotice);
 }
-void Type5DialogOpenConfirm2Step(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogOpenConfirm2Step) {
   Simple(ctx, base, t5::Simple::kOpenConfirm2);
 }
-void Type5DialogCloseConfirm2Step(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogCloseConfirm2Step) {
   Simple(ctx, base, t5::Simple::kCloseConfirm2);
 }
-void Type5DialogCloseNotice2Step(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogCloseNotice2Step) {
   Simple(ctx, base, t5::Simple::kCloseNotice2);
 }
-void Type5DialogMoveCursorStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogMoveCursorStep) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::MoveCursorStep(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void Type5DialogStep9(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogStep9) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::Step9(base, ctx.r1.u32, guest.calls());
 }
-void Type5DialogConfirmPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogConfirmPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::ConfirmPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void Type5DialogNoticePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogNoticePage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::NoticePage(base, ctx.r3.u32, false, ctx.r1.u32, guest.calls());
 }
-void Type5DialogNotice2Page(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogNotice2Page) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::NoticePage(base, ctx.r3.u32, true, ctx.r1.u32, guest.calls());
 }
-void Type5DialogDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogDraw) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::Draw(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
-void Type5DialogUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::Update(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void Type5DialogOnEnter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogOnEnter) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::OnEnter(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void Type5DialogWaitForMovies(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogWaitForMovies) {
   ctx.r3.u64 = t5::WaitForMovies(base, ctx.r3.u64, ctx.r1.u32);
 }
-void Type5DialogOnInterrupt(PPCContext&, uint8_t* base) { t5::OnInterrupt(base); }
-void Type5DialogOpenConfirm(PPCContext& ctx, uint8_t* base) {
+void Type5DialogOnInterrupt(lifted::Regs&, uint8_t* base) { t5::OnInterrupt(base); }
+ITC_REGS_STEP(Type5DialogOpenConfirm) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::OpenConfirm(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void Type5DialogOpenNotice(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogOpenNotice) {
   t5::OpenNotice(base, ctx.r3.u32, false);
 }
-void Type5DialogOpenConfirm2(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogOpenConfirm2) {
   ctx.r3.u64 = t5::OpenConfirm2(base, ctx.r3.u32, ctx.r1.u32);
 }
-void Type5DialogOpenNotice2(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogOpenNotice2) {
   t5::OpenNotice(base, ctx.r3.u32, true);
 }
-void Type5DialogOnLeft(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogOnLeft) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::OnLeft(base, ctx.r1.u32, guest.calls());
 }
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 dialog's Init.
-void Type5DialogInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type5DialogInit) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
@@ -180,44 +181,39 @@ void Type5DialogInit(PPCContext& ctx, uint8_t* base) {
       t5::DialogInit(base, machine, ctx.r1.u32 - t5::kDialogInitFrame, &replaced);
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
-void ModeType5Init(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType5Init) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::ModeInit(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void ModeType5FindShown(PPCContext& ctx, uint8_t* base) { t5::FindShown(base, ctx.r3.u32); }
-void ModeType5WaitForLoads(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType5FindShown) { t5::FindShown(base, ctx.r3.u32); }
+ITC_REGS_STEP(ModeType5WaitForLoads) {
   Delegate<t5::WaitForLoads>(ctx, base);
 }
-void ModeType5NextMode(PPCContext& ctx, uint8_t* base) { Delegate<t5::NextMode>(ctx, base); }
-void ModeType5LeaveScreen(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType5NextMode) { Delegate<t5::NextMode>(ctx, base); }
+ITC_REGS_STEP(ModeType5LeaveScreen) {
   Delegate<t5::LeaveScreen>(ctx, base);
 }
-void ModeType5WaitForShown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType5WaitForShown) {
   Delegate<t5::WaitForShown>(ctx, base);
 }
-void ModeType5Leaving(PPCContext& ctx, uint8_t* base) { Delegate<t5::Leaving>(ctx, base); }
-void ModeSlot14Thunk(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType5Leaving) { Delegate<t5::Leaving>(ctx, base); }
+ITC_REGS_STEP(ModeSlot14Thunk) {
   const uint32_t lr = uint32_t(ctx.lr);
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t5::Slot14Thunk(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, lr, guest.calls());
 }
-void ModeType5Interrupt(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType5Interrupt) {
   ctx.r3.u64 = t5::Interrupt(base, ctx.r3.u32);
 }
-void ModeType5ForceExit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ModeType5ForceExit) {
   t5::ForceExit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
-void ModeType5Resume(PPCContext&, uint8_t* base) { t5::Resume(base); }
+void ModeType5Resume(lifted::Regs&, uint8_t* base) { t5::Resume(base); }
 
 }  // namespace hooks
 
 #define ITC_TYPE5_MODE(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {   \
-    REX_FUNC_PROLOGUE();                 \
-    if (!ITC_FLAG(native_type5_mode)) {  \
-      __imp__sub_##address(ctx, base);   \
-      return;                            \
-    }                                    \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type5_mode)) { \
     hooks::step(ctx, base);              \
   }
 

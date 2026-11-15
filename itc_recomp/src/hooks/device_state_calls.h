@@ -6,6 +6,7 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "graphics/device_state.h"
@@ -16,7 +17,7 @@ namespace hooks {
 // The guest calls they keep: the draw's flush helpers (Wrapped, in
 // src/native/draw_packets.cpp), table setters that aren't native, and
 // SetTexture's original. Each sets the registers the original's call does.
-inline graphics::device_state::DeviceCalls DeviceStateCalls(PPCContext& ctx, uint8_t* base,
+inline graphics::device_state::DeviceCalls DeviceStateCalls(lifted::Regs& ctx, uint8_t* base,
                                                             uint32_t device) {
   graphics::device_state::DeviceCalls calls;
   calls.flush_hiz = [&ctx, base, device](uint64_t mask, uint32_t hiz) {

@@ -13,6 +13,7 @@
 // --log_xma logs each sound's start, loop and end, and the buffers made.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "audio/xma_packets.h"
 #include "audio/xma_stream.h"
@@ -129,7 +130,7 @@ void Advance(uint8_t* base, StreamState& s) {
 // Runs `f(state)` on stream r4 of object r3 under its lock; r3 = `none` for
 // a handle or stream that isn't ours.
 template <typename F>
-void OnStream(PPCContext& ctx, uint32_t none, F f) {
+void OnStream(lifted::Regs& ctx, uint32_t none, F f) {
   auto object = Find(ctx.r3.u32);
   const uint32_t index = ctx.r4.u32;
   if (!object) {
@@ -151,8 +152,8 @@ void OnStream(PPCContext& ctx, uint32_t none, F f) {
 // XmaObject::Create (r3 the stream count, r4 their descriptions, 12 bytes
 // each: sample rate +0, output ring samples +4, channels +8; r5 flags, bit 0
 // = contexts made later; r6 out): the object and its handle.
-extern "C" REX_FUNC(sub_8245C650) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245C650) {
+  
   const uint32_t count = ctx.r3.u32, descriptions = ctx.r4.u32, flags = ctx.r5.u32,
                  out = ctx.r6.u32;
   auto object = std::make_shared<Object>();
@@ -179,8 +180,8 @@ extern "C" REX_FUNC(sub_8245C650) {
 }
 
 // XmaObject::Destroy (r3 the object).
-extern "C" REX_FUNC(sub_8245C880) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245C880) {
+  
   const uint32_t handle = ctx.r3.u32;
   std::shared_ptr<Object> object;
   {
@@ -203,8 +204,8 @@ extern "C" REX_FUNC(sub_8245C880) {
 
 // XmaObject::ReleaseContexts and MakeContexts: only the "made" state is
 // kept (sub_8245C948 reads it).
-extern "C" REX_FUNC(sub_8245C8D0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245C8D0) {
+  
   if (auto object = Find(ctx.r3.u32)) {
     std::lock_guard lock(object->mutex);
     object->contexts_made = false;
@@ -212,8 +213,8 @@ extern "C" REX_FUNC(sub_8245C8D0) {
   ctx.r3.u64 = 0;
 }
 
-extern "C" REX_FUNC(sub_8245D138) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245D138) {
+  
   if (auto object = Find(ctx.r3.u32)) {
     std::lock_guard lock(object->mutex);
     object->contexts_made = true;
@@ -221,15 +222,15 @@ extern "C" REX_FUNC(sub_8245D138) {
   ctx.r3.u64 = 0;
 }
 
-extern "C" REX_FUNC(sub_8245C948) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245C948) {
+  
   auto object = Find(ctx.r3.u32);
   ctx.r3.u64 = object && object->contexts_made ? 1 : 0;
 }
 
 // XmaObject::SetInputBuffer (object, stream, data, size in bytes).
-extern "C" REX_FUNC(sub_8245C958) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245C958) {
+  
   const uint32_t data = ctx.r5.u32, size = ctx.r6.u32;
   OnStream(ctx, kBothInUse, [&](StreamState& s) -> uint32_t {
     if (!s.input) {
@@ -246,8 +247,8 @@ extern "C" REX_FUNC(sub_8245C958) {
 }
 
 // (object, stream, address): 1 if a sound at that address is still playing.
-extern "C" REX_FUNC(sub_8245CA30) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245CA30) {
+  
   const uint32_t address = ctx.r5.u32;
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t {
     return (Valid(s) && s.input == address) || s.pending == address;
@@ -255,20 +256,20 @@ extern "C" REX_FUNC(sub_8245CA30) {
 }
 
 // (object, stream): 1 unless both input slots are taken.
-extern "C" REX_FUNC(sub_8245CA90) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245CA90) {
+  
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t { return !(Valid(s) && s.pending); });
 }
 
 // (object, stream): 1 if no sound is playing.
-extern "C" REX_FUNC(sub_8245CAE0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245CAE0) {
+  
   OnStream(ctx, 1, [&](StreamState& s) -> uint32_t { return !Valid(s) && !s.pending; });
 }
 
 // (object, stream): samples ready.
-extern "C" REX_FUNC(sub_8245CB38) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245CB38) {
+  
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t {
     return s.input ? s.stream.Ready(s.ring_samples) : 0;
   });
@@ -276,8 +277,8 @@ extern "C" REX_FUNC(sub_8245CB38) {
 
 // (object, stream, out address): where to read (to r5) and the samples
 // readable there in one go.
-extern "C" REX_FUNC(sub_8245CD68) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245CD68) {
+  
   const uint32_t out = ctx.r5.u32;
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t {
     guest::StoreU32(base, out, s.buffer + s.stream.position() * s.channels * 2);
@@ -287,8 +288,8 @@ extern "C" REX_FUNC(sub_8245CD68) {
 
 // (object, stream, samples, out address): takes up to that many samples;
 // where they were read from to r6; returns how many.
-extern "C" REX_FUNC(sub_8245CBB0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245CBB0) {
+  
   const uint32_t count = ctx.r5.u32, out = ctx.r6.u32;
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t {
     guest::StoreU32(base, out, s.buffer + s.stream.position() * s.channels * 2);
@@ -308,14 +309,14 @@ extern "C" REX_FUNC(sub_8245CBB0) {
 }
 
 // (object, stream): samples taken so far.
-extern "C" REX_FUNC(sub_8245D050) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245D050) {
+  
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t { return s.consumed; });
 }
 
 // XmaObject::ResetStream (object, stream): the sound stopped.
-extern "C" REX_FUNC(sub_8245CE98) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245CE98) {
+  
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t {
     if (ITC_FLAG(log_xma) && s.input) {
       ITC_LOG_INFO("xma: reset: data {:08X} after {} samples", s.input, s.consumed);
@@ -326,16 +327,16 @@ extern "C" REX_FUNC(sub_8245CE98) {
 }
 
 // (object, stream): the error status; none.
-extern "C" REX_FUNC(sub_8245CF60) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245CF60) {
+  
   OnStream(ctx, 0, [&](StreamState&) -> uint32_t { return 0; });
 }
 
 // XmaObject::SetLoopData (object, stream, r5 the loop data: start bit +0,
 // end bit +4 (26 bits each), subframes played in the last frame - 1 +8,
 // subframes skipped at the start +9, count +10).
-extern "C" REX_FUNC(sub_8245CF98) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245CF98) {
+  
   const uint32_t loop = ctx.r5.u32;
   const uint32_t start_bit = guest::LoadU32(base, loop) & 0x3FFFFFF;
   const uint32_t end_bit = guest::LoadU32(base, loop + 4) & 0x3FFFFFF;
@@ -355,8 +356,8 @@ extern "C" REX_FUNC(sub_8245CF98) {
 }
 
 // (object, stream, r5 the start's bit offset, r6 subframes to skip).
-extern "C" REX_FUNC(sub_8245D0E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245D0E0) {
+  
   const uint32_t bit = ctx.r5.u32 & 0x3FFFFFF, skip = ctx.r6.u32 & 7;
   OnStream(ctx, 0, [&](StreamState& s) -> uint32_t {
     s.stream.SetStart(bit, skip);
@@ -366,26 +367,26 @@ extern "C" REX_FUNC(sub_8245D0E0) {
 
 // XmaObject::Lock, IsLocked, Unlock: nothing to wait for. Unlock decodes
 // ahead and moves finished streams on.
-extern "C" REX_FUNC(sub_8245D208) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245D208) {
+  
   ctx.r3.u64 = 0;
 }
 
-extern "C" REX_FUNC(sub_8245D350) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245D350) {
+  
   ctx.r3.u64 = 1;
 }
 
 // The hardware wait (r3 the object; polled sub_8245D350, and after an eighth
 // of a second reset the XMA hardware through its registers): nothing to wait
 // for, 0 (answered at once).
-extern "C" REX_FUNC(sub_8245D288) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245D288) {
+  
   ctx.r3.u64 = 0;
 }
 
-extern "C" REX_FUNC(sub_8245D4D0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245D4D0) {
+  
   if (auto object = Find(ctx.r3.u32)) {
     std::lock_guard lock(object->mutex);
     for (auto& s : object->streams) {
@@ -397,25 +398,25 @@ extern "C" REX_FUNC(sub_8245D4D0) {
 }
 
 // Reads the XMA registers' context array address at boot: no hardware.
-extern "C" REX_FUNC(sub_8245C638) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245C638) {
+  
 }
 
 // Never called in play (docs/functions/audio.md): logged if one ever is.
-extern "C" REX_FUNC(sub_8245CE10) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245CE10) {
+  
   ITC_LOG_ERROR("xma: sub_8245CE10 called (from {:08X}), not handled", uint32_t(ctx.lr));
   ctx.r3.u64 = 1;
 }
 
-extern "C" REX_FUNC(sub_8245D010) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245D010) {
+  
   ITC_LOG_ERROR("xma: sub_8245D010 called (from {:08X}), not handled", uint32_t(ctx.lr));
   ctx.r3.u64 = 0;
 }
 
-extern "C" REX_FUNC(sub_8245D070) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8245D070) {
+  
   ITC_LOG_ERROR("xma: sub_8245D070 called (from {:08X}), not handled", uint32_t(ctx.lr));
   for (uint32_t i = 0; i < 3; i++) {
     guest::StoreU32(base, ctx.r5.u32 + 4 * i, 0);
@@ -425,8 +426,8 @@ extern "C" REX_FUNC(sub_8245D070) {
 
 // The frame walk, sample to bit offset (r3 the data, r4 its size, r5 the
 // stream, r6 the sample).
-extern "C" REX_FUNC(sub_8246A5F8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8246A5F8) {
+  
   ctx.r3.u64 =
       audio::xma::BitOffsetOfSample(base + ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
 }

@@ -443,18 +443,18 @@ void Panels(Context& h, const World& w) {
         t.r3.u64 = w.at(r.Below(2) == 0 ? kGroupA : kGroupB);
         t.r4.u64 = r.Below(2000);
       },
-      __imp__sub_8224EF18, hooks::CarListSetCaption);
+      __imp__sub_8224EF18, ITC_CONTEXT_FN(hooks::CarListSetCaption));
   Group(h, w, "PanelPart::FinishAll (sub_82249CF0)", 16, {96, 8}, group(4), __imp__sub_82249CF0,
-        hooks::CarListPartFinishAll);
+        ITC_CONTEXT_FN(hooks::CarListPartFinishAll));
   Group(
       h, w, "TabPanel::SetCursorY (sub_8224FD20)", n, {112, 24},
       [base](PPCContext& t, Random& r, const World& w) {
         SetGroup(base, w, r, 4);
         t.r4.u64 = r.Below(4) == 0 ? r.Next() : 40 * r.Below(3);
       },
-      __imp__sub_8224FD20, hooks::CarListTabSetCursorY);
+      __imp__sub_8224FD20, ITC_CONTEXT_FN(hooks::CarListTabSetCursorY));
   Group(h, w, "TabPanel::SetButtons (sub_8224FD90)", n, {112, 24}, group(4),
-        __imp__sub_8224FD90, hooks::CarListTabSetButtons);
+        __imp__sub_8224FD90, ITC_CONTEXT_FN(hooks::CarListTabSetButtons));
   // The rows: r4 the row (0 to 7, now and then -1), r5 the entry.
   Group(
       h, w, "RowPanel::SetRow (sub_8224F018)", 80, {128, 48},
@@ -472,7 +472,7 @@ void Panels(Context& h, const World& w) {
         guest::StoreU32(base, w.entry.address + 8432,
                         r.Below(2) == 0 ? kIds[r.Below(12)] : r.Below(80));
       },
-      __imp__sub_8224F018, hooks::CarListRowSetRow);
+      __imp__sub_8224F018, ITC_CONTEXT_FN(hooks::CarListRowSetRow));
   Group(
       h, w, "RowPanel::SetArrows (sub_8224F680)", n, {128, 48},
       [base](PPCContext& t, Random& r, const World& w) {
@@ -481,26 +481,26 @@ void Panels(Context& h, const World& w) {
         t.r5.u64 = r.Below(2) == 0 ? guest::LoadU32(base, w.panel() + 4) + uint32_t(t.r4.u64)
                                    : Small(r);
       },
-      __imp__sub_8224F680, hooks::CarListRowSetArrows);
+      __imp__sub_8224F680, ITC_CONTEXT_FN(hooks::CarListRowSetArrows));
   Group(
       h, w, "RowPanel::Unhighlight (sub_8224F558)", n, {112, 24},
       [base](PPCContext&, Random& r, const World& w) {
         SetGroup(base, w, r, 0);
         guest::StoreU32(base, w.panel() + 156, r.Below(2));
       },
-      __imp__sub_8224F558, hooks::CarListRowUnhighlight);
+      __imp__sub_8224F558, ITC_CONTEXT_FN(hooks::CarListRowUnhighlight));
   Group(h, w, "RowPanel::Hide (sub_8224F4C8)", n, {112, 24}, group(0), __imp__sub_8224F4C8,
-        hooks::CarListRowHide);
+        ITC_CONTEXT_FN(hooks::CarListRowHide));
   // The colors.
   Group(h, w, "ColorPanel::Show (sub_8224D010)", n, {112, 24}, group(4), __imp__sub_8224D010,
-        hooks::CarListColorShow);
+        ITC_CONTEXT_FN(hooks::CarListColorShow));
   Group(
       h, w, "ColorPanel::Select (sub_8224D118)", n, {112, 32},
       [base](PPCContext& t, Random& r, const World& w) {
         SetGroup(base, w, r, 4);
         t.r4.u64 = r.Below(13);
       },
-      __imp__sub_8224D118, hooks::CarListColorSelect);
+      __imp__sub_8224D118, ITC_CONTEXT_FN(hooks::CarListColorSelect));
   Group(
       h, w, "ColorPanel::SetArrows (sub_8224D2D0)", n, {128, 40},
       [base](PPCContext& t, Random& r, const World& w) {
@@ -508,21 +508,21 @@ void Panels(Context& h, const World& w) {
         t.r4.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
         t.r5.u64 = r.Below(3) == 0 ? t.r4.u64 : r.Below(2);
       },
-      __imp__sub_8224D2D0, hooks::CarListColorSetArrows);
+      __imp__sub_8224D2D0, ITC_CONTEXT_FN(hooks::CarListColorSetArrows));
   Group(
       h, w, "ColorPanel::ShowSwatches (sub_8224D358)", n, {128, 40},
       [base](PPCContext& t, Random& r, const World& w) {
         SetGroup(base, w, r, 4);
         t.r4.u64 = Small(r);
       },
-      __imp__sub_8224D358, hooks::CarListColorShowSwatches);
+      __imp__sub_8224D358, ITC_CONTEXT_FN(hooks::CarListColorShowSwatches));
   Group(
       h, w, "ColorPanel::PlaceCursor (sub_8224D3E0)", n, {128, 32},
       [base](PPCContext& t, Random& r, const World& w) {
         SetGroup(base, w, r, 4);
         t.r4.u64 = Small(r);
       },
-      __imp__sub_8224D3E0, hooks::CarListColorPlaceCursor);
+      __imp__sub_8224D3E0, ITC_CONTEXT_FN(hooks::CarListColorPlaceCursor));
   Group(
       h, w, "ColorPanel::SetCount (sub_8224D458)", n, {96, 16},
       [base](PPCContext& t, Random& r, const World& w) {
@@ -530,7 +530,7 @@ void Panels(Context& h, const World& w) {
         guest::StoreU32(base, w.panel() + 88, r.Below(2));
         t.r4.u64 = Small(r);
       },
-      __imp__sub_8224D458, hooks::CarListColorSetCount);
+      __imp__sub_8224D458, ITC_CONTEXT_FN(hooks::CarListColorSetCount));
   Group(
       h, w, "ColorPanel::SetSwatch (sub_8224D4A0)", n, {128, 40},
       [base](PPCContext& t, Random& r, const World& w) {
@@ -538,7 +538,7 @@ void Panels(Context& h, const World& w) {
         t.r4.u64 = r.Below(8);
         t.r5.u64 = w.at(kColorRecords) + 32 * r.Below(13);
       },
-      __imp__sub_8224D4A0, hooks::CarListColorSetSwatch);
+      __imp__sub_8224D4A0, ITC_CONTEXT_FN(hooks::CarListColorSetSwatch));
   Group(
       h, w, "ColorPanel::SetSwatches (sub_8224D518)", n, {128, 40},
       [base](PPCContext& t, Random& r, const World& w) {
@@ -548,10 +548,10 @@ void Panels(Context& h, const World& w) {
         // The swatches drawn (each node's +104) stay few: the count 0 to 8.
         guest::StoreU32(base, w.at(kColors) + 52, r.Below(9));
       },
-      __imp__sub_8224D518, hooks::CarListColorSetSwatches);
+      __imp__sub_8224D518, ITC_CONTEXT_FN(hooks::CarListColorSetSwatches));
   // The car's info.
   Group(h, w, "CarPanel::SetTexts (sub_8224D7F0)", n, {112, 32}, group(12), __imp__sub_8224D7F0,
-        hooks::CarListCarSetTexts);
+        ITC_CONTEXT_FN(hooks::CarListCarSetTexts));
   Group(
       h, w, "CarPanel::SetButtons (sub_8224D860)", n, {144, 56},
       [base](PPCContext& t, Random& r, const World& w) {
@@ -561,14 +561,14 @@ void Panels(Context& h, const World& w) {
                                      : (r.Below(4) == 0 ? r.Next() : r.Below(8));
         }
       },
-      __imp__sub_8224D860, hooks::CarListCarSetButtons);
+      __imp__sub_8224D860, ITC_CONTEXT_FN(hooks::CarListCarSetButtons));
   Group(
       h, w, "CarPanel::PlaceCursor (sub_8224D9A0)", n, {128, 32},
       [base](PPCContext& t, Random& r, const World& w) {
         SetGroup(base, w, r, 12);
         t.r4.u64 = Small(r);
       },
-      __imp__sub_8224D9A0, hooks::CarListCarPlaceCursor);
+      __imp__sub_8224D9A0, ITC_CONTEXT_FN(hooks::CarListCarPlaceCursor));
   Group(
       h, w, "CarPanel::Select (sub_8224DCF0)", n, {112, 32},
       [base](PPCContext& t, Random& r, const World& w) {
@@ -576,9 +576,9 @@ void Panels(Context& h, const World& w) {
         guest::StoreU32(base, w.panel() + 8, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(10));
         t.r4.u64 = r.Below(3) == 0 ? (r.Next() & 0xFFFFFFFF00000000ull) : r.Below(2);
       },
-      __imp__sub_8224DCF0, hooks::CarListCarSelect);
+      __imp__sub_8224DCF0, ITC_CONTEXT_FN(hooks::CarListCarSelect));
   Group(h, w, "CarPanel::StopArrows (sub_8224DF30)", n, {112, 24}, group(12),
-        __imp__sub_8224DF30, hooks::CarListCarStopArrows);
+        __imp__sub_8224DF30, ITC_CONTEXT_FN(hooks::CarListCarStopArrows));
   Group(
       h, w, "CarPanel::SetName (sub_8224DED8)", n, {112, 24},
       [base](PPCContext& t, Random& r, const World& w) {
@@ -586,7 +586,7 @@ void Panels(Context& h, const World& w) {
         guest::StoreU32(base, w.panel() + 316, r.Below(2));
         t.r4.u64 = w.entry.address;
       },
-      __imp__sub_8224DED8, hooks::CarListCarSetName);
+      __imp__sub_8224DED8, ITC_CONTEXT_FN(hooks::CarListCarSetName));
   // SetStats: the record's ids small, its values any words, +24 a float
   // (any bits).
   const auto stats_record = [base](Random& r, uint32_t record) {
@@ -606,7 +606,7 @@ void Panels(Context& h, const World& w) {
         }
         t.r4.u64 = w.at(kRecord);
       },
-      __imp__sub_8224E288, hooks::CarListCarSetStats);
+      __imp__sub_8224E288, ITC_CONTEXT_FN(hooks::CarListCarSetStats));
   Group(
       h, w, "CarPanel::SetCarName (sub_822417E8)", n, {128, 40},
       [base](PPCContext& t, Random& r, const World& w) {
@@ -614,7 +614,7 @@ void Panels(Context& h, const World& w) {
         t.r4.u64 = r.Below(80);
         t.r5.u64 = r.Below(10);
       },
-      __imp__sub_822417E8, hooks::CarListCarSetCarName);
+      __imp__sub_822417E8, ITC_CONTEXT_FN(hooks::CarListCarSetCarName));
   // The C panels' base's SetCarName and Panel6C::SetStats (Panel8C's slots
   // 2 and 1; never seen in play): as CarPanel's.
   Group(
@@ -624,7 +624,7 @@ void Panels(Context& h, const World& w) {
         t.r4.u64 = r.Below(80);
         t.r5.u64 = r.Below(10);
       },
-      __imp__sub_8224E878, hooks::CarListBaseSetCarName);
+      __imp__sub_8224E878, ITC_CONTEXT_FN(hooks::CarListBaseSetCarName));
   Group(
       h, w, "Panel6C::SetStats (sub_8224E490)", 12, {144, 56},
       [base, stats_record](PPCContext& t, Random& r, const World& w) {
@@ -635,7 +635,7 @@ void Panels(Context& h, const World& w) {
         }
         t.r4.u64 = w.at(kRecord);
       },
-      __imp__sub_8224E490, hooks::CarListPanel6CSetStats);
+      __imp__sub_8224E490, ITC_CONTEXT_FN(hooks::CarListPanel6CSetStats));
   // Panel8C's slots 1 and 3 (the type 8 panel screen's C panels,
   // src/type8_screens/; never seen in play): SetStats a tail call of
   // Panel6C::SetStats, ShowArrows on the panel's +16 and +156 (an index, now
@@ -647,28 +647,28 @@ void Panels(Context& h, const World& w) {
         stats_record(r, w.at(kRecord));
         t.r4.u64 = w.at(kRecord);
       },
-      __imp__sub_8223A090, hooks::Type8Panel8CSetStats);
+      __imp__sub_8223A090, ITC_CONTEXT_FN(hooks::Type8Panel8CSetStats));
   Group(
       h, w, "Panel8C::ShowArrows (sub_8223A098)", 10, {112, 24},
       [base](PPCContext& t, Random& r, const World& w) {
         SetGroup(base, w, r, 12);
         t.r4.u64 = r.Below(3) == 0 ? (r.Next() & 0xFFFFFFFF00000000ull) : r.Below(2);
       },
-      __imp__sub_8223A098, hooks::Type8Panel8CShowArrows);
+      __imp__sub_8223A098, ITC_CONTEXT_FN(hooks::Type8Panel8CShowArrows));
   // ~CarPanelBase and ConfirmPanel::ConfirmPanel (leaves) on the panel.
   Group(h, w, "CarPanelBase::~CarPanelBase (sub_8224D7E0)", 4, {0, 0},
         [](PPCContext&, Random&, const World&) {}, __imp__sub_8224D7E0,
-        hooks::CarListCarPanelBaseDestruct);
+        ITC_CONTEXT_FN(hooks::CarListCarPanelBaseDestruct));
   Group(h, w, "ConfirmPanel::ConfirmPanel (sub_8224EBB0)", 4, {0, 0},
         [](PPCContext&, Random&, const World&) {}, __imp__sub_8224EBB0,
-        hooks::CarListConfirmPanelConstruct);
+        ITC_CONTEXT_FN(hooks::CarListConfirmPanelConstruct));
   Group(
       h, w, "Panel7C::ShowArrows (sub_82241868)", n, {96, 16},
       [base](PPCContext& t, Random& r, const World& w) {
         SetGroup(base, w, r, 12);
         t.r4.u64 = r.Below(3) == 0 ? (r.Next() & 0xFFFFFFFF00000000ull) : r.Below(2);
       },
-      __imp__sub_82241868, hooks::CarListPanel7CShowArrows);
+      __imp__sub_82241868, ITC_CONTEXT_FN(hooks::CarListPanel7CShowArrows));
   // ShowStats: the C panel's vtable at +0, its +4 0 (CarPanel::SetPrice never
   // ran in play), the entry's floats any bits or small.
   Group(
@@ -684,7 +684,7 @@ void Panels(Context& h, const World& w) {
         }
         t.r4.u64 = w.entry.address;
       },
-      __imp__sub_8224E920, hooks::CarListCarShowStats);
+      __imp__sub_8224E920, ITC_CONTEXT_FN(hooks::CarListCarShowStats));
 }
 
 // A small word around 0 (-2 to 3), now and then any word.
@@ -702,7 +702,7 @@ void MorePanels(Context& h, const World& w) {
         guest::StoreU32(base, w.panel() + 140, r.Below(2));
         t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(4);
       },
-      __imp__sub_822501C8, hooks::CarListTabSetTab);
+      __imp__sub_822501C8, ITC_CONTEXT_FN(hooks::CarListTabSetTab));
   Group(
       h, w, "TabPanel::Move (sub_8224FF88)", 80, {160, 72},
       [base](PPCContext& t, Random& r, const World& w) {
@@ -715,7 +715,7 @@ void MorePanels(Context& h, const World& w) {
         t.r5.u64 = r.Below(4) == 0 ? r.Next() : t.r4.u64 + Around(r);
         t.r6.u64 = Around(r);
       },
-      __imp__sub_8224FF88, hooks::CarListTabMove);
+      __imp__sub_8224FF88, ITC_CONTEXT_FN(hooks::CarListTabMove));
   // The rows over the world's list: the rows shown (+4) 0 to 8, the scroll
   // 0 to 10, the item 0 to 9.
   const auto rows = [base](PPCContext& t, Random& r, const World& w) {
@@ -735,9 +735,9 @@ void MorePanels(Context& h, const World& w) {
         rows(t, r, w);
         t.r6.u64 = r.Below(10);
       },
-      __imp__sub_8224F758, hooks::CarListRowFill);
+      __imp__sub_8224F758, ITC_CONTEXT_FN(hooks::CarListRowFill));
   Group(h, w, "RowPanel::Refresh (sub_8224F888)", n, {128, 48}, rows, __imp__sub_8224F888,
-        hooks::CarListRowRefresh);
+        ITC_CONTEXT_FN(hooks::CarListRowRefresh));
   Group(
       h, w, "RowPanel::Move (sub_8224F8F8)", 80, {160, 80},
       [rows](PPCContext& t, Random& r, const World& w) {
@@ -749,7 +749,7 @@ void MorePanels(Context& h, const World& w) {
         t.r8.u64 = r.Next();
         t.r9.u64 = w.at(kList);
       },
-      __imp__sub_8224F8F8, hooks::CarListRowMove);
+      __imp__sub_8224F8F8, ITC_CONTEXT_FN(hooks::CarListRowMove));
   Group(
       h, w, "ColorPanel::Move (sub_8224D580)", 80, {160, 80},
       [base](PPCContext& t, Random& r, const World& w) {
@@ -763,7 +763,7 @@ void MorePanels(Context& h, const World& w) {
         t.r10.u64 = w.at(kColors);
         guest::StoreU32(base, w.at(kColors) + 52, r.Below(9));
       },
-      __imp__sub_8224D580, hooks::CarListColorMove);
+      __imp__sub_8224D580, ITC_CONTEXT_FN(hooks::CarListColorMove));
   // PowerGraph::SetEntry: the record at the world's +0x408; the byte +708 0
   // to 9, the floats any bits or small.
   Group(
@@ -778,7 +778,7 @@ void MorePanels(Context& h, const World& w) {
         t.r3.u64 = w.entry.address | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
         t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(3);
       },
-      __imp__sub_82250368, hooks::CarListPowerGraphSetEntry);
+      __imp__sub_82250368, ITC_CONTEXT_FN(hooks::CarListPowerGraphSetEntry));
 }
 
 // Both movies' animation lists given 0 to 5 used slots each, as
@@ -827,17 +827,17 @@ void PanelAnswers(Context& h, const World& w) {
     };
   };
   Group(h, w, "TabPanel::IsShown (sub_8224FCE0)", n, {96, 16}, answer(4, {116}),
-        __imp__sub_8224FCE0, hooks::CarListTabIsShown);
+        __imp__sub_8224FCE0, ITC_CONTEXT_FN(hooks::CarListTabIsShown));
   Group(h, w, "RowPanel::IsShown (sub_8224F5E8)", n, {96, 16}, answer(0, {76, 80}),
-        __imp__sub_8224F5E8, hooks::CarListRowIsShown);
+        __imp__sub_8224F5E8, ITC_CONTEXT_FN(hooks::CarListRowIsShown));
   Group(h, w, "RowPanel::IsHidden (sub_8224F640)", n, {96, 16}, answer(0, {88}),
-        __imp__sub_8224F640, hooks::CarListRowIsHidden);
+        __imp__sub_8224F640, ITC_CONTEXT_FN(hooks::CarListRowIsHidden));
   Group(h, w, "CarPanel::IsShown (sub_8224E108)", n, {128, 40}, answer(12, {40, 44}),
-        __imp__sub_8224E108, hooks::CarListCarIsShown);
+        __imp__sub_8224E108, ITC_CONTEXT_FN(hooks::CarListCarIsShown));
   Group(h, w, "ColorPanel::IsShown (sub_8224D1F0)", n, {96, 16}, answer(4, {16}),
-        __imp__sub_8224D1F0, hooks::CarListColorIsShown);
+        __imp__sub_8224D1F0, ITC_CONTEXT_FN(hooks::CarListColorIsShown));
   Group(h, w, "ColorPanel::IsIdle (sub_8224D288)", n, {112, 32}, answer(4, {36, 40}),
-        __imp__sub_8224D288, hooks::CarListColorIsIdle);
+        __imp__sub_8224D288, ITC_CONTEXT_FN(hooks::CarListColorIsIdle));
 }
 
 // The panels' shows, selections and moves (the lists filled as for the
@@ -851,7 +851,7 @@ void PanelShows(Context& h, const World& w) {
         SetGroup(base, w, r, 4);
         FillLists(base, w, r, {116, 124, 132, 136});
       },
-      __imp__sub_8224FE50, hooks::CarListTabShow);
+      __imp__sub_8224FE50, ITC_CONTEXT_FN(hooks::CarListTabShow));
   Group(
       h, w, "TabPanel::Select (sub_8224FB20)", n, {112, 32},
       [base](PPCContext&, Random& r, const World& w) {
@@ -862,7 +862,7 @@ void PanelShows(Context& h, const World& w) {
         }
         FillLists(base, w, r, {128, 132});
       },
-      __imp__sub_8224FB20, hooks::CarListTabSelect);
+      __imp__sub_8224FB20, ITC_CONTEXT_FN(hooks::CarListTabSelect));
   Group(
       h, w, "RowPanel::Show (sub_8224F1D8)", n, {112, 24},
       [base](PPCContext&, Random& r, const World& w) {
@@ -871,7 +871,7 @@ void PanelShows(Context& h, const World& w) {
         guest::StoreU32(base, w.panel() + 8, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(8));
         FillLists(base, w, r, {76, 80, 112, 116});
       },
-      __imp__sub_8224F1D8, hooks::CarListRowShow);
+      __imp__sub_8224F1D8, ITC_CONTEXT_FN(hooks::CarListRowShow));
   Group(
       h, w, "RowPanel::Select (sub_8224F340)", n, {112, 24},
       [base](PPCContext&, Random& r, const World& w) {
@@ -879,7 +879,7 @@ void PanelShows(Context& h, const World& w) {
         guest::StoreU32(base, w.panel() + 8, r.Below(8));
         FillLists(base, w, r, {112, 116});
       },
-      __imp__sub_8224F340, hooks::CarListRowSelect);
+      __imp__sub_8224F340, ITC_CONTEXT_FN(hooks::CarListRowSelect));
   // The C panel: the highlighted action (+8) -1 or 0 to 9 (its word at +68
   // on), the actions r4 and r5 0 to 9, the direction around 0.
   Group(
@@ -889,7 +889,7 @@ void PanelShows(Context& h, const World& w) {
         guest::StoreU32(base, w.panel() + 8, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(10));
         FillLists(base, w, r, {68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 40, 44, 124, 128});
       },
-      __imp__sub_8224DA20, hooks::CarListCarShow);
+      __imp__sub_8224DA20, ITC_CONTEXT_FN(hooks::CarListCarShow));
   const auto swap = [base](PPCContext& t, Random& r, const World& w) {
     SetGroup(base, w, r, 12);
     FillLists(base, w, r, {68, 72, 76, 80, 84, 88, 92, 96, 100, 104});
@@ -898,9 +898,9 @@ void PanelShows(Context& h, const World& w) {
     t.r6.u64 = Around(r);
   };
   Group(h, w, "CarPanel::Move (sub_8224DDF8)", n, {128, 48}, swap, __imp__sub_8224DDF8,
-        hooks::CarListCarMove);
+        ITC_CONTEXT_FN(hooks::CarListCarMove));
   Group(h, w, "CarPanel::Pick (sub_8224E050)", n, {128, 40}, swap, __imp__sub_8224E050,
-        hooks::CarListCarPick);
+        ITC_CONTEXT_FN(hooks::CarListCarPick));
 }
 
 // PanelSet's leaves on the objects block (r3 its start, its words random).
@@ -917,19 +917,19 @@ void Leaves(Context& h, const World& w) {
     const char* name;
     GuestFunction recompiled, native;
   } leaves[] = {
-      {"PanelSet::Reset (sub_822496C8)", __imp__sub_822496C8, hooks::CarListSetReset},
-      {"PanelSet::Picked (sub_82249848)", __imp__sub_82249848, hooks::CarListSetPicked},
-      {"PanelSet::WentBack (sub_82249870)", __imp__sub_82249870, hooks::CarListSetWentBack},
+      {"PanelSet::Reset (sub_822496C8)", __imp__sub_822496C8, ITC_CONTEXT_FN(hooks::CarListSetReset)},
+      {"PanelSet::Picked (sub_82249848)", __imp__sub_82249848, ITC_CONTEXT_FN(hooks::CarListSetPicked)},
+      {"PanelSet::WentBack (sub_82249870)", __imp__sub_82249870, ITC_CONTEXT_FN(hooks::CarListSetWentBack)},
       {"PanelSet::WantsPowerGraph (sub_82249898)", __imp__sub_82249898,
-       hooks::CarListSetWantsPowerGraph},
-      {"PanelSet::SetOpenKind (sub_8224B6D8)", __imp__sub_8224B6D8, hooks::CarListSetOpenKind},
+       ITC_CONTEXT_FN(hooks::CarListSetWantsPowerGraph)},
+      {"PanelSet::SetOpenKind (sub_8224B6D8)", __imp__sub_8224B6D8, ITC_CONTEXT_FN(hooks::CarListSetOpenKind)},
       {"PanelSet::SetPreviousTab (sub_8224B6E8)", __imp__sub_8224B6E8,
-       hooks::CarListSetPreviousTab},
+       ITC_CONTEXT_FN(hooks::CarListSetPreviousTab)},
       {"PanelSet::SetPreviousEntry (sub_8224B6F0)", __imp__sub_8224B6F0,
-       hooks::CarListSetPreviousEntry},
+       ITC_CONTEXT_FN(hooks::CarListSetPreviousEntry)},
       {"PanelSet::SetPreviousColor (sub_8224B6F8)", __imp__sub_8224B6F8,
-       hooks::CarListSetPreviousColor},
-      {"PanelSetBase::PickedPage (sub_82248EF0)", __imp__sub_82248EF0, hooks::CarListPickedPage},
+       ITC_CONTEXT_FN(hooks::CarListSetPreviousColor)},
+      {"PanelSetBase::PickedPage (sub_82248EF0)", __imp__sub_82248EF0, ITC_CONTEXT_FN(hooks::CarListPickedPage)},
   };
   for (const auto& leaf : leaves) {
     Group(h, w, leaf.name, n, {0, 0}, words, leaf.recompiled, leaf.native);
@@ -942,7 +942,7 @@ void Leaves(Context& h, const World& w) {
         guest::StoreU32(base, car_list::kTwoPlayers, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
         guest::StoreU32(base, w.panel() + 1952, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2));
       },
-      __imp__sub_82249668, hooks::CarListSaveData);
+      __imp__sub_82249668, ITC_CONTEXT_FN(hooks::CarListSaveData));
 }
 
 // --- PanelSet's pages and steps ---
@@ -1211,13 +1211,13 @@ void Pages(Context& h, const World& w) {
   };
   const AfterFn settle = [base](const World& w, Outputs& out) { SettleMenu(base, w, out); };
   Group(h, w, "PanelSetBase::TabsPage (sub_82249EB8)", 60, {144, 40}, shape, __imp__sub_82249EB8,
-        hooks::CarListTabsPage, settle);
+        ITC_CONTEXT_FN(hooks::CarListTabsPage), settle);
   Group(h, w, "PanelSetBase::RowsPage (sub_8224A178)", 60, {112, 32}, shape, __imp__sub_8224A178,
-        hooks::CarListRowsPage, settle);
+        ITC_CONTEXT_FN(hooks::CarListRowsPage), settle);
   Group(h, w, "PanelSetBase::ColorsPage (sub_8224AEA8)", 60, {112, 32}, shape,
-        __imp__sub_8224AEA8, hooks::CarListColorsPage, settle);
+        __imp__sub_8224AEA8, ITC_CONTEXT_FN(hooks::CarListColorsPage), settle);
   Group(h, w, "PanelSetBase::PowerGraphPage (sub_8224BDC0)", 60, {112, 24}, shape,
-        __imp__sub_8224BDC0, hooks::CarListPowerGraphPage, settle);
+        __imp__sub_8224BDC0, ITC_CONTEXT_FN(hooks::CarListPowerGraphPage), settle);
   // HandleInput over the pages it runs natively now (0, 1, 3, 6) and the
   // others in its cases (-1, 5, 7, 8).
   const auto input = [base, shape](PPCContext& t, Random& r, const World& w) {
@@ -1226,12 +1226,12 @@ void Pages(Context& h, const World& w) {
     guest::StoreU32(base, w.b() + 32, kPages[r.Below(8)]);
   };
   Group(h, w, "PanelSetBase::HandleInput, the pages (sub_8224BF30)", 60, {176, 48}, input,
-        __imp__sub_8224BF30, hooks::CarListBaseHandleInput, settle);
+        __imp__sub_8224BF30, ITC_CONTEXT_FN(hooks::CarListBaseHandleInput), settle);
   // PanelSetPair::HandleInput: both bases shaped so (the players 0 and 1),
   // their menus' enabled blocks compared before the blocks are settled.
   PairGroup(
       h, w, "PanelSetPair::HandleInput (sub_8224CA80)", 12, {112, 24}, input,
-      __imp__sub_8224CA80, hooks::CarListPairHandleInput, [base](const World& w, Outputs& out) {
+      __imp__sub_8224CA80, ITC_CONTEXT_FN(hooks::CarListPairHandleInput), [base](const World& w, Outputs& out) {
         for (const uint32_t at : {4u, kSecondBase}) {
           const uint32_t list = w.set.address + at + 60;
           const uint32_t block = guest::LoadU32(base, list + 68);
@@ -1272,14 +1272,14 @@ void Steps(Context& h, const World& w) {
   };
   const AfterFn settle = [base](const World& w, Outputs& out) { SettleBlocks(base, w, out); };
   Group(h, w, "PanelSetBase::ToTabs (sub_82249558)", n, {128, 24}, set, __imp__sub_82249558,
-        hooks::CarListToTabs, settle);
+        ITC_CONTEXT_FN(hooks::CarListToTabs), settle);
   Group(
       h, w, "PanelSet::Open (sub_82249730)", n, {112, 24},
       [set](PPCContext& t, Random& r, const World& w) {
         set(t, r, w);
         t.r3.u64 -= 4;  // the set
       },
-      __imp__sub_82249730, hooks::CarListOpen, settle);
+      __imp__sub_82249730, ITC_CONTEXT_FN(hooks::CarListOpen), settle);
   // Free: each list 0 to 3 entries of the layer's pages, the menus' blocks
   // pages or 0.
   const auto lists = [base, set](PPCContext& t, Random& r, const World& w) {
@@ -1297,14 +1297,14 @@ void Steps(Context& h, const World& w) {
     }
   };
   Group(h, w, "PanelSetBase::Free (sub_8224B538)", n, {112, 32}, lists, __imp__sub_8224B538,
-        hooks::CarListBaseFree, settle);
+        ITC_CONTEXT_FN(hooks::CarListBaseFree), settle);
   Group(
       h, w, "PanelSet::Free (sub_8224B880)", 12, {112, 32},
       [lists](PPCContext& t, Random& r, const World& w) {
         lists(t, r, w);
         t.r3.u64 -= 4;
       },
-      __imp__sub_8224B880, hooks::CarListSetFree, settle);
+      __imp__sub_8224B880, ITC_CONTEXT_FN(hooks::CarListSetFree), settle);
   // The destructors: PanelSetBase's and PanelSet's over the set's menus
   // (their blocks pages or 0, released through MenuList::Release's
   // adapter), PanelGroupBase's on the panel, the interface's deleting
@@ -1316,21 +1316,21 @@ void Steps(Context& h, const World& w) {
     }
   };
   Group(h, w, "PanelSetBase::~PanelSetBase (sub_8224AE60)", 8, {96, 16}, menus,
-        __imp__sub_8224AE60, hooks::CarListSetBaseDestruct, settle);
+        __imp__sub_8224AE60, ITC_CONTEXT_FN(hooks::CarListSetBaseDestruct), settle);
   Group(
       h, w, "PanelSet::~PanelSet (sub_8224B708)", 8, {96, 16},
       [menus](PPCContext& t, Random& r, const World& w) {
         menus(t, r, w);
         t.r3.u64 -= 4;
       },
-      __imp__sub_8224B708, hooks::CarListSetDestruct, settle);
+      __imp__sub_8224B708, ITC_CONTEXT_FN(hooks::CarListSetDestruct), settle);
   Group(h, w, "PanelGroupBase::~PanelGroupBase (sub_8224EF08)", 4, {0, 0},
         [](PPCContext&, Random&, const World&) {}, __imp__sub_8224EF08,
-        hooks::CarListGroupBaseDestruct);
+        ITC_CONTEXT_FN(hooks::CarListGroupBaseDestruct));
   Group(
       h, w, "PanelSetInterface::DeletingDestructor (sub_8224AC98)", 4, {96, 16},
       [](PPCContext& t, Random&, const World&) { t.r4.u64 &= ~1ull; }, __imp__sub_8224AC98,
-      hooks::CarListSetInterfaceDeletingDestruct);
+      ITC_CONTEXT_FN(hooks::CarListSetInterfaceDeletingDestruct));
   {
     // With bit 0 set: a block of operator new's (64 bytes of random words)
     // deleted, compared by whether operator new hands it out again.
@@ -1350,7 +1350,7 @@ void Steps(Context& h, const World& w) {
         t.r3.u64 = *block;
         t.r4.u64 = (r.Next() & ~3ull) | (r.Below(2) == 0 ? 1 : 3);
         ITC_FLAG(native_car_list) = v == 1;
-        (v == 0 ? __imp__sub_8224AC98 : hooks::CarListSetInterfaceDeletingDestruct)(t, base);
+        (v == 0 ? __imp__sub_8224AC98 : ITC_CONTEXT_FN(hooks::CarListSetInterfaceDeletingDestruct))(t, base);
         ITC_FLAG(native_car_list) = true;
         out[v].Word(t.r3.u32 == *block ? 1 : 0);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -1370,16 +1370,16 @@ void Steps(Context& h, const World& w) {
     guest::StoreU32(base, w.b() + 32, kPages[r.Below(4)]);
   };
   Group(h, w, "PanelSetBase::HandleInput (sub_8224BF30)", n, {176, 48}, input,
-        __imp__sub_8224BF30, hooks::CarListBaseHandleInput, settle);
+        __imp__sub_8224BF30, ITC_CONTEXT_FN(hooks::CarListBaseHandleInput), settle);
   Group(
       h, w, "PanelSet::HandleInput (sub_8224CA28)", 12, {176, 48},
       [input](PPCContext& t, Random& r, const World& w) {
         input(t, r, w);
         t.r3.u64 -= 4;
       },
-      __imp__sub_8224CA28, hooks::CarListSetHandleInput, settle);
+      __imp__sub_8224CA28, ITC_CONTEXT_FN(hooks::CarListSetHandleInput), settle);
   Group(h, w, "PanelSetBase::BackPage8 (sub_8224A3F8)", n, {96, 16}, set, __imp__sub_8224A3F8,
-        hooks::CarListBackPage8, settle);
+        ITC_CONTEXT_FN(hooks::CarListBackPage8), settle);
   // The steps: r4 the first-pass word (b + 56) 0 or 1.
   const auto step = [base, set](PPCContext& t, Random& r, const World& w) {
     set(t, r, w);
@@ -1391,15 +1391,15 @@ void Steps(Context& h, const World& w) {
     Frame frame;
     GuestFunction recompiled, native;
   } steps[] = {
-      {"PanelSetBase::Step2 (sub_82248F00)", {128, 48}, __imp__sub_82248F00, hooks::CarListStep2},
-      {"PanelSetBase::Step3 (sub_8224A718)", {112, 32}, __imp__sub_8224A718, hooks::CarListStep3},
-      {"PanelSetBase::Step7 (sub_82249098)", {144, 64}, __imp__sub_82249098, hooks::CarListStep7},
+      {"PanelSetBase::Step2 (sub_82248F00)", {128, 48}, __imp__sub_82248F00, ITC_CONTEXT_FN(hooks::CarListStep2)},
+      {"PanelSetBase::Step3 (sub_8224A718)", {112, 32}, __imp__sub_8224A718, ITC_CONTEXT_FN(hooks::CarListStep3)},
+      {"PanelSetBase::Step7 (sub_82249098)", {144, 64}, __imp__sub_82249098, ITC_CONTEXT_FN(hooks::CarListStep7)},
       {"PanelSetBase::Step11 (sub_8224A7E0)", {112, 32}, __imp__sub_8224A7E0,
-       hooks::CarListStep11},
+       ITC_CONTEXT_FN(hooks::CarListStep11)},
       {"PanelSetBase::Step18 (sub_82249258)", {112, 24}, __imp__sub_82249258,
-       hooks::CarListStep18},
+       ITC_CONTEXT_FN(hooks::CarListStep18)},
       {"PanelSetBase::Step26 (sub_8224A8E0)", {112, 32}, __imp__sub_8224A8E0,
-       hooks::CarListStep26},
+       ITC_CONTEXT_FN(hooks::CarListStep26)},
   };
   for (const auto& s : steps) {
     Group(h, w, s.name, 40, s.frame, step, s.recompiled, s.native, settle);
@@ -1415,9 +1415,9 @@ void Steps(Context& h, const World& w) {
     FillListsAt(base, w, r, r.Below(2) == 0 ? w.at(kOtherPanel) : w.panel(), named);
   };
   Group(h, w, "PanelSetBase::Step0 (sub_8224A570)", 40, {144, 40}, panel_step,
-        __imp__sub_8224A570, hooks::CarListStep0, settle);
+        __imp__sub_8224A570, ITC_CONTEXT_FN(hooks::CarListStep0), settle);
   Group(h, w, "PanelSetBase::Step1 (sub_8224A6A0)", 40, {112, 24}, panel_step,
-        __imp__sub_8224A6A0, hooks::CarListStep1, settle);
+        __imp__sub_8224A6A0, ITC_CONTEXT_FN(hooks::CarListStep1), settle);
   // Step4: SetUpRows' world (as its cases'), F set (its buttons unchecked).
   Group(
       h, w, "PanelSetBase::Step4 (sub_8224B078)", 40, {112, 24},
@@ -1436,9 +1436,9 @@ void Steps(Context& h, const World& w) {
         GarageChain(base, w, r);
         guest::StoreU32(base, b + 1928, r.Below(2));
       },
-      __imp__sub_8224B078, hooks::CarListStep4, settle);
+      __imp__sub_8224B078, ITC_CONTEXT_FN(hooks::CarListStep4), settle);
   Group(h, w, "PanelSetBase::Step6 (sub_82248F70)", 40, {112, 24}, panel_step,
-        __imp__sub_82248F70, hooks::CarListStep6, settle);
+        __imp__sub_82248F70, ITC_CONTEXT_FN(hooks::CarListStep6), settle);
   // Step8: F set (its SetTab unchecked).
   Group(
       h, w, "PanelSetBase::Step8 (sub_82248FE0)", 40, {128, 32},
@@ -1446,7 +1446,7 @@ void Steps(Context& h, const World& w) {
         panel_step(t, r, w);
         guest::StoreU32(base, w.b() + 1896, w.at(kOtherPanel));
       },
-      __imp__sub_82248FE0, hooks::CarListStep8, settle);
+      __imp__sub_82248FE0, ITC_CONTEXT_FN(hooks::CarListStep8), settle);
   // Step9: SetUpCarPage's world (as its cases', tabs 0 and 1), C set (its
   // buttons and slot 3 unchecked) with the world's vtable (slot 3
   // Panel7C::ShowArrows or the stand-in sub_820CC470), the stand's holders.
@@ -1469,7 +1469,7 @@ void Steps(Context& h, const World& w) {
         guest::StoreU32(base, w.at(kVtable) + 12,
                         r.Below(4) == 0 ? 0x820CC470u : car_list::kPanel7CShowArrows);
       },
-      __imp__sub_8224CB28, hooks::CarListStep9, settle);
+      __imp__sub_8224CB28, ITC_CONTEXT_FN(hooks::CarListStep9), settle);
   // Step12: C set (its actions' words read by the menu's selection).
   Group(
       h, w, "PanelSetBase::Step12 (sub_82249128)", 40, {128, 48},
@@ -1478,7 +1478,7 @@ void Steps(Context& h, const World& w) {
         guest::StoreU32(base, w.b() + 1908,
                         r.Below(6) == 0 ? 0 : w.at(kOtherPanel));
       },
-      __imp__sub_82249128, hooks::CarListStep12, settle);
+      __imp__sub_82249128, ITC_CONTEXT_FN(hooks::CarListStep12), settle);
   // Step19: D set (its swatches unchecked; its +12 a node index, not C's
   // group), the colors' list (b +1824: the
   // world's records, the count 0 to 8), the count (+60) 0 to 9, the rows
@@ -1500,7 +1500,7 @@ void Steps(Context& h, const World& w) {
         guest::StoreU32(base, b + 1924, r.Below(8));
         guest::StoreU32(base, b + 64, r.Below(4));
       },
-      __imp__sub_822492C8, hooks::CarListStep19, settle);
+      __imp__sub_822492C8, ITC_CONTEXT_FN(hooks::CarListStep19), settle);
 }
 
 // The set-ups: the tab (+232) 0 to 2 (2 the garage's count, with two
@@ -1535,16 +1535,16 @@ void Pairs(Context& h, const World& w) {
           guest::StoreU32(base, sp + 100, r.Below(3) == 0 ? 0 : w.at(0xE40));
           guest::StoreU32(base, sp + 108, w.at(r.Below(2) == 0 ? kGroupA : kGroupB));
         },
-        __imp__sub_8224B750, hooks::CarListPairConstruct,
+        __imp__sub_8224B750, ITC_CONTEXT_FN(hooks::CarListPairConstruct),
         [base, frame](const World&, Outputs& out) { out.Bytes(Read(base, frame - 48, 48)); });
     g_pair = false;
   }
   PairGroup(
       h, w, "PanelSetPair::Reset (sub_822498C0)", 8, {0, 0},
-      [](PPCContext&, Random&, const World&) {}, __imp__sub_822498C0, hooks::CarListPairReset,
+      [](PPCContext&, Random&, const World&) {}, __imp__sub_822498C0, ITC_CONTEXT_FN(hooks::CarListPairReset),
       {});
   PairGroup(h, w, "PanelSetPair::Open (sub_822499F0)", 12, {176, 32}, set, __imp__sub_822499F0,
-            hooks::CarListPairOpen, settle);
+            ITC_CONTEXT_FN(hooks::CarListPairOpen), settle);
   // Picked: the bases' done (+16, +1988) and picked (+12, +1984) words 0, 1
   // or any.
   PairGroup(
@@ -1556,7 +1556,7 @@ void Pairs(Context& h, const World& w) {
                           r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
         }
       },
-      __imp__sub_82249B60, hooks::CarListPairPicked, {});
+      __imp__sub_82249B60, ITC_CONTEXT_FN(hooks::CarListPairPicked), {});
   // The destructors over both bases' menus (their blocks pages or 0); the
   // deleting destructor with bit 0 of r4 clear, then deleting below.
   const auto menus = [base, set](PPCContext& t, Random& r, const World& w) {
@@ -1566,14 +1566,14 @@ void Pairs(Context& h, const World& w) {
     }
   };
   PairGroup(h, w, "PanelSetPair::~PanelSetPair (sub_8224B830)", 8, {112, 32}, menus,
-            __imp__sub_8224B830, hooks::CarListPairDestruct, settle);
+            __imp__sub_8224B830, ITC_CONTEXT_FN(hooks::CarListPairDestruct), settle);
   PairGroup(
       h, w, "PanelSetPair::DeletingDestructor (sub_8224CA30)", 6, {112, 24},
       [menus](PPCContext& t, Random& r, const World& w) {
         menus(t, r, w);
         t.r4.u64 &= ~1ull;
       },
-      __imp__sub_8224CA30, hooks::CarListPairDeletingDestruct, settle);
+      __imp__sub_8224CA30, ITC_CONTEXT_FN(hooks::CarListPairDeletingDestruct), settle);
   {
     // With bit 0 set: a pair of operator new's (random words, the four
     // menus' blocks 0) deleted, compared by whether operator new hands it
@@ -1598,7 +1598,7 @@ void Pairs(Context& h, const World& w) {
         t.r3.u64 = *block;
         t.r4.u64 = (r.Next() & ~3ull) | (r.Below(2) == 0 ? 1 : 3);
         ITC_FLAG(native_car_list) = v == 1;
-        (v == 0 ? __imp__sub_8224CA30 : hooks::CarListPairDeletingDestruct)(t, base);
+        (v == 0 ? __imp__sub_8224CA30 : ITC_CONTEXT_FN(hooks::CarListPairDeletingDestruct))(t, base);
         ITC_FLAG(native_car_list) = true;
         out[v].Word(t.r3.u32 == *block ? 1 : 0);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -1634,7 +1634,7 @@ void SetUps(Context& h, const World& w) {
   Group(
       h, w, "PanelSetBase::SetUpRows (sub_8224A978)", 60, {144, 48},
       [shape](PPCContext& t, Random& r, const World& w) { shape(t, r, w, 3); },
-      __imp__sub_8224A978, hooks::CarListSetUpRows, settle);
+      __imp__sub_8224A978, ITC_CONTEXT_FN(hooks::CarListSetUpRows), settle);
   Group(
       h, w, "PanelSetBase::SetUpCarPage (sub_8224C560)", 60, {128, 32},
       [shape, base](PPCContext& t, Random& r, const World& w) {
@@ -1647,7 +1647,7 @@ void SetUps(Context& h, const World& w) {
           guest::StoreU32(base, c + 4, 0);
         }
       },
-      __imp__sub_8224C560, hooks::CarListSetUpCarPage, settle);
+      __imp__sub_8224C560, ITC_CONTEXT_FN(hooks::CarListSetUpCarPage), settle);
 }
 
 // Build: two players (the save data the world's whole one at
@@ -1740,18 +1740,18 @@ void Builds(Context& h, const World& w) {
     SettleBlocks(base, w, out);
   };
   Group(h, w, "PanelSetBase::Build (sub_8224C698)", 40, {160, 72}, shape, __imp__sub_8224C698,
-        hooks::CarListBaseBuild, after);
+        ITC_CONTEXT_FN(hooks::CarListBaseBuild), after);
   Group(
       h, w, "PanelSet::Build (sub_8224CAD8)", 12, {160, 72},
       [shape](PPCContext& t, Random& r, const World& w) {
         shape(t, r, w);
         t.r3.u64 -= 4;  // the set
       },
-      __imp__sub_8224CAD8, hooks::CarListSetBuild, after);
+      __imp__sub_8224CAD8, ITC_CONTEXT_FN(hooks::CarListSetBuild), after);
   // PanelSetPair::Build: both bases shaped so, the specs' lists made from the
   // pair's save block (each half's bits and garage).
   PairGroup(h, w, "PanelSetPair::Build (sub_8224CAE0)", 10, {96, 16}, shape,
-            __imp__sub_8224CAE0, hooks::CarListPairBuild, [after](const World& w, Outputs& out) {
+            __imp__sub_8224CAE0, ITC_CONTEXT_FN(hooks::CarListPairBuild), [after](const World& w, Outputs& out) {
               for (const uint32_t at : {kSecondBase, 4u}) {
                 g_base_at = at;
                 after(w, out);
@@ -1853,9 +1853,9 @@ void Updates(Context& h, const World& w) {
     t.r3.u64 = w.b() | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
   };
   Group(h, w, "GarageStages::DrawAll (sub_821807D8)", 60, {160, 40}, stand, __imp__sub_821807D8,
-        hooks::CarListDrawAll);
+        ITC_CONTEXT_FN(hooks::CarListDrawAll));
   Group(h, w, "PanelSetBase::UpdateStand (sub_8224C008)", 80, {9952, 88}, stand,
-        __imp__sub_8224C008, hooks::CarListUpdateStand);
+        __imp__sub_8224C008, ITC_CONTEXT_FN(hooks::CarListUpdateStand));
   // Update: the set as the steps' cases shape it, the step -1, below -1, or
   // one of the steps made native (their worlds the steps' cases'), the
   // stand's world after.
@@ -1871,18 +1871,18 @@ void Updates(Context& h, const World& w) {
   };
   const AfterFn settle = [base](const World& w, Outputs& out) { SettleBlocks(base, w, out); };
   Group(h, w, "PanelSetBase::Update (sub_8224CD00)", 80, {368, 152}, update, __imp__sub_8224CD00,
-        hooks::CarListBaseUpdate, settle);
+        ITC_CONTEXT_FN(hooks::CarListBaseUpdate), settle);
   Group(
       h, w, "PanelSet::Update (sub_8224CF18)", 30, {368, 152},
       [update](PPCContext& t, Random& r, const World& w) {
         update(t, r, w);
         t.r3.u64 -= 4;  // the set
       },
-      __imp__sub_8224CF18, hooks::CarListSetUpdate, settle);
+      __imp__sub_8224CF18, ITC_CONTEXT_FN(hooks::CarListSetUpdate), settle);
   // PanelSetPair::Update: both bases shaped so (the players 0 and 1; the
   // stand's world as the first base's shape left it).
   PairGroup(h, w, "PanelSetPair::Update (sub_8224CF20)", 12, {96, 16}, update,
-            __imp__sub_8224CF20, hooks::CarListPairUpdate, settle);
+            __imp__sub_8224CF20, ITC_CONTEXT_FN(hooks::CarListPairUpdate), settle);
 }
 
 // --- Step 17 and the car's page (with the stand's car) ---
@@ -1957,7 +1957,7 @@ void CarPageAndStep17(Context& h, const World& w) {
         t.r3.u64 = w.b() | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
         t.r4.u64 = w.b() + 56;
       },
-      __imp__sub_8224C450, hooks::CarListStep17, settle);
+      __imp__sub_8224C450, ITC_CONTEXT_FN(hooks::CarListStep17), settle);
   // The car's page without the stand's car: every path but the pick's for
   // the tab 0 without the confirm panel (its cases below, with the stand's
   // world) and the garage tab's (tab 2).
@@ -1973,7 +1973,7 @@ void CarPageAndStep17(Context& h, const World& w) {
         guest::StoreU32(base, b + 232, confirm ? r.Below(2) : 1);
         t.r3.u64 = b | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
       },
-      __imp__sub_8224B8D8, hooks::CarListCarPage, settle_menu);
+      __imp__sub_8224B8D8, ITC_CONTEXT_FN(hooks::CarListCarPage), settle_menu);
 
   // With the stand's car (load_poll's re-applies' ShowStandCar world,
   // stand_car_world.h): its blocks, globals and the car list entry's car
@@ -2020,7 +2020,7 @@ void CarPageAndStep17(Context& h, const World& w) {
         t.r3.u64 = b | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
         t.r4.u64 = b + 56;
       },
-      __imp__sub_8224C450, hooks::CarListStep17,
+      __imp__sub_8224C450, ITC_CONTEXT_FN(hooks::CarListStep17),
       [base, sp, &stand](const World& w, Outputs& out) {
         const uint32_t b = w.b();
         const uint32_t made = guest::LoadU32(base, b + 1876);
@@ -2072,7 +2072,7 @@ void CarPageAndStep17(Context& h, const World& w) {
         stand.Lay(r, w.entry.address, t.r1.u32);
         t.r3.u64 = b | (r.Below(4) == 0 ? 0xFFFFFFFF00000000ull : 0);
       },
-      __imp__sub_8224B8D8, hooks::CarListCarPage,
+      __imp__sub_8224B8D8, ITC_CONTEXT_FN(hooks::CarListCarPage),
       [base, sp, &stand, &picks, &runs](const World& w, Outputs& out) {
         const uint32_t b = w.b();
         runs++;

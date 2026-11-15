@@ -6,6 +6,7 @@
 // Time::Clamp (recompiled).
 
 #include "hooks/achievements.h"
+#include "hooks/native_entry.h"
 
 #include "achievements/achievements.h"
 #include "base/flags.h"
@@ -33,7 +34,7 @@ namespace {
 // put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -43,7 +44,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[3], uint32_t r1,
                        uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -55,23 +56,23 @@ class GuestCalls {
     ctx.r1.u64 = stack;
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
-void TimeLessSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(TimeLessSteps) {
   ctx.r3.u64 = achievements::TimeLess(guest::LoadU32(base, ctx.r3.u32),
                                       guest::LoadU32(base, ctx.r4.u32));
 }
 
-void AchievementsCheckSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AchievementsCheckSteps) {
   ctx.r3.u64 = achievements::Check(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void WriteAchievementsSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(WriteAchievementsSteps) {
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
     return {achievements::WriteAchievements(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
                                             uint32_t(a.r[1]), uint32_t(a.r[2])),
@@ -79,7 +80,7 @@ void WriteAchievementsSteps(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void AchievementsWriteSteps(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(AchievementsWriteSteps) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = achievements::Write(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
@@ -88,12 +89,7 @@ void AchievementsWriteSteps(PPCContext& ctx, uint8_t* base) {
 
 // Defines an adapter: the flag, else the original.
 #define ITC_ACHIEVEMENTS(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_achievements)) { \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_achievements)) { \
     hooks::step(ctx, base);               \
   }
 
@@ -109,13 +105,13 @@ ITC_ACHIEVEMENTS(820FF708, TimeLessSteps)
 // is handed to it, so a harness case never unlocks anything in the SDK;
 // otherwise XAPI's wrapper over the import (still the SDK's, the user's
 // call), natively with --native_achievements, else the original.
-extern "C" REX_FUNC(sub_82294E58) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82294E58) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82294E58)) {
     return;
   }
   if (!ITC_FLAG(native_achievements)) {
-    __imp__sub_82294E58(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82294E58);
     return;
   }
   hooks::WriteAchievementsSteps(ctx, base);

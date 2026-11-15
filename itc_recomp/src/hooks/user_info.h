@@ -7,27 +7,42 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 namespace hooks {
 
 // The machine's handlers (r3 the machine, r4 the mode where read).
 void UserInfoCreate(PPCContext& ctx, uint8_t* base);
+void UserInfoCreate(lifted::Regs& ctx, uint8_t* base);
 void UserInfoOpenMovie(PPCContext& ctx, uint8_t* base);
+void UserInfoOpenMovie(lifted::Regs& ctx, uint8_t* base);
 void UserInfoWaitForLoad(PPCContext& ctx, uint8_t* base);
+void UserInfoWaitForLoad(lifted::Regs& ctx, uint8_t* base);
 void UserInfoReenter(PPCContext& ctx, uint8_t* base);
+void UserInfoReenter(lifted::Regs& ctx, uint8_t* base);
 void UserInfoClose(PPCContext& ctx, uint8_t* base);
+void UserInfoClose(lifted::Regs& ctx, uint8_t* base);
 void UserInfoDestroy(PPCContext& ctx, uint8_t* base);
+void UserInfoDestroy(lifted::Regs& ctx, uint8_t* base);
 void UserInfoUpdatePage(PPCContext& ctx, uint8_t* base);
+void UserInfoUpdatePage(lifted::Regs& ctx, uint8_t* base);
 void UserInfoUpdate(PPCContext& ctx, uint8_t* base);
+void UserInfoUpdate(lifted::Regs& ctx, uint8_t* base);
 // The page (r3 the mode) and its helper (no arguments).
 void UserInfoMenuPage(PPCContext& ctx, uint8_t* base);
+void UserInfoMenuPage(lifted::Regs& ctx, uint8_t* base);
 void UserInfoSetPlayTimeText(PPCContext& ctx, uint8_t* base);
+void UserInfoSetPlayTimeText(lifted::Regs& ctx, uint8_t* base);
 // The transitions (r3 the started word's address) and the texts (no
 // arguments).
 void UserInfoOpening(PPCContext& ctx, uint8_t* base);
+void UserInfoOpening(lifted::Regs& ctx, uint8_t* base);
 void UserInfoClosing(PPCContext& ctx, uint8_t* base);
+void UserInfoClosing(lifted::Regs& ctx, uint8_t* base);
 void UserInfoSetTexts(PPCContext& ctx, uint8_t* base);
+void UserInfoSetTexts(lifted::Regs& ctx, uint8_t* base);
 // InitStates (r3 the machine).
 void UserInfoInitStates(PPCContext& ctx, uint8_t* base);
+void UserInfoInitStates(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

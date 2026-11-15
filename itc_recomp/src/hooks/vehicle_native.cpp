@@ -3,6 +3,7 @@
 // harness shares (hooks/vehicle_native.h).
 
 #include "hooks/vehicle_native.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -39,33 +40,33 @@ namespace hooks {
 
 namespace vh = vehicle;
 
-void VehicleMatrixFromRows(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleMatrixFromRows) {
   ctx.fpscr.disableFlushMode();
   vh::MatrixFromRows(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
 }
 
-void VehicleTrackPositionCopy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleTrackPositionCopy) {
   ctx.fpscr.disableFlushMode();
   vh::TrackPositionCopy(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void VehicleCameraCurveLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleCameraCurveLoad) {
   ctx.fpscr.disableFlushMode();
   vh::CameraCurveLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void VehicleRoutePositionStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleRoutePositionStep) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 =
       vh::RoutePositionStep(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112);
 }
 
-void VehicleUpdateTrackPositions(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleUpdateTrackPositions) {
   ctx.fpscr.disableFlushMode();
   vh::VehicleUpdateTrackPositions(base, ctx.r3.u32, ctx.r1.u32 - 112);
 }
 
-void VehicleLinkTrackPositions(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleLinkTrackPositions) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
   if (!vh::VehicleLinkTrackPositions(base, ctx.r3.u32, &r3)) {
@@ -75,7 +76,7 @@ void VehicleLinkTrackPositions(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void VehicleRefresh(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleRefresh) {
   ctx.fpscr.disableFlushMode();
   double f1 = 0.0;
   uint32_t r3 = 0;
@@ -87,7 +88,7 @@ void VehicleRefresh(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void VehicleRemoveFromWorld(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleRemoveFromWorld) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
   if (!NativeHeapActive() || !vh::VehicleRemoveFromWorld(base, ctx.r3.u32, &r3)) {
@@ -97,7 +98,7 @@ void VehicleRemoveFromWorld(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void VehiclesCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehiclesCreate) {
   ctx.fpscr.disableFlushMode();
   const auto r3 = NativeHeapActive() ? vh::VehiclesCreate(base, ctx.r1.u32 - 112) : std::nullopt;
   if (!r3) {
@@ -107,7 +108,7 @@ void VehiclesCreate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;
 }
 
-void VehiclesDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehiclesDestroy) {
   ctx.fpscr.disableFlushMode();
   if (!NativeHeapActive() || !vh::VehiclesDestroy(base)) {
     lifted::original::c820C3B78(ctx, base);
@@ -116,7 +117,7 @@ void VehiclesDestroy(PPCContext& ctx, uint8_t* base) {
   // its own r3 without a block; its callers don't read it.
 }
 
-void VehicleApplyInput(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleApplyInput) {
   ctx.fpscr.disableFlushMode();
   const uint32_t vehicle = ctx.r3.u32;
   const uint32_t frame = ctx.r1.u32 - 176;
@@ -141,42 +142,42 @@ void VehicleApplyInput(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = double(guest::LoadFloat(base, vh::kStepSeconds));
 }
 
-void VehicleSlipWheelValue(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleSlipWheelValue) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = vh::VehicleSlipWheelValue(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32 - 240);
 }
 
-void VehicleNearestHuman(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleNearestHuman) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = vh::RacersNearestHumanVehicle(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 304);
 }
 
-void VehicleShiftPeak(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleShiftPeak) {
   ctx.fpscr.disableFlushMode();
   vh::PowerCurveShiftPeak(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void VehicleBuildCurve(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleBuildCurve) {
   ctx.fpscr.disableFlushMode();
   vh::PowerCurveBuild(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112);
 }
 
-void VehicleCurveFromEngine(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleCurveFromEngine) {
   ctx.fpscr.disableFlushMode();
   vh::PowerCurveFromEngine(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112);
 }
 
-void VehicleStatusReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleStatusReset) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = vh::VehicleStatusReset(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 1168);
 }
 
-void VehicleSurfaceGrip(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleSurfaceGrip) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = vh::VehicleSetUpSurfaceGrip(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 480);
 }
 
-vehicle::CalleeOriginal VehicleSetUpOriginals(PPCContext& ctx, uint8_t* base, uint32_t frame) {
+vehicle::CalleeOriginal VehicleSetUpOriginals(lifted::Regs& ctx, uint8_t* base, uint32_t frame) {
   return [&ctx, base, frame](uint32_t address, uint64_t r3, uint64_t r4, uint64_t r5,
                              uint64_t r6) {
     const uint64_t r1 = ctx.r1.u64;
@@ -206,7 +207,7 @@ vehicle::CalleeOriginal VehicleSetUpOriginals(PPCContext& ctx, uint8_t* base, ui
 
 namespace {
 
-void SetUpStep(PPCContext& ctx, uint8_t* base, bool reset) {
+void SetUpStep(lifted::Regs& ctx, uint8_t* base, bool reset) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 224;
   double f1 = 0.0;
@@ -217,15 +218,15 @@ void SetUpStep(PPCContext& ctx, uint8_t* base, bool reset) {
 
 }  // namespace
 
-void VehicleSetUp(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleSetUp) {
   SetUpStep(ctx, base, false);
 }
 
-void VehicleResetForCar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleResetForCar) {
   SetUpStep(ctx, base, true);
 }
 
-void VehicleStatusUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleStatusUpdate) {
   ctx.fpscr.disableFlushMode();
   if (!vh::VehicleStatusUpdate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                ctx.r1.u32 - 384)) {
@@ -233,7 +234,7 @@ void VehicleStatusUpdate(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-vehicle::GuestCall VehicleTickCalls(PPCContext& ctx, uint8_t* base) {
+vehicle::GuestCall VehicleTickCalls(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t address, uint32_t r1, const vh::GuestRegisters& r) {
     const uint64_t saved = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -271,13 +272,13 @@ vehicle::GuestCall VehicleTickCalls(PPCContext& ctx, uint8_t* base) {
   };
 }
 
-void VehicleTick(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehicleTick) {
   ctx.fpscr.disableFlushMode();
   vh::VehicleTick(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32 - 144,
                   VehicleTickCalls(ctx, base));
 }
 
-void VehiclePlaceOnRoute(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(VehiclePlaceOnRoute) {
   ctx.fpscr.disableFlushMode();
   auto call = [&](uint32_t address, uint32_t r1, const vh::GuestRegisters& r) {
     const uint64_t saved = ctx.r1.u64;
@@ -305,12 +306,7 @@ void VehiclePlaceOnRoute(PPCContext& ctx, uint8_t* base) {
 
 // Defines an adapter: the flag, else the original.
 #define ITC_VEHICLE(address, step)      \
-  extern "C" REX_FUNC(sub_##address) {  \
-    REX_FUNC_PROLOGUE();                \
-    if (!ITC_FLAG(native_vehicle)) {    \
-      __imp__sub_##address(ctx, base);  \
-      return;                           \
-    }                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vehicle)) { \
     hooks::step(ctx, base);             \
   }
 

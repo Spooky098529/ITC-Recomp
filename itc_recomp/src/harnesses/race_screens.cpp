@@ -225,7 +225,7 @@ void PagesAndLists(Context& h, const World& w) {
         t.r3.u64 = w.pages();
         t.r4.u64 = Around(r, -1, 7);
       },
-      __imp__sub_8220BA98, hooks::RaceScreensPagesInit);
+      __imp__sub_8220BA98, ITC_CONTEXT_FN(hooks::RaceScreensPagesInit));
   Group(
       h, w, "ScreenPages::Go (sub_8220BA68)", 100,
       [&h](PPCContext& t, Random& r, const World& w) {
@@ -235,7 +235,7 @@ void PagesAndLists(Context& h, const World& w) {
         t.r5.u64 = r.Below(3) == 0 ? ~uint64_t(0) : Around(r, -1, 20);
         t.r6.u64 = Around(r, -1, 20);
       },
-      __imp__sub_8220BA68, hooks::RaceScreensPagesGo);
+      __imp__sub_8220BA68, ITC_CONTEXT_FN(hooks::RaceScreensPagesGo));
   Group(
       h, w, "ScreenPages::Finish (sub_8220BA28)", 100,
       [&h](PPCContext& t, Random& r, const World& w) {
@@ -243,18 +243,18 @@ void PagesAndLists(Context& h, const World& w) {
         t.r3.u64 = w.pages();
         t.r4.u64 = r.Below(3) == 0 ? 0 : Around(r, -1, 2);
       },
-      __imp__sub_8220BA28, hooks::RaceScreensPagesFinish);
+      __imp__sub_8220BA28, ITC_CONTEXT_FN(hooks::RaceScreensPagesFinish));
   Group(
       h, w, "MenuList::Selection (sub_8220BC20)", 30,
       [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.list(); },
-      __imp__sub_8220BC20, hooks::RaceScreensListSelection);
+      __imp__sub_8220BC20, ITC_CONTEXT_FN(hooks::RaceScreensListSelection));
   Group(
       h, w, "MenuList::SetSelection (sub_8220BC30)", 30,
       [](PPCContext& t, Random& r, const World& w) {
         t.r3.u64 = w.list();
         t.r4.u64 = Around(r, -1, 12);
       },
-      __imp__sub_8220BC30, hooks::RaceScreensListSetSelection);
+      __imp__sub_8220BC30, ITC_CONTEXT_FN(hooks::RaceScreensListSetSelection));
   Group(
       h, w, "MenuList::SetEnabled (sub_8220BC00)", 50,
       [](PPCContext& t, Random& r, const World& w) {
@@ -262,28 +262,28 @@ void PagesAndLists(Context& h, const World& w) {
         t.r4.u64 = r.Below(kBlockWords);
         t.r5.u64 = r.Below(2);
       },
-      __imp__sub_8220BC00, hooks::RaceScreensListSetEnabled);
+      __imp__sub_8220BC00, ITC_CONTEXT_FN(hooks::RaceScreensListSetEnabled));
   Group(
       h, w, "MenuList::IsEnabled (sub_8220BC10)", 50,
       [](PPCContext& t, Random& r, const World& w) {
         t.r3.u64 = w.list();
         t.r4.u64 = r.Below(kBlockWords);
       },
-      __imp__sub_8220BC10, hooks::RaceScreensListIsEnabled);
+      __imp__sub_8220BC10, ITC_CONTEXT_FN(hooks::RaceScreensListIsEnabled));
   Group(
       h, w, "MenuList::Fit (sub_8220BC40)", 400,
       [](PPCContext& t, Random& r, const World& w) {
         t.r3.u64 = w.list();
         t.r4.u64 = r.Below(2) == 0 ? 0 : (r.Below(4) == 0 ? r.Next() : 1);
       },
-      __imp__sub_8220BC40, hooks::RaceScreensListFit);
+      __imp__sub_8220BC40, ITC_CONTEXT_FN(hooks::RaceScreensListFit));
   Group(
       h, w, "MenuList::Fired (sub_8220C020)", 400,
       [](PPCContext& t, Random& r, const World& w) {
         t.r3.u64 = w.list();
         t.r4.u64 = r.Below(4) == 0 ? 152 + r.Below(20) : AnyAction(r);
       },
-      __imp__sub_8220C020, hooks::RaceScreensListFired, {{96, 16}});
+      __imp__sub_8220C020, ITC_CONTEXT_FN(hooks::RaceScreensListFired), {{96, 16}});
   // Update: Fired's frames below its own (from each of its calls).
   Group(
       h, w, "MenuList::Update (sub_8220C1E0)", 800,
@@ -300,24 +300,24 @@ void PagesAndLists(Context& h, const World& w) {
           }
         }
       },
-      __imp__sub_8220C1E0, hooks::RaceScreensListUpdate, {{144, 56}, {240, 160}});
+      __imp__sub_8220C1E0, ITC_CONTEXT_FN(hooks::RaceScreensListUpdate), {{144, 56}, {240, 160}});
   const Frames pressed = {{96, 16}};
   Group(
       h, w, "MenuList::Accepted (sub_8220BD50)", 200,
       [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.list(); }, __imp__sub_8220BD50,
-      hooks::RaceScreensListAccepted, pressed);
+      ITC_CONTEXT_FN(hooks::RaceScreensListAccepted), pressed);
   Group(
       h, w, "MenuList::Cancelled (sub_8220BDE0)", 200,
       [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.list(); }, __imp__sub_8220BDE0,
-      hooks::RaceScreensListCancelled, pressed);
+      ITC_CONTEXT_FN(hooks::RaceScreensListCancelled), pressed);
   Group(
       h, w, "MenuList::Pressed152 (sub_8220BE70)", 200,
       [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.list(); }, __imp__sub_8220BE70,
-      hooks::RaceScreensListPressed152, pressed);
+      ITC_CONTEXT_FN(hooks::RaceScreensListPressed152), pressed);
   Group(
       h, w, "MenuList::Pressed166 (sub_8220BF90)", 200,
       [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.list(); }, __imp__sub_8220BF90,
-      hooks::RaceScreensListPressed166, pressed);
+      ITC_CONTEXT_FN(hooks::RaceScreensListPressed166), pressed);
 }
 
 // --- The makers and teardowns ---
@@ -343,27 +343,27 @@ struct Maker {
 void Makers(Context& h) {
   const std::vector<Maker> makers = {
       {"PauseMenu::Create (sub_8220D7E8)", __imp__sub_8220D7E8,
-       hooks::RaceScreensPauseMenuCreate,
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuCreate),
        {{rs::kPauseScreen, 4}, {rs::kPauseData, 160}, {rs::kPauseList, 72}, {rs::kPausePages, 28}},
        96, 8},
       {"PauseMenu4::Create (sub_82210868)", __imp__sub_82210868,
-       hooks::RaceScreensPauseMenu4Create,
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenu4Create),
        {{rs::kPause4Screen, 4}, {rs::kPause4Data, 80}, {rs::kPause4List, 72}, {rs::kPause4Pages, 28}},
        96, 8},
       {"AfterRaceMenu::Create (sub_8221B1F0)", __imp__sub_8221B1F0,
-       hooks::RaceScreensAfterRaceMenuCreate,
+       ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuCreate),
        {{rs::kAfterScreen, 4}, {rs::kAfterData, 24}, {rs::kAfterPages, 28}, {rs::kAfterList, 72}},
        96, 8},
       {"RaceDialog::Create (sub_82217D70)", __imp__sub_82217D70,
-       hooks::RaceScreensRaceDialogCreate,
+       ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogCreate),
        {{rs::kDialogList, 72}, {rs::kDialogPages, 28}, {rs::kDialogData, 40}}, 96, 16},
       {"CareerResults::Create (sub_82219138)", __imp__sub_82219138,
-       hooks::RaceScreensCareerResultsCreate, {{rs::kCareerResults, 212}}, 96, 8},
+       ITC_CONTEXT_FN(hooks::RaceScreensCareerResultsCreate), {{rs::kCareerResults, 212}}, 96, 8},
       {"RaceResults::Create (sub_8221F390)", __imp__sub_8221F390,
-       hooks::RaceScreensRaceResultsCreate, {{rs::kRaceResults, 52}}, 96, 8},
+       ITC_CONTEXT_FN(hooks::RaceScreensRaceResultsCreate), {{rs::kRaceResults, 52}}, 96, 8},
       {"SplitResults::Create (sub_8221FA30)", __imp__sub_8221FA30,
-       hooks::RaceScreensSplitResultsCreate, {{rs::kSplitResults, 40}}, 96, 8},
-      {"Kind6Menu::Create (sub_8221BDD0)", __imp__sub_8221BDD0, hooks::RaceScreensKind6MenuCreate,
+       ITC_CONTEXT_FN(hooks::RaceScreensSplitResultsCreate), {{rs::kSplitResults, 40}}, 96, 8},
+      {"Kind6Menu::Create (sub_8221BDD0)", __imp__sub_8221BDD0, ITC_CONTEXT_FN(hooks::RaceScreensKind6MenuCreate),
        {{rs::kKind6Menu, 360}, {rs::kKind6Word, 0}}, 96, 8},
   };
   for (const Maker& maker : makers) {
@@ -434,30 +434,30 @@ struct Teardown {
 void Teardowns(Context& h) {
   const std::vector<Teardown> teardowns = {
       {"PauseMenu::Destroy (sub_8220C4C8)", __imp__sub_8220C4C8,
-       hooks::RaceScreensPauseMenuDestroy,
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuDestroy),
        {rs::kPauseScreen, rs::kPauseData, rs::kPauseList, rs::kPausePages}, rs::kPauseList, 128,
        40, true},
       {"PauseMenu4::Destroy (sub_8220FC98)", __imp__sub_8220FC98,
-       hooks::RaceScreensPauseMenu4Destroy,
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenu4Destroy),
        {rs::kPause4Screen, rs::kPause4Data, rs::kPause4List, rs::kPause4Pages}, rs::kPause4List,
        128, 40, true},
       {"AfterRaceMenu::Destroy (sub_8221A3E8)", __imp__sub_8221A3E8,
-       hooks::RaceScreensAfterRaceMenuDestroy,
+       ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuDestroy),
        {rs::kAfterScreen, rs::kAfterData, rs::kAfterList, rs::kAfterPages}, rs::kAfterList, 128,
        40, true},
       {"RaceDialog::Destroy (sub_82217CD0)", __imp__sub_82217CD0,
-       hooks::RaceScreensRaceDialogDestroy, {rs::kDialogList, rs::kDialogPages, rs::kDialogData},
+       ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogDestroy), {rs::kDialogList, rs::kDialogPages, rs::kDialogData},
        rs::kDialogList, 112, 32, false},
       {"CareerResults::Destroy (sub_82219170)", __imp__sub_82219170,
-       hooks::RaceScreensCareerResultsDestroy, {rs::kCareerResults}, 0, 96, 16, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensCareerResultsDestroy), {rs::kCareerResults}, 0, 96, 16, true},
       {"RaceResults::Destroy (sub_8221F3C8)", __imp__sub_8221F3C8,
-       hooks::RaceScreensRaceResultsDestroy, {rs::kRaceResults}, 0, 96, 16, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensRaceResultsDestroy), {rs::kRaceResults}, 0, 96, 16, true},
       {"SplitResults::Destroy (sub_8221FA68)", __imp__sub_8221FA68,
-       hooks::RaceScreensSplitResultsDestroy, {rs::kSplitResults}, 0, 96, 16, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensSplitResultsDestroy), {rs::kSplitResults}, 0, 96, 16, true},
       {"Kind6Menu::Destroy (sub_8221BE30)", __imp__sub_8221BE30,
-       hooks::RaceScreensKind6MenuDestroy, {rs::kKind6Menu}, 0, 96, 16, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensKind6MenuDestroy), {rs::kKind6Menu}, 0, 96, 16, true},
       {"AfterRaceMenu::Close (sub_8221A498)", __imp__sub_8221A498,
-       hooks::RaceScreensAfterRaceMenuClose, {}, rs::kAfterList, 0, 0, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuClose), {}, rs::kAfterList, 0, 0, false},
   };
   for (const Teardown& teardown : teardowns) {
     Results results(teardown.name);
@@ -586,19 +586,19 @@ void Data(Context& h) {
   };
   const std::vector<Function> functions = {
       {"PauseMenu::LoadData (sub_8220F840)", __imp__sub_8220F840,
-       hooks::RaceScreensPauseMenuLoadData, 6176, 40, 300},
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuLoadData), 6176, 40, 300},
       {"PauseMenu::SaveOptions (sub_8220D6A0)", __imp__sub_8220D6A0,
-       hooks::RaceScreensPauseMenuSaveOptions, 96, 8, 50},
-      {"PauseMenu::Close (sub_8220D890)", __imp__sub_8220D890, hooks::RaceScreensPauseMenuClose,
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuSaveOptions), 96, 8, 50},
+      {"PauseMenu::Close (sub_8220D890)", __imp__sub_8220D890, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuClose),
        96, 8, 20},
       {"PauseMenu::SaveHudOptions (sub_8220D740)", __imp__sub_8220D740,
-       hooks::RaceScreensPauseMenuSaveHudOptions, 96, 8, 50},
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuSaveHudOptions), 96, 8, 50},
       {"PauseMenu::AnswerPage (sub_8220C5D0)", __imp__sub_8220C5D0,
-       hooks::RaceScreensPauseMenuAnswerPage, 0, 0, 20},
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuAnswerPage), 0, 0, 20},
       {"AfterRaceMenu::AnswerPage (sub_8221A720)", __imp__sub_8221A720,
-       hooks::RaceScreensAfterRaceMenuAnswerPage, 0, 0, 20},
+       ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuAnswerPage), 0, 0, 20},
       {"RaceDialog::Answer (sub_82217D40)", __imp__sub_82217D40,
-       hooks::RaceScreensRaceDialogAnswer, 0, 0, 40},
+       ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogAnswer), 0, 0, 40},
   };
   for (const Function& f : functions) {
     Results results(f.name);
@@ -753,20 +753,20 @@ void Pages(Context& h) {
       [&](PPCContext&, Random& r, const PageWorld& w) {
         page_of(w.block(rs::kPausePages), {-1, 5}, r);
       },
-      __imp__sub_8220F638, hooks::RaceScreensPauseMenuUpdate, 112, 8);
+      __imp__sub_8220F638, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuUpdate), 112, 8);
   PageGroup(
       h, w, "CareerResults::Update (sub_8221A090)", 60,
       [&](PPCContext& t, Random& r, const PageWorld& w) {
         t.r3.u64 = w.block(rs::kCareerResults);
         page_of(w.block(rs::kCareerResults) + 184, {-1, 0, 4}, r);
       },
-      __imp__sub_8221A090, hooks::RaceScreensCareerResultsUpdate, 112, 8);
+      __imp__sub_8221A090, ITC_CONTEXT_FN(hooks::RaceScreensCareerResultsUpdate), 112, 8);
   PageGroup(
       h, w, "AfterRaceMenu::Update (sub_8221BD20)", 60,
       [&](PPCContext&, Random& r, const PageWorld& w) {
         page_of(w.block(rs::kAfterPages), {-1, 7}, r);
       },
-      __imp__sub_8221BD20, hooks::RaceScreensAfterRaceMenuUpdate, 128, 8);
+      __imp__sub_8221BD20, ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuUpdate), 128, 8);
   PageGroup(
       h, w, "RaceDialog::Update (sub_822185B0)", 120,
       [&](PPCContext&, Random& r, const PageWorld& w) {
@@ -783,11 +783,11 @@ void Pages(Context& h) {
           // Skips the Go: the page stays -1.
         }
       },
-      __imp__sub_822185B0, hooks::RaceScreensRaceDialogUpdate, 128, 24);
+      __imp__sub_822185B0, ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogUpdate), 128, 24);
   PageGroup(
       h, w, "CareerResults::Start (sub_822191D0)", 20,
       [](PPCContext&, Random&, const PageWorld&) {}, __imp__sub_822191D0,
-      hooks::RaceScreensCareerResultsStart, 96, 8);
+      ITC_CONTEXT_FN(hooks::RaceScreensCareerResultsStart), 96, 8);
   // The steps: the list's side (+28) -1, 0, 1 or any word, its selection
   // (+16; the scroll +4 0) 0 to 4; the values near their bounds.
   auto steps = [&h](PPCContext&, Random& r, const PageWorld& w) {
@@ -805,9 +805,9 @@ void Pages(Context& h) {
     guest::StoreU32(h.base, data + 144, r.Below(3));
   };
   PageGroup(h, w, "PauseMenu::StepVolume (sub_8220CED0)", 200, steps, __imp__sub_8220CED0,
-            hooks::RaceScreensPauseMenuStepVolume, 96, 16);
+            ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuStepVolume), 96, 16);
   PageGroup(h, w, "PauseMenu::StepAdjust (sub_8220D248)", 200, steps, __imp__sub_8220D248,
-            hooks::RaceScreensPauseMenuStepAdjust, 96, 16);
+            ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuStepAdjust), 96, 16);
 }
 
 // --- The screens' transitions and node helpers (a UI movie world) ---
@@ -1279,7 +1279,7 @@ void Openers(Context& h, const MovieWorld& w) {
   MovieGroup(
       h, w, "RaceHudMachine::OpenPause (sub_8216D600)", 150,
       [&](PPCContext& t, Random& r, const MovieWorld& w) { shape(t, r, w, false); },
-      __imp__sub_8216D600, hooks::RaceHudMachineOpenPause, open);
+      __imp__sub_8216D600, ITC_CONTEXT_FN(hooks::RaceHudMachineOpenPause), open);
   // OpenRacePause's career path runs OpenCareerPause's 96-byte frame first
   // (Open's below it, its register saves at sp - 112 to sp - 96): the
   // frame's lowest 16 bytes (Open's back chain on the other paths) left
@@ -1289,13 +1289,13 @@ void Openers(Context& h, const MovieWorld& w) {
   MovieGroup(
       h, w, "RaceHudMachine::OpenRacePause (sub_8216DA40)", 200,
       [&](PPCContext& t, Random& r, const MovieWorld& w) { shape(t, r, w, true); },
-      __imp__sub_8216DA40, hooks::RaceHudMachineOpenRacePause, racing);
+      __imp__sub_8216DA40, ITC_CONTEXT_FN(hooks::RaceHudMachineOpenRacePause), racing);
   FrameSpec career{96, 16, {0, 0}, true};
   career.after = open.after;
   MovieGroup(
       h, w, "RaceHudMachine::OpenCareerPause (sub_8216D8C8)", 100,
       [&](PPCContext& t, Random& r, const MovieWorld& w) { shape(t, r, w, false); },
-      __imp__sub_8216D8C8, hooks::RaceHudMachineOpenCareerPause, career);
+      __imp__sub_8216D8C8, ITC_CONTEXT_FN(hooks::RaceHudMachineOpenCareerPause), career);
   guest::StoreU32(h.base, kRaceData, saved_race);
 }
 
@@ -1378,7 +1378,7 @@ void Results(Context& h, const MovieWorld& w) {
   MovieGroup(
       h, w, "CareerResults::SetTexts (sub_822197A8)", 150,
       [&](PPCContext& t, Random& r, const MovieWorld& w) { t.r3.u64 = screen(r, w); },
-      __imp__sub_822197A8, hooks::RaceScreensCareerResultsSetTexts, set_texts);
+      __imp__sub_822197A8, ITC_CONTEXT_FN(hooks::RaceScreensCareerResultsSetTexts), set_texts);
   FrameSpec open{112, 24, {0, 0}, true};
   open.after = [&](Outputs& out) { out.Bytes(Read(h.base, source.address, source.bytes)); };
   MovieGroup(
@@ -1389,7 +1389,7 @@ void Results(Context& h, const MovieWorld& w) {
         values(r, source.address);
         t.r4.u64 = source.address;
       },
-      __imp__sub_8221A1F0, hooks::RaceScreensCareerResultsOpen, open);
+      __imp__sub_8221A1F0, ITC_CONTEXT_FN(hooks::RaceScreensCareerResultsOpen), open);
 
   // The race HUD machine's results.
   auto shape = [&](PPCContext& t, Random& r, const MovieWorld& w, bool award) {
@@ -1488,13 +1488,13 @@ void Results(Context& h, const MovieWorld& w) {
   MovieGroup(
       h, w, "RaceHudMachine::AwardPrize (sub_8216E150)", 300,
       [&](PPCContext& t, Random& r, const MovieWorld& w) { shape(t, r, w, true); },
-      WithoutMachine<__imp__sub_8216E150>, hooks::RaceHudMachineAwardPrize, award);
+      WithoutMachine<__imp__sub_8216E150>, ITC_CONTEXT_FN(hooks::RaceHudMachineAwardPrize), award);
   FrameSpec end{96, 16, {0, 0}, true};
   end.after = after;
   MovieGroup(
       h, w, "RaceHudMachine::OnRaceEnd (sub_8216E5B0)", 200,
       [&](PPCContext& t, Random& r, const MovieWorld& w) { shape(t, r, w, false); },
-      WithoutMachine<__imp__sub_8216E5B0>, hooks::RaceHudMachineOnRaceEnd, end);
+      WithoutMachine<__imp__sub_8216E5B0>, ITC_CONTEXT_FN(hooks::RaceHudMachineOnRaceEnd), end);
   guest::StoreU32(h.base, kRaceData, saved_race);
   guest::StoreU32(h.base, data_tables::kTables, saved_tables);
 }
@@ -1527,30 +1527,30 @@ void AfterRace(Context& h, const MovieWorld& w) {
         guest::StoreU32(h.base, dialog + 36, page != -1 && page != 5 ? 1 : r.Below(2));
         guest::StoreU32(h.base, dialog + 0, r.Below(3));
       },
-      __imp__sub_8221A6C8, hooks::RaceScreensAfterRaceMenuConfirmPage, {96, 8});
+      __imp__sub_8221A6C8, ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuConfirmPage), {96, 8});
   MovieGroup(h, w, "AfterRaceMenu::Intro (sub_8221A730)", 100, after_step, __imp__sub_8221A730,
-             hooks::RaceScreensAfterRaceMenuIntro, {96, 16});
+             ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuIntro), {96, 16});
   MovieGroup(h, w, "AfterRaceMenu::Show (sub_8221A7A8)", 100, after_step, __imp__sub_8221A7A8,
-             hooks::RaceScreensAfterRaceMenuShow, {112, 24});
+             ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuShow), {112, 24});
   MovieGroup(h, w, "AfterRaceMenu::CloseMain (sub_8221A950)", 100, after_step,
-             __imp__sub_8221A950, hooks::RaceScreensAfterRaceMenuCloseMain, {112, 24});
+             __imp__sub_8221A950, ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuCloseMain), {112, 24});
   MovieGroup(h, w, "AfterRaceMenu::Move (sub_8221AA20)", 100, after_step, __imp__sub_8221AA20,
-             hooks::RaceScreensAfterRaceMenuMove, {112, 32});
+             ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuMove), {112, 32});
   MovieGroup(
       h, w, "AfterRaceMenu::ShowItems (sub_8221AC00)", 150,
       [&](PPCContext&, Random& r, const MovieWorld& w) { data(r, w); }, __imp__sub_8221AC00,
-      hooks::RaceScreensAfterRaceMenuShowItems, {128, 48, {48, 80}});
+      ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuShowItems), {128, 48, {48, 80}});
   MovieGroup(
       h, w, "AfterRaceMenu::ColorItems (sub_8221B768)", 100,
       [&](PPCContext& t, Random& r, const MovieWorld& w) {
         data(r, w);
         t.r3.u64 = w.block(rs::kAfterScreen);
       },
-      __imp__sub_8221B768, hooks::RaceScreensAfterRaceMenuColorItems, {128, 48});
+      __imp__sub_8221B768, ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuColorItems), {128, 48});
   MovieGroup(
       h, w, "AfterRaceMenu::Start (sub_8221B860)", 60,
       [&](PPCContext&, Random& r, const MovieWorld& w) { data(r, w); }, __imp__sub_8221B860,
-      hooks::RaceScreensAfterRaceMenuStart, {96, 8});
+      ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuStart), {96, 8});
   // Init's block: compared, freed, +68 0 again.
   auto init_block = [&](Outputs& out) {
     const uint32_t list = w.block(rs::kAfterList);
@@ -1570,7 +1570,7 @@ void AfterRace(Context& h, const MovieWorld& w) {
         data(r, w);
         guest::StoreU32(h.base, w.block(rs::kAfterList) + rs::kListBlock, 0);
       },
-      __imp__sub_8221B5C8, hooks::RaceScreensAfterRaceMenuSetUpItems, set_up);
+      __imp__sub_8221B5C8, ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuSetUpItems), set_up);
   FrameSpec open{128, 40};
   open.after = init_block;
   MovieGroup(
@@ -1582,7 +1582,7 @@ void AfterRace(Context& h, const MovieWorld& w) {
         t.r4.u64 = r.Below(8);
         t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
       },
-      __imp__sub_8221BA68, hooks::RaceScreensAfterRaceMenuOpen, open);
+      __imp__sub_8221BA68, ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuOpen), open);
 }
 
 // The confirm dialog's pages, transitions and draw.
@@ -1664,15 +1664,15 @@ void Dialog(Context& h, const MovieWorld& w) {
         }
         guest::StoreU32(h.base, kReplayList, save.address + kReplayHeader);
       },
-      __imp__sub_82217F40, hooks::RaceScreensRaceDialogQuestion, question);
+      __imp__sub_82217F40, ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogQuestion), question);
   auto step = [&](PPCContext& t, Random& r, const MovieWorld& w) {
     data(r, w);
     StepWord(t, r, w, rs::kDialogPages);
   };
   MovieGroup(h, w, "RaceDialog::OpenAnim (sub_822186A8)", 150, step, __imp__sub_822186A8,
-             hooks::RaceScreensRaceDialogOpenAnim, {128, 32});
+             ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogOpenAnim), {128, 32});
   MovieGroup(h, w, "RaceDialog::Move (sub_82218788)", 100, step, __imp__sub_82218788,
-             hooks::RaceScreensRaceDialogMove, {128, 32});
+             ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogMove), {128, 32});
   // ShowMessage: the step word 0 or 1 (the world's), the message (+12) the
   // question's (13) mostly, now and then any word or 0 to 11 (the jump
   // table's messages, never seen in play: the original on both sides), the
@@ -1701,7 +1701,7 @@ void Dialog(Context& h, const MovieWorld& w) {
         guest::StoreU32(h.base, d + 28, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(3));
         guest::StoreU32(h.base, w.block(rs::kDialogList) + rs::kListBlock, 0);
       },
-      __imp__sub_82218C10, hooks::RaceScreensRaceDialogShowMessage, show);
+      __imp__sub_82218C10, ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogShowMessage), show);
   // Draw: the running transition (+12) none (-1), OpenAnim's (1), Move's (2)
   // or another negative one (ShowMessage's, 0, never seen in play, left out:
   // the original on both sides), the queued one (+16) -1 or 0 to 2.
@@ -1716,7 +1716,7 @@ void Dialog(Context& h, const MovieWorld& w) {
         guest::StoreU32(h.base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(3));
         guest::StoreU32(h.base, pages + 4, r.Below(8));
       },
-      __imp__sub_82218F30, hooks::RaceScreensRaceDialogDraw, {128, 16});
+      __imp__sub_82218F30, ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogDraw), {128, 16});
   // SetText: the string id one its callers pass (62, 75, 77, 1954 to 1956)
   // or any below 2000, the varargs random words (the strings have no
   // argument codes). The frame's +40 to +79 left out: UiMovie::SetNodeText
@@ -1737,7 +1737,7 @@ void Dialog(Context& h, const MovieWorld& w) {
         t.r9.u64 = r.Next();
         t.r10.u64 = r.Next();
       },
-      __imp__sub_82218838, hooks::RaceScreensRaceDialogSetText, set_text);
+      __imp__sub_82218838, ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogSetText), set_text);
   // Open: the mode 0 to 5 or any up to 7, the player 0, 1 or any word. The
   // frame's +32 to +79 left out: SetText stores r5 to r10 there, the
   // caller's leftovers in the original and 0 in ours (the user's call for
@@ -1750,7 +1750,7 @@ void Dialog(Context& h, const MovieWorld& w) {
         t.r3.u64 = r.Below(8);
         t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
       },
-      __imp__sub_82218B30, hooks::RaceScreensRaceDialogOpen, open);
+      __imp__sub_82218B30, ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogOpen), open);
 }
 
 // The two main pages (PauseMenu::MainPage, AfterRaceMenu::MainPage), then
@@ -1797,7 +1797,7 @@ void MainPages(Context& h, const MovieWorld& w) {
         guest::StoreU32(h.base, rs::kRaceData, race.address);
         guest::StoreU32(h.base, rs::kStageWord, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
       },
-      __imp__sub_8220D898, hooks::RaceScreensPauseMenuMainPage, pause);
+      __imp__sub_8220D898, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuMainPage), pause);
   guest::StoreU32(h.base, rs::kRaceData, saved_race);
   guest::StoreU32(h.base, rs::kStageWord, saved_word);
   FrameSpec after{112, 32};
@@ -1822,7 +1822,7 @@ void MainPages(Context& h, const MovieWorld& w) {
         guest::StoreU32(h.base, kReplayList, save.address + kReplayHeader);
         guest::StoreU32(h.base, w.block(rs::kDialogList) + rs::kListBlock, 0);
       },
-      __imp__sub_8221A4A8, hooks::RaceScreensAfterRaceMenuMainPage, after);
+      __imp__sub_8221A4A8, ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuMainPage), after);
   // The pause menu's set-ups and the adjust page: the volumes (+52, +56) 0
   // to 15 or any, the three values and their saved and default copies (+24
   // to +32, +60 to +68, +96 to +104) -10 to 10 or any, the toggle (+144) 0
@@ -1848,7 +1848,7 @@ void MainPages(Context& h, const MovieWorld& w) {
   // r10 there, leftovers in the original and 0 in ours for strings 2009 to
   // 2011: the user's call for the parking area, 2026-10-30).
   MovieGroup(h, w, "PauseMenu::ShowCareer (sub_8220D418)", 150, set_values, __imp__sub_8220D418,
-             hooks::RaceScreensPauseMenuShowCareer, {128, 32, {48, 80}});
+             ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowCareer), {128, 32, {48, 80}});
   // SetUpMain: MenuList::Init frees the list's old item block (+68, 0 here)
   // and makes one: its words compared, then it's freed and +68 put to 0.
   FrameSpec set_up{144, 40};
@@ -1868,15 +1868,15 @@ void MainPages(Context& h, const MovieWorld& w) {
         values(r, w);
         guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
       },
-      __imp__sub_8220E418, hooks::RaceScreensPauseMenuSetUpMain, set_up);
+      __imp__sub_8220E418, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuSetUpMain), set_up);
   MovieGroup(h, w, "PauseMenu::ShowVolumesB (sub_8220E810)", 100, set_values, __imp__sub_8220E810,
-             hooks::RaceScreensPauseMenuShowVolumesB, {112, 24});
+             ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowVolumesB), {112, 24});
   MovieGroup(h, w, "PauseMenu::ShowAdjustB (sub_8220E908)", 100, set_values, __imp__sub_8220E908,
-             hooks::RaceScreensPauseMenuShowAdjustB, {128, 32});
+             ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowAdjustB), {128, 32});
   FrameSpec adjust{112, 24};
   adjust.list_world = &list_world;
   MovieGroup(h, w, "PauseMenu::AdjustPage (sub_8220EBD8)", 400, set_values, __imp__sub_8220EBD8,
-             hooks::RaceScreensPauseMenuAdjustPage, adjust);
+             ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuAdjustPage), adjust);
   // MenuList::Init's block made by SetUpVolume (3 items), SetUpAdjust (4)
   // and SetUpMain (up to 6): the list's +68 put to 0 before the case; its
   // item words compared (the list's count, at most 6), then it's freed and
@@ -1902,11 +1902,11 @@ void MainPages(Context& h, const MovieWorld& w) {
   FrameSpec set_up_volume{128, 24, {40, 80}};
   set_up_volume.after = list_block;
   MovieGroup(h, w, "PauseMenu::SetUpVolume (sub_8220F3C0)", 150, values_no_block,
-             __imp__sub_8220F3C0, hooks::RaceScreensPauseMenuSetUpVolume, set_up_volume);
+             __imp__sub_8220F3C0, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuSetUpVolume), set_up_volume);
   FrameSpec set_up_adjust{144, 40, {40, 80}};
   set_up_adjust.after = list_block;
   MovieGroup(h, w, "PauseMenu::SetUpAdjust (sub_8220F500)", 150, values_no_block,
-             __imp__sub_8220F500, hooks::RaceScreensPauseMenuSetUpAdjust, set_up_adjust);
+             __imp__sub_8220F500, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuSetUpAdjust), set_up_adjust);
   // The transitions that call the set-ups: r3 the pause pages' step word (0
   // or 1, the world's), the list's selection (the world's: 0 to 7, now and
   // then up to 20).
@@ -1918,17 +1918,17 @@ void MainPages(Context& h, const MovieWorld& w) {
   FrameSpec transition{112, 24};
   transition.after = list_block;
   MovieGroup(h, w, "PauseMenu::OpenMain (sub_8220ED90)", 150, transition_values,
-             __imp__sub_8220ED90, hooks::RaceScreensPauseMenuOpenMain, transition);
+             __imp__sub_8220ED90, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuOpenMain), transition);
   MovieGroup(h, w, "PauseMenu::CloseOptions (sub_8220EFA8)", 150, transition_values,
-             __imp__sub_8220EFA8, hooks::RaceScreensPauseMenuCloseOptions, transition);
+             __imp__sub_8220EFA8, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuCloseOptions), transition);
   MovieGroup(h, w, "PauseMenu::CloseVolume (sub_8220F0A0)", 150, transition_values,
-             __imp__sub_8220F0A0, hooks::RaceScreensPauseMenuCloseVolume, transition);
+             __imp__sub_8220F0A0, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuCloseVolume), transition);
   MovieGroup(h, w, "PauseMenu::CloseAdjust (sub_8220F2A8)", 150, transition_values,
-             __imp__sub_8220F2A8, hooks::RaceScreensPauseMenuCloseAdjust, transition);
+             __imp__sub_8220F2A8, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuCloseAdjust), transition);
   MovieGroup(h, w, "PauseMenu::OpenVolume (sub_8220F6D0)", 150, transition_values,
-             __imp__sub_8220F6D0, hooks::RaceScreensPauseMenuOpenVolume, transition);
+             __imp__sub_8220F6D0, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuOpenVolume), transition);
   MovieGroup(h, w, "PauseMenu::OpenAdjust (sub_8220F788)", 150, transition_values,
-             __imp__sub_8220F788, hooks::RaceScreensPauseMenuOpenAdjust, transition);
+             __imp__sub_8220F788, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuOpenAdjust), transition);
   // The volume page and SaveVolumes: the volumes and their saved and default
   // copies (+16, +20, +52, +56, +88, +92) 0 to 15 or any; the sound
   // manager's slots 29 and 30 (GetCategory, SetCategoryVolume) the getter
@@ -1971,13 +1971,13 @@ void MainPages(Context& h, const MovieWorld& w) {
         values(r, w);
         volumes(r, w);
       },
-      __imp__sub_8220E988, hooks::RaceScreensPauseMenuVolumePage, volume_page);
+      __imp__sub_8220E988, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuVolumePage), volume_page);
   FrameSpec save_volumes{96, 8};
   save_volumes.after = volume_outputs;
   MovieGroup(
       h, w, "PauseMenu::SaveVolumes (sub_8220D7A0)", 100,
       [&](PPCContext&, Random& r, const MovieWorld& w) { volumes(r, w); }, __imp__sub_8220D7A0,
-      NativeSaveVolumes, save_volumes);
+      ITC_CONTEXT_FN(NativeSaveVolumes), save_volumes);
 }
 
 // The dialog's page object and data as its draw's cases shape them (its
@@ -2026,7 +2026,7 @@ void Draws(Context& h, const MovieWorld& w) {
         guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
         StepWord(t, r, w, rs::kPausePages);
       },
-      __imp__sub_8220EEF0, hooks::RaceScreensPauseMenuOpenOptions, open_options);
+      __imp__sub_8220EEF0, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuOpenOptions), open_options);
   FrameSpec pause_draw{320, 144};
   pause_draw.after = pause_block;
   // The pause list's item block (+68) 0 only for OpenOptions (6), whose
@@ -2049,7 +2049,7 @@ void Draws(Context& h, const MovieWorld& w) {
     t.r3.u64 = w.block(rs::kPauseScreen);
   };
   MovieGroup(h, w, "PauseMenu::Draw (sub_8220FB10)", 300, pause_draw_setup, __imp__sub_8220FB10,
-             hooks::RaceScreensPauseMenuDraw, pause_draw);
+             ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuDraw), pause_draw);
   const MovieSetupFn after_draw_setup = [&h](PPCContext& t, Random& r, const MovieWorld& w) {
     const uint32_t d = w.block(rs::kAfterData);
     guest::StoreU32(h.base, d + 0, r.Below(8));
@@ -2065,7 +2065,7 @@ void Draws(Context& h, const MovieWorld& w) {
     t.r3.u64 = w.block(rs::kAfterScreen);
   };
   MovieGroup(h, w, "AfterRaceMenu::Draw (sub_8221BB48)", 200, after_draw_setup,
-             __imp__sub_8221BB48, hooks::RaceScreensAfterRaceMenuDraw, {176, 56});
+             __imp__sub_8221BB48, ITC_CONTEXT_FN(hooks::RaceScreensAfterRaceMenuDraw), {176, 56});
   // The race HUD object's tail calls to these draws (race-hud-object.md):
   // r3 a holder of the case's own (its words random) whose +1012 and +1020
   // are the screens the draws' cases pass; the holder compared.
@@ -2099,12 +2099,12 @@ void Draws(Context& h, const MovieWorld& w) {
     }
   };
   MovieGroup(h, w, "RaceScreens::DrawPauseMenu (sub_82211D08)", 150, of_holder(pause_items_setup),
-             __imp__sub_82211D08, hooks::RaceHudObjectDrawPauseMenu, held_pause);
+             __imp__sub_82211D08, ITC_CONTEXT_FN(hooks::RaceHudObjectDrawPauseMenu), held_pause);
   FrameSpec held_after{176, 56};
   held_after.after = [&](Outputs& out) { out.Bytes(Read(h.base, holder.address, holder.bytes)); };
   MovieGroup(h, w, "RaceScreens::DrawAfterRaceMenu (sub_82211D10)", 150,
              of_holder(after_draw_setup), __imp__sub_82211D10,
-             hooks::RaceHudObjectDrawAfterRaceMenu, held_after);
+             ITC_CONTEXT_FN(hooks::RaceHudObjectDrawAfterRaceMenu), held_after);
   auto career = [&h](Random& r, const MovieWorld& w) {
     const uint32_t screen = w.block(rs::kCareerResults);
     guest::StoreU32(h.base, screen + 0, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(4));
@@ -2119,18 +2119,18 @@ void Draws(Context& h, const MovieWorld& w) {
     t.r3.u64 = career(r, w) + 208;
   };
   MovieGroup(h, w, "CareerResults::Intro (sub_82219210)", 100, career_step, __imp__sub_82219210,
-             hooks::RaceScreensCareerResultsIntro, {96, 16});
+             ITC_CONTEXT_FN(hooks::RaceScreensCareerResultsIntro), {96, 16});
   MovieGroup(h, w, "CareerResults::Show (sub_822192B0)", 100, career_step, __imp__sub_822192B0,
-             hooks::RaceScreensCareerResultsShow, {96, 16});
+             ITC_CONTEXT_FN(hooks::RaceScreensCareerResultsShow), {96, 16});
   MovieGroup(h, w, "CareerResults::Close1 (sub_822193D8)", 100, career_step,
-             __imp__sub_822193D8, hooks::RaceScreensCareerResultsClose1, {96, 16});
+             __imp__sub_822193D8, ITC_CONTEXT_FN(hooks::RaceScreensCareerResultsClose1), {96, 16});
   // Page1: player 0's mapper from a menu list world of the first section's.
   FrameSpec page1{112, 32};
   page1.list_world = &list_world;
   MovieGroup(
       h, w, "CareerResults::Page1 (sub_82219A78)", 300,
       [&](PPCContext&, Random& r, const MovieWorld& w) { career(r, w); }, __imp__sub_82219A78,
-      hooks::RaceScreensCareerResultsPage1, page1);
+      ITC_CONTEXT_FN(hooks::RaceScreensCareerResultsPage1), page1);
   // Draw: the running transition (+196) none (-1), another negative one, or
   // the native ones (0 Intro, 1 Show, 6 Close1); the queued one (+200) -1 or
   // 0 to 8.
@@ -2145,7 +2145,7 @@ void Draws(Context& h, const MovieWorld& w) {
         guest::StoreU32(h.base, screen + 188, r.Below(5));
         t.r3.u64 = screen;
       },
-      __imp__sub_8221A2F8, hooks::RaceScreensCareerResultsDraw, {144, 24});
+      __imp__sub_8221A2F8, ITC_CONTEXT_FN(hooks::RaceScreensCareerResultsDraw), {144, 24});
 }
 
 // The confirm dialog's save notes (never seen in play): StartSave (its
@@ -2180,11 +2180,11 @@ void DialogSave(Context& h, const MovieWorld& w) {
   FrameSpec start{128, 24, {24, 80}};
   start.after = outputs;
   MovieGroup(h, w, "RaceDialog::StartSave (sub_822189B8)", 200, shape, __imp__sub_822189B8,
-             hooks::RaceScreensRaceDialogStartSave, start);
+             ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogStartSave), start);
   FrameSpec saving{112, 24, {24, 80}};
   saving.after = outputs;
   MovieGroup(h, w, "RaceDialog::ShowSaving (sub_82218AB0)", 150, shape, __imp__sub_82218AB0,
-             hooks::RaceScreensRaceDialogShowSaving, saving);
+             ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogShowSaving), saving);
   FrameSpec note{112, 24};
   note.after = outputs;
   MovieGroup(
@@ -2199,7 +2199,7 @@ void DialogSave(Context& h, const MovieWorld& w) {
         t.r9.u64 = r.Next();
         t.r10.u64 = r.Next();
       },
-      __imp__sub_82218918, hooks::RaceScreensRaceDialogSetNote, note);
+      __imp__sub_82218918, ITC_CONTEXT_FN(hooks::RaceScreensRaceDialogSetNote), note);
 }
 
 void Transitions(Context& h) {
@@ -2218,22 +2218,22 @@ void Transitions(Context& h) {
     FrameSpec spec;
   };
   const std::vector<Transition> transitions = {
-      {"PauseMenu::RunTen (sub_8220C5E0)", __imp__sub_8220C5E0, hooks::RaceScreensPauseMenuRunTen,
+      {"PauseMenu::RunTen (sub_8220C5E0)", __imp__sub_8220C5E0, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuRunTen),
        {96, 16}},
       {"PauseMenu::BackToMain (sub_8220C668)", __imp__sub_8220C668,
-       hooks::RaceScreensPauseMenuBackToMain, {112, 32}},
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuBackToMain), {112, 32}},
       {"PauseMenu::CloseMain (sub_8220C700)", __imp__sub_8220C700,
-       hooks::RaceScreensPauseMenuCloseMain, {112, 24}},
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuCloseMain), {112, 24}},
       {"PauseMenu::MoveMain (sub_8220C7B8)", __imp__sub_8220C7B8,
-       hooks::RaceScreensPauseMenuMoveMain, {112, 32}},
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuMoveMain), {112, 32}},
       {"PauseMenu::ShowOptionsRow (sub_8220C868)", __imp__sub_8220C868,
-       hooks::RaceScreensPauseMenuShowOptionsRow, {112, 32}},
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowOptionsRow), {112, 32}},
       {"PauseMenu::ToggleOptions (sub_8220C930)", __imp__sub_8220C930,
-       hooks::RaceScreensPauseMenuToggleOptions, {112, 24}},
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuToggleOptions), {112, 24}},
       {"PauseMenu::ShowVolumeRow (sub_8220CA28)", __imp__sub_8220CA28,
-       hooks::RaceScreensPauseMenuShowVolumeRow, {112, 24}},
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowVolumeRow), {112, 24}},
       {"PauseMenu::ShowAdjustRow (sub_8220CAB0)", __imp__sub_8220CAB0,
-       hooks::RaceScreensPauseMenuShowAdjustRow, {112, 24}},
+       ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowAdjustRow), {112, 24}},
   };
   for (const Transition& tr : transitions) {
     MovieGroup(h, w, tr.name, 100, pause_step, tr.recompiled, tr.native, tr.spec);
@@ -2252,23 +2252,23 @@ void Transitions(Context& h) {
         guest::StoreU32(h.base, data + 36, page != -1 && page != 5 ? 1 : r.Below(2));
         guest::StoreU32(h.base, data + 0, r.Below(3));
       },
-      __imp__sub_8220C578, hooks::RaceScreensPauseMenuConfirmPage, {96, 8});
+      __imp__sub_8220C578, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuConfirmPage), {96, 8});
   // The node helpers.
   MovieGroup(
       h, w, "PauseMenu::ShowItems (sub_8220CB38)", 150,
       [](PPCContext&, Random&, const MovieWorld&) {}, __imp__sub_8220CB38,
-      hooks::RaceScreensPauseMenuShowItems, {128, 48, {48, 80}});
+      ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowItems), {128, 48, {48, 80}});
   MovieGroup(
       h, w, "PauseMenu::SetArrowA (sub_8220CBF8)", 100,
       [](PPCContext& t, Random& r, const MovieWorld&) {
         const uint64_t values[4] = {0, 120, uint64_t(int64_t(-int32_t(r.Below(1000)))), r.Next()};
         t.r3.u64 = values[r.Below(4)];
       },
-      __imp__sub_8220CBF8, hooks::RaceScreensPauseMenuSetArrowA, {112, 24});
+      __imp__sub_8220CBF8, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuSetArrowA), {112, 24});
   MovieGroup(
       h, w, "PauseMenu::ShowOptions (sub_8220CC60)", 150,
       [](PPCContext&, Random&, const MovieWorld&) {}, __imp__sub_8220CC60,
-      hooks::RaceScreensPauseMenuShowOptions, {192, 88});
+      ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowOptions), {192, 88});
   MovieGroup(
       h, w, "PauseMenu::ShowVolumes (sub_8220D0B8)", 100,
       [&h](PPCContext&, Random& r, const MovieWorld& w) {
@@ -2276,7 +2276,7 @@ void Transitions(Context& h) {
           guest::StoreU32(h.base, w.block(rs::kPauseData) + field, r.Below(16));
         }
       },
-      __imp__sub_8220D0B8, hooks::RaceScreensPauseMenuShowVolumes, {112, 24});
+      __imp__sub_8220D0B8, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowVolumes), {112, 24});
   // ShowVolume: r3 a leaf, r4 the volume 0 to 15, now and then any word
   // (SetNodeText's unset r7 to r10 stored at its frame's +48 to +79 left
   // out; r29 to r31 and lr saved at the top 32 bytes).
@@ -2286,7 +2286,7 @@ void Transitions(Context& h) {
         t.r3.u64 = w.leaf(r.Below(kLeaves));
         t.r4.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(r.Below(17));
       },
-      __imp__sub_8220D040, hooks::RaceScreensPauseMenuShowVolume, {112, 32, {48, 80}});
+      __imp__sub_8220D040, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowVolume), {112, 32, {48, 80}});
   // ShowSlider: r3 a leaf, r4 the value -10 to 10, now and then any word
   // (SetNodeText's unset r7 to r10 stored at its frame's +48 to +79 left out).
   MovieGroup(
@@ -2295,24 +2295,24 @@ void Transitions(Context& h) {
         t.r3.u64 = w.leaf(r.Below(kLeaves));
         t.r4.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(21)) - 10));
       },
-      __imp__sub_8220D130, hooks::RaceScreensPauseMenuShowSlider, {128, 40, {48, 80}});
+      __imp__sub_8220D130, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowSlider), {128, 40, {48, 80}});
   MovieGroup(
       h, w, "PauseMenu::RestoreNodes (sub_8220D5D0)", 150,
       [](PPCContext& t, Random& r, const MovieWorld&) {
         t.r3.u64 = r.Below(3) == 0 ? ~uint64_t(0) : r.Below(16);
         t.r4.u64 = r.Below(16);
       },
-      __imp__sub_8220D5D0, hooks::RaceScreensPauseMenuRestoreNodes, {128, 40});
+      __imp__sub_8220D5D0, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuRestoreNodes), {128, 40});
   MovieGroup(h, w, "PauseMenu::MoveOptions (sub_8220DD98)", 200, pause_step,
-             __imp__sub_8220DD98, hooks::RaceScreensPauseMenuMoveOptions, {144, 64});
+             __imp__sub_8220DD98, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuMoveOptions), {144, 64});
   MovieGroup(h, w, "PauseMenu::MoveAdjust (sub_8220E1F8)", 200, pause_step,
-             __imp__sub_8220E1F8, hooks::RaceScreensPauseMenuMoveAdjust, {144, 56});
+             __imp__sub_8220E1F8, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuMoveAdjust), {144, 56});
   MovieGroup(h, w, "PauseMenu::ShowMain (sub_8220EE28)", 100, pause_step, __imp__sub_8220EE28,
-             hooks::RaceScreensPauseMenuShowMain, {112, 32});
+             ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowMain), {112, 32});
   MovieGroup(
       h, w, "PauseMenu::ColorItems (sub_8220E700)", 100,
       [](PPCContext&, Random&, const MovieWorld&) {}, __imp__sub_8220E700,
-      hooks::RaceScreensPauseMenuColorItems, {128, 48});
+      ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuColorItems), {128, 48});
   MovieGroup(
       h, w, "PauseMenu::ShowAdjust (sub_8220E888)", 100,
       [&h](PPCContext&, Random& r, const MovieWorld& w) {
@@ -2321,7 +2321,7 @@ void Transitions(Context& h) {
                           r.Below(6) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(21)) - 10));
         }
       },
-      __imp__sub_8220E888, hooks::RaceScreensPauseMenuShowAdjust, {128, 32});
+      __imp__sub_8220E888, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuShowAdjust), {128, 32});
   // Open: r3 the screen word, r4 the kind 0 to 4 (now and then any word),
   // r5 the flag.
   MovieGroup(
@@ -2331,7 +2331,7 @@ void Transitions(Context& h) {
         t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(5);
         t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
       },
-      __imp__sub_8220FA88, hooks::RaceScreensPauseMenuOpen, {112, 16, {0, 0}, true});
+      __imp__sub_8220FA88, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuOpen), {112, 16, {0, 0}, true});
   // The options page: the edits (+36 to +48, +144) and the saved ones (+0 to
   // +12, +72 to +84) 0, 1 or any; the list's selection 0 to 4.
   auto edits = [&h](Random& r, const MovieWorld& w) {
@@ -2348,7 +2348,7 @@ void Transitions(Context& h) {
         const uint32_t sides[4] = {0xFFFFFFFFu, 0, 1, uint32_t(r.Next())};
         guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListSide, sides[r.Below(4)]);
       },
-      __imp__sub_8220CDA0, hooks::RaceScreensPauseMenuToggleOption, {128, 16});
+      __imp__sub_8220CDA0, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuToggleOption), {128, 16});
   const World list_world;
   if (!list_world.ok()) {
     ITC_LOG_ERROR("harness: race_screens: no block from the allocation layer");
@@ -2359,7 +2359,7 @@ void Transitions(Context& h) {
   MovieGroup(
       h, w, "PauseMenu::OptionsPage (sub_8220DB98)", 400,
       [&](PPCContext&, Random& r, const MovieWorld& w) { edits(r, w); },
-      __imp__sub_8220DB98, hooks::RaceScreensPauseMenuOptionsPage, options);
+      __imp__sub_8220DB98, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuOptionsPage), options);
   // SetUpOptions: MenuList::Init frees the list's old item block (+68, 0
   // here) and makes one of its own: its words compared, then it's freed and
   // +68 put to 0.
@@ -2380,9 +2380,9 @@ void Transitions(Context& h) {
         edits(r, w);
         guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
       },
-      __imp__sub_8220E530, hooks::RaceScreensPauseMenuSetUpOptions, set_up);
+      __imp__sub_8220E530, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuSetUpOptions), set_up);
   MovieGroup(h, w, "PauseMenu::SetAdjust (sub_8220F1B8)", 100, pause_step,
-             __imp__sub_8220F1B8, hooks::RaceScreensPauseMenuSetAdjust, {112, 24});
+             __imp__sub_8220F1B8, ITC_CONTEXT_FN(hooks::RaceScreensPauseMenuSetAdjust), {112, 24});
   Openers(h, w);
   Results(h, w);
   AfterRace(h, w);
@@ -2513,41 +2513,41 @@ void Pause4(Context& h, const MovieWorld& w) {
   };
   const Simple simple[] = {
       {"PauseMenu4::StepVolume (sub_82210488)", 200, &plain, __imp__sub_82210488,
-       hooks::RaceScreensUnseenPause4StepVolume, 96, 16, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4StepVolume), 96, 16, {0, 0}, false},
       {"PauseMenu4::ShowItems (sub_82210360)", 150, &plain, __imp__sub_82210360,
-       hooks::RaceScreensUnseenPause4ShowItems, 128, 48, {48, 80}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4ShowItems), 128, 48, {48, 80}, false},
       {"PauseMenu4::ColorItems (sub_82210CD0)", 150, &plain, __imp__sub_82210CD0,
-       hooks::RaceScreensUnseenPause4ColorItems, 128, 48, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4ColorItems), 128, 48, {0, 0}, false},
       {"PauseMenu4::SetUpMain (sub_82210C00)", 150, &no_block, __imp__sub_82210C00,
-       hooks::RaceScreensUnseenPause4SetUpMain, 128, 24, {0, 0}, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4SetUpMain), 128, 24, {0, 0}, true},
       {"PauseMenu4::SetUpVolume (sub_82211250)", 150, &no_block, __imp__sub_82211250,
-       hooks::RaceScreensUnseenPause4SetUpVolume, 128, 24, {40, 80}, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4SetUpVolume), 128, 24, {40, 80}, true},
       {"PauseMenu4::ShowVolumes (sub_82210670)", 100, &plain, __imp__sub_82210670,
-       hooks::RaceScreensUnseenPause4ShowVolumes, 112, 24, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4ShowVolumes), 112, 24, {0, 0}, false},
       {"PauseMenu4::ShowVolumesB (sub_82210DE0)", 100, &plain, __imp__sub_82210DE0,
-       hooks::RaceScreensUnseenPause4ShowVolumesB, 112, 24, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4ShowVolumesB), 112, 24, {0, 0}, false},
       {"PauseMenu4::RunTen (sub_8220FF88)", 100, &step, __imp__sub_8220FF88,
-       hooks::RaceScreensUnseenPause4RunTen, 96, 16, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4RunTen), 96, 16, {0, 0}, false},
       {"PauseMenu4::OpenMain (sub_82211098)", 150, &step_no_block, __imp__sub_82211098,
-       hooks::RaceScreensUnseenPause4OpenMain, 112, 24, {0, 0}, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4OpenMain), 112, 24, {0, 0}, true},
       {"PauseMenu4::ShowMain (sub_82210010)", 100, &step, __imp__sub_82210010,
-       hooks::RaceScreensUnseenPause4ShowMain, 112, 32, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4ShowMain), 112, 32, {0, 0}, false},
       {"PauseMenu4::BackToMain (sub_822100D8)", 100, &step, __imp__sub_822100D8,
-       hooks::RaceScreensUnseenPause4BackToMain, 112, 32, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4BackToMain), 112, 32, {0, 0}, false},
       {"PauseMenu4::MoveMain (sub_82210228)", 100, &step, __imp__sub_82210228,
-       hooks::RaceScreensUnseenPause4MoveMain, 112, 32, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4MoveMain), 112, 32, {0, 0}, false},
       {"PauseMenu4::CloseMain (sub_82210170)", 100, &step, __imp__sub_82210170,
-       hooks::RaceScreensUnseenPause4CloseMain, 112, 24, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4CloseMain), 112, 24, {0, 0}, false},
       {"PauseMenu4::OpenVolume (sub_822114D8)", 150, &step_no_block, __imp__sub_822114D8,
-       hooks::RaceScreensUnseenPause4OpenVolume, 112, 24, {0, 0}, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4OpenVolume), 112, 24, {0, 0}, true},
       {"PauseMenu4::ShowVolumeRow (sub_822102D8)", 100, &step, __imp__sub_822102D8,
-       hooks::RaceScreensUnseenPause4ShowVolumeRow, 112, 24, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4ShowVolumeRow), 112, 24, {0, 0}, false},
       {"PauseMenu4::MoveVolume (sub_82210940)", 200, &step, __imp__sub_82210940,
-       hooks::RaceScreensUnseenPause4MoveVolume, 144, 56, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4MoveVolume), 144, 56, {0, 0}, false},
       {"PauseMenu4::SetVolume (sub_82210B08)", 150, &step, __imp__sub_82210B08,
-       hooks::RaceScreensUnseenPause4SetVolume, 128, 40, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4SetVolume), 128, 40, {0, 0}, false},
       {"PauseMenu4::CloseVolume (sub_82211138)", 150, &step_no_block, __imp__sub_82211138,
-       hooks::RaceScreensUnseenPause4CloseVolume, 112, 24, {0, 0}, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4CloseVolume), 112, 24, {0, 0}, true},
   };
   for (const Simple& f : simple) {
     FrameSpec spec{f.frame, f.saves, f.skip};
@@ -2557,11 +2557,11 @@ void Pause4(Context& h, const MovieWorld& w) {
   FrameSpec saving{96, 8};
   saving.after = save_bytes;
   FreshGroup(h, w, count, "PauseMenu4::LoadVolumes (sub_822107B8)", 100, plain, __imp__sub_822107B8,
-             hooks::RaceScreensUnseenPause4LoadVolumes, saving);
+             ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4LoadVolumes), saving);
   FreshGroup(h, w, count, "PauseMenu4::SaveVolumes (sub_82210820)", 100, plain, __imp__sub_82210820,
-             hooks::RaceScreensUnseenPause4SaveVolumes, saving);
+             ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4SaveVolumes), saving);
   FreshGroup(h, w, count, "PauseMenu4::AnswerPage (sub_82210910)", 100, plain, __imp__sub_82210910,
-             hooks::RaceScreensUnseenPause4AnswerPage, saving);
+             ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4AnswerPage), saving);
   // RestoreNodes: the group (r3) -1 or 0 to 3, the child (r4) 0 to 8.
   FreshGroup(
       h, w, count, "PauseMenu4::RestoreNodes (sub_822106E8)", 100,
@@ -2570,7 +2570,7 @@ void Pause4(Context& h, const MovieWorld& w) {
         t.r3.u64 = r.Below(3) == 0 ? ~uint64_t(0) : r.Below(4);
         t.r4.u64 = r.Below(9);
       },
-      __imp__sub_822106E8, hooks::RaceScreensUnseenPause4RestoreNodes, {128, 40});
+      __imp__sub_822106E8, ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4RestoreNodes), {128, 40});
   // ShowVolume: the node (r3) one of the world's sub-scenes or leaves, the
   // volume (r4) -2 to 17 or any.
   FreshGroup(
@@ -2580,7 +2580,7 @@ void Pause4(Context& h, const MovieWorld& w) {
         t.r3.u64 = r.Below(2) == 0 ? w.sub(r.Below(kSubScenes)) : w.leaf(r.Below(kLeaves));
         t.r4.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(20)) - 2));
       },
-      __imp__sub_822105F8, hooks::RaceScreensUnseenPause4ShowVolume, {112, 32, {40, 80}});
+      __imp__sub_822105F8, ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4ShowVolume), {112, 32, {40, 80}});
   // SetArrow: r3 0, 40 or any.
   FreshGroup(
       h, w, count, "PauseMenu4::SetArrow (sub_82210420)", 100,
@@ -2589,7 +2589,7 @@ void Pause4(Context& h, const MovieWorld& w) {
         const uint64_t values[3] = {0, 40, r.Next()};
         t.r3.u64 = values[r.Below(3)];
       },
-      __imp__sub_82210420, hooks::RaceScreensUnseenPause4SetArrow, {112, 24});
+      __imp__sub_82210420, ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4SetArrow), {112, 24});
   // The confirm dialog's page object and data, as AfterRaceMenu::
   // ConfirmPage's cases shape them.
   auto dialog = [&h](Random& r, const MovieWorld& w) {
@@ -2608,13 +2608,13 @@ void Pause4(Context& h, const MovieWorld& w) {
         shape(r, w, false);
         dialog(r, w);
       },
-      __imp__sub_8220FF30, hooks::RaceScreensUnseenPause4ConfirmPage, {96, 8});
+      __imp__sub_8220FF30, ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4ConfirmPage), {96, 8});
   // MainPage: the list in the menu list world (5 items, selections 0 to 4).
   FrameSpec main_page{112, 24};
   main_page.list_world = &list_world;
   main_page.list_global = rs::kPause4List;
   FreshGroup(h, w, count, "PauseMenu4::MainPage (sub_8220FD48)", 400, plain, __imp__sub_8220FD48,
-             hooks::RaceScreensUnseenPause4MainPage, main_page);
+             ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4MainPage), main_page);
   // VolumePage: the sound manager's slots 29 and 30 (GetCategory,
   // SetCategoryVolume) the getter sub_82090770 (r3 = +60) and the recorder
   // sub_820CE9F8, as PauseMenu::VolumePage's cases lay them; the volume
@@ -2648,7 +2648,7 @@ void Pause4(Context& h, const MovieWorld& w) {
         shape(r, w, false);
         sound_slots(r, w);
       },
-      __imp__sub_82210E58, hooks::RaceScreensUnseenPause4VolumePage, volume_page);
+      __imp__sub_82210E58, ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4VolumePage), volume_page);
   // Update: the page -1 to 3 (ConfirmPage's r4 the case's), the list in the
   // menu list world, the dialog and the sound slots shaped.
   FrameSpec update{112, 8};
@@ -2669,7 +2669,7 @@ void Pause4(Context& h, const MovieWorld& w) {
         dialog(r, w);
         guest::StoreU32(h.base, w.block(rs::kPause4Pages), uint32_t(int32_t(r.Below(5)) - 1));
       },
-      __imp__sub_82211458, hooks::RaceScreensUnseenPause4Update, update);
+      __imp__sub_82211458, ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4Update), update);
   // Open: r3 the screen's block, r4 the player 0, 1 or any, r5 the kind;
   // UI movie 5 in the movie table half the time (the second pair's id), the
   // missing movie's answer otherwise.
@@ -2686,7 +2686,7 @@ void Pause4(Context& h, const MovieWorld& w) {
         t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
         t.r5.u64 = r.Next();
       },
-      __imp__sub_82211390, hooks::RaceScreensUnseenPause4Open, open);
+      __imp__sub_82211390, ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4Open), open);
   // Draw: the running transition (+12) none (-1), another negative one or 0
   // to 10, the queued one (+16) -1 or 0 to 10, the page (+0) 0 to 3; the
   // list's block 0 where the transition runs MenuList::Init (1, 6 and 10).
@@ -2708,7 +2708,7 @@ void Pause4(Context& h, const MovieWorld& w) {
         ShapeDialogPages(h.base, r, w);
         t.r3.u64 = w.block(rs::kPause4Screen);
       },
-      __imp__sub_82211590, hooks::RaceScreensUnseenPause4Draw, draw);
+      __imp__sub_82211590, ITC_CONTEXT_FN(hooks::RaceScreensUnseenPause4Draw), draw);
 }
 
 // The results at +1028 and +1032 (RaceResults::, SplitResults::): the
@@ -2829,29 +2829,29 @@ void UnseenResults(Context& h, const MovieWorld& w) {
   };
   const Spec specs[] = {
       {"RaceResults::SetTexts (sub_8221F628)", 200, &on_results, __imp__sub_8221F628,
-       hooks::RaceScreensUnseenRaceResultsSetTexts, 160, 32, {48, 80}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenRaceResultsSetTexts), 160, 32, {48, 80}, false},
       {"RaceResults::Intro (sub_8221F428)", 100, &results_step, __imp__sub_8221F428,
-       hooks::RaceScreensUnseenRaceResultsIntro, 96, 16, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenRaceResultsIntro), 96, 16, {0, 0}, false},
       {"RaceResults::Show (sub_8221F4B0)", 100, &results_step, __imp__sub_8221F4B0,
-       hooks::RaceScreensUnseenRaceResultsShow, 112, 24, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenRaceResultsShow), 112, 24, {0, 0}, false},
       {"RaceResults::Close (sub_8221F580)", 100, &results_step, __imp__sub_8221F580,
-       hooks::RaceScreensUnseenRaceResultsClose, 112, 24, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenRaceResultsClose), 112, 24, {0, 0}, false},
       {"RaceResults::MainPage (sub_8221F870)", 200, &on_results, __imp__sub_8221F870,
-       hooks::RaceScreensUnseenRaceResultsMainPage, 96, 16, {0, 0}, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenRaceResultsMainPage), 96, 16, {0, 0}, true},
       {"RaceResults::Update (sub_8221F930)", 200, &on_results, __imp__sub_8221F930,
-       hooks::RaceScreensUnseenRaceResultsUpdate, 96, 8, {0, 0}, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenRaceResultsUpdate), 96, 8, {0, 0}, true},
       {"RaceResults::Draw (sub_8221F7D0)", 300, &on_results, __imp__sub_8221F7D0,
-       hooks::RaceScreensUnseenRaceResultsDraw, 112, 16, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenRaceResultsDraw), 112, 16, {0, 0}, false},
       {"SplitResults::Intro (sub_8221FAC8)", 400, &split_step, __imp__sub_8221FAC8,
-       hooks::RaceScreensUnseenSplitResultsIntro, 112, 32, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenSplitResultsIntro), 112, 32, {0, 0}, false},
       {"SplitResults::Show (sub_8221FBE8)", 400, &split_step, __imp__sub_8221FBE8,
-       hooks::RaceScreensUnseenSplitResultsShow, 112, 24, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenSplitResultsShow), 112, 24, {0, 0}, false},
       {"SplitResults::Close (sub_8221FD98)", 100, &split_step, __imp__sub_8221FD98,
-       hooks::RaceScreensUnseenSplitResultsClose, 112, 24, {0, 0}, false},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenSplitResultsClose), 112, 24, {0, 0}, false},
       {"SplitResults::MainPage (sub_8221FE70)", 300, &split_race, __imp__sub_8221FE70,
-       hooks::RaceScreensUnseenSplitResultsMainPage, 192, 32, {0, 0}, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenSplitResultsMainPage), 192, 32, {0, 0}, true},
       {"SplitResults::Update (sub_8221FFF0)", 300, &split_race, __imp__sub_8221FFF0,
-       hooks::RaceScreensUnseenSplitResultsUpdate, 96, 8, {0, 0}, true},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenSplitResultsUpdate), 96, 8, {0, 0}, true},
   };
   for (const Spec& s : specs) {
     FrameSpec spec{s.frame, s.saves, s.skip};
@@ -2917,7 +2917,7 @@ void UnseenResults(Context& h, const MovieWorld& w) {
     out.Word(guest::LoadU32(h.base, records + 0x49FE0));
   };
   MovieGroup(h, w, "SplitResults::Draw (sub_822200E0)", 600, split_draw, __imp__sub_822200E0,
-             hooks::RaceScreensUnseenSplitResultsDraw, draw);
+             ITC_CONTEXT_FN(hooks::RaceScreensUnseenSplitResultsDraw), draw);
   // The openers: UI movie 7 or 8 in the movie table half the time (the
   // second pair's id), the missing movie's answer otherwise.
   FrameSpec open{112, 24};
@@ -2931,7 +2931,7 @@ void UnseenResults(Context& h, const MovieWorld& w) {
         t.r3.u64 = results;
         t.r4.u64 = screens.address + 0xC0;  // the block: the screens block's random words
       },
-      __imp__sub_8221F990, hooks::RaceScreensUnseenRaceResultsOpen, open);
+      __imp__sub_8221F990, ITC_CONTEXT_FN(hooks::RaceScreensUnseenRaceResultsOpen), open);
   FrameSpec split_open{112, 16};
   split_open.after = outputs;
   MovieGroup(
@@ -2944,7 +2944,7 @@ void UnseenResults(Context& h, const MovieWorld& w) {
         t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(3);
         t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(3);
       },
-      __imp__sub_82220050, hooks::RaceScreensUnseenSplitResultsOpen, split_open);
+      __imp__sub_82220050, ITC_CONTEXT_FN(hooks::RaceScreensUnseenSplitResultsOpen), split_open);
 }
 
 // Kind 6's screen after the race (Kind6Menu::): its globals each a block
@@ -3126,59 +3126,59 @@ void UnseenKind6(Context& h, const MovieWorld& w) {
   constexpr std::pair<uint32_t, uint32_t> kText = {48, 80}, kNodeText = {40, 80}, kNo = {0, 0};
   const Spec specs[] = {
       {"Kind6Menu::Close (sub_8221C168)", 100, &close, __imp__sub_8221C168,
-       hooks::RaceScreensUnseenKind6Close, 96, 16, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6Close), 96, 16, kNo},
       {"Kind6Menu::HidePanels (sub_8221CFC0)", 100, &plain, __imp__sub_8221CFC0,
-       hooks::RaceScreensUnseenKind6HidePanels, 96, 16, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6HidePanels), 96, 16, kNo},
       {"Kind6Menu::ShowPanelA (sub_8221D050)", 100, &plain, __imp__sub_8221D050,
-       hooks::RaceScreensUnseenKind6ShowPanelA, 112, 24, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6ShowPanelA), 112, 24, kNo},
       {"Kind6Menu::ShowHelp (sub_8221D130)", 100, &plain, __imp__sub_8221D130,
-       hooks::RaceScreensUnseenKind6ShowHelp, 96, 16, kText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6ShowHelp), 96, 16, kText},
       {"Kind6Menu::ShowCourse (sub_8221D1A8)", 200, &plain, __imp__sub_8221D1A8,
-       hooks::RaceScreensUnseenKind6ShowCourse, 240, 88, kText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6ShowCourse), 240, 88, kText},
       {"Kind6Menu::SetUpTexts (sub_8221E038)", 200, &on_screen, __imp__sub_8221E038,
-       hooks::RaceScreensUnseenKind6SetUpTexts, 128, 32, kText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6SetUpTexts), 128, 32, kText},
       {"Kind6Menu::SetCursorX (sub_8221D7B0)", 100, &cursor, __imp__sub_8221D7B0,
-       hooks::RaceScreensUnseenKind6SetCursorX, 112, 16, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6SetCursorX), 112, 16, kNo},
       {"Kind6Menu::ShowReplay (sub_8221CBD8)", 300, &record, __imp__sub_8221CBD8,
-       hooks::RaceScreensUnseenKind6ShowReplay, 176, 40, kText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6ShowReplay), 176, 40, kText},
       {"Kind6Menu::ShowList (sub_8221D4E8)", 200, &plain, __imp__sub_8221D4E8,
-       hooks::RaceScreensUnseenKind6ShowList, 160, 80, kNodeText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6ShowList), 160, 80, kNodeText},
       {"Kind6Menu::SetUpList (sub_8221DF70)", 200, &plain, __imp__sub_8221DF70,
-       hooks::RaceScreensUnseenKind6SetUpList, 160, 48, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6SetUpList), 160, 48, kNo},
       {"Kind6Menu::Intro (sub_8221C438)", 100, &step, __imp__sub_8221C438,
-       hooks::RaceScreensUnseenKind6Intro, 112, 32, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6Intro), 112, 32, kNo},
       {"Kind6Menu::Show (sub_8221C550)", 100, &step, __imp__sub_8221C550,
-       hooks::RaceScreensUnseenKind6Show, 112, 24, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6Show), 112, 24, kNo},
       {"Kind6Menu::RunToEnd (sub_8221C5D8)", 100, &step, __imp__sub_8221C5D8,
-       hooks::RaceScreensUnseenKind6RunToEnd, 96, 8, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6RunToEnd), 96, 8, kNo},
       {"Kind6Menu::MoveMain (sub_8221DB48)", 200, &step, __imp__sub_8221DB48,
-       hooks::RaceScreensUnseenKind6MoveMain, 128, 40, kText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6MoveMain), 128, 40, kText},
       {"Kind6Menu::BackToQuit (sub_8221DC88)", 100, &step, __imp__sub_8221DC88,
-       hooks::RaceScreensUnseenKind6BackToQuit, 128, 48, kText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6BackToQuit), 128, 48, kText},
       {"Kind6Menu::OpenList (sub_8221EB98)", 200, &step, __imp__sub_8221EB98,
-       hooks::RaceScreensUnseenKind6OpenList, 112, 32, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6OpenList), 112, 32, kNo},
       {"Kind6Menu::CloseList (sub_8221C628)", 100, &step, __imp__sub_8221C628,
-       hooks::RaceScreensUnseenKind6CloseList, 112, 24, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6CloseList), 112, 24, kNo},
       {"Kind6Menu::MoveList (sub_8221DD78)", 300, &step, __imp__sub_8221DD78,
-       hooks::RaceScreensUnseenKind6MoveList, 176, 88, kNodeText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6MoveList), 176, 88, kNodeText},
       {"Kind6Menu::OpenQuestion (sub_8221C6C8)", 100, &step, __imp__sub_8221C6C8,
-       hooks::RaceScreensUnseenKind6OpenQuestion, 112, 32, kText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6OpenQuestion), 112, 32, kText},
       {"Kind6Menu::CloseQuestion (sub_8221C7D8)", 100, &step, __imp__sub_8221C7D8,
-       hooks::RaceScreensUnseenKind6CloseQuestion, 128, 40, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6CloseQuestion), 128, 40, kNo},
       {"Kind6Menu::MoveQuestion (sub_8221C888)", 100, &step, __imp__sub_8221C888,
-       hooks::RaceScreensUnseenKind6MoveQuestion, 112, 32, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6MoveQuestion), 112, 32, kNo},
       {"Kind6Menu::OpenMessage (sub_8221CAB8)", 100, &step, __imp__sub_8221CAB8,
-       hooks::RaceScreensUnseenKind6OpenMessage, 128, 40, kText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6OpenMessage), 128, 40, kText},
       {"Kind6Menu::CloseMessage (sub_8221CB50)", 100, &step, __imp__sub_8221CB50,
-       hooks::RaceScreensUnseenKind6CloseMessage, 128, 40, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6CloseMessage), 128, 40, kNo},
       {"Kind6Menu::OpenWaiting (sub_8221C920)", 100, &step, __imp__sub_8221C920,
-       hooks::RaceScreensUnseenKind6OpenWaiting, 128, 40, kNodeText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6OpenWaiting), 128, 40, kNodeText},
       {"Kind6Menu::CloseWaiting (sub_8221CA20)", 100, &step, __imp__sub_8221CA20,
-       hooks::RaceScreensUnseenKind6CloseWaiting, 128, 40, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6CloseWaiting), 128, 40, kNo},
       {"Kind6Menu::Open (sub_8221EC48)", 300, &open, __imp__sub_8221EC48,
-       hooks::RaceScreensUnseenKind6Open, 160, 48, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6Open), 160, 48, kNo},
       {"Kind6Menu::Draw (sub_8221EF60)", 500, &draw, __imp__sub_8221EF60,
-       hooks::RaceScreensUnseenKind6Draw, 144, 24, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6Draw), 144, 24, kNo},
   };
   for (const Spec& s : specs) {
     FrameSpec spec{s.frame, s.saves, s.skip};
@@ -3483,57 +3483,57 @@ void UnseenKind6Pages(Context& h, const MovieWorld& w) {
   constexpr std::pair<uint32_t, uint32_t> kText = {48, 80}, kNodeText = {40, 80}, kNo = {0, 0};
   const Spec specs[] = {
       {"Leaderboard::Rank (sub_822914A8)", 200, &plain, __imp__sub_822914A8,
-       hooks::RaceScreensUnseenKind6Rank, 0, 0, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6Rank), 0, 0, kNo},
       {"Leaderboard::CarLogo (sub_8225FFC8)", 200, &car, __imp__sub_8225FFC8,
-       hooks::RaceScreensUnseenKind6CarLogo, 0, 0, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6CarLogo), 0, 0, kNo},
       {"Network::SetLiveState (sub_822927B0)", 150, &net, __imp__sub_822927B0,
-       hooks::RaceScreensUnseenKind6NetState, 96, 8, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6NetState), 96, 8, kNo},
       {"Kind6Menu::RankingTime (sub_8221D808)", 200, &time, __imp__sub_8221D808,
-       hooks::RaceScreensUnseenKind6RankingTime, 0, 0, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6RankingTime), 0, 0, kNo},
       {"Kind6Menu::ShowPanelB (sub_8221CEA0)", 100, &plain, __imp__sub_8221CEA0,
-       hooks::RaceScreensUnseenKind6ShowPanelB, 112, 24, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6ShowPanelB), 112, 24, kNo},
       {"Kind6Menu::ShowTimeOnly (sub_8221D3D0)", 150, &plain, __imp__sub_8221D3D0,
-       hooks::RaceScreensUnseenKind6ShowTimeOnly, 112, 32, kNodeText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6ShowTimeOnly), 112, 32, kNodeText},
       {"Kind6Menu::ShowRanking (sub_8221E1A0)", 400, &plain, __imp__sub_8221E1A0,
-       hooks::RaceScreensUnseenKind6ShowRanking, 192, 96, kNodeText},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6ShowRanking), 192, 96, kNodeText},
       {"Kind6Menu::AnswerPage (sub_8221C1E0)", 100, &plain, __imp__sub_8221C1E0,
-       hooks::RaceScreensUnseenKind6AnswerPage, 0, 0, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6AnswerPage), 0, 0, kNo},
       {"Kind6Menu::WaitingPage (sub_8221C3F0)", 100, &plain, __imp__sub_8221C3F0,
-       hooks::RaceScreensUnseenKind6WaitingPage, 96, 8, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6WaitingPage), 96, 8, kNo},
       {"Kind6Menu::QuestionAnswerPage (sub_8221C360)", 100, &plain, __imp__sub_8221C360,
-       hooks::RaceScreensUnseenKind6QuestionAnswerPage, 96, 16, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6QuestionAnswerPage), 96, 16, kNo},
       {"Kind6Menu::MenuBackPage (sub_8221D898)", 100, &plain, __imp__sub_8221D898,
-       hooks::RaceScreensUnseenKind6MenuBackPage, 96, 16, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6MenuBackPage), 96, 16, kNo},
       {"Kind6Menu::MessageBackPage (sub_8221D9D8)", 100, &plain, __imp__sub_8221D9D8,
-       hooks::RaceScreensUnseenKind6MessageBackPage, 96, 16, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6MessageBackPage), 96, 16, kNo},
       {"Kind6Menu::UploadResultPage (sub_8221D908)", 150, &plain, __imp__sub_8221D908,
-       hooks::RaceScreensUnseenKind6UploadResultPage, 96, 16, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6UploadResultPage), 96, 16, kNo},
       {"Kind6Menu::QuitPage (sub_8221C308)", 150, &dialog_r4, __imp__sub_8221C308,
-       hooks::RaceScreensUnseenKind6QuitPage, 96, 8, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6QuitPage), 96, 8, kNo},
       {"Kind6Menu::SavePage (sub_8221C238)", 150, &dialog_r4, __imp__sub_8221C238,
-       hooks::RaceScreensUnseenKind6SavePage, 96, 8, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6SavePage), 96, 8, kNo},
       {"Kind6Menu::OverwritePage (sub_8221E908)", 150, &dialog_r4, __imp__sub_8221E908,
-       hooks::RaceScreensUnseenKind6OverwritePage, 96, 8, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6OverwritePage), 96, 8, kNo},
       {"Kind6Menu::SavingPage (sub_8221C2B8)", 150, &dialog_r4, __imp__sub_8221C2B8,
-       hooks::RaceScreensUnseenKind6SavingPage, 96, 8, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6SavingPage), 96, 8, kNo},
       {"Kind6Menu::SlotPage (sub_8221DA60)", 150, &slots, __imp__sub_8221DA60,
-       hooks::RaceScreensUnseenKind6SlotPage, 96, 16, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6SlotPage), 96, 16, kNo},
       {"Kind6Menu::CheckRecordPage (sub_8221E510)", 200, &plain, __imp__sub_8221E510,
-       hooks::RaceScreensUnseenKind6CheckRecordPage, 112, 24, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6CheckRecordPage), 112, 24, kNo},
       {"Kind6Menu::RankingReadPage (sub_8221C008)", 200, &no_live, __imp__sub_8221C008,
-       hooks::RaceScreensUnseenKind6RankingReadPage, 128, 40, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6RankingReadPage), 128, 40, kNo},
       {"Kind6Menu::RankingPage (sub_8221BE90)", 200, &no_live, __imp__sub_8221BE90,
-       hooks::RaceScreensUnseenKind6RankingPage, 128, 40, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6RankingPage), 128, 40, kNo},
       {"Kind6Menu::UploadPage (sub_8221E5E8)", 300, &plain, __imp__sub_8221E5E8,
-       hooks::RaceScreensUnseenKind6UploadPage, 128, 40, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6UploadPage), 128, 40, kNo},
       {"Kind6Menu::QuestionPage (sub_8221E980)", 300, &plain, __imp__sub_8221E980,
-       hooks::RaceScreensUnseenKind6QuestionPage, 96, 16, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6QuestionPage), 96, 16, kNo},
       {"Kind6Menu::MessagePage (sub_8221EAE8)", 300, &plain, __imp__sub_8221EAE8,
-       hooks::RaceScreensUnseenKind6MessagePage, 96, 16, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6MessagePage), 96, 16, kNo},
       {"Kind6Menu::MainPage (sub_8221E788)", 400, &plain, __imp__sub_8221E788,
-       hooks::RaceScreensUnseenKind6MainPage, 96, 16, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6MainPage), 96, 16, kNo},
       {"Kind6Menu::Update (sub_8221F1E8)", 600, &update, __imp__sub_8221F1E8,
-       hooks::RaceScreensUnseenKind6Update, 304, 128, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6Update), 304, 128, kNo},
   };
   // Update's cases may leave a results block of the heap the read didn't
   // free (its read not started): compared as kept, freed, the word 0.
@@ -3623,13 +3623,13 @@ void UnseenKind6Pages(Context& h, const MovieWorld& w) {
     out.Bytes(Read(h.base, rs::kKind6StatsSpec, 16));
   };
   MovieGroup(h, w, "Leaderboard::SetUpSpec (sub_82292648)", 150, spec_setup, __imp__sub_82292648,
-             hooks::RaceScreensUnseenKind6ReadSpecSetUp, spec_frame);
+             ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6ReadSpecSetUp), spec_frame);
   FrameSpec read_frame{144, 48};
   read_frame.list_world = &list_world;
   read_frame.after = read_after(false);
   read_frame.compare_r3 = false;  // XEnumerate's answer in the original, 0 in ours
   MovieGroup(h, w, "Leaderboard::Read (sub_82292CC0)", 40, read_setup, __imp__sub_82292CC0,
-             hooks::RaceScreensUnseenKind6LeaderboardRead, read_frame);
+             ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6LeaderboardRead), read_frame);
   // Expected to differ (the user's call, 2026-11-14): the SDK's stub of
   // XamUserCreateStatsEnumerator answers success without writing the size,
   // so the original allocates a buffer of whatever its frame word holds into
@@ -3640,12 +3640,12 @@ void UnseenKind6Pages(Context& h, const MovieWorld& w) {
   read_all.list_world = &list_world;
   read_all.after = read_after(true);
   MovieGroup(h, w, "Leaderboard::Read (sub_82292CC0) (expected to differ)", 20, read_setup,
-             __imp__sub_82292CC0, hooks::RaceScreensUnseenKind6LeaderboardRead, read_all);
+             __imp__sub_82292CC0, ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6LeaderboardRead), read_all);
   for (const auto& [name, recompiled, native] :
        {std::tuple{"Kind6Menu::RankingReadPage with the read (sub_8221C008)", __imp__sub_8221C008,
-                   hooks::RaceScreensUnseenKind6RankingReadPage},
+                   ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6RankingReadPage)},
         std::tuple{"Kind6Menu::RankingPage with the read (sub_8221BE90)", __imp__sub_8221BE90,
-                   hooks::RaceScreensUnseenKind6RankingPage}}) {
+                   ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6RankingPage)}}) {
     FrameSpec page{128, 40};
     page.list_world = &list_world;
     page.after = read_after(false);
@@ -3721,13 +3721,13 @@ void UnseenKind6Pages(Context& h, const MovieWorld& w) {
   };
   const SaveSpec save_specs[] = {
       {"Replay::CopyFrom (sub_821A66A8)", &copy_from, __imp__sub_821A66A8,
-       hooks::RaceScreensUnseenReplayCopyFrom, 112, 24, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenReplayCopyFrom), 112, 24, kNo},
       {"RaceDialog::StoreReplay (sub_82218FF8)", &store_replay, __imp__sub_82218FF8,
-       hooks::RaceScreensUnseenStoreReplay, 112, 24, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenStoreReplay), 112, 24, kNo},
       {"RaceDialog::AskSlot (sub_82219058)", &ask_slot, __imp__sub_82219058,
-       hooks::RaceScreensUnseenAskSlot, 144, 40, {40, 80}},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenAskSlot), 144, 40, {40, 80}},
       {"Kind6Menu::SaveReplay (sub_8221D678)", &save_replay, __imp__sub_8221D678,
-       hooks::RaceScreensUnseenKind6SaveReplay, 176, 48, kNo},
+       ITC_CONTEXT_FN(hooks::RaceScreensUnseenKind6SaveReplay), 176, 48, kNo},
   };
   for (const SaveSpec& sp : save_specs) {
     FrameSpec spec{sp.frame, sp.saves, sp.skip};

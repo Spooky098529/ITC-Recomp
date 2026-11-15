@@ -540,16 +540,16 @@ void ModeSelect(Context& h, const World& w) {
   // Start with SetUp: their frames without the saves and SetUp's text
   // setter's parameter area.
   Run(h, w, {"NetModeSelect::Start (sub_8227D300; sub_8227CCE0)", 100, __imp__sub_8227D300,
-             hooks::NetModeSelectStart, {{-96, -8}, {-224, -176}, {-144, -128}}, Machine});
+             ITC_CONTEXT_FN(hooks::NetModeSelectStart), {{-96, -8}, {-224, -176}, {-144, -128}}, Machine});
   Run(h, w, {"NetModeSelect::SetUp (sub_8227CCE0)", 60, __imp__sub_8227CCE0,
-             hooks::NetModeSelectSetUp, {{-128, -80}, {-48, -32}}, Nothing});
+             ITC_CONTEXT_FN(hooks::NetModeSelectSetUp), {{-128, -80}, {-48, -32}}, Nothing});
   Run(h, w, {"NetModeSelect::Open (sub_8227C5C8)", 100, __imp__sub_8227C5C8,
-             hooks::NetModeSelectOpen, {}, Machine});
+             ITC_CONTEXT_FN(hooks::NetModeSelectOpen), {}, Machine});
   // Draw: the page -1 or 0 to 8 (each page has its own cases too, run here
   // through Draw's table with the session there); only its own frame
   // compared.
   Run(h, w, {"NetModeSelect::Draw (sub_8227D248)", 400, __imp__sub_8227D248,
-             hooks::NetModeSelectDraw, {{-160, -32}},
+             ITC_CONTEXT_FN(hooks::NetModeSelectDraw), {{-160, -32}},
              [](PPCContext& t, Random& r, const World& w) {
                guest::StoreU32(w.base, nm::kSession, w.session);
                Machine(t, r, w);
@@ -557,53 +557,53 @@ void ModeSelect(Context& h, const World& w) {
   // Update: the running transition -1, another negative or 0 to 4 (the
   // world's); only its own frame compared.
   Run(h, w, {"NetModeSelect::Update (sub_8227D4E8)", 400, __imp__sub_8227D4E8,
-             hooks::NetModeSelectUpdate, {{-160, -40}}, Machine});
+             ITC_CONTEXT_FN(hooks::NetModeSelectUpdate), {{-160, -40}}, Machine});
   // MenuPage with Session::Make and Session::Init below it.
   Run(h, w, {"NetModeSelect::MenuPage (sub_8227C658; sub_822926B8, sub_822915C0)", 400,
-             __imp__sub_8227C658, hooks::NetModeSelectMenuPage,
+             __imp__sub_8227C658, ITC_CONTEXT_FN(hooks::NetModeSelectMenuPage),
              {{-112, -32}, {-208, -128}, {-320, -240}}, Dispatcher});
   Run(h, w, {"NetModeSelect::LeavePage (sub_8227C970)", 60, __imp__sub_8227C970,
-             hooks::NetModeSelectLeavePage, {}, Dispatcher});
+             ITC_CONTEXT_FN(hooks::NetModeSelectLeavePage), {}, Dispatcher});
   Run(h, w, {"NetModeSelect::BattlePage (sub_8227C9F0)", 300, __imp__sub_8227C9F0,
-             hooks::NetModeSelectBattlePage, {{-112, -24}}, Dispatcher});
+             ITC_CONTEXT_FN(hooks::NetModeSelectBattlePage), {{-112, -24}}, Dispatcher});
   Run(h, w, {"NetModeSelect::TimeAttackPage (sub_8227CB38)", 300, __imp__sub_8227CB38,
-             hooks::NetModeSelectTimeAttackPage, {{-112, -24}}, WithSession});
+             ITC_CONTEXT_FN(hooks::NetModeSelectTimeAttackPage), {{-112, -24}}, WithSession});
   Run(h, w, {"NetModeSelect::SignInPage (sub_8227C088)", 300, __imp__sub_8227C088,
-             hooks::NetModeSelectSignInPage, {{-96, -16}}, Dispatcher});
+             ITC_CONTEXT_FN(hooks::NetModeSelectSignInPage), {{-96, -16}}, Dispatcher});
   Run(h, w, {"NetModeSelect::SignInPage2 (sub_8227C210)", 300, __imp__sub_8227C210,
-             hooks::NetModeSelectSignInPage2, {{-96, -16}}, Dispatcher});
+             ITC_CONTEXT_FN(hooks::NetModeSelectSignInPage2), {{-96, -16}}, Dispatcher});
   Run(h, w, {"NetModeSelect::BackPage (sub_8227CC78)", 60, __imp__sub_8227CC78,
-             hooks::NetModeSelectBackPage, {}, Dispatcher});
+             ITC_CONTEXT_FN(hooks::NetModeSelectBackPage), {}, Dispatcher});
   Run(h, w, {"NetModeSelect::Intro (sub_8227CE50)", 200, __imp__sub_8227CE50,
-             hooks::NetModeSelectIntro, {{-128, -32}}, Started});
+             ITC_CONTEXT_FN(hooks::NetModeSelectIntro), {{-128, -32}}, Started});
   Run(h, w, {"NetModeSelect::ShowCursor (sub_8227D138)", 150, __imp__sub_8227D138,
-             hooks::NetModeSelectShowCursor, {{-112, -24}}, Started});
+             ITC_CONTEXT_FN(hooks::NetModeSelectShowCursor), {{-112, -24}}, Started});
   // MoveCursor: without SetText's parameter area and its saves (r26 on);
   // SetCursorY's frame below without its saves (r31, f31).
   Run(h, w, {"NetModeSelect::MoveCursor (sub_8227D380; sub_8227D1D8)", 300, __imp__sub_8227D380,
-             hooks::NetModeSelectMoveCursor, {{-144, -96}, {-64, -56}, {-256, -168}}, Started});
+             ITC_CONTEXT_FN(hooks::NetModeSelectMoveCursor), {{-144, -96}, {-64, -56}, {-256, -168}}, Started});
   // SetCursorY: r3 0 or 20 (play's), now and then any.
   Run(h, w, {"NetModeSelect::SetCursorY (sub_8227D1D8)", 100, __imp__sub_8227D1D8,
-             hooks::NetModeSelectSetCursorY, {{-112, -24}},
+             ITC_CONTEXT_FN(hooks::NetModeSelectSetCursorY), {{-112, -24}},
              [](PPCContext& t, Random& r, const World&) {
                t.r3.u64 = r.Below(4) == 0 ? r.Next() : (r.Below(2) == 0 ? 0 : 20);
              }});
   Run(h, w, {"NetModeSelect::FadeOut (sub_8227D088)", 150, __imp__sub_8227D088,
-             hooks::NetModeSelectFadeOut, {{-112, -24}}, Started});
+             ITC_CONTEXT_FN(hooks::NetModeSelectFadeOut), {{-112, -24}}, Started});
   Run(h, w, {"NetModeSelect::FadeIn (sub_8227CFA8)", 150, __imp__sub_8227CFA8,
-             hooks::NetModeSelectFadeIn, {{-128, -32}}, Started});
+             ITC_CONTEXT_FN(hooks::NetModeSelectFadeIn), {{-128, -32}}, Started});
   Run(h, w, {"NetModeSelect::OnNo (sub_8227BF80)", 40, __imp__sub_8227BF80,
-             hooks::NetModeSelectOnNo, {}, Machine});
+             ITC_CONTEXT_FN(hooks::NetModeSelectOnNo), {}, Machine});
   Run(h, w, {"NetModeSelect::OnYes (sub_8227BFB8)", 20, __imp__sub_8227BFB8,
-             hooks::NetModeSelectOnYes, {}, Machine});
+             ITC_CONTEXT_FN(hooks::NetModeSelectOnYes), {}, Machine});
   Run(h, w, {"NetModeSelect::OnDialogClosed (sub_8227BFD8)", 150, __imp__sub_8227BFD8,
-             hooks::NetModeSelectOnDialogClosed, {}, Machine});
+             ITC_CONTEXT_FN(hooks::NetModeSelectOnDialogClosed), {}, Machine});
   Run(h, w, {"NetModeSelect::Unload (sub_8227C7A8)", 60, __imp__sub_8227C7A8,
-             hooks::NetModeSelectUnload, {{-112, -16}}, Machine});
+             ITC_CONTEXT_FN(hooks::NetModeSelectUnload), {{-112, -16}}, Machine});
   // Unloaded: the menu's item 0 to 2 (2 never in play: the caller's word
   // posted).
   Run(h, w, {"NetModeSelect::Unloaded (sub_8227C810)", 100, __imp__sub_8227C810,
-             hooks::NetModeSelectUnloaded, {},
+             ITC_CONTEXT_FN(hooks::NetModeSelectUnloaded), {},
              [](PPCContext& t, Random& r, const World& w) {
                Machine(t, r, w);
                guest::StoreU32(w.base, w.at(kMenuAt), r.Below(8) == 0 ? 2 : r.Below(2));
@@ -611,8 +611,8 @@ void ModeSelect(Context& h, const World& w) {
   // Session::Make (the session there or none) and Session::Init (on the
   // world's session block).
   Run(h, w, {"Session::Make (sub_822926B8; sub_822915C0)", 60, __imp__sub_822926B8,
-             hooks::SessionMake, {{-96, -16}, {-208, -128}}, Nothing});
-  Run(h, w, {"Session::Init (sub_822915C0)", 40, __imp__sub_822915C0, hooks::SessionInit,
+             ITC_CONTEXT_FN(hooks::SessionMake), {{-96, -16}, {-208, -128}}, Nothing});
+  Run(h, w, {"Session::Init (sub_822915C0)", 40, __imp__sub_822915C0, ITC_CONTEXT_FN(hooks::SessionInit),
              {{-112, -32}},
              [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.session; }});
 }

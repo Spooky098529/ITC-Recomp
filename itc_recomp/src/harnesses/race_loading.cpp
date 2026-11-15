@@ -144,7 +144,7 @@ void Inits(Context& h, const Block& machine) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = machine.address;
-      Run(v, __imp__sub_821517D8, hooks::CourseSetupInit, t, h.base);
+      Run(v, __imp__sub_821517D8, ITC_CONTEXT_FN(hooks::CourseSetupInit), t, h.base);
       out[v].Bytes(Read(h.base, machine.address, machine.bytes));
       out[v].Bytes(Read(h.base, frame + 80, rl::kInitFrame - 80 - kSaves));
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
@@ -221,11 +221,11 @@ struct Handler {
 
 void Handlers(Context& h, const Block& machine, const Block& dispatcher) {
   const Handler handlers[] = {
-      {"CourseSetup::Start (sub_82151408)", __imp__sub_82151408, hooks::CourseSetupStart, 112},
-      {"CourseSetup::Begin (sub_82150DE0)", __imp__sub_82150DE0, hooks::CourseSetupBegin, 0},
+      {"CourseSetup::Start (sub_82151408)", __imp__sub_82151408, ITC_CONTEXT_FN(hooks::CourseSetupStart), 112},
+      {"CourseSetup::Begin (sub_82150DE0)", __imp__sub_82150DE0, ITC_CONTEXT_FN(hooks::CourseSetupBegin), 0},
       {"CourseSetup::OnCourseReady (sub_82150DD0)", __imp__sub_82150DD0,
-       hooks::CourseSetupOnCourseReady, 0},
-      {"CourseSetup::WaitDraw (sub_821515A0)", __imp__sub_821515A0, hooks::CourseSetupWaitDraw,
+       ITC_CONTEXT_FN(hooks::CourseSetupOnCourseReady), 0},
+      {"CourseSetup::WaitDraw (sub_821515A0)", __imp__sub_821515A0, ITC_CONTEXT_FN(hooks::CourseSetupWaitDraw),
        96},
   };
   const auto saved_fades = Read(h.base, kFades, kFadesBytes);
@@ -235,7 +235,7 @@ void Handlers(Context& h, const Block& machine, const Block& dispatcher) {
                  "with step 0 skipped");
   }
   for (const Handler& handler : handlers) {
-    const bool wait_draw = handler.native == hooks::CourseSetupWaitDraw;
+    const bool wait_draw = handler.native == ITC_CONTEXT_FN(hooks::CourseSetupWaitDraw);
     Results results(handler.name);
     std::optional<QueueControl> queue;
     if (wait_draw && queue_native) {
@@ -326,8 +326,8 @@ void CourseWaits(Context& h, const Block& machine, const Block& dispatcher) {
   };
   const Handler handlers[] = {
       {"CourseSetup::WaitCourse (sub_821514A0)", __imp__sub_821514A0,
-       hooks::CourseSetupWaitCourse},
-      {"CourseSetup::EndTick (sub_821516F0)", __imp__sub_821516F0, hooks::CourseSetupEndTick},
+       ITC_CONTEXT_FN(hooks::CourseSetupWaitCourse)},
+      {"CourseSetup::EndTick (sub_821516F0)", __imp__sub_821516F0, ITC_CONTEXT_FN(hooks::CourseSetupEndTick)},
   };
   constexpr uint32_t kGlobals[] = {rl::kSceneryManager, scene::kScene,
                                    scene::kFirstSet,      rl::kCollisionState,
@@ -480,13 +480,13 @@ void LoadingScreen(Context& h, const MovieWorld& w) {
   };
   const Case kinds[] = {
       {"LoadingScreen::Show (sub_822478D0)", Kind::kShow, __imp__sub_822478D0,
-       hooks::LoadingScreenShow},
+       ITC_CONTEXT_FN(hooks::LoadingScreenShow)},
       {"LoadingScreen::Run (sub_82247898)", Kind::kRun, __imp__sub_82247898,
-       hooks::LoadingScreenRun},
+       ITC_CONTEXT_FN(hooks::LoadingScreenRun)},
       {"LoadingScreen::Finish (sub_82247A60)", Kind::kFinish, __imp__sub_82247A60,
-       hooks::LoadingScreenFinish},
+       ITC_CONTEXT_FN(hooks::LoadingScreenFinish)},
       {"UiMovie::SetFrames (sub_82290B30)", Kind::kSetFrames, __imp__sub_82290B30,
-       NativeSetFrames},
+       ITC_CONTEXT_FN(NativeSetFrames)},
   };
   constexpr uint32_t kShowFrame = 144, kShowSaves = 40;  // __savegprlr_28
   for (const Case& kind : kinds) {
@@ -621,7 +621,7 @@ void SystemRequests(Context& h) {
       const uint32_t limit = 1 + r.Below(1000);
       guest::StoreU32(h.base, 0x826C7944, limit);
       guest::StoreU32(h.base, 0x826C7958, r.Below(limit));
-      Run(v, __imp__sub_82293460, hooks::CheckSystemRequest, t, h.base);
+      Run(v, __imp__sub_82293460, ITC_CONTEXT_FN(hooks::CheckSystemRequest), t, h.base);
       out[v].Word(guest::LoadU32(h.base, sp - 96));
       out[v].Word(guest::LoadU32(h.base, rl::kSystemRequest));
       out[v].Word(t.r3.u32);

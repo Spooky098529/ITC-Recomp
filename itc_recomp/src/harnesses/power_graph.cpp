@@ -305,7 +305,7 @@ void DrawCases(Context& h, uint32_t block) {
       t.r6.u64 = block + kCar;
       t.f1.f64 = x;
       t.f2.f64 = y;
-      (v == 0 ? __imp__sub_8217C708 : hooks::PowerGraphDraw)(t, h.base);
+      (v == 0 ? __imp__sub_8217C708 : ITC_CONTEXT_FN(hooks::PowerGraphDraw))(t, h.base);
       Collect(h, block, t.r1.u32 - pg::kDrawFrame, lines, float_slots, out[v]);
       for (const Global& g : kGlobals) {
         out[v].Bytes(Read(h.base, g.address, g.bytes));
@@ -416,7 +416,7 @@ void TuningCases(Context& h, uint32_t block, uint32_t tuning) {
       Fill(h.base, t.r1.u32 - 12288 - 512, 12288 + 512 + 64, 0xA5);
       t.r3.u64 = screen;
       ITC_FLAG(native_power_graph) = v == 1;
-      (v == 0 ? __imp__sub_821DF350 : hooks::TuningScreenDrawPowerGraph)(t, h.base);
+      (v == 0 ? __imp__sub_821DF350 : ITC_CONTEXT_FN(hooks::TuningScreenDrawPowerGraph))(t, h.base);
       ITC_FLAG(native_power_graph) = true;
       // Its frame (the key at +80) with its saves in the caller's (lr, r30,
       // r31), then the draw's; r30 and r31 kept.
@@ -571,7 +571,7 @@ void EntryCases(Context& h, uint32_t block, uint32_t garage, uint32_t race) {
       t.r31.u64 = r31;
       t.fpscr.disableFlushModeUnconditional();
       ITC_FLAG(native_power_graph) = v == 1;
-      (v == 0 ? __imp__sub_82250670 : hooks::CarListDrawEntryPowerGraph)(t, h.base);
+      (v == 0 ? __imp__sub_82250670 : ITC_CONTEXT_FN(hooks::CarListDrawEntryPowerGraph))(t, h.base);
       ITC_FLAG(native_power_graph) = true;
       const uint32_t frame = sp - pg::kEntryFrame;
       Collect(h, block, frame - pg::kDrawFrame, lines, float_slots, out[v]);
@@ -700,7 +700,7 @@ void CarCases(Context& h, uint32_t block, uint32_t garage, uint32_t race, bool s
       t.r31.u64 = r31;
       t.fpscr.disableFlushModeUnconditional();
       if (set_from_car) {
-        (v == 0 ? __imp__sub_82250488 : NativeSetFromCar)(t, h.base);
+        (v == 0 ? __imp__sub_82250488 : ITC_CONTEXT_FN(NativeSetFromCar))(t, h.base);
         const uint32_t frame = sp - pg::kSetFromCarFrame;
         out[v].Bytes(Read(h.base, sp - 16384, frame - (sp - 16384)));
         out[v].Bytes(Read(h.base, frame, 80));
@@ -716,7 +716,7 @@ void CarCases(Context& h, uint32_t block, uint32_t garage, uint32_t race, bool s
         out[v].Bytes(Read(h.base, record + 56, kRecordBytes - 56));
       } else {
         ITC_FLAG(native_power_graph) = v == 1;
-        (v == 0 ? __imp__sub_82250700 : hooks::CarListDrawCarPowerGraph)(t, h.base);
+        (v == 0 ? __imp__sub_82250700 : ITC_CONTEXT_FN(hooks::CarListDrawCarPowerGraph))(t, h.base);
         ITC_FLAG(native_power_graph) = true;
         const uint32_t frame = sp - pg::kCarFrame;
         Collect(h, block, frame - pg::kDrawFrame, lines, float_slots, out[v]);

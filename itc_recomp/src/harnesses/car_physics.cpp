@@ -481,7 +481,7 @@ void CarPhysics(Context& h) {
       {"RigidBody::Integrate (sub_820B7658)", Original<__imp__sub_820B7658>, NativeIntegrate,
        false},
       {"RigidBody::Reset (sub_820B77D0)", Original<__imp__sub_820B77D0>, NativeReset, false},
-      {"RigidBody::RigidBody (sub_820B7928)", Original<__imp__sub_820B7928>, NativeConstruct,
+      {"RigidBody::RigidBody (sub_820B7928)", Original<__imp__sub_820B7928>, ITC_CONTEXT_FN(NativeConstruct),
        false},
       {"RigidBody::EffectiveMassAt (sub_820B6A38)", Original<__imp__sub_820B6A38>,
        NativeEffectiveMassAt, true, kMassAt},
@@ -490,8 +490,8 @@ void CarPhysics(Context& h) {
       {"RigidBody::FrictionImpulse (sub_820B6D48)", Original<__imp__sub_820B6D48>,
        NativeFrictionImpulse, false, kFriction},
       {"RigidBody::ContactImpulseWith (sub_820B72C8)", Original<__imp__sub_820B72C8>,
-       NativeContactImpulseWith, true, kImpulseWith, true},
-      {"Matrix::CopyRows (sub_820AFB78)", Original<__imp__sub_820AFB78>, NativeCopyRows, false,
+       ITC_CONTEXT_FN(NativeContactImpulseWith), true, kImpulseWith, true},
+      {"Matrix::CopyRows (sub_820AFB78)", Original<__imp__sub_820AFB78>, ITC_CONTEXT_FN(NativeCopyRows), false,
        kMatrix},
       {"Matrix::MultiplyTranslation (sub_820B0D68)", Original<__imp__sub_820B0D68>,
        NativeMultiplyTranslation, false, kMatrix},
@@ -878,11 +878,11 @@ void CarPhysicsVehicle(Context& h) {
        false, kSteerRecordR4},
       // r3 is what tan's _ctrlfp leaves (as UpdateSteering's).
       {"SteerRecord::Curve (sub_820B3E98)", Original<__imp__sub_820B3E98>,
-       NativeSteerRecordCurve, true, kSteerRecordR4, false, false},
-      {"Vehicle::SteerTowards (sub_820B5FD8)", Original<__imp__sub_820B5FD8>, NativeSteerTowards,
+       ITC_CONTEXT_FN(NativeSteerRecordCurve), true, kSteerRecordR4, false, false},
+      {"Vehicle::SteerTowards (sub_820B5FD8)", Original<__imp__sub_820B5FD8>, ITC_CONTEXT_FN(NativeSteerTowards),
        true, kByteR4, false, false},
       {"Vehicle::UpdateSuspension (sub_820B6328)", Original<__imp__sub_820B6328>,
-       NativeUpdateSuspension, true},
+       ITC_CONTEXT_FN(NativeUpdateSuspension), true},
       {"Vehicle::UpdateWheelSuspension (sub_820B5588)", Original<__imp__sub_820B5588>,
        NativeUpdateWheelSuspension, true},
       // r6 = a velocity in the vehicle (+5000).
@@ -1248,19 +1248,19 @@ void CarPhysicsPairs(Context& h) {
       {"CollisionWorld::MovePair (sub_820BBD30)", Original<__imp__sub_820BBD30>, NativeMovePair,
        kMovePairArgs},
       {"CollisionWorld::RemovePair (sub_820B8A88)", Original<__imp__sub_820B8A88>,
-       NativeRemovePair, kRemovePairArgs},
+       ITC_CONTEXT_FN(NativeRemovePair), kRemovePairArgs},
       {"CollisionWorld::Reset (sub_820B85E8)", Original<__imp__sub_820B85E8>, NativeWorldReset,
        kResetArgs},
       {"CollisionWorld::RemovePairsOf (sub_820B8BA8)", Original<__imp__sub_820B8BA8>,
-       NativeRemovePairsOf, kObjectGroups},
+       ITC_CONTEXT_FN(NativeRemovePairsOf), kObjectGroups},
       {"CollisionWorld::RemovePairsByGroups (sub_820B8AF8)", Original<__imp__sub_820B8AF8>,
-       NativeRemovePairsByGroups, kObjectGroups},
+       ITC_CONTEXT_FN(NativeRemovePairsByGroups), kObjectGroups},
       {"CollisionWorld::RemoveObject (sub_820B9448)", Original<__imp__sub_820B9448>,
-       NativeRemoveObject, kObjectGroups},
+       ITC_CONTEXT_FN(NativeRemoveObject), kObjectGroups},
       {"CollisionObject::AddGroups (sub_820B7CC8)", Original<__imp__sub_820B7CC8>,
        NativeAddGroups, kObjectGroups},
       {"CollisionObject::RemoveGroups (sub_820B7CF0)", Original<__imp__sub_820B7CF0>,
-       NativeRemoveGroups, kObjectGroups},
+       ITC_CONTEXT_FN(NativeRemoveGroups), kObjectGroups},
   };
   uint8_t saved_surfaces[kSurfaceBytes];
   std::memcpy(saved_surfaces, h.base + kSurfaceGlobals, kSurfaceBytes);
@@ -1778,7 +1778,7 @@ void CarPhysicsVehicleApplyTuning(Context& h) {
         t.fpscr.disableFlushModeUnconditional();
         t.r3.u64 = data;
         t.r4.u64 = car;
-        (v == 0 ? GuestFunction(Original<__imp__sub_820C0D28>) : NativeVehicleApplyTuning)(
+        (v == 0 ? GuestFunction(Original<__imp__sub_820C0D28>) : ITC_CONTEXT_FN(NativeVehicleApplyTuning))(
             t, h.base);
         out[v].Floats(h.base, data, kTuningDataBytes / 4);
         out[v].Bytes(Read(h.base, car, kTuningCarBytes));

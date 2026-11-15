@@ -3,6 +3,7 @@
 // (hooks/car_dealer.h).
 
 #include "hooks/car_dealer.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
@@ -71,7 +72,7 @@ namespace cd = car_dealer;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -81,7 +82,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -102,14 +103,14 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
-void CarDealerInitStates(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerInitStates) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
@@ -118,217 +119,217 @@ void CarDealerInitStates(PPCContext& ctx, uint8_t* base) {
   // machine's 64-bit r3.
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
-void CarDealerCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerCreate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Create(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerOpenMovie) {
   // A tail call: UiMovies::Open runs on the caller's frame with its lr.
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::OpenMovie(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
-void CarDealerWaitForLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerWaitForLoad) {
   ctx.r3.u64 = cd::WaitForLoad(base, ctx.r3.u64, ctx.r1.u32);
 }
-void CarDealerAfterDetail(PPCContext&, uint8_t* base) { cd::AfterDetail(base); }
-void CarDealerPage4(PPCContext& ctx, uint8_t* base) { cd::Page4(base, ctx.r3.u32); }
-void CarDealerPage0(PPCContext& ctx, uint8_t* base) {
+void CarDealerAfterDetail(lifted::Regs&, uint8_t* base) { cd::AfterDetail(base); }
+ITC_REGS_STEP(CarDealerPage4) { cd::Page4(base, ctx.r3.u32); }
+ITC_REGS_STEP(CarDealerPage0) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Page0(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerPage1(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerPage1) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Page1(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerPage2(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerPage2) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Page2(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerPage3(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerPage3) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Page3(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerUnload(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerUnload) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Unload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerClose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerClose) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Close(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerDestroy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Destroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerOnYes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerOnYes) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::OnYes(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void CarDealerUpdatePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerUpdatePage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::UpdatePage(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
-void CarDealerLeave(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerLeave) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Leave(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition3(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition3) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition3(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition0(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition0) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition0(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition4(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition4) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition4(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition5(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition5) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition5(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition8(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition8) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition8(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition9(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition9) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition9(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition1(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition1) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition1(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition6(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition6) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition6(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition11(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition11) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition11(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition16(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition16) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition16(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition19(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition19) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition19(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition7(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition7) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition7(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition15(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition15) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition15(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerTransition17(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerTransition17) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Transition17(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerOpenColors(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerOpenColors) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::OpenColors(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerShowCarInfo(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerShowCarInfo) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::ShowCarInfo(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void CarDealerShowSwatches(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerShowSwatches) {
   ctx.r3.u64 = cd::ShowSwatches(base, ctx.r1.u32);
 }
-void CarDealerFillStatus(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerFillStatus) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::FillStatus(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerSetNameTexts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerSetNameTexts) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::SetNameTexts(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
-void CarDealerSetPriceTexts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerSetPriceTexts) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::SetPriceTexts(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void CarDealerSetSpecTexts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerSetSpecTexts) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::SetSpecTexts(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerSetSwatchColor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerSetSwatchColor) {
   ctx.r3.u64 = cd::SetSwatchColor(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
-void CarDealerUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Update(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerStart) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Start(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerOnDialogDone(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerOnDialogDone) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::OnDialogDone(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void CarDealerShowBusy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerShowBusy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::ShowBusy(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerHideBusy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerHideBusy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::HideBusy(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerHideBusyNow(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerHideBusyNow) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::HideBusyNow(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerStartFirstRace(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerStartFirstRace) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::StartFirstRace(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerBuildLists(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerBuildLists) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::BuildLists(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerBuy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerBuy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::Buy(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerCheckLimits(PPCContext&, uint8_t* base) { cd::CheckLimits(base); }
-void CarDealerReloadStandModel(PPCContext& ctx, uint8_t* base) {
+void CarDealerCheckLimits(lifted::Regs&, uint8_t* base) { cd::CheckLimits(base); }
+ITC_REGS_STEP(CarDealerReloadStandModel) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::ReloadStandModel(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerSetKindBar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerSetKindBar) {
   ctx.r3.u64 = cd::SetKindBar(base, ctx.r3.u64, ctx.r1.u32);
 }
-void CarDealerSetColorBar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerSetColorBar) {
   ctx.r3.u64 = cd::SetColorBar(base, ctx.r3.u64, ctx.r1.u32);
 }
-void CarDealerSetScrollArrows(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerSetScrollArrows) {
   ctx.r3.u64 = cd::SetScrollArrows(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32);
 }
-void CarDealerSetHeader(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerSetHeader) {
   ctx.r3.u64 = cd::SetHeader(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
-void CarDealerSetPrompts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerSetPrompts) {
   const uint32_t args[6] = {ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                             ctx.r6.u32, ctx.r7.u32, ctx.r8.u32};
   ctx.r3.u64 = cd::SetPrompts(base, args, ctx.r1.u32);
 }
-void CarDealerOpenListMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerOpenListMenu) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::OpenListMenu(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerOpenCarList(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerOpenCarList) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::OpenCarList(base, ctx.r1.u32, guest.calls());
 }
-void CarDealerOpenCar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarDealerOpenCar) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::OpenCar(base, ctx.r1.u32, guest.calls());
 }
-void HelpLineSet(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HelpLineSet) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = cd::HelpLineSet(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
@@ -336,12 +337,7 @@ void HelpLineSet(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_CAR_DEALER(address, step)       \
-  extern "C" REX_FUNC(sub_##address) {      \
-    REX_FUNC_PROLOGUE();                    \
-    if (!ITC_FLAG(native_car_dealer)) {     \
-      __imp__sub_##address(ctx, base);      \
-      return;                               \
-    }                                       \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_dealer)) { \
     hooks::step(ctx, base);                 \
   }
 
@@ -399,13 +395,13 @@ ITC_CAR_DEALER(82181B98, CarDealerPage4)
 // play, reaches the original) (removed, B7 loop, 2026-11-08): their callers
 // in play are native, the flag switches those; their steps above are the
 // harness's.
-extern "C" REX_FUNC(sub_82180CE8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82180CE8) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82180CE8)) {
     return;
   }
   if (!ITC_FLAG(native_car_dealer)) {
-    __imp__sub_82180CE8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82180CE8);
     return;
   }
   hooks::CarDealerStartFirstRace(ctx, base);

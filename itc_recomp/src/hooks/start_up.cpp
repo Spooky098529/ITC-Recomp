@@ -3,6 +3,7 @@
 // docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "guest_call.h"
 
 #include "base/log.h"
@@ -23,7 +24,7 @@ constexpr uint32_t kHeapBytes = 0x100000;
 // sub_82297C08's work: makes the heap once (sub_822997B0, kept at kHeap)
 // with a 48-byte attributes block (its size, then zeros), in a frame like
 // the original's. True when the heap exists.
-bool MakeHeap(PPCContext& ctx, uint8_t* base) {
+bool MakeHeap(lifted::Regs& ctx, uint8_t* base) {
   if (!guest::LoadU32(base, kHeap)) {
     InFrame(ctx, base, 160, 0x82297CB0, [&](uint32_t frame) {
       const uint32_t attributes = frame + 80;
@@ -49,23 +50,23 @@ bool MakeHeap(PPCContext& ctx, uint8_t* base) {
 // The XDK's PAL-50 check: 1 when it showed the 50 Hz console warning (then
 // xstart ends the title). The SDK's AV pack (XGetAVPack) is 6, which passes
 // before any console setting is read, so it's always 0.
-extern "C" REX_FUNC(sub_82296AB0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82296AB0) {
+  
   ctx.r3.u64 = 0;
 }
 
 // Makes the heap (RtlImageXexHeaderField for its size left out: kHeapBytes);
 // returns 1 when it exists.
-extern "C" REX_FUNC(sub_82297C08) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82297C08) {
+  
   ctx.r3.u64 = MakeHeap(ctx, base) ? 1 : 0;
 }
 
 // The heap check: the game can't run without the heap, so the original
 // returned to the firmware (HalReturnToFirmware, which the SDK answered by
 // exiting); ours exits.
-extern "C" REX_FUNC(sub_82297CE0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82297CE0) {
+  
   if (!MakeHeap(ctx, base)) {
     ITC_LOG_ERROR("The game's heap couldn't be made");
     std::exit(EXIT_FAILURE);

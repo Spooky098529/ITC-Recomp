@@ -3,6 +3,7 @@
 // shares (hooks/type2_screens.h).
 
 #include "hooks/type2_screens.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "type2_screens/type2_screens.h"
@@ -96,7 +97,7 @@ namespace t2 = type2_screens;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -106,7 +107,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -127,343 +128,343 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
-void ScreenLeaveToHub(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ScreenLeaveToHub) {
   t2::LeaveToHub(base, ctx.r3.u32, ctx.r4.u32);
 }
-void PlateCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateCreate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateOpenMovie) {
   // A tail call: UiMovies::Open runs on the caller's frame with its lr.
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateOpenMovie(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
-void PlateWaitForLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateWaitForLoad) {
   ctx.r3.u64 = t2::PlateWaitForLoad(base, ctx.r3.u64, ctx.r1.u32);
 }
-void PlateClose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateClose) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateClose(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void PlateDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateDestroy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateDestroy(base, ctx.r1.u32, guest.calls());
 }
-void PlateOnMessage32(PPCContext&, uint8_t* base) { t2::PlateOnMessage32(base); }
-void PlateStart(PPCContext& ctx, uint8_t* base) {
+void PlateOnMessage32(lifted::Regs&, uint8_t* base) { t2::PlateOnMessage32(base); }
+ITC_REGS_STEP(PlateStart) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateStart(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void PlateLeavePage(PPCContext& ctx, uint8_t* base) { t2::PlateLeavePage(base, ctx.r3.u32); }
-void PlateCharLineKind(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateLeavePage) { t2::PlateLeavePage(base, ctx.r3.u32); }
+ITC_REGS_STEP(PlateCharLineKind) {
   ctx.r3.u64 = t2::PlateCharLineKind(base, ctx.r3.u32);
 }
-void PlateRandom(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateRandom) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateRandom(base, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void PlateLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateLoad) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateLoad(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void PlateResetMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateResetMovie) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateResetMovie(base, ctx.r1.u32, guest.calls());
 }
-void PlateShowRegion(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateShowRegion) {
   ctx.r3.u64 = t2::PlateShowRegion(base, ctx.r3.u32, ctx.r1.u32);
 }
-void PlateShowDigits(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateShowDigits) {
   ctx.r3.u64 = t2::PlateShowDigits(base, ctx.r3.u32, ctx.r1.u32);
 }
-void PlateShowChars(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateShowChars) {
   ctx.r3.u64 = t2::PlateShowChars(base, ctx.r3.u32, ctx.r1.u32);
 }
-void PlateMarkField(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateMarkField) {
   ctx.r3.u64 = t2::PlateMarkField(base, ctx.r3.u32, ctx.r1.u32);
 }
-void PlateFinishRegionAnim(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateFinishRegionAnim) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateFinishRegionAnim(base, ctx.r1.u32, guest.calls());
 }
-void PlateFinishDigitAnim(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateFinishDigitAnim) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateFinishDigitAnim(base, ctx.r1.u32, guest.calls());
 }
 
-void PlateShowRegionCells(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateShowRegionCells) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateShowRegionCells(base, ctx.r1.u32, guest.calls());
 }
-void PlateShowDigitCells(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateShowDigitCells) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateShowDigitCells(base, ctx.r1.u32, guest.calls());
 }
-void PlateShowCharCells(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateShowCharCells) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateShowCharCells(base, ctx.r1.u32, guest.calls());
 }
-void PlateShowCharLine(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateShowCharLine) {
   ctx.r3.u64 = t2::PlateShowCharLine(base, ctx.r3.u32, ctx.r1.u32);
 }
-void PlateShowPlate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateShowPlate) {
   ctx.r3.u64 = t2::PlateShowPlate(base, ctx.r3.u32, ctx.r1.u32);
 }
-void PlateSetUpRegionMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateSetUpRegionMenu) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateSetUpRegionMenu(base, ctx.r1.u32, guest.calls());
 }
-void PlateSetUpNumberMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateSetUpNumberMenu) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateSetUpNumberMenu(base, ctx.r1.u32, guest.calls());
 }
-void PlateSetUpCharsMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateSetUpCharsMenu) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateSetUpCharsMenu(base, ctx.r1.u32, guest.calls());
 }
-void PlateTransition0(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateTransition0) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateTransition0(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateTransition1(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateTransition1) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateTransition1(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateTransition4(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateTransition4) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateTransition4(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateTransition5(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateTransition5) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateTransition5(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateTransition6(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateTransition6) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateTransition6(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateTransition8(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateTransition8) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateTransition8(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateTransition10(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateTransition10) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateTransition10(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateTransition11(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateTransition11) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateTransition11(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateTransition13(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateTransition13) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateTransition13(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateTransition19(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateTransition19) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateTransition19(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateRegionPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateRegionPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateRegionPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateNumberPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateNumberPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateNumberPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateCharsPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateCharsPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateCharsPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void PlateUpdatePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateUpdatePage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateUpdatePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void PlateUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::PlateUpdate(base, ctx.r1.u32, guest.calls());
 }
 
-void SheetCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SheetCreate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::SheetCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void SheetOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SheetOpenMovie) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::SheetOpenMovie(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
-void SheetWaitForLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SheetWaitForLoad) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::SheetWaitForLoad(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void SheetClose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SheetClose) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::SheetClose(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void SheetDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SheetDestroy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::SheetDestroy(base, ctx.r1.u32, guest.calls());
 }
-void BuildCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildCreate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void BuildOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildOpenMovie) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildOpenMovie(base, ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
-void BuildWaitForLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildWaitForLoad) {
   ctx.r3.u64 = t2::BuildWaitForLoad(base, ctx.r3.u64, ctx.r1.u32);
 }
-void BuildUnload(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildUnload) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void BuildClose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildClose) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildClose(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void BuildDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildDestroy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildDestroy(base, ctx.r1.u32, guest.calls());
 }
-void BuildSaveBuildStates(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildSaveBuildStates) {
   ctx.r3.u64 = t2::BuildSaveBuildStates(base, ctx.r1.u32);
 }
-void BuildLeavePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildLeavePage) {
   ctx.r3.u64 = t2::BuildLeavePage(base, ctx.r3.u32, ctx.r1.u32);
 }
-void BuildDetailsPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildDetailsPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildDetailsPage(base, ctx.r1.u32, guest.calls());
 }
-void BuildUpdatePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildUpdatePage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildUpdatePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
-void HubOnYes(PPCContext&, uint8_t* base) { t2::HubOnYes(base); }
-void HubOnNo(PPCContext&, uint8_t* base) { t2::HubOnNo(base); }
-void HubImagesLoadedA(PPCContext& ctx, uint8_t* base) {
+void HubOnYes(lifted::Regs&, uint8_t* base) { t2::HubOnYes(base); }
+void HubOnNo(lifted::Regs&, uint8_t* base) { t2::HubOnNo(base); }
+ITC_REGS_STEP(HubImagesLoadedA) {
   ctx.r3.u64 = t2::HubImagesLoadedA(base, ctx.r3.u32);
 }
-void HubImagesLoadedB(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubImagesLoadedB) {
   ctx.r3.u64 = t2::HubImagesLoadedB(base, ctx.r3.u32);
 }
-void HubWaitForLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubWaitForLoad) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubWaitForLoad(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
-void HubFreeImage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubFreeImage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubFreeImage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void HubOpenSelected(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubOpenSelected) {
   t2::HubOpenSelected(base, ctx.r3.u32, ctx.r4.u32);
 }
-void HubReenter(PPCContext& ctx, uint8_t* base) { t2::HubReenter(base, ctx.r3.u32); }
-void HubPostMessage5(PPCContext& ctx, uint8_t* base) { t2::HubPostMessage5(base, ctx.r3.u32); }
-void HubChoose(PPCContext& ctx, uint8_t* base) { t2::HubChoose(base, ctx.r3.u32, ctx.r4.u32); }
-void HubUnload(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubReenter) { t2::HubReenter(base, ctx.r3.u32); }
+ITC_REGS_STEP(HubPostMessage5) { t2::HubPostMessage5(base, ctx.r3.u32); }
+ITC_REGS_STEP(HubChoose) { t2::HubChoose(base, ctx.r3.u32, ctx.r4.u32); }
+ITC_REGS_STEP(HubUnload) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubUnload(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void HubClose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubClose) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubClose(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void HubSetPrompts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubSetPrompts) {
   const uint32_t args[6] = {ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                             ctx.r6.u32, ctx.r7.u32, ctx.r8.u32};
   ctx.r3.u64 = t2::HubSetPrompts(base, args, ctx.r1.u32);
 }
-void HubBack(PPCContext& ctx, uint8_t* base) { ctx.r3.u64 = t2::HubBack(base, ctx.r1.u32); }
-void HubSetUpStatus(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubBack) { ctx.r3.u64 = t2::HubBack(base, ctx.r1.u32); }
+ITC_REGS_STEP(HubSetUpStatus) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubSetUpStatus(base, ctx.r1.u32, guest.calls());
 }
-void HubNextNotice(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubNextNotice) {
   ctx.r3.u64 = t2::HubNextNotice(base, ctx.r1.u32);
 }
-void HubNextNotice2(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubNextNotice2) {
   ctx.r3.u64 = t2::HubNextNotice2(base, ctx.r1.u32);
 }
-void HubStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubStart) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubStart(base, ctx.r1.u32, guest.calls());
 }
 
-void HubCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubCreate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void HubDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubDestroy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubDestroy(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void HubOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubOpenMovie) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubOpenMovie(base, ctx.r1.u32, guest.calls());
 }
-void HubImageLoaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubImageLoaded) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubImageLoaded(base, ctx.r4.u32, ctx.r6.u32, ctx.r1.u32, guest.calls());
 }
-void HubMarkNoticeImages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubMarkNoticeImages) {
   ctx.r3.u64 = t2::HubMarkNoticeImages(base, ctx.r1.u32);
 }
-void HubFreeImages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubFreeImages) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubFreeImages(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void HubLoadNoticeImage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubLoadNoticeImage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubLoadNoticeImage(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void HubLoadNoticeImages(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubLoadNoticeImages) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubLoadNoticeImages(base, ctx.r1.u32, guest.calls());
 }
 
-void HubUpdatePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubUpdatePage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubUpdatePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void HubRecordPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubRecordPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubRecordPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void HubSetRecordText(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubSetRecordText) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubSetRecordText(base, ctx.r1.u32, guest.calls());
 }
-void HubShowBusy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubShowBusy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubShowBusy(base, ctx.r1.u32, guest.calls());
 }
-void HubHideBusy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubHideBusy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubHideBusy(base, ctx.r1.u32, guest.calls());
 }
-void HubShowNoticeImage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubShowNoticeImage) {
   ctx.r3.u64 = t2::HubShowNoticeImage(base, ctx.r3.u32, ctx.r1.u32);
 }
-void HubShowNotice(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubShowNotice) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubShowNotice(base, ctx.r1.u32, guest.calls());
 }
-void HubFillMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubFillMenu) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubFillMenu(base, ctx.r1.u32, guest.calls());
 }
 #define ITC_HUB_TRANSITION(n)                                                   \
-  void HubTransition##n(PPCContext& ctx, uint8_t* base) {                       \
+  void HubTransition##n(lifted::Regs& ctx, uint8_t* base) {                       \
     GuestCalls guest(ctx, base);                                                \
     ctx.r3.u64 = t2::HubTransition##n(base, ctx.r3.u32, ctx.r1.u32, guest.calls()); \
   }
@@ -476,80 +477,80 @@ ITC_HUB_TRANSITION(6)
 ITC_HUB_TRANSITION(7)
 #undef ITC_HUB_TRANSITION
 
-void HubMenuPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubMenuPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubMenuPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void HubNoticePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubNoticePage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubNoticePage(base, ctx.r1.u32, guest.calls());
 }
-void HubOnDialogDone(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubOnDialogDone) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubOnDialogDone(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void HubFillPlayerRecord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubFillPlayerRecord) {
   GuestCalls guest(ctx, base);
   t2::HubFillPlayerRecord(base, ctx.r1.u32, guest.calls());
 }
 
-void BuildEnter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildEnter) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildEnter(base, ctx.r1.u32, guest.calls());
 }
-void BuildFill(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildFill) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildFill(base, ctx.r1.u32, guest.calls());
 }
-void HubUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubUpdate(base, ctx.r1.u32, guest.calls());
 }
-void HubPutCarOnStand(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubPutCarOnStand) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::HubPutCarOnStand(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void BuildGroupsPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildGroupsPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildGroupsPage(base, ctx.r1.u32, guest.calls());
 }
-void BuildBuildsPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildBuildsPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildBuildsPage(base, ctx.r1.u32, guest.calls());
 }
-void BuildBuildPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildBuildPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildBuildPage(base, ctx.r1.u32, guest.calls());
 }
-void BuildJumpGroupA(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildJumpGroupA) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildJumpGroupA(base, ctx.r1.u32, guest.calls());
 }
-void BuildJumpGroupB(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildJumpGroupB) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildJumpGroupB(base, ctx.r1.u32, guest.calls());
 }
-void BuildJumpBuildA(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildJumpBuildA) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildJumpBuildA(base, ctx.r1.u32, guest.calls());
 }
-void BuildJumpBuildB(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildJumpBuildB) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildJumpBuildB(base, ctx.r1.u32, guest.calls());
 }
-void BuildJumpStandA(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildJumpStandA) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildJumpStandA(base, ctx.r1.u32, guest.calls());
 }
-void BuildJumpStandB(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildJumpStandB) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildJumpStandB(base, ctx.r1.u32, guest.calls());
 }
-void BuildSetUpStatus(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildSetUpStatus) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = t2::BuildSetUpStatus(base, ctx.r1.u32, guest.calls());
 }
-void BuildListRemoveAt(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildListRemoveAt) {
   t2::BuildListRemoveAt(base, ctx.r3.u32, ctx.r4.u32);
 }
 
@@ -557,7 +558,7 @@ namespace {
 // An Init's register step: StateMachine::Add's adapter's r3, a new
 // transition's address from the machine's 64-bit r3.
 template <uint32_t (*Init)(uint8_t*, uint32_t, uint32_t, bool*)>
-void InitStep(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes) {
+void InitStep(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
@@ -566,28 +567,23 @@ void InitStep(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes) {
 }
 }  // namespace
 
-void HubInitStates(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(HubInitStates) {
   InitStep<t2::HubInitStates>(ctx, base, t2::kHubInitFrame);
 }
-void SheetInitStates(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SheetInitStates) {
   InitStep<t2::SheetInitStates>(ctx, base, t2::kSheetInitFrame);
 }
-void BuildInitStates(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(BuildInitStates) {
   InitStep<t2::BuildInitStates>(ctx, base, t2::kBuildInitFrame);
 }
-void PlateInitStates(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(PlateInitStates) {
   InitStep<t2::PlateInitStates>(ctx, base, t2::kPlateInitFrame);
 }
 
 }  // namespace hooks
 
 #define ITC_TYPE2_SCREENS(address, step)     \
-  extern "C" REX_FUNC(sub_##address) {       \
-    REX_FUNC_PROLOGUE();                     \
-    if (!ITC_FLAG(native_type2_screens)) {   \
-      __imp__sub_##address(ctx, base);       \
-      return;                                \
-    }                                        \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type2_screens)) { \
     hooks::step(ctx, base);                  \
   }
 

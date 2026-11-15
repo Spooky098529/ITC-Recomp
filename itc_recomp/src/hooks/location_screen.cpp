@@ -3,6 +3,7 @@
 // register steps the harness shares (hooks/location_screen.h).
 
 #include "hooks/location_screen.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/archive.h"
@@ -65,89 +66,89 @@ namespace hooks {
 
 namespace ls = location_screen;
 
-void LocationScreenSceneryConfig(PPCContext& ctx, uint8_t*) {
+void LocationScreenSceneryConfig(lifted::Regs& ctx, uint8_t*) {
   ctx.r3.u64 = ls::SceneryConfig(ctx.r3.u64, ctx.r4.u64);
 }
 
-void LocationScreenKindText(PPCContext& ctx, uint8_t*) {
+void LocationScreenKindText(lifted::Regs& ctx, uint8_t*) {
   ctx.r3.u64 = ls::KindText(ctx.r3.u32, ctx.r4.u64);
 }
 
-void LocationScreenIsPictureQueued(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenIsPictureQueued) {
   ctx.r3.u64 = ls::IsPictureQueued(base, ctx.r3.u32);
 }
 
-void LocationScreenPictureA(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenPictureA) {
   ctx.r3.u64 = ls::PictureA(base, ctx.r3.u32);
 }
 
-void LocationScreenPictureB(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenPictureB) {
   ctx.r3.u64 = ls::PictureB(base, ctx.r3.u32);
 }
 
-void LocationScreenOnMessage14(PPCContext&, uint8_t* base) { ls::OnMessage14(base); }
+void LocationScreenOnMessage14(lifted::Regs&, uint8_t* base) { ls::OnMessage14(base); }
 
-void LocationScreenHasMoreUnlocks(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenHasMoreUnlocks) {
   ctx.r3.u64 = ls::HasMoreUnlocks(base);
 }
 
-void LocationScreenNextUnlockEntry(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenNextUnlockEntry) {
   ctx.r3.u64 = ls::NextUnlockEntry(base);
 }
 
-void LocationScreenOpponentHasCard(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenOpponentHasCard) {
   if (const auto r3 = ls::OpponentHasCard(base, ctx.r1.u32)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  __imp__sub_82227708(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82227708);
 }
 
-void LocationScreenNextResultText(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenNextResultText) {
   if (const auto r3 = ls::NextResultText(base, ctx.r1.u32)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  __imp__sub_822271F8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_822271F8);
 }
 
-void LocationScreenShowPictures(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenShowPictures) {
   ctx.r3.u64 = ls::ShowPictures(base, ctx.r1.u32);
 }
 
-void LocationScreenHidePictures(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenHidePictures) {
   ctx.r3.u64 = ls::HidePictures(base, ctx.r1.u32);
 }
 
-void LocationScreenSetCarColor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenSetCarColor) {
   ctx.r3.u64 = ls::SetCarColor(base, ctx.r1.u32);
 }
 
-void LocationScreenSetCursor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenSetCursor) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = ls::SetCursor(base, ctx.r1.u32, ctx.r3.u32);
 }
 
-void LocationScreenListNode(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenListNode) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = ls::ListNode(base, ctx.r1.u32, ctx.r3.u32);
 }
 
-void LocationScreenShowArrows(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenShowArrows) {
   ctx.r3.u64 = ls::ShowArrows(base, ctx.r1.u32);
 }
 
 namespace {
 
 struct GuestRun {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
 };
 
 uint64_t RunThrough(void* user, uint32_t movie, uint32_t draw_only, uint32_t frame_bytes,
                     uint32_t lr) {
   auto& guest = *static_cast<GuestRun*>(user);
-  PPCContext& ctx = guest.ctx;
+  lifted::Regs& ctx = guest.ctx;
   guest_call::InFrame(ctx, guest.base, frame_bytes, lr, [&](uint32_t) {
     ctx.r3.u64 = movie;
     ctx.r4.u64 = draw_only;
@@ -158,7 +159,7 @@ uint64_t RunThrough(void* user, uint32_t movie, uint32_t draw_only, uint32_t fra
 
 // Runs `step(run)` with UiMovie::Run through this context; lr put back.
 template <typename Step>
-uint64_t WithRun(PPCContext& ctx, uint8_t* base, Step step) {
+uint64_t WithRun(lifted::Regs& ctx, uint8_t* base, Step step) {
   const uint64_t lr = ctx.lr;
   GuestRun guest{ctx, base};
   const ls::RunCall run{&guest, RunThrough};
@@ -169,33 +170,33 @@ uint64_t WithRun(PPCContext& ctx, uint8_t* base, Step step) {
 
 }  // namespace
 
-void LocationScreenRunCardMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenRunCardMovie) {
   const uint32_t sp = ctx.r1.u32;
   ctx.r3.u64 = WithRun(ctx, base, [&](const ls::RunCall& run) {
     return ls::RunCardMovie(base, sp, run);
   });
 }
 
-void LocationScreenTransition1(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenTransition1) {
   const uint32_t sp = ctx.r1.u32, step = ctx.r3.u32;
   ctx.r3.u64 = WithRun(ctx, base, [&](const ls::RunCall& run) -> uint64_t {
     return ls::Transition1(base, sp, step, run);
   });
 }
 
-void LocationScreenTransition18(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenTransition18) {
   const uint32_t sp = ctx.r1.u32, step = ctx.r3.u32;
   ctx.r3.u64 = WithRun(ctx, base, [&](const ls::RunCall& run) -> uint64_t {
     return ls::Transition18(base, sp, step, run);
   });
 }
 
-void LocationScreenReenter(PPCContext& ctx, uint8_t* base) { ls::Reenter(base, ctx.r3.u32); }
+ITC_REGS_STEP(LocationScreenReenter) { ls::Reenter(base, ctx.r3.u32); }
 
-void LocationScreenReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenReset) {
   const uint32_t screen = ctx.r3.u32;
   if (!ls::ResetNative(screen)) {
-    __imp__sub_822279A8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822279A8);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -203,10 +204,10 @@ void LocationScreenReset(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = screen + 560 + 176;
 }
 
-void LocationScreenResetView(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenResetView) {
   const uint32_t view = ctx.r3.u32;
   if (!ls::ResetNative(view - 560)) {
-    __imp__sub_82227818(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82227818);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -214,7 +215,7 @@ void LocationScreenResetView(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = view + 176;
 }
 
-void LocationScreenApplyQueuedPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenApplyQueuedPage) {
   if (const auto r3 = ls::ApplyQueuedPage(base, ctx.r1.u32)) {
     ctx.r3.u64 = *r3;
   }
@@ -225,7 +226,7 @@ namespace {
 void PageThrough(void* user, uint32_t handler, uint32_t dispatcher, uint32_t machine,
                  uint32_t frame_bytes, uint32_t lr) {
   auto& guest = *static_cast<GuestRun*>(user);
-  PPCContext& ctx = guest.ctx;
+  lifted::Regs& ctx = guest.ctx;
   uint8_t* base = guest.base;
   guest_call::InFrame(ctx, base, frame_bytes, lr, [&](uint32_t) {
     ctx.r3.u64 = dispatcher;
@@ -236,7 +237,7 @@ void PageThrough(void* user, uint32_t handler, uint32_t dispatcher, uint32_t mac
 
 }  // namespace
 
-void LocationScreenUpdatePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenUpdatePage) {
   const uint64_t lr = ctx.lr;
   GuestRun guest{ctx, base};
   const ls::PageCall call{&guest, PageThrough};
@@ -244,7 +245,7 @@ void LocationScreenUpdatePage(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
 }
 
-void LocationScreenInitStates(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenInitStates) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
@@ -256,7 +257,7 @@ void LocationScreenInitStates(PPCContext& ctx, uint8_t* base) {
 
 // --- The second migration's guest calls ---
 
-LocationScreenCalls::LocationScreenCalls(PPCContext& ctx, uint8_t* base)
+LocationScreenCalls::LocationScreenCalls(lifted::Regs& ctx, uint8_t* base)
     : ctx_(ctx),
       base_(base),
       lr_(ctx.lr),
@@ -269,7 +270,7 @@ LocationScreenCalls::~LocationScreenCalls() { ctx_.lr = lr_; }
 uint64_t LocationScreenCalls::Call(void* user, uint32_t function, const uint64_t args[4],
                                    uint32_t r1, uint32_t lr) {
   auto& self = *static_cast<LocationScreenCalls*>(user);
-  PPCContext& ctx = self.ctx_;
+  lifted::Regs& ctx = self.ctx_;
   uint8_t* base = self.base_;
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = r1;
@@ -298,49 +299,49 @@ uint64_t LocationScreenCalls::Call(void* user, uint32_t function, const uint64_t
   return ctx.r3.u64;
 }
 
-void LocationScreenPage9(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenPage9) {
   const uint32_t sp = ctx.r1.u32, machine = ctx.r4.u32;
   LocationScreenCalls calls(ctx, base);
   ctx.r3.u64 = ls::Page9(base, sp, machine, calls.get());
 }
 
-void LocationScreenPage11(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenPage11) {
   const uint32_t sp = ctx.r1.u32, machine = ctx.r4.u32;
   LocationScreenCalls calls(ctx, base);
   ctx.r3.u64 = ls::Page11(base, sp, machine, calls.get());
 }
 
-void LocationScreenNextOpponentText(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenNextOpponentText) {
   const uint32_t sp = ctx.r1.u32;
   LocationScreenCalls calls(ctx, base);
   ctx.r3.u64 = ls::NextOpponentText(base, sp, calls.get());
 }
 
-void LocationScreenLoadPicture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenLoadPicture) {
   const uint32_t sp = ctx.r1.u32, screen = ctx.r3.u32, id = ctx.r4.u32, list = ctx.r5.u32;
   LocationScreenCalls calls(ctx, base);
   ctx.r3.u64 = ls::LoadPicture(base, sp, screen, id, list, calls.get());
 }
 
-void LocationScreenPictureFree(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenPictureFree) {
   const uint32_t sp = ctx.r1.u32, picture = ctx.r3.u32;
   LocationScreenCalls calls(ctx, base);
   ctx.r3.u64 = ls::PictureFree(base, sp, picture, calls.get());
 }
 
-void LocationScreenFreePictures(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenFreePictures) {
   const uint32_t sp = ctx.r1.u32, screen = ctx.r3.u32;
   LocationScreenCalls calls(ctx, base);
   ctx.r3.u64 = ls::FreePictures(base, sp, screen, calls.get());
 }
 
-void LocationScreenOnPictureLoadedA(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenOnPictureLoadedA) {
   const uint32_t sp = ctx.r1.u32, buffer = ctx.r4.u32, screen = ctx.r6.u32;
   LocationScreenCalls calls(ctx, base);
   ctx.r3.u64 = ls::OnPictureLoaded(base, sp, screen, buffer, 0, calls.get());
 }
 
-void LocationScreenOnPictureLoadedB(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenOnPictureLoadedB) {
   const uint32_t sp = ctx.r1.u32, buffer = ctx.r4.u32, screen = ctx.r6.u32;
   LocationScreenCalls calls(ctx, base);
   ctx.r3.u64 = ls::OnPictureLoaded(base, sp, screen, buffer, 1, calls.get());
@@ -356,9 +357,9 @@ namespace {
 // The texts' functions: natively while the UI movies' text setters are, else
 // the original; r3 the plain C++'s.
 template <typename Step>
-void Texts(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_t*), Step step) {
+void Texts(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original, Step step) {
   if (!LocationScreenTextsNative(base)) {
-    original(ctx, base);
+    lifted::Sdk(ctx, base, original);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -369,26 +370,26 @@ void Texts(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_t
 
 }  // namespace
 
-void LocationScreenResetMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenResetMovie) {
   Texts(ctx, base, __imp__sub_8222CD60, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::ResetMovie(base, sp, calls);
   });
 }
 
-void LocationScreenShowUnlockEntry(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenShowUnlockEntry) {
   Texts(ctx, base, __imp__sub_8222A978, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::ShowUnlockEntry(base, sp, calls);
   });
 }
 
-void LocationScreenShowListEntry(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenShowListEntry) {
   Texts(ctx, base, __imp__sub_8222B048, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::ShowListEntry(base, sp, calls);
   });
 }
 
 #define LOCATION_SCREEN_TRANSITION(address, name)                                     \
-  void LocationScreen##name(PPCContext& ctx, uint8_t* base) {                         \
+  void LocationScreen##name(lifted::Regs& ctx, uint8_t* base) {                         \
     Texts(ctx, base, __imp__sub_##address,                                            \
           [&](uint32_t sp, uint32_t step, const ls::Calls& calls) {                   \
             return ls::name(base, sp, step, calls);                                   \
@@ -412,29 +413,29 @@ LOCATION_SCREEN_TRANSITION(8222D108, Transition34)
 LOCATION_SCREEN_TRANSITION(8222DEE0, Transition9)
 #undef LOCATION_SCREEN_TRANSITION
 
-void LocationScreenShowOpponentInfo(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenShowOpponentInfo) {
   Texts(ctx, base, __imp__sub_8222B438, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::ShowOpponentInfo(base, sp, calls);
   });
 }
 
-void LocationScreenStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenStart) {
   Texts(ctx, base, __imp__sub_8222F0B0, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::Start(base, sp, calls);
   });
 }
 
-void LocationScreenShowOpponentSpecs(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenShowOpponentSpecs) {
   Texts(ctx, base, __imp__sub_8222C188, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::ShowOpponentSpecs(base, sp, calls);
   });
 }
 
-void LocationScreenPoseCar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenPoseCar) {
   const uint32_t sp = ctx.r1.u32, model = ctx.r3.u32, index = ctx.r4.u32;
   const uint64_t r3 = ctx.r3.u64;
   if (((sp - ls::kPoseCarFrame) & 0xF) != 0) {
-    __imp__sub_82228588(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82228588);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -446,9 +447,9 @@ void LocationScreenPoseCar(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.enableFlushMode();
 }
 
-void LocationScreenShowCard(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenShowCard) {
   if (!LocationScreenTextsNative(base)) {
-    __imp__sub_8222BBD0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8222BBD0);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -457,7 +458,7 @@ void LocationScreenShowCard(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ls::ShowCard(base, sp, calls.get());
 }
 
-void LocationScreenShowOpponentPictures(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenShowOpponentPictures) {
   const uint32_t sp = ctx.r1.u32;
   LocationScreenCalls calls(ctx, base);
   ctx.r3.u64 = ls::ShowOpponentPictures(base, sp, calls.get());
@@ -465,9 +466,9 @@ void LocationScreenShowOpponentPictures(PPCContext& ctx, uint8_t* base) {
 
 // PollLoad: r3 = the machine; as the texts' functions (it reads the UI
 // movies' nodes through their plain C++).
-void LocationScreenPollLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenPollLoad) {
   if (!LocationScreenTextsNative(base)) {
-    __imp__sub_82229238(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82229238);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -477,7 +478,7 @@ void LocationScreenPollLoad(PPCContext& ctx, uint8_t* base) {
                             NativeArchiveQueue());
 }
 
-void LocationScreenUpdateView(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LocationScreenUpdateView) {
   ctx.fpscr.disableFlushMode();
   const uint32_t sp = ctx.r1.u32;
   LocationScreenCalls calls(ctx, base);
@@ -487,12 +488,7 @@ void LocationScreenUpdateView(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define LOCATION_SCREEN_ADAPTER(address, step)  \
-  extern "C" REX_FUNC(sub_##address) {          \
-    REX_FUNC_PROLOGUE();                        \
-    if (!ITC_FLAG(native_location_screen)) {    \
-      __imp__sub_##address(ctx, base);          \
-      return;                                   \
-    }                                           \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_location_screen)) { \
     hooks::step(ctx, base);                     \
   }
 

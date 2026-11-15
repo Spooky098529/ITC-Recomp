@@ -3,6 +3,7 @@
 // register steps the harness shares (hooks/replay_snapshots.h).
 
 #include "hooks/replay_snapshots.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -31,7 +32,7 @@ namespace {
 // The calls RaceReplay's functions' callees make where their plain C++
 // refuses, as the callees' adapters make them; `frame` is the caller's
 // (ResetVehicles' frame 224 bytes below it, Vehicle::SetUp's below that).
-replay_snapshots::ReplayCalls ReplayCalls(PPCContext& ctx, uint8_t* base, uint32_t frame) {
+replay_snapshots::ReplayCalls ReplayCalls(lifted::Regs& ctx, uint8_t* base, uint32_t frame) {
   replay_snapshots::ReplayCalls calls;
   calls.list = RaceWorldListRacersOriginal(ctx, base);
   calls.setup = VehicleSetUpOriginals(ctx, base, frame - 224 - 224);
@@ -82,7 +83,7 @@ replay_snapshots::ReplayCalls ReplayCalls(PPCContext& ctx, uint8_t* base, uint32
 
 }  // namespace
 
-void ReplayKeep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ReplayKeep) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = replay_snapshots::ReplayKeep(
       base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 272,
@@ -98,26 +99,26 @@ void ReplayKeep(PPCContext& ctx, uint8_t* base) {
       });
 }
 
-void RaceReplaySaveStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceReplaySaveStart) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 144;
   const auto calls = ReplayCalls(ctx, base, frame);
   ctx.r3.u64 = replay_snapshots::RaceReplaySaveStart(base, frame, calls);
 }
 
-void RaceReplaySaveEnd(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceReplaySaveEnd) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = replay_snapshots::RaceReplaySaveEnd(base);
 }
 
-void RaceReplayRestoreStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceReplayRestoreStart) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 144;
   const auto calls = ReplayCalls(ctx, base, frame);
   ctx.r3.u64 = replay_snapshots::RaceReplayRestoreStart(base, frame, calls);
 }
 
-void RaceReplayRestoreEnd(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceReplayRestoreEnd) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 160;
   const auto calls = ReplayCalls(ctx, base, frame);
@@ -150,8 +151,8 @@ bool Native() {
 // RestoreStart), AfterReplayTick (RestoreEnd), sub_82168858 (RestoreStart,
 // not seen in play); all recompiled.
 #define ITC_RACE_REPLAY(address, step, heap)                    \
-  extern "C" REX_FUNC(sub_##address) {                          \
-    REX_FUNC_PROLOGUE();                                        \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                          \
+    \
     if (!Native() || ((heap) && !hooks::NativeHeapActive())) {  \
       __imp__sub_##address(ctx, base);                          \
       return;                                                   \

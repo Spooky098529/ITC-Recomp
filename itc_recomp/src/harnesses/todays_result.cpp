@@ -742,34 +742,34 @@ void InitMachine(PPCContext& t, Random& r, uint8_t* base, uint32_t machine) {
 
 void Mode(Context& h, const World& w) {
   Run(h, w, {"TodaysResult::InitStates (sub_8225B358)", 24, __imp__sub_8225B358,
-             hooks::TodaysResultInitStates, {{-976, -48}},
+             ITC_CONTEXT_FN(hooks::TodaysResultInitStates), {{-976, -48}},
              [](PPCContext& t, Random& r, const World& w) {
                InitMachine(t, r, w.base, w.result());
              }});
   Run(h, w, {"TodaysEvent::InitStates (sub_8225CF30)", 24, __imp__sub_8225CF30,
-             hooks::TodaysEventInitStates, {{-976, -48}},
+             ITC_CONTEXT_FN(hooks::TodaysEventInitStates), {{-976, -48}},
              [](PPCContext& t, Random& r, const World& w) {
                InitMachine(t, r, w.base, w.event());
              }});
   Run(h, w, {"ModeType9::FindShown (sub_8225D658)", 60, __imp__sub_8225D658,
-             hooks::ModeType9FindShown, {},
+             ITC_CONTEXT_FN(hooks::ModeType9FindShown), {},
              [](PPCContext& t, Random& r, const World& w) {
                t.r3.u64 = w.result() | (uint64_t(r.Below(2)) << 32);
              }});
   Run(h, w, {"TodaysEvent::Kind (sub_8225BA48)", 100, __imp__sub_8225BA48,
-             hooks::TodaysEventKind, {{-96, -8}}, [](PPCContext&, Random&, const World&) {}});
+             ITC_CONTEXT_FN(hooks::TodaysEventKind), {{-96, -8}}, [](PPCContext&, Random&, const World&) {}});
   Run(h, w, {"ModeType9::WaitForLoads (sub_8225D918)", 150, __imp__sub_8225D918,
-             hooks::ModeType9WaitForLoads, {{-128, -40}}, Delegate, nullptr, true});
+             ITC_CONTEXT_FN(hooks::ModeType9WaitForLoads), {{-128, -40}}, ITC_CONTEXT_FN(Delegate), nullptr, true});
   Run(h, w, {"ModeType9::NextMode (sub_8225DC38)", 300, __imp__sub_8225DC38,
-             hooks::ModeType9NextMode, {{-144, -56}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType9NextMode), {{-144, -56}}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType9::LeaveScreen (sub_8225DB70)", 60, __imp__sub_8225DB70,
-             hooks::ModeType9LeaveScreen, {{-128, -32}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType9LeaveScreen), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType9::WaitForShown (sub_8225DA68)", 100, __imp__sub_8225DA68,
-             hooks::ModeType9WaitForShown, {{-112, -16}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType9WaitForShown), {{-112, -16}}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType9::Leaving (sub_8225DE78)", 150, __imp__sub_8225DE78,
-             hooks::ModeType9Leaving, {{-128, -32}}, Delegate});
+             ITC_CONTEXT_FN(hooks::ModeType9Leaving), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
   Run(h, w, {"ModeType9::IsLoaded (sub_8225D6A8)", 40, __imp__sub_8225D6A8,
-             hooks::ModeType9IsLoaded, {},
+             ITC_CONTEXT_FN(hooks::ModeType9IsLoaded), {},
              [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.mode() + 32; }});
 }
 
@@ -793,7 +793,7 @@ void Nothing(PPCContext&, Random&, const World&) {}
 void Result(Context& h, const World& w) {
   // Create: the three blocks VirtualAlloc made compared by content.
   Run(h, w, {"TodaysResult::Create (sub_8225A7A0)", 60, __imp__sub_8225A7A0,
-             hooks::TodaysResultCreate, {{-112, -24}}, ResultMachine,
+             ITC_CONTEXT_FN(hooks::TodaysResultCreate), {{-112, -24}}, ResultMachine,
              [](PPCContext& t, const World& w, Outputs& out) {
                // r3 the data's address (the last VirtualAlloc's).
                out.Word(t.r3.u32 == guest::LoadU32(w.base, tr::kResultData) ? 1 : 0);
@@ -805,7 +805,7 @@ void Result(Context& h, const World& w) {
   // Destroy: the three blocks the layer's pages (whether each was freed
   // compared), the data's +4 0 or not.
   Run(h, w, {"TodaysResult::Destroy (sub_8225A8A8)", 60, __imp__sub_8225A8A8,
-             hooks::TodaysResultDestroy, {{-128, -40}},
+             ITC_CONTEXT_FN(hooks::TodaysResultDestroy), {{-128, -40}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                ResultMachine(t, r, w);
@@ -816,24 +816,24 @@ void Result(Context& h, const World& w) {
                guest::StoreU32(base, tr::kResultData, data);
              }});
   Run(h, w, {"TodaysResult::OpenMovie (sub_8225A510)", 20, __imp__sub_8225A510,
-             hooks::TodaysResultOpenMovie, {}, ResultMachine});
+             ITC_CONTEXT_FN(hooks::TodaysResultOpenMovie), {}, ResultMachine});
   Run(h, w, {"TodaysResult::WaitForMovie (sub_8225A930)", 100, __imp__sub_8225A930,
-             hooks::TodaysResultWaitForMovie, {{-96, -16}}, ResultMachine});
+             ITC_CONTEXT_FN(hooks::TodaysResultWaitForMovie), {{-96, -16}}, ResultMachine});
   // Start: only its own frame (ReadDay's, SetUpMovie's and SetTexts' have
   // their own cases).
   Run(h, w, {"TodaysResult::Start (sub_8225B300; sub_8225A520, sub_8225B258, sub_8225ADE0)",
-             60, __imp__sub_8225B300, hooks::TodaysResultStart, {{-96, -8}}, ResultMachine});
+             60, __imp__sub_8225B300, ITC_CONTEXT_FN(hooks::TodaysResultStart), {{-96, -8}}, ResultMachine});
   Run(h, w, {"TodaysResult::ReadDay (sub_8225A520)", 150, __imp__sub_8225A520,
-             hooks::TodaysResultReadDay, {{-11040, -48}}, Nothing});
+             ITC_CONTEXT_FN(hooks::TodaysResultReadDay), {{-11040, -48}}, Nothing});
   Run(h, w, {"TodaysResult::SetUpMovie (sub_8225B258)", 60, __imp__sub_8225B258,
-             hooks::TodaysResultSetUpMovie, {{-128, -32}}, Nothing});
+             ITC_CONTEXT_FN(hooks::TodaysResultSetUpMovie), {{-128, -32}}, Nothing});
   // SetTexts: without the setters' parameter area (+48 to +79) and its
   // saves.
   Run(h, w, {"TodaysResult::SetTexts (sub_8225ADE0)", 100, __imp__sub_8225ADE0,
-             hooks::TodaysResultSetTexts, {{-112, -64}, {-32, -24}}, Nothing});
+             ITC_CONTEXT_FN(hooks::TodaysResultSetTexts), {{-112, -64}, {-32, -24}}, Nothing});
   // Draw: the page -1, 0 or 1 (the table's two); only its own frame.
   Run(h, w, {"TodaysResult::Draw (sub_8225B0C8)", 150, __imp__sub_8225B0C8,
-             hooks::TodaysResultDraw, {{-96, -8}},
+             ITC_CONTEXT_FN(hooks::TodaysResultDraw), {{-96, -8}},
              [](PPCContext& t, Random& r, const World& w) {
                ResultMachine(t, r, w);
                const uint32_t pick = r.Below(3);
@@ -843,7 +843,7 @@ void Result(Context& h, const World& w) {
   // queued one -1 or small, the started word 0 or not, the page 1 or not;
   // only its own frame.
   Run(h, w, {"TodaysResult::Update (sub_8225B128)", 300, __imp__sub_8225B128,
-             hooks::TodaysResultUpdate, {{-128, -16}},
+             ITC_CONTEXT_FN(hooks::TodaysResultUpdate), {{-128, -16}},
              [](PPCContext&, Random& r, const World& w) {
                uint8_t* base = w.base;
                const uint32_t pages = w.at(kResultPagesAt);
@@ -857,33 +857,33 @@ void Result(Context& h, const World& w) {
                guest::StoreU32(base, pages, r.Below(3) == 0 ? 1 : r.Below(2));
              }});
   Run(h, w, {"TodaysResult::WaitPage (sub_8225A9B0)", 300, __imp__sub_8225A9B0,
-             hooks::TodaysResultWaitPage, {{-96, -8}}, Dispatcher});
+             ITC_CONTEXT_FN(hooks::TodaysResultWaitPage), {{-96, -8}}, Dispatcher});
   // LeavePage: the save's movie -1 or not; QueueMovie's frame below without
   // its lr save.
   Run(h, w, {"TodaysResult::LeavePage (sub_8225AB30; sub_8225A720)", 150, __imp__sub_8225AB30,
-             hooks::TodaysResultLeavePage, {{-96, -8}, {-192, -104}}, Dispatcher});
+             ITC_CONTEXT_FN(hooks::TodaysResultLeavePage), {{-96, -8}, {-192, -104}}, Dispatcher});
   Run(h, w, {"TodaysResult::QueueMovie (sub_8225A720)", 60, __imp__sub_8225A720,
-             hooks::TodaysResultQueueMovie, {{-96, -8}}, Nothing});
+             ITC_CONTEXT_FN(hooks::TodaysResultQueueMovie), {{-96, -8}}, Nothing});
   struct Case {
     const char* name;
     GuestFunction recompiled;
     GuestFunction native;
   };
   const Case transitions[] = {
-      {"TodaysResult::Intro (sub_8225ABD8)", __imp__sub_8225ABD8, hooks::TodaysResultIntro},
+      {"TodaysResult::Intro (sub_8225ABD8)", __imp__sub_8225ABD8, ITC_CONTEXT_FN(hooks::TodaysResultIntro)},
       {"TodaysResult::ShowLoop (sub_8225AC88)", __imp__sub_8225AC88,
-       hooks::TodaysResultShowLoop},
-      {"TodaysResult::FadeOut (sub_8225AD20)", __imp__sub_8225AD20, hooks::TodaysResultFadeOut},
+       ITC_CONTEXT_FN(hooks::TodaysResultShowLoop)},
+      {"TodaysResult::FadeOut (sub_8225AD20)", __imp__sub_8225AD20, ITC_CONTEXT_FN(hooks::TodaysResultFadeOut)},
   };
   for (const Case& c : transitions) {
     Run(h, w, {c.name, 150, c.recompiled, c.native, {{-112, -24}}, ResultStarted});
   }
   Run(h, w, {"TodaysResult::Unload (sub_8225AA20)", 60, __imp__sub_8225AA20,
-             hooks::TodaysResultUnload, {{-112, -16}}, ResultMachine});
+             ITC_CONTEXT_FN(hooks::TodaysResultUnload), {{-112, -16}}, ResultMachine});
   Run(h, w, {"TodaysResult::Unloaded (sub_8225A9A0)", 20, __imp__sub_8225A9A0,
-             hooks::TodaysResultUnloaded, {}, ResultMachine});
+             ITC_CONTEXT_FN(hooks::TodaysResultUnloaded), {}, ResultMachine});
   Run(h, w, {"TodaysResult::Leave (sub_8225AA88)", 60, __imp__sub_8225AA88,
-             hooks::TodaysResultLeave, {{-112, -16}}, ResultMachine});
+             ITC_CONTEXT_FN(hooks::TodaysResultLeave), {{-112, -16}}, ResultMachine});
 }
 
 // --- Today's event ---
@@ -941,7 +941,7 @@ void Event(Context& h, const World& w) {
   // Create: the three blocks VirtualAlloc made compared by content (the
   // data's 412 bytes used); Kind 0 or not by the save.
   Run(h, w, {"TodaysEvent::Create (sub_8225BE50; sub_8225BAB8)", 150, __imp__sub_8225BE50,
-             hooks::TodaysEventCreate, {{-112, -32}}, EventMachine,
+             ITC_CONTEXT_FN(hooks::TodaysEventCreate), {{-112, -32}}, EventMachine,
              [](PPCContext& t, const World& w, Outputs& out) {
                out.Word(t.r3.u32 == guest::LoadU32(w.base, tr::kEventData) ? 2 : t.r3.u32);
                t.r3.u64 = 0;
@@ -950,18 +950,18 @@ void Event(Context& h, const World& w) {
                Allocated(w.base, out, tr::kEventData, 412);
              }});
   Run(h, w, {"TodaysEvent::MarkImages (sub_8225BAB8)", 150, __imp__sub_8225BAB8,
-             hooks::TodaysEventMarkImages, {{-160, -56}}, Nothing});
+             ITC_CONTEXT_FN(hooks::TodaysEventMarkImages), {{-160, -56}}, Nothing});
   // OpenMovie, LoadImages, LoadImagePair: the records and buffers they make
   // compared and freed; only their own frames.
   // (The lists empty, as Create leaves them: the images' 46 bits fill them
   // at most.)
   Run(h, w, {"TodaysEvent::OpenMovie (sub_8225C130; sub_8225C008, sub_8225BD10)", 60,
-             __imp__sub_8225C130, hooks::TodaysEventOpenMovie, {{-96, -8}}, EmptyLists,
+             __imp__sub_8225C130, ITC_CONTEXT_FN(hooks::TodaysEventOpenMovie), {{-96, -8}}, EmptyLists,
              ImageRecords});
   Run(h, w, {"TodaysEvent::LoadImages (sub_8225C008; sub_8225BD10)", 100, __imp__sub_8225C008,
-             hooks::TodaysEventLoadImages, {{-112, -24}}, EmptyLists, ImageRecords});
+             ITC_CONTEXT_FN(hooks::TodaysEventLoadImages), {{-112, -24}}, EmptyLists, ImageRecords});
   Run(h, w, {"TodaysEvent::LoadImagePair (sub_8225BD10)", 100, __imp__sub_8225BD10,
-             hooks::TodaysEventLoadImagePair, {{-144, -56}},
+             ITC_CONTEXT_FN(hooks::TodaysEventLoadImagePair), {{-144, -56}},
              [](PPCContext& t, Random& r, const World& w) {
                // The lists' counts at most 45 (room for one more).
                uint8_t* base = w.base;
@@ -973,31 +973,31 @@ void Event(Context& h, const World& w) {
              },
              ImageRecords});
   Run(h, w, {"TodaysEvent::WaitForMovie (sub_8225C160)", 150, __imp__sub_8225C160,
-             hooks::TodaysEventWaitForMovie, {{-96, -16}}, EventMachine});
+             ITC_CONTEXT_FN(hooks::TodaysEventWaitForMovie), {{-96, -16}}, EventMachine});
   Run(h, w, {"TodaysEvent::ImagesLoadedA (sub_8225C0A0)", 100, __imp__sub_8225C0A0,
-             hooks::TodaysEventImagesLoadedA, {}, EventData});
+             ITC_CONTEXT_FN(hooks::TodaysEventImagesLoadedA), {}, EventData});
   Run(h, w, {"TodaysEvent::ImagesLoadedB (sub_8225C0E8)", 100, __imp__sub_8225C0E8,
-             hooks::TodaysEventImagesLoadedB, {}, EventData});
+             ITC_CONTEXT_FN(hooks::TodaysEventImagesLoadedB), {}, EventData});
   // Start: only its own frame (SetUpTexts' and NextUnlockEntry's have their
   // own cases).
   Run(h, w, {"TodaysEvent::Start (sub_8225C990; sub_8225C648, sub_8225BB70)", 150,
-             __imp__sub_8225C990, hooks::TodaysEventStart, {{-112, -16}}, EventMachine});
+             __imp__sub_8225C990, ITC_CONTEXT_FN(hooks::TodaysEventStart), {{-112, -16}}, EventMachine});
   // SetUpTexts: without SetText's parameter area (+48 to +79, where its
   // unset varargs land: the user's call of 2026-10-30) and its saves.
   Run(h, w, {"TodaysEvent::SetUpTexts (sub_8225C648)", 100, __imp__sub_8225C648,
-             hooks::TodaysEventSetUpTexts, {{-128, -80}, {-48, -40}}, Nothing});
+             ITC_CONTEXT_FN(hooks::TodaysEventSetUpTexts), {{-128, -80}, {-48, -40}}, Nothing});
   Run(h, w, {"TodaysEvent::NextUnlockEntry (sub_8225BB70)", 200, __imp__sub_8225BB70,
-             hooks::TodaysEventNextUnlockEntry, {{-96, -16}}, Nothing});
+             ITC_CONTEXT_FN(hooks::TodaysEventNextUnlockEntry), {{-96, -16}}, Nothing});
   Run(h, w, {"TodaysEvent::Unload (sub_8225C1F8)", 100, __imp__sub_8225C1F8,
-             hooks::TodaysEventUnload, {{-128, -32}}, EventMachine});
+             ITC_CONTEXT_FN(hooks::TodaysEventUnload), {{-128, -32}}, EventMachine});
   Run(h, w, {"TodaysEvent::Unloaded (sub_8225C278)", 60, __imp__sub_8225C278,
-             hooks::TodaysEventUnloaded, {{-144, -48}}, EventMachine});
+             ITC_CONTEXT_FN(hooks::TodaysEventUnloaded), {{-144, -48}}, EventMachine});
   Run(h, w, {"TodaysEvent::Leave (sub_8225C348)", 100, __imp__sub_8225C348,
-             hooks::TodaysEventLeave, {{-112, -24}}, EventMachine});
+             ITC_CONTEXT_FN(hooks::TodaysEventLeave), {{-112, -24}}, EventMachine});
   // Destroy and FreeImages: the lists' records and their images the layer's
   // pages (whether each was freed compared).
   Run(h, w, {"TodaysEvent::Destroy (sub_8225BF78; sub_8225BC60)", 100, __imp__sub_8225BF78,
-             hooks::TodaysEventDestroy, {{-128, -40}},
+             ITC_CONTEXT_FN(hooks::TodaysEventDestroy), {{-128, -40}},
              [](PPCContext& t, Random& r, const World& w) {
                uint8_t* base = w.base;
                EventMachine(t, r, w);
@@ -1010,7 +1010,7 @@ void Event(Context& h, const World& w) {
              }});
   // Draw: the page -1, 0 or 1 (the table's two); only its own frame.
   Run(h, w, {"TodaysEvent::Draw (sub_8225C928)", 150, __imp__sub_8225C928,
-             hooks::TodaysEventDraw, {{-96, -8}},
+             ITC_CONTEXT_FN(hooks::TodaysEventDraw), {{-96, -8}},
              [](PPCContext& t, Random& r, const World& w) {
                EventMachine(t, r, w);
                const uint32_t pick = r.Below(3);
@@ -1019,7 +1019,7 @@ void Event(Context& h, const World& w) {
   // Update: the running transition -1, another negative, or 0 to 5, the
   // queued one -1 or small, the started word 0 or not; only its own frame.
   Run(h, w, {"TodaysEvent::Update (sub_8225CDE8)", 300, __imp__sub_8225CDE8,
-             hooks::TodaysEventUpdate, {{-144, -24}},
+             ITC_CONTEXT_FN(hooks::TodaysEventUpdate), {{-144, -24}},
              [](PPCContext&, Random& r, const World& w) {
                uint8_t* base = w.base;
                const uint32_t pages = w.at(kEventPagesAt);
@@ -1032,16 +1032,16 @@ void Event(Context& h, const World& w) {
                guest::StoreU32(base, pages + 24, r.Below(3) == 0 ? 1 : 0);
              }});
   Run(h, w, {"TodaysEvent::EventPage (sub_8225C428)", 300, __imp__sub_8225C428,
-             hooks::TodaysEventEventPage, {{-112, -24}}, Dispatcher});
+             ITC_CONTEXT_FN(hooks::TodaysEventEventPage), {{-112, -24}}, Dispatcher});
   // EndPage: QueueEventMovies' frame below without its lr save.
   Run(h, w, {"TodaysEvent::EndPage (sub_8225C590; sub_8225B9B8)", 150, __imp__sub_8225C590,
-             hooks::TodaysEventEndPage, {{-112, -24}, {-208, -120}},
+             ITC_CONTEXT_FN(hooks::TodaysEventEndPage), {{-112, -24}, {-208, -120}},
              [](PPCContext& t, Random& r, const World& w) {
                t.r3.u64 = w.dispatcher();
                t.r4.u64 = w.event() | (uint64_t(r.Below(2)) << 32);
              }});
   Run(h, w, {"TodaysEvent::QueueEventMovies (sub_8225B9B8)", 60, __imp__sub_8225B9B8,
-             hooks::TodaysEventQueueEventMovies, {{-96, -8}}, Nothing});
+             ITC_CONTEXT_FN(hooks::TodaysEventQueueEventMovies), {{-96, -8}}, Nothing});
   struct Case {
     const char* name;
     GuestFunction recompiled;
@@ -1049,12 +1049,12 @@ void Event(Context& h, const World& w) {
   };
   const Case transitions[] = {
       {"TodaysEvent::Intro (sub_8225CB18; sub_8225CA50, sub_8225C848)", __imp__sub_8225CB18,
-       hooks::TodaysEventIntro},
-      {"TodaysEvent::FadeOut (sub_8225C770)", __imp__sub_8225C770, hooks::TodaysEventFadeOut},
+       ITC_CONTEXT_FN(hooks::TodaysEventIntro)},
+      {"TodaysEvent::FadeOut (sub_8225C770)", __imp__sub_8225C770, ITC_CONTEXT_FN(hooks::TodaysEventFadeOut)},
       {"TodaysEvent::NextUnlock (sub_8225CC80; sub_8225CA50, sub_8225C848)",
-       __imp__sub_8225CC80, hooks::TodaysEventNextUnlock},
+       __imp__sub_8225CC80, ITC_CONTEXT_FN(hooks::TodaysEventNextUnlock)},
       {"TodaysEvent::NextPage (sub_8225CD50; sub_8225CA50, sub_8225C848)", __imp__sub_8225CD50,
-       hooks::TodaysEventNextPage},
+       ITC_CONTEXT_FN(hooks::TodaysEventNextPage)},
   };
   for (const Case& c : transitions) {
     Run(h, w, {c.name, 150, c.recompiled, c.native, {{-112, -24}},
@@ -1070,10 +1070,10 @@ void Event(Context& h, const World& w) {
   // ShowUnlock: without SetText's parameter area (+48 to +79) and its
   // saves.
   Run(h, w, {"TodaysEvent::ShowUnlock (sub_8225CA50; sub_8225C848)", 150, __imp__sub_8225CA50,
-             hooks::TodaysEventShowUnlock, {{-128, -80}, {-48, -40}}, Nothing});
+             ITC_CONTEXT_FN(hooks::TodaysEventShowUnlock), {{-128, -80}, {-48, -40}}, Nothing});
   // ShowImages: r3 an image (one the lists hold now and then).
   Run(h, w, {"TodaysEvent::ShowImages (sub_8225C848)", 150, __imp__sub_8225C848,
-             hooks::TodaysEventShowImages, {{-112, -16}},
+             ITC_CONTEXT_FN(hooks::TodaysEventShowImages), {{-112, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                for (uint32_t k = 0; k < 92; k++) {
                  guest::StoreU32(w.base, w.at(kRecordsAt) + 16 * k + 4, r.Below(tr::kImages));
@@ -1081,7 +1081,7 @@ void Event(Context& h, const World& w) {
                t.r3.u64 = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(tr::kImages);
              }});
   Run(h, w, {"TodaysEvent::FreeImages (sub_8225BC60)", 100, __imp__sub_8225BC60,
-             hooks::TodaysEventFreeImages, {{-112, -32}},
+             ITC_CONTEXT_FN(hooks::TodaysEventFreeImages), {{-112, -32}},
              [](PPCContext& t, Random& r, const World& w) {
                PagesLists(r, w);
                EventData(t, r, w);

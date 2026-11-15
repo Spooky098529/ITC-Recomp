@@ -4,6 +4,7 @@
 // (hooks/front_end_screen_helpers.h).
 
 #include "hooks/front_end_screen_helpers.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "front_end_screen_helpers/front_end_screen_helpers.h"
@@ -50,7 +51,7 @@ namespace fe = front_end_screen_helpers;
 // r1 put back. The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -60,7 +61,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -81,12 +82,12 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
-bool Set(PPCContext& ctx, const std::optional<uint64_t>& r3) {
+bool Set(lifted::Regs& ctx, const std::optional<uint64_t>& r3) {
   if (!r3) {
     return false;
   }
@@ -96,12 +97,12 @@ bool Set(PPCContext& ctx, const std::optional<uint64_t>& r3) {
 
 using Release = std::optional<uint64_t> (*)(uint8_t*, uint32_t, uint32_t, const fe::Calls&);
 
-bool RunRelease(PPCContext& ctx, uint8_t* base, Release release) {
+bool RunRelease(lifted::Regs& ctx, uint8_t* base, Release release) {
   GuestCalls guest(ctx, base);
   return Set(ctx, release(base, ctx.r3.u32, ctx.r1.u32, guest.calls()));
 }
 
-void Varargs(const PPCContext& ctx, uint64_t varargs[7]) {
+void Varargs(const lifted::Regs& ctx, uint64_t varargs[7]) {
   const uint64_t from[7] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
                             ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
   for (int i = 0; i < 7; i++) {
@@ -111,126 +112,126 @@ void Varargs(const PPCContext& ctx, uint64_t varargs[7]) {
 
 }  // namespace
 
-bool FrontEndModeType2Release(PPCContext& ctx, uint8_t* base) {
+bool FrontEndModeType2Release(lifted::Regs& ctx, uint8_t* base) {
   return RunRelease(ctx, base, fe::ModeType2Release);
 }
-bool FrontEndModeType4Release(PPCContext& ctx, uint8_t* base) {
+bool FrontEndModeType4Release(lifted::Regs& ctx, uint8_t* base) {
   return RunRelease(ctx, base, fe::ModeType4Release);
 }
-bool FrontEndModeType5Release(PPCContext& ctx, uint8_t* base) {
+bool FrontEndModeType5Release(lifted::Regs& ctx, uint8_t* base) {
   return RunRelease(ctx, base, fe::ModeType5Release);
 }
-bool FrontEndModeType9Release(PPCContext& ctx, uint8_t* base) {
+bool FrontEndModeType9Release(lifted::Regs& ctx, uint8_t* base) {
   return RunRelease(ctx, base, fe::ModeType9Release);
 }
-bool FrontEndModeType10Release(PPCContext& ctx, uint8_t* base) {
+bool FrontEndModeType10Release(lifted::Regs& ctx, uint8_t* base) {
   return RunRelease(ctx, base, fe::ModeType10Release);
 }
-bool FrontEndModeType12Release(PPCContext& ctx, uint8_t* base) {
+bool FrontEndModeType12Release(lifted::Regs& ctx, uint8_t* base) {
   return RunRelease(ctx, base, fe::ModeType12Release);
 }
 
-void FrontEndSaveScreenSetText(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndSaveScreenSetText) {
   GuestCalls guest(ctx, base);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
   ctx.r3.u64 = fe::SaveScreenSetText(base, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
-void FrontEndSaveScreenSetNote(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndSaveScreenSetNote) {
   GuestCalls guest(ctx, base);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
   ctx.r3.u64 = fe::SaveScreenSetNote(base, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
-void FrontEndSaveScreenSetMessage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndSaveScreenSetMessage) {
   GuestCalls guest(ctx, base);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
   ctx.r3.u64 = fe::SaveScreenSetMessage(base, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
-void FrontEndOptionsSetSaveDialogText(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndOptionsSetSaveDialogText) {
   GuestCalls guest(ctx, base);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
   ctx.r3.u64 =
       fe::OptionsSetDialogText(base, 13, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
-void FrontEndOptionsSetSaveDialogNote(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndOptionsSetSaveDialogNote) {
   GuestCalls guest(ctx, base);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
   ctx.r3.u64 =
       fe::OptionsSetDialogNote(base, 13, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
-void FrontEndOptionsSetCategory6DialogText(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndOptionsSetCategory6DialogText) {
   GuestCalls guest(ctx, base);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
   ctx.r3.u64 =
       fe::OptionsSetDialogText(base, 14, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
-void FrontEndOptionsSetCategory6DialogNote(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndOptionsSetCategory6DialogNote) {
   GuestCalls guest(ctx, base);
   uint64_t varargs[7];
   Varargs(ctx, varargs);
   ctx.r3.u64 =
       fe::OptionsSetDialogNote(base, 14, ctx.r3.u64, varargs, ctx.r1.u32, guest.calls());
 }
-void FrontEndSaveScreenShowNotice(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndSaveScreenShowNotice) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::SaveScreenShowNotice(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void FrontEndSaveScreenStartCheck(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndSaveScreenStartCheck) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::SaveScreenStartCheck(base, ctx.r1.u32, guest.calls());
 }
-void FrontEndSaveScreenStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndSaveScreenStart) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::SaveScreenStart(base, ctx.r1.u32, guest.calls());
 }
-void FrontEndOptionsSetUpSavePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndOptionsSetUpSavePage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::OptionsSetUpDialogPage(base, 13, ctx.r1.u32, guest.calls());
 }
-void FrontEndOptionsSetUpCategory6Page(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndOptionsSetUpCategory6Page) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::OptionsSetUpDialogPage(base, 14, ctx.r1.u32, guest.calls());
 }
-void FrontEndSaveScreenShowMessage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndSaveScreenShowMessage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::SaveScreenShowMessage(base, 0, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void FrontEndSaveScreenShowMessage3(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndSaveScreenShowMessage3) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::SaveScreenShowMessage(base, 1, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void FrontEndSaveScreenShowMessage4(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndSaveScreenShowMessage4) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::SaveScreenShowMessage(base, 2, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void FrontEndOptionsShowSaveDialog(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndOptionsShowSaveDialog) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::OptionsShowDialog(base, 13, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void FrontEndOptionsShowCategory6Dialog(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndOptionsShowCategory6Dialog) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::OptionsShowDialog(base, 14, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void FrontEndCarCardsFillAll(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndCarCardsFillAll) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::CarCardsFillAll(base, ctx.r1.u32, guest.calls());
 }
 
-void FrontEndCarCardFill(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndCarCardFill) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::CarCardFill(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void FrontEndCarCardFillDetail(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndCarCardFillDetail) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::CarCardFillDetail(base, ctx.r1.u32, guest.calls());
 }
-void FrontEndCarDetailOpen(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(FrontEndCarDetailOpen) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = fe::CarDetailOpen(base, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
@@ -238,18 +239,13 @@ void FrontEndCarDetailOpen(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_FRONT_END_HELPERS(address, step)              \
-  extern "C" REX_FUNC(sub_##address) {                    \
-    REX_FUNC_PROLOGUE();                                  \
-    if (!ITC_FLAG(native_front_end_screen_helpers)) {     \
-      __imp__sub_##address(ctx, base);                    \
-      return;                                             \
-    }                                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_front_end_screen_helpers)) { \
     hooks::step(ctx, base);                               \
   }
 
 #define ITC_FRONT_END_RELEASE(address, step)                                         \
-  extern "C" REX_FUNC(sub_##address) {                                               \
-    REX_FUNC_PROLOGUE();                                                             \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                               \
+    \
     if (!ITC_FLAG(native_front_end_screen_helpers) || !hooks::NativeHeapActive() ||  \
         !hooks::step(ctx, base)) {                                                   \
       __imp__sub_##address(ctx, base);                                               \

@@ -119,20 +119,20 @@ struct Pair {
   GuestFunction operator[](int side) const { return side == 0 ? recompiled : native; }
 };
 
-const Pair kMalloc{__imp__sub_825A9A90, NativeMalloc};
-const Pair kFree{__imp__sub_825A9B58, NativeFree};
-const Pair kCallocImpl{__imp__sub_825AC248, NativeCallocImpl};
-const Pair kCalloc{__imp__sub_825AC320, NativeCalloc};
-const Pair kRealloc{__imp__sub_825AEBC8, NativeRealloc};
-const Pair kMsize{__imp__sub_825AED30, NativeMsize};
+const Pair kMalloc{__imp__sub_825A9A90, ITC_CONTEXT_FN(NativeMalloc)};
+const Pair kFree{__imp__sub_825A9B58, ITC_CONTEXT_FN(NativeFree)};
+const Pair kCallocImpl{__imp__sub_825AC248, ITC_CONTEXT_FN(NativeCallocImpl)};
+const Pair kCalloc{__imp__sub_825AC320, ITC_CONTEXT_FN(NativeCalloc)};
+const Pair kRealloc{__imp__sub_825AEBC8, ITC_CONTEXT_FN(NativeRealloc)};
+const Pair kMsize{__imp__sub_825AED30, ITC_CONTEXT_FN(NativeMsize)};
 const Pair kLocalAlloc{__imp__sub_82297F48, NativeLocalAlloc};
 const Pair kLocalFree{__imp__sub_82297F90, NativeLocalFree};
-const Pair kXMemAlloc{__imp__sub_822976F8, NativeXMemAlloc};
+const Pair kXMemAlloc{__imp__sub_822976F8, ITC_CONTEXT_FN(NativeXMemAlloc)};
 const Pair kXMemFree{__imp__sub_82297790, NativeXMemFree};
-const Pair kNew{__imp__sub_825A6880, NativeOperatorNew};
-const Pair kNewArray{__imp__sub_825A6940, NativeOperatorNewArray};
-const Pair kDelete{__imp__sub_825A70E8, NativeOperatorDelete};
-const Pair kDeleteArray{__imp__sub_825A71C0, NativeOperatorDeleteArray};
+const Pair kNew{__imp__sub_825A6880, ITC_CONTEXT_FN(NativeOperatorNew)};
+const Pair kNewArray{__imp__sub_825A6940, ITC_CONTEXT_FN(NativeOperatorNewArray)};
+const Pair kDelete{__imp__sub_825A70E8, ITC_CONTEXT_FN(NativeOperatorDelete)};
+const Pair kDeleteArray{__imp__sub_825A71C0, ITC_CONTEXT_FN(NativeOperatorDeleteArray)};
 
 // Calls `f` with r3, r4, ... set from `args`; returns r3.
 uint32_t Call(Context& h, GuestFunction f, std::initializer_list<uint32_t> args) {
@@ -212,7 +212,7 @@ void AppendBlock(std::vector<uint8_t>& out, uint32_t p) {
 void MallocCases(Context& h, bool failures) {
   Results results("c_runtime_heap: GetProcessHeap, malloc, free, _msize");
   Case(h, results, "GetProcessHeap", [&](int side, std::vector<uint8_t>& out) {
-    Append(out, Call(h, side == 0 ? __imp__sub_8229B670 : NativeGetProcessHeap, {}));
+    Append(out, Call(h, side == 0 ? __imp__sub_8229B670 : ITC_CONTEXT_FN(NativeGetProcessHeap), {}));
   });
   std::vector<uint32_t> sizes = {0, 1, 7, 16, 33, 100, 4096, 5000, 70000};
   if (failures) {

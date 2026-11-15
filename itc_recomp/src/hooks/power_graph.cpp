@@ -5,6 +5,7 @@
 // slots by the return address), the original runs.
 
 #include "hooks/power_graph.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/car_makers.h"
@@ -41,7 +42,7 @@ constexpr uint32_t kRenderManager = 0x826BABA0;
 // A guest call made from the frame at `frame` (`bytes` long, its back chain
 // written as the original's stwu does), returning to `back`.
 template <typename Call>
-void From(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t bytes, uint32_t back,
+void From(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t bytes, uint32_t back,
           Call call) {
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame + bytes;
@@ -52,7 +53,7 @@ void From(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t bytes, uint32
 
 // `object`'s vtable slot at `offset` with r3 = `object`, returning to
 // `back`; its r3.
-uint32_t VtableCall(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t offset,
+uint32_t VtableCall(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t offset,
                     uint32_t back) {
   ctx.r3.u64 = object;
   const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + offset);
@@ -74,9 +75,9 @@ void StoreDoubleword(uint8_t* base, uint32_t address, uint64_t value) {
 
 }  // namespace
 
-void hooks::PowerGraphDraw(PPCContext& ctx, uint8_t* base) {
+void hooks::PowerGraphDraw(lifted::Regs& ctx, uint8_t* base) {
   if (!pg::DrawReady(base, ctx.r6.u32)) {
-    __imp__sub_8217C708(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8217C708);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -125,7 +126,7 @@ void hooks::PowerGraphDraw(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = draw_frame + pg::kDrawR3;
 }
 
-void hooks::TuningScreenDrawPowerGraph(PPCContext& ctx, uint8_t* base) {
+void hooks::TuningScreenDrawPowerGraph(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t screen = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   const uint64_t r30 = ctx.r30.u64;
@@ -164,9 +165,9 @@ bool hooks::CarListDrawEntryCalleesNative() {
          ITC_FLAG(native_career);
 }
 
-void hooks::CarListDrawEntryPowerGraph(PPCContext& ctx, uint8_t* base) {
+void hooks::CarListDrawEntryPowerGraph(lifted::Regs& ctx, uint8_t* base) {
   if (!CarListDrawEntryCalleesNative()) {
-    __imp__sub_82250670(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82250670);
     return;
   }
   const uint32_t entry = ctx.r3.u32;
@@ -198,9 +199,9 @@ void hooks::CarListDrawEntryPowerGraph(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
 }
 
-void hooks::CarListDrawCarPowerGraph(PPCContext& ctx, uint8_t* base) {
+void hooks::CarListDrawCarPowerGraph(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_car_makers) || !hooks::CarMakersGarageCalleesNative()) {
-    __imp__sub_82250700(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82250700);
     return;
   }
   const uint32_t car = ctx.r3.u32;
@@ -232,39 +233,24 @@ void hooks::CarListDrawCarPowerGraph(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
 }
 
-extern "C" REX_FUNC(sub_8217C708) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8217C708) {
+  
   if (!ITC_FLAG(native_power_graph) || ITC_FLAG(log_overlay_uploads) ||
       ITC_FLAG(log_slot_callers) || ITC_FLAG(log_recording_by_pass)) {
-    __imp__sub_8217C708(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8217C708);
     return;
   }
   hooks::PowerGraphDraw(ctx, base);
 }
 
-extern "C" REX_FUNC(sub_821DF350) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_power_graph)) {
-    __imp__sub_821DF350(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(821DF350, ITC_FLAG(native_power_graph)) {
   hooks::TuningScreenDrawPowerGraph(ctx, base);
 }
 
-extern "C" REX_FUNC(sub_82250670) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_power_graph)) {
-    __imp__sub_82250670(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82250670, ITC_FLAG(native_power_graph)) {
   hooks::CarListDrawEntryPowerGraph(ctx, base);
 }
 
-extern "C" REX_FUNC(sub_82250700) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_power_graph)) {
-    __imp__sub_82250700(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82250700, ITC_FLAG(native_power_graph)) {
   hooks::CarListDrawCarPowerGraph(ctx, base);
 }

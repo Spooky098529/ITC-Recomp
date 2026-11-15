@@ -200,7 +200,7 @@ void BlockOf(Context& h, uint32_t block, Random& r) {
         [&](PPCContext& t) {
           t.r3.u64 = c < 80 ? uint64_t(int64_t(c - 4)) : r.Next();
         },
-        __imp__sub_8215AAD0, hooks::CarMakersBlockOf, 0, {}, fmt::format("case {}", c));
+        __imp__sub_8215AAD0, ITC_CONTEXT_FN(hooks::CarMakersBlockOf), 0, {}, fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -235,7 +235,7 @@ void SetPaint(Context& h, uint32_t block, Random& r) {
             guest::StoreU16(h.base, car, uint16_t(r.Below(20)));
           }
         },
-        __imp__sub_8215AC70, hooks::CarMakersSetPaint, 0,
+        __imp__sub_8215AC70, ITC_CONTEXT_FN(hooks::CarMakersSetPaint), 0,
         {{block + kRecord + 32, 36}, {block + kRecord + 4056, 2}, {block + kRecord + 4072, 2}},
         fmt::format("case {}", c));
   }
@@ -256,7 +256,7 @@ void SetWheels(Context& h, uint32_t block, Random& r) {
           t.r3.u64 = block + kRecord;
           t.r4.u64 = car;
         },
-        __imp__sub_8215B238, hooks::CarMakersSetWheels, 24,
+        __imp__sub_8215B238, ITC_CONTEXT_FN(hooks::CarMakersSetWheels), 24,
         {{block + kRecord + 4084, 2}, {block + kRecord + 4096, 2}}, fmt::format("case {}", c));
   }
   results.Report();
@@ -275,7 +275,7 @@ void SetChoice(Context& h, uint32_t block, Random& r) {
           t.r4.u64 = (uint64_t(as[r.Below(5)]) << 32) | bs[r.Below(5)];
           t.r5.u64 = (uint64_t(cs[r.Below(3)]) << 32) | uint32_t(r.Next());
         },
-        __imp__sub_8215B1A0, hooks::CarMakersSetChoice, 0, {}, fmt::format("case {}", c));
+        __imp__sub_8215B1A0, ITC_CONTEXT_FN(hooks::CarMakersSetChoice), 0, {}, fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -289,7 +289,7 @@ void SetBytes(Context& h, uint32_t block, Random& r) {
           t.r3.u64 = block + kRecord + 16;
           t.r4.u64 = block + kBytes;
         },
-        __imp__sub_8215B0E0, hooks::CarMakersSetBytes, 32, {}, fmt::format("case {}", c));
+        __imp__sub_8215B0E0, ITC_CONTEXT_FN(hooks::CarMakersSetBytes), 32, {}, fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -384,7 +384,7 @@ void FromCar(Context& h, uint32_t block, Random& r) {
           t.r4.u64 = car;
           t.r5.u64 = picks[r.Below(4)];
         },
-        __imp__sub_8215B878, hooks::CarMakersFromCar, 80, RecordFloats(block + kRecord),
+        __imp__sub_8215B878, ITC_CONTEXT_FN(hooks::CarMakersFromCar), 80, RecordFloats(block + kRecord),
         fmt::format("case {}", c), 256, 32);
   }
   guest::StoreU32(h.base, kParamsPointer, params_global);
@@ -639,7 +639,7 @@ void Garage(Context& h, Random& r) {
       Case(
           h, results, block, r,
           [&](PPCContext& t) { t.r3.u64 = block + kGarageCar + 4 * r.Below(4); },
-          __imp__sub_82110448, hooks::CarMakersGarageCarReset, 16, {},
+          __imp__sub_82110448, ITC_CONTEXT_FN(hooks::CarMakersGarageCarReset), 16, {},
           fmt::format("case {}", c), 0, 0, {}, {}, kStackBytes, kGarageBytes);
     }
     results.Report();
@@ -656,7 +656,7 @@ void Garage(Context& h, Random& r) {
       }
       Case(
           h, results, block, r, [](PPCContext&) {}, __imp__sub_825D9EF0,
-          hooks::CarMakersStaticInit, 24, {}, fmt::format("case {}", c), 0, 0,
+          ITC_CONTEXT_FN(hooks::CarMakersStaticInit), 24, {}, fmt::format("case {}", c), 0, 0,
           [&] { Write(h.base, kStatic, inputs.data(), kStaticBytes); },
           [&](Outputs& out, const PPCContext&) { out.Bytes(Read(h.base, kStatic, kStaticBytes)); },
           kStackBytes, kGarageBytes);
@@ -683,7 +683,7 @@ void Garage(Context& h, Random& r) {
             t.r4.u64 = block + kGarageCar;
             t.r5.u64 = block + kCarData;
           },
-          __imp__sub_82179A60, hooks::CarMakersFromGarageCar, 24, {},
+          __imp__sub_82179A60, ITC_CONTEXT_FN(hooks::CarMakersFromGarageCar), 24, {},
           fmt::format("case {}", c), 0, 0, [&] { race.Reset(count, added); }, race_outputs,
           0x2000, kGarageBytes);
     }
@@ -712,7 +712,7 @@ void Garage(Context& h, Random& r) {
           // saves (its tail call's; its adapter is gone, so the original
           // runs under the original SetUpCarData), which the native one
           // doesn't write.
-          __imp__sub_821DF2F8, hooks::CarMakersSetUpCarData, 24, {},
+          __imp__sub_821DF2F8, ITC_CONTEXT_FN(hooks::CarMakersSetUpCarData), 24, {},
           fmt::format("case {}", c), 0, 0, [&] { race.Reset(count, added); }, race_outputs,
           0x2000, kGarageBytes);
     }
@@ -744,7 +744,7 @@ void Garage(Context& h, Random& r) {
             text.Lay(r);
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
-          __imp__sub_821DF788, hooks::TuningSetCarStats, 24, {}, fmt::format("case {}", c), 1120,
+          __imp__sub_821DF788, ITC_CONTEXT_FN(hooks::TuningSetCarStats), 24, {}, fmt::format("case {}", c), 1120,
           32,
           [&] {
             race.Reset(count, added);
@@ -817,7 +817,7 @@ void Stand(Context& h, Random& r) {
             t.r3.u64 = block + kHolder;
             t.r4.u64 = block + kGarageCar;
           },
-          __imp__sub_82178C40, hooks::CarMakersFitCar, 32, {{stage + 6096, 28}},
+          __imp__sub_82178C40, ITC_CONTEXT_FN(hooks::CarMakersFitCar), 32, {{stage + 6096, 28}},
           fmt::format("case {}", c), 0, 0, {},
           [](Outputs& out, const PPCContext& t) { out.Double(t.f1.u64); }, 0x2000,
           kGarageBytes);
@@ -838,7 +838,7 @@ void Stand(Context& h, Random& r) {
             t.r3.u64 = block + kHolder;
             t.r4.u64 = block + kGarageCar;
           },
-          __imp__sub_82178B98, hooks::StandModelsFitAxles, 24, {{stage + 6176, 8}},
+          __imp__sub_82178B98, ITC_CONTEXT_FN(hooks::StandModelsFitAxles), 24, {{stage + 6176, 8}},
           fmt::format("case {}", c), 0, 0, {},
           [](Outputs& out, const PPCContext& t) { out.Double(t.f1.u64); }, 0x2000,
           kGarageBytes);
@@ -872,7 +872,7 @@ void Stand(Context& h, Random& r) {
             t.r4.u64 = r.Below(2) == 0 ? block + kModels + 0x1400 * index + 32
                                        : block + kOtherRecord;
           },
-          __imp__sub_8217FC60, hooks::CarMakersCopyRecord, 16, {}, fmt::format("case {}", c),
+          __imp__sub_8217FC60, ITC_CONTEXT_FN(hooks::CarMakersCopyRecord), 16, {}, fmt::format("case {}", c),
           104, 8, [&] { guest::StoreU32(h.base, kScenePointer, block + kCarScene); }, {},
           kStackBytes, kGarageBytes, GetBSaves({96}));
     }
@@ -898,7 +898,7 @@ void Stand(Context& h, Random& r) {
               guest::StoreU32(h.base, block + kPairs + 4, movie);
             },
             which == 0 ? __imp__sub_8219ED10 : __imp__sub_8219EDB0,
-            which == 0 ? hooks::CarMakersShowBusyMarker : hooks::CarMakersHideBusyMarker, 16,
+            which == 0 ? ITC_CONTEXT_FN(hooks::CarMakersShowBusyMarker) : ITC_CONTEXT_FN(hooks::CarMakersHideBusyMarker), 16,
             {}, fmt::format("case {}", c), 0, 0,
             [&] {
               guest::StoreU32(h.base, ui_movies::kMovieTable, block + kPairs);
@@ -1045,7 +1045,7 @@ void Wheels(Context& h, Random& r) {
             t.r5.u64 = RandomWhich(r);
             t.r6.u64 = block + kGarageCar;
           },
-          __imp__sub_8217DD38, hooks::StandModelsSetWheel, 160, WheelFloats(block),
+          __imp__sub_8217DD38, ITC_CONTEXT_FN(hooks::StandModelsSetWheel), 160, WheelFloats(block),
           fmt::format("case {}", c), 3120, 24, before, f1, 0x2000, kGarageBytes);
     }
     results.Report();
@@ -1063,7 +1063,7 @@ void Wheels(Context& h, Random& r) {
             t.r4.u64 = RandomWheelNumber(r);
             t.r5.u64 = RandomWhich(r);
           },
-          __imp__sub_821DFA78, hooks::StandModelsPreviewWheel, 32, WheelFloats(block),
+          __imp__sub_821DFA78, ITC_CONTEXT_FN(hooks::StandModelsPreviewWheel), 32, WheelFloats(block),
           fmt::format("case {}", c), 4016, 160, before, f1, 0x4000, kGarageBytes,
           {{4016 + 3120, 24}});
     }
@@ -1242,7 +1242,7 @@ void TuningStand(Context& h, Random& r) {
             t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(7);
             t.r5.u64 = r.Below(6) == 0 ? r.Next() : r.Below(6);
           },
-          __imp__sub_821CCC50, hooks::TuningSetInteriorPair, 0, floats,
+          __imp__sub_821CCC50, ITC_CONTEXT_FN(hooks::TuningSetInteriorPair), 0, floats,
           fmt::format("case {}", c), 0, 0, before, blocks, 0x1000, kGarageBytes,
           // GarageStage::SetInteriorPair's original (its adapter removed,
           // B7 loop, 2026-11-13): its r30, r31 and lr saves, ApplyRecord's
@@ -1264,7 +1264,7 @@ void TuningStand(Context& h, Random& r) {
             t.r4.u64 = r.Below(3) == 0 ? 0 : r.Next();
             t.r5.u64 = r.Below(3) == 0 ? 0 : r.Next();
           },
-          __imp__sub_8217DAC0, hooks::TuningFitSelectedCar, 48, floats,
+          __imp__sub_8217DAC0, ITC_CONTEXT_FN(hooks::TuningFitSelectedCar), 48, floats,
           fmt::format("case {}", c), 0, 0, before, with_f1, 0x3000, kGarageBytes);
     }
     results.Report();
@@ -1300,7 +1300,7 @@ void TuningStand(Context& h, Random& r) {
             }
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
-          __imp__sub_821D99A0, hooks::TuningPickCameraPreset, 24, floats,
+          __imp__sub_821D99A0, ITC_CONTEXT_FN(hooks::TuningPickCameraPreset), 24, floats,
           fmt::format("case {}", c), 0, 0, before, blocks, 0x3000, kGarageBytes, FitSaves(112));
     }
     results.Report();
@@ -1341,7 +1341,7 @@ void TuningStand(Context& h, Random& r) {
                             r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(4));
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
-          __imp__sub_821D6100, hooks::TuningUpdateBusyIcon, 24, floats,
+          __imp__sub_821D6100, ITC_CONTEXT_FN(hooks::TuningUpdateBusyIcon), 24, floats,
           fmt::format("case {}", c), 0, 0, before, blocks, 0x1000, kGarageBytes);
     }
     results.Report();
@@ -1362,7 +1362,7 @@ void TuningStand(Context& h, Random& r) {
             field(25220, r.Below(12));
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
-          __imp__sub_821E0E00, hooks::TuningPreviewWheels, 16, floats,
+          __imp__sub_821E0E00, ITC_CONTEXT_FN(hooks::TuningPreviewWheels), 16, floats,
           fmt::format("case {}", c), 0, 0, before, with_f1, 0x5000, kGarageBytes,
           // TuningScreen::PreviewWheel's original (its adapter removed, B7
           // loop, 2026-11-13): its saves under the frame, GarageStage::SetWheel's
@@ -1402,7 +1402,7 @@ void TuningStand(Context& h, Random& r) {
             field(30848, small(4));
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
-          __imp__sub_822042D8, hooks::TuningApplyDecals, 56, floats,
+          __imp__sub_822042D8, ITC_CONTEXT_FN(hooks::TuningApplyDecals), 56, floats,
           fmt::format("case {}", c), 0, 0, before, blocks, 0x5000, kGarageBytes,
           // The originals of GarageStage::SetDecalA, SetDecalB and
           // ReloadDecals (their adapters removed, B7 loop, 2026-11-13): their
@@ -1452,7 +1452,7 @@ void TuningStand(Context& h, Random& r) {
             guest::StoreU32(h.base, block + kStage + 5600 + 448, r.Below(4));
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
-          __imp__sub_821F7B90, hooks::TuningApplyAreaDecals, 80, floats,
+          __imp__sub_821F7B90, ITC_CONTEXT_FN(hooks::TuningApplyAreaDecals), 80, floats,
           fmt::format("case {}", c), 4160, 48, before, blocks, 0x5000, kGarageBytes,
           // And GarageStage::ReloadDecals' original's (its adapter removed,
           // B7 loop, 2026-11-13) with GetB's under its 96-byte frame.
@@ -1476,7 +1476,7 @@ void TuningStand(Context& h, Random& r) {
             field(10012, r.Below(6) == 0 ? uint32_t(r.Next()) : 9 + r.Below(2));
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
-          __imp__sub_821FE4E0, hooks::TuningApplyDecalWord, 16, floats,
+          __imp__sub_821FE4E0, ITC_CONTEXT_FN(hooks::TuningApplyDecalWord), 16, floats,
           fmt::format("case {}", c), 96, 32, before, blocks, 0x1000, kGarageBytes,
           GetBSaves({96 + 112}));
     }
@@ -1549,7 +1549,7 @@ void TuningStand(Context& h, Random& r) {
             }
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
-          __imp__sub_821D9F10, hooks::TuningUpdateStand, 40, floats,
+          __imp__sub_821D9F10, ITC_CONTEXT_FN(hooks::TuningUpdateStand), 40, floats,
           fmt::format("case {}", c), 0, 0,
           [&] {
             before();
@@ -1598,7 +1598,7 @@ void TuningStand(Context& h, Random& r) {
             field(kQueue + 16, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(65));
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
-          __imp__sub_822019D0, hooks::TuningDecalCommand, 40, floats,
+          __imp__sub_822019D0, ITC_CONTEXT_FN(hooks::TuningDecalCommand), 40, floats,
           fmt::format("case {}", c), 48, 32,
           [&] {
             before();
@@ -1655,7 +1655,7 @@ void TuningStand(Context& h, Random& r) {
             field(9756 + 4 * r.Below(depth), 23);
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
-          __imp__sub_821E2660, hooks::TuningPagesOnDialogYes, 32, floats,
+          __imp__sub_821E2660, ITC_CONTEXT_FN(hooks::TuningPagesOnDialogYes), 32, floats,
           fmt::format("case {}", c), 112, 16,
           [&] {
             before();
@@ -1751,7 +1751,7 @@ void TuningStand(Context& h, Random& r) {
             }
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
-          __imp__sub_821E07B0, hooks::TuningPreviewItem, 40, floats,
+          __imp__sub_821E07B0, ITC_CONTEXT_FN(hooks::TuningPreviewItem), 40, floats,
           fmt::format("case {}", c), 160, 32, before, with_f1, 0x5000, kGarageBytes,
           // And the stand's setters' originals' (their adapters removed, B7
           // loop, 2026-11-13; TuningScreen::SetTireGrade's under it):
@@ -1797,7 +1797,7 @@ void TuningStand(Context& h, Random& r) {
               t.r4.u64 = r.Below(2) == 0 ? r.Below(8) : r.Next();
               t.r5.u64 = r.Below(6) == 0 ? r.Next() : r.Below(7);
             },
-            __imp__sub_821DA330, hooks::TuningSetCaliper, 0, floats, fmt::format("case {}", c),
+            __imp__sub_821DA330, ITC_CONTEXT_FN(hooks::TuningSetCaliper), 0, floats, fmt::format("case {}", c),
             0, 0, before, blocks, 0x1000, kGarageBytes,
             GetBSaves({112}, {{0, 32}, {112, 16}, {208, 16}}));
       }
@@ -1818,7 +1818,7 @@ void TuningStand(Context& h, Random& r) {
               t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(5);
               t.r5.u64 = r.Below(6) == 0 ? r.Next() : r.Below(6);
             },
-            __imp__sub_821CCBE8, hooks::TuningSetAccessory, 0, floats, fmt::format("case {}", c),
+            __imp__sub_821CCBE8, ITC_CONTEXT_FN(hooks::TuningSetAccessory), 0, floats, fmt::format("case {}", c),
             0, 0, before, blocks, 0x1000, kGarageBytes,
             GetBSaves({112}, {{0, 24}, {112, 24}}));
       }
@@ -1838,7 +1838,7 @@ void TuningStand(Context& h, Random& r) {
               lay_tires();
               t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
             },
-            __imp__sub_821DF9D0, hooks::TuningRefitAxles, 16, floats, fmt::format("case {}", c),
+            __imp__sub_821DF9D0, ITC_CONTEXT_FN(hooks::TuningRefitAxles), 16, floats, fmt::format("case {}", c),
             0, 0, before, with_f1, 0x3000, kGarageBytes, {{4000, 16}, {4000 + 16, 16}});
       }
       results.Report();
@@ -1866,7 +1866,7 @@ void TuningStand(Context& h, Random& r) {
               field(33572, r.Below(5));
               t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
             },
-            __imp__sub_821E7E48, hooks::TuningPreviewInteriorChoices, 88, floats,
+            __imp__sub_821E7E48, ITC_CONTEXT_FN(hooks::TuningPreviewInteriorChoices), 88, floats,
             fmt::format("case {}", c), 208, 32, before, blocks, 0x1000, kGarageBytes,
             GetBSaves({208 + 96, 208 + 112}, {{208 + 112, 56}, {208 + 96, 56}}));
       }
@@ -1901,7 +1901,7 @@ void TuningStand(Context& h, Random& r) {
               t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
               t.f1.f64 = double(std::bit_cast<float>(RandomFloat(r)));
             },
-            __imp__sub_821CC930, hooks::TuningPreviewLightKit, 8, floats,
+            __imp__sub_821CC930, ITC_CONTEXT_FN(hooks::TuningPreviewLightKit), 8, floats,
             fmt::format("case {}", c), 112, 32, before, with_f1, 0x1000, kGarageBytes,
             GetBSaves({112 + 176}, {{112 + 32, 24}}));
       }
@@ -1921,7 +1921,7 @@ void TuningStand(Context& h, Random& r) {
               t.r6.u64 = r.Below(256);
               t.r7.u64 = r.Next();
             },
-            __imp__sub_821E7DA0, hooks::TuningSetRgb, 0, floats, fmt::format("case {}", c), 0,
+            __imp__sub_821E7DA0, ITC_CONTEXT_FN(hooks::TuningSetRgb), 0, floats, fmt::format("case {}", c), 0,
             0, before, blocks, 0x100, kGarageBytes);
       }
       results.Report();
@@ -1968,7 +1968,7 @@ void TuningStand(Context& h, Random& r) {
               }
             },
             which == 0 ? __imp__sub_821CCAA8 : __imp__sub_8217DBC0,
-            which == 0 ? hooks::TuningPreviewParts : hooks::StandModelsSetAeroSet,
+            which == 0 ? ITC_CONTEXT_FN(hooks::TuningPreviewParts) : ITC_CONTEXT_FN(hooks::StandModelsSetAeroSet),
             which == 0 ? 16 : 48, floats, fmt::format("case {}", c),
             which == 0 ? 96 : 224, 56, before, blocks, 0x5000, kGarageBytes,
             which == 0 ? GetBSaves({96 + 144, 96 + 224}, {{96 + 144, 56}, {96 + 224, 56}})
@@ -2056,7 +2056,7 @@ void TuningStand(Context& h, Random& r) {
             field(33620, r.Below(6));
             t.r3.u64 = screen | (r.Below(4) == 0 ? r.Next() << 32 : 0);
           },
-          __imp__sub_821E0FB0, hooks::TuningRestoreStand, 64, floats,
+          __imp__sub_821E0FB0, ITC_CONTEXT_FN(hooks::TuningRestoreStand), 64, floats,
           fmt::format("case {}", c), 224, 32, before, with_f1, 0x5000, kGarageBytes,
           // And GetB's under its callers' frames, at each depth the pages
           // reach it (the GarageStage functions they call).
@@ -2179,7 +2179,7 @@ void TuningStand(Context& h, Random& r) {
       for (int c = 0; c < 40; c++) {
         Case(
             h, results, block, r, [&](PPCContext& t) { lay_view(t, c); },
-            __imp__sub_82201B40, hooks::TuningPagesLeaveVinylView, 32, floats,
+            __imp__sub_82201B40, ITC_CONTEXT_FN(hooks::TuningPagesLeaveVinylView), 32, floats,
             fmt::format("case {}", c), 0, 0, before_view, view_out, 0x3000, kGarageBytes,
             FitSaves(128));
       }
@@ -2188,7 +2188,7 @@ void TuningStand(Context& h, Random& r) {
       for (int c = 0; c < 60; c++) {
         Case(
             h, view, block, r, [&](PPCContext& t) { lay_view(t, c); },
-            __imp__sub_82202928, hooks::TuningPagesInputVinylView, 32, floats,
+            __imp__sub_82202928, ITC_CONTEXT_FN(hooks::TuningPagesInputVinylView), 32, floats,
             fmt::format("case {}", c), 112, 32, before_view, view_out, 0x3000, kGarageBytes,
             FitSaves(112 + 128));
       }
@@ -2201,7 +2201,7 @@ void TuningStand(Context& h, Random& r) {
       for (int c = 0; c < 80; c++) {
         Case(
             h, sticker_view, block, r, [&](PPCContext& t) { lay_view(t, c); },
-            __imp__sub_821F7000, hooks::TuningPagesInputStickerView, 24, floats,
+            __imp__sub_821F7000, ITC_CONTEXT_FN(hooks::TuningPagesInputStickerView), 24, floats,
             fmt::format("case {}", c), 0, 0, before_view, view_out, 0x3000, kGarageBytes);
       }
       sticker_view.Report();
@@ -2272,7 +2272,7 @@ void TuningStand(Context& h, Random& r) {
       for (int c = 0; c < 60; c++) {
         Case(
             h, menu, block, r, [&](PPCContext& t) { lay_pages(t, c); },
-            __imp__sub_821FF3A0, hooks::TuningPagesMoveVinylMenu, 32, floats,
+            __imp__sub_821FF3A0, ITC_CONTEXT_FN(hooks::TuningPagesMoveVinylMenu), 32, floats,
             fmt::format("case {}", c), 0, 0, before_pages, pages_out, 0x3000, kGarageBytes,
             FitSaves(128));
       }
@@ -2281,7 +2281,7 @@ void TuningStand(Context& h, Random& r) {
       for (int c = 0; c < 80; c++) {
         Case(
             h, pages, block, r, [&](PPCContext& t) { lay_pages(t, c); },
-            __imp__sub_82204B70, hooks::TuningPagesInputVinylPages, 48, floats,
+            __imp__sub_82204B70, ITC_CONTEXT_FN(hooks::TuningPagesInputVinylPages), 48, floats,
             fmt::format("case {}", c), 128, 32, before_pages, pages_out, 0x3000, kGarageBytes,
             FitSaves(128 + 128));
       }
@@ -2361,7 +2361,7 @@ void Reloads(Context& h) {
       t.r3.u64 = b + kHolderAt;
       t.r4.u64 = r.Below(3) == 0 ? 0xFFFFFFFFull : r.Below(72);
       t.fpscr.disableFlushModeUnconditional();
-      (v == 0 ? __imp__sub_8217F880 : hooks::CarMakersReloadModel)(t, h.base);
+      (v == 0 ? __imp__sub_8217F880 : ITC_CONTEXT_FN(hooks::CarMakersReloadModel))(t, h.base);
       out[v].Bytes(Read(h.base, b, kBytes));
       out[v].Word(guest::LoadU32(h.base, kReloads));
       out[v].Word(guest::LoadU32(h.base, kSceneSet));

@@ -3,6 +3,7 @@
 // (hooks/car_sounds.h).
 
 #include "hooks/car_sounds.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "car_sounds/car_sounds.h"
@@ -39,47 +40,47 @@ namespace hooks {
 
 namespace cs = car_sounds;
 
-void CarSoundsWaveBankViewInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsWaveBankViewInit) {
   ctx.r3.u64 = cs::WaveBankViewInit(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-void CarSoundsWaveBankFormat(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsWaveBankFormat) {
   ctx.r3.u64 = cs::WaveBankFormat(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void CarSoundsWaveBankLength(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsWaveBankLength) {
   ctx.r3.u64 = cs::WaveBankLength(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void CarSoundsWaveBankData(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsWaveBankData) {
   ctx.r3.u64 = cs::WaveBankData(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void CarSoundsWaveBankEntry(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsWaveBankEntry) {
   if (const auto r3 = cs::WaveBankEntry(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
     ctx.r3.u64 = *r3;
     return;
   }
-  __imp__sub_8210C998(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8210C998);
 }
 
-void CarSoundsSetBanks(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsSetBanks) {
   cs::SetBanks(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void CarSoundsTireSoundAmount(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsTireSoundAmount) {
   cs::TireSoundAmount(base, ctx.r3.u32, ctx.f1.f64);
 }
 
-void CarSoundsEngineSoundConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsEngineSoundConstruct) {
   cs::EngineSoundConstruct(base, ctx.r3.u32);
 }
 
-void CarSoundsCarSoundConstruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsCarSoundConstruct) {
   ctx.r3.u64 = cs::CarSoundConstruct(base, ctx.r3.u32);
 }
 
-void CarSoundsDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsDestroy) {
   const cs::Destroyed done = cs::CarSoundsDestroy(base, ctx.r3.u32, ctx.r4.u32);
   if (done.to_free != 0) {
     const bool freed = done.array ? memory::crt::OperatorDeleteArray(done.to_free)
@@ -92,7 +93,7 @@ void CarSoundsDestroy(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = done.r3;
 }
 
-void CarSoundsSetUp(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsSetUp) {
   const uint32_t sound = ctx.r3.u32;
   uint32_t matrix;
   if (const auto made = memory::crt::OperatorNewArray(base, 24)) {
@@ -111,7 +112,7 @@ bool CarSoundsGlobalsNative() {
   return ITC_FLAG(native_shader_objects) && NativeHeapActive() && ModelsHostLock();
 }
 
-void CarSoundsGlobalsInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsGlobalsInit) {
   cs::SoundGlobalsInit(base, ctx.r3.u32);
   // Music::Play(r3 = a word 0 at +84, r4 = the name, r5 = a byte 0 at +80).
   guest_call::InFrame(ctx, base, 112, 0x82110358, [&](uint32_t frame) {
@@ -125,32 +126,32 @@ void CarSoundsGlobalsInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cs::SoundGlobalsInit3D(base);
 }
 
-void CarSoundsX3DVecSub(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsX3DVecSub) {
   ctx.fpscr.disableFlushMode();
   x3daudio::VecSub(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void CarSoundsX3DVecLength(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsX3DVecLength) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = double(x3daudio::VecLength(base, ctx.r3.u32));
 }
 
-void CarSoundsX3DVecDot(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsX3DVecDot) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = double(x3daudio::VecDot(base, ctx.r3.u32, ctx.r4.u32));
 }
 
-void CarSoundsX3DVecCross(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsX3DVecCross) {
   ctx.fpscr.disableFlushMode();
   x3daudio::VecCross(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
-void CarSoundsX3DEvaluateCurve(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsX3DEvaluateCurve) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = double(x3daudio::EvaluateCurve(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64));
 }
 
-void CarSoundsX3DCurves(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsX3DCurves) {
   ctx.fpscr.disableFlushMode();
   // The original's prologue: lr at r1 - 8, r31 at r1 - 16, the back chain.
   const uint32_t frame = ctx.r1.u32 - 128;
@@ -177,7 +178,7 @@ struct GuestTanUser {
 
 x3daudio::TanResult GuestTan(void* user, uint32_t sp, double x) {
   const GuestTanUser& u = *static_cast<GuestTanUser*>(user);
-  PPCContext& ctx = *u.ctx;
+  lifted::Regs& ctx = *u.ctx;
   const uint64_t stack = ctx.r1.u64;
   const uint64_t lr = ctx.lr;
   ctx.r1.u64 = sp;
@@ -192,7 +193,7 @@ x3daudio::TanResult GuestTan(void* user, uint32_t sp, double x) {
 
 }  // namespace
 
-void CarSoundsX3DPan(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsX3DPan) {
   ctx.fpscr.disableFlushMode();
   GuestTanUser user{&ctx, base};
   const x3daudio::PanSaves saves{uint32_t(ctx.lr), ctx.r28.u64, ctx.r29.u64, ctx.r30.u64,
@@ -204,7 +205,7 @@ void CarSoundsX3DPan(PPCContext& ctx, uint8_t* base) {
   ctx.lr = ctx.r12.u64;
 }
 
-void CarSoundsX3DMatrix(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsX3DMatrix) {
   ctx.fpscr.disableFlushMode();
   // The original's prologue: __savegprlr_26 (r26 to r31 at r1 - 56 to - 16,
   // lr at - 8), __savefpr_23 (f23 to f31 at r1 - 128 to - 64), the back
@@ -231,7 +232,7 @@ void CarSoundsX3DMatrix(PPCContext& ctx, uint8_t* base) {
   ctx.lr = ctx.r12.u64;
 }
 
-void CarSoundsX3DCone(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsX3DCone) {
   ctx.fpscr.disableFlushMode();
   const x3daudio::ConeSaves saves{uint32_t(ctx.lr), ctx.r29.u64, ctx.r30.u64, ctx.r31.u64,
                                   ctx.f29.u64, ctx.f30.u64, ctx.f31.u64};
@@ -242,7 +243,7 @@ void CarSoundsX3DCone(PPCContext& ctx, uint8_t* base) {
   ctx.lr = ctx.r12.u64;
 }
 
-void CarSoundsX3DDoppler(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsX3DDoppler) {
   ctx.fpscr.disableFlushMode();
   const x3daudio::DopplerSaves saves{uint32_t(ctx.lr), ctx.r28.u64, ctx.r29.u64, ctx.r30.u64,
                                      ctx.r31.u64, ctx.f31.u64};
@@ -252,7 +253,7 @@ void CarSoundsX3DDoppler(PPCContext& ctx, uint8_t* base) {
   ctx.lr = ctx.r12.u64;
 }
 
-void CarSoundsX3DCalculate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsX3DCalculate) {
   ctx.fpscr.disableFlushMode();
   GuestTanUser user{&ctx, base};
   const x3daudio::CalculateArgs args{ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64};
@@ -264,7 +265,7 @@ void CarSoundsX3DCalculate(PPCContext& ctx, uint8_t* base) {
   if (!r3) {
     // EmitterAngle or Delay asked for: the original, its callees through
     // their adapters.
-    __imp__sub_82481880(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82481880);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -272,7 +273,7 @@ void CarSoundsX3DCalculate(PPCContext& ctx, uint8_t* base) {
   ctx.lr = ctx.r12.u64;
 }
 
-void CarSoundsUpdate3D(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsUpdate3D) {
   ctx.fpscr.disableFlushMode();
   GuestTanUser user{&ctx, base};
   cs::Update3DSaves saves{uint32_t(ctx.lr), ctx.r22.u64, ctx.r23.u64, ctx.r24.u64, ctx.r25.u64,
@@ -289,7 +290,7 @@ void CarSoundsUpdate3D(PPCContext& ctx, uint8_t* base) {
   ctx.lr = ctx.r12.u64;
 }
 
-void CarSoundsSetPitch(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsSetPitch) {
   ctx.fpscr.disableFlushMode();
   const uint32_t holder = ctx.r3.u32, slot = ctx.r4.u32, r7 = ctx.r7.u32;
   const double f1 = ctx.f1.f64;
@@ -298,7 +299,7 @@ void CarSoundsSetPitch(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsSetPitchScaled(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsSetPitchScaled) {
   ctx.fpscr.disableFlushMode();
   const uint32_t holder = ctx.r3.u32, slot = ctx.r4.u32, r7 = ctx.r7.u32, r9 = ctx.r9.u32;
   const double f1 = ctx.f1.f64, f3 = ctx.f3.f64;
@@ -307,14 +308,14 @@ void CarSoundsSetPitchScaled(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsIsPlaying(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsIsPlaying) {
   const uint32_t holder = ctx.r3.u32, slot = ctx.r4.u32;
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
     return cs::IsPlaying(base, holder, slot, frame, call);
   });
 }
 
-void CarSoundsUpdateVoices(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsUpdateVoices) {
   const uint32_t holder = ctx.r3.u32;
   const uint64_t output = ctx.r4.u64;
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
@@ -322,21 +323,21 @@ void CarSoundsUpdateVoices(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsClear(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsClear) {
   const uint32_t holder = ctx.r3.u32;
   XAudioFramed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
     return cs::Clear(base, holder, frame, call);
   });
 }
 
-void CarSoundsPause(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsPause) {
   const uint32_t holder = ctx.r3.u32;
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
     return cs::Pause(base, holder, frame, call);
   });
 }
 
-void CarSoundsResume(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsResume) {
   const uint32_t holder = ctx.r3.u32;
   const xaudio::Thread thread = XAudioThreadOf(ctx, base);
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
@@ -344,14 +345,14 @@ void CarSoundsResume(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsPauseAll(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsPauseAll) {
   const uint32_t sound = ctx.r3.u32;
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
     return cs::PauseAll(base, sound, frame, call);
   });
 }
 
-void CarSoundsResumeAll(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsResumeAll) {
   const uint32_t sound = ctx.r3.u32;
   const xaudio::Thread thread = XAudioThreadOf(ctx, base);
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
@@ -360,12 +361,12 @@ void CarSoundsResumeAll(PPCContext& ctx, uint8_t* base) {
 }
 
 namespace {
-cs::Voices VoicesOf(PPCContext& ctx, uint8_t* base) {
+cs::Voices VoicesOf(lifted::Regs& ctx, uint8_t* base) {
   return {XAudioThreadOf(ctx, base), NativeHeapActive()};
 }
 }  // namespace
 
-void CarSoundsAddVoice(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsAddVoice) {
   const uint32_t holder = ctx.r3.u32, view = ctx.r4.u32, wave = ctx.r5.u32, loop = ctx.r6.u32;
   const cs::Voices voices = VoicesOf(ctx, base);
   XAudioFramed(ctx, base, 496, [&](const xaudio::GuestCall& call, uint32_t frame) {
@@ -373,7 +374,7 @@ void CarSoundsAddVoice(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsPlayOnce(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsPlayOnce) {
   ctx.fpscr.disableFlushMode();
   const uint32_t holder = ctx.r3.u32, view = ctx.r4.u32, wave = ctx.r5.u32, loop = ctx.r8.u32;
   const double volume = ctx.f1.f64, pitch = ctx.f2.f64;
@@ -383,7 +384,7 @@ void CarSoundsPlayOnce(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsEngineLayerStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsEngineLayerStart) {
   const uint32_t layer = ctx.r3.u32, view = ctx.r5.u32;
   const cs::Voices voices = VoicesOf(ctx, base);
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
@@ -391,7 +392,7 @@ void CarSoundsEngineLayerStart(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsEngineSoundStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsEngineSoundStart) {
   const uint32_t engine = ctx.r3.u32, views = ctx.r5.u32;
   const uint64_t index = ctx.r4.u64;
   const cs::Voices voices = VoicesOf(ctx, base);
@@ -400,7 +401,7 @@ void CarSoundsEngineSoundStart(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsTireSoundStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsTireSoundStart) {
   const uint32_t part = ctx.r3.u32, index = ctx.r4.u32, view = ctx.r5.u32;
   const cs::Voices voices = VoicesOf(ctx, base);
   XAudioFramed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
@@ -408,7 +409,7 @@ void CarSoundsTireSoundStart(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsCarSoundStart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsCarSoundStart) {
   const uint32_t sound = ctx.r3.u32, views = ctx.r4.u32, view = ctx.r5.u32;
   const cs::Voices voices = VoicesOf(ctx, base);
   XAudioFramed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
@@ -416,33 +417,33 @@ void CarSoundsCarSoundStart(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsStop(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsStop) {
   const uint32_t sound = ctx.r3.u32;
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
     return cs::Stop(base, sound, frame, call);
   });
 }
 
-void CarSoundsStopAll(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsStopAll) {
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
     return cs::StopAll(base, frame, call);
   });
 }
 
-void CarSoundsRelease(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsRelease) {
   const uint32_t sound = ctx.r3.u32;
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
     return cs::Release(base, sound, frame, call);
   });
 }
 
-void CarSoundsReleaseAll(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsReleaseAll) {
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
     return cs::CarSoundsRelease(base, frame, call);
   });
 }
 
-void CarSoundsInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsInit) {
   const cs::Voices voices = VoicesOf(ctx, base);
   XAudioFramed(ctx, base, 368, [&](const xaudio::GuestCall& call, uint32_t frame) {
     return cs::CarSoundsInit(base, voices, frame, call);
@@ -454,7 +455,7 @@ namespace {
 // A part's update: r3 the part, r4 the vehicle, r5 the output, in a frame of
 // the original's size.
 template <typename Fn>
-void PartUpdate(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Fn fn) {
+void PartUpdate(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, Fn fn) {
   ctx.fpscr.disableFlushMode();
   const uint32_t part = ctx.r3.u32, vehicle = ctx.r4.u32;
   const uint64_t output = ctx.r5.u64;
@@ -466,7 +467,7 @@ void PartUpdate(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Fn fn) {
 
 // The hits' parts: r3 the part, r4 the vehicle.
 template <typename Fn>
-void HitPart(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Fn fn) {
+void HitPart(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, Fn fn) {
   ctx.fpscr.disableFlushMode();
   const uint32_t part = ctx.r3.u32, vehicle = ctx.r4.u32;
   const cs::Voices voices = VoicesOf(ctx, base);
@@ -477,19 +478,19 @@ void HitPart(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Fn fn) {
 
 }  // namespace
 
-void CarSoundsHitImpact(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsHitImpact) {
   HitPart(ctx, base, 144, cs::HitImpact);
 }
 
-void CarSoundsHitScrape(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsHitScrape) {
   HitPart(ctx, base, 192, cs::HitScrape);
 }
 
-void CarSoundsHitWave9(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsHitWave9) {
   HitPart(ctx, base, 96, cs::HitWave9);
 }
 
-void CarSoundsHitSoundsUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsHitSoundsUpdate) {
   ctx.fpscr.disableFlushMode();
   const uint32_t part = ctx.r3.u32;
   const uint64_t vehicle = ctx.r4.u64, output = ctx.r5.u64;
@@ -499,23 +500,23 @@ void CarSoundsHitSoundsUpdate(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsPart736Update(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsPart736Update) {
   PartUpdate(ctx, base, 112, cs::Part736Update);
 }
 
-void CarSoundsPart840Update(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsPart840Update) {
   PartUpdate(ctx, base, 128, cs::Part840Update);
 }
 
-void CarSoundsPart888Update(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsPart888Update) {
   PartUpdate(ctx, base, 144, cs::Part888Update);
 }
 
-void CarSoundsWindSoundUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsWindSoundUpdate) {
   PartUpdate(ctx, base, 128, cs::WindSoundUpdate);
 }
 
-void CarSoundsPassBySoundUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsPassBySoundUpdate) {
   ctx.fpscr.disableFlushMode();
   const uint32_t part = ctx.r3.u32, vehicle = ctx.r4.u32, passed = ctx.r6.u32;
   const uint64_t output = ctx.r5.u64;
@@ -525,7 +526,7 @@ void CarSoundsPassBySoundUpdate(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsEngineLayerUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsEngineLayerUpdate) {
   ctx.fpscr.disableFlushMode();
   const uint32_t layer = ctx.r3.u32;
   const uint64_t output = ctx.r7.u64;
@@ -536,7 +537,7 @@ void CarSoundsEngineLayerUpdate(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsEngineLayerUpdatePitched(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsEngineLayerUpdatePitched) {
   ctx.fpscr.disableFlushMode();
   const uint32_t engine = ctx.r3.u32;
   const uint64_t output = ctx.r6.u64;
@@ -548,7 +549,7 @@ void CarSoundsEngineLayerUpdatePitched(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsTireLayerUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsTireLayerUpdate) {
   ctx.fpscr.disableFlushMode();
   const uint32_t part = ctx.r3.u32, layer = ctx.r4.u32, active = ctx.r5.u32;
   const uint64_t output = ctx.r7.u64;
@@ -559,15 +560,15 @@ void CarSoundsTireLayerUpdate(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsTireSoundUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsTireSoundUpdate) {
   PartUpdate(ctx, base, 160, cs::TireSoundUpdate);
 }
 
-void CarSoundsRollSoundUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsRollSoundUpdate) {
   PartUpdate(ctx, base, 144, cs::RollSoundUpdate);
 }
 
-void CarSoundsHornSoundUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsHornSoundUpdate) {
   ctx.fpscr.disableFlushMode();
   const uint32_t part = ctx.r3.u32, vehicle = ctx.r4.u32;
   const uint64_t output = ctx.r5.u64;
@@ -578,11 +579,11 @@ void CarSoundsHornSoundUpdate(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsTurboSoundUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsTurboSoundUpdate) {
   PartUpdate(ctx, base, 144, cs::TurboSoundUpdate);
 }
 
-void CarSoundsEngineSoundUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsEngineSoundUpdate) {
   ctx.fpscr.disableFlushMode();
   const uint32_t engine = ctx.r3.u32, vehicle = ctx.r4.u32;
   const uint64_t output = ctx.r5.u64;
@@ -593,7 +594,7 @@ void CarSoundsEngineSoundUpdate(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void CarSoundsUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarSoundsUpdate) {
   ctx.fpscr.disableFlushMode();
   GuestTanUser user{&ctx, base};
   cs::Update3DSaves saves{uint32_t(ctx.lr), ctx.r22.u64, ctx.r23.u64, ctx.r24.u64, ctx.r25.u64,
@@ -619,12 +620,7 @@ void CarSoundsUpdate(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_CAR_SOUNDS_ADAPTER(address, step) \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_car_sounds)) {       \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_sounds)) { \
     hooks::step(ctx, base);                   \
   }
 
@@ -691,13 +687,13 @@ ITC_CAR_SOUNDS_ADAPTER(8210FE00, CarSoundsInit)
 // No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for TurboSound::Update sub_8210F4E8.
 ITC_CAR_SOUNDS_ADAPTER(82110048, CarSoundsUpdate)
 
-extern "C" REX_FUNC(sub_82110258) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82110258) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82110258)) {
     return;
   }
   if (!ITC_FLAG(native_car_sounds) || !hooks::CarSoundsGlobalsNative()) {
-    __imp__sub_82110258(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82110258);
     return;
   }
   hooks::CarSoundsGlobalsInit(ctx, base);

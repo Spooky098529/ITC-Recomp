@@ -5,6 +5,7 @@
 // src/debug/frame_state_diff.cpp, calling these steps.
 
 #include "hooks/load_poll.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -55,7 +56,7 @@ namespace {
 // A call to an original from the plain C++'s frame at `sp`, r1 and lr put
 // back after, the flush mode left off.
 template <typename Body>
-void FromFrame(PPCContext& ctx, uint32_t sp, uint32_t lr, Body body) {
+void FromFrame(lifted::Regs& ctx, uint32_t sp, uint32_t lr, Body body) {
   const uint64_t stack = ctx.r1.u64, link = ctx.lr;
   ctx.r1.u64 = sp;
   ctx.lr = lr;
@@ -67,7 +68,7 @@ void FromFrame(PPCContext& ctx, uint32_t sp, uint32_t lr, Body body) {
 
 // The flush mode as the plain C++'s last float step left it (`was_on`, the
 // mode at entry, when none did).
-void LeaveFlush(PPCContext& ctx, const lp::Calls& calls, bool was_on) {
+void LeaveFlush(lifted::Regs& ctx, const lp::Calls& calls, bool was_on) {
   if (calls.flush == second_set::Flush::kOn ||
       (calls.flush == second_set::Flush::kUnchanged && was_on)) {
     ctx.fpscr.enableFlushMode();
@@ -78,7 +79,7 @@ void LeaveFlush(PPCContext& ctx, const lp::Calls& calls, bool was_on) {
 
 }  // namespace
 
-lp::Calls LoadPollCalls(PPCContext& ctx, uint8_t* base) {
+lp::Calls LoadPollCalls(lifted::Regs& ctx, uint8_t* base) {
   lp::Calls calls;
   calls.find = SecondSetFindCalls(ctx, base);
   calls.wheel = SecondSetWheelCalls(ctx, base);
@@ -139,62 +140,62 @@ lp::Calls LoadPollCalls(PPCContext& ctx, uint8_t* base) {
   (void)was_on;                           \
   ctx.fpscr.disableFlushMode();
 
-void LoadPollWheelsSetRecord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollWheelsSetRecord) {
   ITC_LOAD_POLL_ORIGINAL(820D8EC0)
   lp::Calls calls = LoadPollCalls(ctx, base);
   ctx.r3.u64 = lp::WheelsSetRecord(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
 }
 
-void LoadPollWheelsSetCaliperTexture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollWheelsSetCaliperTexture) {
   ITC_LOAD_POLL_ORIGINAL(820D8ED0)
   ctx.r3.u64 = lp::WheelsSetCaliperTexture(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void LoadPollCarModelIsReady(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollCarModelIsReady) {
   ITC_LOAD_POLL_ORIGINAL(820D4048)
   ctx.r3.u64 = lp::CarModelIsReady(base, ctx.r3.u32);
 }
 
-void LoadPollCarPartsSetVinylTextures(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollCarPartsSetVinylTextures) {
   ITC_LOAD_POLL_ORIGINAL(820D72D8)
   ctx.r3.u64 = lp::CarPartsSetVinylTextures(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
 }
 
-void LoadPollInteriorDialsSetBlock(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollInteriorDialsSetBlock) {
   ITC_LOAD_POLL_ORIGINAL(820E3040)
   ctx.r3.u64 = lp::InteriorDialsSetBlock(base, ctx.r3.u32, ctx.r4.u64);
 }
 
-void LoadPollInteriorMetersSetGauge(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollInteriorMetersSetGauge) {
   ITC_LOAD_POLL_ORIGINAL(820E32E8)
   ctx.r3.u64 = lp::InteriorMetersSetGauge(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32);
 }
 
-void LoadPollSceneInteriorSetGauges(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneInteriorSetGauges) {
   ITC_LOAD_POLL_ORIGINAL(820E3938)
   ctx.r3.u64 = lp::SceneInteriorSetGauges(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
 }
 
-void LoadPollSceneLightsFinish(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneLightsFinish) {
   ITC_LOAD_POLL_ORIGINAL(820DDA60)
   lp::Calls calls = LoadPollCalls(ctx, base);
   ctx.r3.u64 = lp::SceneLightsFinish(base, ctx.r3.u32, ctx.r1.u32, calls);
   LeaveFlush(ctx, calls, was_on);
 }
 
-void LoadPollSceneLightsSetRecord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneLightsSetRecord) {
   ITC_LOAD_POLL_ORIGINAL(820DCB70)
   lp::Calls calls = LoadPollCalls(ctx, base);
   ctx.r3.u64 = lp::SceneLightsSetRecord(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
 }
 
-void LoadPollSceneLightsApplyRecord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneLightsApplyRecord) {
   ITC_LOAD_POLL_ORIGINAL(820DCBC0)
   lp::Calls calls = LoadPollCalls(ctx, base);
   ctx.r3.u64 = lp::SceneLightsApplyRecord(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
 }
 
-void LoadPollSceneTrafficFinish(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneTrafficFinish) {
   ITC_LOAD_POLL_ORIGINAL(820E5A68)
   lp::Calls calls = LoadPollCalls(ctx, base);
   ctx.r3.u64 = lp::SceneTrafficFinish(base, ctx.r3.u32, ctx.r1.u32, calls);
@@ -203,7 +204,7 @@ void LoadPollSceneTrafficFinish(PPCContext& ctx, uint8_t* base) {
 
 namespace {
 
-void PaintRegs(const PPCContext& ctx, uint64_t regs[7]) {
+void PaintRegs(const lifted::Regs& ctx, uint64_t regs[7]) {
   regs[0] = ctx.r4.u64;
   regs[1] = ctx.r5.u64;
   regs[2] = ctx.r6.u64;
@@ -215,12 +216,12 @@ void PaintRegs(const PPCContext& ctx, uint64_t regs[7]) {
 
 }  // namespace
 
-void LoadPollSceneModelApplyPaint(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneModelApplyPaint) {
   ITC_LOAD_POLL_ORIGINAL(820D9B68)
   ctx.r3.u64 = lp::SceneModelApplyPaint(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
 }
 
-void LoadPollSceneModelApplyWheelPaint(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneModelApplyWheelPaint) {
   ITC_LOAD_POLL_ORIGINAL(820D9C50)
   lp::Calls calls = LoadPollCalls(ctx, base);
   ctx.r3.u64 = lp::SceneModelApplyWheelPaint(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32, calls);
@@ -232,57 +233,57 @@ void LoadPollSceneModelApplyWheelPaint(PPCContext& ctx, uint8_t* base) {
   PaintRegs(ctx, regs);                     \
   ctx.r3.u64 = call;
 
-void LoadPollScenePartsApplyPaint(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollScenePartsApplyPaint) {
   ITC_LOAD_POLL_PAINT(820E0908, lp::ScenePartsApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
 }
 
-void LoadPollSceneInteriorApplyPaint(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneInteriorApplyPaint) {
   ITC_LOAD_POLL_PAINT(820E4250, lp::SceneInteriorApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
 }
 
-void LoadPollSceneCockpitApplyPaint(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneCockpitApplyPaint) {
   ITC_LOAD_POLL_PAINT(820DC138, lp::SceneCockpitApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
 }
 
-void LoadPollSceneTrafficApplyPaint(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneTrafficApplyPaint) {
   ITC_LOAD_POLL_PAINT(820E61D0, lp::SceneTrafficApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
 }
 
-void LoadPollTrafficCarSetPaint(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollTrafficCarSetPaint) {
   ITC_LOAD_POLL_PAINT(820D7E18,
                       lp::TrafficCarSetPaint(base, ctx.r3.u32, ctx.r3.u64, regs, ctx.r1.u32))
 }
 
-void LoadPollSceneWheelsApplyPaint(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneWheelsApplyPaint) {
   lp::Calls calls = LoadPollCalls(ctx, base);
   ITC_LOAD_POLL_PAINT(820E8A00,
                       lp::SceneWheelsApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32, calls))
 }
 
-void LoadPollWheelsApplyPaint(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollWheelsApplyPaint) {
   ITC_LOAD_POLL_PAINT(820D91E0, lp::WheelsApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
 }
 
-void LoadPollSceneInteriorFinish(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneInteriorFinish) {
   ITC_LOAD_POLL_ORIGINAL(820E4140)
   lp::Calls calls = LoadPollCalls(ctx, base);
   ctx.r3.u64 = lp::SceneInteriorFinish(base, ctx.r3.u32, ctx.r1.u32, calls);
   LeaveFlush(ctx, calls, was_on);
 }
 
-void LoadPollSceneWheelsSetUpPoints(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneWheelsSetUpPoints) {
   ITC_LOAD_POLL_ORIGINAL(820E8908)
   lp::Calls calls = LoadPollCalls(ctx, base);
   ctx.r3.u64 = lp::SceneWheelsSetUpPoints(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32, calls);
   LeaveFlush(ctx, calls, was_on);
 }
 
-void LoadPollScenePartsSetSelectedTexture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollScenePartsSetSelectedTexture) {
   ITC_LOAD_POLL_ORIGINAL(820DF250)
   ctx.r3.u64 = lp::ScenePartsSetSelectedTexture(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
 }
 
-void LoadPollScenePartsBuild(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollScenePartsBuild) {
   ITC_LOAD_POLL_ORIGINAL(820E05E0)
   lp::Calls calls = LoadPollCalls(ctx, base);
   ctx.r3.u64 = lp::ScenePartsBuild(base, ctx.r3.u32, ctx.r1.u32, calls);
@@ -290,7 +291,7 @@ void LoadPollScenePartsBuild(PPCContext& ctx, uint8_t* base) {
 }
 
 #define ITC_LOAD_POLL_STEP(name, address, call)                \
-  void LoadPoll##name(PPCContext& ctx, uint8_t* base) {        \
+  void LoadPoll##name(lifted::Regs& ctx, uint8_t* base) {        \
     ITC_LOAD_POLL_ORIGINAL(address)                            \
     lp::Calls calls = LoadPollCalls(ctx, base);                \
     ctx.r3.u64 = lp::call(base, ctx.r3.u32, ctx.r1.u32, calls); \
@@ -304,7 +305,7 @@ ITC_LOAD_POLL_STEP(SceneCockpitFinish, 820DBFF8, SceneCockpitFinish)
 ITC_LOAD_POLL_STEP(SceneModelPollLoad, 820DA318, SceneModelPollLoad)
 #undef ITC_LOAD_POLL_STEP
 
-void LoadPollSceneModelApplyPalettes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(LoadPollSceneModelApplyPalettes) {
   ITC_LOAD_POLL_ORIGINAL(820D9EA0)
   lp::Calls calls = LoadPollCalls(ctx, base);
   ctx.r3.u64 = lp::SceneModelApplyPalettes(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32, calls);
@@ -316,12 +317,7 @@ void LoadPollSceneModelApplyPalettes(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_LOAD_POLL(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {  \
-    REX_FUNC_PROLOGUE();                \
-    if (!ITC_FLAG(native_load_poll)) {  \
-      __imp__sub_##address(ctx, base);  \
-      return;                           \
-    }                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_load_poll)) { \
     hooks::step(ctx, base);             \
   }
 

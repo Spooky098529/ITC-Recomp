@@ -5,6 +5,7 @@
 // calls through this context).
 
 #include "hooks/race_hud_machine.h"
+#include "hooks/native_entry.h"
 
 #include "alt_hud/alt_hud.h"
 #include "base/flags.h"
@@ -66,7 +67,7 @@ namespace rh = race_hud_object;
 // make them. The adapter's lr is put back when it ends.
 class Calls {
  public:
-  Calls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  Calls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~Calls() { ctx_.lr = lr_; }
   Calls(const Calls&) = delete;
   Calls& operator=(const Calls&) = delete;
@@ -79,7 +80,7 @@ class Calls {
   static uint64_t Callee(void* user, uint32_t function, const uint64_t args[8], const double*,
                          uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<Calls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint32_t r3 = uint32_t(args[0]);
     switch (function) {
@@ -222,7 +223,7 @@ class Calls {
   static uint64_t Guest(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                         uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<Calls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -247,7 +248,7 @@ class Calls {
   static uint64_t Zone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool set_r4,
                        uint32_t frame, uint32_t lr) {
     auto& self = *static_cast<Calls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = frame;
@@ -264,11 +265,11 @@ class Calls {
   static uint64_t Sound(void* user, uint32_t function, const uint64_t args[4], int set,
                         uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<Calls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
-    PPCRegister* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
+    lifted::Temp* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
     for (int i = 0; i < set; i++) {
       registers[i]->u64 = args[i];
     }
@@ -279,7 +280,7 @@ class Calls {
     return ctx.r3.u64;
   }
 
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
@@ -287,7 +288,7 @@ class Calls {
 // A handler: its plain C++ with the machine's register, or the original
 // where it answers nullopt.
 template <typename Handler>
-void Handle(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_t*),
+void Handle(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original,
             Handler handler) {
   ctx.fpscr.disableFlushMode();
   std::optional<uint64_t> r3;
@@ -296,7 +297,7 @@ void Handle(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_
     r3 = handler(calls.callees());
   }
   if (!r3) {
-    original(ctx, base);
+    lifted::Sdk(ctx, base, original);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -304,7 +305,7 @@ void Handle(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_
 
 }  // namespace
 
-void RaceHudMachineInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineInit) {
   ctx.fpscr.disableFlushMode();
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
@@ -315,190 +316,190 @@ void RaceHudMachineInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
-void RaceHudMachinePreRaceUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachinePreRaceUpdate) {
   Handle(ctx, base, __imp__sub_8216C210, [&](const rh::Calls& callees) {
     return rhm::PreRaceUpdate(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachinePreRaceDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachinePreRaceDraw) {
   Handle(ctx, base, __imp__sub_8216C2A0, [&](const rh::Calls& callees) {
     return rhm::PreRaceDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineCountdownDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineCountdownDraw) {
   Handle(ctx, base, __imp__sub_8216C330, [&](const rh::Calls& callees) {
     return rhm::CountdownDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineStartIntro(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineStartIntro) {
   const uint32_t lr = uint32_t(ctx.lr);
   Handle(ctx, base, __imp__sub_8216C510, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::StartIntro(base, ctx.r3.u32, ctx.r1.u32, lr, callees));
   });
 }
 
-void RaceHudMachineEndIntro(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineEndIntro) {
   const uint32_t lr = uint32_t(ctx.lr);
   Handle(ctx, base, __imp__sub_8216C520, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::EndIntro(base, ctx.r3.u32, ctx.r1.u32, lr, callees));
   });
 }
 
-void RaceHudMachineIntroUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineIntroUpdate) {
   Handle(ctx, base, __imp__sub_8216C530, [&](const rh::Calls& callees) {
     return rhm::IntroUpdate(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineIntroDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineIntroDraw) {
   Handle(ctx, base, __imp__sub_8216C5B8, [&](const rh::Calls& callees) {
     return rhm::IntroDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineCountdownUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineCountdownUpdate) {
   Handle(ctx, base, __imp__sub_8216CB98, [&](const rh::Calls& callees) {
     return rhm::CountdownUpdate(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineRaceDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineRaceDraw) {
   Handle(ctx, base, __imp__sub_8216CE00, [&](const rh::Calls& callees) {
     return rhm::RaceDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineRaceUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineRaceUpdate) {
   const uint32_t dispatcher = ctx.r4.u32;
   Handle(ctx, base, __imp__sub_8216D918, [&](const rh::Calls& callees) {
     return rhm::RaceUpdate(base, ctx.r3.u64, dispatcher, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineSetUp(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineSetUp) {
   Handle(ctx, base, __imp__sub_8216D450, [&](const rh::Calls& callees) {
     return rhm::SetUp(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineResultsUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineResultsUpdate) {
   const uint32_t dispatcher = ctx.r4.u32;
   Handle(ctx, base, __imp__sub_8216DFD0, [&](const rh::Calls& callees) {
     return rhm::ResultsUpdate(base, ctx.r3.u64, dispatcher, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachinePauseUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachinePauseUpdate) {
   const uint32_t dispatcher = ctx.r4.u32;
   Handle(ctx, base, __imp__sub_8216DB70, [&](const rh::Calls& callees) {
     return rhm::PauseUpdate(base, ctx.r3.u64, dispatcher, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineAfterRaceUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineAfterRaceUpdate) {
   const uint32_t dispatcher = ctx.r4.u32;
   Handle(ctx, base, __imp__sub_8216DD88, [&](const rh::Calls& callees) {
     return rhm::AfterRaceUpdate(base, ctx.r3.u64, dispatcher, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineCloseResults(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineCloseResults) {
   Handle(ctx, base, __imp__sub_8216D198, [&](const rh::Calls& callees) {
     return rhm::CloseResults(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineCreateScreens(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineCreateScreens) {
   Handle(ctx, base, __imp__sub_8216CA28, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::CreateScreens(base, ctx.r3.u32, ctx.r1.u32, callees));
   });
 }
 
-void RaceHudMachineClosePause(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineClosePause) {
   Handle(ctx, base, __imp__sub_8216C658, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::ClosePause(base, ctx.r3.u64, ctx.r1.u32, callees));
   });
 }
 
-void RaceHudMachineResultsDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineResultsDraw) {
   Handle(ctx, base, __imp__sub_8216D6D0, [&](const rh::Calls& callees) {
     return rhm::ResultsDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineAfterRaceDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineAfterRaceDraw) {
   Handle(ctx, base, __imp__sub_8216C6D8, [&](const rh::Calls& callees) {
     return rhm::AfterRaceDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachinePauseDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachinePauseDraw) {
   Handle(ctx, base, __imp__sub_8216CF08, [&](const rh::Calls& callees) {
     return rhm::PauseDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineRacePauseDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineRacePauseDraw) {
   Handle(ctx, base, __imp__sub_8216CFE0, [&](const rh::Calls& callees) {
     return rhm::RacePauseDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
-void RaceHudMachineDestroyScreens(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineDestroyScreens) {
   const uint32_t lr = uint32_t(ctx.lr);
   Handle(ctx, base, __imp__sub_8216C208, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::DestroyScreens(base, ctx.r3.u64, ctx.r1.u32, lr, callees));
   });
 }
 
-void RaceHudMachineStartCountdown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineStartCountdown) {
   Handle(ctx, base, __imp__sub_8216CC60, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::StartCountdown(base, ctx.r3.u64, ctx.r1.u32, callees));
   });
 }
 
-void RaceHudMachineOnRaceEnd(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineOnRaceEnd) {
   Handle(ctx, base, __imp__sub_8216E5B0, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::OnRaceEnd(base, ctx.r3.u64, ctx.r1.u32, callees));
   });
 }
 
-void RaceHudMachineAwardPrize(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineAwardPrize) {
   Handle(ctx, base, __imp__sub_8216E150, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::AwardPrize(base, ctx.r3.u64, ctx.r1.u32, callees));
   });
 }
 
-void RaceHudMachineIsFirstDay(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineIsFirstDay) {
   ctx.r3.u64 = rhm::IsFirstDay(base, ctx.r1.u32);
 }
 
-void RaceHudMachineOpponentPrize(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineOpponentPrize) {
   ctx.r3.u64 = rhm::OpponentPrize(base, ctx.r4.u32, ctx.r1.u32);
 }
 
-void RaceHudMachineItemBonus(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineItemBonus) {
   ctx.r3.u64 = rhm::ItemBonus(base, ctx.r4.u32, ctx.r1.u32);
 }
 
-void RaceHudMachineOpenPause(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineOpenPause) {
   const uint32_t lr = uint32_t(ctx.lr);
   Handle(ctx, base, __imp__sub_8216D600, [&](const rh::Calls& callees) {
     return rhm::OpenPause(base, ctx.r3.u64, ctx.r1.u32, lr, callees);
   });
 }
 
-void RaceHudMachineOpenRacePause(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineOpenRacePause) {
   const uint32_t lr = uint32_t(ctx.lr);
   Handle(ctx, base, __imp__sub_8216DA40, [&](const rh::Calls& callees) {
     return rhm::OpenRacePause(base, ctx.r3.u64, ctx.r1.u32, lr, callees);
   });
 }
 
-void RaceHudMachineOpenCareerPause(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudMachineOpenCareerPause) {
   Handle(ctx, base, __imp__sub_8216D8C8, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::OpenCareerPause(base, ctx.r3.u32, ctx.r1.u32, callees));
   });
@@ -510,12 +511,7 @@ void RaceHudMachineOpenCareerPause(PPCContext& ctx, uint8_t* base) {
 // off. The handlers are reached through their functors (no direct callers),
 // so their adapters stay.
 #define ITC_RACE_HUD_MACHINE(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {         \
-    REX_FUNC_PROLOGUE();                       \
-    if (!ITC_FLAG(native_race_hud_machine)) {  \
-      __imp__sub_##address(ctx, base);         \
-      return;                                  \
-    }                                          \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_hud_machine)) { \
     hooks::step(ctx, base);                    \
   }
 

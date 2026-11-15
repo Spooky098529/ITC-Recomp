@@ -5,6 +5,7 @@
 // See docs/functions/ and docs/known-data.md for what is known about each address.
 
 #include "hooks/vehicle.h"
+#include "hooks/native_entry.h"
 
 #include "base/log.h"
 #include "debug/state_capture.h"
@@ -29,8 +30,8 @@ float Vehicle_GetSpeedKmh(uint8_t* base, uint32_t vehicle) {
 // the function table reach them; they only unpack registers and forward.
 
 // Vehicle_GetSpeedKmh: r3 = vehicle, returns f1.
-extern "C" REX_FUNC(sub_820C0128) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820C0128) {
+  
   ctx.fpscr.disableFlushMode();
   debug::StateCapture_OnVehicleSeen(ctx.r3.u32);
   ctx.f1.f64 = double(Vehicle_GetSpeedKmh(base, ctx.r3.u32));

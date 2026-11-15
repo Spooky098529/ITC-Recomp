@@ -170,7 +170,7 @@ void Colors(Context& h, uint32_t block) {
             t.r3.u64 = out;
             t.r4.u64 = block;
           },
-          layout, __imp__sub_820D0D60, hooks::MaterialPassesHsvToRgb, fmt::format("case {}", c));
+          layout, __imp__sub_820D0D60, ITC_CONTEXT_FN(hooks::MaterialPassesHsvToRgb), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -207,7 +207,7 @@ void Colors(Context& h, uint32_t block) {
             t.r3.u64 = out;
             t.r4.u64 = block;
           },
-          Layout{{}, 8}, __imp__sub_820C9808, NativeHsvToRgb8,
+          Layout{{}, 8}, __imp__sub_820C9808, ITC_CONTEXT_FN(NativeHsvToRgb8),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -225,7 +225,7 @@ void Tables(Context& h, uint32_t block) {
             t.r4.u64 = r.Below(16);
             t.r5.u64 = r.Below(4);
           },
-          Layout{}, __imp__sub_820D35D0, hooks::MaterialPassesTableVector,
+          Layout{}, __imp__sub_820D35D0, ITC_CONTEXT_FN(hooks::MaterialPassesTableVector),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -241,7 +241,7 @@ void Tables(Context& h, uint32_t block) {
             t.r3.u64 = (r.Next() << 32) | uint32_t(value);
           },
           Layout{}, a ? __imp__sub_820D3600 : __imp__sub_820D3638,
-          a ? hooks::MaterialPassesIsBlockSetA : hooks::MaterialPassesIsBlockSetB,
+          a ? ITC_CONTEXT_FN(hooks::MaterialPassesIsBlockSetA) : ITC_CONTEXT_FN(hooks::MaterialPassesIsBlockSetB),
           fmt::format("{} {}", a ? "A" : "B", value));
     }
     results.Report();
@@ -254,7 +254,7 @@ void Tables(Context& h, uint32_t block) {
           [&](PPCContext& t, Random& r) {
             t.r3.u64 = c < 16 ? uint64_t(c) : r.Next();
           },
-          Layout{}, __imp__sub_820D3728, hooks::MaterialPassesRecordAt,
+          Layout{}, __imp__sub_820D3728, ITC_CONTEXT_FN(hooks::MaterialPassesRecordAt),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -278,7 +278,7 @@ void Tables(Context& h, uint32_t block) {
             t.r3.u64 = out;
             t.r4.u64 = block;
           },
-          layout, __imp__sub_820D1CB0, hooks::MaterialPassesTransposeRotation,
+          layout, __imp__sub_820D1CB0, ITC_CONTEXT_FN(hooks::MaterialPassesTransposeRotation),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -365,7 +365,7 @@ void Passes(Context& h, uint32_t block) {
             t.r4.u64 = r.Below(2) == 0 ? r.Below(8) : uint32_t(r.Next());
             t.r5.u64 = c % 2 == 0 ? uint64_t(-1) : r.Below(3);
           },
-          Layout{{}, 72}, __imp__sub_820D17D8, hooks::MaterialPassesSetTexture,
+          Layout{{}, 72}, __imp__sub_820D17D8, ITC_CONTEXT_FN(hooks::MaterialPassesSetTexture),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -375,7 +375,7 @@ void Passes(Context& h, uint32_t block) {
     for (int c = 0; c < 128; c++) {
       Case(
           h, results, block, h.random.Next(), [&](PPCContext& t, Random& r) { model(t, r, c); },
-          Layout{{}, 56}, __imp__sub_820D1950, hooks::MaterialPassesFlipCulling,
+          Layout{{}, 56}, __imp__sub_820D1950, ITC_CONTEXT_FN(hooks::MaterialPassesFlipCulling),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -388,10 +388,10 @@ void Passes(Context& h, uint32_t block) {
   };
   const Valued valued[] = {
       {"PartModel::ScaleBlended (sub_820D1A68)", __imp__sub_820D1A68,
-       hooks::MaterialPassesScaleBlended, 64},
+       ITC_CONTEXT_FN(hooks::MaterialPassesScaleBlended), 64},
       {"PartModel::SetPair1002Alpha (sub_820D1B38)", __imp__sub_820D1B38,
-       hooks::MaterialPassesSetPair1002Alpha, 56},
-      {"PartModel::SetAlpha (sub_820D1C00)", __imp__sub_820D1C00, hooks::MaterialPassesSetAlpha,
+       ITC_CONTEXT_FN(hooks::MaterialPassesSetPair1002Alpha), 56},
+      {"PartModel::SetAlpha (sub_820D1C00)", __imp__sub_820D1C00, ITC_CONTEXT_FN(hooks::MaterialPassesSetAlpha),
        56},
   };
   for (const Valued& f : valued) {
@@ -424,7 +424,7 @@ void Passes(Context& h, uint32_t block) {
             t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(8);
           },
           Layout{}, total ? __imp__sub_82594AC0 : __imp__sub_82594B00,
-          total ? NativeMaterialTotal : NativeMaterialAt, fmt::format("case {}", c));
+          total ? ITC_CONTEXT_FN(NativeMaterialTotal) : ITC_CONTEXT_FN(NativeMaterialAt), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -467,7 +467,7 @@ void Passes(Context& h, uint32_t block) {
             const int32_t pairs[] = {-2, -1, -1, 1000, 1002, 1004};
             guest::StoreU32(h.base, sp + 148, uint32_t(pairs[r.Below(6)]));
           },
-          layout, __imp__sub_820D3318, hooks::MaterialPassesSetMaterials,
+          layout, __imp__sub_820D3318, ITC_CONTEXT_FN(hooks::MaterialPassesSetMaterials),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -513,10 +513,10 @@ void Paints(Context& h, uint32_t block, const Layout& floats) {
     uint32_t frame;
   };
   const Paint paints[] = {
-      {"PartModel::SetPaint (sub_820D0EA8)", __imp__sub_820D0EA8, hooks::MaterialPassesSetPaint,
+      {"PartModel::SetPaint (sub_820D0EA8)", __imp__sub_820D0EA8, ITC_CONTEXT_FN(hooks::MaterialPassesSetPaint),
        320},
       {"PartModel::SetPaintBody (sub_820D1378)", __imp__sub_820D1378,
-       hooks::MaterialPassesSetPaintBody, 288},
+       ITC_CONTEXT_FN(hooks::MaterialPassesSetPaintBody), 288},
   };
   for (const Paint& p : paints) {
     Results results(p.name);
@@ -586,7 +586,7 @@ void Paints(Context& h, uint32_t block, const Layout& floats) {
               }
             }
           },
-          layout, __imp__sub_820D2EA8, hooks::MaterialPassesApplyPalette,
+          layout, __imp__sub_820D2EA8, ITC_CONTEXT_FN(hooks::MaterialPassesApplyPalette),
           fmt::format("case {}", c));
     }
     Write(h.base, kPalette, saved.data(), uint32_t(saved.size()));
@@ -644,7 +644,7 @@ void Projectors(Context& h, uint32_t block) {
             t.r5.u64 = vectors + 0;
             t.r6.u64 = vectors + 16;
           },
-          layout, __imp__sub_820D1D70, NativeLookAt, fmt::format("case {}", c));
+          layout, __imp__sub_820D1D70, ITC_CONTEXT_FN(NativeLookAt), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -675,7 +675,7 @@ void Projectors(Context& h, uint32_t block) {
             t.r7.u64 = vectors;
             t.r9.u64 = c % 2;
           },
-          layout, __imp__sub_820D1EB8, hooks::MaterialPassesProjectorMatrices,
+          layout, __imp__sub_820D1EB8, ITC_CONTEXT_FN(hooks::MaterialPassesProjectorMatrices),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -710,7 +710,7 @@ void Palettes(Context& h, uint32_t block) {
       guest::StoreU32(h.base, kScenePointer, kind == 0 ? 0 : scene);
       guest::StoreU32(h.base, scene + 4, set);
       t.r3.u64 = r.Next();
-      (v == 0 ? __imp__sub_820D2330 : hooks::MaterialPassesPaintPaletteInit)(t, h.base);
+      (v == 0 ? __imp__sub_820D2330 : ITC_CONTEXT_FN(hooks::MaterialPassesPaintPaletteInit))(t, h.base);
       for (uint32_t e = 0; e < 16; e++) {
         out[v].Floats(h.base, kPalette + 64 * e, 15);
         out[v].Bytes(Read(h.base, kPalette + 64 * e + 60, 4));

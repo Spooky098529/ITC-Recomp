@@ -149,8 +149,8 @@ void Pools(Context& h, Random& r, uint32_t block) {
     bool make;  // MakeA (else sub_820D0960: r3 = where, r4 = the size)
   };
   const Alloc allocs[] = {
-      {"ScenePools::MakeA (sub_820C3C40)", __imp__sub_820C3C40, hooks::SceneLoadersMakeA, true},
-      {"sub_820D0960 (VirtualAlloc)", __imp__sub_820D0960, hooks::SceneLoadersAllocPages, false},
+      {"ScenePools::MakeA (sub_820C3C40)", __imp__sub_820C3C40, ITC_CONTEXT_FN(hooks::SceneLoadersMakeA), true},
+      {"sub_820D0960 (VirtualAlloc)", __imp__sub_820D0960, ITC_CONTEXT_FN(hooks::SceneLoadersAllocPages), false},
   };
   const uint32_t sizes[] = {0, 1, 80, 4095, 4096, 4097, 0x10000, 0x23456};
   for (const Alloc& alloc : allocs) {
@@ -223,7 +223,7 @@ void PoolNodes(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = block + 0x800 + 16 * r.Below(64);
             t.r4.u64 = list;
           },
-          __imp__sub_82594050, hooks::SceneLoadersPoolNodeConstruct, fmt::format("case {}", c));
+          __imp__sub_82594050, ITC_CONTEXT_FN(hooks::SceneLoadersPoolNodeConstruct), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -243,7 +243,7 @@ void PoolNodes(Context& h, Random& r, uint32_t block) {
             }
             t.r3.u64 = node;
           },
-          __imp__sub_825940B0, hooks::SceneLoadersPoolNodeDestruct, fmt::format("case {}", c));
+          __imp__sub_825940B0, ITC_CONTEXT_FN(hooks::SceneLoadersPoolNodeDestruct), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -263,7 +263,7 @@ void Queries(Context& h, Random& r, uint32_t block) {
             }
             t.r3.u64 = block;
           },
-          __imp__sub_820D3C28, hooks::SceneLoadersCarModelIsLoaded, fmt::format("case {}", c));
+          __imp__sub_820D3C28, ITC_CONTEXT_FN(hooks::SceneLoadersCarModelIsLoaded), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -276,7 +276,7 @@ void Queries(Context& h, Random& r, uint32_t block) {
             Put(h.base, block + 100, RandomState(r, 3));
             t.r3.u64 = block;
           },
-          __imp__sub_820D6A08, hooks::SceneLoadersPool4IsLoaded, fmt::format("case {}", c));
+          __imp__sub_820D6A08, ITC_CONTEXT_FN(hooks::SceneLoadersPool4IsLoaded), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -291,7 +291,7 @@ void Queries(Context& h, Random& r, uint32_t block) {
             t.r4.u64 = c % 6 == 5 ? t.r3.u32 + 28 + 4 * r.Below(8) - 16
                                   : block + 0x400 + r.Below(256);
           },
-          __imp__sub_820D6A60, hooks::SceneLoadersPool4SetRecord, fmt::format("case {}", c));
+          __imp__sub_820D6A60, ITC_CONTEXT_FN(hooks::SceneLoadersPool4SetRecord), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -306,7 +306,7 @@ void Queries(Context& h, Random& r, uint32_t block) {
             t.r5.u64 = r.Next();
             t.r6.u64 = r.Next();
           },
-          __imp__sub_820D6D48, hooks::SceneLoadersPartsSlotOf, fmt::format("case {}", c));
+          __imp__sub_820D6D48, ITC_CONTEXT_FN(hooks::SceneLoadersPartsSlotOf), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -338,7 +338,7 @@ void Queries(Context& h, Random& r, uint32_t block) {
             t.r5.u64 = r.Below(5);
             t.r6.u64 = r.Below(4);
           },
-          __imp__sub_820D6E10, hooks::SceneLoadersPartsPart, fmt::format("case {}", c));
+          __imp__sub_820D6E10, ITC_CONTEXT_FN(hooks::SceneLoadersPartsPart), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -352,7 +352,7 @@ void Queries(Context& h, Random& r, uint32_t block) {
             parts_setup(c < 8 ? 0xFFFFFFFF : 20 + r.Below(400));
             t.r3.u64 = block;
           },
-          __imp__sub_820D7258, hooks::SceneLoadersPartsIsLoaded, fmt::format("case {}", c));
+          __imp__sub_820D7258, ITC_CONTEXT_FN(hooks::SceneLoadersPartsIsLoaded), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -378,7 +378,7 @@ void Queries(Context& h, Random& r, uint32_t block) {
             part_model(block, block + 0x400, block + 0x1000);
             t.r3.u64 = c < 4 ? 0 : block;
           },
-          __imp__sub_820D2270, hooks::SceneLoadersPartWalkMaterials, fmt::format("case {}", c));
+          __imp__sub_820D2270, ITC_CONTEXT_FN(hooks::SceneLoadersPartWalkMaterials), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -395,7 +395,7 @@ void Queries(Context& h, Random& r, uint32_t block) {
             }
             t.r3.u64 = block;
           },
-          __imp__sub_820D6EB8, hooks::SceneLoadersPartsWalkMaterials, fmt::format("case {}", c));
+          __imp__sub_820D6EB8, ITC_CONTEXT_FN(hooks::SceneLoadersPartsWalkMaterials), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -424,19 +424,19 @@ void Queries(Context& h, Random& r, uint32_t block) {
   };
   const Walk walks[] = {
       {"sub_820D6F20 (CarParts' ApplyPalette walk)", __imp__sub_820D6F20,
-       hooks::SceneLoadersPartsApplyPalette, false, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersPartsApplyPalette), false, false},
       {"sub_820D7388 (CarParts' SetPaint walk)", __imp__sub_820D7388,
-       hooks::SceneLoadersPartsSetPaint, false, true},
+       ITC_CONTEXT_FN(hooks::SceneLoadersPartsSetPaint), false, true},
       {"sub_820D5FC8 (the cockpit's ApplyPalette walk)", __imp__sub_820D5FC8,
-       hooks::SceneLoadersCockpitApplyPalette, true, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCockpitApplyPalette), true, false},
       {"sub_820D6328 (the cockpit's SetPaint walk)", __imp__sub_820D6328,
-       hooks::SceneLoadersCockpitSetPaint, true, true},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCockpitSetPaint), true, true},
       {"sub_820D7690 (the interior's ApplyPalette walk)", __imp__sub_820D7690,
-       hooks::SceneLoadersInteriorApplyPalette, true, false, 180, 304},
+       ITC_CONTEXT_FN(hooks::SceneLoadersInteriorApplyPalette), true, false, 180, 304},
       {"sub_820D7840 (the interior's SetPaint walk)", __imp__sub_820D7840,
-       hooks::SceneLoadersInteriorSetPaint, true, true, 180, 304},
+       ITC_CONTEXT_FN(hooks::SceneLoadersInteriorSetPaint), true, true, 180, 304},
       {"sub_820D7BF8 (the traffic car's ApplyPalette walk)", __imp__sub_820D7BF8,
-       hooks::SceneLoadersTrafficApplyPalette, true, false, 4124, 4256},
+       ITC_CONTEXT_FN(hooks::SceneLoadersTrafficApplyPalette), true, false, 4124, 4256},
   };
   for (const Walk& walk : walks) {
     Results results(walk.name);
@@ -484,7 +484,7 @@ void Queries(Context& h, Random& r, uint32_t block) {
             Put(h.base, block + 4000 + 20, r.Below(9));
             t.r3.u64 = block;
           },
-          __imp__sub_820D4588, hooks::SceneLoadersCarModelSelectedTexture,
+          __imp__sub_820D4588, ITC_CONTEXT_FN(hooks::SceneLoadersCarModelSelectedTexture),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -507,7 +507,7 @@ void Queries(Context& h, Random& r, uint32_t block) {
             accessories(block + 0x1800);
             t.r3.u64 = block + 0x1800;
           },
-          __imp__sub_820F07D8, hooks::SceneLoadersAccessoriesAllLoaded,
+          __imp__sub_820F07D8, ITC_CONTEXT_FN(hooks::SceneLoadersAccessoriesAllLoaded),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -528,7 +528,7 @@ void Queries(Context& h, Random& r, uint32_t block) {
             accessories(block + 0x1800);
             t.r3.u64 = interior;
           },
-          __imp__sub_820D7790, hooks::SceneLoadersInteriorIsLoaded, fmt::format("case {}", c));
+          __imp__sub_820D7790, ITC_CONTEXT_FN(hooks::SceneLoadersInteriorIsLoaded), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -590,7 +590,7 @@ void Names(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = block + 0x100;
             t.r4.u64 = block + 0x200;
           },
-          __imp__sub_820CE800, hooks::SceneLoadersNameMatches, fmt::format("case {}", c));
+          __imp__sub_820CE800, ITC_CONTEXT_FN(hooks::SceneLoadersNameMatches), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -616,7 +616,7 @@ void Names(Context& h, Random& r, uint32_t block) {
             xpr(block, "x");
             t.r3.u64 = block;
           },
-          __imp__sub_82596F20, hooks::SceneLoadersXprCount, fmt::format("case {}", c));
+          __imp__sub_82596F20, ITC_CONTEXT_FN(hooks::SceneLoadersXprCount), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -631,7 +631,7 @@ void Names(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = block;
             t.r4.u64 = r.Below(8) == 0 ? r.Next() : r.Below(8);
           },
-          __imp__sub_82596F40, hooks::SceneLoadersXprRecordName, fmt::format("case {}", c));
+          __imp__sub_82596F40, ITC_CONTEXT_FN(hooks::SceneLoadersXprRecordName), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -647,7 +647,7 @@ void Names(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = block;
             t.r4.u64 = block + 0x400;
           },
-          __imp__sub_820D09B8, hooks::SceneLoadersXprFindByName, fmt::format("case {}", c));
+          __imp__sub_820D09B8, ITC_CONTEXT_FN(hooks::SceneLoadersXprFindByName), fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -668,7 +668,7 @@ void Loads(Context& h, Random& r, uint32_t block) {
         PPCContext t = CallContext(h);
         t.r1.u64 &= ~0xFull;
         t.r3.u64 = loads;
-        (v == 0 ? __imp__sub_820D3DE0 : hooks::SceneLoadersCarModelLoadsConstruct)(t, h.base);
+        (v == 0 ? __imp__sub_820D3DE0 : ITC_CONTEXT_FN(hooks::SceneLoadersCarModelLoadsConstruct))(t, h.base);
         for (uint32_t offset : sl::kCarModelLoadsProviders) {
           TakeProvider(h.base, loads + offset, out[v]);
         }
@@ -709,7 +709,7 @@ void Loads(Context& h, Random& r, uint32_t block) {
         PPCContext t = CallContext(h);
         t.r1.u64 &= ~0xFull;
         t.r3.u64 = loads;
-        (v == 0 ? __imp__sub_820D3E40 : hooks::SceneLoadersCarModelLoadsDestruct)(t, h.base);
+        (v == 0 ? __imp__sub_820D3E40 : ITC_CONTEXT_FN(hooks::SceneLoadersCarModelLoadsDestruct))(t, h.base);
         for (int i = 0; i < 2; i++) {
           out[v].Word(memory::IsHeapBlock(storage[i]));
         }
@@ -753,9 +753,9 @@ void Resets(Context& h, Random& r, uint32_t block) {
   };
   const Reset resets[] = {
       {"CarModelLoads::Reset (sub_820D3B58, on the game's list)", __imp__sub_820D3B58,
-       hooks::SceneLoadersCarModelLoadsReset, loads},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCarModelLoadsReset), loads},
       {"CarModel::Reset (sub_820D3E98, on the game's list)", __imp__sub_820D3E98,
-       hooks::SceneLoadersCarModelReset, car},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCarModelReset), car},
   };
   const uint32_t saved_set = guest::LoadU32(h.base, sl::kFirstSet);
   for (const Reset& reset : resets) {
@@ -863,13 +863,13 @@ void Parts(Context& h, Random& r, uint32_t block) {
   };
   const Function functions[] = {
       {"CarPartsLoads::CarPartsLoads (sub_820D6F88)", __imp__sub_820D6F88,
-       hooks::SceneLoadersCarPartsLoadsConstruct, kLoadsConstruct},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCarPartsLoadsConstruct), kLoadsConstruct},
       {"CarParts::CarParts (sub_820D7428, on the game's list)", __imp__sub_820D7428,
-       hooks::SceneLoadersCarPartsConstruct, kConstruct},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCarPartsConstruct), kConstruct},
       {"CarParts::Release (sub_820D6D00, on the game's list)", __imp__sub_820D6D00,
-       hooks::SceneLoadersCarPartsRelease, kRelease},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCarPartsRelease), kRelease},
       {"CarPartsLoads::~CarPartsLoads (sub_820D6FE8, on the game's list)", __imp__sub_820D6FE8,
-       hooks::SceneLoadersCarPartsLoadsDestruct, kLoadsDestruct},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCarPartsLoadsDestruct), kLoadsDestruct},
   };
   for (const Function& f : functions) {
     Results results(f.name);
@@ -982,7 +982,7 @@ void Parts(Context& h, Random& r, uint32_t block) {
         PPCContext t = CallContext(h);
         t.r1.u64 &= ~0xFull;
         t.r3.u64 = object;
-        RunSide(v, __imp__sub_820D6948, hooks::SceneLoadersPool4Reset, t, h.base);
+        RunSide(v, __imp__sub_820D6948, ITC_CONTEXT_FN(hooks::SceneLoadersPool4Reset), t, h.base);
         pending_frees::TakeAddedNodes(h.base, was, out[v]);
         TakeProvider(h.base, object + 112 + models::kModelTextures, out[v]);
         out[v].Bytes(Read(h.base, block, kSmallBytes));
@@ -1023,15 +1023,15 @@ void Cockpits(Context& h, Random& r, uint32_t block) {
   };
   const Function functions[] = {
       {"CockpitLoads::CockpitLoads (sub_820D6010)", __imp__sub_820D6010,
-       hooks::SceneLoadersCockpitLoadsConstruct, kLoadsConstruct},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCockpitLoadsConstruct), kLoadsConstruct},
       {"Cockpit::Cockpit (sub_820D63A0, on the game's list)", __imp__sub_820D63A0,
-       hooks::SceneLoadersCockpitConstruct, kConstruct},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCockpitConstruct), kConstruct},
       {"Cockpit::Release (sub_820D6238, on the game's list)", __imp__sub_820D6238,
-       hooks::SceneLoadersCockpitRelease, kRelease},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCockpitRelease), kRelease},
       {"CockpitLoads::~CockpitLoads (sub_820D6090, on the game's list)", __imp__sub_820D6090,
-       hooks::SceneLoadersCockpitLoadsDestruct, kLoadsDestruct},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCockpitLoadsDestruct), kLoadsDestruct},
       {"Interior::Interior (sub_820D78B8, on the game's list)", __imp__sub_820D78B8,
-       hooks::SceneLoadersInteriorConstruct, kInterior},
+       ITC_CONTEXT_FN(hooks::SceneLoadersInteriorConstruct), kInterior},
   };
   // The texture providers the objects hold: the loads' two and each part
   // model's (the cockpit's at the loads' +512, the interior's at its +304).
@@ -1192,13 +1192,13 @@ void InteriorReleases(Context& h, Random& r, uint32_t block) {
   };
   const Function functions[] = {
       {"Interior::Release (sub_820D75F8, on the game's list)", __imp__sub_820D75F8,
-       hooks::SceneLoadersInteriorRelease, kRelease},
+       ITC_CONTEXT_FN(hooks::SceneLoadersInteriorRelease), kRelease},
       {"Interior::~Interior (sub_820D76D8, on the game's list)", __imp__sub_820D76D8,
-       hooks::SceneLoadersInteriorDestruct, kDestruct},
+       ITC_CONTEXT_FN(hooks::SceneLoadersInteriorDestruct), kDestruct},
       {"Interior's deleting destructor (sub_820D7960, on the game's list)", __imp__sub_820D7960,
-       hooks::SceneLoadersInteriorDeletingDestruct, kDeleting},
+       ITC_CONTEXT_FN(hooks::SceneLoadersInteriorDeletingDestruct), kDeleting},
       {"ScenePools::ReleaseA (sub_820C4488, the interior or no release)", __imp__sub_820C4488,
-       hooks::SceneLoadersReleaseA, kReleaseA},
+       ITC_CONTEXT_FN(hooks::SceneLoadersReleaseA), kReleaseA},
   };
   auto providers = [&]() {
     std::vector<uint32_t> list_of;
@@ -1367,19 +1367,19 @@ void WheelsAndTraffic(Context& h, Random& r, uint32_t block) {
   };
   const Function functions[] = {
       {"WheelsLoads::WheelsLoads (sub_820D8F60)", __imp__sub_820D8F60,
-       hooks::SceneLoadersWheelsLoadsConstruct, kConstruct, &wheels, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersWheelsLoadsConstruct), kConstruct, &wheels, false},
       {"WheelsLoads::Reset (sub_820D8AA8, on the game's list)", __imp__sub_820D8AA8,
-       hooks::SceneLoadersWheelsLoadsReset, kReset, &wheels, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersWheelsLoadsReset), kReset, &wheels, false},
       {"Wheels::Reset (sub_820D8B58, on the game's list)", __imp__sub_820D8B58,
-       hooks::SceneLoadersWheelsReset, kReset, &wheels, true},
+       ITC_CONTEXT_FN(hooks::SceneLoadersWheelsReset), kReset, &wheels, true},
       {"WheelsLoads::~WheelsLoads (sub_820D9010, on the game's list)", __imp__sub_820D9010,
-       hooks::SceneLoadersWheelsLoadsDestruct, kDestruct, &wheels, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersWheelsLoadsDestruct), kDestruct, &wheels, false},
       {"TrafficLoads::TrafficLoads (sub_820D7C40)", __imp__sub_820D7C40,
-       hooks::SceneLoadersTrafficLoadsConstruct, kConstruct, &traffic, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersTrafficLoadsConstruct), kConstruct, &traffic, false},
       {"TrafficCar::Reset (sub_820D7AB0, on the game's list)", __imp__sub_820D7AB0,
-       hooks::SceneLoadersTrafficReset, kReset, &traffic, true},
+       ITC_CONTEXT_FN(hooks::SceneLoadersTrafficReset), kReset, &traffic, true},
       {"TrafficLoads::~TrafficLoads (sub_820D7CC0, on the game's list)", __imp__sub_820D7CC0,
-       hooks::SceneLoadersTrafficLoadsDestruct, kDestruct, &traffic, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersTrafficLoadsDestruct), kDestruct, &traffic, false},
   };
   for (const Function& f : functions) {
     const Layout& l = *f.layout;
@@ -1567,43 +1567,43 @@ void Lifetimes(Context& h, Random& r, uint32_t block) {
   };
   const Function functions[] = {
       {"Pool4Object::Pool4Object (sub_820D6A70, on the game's list)", __imp__sub_820D6A70,
-       hooks::SceneLoadersPool4Construct, kConstruct, &pool4, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersPool4Construct), kConstruct, &pool4, false},
       {"Pool4Object::Release (sub_820D6A20, on the game's list)", __imp__sub_820D6A20,
-       hooks::SceneLoadersPool4Release, kRelease, &pool4, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersPool4Release), kRelease, &pool4, false},
       {"Pool4Object::~Pool4Object (sub_820D6AD0, on the game's list)", __imp__sub_820D6AD0,
-       hooks::SceneLoadersPool4Destruct, kDestruct, &pool4, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersPool4Destruct), kDestruct, &pool4, false},
       {"Pool4Object's deleting destructor (sub_820D6BC0, on the game's list)", __imp__sub_820D6BC0,
-       hooks::SceneLoadersPool4DeletingDestruct, kDestruct, &pool4, true},
+       ITC_CONTEXT_FN(hooks::SceneLoadersPool4DeletingDestruct), kDestruct, &pool4, true},
       {"Wheels::Wheels (sub_820D9570, on the game's list)", __imp__sub_820D9570,
-       hooks::SceneLoadersWheelsConstruct, kConstruct, &wheels, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersWheelsConstruct), kConstruct, &wheels, false},
       {"Wheels::Release (sub_820D8E68, on the game's list)", __imp__sub_820D8E68,
-       hooks::SceneLoadersWheelsRelease, kRelease, &wheels, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersWheelsRelease), kRelease, &wheels, false},
       {"Wheels::~Wheels (sub_820D90B8, on the game's list)", __imp__sub_820D90B8,
-       hooks::SceneLoadersWheelsDestruct, kDestruct, &wheels, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersWheelsDestruct), kDestruct, &wheels, false},
       {"Wheels' deleting destructor (sub_820D95E8, on the game's list)", __imp__sub_820D95E8,
-       hooks::SceneLoadersWheelsDeletingDestruct, kDestruct, &wheels, true},
+       ITC_CONTEXT_FN(hooks::SceneLoadersWheelsDeletingDestruct), kDestruct, &wheels, true},
       {"CarModel::CarModel (sub_820D5890, on the game's list)", __imp__sub_820D5890,
-       hooks::SceneLoadersCarModelConstruct, kConstruct, &car, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCarModelConstruct), kConstruct, &car, false},
       {"CarModel::~CarModel (sub_820D4750, on the game's list)", __imp__sub_820D4750,
-       hooks::SceneLoadersCarModelDestruct, kDestruct, &car, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCarModelDestruct), kDestruct, &car, false},
       {"CarModel's deleting destructor (sub_820D5988, on the game's list)", __imp__sub_820D5988,
-       hooks::SceneLoadersCarModelDeletingDestruct, kDestruct, &car, true},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCarModelDeletingDestruct), kDestruct, &car, true},
       {"CarParts::~CarParts (sub_820D7038, on the game's list)", __imp__sub_820D7038,
-       hooks::SceneLoadersCarPartsDestruct, kDestruct, &parts, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCarPartsDestruct), kDestruct, &parts, false},
       {"CarParts' deleting destructor (sub_820D74C0, on the game's list)", __imp__sub_820D74C0,
-       hooks::SceneLoadersCarPartsDeletingDestruct, kDestruct, &parts, true},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCarPartsDeletingDestruct), kDestruct, &parts, true},
       {"Cockpit::~Cockpit (sub_820D64D0, on the game's list)", __imp__sub_820D64D0,
-       hooks::SceneLoadersCockpitDestruct, kDestruct, &cockpit, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCockpitDestruct), kDestruct, &cockpit, false},
       {"Cockpit's deleting destructor (sub_820D6798, on the game's list)", __imp__sub_820D6798,
-       hooks::SceneLoadersCockpitDeletingDestruct, kDestruct, &cockpit, true},
+       ITC_CONTEXT_FN(hooks::SceneLoadersCockpitDeletingDestruct), kDestruct, &cockpit, true},
       {"TrafficCar::TrafficCar (sub_820D8908, on the game's list)", __imp__sub_820D8908,
-       hooks::SceneLoadersTrafficConstruct, kConstruct, &traffic, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersTrafficConstruct), kConstruct, &traffic, false},
       {"TrafficCar::Release (sub_820D7B90, on the game's list)", __imp__sub_820D7B90,
-       hooks::SceneLoadersTrafficRelease, kRelease, &traffic, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersTrafficRelease), kRelease, &traffic, false},
       {"TrafficCar::~TrafficCar (sub_820D7E90, on the game's list)", __imp__sub_820D7E90,
-       hooks::SceneLoadersTrafficDestruct, kDestruct, &traffic, false},
+       ITC_CONTEXT_FN(hooks::SceneLoadersTrafficDestruct), kDestruct, &traffic, false},
       {"TrafficCar's deleting destructor (sub_820D89B8, on the game's list)", __imp__sub_820D89B8,
-       hooks::SceneLoadersTrafficDeletingDestruct, kDestruct, &traffic, true},
+       ITC_CONTEXT_FN(hooks::SceneLoadersTrafficDeletingDestruct), kDestruct, &traffic, true},
   };
   for (const Function& f : functions) {
     const ObjectLayout& l = *f.layout;
@@ -1776,7 +1776,7 @@ void CreateCases(Context& h, Random& r, uint32_t block) {
       t.r1.u64 &= ~0xFull;
       t.r3.u64 = set;
       t.r4.u64 = record;
-      RunSide(v, __imp__sub_820C3FD8, hooks::SceneLoadersCreateA, t, h.base);
+      RunSide(v, __imp__sub_820C3FD8, ITC_CONTEXT_FN(hooks::SceneLoadersCreateA), t, h.base);
       // The objects, pool by pool along the lists (past a node already there).
       std::vector<PageRegion> regions;
       std::vector<std::pair<uint32_t, uint32_t>> objects;  // pool, object
@@ -1909,7 +1909,7 @@ void PartLoadedCases(Context& h, Random& r, uint32_t block) {
       t.r1.u64 &= ~0xFull;
       t.r3.u64 = request;
       t.r6.u64 = interior;
-      RunSide(v, __imp__sub_820D7578, hooks::SceneLoadersInteriorOnPartLoaded, t, h.base);
+      RunSide(v, __imp__sub_820D7578, ITC_CONTEXT_FN(hooks::SceneLoadersInteriorOnPartLoaded), t, h.base);
       pending_frees::TakeAddedNodes(h.base, was, out[v]);
       const bool alive = pages != 0 && memory::IsPages(pages);
       out[v].Word(alive);
@@ -2037,7 +2037,7 @@ void Binds(Context& h, Random& r, uint32_t block) {
             BindXpr(h.base, block, block + 448, wanted, r);
             t.r3.u64 = block;
           },
-          sl::kCockpitBindFrameBytes, __imp__sub_820D6108, hooks::SceneLoadersCockpitBindTextures,
+          sl::kCockpitBindFrameBytes, __imp__sub_820D6108, ITC_CONTEXT_FN(hooks::SceneLoadersCockpitBindTextures),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -2059,7 +2059,7 @@ void Binds(Context& h, Random& r, uint32_t block) {
             BindXpr(h.base, block, block + 4016, wanted, r);
             t.r3.u64 = block;
           },
-          sl::kTrafficBindFrameBytes, __imp__sub_820D7D38, hooks::SceneLoadersTrafficBindTextures,
+          sl::kTrafficBindFrameBytes, __imp__sub_820D7D38, ITC_CONTEXT_FN(hooks::SceneLoadersTrafficBindTextures),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -2186,7 +2186,7 @@ void ModelPoints(Context& h, Random& r, uint32_t block) {
       RandomBytes(h.base, frame - 512, sl::kModelPointFrameBytes + 512, g);
       t.r3.u64 = point;
       t.r4.u64 = model;
-      RunSide(v, __imp__sub_820D02D0, hooks::SceneLoadersModelPointFind, t, h.base);
+      RunSide(v, __imp__sub_820D02D0, ITC_CONTEXT_FN(hooks::SceneLoadersModelPointFind), t, h.base);
       out[v].Bytes(Read(h.base, point, 16));
       out[v].Floats(h.base, point + 16, 36);
       out[v].Bytes(Read(h.base, point + 160, 80));
@@ -2347,7 +2347,7 @@ void CockpitLoadedCases(Context& h, Random& r, uint32_t block) {
       t.r3.u64 = request;
       t.r4.u64 = buffer;
       t.r6.u64 = cockpit;
-      RunSide(v, __imp__sub_820D6528, hooks::SceneLoadersCockpitOnFileLoaded, t, h.base);
+      RunSide(v, __imp__sub_820D6528, ITC_CONTEXT_FN(hooks::SceneLoadersCockpitOnFileLoaded), t, h.base);
       pending_frees::TakeAddedNodes(h.base, was, out[v]);
       const bool alive = pages != 0 && memory::IsPages(pages);
       out[v].Word(alive);
@@ -2535,7 +2535,7 @@ void TrafficLoadedCases(Context& h, Random& r, uint32_t block) {
       t.r3.u64 = request;
       t.r4.u64 = uint32_t(in.Next());
       t.r6.u64 = traffic;
-      RunSide(v, __imp__sub_820D8430, hooks::SceneLoadersTrafficOnFileLoaded, t, h.base);
+      RunSide(v, __imp__sub_820D8430, ITC_CONTEXT_FN(hooks::SceneLoadersTrafficOnFileLoaded), t, h.base);
       pending_frees::TakeAddedNodes(h.base, was, out[v]);
       const bool alive = memory::IsPages(container);
       out[v].Word(alive);

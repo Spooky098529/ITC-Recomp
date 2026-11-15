@@ -125,7 +125,7 @@ void CourseRecordsOf(Context& h, const Block& block) {
       t.r3.u64 = records;
       t.r4.u64 = pair;
       ITC_FLAG(native_save_data) = v == 1;
-      (v == 0 ? __imp__sub_82105BF8 : hooks::SaveDataCourseRecordsOf)(t, h.base);
+      (v == 0 ? __imp__sub_82105BF8 : ITC_CONTEXT_FN(hooks::SaveDataCourseRecordsOf))(t, h.base);
       ITC_FLAG(native_save_data) = true;
       for (const uint64_t r : {t.r3.u64, t.r10.u64, t.r11.u64}) {
         out[v].Word(uint32_t(r));
@@ -153,7 +153,7 @@ void TwoPlayerBlock(Context& h, const Block& block) {
       t.r3.u64 = r3;
       t.r11.u64 = r11;
       ITC_FLAG(native_save_data) = v == 1;
-      (v == 0 ? __imp__sub_82105678 : hooks::SaveDataTwoPlayerBlock)(t, h.base);
+      (v == 0 ? __imp__sub_82105678 : ITC_CONTEXT_FN(hooks::SaveDataTwoPlayerBlock))(t, h.base);
       ITC_FLAG(native_save_data) = true;
       for (const uint64_t r : {t.r3.u64, t.r11.u64}) {
         out[v].Word(uint32_t(r));
@@ -195,7 +195,7 @@ void Delete(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = player;
       ITC_FLAG(native_save_data) = v == 1;
-      (v == 0 ? __imp__sub_821055D8 : hooks::SaveDataDelete)(t, h.base);
+      (v == 0 ? __imp__sub_821055D8 : ITC_CONTEXT_FN(hooks::SaveDataDelete))(t, h.base);
       ITC_FLAG(native_save_data) = true;
       const bool freed = block == 0 || !memory::IsHeapBlock(block);
       if (!freed) {
@@ -247,7 +247,7 @@ void Create(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = player;
       ITC_FLAG(native_save_data) = v == 1;
-      (v == 0 ? __imp__sub_821057C8 : hooks::SaveDataCreate)(t, h.base);
+      (v == 0 ? __imp__sub_821057C8 : ITC_CONTEXT_FN(hooks::SaveDataCreate))(t, h.base);
       ITC_FLAG(native_save_data) = true;
       const uint32_t block = guest::LoadU32(h.base, slot);
       out[v].Word(block == prefilled && block != 0 ? 1 : 0);
@@ -292,7 +292,7 @@ void CreateTwoPlayerBlock(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = random.Next();
       ITC_FLAG(native_save_data) = v == 1;
-      (v == 0 ? __imp__sub_82105740 : hooks::SaveDataCreateTwoPlayerBlock)(t, h.base);
+      (v == 0 ? __imp__sub_82105740 : ITC_CONTEXT_FN(hooks::SaveDataCreateTwoPlayerBlock))(t, h.base);
       ITC_FLAG(native_save_data) = true;
       const uint32_t block = guest::LoadU32(h.base, save_data::kTwoPlayerBlock);
       out[v].Word(block == prefilled && block != 0 ? 1 : 0);
@@ -368,7 +368,7 @@ void MenuListInit(Context& h) {
       guest::StoreU32(h.base, t.r1.u32 + 84, ids[5]);
       guest::StoreU32(h.base, t.r1.u32 + 92, ids[6]);
       ITC_FLAG(native_save_data) = v == 1;
-      (v == 0 ? __imp__sub_8220BAC0 : hooks::SaveDataMenuListInit)(t, h.base);
+      (v == 0 ? __imp__sub_8220BAC0 : ITC_CONTEXT_FN(hooks::SaveDataMenuListInit))(t, h.base);
       ITC_FLAG(native_save_data) = true;
       RecordList(out[v], h, list, old, t);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
@@ -429,7 +429,7 @@ void ResetControllers(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = random.Next();
       ITC_FLAG(native_save_data) = v == 1;
-      (v == 0 ? __imp__sub_8209F5E0 : hooks::SaveDataResetControllers)(t, h.base);
+      (v == 0 ? __imp__sub_8209F5E0 : ITC_CONTEXT_FN(hooks::SaveDataResetControllers))(t, h.base);
       ITC_FLAG(native_save_data) = true;
       globals.Record(out[v]);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
@@ -479,7 +479,7 @@ void ResetPlayer(Context& h) {
       guest::StoreU32(h.base, save_data::kSlots, prefilled);
       PPCContext t = CallContext(h);
       ITC_FLAG(native_save_data) = v == 1;
-      (v == 0 ? __imp__sub_82221D00 : hooks::SaveDataResetPlayer)(t, h.base);
+      (v == 0 ? __imp__sub_82221D00 : ITC_CONTEXT_FN(hooks::SaveDataResetPlayer))(t, h.base);
       ITC_FLAG(native_save_data) = true;
       const uint32_t block = guest::LoadU32(h.base, save_data::kSlots);
       globals.Record(out[v]);
@@ -510,33 +510,33 @@ void SaveData(Context& h) {
     return;
   }
   OnePointer(h, block, "Stats::Stats (sub_821056C0)", __imp__sub_821056C0,
-             hooks::SaveDataStatsConstruct, save_data::kStatsBytes, 12);
+             ITC_CONTEXT_FN(hooks::SaveDataStatsConstruct), save_data::kStatsBytes, 12);
   OnePointer(h, block, "Stats::ResetRecords (sub_821136D8)", __imp__sub_821136D8,
-             hooks::SaveDataStatsResetRecords, 4 + 15 * 48, 12);
+             ITC_CONTEXT_FN(hooks::SaveDataStatsResetRecords), 4 + 15 * 48, 12);
   OnePointer(h, block, "Stats::Reset (sub_82113730)", __imp__sub_82113730,
-             hooks::SaveDataStatsReset, save_data::kStatsBytes, 12);
+             ITC_CONTEXT_FN(hooks::SaveDataStatsReset), save_data::kStatsBytes, 12);
   OnePointer(h, block, "Progress::Clear (sub_82113BD8)", __imp__sub_82113BD8,
-             hooks::SaveDataProgressClear, save_data::kProgressBytes, 8);
+             ITC_CONTEXT_FN(hooks::SaveDataProgressClear), save_data::kProgressBytes, 8);
   OnePointer(h, block, "BitSet400::SetAll (sub_821133A8)", __imp__sub_821133A8,
-             hooks::SaveDataBitSetAll, 52, 12);
+             ITC_CONTEXT_FN(hooks::SaveDataBitSetAll), 52, 12);
   Getter(h, block, "Defaults::Table50A8 (sub_820CCCC0)", __imp__sub_820CCCC0,
-         hooks::SaveDataTable50A8);
+         ITC_CONTEXT_FN(hooks::SaveDataTable50A8));
   Getter(h, block, "Defaults::Table3044 (sub_820CCCD0)", __imp__sub_820CCCD0,
-         hooks::SaveDataTable3044);
+         ITC_CONTEXT_FN(hooks::SaveDataTable3044));
   Getter(h, block, "Defaults::Table3E34 (sub_820CCCE0)", __imp__sub_820CCCE0,
-         hooks::SaveDataTable3E34);
+         ITC_CONTEXT_FN(hooks::SaveDataTable3E34));
   Getter(h, block, "Defaults::Table3C24 (sub_820CCCF0)", __imp__sub_820CCCF0,
-         hooks::SaveDataTable3C24);
+         ITC_CONTEXT_FN(hooks::SaveDataTable3C24));
   Getter(h, block, "Defaults::Table50E4 (sub_820CCD00)", __imp__sub_820CCD00,
-         hooks::SaveDataTable50E4);
+         ITC_CONTEXT_FN(hooks::SaveDataTable50E4));
   OnePointer(h, block, "Progress::SetDefaults (sub_82113E60)", __imp__sub_82113E60,
-             hooks::SaveDataProgressSetDefaults, save_data::kProgressBytes, 8);
+             ITC_CONTEXT_FN(hooks::SaveDataProgressSetDefaults), save_data::kProgressBytes, 8);
   OnePointer(h, block, "ControlMap::SetDefault (sub_821058A8)", __imp__sub_821058A8,
-             hooks::SaveDataControlMapSetDefault, 60, 12);
+             ITC_CONTEXT_FN(hooks::SaveDataControlMapSetDefault), 60, 12);
   OnePointer(h, block, "Options::SetDefaults (sub_82105940)", __imp__sub_82105940,
-             hooks::SaveDataOptionsSetDefaults, 284, 12);
+             ITC_CONTEXT_FN(hooks::SaveDataOptionsSetDefaults), 284, 12);
   OnePointer(h, block, "CourseRecords::Reset (sub_82105D08)", __imp__sub_82105D08,
-             hooks::SaveDataCourseRecordsReset, 20 + 22 * 408, 12);
+             ITC_CONTEXT_FN(hooks::SaveDataCourseRecordsReset), 20 + 22 * 408, 12);
   CourseRecordsOf(h, block);
   TwoPlayerBlock(h, block);
   Delete(h);

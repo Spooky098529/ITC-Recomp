@@ -3,6 +3,7 @@
 // shares (hooks/race_hud_object.h).
 
 #include "hooks/race_hud_object.h"
+#include "hooks/native_entry.h"
 
 
 #include "base/flags.h"
@@ -87,7 +88,7 @@ namespace {
 // The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -103,11 +104,11 @@ class GuestCalls {
   static uint64_t CallSound(void* user, uint32_t function, const uint64_t args[4], int set,
                             uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
-    PPCRegister* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
+    lifted::Temp* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
     for (int i = 0; i < set; i++) {
       registers[i]->u64 = args[i];
     }
@@ -120,7 +121,7 @@ class GuestCalls {
   static uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool set_r4,
                            uint32_t frame, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = frame;
@@ -136,7 +137,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -157,321 +158,321 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
-void RaceHudObjectCurveEval(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectCurveEval) {
   ctx.fpscr.disableFlushMode();
   rh::CurveEval(base, ctx.r3.u32, ctx.f1.f64);
 }
 
-void RaceHudObjectPowInt(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectPowInt) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = rh::PowInt(base, ctx.f1.f64, ctx.r4.s32);
 }
 
-void RaceHudObjectBarStep(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectBarStep) {
   ctx.fpscr.disableFlushMode();
   rh::BarStep(base, ctx.r3.u32, ctx.r4.s32, ctx.r1.u32);
 }
 
-void RaceHudObjectSetGear(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetGear) {
   ctx.r3.u64 = rh::SetGear(base, ctx.r3.u32, ctx.r4.s32, ctx.r1.u32);
 }
 
-void RaceHudObjectSetBar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetBar) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rh::SetBar(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
-void RaceHudObjectResetBar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectResetBar) {
   ctx.fpscr.disableFlushMode();
   rh::ResetBar(base, ctx.r3.u32);
 }
 
-void RaceHudObjectClearWarning(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectClearWarning) {
   rh::ClearWarning(base, ctx.r3.u32);
 }
 
-void RaceHudObjectSetPlayer(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetPlayer) {
   ctx.r3.u64 = rh::SetPlayer(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void RaceHudObjectTouching(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectTouching) {
   ctx.r3.u64 = rh::Touching(base, ctx.r4.u32, ctx.r1.u32);
 }
 
-void RaceHudObjectSetTach(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetTach) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rh::SetTach(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
-void RaceHudObjectSetBoost(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetBoost) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rh::SetBoost(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
-void RaceHudObjectSetSpeed(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetSpeed) {
   ctx.fpscr.disableFlushMode();
   double f1 = ctx.f1.f64;
   ctx.r3.u64 = rh::SetSpeed(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, &f1);
   ctx.f1.f64 = f1;
 }
 
-void RaceHudObjectSetTime(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetTime) {
   ctx.r3.u64 = rh::SetTime(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
-void RaceHudObjectSetDistance(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetDistance) {
   ctx.fpscr.disableFlushMode();
   double f1 = ctx.f1.f64;
   ctx.r3.u64 = rh::SetDistance(base, ctx.r3.u32, ctx.r1.u32, &f1);
   ctx.f1.f64 = f1;
 }
 
-void RaceHudObjectReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectReset) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rh::Reset(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void RaceHudObjectShowGauge(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectShowGauge) {
   ctx.r3.u64 = rh::ShowGauge(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
-void RaceHudObjectSetUpExtraGauges(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetUpExtraGauges) {
   ctx.r3.u64 = rh::SetUpExtraGauges(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void RaceHudObjectApplyOptions(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectApplyOptions) {
   ctx.r3.u64 = rh::ApplyOptions(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void RaceHudObjectUpdateView(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectUpdateView) {
   ctx.r3.u64 = rh::UpdateView(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void RaceHudObjectSetUpGauges(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetUpGauges) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::SetUpGauges(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectSetUpMirror(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetUpMirror) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::SetUpMirror(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectTearDown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectTearDown) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::TearDown(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectSetUpSigns(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetUpSigns) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::SetUpSigns(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectUpdateExtraGauges(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectUpdateExtraGauges) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::UpdateExtraGauges(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u64, ctx.r6.u64,
                                      ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectUpdateSigns(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectUpdateSigns) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::UpdateSigns(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls(),
                                guest.zone_calls());
 }
 
-void RaceHudObjectUpdateSign(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectUpdateSign) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::UpdateSign(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls(),
                               guest.zone_calls());
 }
 
-void RaceHudObjectUpdatePlaceName(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectUpdatePlaceName) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       rh::UpdatePlaceName(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.zone_calls());
 }
 
-void RaceHudObjectTick(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectTick) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::Tick(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls(),
                         guest.zone_calls());
 }
 
-void RaceHudObjectTickTimer(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectTickTimer) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::TickTimer(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectStartCountdown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectStartCountdown) {
   ctx.r3.u64 = rh::StartCountdown(base, ctx.r3.u32);
 }
 
-void RaceHudObjectStartMovie1(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectStartMovie1) {
   ctx.r3.u64 = rh::StartMovie1(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void RaceHudObjectFinishMovie1(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectFinishMovie1) {
   const uint32_t lr = uint32_t(ctx.lr);
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::FinishMovie1(base, ctx.r3.u32, ctx.r1.u32, lr, guest.calls());
 }
 
-void RaceHudObjectDrawWarning(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectDrawWarning) {
   const uint32_t lr = uint32_t(ctx.lr);
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::DrawWarning(base, ctx.r3.u32, ctx.r1.u32, lr, guest.calls());
 }
 
-void RaceHudObjectRunMovie1(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectRunMovie1) {
   const uint32_t lr = uint32_t(ctx.lr);
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::RunMovie1(base, ctx.r3.u32, ctx.r1.u32, lr, guest.calls());
 }
 
-void RaceHudObjectRunItem(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectRunItem) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::RunItem(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectMovieMask(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectMovieMask) {
   ctx.r3.u64 = rh::MovieMask(ctx.r4.u32);
 }
 
-void RaceHudObjectInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectInit) {
   ctx.r3.u64 = rh::Init(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void RaceHudObjectDraw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectDraw) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::Draw(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectUpdateWarning(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectUpdateWarning) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::UpdateWarning(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectUpdateRecordingFull(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectUpdateRecordingFull) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::UpdateRecordingFull(base, ctx.r3.u32, ctx.r4.s32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectShowItem(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectShowItem) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::ShowItem(base, ctx.r3.u32, ctx.r4.s32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectUpdateItem(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectUpdateItem) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::UpdateItem(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectSetUpTimer(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetUpTimer) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::SetUpTimer(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectSetUpRacers(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetUpRacers) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::SetUpRacers(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectSetMode(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectSetMode) {
   ctx.fpscr.disableFlushMode();
   const uint32_t lr = uint32_t(ctx.lr);
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::SetMode(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, lr, guest.calls());
 }
 
-void RaceHudObjectMake1004(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectMake1004) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::Make1004(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectScreensInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectScreensInit) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::ScreensInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectScreensCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectScreensCreate) {
   if (!NativeHeapActive()) {
-    __imp__sub_82211F40(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82211F40);
     return;
   }
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::ScreensCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectScreensDestruct(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectScreensDestruct) {
   if (!NativeHeapActive()) {
-    __imp__sub_82211B98(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82211B98);
     return;
   }
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::ScreensDestruct(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectScreensDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectScreensDestroy) {
   if (!NativeHeapActive()) {
-    __imp__sub_82211D18(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82211D18);
     return;
   }
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::ScreensDestroy(base, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectDrawPauseMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectDrawPauseMenu) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::DrawPauseMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectDrawAfterRaceMenu(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectDrawAfterRaceMenu) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::DrawAfterRaceMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
-void RaceHudObjectRunCountdown(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectRunCountdown) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       rh::RunCountdown(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls(), &ctx.f1.f64);
 }
 
-void RaceHudObjectUpdateRacerBar(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectUpdateRacerBar) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::UpdateRacerBar(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32,
                                   guest.calls(), guest.sound_calls());
 }
 
-void RaceHudObjectRunWarning(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectRunWarning) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::RunWarning(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls());
 }
 
-void RaceHudObjectTickRacers(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectTickRacers) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 =
       rh::TickRacers(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls());
 }
 
-void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceHudObjectTickPanel) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = rh::TickPanel(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls());

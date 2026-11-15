@@ -6,6 +6,7 @@
 // adapter: its step is the harness's).
 
 #include "hooks/race_end.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/archive.h"
@@ -36,7 +37,7 @@ namespace re = race_end;
 // race event's tests. The adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base)
+  GuestCalls(lifted::Regs& ctx, uint8_t* base)
       : ctx_(ctx), base_(base), lr_(ctx.lr), event_(ctx, base) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
@@ -52,7 +53,7 @@ class GuestCalls {
     ctx_.r1.u64 = r1;
     ctx_.lr = lr;
     ctx_.ctr.u64 = function;
-    PPCContext& ctx = ctx_;
+    lifted::Regs& ctx = ctx_;
     uint8_t* base = base_;
     lifted::CallFromContext(ctx, base, function);
     ctx_.r1.u64 = stack;
@@ -62,7 +63,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCRegister* registers[8] = {&self.ctx_.r3, &self.ctx_.r4, &self.ctx_.r5, &self.ctx_.r6,
+    lifted::Temp* registers[8] = {&self.ctx_.r3, &self.ctx_.r4, &self.ctx_.r5, &self.ctx_.r6,
                                  &self.ctx_.r7, &self.ctx_.r8, &self.ctx_.r9, &self.ctx_.r10};
     for (int i = 0; i < 8; i++) {
       registers[i]->u64 = args[i];
@@ -75,14 +76,14 @@ class GuestCalls {
   static uint64_t CallSet(void* user, uint32_t function, const uint64_t args[8], int set,
                           uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCRegister* registers[8] = {&self.ctx_.r3, &self.ctx_.r4, &self.ctx_.r5, &self.ctx_.r6,
+    lifted::Temp* registers[8] = {&self.ctx_.r3, &self.ctx_.r4, &self.ctx_.r5, &self.ctx_.r6,
                                  &self.ctx_.r7, &self.ctx_.r8, &self.ctx_.r9, &self.ctx_.r10};
     for (int i = 0; i < set && i < 8; i++) {
       registers[i]->u64 = args[i];
     }
     return self.Run(function, r1, lr);
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
   RaceEventGuest event_;
@@ -90,7 +91,7 @@ class GuestCalls {
 
 }  // namespace
 
-void RaceModeModeAfterRace(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceModeModeAfterRace) {
   ctx.fpscr.disableFlushMode();
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -101,7 +102,7 @@ void RaceModeModeAfterRace(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void RaceModeNextMode(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceModeNextMode) {
   ctx.fpscr.disableFlushMode();
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t mode = ctx.r4.u32, sp = ctx.r1.u32;
@@ -116,12 +117,7 @@ void RaceModeNextMode(PPCContext& ctx, uint8_t* base) {
 
 // The adapters: the register steps above, or the originals with the flag off.
 #define ITC_RACE_END(address, step)       \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_race_end)) {     \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_race_end)) { \
     hooks::step(ctx, base);               \
   }
 

@@ -6,6 +6,7 @@
 // box run the original.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -41,20 +42,15 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION(address, body)   \
-  extern "C" REX_FUNC(sub_##address) { \
-    REX_FUNC_PROLOGUE();               \
-    if (!ITC_FLAG(native_collision)) { \
-      __imp__sub_##address(ctx, base); \
-      return;                          \
-    }                                  \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_collision)) { \
     ctx.fpscr.disableFlushMode();      \
     body;                              \
   }
 // The same for one handed a shape record: `call(&value)` false (not a box)
 // runs the original; else r3 = the value.
 #define ITC_COLLISION_RECORD(address, call) \
-  extern "C" REX_FUNC(sub_##address) {      \
-    REX_FUNC_PROLOGUE();                    \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {      \
+    \
     uint32_t value = 0;                     \
     if (!ITC_FLAG(native_collision) || !call) { \
       __imp__sub_##address(ctx, base);      \
@@ -100,15 +96,10 @@ ITC_COLLISION(822BE2C8, ctx.r3.u64 = WordAt8(base, ctx.r3.u32))
 // CollisionObject::Init, is native.
 // Slot 9: r4 = the matrix, r5 = the template; r3 comes back as the box +
 // 96. A template that isn't a box: the original.
-extern "C" REX_FUNC(sub_820B9C40) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_collision)) {
-    __imp__sub_820B9C40(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820B9C40, ITC_FLAG(native_collision)) {
   ctx.fpscr.disableFlushMode();
   if (!BoxPlace(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 288)) {
-    __imp__sub_820B9C40(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820B9C40);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32 + 96;
@@ -126,8 +117,8 @@ ITC_COLLISION_RECORD(820BAE38, CollisionShapeCurrent(base, ctx.r3.u32, &value))
 
 ITC_COLLISION(820BAC00, CollisionShapeUpdateBounds(base, ctx.r3.u32))
 // r4 = the matrix. Copies or a template that aren't boxes: the original.
-extern "C" REX_FUNC(sub_820BB758) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820BB758) {
+  
   if (!ITC_FLAG(native_collision)) {
     lifted::original::c820BB758(ctx, base);
     return;
@@ -149,8 +140,8 @@ extern "C" REX_FUNC(sub_820BB758) {
 // have no adapters: their callers in play are native.
 // The query's tests: shapes that aren't boxes run the original.
 #define ITC_COLLISION_TEST(address, call)    \
-  extern "C" REX_FUNC(sub_##address) {      \
-    REX_FUNC_PROLOGUE();                    \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {      \
+    \
     uint32_t result = 0;                    \
     if (!ITC_FLAG(native_collision)) {      \
       __imp__sub_##address(ctx, base);      \
@@ -177,15 +168,10 @@ ITC_COLLISION(820BBB20, uint32_t r3 = 0;
 // native.
 // Reached through the table 0x82600EB4 (box-box); r3 comes back as the
 // query + 64.
-extern "C" REX_FUNC(sub_820BF038) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_collision)) {
-    __imp__sub_820BF038(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820BF038, ITC_FLAG(native_collision)) {
   ctx.fpscr.disableFlushMode();
   if (!BoxBoxFindImpact(base, ctx.r3.u32)) {
-    __imp__sub_820BF038(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820BF038);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32 + 64;
@@ -199,16 +185,11 @@ extern "C" REX_FUNC(sub_820BF038) {
 // sub_820BF320, sub_820BE150) have no adapters: their caller in play is
 // native.
 // Reached through the table 0x82600E90 (box-box).
-extern "C" REX_FUNC(sub_820BFB28) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_collision)) {
-    __imp__sub_820BFB28(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820BFB28, ITC_FLAG(native_collision)) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
   if (!BoxBoxFindPushOut(base, ctx.r3.u32, ctx.r1.u32 - 96, &r3)) {
-    __imp__sub_820BFB28(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820BFB28);
     return;
   }
   ctx.r3.u64 = r3;
@@ -240,23 +221,23 @@ bool NativeLifetime() {
 }  // namespace
 
 // Slot 0: r4 = the flags; r3 comes back as the shape.
-extern "C" REX_FUNC(sub_820BB140) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820BB140) {
+  
   if (!NativeLifetime() || !ShapeDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_820BB140(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820BB140);
   }
 }
 // Slot 5: r4 = memory or 0; r3 comes back as the copy (or 0).
-extern "C" REX_FUNC(sub_820BB218) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820BB218) {
+  
   uint32_t copy = 0;
   if (!NativeLifetime()) {
-    __imp__sub_820BB218(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820BB218);
     return;
   }
   ctx.fpscr.disableFlushMode();
   if (!BoxClone(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96, &copy)) {
-    __imp__sub_820BB218(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820BB218);
     return;
   }
   ctx.r3.u64 = copy;

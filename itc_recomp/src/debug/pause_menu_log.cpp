@@ -17,6 +17,7 @@
 // "Step 1").
 
 #include "debug/pause_menu_log.h"
+#include "hooks/native_entry.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "hooks/race_screens.h"
@@ -165,7 +166,7 @@ void debug::PauseMenuLog_NoteMapperUpdate(uint32_t caller) {
 
 // The menu list update (natively with --native_race_screens: the adapter's
 // step, hooks/race_screens.h), logged around the update.
-static void MenuListUpdate(PPCContext& ctx, uint8_t* base) {
+static ITC_REGS_STEP(MenuListUpdate) {
   if (ITC_FLAG(native_race_screens)) {
     hooks::RaceScreensListUpdate(ctx, base);
   } else {
@@ -173,8 +174,8 @@ static void MenuListUpdate(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-extern "C" REX_FUNC(sub_8220C1E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8220C1E0) {
+  
   if (!ITC_FLAG(log_pause_menu)) {
     MenuListUpdate(ctx, base);
     return;

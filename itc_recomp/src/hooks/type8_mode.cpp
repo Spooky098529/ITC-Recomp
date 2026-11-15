@@ -6,6 +6,7 @@
 // stay.
 
 #include "hooks/type8_mode.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/type67_modes.h"
@@ -61,7 +62,7 @@ namespace hooks {
 namespace t8m = type8_mode;
 
 #define ITC_T8M_STEP(name, expression)                       \
-  void name(PPCContext& ctx, uint8_t* base) {                \
+  ITC_REGS_STEP(name) {                \
     const t8m::Calls calls = Type67Calls(ctx, base);         \
     (void)calls;                                             \
     const uint32_t sp = ctx.r1.u32;                          \
@@ -83,7 +84,7 @@ ITC_T8M_STEP(Type8DialogNoticePage, t8m::DialogNoticePage(base, ctx.r3.u64, ctx.
 ITC_T8M_STEP(Type8DialogOpenConfirmStep, t8m::DialogOpenConfirmStep(base, ctx.r3.u32, sp, calls))
 
 #define ITC_T8M_SCREEN(name, expression)                     \
-  void name(PPCContext& ctx, uint8_t* base) {                \
+  ITC_REGS_STEP(name) {                \
     const t8m::ScreenCalls calls = Type67ScreensCalls(ctx, base); \
     (void)calls;                                             \
     const uint32_t sp = ctx.r1.u32;                          \
@@ -146,7 +147,7 @@ ITC_T8M_SCREEN(Type8ModeForceExit,
 #undef ITC_T8M_SCREEN
 #undef ITC_T8M_STEP
 
-void Type8ModeInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type8ModeInit) {
   const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
   const t8m::ScreenCalls calls = Type67ScreensCalls(ctx, base);
   ctx.fpscr.disableFlushMode();
@@ -159,12 +160,7 @@ void Type8ModeInit(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_TYPE8_MODE(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {   \
-    REX_FUNC_PROLOGUE();                 \
-    if (!ITC_FLAG(native_type8_mode)) {  \
-      __imp__sub_##address(ctx, base);   \
-      return;                            \
-    }                                    \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type8_mode)) { \
     hooks::step(ctx, base);              \
   }
 

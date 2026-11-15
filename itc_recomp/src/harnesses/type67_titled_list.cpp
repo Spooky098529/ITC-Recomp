@@ -425,11 +425,11 @@ void Deleting(Context& h) {
   };
   const Case cases[] = {
       {"TitledListScreen::DeletingDestructor, deleting", 0x82257990, __imp__sub_82257990,
-       hooks::TitledListScreenDeletingDestruct},
+       ITC_CONTEXT_FN(hooks::TitledListScreenDeletingDestruct)},
       {"NodeListScreen::DeletingDestructor, deleting", 0x82257940, __imp__sub_82257940,
-       hooks::NodeListScreenDeletingDestruct},
+       ITC_CONTEXT_FN(hooks::NodeListScreenDeletingDestruct)},
       {"Type6ListScreen::DeletingDestructor, deleting", 0x82233478, __imp__sub_82233478,
-       hooks::Type6ListScreenDeletingDestruct},
+       ITC_CONTEXT_FN(hooks::Type6ListScreenDeletingDestruct)},
   };
   for (const Case& k : cases) {
     Results results(fmt::format("{} (sub_{:08X})", k.name, k.address));
@@ -482,8 +482,8 @@ void ItemInfos(Context& h, uint32_t block) {
   };
   const Case cases[] = {
       {"Type6ListScreen::ItemInfo", 0x82237008, __imp__sub_82237008,
-       hooks::Type6ListScreenItemInfo},
-      {"NodeScreen::ItemInfo", 0x82259998, __imp__sub_82259998, hooks::NodeScreenItemInfo},
+       ITC_CONTEXT_FN(hooks::Type6ListScreenItemInfo)},
+      {"NodeScreen::ItemInfo", 0x82259998, __imp__sub_82259998, ITC_CONTEXT_FN(hooks::NodeScreenItemInfo)},
   };
   for (const Case& k : cases) {
     Results results(fmt::format("{} (sub_{:08X})", k.name, k.address));
@@ -546,63 +546,63 @@ void Type67TitledList(Context& h) {
   using K = Kind;
   const Function functions[] = {
       {"TitledListScreen::Reset", 0x82257558, 4, K::kAny, {}, __imp__sub_82257558,
-       hooks::TitledListScreenReset},
+       ITC_CONTEXT_FN(hooks::TitledListScreenReset)},
       {"TitledListScreen::Page7", 0x82257490, 8, K::kAny, {}, __imp__sub_82257490,
-       hooks::TitledListScreenPage7},
+       ITC_CONTEXT_FN(hooks::TitledListScreenPage7)},
       {"ListScreen::LeavePage", 0x82255818, 8, K::kAny, {}, __imp__sub_82255818,
-       hooks::ListScreenLeavePage},
+       ITC_CONTEXT_FN(hooks::ListScreenLeavePage)},
       {"TitledListScreen::Page3", 0x822572F0, 8, K::kAny, saves({{16, 0}}), __imp__sub_822572F0,
-       hooks::TitledListScreenPage3},
+       ITC_CONTEXT_FN(hooks::TitledListScreenPage3)},
       {"TitledListScreen::Page4", 0x82257360, 16, K::kAny, saves({{24, 0}}), __imp__sub_82257360,
-       hooks::TitledListScreenPage4},
+       ITC_CONTEXT_FN(hooks::TitledListScreenPage4)},
       {"TitledListScreen::Page2", 0x82257148, 24, K::kAny,
        saves({{32, 0}, {168, 112}, {280, 240}}), __imp__sub_82257148,
-       hooks::TitledListScreenPage2},
+       ITC_CONTEXT_FN(hooks::TitledListScreenPage2)},
       {"TitledListScreen::OnItemMoved", 0x82257B78, 16, K::kAny,
        saves({{80, 0}, {208, 176}, {376, 304}}), __imp__sub_82257B78,
-       hooks::TitledListScreenOnItemMoved},
+       ITC_CONTEXT_FN(hooks::TitledListScreenOnItemMoved)},
       {"TitledListScreen::Step0", 0x82257D48, 16, K::kAny,
        saves({{32, 0}, {168, 128}, {208, 176}, {328, 256}}), __imp__sub_82257D48,
-       hooks::TitledListScreenStep0},
+       ITC_CONTEXT_FN(hooks::TitledListScreenStep0)},
       {"TitledListScreen::Step1", 0x82257FF8, 12, K::kAny, saves({{24, 0}}), __imp__sub_82257FF8,
-       hooks::TitledListScreenStep1},
+       ITC_CONTEXT_FN(hooks::TitledListScreenStep1)},
       {"TitledListScreen::Step2", 0x822580E0, 12, K::kAny,
        saves({{24, 0}, {192, 112}, {320, 288}, {488, 416}}), __imp__sub_822580E0,
-       hooks::TitledListScreenStep2},
+       ITC_CONTEXT_FN(hooks::TitledListScreenStep2)},
       {"TitledListScreen::Draw", 0x822579E8, 24, K::kAny,
        saves({{48, 0}, {240, 208}, {376, 320}, {488, 448}}), __imp__sub_822579E8,
-       hooks::TitledListScreenDraw},
+       ITC_CONTEXT_FN(hooks::TitledListScreenDraw)},
       {"TitledListScreen::Update", 0x82258998, 16, K::kAny,
        saves({{8, 0}, {144, 112}, {320, 224}, {440, 368}, {600, 528}}), __imp__sub_82258998,
-       hooks::TitledListScreenUpdate},
+       ITC_CONTEXT_FN(hooks::TitledListScreenUpdate)},
       {"NodeListScreen::~NodeListScreen", 0x82257000, 8, K::kRelease, saves({{16, 0}}),
-       __imp__sub_82257000, hooks::NodeListScreenDestruct},
+       __imp__sub_82257000, ITC_CONTEXT_FN(hooks::NodeListScreenDestruct)},
       {"TitledListScreen::~TitledListScreen", 0x82257138, 8, K::kRelease, saves({{16, 0}}),
-       __imp__sub_82257138, hooks::TitledListScreenDestruct},
+       __imp__sub_82257138, ITC_CONTEXT_FN(hooks::TitledListScreenDestruct)},
       {"TitledListScreen::DeletingDestructor", 0x82257990, 4, K::kNoDelete,
        saves({{24, 0}, {128, 112}}),
-       __imp__sub_82257990, hooks::TitledListScreenDeletingDestruct},
+       __imp__sub_82257990, ITC_CONTEXT_FN(hooks::TitledListScreenDeletingDestruct)},
       {"NodeListScreen::DeletingDestructor", 0x82257940, 4, K::kNoDelete,
        saves({{24, 0}, {128, 112}}),
-       __imp__sub_82257940, hooks::NodeListScreenDeletingDestruct},
+       __imp__sub_82257940, ITC_CONTEXT_FN(hooks::NodeListScreenDeletingDestruct)},
       // The type 6 list screen's own slots and destructors (type6_list.cpp).
       {"Type6ListScreen::SetItemTexts", 0x822336C0, 8, K::kRow, saves({{32, 0}, {80, 48}}),
-       __imp__sub_822336C0, hooks::Type6ListScreenSetItemTexts},
+       __imp__sub_822336C0, ITC_CONTEXT_FN(hooks::Type6ListScreenSetItemTexts)},
       {"Type6ListScreen::ShowMarks", 0x82233730, 8, K::kMarks, saves({{32, 0}}),
-       __imp__sub_82233730, hooks::Type6ListScreenShowMarks},
+       __imp__sub_82233730, ITC_CONTEXT_FN(hooks::Type6ListScreenShowMarks)},
       {"Type6ListScreen::Back", 0x822337B0, 8, K::kDispatcher, saves({{16, 0}, {120, 112}}),
-       __imp__sub_822337B0, hooks::Type6ListScreenBack},
+       __imp__sub_822337B0, ITC_CONTEXT_FN(hooks::Type6ListScreenBack)},
       // SetUpMenus: LoadItem's saves, and SetItemTexts' varargs words (its
       // frame's +48 to +79, below SetUpMenus' 144 bytes).
       {"Type6ListScreen::SetUpMenus", 0x82233378, 12, K::kInit,
        saves({{40, 0}, {160, 144}, {224, 192}}),
-       __imp__sub_82233378, hooks::Type6ListScreenSetUpMenus},
+       __imp__sub_82233378, ITC_CONTEXT_FN(hooks::Type6ListScreenSetUpMenus)},
       // The destructors: ~NodeListScreen's and ~ListPartInner's saves.
       {"Type6ListScreen::~Type6ListScreen", 0x822332D8, 8, K::kRelease,
        saves({{16, 0}, {112, 96}, {208, 192}}),
-       __imp__sub_822332D8, hooks::Type6ListScreenDestruct},
+       __imp__sub_822332D8, ITC_CONTEXT_FN(hooks::Type6ListScreenDestruct)},
       {"Type6ListScreen::DeletingDestructor", 0x82233478, 4, K::kNoDelete,
-       saves({{24, 0}, {128, 112}, {224, 208}, {320, 304}}), __imp__sub_82233478, hooks::Type6ListScreenDeletingDestruct},
+       saves({{24, 0}, {128, 112}, {224, 208}, {320, 304}}), __imp__sub_82233478, ITC_CONTEXT_FN(hooks::Type6ListScreenDeletingDestruct)},
   };
   for (const Function& f : functions) {
     Run(h, w, block, f);

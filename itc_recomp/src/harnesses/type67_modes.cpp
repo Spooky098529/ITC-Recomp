@@ -348,30 +348,30 @@ void Handlers(Context& h, const Block& world) {
   Handler(h, world, "GarageStage::SetPlates", 0x82178DE8, 8,
           [base](Random&, uint32_t w) { guest::StoreU32(base, w, w + 0x400); },
           [](PPCContext& t, uint32_t) { t.r4.u64 = t.r5.u64 ^ 0x1234; }, __imp__sub_82178DE8,
-          hooks::GarageStageSetPlates);
+          ITC_CONTEXT_FN(hooks::GarageStageSetPlates));
   Handler(h, world, "GarageStage::ResetPose", 0x8217A2D8, 4, none, plain, __imp__sub_8217A2D8,
-          hooks::GarageStageResetPose);
+          ITC_CONTEXT_FN(hooks::GarageStageResetPose));
   Handler(h, world, "CameraPreset::CameraPreset", 0x8217BE08, 4, none, plain,
-          __imp__sub_8217BE08, hooks::CameraPresetConstruct);
+          __imp__sub_8217BE08, ITC_CONTEXT_FN(hooks::CameraPresetConstruct));
   Handler(h, world, "PanelScreen::InitWords", 0x82230740, 4, none, plain, __imp__sub_82230740,
-          hooks::PanelScreenInitWords);
+          ITC_CONTEXT_FN(hooks::PanelScreenInitWords));
   Handler(h, world, "ScreenMachine::Wait", 0x82277068, 4, none, plain, __imp__sub_82277068,
-          hooks::ScreenMachineWait);
+          ITC_CONTEXT_FN(hooks::ScreenMachineWait));
   Handler(h, world, "Screen::Wait", 0x822508F0, 4, none, plain, __imp__sub_822508F0,
-          hooks::ScreenWait);
+          ITC_CONTEXT_FN(hooks::ScreenWait));
   Handler(h, world, "Type7Dialog::QueueReopen", 0x822419D0, 4, none, plain,
-          __imp__sub_822419D0, hooks::DialogQueueReopen);
+          __imp__sub_822419D0, ITC_CONTEXT_FN(hooks::DialogQueueReopen));
   Handler(h, world, "Screen::Reenter", 0x8223B740, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9612); }, plain, __imp__sub_8223B740,
-          hooks::ScreenReenter);
+          ITC_CONTEXT_FN(hooks::ScreenReenter));
   Handler(h, world, "ControllerOptions::Open", 0x821BC660, 4, none, plain, __imp__sub_821BC660,
-          hooks::ControllerOptionsOpen);
+          ITC_CONTEXT_FN(hooks::ControllerOptionsOpen));
   Handler(h, world, "ControllerOptions::Show", 0x821BB260, 8,
           [base](Random& r, uint32_t w) {
             guest::StoreU32(base, t67::kControllerPage, w + kPage);
             if (r.Below(2)) guest::StoreU32(base, w + kPage, 0xFFFFFFFF);
           },
-          plain, __imp__sub_821BB260, hooks::ControllerOptionsShow);
+          plain, __imp__sub_821BB260, ITC_CONTEXT_FN(hooks::ControllerOptionsShow));
   // The ring's count and start small, the mode type 0 to 9 (Handler's).
   Handler(h, world, "ControllerOptions::Leave", 0x821BFB48, 24,
           [base](Random& r, uint32_t w) {
@@ -379,7 +379,7 @@ void Handlers(Context& h, const Block& world) {
             guest::StoreU32(base, w + 0x3200 + 204 + 604, r.Below(r.Below(4) ? 50 : 0x7FFFFFFF));
           },
           [](PPCContext& t, uint32_t w) { t.r4.u64 = w + 0x3200; }, __imp__sub_821BFB48,
-          hooks::ControllerOptionsLeave);
+          ITC_CONTEXT_FN(hooks::ControllerOptionsLeave));
   // The controller pages' steps: the menu (+0x3000) with its side -1, 1, 0
   // or any and its cursor 0 to 13 (now and then any), the settings
   // ([0x826D8494], +0x1000) with page 0's sliders around their bounds; the
@@ -397,11 +397,11 @@ void Handlers(Context& h, const Block& world) {
       }
     };
     Handler(h, world, "ControllerOptions::StepSliders", 0x821BB290, 32, steps, plain,
-            __imp__sub_821BB290, hooks::ControllerOptionsStepSliders);
+            __imp__sub_821BB290, ITC_CONTEXT_FN(hooks::ControllerOptionsStepSliders));
     Handler(h, world, "ControllerOptions::StepButtons", 0x821BB3B8, 16, steps, plain,
-            __imp__sub_821BB3B8, hooks::ControllerOptionsStepButtons);
+            __imp__sub_821BB3B8, ITC_CONTEXT_FN(hooks::ControllerOptionsStepButtons));
     Handler(h, world, "ControllerOptions::StepAnalog", 0x821BB590, 16, steps, plain,
-            __imp__sub_821BB590, hooks::ControllerOptionsStepAnalog);
+            __imp__sub_821BB590, ITC_CONTEXT_FN(hooks::ControllerOptionsStepAnalog));
     guest::StoreU32(base, t67::kControllerSettings, saved_settings);
   }
   // SetMarkY: movie 7 (missing from the table, so UiMovies::Find answers
@@ -438,7 +438,7 @@ void Handlers(Context& h, const Block& world) {
       guest::StoreU32(base, w + 0x1F04, r.Below(2) ? 0 : uint32_t(r.Next()));
     };
     Handler(h, world, "ControllerOptions::SetMarkY", 0x821C0238, 16, marks_y, mark_y,
-            __imp__sub_821C0238, hooks::ControllerOptionsSetMarkY,
+            __imp__sub_821C0238, ITC_CONTEXT_FN(hooks::ControllerOptionsSetMarkY),
             [base](Side& side, PPCContext& t, uint32_t) {
               side.out.Bytes(Read(base, t.r1.u32 - 112, 88));
             });
@@ -446,43 +446,43 @@ void Handlers(Context& h, const Block& world) {
     ITC_LOG_ERROR("harness: type67_modes: movie 7 is in the table; SetMarkY skipped");
   }
   Handler(h, world, "Type6Dialog::Shown", 0x82231F48, 4, none, plain, __imp__sub_82231F48,
-          hooks::Type6DialogShown);
+          ITC_CONTEXT_FN(hooks::Type6DialogShown));
   Handler(h, world, "Type7Dialog::Shown", 0x822419C0, 4, none, plain, __imp__sub_822419C0,
-          hooks::Type7DialogShown);
+          ITC_CONTEXT_FN(hooks::Type7DialogShown));
   Handler(h, world, "Type6Dialog::OnEnter", 0x82231F98, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9612); }, plain, __imp__sub_82231F98,
-          hooks::Type6DialogOnEnter);
+          ITC_CONTEXT_FN(hooks::Type6DialogOnEnter));
   Handler(h, world, "Type7Dialog::OnEnter", 0x82241A08, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9612); }, plain, __imp__sub_82241A08,
-          hooks::Type7DialogOnEnter);
+          ITC_CONTEXT_FN(hooks::Type7DialogOnEnter));
   Handler(h, world, "Type6Dialog::WaitForMovies", 0x82232910, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9608); }, plain, __imp__sub_82232910,
-          hooks::Type6DialogWaitForMovies);
+          ITC_CONTEXT_FN(hooks::Type6DialogWaitForMovies));
   Handler(h, world, "Type7Dialog::WaitForMovies", 0x82242388, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9608); }, plain, __imp__sub_82242388,
-          hooks::Type7DialogWaitForMovies);
+          ITC_CONTEXT_FN(hooks::Type7DialogWaitForMovies));
   Handler(h, world, "Type6Screen0::WaitForMovie", 0x82233B18, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9608); }, plain, __imp__sub_82233B18,
-          hooks::Type6Screen0WaitForMovie);
+          ITC_CONTEXT_FN(hooks::Type6Screen0WaitForMovie));
   Handler(h, world, "Type7Screen0::WaitForMovie", 0x82244080, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9612); }, plain, __imp__sub_82244080,
-          hooks::Type7Screen0WaitForMovie);
+          ITC_CONTEXT_FN(hooks::Type7Screen0WaitForMovie));
   const HandlerSetup menus = [base](Random&, uint32_t w) {
     guest::StoreU32(base, w + 9640, w + kMenu);
     guest::StoreU32(base, w + 9644, w + kPage);
   };
   Handler(h, world, "Type6Screen0::PickYes", 0x82233990, 4, menus, plain, __imp__sub_82233990,
-          hooks::Type6Screen0PickYes);
+          ITC_CONTEXT_FN(hooks::Type6Screen0PickYes));
   Handler(h, world, "Type6Screen0::PickNo", 0x822339A0, 4, menus, plain, __imp__sub_822339A0,
-          hooks::Type6Screen0PickNo);
+          ITC_CONTEXT_FN(hooks::Type6Screen0PickNo));
   Handler(h, world, "Type7Screen0::PickYes", 0x82243F28, 4, menus, plain, __imp__sub_82243F28,
-          hooks::Type7Screen0PickYes);
+          ITC_CONTEXT_FN(hooks::Type7Screen0PickYes));
   Handler(h, world, "Type6Screen0::GoOn", 0x822339C0, 8,
           [base, menus](Random& r, uint32_t w) {
             menus(r, w);
             if (r.Below(2)) guest::StoreU32(base, w + kPage, 3);
           },
-          plain, __imp__sub_822339C0, hooks::Type6Screen0GoOn);
+          plain, __imp__sub_822339C0, ITC_CONTEXT_FN(hooks::Type6Screen0GoOn));
 
   // The allocating ones (over the layer, as the adapters run them).
   if (!hooks::NativeHeapActive()) {
@@ -490,7 +490,7 @@ void Handlers(Context& h, const Block& world) {
     return;
   }
   Handler(h, world, "ControllerOptions::OnEnter", 0x821BB120, 4, none, plain,
-          __imp__sub_821BB120, hooks::ControllerOptionsOnEnter,
+          __imp__sub_821BB120, ITC_CONTEXT_FN(hooks::ControllerOptionsOnEnter),
           [base](Side& side, PPCContext& t, uint32_t) {
             const bool r3_page = t.r3.u32 == guest::LoadU32(base, t67::kControllerPage);
             side.out.Word(r3_page);
@@ -509,10 +509,10 @@ void Handlers(Context& h, const Block& world) {
   };
   Handler(h, world, "Type6Screen0::OnEnter", 0x822339F0, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9612); }, plain, __imp__sub_822339F0,
-          hooks::Type6Screen0OnEnter, screen0_blocks);
+          ITC_CONTEXT_FN(hooks::Type6Screen0OnEnter), screen0_blocks);
   Handler(h, world, "Type7Screen0::OnEnter", 0x82243F58, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9616); }, plain, __imp__sub_82243F58,
-          hooks::Type7Screen0OnEnter, screen0_blocks);
+          ITC_CONTEXT_FN(hooks::Type7Screen0OnEnter), screen0_blocks);
   // CameraPreset::Copy: a source of random words (NaNs among them).
   Handler(h, world, "CameraPreset::Copy", 0x8217D7D0, 8, none, plain, __imp__sub_8217D7D0,
           [](PPCContext& t, uint8_t* b) { hooks::CameraPresetCopy(t, b); },
@@ -692,17 +692,17 @@ void Modes(Context& h, const Block& world) {
   };
   const Function functions[] = {
       {"Type6Mode::NextMode", 0x822363B8, &t67::kType6Layout, true, __imp__sub_822363B8,
-       hooks::Type6ModeNextMode},
+       ITC_CONTEXT_FN(hooks::Type6ModeNextMode)},
       {"Type7Mode::NextMode", 0x82246800, &t67::kType7Layout, true, __imp__sub_82246800,
-       hooks::Type7ModeNextMode},
+       ITC_CONTEXT_FN(hooks::Type7ModeNextMode)},
       {"Type6Mode::Leaving", 0x82236100, &t67::kType6Layout, false, __imp__sub_82236100,
-       hooks::Type6ModeLeaving},
+       ITC_CONTEXT_FN(hooks::Type6ModeLeaving)},
       {"Type7Mode::Leaving", 0x82246590, &t67::kType7Layout, false, __imp__sub_82246590,
-       hooks::Type7ModeLeaving},
+       ITC_CONTEXT_FN(hooks::Type7ModeLeaving)},
       {"Type6Mode::WaitForLoads", 0x82235F28, &t67::kType6Layout, false, __imp__sub_82235F28,
-       hooks::Type6ModeWaitForLoads, true},
+       ITC_CONTEXT_FN(hooks::Type6ModeWaitForLoads), true},
       {"Type7Mode::WaitForLoads", 0x822463D8, &t67::kType7Layout, false, __imp__sub_822463D8,
-       hooks::Type7ModeWaitForLoads, true},
+       ITC_CONTEXT_FN(hooks::Type7ModeWaitForLoads), true},
   };
   // WaitForLoads' world: the sound manager a fake in `extra` (+0; its
   // vtable at +0x100: slot 6 the getter of its +60, the bank's loading
@@ -908,13 +908,13 @@ void GuestCallHandlers(Context& h, const Block& world) {
     results.Report();
   }
   Handler(h, world, "Dialog::Leave", 0x82225C70, 8, ring, dispatcher, __imp__sub_82225C70,
-          hooks::Type6DialogLeave);
+          ITC_CONTEXT_FN(hooks::Type6DialogLeave));
   Handler(h, world, "Type7Dialog::Leave", 0x82241E58, 8, ring, dispatcher, __imp__sub_82241E58,
-          hooks::Type7DialogLeave);
+          ITC_CONTEXT_FN(hooks::Type7DialogLeave));
   Handler(h, world, "Type6Screen0::Leave", 0x82233DF8, 8, ring, dispatcher, __imp__sub_82233DF8,
-          hooks::Type6Screen0Leave);
+          ITC_CONTEXT_FN(hooks::Type6Screen0Leave));
   Handler(h, world, "Type7Screen0::Leave", 0x82244350, 8, ring, dispatcher, __imp__sub_82244350,
-          hooks::Type7Screen0Leave);
+          ITC_CONTEXT_FN(hooks::Type7Screen0Leave));
 
   // The Inits: the vtable at the world's +0x3800.
   constexpr uint32_t kVtable = 0x3800;
@@ -932,12 +932,12 @@ void GuestCallHandlers(Context& h, const Block& world) {
   };
   Handler(h, world, "ListScreen::Init", 0x822515A0, 12,
           vtable(16, 20, {0x8223F9A8, 0x822436A0}), plain, __imp__sub_822515A0,
-          hooks::ListScreenInit);
+          ITC_CONTEXT_FN(hooks::ListScreenInit));
   Handler(h, world, "PanelScreen::Init", 0x82248E10, 12,
           vtable(0, 4, {0x82230F80, 0x82240998}), plain, __imp__sub_82248E10,
-          hooks::PanelScreenInit);
+          ITC_CONTEXT_FN(hooks::PanelScreenInit));
   Handler(h, world, "NodeScreen::Init", 0x82259128, 12, vtable(28, 32, {0x82237320}), plain,
-          __imp__sub_82259128, hooks::NodeScreenInit);
+          __imp__sub_82259128, ITC_CONTEXT_FN(hooks::NodeScreenInit));
 
   // The Draws.
   constexpr uint32_t kType6Pages = 0x826367B8, kType7Table = 0x82815E20, kType7Guard = 0x82815E38;
@@ -952,7 +952,7 @@ void GuestCallHandlers(Context& h, const Block& world) {
             guest::StoreU32(base, w + kPageBlock, r.Below(3) ? r.Below(8) : 0xFFFFFFFF);
           },
           [](PPCContext& t, uint32_t w) { t.r4.u64 = w + 0x3200; }, __imp__sub_82234ED8,
-          hooks::Type6Screen0Draw);
+          ITC_CONTEXT_FN(hooks::Type6Screen0Draw));
   // Type7Screen0::Draw: the guard clear (the table built; page -1) or set
   // with the empty handler in the table.
   Handler(h, world, "Type7Screen0::Draw", 0x82245148, 12,
@@ -971,7 +971,7 @@ void GuestCallHandlers(Context& h, const Block& world) {
             }
           },
           [](PPCContext& t, uint32_t w) { t.r4.u64 = w + 0x3200; }, __imp__sub_82245148,
-          hooks::Type7Screen0Draw, [base, frame_out](Side& side, PPCContext& t, uint32_t w) {
+          ITC_CONTEXT_FN(hooks::Type7Screen0Draw), [base, frame_out](Side& side, PPCContext& t, uint32_t w) {
             frame_out(112, 6)(side, t, w);
             for (uint32_t i = 0; i < 7; i++) side.out.Word(guest::LoadU32(base, kType7Table + 4 * i));
           });
@@ -983,11 +983,11 @@ void GuestCallHandlers(Context& h, const Block& world) {
     guest::StoreU32(base, w + kPageBlock, 0xFFFFFFFF);
   };
   Handler(h, world, "Type6Dialog::Draw", 0x82232740, 2, no_page, dispatcher, __imp__sub_82232740,
-          hooks::Type6DialogDraw, frame_out(96, 2));
+          ITC_CONTEXT_FN(hooks::Type6DialogDraw), frame_out(96, 2));
   Handler(h, world, "Type7Dialog::Draw", 0x822421C0, 2, no_page, dispatcher, __imp__sub_822421C0,
-          hooks::Type7DialogDraw, frame_out(96, 2));
+          ITC_CONTEXT_FN(hooks::Type7DialogDraw), frame_out(96, 2));
   Handler(h, world, "ControllerOptions::Draw", 0x821C7F28, 2, no_page, dispatcher,
-          __imp__sub_821C7F28, hooks::ControllerOptionsDraw, frame_out(112, 3));
+          __imp__sub_821C7F28, ITC_CONTEXT_FN(hooks::ControllerOptionsDraw), frame_out(112, 3));
 }
 
 // --- GarageCamera::LoadPresets: Archive::Load recorded (ArchiveLoads),
@@ -1229,7 +1229,7 @@ void GarageCameraCommands(Context& h, const Block& world) {
           (through_stage ? __imp__sub_821808F0 : __imp__sub_82180358)(t, base);
           ITC_FLAG(native_type67_modes) = true;
         } else {
-          (through_stage ? hooks::GarageStageCameraCommand : hooks::GarageCameraCommand)(t, base);
+          (through_stage ? ITC_CONTEXT_FN(hooks::GarageStageCameraCommand) : ITC_CONTEXT_FN(hooks::GarageCameraCommand))(t, base);
         }
         out[v].Bytes(Read(base, stage, 112 + 16));
         out[v].Floats(base, camera + 16, (272 - 16) / 4);
@@ -1344,10 +1344,10 @@ void StandSlots(Context& h, const Block& world) {
     uint32_t stage_frame;  // GarageStage::Init's frame (0: none)
   };
   const Function functions[] = {
-      {"GarageCamera::Init", 0x82180918, __imp__sub_82180918, hooks::GarageCameraInit, 0},
-      {"GarageStage::Init", 0x82180968, __imp__sub_82180968, hooks::GarageStageInit,
+      {"GarageCamera::Init", 0x82180918, __imp__sub_82180918, ITC_CONTEXT_FN(hooks::GarageCameraInit), 0},
+      {"GarageStage::Init", 0x82180968, __imp__sub_82180968, ITC_CONTEXT_FN(hooks::GarageStageInit),
        sp - t67::kGarageStageInitFrame},
-      {"StandSlot::Init", 0x82180AA0, __imp__sub_82180AA0, hooks::StandSlotInit,
+      {"StandSlot::Init", 0x82180AA0, __imp__sub_82180AA0, ITC_CONTEXT_FN(hooks::StandSlotInit),
        sp - t67::kStandSlotInitFrame - t67::kGarageStageInitFrame},
   };
   for (const Function& f : functions) {
@@ -1491,36 +1491,36 @@ void Dialogs(Context& h, const Block& world) {
   using Function = DialogFunction;
   const Function functions[] = {
       {"Type6Dialog::ConfirmPage", 0x82232328, 128, 48, __imp__sub_82232328,
-       hooks::Type6DialogConfirmPage, kPage},
+       ITC_CONTEXT_FN(hooks::Type6DialogConfirmPage), kPage},
       {"Type7Dialog::ConfirmPage", 0x82241EF8, 128, 48, __imp__sub_82241EF8,
-       hooks::Type7DialogConfirmPage, kPage},
+       ITC_CONTEXT_FN(hooks::Type7DialogConfirmPage), kPage},
       {"Type6Dialog::Update", 0x82232798, 160, 32, __imp__sub_82232798,
-       hooks::Type6DialogUpdate, kUpdate},
+       ITC_CONTEXT_FN(hooks::Type6DialogUpdate), kUpdate},
       {"Type7Dialog::Update", 0x82242218, 160, 32, __imp__sub_82242218,
-       hooks::Type7DialogUpdate, kUpdate},
+       ITC_CONTEXT_FN(hooks::Type7DialogUpdate), kUpdate},
       {"Type7Screen0::FadeOutStep", 0x82244760, 112, 24, __imp__sub_82244760,
-       hooks::Type7Screen0FadeOutStep, kScreen7},
+       ITC_CONTEXT_FN(hooks::Type7Screen0FadeOutStep), kScreen7},
       {"Type7Screen0::ChosenPage", 0x82244610, 112, 16, __imp__sub_82244610,
-       hooks::Type7Screen0ChosenPage, kScreen7},
+       ITC_CONTEXT_FN(hooks::Type7Screen0ChosenPage), kScreen7},
       {"Type6Screen0::FadeOutStep", 0x822342F0, 112, 24, __imp__sub_822342F0,
-       hooks::Type6Screen0FadeOutStep, kScreen6},
+       ITC_CONTEXT_FN(hooks::Type6Screen0FadeOutStep), kScreen6},
       {"Type6Screen0::ChosenPage", 0x82234190, 112, 16, __imp__sub_82234190,
-       hooks::Type6Screen0ChosenPage, kScreen6},
+       ITC_CONTEXT_FN(hooks::Type6Screen0ChosenPage), kScreen6},
       {"Type6Dialog::OpenConfirm", 0x822320D8, 112, 24, __imp__sub_822320D8,
-       hooks::Type6DialogOpenConfirm},
+       ITC_CONTEXT_FN(hooks::Type6DialogOpenConfirm)},
       {"Type7Dialog::OpenConfirm", 0x82241B40, 112, 24, __imp__sub_82241B40,
-       hooks::Type7DialogOpenConfirm},
-      {"Dialog::DrawWaiting", 0x82241C18, 128, 32, __imp__sub_82241C18, hooks::DialogDrawWaiting},
+       ITC_CONTEXT_FN(hooks::Type7DialogOpenConfirm)},
+      {"Dialog::DrawWaiting", 0x82241C18, 128, 32, __imp__sub_82241C18, ITC_CONTEXT_FN(hooks::DialogDrawWaiting)},
       {"Dialog::OpenConfirmStep", 0x822325E0, 128, 40, __imp__sub_822325E0,
-       hooks::DialogOpenConfirmStep},
+       ITC_CONTEXT_FN(hooks::DialogOpenConfirmStep)},
       {"Dialog::CloseConfirmStep", 0x8223AA10, 128, 32, __imp__sub_8223AA10,
-       hooks::DialogCloseConfirmStep},
+       ITC_CONTEXT_FN(hooks::DialogCloseConfirmStep)},
       {"Dialog::MoveCursorStep", 0x8223AB50, 128, 32, __imp__sub_8223AB50,
-       hooks::DialogMoveCursorStep},
+       ITC_CONTEXT_FN(hooks::DialogMoveCursorStep)},
       {"Dialog::OpenNoticeStep", 0x822326A8, 112, 24, __imp__sub_822326A8,
-       hooks::DialogOpenNoticeStep, kStep, true},
+       ITC_CONTEXT_FN(hooks::DialogOpenNoticeStep), kStep, true},
       {"Dialog::CloseNoticeStep", 0x8223AAA8, 112, 24, __imp__sub_8223AAA8,
-       hooks::DialogCloseNoticeStep, kStep, true},
+       ITC_CONTEXT_FN(hooks::DialogCloseNoticeStep), kStep, true},
   };
   RunDialogs(h, world, functions, std::size(functions));
 }
@@ -1915,62 +1915,62 @@ void Screen0Helpers(Context& h, const Block& world) {
   };
   const Function functions[] = {
       {"Type6Screen0::Confirm", 0x82233FC8, true, __imp__sub_82233FC8,
-       hooks::Type6Screen0Confirm},
+       ITC_CONTEXT_FN(hooks::Type6Screen0Confirm)},
       {"Type6Screen0::ConfirmAgain", 0x822340B0, true, __imp__sub_822340B0,
-       hooks::Type6Screen0ConfirmAgain},
+       ITC_CONTEXT_FN(hooks::Type6Screen0ConfirmAgain)},
       {"Type7Screen0::Confirm", 0x82244528, true, __imp__sub_82244528,
-       hooks::Type7Screen0Confirm},
+       ITC_CONTEXT_FN(hooks::Type7Screen0Confirm)},
       {"Type6Screen0::ShowPage", 0x822344A8, false, __imp__sub_822344A8,
-       hooks::Type6Screen0ShowPage},
+       ITC_CONTEXT_FN(hooks::Type6Screen0ShowPage)},
       {"Type7Screen0::ShowPage", 0x82244930, false, __imp__sub_82244930,
-       hooks::Type7Screen0ShowPage},
+       ITC_CONTEXT_FN(hooks::Type7Screen0ShowPage)},
       {"Type7Screen0::PlaceCursor", 0x822448B0, false, __imp__sub_822448B0,
-       hooks::Type7Screen0PlaceCursor},
+       ITC_CONTEXT_FN(hooks::Type7Screen0PlaceCursor)},
       {"Type7Screen0::ShowHelp", 0x82244AB8, false, __imp__sub_82244AB8,
-       hooks::Type7Screen0ShowHelp, 128, 32},
+       ITC_CONTEXT_FN(hooks::Type7Screen0ShowHelp), 128, 32},
       {"Type6Screen0::OnDialogClosed", 0x82234768, true, __imp__sub_82234768,
-       hooks::Type6Screen0OnDialogClosed, 96, 16, 6, false, 0, false, 24},
+       ITC_CONTEXT_FN(hooks::Type6Screen0OnDialogClosed), 96, 16, 6, false, 0, false, 24},
       // A leaf; its tail call's (ShowPage's) frame compared.
       {"Type7Screen0::OnDialogClosed", 0x82244B60, false, __imp__sub_82244B60,
-       hooks::Type7Screen0OnDialogClosed, 112, 24, 7},
+       ITC_CONTEXT_FN(hooks::Type7Screen0OnDialogClosed), 112, 24, 7},
       {"Type7Screen0::MenuPage", 0x82244BF8, true, __imp__sub_82244BF8,
-       hooks::Type7Screen0MenuPage, 112, 24, 0, true, 0, true, 24},
+       ITC_CONTEXT_FN(hooks::Type7Screen0MenuPage), 112, 24, 0, true, 0, true, 24},
       {"Type6Screen0::MenuPage", 0x82234958, true, __imp__sub_82234958,
-       hooks::Type6Screen0MenuPage, 112, 24, 0, true, 0, false, 24},
+       ITC_CONTEXT_FN(hooks::Type6Screen0MenuPage), 112, 24, 0, true, 0, false, 24},
       {"Type6Screen0::PlaceCursor", 0x82234428, false, __imp__sub_82234428,
-       hooks::Type6Screen0PlaceCursor},
+       ITC_CONTEXT_FN(hooks::Type6Screen0PlaceCursor)},
       {"Type6Screen0::ShowHelp", 0x822346A8, false, __imp__sub_822346A8,
-       hooks::Type6Screen0ShowHelp, 128, 32, 0, false, 0, false, 0, Function::kNone, true},
+       ITC_CONTEXT_FN(hooks::Type6Screen0ShowHelp), 128, 32, 0, false, 0, false, 0, Function::kNone, true},
       {"Type6Screen0::PlayItem", 0x822343A8, false, __imp__sub_822343A8,
-       hooks::Type6Screen0PlayItem, 112, 24, 0, false, 0, false, 0, Function::kAnimated},
+       ITC_CONTEXT_FN(hooks::Type6Screen0PlayItem), 112, 24, 0, false, 0, false, 0, Function::kAnimated},
       {"Type7Screen0::PlayItem", 0x82244818, false, __imp__sub_82244818,
-       hooks::Type7Screen0PlayItem, 112, 24, 0, false, 0, true, 0, Function::kAnimated},
+       ITC_CONTEXT_FN(hooks::Type7Screen0PlayItem), 112, 24, 0, false, 0, true, 0, Function::kAnimated},
       {"Type6Screen0::OpeningStep", 0x82234C20, false, __imp__sub_82234C20,
-       hooks::Type6Screen0OpeningStep, 128, 32, 0, false, 0, false, 32, Function::kAnimated},
+       ITC_CONTEXT_FN(hooks::Type6Screen0OpeningStep), 128, 32, 0, false, 0, false, 32, Function::kAnimated},
       {"Type7Screen0::OpeningStep", 0x82244E70, false, __imp__sub_82244E70,
-       hooks::Type7Screen0OpeningStep, 128, 32, 0, false, 0, true, 32, Function::kAnimated},
+       ITC_CONTEXT_FN(hooks::Type7Screen0OpeningStep), 128, 32, 0, false, 0, true, 32, Function::kAnimated},
       {"Type6Screen0::BackStep", 0x82234E38, false, __imp__sub_82234E38,
-       hooks::Type6Screen0BackStep, 128, 32, 0, false, 0, false, 32, Function::kAnimated},
+       ITC_CONTEXT_FN(hooks::Type6Screen0BackStep), 128, 32, 0, false, 0, false, 32, Function::kAnimated},
       {"Type7Screen0::BackStep", 0x822450A8, false, __imp__sub_822450A8,
-       hooks::Type7Screen0BackStep, 128, 32, 0, false, 0, true, 32, Function::kAnimated},
+       ITC_CONTEXT_FN(hooks::Type7Screen0BackStep), 128, 32, 0, false, 0, true, 32, Function::kAnimated},
       {"Type6Screen0::CursorStep", 0x82234D50, false, __imp__sub_82234D50,
-       hooks::Type6Screen0CursorStep, 144, 48, 0, false, 0, false, 32, Function::kAnimated},
+       ITC_CONTEXT_FN(hooks::Type6Screen0CursorStep), 144, 48, 0, false, 0, false, 32, Function::kAnimated},
       {"Type7Screen0::CursorStep", 0x82244FC0, false, __imp__sub_82244FC0,
-       hooks::Type7Screen0CursorStep, 144, 48, 0, false, 0, true, 32, Function::kAnimated},
+       ITC_CONTEXT_FN(hooks::Type7Screen0CursorStep), 144, 48, 0, false, 0, true, 32, Function::kAnimated},
       // A leaf with tail calls; ShowPage's frame compared.
       {"Type6Screen0::QuitPage", 0x82234BF0, false, __imp__sub_82234BF0,
-       hooks::Type6Screen0QuitPage, 112, 24, 0, false, 0, false, 0, Function::kQuit},
+       ITC_CONTEXT_FN(hooks::Type6Screen0QuitPage), 112, 24, 0, false, 0, false, 0, Function::kQuit},
       {"Type6Screen0::PowerGraphPage", 0x82234B80, false, __imp__sub_82234B80,
-       hooks::Type6Screen0PowerGraphPage, 96, 16, 0, false, 0, false, 24, Function::kGraph},
+       ITC_CONTEXT_FN(hooks::Type6Screen0PowerGraphPage), 96, 16, 0, false, 0, false, 24, Function::kGraph},
       {"Type7Screen0::PowerGraphPage", 0x82244E00, false, __imp__sub_82244E00,
-       hooks::Type7Screen0PowerGraphPage, 96, 16, 0, false, 0, true, 24, Function::kGraph},
+       ITC_CONTEXT_FN(hooks::Type7Screen0PowerGraphPage), 96, 16, 0, false, 0, true, 24, Function::kGraph},
       {"Type6Screen0::ShowCarInfo", 0x82233B70, false, __imp__sub_82233B70,
-       hooks::Type6Screen0ShowCarInfo, 4064, 32, 0, false, 2, false},
+       ITC_CONTEXT_FN(hooks::Type6Screen0ShowCarInfo), 4064, 32, 0, false, 2, false},
       {"Type7Screen0::ShowCarInfo", 0x822440D8, false, __imp__sub_822440D8,
-       hooks::Type7Screen0ShowCarInfo, 4048, 32, 0, false, 2, true},
-      {"Type6Screen0::Show", 0x82233C80, false, __imp__sub_82233C80, hooks::Type6Screen0Show,
+       ITC_CONTEXT_FN(hooks::Type7Screen0ShowCarInfo), 4048, 32, 0, false, 2, true},
+      {"Type6Screen0::Show", 0x82233C80, false, __imp__sub_82233C80, ITC_CONTEXT_FN(hooks::Type6Screen0Show),
        128, 48, 0, false, 1, false, 32},
-      {"Type7Screen0::Show", 0x822441D8, false, __imp__sub_822441D8, hooks::Type7Screen0Show,
+      {"Type7Screen0::Show", 0x822441D8, false, __imp__sub_822441D8, ITC_CONTEXT_FN(hooks::Type7Screen0Show),
        128, 48, 0, false, 1, true, 32},
   };
   // The show cases' car block and save data, and the globals they point.
@@ -2578,9 +2578,9 @@ void Screen0Updates(Context& h, const Block& world) {
   };
   const Function functions[] = {
       {"Type6Screen0::Update", 0x82234F08, t67::kType6UpdateFrame, __imp__sub_82234F08,
-       hooks::Type6Screen0Update, false},
+       ITC_CONTEXT_FN(hooks::Type6Screen0Update), false},
       {"Type7Screen0::Update", 0x82245200, t67::kType7UpdateFrame, __imp__sub_82245200,
-       hooks::Type7Screen0Update, true},
+       ITC_CONTEXT_FN(hooks::Type7Screen0Update), true},
   };
   constexpr uint32_t kSaves = 56;  // r26 to r31 and lr
   for (const Function& f : functions) {
@@ -2785,7 +2785,7 @@ void ControllerUpdate(Context& h, const Block& world) {
         guest::StoreU32(base, page + 16, r.Below(2) ? 0xFFFFFFFFu : r.Below(12));
         if (int32_t(step) >= 0) guest::StoreU32(base, page + 24, 1);
       },
-      [](PPCContext&, uint32_t) {}, __imp__sub_821C7F98, hooks::ControllerOptionsUpdate,
+      [](PPCContext&, uint32_t) {}, __imp__sub_821C7F98, ITC_CONTEXT_FN(hooks::ControllerOptionsUpdate),
       [base, sp](Side& side, PPCContext&, uint32_t) {
         side.out.Bytes(Read(base, sp - 176 + 80, 48));
       });
@@ -2963,7 +2963,7 @@ void TearDowns(Context& h, const Block& world) {
           f.recompiled(t, base);
           ITC_FLAG(native_type67_modes) = true;
         } else {
-          (f.type7 ? hooks::Type7ModeTearDown : hooks::Type6ModeTearDown)(t, base);
+          (f.type7 ? ITC_CONTEXT_FN(hooks::Type7ModeTearDown) : ITC_CONTEXT_FN(hooks::Type6ModeTearDown))(t, base);
         }
         out[v].Bytes(Read(base, mode.address, mode.bytes));
         out[v].Bytes(Read(base, block.address + layout.answer, 16));
@@ -3322,9 +3322,9 @@ void ModeInits(Context& h) {
     uint32_t frame, block_bytes;
   };
   const Function functions[] = {
-      {"Type6Mode::Init", 0x82236880, false, __imp__sub_82236880, hooks::Type6ModeInit,
+      {"Type6Mode::Init", 0x82236880, false, __imp__sub_82236880, ITC_CONTEXT_FN(hooks::Type6ModeInit),
        t67::kType6ModeInitFrame, 91272},
-      {"Type7Mode::Init", 0x82246C90, true, __imp__sub_82246C90, hooks::Type7ModeInit,
+      {"Type7Mode::Init", 0x82246C90, true, __imp__sub_82246C90, ITC_CONTEXT_FN(hooks::Type7ModeInit),
        t67::kType7ModeInitFrame, 71292},
   };
   for (const Function& f : functions) {
@@ -3709,9 +3709,9 @@ void Type2Blocks(Context& h) {
     uint32_t frame;
   };
   const Function functions[] = {
-      {"ModeType2::AllLoaded (sub_82197130)", __imp__sub_82197130, hooks::Type2ModeAllLoaded, 0},
+      {"ModeType2::AllLoaded (sub_82197130)", __imp__sub_82197130, ITC_CONTEXT_FN(hooks::Type2ModeAllLoaded), 0},
       {"ModeType2::FindShown (sub_82197218; sub_82196FC0)", __imp__sub_82197218,
-       hooks::Type2ModeFindShown, 96},
+       ITC_CONTEXT_FN(hooks::Type2ModeFindShown), 96},
   };
   for (const Function& f : functions) {
     Results results(f.name);
@@ -3785,35 +3785,35 @@ void Type2Delegates(Context& h, const Block& world) {
   };
   const Function functions[] = {
       {"ModeType2::NextMode (sub_82197D50; sub_82197218)", kDelegate, __imp__sub_82197D50,
-       hooks::Type2ModeNextMode, 144, 56},
+       ITC_CONTEXT_FN(hooks::Type2ModeNextMode), 144, 56},
       {"ModeType2::LeaveScreen (sub_82197C88; sub_82197218)", kDelegate, __imp__sub_82197C88,
-       hooks::Type2ModeLeaveScreen, 128, 32},
+       ITC_CONTEXT_FN(hooks::Type2ModeLeaveScreen), 128, 32},
       {"ModeType2::AfterLeaveScreen (sub_821977E0; sub_82197218)", kDelegate,
-       __imp__sub_821977E0, hooks::Type2ModeAfterLeaveScreen, 96, 8},
+       __imp__sub_821977E0, ITC_CONTEXT_FN(hooks::Type2ModeAfterLeaveScreen), 96, 8},
       {"ModeType2::Restart (sub_82197A30)", kDelegate, __imp__sub_82197A30,
-       hooks::Type2ModeRestart, 112, 16},
+       ITC_CONTEXT_FN(hooks::Type2ModeRestart), 112, 16},
       {"ModeType2::Leaving (sub_82198008)", kDelegate, __imp__sub_82198008,
-       hooks::Type2ModeLeaving, 128, 32},
+       ITC_CONTEXT_FN(hooks::Type2ModeLeaving), 128, 32},
       {"ModeType2::WaitForLoads (sub_82197B00; sub_82197218, sub_82197130)", kWait,
-       __imp__sub_82197B00, hooks::Type2ModeWaitForLoads, 144, 40},
+       __imp__sub_82197B00, ITC_CONTEXT_FN(hooks::Type2ModeWaitForLoads), 144, 40},
       {"ModeType2::TearDown (sub_821970C0)", kTearDown, __imp__sub_821970C0,
-       hooks::Type2ModeTearDown, 112, 24},
-      {"Mode::Slot8Thunk (sub_8223D4B0)", kThunk, __imp__sub_8223D4B0, hooks::ModeSlot8Thunk, 0,
+       ITC_CONTEXT_FN(hooks::Type2ModeTearDown), 112, 24},
+      {"Mode::Slot8Thunk (sub_8223D4B0)", kThunk, __imp__sub_8223D4B0, ITC_CONTEXT_FN(hooks::ModeSlot8Thunk), 0,
        0, 8, 0x82197A30},
-      {"Mode::Slot9Thunk (sub_8223D4C0)", kThunk, __imp__sub_8223D4C0, hooks::ModeSlot9Thunk, 0,
+      {"Mode::Slot9Thunk (sub_8223D4C0)", kThunk, __imp__sub_8223D4C0, ITC_CONTEXT_FN(hooks::ModeSlot9Thunk), 0,
        0, 9, 0x82197B00},
-      {"Mode::Slot10Thunk (sub_8223D4A0)", kThunk, __imp__sub_8223D4A0, hooks::ModeSlot10Thunk,
+      {"Mode::Slot10Thunk (sub_8223D4A0)", kThunk, __imp__sub_8223D4A0, ITC_CONTEXT_FN(hooks::ModeSlot10Thunk),
        0, 0, 10, 0x82197C88},
-      {"Mode::Slot11Thunk (sub_8222FC60)", kThunk, __imp__sub_8222FC60, hooks::ModeSlot11Thunk,
+      {"Mode::Slot11Thunk (sub_8222FC60)", kThunk, __imp__sub_8222FC60, ITC_CONTEXT_FN(hooks::ModeSlot11Thunk),
        0, 0, 11, 0x821970C0},
-      {"Mode::Slot12Thunk (sub_8222FC70)", kThunk, __imp__sub_8222FC70, hooks::ModeSlot12Thunk,
+      {"Mode::Slot12Thunk (sub_8222FC70)", kThunk, __imp__sub_8222FC70, ITC_CONTEXT_FN(hooks::ModeSlot12Thunk),
        0, 0, 12, 0x821977E0},
-      {"Mode::Slot13Thunk (sub_8222FC80)", kThunk, __imp__sub_8222FC80, hooks::ModeSlot13Thunk,
+      {"Mode::Slot13Thunk (sub_8222FC80)", kThunk, __imp__sub_8222FC80, ITC_CONTEXT_FN(hooks::ModeSlot13Thunk),
        0, 0, 13, 0x82198008},
       {"ModeType2::Interrupt (sub_82197858; sub_82197130)", kInterrupt, __imp__sub_82197858,
-       hooks::Type2ModeInterrupt, 96, 16},
+       ITC_CONTEXT_FN(hooks::Type2ModeInterrupt), 96, 16},
       {"ModeType2::ForceExit (sub_82197930)", kForceExit, __imp__sub_82197930,
-       hooks::Type2ModeForceExit, 16, 0},
+       ITC_CONTEXT_FN(hooks::Type2ModeForceExit), 16, 0},
   };
   for (const Function& f : functions) {
     Results results(f.name);
@@ -4425,13 +4425,13 @@ void Type8Dialogs(Context& h) {
   };
   Handler(h, world, "Type8Dialog::OnEnter", 0x8223A408, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9612); }, plain, __imp__sub_8223A408,
-          hooks::Type8DialogOnEnter);
+          ITC_CONTEXT_FN(hooks::Type8DialogOnEnter));
   Handler(h, world, "Type8Dialog::WaitForMovies", 0x8223ADC0, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9608); }, plain, __imp__sub_8223ADC0,
-          hooks::Type8DialogWaitForMovies);
+          ITC_CONTEXT_FN(hooks::Type8DialogWaitForMovies));
   Handler(h, world, "Type8Dialog::OpenNotice", 0x8223A4A0, 8,
           [maybe](Random& r, uint32_t w) { maybe(r, w + 9608); }, plain, __imp__sub_8223A4A0,
-          hooks::Type8DialogOpenNotice);
+          ITC_CONTEXT_FN(hooks::Type8DialogOpenNotice));
   g_handler_flag = nullptr;
   g_movie = saved_movie;
   {
@@ -4464,19 +4464,19 @@ void Type8Dialogs(Context& h) {
   }
   const DialogFunction functions[] = {
       {"Type8Dialog::ConfirmPage", 0x8223A6B8, 112, 32, __imp__sub_8223A6B8,
-       hooks::Type8DialogConfirmPage, kPage, true, true},
+       ITC_CONTEXT_FN(hooks::Type8DialogConfirmPage), kPage, true, true},
       {"Type8Dialog::NoticePage", 0x8223A858, 112, 32, __imp__sub_8223A858,
-       hooks::Type8DialogNoticePage, kPage, true, true},
+       ITC_CONTEXT_FN(hooks::Type8DialogNoticePage), kPage, true, true},
       {"Type8Dialog::Update", 0x8223AC58, 160, 32, __imp__sub_8223AC58,
-       hooks::Type8DialogUpdate, kUpdate, true, true},
-      {"Type8Dialog::Draw", 0x8223AC00, 96, 8, __imp__sub_8223AC00, hooks::Type8DialogDraw,
+       ITC_CONTEXT_FN(hooks::Type8DialogUpdate), kUpdate, true, true},
+      {"Type8Dialog::Draw", 0x8223AC00, 96, 8, __imp__sub_8223AC00, ITC_CONTEXT_FN(hooks::Type8DialogDraw),
        kDraw, true, true},
       {"Type8Dialog::OpenConfirm", 0x8223A510, 112, 24, __imp__sub_8223A510,
-       hooks::Type8DialogOpenConfirm, kStep, true, true},
+       ITC_CONTEXT_FN(hooks::Type8DialogOpenConfirm), kStep, true, true},
       {"Type8Dialog::DrawWaiting", 0x8223A5F0, 128, 32, __imp__sub_8223A5F0,
-       hooks::Type8DialogDrawWaiting, kStep, true, true},
+       ITC_CONTEXT_FN(hooks::Type8DialogDrawWaiting), kStep, true, true},
       {"Type8Dialog::OpenConfirmStep", 0x8223A940, 128, 40, __imp__sub_8223A940,
-       hooks::Type8DialogOpenConfirmStep, kStep, true, true},
+       ITC_CONTEXT_FN(hooks::Type8DialogOpenConfirmStep), kStep, true, true},
   };
   RunDialogs(h, world, functions, std::size(functions));
 }

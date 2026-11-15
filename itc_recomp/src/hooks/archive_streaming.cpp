@@ -12,6 +12,7 @@
 // docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "guest_call.h"
 
 #include "game_data/game_data.h"
@@ -134,8 +135,8 @@ bool ReadWhole(uint8_t* base, uint32_t path, uint32_t buffer, uint32_t size) {
 // allocations (sub_82295398, VirtualAlloc), the locks taken and the loader
 // thread's start (the object's vtable +4, with the thread's parameters at
 // 0x82600B50) are the game's.
-extern "C" REX_FUNC(sub_8209E210) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209E210) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8209E210)) {
     return;
   }
@@ -234,8 +235,8 @@ extern "C" REX_FUNC(sub_8209E210) {
 // to the current one (+84) is unpacked into its destination meanwhile; then
 // the request-done signal is waited for (given here for state 5, as the read's
 // APC did; by the loop for 1-2 and by the loose read for 7).
-extern "C" REX_FUNC(sub_8209E118) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209E118) {
+  
   auto call = [&](uint32_t return_address, auto&& function) {
     InFrame(ctx, base, kFrame, return_address, [&](uint32_t) { function(); });
   };

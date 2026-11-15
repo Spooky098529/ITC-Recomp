@@ -4,13 +4,14 @@
 // See B5 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "last_error.h"
 
 #include "user/user.h"
 
 // XUserGetName: r3 = user, r4 = buffer, r5 = its size; returns an HRESULT.
-extern "C" REX_FUNC(sub_82295020) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82295020) {
+  
   char name[user::kNameBytes];
   uint32_t bytes;
   const uint32_t result = user::Name(ctx.r3.u32, ctx.r5.u32, name, &bytes);
@@ -21,14 +22,14 @@ extern "C" REX_FUNC(sub_82295020) {
 }
 
 // XUserGetSigninState: r3 = user.
-extern "C" REX_FUNC(sub_82295028) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82295028) {
+  
   ctx.r3.u64 = user::SigninState(ctx.r3.u32);
 }
 
 // XUserGetXUID: r3 = user, r4 = the XUID (out); returns a Win32 error.
-extern "C" REX_FUNC(sub_82295268) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82295268) {
+  
   const uint32_t out = ctx.r4.u32;
   if (!out) {
     ctx.r3.u64 = user::kErrorInvalidParameter;
@@ -42,16 +43,16 @@ extern "C" REX_FUNC(sub_82295268) {
 }
 
 // The title id check: r3 = a title id; returns 0 or ERROR_FUNCTION_FAILED.
-extern "C" REX_FUNC(sub_82296EE0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82296EE0) {
+  
   ctx.r3.u64 = user::CheckTitleId(ctx.r3.u32);
 }
 
 // XShowSigninUI: r3 = panes, r4 = flags. No dialog: one local user is always
 // signed in. The SDK answered 0 (its sign-in changed and system UI off reach
 // none of the game's readers since step 6).
-extern "C" REX_FUNC(sub_822952C0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822952C0) {
+  
   ctx.r3.u64 = 0;
 }
 
@@ -59,8 +60,8 @@ extern "C" REX_FUNC(sub_822952C0) {
 // is no longer called): the user's presence context, which nothing reads
 // back. The SDK answered 0 and cleared the last error, which the wrapper
 // then read; the same here.
-extern "C" REX_FUNC(sub_82294F70) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82294F70) {
+  
   last_error::Set(base, ctx.r13.u32, 0);
   ctx.r3.u64 = 0;
 }

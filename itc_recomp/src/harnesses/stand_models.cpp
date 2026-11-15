@@ -191,11 +191,11 @@ void Setters(Context& h, uint32_t b) {
   };
   const Setter setters[] = {
       {"GarageStage::SetInteriorClass (sub_82178FE8)", __imp__sub_82178FE8,
-       hooks::StandModelsSetInteriorClass},
+       ITC_CONTEXT_FN(hooks::StandModelsSetInteriorClass)},
       {"GarageStage::SetWord5016 (sub_82179598)", __imp__sub_82179598,
-       hooks::StandModelsSetWord5016},
+       ITC_CONTEXT_FN(hooks::StandModelsSetWord5016)},
       {"GarageStage::SetWheelWord (sub_82179A18)", __imp__sub_82179A18,
-       hooks::StandModelsSetWheelWord},
+       ITC_CONTEXT_FN(hooks::StandModelsSetWheelWord)},
   };
   for (const Setter& s : setters) {
     Results results(s.name);
@@ -218,7 +218,7 @@ void Setters(Context& h, uint32_t b) {
              Put(h.base, b + kParts + 176 + 27664, RandomFloat(r));
              t.r3.u64 = b + kParts + 176;
            },
-           __imp__sub_820DF1A0, hooks::StandModelsLightValue, 16, 0, true,
+           __imp__sub_820DF1A0, ITC_CONTEXT_FN(hooks::StandModelsLightValue), 16, 0, true,
            fmt::format("case {}", c));
     }
     results.Report();
@@ -236,7 +236,7 @@ void Setters(Context& h, uint32_t b) {
              t.r4.u64 = r.Below(2) == 0 ? 0 : RandomValue(r);
              t.f1.f64 = RandomDouble(r);
            },
-           __imp__sub_82179420, hooks::StandModelsSetLightsOn, 112, 24, true,
+           __imp__sub_82179420, ITC_CONTEXT_FN(hooks::StandModelsSetLightsOn), 112, 24, true,
            fmt::format("case {}", c));
     }
     results.Report();
@@ -271,7 +271,7 @@ void Setters(Context& h, uint32_t b) {
              t.f4.f64 = RandomDouble(r);
            },
            which == 0 ? __imp__sub_82179818 : __imp__sub_821798D8,
-           which == 0 ? hooks::StandModelsSetDecalA : hooks::StandModelsSetDecalB, 160, 64,
+           which == 0 ? ITC_CONTEXT_FN(hooks::StandModelsSetDecalA) : ITC_CONTEXT_FN(hooks::StandModelsSetDecalB), 160, 64,
            false, fmt::format("case {}", c));
     }
     results.Report();
@@ -305,7 +305,7 @@ void MakeModels(Context& h, uint32_t b) {
            t.r4.u64 = r.Below(45);
            t.r5.u64 = RandomValue(r);
          },
-         __imp__sub_8217FCB0, hooks::StandModelsMakeModel, 4384, 40, false,
+         __imp__sub_8217FCB0, ITC_CONTEXT_FN(hooks::StandModelsMakeModel), 4384, 40, false,
          fmt::format("case {}", c));
   }
   results.Report();
@@ -326,47 +326,47 @@ void Reapplies(Context& h, uint32_t b) {
     std::function<void(PPCContext&, Random&)> args;
   };
   const Setter setters[] = {
-      {"GarageStage::SetPart (sub_82178F00)", __imp__sub_82178F00, hooks::StandModelsSetPart, 112,
+      {"GarageStage::SetPart (sub_82178F00)", __imp__sub_82178F00, ITC_CONTEXT_FN(hooks::StandModelsSetPart), 112,
        24,
        [](PPCContext& t, Random& r) {
          t.r4.u64 = r.Below(4) == 0 ? RandomValue(r) : r.Below(18);
          t.r5.u64 = uint32_t(r.Next());
        }},
       {"GarageStage::SetInteriorWord (sub_82179050)", __imp__sub_82179050,
-       hooks::StandModelsSetInteriorWord, 112, 24,
+       ITC_CONTEXT_FN(hooks::StandModelsSetInteriorWord), 112, 24,
        [](PPCContext& t, Random& r) {
          t.r4.u64 = r.Below(4) == 0 ? RandomValue(r) : r.Below(7);
          t.r5.u64 = uint32_t(r.Next());
        }},
       {"GarageStage::SetInteriorLevel (sub_821791C0)", __imp__sub_821791C0,
-       hooks::StandModelsSetInteriorLevel, 96, 16,
+       ITC_CONTEXT_FN(hooks::StandModelsSetInteriorLevel), 96, 16,
        [](PPCContext& t, Random& r) { t.r4.u64 = RandomValue(r); }},
       {"GarageStage::SetInteriorPair (sub_82179250)", __imp__sub_82179250,
-       hooks::StandModelsSetInteriorPair, 112, 24,
+       ITC_CONTEXT_FN(hooks::StandModelsSetInteriorPair), 112, 24,
        [](PPCContext& t, Random& r) {
          t.r4.u64 = uint32_t(r.Next());
          t.r5.u64 = uint32_t(r.Next());
        }},
       {"GarageStage::ClearChoice (sub_82179378)", __imp__sub_82179378,
-       hooks::StandModelsClearChoice, 96, 16,
+       ITC_CONTEXT_FN(hooks::StandModelsClearChoice), 96, 16,
        [](PPCContext& t, Random& r) { t.r4.u64 = r.Below(4) == 0 ? r.Below(40) : r.Below(6); }},
-      {"GarageStage::SetAero (sub_82179548)", __imp__sub_82179548, hooks::StandModelsSetAero, 96,
+      {"GarageStage::SetAero (sub_82179548)", __imp__sub_82179548, ITC_CONTEXT_FN(hooks::StandModelsSetAero), 96,
        16, [](PPCContext& t, Random& r) { t.r4.u64 = uint32_t(r.Next()); }},
       {"GarageStage::SetChoice (sub_82179310)", __imp__sub_82179310,
-       hooks::StandModelsSetChoice, 112, 32,
+       ITC_CONTEXT_FN(hooks::StandModelsSetChoice), 112, 32,
        [](PPCContext& t, Random& r) {
          t.r4.u64 = r.Below(6) == 0 ? r.Below(40) : r.Below(7);
          t.r5.u64 = r.Below(2) == 0 ? r.Below(5) : uint32_t(r.Next());
          t.r6.u64 = r.Below(2) == 0 ? r.Below(5) : uint32_t(r.Next());
        }},
-      {"GarageStage::SetAero2 (sub_821794A8)", __imp__sub_821794A8, hooks::StandModelsSetAero2,
+      {"GarageStage::SetAero2 (sub_821794A8)", __imp__sub_821794A8, ITC_CONTEXT_FN(hooks::StandModelsSetAero2),
        96, 16, [](PPCContext& t, Random& r) { t.r4.u64 = uint32_t(r.Next()); }},
       {"GarageStage::SetDoorKind (sub_821794F8)", __imp__sub_821794F8,
-       hooks::StandModelsSetDoorKind, 96, 16,
+       ITC_CONTEXT_FN(hooks::StandModelsSetDoorKind), 96, 16,
        [](PPCContext& t, Random& r) { t.r4.u64 = r.Below(2) == 0 ? r.Below(2) : r.Next(); }},
       {"GarageStage::ReloadDecals (sub_82178EC0)", __imp__sub_82178EC0,
-       hooks::StandModelsReloadDecals, 96, 16, [](PPCContext&, Random&) {}},
-      {"GarageStage::SetParts (sub_821797A8)", __imp__sub_821797A8, hooks::StandModelsSetParts,
+       ITC_CONTEXT_FN(hooks::StandModelsReloadDecals), 96, 16, [](PPCContext&, Random&) {}},
+      {"GarageStage::SetParts (sub_821797A8)", __imp__sub_821797A8, ITC_CONTEXT_FN(hooks::StandModelsSetParts),
        144, 56,
        [](PPCContext& t, Random& r) {
          for (PPCRegister* reg : {&t.r4, &t.r5, &t.r6, &t.r7, &t.r8, &t.r9}) {
@@ -439,7 +439,7 @@ void TireGrades(Context& h, uint32_t b) {
              LayWheels(h.base, b, r);
              t.r3.u64 = b + kFirstWheels;
            },
-           __imp__sub_820D8F18, hooks::StandModelsSetTireTextures, 96, 16, false,
+           __imp__sub_820D8F18, ITC_CONTEXT_FN(hooks::StandModelsSetTireTextures), 96, 16, false,
            fmt::format("case {}", c));
     }
     results.Report();
@@ -454,7 +454,7 @@ void TireGrades(Context& h, uint32_t b) {
              t.r4.u64 = r.Below(3);
              t.r5.u64 = r.Below(3);
            },
-           __imp__sub_820E7470, hooks::StandModelsSetTireGrades, 96, 16, false,
+           __imp__sub_820E7470, ITC_CONTEXT_FN(hooks::StandModelsSetTireGrades), 96, 16, false,
            fmt::format("case {}", c));
     }
     results.Report();
@@ -474,7 +474,7 @@ void TireGrades(Context& h, uint32_t b) {
              t.r4.u64 = r.Below(6) == 0 ? RandomValue(r) : uint32_t(int32_t(r.Below(5)) - 1);
              t.r5.u64 = r.Below(3);
            },
-           __imp__sub_82179130, hooks::StandModelsSetTireGrade, 112, 24, false,
+           __imp__sub_82179130, ITC_CONTEXT_FN(hooks::StandModelsSetTireGrade), 112, 24, false,
            fmt::format("case {}", c));
     }
     results.Report();
@@ -497,7 +497,7 @@ void TireGrades(Context& h, uint32_t b) {
              t.r4.u64 = r.Below(6) == 0 ? RandomValue(r) : uint32_t(int32_t(r.Below(5)) - 1);
              t.r5.u64 = r.Below(8) == 0 ? 5 : r.Below(5);
            },
-           __imp__sub_821CCA38, hooks::StandModelsTuningSetTireGrade, 112, 8, false,
+           __imp__sub_821CCA38, ITC_CONTEXT_FN(hooks::StandModelsTuningSetTireGrade), 112, 8, false,
            fmt::format("case {}", c));
     }
     results.Report();
@@ -518,7 +518,7 @@ void SecondWheels(Context& h, uint32_t b) {
              LayStage(h.base, b, r);
              t.r3.u64 = b + kHolderAt;
            },
-           __imp__sub_82179C48, hooks::StandModelsSecondWheelsPending, 96, 16, false,
+           __imp__sub_82179C48, ITC_CONTEXT_FN(hooks::StandModelsSecondWheelsPending), 96, 16, false,
            fmt::format("case {}", c));
     }
     results.Report();
@@ -536,7 +536,7 @@ void SecondWheels(Context& h, uint32_t b) {
              }
              t.r3.u64 = b + kHolderAt;
            },
-           __imp__sub_821799D8, hooks::StandModelsApplyWheelPaint, 96, 16, false,
+           __imp__sub_821799D8, ITC_CONTEXT_FN(hooks::StandModelsApplyWheelPaint), 96, 16, false,
            fmt::format("case {}", c));
     }
     results.Report();
@@ -555,17 +555,17 @@ void Colors(Context& h, uint32_t b) {
     GuestFunction recompiled, native;
   };
   const Piece pieces[] = {
-      {"GarageStage::SetColor0 (sub_8217B078)", __imp__sub_8217B078, hooks::StandModelsSetColor0},
-      {"GarageStage::SetColor1 (sub_8217B108)", __imp__sub_8217B108, hooks::StandModelsSetColor1},
-      {"GarageStage::SetColor2 (sub_8217B198)", __imp__sub_8217B198, hooks::StandModelsSetColor2},
-      {"GarageStage::SetColor3 (sub_8217B228)", __imp__sub_8217B228, hooks::StandModelsSetColor3},
-      {"GarageStage::SetColor4 (sub_8217B2B8)", __imp__sub_8217B2B8, hooks::StandModelsSetColor4},
-      {"GarageStage::SetColor5 (sub_8217B348)", __imp__sub_8217B348, hooks::StandModelsSetColor5},
-      {"GarageStage::SetColor (sub_8217C6C8)", __imp__sub_8217C6C8, hooks::StandModelsSetColor},
+      {"GarageStage::SetColor0 (sub_8217B078)", __imp__sub_8217B078, ITC_CONTEXT_FN(hooks::StandModelsSetColor0)},
+      {"GarageStage::SetColor1 (sub_8217B108)", __imp__sub_8217B108, ITC_CONTEXT_FN(hooks::StandModelsSetColor1)},
+      {"GarageStage::SetColor2 (sub_8217B198)", __imp__sub_8217B198, ITC_CONTEXT_FN(hooks::StandModelsSetColor2)},
+      {"GarageStage::SetColor3 (sub_8217B228)", __imp__sub_8217B228, ITC_CONTEXT_FN(hooks::StandModelsSetColor3)},
+      {"GarageStage::SetColor4 (sub_8217B2B8)", __imp__sub_8217B2B8, ITC_CONTEXT_FN(hooks::StandModelsSetColor4)},
+      {"GarageStage::SetColor5 (sub_8217B348)", __imp__sub_8217B348, ITC_CONTEXT_FN(hooks::StandModelsSetColor5)},
+      {"GarageStage::SetColor (sub_8217C6C8)", __imp__sub_8217C6C8, ITC_CONTEXT_FN(hooks::StandModelsSetColor)},
   };
   for (const Piece& p : pieces) {
     Results results(p.name);
-    const bool dispatch = p.native == hooks::StandModelsSetColor;
+    const bool dispatch = p.native == ITC_CONTEXT_FN(hooks::StandModelsSetColor);
     for (int c = 0; c < (dispatch ? 64 : 32); c++) {
       Case(h, results, b, h.random.Next(),
            [&](PPCContext& t, Random& r, std::vector<uint32_t>&) {
@@ -617,7 +617,7 @@ void Decals(Context& h, uint32_t b) {
              t.r9.u64 = r.Next();
              t.f1.f64 = RandomDouble(r);
            },
-           __imp__sub_8217B3D8, hooks::StandModelsSetSticker, 128, 48, true,
+           __imp__sub_8217B3D8, ITC_CONTEXT_FN(hooks::StandModelsSetSticker), 128, 48, true,
            fmt::format("case {}", c));
     }
     results.Report();
@@ -636,7 +636,7 @@ void Decals(Context& h, uint32_t b) {
              t.r3.u64 = b + kHolderAt;
              t.r4.u64 = r.Below(2) == 0 ? r.Below(2) : r.Next();
            },
-           __imp__sub_821793D0, hooks::StandModelsSetDecalWord, 112, 32, false,
+           __imp__sub_821793D0, ITC_CONTEXT_FN(hooks::StandModelsSetDecalWord), 112, 32, false,
            fmt::format("case {}", c));
     }
     results.Report();
@@ -662,7 +662,7 @@ void Sizes(Context& h, uint32_t b) {
            t.r7.u64 = any ? r.Next() : uint64_t(RandomFloat(r)) << 32;
            t.r9.u64 = any ? r.Next() : uint64_t(RandomFloat(r)) << 32;
          },
-         __imp__sub_820E7380, hooks::StandModelsSetSizes, 112, 24, false,
+         __imp__sub_820E7380, ITC_CONTEXT_FN(hooks::StandModelsSetSizes), 112, 24, false,
          fmt::format("case {}", c));
   }
   results.Report();
@@ -701,27 +701,27 @@ void Extras(Context& h, uint32_t b) {
   };
   const Item items[] = {
       {"SceneInterior::SetRecord (sub_820E38E0)", __imp__sub_820E38E0,
-       hooks::StandModelsSceneInteriorSetRecord, 112, 24,
+       ITC_CONTEXT_FN(hooks::StandModelsSceneInteriorSetRecord), 112, 24,
        [&](PPCContext& t, Random& r) {
          lay_interior(r);
          t.r3.u64 = b + kInterior;
          t.r4.u64 = b + 0x8000 + 4 * r.Below(64);
        }},
       {"SceneModel::ApplyInterior (sub_820D9F40)", __imp__sub_820D9F40,
-       hooks::StandModelsApplyInterior, 0, 0,
+       ITC_CONTEXT_FN(hooks::StandModelsApplyInterior), 0, 0,
        [&](PPCContext& t, Random& r) {
          lay_interior(r);
          t.r3.u64 = b + (r.Below(2) == 0 ? kModel : kModel2);
        }},
       {"GarageStage::SetAccessory (sub_821792B0)", __imp__sub_821792B0,
-       hooks::StandModelsSetAccessory, 112, 24,
+       ITC_CONTEXT_FN(hooks::StandModelsSetAccessory), 112, 24,
        [&](PPCContext& t, Random& r) {
          lay_interior(r);
          t.r3.u64 = b + kHolderAt;
          t.r4.u64 = r.Below(2) == 0 ? r.Below(4) : r.Next();
          t.r5.u64 = r.Below(2) == 0 ? r.Below(5) : r.Next();
        }},
-      {"SceneWheels::SetWord68 (sub_820E7410)", __imp__sub_820E7410, hooks::StandModelsSetWord68,
+      {"SceneWheels::SetWord68 (sub_820E7410)", __imp__sub_820E7410, ITC_CONTEXT_FN(hooks::StandModelsSetWord68),
        0, 0,
        [&](PPCContext& t, Random& r) {
          lay_wheels(r);
@@ -729,14 +729,14 @@ void Extras(Context& h, uint32_t b) {
          t.r4.u64 = r.Below(2) == 0 ? r.Below(7) : r.Next();
        }},
       {"SceneWheels::SetCaliperTexture (sub_820E7428)", __imp__sub_820E7428,
-       hooks::StandModelsSceneSetCaliperTexture, 96, 16,
+       ITC_CONTEXT_FN(hooks::StandModelsSceneSetCaliperTexture), 96, 16,
        [&](PPCContext& t, Random& r) {
          lay_wheels(r);
          t.r3.u64 = b + kWheels;
          t.r4.u64 = word(r);
        }},
       {"GarageStage::SetWheelExtras (sub_821790D0)", __imp__sub_821790D0,
-       hooks::StandModelsSetWheelExtras, 112, 32,
+       ITC_CONTEXT_FN(hooks::StandModelsSetWheelExtras), 112, 32,
        [&](PPCContext& t, Random& r) {
          LayStage(h.base, b, r);
          lay_wheels(r);

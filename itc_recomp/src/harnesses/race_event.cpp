@@ -504,26 +504,26 @@ void Conditions(Context& h, World& w) {
     t.r4.u64 = level;
   };
   Group(h, w, "EventCondition::Met (sub_82142820, its tests)", 1400, condition_args,
-        Original<__imp__sub_82142820>, hooks::RaceEventConditionMet, none);
+        Original<__imp__sub_82142820>, ITC_CONTEXT_FN(hooks::RaceEventConditionMet), none);
   Group(h, w, "EventCondition::State (sub_82142C00)", 300, condition_args,
-        Original<__imp__sub_82142C00>, hooks::RaceEventConditionState, none);
+        Original<__imp__sub_82142C00>, ITC_CONTEXT_FN(hooks::RaceEventConditionState), none);
   const auto block_args = [base](Random& r, const World& w, PPCContext& t) {
     t.r3.u64 = w.item(r.Below(kItems)) + 40;
     (void)base;
   };
   Group(h, w, "Unlock::All (sub_82142C80)", 150, block_args, Original<__imp__sub_82142C80>,
-        hooks::RaceEventUnlockAll, none);
+        ITC_CONTEXT_FN(hooks::RaceEventUnlockAll), none);
   Group(h, w, "Unlock::Any (sub_82142CE0)", 150, block_args, Original<__imp__sub_82142CE0>,
-        hooks::RaceEventUnlockAny, none);
+        ITC_CONTEXT_FN(hooks::RaceEventUnlockAny), none);
   const auto item_args = [](Random& r, const World& w, PPCContext& t) {
     t.r3.u64 = w.item(r.Below(kItems));
   };
   Group(h, w, "Unlock::State (sub_82142EC0)", 200, item_args, Original<__imp__sub_82142EC0>,
-        hooks::RaceEventUnlockState, none);
+        ITC_CONTEXT_FN(hooks::RaceEventUnlockState), none);
   Group(h, w, "Unlock::StateKind2 (sub_82142D40)", 100, item_args,
-        Original<__imp__sub_82142D40>, hooks::RaceEventUnlockStateKind2, none);
+        Original<__imp__sub_82142D40>, ITC_CONTEXT_FN(hooks::RaceEventUnlockStateKind2), none);
   Group(h, w, "Unlock::StateKind5 (sub_82142E18)", 100, item_args,
-        Original<__imp__sub_82142E18>, hooks::RaceEventUnlockStateKind5, none);
+        Original<__imp__sub_82142E18>, ITC_CONTEXT_FN(hooks::RaceEventUnlockStateKind5), none);
   Group(
       h, w, "Unlock::HasSectionCondition (sub_82140308)", 64,
       [base](Random& r, const World& w, PPCContext& t) {
@@ -533,7 +533,7 @@ void Conditions(Context& h, World& w) {
         }
         t.r3.u64 = item + 40;
       },
-      Original<__imp__sub_82140308>, hooks::RaceEventHasSectionCondition, none);
+      Original<__imp__sub_82140308>, ITC_CONTEXT_FN(hooks::RaceEventHasSectionCondition), none);
   Group(
       h, w, "EventCondition::CategoryMask (sub_82140340)", 100,
       [&h, base](Random& r, const World&, PPCContext& t) {
@@ -545,7 +545,7 @@ void Conditions(Context& h, World& w) {
         t.r4.u64 = Scratch(h, 0x104);
         t.r5.u64 = Scratch(h, 0x108);
       },
-      Original<__imp__sub_82140340>, hooks::RaceEventCategoryMask, none);
+      Original<__imp__sub_82140340>, ITC_CONTEXT_FN(hooks::RaceEventCategoryMask), none);
   Group(
       h, w, "EventCondition::FloatAtLeast (sub_82140400)", 100,
       [&h, base](Random& r, const World&, PPCContext& t) {
@@ -557,18 +557,18 @@ void Conditions(Context& h, World& w) {
         t.r3.u64 = Scratch(h, 0x100);
         t.r4.u64 = Scratch(h, 0x140);
       },
-      Original<__imp__sub_82140400>, hooks::RaceEventFloatAtLeast, none);
+      Original<__imp__sub_82140400>, ITC_CONTEXT_FN(hooks::RaceEventFloatAtLeast), none);
   Group(
       h, w, "Items::Available (sub_821435C8)", 200,
       [](Random& r, const World&, PPCContext& t) { t.r3.u64 = r.Below(kItems); },
-      Original<__imp__sub_821435C8>, hooks::RaceEventItemsAvailable, none);
+      Original<__imp__sub_821435C8>, ITC_CONTEXT_FN(hooks::RaceEventItemsAvailable), none);
   Group(
       h, w, "Items::Beaten (sub_82143528)", 200,
       [](Random& r, const World& w, PPCContext& t) {
         t.r3.u64 = w.save.address + re::kItemRecords;
         t.r4.u64 = w.item(r.Below(kItems));
       },
-      Original<__imp__sub_82143528>, hooks::RaceEventItemsBeaten, none);
+      Original<__imp__sub_82143528>, ITC_CONTEXT_FN(hooks::RaceEventItemsBeaten), none);
   Group(
       h, w, "DayBlock::BestStreak (sub_82110588)", 16,
       [](Random& r, const World& w, PPCContext& t) {
@@ -591,7 +591,7 @@ void Events(Context& h, World& w) {
   };
   const auto event_r3 = [](Random&, const World& w, PPCContext& t) { t.r3.u64 = w.event(); };
   Group(h, w, "RaceEvent::RaceEvent (sub_82142F20)", 8, event_r3, Original<__imp__sub_82142F20>,
-        hooks::RaceEventConstruct, misc, false);
+        ITC_CONTEXT_FN(hooks::RaceEventConstruct), misc, false);
   Group(
       h, w, "RaceEvent::SetMode (sub_82142F68)", 32,
       [&h, base](Random& r, const World& w, PPCContext& t) {
@@ -601,7 +601,7 @@ void Events(Context& h, World& w) {
         t.r4.u64 = Scratch(h, 0x100);
         t.r5.u64 = Scratch(h, 0x104);
       },
-      Original<__imp__sub_82142F68>, hooks::RaceEventSetMode, misc, false);
+      Original<__imp__sub_82142F68>, ITC_CONTEXT_FN(hooks::RaceEventSetMode), misc, false);
   // Alloc: counts from the event (some 0), its pointers none.
   const auto alloc_args = [base](Random& r, const World& w, PPCContext& t) {
     const uint32_t e = w.event();
@@ -615,27 +615,27 @@ void Events(Context& h, World& w) {
     t.r3.u64 = e;
   };
   Group(h, w, "RaceEvent::Alloc (sub_82143620)", 40, alloc_args,
-        Original<__imp__sub_82143620>, hooks::RaceEventAlloc, event);
+        Original<__imp__sub_82143620>, ITC_CONTEXT_FN(hooks::RaceEventAlloc), event);
   Group(
       h, w, "EventGroup::Alloc (sub_821433A8)", 40,
       [alloc_args](Random& r, const World& w, PPCContext& t) {
         alloc_args(r, w, t);
         t.r3.u64 = w.event() + 36 + 12 * r.Below(10);
       },
-      Original<__imp__sub_821433A8>, hooks::RaceEventGroupAlloc, event);
+      Original<__imp__sub_821433A8>, ITC_CONTEXT_FN(hooks::RaceEventGroupAlloc), event);
   const auto free_args = [base](Random& r, const World& w, PPCContext& t) {
     PagedEvent(base, w.event(), r);
     t.r3.u64 = w.event();
   };
   Group(h, w, "RaceEvent::Free (sub_821436C8)", 32, free_args, Original<__imp__sub_821436C8>,
-        hooks::RaceEventFree, event, false);
+        ITC_CONTEXT_FN(hooks::RaceEventFree), event, false);
   Group(
       h, w, "EventGroup::Free (sub_82143358)", 32,
       [free_args](Random& r, const World& w, PPCContext& t) {
         free_args(r, w, t);
         t.r3.u64 = w.event() + 36 + 12 * r.Below(10);
       },
-      Original<__imp__sub_82143358>, hooks::RaceEventGroupFree, event, false);
+      Original<__imp__sub_82143358>, ITC_CONTEXT_FN(hooks::RaceEventGroupFree), event, false);
   // The pools.
   const auto pools_item = [](Random& r, const World& w, PPCContext& t) {
     t.r3.u64 = w.pools() + 608 * r.Below(10);
@@ -645,9 +645,9 @@ void Events(Context& h, World& w) {
     t.r6.u64 = w.save.address + re::kItemRecords;
   };
   Group(h, w, "EventPools::AddItem (sub_82144950)", 200, pools_item,
-        Original<__imp__sub_82144950>, hooks::RaceEventPoolsAddItem, misc, false);
+        Original<__imp__sub_82144950>, ITC_CONTEXT_FN(hooks::RaceEventPoolsAddItem), misc, false);
   Group(h, w, "EventPools::AddRivals (sub_82144458)", 100, pools_item,
-        Original<__imp__sub_82144458>, hooks::RaceEventPoolsAddRivals, misc, false);
+        Original<__imp__sub_82144458>, ITC_CONTEXT_FN(hooks::RaceEventPoolsAddRivals), misc, false);
   Group(
       h, w, "EventPools::AddRivalsOf (sub_821440F8)", 100,
       [base, pools_item](Random& r, const World& w, PPCContext& t) {
@@ -657,7 +657,7 @@ void Events(Context& h, World& w) {
         }
         t.r4.u64 = t.r4.u32 + (r.Below(2) == 0 ? 0 : 92 + 2 * r.Below(3));
       },
-      Original<__imp__sub_821440F8>, hooks::RaceEventPoolsAddRivalsOf, misc, false);
+      Original<__imp__sub_821440F8>, ITC_CONTEXT_FN(hooks::RaceEventPoolsAddRivalsOf), misc, false);
   Group(
       h, w, "EventPools::Trim (sub_821444D0)", 200,
       [&h, base](Random& r, const World& w, PPCContext& t) {
@@ -666,7 +666,7 @@ void Events(Context& h, World& w) {
         t.r3.u64 = w.pools() + 608 * r.Below(10);
         t.r4.u64 = Scratch(h, 0x100);
       },
-      Original<__imp__sub_821444D0>, hooks::RaceEventPoolsTrim, misc, false);
+      Original<__imp__sub_821444D0>, ITC_CONTEXT_FN(hooks::RaceEventPoolsTrim), misc, false);
   Group(
       h, w, "EventPools::CopyIds (sub_82143420)", 64,
       [&h, base](Random& r, const World& w, PPCContext& t) {
@@ -679,7 +679,7 @@ void Events(Context& h, World& w) {
         t.r6.u64 = Scratch(h, 0x100);
         t.r7.u64 = Scratch(h, 0x104);
       },
-      Original<__imp__sub_82143420>, hooks::RaceEventPoolsCopyIds, misc, false);
+      Original<__imp__sub_82143420>, ITC_CONTEXT_FN(hooks::RaceEventPoolsCopyIds), misc, false);
   Group(
       h, w, "EventPools::ToGroup (sub_82144170)", 64,
       [&h, base](Random& r, const World& w, PPCContext& t) {
@@ -689,7 +689,7 @@ void Events(Context& h, World& w) {
         t.r5.u64 = w.list();
         t.r6.u64 = Scratch(h, 0x100);
       },
-      Original<__imp__sub_82144170>, hooks::RaceEventPoolsToGroup, misc, false);
+      Original<__imp__sub_82144170>, ITC_CONTEXT_FN(hooks::RaceEventPoolsToGroup), misc, false);
   Group(
       h, w, "EventPools::ToGroupNoList (sub_821441D8)", 64,
       [&h, base](Random& r, const World& w, PPCContext& t) {
@@ -698,7 +698,7 @@ void Events(Context& h, World& w) {
         t.r4.u64 = w.event() + 36 + 12 * r.Below(10);
         t.r5.u64 = Scratch(h, 0x100);
       },
-      Original<__imp__sub_821441D8>, hooks::RaceEventPoolsToGroupNoList, misc, false);
+      Original<__imp__sub_821441D8>, ITC_CONTEXT_FN(hooks::RaceEventPoolsToGroupNoList), misc, false);
   // RaceEvent::Init and Make: the event's old list and groups the layer's
   // pages (or none).
   const auto init_args = [&h, base](Random& r, const World& w, PPCContext& t) {
@@ -711,7 +711,7 @@ void Events(Context& h, World& w) {
     t.r6.u64 = Scratch(h, 0x108);
   };
   Group(h, w, "RaceEvent::Init (sub_82144A50)", 60, init_args, Original<__imp__sub_82144A50>,
-        hooks::RaceEventInit, event);
+        ITC_CONTEXT_FN(hooks::RaceEventInit), event);
   Group(
       h, w, "RaceEvent::Make (sub_82144E58)", 60,
       [&h, base, init_args](Random& r, const World& w, PPCContext& t) {
@@ -723,7 +723,7 @@ void Events(Context& h, World& w) {
         t.r4.u64 = Scratch(h, 0x104);
         t.r5.u64 = Scratch(h, 0x108);
       },
-      Original<__imp__sub_82144E58>, hooks::RaceEventMake,
+      Original<__imp__sub_82144E58>, ITC_CONTEXT_FN(hooks::RaceEventMake),
       [&h, base](Outputs& out, const World& w, PPCContext&) {
         const uint32_t e = guest::LoadU32(base, re::kEvent);
         out.Word(e == 0 ? 0 : e == w.event() ? 1 : 2);
@@ -750,7 +750,7 @@ void Events(Context& h, World& w) {
         }
         (void)w;
       },
-      Original<__imp__sub_82144DF0>, hooks::RaceEventDestroy,
+      Original<__imp__sub_82144DF0>, ITC_CONTEXT_FN(hooks::RaceEventDestroy),
       [base](Outputs& out, const World&, PPCContext&) {
         out.Word(guest::LoadU32(base, re::kEvent));
       },
@@ -768,20 +768,20 @@ void Groups(Context& h, World& w) {
     t.r4.u64 = w.list();
   };
   Group(h, w, "EventGroup::PromoteFlagged (sub_82143C70)", 100, group_args,
-        Original<__imp__sub_82143C70>, hooks::RaceEventGroupPromoteFlagged, misc, false);
+        Original<__imp__sub_82143C70>, ITC_CONTEXT_FN(hooks::RaceEventGroupPromoteFlagged), misc, false);
   Group(h, w, "EventGroup::SortOpen (sub_82143DC8)", 100, group_args,
-        Original<__imp__sub_82143DC8>, hooks::RaceEventGroupSortOpen, misc, false);
+        Original<__imp__sub_82143DC8>, ITC_CONTEXT_FN(hooks::RaceEventGroupSortOpen), misc, false);
   Group(h, w, "EventGroup::PromoteUnlocked (sub_82143F90)", 100, group_args,
-        Original<__imp__sub_82143F90>, hooks::RaceEventGroupPromoteUnlocked, misc, false);
+        Original<__imp__sub_82143F90>, ITC_CONTEXT_FN(hooks::RaceEventGroupPromoteUnlocked), misc, false);
   Group(
       h, w, "RaceEvent::Refresh (sub_82144300)", 64,
       [](Random&, const World& w, PPCContext& t) { t.r3.u64 = w.event(); },
-      Original<__imp__sub_82144300>, hooks::RaceEventRefresh, misc);
+      Original<__imp__sub_82144300>, ITC_CONTEXT_FN(hooks::RaceEventRefresh), misc);
   Group(
       h, w, "RaceEvent::RefreshCurrent (sub_82144720)", 32,
       [base](Random& r, const World&, PPCContext&) { MaybeNoEvent(base, r); },
       Original<__imp__sub_82144720>,
-      hooks::RaceEventRefreshCurrent, misc);
+      ITC_CONTEXT_FN(hooks::RaceEventRefreshCurrent), misc);
   Group(
       h, w, "RaceEvent::UpdateLocation (sub_82144740)", 64,
       [&h, base](Random& r, const World&, PPCContext& t) {
@@ -789,7 +789,7 @@ void Groups(Context& h, World& w) {
         t.r3.u64 = Scratch(h, 0x100);
         MaybeNoEvent(base, r);
       },
-      Original<__imp__sub_82144740>, hooks::RaceEventUpdateLocation, misc, false);
+      Original<__imp__sub_82144740>, ITC_CONTEXT_FN(hooks::RaceEventUpdateLocation), misc, false);
   Group(
       h, w, "RaceEvent::GroupItem (sub_821431C0)", 64,
       [&h, base](Random& r, const World& w, PPCContext& t) {
@@ -799,21 +799,21 @@ void Groups(Context& h, World& w) {
         t.r4.u64 = Scratch(h, 0x100);
         t.r5.u64 = Scratch(h, 0x104);
       },
-      Original<__imp__sub_821431C0>, hooks::RaceEventGroupItem, misc);
+      Original<__imp__sub_821431C0>, ITC_CONTEXT_FN(hooks::RaceEventGroupItem), misc);
   Group(
       h, w, "Career::EventQuery (sub_82111638)", 32,
       [base](Random& r, const World&, PPCContext& t) {
         t.r4.u64 = r.Below(4) == 0 ? r.Next() : 0;
         MaybeNoEvent(base, r);
       },
-      Original<__imp__sub_82111638>, hooks::CareerEventQuery, misc);
+      Original<__imp__sub_82111638>, ITC_CONTEXT_FN(hooks::CareerEventQuery), misc);
   Group(
       h, w, "Career::EventLocation (sub_82111650)", 32,
       [base](Random& r, const World& w, PPCContext& t) {
         t.r3.u64 = w.save.address;
         MaybeNoEvent(base, r);
       },
-      Original<__imp__sub_82111650>, hooks::CareerEventLocation, misc, false);
+      Original<__imp__sub_82111650>, ITC_CONTEXT_FN(hooks::CareerEventLocation), misc, false);
 }
 
 // The list's items made to place: +46 1, both conditions met (kind 0, all),
@@ -859,7 +859,7 @@ void Placing(Context& h, World& w) {
         t.r3.u64 = w.list() + 12 * r.Below(30);
         t.r4.u64 = Scratch(h, 0x100);
       },
-      Original<__imp__sub_82142FC8>, hooks::RaceEventFindRacer, misc);
+      Original<__imp__sub_82142FC8>, ITC_CONTEXT_FN(hooks::RaceEventFindRacer), misc);
   const auto position_args = [&h, base](Random& r, const World& w, PPCContext& t) {
     ShapePlacing(base, w, r);
     tr::RandomPosition(base, Scratch(h, 0x100), w.route, r);
@@ -869,7 +869,7 @@ void Placing(Context& h, World& w) {
     t.r5.u64 = Scratch(h, 0x104);
   };
   Group(h, w, "RaceEvent::SectionRival (sub_82143210)", 150, position_args,
-        Original<__imp__sub_82143210>, hooks::RaceEventSectionRival, misc);
+        Original<__imp__sub_82143210>, ITC_CONTEXT_FN(hooks::RaceEventSectionRival), misc);
   Group(
       h, w, "RaceEvent::SectionRivalCurrent (sub_821434A0)", 64,
       [base, position_args](Random& r, const World& w, PPCContext& t) {
@@ -877,9 +877,9 @@ void Placing(Context& h, World& w) {
         t.r3.u64 = t.r4.u64;
         MaybeNoEvent(base, r);
       },
-      Original<__imp__sub_821434A0>, hooks::RaceEventSectionRivalCurrent, misc);
+      Original<__imp__sub_821434A0>, ITC_CONTEXT_FN(hooks::RaceEventSectionRivalCurrent), misc);
   Group(h, w, "RaceEvent::PlaceUnlocked (sub_82143740)", 150, position_args,
-        Original<__imp__sub_82143740>, hooks::RaceEventPlaceUnlocked, misc);
+        Original<__imp__sub_82143740>, ITC_CONTEXT_FN(hooks::RaceEventPlaceUnlocked), misc);
   Group(
       h, w, "RaceEvent::PlaceUnlockedCurrent (sub_821442D8)", 64,
       [base, position_args](Random& r, const World& w, PPCContext& t) {
@@ -888,7 +888,7 @@ void Placing(Context& h, World& w) {
         t.r4.u64 = t.r5.u64;
         MaybeNoEvent(base, r);
       },
-      Original<__imp__sub_821442D8>, hooks::RaceEventPlaceUnlockedCurrent, misc);
+      Original<__imp__sub_821442D8>, ITC_CONTEXT_FN(hooks::RaceEventPlaceUnlockedCurrent), misc);
 }
 
 // Career::SetUpEvent: tables 0 to 7 of 56-byte entries in a block of their
@@ -1005,8 +1005,8 @@ void StartFirstRaceGroup(Context& h, World& w, const SetupFn& shape, uint32_t fr
         g_setups.clear();
         hooks::g_start_up_recorder = RecordSetUp;
       },
-      leave ? OriginalLeave : OriginalStartFirstRace,
-      leave ? hooks::CarDealerLeave : hooks::CarDealerStartFirstRace,
+      leave ? ITC_CONTEXT_FN(OriginalLeave) : ITC_CONTEXT_FN(OriginalStartFirstRace),
+      leave ? ITC_CONTEXT_FN(hooks::CarDealerLeave) : ITC_CONTEXT_FN(hooks::CarDealerStartFirstRace),
       [&h, base, frame_bytes, compared, &dealer](Outputs& out, const World& w, PPCContext&) {
         hooks::g_start_up_recorder = nullptr;
         out.Bytes(Read(base, dealer.address, dealer.bytes));
@@ -1099,7 +1099,7 @@ void RaceMenuStartGroup(Context& h, World& w, const SetupFn& shape, uint32_t fra
           hooks::g_start_up_recorder = RecordSetUp;
         },
         page ? OriginalRaceMenu<__imp__sub_8218BB18> : OriginalRaceMenu<__imp__sub_82188CE8>,
-        page ? hooks::RaceMenuStartPage : hooks::RaceMenuStartEvent,
+        page ? ITC_CONTEXT_FN(hooks::RaceMenuStartPage) : ITC_CONTEXT_FN(hooks::RaceMenuStartEvent),
         [&h, base, &machine, own, saves](Outputs& out, const World& w, PPCContext&) {
           hooks::g_start_up_recorder = nullptr;
           out.Word(uint32_t(g_setups.size()));
@@ -1188,7 +1188,7 @@ void SetUpEvents(Context& h, World& w) {
       };
   Group(
       h, w, "Career::SetUpEvent (sub_82114268)", 64, shape,
-      Original<__imp__sub_82114268>, hooks::CareerSetUpEvent,
+      Original<__imp__sub_82114268>, ITC_CONTEXT_FN(hooks::CareerSetUpEvent),
       [&h, base, frame_bytes, compared](Outputs& out, const World& w, PPCContext&) {
         const uint32_t e = guest::LoadU32(base, re::kEvent);
         out.Word(e == 0 ? 0 : e == w.event() ? 1 : 2);

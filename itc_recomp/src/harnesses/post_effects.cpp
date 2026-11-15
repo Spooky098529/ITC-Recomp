@@ -306,9 +306,9 @@ void ToggleCases(Context& h, uint32_t block) {
         PPCContext t = CallContext(h);
         t.r3.u64 = race ? race_object : object;
         if (race) {
-          Run(v, __imp__sub_8215B690, NativeToggleRaceEffects, t, h.base);
+          Run(v, __imp__sub_8215B690, ITC_CONTEXT_FN(NativeToggleRaceEffects), t, h.base);
         } else {
-          Run(v, __imp__sub_8212EDE0, NativeToggleHidden, t, h.base);
+          Run(v, __imp__sub_8212EDE0, ITC_CONTEXT_FN(NativeToggleHidden), t, h.base);
         }
         out[v].Bytes(Read(h.base, block, kBlockBytes));
         out[v].Word(t.r3.u32);
@@ -491,7 +491,7 @@ void RecordCases(Context& h, uint32_t block) {
       {"sub_82133608 PostEffect::RecordEndStates", __imp__sub_82133608, sub_82133608, 13},
       {"sub_82133790 PostEffect::RecordTargets", __imp__sub_82133790, sub_82133790, 7},
       {"sub_82133D00 PostEffect::RecordPixelConstants", __imp__sub_82133D00, sub_82133D00, 2},
-      {"sub_82133D70 PostEffect::RecordPixelBool", __imp__sub_82133D70, NativeRecordPixelBool, 2},
+      {"sub_82133D70 PostEffect::RecordPixelBool", __imp__sub_82133D70, ITC_CONTEXT_FN(NativeRecordPixelBool), 2},
       {"sub_82133DD8 PostEffect::RecordTexelSize", __imp__sub_82133DD8, sub_82133DD8, 2},
       {"sub_82133F58 PostEffect::RecordResolve", __imp__sub_82133F58, sub_82133F58, 6},
   };
@@ -638,11 +638,11 @@ void GlareCases(Context& h, uint32_t block) {
         t.f4.f64 = f4;
         t.r10.u64 = r10;
         if (f == 0) {
-          Run(v, __imp__sub_8212ED78, NativeGlareDefConstruct, t, h.base);
+          Run(v, __imp__sub_8212ED78, ITC_CONTEXT_FN(NativeGlareDefConstruct), t, h.base);
         } else if (f == 1) {
-          Run(v, __imp__sub_8212EC90, NativeGlareDefInit, t, h.base);
+          Run(v, __imp__sub_8212EC90, ITC_CONTEXT_FN(NativeGlareDefInit), t, h.base);
         } else {
-          Run(v, __imp__sub_8212EA98, NativeStarDefInit, t, h.base);
+          Run(v, __imp__sub_8212EA98, ITC_CONTEXT_FN(NativeStarDefInit), t, h.base);
         }
         out[v].Bytes(Read(h.base, block, 0x200));
         out[v].Word(t.r3.u32);
@@ -726,9 +726,9 @@ void RenderTextureCases(Context& h, uint32_t block) {
         PPCContext t = CallContext(h);
         t.r3.u64 = pool ? block + kAt : entry;
         if (pool) {
-          Run(v, __imp__sub_821332F0, NativeRenderTexturesRelease, t, h.base);
+          Run(v, __imp__sub_821332F0, ITC_CONTEXT_FN(NativeRenderTexturesRelease), t, h.base);
         } else {
-          Run(v, __imp__sub_82133070, NativeRenderTextureRelease, t, h.base);
+          Run(v, __imp__sub_82133070, ITC_CONTEXT_FN(NativeRenderTextureRelease), t, h.base);
         }
         const std::initializer_list<uint32_t> made = {header, memory, entry};
         for (uint32_t i = 0; i < 0x200; i += 4) {
@@ -773,7 +773,7 @@ void ReleaseSurfaceCases(Context& h, uint32_t block) {
       guest::StoreU32(h.base, block + kAt, block + kSurface);
       PPCContext t = CallContext(h);
       t.r3.u64 = block + kAt;
-      Run(v, __imp__sub_82133C60, NativeReleaseSurface, t, h.base);
+      Run(v, __imp__sub_82133C60, ITC_CONTEXT_FN(NativeReleaseSurface), t, h.base);
       out[v].Word(guest::LoadU32(h.base, block + kAt));
       out[v].Word(guest::LoadU32(h.base, block + kSurface + 4));
       out[v].Word(t.r3.u32);
@@ -811,7 +811,7 @@ void TargetFilterCases(Context& h, uint32_t block) {
       t.r3.u64 = block;
       t.r4.u64 = entry;
       guest::StoreU32(h.base, kHiZTaken, uint32_t(c & 1));
-      Run(v, __imp__sub_82135AA8, NativeTargetFilterConstruct, t, h.base);
+      Run(v, __imp__sub_82135AA8, ITC_CONTEXT_FN(NativeTargetFilterConstruct), t, h.base);
       const uint32_t surface = guest::LoadU32(h.base, block + 8064);
       out[v].Bytes(Read(h.base, block, 8064));
       out[v].Bytes(Read(h.base, block + 8068, kBlockBytes - 8068));
@@ -1001,7 +1001,7 @@ void RenderTextureMakeCases(Context& h, uint32_t block) {
         t.r7.u64 = id;
         t.r8.u64 = key0;
         t.r9.u64 = key1;
-        Run(v, __imp__sub_821330D0, NativeTextureCreate, t, h.base);
+        Run(v, __imp__sub_821330D0, ITC_CONTEXT_FN(NativeTextureCreate), t, h.base);
         Made made;
         made.Texture(h.base, block + kEntry, false);
         for (uint32_t i = 0; i < 36; i += 4) {
@@ -1050,7 +1050,7 @@ void RenderTextureMakeCases(Context& h, uint32_t block) {
       t.r6.u64 = height;
       t.r7.u64 = key0;
       t.r8.u64 = key1;
-      Run(v, __imp__sub_82133190, NativeAcquire, t, h.base);
+      Run(v, __imp__sub_82133190, ITC_CONTEXT_FN(NativeAcquire), t, h.base);
       Made made;
       const bool own = t.r3.u32 < kPool || t.r3.u32 >= kPool + 20 * 36;
       if (own) {
@@ -1343,7 +1343,7 @@ void InitBootCases(Context& h, uint32_t block) {
       PPCContext t = CallContext(h);
       FillStack(h.base, t.r1.u32, stack);
       t.r3.u64 = device;
-      Run(v, __imp__sub_82138C38, hooks::PostEffectsInitBoot, t, h.base);
+      Run(v, __imp__sub_82138C38, ITC_CONTEXT_FN(hooks::PostEffectsInitBoot), t, h.base);
       const uint32_t decl = guest::LoadU32(h.base, pe::kVertexDeclaration);
       out[v].Word(decl != 0 && decl != before);
       if (decl != 0 && decl != before) {
@@ -1841,7 +1841,7 @@ void StarPassCases(Context& h, uint32_t star_block) {
       t.f3.f64 = f[2];
       t.f4.f64 = f[3];
       const uint32_t frame = t.r1.u32 - 768;
-      Run(v, __imp__sub_82134060, NativeStarPass, t, h.base);
+      Run(v, __imp__sub_82134060, ITC_CONTEXT_FN(NativeStarPass), t, h.base);
       StarBlockOutputs(out[v], h.base, star_block);
       out[v].Bytes(Read(h.base, frame + 80, 8));  // the last index, as a doubleword
       out[v].Floats(h.base, frame + 88, (624 - 88) / 4);
@@ -1925,7 +1925,7 @@ void StarCases(Context& h, uint32_t star_block) {
       FillStack(h.base, t.r1.u32, stack);
       t.r3.u64 = star_block;
       const uint32_t frame = t.r1.u32 - 672;
-      Run(v, __imp__sub_82136FA8, NativeGlowRecordStar, t, h.base);
+      Run(v, __imp__sub_82136FA8, ITC_CONTEXT_FN(NativeGlowRecordStar), t, h.base);
       StarBlockOutputs(out[v], h.base, star_block);
       // The frame: +92 the last destination, +96 and +112 the quarter
       // size's doublewords, the rest floats (the lines' words, the turn's
@@ -2004,7 +2004,7 @@ void GlowRecordCases(Context& h, uint32_t star_block) {
       FillStack(h.base, t.r1.u32, stack);
       t.r3.u64 = star_block;
       const uint32_t frame = t.r1.u32 - 272;
-      Run(v, __imp__sub_821379D8, NativeGlowRecord, t, h.base);
+      Run(v, __imp__sub_821379D8, ITC_CONTEXT_FN(NativeGlowRecord), t, h.base);
       StarBlockOutputs(out[v], h.base, star_block, true);
       out[v].Bytes(Read(h.base, frame + 80, 16));
       out[v].Floats(h.base, frame + 96, 4);

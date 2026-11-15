@@ -222,7 +222,7 @@ void PassLists(Context& h) {
       guest::StoreU32s(h.base, h.data, words.data(), uint32_t(words.size()));
       PPCContext t = CallContext(h);
       t.r3.u64 = list;
-      (v == 0 ? __imp__sub_8258EB38 : NativePassListClear)(t, h.base);
+      (v == 0 ? __imp__sub_8258EB38 : ITC_CONTEXT_FN(NativePassListClear))(t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
     }
@@ -306,7 +306,7 @@ void Constructors(Context& h) {
         t.r3.u64 = list;
         t.r4.u64 = items;
         t.r5.u64 = buckets;
-        (v == 0 ? __imp__sub_82590B38 : NativePassListConstruct)(t, h.base);
+        (v == 0 ? __imp__sub_82590B38 : ITC_CONTEXT_FN(NativePassListConstruct))(t, h.base);
         PassListOutputs(h.base, list, out[v]);
         out[v].Word(t.r3.u32);
         FreePassList(list, h.base, false);
@@ -325,7 +325,7 @@ void Constructors(Context& h) {
         Fill(h.base, h.data, kScratchBytes);
         PPCContext t = CallContext(h);
         t.r3.u64 = queue;
-        (v == 0 ? RecompiledRenderQueueConstruct : NativeRenderQueueConstruct)(t, h.base);
+        (v == 0 ? ITC_CONTEXT_FN(RecompiledRenderQueueConstruct) : ITC_CONTEXT_FN(NativeRenderQueueConstruct))(t, h.base);
         out[v].Word(guest::LoadU32(h.base, queue + 0));
         const uint32_t state = guest::LoadU32(h.base, queue + 4);
         out[v].Word(state != 0);
@@ -367,13 +367,13 @@ void DeviceShaders(Context& h) {
     return;
   }
   RunSetter(h, device, shaders, "Device::SetVertexShader (sub_822A8808)", __imp__sub_822A8808,
-            NativeSetVertexShader, 592, 12436, 200);
+            ITC_CONTEXT_FN(NativeSetVertexShader), 592, 12436, 200);
   RunSetter(h, device, shaders, "D3DDevice_SetVertexShader (sub_822A8958)",
-            RecompiledSetVertexShaderEntry, NativeSetVertexShaderEntry, 592, 12436, 100);
+            ITC_CONTEXT_FN(RecompiledSetVertexShaderEntry), ITC_CONTEXT_FN(NativeSetVertexShaderEntry), 592, 12436, 100);
   RunSetter(h, device, shaders, "Device::SetPixelShader (sub_822A8618)", __imp__sub_822A8618,
-            NativeSetPixelShader, 56, 12432, 200);
+            ITC_CONTEXT_FN(NativeSetPixelShader), 56, 12432, 200);
   RunSetter(h, device, shaders, "Device::SetVertexDeclaration (sub_822A8960)",
-            __imp__sub_822A8960, NativeSetVertexDeclaration, 0, 11552, 32);
+            __imp__sub_822A8960, ITC_CONTEXT_FN(NativeSetVertexDeclaration), 0, 11552, 32);
   memory::Free(device);
   memory::Free(shaders);
   PassLists(h);

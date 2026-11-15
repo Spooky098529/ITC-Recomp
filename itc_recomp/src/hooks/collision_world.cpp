@@ -5,6 +5,7 @@
 // leaves a value there) as the original does.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -44,20 +45,15 @@ ITC_FLAG_BOOL(native_collision_world, true, "ITC",
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_COLLISION_WORLD(address, body)   \
-  extern "C" REX_FUNC(sub_##address) {       \
-    REX_FUNC_PROLOGUE();                     \
-    if (!ITC_FLAG(native_collision_world)) { \
-      __imp__sub_##address(ctx, base);       \
-      return;                                \
-    }                                        \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_collision_world)) { \
     ctx.fpscr.disableFlushMode();            \
     body;                                    \
   }
 // The same for one allocating or freeing pages: the original unless
 // --native_heap routes VirtualAlloc to the allocation layer.
 #define ITC_COLLISION_WORLD_PAGES(address, body)                              \
-  extern "C" REX_FUNC(sub_##address) {                                        \
-    REX_FUNC_PROLOGUE();                                                      \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                        \
+    \
     if (!ITC_FLAG(native_collision_world) || !hooks::NativeHeapActive()) {     \
       __imp__sub_##address(ctx, base);                                        \
       return;                                                                 \
@@ -124,15 +120,15 @@ ITC_COLLISION_WORLD(820FEAB0,
                                                               ctx.r5.u32, ctx.r1.u32 - 96))
 // The collision world's second query: r3 = the hit records, r4 = the shape
 // (r5 not read). A shape that isn't a box: the original.
-extern "C" REX_FUNC(sub_820FEBD0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820FEBD0) {
+  
   uint32_t count = 0;
   if (ITC_FLAG(native_collision_world)) {
     ctx.fpscr.disableFlushMode();
   }
   if (!ITC_FLAG(native_collision_world) ||
       !TrackCollisionGroundHits(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 384, &count)) {
-    __imp__sub_820FEBD0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820FEBD0);
     return;
   }
   ctx.r3.u64 = count;
@@ -170,15 +166,15 @@ ITC_COLLISION_WORLD(820F9050, TrackRouteOnLoaded(base, ctx.r6.u32); ctx.r3.u64 =
 // The collision world's first query ([0x826C2D78]): r3 = the hit records,
 // r4 = the shape record (r5 not read). A shape that isn't a box: the
 // original.
-extern "C" REX_FUNC(sub_820FF1B0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820FF1B0) {
+  
   uint32_t count = 0;
   if (ITC_FLAG(native_collision_world)) {
     ctx.fpscr.disableFlushMode();
   }
   if (!ITC_FLAG(native_collision_world) ||
       !TrackCollisionWallHits(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 1584, &count)) {
-    __imp__sub_820FF1B0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820FF1B0);
     return;
   }
   ctx.r3.u64 = count;

@@ -5,6 +5,7 @@
 // the slots through the screens' vtables, so their adapters stay.
 
 #include "hooks/type67_screens.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/heap.h"
@@ -139,7 +140,7 @@ namespace hooks {
 
 namespace ts = type67_screens;
 
-ts::Calls Type67ScreensCalls(PPCContext& ctx, uint8_t* base) {
+ts::Calls Type67ScreensCalls(lifted::Regs& ctx, uint8_t* base) {
   ts::Calls calls;
   static_cast<type67_modes::Calls&>(calls) = Type67Calls(ctx, base);
   calls.native_heap = NativeHeapActive();
@@ -189,7 +190,7 @@ ts::Calls Type67ScreensCalls(PPCContext& ctx, uint8_t* base) {
 }
 
 #define ITC_TS_STEP(name, expression)                \
-  void name(PPCContext& ctx, uint8_t* base) {        \
+  ITC_REGS_STEP(name) {        \
     const ts::Calls calls = Type67ScreensCalls(ctx, base); \
     (void)calls;                                     \
     ctx.r3.u64 = (expression);                       \
@@ -449,7 +450,7 @@ ITC_TS_STEP(Type6ListScreenSetUpMenus,
             ts::Type6ListScreenSetUpMenus(base, ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type6ListScreenBack,
             ts::Type6ListScreenBack(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-void Type6ListScreenSetUpRace(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type6ListScreenSetUpRace) {
   ctx.fpscr.disableFlushMode();
   const ts::Calls calls = Type67ScreensCalls(ctx, base);
   ctx.r3.u64 = ts::Type6ListScreenSetUpRace(base, ctx.r3.u64, ctx.r1.u32, calls);
@@ -493,7 +494,7 @@ ITC_TS_STEP(Type7ListScreenSetUpMenus,
             ts::Type7ListScreenSetUpMenus(base, ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(Type7ListScreenBack,
             ts::Type7ListScreenBack(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
-void Type7ListScreenSetUpRace(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Type7ListScreenSetUpRace) {
   ctx.fpscr.disableFlushMode();
   const ts::Calls calls = Type67ScreensCalls(ctx, base);
   ctx.r3.u64 = ts::Type7ListScreenSetUpRace(base, ctx.r3.u64, ctx.r1.u32, calls);
@@ -514,7 +515,7 @@ ITC_TS_STEP(NodeScreenPage5,
             ts::NodeScreenPage5(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(NodeScreenStep0, ts::NodeScreenStep0(base, ctx.r3.u64, ctx.r1.u32, calls))
 ITC_TS_STEP(NodeScreenStep1, ts::NodeScreenStep1(base, ctx.r3.u64, ctx.r1.u32, calls))
-void NodeScreenStep2(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(NodeScreenStep2) {
   ctx.fpscr.disableFlushMode();
   const ts::Calls calls = Type67ScreensCalls(ctx, base);
   ctx.r3.u64 = ts::NodeScreenStep2(base, ctx.r3.u64, ctx.r1.u32, calls);
@@ -569,12 +570,7 @@ ITC_TS_STEP(Type7ScreensDeletingDestruct,
 }  // namespace hooks
 
 #define ITC_TYPE67_SCREENS(address, step)     \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_type67_screens)) {   \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_type67_screens)) { \
     hooks::step(ctx, base);                   \
   }
 

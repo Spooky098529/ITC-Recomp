@@ -7,32 +7,52 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 namespace hooks {
 
 // The block's helpers (r3 the block, r4 an index for MachineOf).
 void Type2ModeMachineOf(PPCContext& ctx, uint8_t* base);
+void Type2ModeMachineOf(lifted::Regs& ctx, uint8_t* base);
 void Type2ModeAllLoaded(PPCContext& ctx, uint8_t* base);
+void Type2ModeAllLoaded(lifted::Regs& ctx, uint8_t* base);
 void Type2ModeFindShown(PPCContext& ctx, uint8_t* base);
+void Type2ModeFindShown(lifted::Regs& ctx, uint8_t* base);
 // The delegate functions (r3 the answer, r4 the mode).
 void Type2ModeTearDown(PPCContext& ctx, uint8_t* base);
+void Type2ModeTearDown(lifted::Regs& ctx, uint8_t* base);
 void Type2ModeLeaveScreen(PPCContext& ctx, uint8_t* base);
+void Type2ModeLeaveScreen(lifted::Regs& ctx, uint8_t* base);
 void Type2ModeAfterLeaveScreen(PPCContext& ctx, uint8_t* base);
+void Type2ModeAfterLeaveScreen(lifted::Regs& ctx, uint8_t* base);
 void Type2ModeRestart(PPCContext& ctx, uint8_t* base);
+void Type2ModeRestart(lifted::Regs& ctx, uint8_t* base);
 void Type2ModeLeaving(PPCContext& ctx, uint8_t* base);
+void Type2ModeLeaving(lifted::Regs& ctx, uint8_t* base);
 void Type2ModeNextMode(PPCContext& ctx, uint8_t* base);
+void Type2ModeNextMode(lifted::Regs& ctx, uint8_t* base);
 void Type2ModeWaitForLoads(PPCContext& ctx, uint8_t* base);
+void Type2ModeWaitForLoads(lifted::Regs& ctx, uint8_t* base);
 // The slot thunks (r3 the answer, r4 the object).
 void ModeSlot8Thunk(PPCContext& ctx, uint8_t* base);
+void ModeSlot8Thunk(lifted::Regs& ctx, uint8_t* base);
 void ModeSlot9Thunk(PPCContext& ctx, uint8_t* base);
+void ModeSlot9Thunk(lifted::Regs& ctx, uint8_t* base);
 void ModeSlot10Thunk(PPCContext& ctx, uint8_t* base);
+void ModeSlot10Thunk(lifted::Regs& ctx, uint8_t* base);
 void ModeSlot11Thunk(PPCContext& ctx, uint8_t* base);
+void ModeSlot11Thunk(lifted::Regs& ctx, uint8_t* base);
 void ModeSlot12Thunk(PPCContext& ctx, uint8_t* base);
+void ModeSlot12Thunk(lifted::Regs& ctx, uint8_t* base);
 void ModeSlot13Thunk(PPCContext& ctx, uint8_t* base);
+void ModeSlot13Thunk(lifted::Regs& ctx, uint8_t* base);
 // The +32 interface (r3 the mode + 32; r4 a number for ForceExit).
 void Type2ModeInterrupt(PPCContext& ctx, uint8_t* base);
+void Type2ModeInterrupt(lifted::Regs& ctx, uint8_t* base);
 void Type2ModeForceExit(PPCContext& ctx, uint8_t* base);
+void Type2ModeForceExit(lifted::Regs& ctx, uint8_t* base);
 // Init (r3 the mode).
 void Type2ModeInit(PPCContext& ctx, uint8_t* base);
+void Type2ModeInit(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

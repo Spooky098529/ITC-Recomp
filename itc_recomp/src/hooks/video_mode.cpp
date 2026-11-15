@@ -2,6 +2,7 @@
 // (src/display/display.h). See B3 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "guest_call.h"
 
 #include <algorithm>
@@ -55,8 +56,8 @@ constexpr float kAspect16x9 = 16.0f / 9.0f;
 // original also had XGetVideoMode write its answer at +152..+199, which
 // nothing reads (checked by overwriting it); it's left out, the bytes
 // zeroed as the original did before asking.
-extern "C" REX_FUNC(sub_8258D568) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
+  
   const uint32_t object = ctx.r3.u32, interval = ctx.r6.u32;
   auto set = [&](uint32_t offset, uint32_t value) { guest::StoreU32(base, object + offset, value); };
   auto field = [&](uint32_t offset) { return guest::LoadU32(base, object + offset); };
@@ -181,8 +182,8 @@ extern "C" REX_FUNC(sub_8258D568) {
 // the object's vtable +96. Returns that call's result, or E_OUTOFMEMORY if
 // a resource couldn't be made. The original asked XGetVideoMode only for
 // is_widescreen.
-extern "C" REX_FUNC(sub_82482B18) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82482B18) {
+  
   const uint32_t object = ctx.r3.u32;
   const uint32_t device = guest::LoadU32(base, object + 56);
   const float width = float(guest::LoadU32(base, device + kDeviceParameters));

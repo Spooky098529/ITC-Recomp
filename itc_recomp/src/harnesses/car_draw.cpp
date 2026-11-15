@@ -254,7 +254,7 @@ void Shadows(Context& h, Random& r, uint32_t block) {
           t.r5.u64 = point;
           t.r6.u64 = normal;
         },
-        __imp__sub_82597FE0, NativeMatrixShadow, {{0x100, 16}},
+        __imp__sub_82597FE0, ITC_CONTEXT_FN(NativeMatrixShadow), {{0x100, 16}},
         fmt::format("case {}", c), [&](const PPCContext& t, Outputs& o) {
           o.Floats(h.base, t.r1.u32 - 16, 4);  // the normalized normal
         });
@@ -315,7 +315,7 @@ void Blinks(Context& h, Random& r, uint32_t block, uint32_t race) {
             }
             t.f3.f64 = double(rate);
           },
-          __imp__sub_820DC4B0, NativeBlinkLevel, {}, fmt::format("case {}", c),
+          __imp__sub_820DC4B0, ITC_CONTEXT_FN(NativeBlinkLevel), {}, fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
             o.Double(t.f1.u64);
             o.Bytes(Read(h.base, t.r1.u32 - 16, 16));  // the period and remainder
@@ -348,7 +348,7 @@ void Blinks(Context& h, Random& r, uint32_t block, uint32_t race) {
             }
             t.r3.u64 = timers;
           },
-          __imp__sub_820DC958, hooks::CarDrawBlinkTimersAdvance, {},
+          __imp__sub_820DC958, ITC_CONTEXT_FN(hooks::CarDrawBlinkTimersAdvance), {},
           fmt::format("case {}", c), [&](const PPCContext& t, Outputs& o) {
             o.Bytes(Read(h.base, t.r1.u32 - 16, 8));
           });
@@ -442,7 +442,7 @@ void Gathers(Context& h, Random& r, uint32_t block) {
           t.r4.u64 = world;
           t.r5.u64 = r.Below(3) == 0 ? 0 : r.Below(8) == 0 ? r.Next() : 1;
         },
-        __imp__sub_820C9170, NativeGather,
+        __imp__sub_820C9170, ITC_CONTEXT_FN(NativeGather),
         {{0x5000 + 48, 160}}, fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& o) {
           const uint32_t frame = t.r1.u32 - car_draw::kGatherFrame;
@@ -518,7 +518,7 @@ void Heights(Context& h, Random& r, uint32_t block, uint32_t race) {
           t.r3.u64 = pass;
           t.r4.u64 = position;
         },
-        __imp__sub_820DAB58, hooks::CarDrawIsNearPlayerHeight, {}, fmt::format("case {}", c),
+        __imp__sub_820DAB58, ITC_CONTEXT_FN(hooks::CarDrawIsNearPlayerHeight), {}, fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& o) {
           const uint32_t frame = t.r1.u32 - car_draw::kNearPlayerHeightFrame;
           o.Word(guest::LoadU32(h.base, frame));
@@ -771,7 +771,7 @@ void ModelDraws(Context& h, Random& r, uint32_t block) {
             t.r7.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
             t.r24.u64 = r.Next();
           },
-          __imp__sub_820D04E8, NativeModelDraw, {}, fmt::format("case {}", c),
+          __imp__sub_820D04E8, ITC_CONTEXT_FN(NativeModelDraw), {}, fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) { DrawOutputs(h, block, t, o, used, true, queued); });
     }
     ITC_LOG_INFO("harness: Model::Draw: {} of 768 cases ended handing an entry to the render "
@@ -805,7 +805,7 @@ void ModelDraws(Context& h, Random& r, uint32_t block) {
             t.r24.u64 = r.Next();
             t.r28.u64 = r.Next();
           },
-          __imp__sub_820D06F0, hooks::CarDrawCarPartDraw, {}, fmt::format("case {}", c),
+          __imp__sub_820D06F0, ITC_CONTEXT_FN(hooks::CarDrawCarPartDraw), {}, fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
             DrawOutputs(h, block, t, o, used, !depth, queued);
           },
@@ -921,7 +921,7 @@ void Morphs(Context& h, Random& r, uint32_t block) {
             t.r6.u64 = r.Below(4) == 0 ? r.Next() : 16 * r.Below(0x1000);
             t.r7.u64 = header;
           },
-          __imp__sub_8235A688, NativeXgSetVertexBufferHeader, {}, fmt::format("case {}", c),
+          __imp__sub_8235A688, ITC_CONTEXT_FN(NativeXgSetVertexBufferHeader), {}, fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
             o.Word(guest::LoadU32(h.base, t.r1.u32 - car_draw::kXgVertexBufferHeaderFrame));
           });
@@ -947,7 +947,7 @@ void Morphs(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = out;
             t.r4.u64 = bytes;
           },
-          __imp__sub_8258A9E8, NativeAllocVertexBuffer, {}, fmt::format("case {}", c),
+          __imp__sub_8258A9E8, ITC_CONTEXT_FN(NativeAllocVertexBuffer), {}, fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
             const uint32_t frame = t.r1.u32 - car_draw::kAllocVertexBufferFrame;
             o.Word(guest::LoadU32(h.base, frame));
@@ -987,7 +987,7 @@ void Morphs(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = r.Next();
             t.r4.u64 = r.Next();
           },
-          __imp__sub_82594E88, NativeQueueJobRelease, {}, fmt::format("case {}", c),
+          __imp__sub_82594E88, ITC_CONTEXT_FN(NativeQueueJobRelease), {}, fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
             o.Word(guest::LoadU32(h.base, t.r1.u32 - car_draw::kQueueJobReleaseFrame));
             queued(t, o, count);
@@ -1066,7 +1066,7 @@ void Morphs(Context& h, Random& r, uint32_t block) {
             t.r4.u64 = morph;
             t.r5.u64 = index;
           },
-          __imp__sub_82595110, NativeMorphShape, {{0x9000, 0xC00 / 4}},
+          __imp__sub_82595110, ITC_CONTEXT_FN(NativeMorphShape), {{0x9000, 0xC00 / 4}},
           fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
             const uint32_t frame = t.r1.u32 - car_draw::kMorphShapeFrame;
@@ -1233,7 +1233,7 @@ void LightKits(Context& h, Random& r, uint32_t block, uint32_t race) {
             t.r24.u64 = r.Next();
             t.r28.u64 = r.Next();
           },
-          __imp__sub_820DDE58, hooks::CarDrawSceneLightsDraw, AlphaFloats(),
+          __imp__sub_820DDE58, ITC_CONTEXT_FN(hooks::CarDrawSceneLightsDraw), AlphaFloats(),
           fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
             const uint32_t frame = t.r1.u32 - car_draw::kSceneLightsDrawFrame;

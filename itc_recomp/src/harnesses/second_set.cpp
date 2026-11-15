@@ -188,7 +188,7 @@ void Points(Context& h, Random& r, uint32_t block) {
             t.r4.u64 = block + 0x300;
           },
           which == 0 ? __imp__sub_820CE8D8 : __imp__sub_820CE900,
-          which == 0 ? hooks::SecondSetPointSetNode : hooks::SecondSetPointSetShape,
+          which == 0 ? ITC_CONTEXT_FN(hooks::SecondSetPointSetNode) : ITC_CONTEXT_FN(hooks::SecondSetPointSetShape),
           fmt::format("case {}", c));
     }
     results.Report();
@@ -201,7 +201,7 @@ void Points(Context& h, Random& r, uint32_t block) {
           [&](PPCContext& t) {
             t.r3.u64 = block + 16 * r.Below(8);
           },
-          __imp__sub_820CEA08, hooks::SecondSetPointClear, {ClearWindow(0)},
+          __imp__sub_820CEA08, ITC_CONTEXT_FN(hooks::SecondSetPointClear), {ClearWindow(0)},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -214,7 +214,7 @@ void Points(Context& h, Random& r, uint32_t block) {
           [&](PPCContext& t) {
             t.r3.u64 = block + 16 * r.Below(8);
           },
-          __imp__sub_820D0270, hooks::SecondSetPointConstruct,
+          __imp__sub_820D0270, ITC_CONTEXT_FN(hooks::SecondSetPointConstruct),
           {ClearWindow(ss::kConstructFrameBytes)}, fmt::format("case {}", c));
     }
     results.Report();
@@ -256,7 +256,7 @@ void Points(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = record;
             t.r4.u64 = model;
           },
-          __imp__sub_820CEB30, hooks::SecondSetFindShape,
+          __imp__sub_820CEB30, ITC_CONTEXT_FN(hooks::SecondSetFindShape),
           {{ss::kFindShapeFrameBytes - 80, 64}}, fmt::format("case {}", c));
     }
     results.Report();
@@ -283,87 +283,87 @@ void Groups(Context& h, Random& r, uint32_t block) {
   }
   const Group groups[] = {
       {"PartsPoints::ResetFrontBumper (sub_820DE0E0)", __imp__sub_820DE0E0,
-       hooks::SecondSetPartsResetFrontBumper, 112, 2656, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetFrontBumper), 112, 2656, false},
       {"PartsPoints::ResetRearBumper (sub_820DE2C8)", __imp__sub_820DE2C8,
-       hooks::SecondSetPartsResetRearBumper, 112, 1696, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetRearBumper), 112, 1696, false},
       {"PartsPoints::ResetRearSpoiler (sub_820DE498)", __imp__sub_820DE498,
-       hooks::SecondSetPartsResetRearSpoiler, 112, 720, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetRearSpoiler), 112, 720, false},
       {"PartsPoints::ResetBonnet (sub_820DE548)", __imp__sub_820DE548,
-       hooks::SecondSetPartsResetBonnet, 128, 480, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetBonnet), 128, 480, false},
       {"PartsPoints::ResetLeftDoor (sub_820DE600)", __imp__sub_820DE600,
-       hooks::SecondSetPartsResetLeftDoor, 128, 6096, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetLeftDoor), 128, 6096, false},
       {"PartsPoints::ResetRightDoor (sub_820DE7E8)", __imp__sub_820DE7E8,
-       hooks::SecondSetPartsResetRightDoor, 128, 6096, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetRightDoor), 128, 6096, false},
       {"PartsPoints::ResetDoors (sub_820DE9D0)", __imp__sub_820DE9D0,
-       hooks::SecondSetPartsResetDoors, 112, 5520, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetDoors), 112, 5520, false},
       {"PartsPoints::ResetHeadlights (sub_820DF740)", __imp__sub_820DF740,
-       hooks::SecondSetPartsResetHeadlights, 192, 3200, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetHeadlights), 192, 3200, false},
       {"PartsPoints::ResetTailLights (sub_820DEBF0)", __imp__sub_820DEBF0,
-       hooks::SecondSetPartsResetTailLights, 128, 3600, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetTailLights), 128, 3600, false},
       {"PartsPoints::ResetFenders (sub_820DECD0)", __imp__sub_820DECD0,
-       hooks::SecondSetPartsResetFenders, 112, 1680, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetFenders), 112, 1680, false},
       {"PartsPoints::ResetCabin (sub_820DEE88)", __imp__sub_820DEE88,
-       hooks::SecondSetPartsResetCabin, 112, 1200, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetCabin), 112, 1200, false},
       {"PartsPoints::ResetEngine (sub_820DF020)", __imp__sub_820DF020,
-       hooks::SecondSetPartsResetEngine, 112, 480, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetEngine), 112, 480, false},
       {"PartsPoints::ResetMufflers (sub_820DF0C0)", __imp__sub_820DF0C0,
-       hooks::SecondSetPartsResetMufflers, 128, 1456, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetMufflers), 128, 1456, false},
       {"PartsPoints::ResetShadows (sub_820DF128)", __imp__sub_820DF128,
-       hooks::SecondSetPartsResetShadows, 112, 976, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsResetShadows), 112, 976, false},
       {"PartsPoints::InitCooling (sub_820DF410)", __imp__sub_820DF410,
-       hooks::SecondSetPartsInitCooling, 96, 240, true},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsInitCooling), 96, 240, true},
       {"PartsPoints::InitSideSkirts (sub_820DF570)", __imp__sub_820DF570,
-       hooks::SecondSetPartsInitSideSkirts, 96, 240, true},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsInitSideSkirts), 96, 240, true},
       {"PartsPoints::InitLeftMirror (sub_820DF668)", __imp__sub_820DF668,
-       hooks::SecondSetPartsInitLeftMirror, 96, 240, true},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsInitLeftMirror), 96, 240, true},
       {"PartsPoints::InitRightMirror (sub_820DF6B0)", __imp__sub_820DF6B0,
-       hooks::SecondSetPartsInitRightMirror, 96, 240, true},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsInitRightMirror), 96, 240, true},
       {"PartsPoints::InitMirror (sub_820DF6F8)", __imp__sub_820DF6F8,
-       hooks::SecondSetPartsInitMirror, 96, 240, true},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsInitMirror), 96, 240, true},
       {"CockpitPoints::InitBonnet (sub_820DC0A8)", __imp__sub_820DC0A8,
-       hooks::SecondSetCockpitInitBonnet, 96, 240, true},
+       ITC_CONTEXT_FN(hooks::SecondSetCockpitInitBonnet), 96, 240, true},
       {"CockpitPoints::InitMirror (sub_820DC0F0)", __imp__sub_820DC0F0,
-       hooks::SecondSetCockpitInitMirror, 96, 240, true},
+       ITC_CONTEXT_FN(hooks::SecondSetCockpitInitMirror), 96, 240, true},
       {"CockpitPoints::ResetFenders (sub_820DB878)", __imp__sub_820DB878,
-       hooks::SecondSetCockpitResetFenders, 112, 720, false},
+       ITC_CONTEXT_FN(hooks::SecondSetCockpitResetFenders), 112, 720, false},
       {"CockpitPoints::ResetCabin (sub_820DB930)", __imp__sub_820DB930,
-       hooks::SecondSetCockpitResetCabin, 112, 480, false},
+       ITC_CONTEXT_FN(hooks::SecondSetCockpitResetCabin), 112, 480, false},
       {"CockpitPoints::ResetDoors (sub_820DB9E8)", __imp__sub_820DB9E8,
-       hooks::SecondSetCockpitResetDoors, 112, 480, false},
+       ITC_CONTEXT_FN(hooks::SecondSetCockpitResetDoors), 112, 480, false},
       {"CockpitPoints::ResetHeadlights (sub_820DBAA0)", __imp__sub_820DBAA0,
-       hooks::SecondSetCockpitResetHeadlights, 128, 1920, false},
+       ITC_CONTEXT_FN(hooks::SecondSetCockpitResetHeadlights), 128, 1920, false},
       {"InteriorPoints::InitBody (sub_820E39B0)", __imp__sub_820E39B0,
-       hooks::SecondSetInteriorInitBody, 96, 240, true},
+       ITC_CONTEXT_FN(hooks::SecondSetInteriorInitBody), 96, 240, true},
       {"InteriorPoints::ResetDials (sub_820E2FC8)", __imp__sub_820E2FC8,
-       hooks::SecondSetInteriorResetDials, 128, 2896, false},
+       ITC_CONTEXT_FN(hooks::SecondSetInteriorResetDials), 128, 2896, false},
       {"InteriorPoints::ResetMeters (sub_820E3200)", __imp__sub_820E3200,
-       hooks::SecondSetInteriorResetMeters, 144, 5328, false},
+       ITC_CONTEXT_FN(hooks::SecondSetInteriorResetMeters), 144, 5328, false},
       {"InteriorPoints::ResetSteering (sub_820E33F0)", __imp__sub_820E33F0,
-       hooks::SecondSetInteriorResetSteering, 112, 976, false},
+       ITC_CONTEXT_FN(hooks::SecondSetInteriorResetSteering), 112, 976, false},
       {"InteriorPoints::ResetSeats (sub_820E3440)", __imp__sub_820E3440,
-       hooks::SecondSetInteriorResetSeats, 128, 976, false},
+       ITC_CONTEXT_FN(hooks::SecondSetInteriorResetSeats), 128, 976, false},
       {"InteriorPoints::ResetRollCage (sub_820E34F8)", __imp__sub_820E34F8,
-       hooks::SecondSetInteriorResetRollCage, 112, 976, false},
+       ITC_CONTEXT_FN(hooks::SecondSetInteriorResetRollCage), 112, 976, false},
       {"LightPoints::ResetFront (sub_820DC748)", __imp__sub_820DC748,
-       hooks::SecondSetLightsResetFront, 112, 4336, false},
+       ITC_CONTEXT_FN(hooks::SecondSetLightsResetFront), 112, 4336, false},
       {"LightPoints::ResetSides (sub_820DC7A0)", __imp__sub_820DC7A0,
-       hooks::SecondSetLightsResetSides, 112, 4336, false},
+       ITC_CONTEXT_FN(hooks::SecondSetLightsResetSides), 112, 4336, false},
       {"LightPoints::ResetRear (sub_820DC7F8)", __imp__sub_820DC7F8,
-       hooks::SecondSetLightsResetRear, 112, 4336, false},
+       ITC_CONTEXT_FN(hooks::SecondSetLightsResetRear), 112, 4336, false},
       {"TrafficPoints::ResetBody (sub_820E54E8)", __imp__sub_820E54E8,
-       hooks::SecondSetTrafficResetBody, 112, 1440, false},
+       ITC_CONTEXT_FN(hooks::SecondSetTrafficResetBody), 112, 1440, false},
       {"TrafficPoints::ResetHeadlights (sub_820E56D0)", __imp__sub_820E56D0,
-       hooks::SecondSetTrafficResetHeadlights, 128, 1680, false},
+       ITC_CONTEXT_FN(hooks::SecondSetTrafficResetHeadlights), 128, 1680, false},
       {"TrafficPoints::ResetTailLights (sub_820E57A0)", __imp__sub_820E57A0,
-       hooks::SecondSetTrafficResetTailLights, 128, 2880, false},
+       ITC_CONTEXT_FN(hooks::SecondSetTrafficResetTailLights), 128, 2880, false},
       {"WheelPoints::ResetTire (sub_820E74B8)", __imp__sub_820E74B8,
-       hooks::SecondSetWheelsResetTire, 128, 1840, false},
+       ITC_CONTEXT_FN(hooks::SecondSetWheelsResetTire), 128, 1840, false},
       {"WheelPoints::ResetRimA (sub_820E7918)", __imp__sub_820E7918,
-       hooks::SecondSetWheelsResetRimA, 144, 1744, false},
+       ITC_CONTEXT_FN(hooks::SecondSetWheelsResetRimA), 144, 1744, false},
       {"WheelPoints::ResetRimB (sub_820E7C08)", __imp__sub_820E7C08,
-       hooks::SecondSetWheelsResetRimB, 128, 1744, false},
+       ITC_CONTEXT_FN(hooks::SecondSetWheelsResetRimB), 128, 1744, false},
       {"WheelPoints::ResetBrakes (sub_820E7F90)", __imp__sub_820E7F90,
-       hooks::SecondSetWheelsResetBrakes, 128, 2944, false},
+       ITC_CONTEXT_FN(hooks::SecondSetWheelsResetBrakes), 128, 2944, false},
       {"PartsPoints::InitLeftDoor (sub_820DF5B8)", __imp__sub_820DF5B8,
        ITC_GROUP_STEP(PartsInitLeftDoor), 112, 6096, false, false},
       {"PartsPoints::InitRightDoor (sub_820DF610)", __imp__sub_820DF610,
@@ -373,25 +373,25 @@ void Groups(Context& h, Random& r, uint32_t block) {
       {"PartsPoints::InitMufflers (sub_820E0010)", __imp__sub_820E0010,
        ITC_GROUP_STEP(PartsInitMufflers), 112, 1456, false, false},
       {"PartsPoints::PartsPoints (sub_820E2A10)", __imp__sub_820E2A10,
-       hooks::SecondSetPartsPointsConstruct, 128, 37096, false, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsPointsConstruct), 128, 37096, false, false},
       {"PartsPoints::Reset (sub_820E00F0)", __imp__sub_820E00F0,
-       hooks::SecondSetPartsPointsReset, 112, 37096, false, false},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsPointsReset), 112, 37096, false, false},
       {"CockpitPoints::CockpitPoints (sub_820DC190)", __imp__sub_820DC190,
-       hooks::SecondSetCockpitPointsConstruct, 128, 4084, false, false},
+       ITC_CONTEXT_FN(hooks::SecondSetCockpitPointsConstruct), 128, 4084, false, false},
       {"CockpitPoints::Reset (sub_820DBC10)", __imp__sub_820DBC10,
-       hooks::SecondSetCockpitPointsReset, 112, 4084, false, false},
+       ITC_CONTEXT_FN(hooks::SecondSetCockpitPointsReset), 112, 4084, false, false},
       {"InteriorPoints::InteriorPoints (sub_820E4FD8)", __imp__sub_820E4FD8,
-       hooks::SecondSetInteriorPointsConstruct, 128, 11460, false, false},
+       ITC_CONTEXT_FN(hooks::SecondSetInteriorPointsConstruct), 128, 11460, false, false},
       {"InteriorPoints::Reset (sub_820E35D8)", __imp__sub_820E35D8,
-       hooks::SecondSetInteriorPointsReset, 96, 11460, false, false},
+       ITC_CONTEXT_FN(hooks::SecondSetInteriorPointsReset), 96, 11460, false, false},
       {"LightPoints::LightPoints (sub_820DDCF8)", __imp__sub_820DDCF8,
-       hooks::SecondSetLightPointsConstruct, 128, 13072, false, false},
+       ITC_CONTEXT_FN(hooks::SecondSetLightPointsConstruct), 128, 13072, false, false},
       {"LightPoints::Reset (sub_820DC8A8)", __imp__sub_820DC8A8,
-       hooks::SecondSetLightPointsReset, 96, 13072, false, false},
+       ITC_CONTEXT_FN(hooks::SecondSetLightPointsReset), 96, 13072, false, false},
       {"TrafficPoints::TrafficPoints (sub_820E68E8)", __imp__sub_820E68E8,
-       hooks::SecondSetTrafficPointsConstruct, 128, 6080, false, false},
+       ITC_CONTEXT_FN(hooks::SecondSetTrafficPointsConstruct), 128, 6080, false, false},
       {"TrafficPoints::Reset (sub_820E5880)", __imp__sub_820E5880,
-       hooks::SecondSetTrafficPointsReset, 96, 6080, false, false},
+       ITC_CONTEXT_FN(hooks::SecondSetTrafficPointsReset), 96, 6080, false, false},
   };
   for (const Group& g : groups) {
     Results results(g.name);
@@ -437,108 +437,108 @@ void Objects(Context& h, Random& r, uint32_t block) {
     bool flags = false;     // r4 the deleting destructors' flags (bit 0 clear)
   };
   const Object objects[] = {
-      {"SceneParts::Reset (sub_820E0510)", __imp__sub_820E0510, hooks::SecondSetScenePartsReset,
+      {"SceneParts::Reset (sub_820E0510)", __imp__sub_820E0510, ITC_CONTEXT_FN(hooks::SecondSetScenePartsReset),
        37296, {}},
       {"SceneCockpit::Reset (sub_820DBE20)", __imp__sub_820DBE20,
-       hooks::SecondSetSceneCockpitReset, 4320, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneCockpitReset), 4320, {}},
       {"SceneInterior::Reset (sub_820E3748)", __imp__sub_820E3748,
-       hooks::SecondSetSceneInteriorReset, 11680, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneInteriorReset), 11680, {}},
       {"SceneLights::Reset (sub_820DCA40)", __imp__sub_820DCA40,
-       hooks::SecondSetSceneLightsReset, 13168, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneLightsReset), 13168, {}},
       {"SceneTraffic::Reset (sub_820E5930)", __imp__sub_820E5930,
-       hooks::SecondSetSceneTrafficReset, 9808, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneTrafficReset), 9808, {}},
       {"SceneModelBlock::SceneModelBlock (sub_820DA108)", __imp__sub_820DA108,
-       hooks::SecondSetSceneModelBlockConstruct, 736, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneModelBlockConstruct), 736, {}},
       {"SceneModelBlock::Reset (sub_820D9F50)", __imp__sub_820D9F50,
-       hooks::SecondSetSceneModelBlockReset, 736,
+       ITC_CONTEXT_FN(hooks::SecondSetSceneModelBlockReset), 736,
        {{ss::kSceneModelBlockResetFrameBytes - 80, 128}}},
       // Without its first-set car model (+24 = 0): CarRecord::Reset and the
       // words (with one, below).
       {"SceneCarModel::Release (sub_820DB6C0, no car model)", __imp__sub_820DB6C0,
-       hooks::SecondSetSceneCarModelRelease, 3744, {}, 24},
-      {"SceneWheels::Reset (sub_820E88A8)", __imp__sub_820E88A8, hooks::SecondSetSceneWheelsReset,
+       ITC_CONTEXT_FN(hooks::SecondSetSceneCarModelRelease), 3744, {}, 24},
+      {"SceneWheels::Reset (sub_820E88A8)", __imp__sub_820E88A8, ITC_CONTEXT_FN(hooks::SecondSetSceneWheelsReset),
        16800, {}},
-      {"WheelPoints::Reset (sub_820E85C8)", __imp__sub_820E85C8, hooks::SecondSetWheelPointsReset,
+      {"WheelPoints::Reset (sub_820E85C8)", __imp__sub_820E85C8, ITC_CONTEXT_FN(hooks::SecondSetWheelPointsReset),
        16608, {}},
       {"WheelPoints::WheelPoints (sub_820ECC48)", __imp__sub_820ECC48,
-       hooks::SecondSetWheelPointsConstruct, 16608, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetWheelPointsConstruct), 16608, {}},
       {"WheelPoints::InitTire (sub_820E8A80)", __imp__sub_820E8A80,
-       hooks::SecondSetWheelsInitTire, 1840, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetWheelsInitTire), 1840, {}},
       {"WheelPoints::InitRimA (sub_820E99C0)", __imp__sub_820E99C0,
-       hooks::SecondSetWheelsInitRimA, 1744, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetWheelsInitRimA), 1744, {}},
       {"WheelPoints::InitRimB (sub_820EA8E8)", __imp__sub_820EA8E8,
-       hooks::SecondSetWheelsInitRimB, 1744, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetWheelsInitRimB), 1744, {}},
       {"WheelPoints::InitBrakes (sub_820EB320)", __imp__sub_820EB320,
-       hooks::SecondSetWheelsInitBrakes, 2944, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetWheelsInitBrakes), 2944, {}},
       // The releases without their first-set object (ScenePools::ReleaseA's
       // path is SceneCarModel::Release's, below, with ReleaseA's own cases).
       {"SceneParts::Release (sub_820E0590, no first-set object)", __imp__sub_820E0590,
-       hooks::SecondSetScenePartsRelease, 37296, {}, 104},
+       ITC_CONTEXT_FN(hooks::SecondSetScenePartsRelease), 37296, {}, 104},
       {"SceneInterior::Release (sub_820E3890, no first-set object)", __imp__sub_820E3890,
-       hooks::SecondSetSceneInteriorRelease, 11680, {}, 36},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneInteriorRelease), 11680, {}, 36},
       {"SceneLights::Release (sub_820DCB20, no first-set object)", __imp__sub_820DCB20,
-       hooks::SecondSetSceneLightsRelease, 13168, {}, 28},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneLightsRelease), 13168, {}, 28},
       {"SceneWheels::Release (sub_820E89B0, no first-set object)", __imp__sub_820E89B0,
-       hooks::SecondSetSceneWheelsRelease, 16800, {}, 28},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneWheelsRelease), 16800, {}, 28},
       {"SceneTraffic::Release (sub_820E5A18, no first-set object)", __imp__sub_820E5A18,
-       hooks::SecondSetSceneTrafficRelease, 9808, {}, 9760},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneTrafficRelease), 9808, {}, 9760},
       {"SceneCarModel::SceneCarModel (sub_820DB770)", __imp__sub_820DB770,
-       hooks::SecondSetSceneCarModelConstruct, 3744, {}, kNone, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneCarModelConstruct), 3744, {}, kNone, true},
       {"SceneParts::SceneParts (sub_820E2F18)", __imp__sub_820E2F18,
-       hooks::SecondSetScenePartsConstruct, 37296, {}, kNone, true},
+       ITC_CONTEXT_FN(hooks::SecondSetScenePartsConstruct), 37296, {}, kNone, true},
       {"SceneCockpit::SceneCockpit (sub_820DC3E8)", __imp__sub_820DC3E8,
-       hooks::SecondSetSceneCockpitConstruct, 4320, {}, kNone, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneCockpitConstruct), 4320, {}, kNone, true},
       {"SceneInterior::SceneInterior (sub_820E5340)", __imp__sub_820E5340,
-       hooks::SecondSetSceneInteriorConstruct, 11680, {}, kNone, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneInteriorConstruct), 11680, {}, kNone, true},
       {"SceneLights::SceneLights (sub_820DE030)", __imp__sub_820DE030,
-       hooks::SecondSetSceneLightsConstruct, 13168, {}, kNone, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneLightsConstruct), 13168, {}, kNone, true},
       {"SceneWheels::SceneWheels (sub_820ECE40)", __imp__sub_820ECE40,
-       hooks::SecondSetSceneWheelsConstruct, 16800, {}, kNone, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneWheelsConstruct), 16800, {}, kNone, true},
       {"SceneTraffic::SceneTraffic (sub_820E6E70)", __imp__sub_820E6E70,
-       hooks::SecondSetSceneTrafficConstruct, 9808, {}, kNone, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneTrafficConstruct), 9808, {}, kNone, true},
       {"SceneModel::SceneModel (sub_820DB330)", __imp__sub_820DB330,
-       hooks::SecondSetSceneModelConstruct, 5120, {}, kNone, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneModelConstruct), 5120, {}, kNone, true},
       {"PartsPoints::~PartsPoints (sub_820E2C10)", __imp__sub_820E2C10,
-       hooks::SecondSetPartsPointsDestruct, 37120, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetPartsPointsDestruct), 37120, {}},
       {"CockpitPoints::~CockpitPoints (sub_820DC258)", __imp__sub_820DC258,
-       hooks::SecondSetCockpitPointsDestruct, 4128, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetCockpitPointsDestruct), 4128, {}},
       {"InteriorPoints::~InteriorPoints (sub_820E50C0)", __imp__sub_820E50C0,
-       hooks::SecondSetInteriorPointsDestruct, 11520, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetInteriorPointsDestruct), 11520, {}},
       {"LightPoints::~LightPoints (sub_820DDD90)", __imp__sub_820DDD90,
-       hooks::SecondSetLightPointsDestruct, 13072, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetLightPointsDestruct), 13072, {}},
       {"WheelPoints::~WheelPoints (sub_820ECCB8)", __imp__sub_820ECCB8,
-       hooks::SecondSetWheelPointsDestruct, 16608, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetWheelPointsDestruct), 16608, {}},
       {"TrafficPoints::~TrafficPoints (sub_820E6980)", __imp__sub_820E6980,
-       hooks::SecondSetTrafficPointsDestruct, 6080, {}},
+       ITC_CONTEXT_FN(hooks::SecondSetTrafficPointsDestruct), 6080, {}},
       // The destructors without their first-set objects (the releases' cases
       // above).
       {"SceneCarModel::~SceneCarModel (sub_820DB720, no car model)", __imp__sub_820DB720,
-       hooks::SecondSetSceneCarModelDestruct, 3744, {}, 24, false, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneCarModelDestruct), 3744, {}, 24, false, true},
       {"SceneParts::~SceneParts (sub_820E2E10, no first-set object)", __imp__sub_820E2E10,
-       hooks::SecondSetScenePartsDestruct, 37296, {}, 104, false, true},
+       ITC_CONTEXT_FN(hooks::SecondSetScenePartsDestruct), 37296, {}, 104, false, true},
       {"SceneInterior::~SceneInterior (sub_820E5178, no first-set object)", __imp__sub_820E5178,
-       hooks::SecondSetSceneInteriorDestruct, 11680, {}, 36, false, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneInteriorDestruct), 11680, {}, 36, false, true},
       {"SceneLights::~SceneLights (sub_820DDE00, no first-set object)", __imp__sub_820DDE00,
-       hooks::SecondSetSceneLightsDestruct, 13168, {}, 28, false, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneLightsDestruct), 13168, {}, 28, false, true},
       {"SceneWheels::~SceneWheels (sub_820ECDD0, no first-set object)", __imp__sub_820ECDD0,
-       hooks::SecondSetSceneWheelsDestruct, 16800, {}, 28, false, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneWheelsDestruct), 16800, {}, 28, false, true},
       {"SceneTraffic::~SceneTraffic (sub_820E69F0)", __imp__sub_820E69F0,
-       hooks::SecondSetSceneTrafficDestruct, 9808, {}, kNone, false, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneTrafficDestruct), 9808, {}, kNone, false, true},
       {"SceneCarModel's deleting destructor (sub_820DB7C8, no car model)", __imp__sub_820DB7C8,
-       hooks::SecondSetSceneCarModelDeletingDestruct, 3744, {}, 24, false, true, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneCarModelDeletingDestruct), 3744, {}, 24, false, true, true},
       {"SceneParts' deleting destructor (sub_820E2F78, no first-set object)", __imp__sub_820E2F78,
-       hooks::SecondSetScenePartsDeletingDestruct, 37296, {}, 104, false, true, true},
+       ITC_CONTEXT_FN(hooks::SecondSetScenePartsDeletingDestruct), 37296, {}, 104, false, true, true},
       {"SceneInterior's deleting destructor (sub_820E53A0, no first-set object)",
-       __imp__sub_820E53A0, hooks::SecondSetSceneInteriorDeletingDestruct, 11680, {}, 36, false,
+       __imp__sub_820E53A0, ITC_CONTEXT_FN(hooks::SecondSetSceneInteriorDeletingDestruct), 11680, {}, 36, false,
        true, true},
       {"SceneLights' deleting destructor (sub_820DE090, no first-set object)", __imp__sub_820DE090,
-       hooks::SecondSetSceneLightsDeletingDestruct, 13168, {}, 28, false, true, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneLightsDeletingDestruct), 13168, {}, 28, false, true, true},
       {"SceneWheels' deleting destructor (sub_820ECEB8, no first-set object)", __imp__sub_820ECEB8,
-       hooks::SecondSetSceneWheelsDeletingDestruct, 16800, {}, 28, false, true, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneWheelsDeletingDestruct), 16800, {}, 28, false, true, true},
       {"SceneTraffic's deleting destructor (sub_820E6ED8)", __imp__sub_820E6ED8,
-       hooks::SecondSetSceneTrafficDeletingDestruct, 9808, {}, kNone, false, true, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneTrafficDeletingDestruct), 9808, {}, kNone, false, true, true},
       {"PoolObject::DeletingDestructor (sub_820DB400)", __imp__sub_820DB400,
-       hooks::SecondSetPoolObjectDeletingDestruct, 5120, {}, kNone, false, true, true},
+       ITC_CONTEXT_FN(hooks::SecondSetPoolObjectDeletingDestruct), 5120, {}, kNone, false, true, true},
   };
   for (const Object& o : objects) {
     Results results(o.name);
@@ -658,19 +658,19 @@ void ReleaseBs(Context& h, Random& r, uint32_t block) {
   const Group groups[] = {
       {"ScenePools::ReleaseB (sub_820C5C88, with SceneModel::Release sub_820DA5D0 and "
        "SceneCockpit::Release sub_820DBF88, no first-set objects)",
-       __imp__sub_820C5C88, hooks::SecondSetReleaseB, -1, false},
+       __imp__sub_820C5C88, ITC_CONTEXT_FN(hooks::SecondSetReleaseB), -1, false},
       // Pool 0's release not native (--native_car_models off on both sides):
       // the original ReleaseB for it, at the top and nested.
       {"ScenePools::ReleaseB (sub_820C5C88, pool 0 left to the original)", __imp__sub_820C5C88,
-       hooks::SecondSetReleaseB, -1, true},
+       ITC_CONTEXT_FN(hooks::SecondSetReleaseB), -1, true},
       {"SceneCockpit::Release (sub_820DBF88, no cockpit body)", __imp__sub_820DBF88,
-       hooks::SecondSetSceneCockpitRelease, 2, false},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneCockpitRelease), 2, false},
       {"SceneModel::Release (sub_820DA5D0, no first-set objects)", __imp__sub_820DA5D0,
-       hooks::SecondSetSceneModelRelease, 7, false},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneModelRelease), 7, false},
       {"SceneCockpit::~SceneCockpit (sub_820DC2F8, no cockpit body)", __imp__sub_820DC2F8,
-       hooks::SecondSetSceneCockpitDestruct, 2, false, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneCockpitDestruct), 2, false, true},
       {"SceneCockpit's deleting destructor (sub_820DC448, no cockpit body)", __imp__sub_820DC448,
-       hooks::SecondSetSceneCockpitDeletingDestruct, 2, false, true, true},
+       ITC_CONTEXT_FN(hooks::SecondSetSceneCockpitDeletingDestruct), 2, false, true, true},
   };
   for (const Group& g : groups) {
     Results results(g.name);
@@ -786,9 +786,9 @@ void CarModelReleases(Context& h, Random& r, uint32_t block) {
         ITC_FLAG(native_scene_loaders) = v == 1;
         ITC_FLAG(native_car_models) = v == 1;
         if (via == 0) {
-          (v == 0 ? __imp__sub_820DB6C0 : hooks::SecondSetSceneCarModelRelease)(t, h.base);
+          (v == 0 ? __imp__sub_820DB6C0 : ITC_CONTEXT_FN(hooks::SecondSetSceneCarModelRelease))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_820C5C88 : hooks::SecondSetReleaseB)(t, h.base);
+          (v == 0 ? __imp__sub_820C5C88 : ITC_CONTEXT_FN(hooks::SecondSetReleaseB))(t, h.base);
         }
         ITC_FLAG(native_second_set) = true;
         ITC_FLAG(native_scene_loaders) = true;
@@ -913,10 +913,10 @@ void Morphs(Context& h, Random& r, uint32_t block) {
     GuestFunction recompiled, native;
   };
   const Accessor accessors[] = {
-      {"Model::StreamData (sub_82594A60)", __imp__sub_82594A60, hooks::SecondSetModelStreamData},
-      {"Model::StreamSize (sub_82594A78)", __imp__sub_82594A78, hooks::SecondSetModelStreamSize},
-      {"Model::StreamData2 (sub_82594A90)", __imp__sub_82594A90, hooks::SecondSetModelStreamData2},
-      {"Model::StreamSize2 (sub_82594AA8)", __imp__sub_82594AA8, hooks::SecondSetModelStreamSize2},
+      {"Model::StreamData (sub_82594A60)", __imp__sub_82594A60, ITC_CONTEXT_FN(hooks::SecondSetModelStreamData)},
+      {"Model::StreamSize (sub_82594A78)", __imp__sub_82594A78, ITC_CONTEXT_FN(hooks::SecondSetModelStreamSize)},
+      {"Model::StreamData2 (sub_82594A90)", __imp__sub_82594A90, ITC_CONTEXT_FN(hooks::SecondSetModelStreamData2)},
+      {"Model::StreamSize2 (sub_82594AA8)", __imp__sub_82594AA8, ITC_CONTEXT_FN(hooks::SecondSetModelStreamSize2)},
   };
   for (const Accessor& a : accessors) {
     Results results(a.name);
@@ -964,7 +964,7 @@ void Morphs(Context& h, Random& r, uint32_t block) {
             t.r7.u64 = weights;
             t.r8.u64 = r.Below(4) == 0 ? 8 + r.Below(4) : r.Below(8);
           },
-          __imp__sub_82594C18, hooks::SecondSetMorphSetUp, {}, {},
+          __imp__sub_82594C18, ITC_CONTEXT_FN(hooks::SecondSetMorphSetUp), {}, {},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -1015,7 +1015,7 @@ void Morphs(Context& h, Random& r, uint32_t block) {
             }
           },
           run == 0 ? __imp__sub_8258BD28 : __imp__sub_82594D10,
-          run == 0 ? hooks::SecondSetMorphBlend : hooks::SecondSetMorphRun,
+          run == 0 ? ITC_CONTEXT_FN(hooks::SecondSetMorphBlend) : ITC_CONTEXT_FN(hooks::SecondSetMorphRun),
           // Blend7's +80 to +112 (r1 - 80: the sizes words, then the
           // weights), Blend6's +80 to +96 (r1 - 48: the weights); the saved
           // registers' slots above them left out.
@@ -1047,7 +1047,7 @@ void Morphs(Context& h, Random& r, uint32_t block) {
             t.r5.u64 = block + 0x0F00;
             t.f1.f64 = double(std::bit_cast<float>(MixedFloat(r)));
           },
-          __imp__sub_820E6F28, hooks::SecondSetTireFillEntries, {{16, 8}}, {},
+          __imp__sub_820E6F28, ITC_CONTEXT_FN(hooks::SecondSetTireFillEntries), {{16, 8}}, {},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -1069,7 +1069,7 @@ void Morphs(Context& h, Random& r, uint32_t block) {
             t.r6.u64 = block + 0x1210;
             t.r7.u64 = block + 0x1214;
           },
-          __imp__sub_820E7010, hooks::SecondSetTireReadEntry, {{16, 8}}, {},
+          __imp__sub_820E7010, ITC_CONTEXT_FN(hooks::SecondSetTireReadEntry), {{16, 8}}, {},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -1429,7 +1429,7 @@ void Finds(Context& h, Random& r, uint32_t block) {
     for (int c = 0; c < 16; c++) {
       const uint32_t set = c % 2 == 0 ? 0 : (c % 4 == 1 ? 1 : uint32_t(r.Next()));
       FindCase(h, results, block, r.Next(), kPartsSpans, std::size(kPartsSpans), 37096, true, 17, set,
-               0, -1, __imp__sub_820E0258, hooks::SecondSetPartsFind,
+               0, -1, __imp__sub_820E0258, ITC_CONTEXT_FN(hooks::SecondSetPartsFind),
                fmt::format("case {} (set {:#x})", c, set));
     }
     results.Report();
@@ -1447,7 +1447,7 @@ void Finds(Context& h, Random& r, uint32_t block) {
     Results results("CockpitPoints::Find (sub_820DBC88)");
     for (int c = 0; c < 12; c++) {
       FindCase(h, results, block, r.Next(), kCockpitSpans, std::size(kCockpitSpans), 4096, false, 6,
-               0, 0, -1, __imp__sub_820DBC88, hooks::SecondSetCockpitFind,
+               0, 0, -1, __imp__sub_820DBC88, ITC_CONTEXT_FN(hooks::SecondSetCockpitFind),
                fmt::format("case {}", c));
     }
     results.Report();
@@ -1471,11 +1471,11 @@ void Finds(Context& h, Random& r, uint32_t block) {
       {"InteriorPoints::FindSeats (sub_820E34A8)", __imp__sub_820E34A8,
        ITC_FIND_STEP(InteriorFindSeats), kInteriorSpans, std::size(kInteriorSpans), 11460, 9488,
        false},
-      {"InteriorPoints::Find (sub_820E3660)", __imp__sub_820E3660, hooks::SecondSetInteriorFind,
+      {"InteriorPoints::Find (sub_820E3660)", __imp__sub_820E3660, ITC_CONTEXT_FN(hooks::SecondSetInteriorFind),
        kInteriorSpans, std::size(kInteriorSpans), 11460, 0, true},
       {"LightPoints::FindGroup (sub_820DC850)", __imp__sub_820DC850,
        ITC_FIND_STEP(LightsFindGroup), kLightsSpans, std::size(kLightsSpans), 13072, 48, false},
-      {"LightPoints::Find (sub_820DC900)", __imp__sub_820DC900, hooks::SecondSetLightsFind,
+      {"LightPoints::Find (sub_820DC900)", __imp__sub_820DC900, ITC_CONTEXT_FN(hooks::SecondSetLightsFind),
        kLightsSpans, std::size(kLightsSpans), 13072, 0, false},
       {"TrafficPoints::FindBody (sub_820E5538)", __imp__sub_820E5538,
        [](PPCContext& c, uint8_t* b) {
@@ -1489,7 +1489,7 @@ void Finds(Context& h, Random& r, uint32_t block) {
       {"TrafficPoints::FindTailLights (sub_820E5808)", __imp__sub_820E5808,
        ITC_FIND_STEP(TrafficFindTailLights), kTrafficSpans, std::size(kTrafficSpans), 6080, 3152,
        false},
-      {"TrafficPoints::Find (sub_820E58C8)", __imp__sub_820E58C8, hooks::SecondSetTrafficFind,
+      {"TrafficPoints::Find (sub_820E58C8)", __imp__sub_820E58C8, ITC_CONTEXT_FN(hooks::SecondSetTrafficFind),
        kTrafficSpans, std::size(kTrafficSpans), 6080, 0, true},
   };
   for (const Other& o : others) {
@@ -1764,7 +1764,7 @@ void Wheels(Context& h, Random& r, uint32_t b) {
             Put(h.base, block + 24, model);
             t.r3.u64 = block;
           },
-          __imp__sub_820E8668, hooks::SecondSetWheelPointsSetUp,
+          __imp__sub_820E8668, ITC_CONTEXT_FN(hooks::SecondSetWheelPointsSetUp),
           {{112, 4}, {448, 4}, {480, 4}, {400, 232}}, {},
           fmt::format("case {} (set {:#x})", c, set));
     }

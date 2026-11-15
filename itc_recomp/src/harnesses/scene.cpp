@@ -135,10 +135,10 @@ void Cases(Context& h, const Block& block, const std::string& name, int count,
 
 void SmallPieces(Context& h, const Block& block) {
   Cases(h, block, "SceneSetUp::SceneSetUp (sub_820D0D50)", 8, Original<__imp__sub_820D0D50>,
-        hooks::SceneSetUpConstruct,
+        ITC_CONTEXT_FN(hooks::SceneSetUpConstruct),
         [&](PPCContext& t, Random& r) { t.r3.u64 = block.address + 0x100 + 4 * r.Below(64); });
   Cases(h, block, "ScenePools::StartTeardownA (sub_820C3C80)", 8,
-        Original<__imp__sub_820C3C80>, hooks::SceneStartTeardownA, [&](PPCContext& t, Random& r) {
+        Original<__imp__sub_820C3C80>, ITC_CONTEXT_FN(hooks::SceneStartTeardownA), [&](PPCContext& t, Random& r) {
           Store(h.base, scene::kFirstSet, block.address + 0x200 + 4 * r.Below(64));
           t.r3.u64 = r.Next();
         });
@@ -147,7 +147,7 @@ void SmallPieces(Context& h, const Block& block) {
   // entries' destruction is the accessories harness's).
   Cases(
       h, block, "CarScene::StartTeardown (sub_820C4D88)", 32, Original<__imp__sub_820C4D88>,
-      hooks::SceneStartTeardown, [&](PPCContext& t, Random& r) {
+      ITC_CONTEXT_FN(hooks::SceneStartTeardown), [&](PPCContext& t, Random& r) {
         Store(h.base, scene::kScene, r.Below(4) == 0 ? 0 : block.address + 0x1000);
         Store(h.base, scene::kFirstSet, block.address + 0x3000);
         const uint32_t set = block.address + 0x3400;
@@ -162,7 +162,7 @@ void SmallPieces(Context& h, const Block& block) {
   // Pool 7's count 0 to 6 (or negative), its nodes in the block linked by
   // +8, each one's interior ready or not and its interior in the block.
   Cases(h, block, "CarScene::SetInteriorWord (sub_820C8950)", 32, Original<__imp__sub_820C8950>,
-        hooks::SceneSetInteriorWord, [&](PPCContext& t, Random& r) {
+        ITC_CONTEXT_FN(hooks::SceneSetInteriorWord), [&](PPCContext& t, Random& r) {
           const uint32_t scene = block.address;
           const uint32_t nodes = 5 + r.Below(3);
           Store(h.base, scene + 5036, r.Below(8) == 0 ? 0xFFFFFFFFu : r.Below(nodes + 1));
@@ -201,7 +201,7 @@ void Pages(Context& h, const Block& block) {
       Store(h.base, word, pages);
       PPCContext t = CallContext(h);
       t.r3.u64 = word;
-      (v == 0 ? Original<__imp__sub_820D09A0> : hooks::SceneFreePagesIn)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820D09A0> : ITC_CONTEXT_FN(hooks::SceneFreePagesIn))(t, h.base);
       const bool freed = !memory::IsPages(pages);
       if (!freed) {
         memory::FreePages(pages);
@@ -252,7 +252,7 @@ void DestroyA(Context& h, const Block& block) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = set;
-      (v == 0 ? Original<__imp__sub_820C3CF8> : hooks::SceneDestroyA)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820C3CF8> : ITC_CONTEXT_FN(hooks::SceneDestroyA))(t, h.base);
       out[v].Word(uint32_t(objects.size()));
       for (const uint32_t object : objects) {
         const bool freed = !memory::IsPages(object);
@@ -350,11 +350,11 @@ void Assets(Context& h, const Block& block) {
   };
   const Case cases[] = {
       {"SceneAssets::SceneAssets (sub_820C5008)", Original<__imp__sub_820C5008>,
-       hooks::SceneAssetsConstruct, false},
+       ITC_CONTEXT_FN(hooks::SceneAssetsConstruct), false},
       {"SceneAssets::Reset (sub_820C4A70, on the game's list)", Original<__imp__sub_820C4A70>,
-       hooks::SceneAssetsReset, true},
+       ITC_CONTEXT_FN(hooks::SceneAssetsReset), true},
       {"SceneAssets::~SceneAssets (sub_820C5168, on the game's list)",
-       Original<__imp__sub_820C5168>, hooks::SceneAssetsDestruct, true},
+       Original<__imp__sub_820C5168>, ITC_CONTEXT_FN(hooks::SceneAssetsDestruct), true},
   };
   for (const Case& f : cases) {
     Results results(f.name);
@@ -396,8 +396,8 @@ void Lists(Context& h, const Block& block) {
     GuestFunction recompiled, native;
   } cases[] = {
       {"List::DeleteAll (sub_82593FF8)", Original<__imp__sub_82593FF8>,
-       hooks::SceneListDeleteAll},
-      {"List::~List (sub_82594188)", Original<__imp__sub_82594188>, hooks::SceneListDestruct},
+       ITC_CONTEXT_FN(hooks::SceneListDeleteAll)},
+      {"List::~List (sub_82594188)", Original<__imp__sub_82594188>, ITC_CONTEXT_FN(hooks::SceneListDestruct)},
   };
   for (const auto& f : cases) {
     Cases(h, block, f.name, 12, f.recompiled, f.native, [&](PPCContext& t, Random& r) {
@@ -456,10 +456,10 @@ void Scenes(Context& h, const Block& block) {
         const pending_frees::ListState was = pending_frees::SaveList(h.base);
         t.r3.u64 = scene;
         if (which == 0) {
-          (v == 0 ? Original<__imp__sub_820C89A8> : hooks::SceneCarSceneConstruct)(t, h.base);
+          (v == 0 ? Original<__imp__sub_820C89A8> : ITC_CONTEXT_FN(hooks::SceneCarSceneConstruct))(t, h.base);
           TakeAssetProviders(h.base, scene + scene::kAssets, out[v]);
         } else {
-          (v == 0 ? Original<__imp__sub_820C9110> : hooks::SceneCarSceneDestruct)(t, h.base);
+          (v == 0 ? Original<__imp__sub_820C9110> : ITC_CONTEXT_FN(hooks::SceneCarSceneDestruct))(t, h.base);
         }
         pending_frees::TakeAddedNodes(h.base, was, out[v]);
         out[v].Bytes(Read(h.base, block.address, block.bytes));
@@ -536,7 +536,7 @@ void UpdateA(Context& h, const Block& block) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = r.Next();
-      (v == 0 ? Original<__imp__sub_820C3DA0> : hooks::SceneUpdateA)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820C3DA0> : ITC_CONTEXT_FN(hooks::SceneUpdateA))(t, h.base);
       out[v].Word(Load(h.base, scene::kFirstSet) == set);
       for (const auto* list : {&pages, &objects}) {
         for (const uint32_t p : *list) {
@@ -593,7 +593,7 @@ void Lighting(Context& h, const Block& block) {
       WriteRandom(h.base, frame, 288, r);
       const uint32_t target = block.address + 0x200 + 16 * r.Below(4);
       t.r3.u64 = target;
-      (v == 0 ? Original<__imp__sub_820C8528> : hooks::SceneInitLighting)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820C8528> : ITC_CONTEXT_FN(hooks::SceneInitLighting))(t, h.base);
       out[v].Floats(h.base, target, 69);
       out[v].Floats(h.base, frame + 4, 47);
       out[v].Word(Load(h.base, frame));
@@ -671,7 +671,7 @@ void Releases(Context& h, const Block& block) {
       }
       const pending_frees::ListState was = pending_frees::SaveList(h.base);
       t.r3.u64 = assets;
-      (v == 0 ? Original<__imp__sub_820C4C80> : hooks::SceneAssetsRelease)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820C4C80> : ITC_CONTEXT_FN(hooks::SceneAssetsRelease))(t, h.base);
       pending_frees::TakeAddedNodes(h.base, was, out[v]);
       TakeAssetProviders(h.base, assets, out[v]);
       for (const uint32_t p : pages) {
@@ -712,7 +712,7 @@ void Creates(Context& h, const Block& block) {
       Store(h.base, scene::kFirstSet, 0);
       Store(h.base, accessories::kSet, 0);
       PPCContext t = CallContext(h);
-      (v == 0 ? Original<__imp__sub_820C8A50> : hooks::SceneCreate)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820C8A50> : ITC_CONTEXT_FN(hooks::SceneCreate))(t, h.base);
       const uint32_t scene = Load(h.base, scene::kScene);
       const uint32_t first = Load(h.base, scene::kFirstSet);
       const uint32_t set = Load(h.base, accessories::kSet);
@@ -782,7 +782,7 @@ void LoadAssetsCases(Context& h, const Block& block) {
       loads.emplace(serials);
       PPCContext t = CallContext(h);
       t.r3.u64 = scene;
-      (v == 0 ? Original<__imp__sub_820C8B40> : hooks::SceneLoadAssets)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820C8B40> : ITC_CONTEXT_FN(hooks::SceneLoadAssets))(t, h.base);
       std::vector<uint32_t> calls = loads->calls();
       for (uint32_t& w : calls) {
         if (w != 0 && memory::IsPages(w)) {
@@ -883,7 +883,7 @@ void FileLoadedCases(Context& h, const Block& block) {
       t.r4.u64 = data;
       t.r6.u64 = scene;
       const uint32_t sp = t.r1.u32;
-      (v == 0 ? Original<__imp__sub_820C52A0> : hooks::SceneOnFileLoaded)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820C52A0> : ITC_CONTEXT_FN(hooks::SceneOnFileLoaded))(t, h.base);
       pending_frees::TakeAddedNodes(h.base, was, out[v]);
       TakeAssetProviders(h.base, assets, out[v]);
       if (pages != 0) {
@@ -928,7 +928,7 @@ void LoadsDoneCases(Context& h) {
   Block block(0x19000);
   const uint32_t scene = block.address;
   Cases(h, block, "CarScene::LoadsDone (sub_820C5798)", 60, Original<__imp__sub_820C5798>,
-        hooks::SceneLoadsDone, [&](PPCContext& t, Random& r) {
+        ITC_CONTEXT_FN(hooks::SceneLoadsDone), [&](PPCContext& t, Random& r) {
           static constexpr uint32_t kSlots[8] = {84, 132, 156, 268, 472, 964, 4156, 4764};
           for (const uint32_t slot : kSlots) {
             Store(h.base, scene + slot, r.Below(24) == 0 ? 2 : r.Below(2));
@@ -1058,7 +1058,7 @@ void DestroyBCases(Context& h, const Block& block) {
   std::vector<uint32_t> objects;
   Cases(
       h, block, "ScenePools::DestroyB (sub_820C59B0)", 12, Original<__imp__sub_820C59B0>,
-      hooks::SceneDestroyB,
+      ITC_CONTEXT_FN(hooks::SceneDestroyB),
       [&](PPCContext& t, Random& r) {
         static constexpr uint32_t kSlots[8] = {84, 132, 156, 268, 472, 964, 4156, 4764};
         for (const uint32_t slot : kSlots) {
@@ -1080,7 +1080,7 @@ void DestroyBCases(Context& h, const Block& block) {
 void UpdateModelsCases(Context& h, const Block& block) {
   const uint32_t scene = block.address + 0x100;
   Cases(h, block, "CarScene::UpdateModels (sub_820C5A60)", 12, __imp__sub_820C5A60,
-        hooks::SceneUpdateModels, [&](PPCContext& t, Random& r) {
+        ITC_CONTEXT_FN(hooks::SceneUpdateModels), [&](PPCContext& t, Random& r) {
           AddSceneModels(h.base, scene, block.address, r);
           t.r3.u64 = scene;
         });
@@ -1154,7 +1154,7 @@ void UpdateCases(Context& h, const Block& block) {
       Store(h.base, scene::kScene, scene);
       const pending_frees::ListState was = pending_frees::SaveList(h.base);
       t.r3.u64 = r.Next();
-      (v == 0 ? Original<__imp__sub_820C9608> : hooks::SceneUpdate)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820C9608> : ITC_CONTEXT_FN(hooks::SceneUpdate))(t, h.base);
       pending_frees::TakeAddedNodes(h.base, was, out[v]);
       out[v].Word(Load(h.base, scene::kScene) == scene);
       out[v].Word(Load(h.base, kSceneCountdown));

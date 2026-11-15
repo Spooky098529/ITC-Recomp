@@ -240,7 +240,7 @@ void Achievements(Context& h) {
   // scratch area (event 0). r31 and lr saved in [sp - 16, sp).
   Group(
       h, "XUserWriteAchievements (sub_82294E58)", 60, __imp__sub_82294E58,
-      hooks::WriteAchievementsSteps, 112, 16,
+      ITC_CONTEXT_FN(hooks::WriteAchievementsSteps), 112, 16,
       [](PPCContext& t, Random& r, uint8_t* base, uint32_t data) {
         if (r.Below(2) == 0) {
           t.r3.u64 = 0;
@@ -255,7 +255,7 @@ void Achievements(Context& h) {
       });
   // Time::Less: a leaf.
   Group(
-      h, "Time::Less (sub_820FF708)", 400, __imp__sub_820FF708, hooks::TimeLessSteps, 0, 0,
+      h, "Time::Less (sub_820FF708)", 400, __imp__sub_820FF708, ITC_CONTEXT_FN(hooks::TimeLessSteps), 0, 0,
       [](PPCContext& t, Random& r, uint8_t* base, uint32_t data) {
         const uint32_t a = PackedTime(r);
         const uint32_t b = r.Below(4) == 0 ? a : PackedTime(r);
@@ -267,7 +267,7 @@ void Achievements(Context& h) {
   // AllBeaten: r29 to r31 and lr saved in [sp - 32, sp).
   Group(
       h, "Achievements::AllBeaten (sub_82290698)", 400, __imp__sub_82290698,
-      NativeAllBeaten, 112, 32, [](PPCContext& t, Random& r, uint8_t* base, uint32_t data) {
+      ITC_CONTEXT_FN(NativeAllBeaten), 112, 32, [](PPCContext& t, Random& r, uint8_t* base, uint32_t data) {
         const uint32_t count = Pick(r, {0, 1, 1, 1, 3, 9, 12});
         for (uint32_t i = 0; i < count; i++) {
           guest::StoreU32(base, data + kList + 4 * i, 376 + r.Below(24));
@@ -278,7 +278,7 @@ void Achievements(Context& h) {
   // BeatsCourseTime: r31 and lr saved in [sp - 16, sp).
   Group(
       h, "Achievements::BeatsCourseTime (sub_82290710)", 400, __imp__sub_82290710,
-      NativeBeatsCourseTime, 96, 16, [](PPCContext& t, Random& r, uint8_t* base, uint32_t data) {
+      ITC_CONTEXT_FN(NativeBeatsCourseTime), 96, 16, [](PPCContext& t, Random& r, uint8_t* base, uint32_t data) {
         guest::StoreU32(base, data + kTimes, Pick(r, {0, 1, 2, 3, 4, 5, 6, 7, 8, 0xFFFFFFFFu}));
         guest::StoreU32(base, data + kTimes + 4, PackedTime(r));
         t.r3.u64 = data + kTimes;
@@ -288,14 +288,14 @@ void Achievements(Context& h) {
   // the frame's +80 to +144 compared).
   Group(
       h, "Achievements::Check (sub_82290788)", 1000, __imp__sub_82290788,
-      hooks::AchievementsCheckSteps, 240, 88, [](PPCContext& t, Random& r, uint8_t*, uint32_t data) {
+      ITC_CONTEXT_FN(hooks::AchievementsCheckSteps), 240, 88, [](PPCContext& t, Random& r, uint8_t*, uint32_t data) {
         t.r3.u64 = r.Below(10) == 0 ? (r.Below(2) == 0 ? 3 : r.Next()) : r.Below(3);
         t.r4.u64 = data + kWords;
       });
   // Write: r25 to r31 and lr saved in [sp - 64, sp).
   Group(
       h, "Achievements::Write (sub_82290A30)", 400, __imp__sub_82290A30,
-      hooks::AchievementsWriteSteps, 144, 64,
+      ITC_CONTEXT_FN(hooks::AchievementsWriteSteps), 144, 64,
       [](PPCContext& t, Random& r, uint8_t* base, uint32_t data) {
         Words(base, data + kWords, r);
         t.r3.u64 = data + kWords;

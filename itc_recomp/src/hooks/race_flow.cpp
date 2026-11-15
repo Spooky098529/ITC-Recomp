@@ -3,6 +3,7 @@
 // (hooks/race_flow.h).
 
 #include "hooks/race_flow.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "race_flow/race_flow.h"
@@ -15,7 +16,7 @@ ITC_FLAG_BOOL(native_race_flow, true, "ITC",
 
 namespace hooks {
 
-void RaceFlowInit(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RaceFlowInit) {
   ctx.fpscr.disableFlushMode();
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
@@ -31,11 +32,6 @@ void RaceFlowInit(PPCContext& ctx, uint8_t* base) {
 
 // The adapter: the register step above, or the original with the flag off.
 // Its only caller, RaceMode::Init sub_82151D20, is recompiled.
-extern "C" REX_FUNC(sub_82160AE0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_race_flow)) {
-    __imp__sub_82160AE0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82160AE0, ITC_FLAG(native_race_flow)) {
   hooks::RaceFlowInit(ctx, base);
 }

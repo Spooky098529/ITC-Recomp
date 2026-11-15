@@ -213,7 +213,7 @@ void MenuHelpers(Context& h) {
   Group(
       h, w, "Menu::Step (sub_82186568)", 1000,
       [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.menu(); }, __imp__sub_82186568,
-      hooks::MenuStep, 48);
+      ITC_CONTEXT_FN(hooks::MenuStep), 48);
   // Menu::Pressed: lr saved at sp - 8.
   Group(
       h, w, "Menu::Pressed (sub_821864C8)", 500,
@@ -221,7 +221,7 @@ void MenuHelpers(Context& h) {
         t.r3.u64 = w.menu();
         t.r4.u64 = AnyAction(r);
       },
-      __imp__sub_821864C8, hooks::MenuPressed, 8);
+      __imp__sub_821864C8, ITC_CONTEXT_FN(hooks::MenuPressed), 8);
 }
 
 }  // namespace harness

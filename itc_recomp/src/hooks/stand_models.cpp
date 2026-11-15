@@ -3,6 +3,7 @@
 // steps the harness shares (hooks/stand_models.h).
 
 #include "hooks/stand_models.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "hooks/load_poll.h"
@@ -67,11 +68,11 @@ namespace hooks {
 
 namespace sm = stand_models;
 
-stand_models::GuestCall StandModelsGuestCall(PPCContext& ctx, uint8_t* base) {
+stand_models::GuestCall StandModelsGuestCall(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t function, std::initializer_list<uint64_t> args, uint32_t frame,
                       uint32_t lr) {
     const uint64_t stack = ctx.r1.u64;
-    PPCRegister* registers[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+    lifted::Temp* registers[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
                                  &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
     int i = 0;
     for (const uint64_t arg : args) {
@@ -86,9 +87,9 @@ stand_models::GuestCall StandModelsGuestCall(PPCContext& ctx, uint8_t* base) {
   };
 }
 
-void StandModelsMakeModel(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsMakeModel) {
   if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
-    __imp__sub_8217FCB0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8217FCB0);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -101,7 +102,7 @@ void StandModelsMakeModel(PPCContext& ctx, uint8_t* base) {
 
 // A setter over the stage's model: r3 the holder, r4 a value.
 #define ITC_STAND_SETTER(Name, address)                                          \
-  void StandModels##Name(PPCContext& ctx, uint8_t* base) {                       \
+  void StandModels##Name(lifted::Regs& ctx, uint8_t* base) {                       \
     if (!ITC_FLAG(native_vehicle_accessors)) {                                   \
       __imp__sub_##address(ctx, base);                                           \
       return;                                                                    \
@@ -116,9 +117,9 @@ ITC_STAND_SETTER(SetWheelWord, 82179A18)
 
 #undef ITC_STAND_SETTER
 
-void StandModelsSetLightsOn(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetLightsOn) {
   if (!ITC_FLAG(native_vehicle_accessors)) {
-    __imp__sub_82179420(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82179420);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -127,9 +128,9 @@ void StandModelsSetLightsOn(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = f1;
 }
 
-void StandModelsSetDecalA(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetDecalA) {
   if (!ITC_FLAG(native_vehicle_accessors)) {
-    __imp__sub_82179818(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82179818);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -137,9 +138,9 @@ void StandModelsSetDecalA(PPCContext& ctx, uint8_t* base) {
                             ctx.f2.f64, ctx.f3.f64, ctx.f4.f64, ctx.r1.u32, sm::kDecalA);
 }
 
-void StandModelsSetDecalB(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetDecalB) {
   if (!ITC_FLAG(native_vehicle_accessors)) {
-    __imp__sub_821798D8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821798D8);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -150,10 +151,10 @@ void StandModelsSetDecalB(PPCContext& ctx, uint8_t* base) {
 // A setter that re-applies the record: `body` with the guest calls, lr put
 // back; the original without its callees' flags.
 template <typename Body>
-void Reapplying(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_t*),
+void Reapplying(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original,
                 Body body) {
   if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
-    original(ctx, base);
+    lifted::Sdk(ctx, base, original);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -165,49 +166,49 @@ void Reapplying(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, ui
   ctx.r3.u64 = r3;
 }
 
-void StandModelsSetPart(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetPart) {
   Reapplying(ctx, base, __imp__sub_82178F00, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t r5, uint32_t stack) {
     return sm::SetPart(base, call, holder, r4, r5, stack);
   });
 }
 
-void StandModelsSetInteriorWord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetInteriorWord) {
   Reapplying(ctx, base, __imp__sub_82179050, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t r5, uint32_t stack) {
     return sm::SetInteriorWord(base, call, holder, r4, r5, stack);
   });
 }
 
-void StandModelsSetInteriorLevel(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetInteriorLevel) {
   Reapplying(ctx, base, __imp__sub_821791C0, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t, uint32_t stack) {
     return sm::SetInteriorLevel(base, call, holder, r4, stack);
   });
 }
 
-void StandModelsSetInteriorPair(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetInteriorPair) {
   Reapplying(ctx, base, __imp__sub_82179250, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t r5, uint32_t stack) {
     return sm::SetInteriorPair(base, call, holder, r4, r5, stack);
   });
 }
 
-void StandModelsClearChoice(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsClearChoice) {
   Reapplying(ctx, base, __imp__sub_82179378, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t, uint32_t stack) {
     return sm::ClearChoice(base, call, holder, r4, stack);
   });
 }
 
-void StandModelsSetAero(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetAero) {
   Reapplying(ctx, base, __imp__sub_82179548, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t, uint32_t stack) {
     return sm::SetAero(base, call, holder, r4, stack);
   });
 }
 
-void StandModelsReloadDecals(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsReloadDecals) {
   Reapplying(ctx, base, __imp__sub_82178EC0, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t, uint32_t, uint32_t stack) {
     return sm::ReloadDecals(base, call, holder, stack);
@@ -222,7 +223,7 @@ bool ApplyWheelPaintNative() {
 }
 
 template <typename Body>
-void WithCalls(PPCContext& ctx, uint8_t* base, Body body) {
+void WithCalls(lifted::Regs& ctx, uint8_t* base, Body body) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   const sm::GuestCall call = StandModelsGuestCall(ctx, base);
@@ -231,9 +232,9 @@ void WithCalls(PPCContext& ctx, uint8_t* base, Body body) {
   ctx.r3.u64 = r3;
 }
 
-void StandModelsSetTireGrade(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetTireGrade) {
   if (!ITC_FLAG(native_vehicle_accessors)) {
-    __imp__sub_82179130(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82179130);
     return;
   }
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
@@ -242,9 +243,9 @@ void StandModelsSetTireGrade(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void StandModelsTuningSetTireGrade(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsTuningSetTireGrade) {
   if (!ITC_FLAG(native_vehicle_accessors)) {
-    __imp__sub_821CCA38(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821CCA38);
     return;
   }
   const uint64_t r3 = ctx.r3.u64;
@@ -254,23 +255,23 @@ void StandModelsTuningSetTireGrade(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void StandModelsSetTireGrades(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetTireGrades) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
     return sm::SceneWheelsSetTireGrades(base, call, r3, r4, r5, stack);
   });
 }
 
-void StandModelsSetTireTextures(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetTireTextures) {
   const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
     return sm::WheelsSetTireTextures(base, call, r3, stack);
   });
 }
 
-void StandModelsStepSecondWheels(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsStepSecondWheels) {
   if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
-    __imp__sub_821CC890(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821CC890);
     return;
   }
   const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
@@ -281,18 +282,18 @@ void StandModelsStepSecondWheels(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void StandModelsSecondWheelsPending(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSecondWheelsPending) {
   ctx.r3.u64 = sm::SecondWheelsPending(base, ctx.r3.u32, ctx.r1.u32);
 }
 
-void StandModelsAddSecondWheels(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsAddSecondWheels) {
   const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
     return sm::AddSecondWheels(base, call, r3, stack);
   });
 }
 
-void StandModelsApplyWheelPaint(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsApplyWheelPaint) {
   const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
   load_poll::Calls poll = LoadPollCalls(ctx, base);
   load_poll::Calls* native_poll = ApplyWheelPaintNative() ? &poll : nullptr;
@@ -301,16 +302,16 @@ void StandModelsApplyWheelPaint(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void StandModelsSceneAddSecondWheels(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSceneAddSecondWheels) {
   const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
     return scene_models::SceneModelAddSecondWheels(base, call, r3, stack);
   });
 }
 
-void StandModelsFitAxles(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsFitAxles) {
   if (!ITC_FLAG(native_car_physics) || !ITC_FLAG(native_math)) {
-    __imp__sub_82178B98(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82178B98);
     return;
   }
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, stack = ctx.r1.u32;
@@ -323,7 +324,7 @@ void StandModelsFitAxles(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void StandModelsSetSizes(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetSizes) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
   const uint64_t r6 = ctx.r6.u64, r7 = ctx.r7.u64, r8 = ctx.r8.u64, r9 = ctx.r9.u64;
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
@@ -336,9 +337,9 @@ bool WheelCalleesNative() {
          ITC_FLAG(native_car_physics) && ITC_FLAG(native_math);
 }
 
-void StandModelsSetWheel(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetWheel) {
   if (!WheelCalleesNative()) {
-    __imp__sub_8217DD38(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8217DD38);
     return;
   }
   const uint32_t r3 = ctx.r3.u32, r5 = ctx.r5.u32, r6 = ctx.r6.u32, stack = ctx.r1.u32;
@@ -352,9 +353,9 @@ void StandModelsSetWheel(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void StandModelsPreviewWheel(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsPreviewWheel) {
   if (!WheelCalleesNative() || !ITC_FLAG(native_race_setup)) {
-    __imp__sub_821DFA78(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821DFA78);
     return;
   }
   const uint32_t r3 = ctx.r3.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
@@ -368,7 +369,7 @@ void StandModelsPreviewWheel(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void StandModelsSetColor(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetColor) {
   const uint64_t r3 = ctx.r3.u64;
   const uint32_t r4 = ctx.r4.u32, stack = ctx.r1.u32;
   const double f1 = ctx.f1.f64, f2 = ctx.f2.f64, f3 = ctx.f3.f64;
@@ -381,7 +382,7 @@ void StandModelsSetColor(PPCContext& ctx, uint8_t* base) {
 
 namespace {
 
-void SetColorPiece(PPCContext& ctx, uint8_t* base, uint32_t piece) {
+void SetColorPiece(lifted::Regs& ctx, uint8_t* base, uint32_t piece) {
   const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
   const double f1 = ctx.f1.f64, f2 = ctx.f2.f64, f3 = ctx.f3.f64;
   load_poll::Calls poll = LoadPollCalls(ctx, base);
@@ -393,27 +394,27 @@ void SetColorPiece(PPCContext& ctx, uint8_t* base, uint32_t piece) {
 
 }  // namespace
 
-void StandModelsSetColor0(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 0); }
-void StandModelsSetColor1(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 1); }
-void StandModelsSetColor2(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 2); }
-void StandModelsSetColor3(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 3); }
-void StandModelsSetColor4(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 4); }
-void StandModelsSetColor5(PPCContext& ctx, uint8_t* base) { SetColorPiece(ctx, base, 5); }
+ITC_REGS_STEP(StandModelsSetColor0) { SetColorPiece(ctx, base, 0); }
+ITC_REGS_STEP(StandModelsSetColor1) { SetColorPiece(ctx, base, 1); }
+ITC_REGS_STEP(StandModelsSetColor2) { SetColorPiece(ctx, base, 2); }
+ITC_REGS_STEP(StandModelsSetColor3) { SetColorPiece(ctx, base, 3); }
+ITC_REGS_STEP(StandModelsSetColor4) { SetColorPiece(ctx, base, 4); }
+ITC_REGS_STEP(StandModelsSetColor5) { SetColorPiece(ctx, base, 5); }
 
-void StandModelsSetSticker(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetSticker) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = sm::SetSticker(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                               ctx.r8.u64, ctx.r9.u64, ctx.f1.f64, ctx.r1.u32);
 }
 
-void StandModelsSetDecalWord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetDecalWord) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, stack = ctx.r1.u32;
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
     return sm::SetDecalWord(base, call, r3, r4, stack);
   });
 }
 
-void StandModelsSetParts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetParts) {
   const uint32_t r6 = ctx.r6.u32, r7 = ctx.r7.u32, r8 = ctx.r8.u32, r9 = ctx.r9.u32;
   Reapplying(ctx, base, __imp__sub_821797A8, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t r5, uint32_t stack) {
@@ -421,9 +422,9 @@ void StandModelsSetParts(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void StandModelsSetAeroSet(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetAeroSet) {
   if (!ITC_FLAG(native_car_specs)) {
-    __imp__sub_8217DBC0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8217DBC0);
     return;
   }
   const uint64_t r4 = ctx.r4.u64;
@@ -434,7 +435,7 @@ void StandModelsSetAeroSet(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void StandModelsSetChoice(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetChoice) {
   const uint32_t r6 = ctx.r6.u32;
   Reapplying(ctx, base, __imp__sub_82179310, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t r5, uint32_t stack) {
@@ -442,35 +443,35 @@ void StandModelsSetChoice(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void StandModelsSetAero2(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetAero2) {
   Reapplying(ctx, base, __imp__sub_821794A8, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t, uint32_t stack) {
     return sm::SetAero2(base, call, holder, r4, stack);
   });
 }
 
-void StandModelsSetDoorKind(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetDoorKind) {
   Reapplying(ctx, base, __imp__sub_821794F8, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t, uint32_t stack) {
     return sm::SetDoorKind(base, call, holder, r4, stack);
   });
 }
 
-void StandModelsSetAccessory(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetAccessory) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
     return sm::SetAccessory(base, call, r3, r4, r5, stack);
   });
 }
 
-void StandModelsApplyInterior(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsApplyInterior) {
   const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
     return sm::SceneModelApplyInterior(base, call, r3, stack);
   });
 }
 
-void StandModelsSceneInteriorSetRecord(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSceneInteriorSetRecord) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, stack = ctx.r1.u32;
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
     return sm::SceneInteriorSetRecord(base, call, r3, r4, stack);
@@ -481,7 +482,7 @@ load_poll::Calls* StandModelsPoll(load_poll::Calls& poll) {
   return ApplyWheelPaintNative() ? &poll : nullptr;
 }
 
-void StandModelsSetWheelExtras(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetWheelExtras) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
   load_poll::Calls poll = LoadPollCalls(ctx, base);
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
@@ -489,7 +490,7 @@ void StandModelsSetWheelExtras(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void StandModelsSetWord68(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSetWord68) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, stack = ctx.r1.u32;
   const uint32_t lr = uint32_t(ctx.lr);
   load_poll::Calls poll = LoadPollCalls(ctx, base);
@@ -498,7 +499,7 @@ void StandModelsSetWord68(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void StandModelsSceneSetCaliperTexture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsSceneSetCaliperTexture) {
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, stack = ctx.r1.u32;
   load_poll::Calls poll = LoadPollCalls(ctx, base);
   WithCalls(ctx, base, [&](const sm::GuestCall& call) {
@@ -506,7 +507,7 @@ void StandModelsSceneSetCaliperTexture(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void StandModelsLightValue(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(StandModelsLightValue) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = sm::LightValue(base, ctx.r3.u32);
 }

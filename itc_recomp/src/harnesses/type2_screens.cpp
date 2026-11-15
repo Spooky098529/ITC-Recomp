@@ -559,11 +559,11 @@ void Words(PPCContext& t, Random& r, const World& w, uint32_t hi, uint32_t speci
 
 void PlateEditor(Context& h, const World& w) {
   Run(h, w, {"Screen::LeaveToHub (sub_821D6A20)", 60, __imp__sub_821D6A20,
-             hooks::ScreenLeaveToHub, {}, MachineAndMode});
+             ITC_CONTEXT_FN(hooks::ScreenLeaveToHub), {}, MachineAndMode});
   if (hooks::NativeHeapActive()) {
     // Create: the three blocks VirtualAlloc made compared by content.
     Run(h, w, {"PlateEditor::Create (sub_82198210)", 60, __imp__sub_82198210,
-               hooks::PlateCreate, {{-112, -24}}, Machine,
+               ITC_CONTEXT_FN(hooks::PlateCreate), {{-112, -24}}, Machine,
                [&h](PPCContext& t, const World&, Outputs& out) {
                  // r3 the data block's address (the last VirtualAlloc's).
                  out.Word(t.r3.u32 == guest::LoadU32(h.base, t2::kPlateData) ? 1 : 0);
@@ -574,7 +574,7 @@ void PlateEditor(Context& h, const World& w) {
                }});
     // Destroy: the three blocks the layer's pages, their globals cleared.
     Run(h, w, {"PlateEditor::Destroy (sub_82198118)", 60, __imp__sub_82198118,
-               hooks::PlateDestroy, {{-112, -32}},
+               ITC_CONTEXT_FN(hooks::PlateDestroy), {{-112, -32}},
                [](PPCContext&, Random& r, const World& w) {
                  guest::StoreU32(w.base, t2::kPlatePages, MakePages(w.base, 28, r));
                  guest::StoreU32(w.base, t2::kPlateList, MakePages(w.base, 72, r));
@@ -582,22 +582,22 @@ void PlateEditor(Context& h, const World& w) {
                }});
   }
   Run(h, w, {"PlateEditor::OpenMovie (sub_82198180)", 20, __imp__sub_82198180,
-             hooks::PlateOpenMovie, {}, None});
+             ITC_CONTEXT_FN(hooks::PlateOpenMovie), {}, None});
   Run(h, w, {"PlateEditor::WaitForLoad (sub_821982F0)", 100, __imp__sub_821982F0,
-             hooks::PlateWaitForLoad, {{-96, -16}}, Machine});
-  Run(h, w, {"PlateEditor::Close (sub_82198498)", 60, __imp__sub_82198498, hooks::PlateClose,
+             ITC_CONTEXT_FN(hooks::PlateWaitForLoad), {{-96, -16}}, Machine});
+  Run(h, w, {"PlateEditor::Close (sub_82198498)", 60, __imp__sub_82198498, ITC_CONTEXT_FN(hooks::PlateClose),
              {{-112, -16}}, MachineAndMode});
   Run(h, w, {"PlateEditor::OnMessage32 (sub_82198190)", 60, __imp__sub_82198190,
-             hooks::PlateOnMessage32, {},
+             ITC_CONTEXT_FN(hooks::PlateOnMessage32), {},
              [](PPCContext&, Random& r, const World& w) {
                if (r.Below(3) == 0) {
                  guest::StoreU32(w.base, w.at(kPagesAt), 4);
                }
              }});
   Run(h, w, {"PlateEditor::LeavePage (sub_82198988)", 60, __imp__sub_82198988,
-             hooks::PlateLeavePage, {}, Mode});
+             ITC_CONTEXT_FN(hooks::PlateLeavePage), {}, Mode});
   Run(h, w, {"PlateEditor::CharLineKind (sub_821981C8)", 200, __imp__sub_821981C8,
-             hooks::PlateCharLineKind, {},
+             ITC_CONTEXT_FN(hooks::PlateCharLineKind), {},
              [](PPCContext& t, Random& r, const World& w) {
                Words(t, r, w, 12, 10, true);
                // The field 0 to 7, 3 often (CharLineKind's 2).
@@ -607,7 +607,7 @@ void PlateEditor(Context& h, const World& w) {
   // RandomPlate: the plate at the data's +24 (byte +0 and +12 on left as
   // they are); its frame but the saves (r29 on) compared.
   Run(h, w, {"PlateEditor::RandomPlate (sub_82198360)", 60, __imp__sub_82198360,
-             hooks::PlateRandom, {{-128, -32}},
+             ITC_CONTEXT_FN(hooks::PlateRandom), {{-128, -32}},
              [](PPCContext& t, Random&, const World& w) { t.r4.u64 = w.data() + 24; }});
   // LoadPlate: with the data's +48 set or not; RandomPlate's frame under
   // its own.
@@ -615,14 +615,14 @@ void PlateEditor(Context& h, const World& w) {
     guest::StoreU32(w.base, w.data() + 48, r.Below(2));
   };
   Run(h, w, {"PlateEditor::LoadPlate (sub_82198420; sub_82198360)", 60, __imp__sub_82198420,
-             hooks::PlateLoad, {{-96, -16}, {-224, -128}}, load});
+             ITC_CONTEXT_FN(hooks::PlateLoad), {{-96, -16}, {-224, -128}}, load});
   Run(h, w, {"PlateEditor::ResetMovie (sub_821989E8)", 60, __imp__sub_821989E8,
-             hooks::PlateResetMovie, {{-96, -8}}, None});
+             ITC_CONTEXT_FN(hooks::PlateResetMovie), {{-96, -8}}, None});
   // Start: LoadPlate's and ResetMovie's frames at the same place under it
   // (ResetMovie's id at +80 over the upper half of LoadPlate's r31 save, its
   // lower half left out), RandomPlate's under them.
   Run(h, w, {"PlateEditor::Start (sub_82199BB8; sub_82198420, sub_821989E8)", 60,
-             __imp__sub_82199BB8, hooks::PlateStart, {{-96, -8}, {-192, -108}, {-320, -224}},
+             __imp__sub_82199BB8, ITC_CONTEXT_FN(hooks::PlateStart), {{-96, -8}, {-192, -108}, {-320, -224}},
              [load](PPCContext& t, Random& r, const World& w) {
                load(t, r, w);
                if (r.Below(3) == 0) {
@@ -630,23 +630,23 @@ void PlateEditor(Context& h, const World& w) {
                }
              }});
   Run(h, w, {"PlateEditor::ShowRegion (sub_82199898)", 60, __imp__sub_82199898,
-             hooks::PlateShowRegion, {{-112, -16}},
+             ITC_CONTEXT_FN(hooks::PlateShowRegion), {{-112, -16}},
              [](PPCContext& t, Random& r, const World&) { t.r3.u64 = r.Below(14); }});
   Run(h, w, {"PlateEditor::ShowDigits (sub_821998F0)", 100, __imp__sub_821998F0,
-             hooks::PlateShowDigits, {{-144, -48}},
+             ITC_CONTEXT_FN(hooks::PlateShowDigits), {{-144, -48}},
              [](PPCContext& t, Random& r, const World& w) { Words(t, r, w, 10, 10); }});
   Run(h, w, {"PlateEditor::ShowChars (sub_82199990)", 100, __imp__sub_82199990,
-             hooks::PlateShowChars, {{-144, -48}},
+             ITC_CONTEXT_FN(hooks::PlateShowChars), {{-144, -48}},
              [](PPCContext& t, Random& r, const World& w) { Words(t, r, w, 38, 37); }});
   Run(h, w, {"PlateEditor::MarkField (sub_82199AA8)", 100, __imp__sub_82199AA8,
-             hooks::PlateMarkField, {{-128, -40}},
+             ITC_CONTEXT_FN(hooks::PlateMarkField), {{-128, -40}},
              [](PPCContext& t, Random& r, const World&) {
                t.r3.u64 = r.Below(4) == 0 ? 0xFFFFFFFFFFFFFFFFull : r.Below(12);
              }});
   Run(h, w, {"PlateEditor::FinishRegionAnim (sub_821992D8)", 60, __imp__sub_821992D8,
-             hooks::PlateFinishRegionAnim, {{-112, -16}}, None});
+             ITC_CONTEXT_FN(hooks::PlateFinishRegionAnim), {{-112, -16}}, None});
   Run(h, w, {"PlateEditor::FinishDigitAnim (sub_82199410)", 60, __imp__sub_82199410,
-             hooks::PlateFinishDigitAnim, {{-112, -16}}, None});
+             ITC_CONTEXT_FN(hooks::PlateFinishDigitAnim), {{-112, -16}}, None});
 }
 
 // The cells' and menus' world: the plate (the data's +4: the region 0 to
@@ -694,14 +694,14 @@ void PlateCells(Context& h, const World& w) {
   auto cells = [](PPCContext&, Random& r, const World& w) { CellsWorld(r, w); };
   // The cells: SetNodeText's parameter area (+40 to +79) left out.
   Run(h, w, {"PlateEditor::ShowRegionCells (sub_821990D0)", 100, __imp__sub_821990D0,
-             hooks::PlateShowRegionCells, {{-176, -136}, {-96, -80}}, cells});
+             ITC_CONTEXT_FN(hooks::PlateShowRegionCells), {{-176, -136}, {-96, -80}}, cells});
   Run(h, w, {"PlateEditor::ShowCharCells (sub_82199488)", 100, __imp__sub_82199488,
-             hooks::PlateShowCharCells, {{-176, -136}, {-96, -88}}, cells});
+             ITC_CONTEXT_FN(hooks::PlateShowCharCells), {{-176, -136}, {-96, -88}}, cells});
   // ShowDigitCells: SetText's parameter area (+48 to +79) left out.
   Run(h, w, {"PlateEditor::ShowDigitCells (sub_82199350)", 100, __imp__sub_82199350,
-             hooks::PlateShowDigitCells, {{-128, -80}, {-48, -40}}, cells});
+             ITC_CONTEXT_FN(hooks::PlateShowDigitCells), {{-128, -80}, {-48, -40}}, cells});
   Run(h, w, {"PlateEditor::ShowCharLine (sub_82199688)", 100, __imp__sub_82199688,
-             hooks::PlateShowCharLine, {{-128, -32}},
+             ITC_CONTEXT_FN(hooks::PlateShowCharLine), {{-128, -32}},
              [](PPCContext& t, Random& r, const World&) {
                t.r3.u64 = r.Below(5) == 0 ? r.Next() : r.Below(4);
              }});
@@ -711,7 +711,7 @@ void PlateCells(Context& h, const World& w) {
   // (the stack's word), small here, as a large one stored into a node's
   // +108 sends FindNode out of the pool.
   Run(h, w, {"PlateEditor::ShowPlate (sub_82199A20; sub_82199898)", 100, __imp__sub_82199A20,
-             hooks::PlateShowPlate, {{-144, -8}, {-288, -192}},
+             ITC_CONTEXT_FN(hooks::PlateShowPlate), {{-144, -8}, {-288, -192}},
              [](PPCContext& t, Random& r, const World& w) {
                CellsWorld(r, w);
                guest::StoreU32(w.base, t.r1.u32 - 144 + 92, r.Below(12));
@@ -723,16 +723,16 @@ void PlateCells(Context& h, const World& w) {
   // The menus' set-ups: their frames (MenuList::Init's stack words) without
   // the saves.
   Run(h, w, {"PlateEditor::SetUpRegionMenu (sub_82199C10; sub_821990D0, sub_82199AA8)", 100,
-             __imp__sub_82199C10, hooks::PlateSetUpRegionMenu, {{-128, -24}}, cells, ListBlock});
+             __imp__sub_82199C10, ITC_CONTEXT_FN(hooks::PlateSetUpRegionMenu), {{-128, -24}}, cells, ListBlock});
   Run(h, w, {"PlateEditor::SetUpNumberMenu (sub_82199CC8; sub_82199350)", 100,
-             __imp__sub_82199CC8, hooks::PlateSetUpNumberMenu, {{-128, -24}},
+             __imp__sub_82199CC8, ITC_CONTEXT_FN(hooks::PlateSetUpNumberMenu), {{-128, -24}},
              [](PPCContext&, Random& r, const World& w) {
                CellsWorld(r, w);
                guest::StoreU32(w.base, w.data() + 56, r.Below(3));
              },
              ListBlock});
   Run(h, w, {"PlateEditor::SetUpCharsMenu (sub_82199D88; sub_82199488)", 100,
-             __imp__sub_82199D88, hooks::PlateSetUpCharsMenu, {{-128, -24}}, cells, ListBlock});
+             __imp__sub_82199D88, ITC_CONTEXT_FN(hooks::PlateSetUpCharsMenu), {{-128, -24}}, cells, ListBlock});
 }
 
 // The transitions: r3 the started word's address (the page object's +24:
@@ -800,15 +800,15 @@ void PlatePages(Context& h, const World& w) {
     t.r3.u64 = w.at(kModeAt);
   };
   Run(h, w, {"PlateEditor::RegionPage (sub_82199ED0)", 300, __imp__sub_82199ED0,
-             hooks::PlateRegionPage, {{-112, -24}}, page});
+             ITC_CONTEXT_FN(hooks::PlateRegionPage), {{-112, -24}}, page});
   Run(h, w, {"PlateEditor::NumberPage (sub_8219A138)", 300, __imp__sub_8219A138,
-             hooks::PlateNumberPage, {{-112, -24}}, page});
+             ITC_CONTEXT_FN(hooks::PlateNumberPage), {{-112, -24}}, page});
   Run(h, w, {"PlateEditor::CharsPage (sub_82198540)", 300, __imp__sub_82198540,
-             hooks::PlateCharsPage, {{-112, -24}}, page});
+             ITC_CONTEXT_FN(hooks::PlateCharsPage), {{-112, -24}}, page});
   // UpdatePage: the page -1 or 0 to 4 (3, ConfirmPage, never seen in play,
   // the original on both sides), the data's +72 21 or another state.
   Run(h, w, {"PlateEditor::UpdatePage (sub_8219B050)", 300, __imp__sub_8219B050,
-             hooks::PlateUpdatePage, {{-128, -16}},
+             ITC_CONTEXT_FN(hooks::PlateUpdatePage), {{-128, -16}},
              [page](PPCContext& t, Random& r, const World& w) {
                page(t, r, w);
                guest::StoreU32(w.base, w.at(kPagesAt), uint32_t(int32_t(r.Below(6)) - 1));
@@ -842,13 +842,13 @@ void InitStates(Context& h, const World& w) {
     t.r3.u64 = machine;
   };
   Run(h, w, {"Type2Hub::InitStates (sub_82190B18)", 24, __imp__sub_82190B18,
-             hooks::HubInitStates, {{-1552, -48}}, machine});
+             ITC_CONTEXT_FN(hooks::HubInitStates), {{-1552, -48}}, machine});
   Run(h, w, {"PowerGraphScreen2::InitStates (sub_821B90D8)", 24, __imp__sub_821B90D8,
-             hooks::SheetInitStates, {{-912, -48}}, machine});
+             ITC_CONTEXT_FN(hooks::SheetInitStates), {{-912, -48}}, machine});
   Run(h, w, {"BuildScreen::InitStates (sub_821A16C0)", 24, __imp__sub_821A16C0,
-             hooks::BuildInitStates, {{-912, -48}}, machine});
+             ITC_CONTEXT_FN(hooks::BuildInitStates), {{-912, -48}}, machine});
   Run(h, w, {"PlateEditor::InitStates (sub_8219B2E8)", 24, __imp__sub_8219B2E8,
-             hooks::PlateInitStates, {{-912, -48}}, machine});
+             ITC_CONTEXT_FN(hooks::PlateInitStates), {{-912, -48}}, machine});
 }
 
 void PlateTransitions(Context& h, const World& w) {
@@ -865,24 +865,24 @@ void PlateTransitions(Context& h, const World& w) {
     int32_t frame, saves;
   } kCases[] = {
       {"PlateEditor::Transition0 (sub_8219A3A8; sub_82199C10, sub_82199A20)", __imp__sub_8219A3A8,
-       hooks::PlateTransition0, 112, 24},
-      {"PlateEditor::Transition1 (sub_82198A40)", __imp__sub_82198A40, hooks::PlateTransition1,
+       ITC_CONTEXT_FN(hooks::PlateTransition0), 112, 24},
+      {"PlateEditor::Transition1 (sub_82198A40)", __imp__sub_82198A40, ITC_CONTEXT_FN(hooks::PlateTransition1),
        128, 32},
-      {"PlateEditor::Transition4 (sub_82198C20)", __imp__sub_82198C20, hooks::PlateTransition4,
+      {"PlateEditor::Transition4 (sub_82198C20)", __imp__sub_82198C20, ITC_CONTEXT_FN(hooks::PlateTransition4),
        112, 24},
       {"PlateEditor::Transition5 (sub_8219A5E8; sub_82199CC8, sub_821998F0)", __imp__sub_8219A5E8,
-       hooks::PlateTransition5, 144, 32},
-      {"PlateEditor::Transition6 (sub_82198D00)", __imp__sub_82198D00, hooks::PlateTransition6,
+       ITC_CONTEXT_FN(hooks::PlateTransition5), 144, 32},
+      {"PlateEditor::Transition6 (sub_82198D00)", __imp__sub_82198D00, ITC_CONTEXT_FN(hooks::PlateTransition6),
        128, 32},
       {"PlateEditor::Transition8 (sub_8219A820; sub_82199CC8, sub_821998F0)", __imp__sub_8219A820,
-       hooks::PlateTransition8, 144, 32},
+       ITC_CONTEXT_FN(hooks::PlateTransition8), 144, 32},
       {"PlateEditor::Transition10 (sub_8219AA00; sub_82199D88, sub_82199688)",
-       __imp__sub_8219AA00, hooks::PlateTransition10, 128, 32},
-      {"PlateEditor::Transition11 (sub_82198DC8)", __imp__sub_82198DC8, hooks::PlateTransition11,
+       __imp__sub_8219AA00, ITC_CONTEXT_FN(hooks::PlateTransition10), 128, 32},
+      {"PlateEditor::Transition11 (sub_82198DC8)", __imp__sub_82198DC8, ITC_CONTEXT_FN(hooks::PlateTransition11),
        128, 32},
       {"PlateEditor::Transition13 (sub_8219AC88; sub_821981C8, sub_82199990)",
-       __imp__sub_8219AC88, hooks::PlateTransition13, 160, 32},
-      {"PlateEditor::Transition19 (sub_82198FB8)", __imp__sub_82198FB8, hooks::PlateTransition19,
+       __imp__sub_8219AC88, ITC_CONTEXT_FN(hooks::PlateTransition13), 160, 32},
+      {"PlateEditor::Transition19 (sub_82198FB8)", __imp__sub_82198FB8, ITC_CONTEXT_FN(hooks::PlateTransition19),
        160, 72},
   };
   for (const auto& c : kCases) {
@@ -891,7 +891,7 @@ void PlateTransitions(Context& h, const World& w) {
   // Update: the running transition -1, -2 (none: done) or one of those seen
   // in play (the others' worlds aren't laid), its frame without the saves
   // (r18 on).
-  Run(h, w, {"PlateEditor::Update (sub_8219B108)", 200, __imp__sub_8219B108, hooks::PlateUpdate,
+  Run(h, w, {"PlateEditor::Update (sub_8219B108)", 200, __imp__sub_8219B108, ITC_CONTEXT_FN(hooks::PlateUpdate),
              {{-304, -120}},
              [step](PPCContext& t, Random& r, const World& w) {
                static constexpr uint32_t kSeen[10] = {0, 1, 4, 5, 6, 8, 10, 11, 13, 19};
@@ -913,7 +913,7 @@ void PlateTransitions(Context& h, const World& w) {
 void SheetAndBuild(Context& h, const World& w) {
   if (hooks::NativeHeapActive()) {
     Run(h, w, {"PowerGraphScreen::Create (sub_821B8120)", 60, __imp__sub_821B8120,
-               hooks::SheetCreate, {{-112, -24}}, Machine,
+               ITC_CONTEXT_FN(hooks::SheetCreate), {{-112, -24}}, Machine,
                [&h](PPCContext& t, const World&, Outputs& out) {
                  out.Word(t.r3.u32 == guest::LoadU32(h.base, t2::kSheetData) ? 1 : 0);
                  t.r3.u64 = 0;
@@ -922,7 +922,7 @@ void SheetAndBuild(Context& h, const World& w) {
                  Allocated(h.base, out, t2::kSheetData, 1968);
                }});
     Run(h, w, {"PowerGraphScreen::Destroy (sub_821B80B8)", 60, __imp__sub_821B80B8,
-               hooks::SheetDestroy, {{-112, -32}},
+               ITC_CONTEXT_FN(hooks::SheetDestroy), {{-112, -32}},
                [](PPCContext&, Random& r, const World& w) {
                  guest::StoreU32(w.base, t2::kSheetPages, MakePages(w.base, 28, r));
                  guest::StoreU32(w.base, t2::kSheetMenu, MakePages(w.base, 68, r));
@@ -931,7 +931,7 @@ void SheetAndBuild(Context& h, const World& w) {
     // BuildScreen::Create: the screen data's first words and its +0x32668
     // compared (the rest is the layer's zeroed pages).
     Run(h, w, {"BuildScreen::Create (sub_8219BD80)", 60, __imp__sub_8219BD80,
-               hooks::BuildCreate, {{-112, -24}}, Machine,
+               ITC_CONTEXT_FN(hooks::BuildCreate), {{-112, -24}}, Machine,
                [&h](PPCContext& t, const World&, Outputs& out) {
                  out.Word(t.r3.u32 == guest::LoadU32(h.base, t2::kBuildScreen) ? 1 : 0);
                  t.r3.u64 = 0;
@@ -947,7 +947,7 @@ void SheetAndBuild(Context& h, const World& w) {
     // BuildScreen::Destroy: the four blocks the layer's pages (the list's
     // +68 block one too, or none: MenuList::Release frees it).
     Run(h, w, {"BuildScreen::Destroy (sub_8219B8C8)", 60, __imp__sub_8219B8C8,
-               hooks::BuildDestroy, {{-112, -32}},
+               ITC_CONTEXT_FN(hooks::BuildDestroy), {{-112, -32}},
                [](PPCContext&, Random& r, const World& w) {
                  uint8_t* base = w.base;
                  const uint32_t list = MakePages(base, 72, r);
@@ -959,18 +959,18 @@ void SheetAndBuild(Context& h, const World& w) {
                }});
   }
   Run(h, w, {"PowerGraphScreen::OpenMovie (sub_82250328)", 20, __imp__sub_82250328,
-             hooks::SheetOpenMovie, {}, None});
+             ITC_CONTEXT_FN(hooks::SheetOpenMovie), {}, None});
   Run(h, w, {"PowerGraphScreen::WaitForLoad (sub_821B8900)", 100, __imp__sub_821B8900,
-             hooks::SheetWaitForLoad, {{-96, -16}}, Machine});
+             ITC_CONTEXT_FN(hooks::SheetWaitForLoad), {{-96, -16}}, Machine});
   Run(h, w, {"PowerGraphScreen::Close (sub_821B8320)", 60, __imp__sub_821B8320,
-             hooks::SheetClose, {{-96, -16}}, MachineAndMode});
+             ITC_CONTEXT_FN(hooks::SheetClose), {{-96, -16}}, MachineAndMode});
   Run(h, w, {"BuildScreen::OpenMovie (sub_8219B950)", 20, __imp__sub_8219B950,
-             hooks::BuildOpenMovie, {}, None});
+             ITC_CONTEXT_FN(hooks::BuildOpenMovie), {}, None});
   Run(h, w, {"BuildScreen::WaitForLoad (sub_8219BE98)", 100, __imp__sub_8219BE98,
-             hooks::BuildWaitForLoad, {{-96, -16}}, Machine});
-  Run(h, w, {"BuildScreen::Unload (sub_8219C298)", 60, __imp__sub_8219C298, hooks::BuildUnload,
+             ITC_CONTEXT_FN(hooks::BuildWaitForLoad), {{-96, -16}}, Machine});
+  Run(h, w, {"BuildScreen::Unload (sub_8219C298)", 60, __imp__sub_8219C298, ITC_CONTEXT_FN(hooks::BuildUnload),
              {{-112, -16}}, Machine});
-  Run(h, w, {"BuildScreen::Close (sub_8219C300)", 60, __imp__sub_8219C300, hooks::BuildClose,
+  Run(h, w, {"BuildScreen::Close (sub_8219C300)", 60, __imp__sub_8219C300, ITC_CONTEXT_FN(hooks::BuildClose),
              {{-112, -16}}, MachineAndMode});
   // SaveBuildStates and LeavePage: the screen data and the save data random,
   // compared (the stage in the block).
@@ -980,11 +980,11 @@ void SheetAndBuild(Context& h, const World& w) {
     t.r3.u64 = w.at(kModeAt);
   };
   Run(h, w, {"BuildScreen::SaveBuildStates (sub_8219C100)", 20, __imp__sub_8219C100,
-             hooks::BuildSaveBuildStates, {{-96, -8}}, screen, nullptr, true});
+             ITC_CONTEXT_FN(hooks::BuildSaveBuildStates), {{-96, -8}}, screen, nullptr, true});
   Run(h, w, {"BuildScreen::LeavePage (sub_8219C3A8; sub_8219C100)", 20, __imp__sub_8219C3A8,
-             hooks::BuildLeavePage, {{-96, -16}}, screen, nullptr, true});
+             ITC_CONTEXT_FN(hooks::BuildLeavePage), {{-96, -16}}, screen, nullptr, true});
   Run(h, w, {"BuildScreen::DetailsPage (sub_8219B960)", 300, __imp__sub_8219B960,
-             hooks::BuildDetailsPage, {{-96, -16}},
+             ITC_CONTEXT_FN(hooks::BuildDetailsPage), {{-96, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                MenuWorld(r, w);
                if (r.Below(2) == 0) {
@@ -995,7 +995,7 @@ void SheetAndBuild(Context& h, const World& w) {
   // UpdatePage: the level -1, 3 (DetailsPage) or 4 (LeavePage); the others'
   // worlds (the groups and builds) are the build screen harness's.
   Run(h, w, {"BuildScreen::UpdatePage (sub_8219FA80)", 200, __imp__sub_8219FA80,
-             hooks::BuildUpdatePage, {{-112, -8}},
+             ITC_CONTEXT_FN(hooks::BuildUpdatePage), {{-112, -8}},
              [screen](PPCContext& t, Random& r, const World& w) {
                MenuWorld(r, w);
                screen(t, r, w);
@@ -1088,27 +1088,27 @@ void BuildLevels(Context& h, const World& w) {
   };
   // The jumps: their frames without the saves (r24 or r25 on).
   Run(h, w, {"BuildScreen::JumpGroupA (sub_8219DBC8)", 300, __imp__sub_8219DBC8,
-             hooks::BuildJumpGroupA, {{-160, -72}}, jump, nullptr, true});
+             ITC_CONTEXT_FN(hooks::BuildJumpGroupA), {{-160, -72}}, jump, nullptr, true});
   Run(h, w, {"BuildScreen::JumpGroupB (sub_8219DDB8)", 300, __imp__sub_8219DDB8,
-             hooks::BuildJumpGroupB, {{-160, -72}}, jump, nullptr, true});
+             ITC_CONTEXT_FN(hooks::BuildJumpGroupB), {{-160, -72}}, jump, nullptr, true});
   Run(h, w, {"BuildScreen::JumpBuildA (sub_8219DFA8)", 300, __imp__sub_8219DFA8,
-             hooks::BuildJumpBuildA, {{-160, -72}}, jump, nullptr, true});
+             ITC_CONTEXT_FN(hooks::BuildJumpBuildA), {{-160, -72}}, jump, nullptr, true});
   Run(h, w, {"BuildScreen::JumpBuildB (sub_8219E348)", 300, __imp__sub_8219E348,
-             hooks::BuildJumpBuildB, {{-160, -72}}, jump, nullptr, true});
+             ITC_CONTEXT_FN(hooks::BuildJumpBuildB), {{-160, -72}}, jump, nullptr, true});
   Run(h, w, {"BuildScreen::JumpStandA (sub_8219E600)", 300, __imp__sub_8219E600,
-             hooks::BuildJumpStandA, {{-160, -64}}, jump, nullptr, true});
+             ITC_CONTEXT_FN(hooks::BuildJumpStandA), {{-160, -64}}, jump, nullptr, true});
   Run(h, w, {"BuildScreen::JumpStandB (sub_8219E9A0)", 300, __imp__sub_8219E9A0,
-             hooks::BuildJumpStandB, {{-160, -64}}, jump, nullptr, true});
+             ITC_CONTEXT_FN(hooks::BuildJumpStandB), {{-160, -64}}, jump, nullptr, true});
   // The pages: their frames without the saves, and their callees' below
   // (the jumps' without theirs).
   Run(h, w, {"BuildScreen::GroupsPage (sub_8219EEC0; sub_8219DBC8, sub_8219DDB8)", 300,
-             __imp__sub_8219EEC0, hooks::BuildGroupsPage, {{-96, -16}, {-256, -168}}, page,
+             __imp__sub_8219EEC0, ITC_CONTEXT_FN(hooks::BuildGroupsPage), {{-96, -16}, {-256, -168}}, page,
              nullptr, true});
   Run(h, w, {"BuildScreen::BuildsPage (sub_8219F048; sub_8219DFA8, sub_8219E348)", 300,
-             __imp__sub_8219F048, hooks::BuildBuildsPage, {{-112, -24}, {-272, -184}}, page,
+             __imp__sub_8219F048, ITC_CONTEXT_FN(hooks::BuildBuildsPage), {{-112, -24}, {-272, -184}}, page,
              nullptr, true});
   Run(h, w, {"BuildScreen::BuildPage (sub_8219F1C8; sub_8219E600, sub_8219E9A0)", 300,
-             __imp__sub_8219F1C8, hooks::BuildBuildPage, {{-112, -24}, {-272, -176}}, page,
+             __imp__sub_8219F1C8, ITC_CONTEXT_FN(hooks::BuildBuildPage), {{-112, -24}, {-272, -176}}, page,
              nullptr, true});
 }
 
@@ -1233,7 +1233,7 @@ void HubMovie(Context& h, const World& w) {
   // UpdatePage: the page -1, 1 or 2 (the empty function), 3 (Choose) or 5
   // (RecordPage); the others' worlds (MenuPage's, NoticePage's) aren't laid.
   Run(h, w, {"Type2Hub::UpdatePage (sub_82190498)", 200, __imp__sub_82190498,
-             hooks::HubUpdatePage, {{-128, -16}},
+             ITC_CONTEXT_FN(hooks::HubUpdatePage), {{-128, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                HubMovieWorld(r, w);
                static constexpr uint32_t kPages[5] = {0xFFFFFFFFu, 1, 2, 3, 5};
@@ -1244,9 +1244,9 @@ void HubMovie(Context& h, const World& w) {
   // The varargs UiMovie::SetText calls' parameter area (+48 to +79 of the
   // caller's frame: r7 to r10, the originals' leftovers) left out.
   Run(h, w, {"Type2Hub::SetRecordText (sub_8218F4D8)", 60, __imp__sub_8218F4D8,
-             hooks::HubSetRecordText, {{-96, -48}, {-16, -8}}, movie});
+             ITC_CONTEXT_FN(hooks::HubSetRecordText), {{-96, -48}, {-16, -8}}, movie});
   Run(h, w, {"Type2Hub::RecordPage (sub_821900B8; sub_8218F4D8)", 60, __imp__sub_821900B8,
-             hooks::HubRecordPage, {{-96, -16}, {-192, -144}, {-112, -104}},
+             ITC_CONTEXT_FN(hooks::HubRecordPage), {{-96, -16}, {-192, -144}, {-112, -104}},
              [](PPCContext& t, Random& r, const World& w) {
                HubMovieWorld(r, w);
                if (r.Below(3) == 0) {
@@ -1254,22 +1254,22 @@ void HubMovie(Context& h, const World& w) {
                }
                t.r3.u64 = w.at(kModeAt);
              }});
-  Run(h, w, {"Type2Hub::ShowBusy (sub_8218EA90)", 40, __imp__sub_8218EA90, hooks::HubShowBusy,
+  Run(h, w, {"Type2Hub::ShowBusy (sub_8218EA90)", 40, __imp__sub_8218EA90, ITC_CONTEXT_FN(hooks::HubShowBusy),
              {{-112, -16}}, movie});
-  Run(h, w, {"Type2Hub::HideBusy (sub_8218EB10)", 40, __imp__sub_8218EB10, hooks::HubHideBusy,
+  Run(h, w, {"Type2Hub::HideBusy (sub_8218EB10)", 40, __imp__sub_8218EB10, ITC_CONTEXT_FN(hooks::HubHideBusy),
              {{-112, -16}}, movie});
   Run(h, w, {"Type2Hub::ShowNoticeImage (sub_8218F3F8)", 100, __imp__sub_8218F3F8,
-             hooks::HubShowNoticeImage, {{-112, -16}},
+             ITC_CONTEXT_FN(hooks::HubShowNoticeImage), {{-112, -16}},
              [](PPCContext& t, Random& r, const World& w) {
                HubMovieWorld(r, w);
                t.r3.u64 = r.Below(14);
              }});
   // ShowNotice: ShowNoticeImage's frame under its own.
   Run(h, w, {"Type2Hub::ShowNotice (sub_821903D0; sub_8218F3F8)", 100, __imp__sub_821903D0,
-             hooks::HubShowNotice, {{-128, -80}, {-48, -40}, {-240, -144}}, movie});
+             ITC_CONTEXT_FN(hooks::HubShowNotice), {{-128, -80}, {-48, -40}, {-240, -144}}, movie});
   // FillMenu: SetPrompts' frame under its own (but its saves).
   Run(h, w, {"Type2Hub::FillMenu (sub_8218FB20; sub_8218F530)", 100, __imp__sub_8218FB20,
-             hooks::HubFillMenu, {{-176, -128}, {-96, -40}, {-368, -240}}, movie});
+             ITC_CONTEXT_FN(hooks::HubFillMenu), {{-176, -128}, {-96, -40}, {-368, -240}}, movie});
   // The transitions: r3 the page object's +24 (0, 1 or any); their own
   // frames without the saves (Transition2's SetText parameter area left
   // out); the callees' frames are their own cases'.
@@ -1293,19 +1293,19 @@ void HubMovie(Context& h, const World& w) {
     std::vector<Range> stack;
   } kCases[] = {
       {"Type2Hub::Transition0 (sub_821901C0; sub_8218FB20)", __imp__sub_821901C0,
-       hooks::HubTransition0, {{-112, -24}}},
-      {"Type2Hub::Transition1 (sub_8218EC78)", __imp__sub_8218EC78, hooks::HubTransition1,
+       ITC_CONTEXT_FN(hooks::HubTransition0), {{-112, -24}}},
+      {"Type2Hub::Transition1 (sub_8218EC78)", __imp__sub_8218EC78, ITC_CONTEXT_FN(hooks::HubTransition1),
        {{-128, -32}}},
-      {"Type2Hub::Transition2 (sub_8218EE48)", __imp__sub_8218EE48, hooks::HubTransition2,
+      {"Type2Hub::Transition2 (sub_8218EE48)", __imp__sub_8218EE48, ITC_CONTEXT_FN(hooks::HubTransition2),
        {{-144, -96}, {-64, -48}}},
-      {"Type2Hub::Transition3 (sub_8218ED98)", __imp__sub_8218ED98, hooks::HubTransition3,
+      {"Type2Hub::Transition3 (sub_8218ED98)", __imp__sub_8218ED98, ITC_CONTEXT_FN(hooks::HubTransition3),
        {{-112, -24}}},
       {"Type2Hub::Transition5 (sub_82190548; sub_8218F530, sub_821903D0)", __imp__sub_82190548,
-       hooks::HubTransition5, {{-112, -24}}},
-      {"Type2Hub::Transition6 (sub_8218F098)", __imp__sub_8218F098, hooks::HubTransition6,
+       ITC_CONTEXT_FN(hooks::HubTransition5), {{-112, -24}}},
+      {"Type2Hub::Transition6 (sub_8218F098)", __imp__sub_8218F098, ITC_CONTEXT_FN(hooks::HubTransition6),
        {{-112, -24}}},
       {"Type2Hub::Transition7 (sub_821902C8; sub_8218FB20)", __imp__sub_821902C8,
-       hooks::HubTransition7, {{-112, -24}}},
+       ITC_CONTEXT_FN(hooks::HubTransition7), {{-112, -24}}},
   };
   for (const auto& c : kCases) {
     Run(h, w, {c.name, 100, c.recompiled, c.native, c.stack, step});
@@ -1359,19 +1359,19 @@ void HubPages(Context& h, const World& w) {
     t.r4.u64 = w.at(kModeAt);
   };
   Run(h, w, {"Type2Hub::FillPlayerRecord (sub_8218DA48)", 100, __imp__sub_8218DA48,
-             hooks::HubFillPlayerRecord, {{-6176, -32}}, menu, RecordFloats});
+             ITC_CONTEXT_FN(hooks::HubFillPlayerRecord), {{-6176, -32}}, menu, RecordFloats});
   Run(h, w, {"Type2Hub::NoticePage (sub_8218E8F8; sub_8218DBD0, sub_8218DD78)", 300,
-             __imp__sub_8218E8F8, hooks::HubNoticePage, {{-112, -24}}, menu, nullptr, true});
+             __imp__sub_8218E8F8, ITC_CONTEXT_FN(hooks::HubNoticePage), {{-112, -24}}, menu, nullptr, true});
   // OnDialogDone: SetText's parameter area left out.
   Run(h, w, {"Type2Hub::OnDialogDone (sub_8218F800; sub_8218F530, sub_8218DD78)", 300,
-             __imp__sub_8218F800, hooks::HubOnDialogDone, {{-128, -80}, {-48, -32}},
+             __imp__sub_8218F800, ITC_CONTEXT_FN(hooks::HubOnDialogDone), {{-128, -80}, {-48, -32}},
              [menu](PPCContext& t, Random& r, const World& w) {
                menu(t, r, w);
                t.r3.u64 = r.Next();
              },
              nullptr, true});
   Run(h, w, {"Type2Hub::MenuPage (sub_8218FCC8; sub_8218DA48, sub_8218F530)", 300,
-             __imp__sub_8218FCC8, hooks::HubMenuPage, {{-2112, -2064}, {-2032, -40}}, menu,
+             __imp__sub_8218FCC8, ITC_CONTEXT_FN(hooks::HubMenuPage), {{-2112, -2064}, {-2032, -40}}, menu,
              RecordFloats});
 }
 
@@ -1386,18 +1386,18 @@ void Hub(Context& h, const World& w) {
     hub(t, r, w);
     t.r3.u64 = w.data();
   };
-  Run(h, w, {"Type2Hub::OnYes (sub_8218D6A8)", 20, __imp__sub_8218D6A8, hooks::HubOnYes, {}, hub});
-  Run(h, w, {"Type2Hub::OnNo (sub_8218D6C0)", 20, __imp__sub_8218D6C0, hooks::HubOnNo, {}, hub});
+  Run(h, w, {"Type2Hub::OnYes (sub_8218D6A8)", 20, __imp__sub_8218D6A8, ITC_CONTEXT_FN(hooks::HubOnYes), {}, hub});
+  Run(h, w, {"Type2Hub::OnNo (sub_8218D6C0)", 20, __imp__sub_8218D6C0, ITC_CONTEXT_FN(hooks::HubOnNo), {}, hub});
   Run(h, w, {"Type2Hub::ImagesLoadedA (sub_8218E2D8)", 100, __imp__sub_8218E2D8,
-             hooks::HubImagesLoadedA, {}, data});
+             ITC_CONTEXT_FN(hooks::HubImagesLoadedA), {}, data});
   Run(h, w, {"Type2Hub::ImagesLoadedB (sub_8218E320)", 100, __imp__sub_8218E320,
-             hooks::HubImagesLoadedB, {}, data});
+             ITC_CONTEXT_FN(hooks::HubImagesLoadedB), {}, data});
   Run(h, w, {"Type2Hub::WaitForLoad (sub_8218E420; sub_8218E2D8, sub_8218E320)", 300,
-             __imp__sub_8218E420, hooks::HubWaitForLoad, {{-112, -24}}, machine});
+             __imp__sub_8218E420, ITC_CONTEXT_FN(hooks::HubWaitForLoad), {{-112, -24}}, machine});
   if (hooks::NativeHeapActive()) {
     // FreeImage: the record's two blocks the layer's pages.
     Run(h, w, {"Type2Hub::FreeImage (sub_8218D650)", 40, __imp__sub_8218D650,
-               hooks::HubFreeImage, {{-96, -16}},
+               ITC_CONTEXT_FN(hooks::HubFreeImage), {{-96, -16}},
                [](PPCContext& t, Random& r, const World& w) {
                  const uint32_t record = w.at(kHubAt) + 0x340;
                  guest::StoreU32(w.base, record + 8, MakePages(w.base, 24, r));
@@ -1406,8 +1406,8 @@ void Hub(Context& h, const World& w) {
                }});
   }
   Run(h, w, {"Type2Hub::OpenSelected (sub_8218E5B0)", 100, __imp__sub_8218E5B0,
-             hooks::HubOpenSelected, {}, machine});
-  Run(h, w, {"Type2Hub::Reenter (sub_8218D9B8)", 100, __imp__sub_8218D9B8, hooks::HubReenter,
+             ITC_CONTEXT_FN(hooks::HubOpenSelected), {}, machine});
+  Run(h, w, {"Type2Hub::Reenter (sub_8218D9B8)", 100, __imp__sub_8218D9B8, ITC_CONTEXT_FN(hooks::HubReenter),
              {},
              [machine](PPCContext& t, Random& r, const World& w) {
                machine(t, r, w);
@@ -1416,15 +1416,15 @@ void Hub(Context& h, const World& w) {
                }
              }});
   Run(h, w, {"Type2Hub::Choose (sub_8218E768; sub_8218E7A4)", 100, __imp__sub_8218E768,
-             hooks::HubChoose, {},
+             ITC_CONTEXT_FN(hooks::HubChoose), {},
              [machine](PPCContext& t, Random& r, const World& w) {
                machine(t, r, w);
                t.r3.u64 = w.at(kModeAt);
                t.r4.u64 = w.at(kMachineAt);
              }});
-  Run(h, w, {"Type2Hub::Unload (sub_8218E530)", 60, __imp__sub_8218E530, hooks::HubUnload,
+  Run(h, w, {"Type2Hub::Unload (sub_8218E530)", 60, __imp__sub_8218E530, ITC_CONTEXT_FN(hooks::HubUnload),
              {{-128, -40}}, machine});
-  Run(h, w, {"Type2Hub::Close (sub_8218E688)", 60, __imp__sub_8218E688, hooks::HubClose,
+  Run(h, w, {"Type2Hub::Close (sub_8218E688)", 60, __imp__sub_8218E688, ITC_CONTEXT_FN(hooks::HubClose),
              {{-112, -24}}, machine});
   // SetPrompts: each pair's values -1 or small (stored into nodes' +108).
   auto prompts = [hub](PPCContext& t, Random& r, const World& w) {
@@ -1436,9 +1436,9 @@ void Hub(Context& h, const World& w) {
     }
   };
   Run(h, w, {"Type2Hub::SetPrompts (sub_8218F530)", 200, __imp__sub_8218F530,
-             hooks::HubSetPrompts, {{-192, -64}}, prompts});
+             ITC_CONTEXT_FN(hooks::HubSetPrompts), {{-192, -64}}, prompts});
   Run(h, w, {"Type2Hub::Back (sub_8218F698; sub_8218F530)", 100, __imp__sub_8218F698,
-             hooks::HubBack, {{-192, -64}},
+             ITC_CONTEXT_FN(hooks::HubBack), {{-192, -64}},
              [prompts](PPCContext& t, Random& r, const World& w) {
                prompts(t, r, w);
                if (r.Below(3) == 0) {
@@ -1452,15 +1452,15 @@ void Hub(Context& h, const World& w) {
     SmallNodes(r, w);
   };
   Run(h, w, {"Type2Hub::SetUpStatus (sub_8218E810)", 100, __imp__sub_8218E810,
-             hooks::HubSetUpStatus, {{-128, -72}, {-48, -40}}, status, nullptr, true});
+             ITC_CONTEXT_FN(hooks::HubSetUpStatus), {{-128, -72}, {-48, -40}}, status, nullptr, true});
   Run(h, w, {"Type2Hub::NextNotice (sub_8218DBD0)", 200, __imp__sub_8218DBD0,
-             hooks::HubNextNotice, {{-96, -16}}, hub, nullptr, true});
+             ITC_CONTEXT_FN(hooks::HubNextNotice), {{-96, -16}}, hub, nullptr, true});
   Run(h, w, {"Type2Hub::NextNotice2 (sub_8218DD78)", 200, __imp__sub_8218DD78,
-             hooks::HubNextNotice2, {{-96, -8}}, hub, nullptr, true});
+             ITC_CONTEXT_FN(hooks::HubNextNotice2), {{-96, -8}}, hub, nullptr, true});
   // Start: SetUpStatus's frame under its own (the same words), NextNotice's
   // and NextNotice2's back chains over it.
   Run(h, w, {"Type2Hub::Start (sub_8218F6E0; sub_8218E810, sub_8218DBD0, sub_8218DD78)", 200,
-             __imp__sub_8218F6E0, hooks::HubStart, {{-112, -24}, {-240, -184}, {-160, -152}},
+             __imp__sub_8218F6E0, ITC_CONTEXT_FN(hooks::HubStart), {{-112, -24}, {-240, -184}, {-160, -152}},
              [status](PPCContext& t, Random& r, const World& w) {
                status(t, r, w);
                if (r.Below(3) == 0) {
@@ -1469,14 +1469,14 @@ void Hub(Context& h, const World& w) {
              },
              nullptr, true});
   Run(h, w, {"Type2Hub::MarkNoticeImages (sub_8218DCC0)", 200, __imp__sub_8218DCC0,
-             hooks::HubMarkNoticeImages, {{-160, -56}}, hub});
+             ITC_CONTEXT_FN(hooks::HubMarkNoticeImages), {{-160, -56}}, hub});
   if (!hooks::NativeHeapActive()) {
     return;
   }
   // Create: the three blocks compared by content (the data's first 448
   // bytes), MarkNoticeImages' frame under its own.
   Run(h, w, {"Type2Hub::Create (sub_8218E078; sub_8218DCC0)", 100, __imp__sub_8218E078,
-             hooks::HubCreate, {{-128, -40}, {-288, -184}}, machine,
+             ITC_CONTEXT_FN(hooks::HubCreate), {{-128, -40}, {-288, -184}}, machine,
              [&h](PPCContext&, const World&, Outputs& out) {
                Allocated(h.base, out, t2::kHubPages, 28);
                Allocated(h.base, out, t2::kHubMenu, 68);
@@ -1497,14 +1497,14 @@ void Hub(Context& h, const World& w) {
     }
   };
   Run(h, w, {"Type2Hub::FreeImages (sub_8218DE88; sub_8218D650)", 100, __imp__sub_8218DE88,
-             hooks::HubFreeImages, {{-112, -32}, {-208, -128}},
+             ITC_CONTEXT_FN(hooks::HubFreeImages), {{-112, -32}, {-208, -128}},
              [hub, images](PPCContext& t, Random& r, const World& w) {
                hub(t, r, w);
                images(r, w.data(), w);
                t.r3.u64 = w.data();
              }});
   Run(h, w, {"Type2Hub::Destroy (sub_8218E1A8; sub_8218DE88)", 100, __imp__sub_8218E1A8,
-             hooks::HubDestroy, {{-128, -40}, {-240, -160}, {-336, -256}},
+             ITC_CONTEXT_FN(hooks::HubDestroy), {{-128, -40}, {-240, -160}, {-336, -256}},
              [machine, images](PPCContext& t, Random& r, const World& w) {
                machine(t, r, w);
                uint8_t* base = w.base;
@@ -1517,7 +1517,7 @@ void Hub(Context& h, const World& w) {
              }});
   // The notice images' loads: Archive::Load recorded (no load queued).
   Run(h, w, {"Type2Hub::LoadNoticeImage (sub_8218DF38)", 40, __imp__sub_8218DF38,
-             hooks::HubLoadNoticeImage, {{-144, -56}},
+             ITC_CONTEXT_FN(hooks::HubLoadNoticeImage), {{-144, -56}},
              [data](PPCContext& t, Random& r, const World& w) {
                data(t, r, w);
                for (const uint32_t list : {32u, 220u}) {
@@ -1526,16 +1526,16 @@ void Hub(Context& h, const World& w) {
                t.r4.u64 = r.Below(46);
              }});
   Run(h, w, {"Type2Hub::LoadNoticeImages (sub_8218E240; sub_8218DF38)", 40,
-             __imp__sub_8218E240, hooks::HubLoadNoticeImages, {{-112, -24}, {-256, -168}}, hub});
+             __imp__sub_8218E240, ITC_CONTEXT_FN(hooks::HubLoadNoticeImages), {{-112, -24}, {-256, -168}}, hub});
   // OpenMovie: the selected garage car copied into its frame (compared).
   Run(h, w, {"Type2Hub::OpenMovie (sub_8218E368; sub_8218E240)", 60, __imp__sub_8218E368,
-             hooks::HubOpenMovie, {{-2064, -8}, {-2176, -2088}, {-2320, -2232}}, hub});
+             ITC_CONTEXT_FN(hooks::HubOpenMovie), {{-2064, -8}, {-2176, -2088}, {-2320, -2232}}, hub});
   // ImageLoaded: an XPR2 file of 1 to 4 records in the layer's pages (the
   // callback frees it), as the location screen's harness makes them; the
   // XPR's and the texture record's words compared (the texture and the
   // XPR's +16 as offsets in its header block), then the blocks freed.
   Run(h, w, {"Type2Hub::ImageLoaded (sub_8218D8E8)", 60, __imp__sub_8218D8E8,
-             hooks::HubImageLoaded, {{-144, -24}},
+             ITC_CONTEXT_FN(hooks::HubImageLoaded), {{-144, -24}},
              [hub](PPCContext& t, Random& r, const World& w) {
                hub(t, r, w);
                uint8_t* base = w.base;
@@ -1607,7 +1607,7 @@ void BuildEntry(Context& h, const World& w) {
   // RemoveAt: a list in the screen data (+76) with links and slots below
   // 400, its count small, the position 0 to 5.
   Run(h, w, {"BuildList::RemoveAt (sub_8219C160)", 200, __imp__sub_8219C160,
-             hooks::BuildListRemoveAt, {},
+             ITC_CONTEXT_FN(hooks::BuildListRemoveAt), {},
              [](PPCContext& t, Random& r, const World& w) {
                const uint32_t list = w.screen + 76;
                for (uint32_t k = 0; k < 400; k++) {
@@ -1651,11 +1651,11 @@ void BuildEntry(Context& h, const World& w) {
   };
   // SetUpStatus: SetText's parameter area past its r7 left out.
   Run(h, w, {"BuildScreen::SetUpStatus (sub_8219C438)", 60, __imp__sub_8219C438,
-             hooks::BuildSetUpStatus, {{-112, -56}, {-32, -24}}, screen, nullptr, true});
+             ITC_CONTEXT_FN(hooks::BuildSetUpStatus), {{-112, -56}, {-32, -24}}, screen, nullptr, true});
   Run(h, w, {"BuildScreen::Fill (sub_821A0228; sub_8219C160)", 10, __imp__sub_821A0228,
-             hooks::BuildFill, {{-240, -88}}, screen, nullptr, true});
+             ITC_CONTEXT_FN(hooks::BuildFill), {{-240, -88}}, screen, nullptr, true});
   Run(h, w, {"BuildScreen::Enter (sub_821A0860; sub_821A0228, sub_8219C438)", 10,
-             __imp__sub_821A0860, hooks::BuildEnter, {{-96, -8}},
+             __imp__sub_821A0860, ITC_CONTEXT_FN(hooks::BuildEnter), {{-96, -8}},
              [screen](PPCContext& t, Random& r, const World& w) {
                screen(t, r, w);
                if (r.Below(3) == 0) {
@@ -1754,7 +1754,7 @@ void HubUpdateCases(Context& h, const World& w) {
   // Update without the car: the transitions, the busy marker, the drawless
   // stand and the model not remade; its frame without the saves (r24 on).
   Run(h, w, {"Type2Hub::Update (sub_821907F8), the stand drawless", 200, __imp__sub_821907F8,
-             hooks::HubUpdate, {{-2208, -72}},
+             ITC_CONTEXT_FN(hooks::HubUpdate), {{-2208, -72}},
              [](PPCContext& t, Random& r, const World& w) {
                UpdateWorld(r, w, true);
                DrawlessStand(r, w);
@@ -1803,7 +1803,7 @@ void HubUpdateCases(Context& h, const World& w) {
   int reached = 0, runs = 0;
   auto settle = [&stand](PPCContext&, const World&, Outputs& out) { stand.Settle(out, 0, false); };
   Run(h, w, {"Type2Hub::PutCarOnStand (sub_8218DB60)", 30, __imp__sub_8218DB60,
-             hooks::HubPutCarOnStand, {{-3920, -16}},
+             ITC_CONTEXT_FN(hooks::HubPutCarOnStand), {{-3920, -16}},
              [lay](PPCContext& t, Random& r, const World& w) {
                const uint32_t car = w.items + 0x3000;
                lay(t, r, w, car);
@@ -1811,7 +1811,7 @@ void HubUpdateCases(Context& h, const World& w) {
              },
              settle});
   Run(h, w, {"Type2Hub::Update (sub_821907F8; sub_8218DB60), with the stand's car", 30,
-             __imp__sub_821907F8, hooks::HubUpdate, {{-2208, -72}},
+             __imp__sub_821907F8, ITC_CONTEXT_FN(hooks::HubUpdate), {{-2208, -72}},
              [lay](PPCContext& t, Random& r, const World& w) {
                UpdateWorld(r, w, false);
                const uint32_t car = w.items + 0x3000;

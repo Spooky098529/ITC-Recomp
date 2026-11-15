@@ -415,7 +415,7 @@ void Init(Context& h) {
       }
       PPCContext t = CallContext(h);
       ITC_FLAG(native_data_tables) = v == 1;
-      (v == 0 ? __imp__sub_82116DB0 : NativeInit)(t, h.base);
+      (v == 0 ? __imp__sub_82116DB0 : ITC_CONTEXT_FN(NativeInit))(t, h.base);
       ITC_FLAG(native_data_tables) = true;
       guest::StoreU32(h.base, archive::kBuildToc, toc_global);
       const uint32_t object = guest::LoadU32(h.base, dt::kTables);

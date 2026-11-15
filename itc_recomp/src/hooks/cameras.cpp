@@ -11,6 +11,7 @@
 // left the same.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -67,7 +68,7 @@ ITC_FLAG_DECLARE(bool, native_graphics_resources);
   }
 
 // Camera::SetFieldOfView: r3 = the camera, f1 = degrees.
-extern "C" REX_FUNC(sub_82593278) {
+ITC_NATIVE_ENTRY_ALWAYS(82593278) {
   ITC_CAMERAS_FALLBACK(82593278)
   ctx.fpscr.disableFlushMode();
   cameras::SetFieldOfView(base, ctx.r3.u32, ctx.f1.f64);
@@ -75,10 +76,10 @@ extern "C" REX_FUNC(sub_82593278) {
 
 // Camera::SetViewportSize: r3 = the camera, r4 = width, r5 = height (their
 // low words).
-extern "C" REX_FUNC(sub_82593500) {
+ITC_NATIVE_ENTRY_ALWAYS(82593500) {
   ITC_CAMERAS_FALLBACK(82593500)
   if ((ctx.r1.u32 & 0xF) != 0) {
-    __imp__sub_82593500(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82593500);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -89,24 +90,24 @@ extern "C" REX_FUNC(sub_82593500) {
 // original's (320 bytes), 16-byte aligned (the original otherwise); r3 left
 // as the original's last call leaves it (Matrix::Multiply's out, +144) and
 // flush-to-zero off.
-extern "C" REX_FUNC(sub_82593568) {
+ITC_NATIVE_ENTRY_ALWAYS(82593568) {
   ITC_CAMERAS_FALLBACK(82593568)
   if (!hooks::CameraUpdate(ctx, base)) {
-    __imp__sub_82593568(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82593568);
   }
 }
 
 // Camera::Camera: r3 = the camera; r3 = it. Its frame 128 bytes, Update's
 // below it.
-extern "C" REX_FUNC(sub_82593908) {
+ITC_NATIVE_ENTRY_ALWAYS(82593908) {
   ITC_CAMERAS_FALLBACK(82593908)
   if (!hooks::CameraConstruct(ctx, base)) {
-    __imp__sub_82593908(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82593908);
   }
 }
 
 // CameraPasses::Mode: r3 = which (1); r3 = the mode (lwz) or -1.
-extern "C" REX_FUNC(sub_8209F718) {
+ITC_NATIVE_ENTRY_ALWAYS(8209F718) {
   ITC_CAMERAS_FALLBACK(8209F718)
   const int32_t which = ctx.r3.s32;
   const uint32_t mode = cameras::Mode(base, which);
@@ -121,13 +122,13 @@ extern "C" REX_FUNC(sub_8209F718) {
 // four vectors, LookAt's r4 the eye and r5 the target); r3 = entry 16, as
 // Viewport::UpdateEntries leaves it (no adapter of its own: only their plain
 // C++ calls it). Flush-to-zero left off.
-extern "C" REX_FUNC(sub_820AAE40) {
+ITC_NATIVE_ENTRY_ALWAYS(820AAE40) {
   ITC_CAMERAS_FALLBACK(820AAE40)
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = cameras::ViewportUpdate(base, ctx.r3.u32);
 }
 
-extern "C" REX_FUNC(sub_820AAE48) {
+ITC_NATIVE_ENTRY_ALWAYS(820AAE48) {
   ITC_CAMERAS_FALLBACK(820AAE48)
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = cameras::ViewportSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -139,13 +140,13 @@ extern "C" REX_FUNC(sub_820AAE48) {
 // calls cameras::ViewportLookAt.
 
 // CameraPass::Enable: r3 = the pass.
-extern "C" REX_FUNC(sub_820A0968) {
+ITC_NATIVE_ENTRY_ALWAYS(820A0968) {
   ITC_CAMERAS_FALLBACK(820A0968)
   cameras::Enable(base, ctx.r3.u32);
 }
 
 // CameraPasses::SetNear: f1 = the distance.
-extern "C" REX_FUNC(sub_820AA368) {
+ITC_NATIVE_ENTRY_ALWAYS(820AA368) {
   ITC_CAMERAS_FALLBACK(820AA368)
   ctx.fpscr.disableFlushMode();
   cameras::SetNear(base, ctx.f1.f64);
@@ -155,7 +156,7 @@ extern "C" REX_FUNC(sub_820AA368) {
 // a guest call from a frame like the original's (112 bytes), with its return
 // addresses; r3 as the original leaves it (the pass for types without
 // surfaces, else Release's answer for +580, or 0 when +580 was empty).
-extern "C" REX_FUNC(sub_820A0C40) {
+ITC_NATIVE_ENTRY_ALWAYS(820A0C40) {
   ITC_CAMERAS_FALLBACK(820A0C40)
   const uint32_t pass = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
@@ -182,7 +183,7 @@ namespace {
 // The video output, as the device's users reach it: `[0x8266D088]`'s vtable
 // slot 7, then that object's slot 3, as guest calls with the original's
 // return addresses. r3 = the video output after.
-uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
+uint32_t VideoOutputCall(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
   ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
   const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
   ctx.lr = first;
@@ -207,7 +208,7 @@ bool DeviceUsersNative() {
 
 namespace hooks {
 
-bool CameraPassesMakeRenderTarget(PPCContext& ctx, uint8_t* base) {
+bool CameraPassesMakeRenderTarget(lifted::Regs& ctx, uint8_t* base) {
   if (!DeviceUsersNative()) {
     return false;
   }
@@ -238,7 +239,7 @@ bool CameraPassesMakeRenderTarget(PPCContext& ctx, uint8_t* base) {
   return true;
 }
 
-bool CameraPassSetUpSurfaces(PPCContext& ctx, uint8_t* base) {
+bool CameraPassSetUpSurfaces(lifted::Regs& ctx, uint8_t* base) {
   if (!DeviceUsersNative()) {
     return false;
   }
@@ -300,7 +301,7 @@ bool CameraPassSetUpSurfaces(PPCContext& ctx, uint8_t* base) {
 
 thread_local std::vector<std::array<uint32_t, 3>>* camera_pass_init_calls = nullptr;
 
-void CameraPassesInit(PPCContext& ctx, uint8_t* base, bool all) {
+void CameraPassesInit(lifted::Regs& ctx, uint8_t* base, bool all) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   bool original_set_mode = false;
@@ -336,7 +337,7 @@ void CameraPassesInit(PPCContext& ctx, uint8_t* base, bool all) {
   }
 }
 
-bool CameraPassInit(PPCContext& ctx, uint8_t* base) {
+bool CameraPassInit(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t pass = ctx.r3.u32;
   const uint32_t type = ctx.r4.u32;
   const uint64_t lr = ctx.lr;
@@ -369,7 +370,7 @@ bool CameraPassInit(PPCContext& ctx, uint8_t* base) {
   return true;
 }
 
-std::optional<uint32_t> ViewportsInit(PPCContext& ctx, uint8_t* base) {
+std::optional<uint32_t> ViewportsInit(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - cameras::kViewportsInitFrame;
@@ -393,24 +394,24 @@ std::optional<uint32_t> ViewportsInit(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 // CameraPasses::MakeRenderTarget: r3 = the id (hooks::CameraPassesMakeRenderTarget).
-extern "C" REX_FUNC(sub_8209FBF0) {
+ITC_NATIVE_ENTRY_ALWAYS(8209FBF0) {
   ITC_CAMERAS_FALLBACK(8209FBF0)
   if (!hooks::CameraPassesMakeRenderTarget(ctx, base)) {
-    __imp__sub_8209FBF0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209FBF0);
   }
 }
 
 // CameraPass::SetUpSurfaces: r3 = the pass (hooks::CameraPassSetUpSurfaces).
-extern "C" REX_FUNC(sub_820A2F40) {
+ITC_NATIVE_ENTRY_ALWAYS(820A2F40) {
   ITC_CAMERAS_FALLBACK(820A2F40)
   if (!hooks::CameraPassSetUpSurfaces(ctx, base)) {
-    __imp__sub_820A2F40(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A2F40);
   }
 }
 
 // CameraPasses::Init: no arguments (hooks::CameraPassesInit). InitPasses
 // (sub_8209F960) has no adapter: only Init's plain C++ calls it.
-extern "C" REX_FUNC(sub_8209F9B8) {
+ITC_NATIVE_ENTRY_ALWAYS(8209F9B8) {
   ITC_CAMERAS_FALLBACK(8209F9B8)
   if (hooks::StartUpRecorded(ctx, 0x8209F9B8)) {
     return;
@@ -421,15 +422,15 @@ extern "C" REX_FUNC(sub_8209F9B8) {
 // CameraPass::Init: r3 = the pass, r4 = the type (hooks::CameraPassInit).
 // While the cameras harness records (hooks::camera_pass_init_calls), only
 // the arguments are kept.
-extern "C" REX_FUNC(sub_820A3DB0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820A3DB0) {
+  
   if (hooks::camera_pass_init_calls != nullptr) {
     hooks::camera_pass_init_calls->push_back({ctx.r3.u32, ctx.r4.u32, ctx.r5.u32});
     ctx.r3.u64 = 0;
     return;
   }
   if (!ITC_FLAG(native_cameras)) {
-    __imp__sub_820A3DB0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A3DB0);
     return;
   }
   hooks::CameraPassInit(ctx, base);
@@ -438,10 +439,10 @@ extern "C" REX_FUNC(sub_820A3DB0) {
 // Viewports::Release: no arguments; r3 = VirtualFree's answer for the block
 // (1). The original unless --native_heap routes VirtualFree to the
 // allocation layer, or where a block isn't the layer's.
-extern "C" REX_FUNC(sub_820AA430) {
+ITC_NATIVE_ENTRY_ALWAYS(820AA430) {
   ITC_CAMERAS_FALLBACK(820AA430)
   if (!hooks::NativeHeapActive() || !cameras::ReleaseViewports(base)) {
-    __imp__sub_820AA430(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AA430);
     return;
   }
   ctx.r3.u64 = 1;
@@ -450,7 +451,7 @@ extern "C" REX_FUNC(sub_820AA430) {
 // Viewports::Init: no arguments; r3 = the second viewport, as the
 // original's last Viewport::Init leaves it. Only while --native_heap routes
 // VirtualAlloc to the allocation layer, with native atexit.
-extern "C" REX_FUNC(sub_820AB358) {
+ITC_NATIVE_ENTRY_ALWAYS(820AB358) {
   ITC_CAMERAS_FALLBACK(820AB358)
   if (hooks::NativeHeapActive() && hooks::NativeAtexit()) {
     if (const auto viewport = hooks::ViewportsInit(ctx, base)) {
@@ -458,18 +459,18 @@ extern "C" REX_FUNC(sub_820AB358) {
       return;
     }
   }
-  __imp__sub_820AB358(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820AB358);
 }
 
 // Viewport::SetZoom: r3 = the viewport, f1 = the zoom.
-extern "C" REX_FUNC(sub_820AAE90) {
+ITC_NATIVE_ENTRY_ALWAYS(820AAE90) {
   ITC_CAMERAS_FALLBACK(820AAE90)
   ctx.fpscr.disableFlushMode();
   cameras::ViewportSetZoom(base, ctx.r3.u32, ctx.f1.f64);
 }
 
 // Viewport::SetRoll: r3 = the viewport, f1 = the angle.
-extern "C" REX_FUNC(sub_820AA2D0) {
+ITC_NATIVE_ENTRY_ALWAYS(820AA2D0) {
   ITC_CAMERAS_FALLBACK(820AA2D0)
   ctx.fpscr.disableFlushMode();
   cameras::ViewportSetRoll(base, ctx.r3.u32, ctx.f1.f64);
@@ -490,7 +491,7 @@ constexpr uint32_t kScene = 0x826BABA0;
 // A call through slot `slot` of r3's vtable, returning to `return_address`.
 // The render manager's slots 8 and 7 by their plain C++ where they're the
 // game's (hooks::DirectSlotCall).
-void VtableCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_address) {
+void VtableCall(lifted::Regs& ctx, uint8_t* base, uint32_t slot, uint32_t return_address) {
   ctx.lr = return_address;
   const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot);
   if (hooks::DirectSlotCall(ctx, base, function)) {
@@ -509,7 +510,7 @@ void VtableCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_a
 // command list's diagnostics on, or a chunk its command list calls would
 // print about: then the scene's getters have been called once more than the
 // original would, never seen in play).
-bool RecordAndSubmit(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes,
+bool RecordAndSubmit(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes,
                      const uint32_t (&returns)[5], uint32_t key,
                      const std::function<std::optional<uint32_t>(uint32_t list)>& record) {
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
@@ -540,7 +541,7 @@ bool RecordAndSubmit(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes,
 }
 
 // CameraPass::RecordViewport's: its frame is 144 bytes.
-bool RecordViewportCalls(PPCContext& ctx, uint8_t* base, uint32_t pass, uint32_t key) {
+bool RecordViewportCalls(lifted::Regs& ctx, uint8_t* base, uint32_t pass, uint32_t key) {
   static constexpr uint32_t kReturns[5] = {0x820A09A8, 0x820A09B8, 0x820A0A88, 0x820A0A98,
                                            0x820A0AB4};
   return RecordAndSubmit(ctx, base, 144, kReturns, key, [&](uint32_t list) {
@@ -560,7 +561,7 @@ struct Route {
 // Hands `subs` to the render queue as the original does: for each, the
 // scene's getters (slot 8, then slot 2) and the queue's slot 4 (r4 = the
 // chunk, r5 = the key, f1 = 0.0).
-void Submit(PPCContext& ctx, uint8_t* base, const cameras::Submissions& subs, const Route& route) {
+void Submit(lifted::Regs& ctx, uint8_t* base, const cameras::Submissions& subs, const Route& route) {
   for (uint32_t i = 0; i < subs.count; i++) {
     ctx.r3.u64 = guest::LoadU32(base, kScene);
     VtableCall(ctx, base, 8, route.get[i][0]);
@@ -579,7 +580,7 @@ void Submit(PPCContext& ctx, uint8_t* base, const cameras::Submissions& subs, co
 // False where the original must run (the command list's diagnostics on, or
 // a chunk its command list calls would print about: then the scene's getters
 // have been called once more than the original would, never seen in play).
-bool RecordPass(PPCContext& ctx, uint8_t* base, const uint32_t (&list_returns)[2],
+bool RecordPass(lifted::Regs& ctx, uint8_t* base, const uint32_t (&list_returns)[2],
                 const Route& route,
                 const std::function<std::optional<cameras::Submissions>(uint32_t list)>& record) {
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
@@ -655,36 +656,36 @@ Route EndRoute(uint32_t type) {
 // (CameraPasses::RecordBegins and RecordEnds) are native and call the work
 // directly; these stay for them with the flag off (their work makes guest
 // calls).
-extern "C" REX_FUNC(sub_820A0CC0) {
+ITC_NATIVE_ENTRY_ALWAYS(820A0CC0) {
   ITC_CAMERAS_FALLBACK(820A0CC0)
   if (!hooks::CameraPassRecordBegin(ctx, base)) {
-    __imp__sub_820A0CC0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A0CC0);
   }
 }
 
-extern "C" REX_FUNC(sub_820A1C30) {
+ITC_NATIVE_ENTRY_ALWAYS(820A1C30) {
   ITC_CAMERAS_FALLBACK(820A1C30)
   if (!hooks::CameraPassRecordEnd(ctx, base)) {
-    __imp__sub_820A1C30(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A1C30);
   }
 }
 
 // CameraPass::RecordViewport: r3 = the pass, r4 = the sort key.
-extern "C" REX_FUNC(sub_820A0978) {
+ITC_NATIVE_ENTRY_ALWAYS(820A0978) {
   ITC_CAMERAS_FALLBACK(820A0978)
   hooks::CameraPassRecordViewport(ctx, base);
 }
 
 // RecordClear: r4 = the key, r5 = the flags, r6 = the color, r7 = the depth
 // (its low word). The guest calls as RecordViewport's, from a 160-byte frame.
-extern "C" REX_FUNC(sub_8209FA38) {
+ITC_NATIVE_ENTRY_ALWAYS(8209FA38) {
   ITC_CAMERAS_FALLBACK(8209FA38)
   hooks::RecordClear(ctx, base);
 }
 
 namespace hooks {
 
-bool CameraUpdate(PPCContext& ctx, uint8_t* base) {
+bool CameraUpdate(lifted::Regs& ctx, uint8_t* base) {
   if ((ctx.r1.u32 & 0xF) != 0) {
     return false;
   }
@@ -700,7 +701,7 @@ bool CameraUpdate(PPCContext& ctx, uint8_t* base) {
   return true;
 }
 
-bool CameraConstruct(PPCContext& ctx, uint8_t* base) {
+bool CameraConstruct(lifted::Regs& ctx, uint8_t* base) {
   if ((ctx.r1.u32 & 0xF) != 0) {
     return false;
   }
@@ -716,7 +717,7 @@ bool CameraConstruct(PPCContext& ctx, uint8_t* base) {
   return true;
 }
 
-void RecordClear(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RecordClear) {
   static constexpr uint32_t kReturns[5] = {0x8209FA6C, 0x8209FA7C, 0x8209FB44, 0x8209FB54,
                                            0x8209FB74};
   const PPCContext in = ctx;
@@ -728,11 +729,11 @@ void RecordClear(PPCContext& ctx, uint8_t* base) {
     ctx.r5 = in.r5;
     ctx.r6 = in.r6;
     ctx.r7 = in.r7;
-    __imp__sub_8209FA38(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209FA38);
   }
 }
 
-bool CameraPassRecordBegin(PPCContext& ctx, uint8_t* base) {
+bool CameraPassRecordBegin(lifted::Regs& ctx, uint8_t* base) {
   static constexpr uint32_t kList[2] = {0x820A0CEC, 0x820A0CFC};
   const uint32_t pass = ctx.r3.u32;
   const Route route = BeginRoute(guest::LoadU32(base, pass + 584));
@@ -744,7 +745,7 @@ bool CameraPassRecordBegin(PPCContext& ctx, uint8_t* base) {
   return true;
 }
 
-bool CameraPassRecordEnd(PPCContext& ctx, uint8_t* base) {
+bool CameraPassRecordEnd(lifted::Regs& ctx, uint8_t* base) {
   static constexpr uint32_t kList[2] = {0x820A1C5C, 0x820A1C6C};
   const uint32_t pass = ctx.r3.u32;
   const Route route = EndRoute(guest::LoadU32(base, pass + 584));
@@ -763,7 +764,7 @@ bool CameraPassRecordEnd(PPCContext& ctx, uint8_t* base) {
   return true;
 }
 
-void CameraPassesRecordBegins(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraPassesRecordBegins) {
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, 112, 0x8209F8D4, [&](uint32_t) {
     cameras::RecordBegins(base, [&](uint32_t pass) {
@@ -772,14 +773,14 @@ void CameraPassesRecordBegins(PPCContext& ctx, uint8_t* base) {
       if (!ITC_FLAG(native_cameras) || !CameraPassRecordBegin(ctx, base)) {
         ctx.r3.u64 = pass;
         ctx.lr = 0x8209F8D4;
-        __imp__sub_820A0CC0(ctx, base);
+        lifted::Sdk(ctx, base, __imp__sub_820A0CC0);
       }
     });
   });
   ctx.lr = lr;
 }
 
-void CameraPassesRecordEnds(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraPassesRecordEnds) {
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, 112, 0x8209F934, [&](uint32_t) {
     cameras::RecordEnds(base, [&](uint32_t pass) {
@@ -788,24 +789,24 @@ void CameraPassesRecordEnds(PPCContext& ctx, uint8_t* base) {
       if (!ITC_FLAG(native_cameras) || !CameraPassRecordEnd(ctx, base)) {
         ctx.r3.u64 = pass;
         ctx.lr = 0x8209F934;
-        __imp__sub_820A1C30(ctx, base);
+        lifted::Sdk(ctx, base, __imp__sub_820A1C30);
       }
     });
   });
   ctx.lr = lr;
 }
 
-void CameraPassRecordViewport(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CameraPassRecordViewport) {
   const uint32_t pass = ctx.r3.u32;
   const uint64_t key = ctx.r4.u64;
   if (!RecordViewportCalls(ctx, base, pass, uint32_t(key))) {
     ctx.r3.u64 = pass;
     ctx.r4.u64 = key;
-    __imp__sub_820A0978(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A0978);
   }
 }
 
-bool CameraPassUpdate(PPCContext& ctx, uint8_t* base) {
+bool CameraPassUpdate(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_cameras) || (ctx.r1.u32 & 0xF) != 0) {
     return false;
   }
@@ -819,7 +820,7 @@ bool CameraPassUpdate(PPCContext& ctx, uint8_t* base) {
         ctx.r3.u64 = pass;
         ctx.r4.u64 = key;
         ctx.lr = 0x820A39C0;
-        __imp__sub_820A0978(ctx, base);
+        lifted::Sdk(ctx, base, __imp__sub_820A0978);
       }
     });
   });
@@ -842,7 +843,7 @@ bool CameraPassUpdate(PPCContext& ctx, uint8_t* base) {
 // The fields natively, then CameraPass::Update called as the original's tail
 // (its wrapper, src/frame_pacing/per_frame_logic.cpp, keeps its diagnostics
 // and runs it natively) from a frame like the original's (112 bytes).
-extern "C" REX_FUNC(sub_820AA4A8) {
+ITC_NATIVE_ENTRY_ALWAYS(820AA4A8) {
   ITC_CAMERAS_FALLBACK(820AA4A8)
   const uint32_t pass = ctx.r3.u32;
   ctx.fpscr.disableFlushMode();

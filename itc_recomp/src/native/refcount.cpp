@@ -28,6 +28,7 @@
 // refcount::AddRef, lock-free, either way).
 
 #include "native/refcount.h"
+#include "hooks/native_entry.h"
 
 #include "guest.h"
 
@@ -106,19 +107,19 @@ void NoteSetVertexShader(bool same) {
 
 }  // namespace refcount
 
-extern "C" REX_FUNC(sub_822A6738) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A6738) {
+  
   if (ITC_FLAG(refcount_global_lock)) {
-    __imp__sub_822A6738(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822A6738);
     return;
   }
   ctx.r3.u64 = refcount::AddRef(base, ctx.r3.u32);
 }
 
-extern "C" REX_FUNC(sub_822A67B0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A67B0) {
+  
   if (ITC_FLAG(refcount_global_lock)) {
-    __imp__sub_822A67B0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822A67B0);
     return;
   }
   uint32_t object = ctx.r3.u32;

@@ -2,6 +2,7 @@
 // src/ui_movies/ (docs/functions/ui-movies.md).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include <bit>
@@ -60,12 +61,7 @@ bool SlotDiagnostics() {
 // An accessor: r3 = the object, r4 = i; returns the address (or the pointer)
 // `native` gives.
 #define UI_MOVIE_ACCESSOR(address, expression)    \
-  extern "C" REX_FUNC(sub_##address) {            \
-    REX_FUNC_PROLOGUE();                          \
-    if (!ITC_FLAG(native_ui_movies)) {            \
-      __imp__sub_##address(ctx, base);            \
-      return;                                     \
-    }                                             \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_ui_movies)) { \
     const uint32_t object = ctx.r3.u32;           \
     const uint32_t i = ctx.r4.u32;                \
     (void)base;                                   \
@@ -81,62 +77,37 @@ UI_MOVIE_ACCESSOR(8259D670, ui_movies::SceneAnimation(base, object, i))
 
 // UiMovie::DrawPicture and DrawPrimitive: r3 = the draw context, r5 = the
 // node, r6 = the layer (src/hooks/ui_movies.h).
-extern "C" REX_FUNC(sub_8259ED40) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8259ED40) {
+  
   ui_movies_hooks::DrawPicture(ctx, base);
 }
-extern "C" REX_FUNC(sub_8259F348) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8259F348) {
+  
   ui_movies_hooks::DrawPrimitive(ctx, base);
 }
 
 // sub_8259D5C8: r3 = a chunk, r4 = a tag; the next chunk with that tag.
-extern "C" REX_FUNC(sub_8259D5C8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259D5C8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8259D5C8, ITC_FLAG(native_ui_movies)) {
   ctx.r3.u64 = ui_movies::FindChunk(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // sub_825A0EB0: r3 = a movie file; its scene, or 0.
-extern "C" REX_FUNC(sub_825A0EB0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A0EB0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A0EB0, ITC_FLAG(native_ui_movies)) {
   ctx.r3.u64 = ui_movies::FileScene(base, ctx.r3.u32);
 }
 
 // sub_825A0CD0: r3 = an XMD file, r4 = i; its entry i, or 0.
-extern "C" REX_FUNC(sub_825A0CD0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A0CD0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A0CD0, ITC_FLAG(native_ui_movies)) {
   ctx.r3.u64 = ui_movies::XmdEntry(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // UiMovie::SetRenderer: r3 = the renderer, r4 = the command list.
-extern "C" REX_FUNC(sub_8259D798) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259D798(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8259D798, ITC_FLAG(native_ui_movies)) {
   ui_movies::SetRenderer(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // sub_8259D930: r3 = a draw context, reset; returns it.
-extern "C" REX_FUNC(sub_8259D930) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259D930(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8259D930, ITC_FLAG(native_ui_movies)) {
   ui_movies::ResetDrawContext(base, ctx.r3.u32);
 }
 
@@ -148,7 +119,7 @@ namespace {
 // Hands a recorded chunk to the renderer (vtable slot 4: r3 = the renderer,
 // r4 = the chunk, r5 = the key, f1 = the float at `depth`), from a frame like
 // the original's, with its return address.
-void Submit(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, uint32_t return_address,
+void Submit(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, uint32_t return_address,
             uint32_t chunk, uint32_t key, uint32_t depth) {
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, frame_bytes, return_address, [&](uint32_t) {
@@ -168,7 +139,7 @@ constexpr uint32_t kClipResetDepth = 0x82001C00;
 constexpr uint32_t kStateResetDepth = 0x82001BFC;
 
 // A quad recorder: r3 = the quad, r4 = the key (f1 isn't read).
-bool RecordQuad(PPCContext& ctx, uint8_t* base, bool textured, uint32_t return_address) {
+bool RecordQuad(lifted::Regs& ctx, uint8_t* base, bool textured, uint32_t return_address) {
   if (!ITC_FLAG(native_ui_movies) || SlotDiagnostics()) {
     return false;
   }
@@ -184,30 +155,30 @@ bool RecordQuad(PPCContext& ctx, uint8_t* base, bool textured, uint32_t return_a
 }  // namespace
 
 // sub_8259DAD0: a textured quad or primitive recorded and handed on.
-extern "C" REX_FUNC(sub_8259DAD0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8259DAD0) {
+  
   if (!RecordQuad(ctx, base, true, 0x8259E090)) {
-    __imp__sub_8259DAD0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8259DAD0);
   }
 }
 
 // sub_8259E098: the same, untextured.
-extern "C" REX_FUNC(sub_8259E098) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8259E098) {
+  
   if (!RecordQuad(ctx, base, false, 0x8259E618)) {
-    __imp__sub_8259E098(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8259E098);
   }
 }
 
 // sub_8259D7B0: r3 = a key (f1 isn't read): the clip reset to the whole
 // screen and the state reset, each recorded and handed on.
-extern "C" REX_FUNC(sub_8259D7B0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8259D7B0) {
+  
   const uint32_t list = guest::LoadU32(base, ui_movies::kCommandList);
   if (!ITC_FLAG(native_ui_movies) || SlotDiagnostics() ||
       !ui_movies::ChunksFit(base, list,
                             {ui_movies::kResetChunkSlots, ui_movies::kResetChunkSlots})) {
-    __imp__sub_8259D7B0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8259D7B0);
     return;
   }
   const uint32_t key = ctx.r3.u32;
@@ -227,22 +198,12 @@ extern "C" REX_FUNC(sub_8259D7B0) {
 // The file fix-ups: r3 = the file; each returns its result in r3. Their
 // helpers (sub_825A0C60, sub_825A0E40, sub_825A0ED8, sub_8259D688 and
 // sub_825A6570) have no adapters: only these reach them, natively.
-extern "C" REX_FUNC(sub_825A0CF8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A0CF8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A0CF8, ITC_FLAG(native_ui_movies)) {
   ctx.r3.u64 = ui_movies::CheckXmd(base, ctx.r3.u32);
 }
 
 // UiMovie::FixUpFile.
-extern "C" REX_FUNC(sub_825A0EF0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A0EF0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(825A0EF0, ITC_FLAG(native_ui_movies)) {
   ctx.r3.u64 = ui_movies::FixUpFile(base, ctx.r3.u32);
 }
 
@@ -251,14 +212,14 @@ extern "C" REX_FUNC(sub_825A0EF0) {
 // textured by its +84, then, when clipped (+100), the resets with key r4 + 1.
 // The recorders (ours, above) are called from a frame like the original's
 // (112 bytes) with its return addresses.
-extern "C" REX_FUNC(sub_8259EBE8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8259EBE8) {
+  
   if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
       ui_movies_hooks::g_update_callee_stand_in(0x8259EBE8, ctx, base)) {
     return;
   }
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259EBE8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8259EBE8);
     return;
   }
   const uint32_t quad = ctx.r3.u32, key = ctx.r4.u32;
@@ -292,7 +253,7 @@ namespace {
 // The quad built natively, then handed to sub_8259EBE8 from a frame of
 // `frame_bytes` (the original's) returning to `return_address`.
 template <typename Build>
-void BuildAndRecord(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes,
+void BuildAndRecord(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes,
                     uint32_t return_address, Build build) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
@@ -308,36 +269,36 @@ void BuildAndRecord(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes,
 }
 }  // namespace
 
-void DrawPicture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DrawPicture) {
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259ED40(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8259ED40);
     return;
   }
   // Without a texture the original faults (its size read at guest address
   // 4; never so in play): it's left to run.
   if (ui_movies::PictureTextureOf(base, ctx.r3.u32, ctx.r5.u32) == 0) {
-    __imp__sub_8259ED40(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8259ED40);
     return;
   }
   RecordPicture(ctx, base);
 }
 
-void RecordPicture(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RecordPicture) {
   const uint32_t context = ctx.r3.u32, picture = ctx.r5.u32, layer = ctx.r6.u32;
   BuildAndRecord(ctx, base, 1088, 0x8259F338, [&](uint32_t frame) {
     return ui_movies::BuildPicture(base, context, picture, layer, frame);
   });
 }
 
-void DrawPrimitive(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(DrawPrimitive) {
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259F348(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8259F348);
     return;
   }
   RecordPrimitive(ctx, base);
 }
 
-void RecordPrimitive(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RecordPrimitive) {
   const uint32_t context = ctx.r3.u32, primitive = ctx.r5.u32, layer = ctx.r6.u32;
   BuildAndRecord(ctx, base, 1152, 0x8259F6EC, [&](uint32_t frame) {
     return ui_movies::BuildPrimitive(base, context, primitive, layer, frame);
@@ -354,7 +315,7 @@ struct Walk {
 uint32_t CallFromWalk(void* user, ui_movies::DrawCall kind, uint32_t context, uint32_t scene,
                       uint32_t node, uint64_t layer, uint32_t stack, uint32_t return_address) {
   Walk& walk = *static_cast<Walk*>(user);
-  PPCContext& ctx = *walk.ctx;
+  lifted::Regs& ctx = *walk.ctx;
   const uint64_t r1 = ctx.r1.u64, lr = ctx.lr;
   ctx.r1.u64 = stack;
   ctx.lr = return_address;
@@ -380,9 +341,9 @@ uint32_t CallFromWalk(void* user, ui_movies::DrawCall kind, uint32_t context, ui
 }
 }  // namespace
 
-void Draw(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(Draw) {
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259FA00(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8259FA00);
     return;
   }
   ITC_NATIVE_RUNNING("sub_8259FA00 UiMovie::Draw");
@@ -395,16 +356,16 @@ void Draw(PPCContext& ctx, uint8_t* base) {
   RecordDrawNode(ctx, base);
 }
 
-void RecordDrawNode(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RecordDrawNode) {
   ctx.fpscr.disableFlushMode();
   Walk walk{&ctx, base};
   ctx.r3.u64 = ui_movies::DrawNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u64,
                                    ctx.r1.u32, CallFromWalk, &walk);
 }
 
-void ResetAfterMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ResetAfterMovie) {
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259DAC0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8259DAC0);
     return;
   }
   ctx.r3.u64 = ctx.r4.u64;
@@ -413,9 +374,9 @@ void ResetAfterMovie(PPCContext& ctx, uint8_t* base) {
   lifted::CallFromContext(ctx, base, 0x8259D7B0);
 }
 
-void RestorePose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(RestorePose) {
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_82119B80(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82119B80);
     return;
   }
   ctx.r3.u64 = ui_movies::RestorePose(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -427,13 +388,13 @@ namespace {
 // ApplyTrack's key functions through the translated code (ui_movies::KeyCall),
 // from a frame like the original's (224 bytes) with its return addresses.
 struct GuestKeys {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   ui_movies::KeyCall Call() { return {&GuestKeys::Run, this}; }
   static ui_movies::KeyResult Run(void* self, uint32_t function, uint32_t k0, uint32_t k1,
                                   double t) {
     auto& keys = *static_cast<GuestKeys*>(self);
-    PPCContext& ctx = keys.ctx;
+    lifted::Regs& ctx = keys.ctx;
     uint8_t* base = keys.base;
     uint32_t return_address = 0;
     switch (function) {
@@ -463,7 +424,7 @@ struct GuestKeys {
 }  // namespace
 
 namespace ui_movies_hooks {
-void ApplyTrackNative(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ApplyTrackNative) {
   ctx.fpscr.disableFlushMode();
   hooks::GuestAtexit atexit{ctx, base};
   GuestKeys keys{ctx, base};
@@ -471,9 +432,9 @@ void ApplyTrackNative(PPCContext& ctx, uint8_t* base) {
                         ctx.r1.u32 - 224, atexit.Call(), keys.Call());
 }
 
-void ApplyTrack(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ApplyTrack) {
   if (!ITC_FLAG(native_ui_movies) || !hooks::NativeAtexit()) {
-    __imp__sub_825A0548(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825A0548);
     return;
   }
   ApplyTrackNative(ctx, base);
@@ -484,13 +445,13 @@ namespace {
 // ApplyAnimation's tracks (ui_movies::TrackCall): sub_825A0548 (its override)
 // from the level's frame, with the original's return address.
 struct GuestTracks {
-  PPCContext& ctx;
+  lifted::Regs& ctx;
   uint8_t* base;
   ui_movies::TrackCall Call() { return {&GuestTracks::Run, this}; }
   static void Run(void* self, uint32_t frame, uint32_t node, uint32_t track, double t,
                   uint32_t k0, uint32_t k1) {
     auto& tracks = *static_cast<GuestTracks*>(self);
-    PPCContext& ctx = tracks.ctx;
+    lifted::Regs& ctx = tracks.ctx;
     uint8_t* base = tracks.base;
     const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
     ctx.r1.u64 = frame;
@@ -508,7 +469,7 @@ struct GuestTracks {
 };
 }  // namespace
 
-void ui_movies_hooks::ApplyAnimationNative(PPCContext& ctx, uint8_t* base) {
+void ui_movies_hooks::ApplyAnimationNative(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   GuestTracks tracks{ctx, base};
   const uint32_t node = ctx.r3.u32, animation = ctx.r4.u32, loop = ctx.r6.u32;
@@ -519,14 +480,14 @@ void ui_movies_hooks::ApplyAnimationNative(PPCContext& ctx, uint8_t* base) {
 
 // UiMovie::ApplyAnimation: r3 = the node, r4 = the animation, f1 = the time,
 // r6 = loop; r3 = 1 while playing.
-extern "C" REX_FUNC(sub_825A08E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(825A08E0) {
+  
   if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
       ui_movies_hooks::g_update_callee_stand_in(0x825A08E0, ctx, base)) {
     return;
   }
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_825A08E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_825A08E0);
     return;
   }
   ui_movies_hooks::ApplyAnimationNative(ctx, base);
@@ -536,9 +497,9 @@ ui_movies_hooks::UpdateCalleeStandIn ui_movies_hooks::g_update_callee_stand_in =
 
 // UiMovie::Update: its calls made as the original's (r1 its frame, lr the
 // return address after each call), the rest in src/ui_movies/update.cpp.
-void ui_movies_hooks::Update(PPCContext& ctx, uint8_t* base) {
+void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8211D2F8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8211D2F8);
     return;
   }
   const uint32_t movie = ctx.r3.u32;

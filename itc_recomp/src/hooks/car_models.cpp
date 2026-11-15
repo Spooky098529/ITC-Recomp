@@ -3,6 +3,7 @@
 // shares (hooks/car_models.h).
 
 #include "hooks/car_models.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -64,35 +65,35 @@ namespace hooks {
 
 namespace cm = car_models;
 
-void CarModelsLoadSlotReset(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsLoadSlotReset) {
   cm::LoadSlotReset(base, ctx.r3.u32);
 }
 
-void CarModelsLoadSlotReleaseBuffer(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsLoadSlotReleaseBuffer) {
   if (hooks::NativeHeapActive()) {
     if (const auto r3 = cm::LoadSlotReleaseBuffer(base, ctx.r3.u32)) {
       ctx.r3.u64 = *r3;
       return;
     }
   }
-  __imp__sub_820D0758(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820D0758);
 }
 
-void CarModelsLoadSlotLoadShared(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsLoadSlotLoadShared) {
   ctx.r3.u64 = cm::LoadSlotLoadShared(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                       hooks::NativeArchiveLoad(base));
 }
 
-void CarModelsLoadSlotLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsLoadSlotLoad) {
   if (!hooks::NativeHeapActive()) {
-    __imp__sub_820D07C8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820D07C8);
     return;
   }
   ctx.r3.u64 = cm::LoadSlotLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                 ctx.r13.u32, hooks::NativeArchiveLoad(base));
 }
 
-void CarModelsLoadExterior(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsLoadExterior) {
   if (hooks::NativeHeapActive()) {
     if (const auto r3 = cm::CarModelLoadExterior(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
                                                  ctx.r13.u32, hooks::NativeArchiveLoad(base))) {
@@ -100,32 +101,32 @@ void CarModelsLoadExterior(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_820D5EC8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820D5EC8);
 }
 
-void CarModelsReloadDecals(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsReloadDecals) {
   if (!hooks::NativeHeapActive() || int32_t(guest::LoadU32(base, ctx.r3.u32 + 3724)) == 1) {
-    __imp__sub_820D5D20(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820D5D20);
     return;
   }
   ctx.r3.u64 = cm::CarModelReloadDecals(base, ctx.r3.u32, ctx.r1.u32,
                                         hooks::NativeArchiveLoad(base));
 }
 
-void CarModelsSetVinylTextures(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsSetVinylTextures) {
   ctx.r3.u64 = cm::CarModelSetVinylTextures(base, ctx.r3.u32);
 }
 
-void CarModelsWheelsSetUp(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsWheelsSetUp) {
   if (const auto r3 =
           cm::WheelsSetUp(base, ctx.r3.u32, ctx.r4.u32, hooks::NativeArchiveLoad(base))) {
     ctx.r3.u64 = *r3;
     return;
   }
-  __imp__sub_820D9110(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820D9110);
 }
 
-void CarModelsCockpitLoadSetC(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsCockpitLoadSetC) {
   if (hooks::NativeHeapActive()) {
     if (const auto r3 = cm::CockpitLoadSetC(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, ctx.r13.u32,
                                             hooks::NativeArchiveLoad(base))) {
@@ -133,10 +134,10 @@ void CarModelsCockpitLoadSetC(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_820D67E8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820D67E8);
 }
 
-void CarModelsInteriorLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsInteriorLoad) {
   const uint64_t lr = ctx.lr;
   std::optional<uint32_t> r3;
   // The accessories' slot +4 calls from the original's frame (112 bytes).
@@ -154,15 +155,15 @@ void CarModelsInteriorLoad(PPCContext& ctx, uint8_t* base) {
   });
   ctx.lr = lr;
   if (!r3) {
-    __imp__sub_820D79B0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820D79B0);
     return;
   }
   ctx.r3.u64 = *r3;
 }
 
-void CarModelsMakePlate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsMakePlate) {
   if (!hooks::NativeHeapActive()) {
-    __imp__sub_820ED6D0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820ED6D0);
     return;
   }
   const uint64_t regs[4] = {ctx.r7.u64, ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
@@ -182,18 +183,18 @@ void CarModelsMakePlate(PPCContext& ctx, uint8_t* base) {
   });
   ctx.lr = lr;
   if (!r3) {
-    __imp__sub_820ED6D0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820ED6D0);
     return;
   }
   ctx.r3.u64 = *r3;
 }
 
-void CarModelsFileLoaded(PPCContext& ctx, uint8_t* base, cm::FileLoadedSet set) {
+void CarModelsFileLoaded(lifted::Regs& ctx, uint8_t* base, cm::FileLoadedSet set) {
   const bool a = set == cm::FileLoadedSet::kA;
   const uint32_t request = ctx.r3.u32, buffer = ctx.r4.u32, car = ctx.r6.u32;
   if (!hooks::ModelsNativeLifetime() || !native::Buffers_NativeMemcpy() ||
       !cm::FileLoadedNative(base, set, request, car)) {
-    (a ? lifted::original::c820D47A8 : lifted::original::c820D4F80)(ctx, base);
+    (a ? ITC_REGS_FN(lifted::original::c820D47A8) : ITC_REGS_FN(lifted::original::c820D4F80))(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -209,7 +210,7 @@ void CarModelsFileLoaded(PPCContext& ctx, uint8_t* base, cm::FileLoadedSet set) 
       ctx.r4.u64 = file;
       ctx.r5.u64 = 0;
       ctx.lr = a ? 0x820D483C : 0x820D5018;
-      __imp__sub_82599A20(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_82599A20);
     };
     calls.update_matrices = [&](uint32_t skeleton) {
       ctx.r3.u64 = skeleton;
@@ -220,7 +221,7 @@ void CarModelsFileLoaded(PPCContext& ctx, uint8_t* base, cm::FileLoadedSet set) 
       ctx.r3.u64 = xpr;
       ctx.r4.u64 = file;
       ctx.lr = a ? 0x820D4DC8 : 0x820D55A0;
-      __imp__sub_82596F68(ctx, base);
+      lifted::Sdk(ctx, base, __imp__sub_82596F68);
     };
     calls.provider_set = [&](uint32_t provider, uint32_t xpr) {
       ctx.r3.u64 = provider;
@@ -242,15 +243,15 @@ void CarModelsFileLoaded(PPCContext& ctx, uint8_t* base, cm::FileLoadedSet set) 
   ctx.fpscr.disableFlushMode();
 }
 
-void CarModelsOnFileLoaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsOnFileLoaded) {
   CarModelsFileLoaded(ctx, base, cm::FileLoadedSet::kA);
 }
 
-void CarModelsOnFileLoadedB(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsOnFileLoadedB) {
   CarModelsFileLoaded(ctx, base, cm::FileLoadedSet::kB);
 }
 
-void CarModelsCarModelRelease(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsCarModelRelease) {
   if (hooks::ModelsNativeLifetime()) {
     ctx.fpscr.disableFlushMode();  // as CarModel::Reset
     if (const auto r3 = cm::CarModelRelease(base, ctx.r3.u32)) {
@@ -258,27 +259,27 @@ void CarModelsCarModelRelease(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_820D4508(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820D4508);
 }
 
-void CarModelsTextureCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsTextureCreate) {
   if (!hooks::NativeHeapActive()) {
-    __imp__sub_820ECF08(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820ECF08);
     return;
   }
   ctx.r3.u64 = cm::TextureCreate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                  ctx.r7.u32, ctx.r1.u32);
 }
 
-void CarModelsTextureFree(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsTextureFree) {
   if (!hooks::NativeHeapActive() || !cm::TextureFreeable(base, ctx.r3.u32)) {
-    __imp__sub_820ECFC8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820ECFC8);
     return;
   }
   ctx.r3.u64 = cm::TextureFree(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-uint32_t CarModelsVinylCompressAt(PPCContext& ctx, uint8_t* base, uint32_t width,
+uint32_t CarModelsVinylCompressAt(lifted::Regs& ctx, uint8_t* base, uint32_t width,
                                   uint32_t height, uint32_t header_in, uint32_t data_in) {
   const uint32_t stack = ctx.r1.u32;
   const uint64_t lr = ctx.lr;
@@ -297,10 +298,10 @@ uint32_t CarModelsVinylCompressAt(PPCContext& ctx, uint8_t* base, uint32_t width
   return *r3;  // the callers checked TextureFreeable
 }
 
-void CarModelsOnDecalLoaded(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsOnDecalLoaded) {
   const uint32_t request = ctx.r3.u32, car = ctx.r6.u32;
   if (!hooks::NativeHeapActive() || !cm::DecalsNative(base, request, car)) {
-    __imp__sub_820D5750(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820D5750);
     return;
   }
   ctx.fpscr.disableFlushMode();  // as the original's lfs
@@ -321,12 +322,12 @@ void CarModelsOnDecalLoaded(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void CarModelsTgaHeaderClear(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsTgaHeaderClear) {
   cm::TgaHeaderClear(base, ctx.r3.u32);
   ctx.r11.u64 = 0;
 }
 
-void CarModelsTgaCreateImage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsTgaCreateImage) {
   if (hooks::NativeHeapActive()) {
     if (const auto r3 = cm::TgaCreateImage(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                            ctx.r6.u32, ctx.r1.u32)) {
@@ -334,7 +335,7 @@ void CarModelsTgaCreateImage(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_820ED020(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820ED020);
 }
 
 bool CarModelsSceneSetUpNative() {
@@ -342,9 +343,9 @@ bool CarModelsSceneSetUpNative() {
          hooks::ModelsNativeLifetime() && native::Buffers_NativeMemcpy();
 }
 
-void CarModelsSceneSetUp(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsSceneSetUp) {
   if (!CarModelsSceneSetUpNative()) {
-    __imp__sub_820C8DE8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820C8DE8);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -360,9 +361,9 @@ void CarModelsSceneSetUp(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void CarModelsDrawDecal(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(CarModelsDrawDecal) {
   if (!cm::DecalRegionPorted(ctx.r3.u32)) {
-    __imp__sub_820EE638(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820EE638);
     return;
   }
   ctx.fpscr.disableFlushMode();  // as the original's lfs
@@ -374,7 +375,7 @@ void CarModelsDrawDecal(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *cm::DrawDecal(base, arguments, ctx.r1.u32);
 }
 
-void ScenePoolsSetUp(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ScenePoolsSetUp) {
   const uint64_t lr = ctx.lr;
   const uint64_t stack = ctx.r1.u64;
   const cm::PoolSetUps native{ITC_FLAG(native_car_models), ITC_FLAG(native_scene_models),
@@ -398,10 +399,10 @@ void ScenePoolsSetUp(PPCContext& ctx, uint8_t* base) {
 // The second set's set-ups (scene-models.md): r3 = the object, r4 = the
 // record; r3 as the original leaves it, or the original where the plain C++
 // declines.
-void SecondSetUp(PPCContext& ctx, uint8_t* base,
+void SecondSetUp(lifted::Regs& ctx, uint8_t* base,
                  std::optional<uint32_t> (*setup)(uint8_t*, uint32_t, uint32_t, uint32_t,
                                                   const cm::SecondSetUps&),
-                 void (*original)(PPCContext&, uint8_t*)) {
+                 lifted::ImportFunction* original) {
   const uint64_t lr = ctx.lr;
   const uint64_t stack = ctx.r1.u64;
   const cm::GuestCall guest = [&ctx, base, stack](uint32_t function, uint32_t r3, uint32_t r4,
@@ -423,7 +424,7 @@ void SecondSetUp(PPCContext& ctx, uint8_t* base,
   const auto r3 = setup(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, setups);
   ctx.lr = lr;
   if (!r3) {
-    original(ctx, base);
+    lifted::Sdk(ctx, base, original);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -434,7 +435,7 @@ void SecondSetUp(PPCContext& ctx, uint8_t* base,
 // r3 = a scene model; r3 = the last SetUpB's answer. Their set-ups' plain
 // C++ as SecondSetUp's, the guest calls from the frames below ctx.r1.
 template <typename Body>
-static uint32_t WithSecondSetUps(PPCContext& ctx, uint8_t* base, Body body) {
+static uint32_t WithSecondSetUps(lifted::Regs& ctx, uint8_t* base, Body body) {
   const uint64_t lr = ctx.lr;
   const uint64_t stack = ctx.r1.u64;
   const cm::GuestCall guest = [&ctx, base, stack](uint32_t function, uint32_t r3, uint32_t r4,
@@ -459,7 +460,7 @@ static uint32_t WithSecondSetUps(PPCContext& ctx, uint8_t* base, Body body) {
   return r3;
 }
 
-void ScenePoolsSetUpB(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(ScenePoolsSetUpB) {
   const uint32_t scene = ctx.r3.u32, pool = ctx.r4.u32, index = ctx.r5.u32, record = ctx.r6.u32;
   const uint32_t stack = ctx.r1.u32;
   ctx.r3.u64 = WithSecondSetUps(ctx, base, [&](const cm::SecondSetUps& setups) {
@@ -467,7 +468,7 @@ void ScenePoolsSetUpB(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void SceneModelBuild(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SceneModelBuild) {
   const uint32_t model = ctx.r3.u32;
   const uint32_t stack = ctx.r1.u32;
   ctx.r3.u64 = WithSecondSetUps(ctx, base, [&](const cm::SecondSetUps& setups) {
@@ -481,12 +482,7 @@ void SceneModelBuild(PPCContext& ctx, uint8_t* base) {
 // SceneCockpit::SetUp sub_820DBE80 and SceneModel::SetUp sub_820DB458, no
 // adapters: only it calls them) and SceneModel::Build (from SceneModel::
 // Update, recompiled) behind --native_scene_models.
-extern "C" REX_FUNC(sub_820C5B28) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_scene_models)) {
-    __imp__sub_820C5B28(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820C5B28, ITC_FLAG(native_scene_models)) {
   hooks::ScenePoolsSetUpB(ctx, base);
 }
 // SceneModel::Build sub_820D9870 has no adapter (removed, B7 loop,
@@ -508,12 +504,7 @@ extern "C" REX_FUNC(sub_820C5B28) {
 // their originals.
 
 #define ITC_CAR_MODELS(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {   \
-    REX_FUNC_PROLOGUE();                 \
-    if (!ITC_FLAG(native_car_models)) {  \
-      __imp__sub_##address(ctx, base);   \
-      return;                            \
-    }                                    \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_models)) { \
     hooks::step(ctx, base);              \
   }
 

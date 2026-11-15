@@ -5,6 +5,7 @@
 // sub_82297678, no longer called) itself.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "guest_call.h"
 #include "last_error.h"
 
@@ -71,7 +72,7 @@ void StoreZone(uint8_t* base, uint32_t address, const helpers::TimeZoneInformati
   guest::StoreU32(base, address + 168, uint32_t(zone.daylight_bias));
 }
 
-void SetInvalidParameter(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(SetInvalidParameter) {
   last_error::SetFromStatus(base, ctx.r13.u32, kStatusInvalidParameter);
 }
 
@@ -156,7 +157,7 @@ bool ReadTimeZoneSettings(uint8_t* base, uint32_t address) {
 
 // GetTimeZoneInformation's work (sub_82297DC8) on the zone at `address`:
 // returns its state (0, 1 or 2).
-uint32_t GetTimeZoneInformation(PPCContext& ctx, uint8_t* base, uint32_t address) {
+uint32_t GetTimeZoneInformation(lifted::Regs& ctx, uint8_t* base, uint32_t address) {
   const bool uses_daylight = ReadTimeZoneSettings(base, address);
   helpers::TimeZoneInformation zone = LoadZone(base, address);
   bool invalid_parameter = false;
@@ -173,7 +174,7 @@ uint32_t GetTimeZoneInformation(PPCContext& ctx, uint8_t* base, uint32_t address
 
 // The time zone's bias now (the game's sub_82297678), in 100 ns units; the
 // zone read into a guest buffer in a frame like the game's.
-int64_t GetTimeZoneBias(PPCContext& ctx, uint8_t* base) {
+int64_t GetTimeZoneBias(lifted::Regs& ctx, uint8_t* base) {
   int64_t bias = 0;
   InFrame(ctx, base, 272, 0x822968DC, [&](uint32_t frame) {
     const uint32_t state = GetTimeZoneInformation(ctx, base, frame + 80);
@@ -185,8 +186,8 @@ int64_t GetTimeZoneBias(PPCContext& ctx, uint8_t* base) {
 }  // namespace time_hooks
 
 // GetLocalTime: r3 = the SYSTEMTIME.
-extern "C" REX_FUNC(sub_822968B8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822968B8) {
+  
   const uint32_t out = ctx.r3.u32;
   const uint64_t now = time_hooks::g_fake_now != 0 ? time_hooks::g_fake_now
                                                     : helpers::SystemTimeNow();
@@ -196,8 +197,8 @@ extern "C" REX_FUNC(sub_822968B8) {
 
 // GetTimeZoneInformation: r3 = the TIME_ZONE_INFORMATION; returns its state
 // (0, 1 or 2).
-extern "C" REX_FUNC(sub_82297DC8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82297DC8) {
+  
   const uint32_t state = time_hooks::GetTimeZoneInformation(ctx, base, ctx.r3.u32);
   ctx.r3.s64 = int32_t(state);
 }
@@ -206,8 +207,8 @@ extern "C" REX_FUNC(sub_82297DC8) {
 // "uses daylight saving" (out, or 0); returns 0. Only the recompiled time
 // functions the time harness runs still call it; ours call
 // ReadTimeZoneSettings.
-extern "C" REX_FUNC(sub_8229B440) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8229B440) {
+  
   const bool uses_daylight = time_hooks::ReadTimeZoneSettings(base, ctx.r3.u32);
   if (ctx.r4.u32) {
     guest::StoreU32(base, ctx.r4.u32, uses_daylight ? 1 : 0);
@@ -217,8 +218,8 @@ extern "C" REX_FUNC(sub_8229B440) {
 
 // The next cutover of a time zone date: r3 = the date, r4 = the cutover (out),
 // r5 = now, r6 = from this year (low byte); returns 1 when found.
-extern "C" REX_FUNC(sub_8229B1E8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8229B1E8) {
+  
   const helpers::SystemTime rule = LoadSystemTime(base, ctx.r3.u32);
   const uint32_t out = ctx.r4.u32;
   const uint64_t now = LoadU64(base, ctx.r5.u32);
@@ -237,8 +238,8 @@ extern "C" REX_FUNC(sub_8229B1E8) {
 
 // SystemTimeToFileTime: r3 = the SYSTEMTIME, r4 = the FILETIME (out);
 // returns 1, or 0 for an invalid date (the last error set).
-extern "C" REX_FUNC(sub_8229B680) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8229B680) {
+  
   uint64_t time;
   if (!helpers::SystemTimeToFileTime(LoadSystemTime(base, ctx.r3.u32), &time)) {
     SetInvalidParameter(ctx, base);
@@ -251,8 +252,8 @@ extern "C" REX_FUNC(sub_8229B680) {
 
 // FileTimeToSystemTime: r3 = the FILETIME, r4 = the SYSTEMTIME (out);
 // returns 1.
-extern "C" REX_FUNC(sub_8229B720) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8229B720) {
+  
   StoreSystemTime(base, ctx.r4.u32, helpers::FileTimeToSystemTime(LoadU64(base, ctx.r3.u32)));
   ctx.r3.u64 = 1;
 }

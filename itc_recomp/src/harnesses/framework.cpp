@@ -154,14 +154,14 @@ void Positions(Context& h) {
         if (which == 0) {
           t.r3.u64 = x;
           t.r4.u64 = y;
-          (v == 0 ? __imp__sub_8258BE08 : NativeDebugFontSetPosition)(t, h.base);
+          (v == 0 ? __imp__sub_8258BE08 : ITC_CONTEXT_FN(NativeDebugFontSetPosition))(t, h.base);
         } else {
           guest::StoreU32(h.base, h.data + 8, x);
           guest::StoreU32(h.base, h.data + 20, y);
           t.r3.u64 = h.data + 100;
           t.r4.u64 = h.data + 8;
           t.r5.u64 = h.data + 20;
-          (v == 0 ? __imp__sub_82091050 : NativeDebugTextSetPosition)(t, h.base);
+          (v == 0 ? __imp__sub_82091050 : ITC_CONTEXT_FN(NativeDebugTextSetPosition))(t, h.base);
         }
         out[v].Bytes(Read(h.base, fw::kDebugFontPosition, 16));
         out[v].Bytes(Read(h.base, h.data, 64));
@@ -476,7 +476,7 @@ void Iterators(Context& h) {
           },
           [&](PPCContext& t) { t.r3.u64 = p.iterator; },
           which == 0 ? __imp__sub_82099B18 : __imp__sub_82091AE8,
-          which == 0 ? NativeIncrement : NativeDecrement,
+          which == 0 ? ITC_CONTEXT_FN(NativeIncrement) : ITC_CONTEXT_FN(NativeDecrement),
           [&](Outputs& out, const PPCContext& t) { MapOut(h, out, t); }, fmt::format("case {}", c));
     }
     results.Report();
@@ -514,7 +514,7 @@ void Rotations(Context& h) {
             t.r4.u64 = Load(h.base, p.iterator);
           },
           which == 0 ? __imp__sub_82092B10 : __imp__sub_82092A00,
-          which == 0 ? NativeRotateLeft : NativeRotateRight,
+          which == 0 ? ITC_CONTEXT_FN(NativeRotateLeft) : ITC_CONTEXT_FN(NativeRotateRight),
           [&](Outputs& out, const PPCContext& t) { MapOut(h, out, t); }, fmt::format("case {}", c));
     }
     results.Report();
@@ -547,7 +547,7 @@ void Allocations(Context& h) {
       const uint32_t count = c < 16 ? 1 : c < 20 ? 0 : h.random.Below(200);
       MapCase(
           h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = count; }, __imp__sub_82099C80,
-          NativeAllocateNodes,
+          ITC_CONTEXT_FN(NativeAllocateNodes),
           [&](Outputs& out, const PPCContext& t) { BlockOut(h, out, t.r3.u32, 0); },
           fmt::format("count {}", count));
     }
@@ -557,7 +557,7 @@ void Allocations(Context& h) {
     Results results("HandlerMap::NewHead (sub_82099E88)");
     for (int c = 0; c < 20; c++) {
       MapCase(
-          h, results, [] {}, [](PPCContext&) {}, __imp__sub_82099E88, NativeNewHead,
+          h, results, [] {}, [](PPCContext&) {}, __imp__sub_82099E88, ITC_CONTEXT_FN(NativeNewHead),
           [&](Outputs& out, const PPCContext& t) { BlockOut(h, out, t.r3.u32, 6); },
           fmt::format("case {}", c));
     }
@@ -568,7 +568,7 @@ void Allocations(Context& h) {
     for (int c = 0; c < 20; c++) {
       MapCase(
           h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = p.map; }, __imp__sub_82099FB0,
-          NativeConstruct, [&](Outputs& out, const PPCContext& t) { MapOut(h, out, t); },
+          ITC_CONTEXT_FN(NativeConstruct), [&](Outputs& out, const PPCContext& t) { MapOut(h, out, t); },
           fmt::format("case {}", c));
     }
     results.Report();
@@ -590,7 +590,7 @@ void Allocations(Context& h) {
             t.r7.u64 = p.value;
             t.r8.u64 = h.random.Next();  // only its low byte is the color
           },
-          __imp__sub_82099E20, NativeNewNode,
+          __imp__sub_82099E20, ITC_CONTEXT_FN(NativeNewNode),
           [&](Outputs& out, const PPCContext& t) { BlockOut(h, out, t.r3.u32, 6); },
           fmt::format("case {}", c));
     }
@@ -639,7 +639,7 @@ void Inserts(Context& h) {
             t.r6.u64 = Load(h.base, p.iterator);
             t.r7.u64 = p.value;
           },
-          __imp__sub_82093400, NativeInsertNode,
+          __imp__sub_82093400, ITC_CONTEXT_FN(NativeInsertNode),
           [&](Outputs& out, const PPCContext& t) { MapOut(h, out, t); }, fmt::format("case {}", c));
     }
     results.Report();
@@ -664,7 +664,7 @@ void Inserts(Context& h) {
             t.r4.u64 = p.map;
             t.r5.u64 = p.value;
           },
-          __imp__sub_82093740, NativeInsert,
+          __imp__sub_82093740, ITC_CONTEXT_FN(NativeInsert),
           [&](Outputs& out, const PPCContext& t) { MapOut(h, out, t); }, fmt::format("case {}", c));
     }
     results.Report();
@@ -699,7 +699,7 @@ void Requests(Context& h) {
             t.r5.u64 = (uint64_t(p.vector) << 32) | Load(h.base, p.iterator);
             t.r6.u64 = (uint64_t(p.vector) << 32) | Load(h.base, p.iterator + 4);
           },
-          __imp__sub_82092EF8, NativeErase,
+          __imp__sub_82092EF8, ITC_CONTEXT_FN(NativeErase),
           [&](Outputs& out, const PPCContext& t) {
             out.Bytes(Read(h.base, h.data, 512));
             out.Word(t.r3.u32);
@@ -722,7 +722,7 @@ void Requests(Context& h) {
             guest::StoreU32(h.base, p.vector + 8, p.elements + 12 * count);
             guest::StoreU32(h.base, p.vector + 12, p.elements + 12 * count);
           },
-          [&](PPCContext& t) { t.r3.u64 = p.vector; }, __imp__sub_8209A080, NativeClear,
+          [&](PPCContext& t) { t.r3.u64 = p.vector; }, __imp__sub_8209A080, ITC_CONTEXT_FN(NativeClear),
           [&](Outputs& out, const PPCContext& t) {
             out.Bytes(Read(h.base, h.data, 512));
             out.Word(t.r3.u32);
@@ -883,7 +883,7 @@ void VectorGrowth(Context& h) {
             t.r6.u64 = Load(h.base, p.result + 12);
             Fill(h.base, t.r1.u32 + 24, 8);
           },
-          __imp__sub_8209A0E8, NativeInsertN,
+          __imp__sub_8209A0E8, ITC_CONTEXT_FN(NativeInsertN),
           [&](Outputs& out, const PPCContext& t) {
             // r3 isn't compared (see the adapter).
             VectorOut(h, out, block, {Load(h.base, t.r1.u32 + 24), Load(h.base, t.r1.u32 + 28)});
@@ -908,7 +908,7 @@ void VectorGrowth(Context& h) {
             t.r5.u64 = (uint64_t(p.vector) << 32) | Load(h.base, p.iterator);
             t.r6.u64 = Load(h.base, p.result + 12);
           },
-          __imp__sub_8209A600, NativeRequestInsert,
+          __imp__sub_8209A600, ITC_CONTEXT_FN(NativeRequestInsert),
           [&](Outputs& out, const PPCContext& t) { VectorOut(h, out, block, {t.r3.u32}); },
           fmt::format("case {}", c));
     }
@@ -927,7 +927,7 @@ void VectorGrowth(Context& h) {
             t.r3.u64 = p.vector;
             t.r4.u64 = Load(h.base, p.result + 12);
           },
-          __imp__sub_8209A930, NativePushBack,
+          __imp__sub_8209A930, ITC_CONTEXT_FN(NativePushBack),
           [&](Outputs& out, const PPCContext& t) { VectorOut(h, out, block, {t.r3.u32}); },
           fmt::format("case {}", c));
     }
@@ -943,7 +943,7 @@ void RunLoops(Context& h) {
     for (int c = 0; c < 20; c++) {
       MapCase(
           h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = loop; }, __imp__sub_8209A9F0,
-          NativeRunLoop,
+          ITC_CONTEXT_FN(NativeRunLoop),
           [&](Outputs& out, const PPCContext& t) {
             const uint32_t listeners = Load(h.base, loop + rl::kListeners + rl::kMapHead);
             const Walk w =
@@ -983,7 +983,7 @@ void RunLoops(Context& h) {
             t.r4.u64 = (uint64_t(type) << 32) | key;
             t.r5.u64 = (uint64_t(delegate) << 32) | uint32_t(h.random.Next());
           },
-          __imp__sub_8209A458, NativeApplyRequest,
+          __imp__sub_8209A458, ITC_CONTEXT_FN(NativeApplyRequest),
           [&](Outputs& out, const PPCContext& t) {
             const uint32_t listeners = Load(h.base, loop + rl::kListeners + rl::kMapHead);
             const Walk w =
@@ -1060,7 +1060,7 @@ void Dispatchers(Context& h) {
   };
   const Thunk thunks[] = {
       {"Delegate slot 0 thunk (sub_82096330)", __imp__sub_82096330, sub_82096330},
-      {"Delegate slot 1 thunk (sub_82096340)", __imp__sub_82096340, hooks::DelegateSlot1Thunk},
+      {"Delegate slot 1 thunk (sub_82096340)", __imp__sub_82096340, ITC_CONTEXT_FN(hooks::DelegateSlot1Thunk)},
       {"Framework::Start (sub_820902B0)", __imp__sub_820902B0, sub_820902B0},
       {"App input source (sub_82094350)", __imp__sub_82094350, sub_82094350},
       {"App +16 slot +36 (sub_820944C8)", __imp__sub_820944C8, sub_820944C8},
@@ -1105,7 +1105,7 @@ void Dispatchers(Context& h) {
             t.r4.u64 = (h.random.Next() << 32) | ObjectAt(h, 0);
             Fill(h.base, t.r1.u32 + 24, 8);
           },
-          __imp__sub_82099A98, hooks::TickHandlerInvoke,
+          __imp__sub_82099A98, ITC_CONTEXT_FN(hooks::TickHandlerInvoke),
           [&](Outputs& out, const PPCContext& t) {
             DispatchOut(h, out, t);
             out.Bytes(Read(h.base, t.r1.u32 + 24, 8));
@@ -1278,7 +1278,7 @@ void Constructors(Context& h) {
       MapCase(
           h, results, [&] { DispatchObjects(h, 0, {}); },
           [&](PPCContext& t) { t.r3.u64 = h.data + 64; }, __imp__sub_82090420,
-          NativeFrameworkConstruct,
+          ITC_CONTEXT_FN(NativeFrameworkConstruct),
           // r4 to r11 aren't compared: the original leaves vtable addresses
           // there, which Framework::Create (its only caller) doesn't read.
           [&](Outputs& out, const PPCContext& t) { DispatchOut(h, out, t, false); },
@@ -1361,7 +1361,7 @@ void Constructors(Context& h) {
               guest::StoreU32(h.base, t.r1.u32 - at, uint32_t(h.random.Next()));
             }
           },
-          __imp__sub_82090EA8, NativeDebugTextConstruct,
+          __imp__sub_82090EA8, ITC_CONTEXT_FN(NativeDebugTextConstruct),
           [&](Outputs& out, const PPCContext& t) {
             DispatchOut(h, out, t);
             out.Bytes(Read(h.base, rl::kDebugTextGlobal, 4));
@@ -1377,7 +1377,7 @@ void Constructors(Context& h) {
         MapCase(
             h, results, [&] { DispatchObjects(h, 0, {}); },
             [&](PPCContext& t) { t.r3.u64 = h.data + 8; }, __imp__sub_820909B8,
-            NativeFrameworkCreate,
+            ITC_CONTEXT_FN(NativeFrameworkCreate),
             [&](Outputs& out, const PPCContext& t) {
               const uint32_t block = Load(h.base, h.data + 8);
               guest::StoreU32(h.base, h.data + 8, 0);
@@ -1561,7 +1561,7 @@ void MainLoop(Context& h) {
             t.r6.u64 = (uint64_t(function) << 32) | object;
             Fill(h.base, t.r1.u32 - 128, 128 + 48);
           },
-          __imp__sub_82099D50, hooks::ForEachTickHandler,
+          __imp__sub_82099D50, ITC_CONTEXT_FN(hooks::ForEachTickHandler),
           [&](Outputs& out, const PPCContext& t) {
             RunLoopOut(h, out, loop, 0, [&](const Numbering& n) {
               n.Words(h.base, out, h.data, 3072 + 56);
@@ -1613,7 +1613,7 @@ void MainLoop(Context& h) {
             t.r6.u64 = (uint64_t(function) << 32) | object;
             Fill(h.base, t.r1.u32 - 128, 128 + 48);
           },
-          __imp__sub_82099EE8, hooks::ForEachRequest,
+          __imp__sub_82099EE8, ITC_CONTEXT_FN(hooks::ForEachRequest),
           [&](Outputs& out, const PPCContext& t) {
             // The vector's block is the run loop's for the walk: the case's
             // vector is at data + 64, so it's freed here.
@@ -1705,7 +1705,7 @@ void MainLoop(Context& h) {
             t.r4.u64 = h.data + 2048;
             Fill(h.base, t.r1.u32 - 208, 208 + 48);
           },
-          __imp__sub_8209A760, hooks::AppRun,
+          __imp__sub_8209A760, ITC_CONTEXT_FN(hooks::AppRun),
           [&](Outputs& out, const PPCContext& t) {
             RunLoopOut(h, out, loop, block, [&](const Numbering& n) {
               n.Words(h.base, out, h.data, 3072 + 56);
@@ -1751,7 +1751,7 @@ void MainLoop(Context& h) {
             Fill(h.base, t.r1.u32 - 160, 160 + 48);
           },
           which == 0 ? __imp__sub_8209ABE8 : __imp__sub_82090378,
-          which == 0 ? hooks::RunFramework : hooks::RunFrameworkAt,
+          which == 0 ? ITC_CONTEXT_FN(hooks::RunFramework) : ITC_CONTEXT_FN(hooks::RunFrameworkAt),
           [&](Outputs& out, const PPCContext& t) {
             out.Bytes(Read(h.base, h.data, 2400));
             // The run loop on the frame (+80) after its destructor: the
@@ -1803,7 +1803,7 @@ void MainLoop(Context& h) {
             guest::StoreU32(h.base, kFrameworkVtable + 20, getters[h.random.Below(2)]);
           },
           [&](PPCContext& t) { Fill(h.base, t.r1.u32 - 112, 112 + 48); },
-          __imp__sub_82090108, hooks::Main,
+          __imp__sub_82090108, ITC_CONTEXT_FN(hooks::Main),
           [&](Outputs& out, const PPCContext& t) {
             Write(h.base, kFrameworkVtable, kept.data(), 24);
             out.Bytes(Read(h.base, h.data, 2048));

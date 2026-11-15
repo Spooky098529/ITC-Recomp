@@ -165,7 +165,7 @@ void ShadowsDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
           t.r24.u64 = r.Next();
           t.r28.u64 = r.Next();
         },
-        __imp__sub_820E1D88, NativeShadows, AlphaFloats(),
+        __imp__sub_820E1D88, ITC_CONTEXT_FN(NativeShadows), AlphaFloats(),
         fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& o) {
           const uint32_t frame = t.r1.u32 - car_draw::kPartsShadowsFrame;

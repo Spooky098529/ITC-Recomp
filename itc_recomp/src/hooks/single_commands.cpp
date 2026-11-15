@@ -6,6 +6,7 @@
 // original does.
 
 #include "hooks/single_commands.h"
+#include "hooks/native_entry.h"
 
 #include "guest.h"
 
@@ -26,12 +27,12 @@ ITC_FLAG_BOOL(native_single_commands, true, "ITC",
 
 namespace sc = graphics::single_commands;
 
-sc::GuestCall hooks::SingleCommandsCall(PPCContext& ctx, uint8_t* base) {
+sc::GuestCall hooks::SingleCommandsCall(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t function, uint32_t sp, uint32_t return_address,
                       std::initializer_list<uint64_t> args) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
-    PPCRegister* registers[] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7, &ctx.r8};
+    lifted::Temp* registers[] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7, &ctx.r8};
     size_t i = 0;
     for (uint64_t value : args) {
       registers[i++]->u64 = value;
@@ -44,15 +45,15 @@ sc::GuestCall hooks::SingleCommandsCall(PPCContext& ctx, uint8_t* base) {
   };
 }
 
-void hooks::NativeSingleInlineVertices(PPCContext& ctx, uint8_t* base) {
+void hooks::NativeSingleInlineVertices(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = sc::InlineVertices(base, ctx.r3.u32);
 }
 
-void hooks::NativeSingleSetUpDrawer(PPCContext& ctx, uint8_t* base) {
+void hooks::NativeSingleSetUpDrawer(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = sc::SetUpDrawer(base, ctx.r3.u32, ctx.r1.u32, SingleCommandsCall(ctx, base));
 }
 
-void hooks::NativeSingleSetShaderConstants(PPCContext& ctx, uint8_t* base) {
+void hooks::NativeSingleSetShaderConstants(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 =
       sc::SetShaderConstants(base, ctx.r3.u32, ctx.r1.u32, SingleCommandsCall(ctx, base));
 }
@@ -62,7 +63,7 @@ namespace {
 // Command 15: marked as command 15 around it, so the wraps of BeginVertices
 // and EndVertices hand PrimitiveDrawer::Draw's inline draw to the renderer
 // (as its wrap in src/native/replay_hooks.cpp does around the original).
-uint32_t DrawerDrawMarked(PPCContext& ctx, uint8_t* base, uint32_t sp) {
+uint32_t DrawerDrawMarked(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
   const uint32_t outer_command = native::g_current_command;
   native::g_current_command = 15;
   const uint32_t r3 = sc::DrawerDraw(base, sp, hooks::SingleCommandsCall(ctx, base));
@@ -72,15 +73,15 @@ uint32_t DrawerDrawMarked(PPCContext& ctx, uint8_t* base, uint32_t sp) {
 
 }  // namespace
 
-void hooks::NativeSingleDrawerDraw(PPCContext& ctx, uint8_t* base) {
+void hooks::NativeSingleDrawerDraw(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = DrawerDrawMarked(ctx, base, ctx.r1.u32);
 }
 
-void hooks::NativeSingleCallback(PPCContext& ctx, uint8_t* base) {
+void hooks::NativeSingleCallback(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = sc::Callback(base, ctx.r3.u32, ctx.r1.u32, SingleCommandsCall(ctx, base));
 }
 
-graphics::render_queue::SingleCommand hooks::SingleCommands(PPCContext& ctx, uint8_t* base) {
+graphics::render_queue::SingleCommand hooks::SingleCommands(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t handler, uint32_t slot, uint32_t sp) -> std::optional<uint32_t> {
     if (!ITC_FLAG(native_single_commands)) {
       return std::nullopt;
@@ -103,41 +104,21 @@ graphics::render_queue::SingleCommand hooks::SingleCommands(PPCContext& ctx, uin
 }
 
 // Single::InlineVertices (5): r3 = the slot.
-extern "C" REX_FUNC(sub_8258E8E8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_single_commands)) {
-    __imp__sub_8258E8E8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8258E8E8, ITC_FLAG(native_single_commands)) {
   hooks::NativeSingleInlineVertices(ctx, base);
 }
 
 // Single::SetUpDrawer (13 and 14): r3 = the slot.
-extern "C" REX_FUNC(sub_8258E958) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_single_commands)) {
-    __imp__sub_8258E958(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8258E958, ITC_FLAG(native_single_commands)) {
   hooks::NativeSingleSetUpDrawer(ctx, base);
 }
 
 // Single::SetShaderConstants (7): r3 = the slot.
-extern "C" REX_FUNC(sub_8258F0F0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_single_commands)) {
-    __imp__sub_8258F0F0(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8258F0F0, ITC_FLAG(native_single_commands)) {
   hooks::NativeSingleSetShaderConstants(ctx, base);
 }
 
 // Single::Callback (28): r3 = the slot.
-extern "C" REX_FUNC(sub_8258E9B8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_single_commands)) {
-    __imp__sub_8258E9B8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(8258E9B8, ITC_FLAG(native_single_commands)) {
   hooks::NativeSingleCallback(ctx, base);
 }

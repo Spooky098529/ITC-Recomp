@@ -9,6 +9,7 @@
 // src/hooks/network.cpp). See B5 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "guest_call.h"
 #include "base/flags.h"
 #include "hooks/save_interface.h"
@@ -42,8 +43,8 @@ void SetUsersBuilt(bool built) {
 }  // namespace notify_hooks
 
 // XNotifyCreateListener: r3 = the areas (mask). No listener made.
-extern "C" REX_FUNC(sub_822952B8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822952B8) {
+  
   ctx.r3.u64 = kNoListener;
 }
 
@@ -51,8 +52,8 @@ extern "C" REX_FUNC(sub_822952B8) {
 // (sub_82099600) and flags it changed (+244) once, on the first call with a
 // listener (+240), as the start-up sign-in changed did; returns 0 otherwise,
 // as an empty queue did.
-extern "C" REX_FUNC(sub_82099828) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82099828) {
+  
   const uint32_t app = ctx.r3.u32;
   if (g_users_built || !guest::LoadU32(base, app + 240)) {
     ctx.r3.u64 = 0;
@@ -70,7 +71,7 @@ namespace {
 
 // Calls guest code at `function` with the link register the recompiled call
 // had.
-void CallAt(PPCContext& ctx, uint8_t* base, uint32_t function, uint32_t return_address) {
+void CallAt(lifted::Regs& ctx, uint8_t* base, uint32_t function, uint32_t return_address) {
   ctx.lr = return_address;
   lifted::CallFromContext(ctx, base, function);
 }
@@ -92,8 +93,8 @@ uint32_t Method(uint8_t* base, uint32_t object, uint32_t offset) {
 // With --native_save_interface, its plain C++ instead (B7 loop,
 // save_interface/slot_handlers.h: the handlers, the device list and
 // SaveSlot::State native; its prologue written as the original's).
-extern "C" REX_FUNC(sub_820A4610) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820A4610) {
+  
   if (ITC_FLAG(native_save_interface)) {
     hooks::SaveDevicesUpdateSteps(ctx, base);
     return;

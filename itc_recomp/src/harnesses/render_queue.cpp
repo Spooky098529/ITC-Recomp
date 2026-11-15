@@ -107,16 +107,16 @@ void SmallMethods(Context& h) {
     GuestFunction recompiled, native;
   };
   const Method methods[] = {
-      {"RenderQueue::Flip (sub_8258E5E0)", __imp__sub_8258E5E0, NativeFlip},
-      {"RenderQueue::Recording (sub_8258E5F8)", __imp__sub_8258E5F8, NativeRecording},
-      {"RenderQueue::Replaying (sub_8258E618)", __imp__sub_8258E618, NativeReplaying},
+      {"RenderQueue::Flip (sub_8258E5E0)", __imp__sub_8258E5E0, ITC_CONTEXT_FN(NativeFlip)},
+      {"RenderQueue::Recording (sub_8258E5F8)", __imp__sub_8258E5F8, ITC_CONTEXT_FN(NativeRecording)},
+      {"RenderQueue::Replaying (sub_8258E618)", __imp__sub_8258E618, ITC_CONTEXT_FN(NativeReplaying)},
   };
   for (const Method& m : methods) {
     Results results(m.name);
     for (int c = 0; c < 32; c++) {
       // Replaying reads +8 + 4 x the index: kept inside the queue's words.
       const uint32_t index = c < 3 ? uint32_t(c) : r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2);
-      const uint32_t safe = m.native == NativeReplaying ? (index & 3) : index;
+      const uint32_t safe = m.native == ITC_CONTEXT_FN(NativeReplaying) ? (index & 3) : index;
       const std::vector<uint32_t> words = MakeQueue(h, r, false, safe, 0);
       Outputs out[2];
       for (int v = 0; v < 2; v++) {
@@ -142,7 +142,7 @@ void SmallMethods(Context& h) {
         guest::StoreU32(h.base, entry + 8, bits);
         PPCContext t = CallContext(h);
         t.r3.u64 = entry;
-        (v == 0 ? __imp__sub_8258E5C0 : NativeSequence)(t, h.base);
+        (v == 0 ? __imp__sub_8258E5C0 : ITC_CONTEXT_FN(NativeSequence))(t, h.base);
         out[v].Double(t.f1.u64);
         out[v].Word(t.r3.u32);
       }
@@ -167,7 +167,7 @@ void ClearRecording(Context& h) {
       guest::StoreU32s(h.base, h.data, words.data(), uint32_t(words.size()));
       PPCContext t = CallContext(h);
       t.r3.u64 = h.data + kQueue;
-      (v == 0 ? __imp__sub_8258ED78 : NativeClearRecording)(t, h.base);
+      (v == 0 ? __imp__sub_8258ED78 : ITC_CONTEXT_FN(NativeClearRecording))(t, h.base);
       out[v].Bytes(Read(h.base, h.data, kState + 84));
       out[v].Float(guest::LoadU32(h.base, h.data + kState + 84));
       out[v].Bytes(Read(h.base, h.data + kState + 88, kScratchBytes - kState - 88));
@@ -212,7 +212,7 @@ void Init(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = h.data + kQueue;
       t.r4.u64 = device;
-      (v == 0 ? __imp__sub_8258ED00 : hooks::NativeRenderQueueInit)(t, h.base);
+      (v == 0 ? __imp__sub_8258ED00 : ITC_CONTEXT_FN(hooks::NativeRenderQueueInit))(t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Bytes(Read(h.base, device, kDeviceBytes));
       out[v].Word(t.r3.u32);
@@ -301,7 +301,7 @@ void Adds(Context& h) {
         t.r4.u64 = chunk_key;
         t.r5.u64 = sequence;
         t.r6.u64 = bucket;
-        (v == 0 ? __imp__sub_8258EB88 : NativePassListAdd)(t, h.base);
+        (v == 0 ? __imp__sub_8258EB88 : ITC_CONTEXT_FN(NativePassListAdd))(t, h.base);
         ScratchOutputs(h.base, h.data, out[v]);
         out[v].Bytes(Read(h.base, sp + 32, 16));
         out[v].Word(t.r3.u32);
@@ -337,7 +337,7 @@ void Adds(Context& h) {
         t.r4.u64 = chunk;
         t.r5.u64 = bucket;
         t.f1.f64 = key;
-        (v == 0 ? __imp__sub_8258EDC8 : NativeAdd)(t, h.base);
+        (v == 0 ? __imp__sub_8258EDC8 : ITC_CONTEXT_FN(NativeAdd))(t, h.base);
         ScratchOutputs(h.base, h.data, out[v]);
         // Add's frame: what PassList::Add stores at +32 and +40, Add's own
         // {chunk, key} and {sequence, the leftover} at +80 and +88.
@@ -430,7 +430,7 @@ void PushBacks(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = h.data + kVector;
       t.r4.u64 = value;
-      (v == 0 ? __imp__sub_82591540 : NativePushBack)(t, h.base);
+      (v == 0 ? __imp__sub_82591540 : ITC_CONTEXT_FN(NativePushBack))(t, h.base);
       if (kind == 0) {
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       } else {
@@ -680,8 +680,8 @@ void Sorts(Context& h, uint32_t block) {
     GuestFunction recompiled, native;
   };
   const Sort sorts[] = {
-      {"RenderQueue::Partition (sub_8258EC38)", __imp__sub_8258EC38, NativePartition},
-      {"RenderQueue::QuickSort (sub_82590CB0)", __imp__sub_82590CB0, NativeQuickSort},
+      {"RenderQueue::Partition (sub_8258EC38)", __imp__sub_8258EC38, ITC_CONTEXT_FN(NativePartition)},
+      {"RenderQueue::QuickSort (sub_82590CB0)", __imp__sub_82590CB0, ITC_CONTEXT_FN(NativeQuickSort)},
   };
   const uint32_t getters[] = {0x820B6708, 0x8258E5C0, kFloat48Getter};
   for (const Sort& sort : sorts) {
@@ -713,7 +713,7 @@ void Sorts(Context& h, uint32_t block) {
         t.r6.u64 = getter;
         (v == 0 ? sort.recompiled : sort.native)(t, h.base);
         out[v].Bytes(Read(h.base, block, kWorldBytes));
-        if (sort.native == NativePartition) out[v].Word(t.r3.u32);
+        if (sort.native == ITC_CONTEXT_FN(NativePartition)) out[v].Word(t.r3.u32);
       }
       results.Check(out[0], out[1],
                     fmt::format("case {}: {} entries, {} to {}, getter {:08X}", c, n, lo, hi,
@@ -735,7 +735,7 @@ void Chains(Context& h, uint32_t block) {
       PPCContext t = CallContext(h);
       t.r3.u64 = block + kWQueue;
       t.r4.u64 = chain;
-      (v == 0 ? __imp__sub_8258EE98 : NativeChunkChainRun)(t, h.base);
+      (v == 0 ? __imp__sub_8258EE98 : ITC_CONTEXT_FN(NativeChunkChainRun))(t, h.base);
       // r3 isn't compared: the replay doesn't read ChunkChain::Run's.
       out[v].Bytes(Read(h.base, block, kWorldBytes));
     }
@@ -815,7 +815,7 @@ void Replays(Context& h, uint32_t block) {
       t.r3.u64 = block + kWQueue;
       t.r4.u64 = device;
       t.r5.u64 = output;
-      (v == 0 ? __imp__sub_82591238 : NativeReplay)(t, h.base);
+      (v == 0 ? __imp__sub_82591238 : ITC_CONTEXT_FN(NativeReplay))(t, h.base);
       // r3 isn't compared: Scene::Draw doesn't read it.
       out[v].Bytes(Read(h.base, block, kWorldBytes));
       out[v].Bytes(Read(h.base, kGlobals, 12 + 4 * 64));       // the release list, device, entries

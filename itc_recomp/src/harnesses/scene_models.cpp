@@ -135,7 +135,7 @@ void Links(Context& h, Random& r, uint32_t block) {
             guest::StoreU32(h.base, sm::kAccessories, c == 0 ? 0 : uint32_t(r.Next()));
             t.r3.u64 = r.Next();
           },
-          __imp__sub_820F0E50, hooks::SceneModelsAccessories, {}, fmt::format("case {}", c));
+          __imp__sub_820F0E50, ITC_CONTEXT_FN(hooks::SceneModelsAccessories), {}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -155,7 +155,7 @@ void Links(Context& h, Random& r, uint32_t block) {
             guest::StoreU32(h.base, interior + 140, r.Below(8) == 0 ? r.Below(64) : r.Below(4));
             t.r3.u64 = interior;
           },
-          __imp__sub_820D97B8, hooks::SceneModelsAccessory, {}, fmt::format("case {}", c));
+          __imp__sub_820D97B8, ITC_CONTEXT_FN(hooks::SceneModelsAccessory), {}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -174,7 +174,7 @@ void Links(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = r.Next();
             t.r6.u64 = block;
           },
-          __imp__sub_82175EE0, hooks::SceneModelsOnSoundLoaded, {}, fmt::format("case {}", c));
+          __imp__sub_82175EE0, ITC_CONTEXT_FN(hooks::SceneModelsOnSoundLoaded), {}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -185,13 +185,13 @@ void Links(Context& h, Random& r, uint32_t block) {
     bool car_model;  // r4 a car model whose +24 is read
   };
   const Setter setters[] = {
-      {"sub_820E7378", __imp__sub_820E7378, hooks::SceneModelsWheelsSetRecord, false},
-      {"sub_820E70B8", __imp__sub_820E70B8, hooks::SceneModelsSetCarModel, false},
-      {"SceneParts::Link (sub_820DF1A8)", __imp__sub_820DF1A8, hooks::SceneModelsPartsLink, true},
-      {"sub_820DF1C0", __imp__sub_820DF1C0, hooks::SceneModelsPartsSetRecord, false},
-      {"SceneInterior::Link (sub_820E37D0)", __imp__sub_820E37D0, hooks::SceneModelsInteriorLink,
+      {"sub_820E7378", __imp__sub_820E7378, ITC_CONTEXT_FN(hooks::SceneModelsWheelsSetRecord), false},
+      {"sub_820E70B8", __imp__sub_820E70B8, ITC_CONTEXT_FN(hooks::SceneModelsSetCarModel), false},
+      {"SceneParts::Link (sub_820DF1A8)", __imp__sub_820DF1A8, ITC_CONTEXT_FN(hooks::SceneModelsPartsLink), true},
+      {"sub_820DF1C0", __imp__sub_820DF1C0, ITC_CONTEXT_FN(hooks::SceneModelsPartsSetRecord), false},
+      {"SceneInterior::Link (sub_820E37D0)", __imp__sub_820E37D0, ITC_CONTEXT_FN(hooks::SceneModelsInteriorLink),
        true},
-      {"sub_820E3658", __imp__sub_820E3658, hooks::SceneModelsSetWord11452, false},
+      {"sub_820E3658", __imp__sub_820E3658, ITC_CONTEXT_FN(hooks::SceneModelsSetWord11452), false},
   };
   for (const Setter& setter : setters) {
     Results results(setter.name);
@@ -201,11 +201,11 @@ void Links(Context& h, Random& r, uint32_t block) {
           [&](PPCContext& t) {
             // The setters of a far field (+16776, +37248, +11452) get an
             // object below the block, so the field lands in it.
-            const uint32_t object = block - (setter.native == hooks::SceneModelsPartsSetRecord
+            const uint32_t object = block - (setter.native == ITC_CONTEXT_FN(hooks::SceneModelsPartsSetRecord)
                                                  ? 37248 - 0x100
-                                             : setter.native == hooks::SceneModelsWheelsSetRecord
+                                             : setter.native == ITC_CONTEXT_FN(hooks::SceneModelsWheelsSetRecord)
                                                  ? 16776 - 0x100
-                                             : setter.native == hooks::SceneModelsSetWord11452
+                                             : setter.native == ITC_CONTEXT_FN(hooks::SceneModelsSetWord11452)
                                                  ? 11452 - 0x100
                                                  : 0u) +
                                     4 * r.Below(8);
@@ -246,7 +246,7 @@ void Copies(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = model;
             t.r4.u64 = record;
           },
-          __imp__sub_820D3C70, hooks::SceneModelsCarModelSetRecord, {},
+          __imp__sub_820D3C70, ITC_CONTEXT_FN(hooks::SceneModelsCarModelSetRecord), {},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -279,7 +279,7 @@ void Copies(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = to;
             t.r4.u64 = from;
           },
-          __imp__sub_820D7EE8, hooks::SceneModelsCarRecordCopy, floats,
+          __imp__sub_820D7EE8, ITC_CONTEXT_FN(hooks::SceneModelsCarRecordCopy), floats,
           fmt::format("case {}{}", c, overlap ? " (overlapping: the original's)" : ""));
     }
     results.Report();
@@ -314,7 +314,7 @@ void Copies(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = to;
             t.r4.u64 = from;
           },
-          __imp__sub_820DB290, hooks::SceneModelsSceneModelRecordCopy, floats,
+          __imp__sub_820DB290, ITC_CONTEXT_FN(hooks::SceneModelsSceneModelRecordCopy), floats,
           fmt::format("case {}{}", c, overlap ? " (overlapping: the original's)" : ""));
     }
     results.Report();
@@ -330,19 +330,19 @@ void Defaults(Context& h, Random& r, uint32_t block) {
     GuestFunction native;
   };
   const Reset resets[] = {
-      {"sub_820D45B0", __imp__sub_820D45B0, hooks::SceneModelsCarRecordSetW},
-      {"sub_820D3B38", __imp__sub_820D3B38, hooks::SceneModelsRecord12Reset},
-      {"sub_820D0A20", __imp__sub_820D0A20, hooks::SceneModelsLayerReset},
-      {"CarRecord::Reset (sub_820D0A98)", __imp__sub_820D0A98, hooks::SceneModelsCarRecordReset},
+      {"sub_820D45B0", __imp__sub_820D45B0, ITC_CONTEXT_FN(hooks::SceneModelsCarRecordSetW)},
+      {"sub_820D3B38", __imp__sub_820D3B38, ITC_CONTEXT_FN(hooks::SceneModelsRecord12Reset)},
+      {"sub_820D0A20", __imp__sub_820D0A20, ITC_CONTEXT_FN(hooks::SceneModelsLayerReset)},
+      {"CarRecord::Reset (sub_820D0A98)", __imp__sub_820D0A98, ITC_CONTEXT_FN(hooks::SceneModelsCarRecordReset)},
       {"SceneModelRecord::SceneModelRecord (sub_820DB240)", __imp__sub_820DB240,
-       hooks::SceneModelsSceneModelRecordConstruct},
-      {"sub_820D34B8", __imp__sub_820D34B8, hooks::SceneModelsCockpitRecordReset},
+       ITC_CONTEXT_FN(hooks::SceneModelsSceneModelRecordConstruct)},
+      {"sub_820D34B8", __imp__sub_820D34B8, ITC_CONTEXT_FN(hooks::SceneModelsCockpitRecordReset)},
       {"SceneModelRecord::Reset (sub_820D9810)", __imp__sub_820D9810,
-       hooks::SceneModelsSceneModelRecordReset},
-      {"sub_820D3558", __imp__sub_820D3558, hooks::SceneModelsPartsRecordReset},
-      {"sub_820D3840", __imp__sub_820D3840, hooks::SceneModelsInteriorRecordReset},
-      {"sub_820D3900", __imp__sub_820D3900, hooks::SceneModelsWheelsRecordReset},
-      {"sub_820D34E0", __imp__sub_820D34E0, hooks::SceneModelsPool4RecordReset},
+       ITC_CONTEXT_FN(hooks::SceneModelsSceneModelRecordReset)},
+      {"sub_820D3558", __imp__sub_820D3558, ITC_CONTEXT_FN(hooks::SceneModelsPartsRecordReset)},
+      {"sub_820D3840", __imp__sub_820D3840, ITC_CONTEXT_FN(hooks::SceneModelsInteriorRecordReset)},
+      {"sub_820D3900", __imp__sub_820D3900, ITC_CONTEXT_FN(hooks::SceneModelsWheelsRecordReset)},
+      {"sub_820D34E0", __imp__sub_820D34E0, ITC_CONTEXT_FN(hooks::SceneModelsPool4RecordReset)},
   };
   for (const Reset& reset : resets) {
     Results results(reset.name);
@@ -370,7 +370,7 @@ void Pages(Context& h, Random& r, uint32_t block) {
       t.r3.u64 = r.Next();
       t.r4.u64 = at;
       t.r5.u64 = size;
-      (v == 0 ? __imp__sub_820C3CA0 : hooks::SceneModelsAllocPages)(t, h.base);
+      (v == 0 ? __imp__sub_820C3CA0 : ITC_CONTEXT_FN(hooks::SceneModelsAllocPages))(t, h.base);
       const uint32_t pages = t.r3.u32;
       out[v].Word(guest::LoadU32(h.base, at) == pages);
       out[v].Word(pages != 0);
@@ -424,7 +424,7 @@ void ModelUpdates(Context& h, Random& r, uint32_t block) {
           guest::StoreU32(h.base, loading + 140, r.Below(4));
           t.r3.u64 = model;
         },
-        __imp__sub_820DA180, hooks::SceneModelUpdate, {}, fmt::format("case {}", c));
+        __imp__sub_820DA180, ITC_CONTEXT_FN(hooks::SceneModelUpdate), {}, fmt::format("case {}", c));
   }
   results.Report();
 }

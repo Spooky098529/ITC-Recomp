@@ -3,6 +3,7 @@
 // (hooks/user_info.h).
 
 #include "hooks/user_info.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "user_info/user_info.h"
@@ -37,7 +38,7 @@ namespace ui = user_info;
 // adapter's lr is put back when it ends.
 class GuestCalls {
  public:
-  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  GuestCalls(lifted::Regs& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
   ~GuestCalls() { ctx_.lr = lr_; }
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
@@ -47,7 +48,7 @@ class GuestCalls {
   static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
-    PPCContext& ctx = self.ctx_;
+    lifted::Regs& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
@@ -68,64 +69,64 @@ class GuestCalls {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   }
-  PPCContext& ctx_;
+  lifted::Regs& ctx_;
   uint8_t* base_;
   uint64_t lr_;
 };
 
 }  // namespace
 
-void UserInfoCreate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoCreate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ui::Create(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void UserInfoOpenMovie(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoOpenMovie) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ui::OpenMovie(ctx.r1.u32, uint32_t(ctx.lr), guest.calls());
 }
-void UserInfoWaitForLoad(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoWaitForLoad) {
   ctx.r3.u64 = ui::WaitForLoad(base, ctx.r3.u64, ctx.r1.u32);
 }
-void UserInfoReenter(PPCContext& ctx, uint8_t* base) { ui::Reenter(base, ctx.r3.u32); }
-void UserInfoClose(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoReenter) { ui::Reenter(base, ctx.r3.u32); }
+ITC_REGS_STEP(UserInfoClose) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ui::Close(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void UserInfoDestroy(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoDestroy) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ui::Destroy(base, ctx.r1.u32, guest.calls());
 }
-void UserInfoUpdatePage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoUpdatePage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ui::UpdatePage(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
-void UserInfoUpdate(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoUpdate) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ui::Update(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void UserInfoMenuPage(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoMenuPage) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ui::MenuPage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void UserInfoSetPlayTimeText(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoSetPlayTimeText) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ui::SetPlayTimeText(base, ctx.r1.u32, guest.calls());
 }
-void UserInfoOpening(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoOpening) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ui::Opening(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void UserInfoClosing(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoClosing) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ui::Closing(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
-void UserInfoSetTexts(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoSetTexts) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ui::SetTexts(base, ctx.r1.u32, guest.calls());
 }
 // StateMachine::Add's adapter's r3: a new transition's address from the
 // machine's 64-bit r3, as the type 2 screens' Inits.
-void UserInfoInitStates(PPCContext& ctx, uint8_t* base) {
+ITC_REGS_STEP(UserInfoInitStates) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;
@@ -136,12 +137,7 @@ void UserInfoInitStates(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 #define ITC_USER_INFO(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {  \
-    REX_FUNC_PROLOGUE();                \
-    if (!ITC_FLAG(native_user_info)) {  \
-      __imp__sub_##address(ctx, base);  \
-      return;                           \
-    }                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_user_info)) { \
     hooks::step(ctx, base);             \
   }
 

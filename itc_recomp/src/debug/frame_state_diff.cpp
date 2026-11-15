@@ -1,4 +1,5 @@
 #include "frame_state_diff.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "frame_pacing/game_messages.h"
@@ -430,8 +431,8 @@ void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
 // The race draw step's parts (sub_8215B4F8 calls these), wrapped only to
 // name which one advances per-frame state (logged as "draw step part").
 #define ITC_FRAME_STATE_WRAP(address)                       \
-  extern "C" REX_FUNC(sub_##address) {                      \
-    REX_FUNC_PROLOGUE();                                    \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                      \
+    \
     if (debug::IsHidden(0x##address)) {                     \
       return;                                               \
     }                                                       \
@@ -443,8 +444,8 @@ void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
 // (src/cameras/cameras.cpp, --native_cameras) or translated, inside the
 // same wrap.
 #define ITC_FRAME_STATE_WRAP_RECORDS(address, native)                 \
-  extern "C" REX_FUNC(sub_##address) {                                \
-    REX_FUNC_PROLOGUE();                                              \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                \
+    \
     if (debug::IsHidden(0x##address)) {                               \
       return;                                                         \
     }                                                                 \
@@ -461,8 +462,8 @@ ITC_FRAME_STATE_WRAP_RECORDS(8209F900, hooks::CameraPassesRecordEnds)
 // Scenery::Draw natively under --native_course_scenery
 // (src/course_scenery/draw.cpp, hooks::CourseSceneryDraw), inside the same
 // wrap.
-extern "C" REX_FUNC(sub_820F6068) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820F6068) {
+  
   if (debug::IsHidden(0x820F6068)) {
     return;
   }
@@ -470,15 +471,15 @@ extern "C" REX_FUNC(sub_820F6068) {
   if (hooks::CourseSceneryDrawNative()) {
     hooks::CourseSceneryDraw(ctx, base);
   } else {
-    __imp__sub_820F6068(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820F6068);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820F6068);
 }
 // ScreenObject::Record natively under --native_screen_objects
 // (src/screen_objects/record.cpp, lift.py's translation), inside the same
 // wrap.
-extern "C" REX_FUNC(sub_82130978) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82130978) {
+  
   if (debug::IsHidden(0x82130978)) {
     return;
   }
@@ -489,7 +490,7 @@ extern "C" REX_FUNC(sub_82130978) {
                                     a.r[5], a.r[6], a.r[7], a.f[0]);
     });
   } else {
-    __imp__sub_82130978(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82130978);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x82130978);
 }
@@ -497,8 +498,8 @@ extern "C" REX_FUNC(sub_82130978) {
 // work natively (src/cameras/cameras.cpp, --native_cameras) or translated,
 // inside the same wrap. CameraPasses::RenderTarget: r3 = the id; r3 = its
 // texture (zero-extended, as lwz leaves it).
-extern "C" REX_FUNC(sub_8209F7A8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209F7A8) {
+  
   if (debug::IsHidden(0x8209F7A8)) {
     return;
   }
@@ -506,13 +507,13 @@ extern "C" REX_FUNC(sub_8209F7A8) {
   if (ITC_FLAG(native_cameras)) {
     ctx.r3.u64 = cameras::RenderTarget(base, ctx.r3.u32);
   } else {
-    __imp__sub_8209F7A8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209F7A8);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x8209F7A8);
 }
 // CameraPass::Disable: r3 = the pass.
-extern "C" REX_FUNC(sub_820A0958) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820A0958) {
+  
   if (debug::IsHidden(0x820A0958)) {
     return;
   }
@@ -520,14 +521,14 @@ extern "C" REX_FUNC(sub_820A0958) {
   if (ITC_FLAG(native_cameras)) {
     cameras::Disable(base, ctx.r3.u32);
   } else {
-    __imp__sub_820A0958(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A0958);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820A0958);
 }
 // CameraPasses::EnableForView: r3 = the last pass enabled, as the original
 // leaves it.
-extern "C" REX_FUNC(sub_820AA1A8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820AA1A8) {
+  
   if (debug::IsHidden(0x820AA1A8)) {
     return;
   }
@@ -535,15 +536,15 @@ extern "C" REX_FUNC(sub_820AA1A8) {
   if (ITC_FLAG(native_cameras)) {
     ctx.r3.u64 = cameras::EnableForView(base);
   } else {
-    __imp__sub_820AA1A8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AA1A8);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820AA1A8);
 }
 // Vec4::Transform: r3 = out, r4 = a matrix, r5 = a vector; its work natively
 // (src/matrix_math/matrix_math.cpp, --native_matrix_math; the translated
 // code leaves flush-to-zero on) or translated, inside the same wrap.
-extern "C" REX_FUNC(sub_820AB560) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820AB560) {
+  
   if (debug::IsHidden(0x820AB560)) {
     return;
   }
@@ -552,7 +553,7 @@ extern "C" REX_FUNC(sub_820AB560) {
     matrix_math::Vec4Transform(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
     ctx.fpscr.enableFlushMode();
   } else {
-    __imp__sub_820AB560(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AB560);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820AB560);
 }
@@ -560,8 +561,8 @@ extern "C" REX_FUNC(sub_820AB560) {
 // (src/car_scene_draw/; native callers call the plain C++, not these wraps),
 // inside the same wrap.
 #define ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(address, step)            \
-  extern "C" REX_FUNC(sub_##address) {                                \
-    REX_FUNC_PROLOGUE();                                              \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                \
+    \
     if (debug::IsHidden(0x##address)) {                               \
       return;                                                         \
     }                                                                 \
@@ -583,8 +584,8 @@ ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820DAAC8, CarSceneDrawBeam)
 ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820DAB10, CarSceneDrawBeamShape)
 // XPR::GetTexture: r3 = the XPR, r4 = the index; r3 the record's header.
 // Natively under --native_models (src/models/xpr.cpp), inside the same wrap.
-extern "C" REX_FUNC(sub_82597118) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82597118) {
+  
   if (debug::IsHidden(0x82597118)) {
     return;
   }
@@ -592,7 +593,7 @@ extern "C" REX_FUNC(sub_82597118) {
   if (ITC_FLAG(native_models)) {
     ctx.r3.u64 = models::XprGetTexture(base, ctx.r3.u32, ctx.r4.u32);
   } else {
-    __imp__sub_82597118(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82597118);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x82597118);
 }
@@ -622,8 +623,8 @@ void debug::WatchLights(uint8_t* base, uint32_t list) {
 // Billboards::Record natively under --native_billboards
 // (src/sprites/billboard_record.cpp, hooks::BillboardsRecord), inside the
 // same wrap; its native caller Billboards::Draw makes the same checks.
-extern "C" REX_FUNC(sub_8209CC38) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209CC38) {
+  
   if (debug::IsHidden(0x8209CC38)) {
     return;
   }
@@ -632,7 +633,7 @@ extern "C" REX_FUNC(sub_8209CC38) {
   if (hooks::BillboardsNative()) {
     hooks::BillboardsRecord(ctx, base);
   } else {
-    __imp__sub_8209CC38(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209CC38);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x8209CC38);
 }
@@ -640,8 +641,8 @@ extern "C" REX_FUNC(sub_8209CC38) {
 // Car::DrawUpdate natively under --native_car_draw (src/car_draw/update.cpp;
 // it calls its callees' plain C++ inside the same checks as their wraps
 // below), inside the same wrap.
-extern "C" REX_FUNC(sub_820DAC68) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820DAC68) {
+  
   if (debug::IsHidden(0x820DAC68)) {
     return;
   }
@@ -649,7 +650,7 @@ extern "C" REX_FUNC(sub_820DAC68) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawUpdate(ctx, base);
   } else {
-    __imp__sub_820DAC68(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820DAC68);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820DAC68);
 }
@@ -657,8 +658,8 @@ extern "C" REX_FUNC(sub_820DAC68) {
 // Natively under --native_second_set (src/second_set/objects.cpp; the
 // releases it reaches call its plain C++, not this wrap), inside the same
 // wrap.
-extern "C" REX_FUNC(sub_820C5C88) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820C5C88) {
+  
   if (debug::IsHidden(0x820C5C88)) {
     return;
   }
@@ -674,8 +675,8 @@ extern "C" REX_FUNC(sub_820C5C88) {
 // --native_load_poll (src/load_poll/; their native callers call the plain
 // C++, not these wraps), inside the same wrap.
 #define ITC_FRAME_STATE_WRAP_LOAD_POLL(address, step)               \
-  extern "C" REX_FUNC(sub_##address) {                              \
-    REX_FUNC_PROLOGUE();                                            \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                              \
+    \
     if (debug::IsHidden(0x##address)) {                             \
       return;                                                       \
     }                                                               \
@@ -699,8 +700,8 @@ ITC_FRAME_STATE_WRAP_LOAD_POLL(820D9EA0, LoadPollSceneModelApplyPalettes)
 // SceneModel::IsNearPlayerHeight natively under --native_car_draw
 // (src/car_draw/; its native callers call the plain C++, not this wrap),
 // inside the same wrap.
-extern "C" REX_FUNC(sub_820DAB58) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820DAB58) {
+  
   if (debug::IsHidden(0x820DAB58)) {
     return;
   }
@@ -708,7 +709,7 @@ extern "C" REX_FUNC(sub_820DAB58) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawIsNearPlayerHeight(ctx, base);
   } else {
-    __imp__sub_820DAB58(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820DAB58);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820DAB58);
 }
@@ -716,8 +717,8 @@ ITC_FRAME_STATE_WRAP_LOAD_POLL(820DBFF8, LoadPollSceneCockpitFinish)
 // SceneCockpit::Draw natively under --native_car_draw (src/car_draw/; its
 // native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
 // same checks; this wrap stays for the recompiled one), inside the same wrap.
-extern "C" REX_FUNC(sub_820DC498) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820DC498) {
+  
   if (debug::IsHidden(0x820DC498)) {
     return;
   }
@@ -725,7 +726,7 @@ extern "C" REX_FUNC(sub_820DC498) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawSceneCockpit(ctx, base);
   } else {
-    __imp__sub_820DC498(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820DC498);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820DC498);
 }
@@ -734,8 +735,8 @@ ITC_FRAME_STATE_WRAP_LOAD_POLL(820DDA60, LoadPollSceneLightsFinish)
 // SceneLights::Draw natively under --native_car_draw (src/car_draw/; it
 // skips BlinkTimers::Advance on render-only passes as that one's adapter
 // does), inside the same wrap.
-extern "C" REX_FUNC(sub_820DDE58) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820DDE58) {
+  
   if (debug::IsHidden(0x820DDE58)) {
     return;
   }
@@ -743,7 +744,7 @@ extern "C" REX_FUNC(sub_820DDE58) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawSceneLightsDraw(ctx, base);
   } else {
-    __imp__sub_820DDE58(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820DDE58);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820DDE58);
 }
@@ -751,8 +752,8 @@ ITC_FRAME_STATE_WRAP_LOAD_POLL(820E2E68, LoadPollScenePartsFinish)
 // SceneParts::Draw natively under --native_car_draw (src/car_draw/; its
 // native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
 // same checks; this wrap stays for the recompiled one), inside the same wrap.
-extern "C" REX_FUNC(sub_820E2EE8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820E2EE8) {
+  
   if (debug::IsHidden(0x820E2EE8)) {
     return;
   }
@@ -760,7 +761,7 @@ extern "C" REX_FUNC(sub_820E2EE8) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawSceneParts(ctx, base);
   } else {
-    __imp__sub_820E2EE8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820E2EE8);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820E2EE8);
 }
@@ -768,8 +769,8 @@ ITC_FRAME_STATE_WRAP_LOAD_POLL(820E4140, LoadPollSceneInteriorFinish)
 // SceneInterior::Draw natively under --native_car_draw (src/car_draw/; its
 // native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
 // same checks; this wrap stays for the recompiled one), inside the same wrap.
-extern "C" REX_FUNC(sub_820E53F0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820E53F0) {
+  
   if (debug::IsHidden(0x820E53F0)) {
     return;
   }
@@ -777,7 +778,7 @@ extern "C" REX_FUNC(sub_820E53F0) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawSceneInterior(ctx, base);
   } else {
-    __imp__sub_820E53F0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820E53F0);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820E53F0);
 }
@@ -785,8 +786,8 @@ ITC_FRAME_STATE_WRAP_LOAD_POLL(820E5A68, LoadPollSceneTrafficFinish)
 // SceneTraffic::Draw natively under --native_car_draw (src/car_draw/; its
 // native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
 // same checks; this wrap stays for the recompiled one), inside the same wrap.
-extern "C" REX_FUNC(sub_820E6A40) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820E6A40) {
+  
   if (debug::IsHidden(0x820E6A40)) {
     return;
   }
@@ -794,7 +795,7 @@ extern "C" REX_FUNC(sub_820E6A40) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawSceneTraffic(ctx, base);
   } else {
-    __imp__sub_820E6A40(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820E6A40);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820E6A40);
 }
@@ -803,8 +804,8 @@ ITC_FRAME_STATE_WRAP_LOAD_POLL(820E8908, LoadPollSceneWheelsSetUpPoints)
 // SceneWheels::Draw natively under --native_car_draw (src/car_draw/; its
 // native caller, Car::DrawUpdate's plain C++, calls the plain C++ inside the
 // same checks; this wrap stays for the recompiled one), inside the same wrap.
-extern "C" REX_FUNC(sub_820ECE28) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820ECE28) {
+  
   if (debug::IsHidden(0x820ECE28)) {
     return;
   }
@@ -812,7 +813,7 @@ extern "C" REX_FUNC(sub_820ECE28) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawSceneWheels(ctx, base);
   } else {
-    __imp__sub_820ECE28(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820ECE28);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820ECE28);
 }
@@ -823,8 +824,8 @@ extern "C" REX_FUNC(sub_820ECE28) {
 // the 15 per-view objects at 0x826C5D80 whose camera pass (index at
 // 0x826174C8 + 36 * i) is active and whose +52 is clear, calls vtable slot 0,
 // then clears +8056 and +48 and flips +8060 (logged as "view draw").
-extern "C" REX_FUNC(sub_82133960) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82133960) {
+  
   if (debug::IsHidden(0x82133960)) {
     return;
   }
@@ -860,14 +861,14 @@ extern "C" REX_FUNC(sub_82133960) {
 
 // Tick handler 0x82096340 is a thunk calling vtable slot 1 of the object in
 // r3; name the function it reaches (logged as "thunk target").
-extern "C" REX_FUNC(sub_82096340) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82096340) {
+  
   uint32_t target = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4);
   debug::FrameStateDiff_Before(base);
   if (hooks::NativeFramework()) {
     hooks::DelegateSlot1Thunk(ctx, base);
   } else {
-    __imp__sub_82096340(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82096340);
   }
   debug::FrameStateDiff_After(base, "thunk target", target);
 }

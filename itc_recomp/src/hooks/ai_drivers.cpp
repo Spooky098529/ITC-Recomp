@@ -88,6 +88,7 @@
 // Extend.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "ai_drivers/ai_drivers.h"
@@ -209,12 +210,7 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_AI_DRIVERS(address, body)   \
-  extern "C" REX_FUNC(sub_##address) {  \
-    REX_FUNC_PROLOGUE();                \
-    if (!ITC_FLAG(native_ai_drivers)) { \
-      __imp__sub_##address(ctx, base);  \
-      return;                           \
-    }                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_ai_drivers)) { \
     ctx.fpscr.disableFlushMode();       \
     body;                               \
   }
@@ -254,8 +250,8 @@ ITC_AI_DRIVERS(82144EF8, UpdateLane(base, ctx.r3.u32, ctx.r1.u32 - 128);
 
 // The copies in the original's frame (6,320 bytes down); the original where
 // one can't be made natively.
-extern "C" REX_FUNC(sub_8213ADF8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8213ADF8) {
+  
   if (ITC_FLAG(native_ai_drivers)) {
     ctx.fpscr.disableFlushMode();
     uint32_t result = 0;
@@ -264,7 +260,7 @@ extern "C" REX_FUNC(sub_8213ADF8) {
       return;
     }
   }
-  __imp__sub_8213ADF8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8213ADF8);
 }
 
 // --- Resets, steering input and the path's lists ---
@@ -281,8 +277,8 @@ ITC_AI_DRIVERS(8213A140, ctx.r3.u64 = ClearAll(base, ctx.r1.u32 - 128))
 // --- The drivers' table and the path's lines and ranges ---
 
 // The original where operator new fails natively.
-extern "C" REX_FUNC(sub_8213B1E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8213B1E0) {
+  
   if (ITC_FLAG(native_ai_drivers)) {
     ctx.fpscr.disableFlushMode();
     uint64_t r3 = 0;
@@ -295,8 +291,8 @@ extern "C" REX_FUNC(sub_8213B1E0) {
 }
 
 // The original where the table can't be freed natively.
-extern "C" REX_FUNC(sub_8213B2B8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8213B2B8) {
+  
   if (ITC_FLAG(native_ai_drivers)) {
     uint64_t r3 = ctx.r3.u64;
     if (Destroy(base, &r3)) {
@@ -344,7 +340,7 @@ struct UpdateCall {
 // bytes, returning to 0x82139684) with r3 = the driver, as the original.
 uint64_t CallDriverUpdate(void* user, uint64_t driver, uint32_t function) {
   auto& call = *static_cast<UpdateCall*>(user);
-  PPCContext& ctx = *call.ctx;
+  lifted::Regs& ctx = *call.ctx;
   uint8_t* base = call.base;
   guest_call::InFrame(ctx, base, 176, 0x82139684, [&](uint32_t) {
     ctx.r3.u64 = driver;
@@ -357,13 +353,13 @@ uint64_t CallDriverUpdate(void* user, uint64_t driver, uint32_t function) {
 
 // The updates are recompiled code (through the driver's +6148); the
 // original's frame 176 bytes down.
-void hooks::AiUpdateAll(PPCContext& ctx, uint8_t* base) {
+void hooks::AiUpdateAll(lifted::Regs& ctx, uint8_t* base) {
   if (g_update_all_stand_in != nullptr) {
     g_update_all_stand_in(ctx, base);
     return;
   }
   if (!ITC_FLAG(native_ai_drivers)) {
-    __imp__sub_82139628(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82139628);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -372,8 +368,8 @@ void hooks::AiUpdateAll(PPCContext& ctx, uint8_t* base) {
   call.base = base;
   ctx.r3.u64 = UpdateAll(base, ctx.r1.u32 - 176, CallDriverUpdate, &call);
 }
-extern "C" REX_FUNC(sub_82139628) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82139628) {
+  
   hooks::AiUpdateAll(ctx, base);
 }
 
@@ -402,7 +398,7 @@ struct PathCall {
 uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t path,
                         uint32_t entry, uint32_t position, uint32_t lane, uint64_t masks) {
   auto& call = *static_cast<PathCall*>(user);
-  PPCContext& ctx = *call.ctx;
+  lifted::Regs& ctx = *call.ctx;
   uint8_t* base = call.base;
   const uint64_t saved = ctx.r1.u64;
   guest::StoreU32(base, frame, frame + 208);
@@ -424,7 +420,7 @@ uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t 
 
 // r3 = the car's input record (left in r3), r4 = the racer's index, r5 = the
 // flag; the original's frame 144 bytes down.
-void hooks::AiDriveCar(PPCContext& ctx, uint8_t* base) {
+void hooks::AiDriveCar(lifted::Regs& ctx, uint8_t* base) {
   if (g_drive_car_stand_in != nullptr) {
     g_drive_car_stand_in(ctx, base);
     return;
@@ -442,14 +438,14 @@ void hooks::AiDriveCar(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_8215F678(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8215F678);
 }
-extern "C" REX_FUNC(sub_8215F678) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8215F678) {
+  
   hooks::AiDriveCar(ctx, base);
 }
 // The original's frame 96 bytes down.
-void hooks::AiUpdateIdle(PPCContext& ctx, uint8_t* base) {
+void hooks::AiUpdateIdle(lifted::Regs& ctx, uint8_t* base) {
   if (g_update_idle_stand_in != nullptr) {
     g_update_idle_stand_in(ctx, base);
     return;
@@ -465,9 +461,9 @@ void hooks::AiUpdateIdle(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_821399A8(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_821399A8);
 }
-extern "C" REX_FUNC(sub_821399A8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(821399A8) {
+  
   hooks::AiUpdateIdle(ctx, base);
 }

@@ -79,7 +79,7 @@ void ParseFiles(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = file;
       t.r4.u64 = record;
-      (v == 0 ? __imp__sub_822A8568 : NativeParseFile)(t, h.base);
+      (v == 0 ? __imp__sub_822A8568 : ITC_CONTEXT_FN(NativeParseFile))(t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
     }
@@ -105,7 +105,7 @@ void PixelShaderInits(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = object;
       t.r4.u64 = microcode;
-      (v == 0 ? __imp__sub_822A85B8 : NativePixelShaderInit)(t, h.base);
+      (v == 0 ? __imp__sub_822A85B8 : ITC_CONTEXT_FN(NativePixelShaderInit))(t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
     }
     results.Check(out[0], out[1], fmt::format("case {} (object at +{})", c, object - h.data));
@@ -183,7 +183,7 @@ void VertexShaderInits(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = object;
       t.r4.u64 = microcode;
-      (v == 0 ? __imp__sub_822A8740 : NativeVertexShaderInit)(t, h.base);
+      (v == 0 ? __imp__sub_822A8740 : ITC_CONTEXT_FN(NativeVertexShaderInit))(t, h.base);
       out[v].Bytes(Read(h.base, block, kObjectBytes));
       if (microcode != object + 4) {
         out[v].Bytes(Read(h.base, microcode, kMicrocodeBytes));
@@ -273,9 +273,9 @@ void HeaderCopies(Context& h) {
         t.r4.u64 = uint32_t(h.random.Next());
         t.r5.u64 = at;
         if (pixel) {
-          (v == 0 ? __imp__sub_822A9EA8 : NativeCopyPixelHeader)(t, h.base);
+          (v == 0 ? __imp__sub_822A9EA8 : ITC_CONTEXT_FN(NativeCopyPixelHeader))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_822A9FD8 : NativeCopyVertexHeader)(t, h.base);
+          (v == 0 ? __imp__sub_822A9FD8 : ITC_CONTEXT_FN(NativeCopyVertexHeader))(t, h.base);
         }
         out[v].Bytes(Read(h.base, objects, kBlockBytes));
         out[v].Bytes(Read(h.base, files, kBlockBytes));
@@ -306,7 +306,7 @@ void TextureRelocations(Context& h) {
       t.r3.u64 = header;
       t.r4.u64 = c % 3 == 0 ? (a & 0xFFFFF000u) : a;
       t.r5.u64 = b;
-      (v == 0 ? __imp__sub_8235A990 : NativeRelocateTexture)(t, h.base);
+      (v == 0 ? __imp__sub_8235A990 : ITC_CONTEXT_FN(NativeRelocateTexture))(t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
     }
@@ -365,9 +365,9 @@ void Creates(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = file;
         if (pixel) {
-          (v == 0 ? __imp__sub_822A9EE8 : NativePixelShaderCreate)(t, h.base);
+          (v == 0 ? __imp__sub_822A9EE8 : ITC_CONTEXT_FN(NativePixelShaderCreate))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_822AA018 : NativeVertexShaderCreate)(t, h.base);
+          (v == 0 ? __imp__sub_822AA018 : ITC_CONTEXT_FN(NativeVertexShaderCreate))(t, h.base);
         }
         const uint32_t object = t.r3.u32;
         out[v].Word(object != 0);
@@ -466,7 +466,7 @@ void ResourceRelocations(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = resource;
       t.r4.u64 = address;
-      (v == 0 ? __imp__sub_8235A9F8 : NativeRelocateResource)(t, h.base);
+      (v == 0 ? __imp__sub_8235A9F8 : ITC_CONTEXT_FN(NativeRelocateResource))(t, h.base);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
     }
@@ -516,7 +516,7 @@ void XprCreates(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = xpr;
       t.r4.u64 = file;
-      (v == 0 ? __imp__sub_82596F68 : NativeXprCreate)(t, h.base);
+      (v == 0 ? __imp__sub_82596F68 : ITC_CONTEXT_FN(NativeXprCreate))(t, h.base);
       out[v].Word(t.r3.u32);
       if (!xpr2) {
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
@@ -626,7 +626,7 @@ void LoadShaderSections(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = model;
       t.r4.u64 = section;
-      (v == 0 ? __imp__sub_82594D20 : NativeLoadShaders)(t, h.base);
+      (v == 0 ? __imp__sub_82594D20 : ITC_CONTEXT_FN(NativeLoadShaders))(t, h.base);
       out[v].Word(Load(h.base, model + 420));
       const uint32_t block = Load(h.base, model + 24);
       for (uint32_t i = 0; i < pairs; i++) {
@@ -713,9 +713,9 @@ void SkeletonSetUps(Context& h) {
         t.r5.u64 = with_matrices ? h.data + 2048 : 0;
         t.r6.s64 = instances;
         if (bind) {
-          (v == 0 ? __imp__sub_82599A20 : NativeSkeletonBind)(t, h.base);
+          (v == 0 ? __imp__sub_82599A20 : ITC_CONTEXT_FN(NativeSkeletonBind))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_8259A9E0 : NativeSkeletonSetUp)(t, h.base);
+          (v == 0 ? __imp__sub_8259A9E0 : ITC_CONTEXT_FN(NativeSkeletonSetUp))(t, h.base);
         }
         // The arrays by their contents, their words replaced by 0.
         const uint32_t count = Load(h.base, skeleton + 160);
@@ -984,7 +984,7 @@ void ModelLoads(Context& h) {
       t.r3.u64 = model;
       t.r4.u64 = files;
       t.r5.u64 = with_xpr ? xprs : 0;
-      (v == 0 ? __imp__sub_82596920 : NativeModelLoad)(t, h.base);
+      (v == 0 ? __imp__sub_82596920 : ITC_CONTEXT_FN(NativeModelLoad))(t, h.base);
       out[v].Word(t.r3.u32);
       // The side's blocks: the model's, its shaders', its XPR's, its
       // skeleton's.
@@ -1090,7 +1090,7 @@ void BlockMakers(Context& h) {
       for (int v = 0; v < 2; v++) {
         PPCContext t = CallContext(h);
         t.r3.u64 = size;
-        (v == 0 ? __imp__sub_8258DFF0 : NativeAllocVirtual)(t, h.base);
+        (v == 0 ? __imp__sub_8258DFF0 : ITC_CONTEXT_FN(NativeAllocVirtual))(t, h.base);
         out[v].Word(t.r3.u32 != 0 && memory::IsPages(t.r3.u32 - models::kBlockHeaderBytes));
         MadeBlock(out[v], h.base, t.r3.u32, 4096, [](uint32_t header) {
           memory::FreePages(header);
@@ -1119,7 +1119,7 @@ void BlockMakers(Context& h) {
           t.r5.u64 = a.high;
           t.r6.u64 = a.alignment;
           t.r7.u64 = a.protection;
-          (v == 0 ? __imp__sub_8258E098 : NativeAllocPhysicalEx)(t, h.base);
+          (v == 0 ? __imp__sub_8258E098 : ITC_CONTEXT_FN(NativeAllocPhysicalEx))(t, h.base);
           MadeBlock(out[v], h.base, t.r3.u32, a.alignment > 4096 ? a.alignment : 4096,
                     [](uint32_t header) { memory::FreePhysical(header); });
         }
@@ -1141,7 +1141,7 @@ void BlockMakers(Context& h) {
           PPCContext t = CallContext(h);
           t.r3.u64 = size;
           t.r4.u64 = a;
-          (v == 0 ? __imp__sub_8258E138 : NativeAllocPhysical)(t, h.base);
+          (v == 0 ? __imp__sub_8258E138 : ITC_CONTEXT_FN(NativeAllocPhysical))(t, h.base);
           MadeBlock(out[v], h.base, t.r3.u32, (a & 0x80000000u) ? 4096 : 16,
                     [&](uint32_t header) { memory::crt::XMemFree(header, a); });
         }
@@ -1213,7 +1213,7 @@ void FreesDue(Context& h) {
       Store(h.base, list + models::kListHead, head);
       Store(h.base, list + models::kListSize, count);
       PPCContext t = CallContext(h);
-      (v == 0 ? __imp__sub_8258E1D8 : NativeFreeDue)(t, h.base);
+      (v == 0 ? __imp__sub_8258E1D8 : ITC_CONTEXT_FN(NativeFreeDue))(t, h.base);
       out[v].Word(Load(h.base, list + models::kListSize));
       out[v].Word(Load(h.base, head + models::kNodePrevious) ==
                   (count == 0 ? head : Load(h.base, head + models::kNodePrevious)));

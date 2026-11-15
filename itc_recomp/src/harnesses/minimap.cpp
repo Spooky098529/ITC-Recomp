@@ -172,7 +172,7 @@ void Lookups(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = block;
             t.r4.u64 = c % 3 == 2 ? r.Next() : uint64_t(c % 3);
           },
-          __imp__sub_82170608, hooks::MinimapFindPlayerEntry, {}, fmt::format("case {}", c));
+          __imp__sub_82170608, ITC_CONTEXT_FN(hooks::MinimapFindPlayerEntry), {}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -190,7 +190,7 @@ void Lookups(Context& h, Random& r, uint32_t block) {
             guest::StoreU32(h.base, kVehicles, c % 8 == 5 ? 0 : 0x40000000u + r.Below(0x1000) * 16);
             t.r3.u64 = racer;
           },
-          __imp__sub_82170578, hooks::MinimapRacerVehicle, {}, fmt::format("case {}", c));
+          __imp__sub_82170578, ITC_CONTEXT_FN(hooks::MinimapRacerVehicle), {}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -215,7 +215,7 @@ void Points(Context& h, Random& r, uint32_t block) {
           t.r6.u64 = point;
           t.r7.u64 = part;
         },
-        __imp__sub_82147D18, hooks::MinimapSetListPoint, {{out - block, 3}},
+        __imp__sub_82147D18, ITC_CONTEXT_FN(hooks::MinimapSetListPoint), {{out - block, 3}},
         fmt::format("case {}", c));
   }
   results.Report();
@@ -269,7 +269,7 @@ void MarkerType(Context& h, Random& r, uint32_t block) {
           const uint32_t pick = r.Below(16);
           t.r4.u64 = pick == 0 ? ~0ull : pick == 1 ? r.Next() : r.Below(16);
         },
-        __imp__sub_820F2D28, hooks::MinimapRacerMarkerType, {}, fmt::format("case {}", c));
+        __imp__sub_820F2D28, ITC_CONTEXT_FN(hooks::MinimapRacerMarkerType), {}, fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -295,7 +295,7 @@ void Shapes(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = out;
             t.r4.u64 = vector;
           },
-          __imp__sub_820F2EF8, hooks::MinimapScaling,
+          __imp__sub_820F2EF8, ITC_CONTEXT_FN(hooks::MinimapScaling),
           {{out - block, 1}, {out - block + 20, 1}, {out - block + 40, 1}},
           fmt::format("case {}", c));
     }
@@ -308,7 +308,7 @@ void Shapes(Context& h, Random& r, uint32_t block) {
       const uint32_t triangle = block + 0x100 + 4 * uint32_t(c % 4);
       Case(
           h, results, block, r, [&](PPCContext& t) { t.r3.u64 = triangle; },
-          __imp__sub_820F4040, hooks::MinimapTriangleInit, {}, fmt::format("case {}", c));
+          __imp__sub_820F4040, ITC_CONTEXT_FN(hooks::MinimapTriangleInit), {}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -362,7 +362,7 @@ void Lists(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = list;
             t.r4.u64 = (r.Below(4) == 0 ? r.Next() & ~0xFFFFull : 0) | r.Below(count + 1);
           },
-          __imp__sub_820F40C0, NativeLink, {}, fmt::format("case {}", c));
+          __imp__sub_820F40C0, ITC_CONTEXT_FN(NativeLink), {}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -381,7 +381,7 @@ void Lists(Context& h, Random& r, uint32_t block) {
             // The game's position is the count.
             t.r5.u64 = c % 2 == 0 ? count : r.Below(count + 1);
           },
-          __imp__sub_820F5238, hooks::MinimapList80Insert, {{data, 80 * 16}},
+          __imp__sub_820F5238, ITC_CONTEXT_FN(hooks::MinimapList80Insert), {{data, 80 * 16}},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -398,7 +398,7 @@ void Lists(Context& h, Random& r, uint32_t block) {
             t.r4.u64 = list;
             t.r5.u64 = r.Below(count);
           },
-          __imp__sub_820F51A8, hooks::MinimapList80Copy, {}, fmt::format("case {}", c));
+          __imp__sub_820F51A8, ITC_CONTEXT_FN(hooks::MinimapList80Copy), {}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -428,7 +428,7 @@ void Transform(Context& h, Random& r, uint32_t block) {
           t.r3.u64 = pass;
           t.r4.u64 = primitive;
         },
-        __imp__sub_8217AEA8, hooks::MinimapRecordTransform,
+        __imp__sub_8217AEA8, ITC_CONTEXT_FN(hooks::MinimapRecordTransform),
         {{0x1000 + 16, 4}, {0x1000 + 32, 4}, {0x1000 + 48, 4}, {0x1000 + 64, 4}},
         fmt::format("case {}", c), [&](const PPCContext& t, Outputs& out) {
           out.Floats(h.base, t.r1.u32 - mm::kTransformProduct, 16);
@@ -489,7 +489,7 @@ void Triangles(Context& h, Random& r, uint32_t block) {
             t.r5.u64 = r.Below(4) == 0 ? r.Next() : 104;
           },
           which == 0 ? __imp__sub_8217C370 : __imp__sub_8217DAA0,
-          which == 0 ? NativeRecordFlat : hooks::MinimapTriangleRecord, floats,
+          which == 0 ? ITC_CONTEXT_FN(NativeRecordFlat) : ITC_CONTEXT_FN(hooks::MinimapTriangleRecord), floats,
           fmt::format("case {}", c), [&](const PPCContext& t, Outputs& out) {
             out.Floats(h.base, t.r1.u32 - mm::kRecordFlatFrame - mm::kTransformProduct, 16);
             out.Double(t.f1.u64);
@@ -562,7 +562,7 @@ void Markers(Context& h, Random& r, uint32_t block) {
             t.r5.u64 = matrix;
           },
           point ? __imp__sub_820F4BA8 : __imp__sub_820F4888,
-          point ? hooks::MinimapDrawPointMarker : hooks::MinimapDrawCarMarker, floats,
+          point ? ITC_CONTEXT_FN(hooks::MinimapDrawPointMarker) : ITC_CONTEXT_FN(hooks::MinimapDrawCarMarker), floats,
           fmt::format("case {} ({})", c, pick == 0 ? "the game's table"
                                          : pick == 1 ? "made again" : "random floats"),
           [&](const PPCContext& t, Outputs& out) {

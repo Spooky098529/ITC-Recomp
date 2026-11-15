@@ -2,6 +2,7 @@
 // (docs/functions/app-start-up.md).
 
 #include "hooks/app_start_up.h"
+#include "hooks/native_entry.h"
 #include "hooks/direct_slots.h"
 
 #include "app_start_up/start_up.h"
@@ -55,8 +56,8 @@ hooks::StartUpRecorder hooks::g_start_up_recorder = nullptr;
 // App::StartUp's plain C++ calls them in play (Movies::Set's original where
 // its plain C++ hands back).
 
-extern "C" REX_FUNC(sub_822A8980) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A8980) {
+  
   if (ITC_FLAG(native_app_start_up) && hooks::NativeHeapActive()) {
     const auto declaration =
         asu::CreateVertexDeclaration(base, ctx.r3.u32, [&](uint32_t to, uint32_t from, uint32_t size) {
@@ -75,7 +76,7 @@ extern "C" REX_FUNC(sub_822A8980) {
       return;
     }
   }
-  __imp__sub_822A8980(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_822A8980);
 }
 
 // --- The network manager's set-up ---
@@ -85,7 +86,7 @@ namespace {
 // memcpy through the guest from XNet::Configure's frame. (SignIn::SetUp,
 // Network::StartUp, XNetStartup and XNet::Configure have no adapters: only
 // Network::SetUp's plain C++ calls them in play.)
-asu::MemcpyCall XNetMemcpy(PPCContext& ctx, uint8_t* base) {
+asu::MemcpyCall XNetMemcpy(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t to, uint32_t from, uint32_t size) {
     InFrame(ctx, base, 112, 0x82577580, [&](uint32_t) {
       ctx.r3.u64 = to;
@@ -98,13 +99,13 @@ asu::MemcpyCall XNetMemcpy(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_8214E190) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8214E190) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8214E190)) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_8214E190(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8214E190);
     return;
   }
   ctx.r3.u64 = asu::NetworkSetUp(base, ctx.r3.u32, ctx.r1.u32 - 144, XNetMemcpy(ctx, base));
@@ -119,7 +120,7 @@ namespace {
 
 // [0x8266D088]'s slot 7, then that object's slot 3: the video output, with
 // the original's return addresses.
-uint32_t VideoOutput(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
+uint32_t VideoOutput(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
   ctx.r3.u64 = guest::LoadU32(base, asu::kSceneTargetApp);
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
@@ -142,7 +143,7 @@ bool DeviceUsersNative() {
 
 // (SceneTarget::SceneTarget has no adapter: only SceneTarget::Create's plain
 // C++ calls it in play.)
-asu::VideoOutputCall SceneTargetVideoOutput(PPCContext& ctx, uint8_t* base) {
+asu::VideoOutputCall SceneTargetVideoOutput(lifted::Regs& ctx, uint8_t* base) {
   return [&ctx, base](int at) {
     return at == 0 ? VideoOutput(ctx, base, 0x8209B0B0, 0x8209B0C0)
                    : VideoOutput(ctx, base, 0x8209B298, 0x8209B2A8);
@@ -151,13 +152,13 @@ asu::VideoOutputCall SceneTargetVideoOutput(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_8209B378) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209B378) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8209B378)) {
     return;
   }
   if (!DeviceUsersNative()) {
-    __imp__sub_8209B378(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209B378);
     return;
   }
   const uint32_t interface = ctx.r3.u32;
@@ -170,7 +171,7 @@ extern "C" REX_FUNC(sub_8209B378) {
   });
   ctx.lr = lr;
   if (!result) {
-    __imp__sub_8209B378(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209B378);
     return;
   }
   ctx.r3.u64 = *result;
@@ -180,7 +181,7 @@ extern "C" REX_FUNC(sub_8209B378) {
 
 namespace {
 
-uint32_t VirtualCall(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t offset,
+uint32_t VirtualCall(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t offset,
                      uint32_t return_address) {
   ctx.r3.u64 = object;
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, object) + offset);
@@ -195,13 +196,13 @@ uint32_t VirtualCall(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t o
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_8209BE88) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8209BE88) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8209BE88)) {
     return;
   }
   if (!DeviceUsersNative()) {
-    __imp__sub_8209BE88(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8209BE88);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -270,7 +271,7 @@ namespace {
 // Runs `call` with r1 at `frame` (the frame the original makes the call
 // from), then puts r1 back.
 template <typename Call>
-uint32_t At(PPCContext& ctx, uint32_t frame, Call call) {
+uint32_t At(lifted::Regs& ctx, uint32_t frame, Call call) {
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame;
   const uint32_t r3 = call();
@@ -280,7 +281,7 @@ uint32_t At(PPCContext& ctx, uint32_t frame, Call call) {
 
 // The font's guest calls: Font::Font's from `font_frame`, Font::CreateShaders'
 // from `shaders_frame`, Strings::Init from `text_frame` (Text::Init's).
-asu::FontCalls FontCallsFor(PPCContext& ctx, uint8_t* base, uint32_t text_frame,
+asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_frame,
                             uint32_t font_frame, uint32_t shaders_frame) {
   asu::FontCalls calls;
   calls.video_output = [&ctx, base, font_frame] {
@@ -371,7 +372,7 @@ asu::FontCalls FontCallsFor(PPCContext& ctx, uint8_t* base, uint32_t text_frame,
 
 }  // namespace
 
-void hooks::TextInitSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::TextInitSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
   InFrame(ctx, base, 96, 0x8210ADE0, [&](uint32_t text_frame) {
@@ -388,7 +389,7 @@ void hooks::TextInitSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void hooks::FontConstructSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::FontConstructSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t font = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   InFrame(ctx, base, 128, 0x82109258, [&](uint32_t font_frame) {
@@ -403,13 +404,13 @@ void hooks::FontConstructSteps(PPCContext& ctx, uint8_t* base) {
 
 // Text::Init: no arguments (Font::Init, Font::Font and Font::CreateShaders
 // have no adapters: only its plain C++ calls them in play).
-extern "C" REX_FUNC(sub_8210ADD0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8210ADD0) {
+  
   if (hooks::StartUpRecorded(ctx, 0x8210ADD0)) {
     return;
   }
   if (!DeviceUsersNative()) {
-    __imp__sub_8210ADD0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8210ADD0);
     return;
   }
   hooks::TextInitSteps(ctx, base);
@@ -417,7 +418,7 @@ extern "C" REX_FUNC(sub_8210ADD0) {
 
 // --- The app's start-up ---
 
-void hooks::AppStartUpSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::AppStartUpSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t interface = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
   const uint64_t r31 = ctx.r31.u64;
@@ -452,13 +453,13 @@ void hooks::AppStartUpSteps(PPCContext& ctx, uint8_t* base) {
 }
 
 // App::StartUp: r3 = app + 16, from App::App once at boot.
-extern "C" REX_FUNC(sub_82106548) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82106548) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82106548)) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_82106548(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82106548);
     return;
   }
   hooks::AppStartUpSteps(ctx, base);
@@ -470,12 +471,12 @@ namespace {
 
 // The original's __savegprlr_N: the link register at r1 - 8 and rN to r31
 // (doublewords) below it, above the frame it's about to make.
-void SaveRegisters(PPCContext& ctx, uint8_t* base, int first) {  // first >= 14
+void SaveRegisters(lifted::Regs& ctx, uint8_t* base, int first) {  // first >= 14
   // r14 to r31 are consecutive in PPCContext (r3 comes first there).
-  static_assert(offsetof(PPCContext, r31) - offsetof(PPCContext, r14) == 17 * sizeof(PPCRegister));
+  static_assert(offsetof(PPCContext, r31) - offsetof(PPCContext, r14) == 17 * sizeof(lifted::Temp));
   const uint32_t sp = ctx.r1.u32;
   guest::StoreU32(base, sp - 8, uint32_t(ctx.lr));
-  const PPCRegister* regs = &ctx.r14;
+  const lifted::Temp* regs = &ctx.r14;
   for (int n = first; n < 32; n++) {
     const uint64_t value = regs[n - 14].u64;
     const uint32_t at = sp - 8 * (32 - n) - 8;
@@ -486,7 +487,7 @@ void SaveRegisters(PPCContext& ctx, uint8_t* base, int first) {  // first >= 14
 
 }  // namespace
 
-void hooks::MovieWrapperSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::MovieWrapperSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t wrapper = ctx.r3.u32;
   // The original's prologue: lr, r30 and r31 above its 112-byte frame.
   SaveRegisters(ctx, base, 30);
@@ -494,14 +495,14 @@ void hooks::MovieWrapperSteps(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = *r3;
     return;
   }
-  __imp__sub_82593DC0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_82593DC0);
 }
 
 // MovieWrapper::MovieWrapper (sub_82593DC0) has no adapter: only Movie::Movie's
 // plain C++ calls it in play (its steps above), the original with the flag
 // off.
 
-void hooks::MovieConstructSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::MovieConstructSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t movie = ctx.r3.u32;
   const uint32_t block = ctx.r4.u32;
   const uint64_t lr = ctx.lr;
@@ -528,7 +529,7 @@ void hooks::MovieConstructSteps(PPCContext& ctx, uint8_t* base) {
   if (!result) {
     ctx.r3.u64 = movie;
     ctx.r4.u64 = block;
-    __imp__sub_820AEA88(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AEA88);
     return;
   }
   ctx.r3.u64 = *result;
@@ -536,13 +537,13 @@ void hooks::MovieConstructSteps(PPCContext& ctx, uint8_t* base) {
 
 // Movie::Movie: r3 = the movie (312 bytes), r4 = the set-up block, from
 // App::App once at boot.
-extern "C" REX_FUNC(sub_820AEA88) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820AEA88) {
+  
   if (hooks::StartUpRecorded(ctx, 0x820AEA88)) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    __imp__sub_820AEA88(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820AEA88);
     return;
   }
   hooks::MovieConstructSteps(ctx, base);
@@ -557,7 +558,7 @@ void StoreDoubleword(uint8_t* base, uint32_t address, uint64_t value) {
   guest::StoreU32(base, address + 4, uint32_t(value));
 }
 
-asu::AudioManagerCalls AudioManagerCallsFor(PPCContext& ctx, uint8_t* base, uint32_t frame) {
+asu::AudioManagerCalls AudioManagerCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t frame) {
   asu::AudioManagerCalls calls;
   calls.call = [&ctx, base](uint32_t target, uint32_t sp, uint32_t r3, std::optional<uint32_t> r4,
                             std::optional<uint32_t> r5, uint32_t return_address) {
@@ -595,7 +596,7 @@ asu::AudioManagerCalls AudioManagerCallsFor(PPCContext& ctx, uint8_t* base, uint
 
 }  // namespace
 
-void hooks::AudioManagerCreateSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::AudioManagerCreateSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t owner = ctx.r3.u32, name = ctx.r4.u32, count = ctx.r5.u32;
   const uint64_t entry_r3 = ctx.r3.u64, entry_r4 = ctx.r4.u64, entry_r5 = ctx.r5.u64;
   const uint64_t lr = ctx.lr;
@@ -618,7 +619,7 @@ void hooks::AudioManagerCreateSteps(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = entry_r3;
     ctx.r4.u64 = entry_r4;
     ctx.r5.u64 = entry_r5;
-    __imp__sub_82119B38(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82119B38);
     return;
   }
   if (*result != 0) {
@@ -639,19 +640,19 @@ void hooks::AudioManagerCreateSteps(PPCContext& ctx, uint8_t* base) {
 // bank count's address; from App::App once at boot. (AudioManager's
 // constructor and AudioEngine::StartXAudio have no adapters: only its plain
 // C++ calls them in play.)
-extern "C" REX_FUNC(sub_82119B38) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82119B38) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82119B38)) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    __imp__sub_82119B38(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82119B38);
     return;
   }
   hooks::AudioManagerCreateSteps(ctx, base);
 }
 
-void hooks::StartXAudioSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::StartXAudioSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t sp = ctx.r1.u32;
   const uint64_t lr = ctx.lr;
   // The original's prologue: lr, r30 and r31 above its 144-byte frame.
@@ -669,11 +670,11 @@ void hooks::StartXAudioSteps(PPCContext& ctx, uint8_t* base) {
 
 namespace {
 
-asu::AppCameraCalls AppCameraCallsFor(PPCContext& ctx, uint8_t* base, uint64_t owner);
+asu::AppCameraCalls AppCameraCallsFor(lifted::Regs& ctx, uint8_t* base, uint64_t owner);
 
 // The constructors' prologues: lr and r31 (the owner's object, the caller's
 // r31) above their frames.
-uint32_t AppCameraCameraSteps(PPCContext& ctx, uint8_t* base, uint32_t camera, uint64_t owner) {
+uint32_t AppCameraCameraSteps(lifted::Regs& ctx, uint8_t* base, uint32_t camera, uint64_t owner) {
   const uint32_t sp = ctx.r1.u32;
   guest::StoreU32(base, sp - 8, 0x820A8C40);
   StoreDoubleword(base, sp - 16, owner);
@@ -682,7 +683,7 @@ uint32_t AppCameraCameraSteps(PPCContext& ctx, uint8_t* base, uint32_t camera, u
   return asu::AppCameraCameraConstruct(base, camera, frame, AppCameraCallsFor(ctx, base, owner));
 }
 
-uint32_t AppCameraListSteps(PPCContext& ctx, uint8_t* base, uint32_t list, uint64_t owner) {
+uint32_t AppCameraListSteps(lifted::Regs& ctx, uint8_t* base, uint32_t list, uint64_t owner) {
   const uint32_t sp = ctx.r1.u32;
   guest::StoreU32(base, sp - 8, 0x820A8C64);
   StoreDoubleword(base, sp - 16, owner);
@@ -692,12 +693,12 @@ uint32_t AppCameraListSteps(PPCContext& ctx, uint8_t* base, uint32_t list, uint6
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = list;
   ctx.lr = 0x820A8C64;
-  __imp__sub_820A98C0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820A98C0);
   ctx.lr = lr;
   return ctx.r3.u32;
 }
 
-asu::AppCameraCalls AppCameraCallsFor(PPCContext& ctx, uint8_t* base, uint64_t owner) {
+asu::AppCameraCalls AppCameraCallsFor(lifted::Regs& ctx, uint8_t* base, uint64_t owner) {
   asu::AppCameraCalls calls;
   calls.call = [&ctx, base](uint32_t target, uint32_t sp, uint32_t r3, uint32_t return_address) {
     const uint64_t stack = ctx.r1.u64;
@@ -740,7 +741,7 @@ asu::AppCameraCalls AppCameraCallsFor(PPCContext& ctx, uint8_t* base, uint64_t o
 
 }  // namespace
 
-void hooks::AppCameraSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::AppCameraSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t object = ctx.r3.u32, block = ctx.r4.u32;
   const uint64_t entry_r3 = ctx.r3.u64, entry_r4 = ctx.r4.u64;
   const uint64_t lr = ctx.lr;
@@ -758,13 +759,13 @@ void hooks::AppCameraSteps(PPCContext& ctx, uint8_t* base) {
   if (!result) {
     ctx.r3.u64 = entry_r3;
     ctx.r4.u64 = entry_r4;
-    __imp__sub_820A8B88(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A8B88);
     return;
   }
   ctx.r3.u64 = *result;
 }
 
-void hooks::AppCameraCameraConstructSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::AppCameraCameraConstructSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32;
   guest::StoreU32(base, sp - 8, uint32_t(lr));
@@ -778,7 +779,7 @@ void hooks::AppCameraCameraConstructSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-void hooks::AppCameraListConstructSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::AppCameraListConstructSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
   StoreDoubleword(base, ctx.r1.u32 - 16, ctx.r31.u64);
@@ -786,20 +787,20 @@ void hooks::AppCameraListConstructSteps(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = *r3;
     return;
   }
-  __imp__sub_820A98C0(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_820A98C0);
 }
 
 // The second camera class: r3 = the object (368 bytes), r4 = the block
 // {app + 20, app + 4}; from App::App once at boot. (Its camera, list and
 // entry constructors, sub_820A9E28, sub_820A98C0 and sub_820A75E8, have no
 // adapters: only its plain C++ calls them in play.)
-extern "C" REX_FUNC(sub_820A8B88) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(820A8B88) {
+  
   if (hooks::StartUpRecorded(ctx, 0x820A8B88)) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    __imp__sub_820A8B88(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A8B88);
     return;
   }
   hooks::AppCameraSteps(ctx, base);
@@ -807,14 +808,14 @@ extern "C" REX_FUNC(sub_820A8B88) {
 
 // --- The app's constructor ---
 
-void hooks::AppConstructSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::AppConstructSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t app = ctx.r3.u32, block = ctx.r4.u32;
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32;
   // The original's prologue (__savegprlr_22), then its saved registers as
   // it sets them for the body (r30 per call), put back at the end.
   SaveRegisters(ctx, base, 22);
-  PPCRegister* const saved = &ctx.r22;
+  lifted::Temp* const saved = &ctx.r22;
   uint64_t entry[10];
   for (int i = 0; i < 10; i++) {
     entry[i] = saved[i].u64;
@@ -863,13 +864,13 @@ void hooks::AppConstructSteps(PPCContext& ctx, uint8_t* base) {
 
 // App::App: r3 = the app (132 bytes), r4 = the block; from App::Create once
 // at boot.
-extern "C" REX_FUNC(sub_82094590) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82094590) {
+  
   if (hooks::StartUpRecorded(ctx, 0x82094590)) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    __imp__sub_82094590(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82094590);
     return;
   }
   hooks::AppConstructSteps(ctx, base);
@@ -877,7 +878,7 @@ extern "C" REX_FUNC(sub_82094590) {
 
 // --- App::Create and the app's interface slots ---
 
-void hooks::AppCreateSteps(PPCContext& ctx, uint8_t* base) {
+void hooks::AppCreateSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t block = ctx.r3.u32;
   const uint64_t entry_r3 = ctx.r3.u64;
   const uint64_t lr = ctx.lr;
@@ -901,7 +902,7 @@ void hooks::AppCreateSteps(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
   if (!result) {
     ctx.r3.u64 = entry_r3;
-    __imp__sub_82094AB8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82094AB8);
     return;
   }
   ctx.r3.u64 = *result;
@@ -909,31 +910,21 @@ void hooks::AppCreateSteps(PPCContext& ctx, uint8_t* base) {
 
 // App::Create: r3 = the block {the run loop, the framework's +36
 // interface}; from Framework::Init (recompiled) once at boot.
-extern "C" REX_FUNC(sub_82094AB8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82094AB8) {
+  
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    __imp__sub_82094AB8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82094AB8);
     return;
   }
   hooks::AppCreateSteps(ctx, base);
 }
 
 // The getters of +108 and +112 (vtable slots; r3 the object).
-extern "C" REX_FUNC(sub_82379338) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_82379338(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82379338, ITC_FLAG(native_app_start_up)) {
   ctx.r3.u64 = asu::InterfaceWord108(base, ctx.r3.u32);
 }
 
-extern "C" REX_FUNC(sub_82379350) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_82379350(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82379350, ITC_FLAG(native_app_start_up)) {
   ctx.r3.u64 = asu::InterfaceWord112(base, ctx.r3.u32);
 }
 
@@ -941,7 +932,7 @@ extern "C" REX_FUNC(sub_82379350) {
 // call (lr the caller's; r11 the target, ctr it, as the original's).
 namespace {
 
-void TailCall(PPCContext& ctx, uint8_t* base, const asu::SlotCall& call) {
+void TailCall(lifted::Regs& ctx, uint8_t* base, const asu::SlotCall& call) {
   ctx.r3.u64 = call.object;
   ctx.r11.u64 = call.target;
   lifted::CallFromContext(ctx, base, call.target);
@@ -949,33 +940,18 @@ void TailCall(PPCContext& ctx, uint8_t* base, const asu::SlotCall& call) {
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_82094368) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_82094368(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(82094368, ITC_FLAG(native_app_start_up)) {
   TailCall(ctx, base, asu::AppPoolSlot(base, ctx.r3.u32));
 }
 
-extern "C" REX_FUNC(sub_820944A8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_820944A8(ctx, base);
-    return;
-  }
+ITC_NATIVE_ENTRY(820944A8, ITC_FLAG(native_app_start_up)) {
   TailCall(ctx, base, asu::AppPoolSlotFromInterface16(base, ctx.r3.u32));
 }
 
 // The scene's render manager's slot 8 and the frame driver's slots (vtable
 // slots; tail calls through the framework's +36 interface).
 #define ITC_APP_SLOT(address, plain)                    \
-  extern "C" REX_FUNC(sub_##address) {                  \
-    REX_FUNC_PROLOGUE();                                \
-    if (!ITC_FLAG(native_app_start_up)) {               \
-      __imp__sub_##address(ctx, base);                  \
-      return;                                           \
-    }                                                   \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_app_start_up)) { \
     TailCall(ctx, base, asu::plain(base, ctx.r3.u32));  \
   }
 
@@ -985,7 +961,7 @@ ITC_APP_SLOT(82094320, FrameDriverSlot)
 ITC_APP_SLOT(82094498, FrameDriverSlotFromInterface16)
 ITC_APP_SLOT(82094480, FrameDriverSlotFromInterface8)
 
-bool hooks::RenderManagerSlotDirect(PPCContext& ctx, uint8_t* base, uint32_t function) {
+bool hooks::RenderManagerSlotDirect(lifted::Regs& ctx, uint8_t* base, uint32_t function) {
   const auto slot = asu::RenderManagerCall(base, function, ctx.r3.u32);
   if (!slot) {
     return false;

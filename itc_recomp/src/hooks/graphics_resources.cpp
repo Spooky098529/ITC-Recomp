@@ -22,6 +22,7 @@
 // (sub_822A6268), from Resource::Destroy.
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 #include "base/flags.h"
 #include "graphics/resources.h"
@@ -65,19 +66,14 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
 #define ITC_GRAPHICS_RESOURCES(address, ...)       \
-  extern "C" REX_FUNC(sub_##address) {             \
-    REX_FUNC_PROLOGUE();                           \
-    if (!ITC_FLAG(native_graphics_resources)) {    \
-      __imp__sub_##address(ctx, base);             \
-      return;                                      \
-    }                                              \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_graphics_resources)) { \
     __VA_ARGS__;                                   \
   }
 
 // The same for those that allocate: the game's own with --native_heap off.
 #define ITC_GRAPHICS_RESOURCES_HEAP(address, ...)                           \
-  extern "C" REX_FUNC(sub_##address) {                                      \
-    REX_FUNC_PROLOGUE();                                                    \
+  ITC_NATIVE_ENTRY_ALWAYS(address) {                                      \
+    \
     if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive()) { \
       __imp__sub_##address(ctx, base);                                      \
       return;                                                               \
@@ -91,7 +87,7 @@ namespace {
 
 // Texture::LevelOffset's outputs, through the pointers in r6-r10 and the
 // caller's stack (+84, +92, +100), in the original's order.
-void StoreLevelPlace(uint8_t* base, const PPCContext& ctx, const LevelPlace& place) {
+void StoreLevelPlace(uint8_t* base, const lifted::Regs& ctx, const LevelPlace& place) {
   const uint32_t stack = ctx.r1.u32;
   guest::StoreU32(base, guest::LoadU32(base, stack + 100), place.offset);
   guest::StoreU32(base, ctx.r6.u32, place.pitch);
@@ -136,10 +132,10 @@ ITC_GRAPHICS_RESOURCES(822A5F50, ctx.r3.u64 = SurfaceDesc(base, ctx.r3.u32, ctx.
 // the stack's +84 the height, +92 the depth, +100 the level's offset (stored
 // in the original's order). r3 is left as it came (no caller reads it).
 // Levels from 2^31 on run the original (it reads uninitialized stack words).
-extern "C" REX_FUNC(sub_822A4FF0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A4FF0) {
+  
   if (!ITC_FLAG(native_graphics_resources) || ctx.r5.u32 >= 0x80000000u) {
-    __imp__sub_822A4FF0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822A4FF0);
     return;
   }
   StoreLevelPlace(base, ctx, TextureLevelOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
@@ -147,11 +143,11 @@ extern "C" REX_FUNC(sub_822A4FF0) {
 
 // r3-r5 width, height, depth, r6 levels, r7 usage, r8 format, r10 the type
 // (others than TextureHeader::Set takes run the original).
-extern "C" REX_FUNC(sub_822A5D08) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A5D08) {
+  
   if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive() ||
       !TextureTypeKnown(ctx.r10.u32)) {
-    __imp__sub_822A5D08(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822A5D08);
     return;
   }
   ctx.r3.u64 = CreateTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
@@ -166,12 +162,12 @@ ITC_GRAPHICS_RESOURCES_HEAP(822A5B80, ctx.r3.u64 = GetSurfaceLevel(base, ctx.r3.
 // there), +100 and +108 the base and mip sizes out. XGSetTextureHeaderEx
 // has no adapter: only this calls it. A header in the physical views or
 // across two views runs the original (its memcpy records those copies).
-extern "C" REX_FUNC(sub_8235A920) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(8235A920) {
+  
   const uint32_t stack = ctx.r1.u32;
   const uint32_t header = guest::LoadU32(base, stack + 92);
   if (!ITC_FLAG(native_graphics_resources) || !XgHeaderCopyFits(header)) {
-    __imp__sub_8235A920(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8235A920);
     return;
   }
   ctx.r3.u64 = XGSetTextureHeader(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -216,10 +212,10 @@ ITC_GRAPHICS_RESOURCES(822A3880, {
 
 // r3 the texture, r4 the level, r5 the locked rect, r6 the rectangle, r7
 // the flags: face 0.
-extern "C" REX_FUNC(sub_822A5C38) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A5C38) {
+  
   if (!ITC_FLAG(native_graphics_resources) || ctx.r4.u32 >= 0x80000000u) {
-    __imp__sub_822A5C38(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822A5C38);
     return;
   }
   ctx.r3.u64 = LockTextureRectLevel(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -250,11 +246,11 @@ ITC_GRAPHICS_RESOURCES(822A6A78, ctx.r3.u64 = UnlockIndexBuffer(base, ctx.r3.u32
 // (its sub_822AD9D8, not seen in play). Its surface case (sub_822A6268, a
 // piece the recompiler split off) has no adapter: the original's runs only
 // from the original Destroy.
-extern "C" REX_FUNC(sub_822A6210) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(822A6210) {
+  
   if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive() ||
       (guest::LoadU32(base, ctx.r3.u32) & 0xF) == 9) {
-    __imp__sub_822A6210(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_822A6210);
     return;
   }
   ctx.r3.u64 = DestroyResource(base, ctx.r3.u32);

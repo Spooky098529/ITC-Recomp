@@ -3,6 +3,7 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 
 namespace hooks {
 
@@ -10,5 +11,6 @@ namespace hooks {
 // the disposition, r8 the flags): game_data::CreateFile entered through
 // lifted::Enter, without the flag (the adapter's and the harness's).
 void CreateFileSteps(PPCContext& ctx, uint8_t* base);
+void CreateFileSteps(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks
