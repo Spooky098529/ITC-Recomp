@@ -156,6 +156,20 @@ outside:
   every function is native.
 - Left: the 141 still unported (overrides of ours, registers another
   function left, the global lock), then rewiring (piece 4).
+- Wrapped functions (2026-11-15, after the render path's): the game's
+  work inside our wraps made native by hand, the wraps kept: the action
+  mappers' last read slots, the sound manager's per-frame callees,
+  `AudioRenderDriver::Destroy`, `PauseMenu::ShowVolume`,
+  `XUserWriteAchievements`' XAPI wrapper, `CreateFile`, `Race::DrawStep`,
+  `Modes::Tick`, the world-space sprites' recorders and
+  `RaceManager::GiveVehicle`. Their plain C++ calls other functions
+  through the dispatch table with no `ctx` (`src/hooks/lifted_call.h`:
+  the adapter enters it through `lifted::Enter`, so calls to code that
+  isn't native yet go through the boundary). Left recompiled:
+  `ScreenObject::Record` (`sub_82130978`: 1,038 instructions of render
+  path that returns at once in every call seen, so frame dumps can't
+  check it) and `sub_821743A8` (the network battle's cars put at their
+  sent places, with system link sends: out of scope).
 
 ## The user's calls (2026-11-15)
 
