@@ -420,6 +420,7 @@ set(ITC_SOURCES
     src/morph_jobs/morph_jobs.cpp
     src/hooks/race_update.cpp
     src/race_update/race_update.cpp
+    src/race_update/draw_step.cpp
     src/hooks/stand_models.cpp
     src/stand_models/setters.cpp
     src/stand_models/wheels.cpp
