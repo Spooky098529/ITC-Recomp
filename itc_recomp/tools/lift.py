@@ -498,6 +498,7 @@ def rewrite(text):
         if field is None:
             raise Refused(f"ctx.{name} bare")
         return read_expr(name, field)
+    text = re.sub(r"ppc_trap\(ctx, base, (\d+)\)", r"lifted::Trap(\1)", text)
     out = TOKEN.sub(sub, text)
     if "ctx" in re.sub(r"\w*ctx\w+", "", out):
         raise Refused(f"ctx left in: {out[:60]}")
@@ -657,6 +658,10 @@ def emit_function(info, infos, emitting):
             body.append("  " + (plain(st.code) if st.kind == "decl" else st.code))
         else:
             body.append("  " + plain(st.code))
+        # A conditional return (a conditional branch to the link register)
+        # returns what the function returns.
+        if body[-1].endswith(" return;") and st.kind != "return":
+            body[-1] = body[-1][: -len("return;")] + return_stmt(info)
         for t in TOKEN.finditer(st.code):
             reg = register_of(t.group(1), t.group(2))
             if reg is not None:
