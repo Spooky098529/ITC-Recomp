@@ -111,6 +111,26 @@ outside:
    run, their totals in "The boundary over time"
    (`docs/rexglue-removal.md`), and a summary like the loop's.
 
+## Progress
+
+- 2026-11-15: the runtime and the tool; the prototype (21 functions,
+  harness `lifted`); then the sweep: 2,749 functions lifted in 29
+  batches (`src/lifted/batch_000.cpp` to `batch_028.cpp`). Fixed on the
+  way: jump-table fragments the recompiler split off are folded into
+  their parents (the static map's `folded` column), a return reads what
+  the function returns, a conditional return returns the function's
+  value, and existing overrides made by macros are found through
+  `src_edges.py`. Every harness at 0, the pad replay clean. Static map:
+  unported 3,106 -> 329 (205 vector code, 64 with an override of ours,
+  the rest reading registers another function left or their caller
+  saved, or the global lock).
+- The batch flags only switch how the SDK and ported code enter lifted
+  functions: lifted functions call each other directly, so bisecting by
+  flags doesn't isolate a bad function; harness it directly instead (add
+  it to `src/harnesses/lifted.cpp`).
+- Left: rows for the lifted functions (none written yet), the refused
+  functions by hand, then rewiring (piece 4).
+
 ## The user's calls (2026-11-15)
 
 - The end state is the goal: native C++ calling native C++, no `ctx`,

@@ -5649,3 +5649,20 @@ Imports: 186 called, 45 with a live caller. B7 (`b7_status.py`): ours
 6,772, work left 656 (Wrapped 51, with a row 354, no row yet 251).
 Static map: reachable 10,845, ours 6,138, unported 3,106 (624 seen in
 play, 2,482 never seen).
+
+**2026-11-15, the lift sweep (branch `lift-sweep`,
+`docs/loops/lift-sweep.md`):** `itc_recomp/tools/lift.py` translated
+2,749 of the static map's 3,106 unported functions from `generated/`
+into plain C++ (`src/lifted/`, 29 batches, `--native_lifted_000` to
+`028`), calling each other directly, through a dispatch table by
+address, or the SDK's imports. Refused: 205 vector functions, 64 with
+an override of ours (Wrapped), and about 90 that read registers another
+function left or their caller saved, or use the global lock. Every
+harness at 0 in `attract_race.sh 180 --run_harnesses=all`; the pad
+replay ran 124 s with no error lines (465 lifted functions ran in it).
+The boundary: 449 functions (916 pairs): overridden 264, Native 48,
+Dropped 24, never called 34, live 79. Imports: 186 called, 36 with a
+live caller. B7 (`b7_status.py`): ours 9,521, work left 111 (Wrapped
+51, with a row 39, no row yet 21); 1,577 lifted functions have no row
+yet. Static map: reachable 9,131, ours 8,793, unported 329 (75 seen in
+play, 254 never seen).
