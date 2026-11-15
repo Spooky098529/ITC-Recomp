@@ -69,6 +69,7 @@ def main(argv):
         "#pragma once",
         "",
         '#include "lifted/lifted.h"',
+        '#include "lifted/regs.h"',
         '#include "lifted/sdk.h"',
         "",
         "namespace lifted::original {",
@@ -79,6 +80,7 @@ def main(argv):
         h.append(f"Result {lift.ename(n)}(uint8_t* base, const Args& a);")
         h.append(f"// The same for code still holding a context (in place of __imp__{n}).")
         h.append(f"void c{n[4:]}(PPCContext& ctx, uint8_t* base);")
+        h.append(f"inline void c{n[4:]}(Regs& regs, uint8_t* base) {{ regs.Apply({lift.ename(n)}(base, regs.ToArgs())); }}")
     h += ["", "}  // namespace lifted::original", ""]
     with open(os.path.join(lift.OUT, "originals.cpp"), "w") as f:
         f.write("\n".join(cpp))

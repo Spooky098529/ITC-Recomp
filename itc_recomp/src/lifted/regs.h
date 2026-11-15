@@ -76,6 +76,9 @@ inline void CallFromContext(Regs& regs, uint8_t* base, uint32_t address) {
   regs.Apply(Call(base, address, regs.ToArgs()));
 }
 
+// The flag of entries registered always on.
+inline constexpr bool kAlwaysOn = true;
+
 // Registers one hand port's entry under its address, with the flag that
 // turns it on (false when the address already has one: logged).
 bool RegisterEntry(uint32_t address, Entry entry, const bool* enabled);

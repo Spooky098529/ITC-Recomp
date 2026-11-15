@@ -37,3 +37,31 @@
   }                                                                                      \
   static void itc_entry_body_##address([[maybe_unused]] lifted::Regs& ctx,               \
                                        [[maybe_unused]] uint8_t* base)
+
+// The same for an adapter whose body checks its own conditions (a flag
+// among others, a diagnostic's skip): registered always on, the body's
+// fallbacks to the original calling it through lifted::Sdk.
+#define ITC_NATIVE_ENTRY_ALWAYS(address)                                                 \
+  static void itc_entry_body_##address(lifted::Regs& ctx, uint8_t* base);                \
+  static lifted::Result itc_entry_##address(uint8_t* base, const lifted::Args& args) {    \
+    lifted::Regs ctx(args);                                                              \
+    itc_entry_body_##address(ctx, base);                                                 \
+    return ctx.result();                                                                 \
+  }                                                                                      \
+  [[maybe_unused]] static const bool itc_entry_registered_##address =                    \
+      lifted::RegisterEntry(0x##address, itc_entry_##address, &lifted::kAlwaysOn);       \
+  extern "C" REX_FUNC(sub_##address) { lifted::Enter(ctx, base, itc_entry_##address); }  \
+  static void itc_entry_body_##address([[maybe_unused]] lifted::Regs& ctx,               \
+                                       [[maybe_unused]] uint8_t* base)
+
+// A step on our register view (an adapter's body split out, shared with a
+// harness): `name(lifted::Regs&, uint8_t*)`, with the form taking the SDK's
+// context for code still entered with it (a harness), which runs it on a
+// view of the context (lifted::RegsScope). Followed by the body.
+#define ITC_REGS_STEP(name)                                                              \
+  void name(lifted::Regs& ctx, uint8_t* base);                                           \
+  void name(PPCContext& ctx, uint8_t* base) {                                            \
+    lifted::RegsScope scope(ctx);                                                        \
+    name(scope.regs, base);                                                              \
+  }                                                                                      \
+  void name([[maybe_unused]] lifted::Regs& ctx, [[maybe_unused]] uint8_t* base)
