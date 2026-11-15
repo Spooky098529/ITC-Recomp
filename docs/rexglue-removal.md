@@ -3221,6 +3221,73 @@ The new start-up:
 Checked by attract races, the pad replay, a drive by the user, and the
 Windows build under Wine (`wWinMain`: SDL's `SDL_main.h`).
 
+## Before E1: the rewiring (2026-11-15)
+
+After the lift sweep (merged into `rexglue-removal-project`
+2026-11-15, after an attract race; the drive and the Windows check left
+for later, the user's call), no recompiled function runs in play, but
+the scaffolding that let native and recompiled code share the game is
+all still there: 6,558 `REX_FUNC` overrides (3,548 hand-port adapters,
+3,399 of them in `src/hooks/`, and 3,010 lifted entries), 94 files whose
+guest calls (`Calls` callbacks, `REX_CALL_INDIRECT_FUNC`,
+`sub_X(ctx, base)`) go through the SDK's function table, 1,532 plain
+C++ functions taking a `Calls`, `generated/` compiled (~240k lines, for
+`PPCImageConfig`, the function table, the memory macros and the
+declarations) and the harnesses. The rewiring removes it, on
+`rewiring-15-11-26`, so that E1 can start.
+
+The goal: game code reaches rexglue in two places only. Calls out are
+the kernel imports. Calls in are the few entries the kernel itself
+calls: thread start routines and the callbacks the game hands it. There
+are no other overrides, and `generated/` and the harnesses aren't
+built. For the whole port, the goal is native C++ that needs rexglue only
+for guest memory, the kernel's functions and the SDL window.
+
+The stages, each leaving the game working and checked:
+
+1. **Record and inventory**: this section; every address the game hands
+   the kernel to call (thread start routines, registered callbacks, the
+   main thread's start), found from our C++ and from `generated/`'s
+   import call sites. Those are the only overrides that stay. The user
+   sees the list before going on.
+2. **Ctx-free guest calls**: the ports' `Calls` callback classes and
+   direct guest calls (94 files) switch from the SDK's function table to
+   `lifted::Call`, or a direct C++ call where the callee's plain C++ is
+   known.
+3. **Every native function in our dispatch table**: each hand port gets
+   a ctx-free uniform entry (`lifted::Args` in, `lifted::Result` out) in
+   place of its `REX_FUNC` adapter, registered like the lifted batches'
+   `kEntries`. A tool converts the adapters that only read registers into
+   the plain C++ and store r3; migration agents take the irregular ones,
+   subsystem by subsystem. Each wrapper's own work (interpolation, replay
+   counting, diagnostics) is kept as it is.
+4. **Delete the overrides**: once nothing reaches them through the SDK's
+   function table, the hand ports' adapters and the lifted functions'
+   `REX_FUNC` entries go, except stage 1's kernel entries, which become
+   tool-written "unpack the context, call native code" entries.
+   `lifted::Call`'s fallback into the SDK goes: an unknown address logs
+   and stops. The user is asked before the deletions.
+5. **`generated/` out of the build**: our own small function table for
+   the SDK (`PPCImageConfig`: the image layout and the kernel entries
+   only) instead of `generated/`'s `itc_init.cpp` and
+   `itc_register.cpp`; our own copies of the memory macros
+   (`REX_LOAD_U32` and the like, from `generated/default/itc_pch.h`) and
+   declarations, so `guest.h` stops including `generated/`; the
+   `__imp__` fallbacks behind the `--native_*` flags removed;
+   `generated/` and `src/harnesses/` dropped from
+   `itc_recomp/CMakeLists.txt` (the user's call: translated code needs no
+   harnesses; git history keeps them). Then, before E1: whether the SDK's
+   typed kernel functions (behind its import shims) let our code call the
+   kernel without a `ctx`, reported to the user.
+
+Checks at each stage: `attract_race.sh 40` as a smoke run;
+`attract_race.sh 180 --run_harnesses=all` while the harnesses exist (0
+differing outside the expected groups); the pad replay
+(`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`, ~127 s,
+no error lines); frame dumps on against off for the render path; and
+`static_map.py`, `boundary_status.py` and `b7_status.py` recorded in
+"The boundary over time".
+
 ## The end state: removing the core
 
 Only when no recompiled function is left (or none that touches what's
