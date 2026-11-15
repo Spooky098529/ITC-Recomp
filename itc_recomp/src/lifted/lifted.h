@@ -12,19 +12,39 @@
 
 #include "guest.h"
 
+// The SDK's helpers for vector instructions SSE has no single instruction
+// for (vperm, the shifts, the conversions) and their shuffle tables:
+// called as the generated code calls them.
+#include <rex/ppc/intrinsics.h>
+
 #include <bit>
 #include <cstddef>
 #include <cstdint>
 
 namespace lifted {
 
+// A vector register's value, with the generated code's views of it.
+union alignas(16) Vec {
+  int8_t s8[16];
+  uint8_t u8[16];
+  int16_t s16[8];
+  uint16_t u16[8];
+  int32_t s32[4];
+  uint32_t u32[4];
+  int64_t s64[2];
+  uint64_t u64[2];
+  float f32[4];
+  double f64[2];
+};
+
 // A call's argument registers, for a call by address: the stack pointer,
-// r13 (the thread's block), r3 to r10 and f1 to f13.
+// r13 (the thread's block), r3 to r10, f1 to f13 and v1 to v13.
 struct Args {
   uint64_t r1 = 0;
   uint64_t r13 = 0;
   uint64_t r[8] = {};
   double f[13] = {};
+  Vec v[13] = {};
 };
 
 // What a call leaves in r3 and f1.
@@ -80,6 +100,24 @@ inline Cr Compare(T left, T right, uint8_t so) {
   return cr;
 }
 
+// A vector compare's summary (the record forms): all lanes true in the
+// first bit, none in the third.
+inline Cr CrFromMask(simde__m128 mask, int all) {
+  const int m = simde_mm_movemask_ps(mask);
+  Cr cr;
+  cr.lt = m == all;
+  cr.eq = m == 0;
+  return cr;
+}
+
+inline Cr CrFromMask(simde__m128i mask, int all) {
+  const int m = simde_mm_movemask_epi8(mask);
+  Cr cr;
+  cr.lt = m == all;
+  cr.eq = m == 0;
+  return cr;
+}
+
 // A float compare: unordered (a NaN) in the fourth bit.
 inline Cr CompareFloat(double left, double right) {
   Cr cr;
@@ -93,6 +131,10 @@ inline Cr CompareFloat(double left, double right) {
 // The scalar float mode the original sets before its float instructions:
 // denormals kept (flush to zero off).
 void ScalarFloatMode();
+
+// The vector float mode the original sets before its vector instructions:
+// denormals flushed to zero.
+void VectorFloatMode();
 
 // A trap instruction the original reaches (an assert): logged, as the
 // SDK's handler does, and run on past.

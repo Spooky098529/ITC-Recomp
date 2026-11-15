@@ -1257,7 +1257,7 @@ loc_82090B4C:
   REX_STORE_U32(uint32_t(r1) + 100, uint32_t(r10));
   // bl 0x82098c70
   // (left out: dead in C++)
-  { const lifted::Result o = f82098C70(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = f82098C70(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // stw r30,272(r1)

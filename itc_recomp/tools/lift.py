@@ -54,28 +54,30 @@ CACHE = os.path.join(ROOT, "itc_recomp", "out", "lift_bodies.pickle")
 SIGNATURES = os.path.join(OUT, "signatures.json")
 
 GPRS = [f"r{i}" for i in range(32)]
+VRS = [f"v{i}" for i in range(128)]
+VR_VOLATILE = {f"v{i}" for i in range(14)} | {f"v{i}" for i in range(32, 64)}
 FPRS = [f"f{i}" for i in range(32)]
 CRS = [f"cr{i}" for i in range(8)]
 GPR_LIKE = set(GPRS) | {"ctr", "reserved"}
 XER = {"ca", "so", "ov"}
-PARAM_ORDER = ["r1", "r2", "r13"] + [f"r{i}" for i in range(3, 11)] + [f"f{i}" for i in range(1, 14)]
+PARAM_ORDER = (["r1", "r2", "r13"] + [f"r{i}" for i in range(3, 11)] + [f"f{i}" for i in range(1, 14)]
+               + sorted(VR_VOLATILE, key=lambda v: int(v[1:])))
 PARAMS = set(PARAM_ORDER)
 CALL_GPRS = [f"r{i}" for i in range(3, 11)]
 CALL_FPRS = [f"f{i}" for i in range(1, 14)]
 ALL_ARGS = {"r1", "r13"} | set(CALL_GPRS) | set(CALL_FPRS)
 VOLATILE = ({"r0"} | {f"r{i}" for i in range(4, 13)} | {"f0"} | {f"f{i}" for i in range(2, 14)}
-            | {"cr0", "cr1", "cr5", "cr6", "cr7", "ctr", "reserved", "ca", "ov"})
+            | {"cr0", "cr1", "cr5", "cr6", "cr7", "ctr", "reserved", "ca", "ov"} | VR_VOLATILE)
 NONVOLATILE = ({f"r{i}" for i in range(14, 32)} | {f"f{i}" for i in range(14, 32)}
-               | {"cr2", "cr3", "cr4"})
-ZERO_AT_ENTRY = {"so", "ov"}  # the XER's overflow bits: never set by the game's code
+               | {"cr2", "cr3", "cr4"} | (set(VRS) - VR_VOLATILE))
+ZERO_AT_ENTRY = {"so", "ov", "vscr_sat"}  # the XER's overflow bits and the vector
+# saturation flag: never read for a result by the game's code
 
 TOKEN = re.compile(r"ctx\.(\w+)(?:\.(\w+))?")
 REFUSE_TEXT = [
-    (re.compile(r"simde|ctx\.v\d|vTemp|vscr_sat|PPCVRegister"), "vector code"),
     (re.compile(r"ppc_setjmp|ppc_longjmp"), "setjmp"),
     (re.compile(r"ctx\.msr"), "the machine state register"),
     (re.compile(r"REX_(ENTER|LEAVE|CHECK)_GLOBAL_LOCK"), "the global lock"),
-    (re.compile(r"enableFlushMode"), "the flush mode turned on"),
     (re.compile(r"last_indirect_target|REX_UNIMPLEMENTED|REX_MM_|REX_QUERY_TIMEBASE"), "an SDK macro"),
 ]
 
@@ -142,13 +144,21 @@ IF_GOTO_RE = re.compile(r"^if \((.*)\) goto (loc_[0-9A-F]+);$")
 def parse(name, lines):
     stmts = []
     comment = None
+    braces = []
+    pending = ""
     for raw in lines:
         s = raw.strip()
         if not s:
             continue
-        if s.startswith("//"):
+        if s.startswith("//") and not pending:
             comment = s[2:].strip()
             continue
+        # A statement split over lines: joined until its parentheses close.
+        if pending or s.count("(") > s.count(")"):
+            pending = (pending + " " + s).strip()
+            if pending.count("(") > pending.count(")"):
+                continue
+            s, pending = pending, ""
         for pattern, reason in REFUSE_TEXT:
             if pattern.search(s):
                 raise Refused(reason)
@@ -158,8 +168,6 @@ def parse(name, lines):
         if m:
             target = m.group(1)
             if target.startswith("__save") or target.startswith("__rest"):
-                if "vmx" in target:
-                    raise Refused("vector code")
                 stmts.append(Stmt("skip", s, comment))
             elif target.startswith("__imp__"):
                 stmts.append(Stmt("call", s, comment, how="import", target=target))
@@ -181,12 +189,21 @@ def parse(name, lines):
         elif re.match(r"^ppc_trap\(ctx, base, \d+\);$", s):
             stmts.append(Stmt("trap", s, comment, number=int(re.search(r"\d+", s[16:]).group(0))))
         elif re.match(r"^switch \((.*)\) \{$", s):
+            braces.append("switch")
             stmts.append(Stmt("switch", s, comment, expr=s[8:-3], labels=[]))
         elif re.match(r"^case -?\d+:$", s) or s == "default:":
             stmts.append(Stmt("case", s, comment))
         elif s == "}":
-            stmts.append(Stmt("end", s, comment))
-        elif re.match(r"^(uint32_t ea\{\};|PPCRegister temp\{\};)$", s):
+            opened = braces.pop() if braces else None
+            if opened is None:
+                raise Refused("an unmatched }")
+            stmts.append(Stmt("end" if opened == "switch" else "brace", s, comment))
+        elif s == "{":
+            braces.append("block")
+            stmts.append(Stmt("brace", s, comment))
+        elif re.match(r"^for \(.*\)$", s):
+            stmts.append(Stmt("plain", s, comment))
+        elif re.match(r"^(uint32_t ea\{\};|PPCRegister temp\{\};|PPCVRegister vTemp\{\};)$", s):
             stmts.append(Stmt("decl", s, comment))
         elif s.endswith(";") and not s.endswith("{") and "{" not in s:
             if re.match(r"^ctx\.lr = ", s):
@@ -211,7 +228,9 @@ def parse(name, lines):
 
 def register_of(name, field):
     """A ctx member's register for the analysis, or None (lr, fpscr)."""
-    if name in GPR_LIKE or name in FPRS or name in CRS:
+    if name in GPR_LIKE or name in FPRS or name in CRS or name in VRS:
+        return name
+    if name == "vscr_sat":
         return name
     if name == "xer":
         return field if field in XER else "so"
@@ -238,10 +257,25 @@ def defs_uses(st):
         elif reg in CRS or reg in XER:
             defs.add(reg)
             skip = m.start()
-    m = re.match(r"^ctx\.(cr\d)\.(compare|set_raw)", code)
+    m = re.match(r"^ctx\.(cr\d)\.(compare|set_raw|setFromMask)", code)
     if m:
         defs.add(m.group(1))
         skip = m.start()
+    # A vector register written whole: a store into it, or assigned.
+    m = (re.match(r"^simde_mm_store_(?:si128|ps)\(\(?(?:simde__m128i\*)?\)?ctx\.(v\d+)\.\w+,", code)
+         or re.match(r"^ctx\.(v\d+) = ", code))
+    if m:
+        defs.add(m.group(1))
+        skip = m.start(1) - 4
+    # A vector element written: counted as the register's write (its other
+    # lanes start at 0 where the original had what the caller left).
+    m = re.match(r"^ctx\.(v\d+)\.\w+\[[^\]]+\]\s*[|&^+-]?=(?!=)", code)
+    if m:
+        defs.add(m.group(1))
+        skip = m.start(1) - 4
+    if re.match(r"^ctx\.vscr_sat = ", code):
+        defs.add("vscr_sat")
+        skip = 0
     uses = set()
     for t in TOKEN.finditer(code):
         if t.start() == skip:
@@ -253,7 +287,10 @@ def defs_uses(st):
 
 
 def is_save(st, reg):
-    """A nonvolatile register stored as it came (std, stfd): its save."""
+    """A nonvolatile register stored as it came (std, stfd, stvx): its save."""
+    if reg in VRS:
+        return st.kind == "plain" and st.code.startswith(
+            "simde_mm_store_si128((simde__m128i*)REX_RAW_ADDR(") and st.code.count("ctx.v") == 1
     return st.kind == "plain" and re.match(
         r"^REX_STORE_U64\([^;]*, ctx\.%s\.u64\);$" % reg, st.code) is not None
 
@@ -329,7 +366,7 @@ def prepare(info):
     info.indirect_uses = [defs_uses(st)[1] if st.kind == "call" else None for st in stmts]
 
 
-EVERY = frozenset(set(GPRS) | set(FPRS) | set(CRS) | {"ctr", "reserved"} | XER)
+EVERY = frozenset(set(GPRS) | set(FPRS) | set(CRS) | set(VRS) | {"ctr", "reserved", "vscr_sat"} | XER)
 
 
 def analyze(info, info_by_name):
@@ -561,6 +598,10 @@ def rewrite(text):
             return field if field in XER else "so"
         if name == "lr":
             return "0" if field is None else "0"
+        if name in VRS:
+            return name if field is None else f"{name}.{field}"
+        if name == "vscr_sat":
+            return name
         if field is None:
             raise Refused(f"ctx.{name} bare")
         return read_expr(name, field)
@@ -614,6 +655,13 @@ def plain(code):
         return f"{m.group(1)} = lifted::CompareFloat({args});"
     if re.match(r"^ctx\.fpscr\.disableFlushMode(Unconditional)?\(\);$", code):
         return "lifted::ScalarFloatMode();"
+    if re.match(r"^ctx\.fpscr\.enableFlushMode(Unconditional)?\(\);$", code):
+        return "lifted::VectorFloatMode();"
+    m = re.match(r"^ctx\.(cr\d)\.setFromMask\((.*)\);$", code)
+    if m:
+        return f"{m.group(1)} = lifted::CrFromMask({rewrite(m.group(2))});"
+    if code == "PPCVRegister vTemp{};":
+        return "lifted::Vec vTemp{};"
     if code == "PPCRegister temp{};":
         return "lifted::Temp temp{};"
     m = re.match(r"^(--|\+\+)ctx\.ctr\.u64;$", code)
@@ -637,7 +685,9 @@ def plain(code):
 def signature(info, qualified=False):
     r3, f1 = info.returns
     ret = "lifted::Result" if r3 and f1 else "uint64_t" if r3 else "double" if f1 else "void"
-    params = ["uint8_t* base"] + [("double " if p.startswith("f") else "uint64_t ") + p for p in info.params]
+    def typed(p):
+        return ("double " if p.startswith("f") else "lifted::Vec " if p.startswith("v") else "uint64_t ") + p
+    params = ["uint8_t* base"] + [typed(p) for p in info.params]
     return f"{ret} {'lifted::' if qualified else ''}{fname(info.name)}({', '.join(params)})"
 
 
@@ -750,10 +800,13 @@ def emit_function(info, infos, emitting):
     flocals = [r for r in FPRS if r in used and r not in info.params]
     if flocals:
         out.append("  double " + ", ".join(f"{r} = 0.0" for r in flocals) + ";")
+    vrs = [r for r in VRS if r in used and r not in info.params]
+    if vrs:
+        out.append("  lifted::Vec " + ", ".join(f"{r}{{}}" for r in vrs) + ";")
     crs = [r for r in CRS if r in used]
     if crs:
         out.append("  lifted::Cr " + ", ".join(crs) + ";")
-    xer = [r for r in ("ca", "so", "ov") if r in used]
+    xer = [r for r in ("ca", "so", "ov", "vscr_sat") if r in used]
     if xer:
         out.append("  uint8_t " + ", ".join(f"{r} = 0" for r in xer) + ";")
     out.extend("  " + d for d in decls.values())
@@ -775,6 +828,8 @@ def emit_entry(info):
             args.append("0")
         elif p.startswith("r"):
             args.append(f"a.r[{int(p[1:]) - 3}]")
+        elif p.startswith("v"):
+            args.append(f"a.v[{int(p[1:]) - 1}]" if 1 <= int(p[1:]) <= 13 else "lifted::Vec{}")
         else:
             args.append(f"a.f[{int(p[1:]) - 1}]")
     call = f"{fname(info.name)}({', '.join(args)})"

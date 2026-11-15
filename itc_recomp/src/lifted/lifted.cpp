@@ -6,6 +6,7 @@
 #include "base/log.h"
 
 #include <cstdlib>
+#include <cstring>
 #include <unordered_map>
 
 namespace lifted {
@@ -59,6 +60,10 @@ Result Boundary(const Args& args, Invoke invoke) {
   for (int i = 0; i < 13; i++) {
     f[i].f64 = args.f[i];
   }
+  PPCVRegister* v = &ctx.v1;
+  for (int i = 0; i < 13; i++) {
+    std::memcpy(&v[i], &args.v[i], sizeof(Vec));
+  }
   SyncFloatMode(ctx);
   invoke(ctx);
   SyncFloatMode(ctx);
@@ -74,6 +79,13 @@ void ScalarFloatMode() {
   const uint32_t csr = PPCFPSCRRegister::Platform::getcsr();
   if ((csr & PPCFPSCRRegister::FlushMask) != 0) [[unlikely]] {
     PPCFPSCRRegister::Platform::setcsr(csr & ~uint32_t(PPCFPSCRRegister::FlushMask));
+  }
+}
+
+void VectorFloatMode() {
+  const uint32_t csr = PPCFPSCRRegister::Platform::getcsr();
+  if ((csr & PPCFPSCRRegister::FlushMask) != PPCFPSCRRegister::FlushMask) [[unlikely]] {
+    PPCFPSCRRegister::Platform::setcsr(csr | uint32_t(PPCFPSCRRegister::FlushMask));
   }
 }
 
@@ -123,6 +135,10 @@ void Enter(PPCContext& ctx, uint8_t* base, Entry entry) {
   const PPCRegister* f = &ctx.f1;
   for (int i = 0; i < 13; i++) {
     args.f[i] = f[i].f64;
+  }
+  const PPCVRegister* v = &ctx.v1;
+  for (int i = 0; i < 13; i++) {
+    std::memcpy(&args.v[i], &v[i], sizeof(Vec));
   }
   const Result result = entry(base, args);
   ctx.r3.u64 = result.r3;

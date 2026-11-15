@@ -2505,10 +2505,10 @@ loc_825DA724:
 }
 
 // sub_825DA750: lifted from generated/ by lift.py.
-lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f3, double f4, double f5, double f6, double f7, double f8, double f9, double f10, double f11, double f12, double f13) {
+lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_825DA750 (lifted)");
-  uint64_t r11 = 0, r12 = 0, r30 = 0, r31 = 0;
-  double f0 = 0.0, f1 = 0.0, f2 = 0.0, f31 = 0.0;
+  uint64_t r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
+  double f0 = 0.0, f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0, f31 = 0.0;
   lifted::Temp temp{};
   uint32_t ea{};
   // mflr r12
@@ -2769,10 +2769,10 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
 }
 
 // sub_825DA8F8: lifted from generated/ by lift.py.
-lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f2, double f3, double f4, double f5, double f6, double f7, double f8, double f9, double f10, double f11, double f12, double f13) {
+lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825DA8F8 (lifted)");
-  uint64_t r11 = 0, r12 = 0, r30 = 0, r31 = 0;
-  double f0 = 0.0, f1 = 0.0, f31 = 0.0;
+  uint64_t r3 = 0, r4 = 0, r5 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
+  double f0 = 0.0, f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0, f31 = 0.0;
   lifted::Temp temp{};
   uint32_t ea{};
   // mflr r12
@@ -2978,10 +2978,10 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
 }
 
 // sub_825DAA30: lifted from generated/ by lift.py.
-lifted::Result f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f2, double f3, double f4, double f5, double f6, double f7, double f8, double f9, double f10, double f11, double f12, double f13) {
+double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   ITC_NATIVE_RUNNING("sub_825DAA30 (lifted)");
-  uint64_t r11 = 0, r12 = 0, r30 = 0, r31 = 0;
-  double f0 = 0.0, f1 = 0.0, f30 = 0.0, f31 = 0.0;
+  uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
+  double f0 = 0.0, f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0, f30 = 0.0, f31 = 0.0;
   lifted::Temp temp{};
   uint32_t ea{};
   // mflr r12
@@ -3232,7 +3232,7 @@ lifted::Result f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // ld r31,-16(r1)
   r31 = REX_LOAD_U64(uint32_t(r1) + -16);
   // blr
-  return {r3, f1};
+  return f1;
 }
 
 // sub_825DABC8: lifted from generated/ by lift.py.
@@ -3754,15 +3754,15 @@ lifted::Result e825DA648(uint8_t* base, const lifted::Args& a) {
 }
 
 lifted::Result e825DA750(uint8_t* base, const lifted::Args& a) {
-  return f825DA750(base, a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[2], a.f[3], a.f[4], a.f[5], a.f[6], a.f[7], a.f[8], a.f[9], a.f[10], a.f[11], a.f[12]);
+  return f825DA750(base, a.r1, a.r13, a.r[0]);
 }
 
 lifted::Result e825DA8F8(uint8_t* base, const lifted::Args& a) {
-  return f825DA8F8(base, a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[1], a.f[2], a.f[3], a.f[4], a.f[5], a.f[6], a.f[7], a.f[8], a.f[9], a.f[10], a.f[11], a.f[12]);
+  return f825DA8F8(base, a.r1, a.r13, a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
 
 lifted::Result e825DAA30(uint8_t* base, const lifted::Args& a) {
-  return f825DAA30(base, a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[1], a.f[2], a.f[3], a.f[4], a.f[5], a.f[6], a.f[7], a.f[8], a.f[9], a.f[10], a.f[11], a.f[12]);
+  return {a.r[0], f825DAA30(base, a.r1, a.r13)};
 }
 
 lifted::Result e825DABC8(uint8_t* base, const lifted::Args& a) {

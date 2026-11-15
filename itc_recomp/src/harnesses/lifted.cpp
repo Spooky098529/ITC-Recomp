@@ -11,6 +11,9 @@
 
 #include "harness.h"
 
+#include "base/log.h"
+
+#include "lifted/lifted.h"
 #include "memory/heap.h"
 
 #include <fmt/format.h>
@@ -29,8 +32,14 @@ REX_FUNC(sub_825CD358);
 REX_FUNC(sub_825CFF70);
 REX_FUNC(sub_825D36F0);
 REX_FUNC(sub_825DAD90);
-REX_FUNC(sub_8213AB40);
 REX_FUNC(sub_8213A200);
+REX_FUNC(sub_8213AB40);
+REX_FUNC(sub_822AF328);
+REX_FUNC(sub_820F8FA0);
+REX_FUNC(sub_82421938);
+REX_FUNC(sub_820A6470);
+REX_FUNC(sub_823F6170);
+REX_FUNC(sub_8211FF20);
 REX_FUNC(sub_821392D8);
 REX_FUNC(__imp__sub_820951D8);
 REX_FUNC(__imp__sub_821128A0);
@@ -43,8 +52,14 @@ REX_FUNC(__imp__sub_825CD358);
 REX_FUNC(__imp__sub_825CFF70);
 REX_FUNC(__imp__sub_825D36F0);
 REX_FUNC(__imp__sub_825DAD90);
-REX_FUNC(__imp__sub_8213AB40);
 REX_FUNC(__imp__sub_8213A200);
+REX_FUNC(__imp__sub_8213AB40);
+REX_FUNC(__imp__sub_822AF328);
+REX_FUNC(__imp__sub_820F8FA0);
+REX_FUNC(__imp__sub_82421938);
+REX_FUNC(__imp__sub_820A6470);
+REX_FUNC(__imp__sub_823F6170);
+REX_FUNC(__imp__sub_8211FF20);
 REX_FUNC(__imp__sub_821392D8);
 }
 
@@ -74,8 +89,14 @@ const Function kFunctions[] = {
     {"sub_825CFF70", __imp__sub_825CFF70, sub_825CFF70},
     {"sub_825D36F0", __imp__sub_825D36F0, sub_825D36F0},
     {"sub_825DAD90", __imp__sub_825DAD90, sub_825DAD90},
-    {"sub_8213AB40", __imp__sub_8213AB40, sub_8213AB40},
     {"sub_8213A200", __imp__sub_8213A200, sub_8213A200},
+    {"sub_8213AB40", __imp__sub_8213AB40, sub_8213AB40},
+    {"sub_822AF328", __imp__sub_822AF328, sub_822AF328},
+    {"sub_820F8FA0", __imp__sub_820F8FA0, sub_820F8FA0},
+    {"sub_82421938", __imp__sub_82421938, sub_82421938},
+    {"sub_820A6470", __imp__sub_820A6470, sub_820A6470},
+    {"sub_823F6170", __imp__sub_823F6170, sub_823F6170},
+    {"sub_8211FF20", __imp__sub_8211FF20, sub_8211FF20},
     {"sub_821392D8", __imp__sub_821392D8, sub_821392D8},
 };
 
@@ -119,6 +140,18 @@ void Case(Context& h, Results& results, uint32_t block, const Function& f, uint6
     for (int i = 0; i < 13; i++) {
       fprs[i].f64 = AnyDouble(r);
     }
+    // Vector arguments (v1 to v13): random floats, lane by lane.
+    PPCVRegister* vrs = &t.v1;
+    for (int i = 0; i < 13; i++) {
+      for (int lane = 0; lane < 4; lane++) {
+        vrs[i].f32[lane] = float(AnyDouble(r));
+      }
+    }
+    // The host's float mode as the game leaves it between calls (denormals
+    // kept), and the context's copy of it in step: the recompiled code
+    // skips a switch its copy says is done already.
+    lifted::ScalarFloatMode();
+    t.fpscr.csr = t.fpscr.getcsr();
     (v == 0 ? f.recompiled : f.lifted)(t, h.base);
     out[v].Bytes(Read(h.base, block, kBlockBytes));
     out[v].Word(t.r3.u32);
