@@ -3273,6 +3273,35 @@ The stages, each leaving the game working and checked:
    the plain C++ and store r3; migration agents take the irregular ones,
    subsystem by subsystem. Each wrapper's own work (interpolation, replay
    counting, diagnostics) is kept as it is.
+
+   The survey (2026-11-15; every source of ours preprocessed, each
+   adapter classified with the steps, `Calls` builders and helpers it
+   reaches, headers included): 3,548 adapters, about 2,700 of them made
+   by some 117 files' macros (an adapter macro around a step,
+   `hooks::Step(ctx, base)`, which the harnesses share).
+   - Simple, 1,692: argument registers in, plain C++, r3 or f1 out.
+   - Guest calls without other context state, 981: their `Calls` (or
+     `GuestCall`, `InFrame`) built from the context today, to be built
+     from the entry's arguments (the stack pointer, r13).
+   - Irregular, 870 (overlapping):
+     - the link register, 807: 595 only keep it and put it back
+       (nothing to do without a context); 208 pass it on, into the plain
+       C++ and from there as the return address of the port's own guest
+       calls, so a callee that acts on its caller sees the original's;
+     - the nonvolatile registers, 79: mostly kept and put back around
+       calls (`app_states`' 22); a few pass a value a callee reads from
+       its caller's registers (`car_draw`'s r24 and r28, the render
+       recorder's r24-r26, `Matrix_Copy`'s r29, the C runtime's
+       `__finally` blocks);
+     - r0, r2, r11, r12, 68 (34 in `native/replay_hooks.cpp`), and the
+       condition and XER registers, mostly `ctr` as a call's target.
+   - Already through `lifted::Enter`: 5.
+
+   Wraps that act on their caller (not only log it): interpolation's
+   `OnMultiply` (the recorder's multiply), the single sprites' pairing
+   key, the UI movies' per-tick tracks, `Buffers_Memcpy`'s caller, and
+   the input reads' counts. Today a lifted caller reaches them through
+   `lifted::Call`'s boundary with the context's last lr, not its own.
 4. **Delete the overrides**: once nothing reaches them through the SDK's
    function table, the hand ports' adapters and the lifted functions'
    `REX_FUNC` entries go, except stage 1's kernel entries, which become
