@@ -2,7 +2,7 @@
 
 Made by `itc_recomp/tools/static_map.py` on every run; never edit it by hand (run the tool again). What it reads, how edges are found and its gaps: the tool's docstring and "The static map" in `docs/coverage.md`.
 
-Made 2026-11-15 at commit `69c08d38` (`lift-sweep`).
+Made 2026-11-15 at commit `1a330454` (`rewiring-15-11-26`).
 
 ## Totals
 
@@ -11,7 +11,7 @@ Made 2026-11-15 at commit `69c08d38` (`lift-sweep`).
 - Ours: 9068. Excluded (replaced libraries): 11.
 - **Unported: 2** (1 under `main`): seen in play 1, never seen 1; 805 generated lines.
 - Of the unported, 1 hang under unported code (or a root); 1 are reached only through ours (0 seen in play), 1 of them called by our C++ itself (a guest call by name or address, a fallback for a branch, a table or vtable it stores) and the rest under those; the TSV's `behind_ours` column lists them.
-- Ours functions' edges come from our C++ (`src_edges.py`): 37222 definitions in 1201 files of `src/` (harnesses left out), 9689 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 9060 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
+- Ours functions' edges come from our C++ (`src_edges.py`): 37225 definitions in 1201 files of `src/` (harnesses left out), 9689 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 9060 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
 - Ours functions whose original body is still reachable: 0 (0 from our C++: an `__imp__` fallback when the native C++ declines, or a guest call to a function with neither override nor C++); listed below.
 - Host code no native function's C++ reaches but that names guest functions (constants defined but not resolved to a user, a few hooks' helpers): 3045 functions named, taken as roots; they add 1478 reachable functions.
 - Before 2026-11-14's fix the graph followed the original's edges through ours too: 15901 reachable. **Originals no longer called: 1696** (980 not ours, 716 ours whose work our C++ took in; 140298 lines, 300 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.

@@ -741,7 +741,12 @@ to `033`; status **Lifted**, rows in place or in
 `docs/functions/lifted.md`), and B7-style agents made 66 of the 67
 Wrapped functions native: unported 3,106 -> 2 (`xstart` and
 `sub_821743A8`, reached only by the Xbox Live mode), every harness at 0;
-left is the rewiring.
+left is the rewiring ("Before E1: the rewiring" in
+`docs/rexglue-removal.md`, on `rewiring-15-11-26`, after `lift-sweep`
+was merged into `rexglue-removal-project` 2026-11-15): the kernel's
+entries are listed (five thread starts), and the hand ports' guest calls
+go through `lifted::CallFromContext` (stage 2, done), so only
+`src/lifted/lifted.cpp` reaches the SDK's function table.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

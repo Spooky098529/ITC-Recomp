@@ -220,6 +220,13 @@ outside:
   original reachable from our C++. Every harness at 0; the pad replay
   ran 127 s with no error lines.
 
+- Merged into `rexglue-removal-project` (2026-11-15, after an attract
+  race; the user's drive and the Windows check left for later). The
+  rewiring goes on, on `rewiring-15-11-26`, as "Before E1: the
+  rewiring" in `docs/rexglue-removal.md`: the kernel's entries listed
+  (stage 1), the hand ports' guest calls through
+  `lifted::CallFromContext` (stage 2).
+
 ## The user's calls (2026-11-15)
 
 - The end state is the goal: native C++ calling native C++, no `ctx`,

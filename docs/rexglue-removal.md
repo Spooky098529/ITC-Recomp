@@ -3254,6 +3254,18 @@ The stages, each leaving the game working and checked:
    direct guest calls (94 files) switch from the SDK's function table to
    `lifted::Call`, or a direct C++ call where the callee's plain C++ is
    known.
+
+   Done (2026-11-15): `lifted::CallFromContext(ctx, base, address)`
+   (`src/lifted/sdk.h`) runs the dispatch table's entry when there is one,
+   as the function's own REX_FUNC entry does (through `Enter`), else the
+   SDK's table on the same context as before, so lr, the nonvolatile
+   registers and leftovers reach hand ports' overrides unchanged. Every
+   `REX_CALL_INDIRECT_FUNC` and `sub_X(ctx, base)` outside the harnesses
+   and `src/lifted/` was converted by a script (372 sites in 123 files),
+   and native audio's mixer callback no longer goes through
+   `FunctionDispatcher::Execute`. Direct C++ calls in place of these are
+   left to stage 3, where the adapters go: most callees are hand ports
+   whose plain C++ still takes the caller's `Calls`.
 3. **Every native function in our dispatch table**: each hand port gets
    a ctx-free uniform entry (`lifted::Args` in, `lifted::Result` out) in
    place of its `REX_FUNC` adapter, registered like the lifted batches'
@@ -5861,3 +5873,16 @@ lines. The boundary: overridden 268, Native 48, Dropped 24, never called
 row yet 18). Static map: reachable 9,106, ours 9,095, **unported 2**:
 `sub_821743A8` (reached only by the Xbox Live mode's network battle)
 and `xstart`.
+
+**2026-11-15, the rewiring's stage 2 (branch `rewiring-15-11-26`):**
+`lift-sweep` merged into `rexglue-removal-project` after an attract
+race; the kernel's entries listed (five thread starts, "Before E1: the
+rewiring"); every guest call our hand ports made through the SDK's
+function table (372 sites in 123 files, native audio's mixer callback
+among them) goes through `lifted::CallFromContext`, so only
+`src/lifted/lifted.cpp` reaches the table. No behavior change. Every
+harness at 0; the pad replay ran 127 s with no error lines. The
+boundary: overridden 268, Native 48, Dropped 24, never called 34, live
+75. Imports: 186 called, 30 with a live caller. B7 (`b7_status.py`):
+ours 9,848, work left 37. Static map: reachable 9,081, ours 9,068,
+unported 2.
