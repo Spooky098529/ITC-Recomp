@@ -789,3 +789,13 @@ ITC_SAVE_INTERFACE_ADAPTER(820A5A88, SlotCheckStepSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A5BE8, SlotSaveStepSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A5E68, SlotLoadStepSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A6010, SlotDeleteStepSteps)
+
+// The forms on the SDK's context the header declares (a harness's), run on a
+// view of it (the rewiring, stage 3).
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::SaveInterfaceContentSize)
+#undef ITC_CONTEXT_FORM

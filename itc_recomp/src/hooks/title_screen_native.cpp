@@ -536,3 +536,20 @@ ITC_TITLE_SCREEN(82220960, TitleLoadDebugStep<8>)
 ITC_TITLE_SCREEN(822209F0, TitleLoadDebugStep<9>)
 ITC_TITLE_SCREEN(82220A80, TitleLoadDebugStep<10>)
 ITC_TITLE_SCREEN(82220B10, TitleLoadDebugStep<11>)
+
+// The forms on the SDK's context the header declares (a harness's), run on a
+// view of it (the rewiring, stage 3).
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::TitleScreenOnGameDataLoaded)
+ITC_CONTEXT_FORM(hooks::TitleScreenOnInterrupt)
+ITC_CONTEXT_FORM(hooks::TitleScreenOnResume)
+ITC_CONTEXT_FORM(hooks::ModeType4Restart)
+ITC_CONTEXT_FORM(hooks::ModeType4NextMode)
+ITC_CONTEXT_FORM(hooks::ModeType4LeaveScreen)
+ITC_CONTEXT_FORM(hooks::ModeType4WaitForLeave)
+ITC_CONTEXT_FORM(hooks::ModeType4Leaving)
+#undef ITC_CONTEXT_FORM

@@ -399,3 +399,15 @@ ITC_NATIVE_ENTRY_ALWAYS(8210ADF8) {
   }
   hooks::TextLoadSteps(ctx, base);
 }
+
+// The forms on the SDK's context the header declares (a harness's), run on a
+// view of it (the rewiring, stage 3).
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::StringsFormatVSteps)
+ITC_CONTEXT_FORM(hooks::StringsFormatSteps)
+ITC_CONTEXT_FORM(hooks::TextLoadSteps)
+#undef ITC_CONTEXT_FORM
