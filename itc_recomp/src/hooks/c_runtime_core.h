@@ -107,18 +107,15 @@ void CoreInvokeWatson(PPCContext& ctx, uint8_t* base);
 void CoreInvokeWatson(lifted::Regs& ctx, uint8_t* base);                        // sub_825AFD10
 void CoreLockFhandle(PPCContext& ctx, uint8_t* base);
 void CoreLockFhandle(lifted::Regs& ctx, uint8_t* base);           // sub_825B7958
-void CoreLockFhandleFinally(PPCContext& ctx, uint8_t* base);
-void CoreLockFhandleFinally(lifted::Regs& ctx, uint8_t* base);    // sub_825B7A20
+void CoreLockFhandleFinally(PPCContext& ctx, uint8_t* base);    // sub_825B7A20
 void CoreFreeOsfhnd(PPCContext& ctx, uint8_t* base);
 void CoreFreeOsfhnd(lifted::Regs& ctx, uint8_t* base);            // sub_825B77E8
 void CoreGetOsfhandle(PPCContext& ctx, uint8_t* base);
 void CoreGetOsfhandle(lifted::Regs& ctx, uint8_t* base);          // sub_825B7880
-void CoreRaiseFinally(PPCContext& ctx, uint8_t* base);
-void CoreRaiseFinally(lifted::Regs& ctx, uint8_t* base);          // sub_825B4C8C
+void CoreRaiseFinally(PPCContext& ctx, uint8_t* base);          // sub_825B4C8C
 void CoreUnlockStreamsFinally(PPCContext& ctx, uint8_t* base);
 void CoreUnlockStreamsFinally(lifted::Regs& ctx, uint8_t* base);  // sub_825B4F38, sub_825ACEB4
-void CoreFlsallInnerFinally(PPCContext& ctx, uint8_t* base);
-void CoreFlsallInnerFinally(lifted::Regs& ctx, uint8_t* base);    // sub_825ACF04
+void CoreFlsallInnerFinally(PPCContext& ctx, uint8_t* base);    // sub_825ACF04
 void CoreExp(PPCContext& ctx, uint8_t* base);
 void CoreExp(lifted::Regs& ctx, uint8_t* base);                   // sub_825ABE30
 void CoreForcdecpt(PPCContext& ctx, uint8_t* base);
@@ -158,14 +155,10 @@ void CoreUnlockFhandle(lifted::Regs& ctx, uint8_t* base);  // sub_825B7A58
 
 void CoreFileno(PPCContext& ctx, uint8_t* base);
 void CoreFileno(lifted::Regs& ctx, uint8_t* base);             // sub_825B0E88
-void CoreCloseFinally(PPCContext& ctx, uint8_t* base);
-void CoreCloseFinally(lifted::Regs& ctx, uint8_t* base);  // sub_825B0E50, sub_825B1304, sub_825B6730
-void CoreCommitFinally(PPCContext& ctx, uint8_t* base);
-void CoreCommitFinally(lifted::Regs& ctx, uint8_t* base);      // sub_825B4978
-void CoreFcloseFinally(PPCContext& ctx, uint8_t* base);
-void CoreFcloseFinally(lifted::Regs& ctx, uint8_t* base);  // sub_825A9664, sub_825AD02C, sub_825AD488
-void CoreExitUnlockFinally(PPCContext& ctx, uint8_t* base);
-void CoreExitUnlockFinally(lifted::Regs& ctx, uint8_t* base);  // sub_825AA338
+void CoreCloseFinally(PPCContext& ctx, uint8_t* base);  // sub_825B0E50, sub_825B1304, sub_825B6730
+void CoreCommitFinally(PPCContext& ctx, uint8_t* base);      // sub_825B4978
+void CoreFcloseFinally(PPCContext& ctx, uint8_t* base);  // sub_825A9664, sub_825AD02C, sub_825AD488
+void CoreExitUnlockFinally(PPCContext& ctx, uint8_t* base);  // sub_825AA338
 void CoreTerminate(PPCContext& ctx, uint8_t* base);
 void CoreTerminate(lifted::Regs& ctx, uint8_t* base);          // sub_825B3498
 

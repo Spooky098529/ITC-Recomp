@@ -201,7 +201,7 @@ cc::Calls hooks::CRuntimeCoreCalls(lifted::Regs& ctx, uint8_t* base) {
     guest_call::InFrame(ctx, base, bytes, uint32_t(lr), body);
     ctx.lr = lr;
   };
-  calls.trap = [&ctx, base](uint32_t type) { ppc_trap(ctx, base, uint16_t(type)); };
+  calls.trap = [](uint32_t type) { lifted::Trap(type); };  // logged, as the SDK's handler
   calls.atexit = [&ctx, base](uint32_t function) {
     const uint64_t lr = ctx.lr;
     hooks::GuestAtexit guest{ctx, base};
@@ -445,11 +445,16 @@ void hooks::CoreLockFhandle(lifted::Regs& ctx, uint8_t* base) {
 
 // The __finally funclets: r12 the parent's frame end (r31 = its frame), and
 // the parent's registers they reload or keep, as the originals leave them.
-void hooks::CoreLockFhandleFinally(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CoreLockFhandleFinally(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
+  // (and reloads) its parent's registers, which the view doesn't carry; the
+  // rest on a view of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   cc::LockFhandleFinally(CRuntimeCoreCalls(ctx, base));
-  ctx.r11.u64 = cc::kPioinfo;
-  ctx.r3.u64 = guest::LoadU32(base, ctx.r31.u32 + 148);
-  ctx.r29.u64 = guest::LoadU32(base, ctx.r31.u32 + 80);
+  sdk.r11.u64 = cc::kPioinfo;
+  ctx.r3.u64 = guest::LoadU32(base, sdk.r31.u32 + 148);
+  sdk.r29.u64 = guest::LoadU32(base, sdk.r31.u32 + 80);
 }
 
 void hooks::CoreFreeOsfhnd(lifted::Regs& ctx, uint8_t* base) {
@@ -469,9 +474,14 @@ void hooks::CoreGetOsfhandle(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = loaded ? uint64_t(result) : uint64_t(int64_t(int32_t(result)));
 }
 
-void hooks::CoreRaiseFinally(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CoreRaiseFinally(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
+  // (and reloads) its parent's registers, which the view doesn't carry; the
+  // rest on a view of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   bool called = false;
-  const uint64_t r3 = cc::RaiseFinally(ctx.r28.u32, &called, CRuntimeCoreCalls(ctx, base));
+  const uint64_t r3 = cc::RaiseFinally(sdk.r28.u32, &called, CRuntimeCoreCalls(ctx, base));
   if (called) {
     ctx.r3.u64 = r3;
   }
@@ -481,13 +491,18 @@ void hooks::CoreUnlockStreamsFinally(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::UnlockStreamsFinally(CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreFlsallInnerFinally(lifted::Regs& ctx, uint8_t* base) {
-  const uint32_t index = ctx.r28.u32, piob_word = ctx.r29.u32;
+void hooks::CoreFlsallInnerFinally(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
+  // (and reloads) its parent's registers, which the view doesn't carry; the
+  // rest on a view of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
+  const uint32_t index = sdk.r28.u32, piob_word = sdk.r29.u32;
   ctx.r4.u64 = guest::LoadU32(base, guest::LoadU32(base, piob_word) + 4 * index);
   ctx.r3.u64 = cc::FlsallInnerFinally(base, index, piob_word, CRuntimeCoreCalls(ctx, base));
-  ctx.r11.u64 = 0x82980000u;
+  sdk.r11.u64 = 0x82980000u;
   ctx.r10.u64 = cc::kNstream;
-  ctx.r27.u64 = guest::LoadU32(base, ctx.r12.u32 + 20);
+  sdk.r27.u64 = guest::LoadU32(base, sdk.r12.u32 + 20);
 }
 
 void hooks::CoreExp(lifted::Regs& ctx, uint8_t* base) {
@@ -546,21 +561,41 @@ void hooks::CoreFileno(lifted::Regs& ctx, uint8_t* base) {
 
 // The __finally funclets over a file handle's lock: the handle in r30
 // (_close's, _write's) or r27 (_commit's).
-void hooks::CoreCloseFinally(lifted::Regs& ctx, uint8_t* base) {
-  ctx.r3.u64 = cc::UnlockFhandleFinally(base, ctx.r30.u32, CRuntimeCoreCalls(ctx, base));
+void hooks::CoreCloseFinally(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
+  // (and reloads) its parent's registers, which the view doesn't carry; the
+  // rest on a view of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
+  ctx.r3.u64 = cc::UnlockFhandleFinally(base, sdk.r30.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreCommitFinally(lifted::Regs& ctx, uint8_t* base) {
-  ctx.r3.u64 = cc::UnlockFhandleFinally(base, ctx.r27.u32, CRuntimeCoreCalls(ctx, base));
+void hooks::CoreCommitFinally(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
+  // (and reloads) its parent's registers, which the view doesn't carry; the
+  // rest on a view of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
+  ctx.r3.u64 = cc::UnlockFhandleFinally(base, sdk.r27.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreFcloseFinally(lifted::Regs& ctx, uint8_t* base) {
-  ctx.r3.u64 = cc::UnlockFileFinally(base, ctx.r30.u32, CRuntimeCoreCalls(ctx, base));
+void hooks::CoreFcloseFinally(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
+  // (and reloads) its parent's registers, which the view doesn't carry; the
+  // rest on a view of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
+  ctx.r3.u64 = cc::UnlockFileFinally(base, sdk.r30.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-void hooks::CoreExitUnlockFinally(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CoreExitUnlockFinally(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
+  // (and reloads) its parent's registers, which the view doesn't carry; the
+  // rest on a view of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   bool called = false;
-  const uint64_t r3 = cc::ExitUnlockFinally(ctx.r28.u32, &called, CRuntimeCoreCalls(ctx, base));
+  const uint64_t r3 = cc::ExitUnlockFinally(sdk.r28.u32, &called, CRuntimeCoreCalls(ctx, base));
   if (called) {
     ctx.r3.u64 = r3;
   }
@@ -741,6 +776,18 @@ void hooks::CoreCftog(lifted::Regs& ctx, uint8_t* base) {
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_c_runtime_core)) { \
     hooks::step(ctx, base);                     \
   }
+// The __finally funclets' adapters stay on the SDK's context (not in the
+// dispatch table): they read and reload their parent's registers (the
+// rewiring, stage 3; left for later).
+#define ITC_C_RUNTIME_CORE_SDK(address, step)   \
+  extern "C" REX_FUNC(sub_##address) {          \
+    REX_FUNC_PROLOGUE();                        \
+    if (!ITC_FLAG(native_c_runtime_core)) {     \
+      __imp__sub_##address(ctx, base);          \
+      return;                                   \
+    }                                           \
+    hooks::step(ctx, base);                     \
+  }
 
 // __crtTlsAlloc: r3 = the FLS callback (ignored); r3 = the TLS index.
 ITC_C_RUNTIME_CORE(825AA3F8, CoreCrtTlsAlloc)
@@ -839,7 +886,7 @@ ITC_C_RUNTIME_CORE(825AFD10, CoreInvokeWatson)
 // __lock_fhandle: r3 = a file handle; r3 = 1, or 0.
 ITC_C_RUNTIME_CORE(825B7958, CoreLockFhandle)
 // __lock_fhandle's __finally: r31 = its frame; r3, r29 and r11 reloaded.
-ITC_C_RUNTIME_CORE(825B7A20, CoreLockFhandleFinally)
+ITC_C_RUNTIME_CORE_SDK(825B7A20, CoreLockFhandleFinally)
 // _free_osfhnd, _get_osfhandle: r3 = a file handle.
 ITC_C_RUNTIME_CORE(825B77E8, CoreFreeOsfhnd)
 ITC_C_RUNTIME_CORE(825B7880, CoreGetOsfhandle)
@@ -862,9 +909,9 @@ ITC_C_RUNTIME_CORE(825B70D0, CoreLd12ToFloat)
 // _fileno: r3 = a stream; r3 = its handle, or -1.
 ITC_C_RUNTIME_CORE(825B0E88, CoreFileno)
 // _close's and _write's __finally: r30 = the handle; _commit's: r27.
-ITC_C_RUNTIME_CORE(825B0E50, CoreCloseFinally)
-ITC_C_RUNTIME_CORE(825B1304, CoreCloseFinally)
-ITC_C_RUNTIME_CORE(825B4978, CoreCommitFinally)
+ITC_C_RUNTIME_CORE_SDK(825B0E50, CoreCloseFinally)
+ITC_C_RUNTIME_CORE_SDK(825B1304, CoreCloseFinally)
+ITC_C_RUNTIME_CORE_SDK(825B4978, CoreCommitFinally)
 // (fclose's __finally, sub_825A9664, has no adapter: fclose is native.)
 // (doexit's unwind funclet, sub_825AA338, has no adapter: doexit is native.)
 // terminate: no registers; ends in KeBugCheck(0xC0000144).
@@ -883,7 +930,7 @@ ITC_C_RUNTIME_CORE(825B4828, CoreCommit)
 ITC_C_RUNTIME_CORE(825B6500, CoreLseekNolock)
 ITC_C_RUNTIME_CORE(825B65D0, CoreLseek)
 // _lseeki64's __finally: r30 = the handle.
-ITC_C_RUNTIME_CORE(825B6730, CoreCloseFinally)
+ITC_C_RUNTIME_CORE_SDK(825B6730, CoreCloseFinally)
 // _write: r3 = a file handle, r4 = the bytes, r5 = their count; r3 = the
 // count written, or -1. (_write_nolock, sub_825B0F48, and WriteFile,
 // sub_82295D50, have no adapters: _write is _write_nolock's only caller, and
