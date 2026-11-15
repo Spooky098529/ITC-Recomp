@@ -11,6 +11,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "graphics/shader_patch.h"
 #include "graphics/video_output.h"
 #include "hooks/guest_call.h"
 #include "hooks/single_commands.h"
@@ -23,7 +24,8 @@ ITC_FLAG_BOOL(native_replay_commands, true, "ITC",
               "Run the render command replay's command handlers (the table 0x8265EDE0, "
               "docs/functions/functions.md's Command::* rows: sub_8258FBD0 to sub_82591798 and "
               "command 7's sub_8258FD48) and the frame's end resolve "
-              "(VideoOutput::ResolveFrontBuffer sub_8258D998) natively inside their wraps "
+              "(VideoOutput::ResolveFrontBuffer sub_8258D998), and the vertex shader patcher "
+              "(sub_822AE340) natively inside their wraps "
               "instead of through the "
               "translated code (the same writes; the device's native setters called as plain "
               "C++, everything else a guest call; checked by frame dumps, as the render path's "
@@ -92,6 +94,37 @@ uint32_t g_current_command = 0;
 uint32_t g_command_serial = 0;
 }
 
+// The vertex shader patcher's plain C++ (src/graphics/shader_patch.h): r3
+// the shader, r4 where the patched instructions go, r5 the declaration, r6
+// the stream bytes; its memcpy a guest call (memcpy's override records
+// copies for the renderer's mirrors), from the original's return address.
+namespace {
+struct PatchCopyContext {
+  PPCContext* ctx;
+  uint8_t* base;
+};
+void PatchCopy(void* context, uint32_t destination, uint32_t source, uint32_t size) {
+  PatchCopyContext& c = *static_cast<PatchCopyContext*>(context);
+  PPCContext& ctx = *c.ctx;
+  uint8_t* base = c.base;
+  const uint64_t stack = ctx.r1.u64;
+  ctx.r1.u64 = stack - 592;
+  ctx.r3.u64 = destination;
+  ctx.r4.u64 = source;
+  ctx.r5.u64 = size;
+  ctx.lr = 0x822AE900;
+  sub_825A7410(ctx, base);
+  ctx.r1.u64 = stack;
+}
+void NativePatchVertexShader(PPCContext& ctx, uint8_t* base) {
+  PatchCopyContext context{&ctx, base};
+  const uint32_t shader = ctx.r3.u32, microcode = ctx.r4.u32, declaration = ctx.r5.u32,
+                 streams = ctx.r6.u32, sp = ctx.r1.u32;
+  ctx.r3.u64 = graphics::shader_patch::PatchVertexShader(base, shader, microcode, declaration,
+                                                         streams, sp, PatchCopy, &context);
+}
+}  // namespace
+
 // When the GPU may still be using a vertex shader's microcode, the library
 // can't patch it in place: sub_822AEBF0 copies it into the command buffer
 // (IM_LOAD_IMMEDIATE) and patches the copy, leaving the object's microcode
@@ -106,7 +139,12 @@ extern "C" REX_FUNC(sub_822AE340) {
   native::g_last_patch[0] = object;
   native::g_last_patch[1] = declaration;
   native::g_last_patch[2] = declaration ? guest::LoadU32(base, declaration + 48) : 0;
-  __imp__sub_822AE340(ctx, base);
+  if (ITC_FLAG(native_replay_commands)) {
+    ctx.fpscr.disableFlushMode();
+    NativePatchVertexShader(ctx, base);
+  } else {
+    __imp__sub_822AE340(ctx, base);
+  }
   if (copy) {
     native::LoadedVertexShader& loaded = native::g_loaded_vertex_shader;
     loaded.object = object;
