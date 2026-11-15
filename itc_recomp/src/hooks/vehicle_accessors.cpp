@@ -3,6 +3,7 @@
 // (docs/functions/vehicle-accessors.md).
 
 #include "guest.h"
+#include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
 #include "base/flags.h"
@@ -31,35 +32,20 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
 // Defines an adapter returning a word in r3: `address` the function's
 // (sub_<address>), `expr` the result (using `ctx` and `base`).
 #define ITC_ACCESSOR_WORD(address, expr)          \
-  extern "C" REX_FUNC(sub_##address) {           \
-    REX_FUNC_PROLOGUE();                         \
-    if (!ITC_FLAG(native_vehicle_accessors)) {   \
-      __imp__sub_##address(ctx, base);           \
-      return;                                    \
-    }                                            \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vehicle_accessors)) { \
     ctx.r3.u64 = uint32_t(expr);                 \
   }
 
 // The same for a signed word (-1 sign-extended, as the original's li).
 #define ITC_ACCESSOR_SIGNED(address, expr)        \
-  extern "C" REX_FUNC(sub_##address) {           \
-    REX_FUNC_PROLOGUE();                         \
-    if (!ITC_FLAG(native_vehicle_accessors)) {   \
-      __imp__sub_##address(ctx, base);           \
-      return;                                    \
-    }                                            \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vehicle_accessors)) { \
     ctx.r3.s64 = int32_t(expr);                  \
   }
 
 // The same for a float returned in f1 (the original's lfs, a single widened
 // to double).
 #define ITC_ACCESSOR_FLOAT(address, expr)         \
-  extern "C" REX_FUNC(sub_##address) {           \
-    REX_FUNC_PROLOGUE();                         \
-    if (!ITC_FLAG(native_vehicle_accessors)) {   \
-      __imp__sub_##address(ctx, base);           \
-      return;                                    \
-    }                                            \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vehicle_accessors)) { \
     ctx.fpscr.disableFlushMode();                \
     ctx.f1.f64 = double(expr);                   \
   }
@@ -67,12 +53,7 @@ ITC_FLAG_BOOL(native_vehicle_accessors, true, "ITC",
 // The same for a function returning nothing (`call` uses `ctx` and `base`,
 // and sets r3 where the original leaves it something callers could see).
 #define ITC_ACCESSOR_VOID(address, call)          \
-  extern "C" REX_FUNC(sub_##address) {           \
-    REX_FUNC_PROLOGUE();                         \
-    if (!ITC_FLAG(native_vehicle_accessors)) {   \
-      __imp__sub_##address(ctx, base);           \
-      return;                                    \
-    }                                            \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vehicle_accessors)) { \
     ctx.fpscr.disableFlushMode();                \
     call;                                        \
   }
@@ -253,24 +234,14 @@ ITC_FLAG_BOOL(native_vector_library, true, "ITC",
 // Defines an adapter for a function returning nothing (r3 left as it was):
 // `call` uses `ctx` and `base`.
 #define ITC_VECTOR_VOID(address, call)         \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_vector_library)) {   \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vector_library)) { \
     ctx.fpscr.disableFlushMode();             \
     call;                                     \
   }
 
 // The same for a single returned in f1.
 #define ITC_VECTOR_FLOAT(address, expr)        \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_vector_library)) {   \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_vector_library)) { \
     ctx.fpscr.disableFlushMode();             \
     ctx.f1.f64 = double(expr);                \
   }

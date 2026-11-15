@@ -9,6 +9,7 @@
 #pragma once
 
 #include "lifted/lifted.h"
+#include "lifted/regs.h"
 
 namespace lifted {
 
@@ -30,5 +31,28 @@ void Enter(PPCContext& ctx, uint8_t* base, Entry entry);
 // harnesses that reaches the SDK's function table (docs/rexglue-removal.md,
 // "Before E1: the rewiring", stage 2).
 void CallFromContext(PPCContext& ctx, uint8_t* base, uint32_t address);
+
+// An SDK function (an import, or a recompiled original `__imp__sub_X`) with
+// a register view's registers, on the thread's context (as Import); its r3
+// and f1 back in them.
+void Sdk(Regs& regs, uint8_t* base, ImportFunction* function);
+
+// A register view of the context for code still entered with it (a
+// harness, an adapter): made from the context's registers, the context the
+// one calls through the boundary use while it lives, and its registers put
+// back in the context at the end (the float mode synced).
+class RegsScope {
+ public:
+  explicit RegsScope(PPCContext& ctx);
+  ~RegsScope();
+  RegsScope(const RegsScope&) = delete;
+  RegsScope& operator=(const RegsScope&) = delete;
+
+  Regs regs;
+
+ private:
+  PPCContext& ctx_;
+  PPCContext* outer_;
+};
 
 }  // namespace lifted

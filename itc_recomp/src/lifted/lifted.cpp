@@ -181,6 +181,55 @@ void Enter(PPCContext& ctx, uint8_t* base, Entry entry) {
   current = outer;
 }
 
+bool RegisterEntry(uint32_t address, Entry entry, const bool* enabled) {
+  auto& table = Table();
+  if (table.contains(address)) {
+    ITC_LOG_ERROR("lifted: {:08X} registered twice", address);
+    return false;
+  }
+  table[address] = Target{entry, enabled};
+  return true;
+}
+
+void Sdk(Regs& regs, uint8_t* base, ImportFunction* function) {
+  regs.Apply(Import(base, function, regs.ToArgs()));
+}
+
+RegsScope::RegsScope(PPCContext& ctx) : ctx_(ctx), outer_(current) {
+  current = &ctx;
+  regs.r1.u64 = ctx.r1.u64;
+  regs.r13.u64 = ctx.r13.u64;
+  Temp* r = &regs.r3;
+  for (int i = 0; i < 8; i++) {
+    r[i].u64 = (i == 0 ? ctx.r3 : (&ctx.r4)[i - 1]).u64;
+  }
+  Temp* f = &regs.f1;
+  const PPCRegister* cf = &ctx.f1;
+  for (int i = 0; i < 13; i++) {
+    f[i].f64 = cf[i].f64;
+  }
+  regs.ctr.u64 = ctx.ctr.u64;
+  regs.lr = ctx.lr;
+}
+
+RegsScope::~RegsScope() {
+  ctx_.r1.u64 = regs.r1.u64;
+  ctx_.r13.u64 = regs.r13.u64;
+  const Temp* r = &regs.r3;
+  for (int i = 0; i < 8; i++) {
+    (i == 0 ? ctx_.r3 : (&ctx_.r4)[i - 1]).u64 = r[i].u64;
+  }
+  const Temp* f = &regs.f1;
+  PPCRegister* cf = &ctx_.f1;
+  for (int i = 0; i < 13; i++) {
+    cf[i].f64 = f[i].f64;
+  }
+  ctx_.ctr.u64 = regs.ctr.u64;
+  ctx_.lr = regs.lr;
+  SyncFloatMode(ctx_);
+  current = outer_;
+}
+
 void CallFromContext(PPCContext& ctx, uint8_t* base, uint32_t address) {
   ctx.ctr.u64 = address;
   if (const Entry entry = Find(address)) {
