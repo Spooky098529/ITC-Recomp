@@ -15,6 +15,8 @@
 #include "audio/native_audio.h"
 
 #include "audio/output_mix.h"
+#include "audio/render_driver.h"
+#include "hooks/lifted_call.h"
 #include "movies/player.h"
 
 #include "guest.h"
@@ -44,6 +46,11 @@
 
 ITC_FLAG_BOOL(native_audio, true, "ITC",
               "Our own audio output instead of the SDK's render driver and Audio Worker");
+ITC_FLAG_BOOL(native_render_driver, true, "ITC",
+              "Run the game's render driver's destructor (AudioRenderDriver::Destroy "
+              "sub_824658C8, docs/functions/audio.md) natively inside its wrap instead of "
+              "through the translated code (XAudioUnregisterRenderDriverClient through its "
+              "import as the original; checked by --run_harnesses=audio_wraps)");
 
 ITC_FLAG_DECLARE(int32_t, audio_maxqframes);
 
@@ -467,9 +474,10 @@ extern "C" REX_FUNC(sub_82465870) {
   ctx.r3.u64 = 0;
 }
 
-// Destructor: unregisters the handle at +16 if it's ours, so the original
-// (which would call the kernel's XAudioUnregisterRenderDriverClient) sees
-// none.
+// Destructor: unregisters the handle at +16 if it's ours, so the game's
+// destructor (which would call the kernel's XAudioUnregisterRenderDriverClient)
+// sees none. The destructor's work: its plain C++ (audio/render_driver.h)
+// with --native_render_driver, else the original.
 extern "C" REX_FUNC(sub_824658C8) {
   REX_FUNC_PROLOGUE();
   uint32_t object = ctx.r3.u32;
@@ -478,5 +486,9 @@ extern "C" REX_FUNC(sub_824658C8) {
     g_system->Unregister(handle);
     guest::StoreU32(base, object + 16, 0);
   }
-  __imp__sub_824658C8(ctx, base);
+  if (ITC_FLAG(native_render_driver)) {
+    lifted_call::EnterR3<audio::RenderDriverDestroy>(ctx, base);
+  } else {
+    __imp__sub_824658C8(ctx, base);
+  }
 }

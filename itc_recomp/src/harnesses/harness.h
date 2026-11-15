@@ -340,5 +340,7 @@ void MorphJobs(Context& h);
 void Type8Screens(Context& h);
 void Type8Mode(Context& h);
 void Lifted(Context& h);
+// The audio functions native inside their wraps (src/harnesses/audio_wraps.cpp).
+void AudioWraps(Context& h);
 
 }  // namespace harness

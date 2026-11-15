@@ -64,6 +64,7 @@ set(ITC_SOURCES
     src/base/log.cpp
     src/base/log_sdk.cpp
     src/audio/native_audio.cpp
+    src/audio/render_driver.cpp
     src/audio/output_mix.cpp
     src/hooks/vehicle.cpp
     src/hooks/title_screen.cpp
@@ -709,6 +710,7 @@ set(ITC_SOURCES
     src/hooks/std_string.cpp
     src/std_string/std_string.cpp
     src/hooks/sound_cues.cpp
+    src/sound_cues/manager_update.cpp
     src/sound_cues/sound_cues.cpp
     src/hooks/xact.cpp
     src/xact/xact.cpp
@@ -911,6 +913,7 @@ set(ITC_SOURCES
     src/harnesses/cameras.cpp
     src/harnesses/strings_and_font.cpp
     src/harnesses/std_string.cpp
+    src/harnesses/audio_wraps.cpp
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
     src/harnesses/xact_waves.cpp
