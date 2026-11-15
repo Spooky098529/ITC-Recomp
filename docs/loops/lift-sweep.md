@@ -114,7 +114,14 @@ outside:
 ## The user's calls (2026-11-15)
 
 - The end state is the goal: native C++ calling native C++, no `ctx`,
-  no adapters, SDK imports kept.
+  no adapters, needing rexglue only for guest memory, the kernel's
+  functions and the SDL window. The generated code goes with the
+  dispatch table's fallback into the SDK, once every function is native
+  and the refused ones are ported by hand.
+- Parameter lists made long by calls through vtables and imports (each
+  assumed to pass every argument register) are left for later.
+- The lifted code's wordiness isn't cleaned up: most of it is unlikely
+  to run.
 - Lifted-looking code is fine for every size of function.
 - The sweep runs on its own branch, `lift-sweep`, from
   `rexglue-removal-project`.
