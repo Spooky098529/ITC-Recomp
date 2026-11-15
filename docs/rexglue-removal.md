@@ -3302,6 +3302,19 @@ The stages, each leaving the game working and checked:
    key, the UI movies' per-tick tracks, `Buffers_Memcpy`'s caller, and
    the input reads' counts. Today a lifted caller reaches them through
    `lifted::Call`'s boundary with the context's last lr, not its own.
+
+   The return address travels with the call (the user's call,
+   2026-11-15): `lifted::Args::lr`, filled by `Enter` from the context,
+   put in the context's lr by the boundary for code still on the SDK
+   side. `lift.py` passes each call's own return address (the
+   `ctx.lr = X` before it in `generated/`), and a function with a tail
+   call by address or import (about 1,700 tail calls in all: the
+   caller's return address passes on), or to a lifted function that
+   takes one, takes its own `lr` as a parameter; the batches and
+   `originals.cpp` were emitted again with it. Hand ports' calls carry
+   theirs through stage 3; until then `lifted_call::Call`'s 18 sites and
+   `ScreenObject::Record`'s pasted translation pass 0, where they passed
+   the context's last value.
 4. **Delete the overrides**: once nothing reaches them through the SDK's
    function table, the hand ports' adapters and the lifted functions'
    `REX_FUNC` entries go, except stage 1's kernel entries, which become

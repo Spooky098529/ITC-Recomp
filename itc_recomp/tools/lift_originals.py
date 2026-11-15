@@ -28,6 +28,7 @@ def main(argv):
         print(f"{n}: refused: {infos[n].error}")
     names = [n for n in wanted if infos[n].lifted]
     emitting = set(lifted_before)  # direct calls only to lift.py's functions
+    lift.mark_needs_lr(infos, emitting)
     cpp = [
         "// The originals our C++ still called (docs/loops/lift-sweep.md): written by",
         "// itc_recomp/tools/lift_originals.py from generated/. Don't edit it by hand:",
@@ -43,10 +44,11 @@ def main(argv):
         "#include <bit>",
         "#include <cstdlib>",
         "",
-        "// A call by address or an import passes every argument register.",
-        "#define LIFTED_ARGS \\",
+        "// A call by address or an import passes every argument register and its",
+        "// return address.",
+        "#define LIFTED_ARGS(lr) \\",
         "  lifted::Args { r1, r13, {r3, r4, r5, r6, r7, r8, r9, r10}, \\",
-        "                 {f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13} }",
+        "                 {f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}, {}, uint32_t(lr) }",
         "",
         "namespace lifted::original {",
         "",

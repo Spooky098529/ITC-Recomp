@@ -38,13 +38,17 @@ union alignas(16) Vec {
 };
 
 // A call's argument registers, for a call by address: the stack pointer,
-// r13 (the thread's block), r3 to r10, f1 to f13 and v1 to v13.
+// r13 (the thread's block), r3 to r10, f1 to f13 and v1 to v13; and its
+// return address (the link register the original's call sets: a tail call
+// passes on its caller's), which wraps acting on their caller read (0 when
+// a caller doesn't know it).
 struct Args {
   uint64_t r1 = 0;
   uint64_t r13 = 0;
   uint64_t r[8] = {};
   double f[13] = {};
   Vec v[13] = {};
+  uint32_t lr = 0;
 };
 
 // What a call leaves in r3 and f1.

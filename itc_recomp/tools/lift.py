@@ -149,6 +149,7 @@ def parse(name, lines):
     comment = None
     braces = []
     pending = ""
+    last_lr = None  # the return address the last `ctx.lr = ` set
     for raw in lines:
         s = raw.strip()
         if not s:
@@ -172,12 +173,16 @@ def parse(name, lines):
             target = m.group(1)
             if target.startswith("__save") or target.startswith("__rest") or target in LEFT_OUT:
                 stmts.append(Stmt("skip", s, comment))
+                last_lr = None
             elif target.startswith("__imp__"):
-                stmts.append(Stmt("call", s, comment, how="import", target=target))
+                stmts.append(Stmt("call", s, comment, how="import", target=target, lr=last_lr))
             else:
-                stmts.append(Stmt("call", s, comment, how="direct", target=target))
+                stmts.append(Stmt("call", s, comment, how="direct", target=target, lr=last_lr))
+            last_lr = None
         elif INDIRECT_RE.match(s):
-            stmts.append(Stmt("call", s, comment, how="indirect", target=INDIRECT_RE.match(s).group(1)))
+            stmts.append(Stmt("call", s, comment, how="indirect", target=INDIRECT_RE.match(s).group(1),
+                              lr=last_lr))
+            last_lr = None
         elif re.match(r"^loc_[0-9A-F]+:$", s):
             stmts.append(Stmt("label", s, comment, label=s[:-1]))
         elif IF_GOTO_RE.match(s):
@@ -209,6 +214,9 @@ def parse(name, lines):
         elif re.match(r"^(uint32_t ea\{\};|PPCRegister temp\{\};|PPCVRegister vTemp\{\};)$", s):
             stmts.append(Stmt("decl", s, comment))
         elif s.endswith(";") and not s.endswith("{") and "{" not in s:
+            m_lr = re.match(r"^ctx\.lr = (0x[0-9A-Fa-f]+);$", s)
+            if m_lr:
+                last_lr = "0x" + m_lr.group(1)[2:].upper()
             if re.match(r"^ctx\.lr = ", s) or re.match(r"^ctx\.(r\d+)\.u64 = ctx\.\1\.u64;$", s):
                 # A return address (dead in C++), or a register moved to
                 # itself (`mr rN,rN`, the 360's no-op hints).
@@ -771,6 +779,8 @@ def signature(info, qualified=False):
     def typed(p):
         return ("double " if p.startswith("f") else "lifted::Vec " if p.startswith("v") else "uint64_t ") + p
     params = ["uint8_t* base"] + [typed(p) for p in info.params]
+    if getattr(info, "needs_lr", False):
+        params.append("uint64_t lr")
     return f"{ret} {'lifted::' if qualified else ''}{fname(info.name)}({', '.join(params)})"
 
 
@@ -807,6 +817,36 @@ def assign_result(info_callee, call):
     return f"{call};"
 
 
+def is_direct(st, infos, emitting):
+    """Whether a call statement is a direct C++ call to a lifted function."""
+    return (st.how == "direct" and st.target in infos and infos[st.target].lifted
+            and st.target in emitting)
+
+
+def mark_needs_lr(infos, emitting):
+    """Marks the lifted functions that take their own return address (`lr`):
+    those with a tail call (no return address of its own: the caller's
+    passes on) by address, to an import, or to a lifted function that
+    takes one. A call's return address reaches the callee in
+    `lifted::Args::lr`, so a wrap that acts on its caller sees the
+    original's (the user's call, 2026-11-15)."""
+    for info in infos.values():
+        info.needs_lr = False
+    changed = True
+    while changed:
+        changed = False
+        for info in infos.values():
+            if not info.lifted or info.needs_lr:
+                continue
+            for st in info.stmts:
+                if st.kind != "call" or st.lr is not None:
+                    continue
+                if not is_direct(st, infos, emitting) or infos[st.target].needs_lr:
+                    info.needs_lr = True
+                    changed = True
+                    break
+
+
 def emit_function(info, infos, emitting):
     out = []
     used = set()
@@ -823,20 +863,21 @@ def emit_function(info, infos, emitting):
             body.append("  // (left out: dead in C++)")
             continue
         if st.kind == "call":
-            if st.how == "direct" and st.target in infos and infos[st.target].lifted and st.target in emitting:
+            lr = st.lr or "lr"  # a tail call passes on the function's own
+            if is_direct(st, infos, emitting):
                 callee = infos[st.target]
-                call = f"{fname(st.target)}({', '.join(['base'] + callee.params)})"
+                call = f"{fname(st.target)}({', '.join(['base'] + callee.params + ([lr] if callee.needs_lr else []))})"
                 used.update(callee.params)
                 line = assign_result(callee, call)
             elif st.how == "direct":
-                line = assign_result(None, f"lifted::Call(base, 0x{st.target[4:]}, LIFTED_ARGS)")
+                line = assign_result(None, f"lifted::Call(base, 0x{st.target[4:]}, LIFTED_ARGS({lr}))")
                 used.update(ALL_ARGS)
             elif st.how == "import":
-                line = assign_result(None, f"lifted::Import(base, {st.target}, LIFTED_ARGS)")
+                line = assign_result(None, f"lifted::Import(base, {st.target}, LIFTED_ARGS({lr}))")
                 used.update(ALL_ARGS)
             else:
                 target = rewrite(st.target)
-                line = assign_result(None, f"lifted::Call(base, uint32_t({target}), LIFTED_ARGS)")
+                line = assign_result(None, f"lifted::Call(base, uint32_t({target}), LIFTED_ARGS({lr}))")
                 used.update(ALL_ARGS)
             body.append("  " + line)
             used.update({"r3", "f1"})
@@ -915,6 +956,8 @@ def emit_entry(info):
             args.append(f"a.v[{int(p[1:]) - 1}]" if 1 <= int(p[1:]) <= 13 else "lifted::Vec{}")
         else:
             args.append(f"a.f[{int(p[1:]) - 1}]")
+    if getattr(info, "needs_lr", False):
+        args.append("a.lr")
     call = f"{fname(info.name)}({', '.join(args)})"
     r3, f1 = info.returns
     if r3 and f1:
@@ -951,10 +994,11 @@ def emit_batch(batch, names, infos, emitting):
         f"              \"Run lift sweep batch {batch}'s functions as lifted C++ (src/lifted/, \"",
         "              \"docs/loops/lift-sweep.md) instead of the recompiled ones.\");",
         "",
-        "// A call by address or an import passes every argument register.",
-        "#define LIFTED_ARGS \\",
+        "// A call by address or an import passes every argument register and its",
+        "// return address.",
+        "#define LIFTED_ARGS(lr) \\",
         "  lifted::Args { r1, r13, {r3, r4, r5, r6, r7, r8, r9, r10}, \\",
-        "                 {f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13} }",
+        "                 {f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}, {}, uint32_t(lr) }",
         "",
         "namespace lifted {",
         "",
@@ -1070,6 +1114,7 @@ def main(argv):
                 print(f"{n}: refused: {infos[n].error}")
             return 1
         os.makedirs(OUT, exist_ok=True)
+        mark_needs_lr(infos, set(chosen) | set(lifted_before))
         with open(os.path.join(OUT, f"batch_{batch}.cpp"), "w") as f:
             f.write(emit_batch(batch, chosen, infos, set(chosen) | set(lifted_before)))
         signatures = dict(lifted_before)
