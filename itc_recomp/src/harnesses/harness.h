@@ -342,5 +342,7 @@ void Type8Mode(Context& h);
 void Lifted(Context& h);
 // The audio functions native inside their wraps (src/harnesses/audio_wraps.cpp).
 void AudioWraps(Context& h);
+// The game's CreateFile (src/harnesses/create_file.cpp).
+void CreateFile(Context& h);
 
 }  // namespace harness

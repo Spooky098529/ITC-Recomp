@@ -737,6 +737,7 @@ set(ITC_SOURCES
     src/c_runtime/core.cpp
     src/game_data/game_data.cpp
     src/game_data/data_file.cpp
+    src/game_data/create_file.cpp
     src/hooks/data_file.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
@@ -914,6 +915,7 @@ set(ITC_SOURCES
     src/harnesses/strings_and_font.cpp
     src/harnesses/std_string.cpp
     src/harnesses/audio_wraps.cpp
+    src/harnesses/create_file.cpp
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
     src/harnesses/xact_waves.cpp
