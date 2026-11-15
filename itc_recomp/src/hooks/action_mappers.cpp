@@ -20,8 +20,8 @@ ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
               "the listeners' held test, sub_8258CF10 and sub_825924E0; the client list, "
               "sub_8259C6D0 to sub_8259C960; the update, sub_8210B018, sub_8210C370, "
               "sub_8210C0E0, sub_8210B7D0, sub_8210B4A8, sub_8210B500, sub_8210B718 and "
-              "sub_8210BBA0; the read slots, sub_8210BE70, sub_8210BF40, sub_8210C010 and "
-              "sub_8210BA28; the setters, sub_8210B698, sub_8210BDF0 and sub_8210BE30; "
+              "sub_8210BBA0; the read slots, sub_8210BE70, sub_8210BF40, sub_8210C010, "
+              "sub_8210BA28, sub_8210BED8, sub_8210BFA8 and sub_8210BA68; the setters, sub_8210B698, sub_8210BDF0 and sub_8210BE30; "
               "ActionMappers::Configure, sub_8209F228; the set-up, sub_8210C078, sub_8210BB38, "
               "sub_8210BAB0, sub_8210B8A8, sub_8210B438, sub_8210AEB0, sub_8210AE60 and "
               "sub_8210AF00; the mapper's constructor, sub_8210C180; ActionMapper::Bind, "
@@ -142,7 +142,27 @@ ITC_MAPPERS_READ_SLOT(8210BE70, 8, Held)
 ITC_MAPPERS_READ_SLOT(8210BF40, 10, Pressed)
 ITC_MAPPERS_READ_SLOT(8210C010, 12, Fired)
 ITC_MAPPERS_READ_SLOT(8210BA28, 14, AnalogRaw)
+ITC_MAPPERS_READ_SLOT(8210BED8, 9, HeldBefore)
+ITC_MAPPERS_READ_SLOT(8210BFA8, 11, Released)
 #undef ITC_MAPPERS_READ_SLOT
+
+// Slot 5 (the analog value in f1; r3 left as IndexOf's result), logged the
+// same way with its f1.
+extern "C" REX_FUNC(sub_8210BA68) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t mapper = ctx.r3.u32;
+  const uint32_t action = ctx.r4.u32;
+  const uint32_t caller = uint32_t(ctx.lr);
+  if (ITC_FLAG(native_action_mappers)) {
+    ctx.fpscr.disableFlushMode();
+    double f1 = 0;
+    ctx.r3.u64 = AnalogValue(base, mapper, action, &f1);
+    ctx.f1.f64 = f1;
+  } else {
+    __imp__sub_8210BA68(ctx, base);
+  }
+  debug::PauseMenuLog_NoteSlotRead(5, mapper, action, caller, ctx.f1.f64);
+}
 
 // The setters (slots 2, 4 and 7), from ActionMappers::Configure at boot.
 ITC_MAPPERS_WORD(8210B698, SetThreshold(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64,
