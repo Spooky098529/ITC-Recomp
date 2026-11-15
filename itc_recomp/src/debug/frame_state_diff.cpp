@@ -462,8 +462,10 @@ ITC_FRAME_STATE_WRAP_RECORDS(8209F900, hooks::CameraPassesRecordEnds)
 // Scenery::Draw natively under --native_course_scenery
 // (src/course_scenery/draw.cpp, hooks::CourseSceneryDraw), inside the same
 // wrap.
-ITC_NATIVE_ENTRY_ALWAYS(820F6068) {
-  
+// On the SDK's context (not in the dispatch table): the native body sets r24
+// for its callees' adapters (the rewiring, stage 3; left for later).
+extern "C" REX_FUNC(sub_820F6068) {
+  REX_FUNC_PROLOGUE();
   if (debug::IsHidden(0x820F6068)) {
     return;
   }
@@ -471,7 +473,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F6068) {
   if (hooks::CourseSceneryDrawNative()) {
     hooks::CourseSceneryDraw(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820F6068);
+    __imp__sub_820F6068(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820F6068);
 }

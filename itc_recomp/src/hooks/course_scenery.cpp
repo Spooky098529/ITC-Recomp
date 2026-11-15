@@ -128,7 +128,7 @@ using namespace course_scenery;
 namespace {
 
 struct GuestCalls {
-  PPCContext* ctx;
+  lifted::Regs* ctx;
   uint8_t* base;
 };
 
@@ -278,10 +278,15 @@ ITC_COURSE_SCENERY(820F1E00, ITC_SCENERY_CALLS;
 void hooks::CourseSceneryUpdate(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  ctx.r12.u64 = ctx.lr;
-  __savegprlr_18(ctx, base);
-  guest::StoreU32(base, ctx.r1.u32 - 128, uint32_t(ctx.f31.u64 >> 32));
-  guest::StoreU32(base, ctx.r1.u32 - 124, uint32_t(ctx.f31.u64));
+  // __savegprlr_18's stores: lr at r1 - 8, r18 to r31 below it (the
+  // caller's: not carried by the view, stored as 0); f31 likewise.
+  guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
+  for (uint32_t offset = 16; offset <= 120; offset += 8) {
+    guest::StoreU32(base, ctx.r1.u32 - offset, 0);
+    guest::StoreU32(base, ctx.r1.u32 - offset + 4, 0);
+  }
+  guest::StoreU32(base, ctx.r1.u32 - 128, 0);
+  guest::StoreU32(base, ctx.r1.u32 - 124, 0);
   GuestCalls call{&ctx, base};
   const Calls calls{&call, [](void* user, uint32_t function, const uint32_t* args, int count,
                               uint32_t frame, uint32_t back) {
@@ -291,7 +296,9 @@ void hooks::CourseSceneryUpdate(lifted::Regs& ctx, uint8_t* base) {
                     },
                     SceneryLoads(base)};
   ctx.r3.u64 = Update(base, calls, ctx.r1.u32, ctx.r3.u32,
-                      {ctx.r25.u64, ctx.r26.u64, ctx.r3.u64}, hooks::NativeArchiveQueue());
+                      // (the caller's r25 and r26, saved below by the
+                      // callees: not carried by the view)
+                      {0, 0, ctx.r3.u64}, hooks::NativeArchiveQueue());
   ctx.lr = lr;
 }
 ITC_COURSE_SCENERY(820F4558, hooks::CourseSceneryUpdate(ctx, base))
@@ -302,19 +309,24 @@ ITC_COURSE_SCENERY(820F4558, hooks::CourseSceneryUpdate(ctx, base))
 
 // --- The course set's draws ---
 
-void hooks::CourseSceneryDrawSetLists(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CourseSceneryDrawSetLists(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): r24 is set in it for the
+  // callees' adapters, which read it from their caller; the rest on a view
+  // of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   if (hooks::SceneryListsSlotDiagnostics()) {
     lifted::Sdk(ctx, base, __imp__sub_820F52A8);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  const uint64_t r24 = ctx.r24.u64;
-  ctx.r24.u64 = DrawSetListsViewProjection(base, ctx.r4.u32);
+  const uint64_t r24 = sdk.r24.u64;
+  sdk.r24.u64 = DrawSetListsViewProjection(base, ctx.r4.u32);
   hooks::SceneryDrawGuest guest{ctx, base};
   const scenery_lists::DrawCalls calls = hooks::SceneryListsDrawCalls(&guest);
   const uint32_t r3 = DrawSetLists(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
-  ctx.r24.u64 = r24;
+  sdk.r24.u64 = r24;
   ctx.lr = lr;
   ctx.r3.u64 = r3;
   ctx.fpscr.disableFlushMode();
@@ -360,16 +372,21 @@ bool hooks::CourseSceneryDrawAreaNative() {
          hooks::LightGroupsNative() && !hooks::SceneryListsSlotDiagnostics();
 }
 
-void hooks::CourseSceneryDrawArea(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CourseSceneryDrawArea(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): r24 is set in it for the
+  // callees' adapters, which read it from their caller; the rest on a view
+  // of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  const uint64_t r24 = ctx.r24.u64;
-  ctx.r24.u64 = guest::LoadU32(base, ctx.r4.u32 + 20) * 592u + 0x826BAC00u;
+  const uint64_t r24 = sdk.r24.u64;
+  sdk.r24.u64 = guest::LoadU32(base, ctx.r4.u32 + 20) * 592u + 0x826BAC00u;
   hooks::SceneryDrawGuest guest{ctx, base};
   const scenery_lists::DrawCalls draws = hooks::SceneryListsDrawCalls(&guest);
-  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
-  DrawArea(base, draws, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r28.u32);
-  ctx.r24.u64 = r24;
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base, &sdk);
+  DrawArea(base, draws, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, sdk.r28.u32);
+  sdk.r24.u64 = r24;
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
@@ -388,14 +405,19 @@ bool hooks::CourseSceneryDrawNative() {
   return hooks::CourseSceneryDrawAreaNative();
 }
 
-void hooks::CourseSceneryDraw(lifted::Regs& ctx, uint8_t* base) {
+void hooks::CourseSceneryDraw(PPCContext& sdk, uint8_t* base) {
+  // On the SDK's context (the rewiring, stage 3): r24 is set in it for the
+  // callees' adapters, which read it from their caller; the rest on a view
+  // of it.
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  const uint64_t r24 = ctx.r24.u64;
-  ctx.r24.u64 = 0x8265ECA0;
+  const uint64_t r24 = sdk.r24.u64;
+  sdk.r24.u64 = 0x8265ECA0;
   hooks::SceneryDrawGuest guest{ctx, base};
   const scenery_lists::DrawCalls draws = hooks::SceneryListsDrawCalls(&guest);
-  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base, &sdk);
   // A call into our own code from `frame` with the original's return
   // address, r1 put back.
   auto in_frame = [&](uint32_t frame, uint32_t back, auto&& run) {
@@ -408,7 +430,7 @@ void hooks::CourseSceneryDraw(lifted::Regs& ctx, uint8_t* base) {
   };
   DrawSteps steps;
   steps.native_model_animation = ITC_FLAG(native_model_animation);
-  steps.set_r24 = [&](uint32_t value) { ctx.r24.u64 = value; };
+  steps.set_r24 = [&](uint32_t value) { sdk.r24.u64 = value; };
   steps.advance = [&](uint32_t frame, uint32_t set) {
     in_frame(frame, 0x820F60B8, [&] {
       ctx.r3.u64 = set;
@@ -434,7 +456,7 @@ void hooks::CourseSceneryDraw(lifted::Regs& ctx, uint8_t* base) {
     });
   };
   Draw(base, draws, calls, steps, ctx.r1.u32, ctx.r3.u32);
-  ctx.r24.u64 = r24;
+  sdk.r24.u64 = r24;
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
