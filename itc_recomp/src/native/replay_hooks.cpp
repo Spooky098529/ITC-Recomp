@@ -1,6 +1,8 @@
 // The render command handlers (the table at 0x8265EDE0; see
 // docs/gpu-functions.md), wrapped to pass each command on before it runs.
 
+#include "native/replay_hooks.h"
+
 #include "debug/replay_stats.h"
 #include "draw_packets.h"
 #include "guest.h"
@@ -9,18 +11,56 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "graphics/video_output.h"
+#include "hooks/guest_call.h"
 #include "hooks/single_commands.h"
 
 #include <set>
 #include <utility>
 
 ITC_FLAG_DECLARE(bool, native_single_commands);
+ITC_FLAG_BOOL(native_replay_commands, true, "ITC",
+              "Run the render command replay's command handlers (the table 0x8265EDE0, "
+              "docs/functions/functions.md's Command::* rows: sub_8258FBD0 to sub_82591798 and "
+              "command 7's sub_8258FD48) and the frame's end resolve "
+              "(VideoOutput::ResolveFrontBuffer sub_8258D998) natively inside their wraps "
+              "instead of through the "
+              "translated code (the same writes; the device's native setters called as plain "
+              "C++, everything else a guest call; checked by frame dumps, as the render path's "
+              "code is)");
+
+namespace rc = graphics::replay_commands;
+
+rc::GuestCall native::ReplayCall(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t function, uint32_t sp, uint32_t return_address,
+                      std::initializer_list<uint64_t> args, std::optional<double> f1) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    int reg = 3;
+    for (uint64_t value : args) {
+      guest_call::Gpr(ctx, reg++).u64 = value;
+    }
+    if (f1) {
+      ctx.f1.f64 = *f1;
+    }
+    ctx.lr = return_address;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+}
 
 // Command handlers, wrapped so the stats logger and the native renderer
 // see every command. Command 7 (sub_8258FD48) is wrapped in blend_state.cpp.
 // Ids 0, 36 and 37 (sub_82304258) aren't wrapped: that function is also
-// used elsewhere, and they do nothing.
-#define REPLAY_COUNTED_HANDLER(address, id)                                         \
+// used elsewhere, and they do nothing. Inside the wrap, the handler's work
+// is its plain C++ (src/graphics/replay_commands.h) with
+// --native_replay_commands, else the original. `body` is the plain C++
+// call, with payload (r3), arg1 (r4), arg2 (r5), sp (r1) and call (the
+// guest calls) in scope; it leaves r3.
+#define REPLAY_COUNTED_HANDLER(address, id, body)                                 \
   extern "C" REX_FUNC(sub_##address) {                                              \
     REX_FUNC_PROLOGUE();                                                            \
     uint32_t payload = ctx.r3.u32, arg1 = ctx.r4.u32, arg2 = ctx.r5.u32;           \
@@ -29,7 +69,14 @@ ITC_FLAG_DECLARE(bool, native_single_commands);
     uint32_t outer_command = native::g_current_command;                             \
     native::g_current_command = id;                                                 \
     native::g_command_serial++;                                                     \
-    __imp__sub_##address(ctx, base);                                                \
+    if (ITC_FLAG(native_replay_commands)) {                                         \
+      [[maybe_unused]] const uint32_t sp = ctx.r1.u32;                              \
+      [[maybe_unused]] const rc::GuestCall call = native::ReplayCall(ctx, base);    \
+      ctx.fpscr.disableFlushMode();                                                 \
+      ctx.r3.u64 = (body);                                                          \
+    } else {                                                                        \
+      __imp__sub_##address(ctx, base);                                              \
+    }                                                                               \
     native::g_current_command = outer_command;                                      \
     native::Renderer_AfterCommand(base, id, payload, arg1, arg2);                   \
   }
@@ -118,39 +165,39 @@ extern "C" REX_FUNC(sub_825BDDA0) {
   __imp__sub_825BDDA0(ctx, base);
 }
 
-REPLAY_COUNTED_HANDLER(8258FBD0, 1)
-REPLAY_COUNTED_HANDLER(8258FC30, 2)
-REPLAY_COUNTED_HANDLER(8258FC90, 3)
-REPLAY_COUNTED_HANDLER(8258FCE0, 4)
-REPLAY_COUNTED_HANDLER(8258E9F8, 5)
-REPLAY_COUNTED_HANDLER(8258EA20, 6)
-REPLAY_COUNTED_HANDLER(8258FF50, 8)
-REPLAY_COUNTED_HANDLER(8258FFA0, 9)
-REPLAY_COUNTED_HANDLER(8258FFF0, 10)
-REPLAY_COUNTED_HANDLER(82590040, 11)
-REPLAY_COUNTED_HANDLER(825900B8, 12)
-REPLAY_COUNTED_HANDLER(8258EA58, 13)  // also 14: one handler
-REPLAY_COUNTED_HANDLER(82590108, 15)
-REPLAY_COUNTED_HANDLER(825901B0, 16)
-REPLAY_COUNTED_HANDLER(82590268, 17)
-REPLAY_COUNTED_HANDLER(825902E0, 18)
-REPLAY_COUNTED_HANDLER(82590360, 19)
-REPLAY_COUNTED_HANDLER(825903D8, 20)
-REPLAY_COUNTED_HANDLER(8258EAD0, 21)
-REPLAY_COUNTED_HANDLER(82591798, 22)
-REPLAY_COUNTED_HANDLER(82590428, 23)
-REPLAY_COUNTED_HANDLER(82590478, 24)
-REPLAY_COUNTED_HANDLER(825904C8, 25)
-REPLAY_COUNTED_HANDLER(82590620, 26)
-REPLAY_COUNTED_HANDLER(82590698, 27)
-REPLAY_COUNTED_HANDLER(8258EAE0, 28)
-REPLAY_COUNTED_HANDLER(82590768, 29)
-REPLAY_COUNTED_HANDLER(82590860, 30)
-REPLAY_COUNTED_HANDLER(825908E0, 31)
-REPLAY_COUNTED_HANDLER(82590968, 32)
-REPLAY_COUNTED_HANDLER(825909E8, 33)
-REPLAY_COUNTED_HANDLER(82590A68, 34)
-REPLAY_COUNTED_HANDLER(82590AD0, 35)
+REPLAY_COUNTED_HANDLER(8258FBD0, 1, rc::SetRenderStates(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258FC30, 2, rc::SetSamplerStates(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258FC90, 3, rc::SetBlendControls(base, payload, arg1))
+REPLAY_COUNTED_HANDLER(8258FCE0, 4, rc::SetTextures(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258E9F8, 5, rc::InlineVertices(base, payload, arg1))
+REPLAY_COUNTED_HANDLER(8258EA20, 6, rc::InlineIndices(base, payload, arg1, arg2))
+REPLAY_COUNTED_HANDLER(8258FF50, 8, rc::SetVertexShaders(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258FFA0, 9, rc::SetPixelShaders(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258FFF0, 10, rc::SetVertexDeclarations(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590040, 11, rc::SetStreamSources(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(825900B8, 12, rc::SetIndices(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258EA58, 13, rc::SetUpDrawer(base, payload, arg1, sp, call))  // also 14: one handler
+REPLAY_COUNTED_HANDLER(82590108, 15, rc::DrawerDraw(base, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(825901B0, 16, rc::DrawerDrawIndexed(base, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590268, 17, rc::DrawVertices(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(825902E0, 18, rc::DrawIndexedVertices(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590360, 19, rc::DrawVerticesUP(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(825903D8, 20, rc::ReleaseResources(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258EAD0, 21, rc::Skip(arg1))
+REPLAY_COUNTED_HANDLER(82591798, 22, rc::DeferRelease(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590428, 23, rc::SetRenderTargets(base, payload, arg1))
+REPLAY_COUNTED_HANDLER(82590478, 24, rc::SetDepthStencilSurfaces(base, payload, arg1))
+REPLAY_COUNTED_HANDLER(825904C8, 25, rc::Resolves(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590620, 26, rc::Clears(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590698, 27, rc::DrawIndexedVerticesUP(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(8258EAE0, 28, rc::Callbacks(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590768, 29, rc::RestoreSurfaces(base, payload, arg1))
+REPLAY_COUNTED_HANDLER(82590860, 30, rc::SetViewports(base, payload, arg1, sp))
+REPLAY_COUNTED_HANDLER(825908E0, 31, rc::SetScissorRects(base, payload, arg1, sp))
+REPLAY_COUNTED_HANDLER(82590968, 32, rc::BeginTiling(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(825909E8, 33, rc::EndTiling(base, payload, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590A68, 34, rc::SaveSurfaces(base, arg1, sp, call))
+REPLAY_COUNTED_HANDLER(82590AD0, 35, rc::RestoreSavedSurfaces(base, arg1))
 
 
 // The chain walker (sub_8258EE98) also has items of single commands, a
@@ -184,7 +231,13 @@ extern "C" REX_FUNC(sub_8258D998) {
   uint32_t front_buffer =
       guest::LoadU32(base, video_output + 4 * (68 + guest::LoadU32(base, video_output + 268)));
   native::Renderer_FrontBufferResolve(base, guest::LoadU32(base, video_output + 140), front_buffer);
-  __imp__sub_8258D998(ctx, base);
+  if (!ITC_FLAG(native_replay_commands)) {
+    __imp__sub_8258D998(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = graphics::video_output::ResolveFrontBuffer(base, video_output, ctx.r1.u32,
+                                                          native::ReplayCall(ctx, base));
 }
 
 // The library's other draws and Resolve: logged when called outside the
