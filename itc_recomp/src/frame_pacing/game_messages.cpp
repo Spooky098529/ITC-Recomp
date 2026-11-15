@@ -669,7 +669,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820990F0) {
 #ifndef ITC_NO_HARNESSES
   {
     base::InHarnessScope in_harness;  // ITC_NATIVE_RUNNING's harness lines
-    harness::RunRequested(ctx, base);  // --run_harnesses, once
+    // --run_harnesses, once (on the thread's SDK context: the harnesses keep it)
+    lifted::Sdk(ctx, base, harness::RunRequested);
   }
 #endif
   if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
@@ -713,16 +714,18 @@ ITC_NATIVE_ENTRY_ALWAYS(820990F0) {
 // The race's draw step: r3 = its argument. Noted to tell races from menus.
 // r31 isn't an argument: it's what the caller (sub_8215C770) left in it.
 // Its work: the plain C++ (src/race_update/draw_step.h) with
-// --native_race_draw_step, else the original.
-ITC_NATIVE_ENTRY_ALWAYS(8215B4F8) {
-  
+// --native_race_draw_step, else the original. On the SDK's context (not in
+// the dispatch table): it reads its caller's r31 (the rewiring, stage 3;
+// left for later).
+extern "C" REX_FUNC(sub_8215B4F8) {
+  REX_FUNC_PROLOGUE();
   uint32_t r31_value = guest::LoadU32(base, ctx.r31.u32 + 588);
   frame_pacing::InputLog_PauseSigns(base, ctx.r31.u32, r31_value);
   frame_pacing::g_race_draw_step_seen = true;
   if (ITC_FLAG(native_race_draw_step)) {
     lifted_call::EnterR3<race_update::RaceDrawStep>(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8215B4F8);
+    __imp__sub_8215B4F8(ctx, base);
   }
 }
 

@@ -415,7 +415,7 @@ ITC_REGS_STEP(CftofL) {
 // call through the table at 0x8266BA5C, reads no register after it.
 ITC_NATIVE_ENTRY(825AEB20, ITC_FLAG(native_c_runtime)) {
   const int32_t format = ctx.r6.s32;
-  ctx.r11.u64 = ctx.r6.u64;
+  // (r11 = r6, the original's switch value, was a leftover: none reads it)
   ctx.r6.u64 = ctx.r7.u64;
   ctx.r7.u64 = ctx.r8.u64;
   ctx.r8.u64 = ctx.r9.u64;
@@ -542,7 +542,7 @@ ITC_NATIVE_ENTRY(825B6958, ITC_FLAG(native_c_runtime)) {
 namespace {
 
 struct ArrayCall {
-  PPCContext* ctx;
+  lifted::Regs* ctx;
   uint8_t* base;
   uint32_t return_address;  // after the original's bctrl
 };

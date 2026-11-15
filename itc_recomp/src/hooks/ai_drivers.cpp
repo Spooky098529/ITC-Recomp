@@ -217,9 +217,9 @@ ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
 
 using namespace ai_drivers;
 
-hooks::GuestStandIn hooks::g_drive_car_stand_in = nullptr;
-hooks::GuestStandIn hooks::g_update_idle_stand_in = nullptr;
-hooks::GuestStandIn hooks::g_update_all_stand_in = nullptr;
+hooks::AiStandIn hooks::g_drive_car_stand_in = nullptr;
+hooks::AiStandIn hooks::g_update_idle_stand_in = nullptr;
+hooks::AiStandIn hooks::g_update_all_stand_in = nullptr;
 
 // --- Set-up and clears (r3 kept) ---
 
@@ -333,7 +333,7 @@ ITC_AI_DRIVERS(8213D378, ctx.r3.s64 = int32_t(BranchMasksFor(base, ctx.r3.u32)))
 
 namespace {
 struct UpdateCall {
-  PPCContext* ctx;
+  lifted::Regs* ctx;
   uint8_t* base;
 };
 // A driver's update (its +6148), called from a frame like UpdateAll's (176
@@ -355,7 +355,7 @@ uint64_t CallDriverUpdate(void* user, uint64_t driver, uint32_t function) {
 // original's frame 176 bytes down.
 void hooks::AiUpdateAll(lifted::Regs& ctx, uint8_t* base) {
   if (g_update_all_stand_in != nullptr) {
-    g_update_all_stand_in(ctx, base);
+    lifted::Sdk(ctx, base, g_update_all_stand_in);
     return;
   }
   if (!ITC_FLAG(native_ai_drivers)) {
@@ -389,7 +389,7 @@ ITC_AI_DRIVERS(821469D0, ctx.r3.u64 = ReadVehicleOwnSlice(base, ctx.r3.u32))
 
 namespace {
 struct PathCall {
-  PPCContext* ctx;
+  lifted::Regs* ctx;
   uint8_t* base;
 };
 // The path's normalizer when it's neither of the native ones (never in the
@@ -422,7 +422,7 @@ uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t 
 // flag; the original's frame 144 bytes down.
 void hooks::AiDriveCar(lifted::Regs& ctx, uint8_t* base) {
   if (g_drive_car_stand_in != nullptr) {
-    g_drive_car_stand_in(ctx, base);
+    lifted::Sdk(ctx, base, g_drive_car_stand_in);
     return;
   }
   if (ITC_FLAG(native_ai_drivers)) {
@@ -447,7 +447,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8215F678) {
 // The original's frame 96 bytes down.
 void hooks::AiUpdateIdle(lifted::Regs& ctx, uint8_t* base) {
   if (g_update_idle_stand_in != nullptr) {
-    g_update_idle_stand_in(ctx, base);
+    lifted::Sdk(ctx, base, g_update_idle_stand_in);
     return;
   }
   if (ITC_FLAG(native_ai_drivers)) {

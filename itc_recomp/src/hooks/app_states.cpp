@@ -184,18 +184,14 @@ as::AppCalls AppStatesCalls(lifted::Regs& ctx, uint8_t* base) {
   };
   calls.in_frame = [&ctx, base](uint32_t bytes, uint32_t return_address,
                                 const std::function<void(uint32_t)>& body) {
-    uint64_t kept[18];
-    for (int i = 0; i < 18; i++) {
-      kept[i] = (&ctx.r14)[i].u64;
-    }
+    // (r14 to r31 were kept and put back around the body: nothing to keep
+    // without a context)
     guest_call::InFrame(ctx, base, bytes, return_address, body);
-    for (int i = 0; i < 18; i++) {
-      (&ctx.r14)[i].u64 = kept[i];
-    }
   };
-  calls.set_register = [&ctx](int reg, uint64_t value) {
-    guest_call::Gpr(ctx, reg).u64 = value;
-  };
+  // The registers set (r11, r22 to r31) are the original's nonvolatile and
+  // scratch values, which reached callees only as the bytes they save: not
+  // carried by the view.
+  calls.set_register = [](int, uint64_t) {};
   calls.increment = [&ctx, base](uint32_t iterator, uint32_t return_address) {
     ctx.r3.u64 = iterator;
     ctx.lr = return_address;
@@ -432,7 +428,7 @@ ITC_REGS_STEP(AppStatesIsEmpty) {
 
 ITC_REGS_STEP(AppIsRunning) {
   ctx.r3.u64 = as::AppIsRunning(base, ctx.r3.u32, AppStatesCalls(ctx, base));
-  ctx.r11.u64 = ctx.r3.u64;
+  // (r11 = r3 was a leftover for recompiled callers: none now)
 }
 
 namespace {

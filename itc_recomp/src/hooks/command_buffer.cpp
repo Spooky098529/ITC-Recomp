@@ -108,7 +108,7 @@ void hooks::NextCommandSegment(lifted::Regs& ctx, uint8_t* base) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                           \
     \
     if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {   \
-      __imp__sub_##address(ctx, base);                                           \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                              \
       return;                                                                    \
     }                                                                            \
     const cb::Kick kick = hooks::CommandBufferKick(ctx, base);                   \

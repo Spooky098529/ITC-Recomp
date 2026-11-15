@@ -31,9 +31,11 @@ void AiUpdateAll(lifted::Regs& ctx, uint8_t* base);
 
 // For harnesses: while set, these run instead (from the adapters and the
 // functions above), answering with made-up data.
-using GuestStandIn = void (*)(lifted::Regs&, uint8_t*);
-extern GuestStandIn g_drive_car_stand_in;
-extern GuestStandIn g_update_idle_stand_in;
-extern GuestStandIn g_update_all_stand_in;
+// On the SDK's context (the harnesses' functions); code on a view calls them
+// through lifted::Sdk.
+using AiStandIn = void (*)(PPCContext&, uint8_t*);
+extern AiStandIn g_drive_car_stand_in;
+extern AiStandIn g_update_idle_stand_in;
+extern AiStandIn g_update_all_stand_in;
 
 }  // namespace hooks

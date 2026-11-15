@@ -53,7 +53,7 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
     \
     uint32_t value = 0;                     \
     if (!ITC_FLAG(native_collision) || !call) { \
-      __imp__sub_##address(ctx, base);      \
+      lifted::Sdk(ctx, base, __imp__sub_##address); \
       return;                               \
     }                                       \
     ctx.r3.u64 = value;                     \
@@ -144,12 +144,12 @@ ITC_NATIVE_ENTRY_ALWAYS(820BB758) {
     \
     uint32_t result = 0;                    \
     if (!ITC_FLAG(native_collision)) {      \
-      __imp__sub_##address(ctx, base);      \
+      lifted::Sdk(ctx, base, __imp__sub_##address); \
       return;                               \
     }                                       \
     ctx.fpscr.disableFlushMode();           \
     if (!call) {                            \
-      __imp__sub_##address(ctx, base);      \
+      lifted::Sdk(ctx, base, __imp__sub_##address); \
       return;                               \
     }                                       \
     ctx.r3.u64 = result;                    \

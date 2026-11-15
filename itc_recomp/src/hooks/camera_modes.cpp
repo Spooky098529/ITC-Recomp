@@ -112,7 +112,7 @@ void hooks::SetCameraConstructStandIn(CameraConstructStandIn stand_in) {
       return;                                                                            \
     }                                                                                    \
     if (!ITC_FLAG(native_camera_modes)) {                                                \
-      __imp__sub_##address(ctx, base);                                                   \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                      \
       return;                                                                            \
     }                                                                                    \
     hooks::CameraModesStep##address(ctx, base);                                          \
@@ -251,7 +251,7 @@ ITC_REGS_STEP(CameraModesStep82090000) {
     from[i] = guest::LoadU32(base, ctx.r1.u32 + 84 + 8 * (i - 7));
   }
   cm::MatrixFromFloats(base, ctx.r3.u32, from);
-  ctx.r11.u64 = from[15];
+  // (r11 = the last pointer was a leftover for recompiled callers: none now)
 }
 
 // --- The lists: r3 = the list (left, or as memcpy leaves it) ---
@@ -1123,26 +1123,25 @@ namespace {
 // natively where its adapter would, else its adapter, from frames like the
 // original's.
 cm::RivalLogoCloseCalls RivalLogoCloseCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t sp) {
-  auto call = [&ctx, base, sp](uint32_t back, void (*function)(lifted::Regs&, uint8_t*),
-                               uint32_t r3) {
+  auto call = [&ctx, base, sp](uint32_t back, uint32_t function, uint32_t r3) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp + 128;
     guest_call::InFrame(ctx, base, 128, back, [&](uint32_t) {
       ctx.r3.u64 = r3;
-      function(ctx, base);
+      lifted::CallFromContext(ctx, base, function);
     });
     ctx.r1.u64 = stack;
     return ctx.r3.u32;
   };
   cm::RivalLogoCloseCalls calls;
-  calls.finish_all = [call](uint32_t movie) { call(0x822119C0, sub_8211DFF8, movie); };
-  calls.release_xpr = [call](uint32_t holder) { call(0x822119F8, sub_82211768, holder); };
+  calls.finish_all = [call](uint32_t movie) { call(0x822119C0, 0x8211DFF8, movie); };
+  calls.release_xpr = [call](uint32_t holder) { call(0x822119F8, 0x82211768, holder); };
   calls.remove = [&ctx, base, sp, call](uint32_t id) -> uint32_t {
     if (ui_movies_game_hooks::DeleteNative()) {
       return ui_movies::DeleteMovie(base, id, sp - 128,
                                     ui_movies_game_hooks::DeleteCalls(ctx, base, sp));
     }
-    return call(0x82211A00, sub_8211E258, id);
+    return call(0x82211A00, 0x8211E258, id);
   };
   return calls;
 }

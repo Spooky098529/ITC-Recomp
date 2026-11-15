@@ -246,7 +246,7 @@ void MenuSelectionScan_After(uint8_t* base, const char* kind, uint32_t id) {
     if (ITC_FLAG(native_audio_manager_update)) {            \
       lifted_call::EnterR3<sound_cues::step>(ctx, base);    \
     } else {                                                \
-      __imp__sub_##address(ctx, base);                      \
+      lifted::Sdk(ctx, base, __imp__sub_##address);         \
     }                                                       \
     debug::MenuSelectionScan_After(base, "call", 0x##address); \
   }
