@@ -87,7 +87,7 @@ ITC_REGS_STEP(CarSoundsDestroy) {
                                   : memory::crt::OperatorDelete(done.to_free);
     if (!freed) {
       ctx.r3.u64 = done.to_free;
-      (done.array ? sub_825A71C0 : sub_825A70E8)(ctx, base);
+      lifted::CallFromContext(ctx, base, done.array ? 0x825A71C0 : 0x825A70E8);
     }
   }
   ctx.r3.u64 = done.r3;
@@ -156,14 +156,13 @@ ITC_REGS_STEP(CarSoundsX3DCurves) {
   // The original's prologue: lr at r1 - 8, r31 at r1 - 16, the back chain.
   const uint32_t frame = ctx.r1.u32 - 128;
   guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(ctx.lr));
-  REX_STORE_U64(ctx.r1.u32 - 16, ctx.r31.u64);
+  REX_STORE_U64(ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
   guest::StoreU32(base, frame, ctx.r1.u32);
   if (const uint32_t r3 = x3daudio::Curves(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, frame)) {
     ctx.r3.u64 = r3;
   }
-  // The epilogue's r12 and lr: the saved word.
-  ctx.r12.u64 = uint32_t(ctx.lr);
-  ctx.lr = ctx.r12.u64;
+  // The epilogue's lr: the saved word (r12, also it there: not carried).
+  ctx.lr = uint32_t(ctx.lr);
 }
 
 namespace {
@@ -172,7 +171,7 @@ namespace {
 // can't give it), from Pan's frame and return address: r1 and lr put back
 // after.
 struct GuestTanUser {
-  PPCContext* ctx;
+  lifted::Regs* ctx;
   uint8_t* base;
 };
 
@@ -184,7 +183,7 @@ x3daudio::TanResult GuestTan(void* user, uint32_t sp, double x) {
   ctx.r1.u64 = sp;
   ctx.lr = 0x8248133C;
   ctx.f1.f64 = x;
-  sub_825A8A50(ctx, u.base);
+  lifted::CallFromContext(ctx, u.base, 0x825A8A50);
   ctx.r1.u64 = stack;
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
@@ -196,13 +195,13 @@ x3daudio::TanResult GuestTan(void* user, uint32_t sp, double x) {
 ITC_REGS_STEP(CarSoundsX3DPan) {
   ctx.fpscr.disableFlushMode();
   GuestTanUser user{&ctx, base};
-  const x3daudio::PanSaves saves{uint32_t(ctx.lr), ctx.r28.u64, ctx.r29.u64, ctx.r30.u64,
-                                 ctx.r31.u64, ctx.f31.u64};
+  // (The caller's saved registers, which the original's prologue stores:
+  // not carried by the view, stored as 0; lr kept.)
+  const x3daudio::PanSaves saves{uint32_t(ctx.lr), 0, 0, 0, 0, 0};
   ctx.r3.u64 = x3daudio::Pan(base, ctx.r3.u64, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64, ctx.r1.u32,
                              saves, {GuestTan, &user});
-  // The epilogue's r12 and lr: the saved word.
-  ctx.r12.u64 = uint32_t(ctx.lr);
-  ctx.lr = ctx.r12.u64;
+  // The epilogue's lr: the saved word (r12, also it there: not carried).
+  ctx.lr = uint32_t(ctx.lr);
 }
 
 ITC_REGS_STEP(CarSoundsX3DMatrix) {
@@ -210,15 +209,15 @@ ITC_REGS_STEP(CarSoundsX3DMatrix) {
   // The original's prologue: __savegprlr_26 (r26 to r31 at r1 - 56 to - 16,
   // lr at - 8), __savefpr_23 (f23 to f31 at r1 - 128 to - 64), the back
   // chain.
+  // (The caller's r26 to r31 and f23 to f31: not carried by the view,
+  // stored as 0.)
   const uint32_t sp = ctx.r1.u32;
-  const uint64_t gprs[6] = {ctx.r26.u64, ctx.r27.u64, ctx.r28.u64,
-                            ctx.r29.u64, ctx.r30.u64, ctx.r31.u64};
+  const uint64_t gprs[6] = {};
   for (uint32_t i = 0; i < 6; i++) {
     REX_STORE_U64(sp - 56 + 8 * i, gprs[i]);
   }
   guest::StoreU32(base, sp - 8, uint32_t(ctx.lr));
-  const uint64_t fprs[9] = {ctx.f23.u64, ctx.f24.u64, ctx.f25.u64, ctx.f26.u64, ctx.f27.u64,
-                            ctx.f28.u64, ctx.f29.u64, ctx.f30.u64, ctx.f31.u64};
+  const uint64_t fprs[9] = {};
   for (uint32_t i = 0; i < 9; i++) {
     REX_STORE_U64(sp - 128 + 8 * i, fprs[i]);
   }
@@ -226,41 +225,40 @@ ITC_REGS_STEP(CarSoundsX3DMatrix) {
   guest::StoreU32(base, frame, sp);
   GuestTanUser user{&ctx, base};
   ctx.r3.u64 = x3daudio::Matrix(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u64, ctx.r6.u64,
-                                ctx.f31.u64, frame, {GuestTan, &user});
-  // The epilogue's r12 and lr: the saved word.
-  ctx.r12.u64 = uint32_t(ctx.lr);
-  ctx.lr = ctx.r12.u64;
+                                0 /* the caller's f31, for Pan's save: not carried */, frame,
+                                {GuestTan, &user});
+  // The epilogue's lr: the saved word (r12, also it there: not carried).
+  ctx.lr = uint32_t(ctx.lr);
 }
 
 ITC_REGS_STEP(CarSoundsX3DCone) {
   ctx.fpscr.disableFlushMode();
-  const x3daudio::ConeSaves saves{uint32_t(ctx.lr), ctx.r29.u64, ctx.r30.u64, ctx.r31.u64,
-                                  ctx.f29.u64, ctx.f30.u64, ctx.f31.u64};
+  // (The caller's saved registers, which the original's prologue stores:
+  // not carried by the view, stored as 0; lr kept.)
+  const x3daudio::ConeSaves saves{uint32_t(ctx.lr), 0, 0, 0, 0, 0, 0};
   ctx.r3.u64 = x3daudio::Cone(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                               ctx.r1.u32, saves);
-  // The epilogue's r12 and lr: the saved word.
-  ctx.r12.u64 = uint32_t(ctx.lr);
-  ctx.lr = ctx.r12.u64;
+  // The epilogue's lr: the saved word (r12, also it there: not carried).
+  ctx.lr = uint32_t(ctx.lr);
 }
 
 ITC_REGS_STEP(CarSoundsX3DDoppler) {
   ctx.fpscr.disableFlushMode();
-  const x3daudio::DopplerSaves saves{uint32_t(ctx.lr), ctx.r28.u64, ctx.r29.u64, ctx.r30.u64,
-                                     ctx.r31.u64, ctx.f31.u64};
+  // (The caller's saved registers, which the original's prologue stores:
+  // not carried by the view, stored as 0; lr kept.)
+  const x3daudio::DopplerSaves saves{uint32_t(ctx.lr), 0, 0, 0, 0, 0};
   ctx.r3.u64 = x3daudio::Doppler(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                  ctx.r1.u32, saves);
-  ctx.r12.u64 = uint32_t(ctx.lr);
-  ctx.lr = ctx.r12.u64;
+  ctx.lr = uint32_t(ctx.lr);  // the epilogue's (r12, also it there: not carried)
 }
 
 ITC_REGS_STEP(CarSoundsX3DCalculate) {
   ctx.fpscr.disableFlushMode();
   GuestTanUser user{&ctx, base};
   const x3daudio::CalculateArgs args{ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64};
-  const x3daudio::CalculateSaves saves{
-      uint32_t(ctx.lr), ctx.r26.u64, ctx.r27.u64, ctx.r28.u64, ctx.r29.u64, ctx.r30.u64,
-      ctx.r31.u64,      ctx.f23.u64, ctx.f24.u64, ctx.f25.u64, ctx.f26.u64, ctx.f27.u64,
-      ctx.f28.u64,      ctx.f29.u64, ctx.f30.u64, ctx.f31.u64};
+  // (The caller's saved registers, which the original's prologue stores:
+  // not carried by the view, stored as 0; lr kept.)
+  const x3daudio::CalculateSaves saves{uint32_t(ctx.lr)};
   const auto r3 = x3daudio::Calculate(base, args, ctx.r1.u32, saves, {GuestTan, &user});
   if (!r3) {
     // EmitterAngle or Delay asked for: the original, its callees through
@@ -269,25 +267,19 @@ ITC_REGS_STEP(CarSoundsX3DCalculate) {
     return;
   }
   ctx.r3.u64 = *r3;
-  ctx.r12.u64 = uint32_t(ctx.lr);
-  ctx.lr = ctx.r12.u64;
+  ctx.lr = uint32_t(ctx.lr);  // the epilogue's (r12, also it there: not carried)
 }
 
 ITC_REGS_STEP(CarSoundsUpdate3D) {
   ctx.fpscr.disableFlushMode();
   GuestTanUser user{&ctx, base};
-  cs::Update3DSaves saves{uint32_t(ctx.lr), ctx.r22.u64, ctx.r23.u64, ctx.r24.u64, ctx.r25.u64,
-                          ctx.r26.u64,      ctx.r27.u64, ctx.r28.u64, ctx.r29.u64, ctx.r30.u64,
-                          ctx.r31.u64,      ctx.f23.u64, ctx.f24.u64, ctx.f25.u64, ctx.f26.u64,
-                          ctx.f27.u64,      ctx.f28.u64, ctx.f29.u64, ctx.f30.u64, ctx.f31.u64,
-                          {},               {}};
-  std::memcpy(saves.v126, ctx.v126.u8, 16);
-  std::memcpy(saves.v127, ctx.v127.u8, 16);
+  // (The caller's saved registers (and v126, v127), which the original's prologue stores:
+  // not carried by the view, stored as 0; lr kept.)
+  cs::Update3DSaves saves{uint32_t(ctx.lr)};
   ctx.r3.u64 = cs::Update3D(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32, saves,
                             {GuestTan, &user});
-  // The epilogue's r12 and lr: the saved word.
-  ctx.r12.u64 = uint32_t(ctx.lr);
-  ctx.lr = ctx.r12.u64;
+  // The epilogue's lr: the saved word (r12, also it there: not carried).
+  ctx.lr = uint32_t(ctx.lr);
 }
 
 ITC_REGS_STEP(CarSoundsSetPitch) {
@@ -597,13 +589,9 @@ ITC_REGS_STEP(CarSoundsEngineSoundUpdate) {
 ITC_REGS_STEP(CarSoundsUpdate) {
   ctx.fpscr.disableFlushMode();
   GuestTanUser user{&ctx, base};
-  cs::Update3DSaves saves{uint32_t(ctx.lr), ctx.r22.u64, ctx.r23.u64, ctx.r24.u64, ctx.r25.u64,
-                          ctx.r26.u64,      ctx.r27.u64, ctx.r28.u64, ctx.r29.u64, ctx.r30.u64,
-                          ctx.r31.u64,      ctx.f23.u64, ctx.f24.u64, ctx.f25.u64, ctx.f26.u64,
-                          ctx.f27.u64,      ctx.f28.u64, ctx.f29.u64, ctx.f30.u64, ctx.f31.u64,
-                          {},               {}};
-  std::memcpy(saves.v126, ctx.v126.u8, 16);
-  std::memcpy(saves.v127, ctx.v127.u8, 16);
+  // (The caller's saved registers (and v126, v127), which the original's prologue stores:
+  // not carried by the view, stored as 0; lr kept.)
+  cs::Update3DSaves saves{uint32_t(ctx.lr)};
   const uint64_t sound = ctx.r3.u64;
   const cs::Voices voices = VoicesOf(ctx, base);
   uint64_t r3 = 0;
@@ -612,9 +600,8 @@ ITC_REGS_STEP(CarSoundsUpdate) {
     return uint32_t(r3);
   });
   ctx.r3.u64 = r3;
-  // The epilogue's r12 and lr: the saved word.
-  ctx.r12.u64 = uint32_t(ctx.lr);
-  ctx.lr = ctx.r12.u64;
+  // The epilogue's lr: the saved word (r12, also it there: not carried).
+  ctx.lr = uint32_t(ctx.lr);
 }
 
 }  // namespace hooks
