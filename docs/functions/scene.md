@@ -121,6 +121,12 @@ Status:
   behind the caller's fallback flag.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
+- **Lifted**: translated from `generated/` by `itc_recomp/tools/lift.py`
+  into plain C++ in `itc_recomp/src/lifted/` (the lift sweep,
+  `docs/loops/lift-sweep.md`): typed parameters, registers as locals,
+  calls direct or through the dispatch table. While the SDK or code not
+  native yet still reaches it, its entry for them is an override in
+  `src/lifted/` (deleted when nothing reaches it that way).
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to
@@ -154,4 +160,4 @@ run it after changing either, on any branch.
 | `sub_82594188` | `List::~List` (probably) | Native | A jump to `List::DeleteAll`. Only caller `CarScene::~CarScene`. Read in full. Native in `src/scene/scene.cpp` behind `--native_scene` (`ListDestruct`, calling `DeleteAll`'s plain C++; harness `scene`). Adapter removed (2026-11-01): its native caller `CarScene::~CarScene` calls the plain C++, and `--native_scene` now switches only the callers; the harness keeps its register step. |
 | `sub_82593FF8` | `List::DeleteAll` (probably) | Native | r3 = a list: while its first node (+0) isn't 0, that node's vtable slot 0 with r4 = 1 (its deleting destructor, which unlinks it). Only caller `List::~List`. 1 indirect call (probably not taken in play: the scene's lists are empty by then). Read in full. Native in `src/scene/scene.cpp` behind `--native_scene`; the nodes' deleting destructors are guest calls through their vtables from the original's 96-byte frame (harness `scene`). Adapter removed (2026-11-01): its native caller `List::~List` (its destructors' guest calls through the caller's callback) calls the plain C++, and `--native_scene` now switches only the callers; the harness keeps its register step. |
 | `sub_820C8950` | `CarScene::SetInteriorWord` (probably) | Overridden | r3 = the scene, r4 = a word: for each scene model in pool 7 (+5028, its count +5036; `List::At`) whose interior is ready (+5072), the interior's (+5068) +11616 = r4 (read by `sub_820E53F0` for the accessory, `accessories.md`). Only caller the front end's car draw `sub_8217FE60` (a lead). Read in full. Native in `src/scene/scene.cpp` behind `--native_scene` (harness `scene`). |
-| `sub_820C4E68` | `CarScene::GetTga` (probably) | | r3 = the scene, r4 = a 20-byte header (out), r5 = a word (out): memcpy of the scene's +992 (the TGA header at assets +928) into r4 and `[r5]` = +1012 (its pixels, assets +948). From `CarModel::OnFileLoaded`, `OnFileLoadedB` and `ReloadDecals` (`sub_820D47A8`, `sub_820D4F80`, `sub_820D5D20`, `car-models.md`): the car model's +3724 = 1 image branch, which those hand back to their originals. Not seen in play (the coverage list), though it ran in an attract race from `OnFileLoadedB` at `0x820D5694` (`itc_2848`, the car models' migration agent, 2026-10-31). A 112-byte frame. Read in full. |
+| `sub_820C4E68` | `CarScene::GetTga` (probably) | Lifted | r3 = the scene, r4 = a 20-byte header (out), r5 = a word (out): memcpy of the scene's +992 (the TGA header at assets +928) into r4 and `[r5]` = +1012 (its pixels, assets +948). From `CarModel::OnFileLoaded`, `OnFileLoadedB` and `ReloadDecals` (`sub_820D47A8`, `sub_820D4F80`, `sub_820D5D20`, `car-models.md`): the car model's +3724 = 1 image branch, which those hand back to their originals. Not seen in play (the coverage list), though it ran in an attract race from `OnFileLoadedB` at `0x820D5694` (`itc_2848`, the car models' migration agent, 2026-10-31). A 112-byte frame. Read in full. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). |

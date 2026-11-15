@@ -88,6 +88,12 @@ Status:
   behind the caller's fallback flag.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
+- **Lifted**: translated from `generated/` by `itc_recomp/tools/lift.py`
+  into plain C++ in `itc_recomp/src/lifted/` (the lift sweep,
+  `docs/loops/lift-sweep.md`): typed parameters, registers as locals,
+  calls direct or through the dispatch table. While the SDK or code not
+  native yet still reaches it, its entry for them is an override in
+  `src/lifted/` (deleted when nothing reaches it that way).
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to
@@ -110,11 +116,11 @@ run it after changing either, on any branch.
 | `sub_82297790` | `XMemFree` | Overridden | r3 = block, r4 = attributes. With bit `0x80000000`: nothing for a null block, else jumps to XPhysicalFree (`sub_822965C8`). Otherwise jumps to LocalFree (`sub_82297F90`), so r3 comes back 0 or the block (callers treat it as void, probably). 282 direct callers, 98 seen in play. Read in full 2026-10-22 (the B7 loop). Ours (`src/memory/c_runtime_heap.cpp`, its adapter in `src/hooks/c_runtime_heap.cpp`, `--native_c_runtime_heap`, only while `--native_heap` routes the heap to the layer; 2026-10-22, the B7 loop): `memory::FreePhysical` (r3 left as the block, as XPhysicalFree's adapter leaves it) or LocalFree's plain C++. Harness `c_runtime_heap`. |
 | `sub_82297F48` | `LocalAlloc` | Native | r3 = flags, r4 = size: `HeapAlloc(GetProcessHeap(), (r3 >> 3) & 8, r4)`, so LMEM_ZEROINIT (`0x40`) becomes HEAP_ZERO_MEMORY. Only from XMemAlloc. Ours (`src/memory/c_runtime_heap.cpp`, `--native_c_runtime_heap`, only while `--native_heap` routes the heap to the layer; 2026-10-22, the B7 loop): `memory::Alloc(size, (flags >> 3) & 8)`. Harness `c_runtime_heap`. Native since its adapter went (2026-10-22): its only caller, XMemAlloc, calls the plain C++, and `--native_c_runtime_heap` now switches only XMemAlloc. |
 | `sub_82297F90` | `LocalFree` | Native | r3 = block: `HeapFree(GetProcessHeap(), 0, r3)`; returns 0 when freed, else the block. Only from XMemFree. Ours (`src/memory/c_runtime_heap.cpp`, `--native_c_runtime_heap`, only while `--native_heap` routes the heap to the layer; 2026-10-22, the B7 loop): `memory::Free`: 0 when freed, else the block. Harness `c_runtime_heap`. Native since its adapter went (2026-10-22): its only caller, XMemFree, calls the plain C++, and `--native_c_runtime_heap` now switches only XMemFree. |
-| `sub_82297FD8` | | | The heap's own code: calls `NtAllocateVirtualMemory` (probably committing or growing a segment). No longer runs with `--native_heap` (the heap's four functions are routed). Not read. |
+| `sub_82297FD8` | | Lifted | The heap's own code: calls `NtAllocateVirtualMemory` (probably committing or growing a segment). No longer runs with `--native_heap` (the heap's four functions are routed). Not read. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_014.cpp`, `--native_lifted_014`). |
 | `sub_822982B8` | | | The heap's own code, calling `NtAllocateVirtualMemory`, as `sub_82297FD8`. Not read. |
 | `sub_82298A88` | | | HeapReAlloc's in-place resize: r3 = heap, r4 = flags, r5 = header, r6 = size, r7 = new size in 16-byte units; returns non-zero when the block grew into its free neighbor. Not read in detail. |
 | `sub_82298FF8` | `HeapSize` | Overridden | r3 = heap, r4 = flags (unread), r5 = block; returns its usable size, or -1 when the header's busy bit (byte at -11, `0x1`) is clear. For segment blocks, half-word -16 (16-byte units) × 16 less byte -10; for large blocks (header bit `0x8`), word -24 less half-word -16 less 48. Only from `_msize`. Ours: `memory::Size`, the size asked for, kept on the host. Harness `heap`. |
-| `sub_822990A0` | | | The heap's own code, calling `NtAllocateVirtualMemory` or `NtFreeVirtualMemory`, as `sub_82297FD8`. Not read. |
+| `sub_822990A0` | | Lifted | The heap's own code, calling `NtAllocateVirtualMemory` or `NtFreeVirtualMemory`, as `sub_82297FD8`. Not read. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_014.cpp`, `--native_lifted_014`). |
 | `sub_82299208` | | | The same as `sub_822990A0`. Not read. |
 | `sub_82299448` | | | The same as `sub_822990A0`. Not read. |
 | `sub_82299D60` | `HeapAlloc` | Overridden | r3 = heap, r4 = flags, r5 = size; returns the block. Blocks are 16-aligned (seen by the harness). The process heap's own flags are 0; callers pass 0 (malloc) or `0x8` (calloc, HEAP_ZERO_MEMORY). Ours: `memory::Alloc` for the process heap's handle (`0x8297149C`); other handles go to the original, logged once (none seen). Harness `heap`. Not read in detail. |

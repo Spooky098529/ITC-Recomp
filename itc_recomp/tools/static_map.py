@@ -477,7 +477,7 @@ def build(image_path=IMAGE, quiet=True):
         if HELPER.match(f):
             return True
         return (f in overrides and status.get(f) != "Wrapped") or \
-            status.get(f) in ("Native", "Merged", "Dropped")
+            status.get(f) in ("Native", "Merged", "Dropped", "Lifted")
 
     def expands(f):
         return status.get(f) != "Dropped"

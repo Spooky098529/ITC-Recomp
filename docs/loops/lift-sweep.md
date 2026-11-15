@@ -128,8 +128,14 @@ outside:
   functions: lifted functions call each other directly, so bisecting by
   flags doesn't isolate a bad function; harness it directly instead (add
   it to `src/harnesses/lifted.cpp`).
-- Left: rows for the lifted functions (none written yet), the refused
-  functions by hand, then rewiring (piece 4).
+- Rows (the user's call, 2026-11-15): a new status, **Lifted** (defined
+  at the top of every function file; `check_function_statuses.py`,
+  `b7_status.py`, `static_map.py` and `b7_groups.py` know it). The 1,172
+  lifted functions that had a row (all with a blank status) have it set
+  to Lifted where they are; the other 1,577 have rows in
+  `docs/functions/lifted.md`, written by the tool (what each calls,
+  whether it was seen in play, "Not read").
+- Left: the 329 refused functions, then rewiring (piece 4).
 
 ## The user's calls (2026-11-15)
 

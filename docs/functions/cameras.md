@@ -102,6 +102,12 @@ Status:
   behind the caller's fallback flag.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
+- **Lifted**: translated from `generated/` by `itc_recomp/tools/lift.py`
+  into plain C++ in `itc_recomp/src/lifted/` (the lift sweep,
+  `docs/loops/lift-sweep.md`): typed parameters, registers as locals,
+  calls direct or through the dispatch table. While the SDK or code not
+  native yet still reaches it, its entry for them is an override in
+  `src/lifted/` (deleted when nothing reaches it that way).
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to
@@ -161,4 +167,4 @@ run it after changing either, on any branch.
 | `sub_820A9198` | `WordVector::Clear` (probably) | Merged | r3 = a `std::vector` of words: `erase(begin, end)` (`sub_820A8F80`) with checked iterators (`twi` when the first is past the last; the iterators {vector, first} and {vector, last} on its 96-byte frame at +80). Read 2026-10-30 (B7 loop, the app's start-up). Merged into `AppCameraList::AppCameraList`'s plain C++ (its caller seen in play; on a new, empty vector it changes nothing; its frame's words aren't written), harness `app_start_up` (the list's group). |
 | `sub_820A8F80` | `WordVector::Erase` (probably) | Merged | r3 = the iterator out, r4 = the vector, r5 and r6 the iterators {vector, first} and {vector, last} (as doublewords, stored at 160 and 168 above its 128-byte frame, in its caller's): `twi` when they're of other vectors; when first != last, the words from last to +8 moved down to first (`memmove`, `sub_825A7348`) and +8 = first + their bytes; the out = r5. Returns the out. From `sub_820A9198`. Read 2026-10-30 (B7 loop, the app's start-up). Merged into `AppCameraList::AppCameraList`'s plain C++ (from `sub_820A9198` on an empty vector: nothing moved), harness `app_start_up` (the list's group). |
 | `sub_820A75E8` | `AppCameraEntry::AppCameraEntry` (our name) | Native | r3 = a 16-byte object: +0 the vtable `0x82002580`, +4, +8, +12 = 0. Leaf. From `AppCamera::AppCamera`, once at boot. Read 2026-10-30 (B7 loop, the app's start-up). Native (`app_start_up::AppCameraEntryConstruct`, `src/app_start_up/app_camera.cpp`, no adapter: only `AppCamera::AppCamera`'s plain C++ calls it in play). Harness `app_start_up`: `AppCameraEntry::AppCameraEntry (sub_820A75E8)`, and with the class. |
-| `sub_820A9928` | `AppCameraList::Add` (probably) | | Slot 1 of `AppCameraList` (vtable `0x82002780`): r4 = an entry, stored at its caller's frame + 28 (its 96-byte frame's +124); when not 0, `sub_820A9818` (probably the vector's `push_back`) on +4 with that word's address. From `AppCamera::AppCamera` (through the vtable), once at boot. Read 2026-10-30 (B7 loop, the app's start-up); `sub_820A9818` not read. |
+| `sub_820A9928` | `AppCameraList::Add` (probably) | Lifted | Slot 1 of `AppCameraList` (vtable `0x82002780`): r4 = an entry, stored at its caller's frame + 28 (its 96-byte frame's +124); when not 0, `sub_820A9818` (probably the vector's `push_back`) on +4 with that word's address. From `AppCamera::AppCamera` (through the vtable), once at boot. Read 2026-10-30 (B7 loop, the app's start-up); `sub_820A9818` not read. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_003.cpp`, `--native_lifted_003`). |

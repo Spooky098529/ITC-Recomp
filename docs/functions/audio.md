@@ -46,6 +46,12 @@ Status:
   behind the caller's fallback flag.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
+- **Lifted**: translated from `generated/` by `itc_recomp/tools/lift.py`
+  into plain C++ in `itc_recomp/src/lifted/` (the lift sweep,
+  `docs/loops/lift-sweep.md`): typed parameters, registers as locals,
+  calls direct or through the dispatch table. While the SDK or code not
+  native yet still reaches it, its entry for them is an override in
+  `src/lifted/` (deleted when nothing reaches it that way).
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to
@@ -89,13 +95,13 @@ run it after changing either, on any branch.
 | `sub_82465870` | `AudioRenderDriver::Submit` | Overridden | Same file. r4 = the mixed buffer (`sub_8245F718` gives its descriptor; samples at +8), handed to our audio output. |
 | `sub_824658C8` | `AudioRenderDriver::Destroy` | Wrapped | Same file. Unregisters our handle first, so the original doesn't pass it to `XAudioUnregisterRenderDriverClient`. |
 | `sub_8246A5F8` | | Overridden | `src/hooks/xma.cpp` over `audio::xma::BitOffsetOfSample` (`src/audio/xma_packets.cpp`); harness `xma`: 512 cases on made-up packets (1-3 streams), 0 differ. The recompiled one: XMA frame walk, sample to bit offset (r3 the data, r4 its size, r5 the stream, r6 the sample): from the stream's first 2 KB packet, adds each packet's frame count (header's top 6 bits) until the packet holding frame r6 / 512, skipping other streams' packets (header's low 8 bits), then walks that packet's frames (15-bit lengths) from its first frame (header bits, + 32); returns the bit offset from the data's start, or 0 past the end. From `sub_8246B480` and `sub_8246BB98`. |
-| `sub_8246A698` | | | XMA frame walk to the data's end (r3 the data, r4 its size, r5 the stream): the bit offset of the stream's last frame. From `sub_8246BB98`. |
-| `sub_8246A758` | | | The XMA source voice's release of its XMA object (`sub_8245C880`). From `sub_8246AAD0`. Not read in detail. |
+| `sub_8246A698` | | Lifted | XMA frame walk to the data's end (r3 the data, r4 its size, r5 the stream): the bit offset of the stream's last frame. From `sub_8246BB98`. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). |
+| `sub_8246A758` | | Lifted | The XMA source voice's release of its XMA object (`sub_8245C880`). From `sub_8246AAD0`. Not read in detail. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). |
 | `sub_8246AEE0` | | | The XMA source voice's set-up: makes its XMA object (`sub_8245C650`). From `8246CE24`. Not read in detail. |
-| `sub_8246B0C8` | | | Probably the XMA source voice's stop: lock, wait (`sub_8245D288`), `sub_8245CE98` on its streams. From `sub_8246B408` and `sub_8246B450`. Not read in detail. |
-| `sub_8246B1C8` | | | Probably the XMA source voice's flush: reads the input position (`sub_8245D070`) between lock and unlock. No direct callers (a vtable). Never called (the user's session, 2026-10-21, a counter). Not read in detail. |
+| `sub_8246B0C8` | | Lifted | Probably the XMA source voice's stop: lock, wait (`sub_8245D288`), `sub_8245CE98` on its streams. From `sub_8246B408` and `sub_8246B450`. Not read in detail. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). |
+| `sub_8246B1C8` | | Lifted | Probably the XMA source voice's flush: reads the input position (`sub_8245D070`) between lock and unlock. No direct callers (a vtable). Never called (the user's session, 2026-10-21, a counter). Not read in detail. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). |
 | `sub_8246B480` | | | The XMA source voice's input side, once a voice update (voice in r3; its buffer queue at +20: address +8, size +12, loop count +16, state +116: 0 new, 3 handed over, 4 done). Hands each new buffer over (`sub_8245C958`) with the output settings (`sub_8245D0E0`) and, with a loop count, the loop data (`sub_8245CF98`): bit offsets from the buffer (+40, +44), or with voice +266 = 2 from sample positions through `sub_8246A5F8`. A handed-over buffer is done once its address is no longer a valid input buffer (`sub_8245CA30`) or the error status (`sub_8245CF60`) has bit 8; then the buffer-end callback (voice +16's vtable +92). Returns 1 while a stream still has input. |
 | `sub_8246BB98` | | | The XMA source voice's second loop, once a voice update: for the first handed-over buffer with +32 set, once its loop count has run out (`sub_8245D010`), sets a loop from sample +32 − 128 (`sub_8246A5F8`) to the data's end (`sub_8246A698`), count 1 (`sub_8245CF98`); once the input is gone, moves each stream's output by 128 samples (`sub_8245CE10`). Its loop and output moves never happened in the user's session (2026-10-21, a counter). |
-| `sub_8246BE20` | | | The XMA source voice's start: makes its contexts (`sub_8245D138`). From `8245EC1C`, once a sound. Not read in detail. |
-| `sub_8246BFD8` | | | The XMA source voice's end: releases its contexts (`sub_8245C8D0`). From `8245EA38` and `8246CADC`, twice a sound. Not read in detail. |
-| `sub_8246C320` | `XmaVoice::Update` | | The XMA source voice's update, from the mixer callback, ~118 a second a voice (voice in r3, its XMA object at +184): lock (`sub_8245D208`), wait (`sub_8245D288`), output side (`sub_8246BB98`), reads the decoded samples (`sub_8245CB38`, `sub_8245CD68`, `sub_8245CBB0`, `sub_8245D050`) into the mix (`sub_8245F718`, `sub_8245FA10`), input side (`sub_8246B480`), unlock (`sub_8245D4D0`). Reaches the XMA object only through these helpers. |
+| `sub_8246BE20` | | Lifted | The XMA source voice's start: makes its contexts (`sub_8245D138`). From `8245EC1C`, once a sound. Not read in detail. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). |
+| `sub_8246BFD8` | | Lifted | The XMA source voice's end: releases its contexts (`sub_8245C8D0`). From `8245EA38` and `8246CADC`, twice a sound. Not read in detail. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). |
+| `sub_8246C320` | `XmaVoice::Update` | Lifted | The XMA source voice's update, from the mixer callback, ~118 a second a voice (voice in r3, its XMA object at +184): lock (`sub_8245D208`), wait (`sub_8245D288`), output side (`sub_8246BB98`), reads the decoded samples (`sub_8245CB38`, `sub_8245CD68`, `sub_8245CBB0`, `sub_8245D050`) into the mix (`sub_8245F718`, `sub_8245FA10`), input side (`sub_8246B480`), unlock (`sub_8245D4D0`). Reaches the XMA object only through these helpers. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). |

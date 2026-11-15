@@ -34,7 +34,7 @@ function F, its group is F plus the callees only the group calls (seen in
 play, not ours), followed down. Callees outside the group that run in play
 and aren't ours are its blockers; with none, the group is ready.
 
-  ours      an override in src/ (not Wrapped), or status Native, Merged or Dropped;
+  ours      an override in src/ (not Wrapped), or status Native, Merged, Dropped or Lifted;
             the register save and restore helpers count as ours
   callers   only callers seen in play count (a caller that never runs
             doesn't need the callee)
@@ -114,7 +114,7 @@ def load():
         if HELPER.match(f):
             return True
         return (f in overrides and status.get(f) != "Wrapped") or \
-            status.get(f) in ("Native", "Merged", "Dropped")
+            status.get(f) in ("Native", "Merged", "Dropped", "Lifted")
 
     return calls, lines, indirect, imports, seen, ours
 

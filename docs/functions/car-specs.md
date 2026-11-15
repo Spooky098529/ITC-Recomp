@@ -41,6 +41,12 @@ Status:
   behind the caller's fallback flag.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
+- **Lifted**: translated from `generated/` by `itc_recomp/tools/lift.py`
+  into plain C++ in `itc_recomp/src/lifted/` (the lift sweep,
+  `docs/loops/lift-sweep.md`): typed parameters, registers as locals,
+  calls direct or through the dispatch table. While the SDK or code not
+  native yet still reaches it, its entry for them is an override in
+  `src/lifted/` (deleted when nothing reaches it that way).
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to
@@ -92,7 +98,7 @@ run it after changing either, on any branch.
 | `sub_820CBD20` | `CountBodyKits` | Overridden | r3 = `Params::GetCarParts`' block: how many of table 82's two records have +0 other than `[0x82000A34]` (probably 0.0; probably the body kits offered). Only caller `sub_821E1B48` (not read). Each record copied to the stack (memcpy) and swapped there (`sub_820CB7E8`), its first float compared (`fcmpu`: -0.0 counts as 0.0, a NaN as not). Overridden: the adapter in `src/hooks/car_specs.cpp` in front of `car_specs::CountBodyKits` (the first word swapped and compared, no copy; flush-to-zero turned off first, as the original's lfs), `--native_car_specs`; harness `car_specs`. |
 | `sub_820C9E98` | `Params::GetCarSpec` | Overridden | r3 = the car id: table 72 + 8432 × id (no check). 26 call sites in 22 functions. Leaf. Name from SBX-Recomp. Overridden: the adapter in `src/hooks/car_specs.cpp` in front of `car_specs::GetCarSpec`, `--native_car_specs`; harness `car_specs`. |
 | `sub_820C9EB0` | `Params::GetWheel` | Native | r3 = the wheel number: 0 below 1, else table 73's record n − 1. 46 call sites (44 in `sub_8217DD38`, 2 in `Car::Refresh`). Leaf. Name from SBX-Recomp. Native: plain C++ `car_specs::GetWheel`, its adapter removed (2026-10-23): in play only `Car::Refresh`'s plain C++ calls it, so `--native_car_specs` now switches only its callers; a recompiled caller (none seen in play) runs the original. Harness `car_specs`. |
-| `sub_820C9D90` | `Params::Free` | | Frees the block (`sub_825A71C0`) and the object (`sub_825A70E8`), sets `0x826C2E48` to 0. 1 call site (not read). Not seen in play. |
+| `sub_820C9D90` | `Params::Free` | Lifted | Frees the block (`sub_825A71C0`) and the object (`sub_825A70E8`), sets `0x826C2E48` to 0. 1 call site (not read). Not seen in play. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_004.cpp`, `--native_lifted_004`). |
 | `sub_820C9EE0` | `Params::FirstWheelOfModel` | Overridden | r3 = a wheel model: 0 below 1, else `[[0x826C2E48] + 64 + 4m]` + 1 (a wheel number). 2 callers (not read). Leaf. Overridden: the adapter in `src/hooks/car_specs.cpp` in front of `car_specs::FirstWheelOfModel`, `--native_car_specs`; harness `car_specs`. |
 | `sub_820C9E00` | `Params::GetCarParts` | Overridden | r3 = out (9 pointers), r4 = the car: tables 74-82 + the car × their strides (280, 280, 280, 280, 168, 168, 84, 108, 72). 8 callers; `Car::Refresh` passes car 0 when the spec's block 2 +131 isn't 0. Name from SBX-Recomp. Leaves r3 as it came; every table read before any store. Overridden: the adapter in `src/hooks/car_specs.cpp` in front of `car_specs::GetCarParts`, `--native_car_specs`; harness `car_specs`. |
 | `sub_820C9928` | `CarSpec::GetTire` | Native | r3 = a spec, r4 = the type, r5 = the grade, r6 = rear: tire 0 for type 0, else type × 5 + grade − 5; spec + 4244 (front) or + 6176 (rear) + 92 × that. Leaf. Only caller `sub_820C4888` (twice). Name from SBX-Recomp. Native: plain C++ `car_specs::GetTire`, its adapter removed (2026-10-23): in play only `Car::CopySpec and Car::Refresh`'s plain C++ calls it, so `--native_car_specs` now switches only its callers; a recompiled caller (none seen in play) runs the original. Harness `car_specs`. |
