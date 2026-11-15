@@ -36,7 +36,7 @@ ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
 #define ITC_MAPPERS_FALLBACK(address)       \
   REX_FUNC_PROLOGUE();                      \
   if (!ITC_FLAG(native_action_mappers)) {   \
-    __imp__sub_##address(ctx, base);        \
+    lifted::Sdk(ctx, base, __imp__sub_##address); \
     return;                                 \
   }                                         \
   ctx.fpscr.disableFlushMode();
@@ -105,9 +105,10 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CF10) {
 // half of r25 at sub_8210C370.
 
 // The mapper's update, also logged for --log_pause_menu (moved from
-// src/debug/pause_menu_log.cpp).
-ITC_NATIVE_ENTRY_ALWAYS(8210C370) {
-  
+// src/debug/pause_menu_log.cpp). On the SDK's context (not in the dispatch
+// table): it reads its caller's r25 (the rewiring, stage 3; left for later).
+extern "C" REX_FUNC(sub_8210C370) {
+  REX_FUNC_PROLOGUE();
   const uint32_t mapper = ctx.r3.u32;
   const uint32_t caller = uint32_t(ctx.lr);
   const uint32_t fired_before = debug::PauseMenuLog_BeforeMapperUpdate(base, mapper);
@@ -117,7 +118,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210C370) {
     ctx.r3.u64 = MapperUpdate(base, mapper, uint32_t(ctx.r25.u64 >> 32), &f1);
     ctx.f1.f64 = f1;
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8210C370);
+    __imp__sub_8210C370(ctx, base);
   }
   debug::PauseMenuLog_AfterMapperUpdate(base, mapper, caller, fired_before);
 }
@@ -134,7 +135,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210C370) {
     if (ITC_FLAG(native_action_mappers)) {                                     \
       ctx.r3.u64 = function(base, mapper, action);                             \
     } else {                                                                   \
-      __imp__sub_##address(ctx, base);                                         \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                            \
     }                                                                          \
     debug::PauseMenuLog_NoteSlotRead(slot, mapper, action, caller,             \
                                      double(slot == 14 ? ctx.r3.u32 & 0xFFFF   \

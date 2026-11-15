@@ -51,6 +51,21 @@ namespace asu = app_start_up;
 
 hooks::StartUpRecorder hooks::g_start_up_recorder = nullptr;
 
+namespace {
+thread_local uint32_t t_recorder_address = 0;
+thread_local bool t_recorded = false;
+void RunRecorder(PPCContext& ctx, uint8_t*) {
+  t_recorded = hooks::g_start_up_recorder(ctx, t_recorder_address);
+}
+}  // namespace
+
+bool hooks::StartUpRecordedOnView(lifted::Regs& ctx, uint32_t address) {
+  t_recorder_address = address;
+  t_recorded = false;
+  lifted::Sdk(ctx, nullptr, RunRecorder);
+  return t_recorded;
+}
+
 // ReadError::SetApp (sub_8209AC50), sub_8209AC30, sub_8209F580,
 // sub_8225FB70 and Movies::Set (sub_820A4360) have no adapters: only
 // App::StartUp's plain C++ calls them in play (Movies::Set's original where
@@ -421,14 +436,15 @@ ITC_NATIVE_ENTRY_ALWAYS(8210ADD0) {
 void hooks::AppStartUpSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t interface = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
-  const uint64_t r31 = ctx.r31.u64;
-  // The original's prologue: the link register and r31 kept above its frame.
+  // The original's prologue: the link register and r31 kept above its frame
+  // (the caller's r31: not carried by the view).
   guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
-  guest::StoreU32(base, ctx.r1.u32 - 16, uint32_t(r31 >> 32));
-  guest::StoreU32(base, ctx.r1.u32 - 12, uint32_t(r31));
+  guest::StoreU32(base, ctx.r1.u32 - 16, 0);
+  guest::StoreU32(base, ctx.r1.u32 - 12, 0);
   uint32_t r3 = 0;
+  // (r31 = the interface in the body, as the original, reached callees only
+  // as the bytes they save: not carried by the view)
   InFrame(ctx, base, 128, 0x82106564, [&](uint32_t frame) {
-    ctx.r31.u64 = interface;
     asu::StartUpCalls calls;
     calls.call = [&](uint32_t target, std::optional<uint32_t> a, std::optional<uint32_t> b,
                      uint32_t return_address) {
@@ -447,7 +463,6 @@ void hooks::AppStartUpSteps(lifted::Regs& ctx, uint8_t* base) {
     };
     r3 = asu::AppStartUp(base, interface, frame, calls);
   });
-  ctx.r31.u64 = r31;
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
@@ -470,15 +485,13 @@ ITC_NATIVE_ENTRY_ALWAYS(82106548) {
 namespace {
 
 // The original's __savegprlr_N: the link register at r1 - 8 and rN to r31
-// (doublewords) below it, above the frame it's about to make.
+// (doublewords) below it, above the frame it's about to make. rN to r31 are
+// stored as 0 (the caller's: not carried by the view).
 void SaveRegisters(lifted::Regs& ctx, uint8_t* base, int first) {  // first >= 14
-  // r14 to r31 are consecutive in PPCContext (r3 comes first there).
-  static_assert(offsetof(PPCContext, r31) - offsetof(PPCContext, r14) == 17 * sizeof(lifted::Temp));
   const uint32_t sp = ctx.r1.u32;
   guest::StoreU32(base, sp - 8, uint32_t(ctx.lr));
-  const lifted::Temp* regs = &ctx.r14;
   for (int n = first; n < 32; n++) {
-    const uint64_t value = regs[n - 14].u64;
+    const uint64_t value = 0;
     const uint32_t at = sp - 8 * (32 - n) - 8;
     guest::StoreU32(base, at, uint32_t(value >> 32));
     guest::StoreU32(base, at + 4, uint32_t(value));
@@ -624,11 +637,12 @@ void hooks::AudioManagerCreateSteps(lifted::Regs& ctx, uint8_t* base) {
   }
   if (*result != 0) {
     // The constructor's prologue saves: lr, r26 to r28 as they came, r29 to
-    // r31 Create's (the count, the name, the owner).
+    // r31 Create's (the count, the name, the owner). (The caller's r26 to
+    // r28: not carried by the view.)
     guest::StoreU32(base, create_frame - 8, 0x82119B70);
-    StoreDoubleword(base, create_frame - 56, ctx.r26.u64);
-    StoreDoubleword(base, create_frame - 48, ctx.r27.u64);
-    StoreDoubleword(base, create_frame - 40, ctx.r28.u64);
+    StoreDoubleword(base, create_frame - 56, 0);
+    StoreDoubleword(base, create_frame - 48, 0);
+    StoreDoubleword(base, create_frame - 40, 0);
     StoreDoubleword(base, create_frame - 32, entry_r5);
     StoreDoubleword(base, create_frame - 24, entry_r4);
     StoreDoubleword(base, create_frame - 16, entry_r3);
@@ -748,7 +762,7 @@ void hooks::AppCameraSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t sp = ctx.r1.u32;
   // The original's prologue: __savegprlr_27 and f31 at -56.
   SaveRegisters(ctx, base, 27);
-  StoreDoubleword(base, sp - 56, ctx.f31.u64);
+  StoreDoubleword(base, sp - 56, 0);  // (the caller's f31: not carried by the view)
   const uint32_t frame = sp - 224;
   guest::StoreU32(base, frame, sp);
   ctx.r1.u64 = frame;
@@ -769,11 +783,13 @@ void hooks::AppCameraCameraConstructSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32;
   guest::StoreU32(base, sp - 8, uint32_t(lr));
-  StoreDoubleword(base, sp - 16, ctx.r31.u64);
+  // (the caller's r31, saved here and by the callees as their owner: not
+  // carried by the view)
+  StoreDoubleword(base, sp - 16, 0);
   const uint32_t frame = sp - 144;
   guest::StoreU32(base, frame, sp);
   const uint32_t r3 =
-      asu::AppCameraCameraConstruct(base, ctx.r3.u32, frame, AppCameraCallsFor(ctx, base, ctx.r31.u64));
+      asu::AppCameraCameraConstruct(base, ctx.r3.u32, frame, AppCameraCallsFor(ctx, base, 0));
   ctx.r1.u64 = sp;
   ctx.lr = lr;
   ctx.r3.u64 = r3;
@@ -782,7 +798,7 @@ void hooks::AppCameraCameraConstructSteps(lifted::Regs& ctx, uint8_t* base) {
 void hooks::AppCameraListConstructSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
-  StoreDoubleword(base, ctx.r1.u32 - 16, ctx.r31.u64);
+  StoreDoubleword(base, ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
   if (const auto r3 = asu::AppCameraListConstruct(base, ctx.r3.u32)) {
     ctx.r3.u64 = *r3;
     return;
@@ -812,23 +828,10 @@ void hooks::AppConstructSteps(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t app = ctx.r3.u32, block = ctx.r4.u32;
   const uint64_t lr = ctx.lr;
   const uint32_t sp = ctx.r1.u32;
-  // The original's prologue (__savegprlr_22), then its saved registers as
-  // it sets them for the body (r30 per call), put back at the end.
+  // The original's prologue (__savegprlr_22). (Its saved registers as it
+  // sets them for the body, r22 to r31, reached callees only as the bytes
+  // they save: not carried by the view; nor kept and put back.)
   SaveRegisters(ctx, base, 22);
-  lifted::Temp* const saved = &ctx.r22;
-  uint64_t entry[10];
-  for (int i = 0; i < 10; i++) {
-    entry[i] = saved[i].u64;
-  }
-  ctx.r22.u64 = 0x82000E08;
-  ctx.r23.u64 = 0x82000E38;
-  ctx.r24.u64 = app + 16;
-  ctx.r25.u64 = app + 12;
-  ctx.r26.u64 = app + 8;
-  ctx.r27.u64 = app + 4;
-  ctx.r28.u64 = block;
-  ctx.r29.u64 = app + 20;
-  ctx.r31.u64 = app;
   uint32_t r3 = 0;
   InFrame(ctx, base, 240, 0x82094644, [&](uint32_t frame) {
     asu::AppCalls calls;
@@ -841,7 +844,7 @@ void hooks::AppConstructSteps(lifted::Regs& ctx, uint8_t* base) {
       if (c) {
         ctx.r5.u64 = *c;
       }
-      ctx.r30.u64 = r30;
+      (void)r30;  // (not carried by the view, as the other saved registers)
       ctx.lr = return_address;
       lifted::CallFromContext(ctx, base, target);
       return ctx.r3.u32;
@@ -850,14 +853,10 @@ void hooks::AppConstructSteps(lifted::Regs& ctx, uint8_t* base) {
                              uint32_t return_address) {
       ctx.r4.u64 = a;
       ctx.r5.u64 = b;
-      ctx.r30.u64 = 0;
       return VirtualCall(ctx, base, object, offset, return_address);
     };
     r3 = asu::AppConstruct(base, app, block, frame, calls);
   });
-  for (int i = 0; i < 10; i++) {
-    saved[i].u64 = entry[i];
-  }
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
@@ -886,10 +885,9 @@ void hooks::AppCreateSteps(lifted::Regs& ctx, uint8_t* base) {
   // The original's prologue: lr and r31 above its 96-byte frame; r31 the
   // block in the body.
   SaveRegisters(ctx, base, 31);
-  const uint64_t r31 = ctx.r31.u64;
   std::optional<uint32_t> result;
+  // (r31 = the block in the body: not carried by the view, nor kept)
   InFrame(ctx, base, 96, 0x82094AE4, [&](uint32_t) {
-    ctx.r31.u64 = entry_r3;
     result = asu::AppCreate(base, block, [&](uint32_t app) {
       ctx.r3.u64 = app;
       ctx.r4.u64 = entry_r3;
@@ -898,7 +896,6 @@ void hooks::AppCreateSteps(lifted::Regs& ctx, uint8_t* base) {
       return ctx.r3.u32;
     });
   });
-  ctx.r31.u64 = r31;
   ctx.lr = lr;
   if (!result) {
     ctx.r3.u64 = entry_r3;
@@ -929,12 +926,12 @@ ITC_NATIVE_ENTRY(82379350, ITC_FLAG(native_app_start_up)) {
 }
 
 // The app's interfaces' slots to the framework's first worker pool: a tail
-// call (lr the caller's; r11 the target, ctr it, as the original's).
+// call (lr the caller's; ctr the target, as the original's; r11, also the
+// target there, isn't carried: none reads it).
 namespace {
 
 void TailCall(lifted::Regs& ctx, uint8_t* base, const asu::SlotCall& call) {
   ctx.r3.u64 = call.object;
-  ctx.r11.u64 = call.target;
   lifted::CallFromContext(ctx, base, call.target);
 }
 
@@ -967,7 +964,7 @@ bool hooks::RenderManagerSlotDirect(lifted::Regs& ctx, uint8_t* base, uint32_t f
     return false;
   }
   ctx.r3.u64 = slot->r3;
-  ctx.r11.u64 = slot->target;
+  // (r11 = the target was a leftover for recompiled callers: none now)
   ctx.ctr.u64 = slot->target;
   return true;
 }

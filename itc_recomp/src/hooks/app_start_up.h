@@ -22,9 +22,16 @@ namespace hooks {
 // when it answers true, the adapter returns (the recorder set r3), so the
 // harness sees what App::StartUp hands each without setting anything up
 // again.
-using StartUpRecorder = bool (*)(lifted::Regs& ctx, uint32_t address);
+// The recorder is on the SDK's context (the harnesses' functions); from a
+// view, it runs on the thread's context with the view's registers (as
+// lifted::Sdk), its r3 and f1 back in the view.
+using StartUpRecorder = bool (*)(PPCContext& ctx, uint32_t address);
 extern StartUpRecorder g_start_up_recorder;
+bool StartUpRecordedOnView(lifted::Regs& ctx, uint32_t address);
 inline bool StartUpRecorded(lifted::Regs& ctx, uint32_t address) {
+  return g_start_up_recorder != nullptr && StartUpRecordedOnView(ctx, address);
+}
+inline bool StartUpRecorded(PPCContext& ctx, uint32_t address) {
   return g_start_up_recorder != nullptr && g_start_up_recorder(ctx, address);
 }
 

@@ -88,7 +88,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825926E8) {
 #define ITC_ARCHIVE_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                \
   if (!ITC_FLAG(native_archive)) {    \
-    __imp__sub_##address(ctx, base);  \
+    lifted::Sdk(ctx, base, __imp__sub_##address); \
     return;                           \
   }
 
@@ -118,7 +118,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8224FB10) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                            \
     \
     if (!ITC_FLAG(native_archive) || !hooks::NativeAtexit()) {    \
-      __imp__sub_##address(ctx, base);                            \
+      lifted::Sdk(ctx, base, __imp__sub_##address);               \
       return;                                                     \
     }                                                             \
     hooks::GuestAtexit guest{ctx, base};                          \
@@ -146,7 +146,8 @@ struct FinishGuestCalls {
       ctx.r4.u64 = data;
       ctx.r5.u64 = size;
       ctx.r6.u64 = context;
-      ctx.r11.u64 = function;
+      // (r11 = the target, the original's mtctr source, was a leftover: none
+      // reads it)
       lifted::CallFromContext(ctx, base, function);
     });
   }
@@ -176,12 +177,11 @@ void hooks::ArchiveFinishRequest(lifted::Regs& ctx, uint8_t* base) {
 }
 
 // LoaderFunctor::Invoke: r3 = the functor, r4 = the argument: a tail call of
-// the functor's +4 with r4 as r3 (r11 and ctr the target, as the original's
-// mtctr; lr the caller's).
+// the functor's +4 with r4 as r3 (ctr the target, as the original's mtctr;
+// lr the caller's; r11, also the target there, isn't carried: none reads it).
 void hooks::ArchiveInvokeFunctor(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t target = archive::LoaderFunctorTarget(base, ctx.r3.u32);
   ctx.r3.u64 = ctx.r4.u64;
-  ctx.r11.u64 = target;
   lifted::CallFromContext(ctx, base, target);
 }
 
@@ -206,7 +206,7 @@ void hooks::ArchiveUclUnpack(lifted::Regs& ctx, uint8_t* base) {
         ctx.r3.u64 = destination;
         ctx.r4.u64 = source;
         ctx.r5.u64 = size;
-        sub_825A7410(ctx, g.base);
+        lifted::CallFromContext(ctx, g.base, 0x825A7410);
       });
     }
   } guest{ctx, base};
@@ -224,7 +224,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82294610) {
 #define ITC_ARCHIVE_QUEUE_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                      \
   if (!hooks::NativeArchiveQueue()) {       \
-    __imp__sub_##address(ctx, base);        \
+    lifted::Sdk(ctx, base, __imp__sub_##address); \
     return;                                 \
   }
 
@@ -252,7 +252,7 @@ struct SetUpGuestCalls {
       ctx.r4.u64 = size;
       ctx.r5.u64 = 4096;
       ctx.r6.u64 = 4;
-      sub_82295398(ctx, c.base);
+      lifted::CallFromContext(ctx, c.base, 0x82295398);
     });
     return ctx.r3.u32;
   }

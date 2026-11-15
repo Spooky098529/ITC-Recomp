@@ -31,7 +31,7 @@ ITC_FLAG_BOOL(native_data_tables, true, "ITC",
 #define ITC_DATA_TABLES_FALLBACK(address)  \
   REX_FUNC_PROLOGUE();                     \
   if (!ITC_FLAG(native_data_tables)) {     \
-    __imp__sub_##address(ctx, base);       \
+    lifted::Sdk(ctx, base, __imp__sub_##address); \
     return;                                \
   }
 

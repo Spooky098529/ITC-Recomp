@@ -43,7 +43,7 @@ using namespace car_specs;
 #define ITC_CAR_SPECS_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                  \
   if (!ITC_FLAG(native_car_specs)) {    \
-    __imp__sub_##address(ctx, base);    \
+    lifted::Sdk(ctx, base, __imp__sub_##address); \
     return;                             \
   }
 
@@ -123,7 +123,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820C9E00) {
       parts[i] = guest::LoadU32(base, ctx.r4.u32 + 4 * i);             \
     }                                                                  \
     if (!function(base, ctx.r3.u32, parts, ctx.r5.s32)) {              \
-      __imp__sub_##address(ctx, base);                                 \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                    \
       return;                                                          \
     }                                                                  \
     ctx.fpscr.disableFlushMode();                                      \
