@@ -3280,6 +3280,41 @@ The stages, each leaving the game working and checked:
    typed kernel functions (behind its import shims) let our code call the
    kernel without a `ctx`, reported to the user.
 
+### The kernel's entries (stage 1, 2026-11-15)
+
+Where the SDK runs guest code by address: `XThread::Execute` (a
+thread's start, or the XAPI start-up with the routine and its
+parameter), the APC kernel, normal and rundown routines, the audio
+system's client callback, the graphics interrupt, DllMain (DLL modules
+only) and `XexGetProcedureAddress`'s thunks. It stores but never runs
+DPCs (`KeInitializeDpc`) and title terminate notifications. Of the game's
+imports that take a routine, our C++ uses only `ExCreateThread` (three
+callers), `ExRegisterTitleTerminateNotification` and
+`VdSetGraphicsInterruptCallback` (to clear it, in `Device::Release`);
+nothing uses APCs, timers' APCs, DPCs, `NtReadFile`'s or `NtWriteFile`'s
+APC routines, or `XexGetProcedureAddress`.
+
+The kernel's entries, all seen in an attract race (`itc_5616`):
+
+| Address | Function | Started by |
+| --- | --- | --- |
+| `0x82296C80` | `xstart` (our start-up, `src/app/start_up.cpp`) | The kernel: the game's main thread (`PrepareModuleLaunch`) |
+| `0x825BA558` | `XapiThreadStartup` | `ExCreateThread` from `CreateThread` (`sub_825BA380`, `sub_825BA158`): the frame driver's threads (`Thread::Begin`), which then run `Thread::Start` `0x8258DE50` (game code, not an entry) |
+| `0x822B69A8` | `Device::WorkerThread` | `ExCreateThread`, raw: predicated tiling's per-CPU workers (`CreateWorkers`) |
+| `0x8245BE08` | `XAudio::MasterThread` | `ExCreateThread`, raw: XAudio's engine (`XAudioEngine::Init`) |
+| `0x8245BED0` | `XAudio::WorkerThread` | The same, for the other hardware threads |
+
+Registered with the kernel but never run by the SDK: XAudio's title
+terminate routine `0x8245B0D0` (`XAudioEngine::Init`; unregistered by
+`sub_8245AA48`) and the device's, probably `0x822ACB68` (unregistered by
+`Device::Release`).
+
+Not a kernel entry, but our own call into guest code through the SDK's
+table: native audio's thread runs the game's mixer callback
+(`XAudio::MixerCallback` `0x8245FBE0`, registered through our
+`sub_824657E0`) with `function_dispatcher()->Execute`
+(`src/audio/native_audio.cpp`); it moves to `lifted::Call` in stage 2.
+
 Checks at each stage: `attract_race.sh 40` as a smoke run;
 `attract_race.sh 180 --run_harnesses=all` while the harnesses exist (0
 differing outside the expected groups); the pad replay
