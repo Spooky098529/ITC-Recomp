@@ -358,3 +358,17 @@ ITC_TODAYS_RESULT(8225CB18, TodaysEventIntro)
 ITC_TODAYS_RESULT(8225C770, TodaysEventFadeOut)
 ITC_TODAYS_RESULT(8225CC80, TodaysEventNextUnlock)
 ITC_TODAYS_RESULT(8225CD50, TodaysEventNextPage)
+
+// The forms on the SDK's context the header declares (a harness's), on a
+// view of it (the rewiring, stage 3).
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::ModeType9LeaveScreen)
+ITC_CONTEXT_FORM(hooks::ModeType9Leaving)
+ITC_CONTEXT_FORM(hooks::ModeType9NextMode)
+ITC_CONTEXT_FORM(hooks::ModeType9WaitForLoads)
+ITC_CONTEXT_FORM(hooks::ModeType9WaitForShown)
+#undef ITC_CONTEXT_FORM

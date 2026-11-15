@@ -56,9 +56,10 @@ rc::GuestCall native::ReplayCall(lifted::Regs& ctx, uint8_t* base) {
                       std::initializer_list<uint64_t> args, std::optional<double> f1) {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = sp;
-    int reg = 3;
+    // r3 to r10, in order in the view.
+    lifted::Temp* reg = &ctx.r3;
     for (uint64_t value : args) {
-      guest_call::Gpr(ctx, reg++).u64 = value;
+      (reg++)->u64 = value;
     }
     if (f1) {
       ctx.f1.f64 = *f1;
@@ -94,7 +95,7 @@ rc::GuestCall native::ReplayCall(lifted::Regs& ctx, uint8_t* base) {
       ctx.fpscr.disableFlushMode();                                                 \
       ctx.r3.u64 = (body);                                                          \
     } else {                                                                        \
-      __imp__sub_##address(ctx, base);                                              \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                 \
     }                                                                               \
     native::g_current_command = outer_command;                                      \
     native::Renderer_AfterCommand(base, id, payload, arg1, arg2);                   \
@@ -117,7 +118,7 @@ uint32_t g_command_serial = 0;
 // copies for the renderer's mirrors), from the original's return address.
 namespace {
 struct PatchCopyContext {
-  PPCContext* ctx;
+  lifted::Regs* ctx;
   uint8_t* base;
 };
 void PatchCopy(void* context, uint32_t destination, uint32_t source, uint32_t size) {

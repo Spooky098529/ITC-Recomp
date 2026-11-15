@@ -987,3 +987,51 @@ extern "C" REX_FUNC(sub_821E6C50) {
   }
   hooks::TuningUpdate(ctx, base);
 }
+
+// The forms on the SDK's context the header declares (a harness's), on a
+// view of it (the rewiring, stage 3).
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::TuningApplyAreaDecals)
+ITC_CONTEXT_FORM(hooks::TuningApplyDecals)
+ITC_CONTEXT_FORM(hooks::TuningCommand10)
+ITC_CONTEXT_FORM(hooks::TuningCommand11)
+ITC_CONTEXT_FORM(hooks::TuningCommand12)
+ITC_CONTEXT_FORM(hooks::TuningCommand13)
+ITC_CONTEXT_FORM(hooks::TuningCommand14)
+ITC_CONTEXT_FORM(hooks::TuningCommand15)
+ITC_CONTEXT_FORM(hooks::TuningCommand16)
+ITC_CONTEXT_FORM(hooks::TuningCommand17)
+ITC_CONTEXT_FORM(hooks::TuningCommand18)
+ITC_CONTEXT_FORM(hooks::TuningCommand19)
+ITC_CONTEXT_FORM(hooks::TuningCommand22)
+ITC_CONTEXT_FORM(hooks::TuningCommand23)
+ITC_CONTEXT_FORM(hooks::TuningCommand25)
+ITC_CONTEXT_FORM(hooks::TuningCommand26)
+ITC_CONTEXT_FORM(hooks::TuningCommand27)
+ITC_CONTEXT_FORM(hooks::TuningCommand30)
+ITC_CONTEXT_FORM(hooks::TuningCommand31)
+ITC_CONTEXT_FORM(hooks::TuningCommand42)
+ITC_CONTEXT_FORM(hooks::TuningCommand5)
+ITC_CONTEXT_FORM(hooks::TuningCommand52)
+ITC_CONTEXT_FORM(hooks::TuningCommand54)
+ITC_CONTEXT_FORM(hooks::TuningCommand55)
+ITC_CONTEXT_FORM(hooks::TuningCommand56)
+ITC_CONTEXT_FORM(hooks::TuningCommand58)
+ITC_CONTEXT_FORM(hooks::TuningCommand7)
+ITC_CONTEXT_FORM(hooks::TuningCommand9)
+ITC_CONTEXT_FORM(hooks::TuningMarkPick)
+ITC_CONTEXT_FORM(hooks::TuningOpenItems)
+ITC_CONTEXT_FORM(hooks::TuningPickCameraPreset)
+ITC_CONTEXT_FORM(hooks::TuningPlayGroupAnimation)
+ITC_CONTEXT_FORM(hooks::TuningPlayIntro)
+ITC_CONTEXT_FORM(hooks::TuningSetPartName)
+ITC_CONTEXT_FORM(hooks::TuningShowDialog)
+ITC_CONTEXT_FORM(hooks::TuningShowLevels)
+ITC_CONTEXT_FORM(hooks::TuningShowOptions)
+ITC_CONTEXT_FORM(hooks::TuningUpdateBusyIcon)
+ITC_CONTEXT_FORM(hooks::TuningUpdateListCounter)
+#undef ITC_CONTEXT_FORM

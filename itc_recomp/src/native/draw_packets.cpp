@@ -258,3 +258,13 @@ void native::DrawPackets_IndexedDraw(lifted::Regs& ctx, uint8_t* base) {
   REX_STORE_U64(device + kDeviceRenderStateDirty, 0);
   REX_STORE_U64(device + kDeviceOtherStateDirty, 0);
 }
+
+// The forms on the SDK's context the header declares (a harness's), on a
+// view of it (the rewiring, stage 3).
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(native::DrawPackets_IndexedDraw)
+#undef ITC_CONTEXT_FORM

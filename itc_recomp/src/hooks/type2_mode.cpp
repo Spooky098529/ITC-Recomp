@@ -166,3 +166,13 @@ ITC_TYPE2_MODE(82197278, Type2ModeInit)
 // a jump into the hub's recompiled sub_8218DE18, stays recompiled).
 ITC_TYPE2_MODE(82197858, Type2ModeInterrupt)
 ITC_TYPE2_MODE(82197930, Type2ModeForceExit)
+
+// The forms on the SDK's context the header declares (a harness's), on a
+// view of it (the rewiring, stage 3).
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::Type2ModeMachineOf)
+#undef ITC_CONTEXT_FORM

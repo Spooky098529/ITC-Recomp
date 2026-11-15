@@ -679,3 +679,14 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
   ctx.lr = lr;
   ctx.r3.u64 = playing ? 1 : 0;
 }
+
+// The forms on the SDK's context the header declares (a harness's), on a
+// view of it (the rewiring, stage 3).
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(ui_movies_hooks::ApplyAnimationNative)
+ITC_CONTEXT_FORM(ui_movies_hooks::Update)
+#undef ITC_CONTEXT_FORM
