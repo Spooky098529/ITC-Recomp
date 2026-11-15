@@ -13,6 +13,7 @@
 #include "hooks/heap.h"
 #include "hooks/vehicle_native.h"
 #include "race_world/race_world.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "Run the race world and the racers' manager (docs/functions/race-world.md: "
@@ -345,14 +346,14 @@ rw::StartCalls StartCalls(PPCContext& ctx, uint8_t* base, uint32_t setup_frame) 
         lifted::original::c820C20E0(ctx, base);
         break;
       case 0x821706E8:
-        sub_821706E8(ctx, base);  // the original, through the harness's stand-in
+        lifted::CallFromContext(ctx, base, 0x821706E8);  // the original, through the harness's stand-in
         break;
       case 0x820C0118:
         lifted::original::c820C0118(ctx, base);
         break;
       case 0x821743A8:
         ctx.lr = 0x82174CF4;  // as RaceWorld::Tick calls it
-        sub_821743A8(ctx, base);  // the original, through the harness's stand-in
+        lifted::CallFromContext(ctx, base, 0x821743A8);  // the original, through the harness's stand-in
         break;
     }
     ctx.r1.u64 = r1;
@@ -376,7 +377,7 @@ rw::StartCalls StartCalls(PPCContext& ctx, uint8_t* base, uint32_t setup_frame) 
     } else if (address == 0x820B7998) {
       lifted::original::c820B7998(ctx, base);
     } else {
-      sub_825A7410(ctx, base);  // memcpy, through its override as the original
+      lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy, through its override as the original
     }
     ctx.r1.u64 = saved;
     ctx.fpscr.disableFlushMode();
@@ -446,7 +447,7 @@ rw::OriginalCall OpponentsCall(PPCContext& ctx, uint8_t* base) {
     if (address == 0x820C20E0) {
       lifted::original::c820C20E0(ctx, base);
     } else if (address == 0x821706E8) {
-      sub_821706E8(ctx, base);  // the original, through the harness's stand-in
+      lifted::CallFromContext(ctx, base, 0x821706E8);  // the original, through the harness's stand-in
     }
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();

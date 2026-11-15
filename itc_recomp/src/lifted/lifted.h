@@ -156,6 +156,9 @@ struct Registration {
 };
 void Register(const Registration* entries, size_t count, const bool* enabled);
 
+// The entry registered at `address` when its batch is on, else null.
+Entry Find(uint32_t address);
+
 // Calls the function at `address`: its lifted entry when there is one
 // (and its batch is on), else the function the SDK has there (a port's
 // override or the recompiled original) through the boundary.

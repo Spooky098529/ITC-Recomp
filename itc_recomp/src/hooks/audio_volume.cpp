@@ -7,6 +7,7 @@
 
 #include "guest.h"
 #include "hooks/guest_call.h"
+#include "lifted/sdk.h"
 
 using guest_call::InFrame;
 
@@ -20,7 +21,7 @@ extern "C" REX_FUNC(sub_8245B808) {
       ctx.r3.u64 = object;
       ctx.r4.u64 = 0;
       ctx.lr = 0x8245B830;
-      sub_8245ACE0(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8245ACE0);
       // The change mask: none.
       guest::StoreU32(base, object + 140, 0);
       // The pending count at [82954F08]+304, less one, released to the
@@ -38,21 +39,21 @@ extern "C" REX_FUNC(sub_8245B808) {
     ctx.r3.u64 = object;
     ctx.r4.u64 = object + 80;
     ctx.lr = 0x8245B8C0;
-    sub_8245B480(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8245B480);
     ctx.r3.u64 = object;
     ctx.r4.u64 = object + 356;
     ctx.lr = 0x8245B8CC;
-    sub_8245A940(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8245A940);
     uint32_t which = 1;
     for (uint32_t i = 0; i < guest::LoadU8(base, object + 128); i++) {
       ctx.r3.u64 = object;
       ctx.r4.u64 = guest::LoadU32(base, object + 124) + 44 * i;
       ctx.lr = 0x8245B8F0;
-      sub_8245B480(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8245B480);
       ctx.r3.u64 = object;
       ctx.r4.u64 = object + 8 * which + 356;
       ctx.lr = 0x8245B904;
-      sub_8245A940(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8245A940);
       which ^= 1;
     }
     if (read_volumes) {
@@ -60,7 +61,7 @@ extern "C" REX_FUNC(sub_8245B808) {
       ctx.r3.u64 = object;
       ctx.r4.u64 = 1;
       ctx.lr = 0x8245B938;
-      sub_8245ACE0(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8245ACE0);
     }
   });
 }

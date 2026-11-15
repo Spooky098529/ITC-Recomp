@@ -7,6 +7,7 @@
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
 #include "car_dealer/car_dealer.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_car_dealer, true, "ITC",
               "Run the car dealer (docs/functions/car-dealer.md: the type 2 mode's screen "
@@ -96,8 +97,7 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

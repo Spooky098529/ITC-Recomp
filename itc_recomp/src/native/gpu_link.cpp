@@ -30,6 +30,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_tiling_worker, true, "ITC",
               "Run the tiling worker's wake (Device::WakeWorker sub_822B6A78) natively and drop "
@@ -342,7 +343,7 @@ void Interrupt(PPCContext& ctx, uint8_t* base, uint32_t device, uint32_t mask) {
       PPCContext saved = ctx;
       guest::StoreU8(base, ctx.r13.u32 + 268, uint8_t(cpu));
       ctx.r3.u32 = guest::LoadU32(base, block + 20);
-      REX_CALL_INDIRECT_FUNC(function);
+      lifted::CallFromContext(ctx, base, function);
       ctx = saved;
       guest::StoreU8(base, ctx.r13.u32 + 268, uint8_t(own_cpu));
     }
@@ -658,7 +659,7 @@ extern "C" REX_FUNC(sub_8229E848) {
     ctx.r3.u32 = device;
     ctx.r4.u32 = pair;
     ctx.r5.u32 = 1;
-    sub_8229E3F0(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8229E3F0);
   }
   ctx = saved;
   ctx.r3.u32 = result;

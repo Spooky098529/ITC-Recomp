@@ -14,6 +14,7 @@
 #include "hooks/heap.h"
 #include "hooks/second_set.h"
 #include "memory/c_runtime_heap.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_morph_jobs, true, "ITC",
               "Run the morph jobs (docs/functions/morph-jobs.md: the pool makers' slot 1 "
@@ -49,8 +50,7 @@ void TailCall(PPCContext& ctx, uint8_t* base, const mj::TailCall& call, bool wit
     ctx.r12.u64 = call.vtable;
   }
   ctx.r11.u64 = call.function;
-  ctx.ctr.u64 = call.function;
-  REX_CALL_INDIRECT_FUNC(call.function);
+  lifted::CallFromContext(ctx, base, call.function);
 }
 
 // operator delete on `object` from a 96-byte frame returning to `lr`:
@@ -88,7 +88,7 @@ mj::ConstructCalls MorphJobsConstructCalls(PPCContext& ctx, uint8_t* base) {
     ctx.r11.u64 = function;
     ctx.ctr.u64 = function;
     ctx.lr = lr;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.lr = link;
   };
@@ -164,7 +164,7 @@ void MorphJobsWorkItemInterfaceDestroy(PPCContext& ctx, uint8_t* base) {
 void MorphJobsWait(PPCContext& ctx, uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820AC9B8 MorphJob::Wait");
   ctx.r3.s64 = ctx.r3.s64 + mj::kItem;
-  sub_82094B10(ctx, base);  // Job::Wait (--find_menu_selection's wrap)
+  lifted::CallFromContext(ctx, base, 0x82094B10);  // Job::Wait (--find_menu_selection's wrap)
 }
 
 void MorphJobsIsReleased(PPCContext& ctx, uint8_t* base) {
@@ -181,7 +181,7 @@ void MorphJobsRun(PPCContext& ctx, uint8_t* base) {
   ctx.r11.u64 = run.kind_word;
   ctx.r3.s64 = ctx.r3.s64 + (run.morph ? 56 : 8);  // run.record, all 64 bits
   if (!run.morph) {
-    sub_8258BCD8(ctx, base);  // the skinning blend (not seen in play)
+    lifted::CallFromContext(ctx, base, 0x8258BCD8);  // the skinning blend (not seen in play)
   } else if (ITC_FLAG(native_second_set)) {
     SecondSetMorphBlend(ctx, base);
   } else {

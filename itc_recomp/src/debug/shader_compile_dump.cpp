@@ -11,6 +11,7 @@
 #include "base/flags.h"
 #include "base/hash.h"
 #include "base/log.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_STRING(dump_shader_compiles, "", "ITC",
                 "Compile the game's shaders with its HLSL compiler (sub_822B8F10) even "
@@ -36,10 +37,10 @@ std::string LoadString(uint8_t* base, uint32_t address) {
 std::vector<uint8_t> LoadBuffer(PPCContext& ctx, uint8_t* base, uint32_t buffer) {
   uint32_t vtable = guest::LoadU32(base, buffer);
   ctx.r3.u64 = buffer;
-  REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, vtable + 12));
+  lifted::CallFromContext(ctx, base, guest::LoadU32(base, vtable + 12));
   uint32_t data = ctx.r3.u32;
   ctx.r3.u64 = buffer;
-  REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, vtable + 16));
+  lifted::CallFromContext(ctx, base, guest::LoadU32(base, vtable + 16));
   uint32_t size = ctx.r3.u32;
   std::vector<uint8_t> bytes(size);
   for (uint32_t i = 0; i < size; i++) {

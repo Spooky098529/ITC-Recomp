@@ -15,6 +15,7 @@
 #include "tuning_pages/tuning_pages.h"
 
 #include <optional>
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_car_models);
 ITC_FLAG_DECLARE(bool, native_car_specs);
@@ -233,7 +234,7 @@ void TuningPagesFreeTexture(PPCContext& ctx, uint8_t* base) {
     }
     ctx.r3.u64 = header_in;
     ctx.r4.u64 = data_in;
-    sub_820ECFC8(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x820ECFC8);
     return ctx.r3.u64;
   };
   ctx.r3.u64 = tp::FreeTexture(base, ctx.r3.u64, ctx.r4.u64, free);

@@ -58,6 +58,7 @@
 #include <cmath>
 #include <cstdio>
 #include <unordered_map>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_cockpit_dials, true, "ITC",
               "Pose the cockpit dials natively (sub_820E42E8, sub_820E45A8) from the "
@@ -351,7 +352,7 @@ void DrawNeedle(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t part, u
   ctx.r6.u64 = 0, ctx.r7.u64 = 0;
   ctx.lr = lr;
   interpolation::BlendState_SetLivePose(world.data());
-  sub_820D06F0(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x820D06F0);
   interpolation::BlendState_SetLivePose(nullptr);
   ctx.r1.u32 = r1;
 }

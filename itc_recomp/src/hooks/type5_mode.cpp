@@ -6,6 +6,7 @@
 
 #include "base/flags.h"
 #include "type5_mode/type5_mode.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_type5_mode, true, "ITC",
               "Run the type 5 mode (docs/functions/type5-mode.md: the parking area's front-end "
@@ -70,8 +71,7 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

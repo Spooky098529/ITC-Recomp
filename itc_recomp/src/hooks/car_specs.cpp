@@ -22,6 +22,7 @@
 #include "hooks/app_start_up.h"
 #include "hooks/archive.h"
 #include "hooks/heap.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_car_specs, true, "ITC",
               "Run the car parameter tables (docs/functions/car-specs.md: the loads' "
@@ -50,7 +51,7 @@ namespace {
 // The archive's TOC for an asset (r3 = the id): the guest function.
 uint32_t Toc(PPCContext& ctx, uint8_t* base, uint32_t id) {
   ctx.r3.u64 = id;
-  sub_8209D868(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x8209D868);
   return ctx.r3.u32;
 }
 

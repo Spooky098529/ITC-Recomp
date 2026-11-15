@@ -22,6 +22,7 @@
 #include "hooks/screen_objects.h"
 #include "screen_objects/screen_objects.h"
 #include "screen_objects/uv_trees.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_video_output);
 
@@ -107,12 +108,11 @@ uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
   const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
   if (!hooks::DirectSlotCall(ctx, base, slot7)) {
-    ctx.ctr.u64 = slot7;
-    REX_CALL_INDIRECT_FUNC(slot7);
+    lifted::CallFromContext(ctx, base, slot7);
   }
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
   ctx.lr = second;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
   return ctx.r3.u32;
 }
 
@@ -125,7 +125,7 @@ so::ReleaseCalls ReleaseCalls(PPCContext& ctx, uint8_t* base, int& releases) {
           [&ctx, base, &releases](uint32_t resource) {
             ctx.r3.u64 = resource;
             ctx.lr = releases++ == 0 ? 0x8212F100 : 0x8212F110;
-            sub_822A67B0(ctx, base);
+            lifted::CallFromContext(ctx, base, 0x822A67B0);
           }};
 }
 

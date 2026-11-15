@@ -8,6 +8,7 @@
 #include "base/log.h"
 
 #include <cstdlib>
+#include "lifted/sdk.h"
 
 using guest_call::InFrame;
 
@@ -36,7 +37,7 @@ bool MakeHeap(PPCContext& ctx, uint8_t* base) {
       ctx.r6.u64 = 4096;
       ctx.r7.u64 = 0;
       ctx.r8.u64 = attributes;
-      sub_822997B0(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x822997B0);
       guest::StoreU32(base, kHeap, ctx.r3.u32);
     });
   }

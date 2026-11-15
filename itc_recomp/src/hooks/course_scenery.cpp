@@ -45,6 +45,7 @@
 #include "hooks/scenery_lists.h"
 #include "native/buffers.h"
 #include "course_scenery/course_scenery.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_cameras);
 ITC_FLAG_DECLARE(bool, native_data_files);
@@ -147,8 +148,7 @@ uint32_t CallGuest(void* user, uint32_t function, const uint32_t* args, int coun
   for (int i = 0; i < count; i++) {
     registers[i]->u64 = args[i];
   }
-  ctx.ctr.u64 = function;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
   ctx.r1.u64 = saved;
   return ctx.r3.u32;
 }
@@ -416,7 +416,7 @@ void hooks::CourseSceneryDraw(PPCContext& ctx, uint8_t* base) {
   steps.advance = [&](uint32_t frame, uint32_t set) {
     in_frame(frame, 0x820F60B8, [&] {
       ctx.r3.u64 = set;
-      sub_820F11A8(ctx, base);  // the per-frame logic's wrap
+      lifted::CallFromContext(ctx, base, 0x820F11A8);  // the per-frame logic's wrap
     });
   };
   steps.record_clear = [&](uint32_t frame, uint32_t key, uint32_t flags, uint32_t color,
@@ -434,7 +434,7 @@ void hooks::CourseSceneryDraw(PPCContext& ctx, uint8_t* base) {
     in_frame(frame, 0x820F6888, [&] {
       ctx.r3.u64 = manager;
       ctx.r4.u64 = description;
-      sub_820F5740(ctx, base);  // the per-frame logic's wrap
+      lifted::CallFromContext(ctx, base, 0x820F5740);  // the per-frame logic's wrap
     });
   };
   Draw(base, draws, calls, steps, ctx.r1.u32, ctx.r3.u32);

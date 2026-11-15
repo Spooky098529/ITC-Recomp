@@ -11,6 +11,7 @@
 #include "hooks/archive.h"
 #include "hooks/race_event.h"
 #include "race_end/race_end.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_race_end, true, "ITC",
               "Run the race's end (docs/functions/race-end.md: RaceMode::ModeAfterRace "
@@ -53,7 +54,7 @@ class GuestCalls {
     ctx_.ctr.u64 = function;
     PPCContext& ctx = ctx_;
     uint8_t* base = base_;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx_.r1.u64 = stack;
     ctx_.fpscr.disableFlushMode();
     return ctx_.r3.u64;

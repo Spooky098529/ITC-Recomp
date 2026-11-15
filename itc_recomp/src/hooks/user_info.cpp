@@ -6,6 +6,7 @@
 
 #include "base/flags.h"
 #include "user_info/user_info.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_user_info, true, "ITC",
               "Run the type 2 mode's user info screen (docs/functions/user-info.md: the "
@@ -62,8 +63,7 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

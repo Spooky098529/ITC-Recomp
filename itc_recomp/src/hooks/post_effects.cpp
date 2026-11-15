@@ -38,6 +38,7 @@
 #include "post_effects/post_effects.h"
 
 #include <optional>
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_video_output);
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
@@ -113,8 +114,7 @@ ITC_POST_EFFECTS(82133A70, uint32_t r3 = 0; const uint64_t lr = ctx.lr;
                      ctx.r3.u64 = effect;
                      ctx.r4.u64 = 1;
                      ctx.lr = 0x82133ABC;
-                     ctx.ctr.u64 = function;
-                     REX_CALL_INDIRECT_FUNC(function);
+                     lifted::CallFromContext(ctx, base, function);
                      return ctx.r3.u32;
                    });
                  });
@@ -156,8 +156,7 @@ ITC_POST_EFFECTS(82133878, ctx.fpscr.disableFlushMode(); const uint32_t glow = c
                      ctx.r3.u64 = glow;
                      ctx.f1.f64 = value;
                      ctx.lr = kReturns[call++];
-                     ctx.ctr.u64 = function;
-                     REX_CALL_INDIRECT_FUNC(function);
+                     lifted::CallFromContext(ctx, base, function);
                    });
                  });
                  ctx.lr = lr)
@@ -229,12 +228,11 @@ uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
   const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
   if (!hooks::DirectSlotCall(ctx, base, slot7)) {
-    ctx.ctr.u64 = slot7;
-    REX_CALL_INDIRECT_FUNC(slot7);
+    lifted::CallFromContext(ctx, base, slot7);
   }
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
   ctx.lr = second;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
   return ctx.r3.u32;
 }
 
@@ -278,7 +276,7 @@ void PostEffectsReleaseSurface(PPCContext& ctx, uint8_t* base) {
         [&](uint32_t resource) {
           ctx.r3.u64 = resource;
           ctx.lr = 0x82133CB0;
-          sub_822A67B0(ctx, base);
+          lifted::CallFromContext(ctx, base, 0x822A67B0);
         }};
     r3 = ReleaseSurface(base, frame, at, calls);
   });
@@ -321,10 +319,10 @@ CreateCalls MakeCreateCalls(PPCContext& ctx, uint8_t* base) {
             ctx.r5.u64 = device;
             if (function == 0x82134410) {
               ctx.lr = 0x82138BB8;
-              sub_82134410(ctx, base);
+              lifted::CallFromContext(ctx, base, 0x82134410);
             } else {
               ctx.lr = 0x82138B10;
-              sub_82133B10(ctx, base);
+              lifted::CallFromContext(ctx, base, 0x82133B10);
             }
             return ctx.r3.u32;
           }};
@@ -379,7 +377,7 @@ void hooks::PostEffectsInitBoot(PPCContext& ctx, uint8_t* base) {
             ctx.r3.u64 = to;
             ctx.r4.u64 = from;
             ctx.r5.u64 = size;
-            sub_825A7410(ctx, base);  // memcpy
+            lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy
           });
         },
         [&](const std::function<uint32_t(const CreateCalls&)>& create) {
@@ -415,8 +413,7 @@ RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base) {
     for (int i = 0; i < fcount; i++) {
       fprs[i]->f64 = fregs[i];
     }
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -426,7 +423,7 @@ RecordCalls PostEffectsRecordCalls(PPCContext& ctx, uint8_t* base) {
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     ctx.f1.f64 = x;
-    sub_825A8A50(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825A8A50);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.f1.f64;

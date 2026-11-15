@@ -13,6 +13,7 @@
 #include "hooks/app_start_up.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
               "Run the action mappers (docs/functions/action-mappers.md: the repeat and "
@@ -210,7 +211,7 @@ extern "C" REX_FUNC(sub_8210AF08) {
       const uint32_t owner = guest::LoadU32(base, list + 36);
       ctx.r3.u64 = owner;
       ctx.lr = 0x8210AF58;
-      REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, owner) + 36));
+      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, owner) + 36));
       const uint32_t object = ctx.r3.u32;
       if (hooks::NativeHeapActive() && MapperBindKnown(base, mapper, object)) {
         MapperBind(base, mapper, object);
@@ -248,7 +249,7 @@ extern "C" REX_FUNC(sub_8209F430) {
   const uint64_t saved_lr = ctx.lr;
   guest_call::InFrame(ctx, base, 112, 0x8209F56C, [&](uint32_t) {
     ctx.r3.u64 = list;
-    sub_8210AF08(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8210AF08);
     if (ConfigureKnown(base)) {
       double f[3] = {ctx.f1.f64, ctx.f2.f64, ctx.f3.f64};
       ctx.r3.u64 = Configure(base, index, f);
@@ -258,7 +259,7 @@ extern "C" REX_FUNC(sub_8209F430) {
     } else {
       ctx.r3.u64 = index;
       ctx.lr = 0x8209F574;
-      sub_8209F228(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8209F228);
     }
   });
   ctx.lr = saved_lr;

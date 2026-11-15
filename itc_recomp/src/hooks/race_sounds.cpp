@@ -14,6 +14,7 @@
 #include "hooks/menu_sounds.h"
 #include "hooks/mode_tick.h"
 #include "race_sounds/race_sounds.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_race_sounds, true, "ITC",
               "Run the race's sounds (docs/functions/race-sounds.md: the race mode's sound "
@@ -100,8 +101,7 @@ class GuestCalls {
         CarSoundsInit(ctx, base);
         break;
       default:
-        ctx.ctr.u64 = function;
-        REX_CALL_INDIRECT_FUNC(function);
+        lifted::CallFromContext(ctx, base, function);
     }
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();

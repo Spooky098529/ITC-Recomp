@@ -12,6 +12,7 @@
 #include "base/flags.h"
 #include "hooks/archive.h"
 #include "race_loading/race_loading.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_race_loading, true, "ITC",
               "Run the race's loading (docs/functions/race-loading.md: the race mode's "
@@ -60,8 +61,7 @@ class GuestCalls {
       registers[i]->u64 = args[i];
     }
     ctx.lr = lr;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

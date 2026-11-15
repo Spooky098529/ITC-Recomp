@@ -20,6 +20,7 @@
 
 #include <array>
 #include <optional>
+#include "lifted/sdk.h"
 
 // The command list's diagnostics (blend_state.cpp) see who allocates slots:
 // with any of them on, the recorders' originals run.
@@ -76,9 +77,9 @@ struct ReleaseContext {
     ctx.r3.u64 = model;
     if (destroy) {
       ctx.r4.s64 = 1;
-      REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, model)));
+      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, model)));
     } else {
-      sub_82594970(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x82594970);
     }
     ctx.r1.u64 = stack;
     return ctx.r3.u32;
@@ -330,7 +331,7 @@ void SceneryListsDrawShapeDepth(PPCContext& ctx, uint8_t* base) {
     ctx.r4.u64 = draw->entry;
     ctx.r3.u64 = queue;
     ctx.r5.u64 = draw->key;
-    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
   });
   ctx.lr = lr;
 }
@@ -354,8 +355,7 @@ struct DrawContext {
     for (int i = 0; i < count; i++) {
       registers[i]->u64 = args[i];
     }
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     // The plain C++'s scalar float work expects flush-to-zero off (the
     // originals set it before each float instruction).
@@ -377,8 +377,7 @@ struct DrawContext {
     ctx.r3.u64 = queue;
     ctx.r5.u64 = key;
     const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, queue) + 16);
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u32;

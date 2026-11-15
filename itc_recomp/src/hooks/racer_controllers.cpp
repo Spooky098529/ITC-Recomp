@@ -29,6 +29,7 @@
 #include "base/flags.h"
 #include "hooks/ai_drivers.h"
 #include "racer_controllers/racer_controllers.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_action_mappers);
 
@@ -116,8 +117,7 @@ uint64_t CallGuest(void* user, uint32_t function, uint64_t r3, uint64_t r4, bool
   if (set_r4) {
     ctx.r4.u64 = r4;
   }
-  ctx.ctr.u64 = function;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
   ctx.r1.u64 = saved;
   if (f1 != nullptr) {
     *f1 = ctx.f1.f64;

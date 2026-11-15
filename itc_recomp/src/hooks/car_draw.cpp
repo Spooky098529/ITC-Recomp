@@ -14,6 +14,7 @@
 #include "hooks/load_poll.h"
 #include "hooks/morph_jobs.h"
 #include "hooks/second_set.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_scenery_lists);
 ITC_FLAG_DECLARE(bool, native_models);
@@ -203,8 +204,7 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
       registers[i]->u64 = regs[i];
     }
     ctx.fpscr.disableFlushMode();
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

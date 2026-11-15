@@ -9,6 +9,7 @@
 #include "hooks/scenery_lists.h"
 #include "load_poll/load_poll.h"
 #include "native/buffers.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_math);
@@ -65,8 +66,7 @@ fe::Calls FrontEndCarDrawCalls(PPCContext& ctx, uint8_t* base) {
     for (int i = 0; i < fcount; i++) {
       fprs[i]->f64 = fregs[i];
     }
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     ctx.fpscr.disableFlushMode();

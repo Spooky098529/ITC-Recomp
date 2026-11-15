@@ -15,6 +15,7 @@
 #include "hooks/mode_tick.h"
 #include "mode_tick/mode_tick.h"
 #include "mode_tick/modes_tick.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_modes_tick, true, "ITC",
               "Run the mode manager's tick itself (Modes::Tick sub_82107910, "
@@ -132,7 +133,7 @@ void VtableCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_a
   ctx.lr = return_address;
   const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot);
   if (!hooks::DirectSlotCall(ctx, base, function)) {
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
   }
 }
 

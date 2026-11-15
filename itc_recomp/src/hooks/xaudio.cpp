@@ -13,6 +13,7 @@
 #include "xaudio/voices.h"
 
 #include <type_traits>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_xaudio, true, "ITC",
               "Run the parts of XAudio's voices made native (docs/functions/xaudio.md: "
@@ -160,7 +161,7 @@ xa::GuestCall Caller(PPCContext& ctx, uint8_t* base) {
         __imp__RtlLeaveCriticalSection(ctx, base);
         break;
       default:
-        REX_CALL_INDIRECT_FUNC(function);
+        lifted::CallFromContext(ctx, base, function);
         break;
     }
     ctx.r1.u64 = sp;
@@ -193,7 +194,7 @@ using ThunkFn = uint32_t (*)(uint8_t*, uint32_t, uint32_t*);
 void Thunk(PPCContext& ctx, uint8_t* base, ThunkFn thunk) {
   uint32_t function = 0;
   ctx.r3.u64 = thunk(base, ctx.r3.u32, &function);
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
 }
 
 }  // namespace

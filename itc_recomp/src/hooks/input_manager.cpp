@@ -15,6 +15,7 @@
 #include "hooks/heap.h"
 #include "input/input_manager.h"
 #include "std_list/ptr_list.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_input, true, "ITC",
               "Run the input manager's set-up and the C++ library's std::list of pointers "
@@ -195,7 +196,7 @@ bool ConstructManager(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = dispatcher;
     ctx.r4.u64 = frame + 80;
     ctx.r5.u64 = frame + 88;
-    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, dispatcher) + 8));
+    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, dispatcher) + 8));
     // Message 7 through its slot +4.
     dispatcher = guest::LoadU32(base, block);
     guest::StoreU32(base, frame + 108, manager);
@@ -207,7 +208,7 @@ bool ConstructManager(PPCContext& ctx, uint8_t* base) {
     ctx.r4.u64 = frame + 80;
     ctx.r5.u64 = frame + 104;
     ctx.lr = 0x8209930C;
-    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, dispatcher) + 4));
+    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, dispatcher) + 4));
     guest::StoreU32(base, frame + 104, kFunctorDone);
   });
   input::ManagerBindPads(base, manager);

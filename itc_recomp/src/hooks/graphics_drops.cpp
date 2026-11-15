@@ -4,6 +4,7 @@
 // which our renderer doesn't read. See B3 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "lifted/sdk.h"
 
 // RetrainEdram, once a frame from Swap (native Device::Init no longer calls
 // it): with the SDK's VdRetrainEDRAM returning 0 it only took and released
@@ -35,5 +36,5 @@ extern "C" REX_FUNC(sub_822B2610) {
 // docs/rexglue-removal.md.
 extern "C" REX_FUNC(sub_822B8868) {
   REX_FUNC_PROLOGUE();
-  sub_822B8230(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x822B8230);
 }

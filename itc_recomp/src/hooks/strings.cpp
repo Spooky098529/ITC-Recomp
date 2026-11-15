@@ -12,6 +12,7 @@
 #include "base/log.h"
 
 #include <vector>
+#include "lifted/sdk.h"
 
 using guest_call::InFrame;
 
@@ -38,7 +39,7 @@ extern "C" REX_FUNC(sub_82296648) {
       ctx.r4.s64 = source_length;
       ctx.r5.u64 = destination;
       ctx.r6.s64 = destination_length;
-      sub_82297340(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x82297340);
     });
     return;
   }
@@ -93,7 +94,7 @@ extern "C" REX_FUNC(sub_82296720) {
       ctx.r4.s64 = source_length;
       ctx.r5.u64 = destination;
       ctx.r6.s64 = destination_length;
-      sub_82297540(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x82297540);
     });
     return;
   }

@@ -9,6 +9,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/race_hud.h"
 #include "race_hud/race_hud.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_race_hud, true, "ITC",
               "Run the race HUD's movie choice RaceHud::RunMovie sub_822141E8 (with "
@@ -32,21 +33,21 @@ extern "C" REX_FUNC(sub_822141E8) {
       return;
     case race_hud::HudCall::kRun:
       ctx.r3.u64 = movie.movie;
-      sub_8211E1B8(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8211E1B8);
       return;
     case race_hud::HudCall::kDraw:
       ctx.r3.u64 = movie.movie;
-      sub_8211D280(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8211D280);
       return;
     case race_hud::HudCall::kState3:
       // Never seen in play: the original, r3 and r4 as they came.
-      sub_82212958(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x82212958);
       return;
     case race_hud::HudCall::kRunTimer: {
       const uint64_t lr = ctx.lr;
       guest_call::InFrame(ctx, base, 112, 0x8221293C, [&](uint32_t) {
         ctx.r3.u64 = movie.movie;
-        sub_8211E1B8(ctx, base);
+        lifted::CallFromContext(ctx, base, 0x8211E1B8);
       });
       ctx.lr = lr;
       return;
@@ -73,14 +74,14 @@ void DrawRivalLogo(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = *movie;
     ctx.r4.u64 = 0;
     ctx.lr = 0x82211A74;
-    sub_8211E1B8(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8211E1B8);
     if (ctx.r3.u32 != 0) {
       return;
     }
     ctx.r3.u64 = *movie;
     ctx.r4.u64 = guest::LoadU32(base, entry + 8);
     ctx.lr = 0x82211A88;
-    sub_8211DF20(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8211DF20);
     race_hud::RivalLogoFinished(base, entry);
   });
   ctx.lr = lr;

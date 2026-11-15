@@ -21,4 +21,14 @@ Result Import(uint8_t* base, ImportFunction* function, const Args& args);
 // f1 back.
 void Enter(PPCContext& ctx, uint8_t* base, Entry entry);
 
+// A call by address from code that holds the SDK's context (a hand port's
+// adapter or its `Calls`), with the context's registers: the entry in the
+// dispatch table when there is one (as the function's own REX_FUNC entry
+// does, through Enter), else the function the SDK has at the address (a
+// hand port's override, not in the table yet) on the same context, as the
+// generated code's indirect calls do. The only place outside the
+// harnesses that reaches the SDK's function table (docs/rexglue-removal.md,
+// "Before E1: the rewiring", stage 2).
+void CallFromContext(PPCContext& ctx, uint8_t* base, uint32_t address);
+
 }  // namespace lifted

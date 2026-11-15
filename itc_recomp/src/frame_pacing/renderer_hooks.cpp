@@ -34,6 +34,7 @@
 #include <ctime>
 #include "base/log.h"
 #include "base/flags.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(log_frame_times, false, "ITC",
               "Log where frame time goes (main thread work, waits, render thread "
@@ -144,13 +145,13 @@ bool Event_Wait(PPCContext& ctx, uint8_t* base, uint32_t event,
   guest::StoreU32(base, timeout, timeout_ms);
   ctx.r3.u64 = event;
   ctx.r4.u64 = timeout;
-  sub_8258DD90(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x8258DD90);
   return ctx.r3.u32 != 0;
 }
 
 void Event_Signal(PPCContext& ctx, uint8_t* base, uint32_t event) {
   ctx.r3.u64 = event;
-  sub_8258DD78(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x8258DD78);
 }
 
 void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
@@ -240,7 +241,7 @@ void VideoOutput_WaitForVblank(PPCContext& ctx, uint8_t* base, uint32_t video_ou
   // Keep the graphics device call that precedes the wait; drop the wait
   // itself, which held each frame for the game's 2-vblank interval.
   ctx.r3.u64 = guest::LoadU32(base, video_output + kVideoOutputDeviceOffset);
-  sub_822A0718(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x822A0718);
 }
 
 }  // namespace

@@ -12,6 +12,7 @@
 #include "tuning_screen/tuning_screen.h"
 
 #include <optional>
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_car_specs);
 ITC_FLAG_DECLARE(bool, native_tuning_screen);
@@ -89,8 +90,7 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

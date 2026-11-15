@@ -7,6 +7,7 @@
 #include "base/flags.h"
 #include "hooks/course_scenery.h"
 #include "race_update/race_update.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_race_update, true, "ITC",
               "Run the race's update (docs/functions/race-update.md: RaceScene::VaryCar "
@@ -55,7 +56,7 @@ race_update::GuestCall RaceUpdateGuestCall(PPCContext& ctx, uint8_t* base) {
     }
     ctx.r1.u64 = frame;
     ctx.lr = lr;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -93,7 +94,7 @@ void RaceUpdateUpdate(PPCContext& ctx, uint8_t* base) {
     ctx.f1.f64 = f1;
     ctx.r1.u64 = frame;
     ctx.lr = return_address;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -106,7 +107,7 @@ void RaceUpdateUpdate(PPCContext& ctx, uint8_t* base) {
     ctx.r28.u64 = scene;
     ctx.r1.u64 = frame;
     ctx.lr = 0x8215D2D8;
-    REX_CALL_INDIRECT_FUNC(0x820F4558);
+    lifted::CallFromContext(ctx, base, 0x820F4558);
     ctx.r1.u64 = stack;
     ctx.r28.u64 = r28;
     ctx.fpscr.disableFlushMode();

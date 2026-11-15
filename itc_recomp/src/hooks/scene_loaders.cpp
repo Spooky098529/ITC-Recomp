@@ -18,6 +18,7 @@
 #include "scene_loaders/model_point.h"
 #include "scene_loaders/objects.h"
 #include "scene_loaders/pools.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_material_passes);
 ITC_FLAG_DECLARE(bool, native_models);
@@ -356,7 +357,7 @@ sl::FileLoadedCalls MakeFileLoadedCalls(PPCContext& ctx, uint8_t* base,
     ctx.r4.u64 = 0;
     ctx.r5.u64 = xpr;
     ctx.lr = at.provider_set;
-    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
+    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
     return ctx.r3.u64;
   };
   calls.skeleton_bind = [&ctx, base, at](uint32_t skeleton, uint32_t file) {
@@ -375,7 +376,7 @@ sl::FileLoadedCalls MakeFileLoadedCalls(PPCContext& ctx, uint8_t* base,
     // From MakePlate's frame, below the callback's.
     guest_call::InFrame(ctx, base, car_models::kPlateFrameBytes, 0x820ED8E4, [&](uint32_t) {
       ctx.r3.u64 = surface;
-      sub_822A67B0(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x822A67B0);
     });
   };
   return calls;

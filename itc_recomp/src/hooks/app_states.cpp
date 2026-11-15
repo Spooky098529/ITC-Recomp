@@ -21,6 +21,7 @@
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
 #include "std_list/ptr_list.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "Run the app's update and its state stack (docs/functions/app-states.md): the "
@@ -177,7 +178,7 @@ as::AppCalls AppStatesCalls(PPCContext& ctx, uint8_t* base) {
     if (return_address != 0) {
       ctx.lr = return_address;
     }
-    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+    lifted::CallFromContext(ctx, base, ctx.ctr.u32);
     return ctx.r3.u32;
   };
   calls.in_frame = [&ctx, base](uint32_t bytes, uint32_t return_address,
@@ -210,7 +211,7 @@ as::AppCalls AppStatesCalls(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = delegate;
     ctx.ctr.u64 = target;
     ctx.lr = return_address;
-    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+    lifted::CallFromContext(ctx, base, ctx.ctr.u32);
     return ctx.r3.u32;
   };
   calls.native_heap = Heap();

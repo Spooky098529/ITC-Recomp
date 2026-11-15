@@ -10,6 +10,7 @@
 #include "base/flags.h"
 #include "graphics/command_buffer.h"
 #include "hooks/guest_call.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_command_buffer, true, "ITC",
               "Run the graphics library's command buffer (docs/functions/command-buffer.md: "
@@ -82,7 +83,7 @@ graphics::command_buffer::Kick hooks::CommandBufferKick(PPCContext& ctx, uint8_t
       ctx.r6.u64 = words;
       ctx.r7.u64 = interrupts;
       ctx.r8.u64 = list;
-      sub_8229E848(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8229E848);
       r3 = ctx.r3.u32;
     });
     return r3;

@@ -17,6 +17,7 @@
 #include "native/buffers.h"
 
 #include <functional>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_accessories, true, "ITC",
               "Run the interior accessories (docs/functions/accessories.md: the set at "
@@ -50,8 +51,7 @@ void GuestCall(PPCContext& ctx, uint8_t* base, uint32_t function, uint32_t r1, u
   ctx.r3.u64 = r3;
   ctx.r4.u64 = r4;
   ctx.lr = lr;
-  ctx.ctr.u64 = function;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
   ctx.r1.u64 = stack;
   ctx.lr = link;
 }
@@ -88,8 +88,7 @@ void AccessoryFileOnArchiveDone(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.r6.u64 = callback.context;
-  ctx.ctr.u64 = callback.function;
-  REX_CALL_INDIRECT_FUNC(callback.function);
+  lifted::CallFromContext(ctx, base, callback.function);
 }
 
 

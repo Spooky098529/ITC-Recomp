@@ -19,6 +19,7 @@
 #include "base/log.h"
 
 #include <string>
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, log_file_opens);
 
@@ -126,7 +127,7 @@ extern "C" REX_FUNC(sub_82487C48) {
   }
   const uint32_t blocks = ctx.r6.u32, block_size = ctx.r7.u32, count = ctx.r8.u32,
                  ahead = ctx.r9.u32;
-  sub_824880D8(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x824880D8);
   if (ctx.r3.s32 < 0) {
     return;
   }
@@ -144,7 +145,7 @@ extern "C" REX_FUNC(sub_82487C48) {
   ctx.r5.u64 = block_size;
   ctx.r6.u64 = count;
   ctx.r7.u64 = ahead;
-  sub_82487F68(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x82487F68);
 }
 
 // The set-up (vtable +116): r3 = source, r4 = the blocks' memory (0: allocate

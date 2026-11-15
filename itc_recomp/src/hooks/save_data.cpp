@@ -8,6 +8,7 @@
 #include "hooks/app_start_up.h"
 #include "hooks/heap.h"
 #include "save_data/save_data.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_save_data, true, "ITC",
               "Run the players' save data's set-ups (docs/functions/save-data.md: Stats::Stats "
@@ -155,8 +156,8 @@ void SaveDataResetPlayer(PPCContext& ctx, uint8_t* base) {
   // SaveData::Create's plain C++ refused after the delete (operator new's
   // error paths, never seen): the rest as the original does it.
   ctx.r3.u64 = 0;
-  sub_821057C8(ctx, base);
-  sub_8209F5E0(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x821057C8);
+  lifted::CallFromContext(ctx, base, 0x8209F5E0);
 }
 
 #define ITC_SAVE_DATA_TABLE(name)                        \

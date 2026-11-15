@@ -7,6 +7,7 @@
 
 #include "base/flags.h"
 #include "network_mode/network_mode.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_network_mode, true, "ITC",
               "Run the type 12 front-end mode (docs/functions/network-mode.md: the Xbox Live "
@@ -100,8 +101,7 @@ class GuestCalls {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = lr;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

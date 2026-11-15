@@ -9,6 +9,7 @@
 #include "hooks/app_start_up.h"
 #include "base/log.h"
 #include "race_setup/race_setup.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_car_physics);
 
@@ -184,7 +185,7 @@ void RaceSetupCourseRoutesGet(PPCContext& ctx, uint8_t* base) {
     ctx.r4.u64 = source;
     ctx.r5.u64 = rs::kRouteBytes;
     ctx.lr = 0x82101624;
-    sub_825A7410(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825A7410);
     ctx.r1.u64 = r1;
   }
   ctx.r3.u64 = result;

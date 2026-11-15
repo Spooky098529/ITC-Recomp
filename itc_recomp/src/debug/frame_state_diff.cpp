@@ -846,7 +846,7 @@ extern "C" REX_FUNC(sub_82133960) {
       uint32_t draw = guest::LoadU32(base, guest::LoadU32(base, view));
       debug::FrameStateDiff_Before(base);
       ctx.r3.u64 = view;
-      REX_CALL_INDIRECT_FUNC(draw);
+      lifted::CallFromContext(ctx, base, draw);
       debug::FrameStateDiff_After(base, "view draw", draw);
       view = guest::LoadU32(base, kViews + 4 * i);
       uint32_t flip = guest::LoadU32(base, view + 8060);

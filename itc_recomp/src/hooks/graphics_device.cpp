@@ -16,6 +16,7 @@
 #include "hooks/predicated_tiling.h"
 #include "helpers/clock.h"
 #include "helpers/console_settings.h"
+#include "lifted/sdk.h"
 
 using guest_call::InFrame;
 
@@ -105,7 +106,7 @@ extern "C" REX_FUNC(sub_822ACE00) {
       ctx.r9.u64 = 0;
       ctx.r10.u64 = 3;
       ctx.lr = 0x822ACEC8;
-      sub_822A5D08(ctx, base);  // a texture
+      lifted::CallFromContext(ctx, base, 0x822A5D08);  // a texture
       if (!ctx.r3.u32) {
         made = false;
         return;
@@ -119,7 +120,7 @@ extern "C" REX_FUNC(sub_822ACE00) {
       ctx.r6.u64 = parameter(16);
       ctx.r7.u64 = 0;
       ctx.lr = 0x822ACF00;
-      sub_822A5E28(ctx, base);  // a surface
+      lifted::CallFromContext(ctx, base, 0x822A5E28);  // a surface
       const uint32_t surface = ctx.r3.u32;
       if (!surface) {
         made = false;
@@ -136,7 +137,7 @@ extern "C" REX_FUNC(sub_822ACE00) {
         ctx.r4.u64 = 0;
         ctx.r5.u64 = surface;
         ctx.lr = 0x822ACF18;
-        sub_822A3D30(ctx, base);
+        lifted::CallFromContext(ctx, base, 0x822A3D30);
       }
     }
     if (parameter(36) != 0) {
@@ -146,7 +147,7 @@ extern "C" REX_FUNC(sub_822ACE00) {
       ctx.r6.u64 = parameter(16);
       ctx.r7.u64 = 0;
       ctx.lr = 0x822ACF3C;
-      sub_822A5E28(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x822A5E28);
       const uint32_t surface = ctx.r3.u32;
       if (!surface) {
         made = false;
@@ -161,7 +162,7 @@ extern "C" REX_FUNC(sub_822ACE00) {
         ctx.r3.u64 = device;
         ctx.r4.u64 = surface;
         ctx.lr = 0x822ACF50;
-        sub_822A4060(ctx, base);
+        lifted::CallFromContext(ctx, base, 0x822A4060);
       }
     }
     // Through the game's memcpy, as the original (it's wrapped for the
@@ -170,12 +171,12 @@ extern "C" REX_FUNC(sub_822ACE00) {
     ctx.r4.u64 = parameters;
     ctx.r5.u64 = 124;
     ctx.lr = 0x822ACF60;
-    sub_825A7410(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825A7410);
     guest::StoreU32(base, device + kDeviceFrontBufferFormat, StoredFrontBufferFormat(format));
     ctx.r3.u64 = device;
     ctx.r4.u64 = parameters + 96;
     ctx.lr = 0x822ACFA0;
-    sub_822B42D0(ctx, base);  // the scaler's parameters
+    lifted::CallFromContext(ctx, base, 0x822B42D0);  // the scaler's parameters
     // The display mode is set (sub_822AD0B0) at the next Swap.
     guest::StoreU8(base, device + kDeviceFlags,
                    guest::LoadU8(base, device + kDeviceFlags) | 0x10);
@@ -198,7 +199,7 @@ extern "C" REX_FUNC(sub_822AD298) {
   InFrame(ctx, base, 128, 0x822AD2B8, [&](uint32_t) {
     ctx.r3.u64 = device;
     ctx.lr = 0x822AD2B8;
-    sub_822AD228(ctx, base);  // the device's fields and a physical block
+    lifted::CallFromContext(ctx, base, 0x822AD228);  // the device's fields and a physical block
     if (!ctx.r3.u32) {
       return;
     }
@@ -214,7 +215,7 @@ extern "C" REX_FUNC(sub_822AD298) {
     ctx.r3.u64 = device;
     ctx.r4.u64 = parameters + 72;
     ctx.lr = 0x822AD338;
-    sub_8229F280(ctx, base);  // the ring and command buffer
+    lifted::CallFromContext(ctx, base, 0x8229F280);  // the ring and command buffer
     if (ctx.r3.u32) {
       return;
     }
@@ -225,7 +226,7 @@ extern "C" REX_FUNC(sub_822AD298) {
     if (ITC_FLAG(native_predicated_tiling)) {
       hooks::NativeCreateWorkers(ctx, base);
     } else {
-      sub_822B6D70(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x822B6D70);
     }
     if (!ctx.r3.u32) {
       return;
@@ -234,11 +235,11 @@ extern "C" REX_FUNC(sub_822AD298) {
     guest::StoreU32(base, device + 20012, 0xFFFFFFFF);
     ctx.r3.u64 = device;
     ctx.lr = 0x822AD364;
-    sub_822AC2A0(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x822AC2A0);
     ctx.r3.u64 = device;
     ctx.r4.u64 = parameters;
     ctx.lr = 0x822AD370;
-    sub_822ACE00(ctx, base);  // Device::SetUpDisplay
+    lifted::CallFromContext(ctx, base, 0x822ACE00);  // Device::SetUpDisplay
     if (!ctx.r3.u32) {
       return;
     }
@@ -254,37 +255,37 @@ extern "C" REX_FUNC(sub_822AD298) {
     } else {
       ctx.r3.u64 = device;
       ctx.lr = 0x822AD380;
-      sub_822ACB90(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x822ACB90);
     }
     ctx.r3.u64 = 0;
     ctx.r4.u64 = 0xB1800000;
     ctx.lr = 0x822AD38C;
-    sub_82297790(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x82297790);
     ctx.r3.u64 = device;
     ctx.lr = 0x822AD3E8;
-    sub_8229EF48(ctx, base);  // ends the command segment
+    lifted::CallFromContext(ctx, base, 0x8229EF48);  // ends the command segment
     // The performance counter's rate, and its period, as floats.
     const float rate = float(double(helpers::kPerformanceFrequency));
     guest::StoreU32(base, device + kDeviceTimerRate, std::bit_cast<uint32_t>(rate));
     guest::StoreU32(base, device + kDeviceTimerPeriod, std::bit_cast<uint32_t>(1.0f / rate));
     ctx.lr = 0x822AD41C;
-    sub_822B1E70(ctx, base);  // hands debug callbacks to the debug monitor
+    lifted::CallFromContext(ctx, base, 0x822B1E70);  // hands debug callbacks to the debug monitor
     ctx.r3.u64 = device;
     ctx.r4.u64 = 0;
     ctx.lr = 0x822AD438;
-    sub_822A3B90(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x822A3B90);
     if (guest::LoadU32(base, kTrainingFailed)) {
       ctx.r3.u64 = kTrainingFailedMessage;
       ctx.lr = 0x822AD468;
-      sub_822AC530(ctx, base);  // prints it
+      lifted::CallFromContext(ctx, base, 0x822AC530);  // prints it
     }
     ctx.r3.u64 = device;
     ctx.lr = 0x822AD470;
-    sub_822B43C0(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x822B43C0);
     if (!ctx.r3.u32) {
       ctx.r3.u64 = kCheckFailedMessage;
       ctx.lr = 0x822AD484;
-      sub_822AC530(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x822AC530);
     }
     made = true;
   });
@@ -303,7 +304,7 @@ void Free(PPCContext& ctx, uint8_t* base, uint32_t block, uint32_t return_addres
   ctx.r3.u64 = block;
   ctx.r4.u64 = 0xB1800000;
   ctx.lr = return_address;
-  sub_82297790(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x82297790);
 }
 
 uint32_t Allocate(PPCContext& ctx, uint8_t* base, uint32_t bytes, uint32_t flags,
@@ -311,7 +312,7 @@ uint32_t Allocate(PPCContext& ctx, uint8_t* base, uint32_t bytes, uint32_t flags
   ctx.r3.u64 = bytes;
   ctx.r4.u64 = flags;
   ctx.lr = return_address;
-  sub_822976F8(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x822976F8);
   return ctx.r3.u32;
 }
 
@@ -357,13 +358,13 @@ extern "C" REX_FUNC(sub_8229F280) {
     if (field(kDeviceCommandPosition)) {
       ctx.r3.u64 = device;
       ctx.lr = 0x8229F2A4;
-      sub_8229F1B0(ctx, base);  // waits for the GPU
+      lifted::CallFromContext(ctx, base, 0x8229F1B0);  // waits for the GPU
     }
     if (const uint32_t buffer = field(kDeviceCommandBuffer)) {
       ctx.r3.u64 = PhysicalAddress(buffer) - 0x40000000;
       ctx.r4.u64 = PhysicalAddress(field(kDeviceCommandLast)) - 0x40000000;
       ctx.lr = 0x8229F2F4;
-      sub_822AC470(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x822AC470);
     }
     Free(ctx, base, field(kDeviceRingAllocated), 0x8229F304);
     Free(ctx, base, field(kDeviceCommandAllocated), 0x8229F310);
@@ -442,7 +443,7 @@ extern "C" REX_FUNC(sub_8229F280) {
     if (write > field(kDeviceSegmentLimit)) {
       ctx.r3.u64 = device;
       ctx.lr = 0x8229F5E8;
-      sub_8229EF48(ctx, base);  // ends the segment, returns where to write
+      lifted::CallFromContext(ctx, base, 0x8229EF48);  // ends the segment, returns where to write
       write = ctx.r3.u32;
     }
     const uint32_t words[] = {
@@ -458,7 +459,7 @@ extern "C" REX_FUNC(sub_8229F280) {
     set(kDeviceCommandWrite, write);
     ctx.r3.u64 = device;
     ctx.lr = 0x8229F668;
-    sub_8229F0E0(ctx, base);  // WAIT_UNTIL and register 0xD04
+    lifted::CallFromContext(ctx, base, 0x8229F0E0);  // WAIT_UNTIL and register 0xD04
     result = 0;
   });
   ctx.r3.u64 = result;
@@ -550,13 +551,13 @@ extern "C" REX_FUNC(sub_822A08A0) {
     ctx.r4.u64 = front_buffer;
     ctx.r5.u64 = 52;
     ctx.lr = 0x822A08C4;
-    sub_825A7410(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825A7410);
     if (guest::LoadU8(base, device + kDeviceFlags) & 0x10) {
       ctx.r3.u64 = device;
       ctx.r4.u64 = device + kDeviceParameters;
       ctx.r5.u64 = 1;
       ctx.lr = 0x822A0AAC;
-      sub_822AD0B0(ctx, base);  // Device::SetDisplayMode
+      lifted::CallFromContext(ctx, base, 0x822AD0B0);  // Device::SetDisplayMode
       clear_bits(kDeviceFlags, 0x10);
     }
     if (guest::LoadU8(base, device + kDeviceFlags2) & 0x20) {
@@ -569,7 +570,7 @@ extern "C" REX_FUNC(sub_822A08A0) {
     const uint32_t position = field(kDeviceCommandPosition);
     ctx.r3.u64 = device;
     ctx.lr = 0x822A0DFC;
-    sub_8229EF48(ctx, base);  // ends the command segment
+    lifted::CallFromContext(ctx, base, 0x8229EF48);  // ends the command segment
     ctx.r3.u64 = device;
     ctx.r4.u64 = field(kDeviceSegmentBytes) >> 2;
     ctx.lr = 0x822A0E1C;
@@ -581,6 +582,6 @@ extern "C" REX_FUNC(sub_822A08A0) {
     ctx.r3.u64 = device;
     ctx.r4.u64 = 0;
     ctx.lr = 0x822A0E48;
-    sub_822A3B90(ctx, base);  // every register block dirty
+    lifted::CallFromContext(ctx, base, 0x822A3B90);  // every register block dirty
   });
 }

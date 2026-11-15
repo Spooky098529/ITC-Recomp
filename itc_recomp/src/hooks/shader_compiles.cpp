@@ -17,6 +17,7 @@
 #include "base/log.h"
 #include "debug/shader_compile_dump.h"
 #include "graphics/hardcoded_shaders.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(use_hardcoded_shaders, true, "ITC",
               "Use the shaders the game's HLSL compiler made from the HLSL in the image "
@@ -64,7 +65,7 @@ extern "C" REX_FUNC(sub_822B8F10) {
   const uint32_t table_out = guest::LoadU32(base, ctx.r1.u32 + 92);
   ctx.r3.u64 = shader->size;
   ctx.r4.u64 = shader_out;
-  sub_822BE450(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x822BE450);
   if (ctx.r3.s32 < 0) {
     return;
   }

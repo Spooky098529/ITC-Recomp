@@ -13,6 +13,7 @@
 #include "hooks/boot_mode.h"
 
 #include "base/flags.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, play_movies_with_ffmpeg);
 
@@ -50,7 +51,7 @@ bm::Calls BootModeCalls(PPCContext& ctx, uint8_t* base, std::function<bool()> fi
     ctx.lr = lr;
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
-    REX_CALL_INDIRECT_FUNC(target);
+    lifted::CallFromContext(ctx, base, target);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u64;

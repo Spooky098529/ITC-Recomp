@@ -16,6 +16,7 @@
 #include "memory/c_runtime_heap.h"
 
 #include <cstring>
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_shader_objects);
 
@@ -98,7 +99,7 @@ void CarSoundsSetUp(PPCContext& ctx, uint8_t* base) {
     matrix = *made;
   } else {
     ctx.r3.u64 = 24;
-    sub_825A6940(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825A6940);
     matrix = ctx.r3.u32;
   }
   ctx.r3.u64 = cs::SetUp(base, sound, matrix);

@@ -13,6 +13,7 @@
 #include "base/flags.h"
 #include "hooks/save_interface.h"
 #include "user/network.h"
+#include "lifted/sdk.h"
 
 using guest_call::InFrame;
 
@@ -61,7 +62,7 @@ extern "C" REX_FUNC(sub_82099828) {
   guest::StoreU32(base, app + 244, 1);
   InFrame(ctx, base, 112, 0x820998A0, [&](uint32_t) {
     ctx.r3.u64 = app;
-    sub_82099600(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x82099600);
   });
 }
 
@@ -71,7 +72,7 @@ namespace {
 // had.
 void CallAt(PPCContext& ctx, uint8_t* base, uint32_t function, uint32_t return_address) {
   ctx.lr = return_address;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
 }
 
 // An object's method: its vtable's word at `offset`.

@@ -12,6 +12,7 @@
 #include "hooks/front_end_car_draw.h"
 #include "hooks/guest_call.h"
 #include "power_graph/power_graph.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
 ITC_FLAG_DECLARE(bool, log_slot_callers);
@@ -60,7 +61,7 @@ uint32_t VtableCall(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t of
   // (The render manager's slot 8 by its plain C++ where it's the game's,
   // hooks::DirectSlotCall.)
   if (!hooks::DirectSlotCall(ctx, base, function)) {
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
   }
   return ctx.r3.u32;
 }
@@ -115,7 +116,7 @@ void hooks::PowerGraphDraw(PPCContext& ctx, uint8_t* base) {
       ctx.r5.u64 = pg::kPass;
       ctx.r6.u64 = pg::kKey;
       ctx.lr = back;
-      sub_8217B508(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8217B508);
       ctx.fpscr.disableFlushMode();
     };
     pg::Draw(base, frame, x, y, car, calls);
@@ -151,7 +152,7 @@ void hooks::TuningScreenDrawPowerGraph(PPCContext& ctx, uint8_t* base) {
     ctx.r30.u64 = movie;
     ctx.r31.u64 = screen;
     ctx.lr = pg::kTuningDrawReturn;
-    sub_8217C708(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8217C708);
   });
   ctx.r30.u64 = r30;
   ctx.r31.u64 = r31;
@@ -191,7 +192,7 @@ void hooks::CarListDrawEntryPowerGraph(PPCContext& ctx, uint8_t* base) {
     // saves it in its frame, where a count above 32 reads it back).
     ctx.r31.u64 = 0xFFFFFFFF00000000ull | pg::kEntryR31;
     ctx.lr = pg::kEntryDrawReturn;
-    sub_8217C708(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8217C708);
   });
   ctx.r31.u64 = r31;
   ctx.lr = lr;
@@ -225,7 +226,7 @@ void hooks::CarListDrawCarPowerGraph(PPCContext& ctx, uint8_t* base) {
     // saves it in its frame, where a count above 32 reads it back).
     ctx.r31.u64 = 0xFFFFFFFF00000000ull | pg::kEntryR31;
     ctx.lr = pg::kCarDrawReturn;
-    sub_8217C708(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8217C708);
   });
   ctx.r31.u64 = r31;
   ctx.lr = lr;

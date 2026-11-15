@@ -21,6 +21,7 @@
 #include "base/log.h"
 #include "file_layer/file_layer.h"
 #include "std_string/std_string.h"
+#include "lifted/sdk.h"
 
 
 ITC_FLAG_BOOL(native_archive, true, "ITC",
@@ -145,8 +146,7 @@ struct FinishGuestCalls {
       ctx.r5.u64 = size;
       ctx.r6.u64 = context;
       ctx.r11.u64 = function;
-      ctx.ctr.u64 = function;
-      REX_CALL_INDIRECT_FUNC(function);
+      lifted::CallFromContext(ctx, base, function);
     });
   }
   static void GuestFree(void* self, uint32_t address, uint32_t size, uint32_t type) {
@@ -181,8 +181,7 @@ void hooks::ArchiveInvokeFunctor(PPCContext& ctx, uint8_t* base) {
   const uint32_t target = archive::LoaderFunctorTarget(base, ctx.r3.u32);
   ctx.r3.u64 = ctx.r4.u64;
   ctx.r11.u64 = target;
-  ctx.ctr.u64 = target;
-  REX_CALL_INDIRECT_FUNC(target);
+  lifted::CallFromContext(ctx, base, target);
 }
 
 extern "C" REX_FUNC(sub_8209DD80) {
@@ -433,7 +432,7 @@ extern "C" REX_FUNC(sub_8209DFA8) {
     ctx.r3.u64 = file;
     ctx.r4.u64 = std_string::Text(base, path);
     ctx.r5.u64 = frame + 80;
-    sub_820A6AB8(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x820A6AB8);
   });
   if ((ctx.r3.u32 & 0xFF) != 0) {
     guest::StoreU32(base, frame + 84, guest::LoadU32(base, request + 64));
@@ -442,30 +441,30 @@ extern "C" REX_FUNC(sub_8209DFA8) {
       ctx.r3.u64 = file;
       ctx.r4.u64 = frame + 84;
       ctx.r5.u64 = frame + 88;
-      sub_8258C768(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8258C768);
     });
     call(0x8209E0BC, [&] {
       ctx.r3.u64 = file;
       ctx.r4.u64 = guest::LoadU32(base, request + 76);
       ctx.r5.u64 = request + 68;
-      sub_8258C820(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8258C820);
     });
     if (ctx.r3.u32 == 0) {
-      call(0x8209E0C8, [&] { sub_8209AC78(ctx, base); });
+      call(0x8209E0C8, [&] { lifted::CallFromContext(ctx, base, 0x8209AC78); });
     }
     call(0x8209E0D0, [&] {
       ctx.r3.u64 = file;
-      sub_8258C718(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8258C718);
     });
   } else {
-    call(0x8209E0D8, [&] { sub_8209AC78(ctx, base); });
+    call(0x8209E0D8, [&] { lifted::CallFromContext(ctx, base, 0x8209AC78); });
   }
   if (archive::HostSemaphore* done = hooks::ArchiveSemaphore(archive::kRequestDone)) {
     done->Signal(base);
   } else {
     call(0x8209E0E4, [&] {
       ctx.r3.u64 = archive::kRequestDone;
-      sub_825926E8(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x825926E8);
     });
   }
   release(path, 0x8209E0F4);

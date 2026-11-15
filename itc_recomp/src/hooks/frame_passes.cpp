@@ -14,6 +14,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/post_effects.h"
 #include "hooks/scene_target.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
 ITC_FLAG_DECLARE(bool, log_slot_callers);
@@ -64,7 +65,7 @@ extern "C" REX_FUNC(sub_82096350) {
   ctx.r12.u64 = guest::LoadU32(base, ctx.r3.u32);
   ctx.r11.u64 = target;
   ctx.ctr.u64 = target;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
 }
 
 // FramePasses::RecordConstants and RecordSamplers: r4 = the command list;
@@ -109,7 +110,7 @@ void hooks::FramePassesRecordPrimitiveReset(PPCContext& ctx, uint8_t* base) {
     const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 16);
     ctx.ctr.u64 = function;
     ctx.lr = 0x82589A6C;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
   });
   ctx.lr = lr;
   if (!done) {
@@ -134,7 +135,7 @@ void hooks::FramePassesJobWait(PPCContext& ctx, uint8_t* base) {
       ctx.r11.u64 = function;
       ctx.ctr.u64 = function;
       ctx.lr = 0x82094B48;
-      REX_CALL_INDIRECT_FUNC(function);
+      lifted::CallFromContext(ctx, base, function);
     });
     // r11 as the original leaves it: 0 after the wait, else the byte (0).
     ctx.r11.u64 = 0;
@@ -164,7 +165,7 @@ void hooks::FramePassesBoot(PPCContext& ctx, uint8_t* base) {
       ctx.r11.u64 = function;
       ctx.ctr.u64 = function;
       ctx.lr = return_address;
-      REX_CALL_INDIRECT_FUNC(function);
+      lifted::CallFromContext(ctx, base, function);
       return ctx.r3.u32;
     };
     const fp::BootCalls calls{
@@ -206,7 +207,7 @@ void hooks::FramePassesConstruct(PPCContext& ctx, uint8_t* base) {
       ctx.r11.u64 = function;
       ctx.ctr.u64 = function;
       ctx.lr = return_address;
-      REX_CALL_INDIRECT_FUNC(function);
+      lifted::CallFromContext(ctx, base, function);
       return ctx.r3.u32;
     };
     const fp::ConstructCalls calls{
@@ -219,7 +220,7 @@ void hooks::FramePassesConstruct(PPCContext& ctx, uint8_t* base) {
         [&](uint32_t job) {
           ctx.r3.u64 = job;
           ctx.lr = 0x82098710;
-          sub_82094B10(ctx, base);  // --find_menu_selection's wrap
+          lifted::CallFromContext(ctx, base, 0x82094B10);  // --find_menu_selection's wrap
         },
         [&](uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate, uint32_t lr) {
           ctx.r5.u64 = delegate;
@@ -258,7 +259,7 @@ void hooks::FramePassesRecord(PPCContext& ctx, uint8_t* base) {
       ctx.r11.u64 = function;
       ctx.ctr.u64 = function;
       ctx.lr = return_address;
-      REX_CALL_INDIRECT_FUNC(function);
+      lifted::CallFromContext(ctx, base, function);
       return ctx.r3.u32;
     };
     const fp::RecordCalls calls{

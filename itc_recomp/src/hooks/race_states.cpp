@@ -10,6 +10,7 @@
 #include "hooks/race_world.h"
 #include "native/buffers.h"
 #include "race_states/race_states.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_race_states, true, "ITC",
               "Run the race's states and the race's progress (docs/functions/race-states.md: "
@@ -337,8 +338,7 @@ void RaceStatesOnRaceEnd(PPCContext& ctx, uint8_t* base) {
     ctx.r6.u64 = r6;
     ctx.r7.u64 = r7;
     ctx.lr = back;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

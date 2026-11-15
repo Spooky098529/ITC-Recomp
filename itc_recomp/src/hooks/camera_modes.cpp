@@ -19,6 +19,7 @@
 #include "hooks/ui_movies_game.h"
 #include "game_modes/game_modes.h"
 #include "cameras/cameras.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "Run the camera modes (docs/functions/camera-modes.md: the camera director's "
@@ -132,7 +133,7 @@ void GuestMemcpy(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t return
     ctx.r3.u64 = destination;
     ctx.r4.u64 = source;
     ctx.r5.u64 = size;
-    sub_825A7410(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825A7410);
   });
 }
 
@@ -144,7 +145,7 @@ void GuestXMemCpy(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t retur
     ctx.r3.u64 = destination;
     ctx.r4.u64 = source;
     ctx.r5.u64 = size;
-    sub_82295890(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x82295890);
   });
 }
 
@@ -816,12 +817,11 @@ uint32_t VideoOutputFrom(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
   const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
   if (!hooks::DirectSlotCall(ctx, base, slot7)) {
-    ctx.ctr.u64 = slot7;
-    REX_CALL_INDIRECT_FUNC(slot7);
+    lifted::CallFromContext(ctx, base, slot7);
   }
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
   ctx.lr = back + 16;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
   ctx.r1.u64 = stack;
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u32;
@@ -1090,7 +1090,7 @@ RivalLogoOpenCalls RivalLogoOpenCallsAt(PPCContext& ctx, uint8_t* base, uint32_t
     CallFrom(ctx, base, sp, 112, 0x8221195C, [&] {
       ctx.r3.u64 = id;
       ctx.r4.u64 = asset;
-      sub_8211E808(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8211E808);
     });
     return ctx.r3.u32;
   };
@@ -1098,7 +1098,7 @@ RivalLogoOpenCalls RivalLogoOpenCallsAt(PPCContext& ctx, uint8_t* base, uint32_t
     CallFrom(ctx, base, sp, 112, 0x82211978, [&] {
       ctx.r3.u64 = holder;
       ctx.r4.u64 = id;
-      sub_82211878(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x82211878);
     });
     return ctx.r3.u32;
   };
@@ -1173,7 +1173,7 @@ cm::CutsceneTickCalls CutsceneTickCallsAt(PPCContext& ctx, uint8_t* base, uint32
   calls.draw = [&ctx, base, frame](uint32_t entry) {
     CallFrom(ctx, base, frame, 192, 0x82155BE0, [&] {
       ctx.r3.u64 = entry;
-      sub_82211A28(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x82211A28);
     });
   };
   return calls;
@@ -1231,7 +1231,7 @@ cm::TvStepCalls TvStepCallsAt(PPCContext& ctx, uint8_t* base, uint32_t frame,
       ctx.r3.u64 = to;
       ctx.r4.u64 = from;
       ctx.r5.u64 = size;
-      sub_825A7410(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x825A7410);
     });
   };
   calls.request = [&ctx, base, frame, camera](uint32_t buffer, uint32_t index, uint32_t back) {
@@ -1284,8 +1284,7 @@ void CameraModesStep821593D8(PPCContext& ctx, uint8_t* base) {
   calls.slot0 = [&ctx, base, frame](uint32_t function, uint32_t chase) {
     CallFrom(ctx, base, frame, 128, 0x82159408, [&] {
       ctx.r3.u64 = chase;
-      ctx.ctr.u64 = function;
-      REX_CALL_INDIRECT_FUNC(function);
+      lifted::CallFromContext(ctx, base, function);
     });
   };
   calls.set_style_original = [&ctx, base, frame](uint32_t style) {
@@ -1440,7 +1439,7 @@ void CameraModesStep821594B8(PPCContext& ctx, uint8_t* base) {
     CallFrom(ctx, base, frame, 176, back, [&] {
       ctx.r3.u64 = camera;
       ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, camera));
-      REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+      lifted::CallFromContext(ctx, base, ctx.ctr.u32);
     });
   };
   cm::DirectorUpdate(base, director, frame, calls);
@@ -1495,7 +1494,7 @@ void CameraModesStep8217BE98(PPCContext& ctx, uint8_t* base) {
         // (The render manager's slot 8 by its plain C++ where it's the
         // game's, hooks::DirectSlotCall.)
         if (!hooks::DirectSlotCall(ctx, base, ctx.ctr.u32)) {
-          REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+          lifted::CallFromContext(ctx, base, ctx.ctr.u32);
         }
         return ctx.r3.u32;
       };
@@ -1509,7 +1508,7 @@ void CameraModesStep8217BE98(PPCContext& ctx, uint8_t* base) {
   calls.pass_update = [&ctx, base](uint32_t pass, uint32_t f) {
     CallFrom(ctx, base, f - 112, 112, 0x820AA534, [&] {
       ctx.r3.u64 = pass;
-      sub_820A3978(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x820A3978);
     });
   };
   cm::GarageUpdate(base, ctx.r3.u32, frame, calls);

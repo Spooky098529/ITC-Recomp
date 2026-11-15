@@ -17,6 +17,7 @@
 #include "scene/scene.h"
 
 #include <optional>
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_accessories);
 ITC_FLAG_DECLARE(bool, native_car_models);
@@ -62,8 +63,7 @@ void GuestCall(PPCContext& ctx, uint8_t* base, uint32_t function, uint32_t r1, u
   ctx.r3.u64 = r3;
   ctx.r4.u64 = r4;
   ctx.lr = lr;
-  ctx.ctr.u64 = function;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
   ctx.r1.u64 = stack;
   ctx.lr = link;
 }
@@ -215,7 +215,7 @@ void SceneUpdateA(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = header_in;
     ctx.r4.u64 = data_in;
     ctx.lr = 0x820C3E1C;
-    sub_820ECFC8(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x820ECFC8);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u32;
@@ -301,7 +301,7 @@ void SceneOnFileLoaded(PPCContext& ctx, uint8_t* base) {
       ctx.r4.u64 = 0;
       ctx.r5.u64 = xpr;
       ctx.lr = 0x820C5340;
-      REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
+      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
       return ctx.r3.u64;
     };
     calls.tga_create = [&](uint32_t header, uint32_t size, uint32_t buffer_at, uint32_t pixels) {

@@ -14,6 +14,7 @@
 #include "hooks/strings_and_font.h"
 #include "location_screen/location_screen.h"
 #include "memory/c_runtime_heap.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_ui_movies_game);
 ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
@@ -229,8 +230,7 @@ void PageThrough(void* user, uint32_t handler, uint32_t dispatcher, uint32_t mac
   guest_call::InFrame(ctx, base, frame_bytes, lr, [&](uint32_t) {
     ctx.r3.u64 = dispatcher;
     ctx.r4.u64 = machine;
-    ctx.ctr.u64 = handler;
-    REX_CALL_INDIRECT_FUNC(handler);
+    lifted::CallFromContext(ctx, base, handler);
   });
 }
 
@@ -290,8 +290,7 @@ uint64_t LocationScreenCalls::Call(void* user, uint32_t function, const uint64_t
       ctx.r8.u64 = 0;
       [[fallthrough]];
     default:
-      ctx.ctr.u64 = function;
-      REX_CALL_INDIRECT_FUNC(function);
+      lifted::CallFromContext(ctx, base, function);
       break;
   }
   ctx.r1.u64 = stack;

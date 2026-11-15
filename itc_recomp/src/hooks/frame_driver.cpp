@@ -16,6 +16,7 @@
 #include "frame_driver/frame_driver.h"
 #include "frame_driver/scene_set_up.h"
 #include "frame_driver/thread.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_video_output);
 ITC_FLAG_DECLARE(bool, native_device_state);
@@ -311,7 +312,7 @@ fd::SceneSetUpCalls SceneSetUpCallsOn(PPCContext& ctx, uint8_t* base) {
     ctx.r11.u64 = target;
     ctx.ctr.u64 = target;
     ctx.lr = return_address;
-    REX_CALL_INDIRECT_FUNC(target);
+    lifted::CallFromContext(ctx, base, target);
     return ctx.r3.u32;
   };
   calls.render_queue_construct = [&ctx, call](uint32_t queue) {

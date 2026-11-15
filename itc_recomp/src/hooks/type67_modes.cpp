@@ -16,6 +16,7 @@
 #include "hooks/ui_movies_game.h"
 #include "ui_movies/game.h"
 #include "type67_modes/type67_modes.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_screen_constructors);
 ITC_FLAG_DECLARE(bool, native_ui_movies_game);
@@ -280,7 +281,7 @@ t67::Calls Type67Calls(PPCContext& ctx, uint8_t* base) {
     ctx.lr = lr;
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
-    REX_CALL_INDIRECT_FUNC(target);
+    lifted::CallFromContext(ctx, base, target);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u64;
@@ -295,7 +296,7 @@ t67::Calls Type67Calls(PPCContext& ctx, uint8_t* base) {
     ctx.lr = lr;
     ctx.r3.u64 = id;
     ctx.r4.u64 = asset;
-    sub_8211E808(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8211E808);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u64;
@@ -309,7 +310,7 @@ t67::Calls Type67Calls(PPCContext& ctx, uint8_t* base) {
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     ctx.r3.u64 = id;
-    sub_8211E258(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8211E258);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u64;
@@ -323,8 +324,7 @@ t67::Calls Type67Calls(PPCContext& ctx, uint8_t* base) {
       registers[i]->u64 = args[i];
     }
     ctx.lr = lr;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     ctx.fpscr.disableFlushMode();

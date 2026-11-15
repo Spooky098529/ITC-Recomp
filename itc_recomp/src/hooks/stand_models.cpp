@@ -8,6 +8,7 @@
 #include "hooks/load_poll.h"
 #include "load_poll/load_poll.h"
 #include "scene_models/apply.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_load_poll);
@@ -78,7 +79,7 @@ stand_models::GuestCall StandModelsGuestCall(PPCContext& ctx, uint8_t* base) {
     }
     ctx.r1.u64 = frame;
     ctx.lr = lr;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

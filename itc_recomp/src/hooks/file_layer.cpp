@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "file_layer/file_layer.h"
 #include "hooks/guest_call.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_file_layer, true, "ITC",
               "Run the file layer's functions (docs/functions/file-layer.md: "
@@ -86,7 +87,7 @@ extern "C" REX_FUNC(sub_820A6AB8) {
     ctx.r3.u64 = file;
     ctx.r4.u64 = text;
     ctx.r5.u64 = flag;
-    sub_8258C688(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8258C688);
   });
   const bool opened = (ctx.r3.u32 & 0xFF) != 0;
   file_layer::OpenPathRelease(base, ctx.r1.u32);

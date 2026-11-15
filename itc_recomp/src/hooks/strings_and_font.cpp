@@ -30,6 +30,7 @@
 #include "hooks/models.h"
 #include "hooks/strings_and_font.h"
 #include "strings_and_font/strings_and_font.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "Run the string table and the font (docs/functions/strings-and-font.md: "
@@ -151,8 +152,7 @@ uint32_t FormatCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uin
   ctx.r3.u64 = r3;
   ctx.r4.u64 = r4;
   ctx.r5.u64 = r5;
-  ctx.ctr.u64 = function;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
   ctx.r1.u64 = stack;
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u32;
@@ -251,7 +251,7 @@ bool DrawPass(PPCContext& ctx, uint8_t* base, uint32_t font, uint32_t text) {
       ctx.r3.u64 = queue;
       ctx.r4.u64 = result.chunk;
       ctx.r5.s64 = int64_t(int32_t(guest::LoadU32(base, params + 116))) + 1;
-      REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
     });
   }
   guest::StoreU32(base, kDrawGlobals + 48, 0);

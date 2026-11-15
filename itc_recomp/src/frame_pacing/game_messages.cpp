@@ -27,6 +27,7 @@
 #include <map>
 #include <tuple>
 #include <thread>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_race_draw_step, true, "ITC",
               "Run the race's draw step (Race::DrawStep sub_8215B4F8, "
@@ -359,7 +360,7 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     ctx.r3.u64 = guest::LoadU32(base, dispatcher + kHandlersOffset + 4 * i);
     ctx.r4.u64 = message;
     ctx.lr = 0x82106370;
-    sub_82106280(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x82106280);
     uint32_t object = guest::LoadU32(base, ctx.r3.u32);
     uint32_t method = guest::LoadU32(base, guest::LoadU32(base, object));
     ctx.r3.u64 = object;
@@ -394,7 +395,7 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
       g_pause_drawn_this_pass = true;
     }
     InputWatch_Before(base);
-    REX_CALL_INDIRECT_FUNC(method);
+    lifted::CallFromContext(ctx, base, method);
     InputWatch_After(base, kMessageRun, target);
     g_current_handler = 0;
     g_current_message = ~0u;
@@ -638,7 +639,7 @@ void LogInputManager(PPCContext& ctx, uint8_t* base, uint32_t manager) {
       if (enabled) {
         ctx.r3.u64 = device;
         ctx.lr = 0x82591970;
-        REX_CALL_INDIRECT_FUNC(function);
+        lifted::CallFromContext(ctx, base, function);
         uint32_t v = ctx.r3.u32;
         values = fmt::format("returns {:08X} (device + 8: {})", v, v == device + 8);
       }

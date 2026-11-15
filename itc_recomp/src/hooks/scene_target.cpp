@@ -20,6 +20,7 @@
 #include "scene_target/scene_target.h"
 
 #include <optional>
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
 ITC_FLAG_DECLARE(bool, log_slot_callers);
@@ -67,7 +68,7 @@ void hooks::SceneTargetTexturedRect(PPCContext& ctx, uint8_t* base) {
         guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 16);
     ctx.ctr.u64 = function;
     ctx.lr = 0x8217AEA0;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
   });
   ctx.lr = lr;
   if (!done) {
@@ -88,7 +89,7 @@ void hooks::SceneTargetRecordPasses(PPCContext& ctx, uint8_t* base) {
           ctx.lr = return_address;
           // Slot 8's plain C++ where it's the game's (hooks::DirectSlotCall).
           if (!hooks::DirectSlotCall(ctx, base, function)) {
-            REX_CALL_INDIRECT_FUNC(function);
+            lifted::CallFromContext(ctx, base, function);
           }
         };
         scene_target::PassCalls calls;

@@ -35,6 +35,7 @@
 #include "models/xpr.h"
 #include "model_animation/model_animation.h"
 #include "shader_objects/shader_objects.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_models, true, "ITC",
               "Run the model class's pieces (docs/functions/models.md: the memory blocks' "
@@ -233,8 +234,7 @@ models::ProviderCall ProviderGuestCall(PPCContext& ctx, uint8_t* base) {
     ctx.lr = lr;
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     return ctx.r3.u64;
   };
@@ -505,7 +505,7 @@ void ModelLoadCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
     ctx.r5.u64 = r5;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
   });
 }
 

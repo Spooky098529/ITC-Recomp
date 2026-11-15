@@ -16,6 +16,7 @@
 #include "save_interface/save_interface.h"
 #include "save_interface/save_layer.h"
 #include "save_interface/slot_handlers.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "Run the save system's interface (docs/functions/save-interface.md: "
@@ -260,7 +261,7 @@ void SaveInterfaceGameDataSave(PPCContext& ctx, uint8_t* base) {
   calls.local_time = [&](uint32_t out) {
     in_frame(0x8228FB34, [&] {
       ctx.r3.u64 = out;
-      sub_822968B8(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x822968B8);
     });
   };
   calls.swprintf = [&](const std::array<uint64_t, 8>& regs) {
@@ -273,7 +274,7 @@ void SaveInterfaceGameDataSave(PPCContext& ctx, uint8_t* base) {
       ctx.r8.u64 = regs[5];
       ctx.r9.u64 = regs[6];
       ctx.r10.u64 = regs[7];
-      sub_8210A490(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8210A490);
     });
   };
   if (const auto r3 = si::GameDataSave(base, frame, calls)) {
@@ -297,7 +298,7 @@ void SaveInterfaceReplaysBuildList(PPCContext& ctx, uint8_t* base) {
     ctx.r4.u64 = record;
     ctx.r5.u64 = entry;
     ctx.lr = 0x822904E0;
-    sub_822900E0(ctx, base);  // the original (no adapter): a "rep" save's parse
+    lifted::CallFromContext(ctx, base, 0x822900E0);  // the original (no adapter): a "rep" save's parse
     ctx.r1.u64 = stack;
     return ctx.r3.u32;
   };
@@ -368,7 +369,7 @@ std::function<uint32_t(uint32_t)> DestroySlots(PPCContext& ctx, uint8_t* base, u
     ctx.r4.u64 = 3;
     ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, slots));
     ctx.lr = 0x820A5638;
-    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+    lifted::CallFromContext(ctx, base, ctx.ctr.u32);
     ctx.r1.u64 = stack;
     return ctx.r3.u32;
   };
@@ -419,7 +420,7 @@ void SaveDevicesConstructSteps(PPCContext& ctx, uint8_t* base) {
           ctx.r5.u64 = delegate;
           ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, loop) + offset);
           ctx.lr = offset == 8 ? 0x820A61D8 : 0x820A621C;
-          REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+          lifted::CallFromContext(ctx, base, ctx.ctr.u32);
         });
   });
   ctx.lr = lr;
@@ -538,8 +539,7 @@ void GuestCallAt(PPCContext& ctx, uint8_t* base, uint32_t function, const si::Ca
   ctx.r30.u64 = at.r30;
   ctx.r31.u64 = at.r31;
   ctx.lr = at.lr;
-  ctx.ctr.u64 = function;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
   ctx.r1.u64 = r1;
   ctx.r27.u64 = r27;
   ctx.r28.u64 = r28;

@@ -11,6 +11,7 @@
 #include "hooks/vehicle_native.h"
 #include "native/buffers.h"
 #include "replay_snapshots/replay_snapshots.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_replay_snapshots, true, "ITC",
               "Run the replay's snapshots (docs/functions/replay-snapshots.md: a vehicle's "
@@ -56,7 +57,7 @@ replay_snapshots::ReplayCalls ReplayCalls(PPCContext& ctx, uint8_t* base, uint32
     if (address == 0x820B7998) {
       lifted::original::c820B7998(ctx, base);
     } else {
-      sub_825A7410(ctx, base);  // memcpy, through its override as the original
+      lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy, through its override as the original
     }
     ctx.r1.u64 = saved;
     ctx.fpscr.disableFlushMode();

@@ -9,6 +9,7 @@
 #include "hooks/app_start_up.h"
 #include "hooks/guest_call.h"
 #include "hooks/race_event.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_career, true, "ITC",
               "Run the career's progress (docs/functions/career.md: PlayTime::Mark "
@@ -131,7 +132,7 @@ void CareerGarageInsertCar(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = destination;
     ctx.r4.u64 = car;
     ctx.r5.u64 = 1968;
-    sub_825A7410(ctx, base);  // memcpy
+    lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy
     return;
   }
   ctx.r3.u64 = destination;

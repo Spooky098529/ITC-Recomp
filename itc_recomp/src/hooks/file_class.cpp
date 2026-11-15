@@ -15,6 +15,7 @@
 #include "base/log.h"
 
 #include <string>
+#include "lifted/sdk.h"
 
 using guest_call::InFrame;
 
@@ -37,7 +38,7 @@ std::string GuestString(uint8_t* base, uint32_t address, uint32_t max = 260) {
 // The read error report (sub_8209AC78), as the recompiled class calls it
 // (from its own frame).
 void ReportError(PPCContext& ctx, uint8_t* base, uint32_t return_address) {
-  InFrame(ctx, base, 112, return_address, [&](uint32_t) { sub_8209AC78(ctx, base); });
+  InFrame(ctx, base, 112, return_address, [&](uint32_t) { lifted::CallFromContext(ctx, base, 0x8209AC78); });
 }
 
 }  // namespace

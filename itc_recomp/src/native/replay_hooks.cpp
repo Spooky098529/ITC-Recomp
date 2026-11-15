@@ -63,8 +63,7 @@ rc::GuestCall native::ReplayCall(PPCContext& ctx, uint8_t* base) {
       ctx.f1.f64 = *f1;
     }
     ctx.lr = return_address;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -130,7 +129,7 @@ void PatchCopy(void* context, uint32_t destination, uint32_t source, uint32_t si
   ctx.r4.u64 = source;
   ctx.r5.u64 = size;
   ctx.lr = 0x822AE900;
-  sub_825A7410(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x825A7410);
   ctx.r1.u64 = stack;
 }
 void NativePatchVertexShader(PPCContext& ctx, uint8_t* base) {

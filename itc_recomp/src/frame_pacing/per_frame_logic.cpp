@@ -39,6 +39,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_modes_tick);
 ITC_FLAG_BOOL(native_world_sprites, true, "ITC",
@@ -481,7 +482,7 @@ extern "C" REX_FUNC(sub_8215DEA0) {
         continue;
       }
       ctx.r3.u64 = overlay;
-      REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, overlay) + slot));
+      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, overlay) + slot));
     }
   };
   if (!render_only) {
@@ -545,7 +546,7 @@ extern "C" REX_FUNC(sub_821594B8) {
   guest::StackFrame frame(ctx, 176);
   ctx.r3.u64 = g_rival_logo;
   ctx.lr = 0x82155BE0;
-  sub_82211A28(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x82211A28);
 }
 
 // World-space sprite lists (sub_82128750: r3 = list, r4 = camera; from the

@@ -43,6 +43,7 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_audio, true, "ITC",
               "Our own audio output instead of the SDK's render driver and Audio Worker");
@@ -267,6 +268,25 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
   void DestroyDriver(rex::audio::AudioDriver*) override {}
 
  private:
+  // Runs the client's callback (XAudio::MixerCallback, sub_8245FBE0) with
+  // r3 = `arg`, as the SDK's FunctionDispatcher::Execute did: the thread's
+  // state bound, the stack padded by 176 bytes, the link register a marker;
+  // the call through lifted::CallFromContext instead of the SDK's table.
+  void RunCallback(rex::runtime::ThreadState* thread_state, uint32_t callback, uint64_t arg) {
+    PPCContext& ctx = *thread_state->context();
+    uint8_t* base = memory()->virtual_membase();
+    rex::runtime::ThreadState* const previous = rex::runtime::ThreadState::Get();
+    rex::runtime::ThreadState::Bind(thread_state);
+    ctx.r3.u64 = arg;
+    ctx.r1.u64 -= 64 + 112;
+    const uint64_t lr = ctx.lr;
+    ctx.lr = 0xBCBCBCBC;
+    lifted::CallFromContext(ctx, base, callback);
+    ctx.lr = lr;
+    ctx.r1.u64 += 64 + 112;
+    rex::runtime::ThreadState::Bind(previous);
+  }
+
   // Runs each client's mixer while it has credits. The mixer submits its
   // frame (Submit) before returning.
   void ThreadMain() {
@@ -289,7 +309,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       uint32_t callback = client.callback;
       uint64_t args[] = {client.wrapped_arg};
       lock.unlock();
-      function_dispatcher()->Execute(thread_state, callback, args, 1);
+      RunCallback(thread_state, callback, args[0]);
       lock.lock();
     }
   }
@@ -466,7 +486,7 @@ extern "C" REX_FUNC(sub_82465870) {
   guest::StackFrame frame(ctx, 112);
   ctx.r3.u64 = ctx.r4.u64;
   ctx.r4.u64 = frame.Local(80);
-  sub_8245F718(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x8245F718);
   if (ctx.r3.s32 < 0) {
     return;
   }

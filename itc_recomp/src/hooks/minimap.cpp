@@ -13,6 +13,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/scenery_lists.h"
 #include "minimap/minimap.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_minimap, true, "ITC",
               "Run the minimap's parts (docs/functions/minimap.md: Race::FindPlayerEntry "
@@ -133,7 +134,7 @@ void MinimapTriangleRecordFlat(PPCContext& ctx, uint8_t* base) {
     ctx.r5.u64 = key;
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
-    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
   });
   ctx.lr = lr;
 }
@@ -144,7 +145,7 @@ void MinimapTriangleRecord(PPCContext& ctx, uint8_t* base) {
       MinimapTriangleRecordFlat(ctx, base);
       return;
     case minimap::TriangleRecording::kOther:
-      sub_8217C4C0(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8217C4C0);
       return;
     case minimap::TriangleRecording::kNone:
       return;

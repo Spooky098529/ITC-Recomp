@@ -20,6 +20,7 @@
 #include "memory/c_runtime_heap.h"
 
 #include <optional>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_framework, true, "ITC",
               "Run the app framework (docs/functions/framework.md): the framework's flags "
@@ -222,7 +223,7 @@ namespace {
 void TailCall(PPCContext& ctx, uint8_t* base, fw::VirtualCall call) {
   ctx.r3.u64 = call.object;
   ctx.ctr.u64 = call.target;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
 }
 
 }  // namespace
@@ -238,7 +239,7 @@ void hooks::TickHandlerInvoke(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = delegate;
     ctx.r4.u64 = loop;
     ctx.ctr.u64 = target;
-    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+    lifted::CallFromContext(ctx, base, ctx.ctr.u32);
   });
 }
 
@@ -299,7 +300,7 @@ extern "C" REX_FUNC(sub_820902C8) {
       ctx.r4.u64 = r4;
       ctx.ctr.u64 = fw::VirtualTarget(base, object, offset);
       ctx.lr = return_address;
-      REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+      lifted::CallFromContext(ctx, base, ctx.ctr.u32);
       return ctx.r3.u32;
     };
     const fw::OnTickCalls calls{
@@ -308,7 +309,7 @@ extern "C" REX_FUNC(sub_820902C8) {
           ctx.r3.u64 = app;
           ctx.ctr.u64 = fw::VirtualTarget(base, app, 44);
           ctx.lr = 0x82090314;
-          REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+          lifted::CallFromContext(ctx, base, ctx.ctr.u32);
           return ctx.r3.u32;
         },
         [&](uint32_t run_loop, uint32_t key) { call(run_loop, 16, key, 0x8209033C); }};
@@ -333,7 +334,7 @@ void AddRequest(PPCContext& ctx, uint8_t* base, uint32_t type, uint32_t clone_re
       ctx.r3.u64 = object;
       ctx.ctr.u64 = fw::VirtualTarget(base, object, 8);
       ctx.lr = clone_return;
-      REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+      lifted::CallFromContext(ctx, base, ctx.ctr.u32);
       return ctx.r3.u32;
     };
     const auto inserted = fw::RunLoopAddRequest(base, loop, type, key, delegate, request, clone);
@@ -385,7 +386,7 @@ uint32_t VirtualCallFrom(PPCContext& ctx, uint8_t* base, uint32_t object, uint32
   ctx.r3.u64 = object;
   ctx.ctr.u64 = fw::VirtualTarget(base, object, offset);
   ctx.lr = return_address;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
   return ctx.r3.u32;
 }
 
@@ -473,8 +474,7 @@ fw::GuestCall DebugFontCall(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
     ctx.r5.u64 = r5;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     return ctx.r3.u64;
   };
@@ -529,7 +529,7 @@ fw::MainLoopCalls hooks::MainLoopCalls(PPCContext& ctx, uint8_t* base) {
     }
     ctx.ctr.u64 = target;
     ctx.lr = return_address;
-    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+    lifted::CallFromContext(ctx, base, ctx.ctr.u32);
     return ctx.r3.u32;
   };
   calls.in_frame = [&ctx, base](uint32_t bytes, const std::function<void(uint32_t)>& body) {
@@ -575,12 +575,12 @@ fw::MainLoopCalls hooks::MainLoopCalls(PPCContext& ctx, uint8_t* base) {
   calls.destroy_run_loop = [&ctx, base](uint32_t loop) {
     ctx.r3.u64 = loop;
     ctx.lr = 0x8209AC18;
-    sub_8209A6E0(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8209A6E0);
   };
   calls.delete_framework = [&ctx, base](uint32_t holder) {
     ctx.r3.u64 = holder;
     ctx.lr = 0x82090130;
-    sub_82090350(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x82090350);
   };
   return calls;
 }

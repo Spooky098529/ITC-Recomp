@@ -13,6 +13,7 @@
 #include "graphics/render_queue.h"
 #include "hooks/models.h"
 #include "hooks/single_commands.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_render_queue, true, "ITC",
               "Run the render queue's methods (docs/functions/device-shaders.md: "
@@ -36,8 +37,7 @@ rq::GuestCall hooks::RenderQueueCall(PPCContext& ctx, uint8_t* base) {
     if (count > 1) ctx.r4.u64 = r4;
     if (count > 2) ctx.r5.u64 = r5;
     ctx.lr = return_address;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return rq::CallResult{ctx.r3.u64, ctx.f1.f64};

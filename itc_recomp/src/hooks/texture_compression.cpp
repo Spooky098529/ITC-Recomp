@@ -26,6 +26,7 @@
 #include "texture_compression/compress_surface.h"
 #include "texture_compression/dxt45.h"
 #include "texture_compression/dxt_alpha.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_texture_compression, true, "ITC",
               "Run XGraphics' surface compression (docs/functions/texture-compression.md: "
@@ -96,8 +97,7 @@ tc::GuestCall TextureCompressionGuestCall(PPCContext& ctx, uint8_t* base) {
     ctx.r4.u64 = r4;
     ctx.r5.u64 = r5;
     ctx.r6.u64 = r6;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = saved;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u32;

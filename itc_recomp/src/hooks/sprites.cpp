@@ -9,6 +9,7 @@
 #include "base/flags.h"
 #include "hooks/guest_call.h"
 #include "sprites/sprites.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_sprites, true, "ITC",
               "Run the race overlays' sprite helpers (the sprite lists' reset, "
@@ -128,7 +129,7 @@ bool RecordScreenRect(PPCContext& ctx, uint8_t* base) {
     ctx.r4.u64 = *chunk;
     ctx.r5.u64 = layer;
     ctx.f1.f64 = double(guest::LoadFloat(base, kZero));
-    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
   });
   ctx.lr = lr;
   return true;

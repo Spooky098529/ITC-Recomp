@@ -35,6 +35,7 @@
 #include "base/log.h"
 
 #include <chrono>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(refcount_global_lock, false, "ITC",
               "Let the graphics library's AddRef and Release take the recompiler's "
@@ -133,10 +134,10 @@ extern "C" REX_FUNC(sub_822A67B0) {
   if (HoldsChild(base, object)) {
     ctx.r3.u64 = guest::LoadU32(base, object + kChild);
     ctx.lr = 0x822A6810;
-    sub_822A67B0(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x822A67B0);
   }
   ctx.r3.u64 = object;
   ctx.lr = 0x822A6818;
-  sub_822A6210(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x822A6210);
   ctx.r3.u64 = 0;
 }

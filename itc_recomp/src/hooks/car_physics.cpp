@@ -12,6 +12,7 @@
 #include "base/flags.h"
 #include "car_physics/car_physics.h"
 #include "hooks/heap.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "Run the car physics (docs/functions/car-physics.md: the rigid body, sub_820B6A38 "
@@ -479,7 +480,7 @@ car_physics::CollisionGuestCall CollisionWorldUpdateCalls(PPCContext& ctx, uint8
         lifted::original::c820B81C8(ctx, base);
         break;
       default:
-        REX_CALL_INDIRECT_FUNC(address);
+        lifted::CallFromContext(ctx, base, address);
         break;
     }
     ctx.r1.u64 = stack;

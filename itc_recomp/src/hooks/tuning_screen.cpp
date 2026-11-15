@@ -17,6 +17,7 @@
 #include "tuning_screen/tuning_screen.h"
 
 #include <optional>
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_stand_models);
 ITC_FLAG_DECLARE(bool, native_race_setup);
@@ -855,7 +856,7 @@ void TuningUpdate(PPCContext& ctx, uint8_t* base) {
         ctx.r30.u64 = r30;
         ctx.r31.u64 = screen;
         ctx.lr = 0x821E7318;
-        sub_821DF350(ctx, base);
+        lifted::CallFromContext(ctx, base, 0x821DF350);
         ctx.r1.u64 = stack;
         ctx.r30.u64 = r30_was;
         ctx.r31.u64 = r31_was;

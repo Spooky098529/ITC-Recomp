@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <cstring>
+#include "lifted/sdk.h"
 
 using guest_call::InFrame;
 
@@ -63,7 +64,7 @@ extern "C" REX_FUNC(sub_822A8980) {
             ctx.r3.u64 = to;
             ctx.r4.u64 = from;
             ctx.r5.u64 = size;
-            sub_825A7410(ctx, base);  // memcpy
+            lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy
           });
         });
     if (declaration) {
@@ -90,7 +91,7 @@ asu::MemcpyCall XNetMemcpy(PPCContext& ctx, uint8_t* base) {
       ctx.r3.u64 = to;
       ctx.r4.u64 = from;
       ctx.r5.u64 = size;
-      sub_825A7410(ctx, base);  // memcpy
+      lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy
     });
   };
 }
@@ -124,12 +125,11 @@ uint32_t VideoOutput(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t se
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
   const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
   if (!hooks::DirectSlotCall(ctx, base, slot7)) {
-    ctx.ctr.u64 = slot7;
-    REX_CALL_INDIRECT_FUNC(slot7);
+    lifted::CallFromContext(ctx, base, slot7);
   }
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
   ctx.lr = second;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
   return ctx.r3.u32;
 }
 
@@ -188,7 +188,7 @@ uint32_t VirtualCall(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t o
   // (The render manager's slots 8 and 7 by their plain C++ where they're the
   // game's, hooks::DirectSlotCall.)
   if (!hooks::DirectSlotCall(ctx, base, ctx.ctr.u32)) {
-    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+    lifted::CallFromContext(ctx, base, ctx.ctr.u32);
   }
   return ctx.r3.u32;
 }
@@ -218,7 +218,7 @@ extern "C" REX_FUNC(sub_8209BE88) {
       ctx.r9.u64 = 0;
       ctx.r10.u64 = out;
       ctx.lr = which == 0 ? 0x8209BF18 : 0x8209C01C;
-      sub_822B8F10(ctx, base);  // D3DXCompileShader (the stored shaders)
+      lifted::CallFromContext(ctx, base, 0x822B8F10);  // D3DXCompileShader (the stored shaders)
       return ctx.r3.u32;
     };
     calls.buffer_data = [&](int which, uint32_t buffer) {
@@ -237,13 +237,13 @@ extern "C" REX_FUNC(sub_8209BE88) {
     calls.vertex_shader = [&](uint32_t data) {
       ctx.r3.u64 = data;
       ctx.lr = 0x8209BF84;
-      sub_822AA018(ctx, base);  // VertexShader::Create
+      lifted::CallFromContext(ctx, base, 0x822AA018);  // VertexShader::Create
       return ctx.r3.u32;
     };
     calls.pixel_shader = [&](uint32_t data) {
       ctx.r3.u64 = data;
       ctx.lr = 0x8209C084;
-      sub_822A9EE8(ctx, base);  // PixelShader::Create
+      lifted::CallFromContext(ctx, base, 0x822A9EE8);  // PixelShader::Create
       return ctx.r3.u32;
     };
     calls.memcpy_call = [&](uint32_t to, uint32_t from, uint32_t size) {
@@ -251,7 +251,7 @@ extern "C" REX_FUNC(sub_8209BE88) {
         ctx.r3.u64 = to;
         ctx.r4.u64 = from;
         ctx.r5.u64 = size;
-        sub_825A7410(ctx, base);  // memcpy
+        lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy
       });
     };
     asu::BillboardsInit(base, frame, calls);
@@ -309,7 +309,7 @@ asu::FontCalls FontCallsFor(PPCContext& ctx, uint8_t* base, uint32_t text_frame,
       ctx.r9.u64 = 0;
       ctx.r10.u64 = out;
       ctx.lr = which == 0 ? 0x8210893C : 0x821089B8;
-      sub_822B8F10(ctx, base);  // D3DXCompileShader (the stored shaders)
+      lifted::CallFromContext(ctx, base, 0x822B8F10);  // D3DXCompileShader (the stored shaders)
       return ctx.r3.u32;
     });
   };
@@ -327,7 +327,7 @@ asu::FontCalls FontCallsFor(PPCContext& ctx, uint8_t* base, uint32_t text_frame,
     return At(ctx, shaders_frame, [&] {
       ctx.r3.u64 = data;
       ctx.lr = 0x82108954;
-      sub_822AA018(ctx, base);  // VertexShader::Create
+      lifted::CallFromContext(ctx, base, 0x822AA018);  // VertexShader::Create
       return ctx.r3.u32;
     });
   };
@@ -335,7 +335,7 @@ asu::FontCalls FontCallsFor(PPCContext& ctx, uint8_t* base, uint32_t text_frame,
     return At(ctx, shaders_frame, [&] {
       ctx.r3.u64 = data;
       ctx.lr = 0x821089D0;
-      sub_822A9EE8(ctx, base);  // PixelShader::Create
+      lifted::CallFromContext(ctx, base, 0x822A9EE8);  // PixelShader::Create
       return ctx.r3.u32;
     });
   };
@@ -345,7 +345,7 @@ asu::FontCalls FontCallsFor(PPCContext& ctx, uint8_t* base, uint32_t text_frame,
         ctx.r3.u64 = to;
         ctx.r4.u64 = from;
         ctx.r5.u64 = size;
-        sub_825A7410(ctx, base);  // memcpy
+        lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy
       });
       return 0u;
     });
@@ -362,7 +362,7 @@ asu::FontCalls FontCallsFor(PPCContext& ctx, uint8_t* base, uint32_t text_frame,
     }
     return At(ctx, text_frame, [&] {
       ctx.lr = 0x8210ADE4;
-      sub_8210A860(ctx, base);  // Strings::Init
+      lifted::CallFromContext(ctx, base, 0x8210A860);  // Strings::Init
       return ctx.r3.u32;
     });
   };
@@ -438,7 +438,7 @@ void hooks::AppStartUpSteps(PPCContext& ctx, uint8_t* base) {
         ctx.r4.u64 = *b;
       }
       ctx.lr = return_address;
-      REX_CALL_INDIRECT_FUNC(target);
+      lifted::CallFromContext(ctx, base, target);
       return ctx.r3.u32;
     };
     calls.virtual_call = [&](uint32_t offset, uint32_t return_address) {
@@ -571,7 +571,7 @@ asu::AudioManagerCalls AudioManagerCallsFor(PPCContext& ctx, uint8_t* base, uint
       ctx.r5.u64 = *r5;
     }
     ctx.lr = return_address;
-    REX_CALL_INDIRECT_FUNC(target);
+    lifted::CallFromContext(ctx, base, target);
     ctx.r1.u64 = stack;
     return ctx.r3.u32;
   };
@@ -704,7 +704,7 @@ asu::AppCameraCalls AppCameraCallsFor(PPCContext& ctx, uint8_t* base, uint64_t o
     ctx.r1.u64 = sp;
     ctx.r3.u64 = r3;
     ctx.lr = return_address;
-    REX_CALL_INDIRECT_FUNC(target);
+    lifted::CallFromContext(ctx, base, target);
     ctx.r1.u64 = stack;
     return ctx.r3.u32;
   };
@@ -842,7 +842,7 @@ void hooks::AppConstructSteps(PPCContext& ctx, uint8_t* base) {
       }
       ctx.r30.u64 = r30;
       ctx.lr = return_address;
-      REX_CALL_INDIRECT_FUNC(target);
+      lifted::CallFromContext(ctx, base, target);
       return ctx.r3.u32;
     };
     calls.virtual_call = [&](uint32_t object, uint32_t offset, uint32_t a, uint32_t b,
@@ -893,7 +893,7 @@ void hooks::AppCreateSteps(PPCContext& ctx, uint8_t* base) {
       ctx.r3.u64 = app;
       ctx.r4.u64 = entry_r3;
       ctx.lr = 0x82094AE4;
-      sub_82094590(ctx, base);  // App::App (its adapter: the harness's recorder)
+      lifted::CallFromContext(ctx, base, 0x82094590);  // App::App (its adapter: the harness's recorder)
       return ctx.r3.u32;
     });
   });
@@ -944,8 +944,7 @@ namespace {
 void TailCall(PPCContext& ctx, uint8_t* base, const asu::SlotCall& call) {
   ctx.r3.u64 = call.object;
   ctx.r11.u64 = call.target;
-  ctx.ctr.u64 = call.target;
-  REX_CALL_INDIRECT_FUNC(call.target);
+  lifted::CallFromContext(ctx, base, call.target);
 }
 
 }  // namespace

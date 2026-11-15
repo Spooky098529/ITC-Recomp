@@ -24,6 +24,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "Run the game modes and their state machines (docs/functions/game-modes.md: "
@@ -168,7 +169,7 @@ void hooks::GameModesResetOverlays(PPCContext& ctx, uint8_t* base) {
     guest_call::InFrame(ctx, base, 112, 0x8215DE4C, [&](uint32_t) {
       ctx.r3.u64 = overlay;
       ctx.ctr.u64 = target;
-      REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+      lifted::CallFromContext(ctx, base, ctx.ctr.u32);
     });
   });
 }

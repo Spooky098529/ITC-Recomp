@@ -12,6 +12,7 @@
 #include "graphics/command_buffer.h"
 #include "hooks/command_buffer.h"
 #include "hooks/guest_call.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_predicated_tiling, true, "ITC",
               "Run the graphics library's predicated tiling "
@@ -32,7 +33,7 @@ pt::GuestCalls hooks::PredicatedTilingCalls(PPCContext& ctx, uint8_t* base) {
   calls.end_segment = [&ctx, base](uint32_t device) {
     guest_call::InFrame(ctx, base, 128, 0x822B6AEC, [&](uint32_t) {
       ctx.r3.u64 = device;
-      sub_8229EF48(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8229EF48);
     });
   };
   calls.kick = CommandBufferKick(ctx, base);
@@ -135,17 +136,17 @@ pt::WorkerLoopCalls hooks::PredicatedTilingWorkerLoopCalls(PPCContext& ctx, uint
   calls.job = [&ctx, base](uint32_t block) {
     ctx.r3.u64 = block;
     ctx.lr = 0x822B6A68;
-    sub_822B6780(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x822B6780);
   };
   calls.present = [&ctx, base](uint32_t device) {
     ctx.r3.u64 = device;
     ctx.lr = 0x822B6A14;
-    sub_822A0718(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x822A0718);
     ctx.r3.u64 = device;
     ctx.r4.u64 = device + 13444;
     ctx.r5.u64 = 0;
     ctx.lr = 0x822B6A24;
-    sub_822A08A0(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x822A08A0);
   };
   return calls;
 }

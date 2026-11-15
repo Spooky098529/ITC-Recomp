@@ -14,6 +14,7 @@
 #include "hooks/ui_movies.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "Run the UI movie library's functions (the movies the HUD and the menus are made "
@@ -157,7 +158,7 @@ void Submit(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, uint32_t retur
     ctx.r5.u64 = key;
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = double(std::bit_cast<float>(guest::LoadU32(base, depth)));
-    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, renderer) + 16));
+    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, renderer) + 16));
   });
   ctx.lr = lr;
 }
@@ -269,9 +270,9 @@ extern "C" REX_FUNC(sub_8259EBE8) {
     ctx.r4.u64 = key;
     ctx.f1.f64 = depth;
     if (textured) {
-      sub_8259DAD0(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8259DAD0);
     } else {
-      sub_8259E098(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8259E098);
     }
   });
   if (guest::LoadU32(base, quad + 100) != 0) {
@@ -279,7 +280,7 @@ extern "C" REX_FUNC(sub_8259EBE8) {
       ctx.r3.u64 = uint64_t(key) + 1;
       ctx.fpscr.disableFlushMode();
       ctx.f1.f64 = depth;
-      sub_8259D7B0(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8259D7B0);
     });
   }
   ctx.lr = lr;
@@ -301,7 +302,7 @@ void BuildAndRecord(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes,
     ctx.r4.u64 = call.key;
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = call.depth;
-    sub_8259EBE8(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x8259EBE8);
   });
   ctx.lr = lr;
 }
@@ -409,7 +410,7 @@ void ResetAfterMovie(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ctx.r4.u64;
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = double(std::bit_cast<float>(guest::LoadU32(base, kClipResetDepth)));
-  sub_8259D7B0(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x8259D7B0);
 }
 
 void RestorePose(PPCContext& ctx, uint8_t* base) {
@@ -451,8 +452,8 @@ struct GuestKeys {
       switch (function) {
         case 0x8259FB30: lifted::original::c8259FB30(ctx, base); break;
         case 0x8259FC18: lifted::original::c8259FC18(ctx, base); break;
-        case 0x8259FD40: sub_8259FD40(ctx, base); break;
-        default: sub_8259FAA8(ctx, base); break;
+        case 0x8259FD40: lifted::CallFromContext(ctx, base, 0x8259FD40); break;
+        default: lifted::CallFromContext(ctx, base, 0x8259FAA8); break;
       }
     });
     ctx.lr = lr;
@@ -500,7 +501,7 @@ struct GuestTracks {
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = t;
     ctx.lr = 0x825A0AF4;
-    sub_825A0548(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825A0548);
     ctx.r1.u64 = stack;
     ctx.lr = lr;
   }
@@ -559,7 +560,7 @@ void ui_movies_hooks::Update(PPCContext& ctx, uint8_t* base) {
       ctx.r6.u64 = 0;
       ctx.r7.u64 = 0;
       ctx.lr = return_address;
-      sub_82119B80(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x82119B80);
     };
     // UiMovie::ApplyAnimation on a slot (+12 the tree, +16 the animation,
     // +20 the time); its r3.
@@ -570,7 +571,7 @@ void ui_movies_hooks::Update(PPCContext& ctx, uint8_t* base) {
       ctx.fpscr.disableFlushMode();
       ctx.f1.f64 = double(guest::LoadFloat(base, slot + 20));
       ctx.lr = return_address;
-      sub_825A08E0(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x825A08E0);
       ctx.fpscr.disableFlushMode();
       return ctx.r3.s32;
     };
@@ -580,7 +581,7 @@ void ui_movies_hooks::Update(PPCContext& ctx, uint8_t* base) {
       ctx.r4.u64 = slot;
       ctx.r5.s64 = count(local);
       ctx.lr = return_address;
-      sub_8211B4D0(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8211B4D0);
     };
     // The drawing: UiMovie::Draw, DrawTexts, and sub_8259DAC0 with 678 and
     // 148.
@@ -591,17 +592,17 @@ void ui_movies_hooks::Update(PPCContext& ctx, uint8_t* base) {
       ctx.r6.u64 = movie + 40;
       ctx.r7.s64 = -1;
       ctx.lr = returns[0];
-      sub_8259FA00(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8259FA00);
       ctx.r3.u64 = movie;
       ctx.r4.u64 = movie + 40;
       ctx.r5.u64 = texts_r5;
       ctx.lr = returns[1];
-      sub_8211CD90(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x8211CD90);
       for (uint32_t k = 0; k < 2; k++) {
         ctx.r3.u64 = movie + 64;
         ctx.r4.u64 = k == 0 ? 678 : 148;
         ctx.lr = returns[2 + k];
-        sub_8259DAC0(ctx, base);
+        lifted::CallFromContext(ctx, base, 0x8259DAC0);
       }
     };
     restore_pose(word(movie + ui_movies::kMovieSaved), word(movie + ui_movies::kMovieLive),
@@ -654,7 +655,7 @@ void ui_movies_hooks::Update(PPCContext& ctx, uint8_t* base) {
           ctx.r3.u64 = queue;
           ctx.r4.u64 = uint32_t(i);
           ctx.lr = 0x8211D614;
-          sub_8211B080(ctx, base);
+          lifted::CallFromContext(ctx, base, 0x8211B080);
           applied--;
           queued--;
           i--;

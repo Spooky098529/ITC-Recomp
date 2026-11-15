@@ -23,6 +23,7 @@
 #include "input/physical_pad.h"
 
 #include "base/log.h"
+#include "lifted/sdk.h"
 
 namespace input_hooks {
 namespace {
@@ -102,7 +103,7 @@ uint32_t DeviceValues(PPCContext& ctx, uint8_t* base, uint32_t device) {
   }
   ctx.r3.u64 = device;
   ctx.lr = kReturnFromDeviceValues;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
   return ctx.r3.u32;
 }
 
@@ -188,7 +189,7 @@ void UpdateWithPad(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t pad
   ctx.r3.u64 = object;
   ctx.r4.u64 = pad;
   ctx.lr = return_address;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
 }
 
 }  // namespace

@@ -11,6 +11,7 @@
 
 #include "base/flags.h"
 #include "native/state.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_single_commands, true, "ITC",
               "Run the render command replay's single commands "
@@ -36,8 +37,7 @@ sc::GuestCall hooks::SingleCommandsCall(PPCContext& ctx, uint8_t* base) {
       registers[i++]->u64 = value;
     }
     ctx.lr = return_address;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

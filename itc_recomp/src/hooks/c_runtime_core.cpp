@@ -15,6 +15,7 @@
 #include "hooks/heap.h"
 #include "hooks/last_error.h"
 #include "memory/c_runtime_heap.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "Run the C runtime's core natively instead of through the translated code "
@@ -147,8 +148,7 @@ cc::Calls hooks::CRuntimeCoreCalls(PPCContext& ctx, uint8_t* base) {
   calls.guest = [&ctx, base](uint32_t function, std::initializer_list<uint64_t> args) {
     const uint64_t lr = ctx.lr, sp = ctx.r1.u64;
     SetArgs(ctx, args);
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     return ctx.r3.u64;
@@ -166,7 +166,7 @@ cc::Calls hooks::CRuntimeCoreCalls(PPCContext& ctx, uint8_t* base) {
     const uint64_t lr = ctx.lr;
     ctx.r3.u64 = count;
     ctx.r4.u64 = size;
-    sub_825AC320(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825AC320);
     ctx.lr = lr;
     return ctx.r3.u32;
   };
@@ -178,7 +178,7 @@ cc::Calls hooks::CRuntimeCoreCalls(PPCContext& ctx, uint8_t* base) {
     }
     const uint64_t lr = ctx.lr;
     ctx.r3.u64 = size;
-    sub_825A9A90(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825A9A90);
     ctx.lr = lr;
     return ctx.r3.u32;
   };
@@ -188,7 +188,7 @@ cc::Calls hooks::CRuntimeCoreCalls(PPCContext& ctx, uint8_t* base) {
     }
     const uint64_t lr = ctx.lr;
     ctx.r3.u64 = block;
-    sub_825A9B58(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825A9B58);
     ctx.lr = lr;
   };
   calls.thread_id = []() { return graphics::video_output::CurrentThreadId(); };

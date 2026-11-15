@@ -19,6 +19,7 @@
 #include "graphics/device_shaders.h"
 #include "hooks/heap.h"
 #include "native/refcount.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_device_shaders, true, "ITC",
               "Run the graphics device's shader setters (docs/functions/device-shaders.md: "
@@ -40,7 +41,7 @@ dsh::ShaderCalls Calls(PPCContext& ctx, uint8_t* base, uint32_t release_at) {
   calls.release = [&ctx, base, release_at](uint32_t resource) {
     ctx.r3.u64 = resource;
     ctx.lr = release_at;
-    sub_822A67B0(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x822A67B0);
     return ctx.r3.u32;
   };
   calls.memcpy = [&ctx, base](uint32_t destination, uint32_t source, uint32_t size,
@@ -49,7 +50,7 @@ dsh::ShaderCalls Calls(PPCContext& ctx, uint8_t* base, uint32_t release_at) {
     ctx.r4.u64 = source;
     ctx.r5.u64 = size;
     ctx.lr = at;
-    sub_825A7410(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825A7410);
   };
   return calls;
 }

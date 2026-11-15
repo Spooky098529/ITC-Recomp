@@ -12,6 +12,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "ui_movies/game.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_data_load, true, "ITC",
               "Run the data load at boot (docs/functions/data-load.md: Defaults::Init "
@@ -135,7 +136,7 @@ void SlotCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_add
   if (hooks::DirectSlotCall(ctx, base, ctx.ctr.u32)) {
     return;
   }
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
 }
 
 // The movie sets' calls, from the adder's frame (112 bytes, `construct_at`
@@ -150,7 +151,7 @@ dl::MovieCalls MovieCalls(PPCContext& ctx, uint8_t* base, uint32_t construct_at)
     }
     guest_call::InFrame(ctx, base, 112, construct_at, [&](uint32_t) {
       ctx.r3.u64 = movie;
-      sub_8211E1C0(ctx, base);  // UiMovie::UiMovie
+      lifted::CallFromContext(ctx, base, 0x8211E1C0);  // UiMovie::UiMovie
     });
     return ctx.r3.u32;
   };
@@ -246,7 +247,7 @@ void InBootFrame(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Body body
         ctx.r3.u64 = *r3;
       }
       ctx.lr = return_address;
-      REX_CALL_INDIRECT_FUNC(target);
+      lifted::CallFromContext(ctx, base, target);
       return ctx.r3.u32;
     };
     body(frame, call);

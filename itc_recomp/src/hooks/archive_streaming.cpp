@@ -23,6 +23,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include "lifted/sdk.h"
 
 using guest_call::InFrame;
 
@@ -153,11 +154,11 @@ extern "C" REX_FUNC(sub_8209E210) {
     ctx.r4.u64 = size;
     ctx.r5.u64 = type;
     ctx.r6.u64 = 4;
-    call(return_address, [&] { sub_82295398(ctx, base); });
+    call(return_address, [&] { lifted::CallFromContext(ctx, base, 0x82295398); });
     return ctx.r3.u32;
   };
   auto report_error = [&](uint32_t return_address) {
-    call(return_address, [&] { sub_8209AC78(ctx, base); });
+    call(return_address, [&] { lifted::CallFromContext(ctx, base, 0x8209AC78); });
   };
   // The TOCs' sizes: the entry counts built into the image, plus a header.
   const uint32_t toc_size[2] = {(guest::LoadU32(base, 0x82600AA8) + 1) << 4,
@@ -203,7 +204,7 @@ extern "C" REX_FUNC(sub_8209E210) {
       continue;
     }
     ctx.r3.u64 = object_address;
-    call(return_address, [&] { sub_82592670(ctx, base); });
+    call(return_address, [&] { lifted::CallFromContext(ctx, base, 0x82592670); });
   }
   // BUILD.TOC and BUILD_CRS.TOC, then BUILD.DAT and BUILD_CRS.DAT.
   if (!ReadWhole(base, 0x82001E54, toc[0], toc_size[0])) {
@@ -224,7 +225,7 @@ extern "C" REX_FUNC(sub_8209E210) {
   ctx.r3.u64 = object;
   ctx.r4.u64 = kThread;
   ctx.r5.u64 = 1;
-  REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, object) + 4));
+  lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, object) + 4));
 }
 
 // The loader thread's loop (no direct callers; never returns). Each time work
@@ -244,7 +245,7 @@ extern "C" REX_FUNC(sub_8209E118) {
       return;
     }
     ctx.r3.u64 = object;
-    call(return_address, [&] { sub_82592670(ctx, base); });
+    call(return_address, [&] { lifted::CallFromContext(ctx, base, 0x82592670); });
   };
   auto signal = [&](uint32_t object, uint32_t return_address) {
     if (archive::HostSemaphore* s = hooks::ArchiveSemaphore(object)) {
@@ -252,7 +253,7 @@ extern "C" REX_FUNC(sub_8209E118) {
       return;
     }
     ctx.r3.u64 = object;
-    call(return_address, [&] { sub_825926E8(ctx, base); });
+    call(return_address, [&] { lifted::CallFromContext(ctx, base, 0x825926E8); });
   };
   // The next request (r3 the current one or 0; r3 the next).
   auto next = [&](uint32_t current) {
@@ -261,7 +262,7 @@ extern "C" REX_FUNC(sub_8209E118) {
       if (hooks::NativeArchiveQueue()) {
         hooks::ArchiveNextRequest(ctx, base);
       } else {
-        sub_8209DD98(ctx, base);
+        lifted::CallFromContext(ctx, base, 0x8209DD98);
       }
     });
     return ctx.r3.u32;
@@ -275,17 +276,17 @@ extern "C" REX_FUNC(sub_8209E118) {
         signal(kRequestDone, 0x8209E194);
       } else if (state == 5) {
         if (!ReadRequest(base, request)) {
-          call(0x8209DD6C, [&] { sub_8209AC78(ctx, base); });
+          call(0x8209DD6C, [&] { lifted::CallFromContext(ctx, base, 0x8209AC78); });
         }
       } else if (state == 7) {
         ctx.r3.u64 = request;
-        call(0x8209E17C, [&] { sub_8209DFA8(ctx, base); });
+        call(0x8209E17C, [&] { lifted::CallFromContext(ctx, base, 0x8209DFA8); });
       }
       if (uint32_t chained = guest::LoadU32(base, request + 84)) {
         ctx.r3.u64 = guest::LoadU32(base, chained + 88);
         ctx.r4.u64 = guest::LoadU32(base, chained + 76);
         ctx.r5.u64 = guest::LoadU32(base, chained + 72);
-        call(0x8209E1B4, [&] { sub_82294610(ctx, base); });
+        call(0x8209E1B4, [&] { lifted::CallFromContext(ctx, base, 0x82294610); });
       }
       if (int32_t(guest::LoadU32(base, request + 52)) == 5) {
         // The read is done: what the APC's routine (sub_8209D808) did.

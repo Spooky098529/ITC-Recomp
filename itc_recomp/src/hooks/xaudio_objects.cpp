@@ -14,6 +14,7 @@
 #include "xaudio/resampler.h"
 #include "xaudio/reverb_core.h"
 #include "xaudio/reverb_stages.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "Run the parts of XAudio's factory objects made native "
@@ -492,7 +493,7 @@ void XAudioRenderDriverSetUp(PPCContext& ctx, uint8_t* base) {
   const uint32_t function = xa::RenderDriverSetUpThunk(base, ctx.r3.u32, ctx.r4.u32, &r4);
   ctx.r4.u64 = r4;
   ctx.r11.u64 = function;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
 }
 
 void XAudioReverbInnerDestroy(PPCContext& ctx, uint8_t* base) {

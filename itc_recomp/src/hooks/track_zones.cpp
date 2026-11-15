@@ -16,6 +16,7 @@
 #include "hooks/app_start_up.h"
 #include "hooks/guest_call.h"
 #include "track_zones/track_zones.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_track_zones, true, "ITC",
               "Run the track zones (docs/functions/track-zones.md: List16::Link sub_821531C0, "
@@ -119,7 +120,7 @@ void CopyRange(void* user, uint32_t to, uint32_t from, uint32_t frame) {
     ctx.r3.u64 = to;
     ctx.r4.u64 = from;
     ctx.r5.u64 = kRangeBytes;
-    sub_825A7410(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825A7410);
   });
   ctx.r1.u64 = stack;
   ctx.lr = lr;
@@ -137,8 +138,7 @@ uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool 
   if (set_r4) {
     ctx.r4.u64 = r4;
   }
-  ctx.ctr.u64 = function;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
   ctx.r1.u64 = saved;
   return ctx.r3.u64;
 }

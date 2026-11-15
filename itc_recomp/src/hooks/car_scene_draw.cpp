@@ -8,6 +8,7 @@
 #include "base/flags.h"
 #include "car_scene_draw/car_scene_draw.h"
 #include "hooks/car_draw.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_car_draw);
 ITC_FLAG_DECLARE(bool, native_models);
@@ -220,8 +221,7 @@ car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(PPCContext& ctx, uint8_t* b
     for (int i = 0; i < fcount; i++) {
       fprs[i]->f64 = fregs[i];
     }
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

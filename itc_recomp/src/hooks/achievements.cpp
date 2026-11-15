@@ -11,6 +11,7 @@
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
 #include "hooks/lifted_call.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_achievements, true, "ITC",
               "Run the achievements (docs/functions/achievements.md: Achievements::Check "
@@ -50,8 +51,7 @@ class GuestCalls {
     ctx.r4.u64 = args[1];
     ctx.r5.u64 = args[2];
     ctx.lr = lr;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     return ctx.r3.u64;
   }

@@ -7,6 +7,7 @@
 
 #include "base/flags.h"
 #include "menu_sounds/menu_sounds.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_menu_sounds, true, "ITC",
               "Run the menu sounds (docs/functions/menu-sounds.md: MenuSound::Play sub_821103F0 "
@@ -45,8 +46,7 @@ class GuestCalls {
       registers[i]->u64 = args[i];
     }
     ctx.lr = lr;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

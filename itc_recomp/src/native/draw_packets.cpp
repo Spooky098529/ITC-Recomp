@@ -32,6 +32,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_renderer_check_draw_writes, false, "ITC",
               "Log the device fields the graphics library's draw and its packet-writing "
@@ -240,7 +241,7 @@ void native::DrawPackets_IndexedDraw(PPCContext& ctx, uint8_t* base) {
     PPCContext saved = ctx;
     ctx.r3.u64 = device;
     ctx.r4.u64 = shader_state;
-    sub_822AED18(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x822AED18);
     // The mask with the bits for what it wrote in the shadow.
     shader_state |= ctx.r3.u64;
     ctx = saved;

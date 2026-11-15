@@ -21,6 +21,7 @@
 #include "base/flags.h"
 
 #include <cstring>
+#include "lifted/sdk.h"
 
 
 
@@ -301,7 +302,7 @@ extern "C" REX_FUNC(sub_825AA840) {
     return;
   }
   if (ctx.r3.s32 < ctx.r4.s32) {
-    sub_825A7410(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825A7410);
     return;
   }
   if (!c_runtime::MemmoveDown(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
@@ -350,7 +351,7 @@ extern "C" REX_FUNC(sub_825A7270) {
   ctx.r4.u64 = ctx.r5.u64;
   ctx.r5.u64 = ctx.r6.u64;
   ctx.lr = 0x825A72F0;
-  sub_825A7410(ctx, base);
+  lifted::CallFromContext(ctx, base, 0x825A7410);
   ctx.lr = lr;
   ctx.r3.u64 = 0;
 }
@@ -508,14 +509,14 @@ extern "C" REX_FUNC(sub_825AEB20) {
   ctx.r7.u64 = ctx.r8.u64;
   ctx.r8.u64 = ctx.r9.u64;
   if (format == 'e' || format == 'E') {
-    sub_825AE1A8(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825AE1A8);
   } else if (format == 'f') {
     ctx.r7.u64 = ctx.r8.u64;
     CftofL(ctx, base);
   } else if (format == 'a' || format == 'A') {
-    sub_825AE2C0(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825AE2C0);
   } else {
-    sub_825AE9D0(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x825AE9D0);
   }
 }
 
@@ -681,7 +682,7 @@ void CallElement(void* user, uint64_t function, uint64_t element) {
   guest_call::InFrame(ctx, base, 128, call.return_address, [&](uint32_t) {
     ctx.r3.u64 = element;
     ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+    lifted::CallFromContext(ctx, base, ctx.ctr.u32);
   });
 }
 
@@ -734,8 +735,7 @@ uint64_t ThreadDataGuest(void* user, uint32_t function, uint32_t r1, uint32_t lr
     ctx.r4.u64 = r4;
   }
   ctx.lr = lr;
-  ctx.ctr.u64 = function;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
   ctx.r1.u64 = stack;
   ctx.lr = saved_lr;
   return ctx.r3.u64;

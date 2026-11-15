@@ -23,6 +23,7 @@
 #include "hooks/scene_loaders.h"
 #include "hooks/texture_compression.h"
 #include "native/buffers.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "Run the car models' pieces (docs/functions/car-models.md: LoadSlot::Reset "
@@ -146,7 +147,7 @@ void CarModelsInteriorLoad(PPCContext& ctx, uint8_t* base) {
                             ctx.r4.u64 = r4;
                             ctx.r5.u64 = r5;
                             ctx.lr = which == 0 ? 0x820D7A40 : 0x820D7A94;
-                            REX_CALL_INDIRECT_FUNC(
+                            lifted::CallFromContext(ctx, base, 
                                 guest::LoadU32(base, guest::LoadU32(base, set) + 4));
                             return ctx.r3.u32;
                           });
@@ -176,7 +177,7 @@ void CarModelsMakePlate(PPCContext& ctx, uint8_t* base) {
                        [&ctx, base](uint32_t surface) {
                          ctx.r3.u64 = surface;
                          ctx.lr = 0x820ED8E4;
-                         sub_822A67B0(ctx, base);
+                         lifted::CallFromContext(ctx, base, 0x822A67B0);
                        });
   });
   ctx.lr = lr;
@@ -226,13 +227,13 @@ void CarModelsFileLoaded(PPCContext& ctx, uint8_t* base, cm::FileLoadedSet set) 
       ctx.r4.u64 = 0;
       ctx.r5.u64 = xpr;
       ctx.lr = a ? 0x820D4DEC : 0x820D55C4;
-      REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
+      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
     };
     calls.plate_release = [&](uint32_t surface) {
       // From MakePlate's frame (944 bytes below this one).
       guest_call::InFrame(ctx, base, cm::kPlateFrameBytes, 0x820ED8E4, [&](uint32_t) {
         ctx.r3.u64 = surface;
-        sub_822A67B0(ctx, base);
+        lifted::CallFromContext(ctx, base, 0x822A67B0);
       });
     };
     cm::FileLoaded(base, set, request, buffer, car, stack, calls);
@@ -288,7 +289,7 @@ uint32_t CarModelsVinylCompressAt(PPCContext& ctx, uint8_t* base, uint32_t width
                                [&ctx, base](uint32_t surface, int which) {
                                  ctx.r3.u64 = surface;
                                  ctx.lr = which == 0 ? 0x820ED1C0 : 0x820ED1C8;
-                                 sub_822A67B0(ctx, base);
+                                 lifted::CallFromContext(ctx, base, 0x822A67B0);
                                }};
     r3 = cm::VinylCompress(base, width, height, header_in, data_in, stack, calls);
   });
@@ -386,7 +387,7 @@ void ScenePoolsSetUp(PPCContext& ctx, uint8_t* base) {
         ctx.r3.u64 = r3;
         ctx.r4.u64 = r4;
         ctx.lr = lr;
-        REX_CALL_INDIRECT_FUNC(function);
+        lifted::CallFromContext(ctx, base, function);
         ctx.r1.u64 = stack;
         return ctx.r3.u32;
       });
@@ -410,7 +411,7 @@ void SecondSetUp(PPCContext& ctx, uint8_t* base,
     ctx.r4.u64 = r4;
     ctx.r5.u64 = r5;
     ctx.lr = lr;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     return ctx.r3.u32;
   };
@@ -443,7 +444,7 @@ static uint32_t WithSecondSetUps(PPCContext& ctx, uint8_t* base, Body body) {
     ctx.r4.u64 = r4;
     ctx.r5.u64 = r5;
     ctx.lr = lr;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u32;

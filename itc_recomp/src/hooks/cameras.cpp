@@ -24,6 +24,7 @@
 
 #include <functional>
 #include <optional>
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "Run the camera passes and viewports (docs/functions/cameras.md: the library "
@@ -164,7 +165,7 @@ extern "C" REX_FUNC(sub_820A0C40) {
     has_surfaces = cameras::ReleaseSurfaces(base, pass, [&](uint32_t surface, uint32_t field) {
       ctx.r3.u64 = surface;
       ctx.lr = field == 576 ? 0x820A0C8C : 0x820A0CA0;
-      sub_822A67B0(ctx, base);
+      lifted::CallFromContext(ctx, base, 0x822A67B0);
       released_580 = field == 580;
     });
   });
@@ -187,12 +188,11 @@ uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
   if (!hooks::DirectSlotCall(ctx, base, slot7)) {
-    ctx.ctr.u64 = slot7;
-    REX_CALL_INDIRECT_FUNC(slot7);
+    lifted::CallFromContext(ctx, base, slot7);
   }
   ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
   ctx.lr = second;
-  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  lifted::CallFromContext(ctx, base, ctx.ctr.u32);
   return ctx.r3.u32;
 }
 
@@ -224,13 +224,13 @@ bool CameraPassesMakeRenderTarget(PPCContext& ctx, uint8_t* base) {
          [&](uint32_t target) {
            ctx.r3.u64 = target;
            ctx.lr = 0x8209FC40;
-           sub_8209F7A8(ctx, base);
+           lifted::CallFromContext(ctx, base, 0x8209F7A8);
            return ctx.r3.u32;
          },
          [&](uint32_t resource) {
            ctx.r3.u64 = resource;
            ctx.lr = 0x8209FC4C;
-           sub_822A67B0(ctx, base);
+           lifted::CallFromContext(ctx, base, 0x822A67B0);
          }});
   });
   ctx.lr = lr;
@@ -272,26 +272,26 @@ bool CameraPassSetUpSurfaces(PPCContext& ctx, uint8_t* base) {
          [&](uint32_t id) {
            ctx.r3.u64 = id;
            ctx.lr = 0x820A2FF0;
-           sub_8209F7A8(ctx, base);
+           lifted::CallFromContext(ctx, base, 0x8209F7A8);
            return ctx.r3.u32;
          },
          [&](uint32_t id) {
            ctx.r3.u64 = id;
            ctx.lr = 0x820A2FE8;
-           sub_8209FBF0(ctx, base);
+           lifted::CallFromContext(ctx, base, 0x8209FBF0);
          },
          [&](uint32_t texture, uint32_t face) {
            ctx.r3.u64 = texture;
            ctx.r4.u64 = face;
            ctx.r5.u64 = 0;
            ctx.lr = 0x820A30BC;
-           sub_822A5C50(ctx, base);
+           lifted::CallFromContext(ctx, base, 0x822A5C50);
            return ctx.r3.u32;
          },
          [&] {
            ctx.r3.u64 = pass;
            ctx.lr = 0x820A2F60;
-           sub_820A0C40(ctx, base);
+           lifted::CallFromContext(ctx, base, 0x820A0C40);
          }});
   });
   ctx.lr = lr;
@@ -310,7 +310,7 @@ void CameraPassesInit(PPCContext& ctx, uint8_t* base, bool all) {
         ctx.r4.u64 = type;
         ctx.r5.u64 = r5;
         ctx.lr = 0x8209F990;
-        sub_820A3DB0(ctx, base);
+        lifted::CallFromContext(ctx, base, 0x820A3DB0);
       },
       [&](uint32_t mode) {
         original_set_mode = true;
@@ -346,7 +346,7 @@ bool CameraPassInit(PPCContext& ctx, uint8_t* base) {
                       {[&] {
                          ctx.r3.u64 = pass;
                          ctx.lr = 0x820A3DD4;
-                         sub_82593908(ctx, base);
+                         lifted::CallFromContext(ctx, base, 0x82593908);
                          ctx.fpscr.disableFlushMode();
                        },
                        [&](int at) {
@@ -356,12 +356,12 @@ bool CameraPassInit(PPCContext& ctx, uint8_t* base) {
                        [&] {
                          ctx.r3.u64 = pass;
                          ctx.lr = 0x820A4348;
-                         sub_820A3978(ctx, base);
+                         lifted::CallFromContext(ctx, base, 0x820A3978);
                        },
                        [&] {
                          ctx.r3.u64 = pass;
                          ctx.lr = 0x820A4350;
-                         sub_820A2F40(ctx, base);
+                         lifted::CallFromContext(ctx, base, 0x820A2F40);
                        }});
   });
   ctx.lr = lr;
@@ -496,7 +496,7 @@ void VtableCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_a
   if (hooks::DirectSlotCall(ctx, base, function)) {
     return;
   }
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
 }
 
 // A chunk recorded and handed to the render queue, as RecordViewport and
@@ -753,7 +753,7 @@ bool CameraPassRecordEnd(PPCContext& ctx, uint8_t* base) {
           // Through its override (the diagnostics' wrapper), as the original.
           ctx.r3.u64 = id;
           ctx.lr = route.render_target;
-          sub_8209F7A8(ctx, base);
+          lifted::CallFromContext(ctx, base, 0x8209F7A8);
           return ctx.r3.u32;
         });
       })) {
@@ -850,7 +850,7 @@ extern "C" REX_FUNC(sub_820AA4A8) {
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, 112, 0x820AA534, [&](uint32_t) {
     ctx.r3.u64 = pass;
-    sub_820A3978(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x820A3978);
   });
   ctx.lr = lr;
 }

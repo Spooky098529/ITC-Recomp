@@ -9,6 +9,7 @@
 #include "lifted/originals.h"
 
 #include "graphics/device_state.h"
+#include "lifted/sdk.h"
 
 namespace hooks {
 
@@ -24,7 +25,7 @@ inline graphics::device_state::DeviceCalls DeviceStateCalls(PPCContext& ctx, uin
     ctx.r5.u64 = hiz;
     ctx.r6.u64 = 0;
     ctx.lr = 0x8229F6B8;
-    sub_822ADC08(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x822ADC08);
     return ctx.r3.u64;
   };
   calls.flush_registers = [&ctx, base, device](uint64_t mask, uint32_t first, uint32_t shadow) {
@@ -33,14 +34,14 @@ inline graphics::device_state::DeviceCalls DeviceStateCalls(PPCContext& ctx, uin
     ctx.r5.u64 = first;
     ctx.r6.u64 = shadow;
     ctx.lr = 0x8229F6E8;
-    sub_822ADE30(ctx, base);
+    lifted::CallFromContext(ctx, base, 0x822ADE30);
   };
   calls.setter = [&ctx, base, device](uint32_t setter, uint32_t r4, uint32_t r5) {
     ctx.r3.u64 = device;
     ctx.r4.u64 = r4;
     ctx.r5.u64 = r5;
     ctx.lr = 0x822ACBF0;
-    REX_CALL_INDIRECT_FUNC(setter);
+    lifted::CallFromContext(ctx, base, setter);
   };
   calls.set_texture = [&ctx, base, device](uint32_t stage, uint32_t texture, uint64_t dirty) {
     ctx.r3.u64 = device;

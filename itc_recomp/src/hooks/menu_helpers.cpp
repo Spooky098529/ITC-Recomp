@@ -7,6 +7,7 @@
 
 #include "base/flags.h"
 #include "menu_helpers/menu_helpers.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_menu_helpers, true, "ITC",
               "Run the front end's menu helpers (docs/functions/menu-helpers.md: Menu::Step "
@@ -43,8 +44,7 @@ class GuestCalls {
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
     ctx.lr = lr;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

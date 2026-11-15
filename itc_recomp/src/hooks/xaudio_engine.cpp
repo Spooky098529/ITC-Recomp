@@ -10,6 +10,7 @@
 #include "hooks/heap.h"
 #include "hooks/xaudio.h"
 #include "xaudio/engine.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_xaudio_engine, true, "ITC",
               "Run the parts of XAudio's engine and mixer made native "
@@ -105,7 +106,7 @@ void XAudioDeleteObject(PPCContext& ctx, uint8_t* base) {
   }
   // A tail call: the destructor runs at the caller's frame, lr the caller's.
   ctx.r4.s64 = 1;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
 }
 
 void XAudioBarrier(PPCContext& ctx, uint8_t* base) {
@@ -158,7 +159,7 @@ void FactorySlot(PPCContext& ctx, uint8_t* base, uint32_t which) {
   } else {
     ctx.r5.u64 = ctx.r6.u64;
   }
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
 }
 
 }  // namespace

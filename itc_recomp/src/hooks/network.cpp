@@ -11,6 +11,7 @@
 #include "user/user.h"
 
 #include <algorithm>
+#include "lifted/sdk.h"
 
 using guest_call::InFrame;
 
@@ -164,7 +165,7 @@ extern "C" REX_FUNC(sub_8214E268) {
       const uint32_t profile_user = ProfileUser(base);
       InFrame(ctx, base, 512, 0x8214E4A8, [&](uint32_t) {
         ctx.r3.u64 = profile_user;
-        sub_82149178(ctx, base);  // the game's profile read
+        lifted::CallFromContext(ctx, base, 0x82149178);  // the game's profile read
       });
       guest::StoreU32(base, kProfileRequested, 0);
       guest::StoreU32(base, kProfileWasRead, 1);

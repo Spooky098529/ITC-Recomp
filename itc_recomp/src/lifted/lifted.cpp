@@ -125,6 +125,14 @@ void Register(const Registration* entries, size_t count, const bool* enabled) {
   }
 }
 
+Entry Find(uint32_t address) {
+  const auto& table = Table();
+  if (const auto it = table.find(address); it != table.end() && *it->second.enabled) {
+    return it->second.entry;
+  }
+  return nullptr;
+}
+
 Result Call(uint8_t* base, uint32_t address, const Args& args) {
   const auto& table = Table();
   if (const auto it = table.find(address); it != table.end() && *it->second.enabled) {
@@ -167,6 +175,15 @@ void Enter(PPCContext& ctx, uint8_t* base, Entry entry) {
   ctx.f1.f64 = result.f1;
   SyncFloatMode(ctx);
   current = outer;
+}
+
+void CallFromContext(PPCContext& ctx, uint8_t* base, uint32_t address) {
+  ctx.ctr.u64 = address;
+  if (const Entry entry = Find(address)) {
+    Enter(ctx, base, entry);
+    return;
+  }
+  REX_CALL_INDIRECT_FUNC(address);
 }
 
 }  // namespace lifted

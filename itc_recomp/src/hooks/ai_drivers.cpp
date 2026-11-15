@@ -94,6 +94,7 @@
 #include "hooks/ai_drivers.h"
 #include "hooks/guest_call.h"
 #include "base/flags.h"
+#include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_ai_drivers, true, "ITC",
               "Run the AI drivers (docs/functions/ai-drivers.md: AiDriver::InitPath "
@@ -347,8 +348,7 @@ uint64_t CallDriverUpdate(void* user, uint64_t driver, uint32_t function) {
   uint8_t* base = call.base;
   guest_call::InFrame(ctx, base, 176, 0x82139684, [&](uint32_t) {
     ctx.r3.u64 = driver;
-    ctx.ctr.u64 = function;
-    REX_CALL_INDIRECT_FUNC(function);
+    lifted::CallFromContext(ctx, base, function);
   });
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u64;
@@ -413,8 +413,7 @@ uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t 
   ctx.r5.u64 = position;
   ctx.r6.u64 = lane;
   ctx.r7.u64 = masks;
-  ctx.ctr.u64 = function;
-  REX_CALL_INDIRECT_FUNC(function);
+  lifted::CallFromContext(ctx, base, function);
   ctx.r1.u64 = saved;
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u64;
