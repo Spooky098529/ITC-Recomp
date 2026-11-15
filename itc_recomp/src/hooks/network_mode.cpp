@@ -119,14 +119,14 @@ uint64_t AddR3(uint64_t machine_r3, uint32_t r3, bool replaced) {
 }
 
 template <uint32_t (*InitStates)(uint8_t*, uint32_t, uint32_t, bool*), uint32_t kFrame>
-ITC_REGS_STEP(InitStatesStep) {
+void InitStatesStep(lifted::Regs& ctx, uint8_t* base) {
   bool replaced = false;
   const uint32_t r3 = InitStates(base, ctx.r3.u32, ctx.r1.u32 - kFrame, &replaced);
   ctx.r3.u64 = AddR3(ctx.r3.u64, r3, replaced);
 }
 
 template <uint32_t (*InitBase)(uint8_t*, uint32_t, uint32_t, uint32_t, bool*)>
-ITC_REGS_STEP(InitBaseStep) {
+void InitBaseStep(lifted::Regs& ctx, uint8_t* base) {
   bool replaced = false;
   const uint32_t r3 =
       InitBase(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - nm::kInitBaseFrame, &replaced);
@@ -233,7 +233,7 @@ ITC_REGS_STEP(SessionFree) {
 }
 
 template <uint32_t kIndex>
-ITC_REGS_STEP(NetMachineCreate) {
+void NetMachineCreate(lifted::Regs& ctx, uint8_t* base) {
   uint64_t r3;
   {
     GuestCalls guest(ctx, base);
@@ -242,7 +242,7 @@ ITC_REGS_STEP(NetMachineCreate) {
   ctx.r3.u64 = r3;
 }
 template <uint32_t kIndex>
-ITC_REGS_STEP(NetMachineOpenMovie) {
+void NetMachineOpenMovie(lifted::Regs& ctx, uint8_t* base) {
   uint64_t r3;
   {
     GuestCalls guest(ctx, base);
@@ -251,11 +251,11 @@ ITC_REGS_STEP(NetMachineOpenMovie) {
   ctx.r3.u64 = r3;
 }
 template <uint32_t kIndex>
-ITC_REGS_STEP(NetMachineWaitForMovie) {
+void NetMachineWaitForMovie(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = nm::MachineWaitForMovie(base, kIndex, ctx.r3.u64, ctx.r1.u32);
 }
 template <uint32_t kIndex>
-ITC_REGS_STEP(NetMachineLeave) {
+void NetMachineLeave(lifted::Regs& ctx, uint8_t* base) {
   uint64_t r3;
   {
     GuestCalls guest(ctx, base);
@@ -264,7 +264,7 @@ ITC_REGS_STEP(NetMachineLeave) {
   ctx.r3.u64 = r3;
 }
 template <uint32_t kIndex>
-ITC_REGS_STEP(NetMachineDestroy) {
+void NetMachineDestroy(lifted::Regs& ctx, uint8_t* base) {
   uint64_t r3;
   {
     GuestCalls guest(ctx, base);
@@ -272,12 +272,30 @@ ITC_REGS_STEP(NetMachineDestroy) {
   }
   ctx.r3.u64 = r3;
 }
-#define ITC_NET_MACHINE(index)                                       \
-  template void NetMachineCreate<index>(lifted::Regs&, uint8_t*);      \
-  template void NetMachineOpenMovie<index>(lifted::Regs&, uint8_t*);   \
+// The forms on the SDK's context (the harness's), on a view of it.
+#define ITC_NET_MACHINE_CONTEXT_FORM(name)          \
+  template <uint32_t kIndex>                        \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name<kIndex>(scope.regs, base);                 \
+  }
+ITC_NET_MACHINE_CONTEXT_FORM(NetMachineCreate)
+ITC_NET_MACHINE_CONTEXT_FORM(NetMachineOpenMovie)
+ITC_NET_MACHINE_CONTEXT_FORM(NetMachineWaitForMovie)
+ITC_NET_MACHINE_CONTEXT_FORM(NetMachineLeave)
+ITC_NET_MACHINE_CONTEXT_FORM(NetMachineDestroy)
+#undef ITC_NET_MACHINE_CONTEXT_FORM
+#define ITC_NET_MACHINE(index)                                          \
+  template void NetMachineCreate<index>(lifted::Regs&, uint8_t*);       \
+  template void NetMachineOpenMovie<index>(lifted::Regs&, uint8_t*);    \
   template void NetMachineWaitForMovie<index>(lifted::Regs&, uint8_t*); \
-  template void NetMachineLeave<index>(lifted::Regs&, uint8_t*);       \
-  template void NetMachineDestroy<index>(lifted::Regs&, uint8_t*);
+  template void NetMachineLeave<index>(lifted::Regs&, uint8_t*);        \
+  template void NetMachineDestroy<index>(lifted::Regs&, uint8_t*);      \
+  template void NetMachineCreate<index>(PPCContext&, uint8_t*);         \
+  template void NetMachineOpenMovie<index>(PPCContext&, uint8_t*);      \
+  template void NetMachineWaitForMovie<index>(PPCContext&, uint8_t*);   \
+  template void NetMachineLeave<index>(PPCContext&, uint8_t*);          \
+  template void NetMachineDestroy<index>(PPCContext&, uint8_t*);
 ITC_NET_MACHINE(0)
 ITC_NET_MACHINE(1)
 ITC_NET_MACHINE(3)

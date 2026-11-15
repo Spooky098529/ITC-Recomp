@@ -129,13 +129,11 @@ void hooks::PowerGraphDraw(lifted::Regs& ctx, uint8_t* base) {
 void hooks::TuningScreenDrawPowerGraph(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t screen = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
-  const uint64_t r30 = ctx.r30.u64;
-  const uint64_t r31 = ctx.r31.u64;
   // The original's saves in its caller's frame (a segment count above 32
   // has PowerGraph::Draw's lines read them).
   guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
-  StoreDoubleword(base, ctx.r1.u32 - 24, r30);
-  StoreDoubleword(base, ctx.r1.u32 - 16, r31);
+  StoreDoubleword(base, ctx.r1.u32 - 24, 0);  // (the caller's r30: not carried by the view)
+  StoreDoubleword(base, ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
   ctx.fpscr.disableFlushMode();
   guest_call::InFrame(ctx, base, pg::kTuningFrame, pg::kTuningDrawReturn, [&](uint32_t frame) {
     uint32_t r3 = 0, movie = 0;
@@ -148,15 +146,12 @@ void hooks::TuningScreenDrawPowerGraph(lifted::Regs& ctx, uint8_t* base) {
     ctx.r6.u64 = draw.car;
     ctx.f1.f64 = draw.x;
     ctx.f2.f64 = draw.y;
-    // r30 and r31 as the original holds them (PowerGraph::Draw saves them
-    // in its frame).
-    ctx.r30.u64 = movie;
-    ctx.r31.u64 = screen;
+    // (The original holds r30 = the movie and r31 = the screen here, which
+    // PowerGraph::Draw saves in its frame: not carried by the view.)
+    (void)movie;
     ctx.lr = pg::kTuningDrawReturn;
     lifted::CallFromContext(ctx, base, 0x8217C708);
   });
-  ctx.r30.u64 = r30;
-  ctx.r31.u64 = r31;
   ctx.lr = lr;
 }
 
@@ -172,10 +167,9 @@ void hooks::CarListDrawEntryPowerGraph(lifted::Regs& ctx, uint8_t* base) {
   }
   const uint32_t entry = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
-  const uint64_t r31 = ctx.r31.u64;
   // The original's saves in its caller's frame.
   guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
-  StoreDoubleword(base, ctx.r1.u32 - 16, r31);
+  StoreDoubleword(base, ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
   ctx.fpscr.disableFlushMode();
   guest_call::InFrame(ctx, base, pg::kEntryFrame, pg::kEntryDrawReturn, [&](uint32_t frame) {
     const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
@@ -189,13 +183,12 @@ void hooks::CarListDrawEntryPowerGraph(lifted::Regs& ctx, uint8_t* base) {
     ctx.r6.u64 = draw.car;
     ctx.f1.f64 = draw.x;
     ctx.f2.f64 = draw.y;
-    // r31 as the original holds it (lis: sign-extended; PowerGraph::Draw
-    // saves it in its frame, where a count above 32 reads it back).
-    ctx.r31.u64 = 0xFFFFFFFF00000000ull | pg::kEntryR31;
+    // (The original holds r31 = kEntryR31 here, sign-extended, which
+    // PowerGraph::Draw saves in its frame, where a count above 32 reads it
+    // back: not carried by the view.)
     ctx.lr = pg::kEntryDrawReturn;
     lifted::CallFromContext(ctx, base, 0x8217C708);
   });
-  ctx.r31.u64 = r31;
   ctx.lr = lr;
 }
 
@@ -206,10 +199,9 @@ void hooks::CarListDrawCarPowerGraph(lifted::Regs& ctx, uint8_t* base) {
   }
   const uint32_t car = ctx.r3.u32;
   const uint64_t lr = ctx.lr;
-  const uint64_t r31 = ctx.r31.u64;
   // The original's saves in its caller's frame.
   guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
-  StoreDoubleword(base, ctx.r1.u32 - 16, r31);
+  StoreDoubleword(base, ctx.r1.u32 - 16, 0);  // (the caller's r31: not carried by the view)
   ctx.fpscr.disableFlushMode();
   guest_call::InFrame(ctx, base, pg::kCarFrame, pg::kCarDrawReturn, [&](uint32_t frame) {
     const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
@@ -223,13 +215,12 @@ void hooks::CarListDrawCarPowerGraph(lifted::Regs& ctx, uint8_t* base) {
     ctx.r6.u64 = draw.car;
     ctx.f1.f64 = draw.x;
     ctx.f2.f64 = draw.y;
-    // r31 as the original holds it (lis: sign-extended; PowerGraph::Draw
-    // saves it in its frame, where a count above 32 reads it back).
-    ctx.r31.u64 = 0xFFFFFFFF00000000ull | pg::kEntryR31;
+    // (The original holds r31 = kEntryR31 here, sign-extended, which
+    // PowerGraph::Draw saves in its frame, where a count above 32 reads it
+    // back: not carried by the view.)
     ctx.lr = pg::kCarDrawReturn;
     lifted::CallFromContext(ctx, base, 0x8217C708);
   });
-  ctx.r31.u64 = r31;
   ctx.lr = lr;
 }
 

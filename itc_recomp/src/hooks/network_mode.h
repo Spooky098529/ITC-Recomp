@@ -102,18 +102,23 @@ void SessionFree(lifted::Regs& ctx, uint8_t* base);
 // (r3 the machine, r4 the dispatcher). r3 as the originals leave it.
 template <uint32_t kIndex>
 void NetMachineCreate(PPCContext& ctx, uint8_t* base);
+template <uint32_t kIndex>
 void NetMachineCreate(lifted::Regs& ctx, uint8_t* base);
 template <uint32_t kIndex>
 void NetMachineOpenMovie(PPCContext& ctx, uint8_t* base);
+template <uint32_t kIndex>
 void NetMachineOpenMovie(lifted::Regs& ctx, uint8_t* base);
 template <uint32_t kIndex>
 void NetMachineWaitForMovie(PPCContext& ctx, uint8_t* base);
+template <uint32_t kIndex>
 void NetMachineWaitForMovie(lifted::Regs& ctx, uint8_t* base);
 template <uint32_t kIndex>
 void NetMachineLeave(PPCContext& ctx, uint8_t* base);
+template <uint32_t kIndex>
 void NetMachineLeave(lifted::Regs& ctx, uint8_t* base);
 template <uint32_t kIndex>
 void NetMachineDestroy(PPCContext& ctx, uint8_t* base);
+template <uint32_t kIndex>
 void NetMachineDestroy(lifted::Regs& ctx, uint8_t* base);
 // Type12Screen1::ResetData (r3 the data; only Create calls it: no adapter).
 void Type12Screen1ResetData(PPCContext& ctx, uint8_t* base);
