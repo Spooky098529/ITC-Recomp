@@ -168,9 +168,9 @@ fd::ThreadCalls ThreadCallsOn(lifted::Regs& ctx, uint8_t* base) {
   fd::ThreadCalls calls;
   calls.import = [&ctx, base](fd::Import import, std::initializer_list<uint64_t> args,
                               uint32_t return_address) {
-    int reg = 3;
+    lifted::Temp* reg = &ctx.r3;  // r3 to r10 are consecutive in the view
     for (uint64_t arg : args) {
-      guest_call::Gpr(ctx, reg++).u64 = arg;
+      (reg++)->u64 = arg;
     }
     ctx.lr = return_address;
     switch (import) {
@@ -197,14 +197,9 @@ fd::ThreadCalls ThreadCallsOn(lifted::Regs& ctx, uint8_t* base) {
   };
   calls.in_frame = [&ctx, base](uint32_t bytes, uint32_t return_address,
                                 const std::function<void(uint32_t)>& body) {
-    uint64_t kept[18];
-    for (int i = 0; i < 18; i++) {
-      kept[i] = (&ctx.r14)[i].u64;
-    }
+    // (r14 to r31 were kept and put back around the body: nothing to keep
+    // without a context)
     guest_call::InFrame(ctx, base, bytes, return_address, body);
-    for (int i = 0; i < 18; i++) {
-      (&ctx.r14)[i].u64 = kept[i];
-    }
   };
   calls.set_last_error_from_status = [&ctx, base](uint32_t status) {
     last_error::SetFromStatus(base, ctx.r13.u32, status);
@@ -252,16 +247,16 @@ ITC_REGS_STEP(ResumeThreadStep) {
 ITC_REGS_STEP(VideoOutputUnbindAll) {
   const uint32_t video_output = ctx.r3.u32;
   fd::UnbindCalls calls;
-  auto setter = [&](void (*function)(lifted::Regs&, uint8_t*), uint32_t device, uint32_t return_address) {
+  auto setter = [&](uint32_t function, uint32_t device, uint32_t return_address) {
     ctx.r3.u64 = device;
     ctx.lr = return_address;
-    function(ctx, base);
+    lifted::CallFromContext(ctx, base, function);
   };
   calls.set_texture = [&](uint32_t device, uint32_t stage, uint64_t mask) {
     ctx.r4.u64 = stage;
     ctx.r5.u64 = 0;
     ctx.r6.u64 = mask;
-    setter(sub_822A6008, device, 0x8258DA30);
+    setter(0x822A6008, device, 0x8258DA30);
   };
   calls.set_stream_source = [&](uint32_t device, uint32_t stream, uint64_t mask) {
     ctx.r4.u64 = stream;
@@ -269,39 +264,35 @@ ITC_REGS_STEP(VideoOutputUnbindAll) {
     ctx.r6.u64 = 0;
     ctx.r7.u64 = 0;
     ctx.r8.u64 = mask;
-    setter(sub_822A3758, device, 0x8258DA70);
+    setter(0x822A3758, device, 0x8258DA70);
   };
   calls.set_indices = [&](uint32_t device) {
     ctx.r4.u64 = 0;
-    setter(sub_822A3908, device, 0x8258DA88);
+    setter(0x822A3908, device, 0x8258DA88);
   };
   calls.set_pixel_shader = [&](uint32_t device) {
     ctx.r4.u64 = 0;
-    setter(sub_822A8618, device, 0x8258DA94);
+    setter(0x822A8618, device, 0x8258DA94);
   };
   calls.set_vertex_shader = [&](uint32_t device) {
     ctx.r4.u64 = 0;
-    setter(sub_822A8958, device, 0x8258DAA0);
+    setter(0x822A8958, device, 0x8258DAA0);
   };
-  calls.set_register = [&](int reg, uint64_t value) { guest_call::Gpr(ctx, reg).u64 = value; };
-  uint64_t kept[18];
-  for (int i = 0; i < 18; i++) {
-    kept[i] = (&ctx.r14)[i].u64;
-  }
+  // The registers set are the original's nonvolatile ones, which reached
+  // callees only as the bytes they save: not carried by the view (nor kept
+  // and put back around the frame).
+  calls.set_register = [](int, uint64_t) {};
   guest_call::InFrame(ctx, base, 112, 0x8258DA30,
                       [&](uint32_t) { fd::VideoOutputUnbindAll(base, video_output, calls); });
-  for (int i = 0; i < 18; i++) {
-    (&ctx.r14)[i].u64 = kept[i];
-  }
 }
 
 namespace {
 
 fd::SceneSetUpCalls SceneSetUpCallsOn(lifted::Regs& ctx, uint8_t* base) {
   fd::SceneSetUpCalls calls;
-  auto call = [&ctx, base](void (*function)(lifted::Regs&, uint8_t*), uint32_t return_address) {
+  auto call = [&ctx, base](uint32_t function, uint32_t return_address) {
     ctx.lr = return_address;
-    function(ctx, base);
+    lifted::CallFromContext(ctx, base, function);
     return ctx.r3.u32;
   };
   calls.vcall = [&ctx, base](uint32_t object, uint32_t byte, uint64_t r4, uint64_t r5,
@@ -310,27 +301,26 @@ fd::SceneSetUpCalls SceneSetUpCallsOn(lifted::Regs& ctx, uint8_t* base) {
     ctx.r4.u64 = r4;
     ctx.r5.u64 = r5;
     const uint32_t target = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
-    ctx.r11.u64 = target;
-    ctx.ctr.u64 = target;
+    ctx.ctr.u64 = target;  // (r11, also the target there: none reads it)
     ctx.lr = return_address;
     lifted::CallFromContext(ctx, base, target);
     return ctx.r3.u32;
   };
   calls.render_queue_construct = [&ctx, call](uint32_t queue) {
     ctx.r3.u64 = queue;
-    call(sub_825915E0, 0x82098AD0);
+    call(0x825915E0, 0x82098AD0);
   };
   calls.create_declaration = [&ctx, call](uint32_t elements, uint32_t return_address) {
     ctx.r3.u64 = elements;
-    return call(sub_822A8980, return_address);
+    return call(0x822A8980, return_address);
   };
   calls.operator_new = [&ctx, call](uint32_t bytes) {
     ctx.r3.u64 = bytes;
-    return call(sub_825A6940, 0x8258CD88);
+    return call(0x825A6940, 0x8258CD88);
   };
   calls.operator_delete = [&ctx, call](uint32_t block) {
     ctx.r3.u64 = block;
-    call(sub_825A71C0, 0x8258CD50);
+    call(0x825A71C0, 0x8258CD50);
   };
   calls.alloc_physical = [&ctx, call](uint32_t bytes, uint32_t return_address) {
     ctx.r3.u64 = bytes;
@@ -338,24 +328,21 @@ fd::SceneSetUpCalls SceneSetUpCallsOn(lifted::Regs& ctx, uint8_t* base) {
     ctx.r5.u64 = 0xFFFFFFFFFFFFFFFFull;
     ctx.r6.u64 = 4;
     ctx.r7.u64 = 4;
-    return call(sub_8258E098, return_address);
+    return call(0x8258E098, return_address);
   };
   calls.alloc_virtual = [&ctx, call](uint32_t bytes, uint32_t return_address) {
     ctx.r3.u64 = bytes;
-    return call(sub_8258DFF0, return_address);
+    return call(0x8258DFF0, return_address);
   };
   calls.in_frame = [&ctx, base](uint32_t bytes, uint32_t return_address,
                                 const std::function<void(uint32_t)>& body) {
-    uint64_t kept[18];
-    for (int i = 0; i < 18; i++) {
-      kept[i] = (&ctx.r14)[i].u64;
-    }
+    // (r14 to r31 were kept and put back around the body: nothing to keep
+    // without a context)
     guest_call::InFrame(ctx, base, bytes, return_address, body);
-    for (int i = 0; i < 18; i++) {
-      (&ctx.r14)[i].u64 = kept[i];
-    }
   };
-  calls.set_register = [&ctx](int reg, uint64_t value) { guest_call::Gpr(ctx, reg).u64 = value; };
+  // The registers set are the original's nonvolatile ones, which reached
+  // callees only as the bytes they save: not carried by the view.
+  calls.set_register = [](int, uint64_t) {};
   return calls;
 }
 
@@ -405,7 +392,7 @@ ITC_REGS_STEP(PrimitiveDeclInitStep) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {              \
     \
     if (!hooks::NativeFrameDriver()) {          \
-      __imp__sub_##address(ctx, base);              \
+      lifted::Sdk(ctx, base, __imp__sub_##address); \
       return;                                       \
     }                                               \
     hooks::step(ctx, base);                         \
