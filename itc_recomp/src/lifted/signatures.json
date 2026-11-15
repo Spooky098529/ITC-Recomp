@@ -1,0 +1,23 @@
+{
+ "sub_82090840": "uint64_t f82090840(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3)",
+ "sub_82090890": "uint64_t f82090890(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3)",
+ "sub_820951D8": "double f820951D8(uint8_t* base, uint64_t r1, uint64_t r3)",
+ "sub_821128A0": "void f821128A0(uint8_t* base, uint64_t r3)",
+ "sub_8214B2C8": "uint64_t f8214B2C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3)",
+ "sub_822ADA28": "uint64_t f822ADA28(uint8_t* base, uint64_t r3)",
+ "sub_822B43C0": "uint64_t f822B43C0(uint8_t* base, uint64_t r3)",
+ "sub_822B6070": "lifted::Result f822B6070(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r8, uint64_t r9, uint64_t r10)",
+ "sub_82578470": "uint64_t f82578470(uint8_t* base, uint64_t r3, uint64_t r4)",
+ "sub_8257D6F8": "void f8257D6F8(uint8_t* base, uint64_t r3)",
+ "sub_825BFCC8": "uint64_t f825BFCC8(uint8_t* base, uint64_t r4, uint64_t r5)",
+ "sub_825C09A8": "lifted::Result f825C09A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3)",
+ "sub_825CD358": "void f825CD358(uint8_t* base, uint64_t r3, double f1)",
+ "sub_825CFF70": "void f825CFF70(uint8_t* base, uint64_t r3, uint64_t r4)",
+ "sub_825D36F0": "uint64_t f825D36F0(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5)",
+ "sub_825D94C8": "void f825D94C8(uint8_t* base)",
+ "sub_825D99A0": "void f825D99A0(uint8_t* base)",
+ "sub_825D9C40": "uint64_t f825D9C40(uint8_t* base, uint64_t r1, uint64_t r13)",
+ "sub_825DA0A0": "uint64_t f825DA0A0(uint8_t* base, uint64_t r1, uint64_t r13)",
+ "sub_825DA5D0": "void f825DA5D0(uint8_t* base)",
+ "sub_825DAD90": "void f825DAD90(uint8_t* base)"
+}

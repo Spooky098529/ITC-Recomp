@@ -844,6 +844,7 @@ set(ITC_SOURCES
     src/harnesses/predicated_tiling.cpp
     src/harnesses/power_graph.cpp
     src/harnesses/menu_helpers.cpp
+    src/harnesses/lifted.cpp
     src/harnesses/morph_jobs.cpp
     src/harnesses/race_update.cpp
     src/harnesses/stand_models.cpp
@@ -1140,6 +1141,12 @@ target_compile_options(itc_xenos_shaders PRIVATE -Wno-unused-variable)
 target_link_libraries(itc_xenos_shaders PUBLIC
     rexruntime xxHash::xxhash Vulkan::Headers glslang::SPIRV glslang
     MachineIndependent GenericCodeGen OSDependent OGLCompiler)
+
+# The lift sweep's functions (docs/loops/lift-sweep.md): written by
+# tools/lift.py, so taken by glob rather than listed.
+file(GLOB ITC_LIFTED_SOURCES CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lifted/*.cpp")
+list(APPEND ITC_SOURCES ${ITC_LIFTED_SOURCES})
 
 # The game's executable, from our sources and the recompiled code.
 # The harnesses (src/harnesses/, --run_harnesses: "Checking with a harness" in
