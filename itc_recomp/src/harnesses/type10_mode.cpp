@@ -871,17 +871,17 @@ void Mode(Context& h, const World& w) {
                t.r3.u64 = w.machine() | (uint64_t(r.Below(2)) << 32);
              }});
   Run(h, w, {"ModeType10::WaitForLoads (sub_82288B70)", 100, __imp__sub_82288B70,
-             ITC_CONTEXT_FN(hooks::ModeType10WaitForLoads), {{-112, -16}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType10WaitForLoads), {{-112, -16}}, Delegate});
   Run(h, w, {"ModeType10::NextMode (sub_82288E68)", 300, __imp__sub_82288E68,
-             ITC_CONTEXT_FN(hooks::ModeType10NextMode), {{-128, -40}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType10NextMode), {{-128, -40}}, Delegate});
   Run(h, w, {"ModeType10::LeaveScreen (sub_82288DA0)", 60, __imp__sub_82288DA0,
-             ITC_CONTEXT_FN(hooks::ModeType10LeaveScreen), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType10LeaveScreen), {{-128, -32}}, Delegate});
   Run(h, w, {"ModeType10::WaitForShown (sub_82288CA0)", 100, __imp__sub_82288CA0,
-             ITC_CONTEXT_FN(hooks::ModeType10WaitForShown), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType10WaitForShown), {{-128, -32}}, Delegate});
   Run(h, w, {"ModeType10::Leaving (sub_822890D8)", 100, __imp__sub_822890D8,
-             ITC_CONTEXT_FN(hooks::ModeType10Leaving), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType10Leaving), {{-128, -32}}, Delegate});
   Run(h, w, {"ModeType9::NextModeAnswer (sub_8225D638)", 20, __imp__sub_8225D638,
-             ITC_CONTEXT_FN(hooks::ModeType10NextModeAnswer), {}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType10NextModeAnswer), {}, Delegate});
   Run(h, w, {"ModeType10::Interrupt (sub_82288A68)", 150, __imp__sub_82288A68,
              ITC_CONTEXT_FN(hooks::ModeType10Interrupt), {{-96, -16}}, Interface});
   Run(h, w, {"ModeType9::ForceExit (sub_8225D828)", 60, __imp__sub_8225D828,

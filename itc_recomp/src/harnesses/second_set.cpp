@@ -1387,8 +1387,12 @@ void Finds(Context& h, Random& r, uint32_t block) {
     GuestFunction recompiled, native;
     uint32_t at;  // the group in the parts' block
   };
-#define ITC_FIND_STEP(function) \
-  [](PPCContext& c, uint8_t* b) { hooks::SecondSetFindStep(c, b, ss::function); }
+#define ITC_FIND_STEP(function)                                       \
+  [](PPCContext& c, uint8_t* b) {                                     \
+    harness::OnView(c, [&](lifted::Regs& v) {                         \
+      hooks::SecondSetFindStep(v, b, ss::function);                   \
+    });                                                               \
+  }
   const Find finds[] = {
       {"PartsPoints::FindFrontBumper (sub_820DE140)", __imp__sub_820DE140,
        ITC_FIND_STEP(PartsFindFrontBumper), 0},
@@ -1672,8 +1676,12 @@ void Wheels(Context& h, Random& r, uint32_t b) {
   Put(h.base, scene::kScene, b + kWheelScene);
   const uint32_t block = b + kWheelBlock;
   const uint32_t model = b + kWheelModels;
-#define ITC_WHEEL_STEP(function) \
-  [](PPCContext& c, uint8_t* base) { hooks::SecondSetWheelStep(c, base, ss::function); }
+#define ITC_WHEEL_STEP(function)                                      \
+  [](PPCContext& c, uint8_t* base) {                                  \
+    harness::OnView(c, [&](lifted::Regs& v) {                         \
+      hooks::SecondSetWheelStep(v, base, ss::function);               \
+    });                                                               \
+  }
   struct Step {
     const char* name;
     GuestFunction recompiled, native;

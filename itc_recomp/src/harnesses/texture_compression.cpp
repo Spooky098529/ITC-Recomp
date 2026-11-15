@@ -244,8 +244,9 @@ void NativeCreate(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const auto r3 =
-      tc::CreateCodec(base, ctx.r3.u32, ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx, base));
+  const auto r3 = harness::OnView(ctx, [&](lifted::Regs& regs) {
+    return tc::CreateCodec(base, regs.r3.u32, regs.r1.u32, hooks::TextureCompressionGuestCall(regs, base));
+  });
   if (!r3) {
     __imp__sub_823F6C60(ctx, base);
     return;
@@ -263,15 +264,17 @@ void NativeBlitterRelease(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 =
-      tc::BlitterRelease(base, ctx.r3.u32, ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx, base));
+  ctx.r3.u64 = harness::OnView(ctx, [&](lifted::Regs& regs) {
+    return tc::BlitterRelease(base, regs.r3.u32, regs.r1.u32, hooks::TextureCompressionGuestCall(regs, base));
+  });
 }
 
 void NativeCopyRows(PPCContext& ctx, uint8_t* base) {
   // Its results are made by lis (sign-extended), as are Init's and
   // XGCompressSurface's.
-  ctx.r3.s64 = int32_t(
-      tc::BlitterCopyRows(base, ctx.r3.u32, ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx, base)));
+  ctx.r3.s64 = int32_t(harness::OnView(ctx, [&](lifted::Regs& regs) {
+    return tc::BlitterCopyRows(base, regs.r3.u32, regs.r1.u32, hooks::TextureCompressionGuestCall(regs, base));
+  }));
 }
 
 void NativeConvertRows(PPCContext& ctx, uint8_t* base) {
@@ -280,8 +283,9 @@ void NativeConvertRows(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.fpscr.disableFlushMode();
-  const auto r3 = tc::BlitterConvertRows(base, ctx.r3.u32, ctx.r1.u32,
-                                         hooks::TextureCompressionGuestCall(ctx, base));
+  const auto r3 = harness::OnView(ctx, [&](lifted::Regs& regs) {
+    return tc::BlitterConvertRows(base, regs.r3.u32, regs.r1.u32, hooks::TextureCompressionGuestCall(regs, base));
+  });
   if (!r3) {
     __imp__sub_823699F8(ctx, base);
     return;
@@ -295,8 +299,10 @@ void NativeBlitterInit(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.fpscr.disableFlushMode();
-  ctx.r3.s64 = int32_t(tc::BlitterInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                                       ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx, base)));
+  ctx.r3.s64 = int32_t(harness::OnView(ctx, [&](lifted::Regs& regs) {
+    return tc::BlitterInit(base, regs.r3.u32, regs.r4.u32, regs.r5.u32, regs.r6.u32, regs.r1.u32,
+                           hooks::TextureCompressionGuestCall(regs, base));
+  }));
 }
 
 void NativeGetBlockDimensions(PPCContext& ctx, uint8_t* base) {
@@ -2485,8 +2491,9 @@ void NativeCompressSurface(PPCContext& ctx, uint8_t* base) {
   const texture_compression::CompressArguments arguments{
       ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
       ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, ctx.f1.f64};
-  const auto r3 = texture_compression::CompressSurface(
-      base, arguments, ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx, base));
+  const auto r3 = harness::OnView(ctx, [&](lifted::Regs& regs) {
+    return texture_compression::CompressSurface(base, arguments, regs.r1.u32, hooks::TextureCompressionGuestCall(regs, base));
+  });
   if (!r3) {
     __imp__sub_8235AAC0(ctx, base);
     return;

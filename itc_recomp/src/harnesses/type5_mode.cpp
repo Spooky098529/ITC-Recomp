@@ -664,15 +664,15 @@ void Mode(Context& h, const World& w) {
                t.r3.u64 = w.type_block() | High(r);
              }});
   Run(h, w, {"ModeType5::WaitForLoads (sub_82230050)", 100, __imp__sub_82230050,
-             ITC_CONTEXT_FN(hooks::ModeType5WaitForLoads), {{-128, -32}}, ITC_CONTEXT_FN(Delegate), nullptr, false, true});
+             ITC_CONTEXT_FN(hooks::ModeType5WaitForLoads), {{-128, -32}}, Delegate, nullptr, false, true});
   Run(h, w, {"ModeType5::NextMode (sub_82230458)", 300, __imp__sub_82230458,
-             ITC_CONTEXT_FN(hooks::ModeType5NextMode), {{-160, -64}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType5NextMode), {{-160, -64}}, Delegate});
   Run(h, w, {"ModeType5::LeaveScreen (sub_82230260)", 60, __imp__sub_82230260,
-             ITC_CONTEXT_FN(hooks::ModeType5LeaveScreen), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType5LeaveScreen), {{-128, -32}}, Delegate});
   Run(h, w, {"ModeType5::WaitForShown (sub_82230168)", 100, __imp__sub_82230168,
-             ITC_CONTEXT_FN(hooks::ModeType5WaitForShown), {{-112, -16}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType5WaitForShown), {{-112, -16}}, Delegate});
   Run(h, w, {"ModeType5::Leaving (sub_82230328)", 100, __imp__sub_82230328,
-             ITC_CONTEXT_FN(hooks::ModeType5Leaving), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType5Leaving), {{-128, -32}}, Delegate});
   // The slot 14 thunk: the mode's vtable this mode's (its slot 14 Leaving).
   Run(h, w, {"Mode::Slot14Thunk (sub_8222FC50)", 60, __imp__sub_8222FC50, ITC_CONTEXT_FN(hooks::ModeSlot14Thunk),
              {{-128, -32}},

@@ -1968,7 +1968,9 @@ void StickerFields(PPCContext&, Random& r, const World& w) {
 // update calls their plain C++).
 template <uint32_t kCommand>
 void StickerCommandStep(PPCContext& ctx, uint8_t* base) {
-  hooks::TuningPagesStickerCommand(ctx, base, kCommand);
+  harness::OnView(ctx, [&](lifted::Regs& regs) {
+    hooks::TuningPagesStickerCommand(regs, base, kCommand);
+  });
 }
 
 // The update's sticker commands (sticker_commands.cpp) over StickerFields'

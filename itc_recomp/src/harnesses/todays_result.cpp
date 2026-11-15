@@ -759,15 +759,15 @@ void Mode(Context& h, const World& w) {
   Run(h, w, {"TodaysEvent::Kind (sub_8225BA48)", 100, __imp__sub_8225BA48,
              ITC_CONTEXT_FN(hooks::TodaysEventKind), {{-96, -8}}, [](PPCContext&, Random&, const World&) {}});
   Run(h, w, {"ModeType9::WaitForLoads (sub_8225D918)", 150, __imp__sub_8225D918,
-             ITC_CONTEXT_FN(hooks::ModeType9WaitForLoads), {{-128, -40}}, ITC_CONTEXT_FN(Delegate), nullptr, true});
+             ITC_CONTEXT_FN(hooks::ModeType9WaitForLoads), {{-128, -40}}, Delegate, nullptr, true});
   Run(h, w, {"ModeType9::NextMode (sub_8225DC38)", 300, __imp__sub_8225DC38,
-             ITC_CONTEXT_FN(hooks::ModeType9NextMode), {{-144, -56}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType9NextMode), {{-144, -56}}, Delegate});
   Run(h, w, {"ModeType9::LeaveScreen (sub_8225DB70)", 60, __imp__sub_8225DB70,
-             ITC_CONTEXT_FN(hooks::ModeType9LeaveScreen), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType9LeaveScreen), {{-128, -32}}, Delegate});
   Run(h, w, {"ModeType9::WaitForShown (sub_8225DA68)", 100, __imp__sub_8225DA68,
-             ITC_CONTEXT_FN(hooks::ModeType9WaitForShown), {{-112, -16}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType9WaitForShown), {{-112, -16}}, Delegate});
   Run(h, w, {"ModeType9::Leaving (sub_8225DE78)", 150, __imp__sub_8225DE78,
-             ITC_CONTEXT_FN(hooks::ModeType9Leaving), {{-128, -32}}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType9Leaving), {{-128, -32}}, Delegate});
   Run(h, w, {"ModeType9::IsLoaded (sub_8225D6A8)", 40, __imp__sub_8225D6A8,
              ITC_CONTEXT_FN(hooks::ModeType9IsLoaded), {},
              [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.mode() + 32; }});

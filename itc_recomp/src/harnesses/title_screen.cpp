@@ -1035,17 +1035,17 @@ void Mode(Context& h, const World& w) {
   Run(h, w, {"ModeType4::FindShown (sub_82224C10)", 60, __imp__sub_82224C10,
              ITC_CONTEXT_FN(hooks::ModeType4FindShown), {{-96, -8}}, BlockArgs, ScreenBlock});
   Run(h, w, {"ModeType4::Restart (sub_82225098)", 100, __imp__sub_82225098,
-             ITC_CONTEXT_FN(hooks::ModeType4Restart), {{-112, -16}}, ITC_CONTEXT_FN(Delegate), ScreenBlock});
+             ITC_CONTEXT_FN(hooks::ModeType4Restart), {{-112, -16}}, Delegate, ScreenBlock});
   Run(h, w, {"ModeType4::NextMode (sub_82225390)", 200, __imp__sub_82225390,
-             ITC_CONTEXT_FN(hooks::ModeType4NextMode), {{-144, -56}, {-240, -152}}, ITC_CONTEXT_FN(Delegate), ScreenBlock});
+             ITC_CONTEXT_FN(hooks::ModeType4NextMode), {{-144, -56}, {-240, -152}}, Delegate, ScreenBlock});
   Run(h, w, {"ModeType4::LeaveScreen (sub_822252C8)", 60, __imp__sub_822252C8,
-             ITC_CONTEXT_FN(hooks::ModeType4LeaveScreen), {{-128, -32}, {-224, -136}}, ITC_CONTEXT_FN(Delegate), ScreenBlock});
+             ITC_CONTEXT_FN(hooks::ModeType4LeaveScreen), {{-128, -32}, {-224, -136}}, Delegate, ScreenBlock});
   Run(h, w, {"ModeType4::WaitForLeave (sub_822251D0)", 100, __imp__sub_822251D0,
-             ITC_CONTEXT_FN(hooks::ModeType4WaitForLeave), {{-112, -16}, {-208, -120}}, ITC_CONTEXT_FN(Delegate), ScreenBlock});
+             ITC_CONTEXT_FN(hooks::ModeType4WaitForLeave), {{-112, -16}, {-208, -120}}, Delegate, ScreenBlock});
   Run(h, w, {"ModeType4::Leaving (sub_82225698)", 100, __imp__sub_82225698,
-             ITC_CONTEXT_FN(hooks::ModeType4Leaving), {{-128, -32}}, ITC_CONTEXT_FN(Delegate), ScreenBlock});
+             ITC_CONTEXT_FN(hooks::ModeType4Leaving), {{-128, -32}}, Delegate, ScreenBlock});
   Run(h, w, {"ModeType4::NextModeAnswer (sub_82224B98)", 20, __imp__sub_82224B98,
-             ITC_CONTEXT_FN(hooks::ModeType4NextModeAnswer), {}, ITC_CONTEXT_FN(Delegate)});
+             ITC_CONTEXT_FN(hooks::ModeType4NextModeAnswer), {}, Delegate});
   Run(h, w, {"ModeType4::Interrupt (sub_82224E20)", 100, __imp__sub_82224E20,
              ITC_CONTEXT_FN(hooks::ModeType4Interrupt), {{-96, -8}}, Interface});
   Run(h, w, {"ModeType4::ForceExit (sub_82224ED0)", 60, __imp__sub_82224ED0,
