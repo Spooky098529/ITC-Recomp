@@ -926,8 +926,8 @@ command-line options win over it). Since 2026-10-20 the once-a-frame mirrors
 are on by default (and the native renderer always draws: its switches,
 `--native_renderer` and `--native_renderer_exclusive`, went in B3), and without
 `--game_data_root` the game's files are looked for next to the executable
-(`ItcApp::OnConfigurePaths`; the SDK reads that flag before `itc.toml`
-loads), so a bare `./itc` plays as released.
+(`src/app/main.cpp`, our own start-up since 2026-11-15; the flag is read
+before `itc.toml` loads), so a bare `./itc` plays as released.
 
 ## Status (`main`, 2026-10-20, v0.4.7.1)
 
