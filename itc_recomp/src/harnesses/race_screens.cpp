@@ -2277,6 +2277,16 @@ void Transitions(Context& h) {
         }
       },
       __imp__sub_8220D0B8, hooks::RaceScreensPauseMenuShowVolumes, {112, 24});
+  // ShowVolume: r3 a leaf, r4 the volume 0 to 15, now and then any word
+  // (SetNodeText's unset r7 to r10 stored at its frame's +48 to +79 left
+  // out; r29 to r31 and lr saved at the top 32 bytes).
+  MovieGroup(
+      h, w, "PauseMenu::ShowVolume (sub_8220D040)", 150,
+      [](PPCContext& t, Random& r, const MovieWorld& w) {
+        t.r3.u64 = w.leaf(r.Below(kLeaves));
+        t.r4.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(r.Below(17));
+      },
+      __imp__sub_8220D040, hooks::RaceScreensPauseMenuShowVolume, {112, 32, {48, 80}});
   // ShowSlider: r3 a leaf, r4 the value -10 to 10, now and then any word
   // (SetNodeText's unset r7 to r10 stored at its frame's +48 to +79 left out).
   MovieGroup(

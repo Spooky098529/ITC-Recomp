@@ -114,6 +114,9 @@ void RaceScreensPauseMenuShowOptions(PPCContext& ctx, uint8_t* base);
 // sub_8220E888, Open sub_8220FA88 (r3 the screen, r4 the kind, r5 the flag).
 void RaceScreensPauseMenuShowVolumes(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuShowSlider(PPCContext& ctx, uint8_t* base);
+// PauseMenu::ShowVolume sub_8220D040 (never seen in play): its wrap in
+// src/debug/pause_movie_log.cpp runs this with --native_race_screens.
+void RaceScreensPauseMenuShowVolume(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuRestoreNodes(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuMoveOptions(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuMoveAdjust(PPCContext& ctx, uint8_t* base);

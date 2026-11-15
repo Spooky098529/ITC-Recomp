@@ -595,14 +595,18 @@ extern "C" REX_FUNC(sub_821BE5A8) {
   __imp__sub_821BE5A8(ctx, base);
 }
 
+// PauseMenu::ShowVolume: natively with --native_race_screens
+// (src/race_screens/transitions.cpp), inside the log's wrap.
 extern "C" REX_FUNC(sub_8220D040) {
   REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8220D040(ctx, base);
-    return;
+  if (ITC_FLAG(log_pause_movie)) {
+    debug::LogCall("8220D040 node and flags by selection", ctx);
   }
-  debug::LogCall("8220D040 node and flags by selection", ctx);
-  __imp__sub_8220D040(ctx, base);
+  if (ITC_FLAG(native_race_screens)) {
+    hooks::RaceScreensPauseMenuShowVolume(ctx, base);
+  } else {
+    __imp__sub_8220D040(ctx, base);
+  }
 }
 
 // The selection-change handler sub_8220DD98 (r3 = its state; runs when +0
