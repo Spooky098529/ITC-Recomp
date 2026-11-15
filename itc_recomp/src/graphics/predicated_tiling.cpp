@@ -192,4 +192,13 @@ uint32_t WorkerThread(uint8_t* base, uint32_t block, uint32_t timeout,
   }
 }
 
+uint32_t WakeWorker(uint8_t* base, uint32_t argument, uint32_t cpu,
+                    const std::function<uint32_t(uint32_t event, uint32_t increment,
+                                                 uint32_t wait)>& set_event) {
+  ITC_NATIVE_RUNNING("sub_822B6A78 Device::WakeWorker");
+  const uint32_t device = guest::LoadU32(base, guest::LoadU32(base, kVdGlobalDeviceImport));
+  guest::StoreU32(base, device + 10892, argument);
+  return set_event(device + cpu * 56 + 11244, 1, 0);
+}
+
 }  // namespace graphics::predicated_tiling
