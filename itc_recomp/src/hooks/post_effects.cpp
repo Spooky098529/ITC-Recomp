@@ -175,7 +175,7 @@ ITC_POST_EFFECTS(82135148, ctx.fpscr.disableFlushMode();
       r3 = __VA_ARGS__;                                       \
     }                                                         \
     if (!r3) {                                                \
-      __imp__sub_##address(ctx, base);                        \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                        \
       return;                                                 \
     }                                                         \
     ctx.r3.u64 = *r3;                                         \
@@ -439,7 +439,7 @@ RecordCalls PostEffectsRecordCalls(lifted::Regs& ctx, uint8_t* base) {
       ctx.r3.u64 = effect;                                                             \
     }                                                                                  \
     if (!r3) {                                                                         \
-      __imp__sub_##address(ctx, base);                                                 \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                                 \
       return;                                                                          \
     }                                                                                  \
     ctx.r3.u64 = *r3;                                                                  \
@@ -477,7 +477,7 @@ ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                                 \
     \
     if (!ITC_FLAG(native_post_effects) || ((ctx.r4.u32 & 1) != 0 && !FreesNative())) { \
-      __imp__sub_##address(ctx, base);                                                 \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                                 \
       return;                                                                          \
     }                                                                                  \
     const uint64_t lr = ctx.lr;                                                        \
@@ -489,7 +489,7 @@ ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
     });                                                                                \
     ctx.lr = lr;                                                                       \
     if (!r3) {                                                                         \
-      __imp__sub_##address(ctx, base);                                                 \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                                 \
       return;                                                                          \
     }                                                                                  \
     ctx.r3.u64 = *r3;                                                                  \
@@ -498,3 +498,14 @@ ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
 ITC_POST_EFFECT_DELETE(821389C8, EffectKind::kGlow)
 ITC_POST_EFFECT_DELETE(82138570, EffectKind::kColorFilter)
 ITC_POST_EFFECT_DELETE(821385C0, EffectKind::kMotionBlur)
+
+// The forms on the SDK's context the header declares (a harness's), on a
+// view of it (the rewiring, stage 3).
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::PostEffectsGlowRecord)
+ITC_CONTEXT_FORM(hooks::PostEffectsInitBoot)
+#undef ITC_CONTEXT_FORM

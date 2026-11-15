@@ -514,3 +514,17 @@ ITC_NETWORK_MODE(8227BFB8, NetModeSelectOnYes)
 ITC_NETWORK_MODE(8227BFD8, NetModeSelectOnDialogClosed)
 ITC_NETWORK_MODE(8227C7A8, NetModeSelectUnload)
 ITC_NETWORK_MODE(8227C810, NetModeSelectUnloaded)
+
+// The forms on the SDK's context the header declares (a harness's), on a
+// view of it (the rewiring, stage 3).
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::ModeType12LeaveScreen)
+ITC_CONTEXT_FORM(hooks::ModeType12NextMode)
+ITC_CONTEXT_FORM(hooks::ModeType12Teardown)
+ITC_CONTEXT_FORM(hooks::ModeType12WaitForLoads)
+ITC_CONTEXT_FORM(hooks::ModeType12WaitForShown)
+#undef ITC_CONTEXT_FORM
