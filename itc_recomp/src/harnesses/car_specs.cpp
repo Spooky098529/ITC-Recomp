@@ -983,7 +983,9 @@ void Load(Context& h) {
       if (v == 0) {
         __imp__sub_820CC2A8(t, h.base);
       } else {
-        hooks::SetArchiveSerial(t, cs::ParamsLoad(h.base, loads.Native()));
+        harness::OnView(t, [&](lifted::Regs& regs) {
+          hooks::SetArchiveSerial(regs, cs::ParamsLoad(h.base, loads.Native()));
+        });
       }
       guest::StoreU32(h.base, cs::kParams, saved);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));

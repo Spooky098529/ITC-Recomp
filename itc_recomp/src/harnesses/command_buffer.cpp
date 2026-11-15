@@ -588,99 +588,127 @@ void CommandBuffer(Context& h) {
                    "address; the segment flow's cases skipped",
                    b.ring);
     } else {
-      RunRing(h, b, "Device::EndSegment (sub_8229EF48)", __imp__sub_8229EF48, 800,
-              [&](Random& r, PPCContext& t, int c) {
-                const uint32_t open = FlowFields(h, b, r, c, false);
-                ThrottleFences(h, b, r, open, true);
-                TrainingFailed(h, b, r, open);
-                t.r3.u64 = b.device;
-              },
-              [&](PPCContext& t) {
-                t.r3.u64 = cb::EndSegment(h.base, t.r3.u32, hooks::CommandBufferKick(t, h.base));
-              });
-      RunRing(h, b, "Device::KickSegment (sub_8229EDA8)", __imp__sub_8229EDA8, 600,
-              [&](Random& r, PPCContext& t, int c) {
-                const uint32_t open = FlowFields(h, b, r, c, false);
-                ThrottleFences(h, b, r, open, true);
-                guest::StoreU32(h.base, cb::kTrainingFailed, 0);
-                t.r3.u64 = b.device;
-              },
-              [&](PPCContext& t) {
-                t.r3.u64 = cb::KickSegment(h.base, t.r3.u32, hooks::CommandBufferKick(t, h.base));
-              });
+      RunRing(
+          h, b, "Device::EndSegment (sub_8229EF48)", __imp__sub_8229EF48, 800,
+          [&](Random& r, PPCContext& t, int c) {
+            const uint32_t open = FlowFields(h, b, r, c, false);
+            ThrottleFences(h, b, r, open, true);
+            TrainingFailed(h, b, r, open);
+            t.r3.u64 = b.device;
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = harness::OnView(t, [&](lifted::Regs& regs) {
+              return cb::EndSegment(h.base, regs.r3.u32, hooks::CommandBufferKick(regs, h.base));
+            });
+          });
+      RunRing(
+          h, b, "Device::KickSegment (sub_8229EDA8)", __imp__sub_8229EDA8, 600,
+          [&](Random& r, PPCContext& t, int c) {
+            const uint32_t open = FlowFields(h, b, r, c, false);
+            ThrottleFences(h, b, r, open, true);
+            guest::StoreU32(h.base, cb::kTrainingFailed, 0);
+            t.r3.u64 = b.device;
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = harness::OnView(t, [&](lifted::Regs& regs) {
+              return cb::KickSegment(h.base, regs.r3.u32, hooks::CommandBufferKick(regs, h.base));
+            });
+          });
       // NextSegment: the words asked 0 (the segment end's), the segment size's
       // (Swap's) or a few; the throttle's fence the open one only without a
       // wrap.
-      RunRing(h, b, "Device::NextSegment (sub_8229EC00)", __imp__sub_8229EC00, 800,
-              [&](Random& r, PPCContext& t, int c) {
-                const bool may_open = c % 2 == 0;
-                const uint32_t open = FlowFields(h, b, r, c, may_open);
-                ThrottleFences(h, b, r, open, may_open);
-                TrainingFailed(h, b, r, open);
-                t.r3.u64 = b.device;
-                switch (r.Below(3)) {
-                  case 0: t.r4.u64 = 0; break;
-                  case 1:
-                    t.r4.u64 = guest::LoadU32(h.base, b.device + cb::kSegmentSize) >> 2;
-                    break;
-                  default: t.r4.u64 = r.Below(0x400); break;
-                }
-              },
-              [&](PPCContext& t) {
-                t.r3.u64 = cb::NextSegment(h.base, t.r3.u32, t.r4.u32,
-                                           hooks::CommandBufferKick(t, h.base));
-              });
+      RunRing(
+          h, b, "Device::NextSegment (sub_8229EC00)", __imp__sub_8229EC00, 800,
+          [&](Random& r, PPCContext& t, int c) {
+            const bool may_open = c % 2 == 0;
+            const uint32_t open = FlowFields(h, b, r, c, may_open);
+            ThrottleFences(h, b, r, open, may_open);
+            TrainingFailed(h, b, r, open);
+            t.r3.u64 = b.device;
+            switch (r.Below(3)) {
+              case 0:
+                t.r4.u64 = 0;
+                break;
+              case 1:
+                t.r4.u64 = guest::LoadU32(h.base, b.device + cb::kSegmentSize) >> 2;
+                break;
+              default:
+                t.r4.u64 = r.Below(0x400);
+                break;
+            }
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = harness::OnView(t, [&](lifted::Regs& regs) {
+              return cb::NextSegment(h.base, regs.r3.u32, regs.r4.u32,
+                                     hooks::CommandBufferKick(regs, h.base));
+            });
+          });
       // WaitForFence: 0, done, or the open fence (not when out of space: no
       // kick would complete it, and the original would spin).
-      RunRing(h, b, "Device::WaitForFence (sub_8229E908)", __imp__sub_8229E908, 600,
-              [&](Random& r, PPCContext& t, int c) {
-                const uint32_t open = FlowFields(h, b, r, c, false);
-                ThrottleFences(h, b, r, open, true);
-                TrainingFailed(h, b, r, open);
-                const bool out_of_space = guest::LoadU8(h.base, b.device + cb::kFlags) & 0x40;
-                t.r3.u64 = b.device;
-                t.r4.u64 = WaitedFence(h, b, r, open, !out_of_space);
-                t.r5.u64 = r.Below(7);
-                t.r6.u64 = uint32_t(r.Next());
-              },
-              [&](PPCContext& t) {
-                t.r3.u64 = cb::WaitForFence(h.base, t.r3.u32, t.r4.u32, t.r5.u32,
-                                            hooks::CommandBufferKick(t, h.base));
-              });
+      RunRing(
+          h, b, "Device::WaitForFence (sub_8229E908)", __imp__sub_8229E908, 600,
+          [&](Random& r, PPCContext& t, int c) {
+            const uint32_t open = FlowFields(h, b, r, c, false);
+            ThrottleFences(h, b, r, open, true);
+            TrainingFailed(h, b, r, open);
+            const bool out_of_space = guest::LoadU8(h.base, b.device + cb::kFlags) & 0x40;
+            t.r3.u64 = b.device;
+            t.r4.u64 = WaitedFence(h, b, r, open, !out_of_space);
+            t.r5.u64 = r.Below(7);
+            t.r6.u64 = uint32_t(r.Next());
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = harness::OnView(t, [&](lifted::Regs& regs) {
+              return cb::WaitForFence(h.base, regs.r3.u32, regs.r4.u32, regs.r5.u32,
+                                      hooks::CommandBufferKick(regs, h.base));
+            });
+          });
       // ReserveWords: a few words (or more than a segment holds), the write
       // position anywhere before the segment's end.
-      RunRing(h, b, "Device::ReserveWords (sub_8229F148)", __imp__sub_8229F148, 600,
-              [&](Random& r, PPCContext& t, int c) {
-                const uint32_t open = FlowFields(h, b, r, c, false);
-                ThrottleFences(h, b, r, open, true);
-                TrainingFailed(h, b, r, open);
-                t.r3.u64 = b.device;
-                t.r4.u64 = r.Below(4) == 0 ? r.Below(0x1000) : r.Below(1100);
-              },
-              [&](PPCContext& t) {
-                t.r3.u64 = cb::ReserveWords(h.base, t.r3.u32, t.r4.u32,
-                                            hooks::CommandBufferKick(t, h.base));
-              });
+      RunRing(
+          h, b, "Device::ReserveWords (sub_8229F148)", __imp__sub_8229F148, 600,
+          [&](Random& r, PPCContext& t, int c) {
+            const uint32_t open = FlowFields(h, b, r, c, false);
+            ThrottleFences(h, b, r, open, true);
+            TrainingFailed(h, b, r, open);
+            t.r3.u64 = b.device;
+            t.r4.u64 = r.Below(4) == 0 ? r.Below(0x1000) : r.Below(1100);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = harness::OnView(t, [&](lifted::Regs& regs) {
+              return cb::ReserveWords(h.base, regs.r3.u32, regs.r4.u32,
+                                      hooks::CommandBufferKick(regs, h.base));
+            });
+          });
       // InsertCallback: the flags as WriteCallback's cases.
-      RunRing(h, b, "Device::InsertCallback (sub_8229F228)", __imp__sub_8229F228, 400,
-              [&](Random& r, PPCContext& t, int c) {
-                const uint32_t open = FlowFields(h, b, r, c, false);
-                ThrottleFences(h, b, r, open, true);
-                TrainingFailed(h, b, r, open);
-                const uint32_t cpus = (c % 8 == 1) ? 0 : (uint32_t(r.Next()) & 0x3F000000u);
-                switch (c % 3) {
-                  case 0: t.r4.u64 = cpus; break;
-                  case 1: t.r4.u64 = cpus | (1u << r.Below(32)); break;
-                  default: t.r4.u64 = uint32_t(r.Next()); break;
-                }
-                t.r3.u64 = b.device;
-                t.r5.u64 = c == 2 ? 0x822B6A78u : uint32_t(r.Next());
-                t.r6.u64 = uint32_t(r.Next());
-              },
-              [&](PPCContext& t) {
-                t.r3.u64 = cb::InsertCallback(h.base, t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32,
-                                              hooks::CommandBufferKick(t, h.base));
-              });
+      RunRing(
+          h, b, "Device::InsertCallback (sub_8229F228)", __imp__sub_8229F228, 400,
+          [&](Random& r, PPCContext& t, int c) {
+            const uint32_t open = FlowFields(h, b, r, c, false);
+            ThrottleFences(h, b, r, open, true);
+            TrainingFailed(h, b, r, open);
+            const uint32_t cpus = (c % 8 == 1) ? 0 : (uint32_t(r.Next()) & 0x3F000000u);
+            switch (c % 3) {
+              case 0:
+                t.r4.u64 = cpus;
+                break;
+              case 1:
+                t.r4.u64 = cpus | (1u << r.Below(32));
+                break;
+              default:
+                t.r4.u64 = uint32_t(r.Next());
+                break;
+            }
+            t.r3.u64 = b.device;
+            t.r5.u64 = c == 2 ? 0x822B6A78u : uint32_t(r.Next());
+            t.r6.u64 = uint32_t(r.Next());
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = harness::OnView(t, [&](lifted::Regs& regs) {
+              return cb::InsertCallback(h.base, regs.r3.u32, regs.r4.u32, regs.r5.u32, regs.r6.u32,
+                                        hooks::CommandBufferKick(regs, h.base));
+            });
+          });
       // sub_8229F0E0 and the full GPU wait without their packets: the
       // reference ends the segment when past its soft end (the original
       // segment end) and, for the wait, waits for the open fence (the
@@ -704,7 +732,10 @@ void CommandBuffer(Context& h) {
             t.r3.u64 = guest::LoadU32(h.base, device + cb::kWritePosition);
           },
           [&](PPCContext& t) {
-            t.r3.u64 = cb::WriteIdlePackets(h.base, t.r3.u32, hooks::CommandBufferKick(t, h.base));
+            t.r3.u64 = harness::OnView(t, [&](lifted::Regs& regs) {
+              return cb::WriteIdlePackets(h.base, regs.r3.u32,
+                                          hooks::CommandBufferKick(regs, h.base));
+            });
           });
       RunWithoutPackets(
           h, b, "Device::WaitForIdle (sub_8229F1B0)", __imp__sub_8229F1B0, 300,
@@ -730,7 +761,9 @@ void CommandBuffer(Context& h) {
             __imp__sub_8229E908(t, h.base);
           },
           [&](PPCContext& t) {
-            t.r3.u64 = cb::WaitForIdle(h.base, t.r3.u32, hooks::CommandBufferKick(t, h.base));
+            t.r3.u64 = harness::OnView(t, [&](lifted::Regs& regs) {
+              return cb::WaitForIdle(h.base, regs.r3.u32, hooks::CommandBufferKick(regs, h.base));
+            });
           });
     }
     guest::StoreU32(h.base, cb::kTrainingFailed, training_failed);

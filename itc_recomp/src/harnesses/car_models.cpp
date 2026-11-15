@@ -457,7 +457,9 @@ void TextureFrees(Context& h, uint32_t block) {
 
 // Vinyl::Compress's register steps (its adapter is gone: only
 // CarModel::OnDecalLoaded's native version calls it).
-void NativeVinylCompress(PPCContext& ctx, uint8_t* base) {
+void NativeVinylCompress(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = hooks::CarModelsVinylCompressAt(ctx, base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                ctx.r6.u32);
@@ -2702,7 +2704,9 @@ void SecondSetUps(Context& h) {
         if (v == 0) {
           setup.recompiled(t, h.base);
         } else {
-          hooks::SecondSetUp(t, h.base, setup.native, setup.recompiled);
+          harness::OnView(t, [&](lifted::Regs& regs) {
+            return hooks::SecondSetUp(regs, h.base, setup.native, setup.recompiled);
+          });
         }
         const uint32_t header = guest::LoadU32(h.base, first + 3728);
         const uint32_t data = guest::LoadU32(h.base, first + 3732);
