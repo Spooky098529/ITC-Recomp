@@ -76,7 +76,7 @@ ITC_FLAG_DECLARE(bool, log_recording_by_pass);
 #define ITC_STRINGS_AND_FONT_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                         \
   if (!ITC_FLAG(native_strings_and_font)) {    \
-    __imp__sub_##address(ctx, base);           \
+    lifted::Sdk(ctx, base, __imp__sub_##address);           \
     return;                                    \
   }
 

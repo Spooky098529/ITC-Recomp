@@ -175,9 +175,11 @@ void PlayersAssignController(lifted::Regs& ctx, uint8_t* base);
 // the started word), 0 to 3 and 0 to 11.
 template <uint32_t kWhich>
 void TitleLoadDebugPage(PPCContext& ctx, uint8_t* base);
+template <uint32_t kWhich>
 void TitleLoadDebugPage(lifted::Regs& ctx, uint8_t* base);
 template <uint32_t kWhich>
 void TitleLoadDebugStep(PPCContext& ctx, uint8_t* base);
+template <uint32_t kWhich>
 void TitleLoadDebugStep(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

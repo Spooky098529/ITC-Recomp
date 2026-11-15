@@ -382,30 +382,46 @@ ITC_REGS_STEP(PlayersAssignController) {
 }
 
 template <uint32_t kWhich>
-ITC_REGS_STEP(TitleLoadDebugPage) {
+void TitleLoadDebugPage(lifted::Regs& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = ts::LoadDebugPage(base, kWhich, ctx.r3.u64, ctx.r1.u32, guest.calls());
 }
 template <uint32_t kWhich>
-ITC_REGS_STEP(TitleLoadDebugStep) {
+void TitleLoadDebugStep(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = ts::LoadDebugStep(base, kWhich, ctx.r3.u32, ctx.r1.u32);
 }
-template void TitleLoadDebugPage<0>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugPage<1>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugPage<2>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugPage<3>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugStep<0>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugStep<1>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugStep<2>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugStep<3>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugStep<4>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugStep<5>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugStep<6>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugStep<7>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugStep<8>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugStep<9>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugStep<10>(lifted::Regs&, uint8_t*);
-template void TitleLoadDebugStep<11>(lifted::Regs&, uint8_t*);
+// Their forms on the SDK's context (a harness's), run on a view of it (the
+// rewiring, stage 3).
+template <uint32_t kWhich>
+void TitleLoadDebugPage(PPCContext& ctx, uint8_t* base) {
+  lifted::RegsScope scope(ctx);
+  TitleLoadDebugPage<kWhich>(scope.regs, base);
+}
+template <uint32_t kWhich>
+void TitleLoadDebugStep(PPCContext& ctx, uint8_t* base) {
+  lifted::RegsScope scope(ctx);
+  TitleLoadDebugStep<kWhich>(scope.regs, base);
+}
+#define ITC_TITLE_LOAD_DEBUG(name, index)                  \
+  template void name<index>(lifted::Regs&, uint8_t*);      \
+  template void name<index>(PPCContext&, uint8_t*);
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 0)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 1)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 2)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 3)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 0)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 1)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 2)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 3)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 4)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 5)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 6)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 7)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 8)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 9)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 10)
+ITC_TITLE_LOAD_DEBUG(TitleLoadDebugStep, 11)
+#undef ITC_TITLE_LOAD_DEBUG
 
 }  // namespace hooks
 

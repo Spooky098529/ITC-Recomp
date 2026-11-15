@@ -40,7 +40,7 @@ ITC_REGS_STEP(RaceStatesProgressCreate) {
   ctx.fpscr.disableFlushMode();
   const auto r3 = NativeHeapActive() ? rs::ProgressCreate(base) : std::nullopt;
   if (!r3) {
-    __imp__sub_821698B0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821698B0);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -50,7 +50,7 @@ ITC_REGS_STEP(RaceStatesProgressReset) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 96;
   if (!rs::ProgressResetNative(frame)) {
-    __imp__sub_821648E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821648E0);
     return;
   }
   rs::ProgressReset(base, ctx.r3.u32, frame);
@@ -120,7 +120,7 @@ ITC_REGS_STEP(RaceStatesCheckLap) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 544;
   if (!rs::CheckLapNative(base, ctx.r4.u32, frame)) {
-    __imp__sub_82164090(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82164090);
     return;
   }
   ctx.r3.u64 = rs::CheckLap(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame);
@@ -154,7 +154,7 @@ ITC_REGS_STEP(RaceStatesEndWhenFaded) {
 ITC_REGS_STEP(RaceStatesUnload) {
   ctx.fpscr.disableFlushMode();
   if (!NativeHeapActive() || !rs::Unload(base)) {
-    __imp__sub_82163920(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82163920);
   }
 }
 
@@ -229,7 +229,7 @@ ITC_REGS_STEP(RaceStatesCountdownTick) {
 ITC_REGS_STEP(RaceStatesStandingStartTick) {
   ctx.fpscr.disableFlushMode();
   if (!rs::StandingStartTickNative(base, ctx.r3.u32)) {
-    __imp__sub_821692C8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821692C8);
     return;
   }
   const uint32_t frame = ctx.r1.u32 - 2816;
@@ -240,7 +240,7 @@ ITC_REGS_STEP(RaceStatesStandingStartTick) {
   calls.all_settled = [&ctx, base](uint32_t sp) {
     const uint64_t r1 = ctx.r1.u64;
     ctx.r1.u64 = sp;
-    __imp__sub_8213ADF8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8213ADF8);
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u32;
@@ -252,7 +252,7 @@ ITC_REGS_STEP(RaceStatesBegin) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 112;
   if (!rs::ProgressResetNative(frame - 96)) {
-    __imp__sub_82164DC0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82164DC0);
     return;
   }
   rs::Begin(base, ctx.r3.u32, frame);
@@ -272,7 +272,7 @@ ITC_REGS_STEP(RaceStatesStartRoute) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 496;
   if (!rs::StartRouteNative(base, ctx.r3.u32, frame)) {
-    __imp__sub_821635D0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821635D0);
     return;
   }
   rs::StartRoute(base, ctx.r3.u32, frame);
@@ -282,7 +282,7 @@ ITC_REGS_STEP(RaceStatesRouteDistance) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 656;
   if (!rs::RouteDistanceNative(ctx.r4.u32, frame)) {
-    __imp__sub_82162330(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82162330);
     return;
   }
   rs::RouteDistance(base, ctx.r3.u32, ctx.r4.u32, frame);
@@ -292,7 +292,7 @@ ITC_REGS_STEP(RaceStatesRaceTick) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 208;
   if (!rs::RaceTickNative(base, ctx.r3.u32, frame)) {
-    __imp__sub_82167610(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82167610);
     return;
   }
   rs::RaceTick(base, ctx.r3.u32, ctx.r4.u32, frame);
@@ -302,7 +302,7 @@ ITC_REGS_STEP(RaceStatesOnGo) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 112;
   if (!rs::OnGoNative(base, ctx.r3.u32, frame)) {
-    __imp__sub_82164458(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82164458);
     return;
   }
   rs::OnGo(base, ctx.r3.u32, frame);
@@ -317,7 +317,7 @@ ITC_REGS_STEP(RaceStatesInit) {
                       ? rs::Init(base, machine, ctx.r1.u32 - 5824, &replaced)
                       : std::nullopt;
   if (!r3) {
-    __imp__sub_82169920(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82169920);
     return;
   }
   // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new

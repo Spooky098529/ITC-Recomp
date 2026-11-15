@@ -95,7 +95,8 @@ ITC_REGS_STEP(RaceSetupSetupVehicle) {
     }
   }
   const uint64_t car = ctx.r3.u64;
-  ctx.r11.u64 = car;
+  // (r11 = the car, as the original's caller leaves it: a leftover, the
+  // original doesn't read it)
   ctx.r3.u64 = ctx.r4.u64;
   ctx.r4.u64 = car;
   lifted::original::c820C27E8(ctx, base);
@@ -319,7 +320,7 @@ namespace {
 // Car::Refresh's original from Racers::SetStart's frame (`r1`), where its
 // plain C++ refuses.
 struct RefreshCall {
-  PPCContext* ctx;
+  lifted::Regs* ctx;
   uint8_t* base;
   uint32_t r1;
   uint32_t lr;  // a return address of the original's Car::Refresh calls
@@ -332,7 +333,7 @@ void GuestRefresh(void* user, uint32_t car) {
   ctx.r1.u64 = call.r1;
   ctx.r3.u64 = car;
   ctx.lr = call.lr;
-  sub_820C4998(ctx, call.base);
+  lifted::CallFromContext(ctx, call.base, 0x820C4998);
   ctx.r1.u64 = r1;
 }
 
@@ -375,7 +376,7 @@ namespace {
 
 // Race::SetUp's guest calls: the callees' originals, from its frame.
 struct SetUpCall {
-  PPCContext* ctx;
+  lifted::Regs* ctx;
   uint8_t* base;
 };
 
@@ -393,22 +394,22 @@ uint64_t SetUpGuestCall(void* user, uint32_t function, const uint64_t args[4], d
   ctx.lr = lr;
   switch (function) {
     case 0x820C4998:
-      sub_820C4998(ctx, call.base);
+      lifted::CallFromContext(ctx, call.base, 0x820C4998);
       break;
     case 0x82112DB0:
-      sub_82112DB0(ctx, call.base);
+      lifted::CallFromContext(ctx, call.base, 0x82112DB0);
       break;
     case 0x82102048:
-      sub_82102048(ctx, call.base);
+      lifted::CallFromContext(ctx, call.base, 0x82102048);
       break;
     case 0x821017C0:
-      sub_821017C0(ctx, call.base);
+      lifted::CallFromContext(ctx, call.base, 0x821017C0);
       break;
     case 0x821021A8:
-      sub_821021A8(ctx, call.base);
+      lifted::CallFromContext(ctx, call.base, 0x821021A8);
       break;
     case 0x82101D38:
-      sub_82101D38(ctx, call.base);
+      lifted::CallFromContext(ctx, call.base, 0x82101D38);
       break;
     default:
       ITC_LOG_ERROR("race_setup: no guest call for {:08X}", function);

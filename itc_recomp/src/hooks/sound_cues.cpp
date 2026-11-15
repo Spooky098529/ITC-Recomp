@@ -26,7 +26,7 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
 #define ITC_SOUND_FALLBACK(address)        \
   REX_FUNC_PROLOGUE();                     \
   if (!ITC_FLAG(native_sound_cues)) {      \
-    __imp__sub_##address(ctx, base);       \
+    lifted::Sdk(ctx, base, __imp__sub_##address);       \
     return;                                \
   }                                        \
   ctx.fpscr.disableFlushMode();
@@ -53,7 +53,7 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
     ITC_SOUND_FALLBACK(address)                                          \
     uint32_t result = 0;                                                 \
     if (!function(base, ctx.r3.u32, ctx.r4.u32, &result)) {              \
-      __imp__sub_##address(ctx, base);                                   \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                   \
       return;                                                            \
     }                                                                    \
     ctx.r3.u64 = result;                                                 \
@@ -136,7 +136,7 @@ ITC_SOUND_WORD(8259CE10, AudioEngineStart3D(base, ctx.r3.u32))
     ITC_SOUND_FALLBACK(address)                                           \
     uint32_t r3 = 0;                                                      \
     if (!hooks::NativeHeapActive() || !function(base, ctx.r3.u32, &r3)) { \
-      __imp__sub_##address(ctx, base);                                    \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                    \
       return;                                                             \
     }                                                                     \
     ctx.r3.u64 = r3;                                                      \

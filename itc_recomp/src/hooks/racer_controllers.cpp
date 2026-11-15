@@ -69,7 +69,7 @@ using namespace racer_controllers;
 namespace {
 
 struct GuestCalls {
-  PPCContext* ctx;
+  lifted::Regs* ctx;
   uint8_t* base;
 };
 

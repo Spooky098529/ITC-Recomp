@@ -178,7 +178,7 @@ void SaveInterfaceContentSize(lifted::Regs& ctx, uint8_t*) {
       ctx.r3.u64 = *answer;                             \
       return;                                           \
     }                                                   \
-    __imp__sub_##address(ctx, base);                    \
+    lifted::Sdk(ctx, base, __imp__sub_##address);                    \
   }
 
 ITC_SAVE_INTERFACE_WRAPPER(8209FFB8, SaveInterfaceInit, si::Init(base, ctx.r3.u32))
@@ -349,14 +349,10 @@ void Prologue(uint8_t* base, uint32_t sp, uint32_t lr, uint32_t frame_bytes, int
   guest::StoreU32(base, sp - frame_bytes, sp);
 }
 
-// r`first` to r31 of `ctx` (r14 to r31 are consecutive in PPCContext).
-std::vector<uint64_t> Regs(const lifted::Regs& ctx, int first) {
-  static_assert(offsetof(PPCContext, r31) - offsetof(PPCContext, r14) == 17 * sizeof(lifted::Temp));
-  std::vector<uint64_t> regs;
-  for (int n = first; n < 32; n++) {
-    regs.push_back((&ctx.r14)[n - 14].u64);
-  }
-  return regs;
+// r`first` to r31 of the caller, for a prologue's saves: 0 (the caller's
+// nonvolatiles: not carried by the view).
+std::vector<uint64_t> Regs(const lifted::Regs&, int first) {
+  return std::vector<uint64_t>(32 - first, 0);
 }
 
 // The first slot's vtable slot 0 with r4 = 3 (the slots' vector deleting
@@ -436,24 +432,18 @@ ITC_REGS_STEP(SaveDevicesCreateSteps) {
     return;
   }
   const uint64_t lr = ctx.lr;
-  const uint64_t r30 = ctx.r30.u64;
-  const uint64_t r31 = ctx.r31.u64;
   const auto regs = Regs(ctx, 30);
   const auto devices = si::SaveDevicesCreate(base, saves, [&](uint32_t devices) {
     // The original's prologue: lr, r30 and r31 above its 112-byte frame.
     Prologue(base, ctx.r1.u32, uint32_t(lr), 112, 30, regs.data());
     guest_call::InFrame(ctx, base, 112, 0x820A6400, [&](uint32_t) {
-      // The constructor from Create's frame, with the registers Create
-      // holds there (mr r31,r3 and mr r30,r4), which its prologue saves.
-      ctx.r30.u64 = ctx.r4.u64;
-      ctx.r31.u64 = ctx.r3.u64;
+      // The constructor from Create's frame (Create's r31 and r30 there,
+      // which its prologue saves: not carried by the view).
       ctx.r3.u64 = devices;
       ctx.r4.u64 = block;
       ctx.r5.u64 = saves;
       SaveDevicesConstructSteps(ctx, base);
     });
-    ctx.r30.u64 = r30;
-    ctx.r31.u64 = r31;
     ctx.lr = lr;
   });
   if (!devices) {
@@ -504,7 +494,8 @@ ITC_REGS_STEP(SaveDevicesDestroySteps) {
   }
   const uint32_t devices = ctx.r3.u32;
   const uint32_t slots_sp =
-      DestroyPrologues(base, ctx.r1.u32, uint32_t(ctx.lr), ctx.r31.u64, devices);
+      DestroyPrologues(base, ctx.r1.u32, uint32_t(ctx.lr),
+                       0 /* (the caller's r31: not carried by the view) */, devices);
   ctx.r3.u64 = si::SaveDevicesDestroy(base, devices, DestroySlots(ctx, base, slots_sp));
 }
 
@@ -513,40 +504,30 @@ ITC_REGS_STEP(SlotArrayResetSteps) {
     lifted::Sdk(ctx, base, __imp__sub_820A55F0);
     return;
   }
-  const uint32_t frame = ResetPrologue(base, ctx.r1.u32, uint32_t(ctx.lr), ctx.r31.u64);
+  const uint32_t frame = ResetPrologue(base, ctx.r1.u32, uint32_t(ctx.lr),
+                                       0 /* (the caller's r31: not carried by the view) */);
   ctx.r3.u64 = si::SlotArrayReset(base, ctx.r3.u32, DestroySlots(ctx, base, frame));
 }
 
 namespace {
 
 // The call into an adapter as a CallSite: its stack pointer, return address
-// and r27 to r31.
+// and r27 to r31 (the caller's: not carried by the view, 0).
 si::CallSite Site(const lifted::Regs& ctx) {
-  return si::CallSite{ctx.r1.u32, uint32_t(ctx.lr), ctx.r27.u64, ctx.r28.u64,
-                      ctx.r29.u64,  ctx.r30.u64,     ctx.r31.u64};
+  return si::CallSite{ctx.r1.u32, uint32_t(ctx.lr), 0, 0, 0, 0, 0};
 }
 
-// A guest call to `function` from native code at `at` (its stack pointer,
-// return address and nonvolatile registers as the original's call has
-// them); r3 and the other argument registers set by the caller. The stack
-// pointer and r27 to r31 put back after.
+// A guest call to `function` from native code at `at` (its stack pointer
+// and return address as the original's call has them; its nonvolatile
+// registers, for the callee's prologue saves, aren't carried by the view);
+// r3 and the other argument registers set by the caller. The stack pointer
+// put back after.
 void GuestCallAt(lifted::Regs& ctx, uint8_t* base, uint32_t function, const si::CallSite& at) {
-  const uint64_t r1 = ctx.r1.u64, r27 = ctx.r27.u64, r28 = ctx.r28.u64, r29 = ctx.r29.u64,
-                 r30 = ctx.r30.u64, r31 = ctx.r31.u64;
+  const uint64_t r1 = ctx.r1.u64;
   ctx.r1.u64 = at.sp;
-  ctx.r27.u64 = at.r27;
-  ctx.r28.u64 = at.r28;
-  ctx.r29.u64 = at.r29;
-  ctx.r30.u64 = at.r30;
-  ctx.r31.u64 = at.r31;
   ctx.lr = at.lr;
   lifted::CallFromContext(ctx, base, function);
   ctx.r1.u64 = r1;
-  ctx.r27.u64 = r27;
-  ctx.r28.u64 = r28;
-  ctx.r29.u64 = r29;
-  ctx.r30.u64 = r30;
-  ctx.r31.u64 = r31;
 }
 
 }  // namespace

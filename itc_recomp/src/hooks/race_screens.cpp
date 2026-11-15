@@ -158,7 +158,7 @@ ITC_RACE_SCREENS_PRESSED(Pressed166)
 #define ITC_RACE_SCREENS_CREATE(name, address)                       \
   void RaceScreens##name##Create(lifted::Regs& ctx, uint8_t* base) {   \
     if (!NativeHeapActive()) {                                       \
-      __imp__sub_##address(ctx, base);                               \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                               \
       return;                                                        \
     }                                                                \
     ctx.r3.u64 = race_screens::name##Create(base, ctx.r1.u32);       \
@@ -181,7 +181,7 @@ ITC_RACE_SCREENS_CREATE(Kind6Menu, 8221BDD0)
         return;                                                            \
       }                                                                    \
     }                                                                      \
-    __imp__sub_##address(ctx, base);                                       \
+    lifted::Sdk(ctx, base, __imp__sub_##address);                                       \
   }
 ITC_RACE_SCREENS_FREE(PauseMenuDestroy, 8220C4C8)
 ITC_RACE_SCREENS_FREE(PauseMenu4Destroy, 8220FC98)

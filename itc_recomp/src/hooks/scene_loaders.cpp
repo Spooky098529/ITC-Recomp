@@ -477,7 +477,7 @@ ITC_REGS_STEP(SceneLoadersCarModelLoadsDestruct) {
         return;                                                           \
       }                                                                   \
     }                                                                     \
-    __imp__sub_##address(ctx, base);                                      \
+    lifted::Sdk(ctx, base, __imp__sub_##address);                                      \
   }
 
 ITC_SCENE_LOADERS_RESET(SceneLoadersCarModelLoadsReset, 820D3B58, CarModelLoadsReset)
@@ -520,7 +520,7 @@ ITC_SCENE_LOADERS_RESET(SceneLoadersCockpitLoadsDestruct, 820D6090, CockpitLoads
         return;                                            \
       }                                                    \
     }                                                      \
-    __imp__sub_##address(ctx, base);                       \
+    lifted::Sdk(ctx, base, __imp__sub_##address);                       \
   }
 
 ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersCockpitLoadsConstruct, 820D6010,
@@ -583,7 +583,7 @@ struct CreateAGuest {
   lifted::Regs& ctx;
   uint8_t* base;
   static void Construct(void* user, uint32_t pool, uint32_t object, uint32_t list) {
-    using ITC_REGS_FN(Original) = lifted::ImportFunction*;
+    using Original = void (*)(lifted::Regs&, uint8_t*);
     static constexpr Original kOriginals[7] = {
         ITC_REGS_FN(lifted::original::c820D5890), ITC_REGS_FN(lifted::original::c820D7428), ITC_REGS_FN(lifted::original::c820D63A0), ITC_REGS_FN(lifted::original::c820D78B8),
         ITC_REGS_FN(lifted::original::c820D6A70), ITC_REGS_FN(lifted::original::c820D9570), ITC_REGS_FN(lifted::original::c820D8908)};
