@@ -66,7 +66,7 @@ namespace fw = framework;
 #define ITC_FRAMEWORK_FALLBACK(address)  \
   REX_FUNC_PROLOGUE();                   \
   if (!ITC_FLAG(native_framework)) {     \
-    __imp__sub_##address(ctx, base);     \
+    lifted::Sdk(ctx, base, __imp__sub_##address); \
     return;                              \
   }
 
@@ -92,7 +92,8 @@ ITC_FRAMEWORK_WORD(820908E8, WorkerPoolFrom36)
 ITC_FRAMEWORK_WORD(82090908, SceneFrom36)
 
 // DebugText::SetPosition: r4, r5 = pointers to x and y; r3, r4 the words
-// and r11 as the original leaves them.
+// as the original leaves them (and r11, the font's position: not carried,
+// none reads it).
 ITC_NATIVE_ENTRY_ALWAYS(82091050) {
   ITC_FRAMEWORK_FALLBACK(82091050)
   const uint32_t x = guest::LoadU32(base, ctx.r4.u32);
@@ -100,7 +101,6 @@ ITC_NATIVE_ENTRY_ALWAYS(82091050) {
   fw::DebugTextSetPosition(base, ctx.r4.u32, ctx.r5.u32);
   ctx.r3.u64 = x;
   ctx.r4.u64 = y;
-  ctx.r11.u64 = fw::kDebugFontPosition;
 }
 
 // --- The run loop's containers (src/framework/run_loop.h) ---
@@ -534,18 +534,13 @@ fw::MainLoopCalls hooks::MainLoopCalls(lifted::Regs& ctx, uint8_t* base) {
     return ctx.r3.u32;
   };
   calls.in_frame = [&ctx, base](uint32_t bytes, const std::function<void(uint32_t)>& body) {
-    uint64_t kept[18];
-    for (int i = 0; i < 18; i++) {
-      kept[i] = (&ctx.r14)[i].u64;
-    }
+    // (r14 to r31 were kept and put back around the body: nothing to keep
+    // without a context)
     guest_call::InFrame(ctx, base, bytes, uint32_t(ctx.lr), body);
-    for (int i = 0; i < 18; i++) {
-      (&ctx.r14)[i].u64 = kept[i];
-    }
   };
-  calls.set_register = [&ctx](int reg, uint64_t value) {
-    guest_call::Gpr(ctx, reg).u64 = value;
-  };
+  // The registers set are the original's nonvolatile ones, which reached
+  // callees only as the bytes they save: not carried by the view.
+  calls.set_register = [](int, uint64_t) {};
   calls.increment = [&ctx, base](uint32_t iterator) {
     ctx.r3.u64 = iterator;
     ctx.lr = 0x82099DFC;

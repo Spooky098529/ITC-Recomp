@@ -48,7 +48,7 @@ bool hooks::NativeFramePasses() {
 #define ITC_FRAME_PASSES_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                     \
   if (!hooks::NativeFramePasses()) {       \
-    __imp__sub_##address(ctx, base);       \
+    lifted::Sdk(ctx, base, __imp__sub_##address); \
     return;                                \
   }
 
@@ -59,12 +59,11 @@ ITC_NATIVE_ENTRY_ALWAYS(82096218) {
 }
 
 // The delegate thunk: r3 = the object; its slot 2 as a tail call (r12 the
-// vtable and r11 the target, as the original leaves them).
+// vtable and r11 the target, as the original leaves them, aren't carried:
+// none reads them).
 ITC_NATIVE_ENTRY_ALWAYS(82096350) {
   ITC_FRAME_PASSES_FALLBACK(82096350)
   const uint32_t target = fp::DelegateSlot2Target(base, ctx.r3.u32);
-  ctx.r12.u64 = guest::LoadU32(base, ctx.r3.u32);
-  ctx.r11.u64 = target;
   ctx.ctr.u64 = target;
   lifted::CallFromContext(ctx, base, ctx.ctr.u32);
 }
@@ -133,13 +132,12 @@ void hooks::FramePassesJobWait(lifted::Regs& ctx, uint8_t* base) {
       ctx.r3.u64 = object;
       ctx.r4.u64 = job;
       const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + 4);
-      ctx.r11.u64 = function;
-      ctx.ctr.u64 = function;
+      ctx.ctr.u64 = function;  // (r11, also the target there: none reads it)
       ctx.lr = 0x82094B48;
       lifted::CallFromContext(ctx, base, function);
     });
-    // r11 as the original leaves it: 0 after the wait, else the byte (0).
-    ctx.r11.u64 = 0;
+    // (r11 = 0, as the original leaves it, was a leftover for recompiled
+    // callers: none now)
     if (!waited) {
       ctx.r3.u64 = job;
     }
@@ -163,8 +161,7 @@ void hooks::FramePassesBoot(lifted::Regs& ctx, uint8_t* base) {
     auto vtable_call = [&](uint32_t object, uint32_t byte, uint32_t return_address) {
       ctx.r3.u64 = object;
       const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
-      ctx.r11.u64 = function;
-      ctx.ctr.u64 = function;
+      ctx.ctr.u64 = function;  // (r11, also the target there: none reads it)
       ctx.lr = return_address;
       lifted::CallFromContext(ctx, base, function);
       return ctx.r3.u32;
@@ -205,8 +202,7 @@ void hooks::FramePassesConstruct(lifted::Regs& ctx, uint8_t* base) {
     auto vtable_call = [&](uint32_t object, uint32_t byte, uint32_t return_address) {
       ctx.r3.u64 = object;
       const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
-      ctx.r11.u64 = function;
-      ctx.ctr.u64 = function;
+      ctx.ctr.u64 = function;  // (r11, also the target there: none reads it)
       ctx.lr = return_address;
       lifted::CallFromContext(ctx, base, function);
       return ctx.r3.u32;
@@ -257,8 +253,7 @@ void hooks::FramePassesRecord(lifted::Regs& ctx, uint8_t* base) {
     auto vcall = [&](uint32_t object, uint32_t byte, uint32_t return_address) {
       ctx.r3.u64 = object;
       const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + byte);
-      ctx.r11.u64 = function;
-      ctx.ctr.u64 = function;
+      ctx.ctr.u64 = function;  // (r11, also the target there: none reads it)
       ctx.lr = return_address;
       lifted::CallFromContext(ctx, base, function);
       return ctx.r3.u32;

@@ -63,7 +63,7 @@ ITC_FLAG_DECLARE(bool, native_graphics_resources);
 #define ITC_CAMERAS_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                \
   if (!ITC_FLAG(native_cameras)) {    \
-    __imp__sub_##address(ctx, base);  \
+    lifted::Sdk(ctx, base, __imp__sub_##address); \
     return;                           \
   }
 
@@ -720,7 +720,7 @@ bool CameraConstruct(lifted::Regs& ctx, uint8_t* base) {
 ITC_REGS_STEP(RecordClear) {
   static constexpr uint32_t kReturns[5] = {0x8209FA6C, 0x8209FA7C, 0x8209FB44, 0x8209FB54,
                                            0x8209FB74};
-  const PPCContext in = ctx;
+  const lifted::Regs in = ctx;
   const uint32_t flags = ctx.r5.u32, color = ctx.r6.u32, depth = ctx.r7.u32;
   if (!RecordAndSubmit(ctx, base, 160, kReturns, ctx.r4.u32, [&](uint32_t list) {
         return cameras::RecordClear(base, list, flags, color, depth);
