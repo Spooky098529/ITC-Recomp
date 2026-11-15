@@ -700,7 +700,9 @@ void Compares(Context& h) {
 // --- SignInWatch::StaticInit (on the game's sign-in watch and exit table,
 // each put back after a side). ---
 
-void NativeSignInWatchStaticInit(PPCContext& ctx, uint8_t* base) {
+void NativeSignInWatchStaticInit(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   hooks::GuestAtexit guest{ctx, base};
   ctx.r3.s64 = mode_tick::SignInWatchStaticInit(base, guest.Call());
 }

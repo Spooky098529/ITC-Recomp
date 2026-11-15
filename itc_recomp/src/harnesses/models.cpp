@@ -942,7 +942,9 @@ void ProviderGetterCases(Context& h) {
             (which == 0 ? __imp__sub_825946B8 : __imp__sub_825941D0)(t, h.base);
             out[v].Word(1);
           } else {
-            out[v].Word(hooks::TextureProviderSlotDirect(t, h.base, function));
+            out[v].Word(harness::OnView(t, [&](lifted::Regs& regs) {
+              return hooks::TextureProviderSlotDirect(regs, h.base, function);
+            }));
           }
         });
         out[v].Bytes(Read(h.base, b, block.bytes));

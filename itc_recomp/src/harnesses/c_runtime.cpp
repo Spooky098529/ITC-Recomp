@@ -331,7 +331,9 @@ void NativeI10Output(PPCContext& ctx, uint8_t* base) {
 // buffer, r6 = its size; returns r4. Its plain C++ over guest memory
 // (c_runtime::core::Fltout2, the native _cftoe_l's and _cftog_l's; the
 // native _cftof_l makes the same steps in host memory).
-void NativeFltout2(PPCContext& ctx, uint8_t* base) {
+void NativeFltout2(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.r3.u64 = c_runtime::core::Fltout2(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                         hooks::CRuntimeCoreCalls(ctx, base));
 }

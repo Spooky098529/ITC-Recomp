@@ -321,6 +321,13 @@ archive::LoadCall hooks::NativeArchiveLoad(uint8_t* base) {
 }
 
 void hooks::SetArchiveSerial(lifted::Regs& ctx, int64_t serial) { SetSerial(ctx, serial); }
+void hooks::SetArchiveSerial(PPCContext& ctx, int64_t serial) {
+  if (serial < 0) {
+    ctx.r3.s64 = -1;
+  } else {
+    ctx.r3.u64 = uint64_t(serial);
+  }
+}
 
 // The set-up: r3 = the request; r3 read by no caller (the next request sets
 // its own).

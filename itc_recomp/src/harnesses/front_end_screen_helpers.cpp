@@ -103,7 +103,7 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& random
 struct ReleaseInfo {
   const char* name;
   GuestFunction recompiled;
-  bool (*native)(PPCContext&, uint8_t*);
+  bool (*native)(lifted::Regs&, uint8_t*);
   uint32_t frame, saves;
 };
 
@@ -216,7 +216,8 @@ void Releases(Context& h) {
           ITC_FLAG(native_front_end_screen_helpers) = false;
           info.recompiled(t, base);
           ITC_FLAG(native_front_end_screen_helpers) = true;
-        } else if (!info.native(t, base)) {
+        } else if (!harness::OnView(t,
+                                    [&](lifted::Regs& regs) { return info.native(regs, base); })) {
           ITC_LOG_ERROR("harness: front_end_screen_helpers: {} refused", info.name);
         }
         // The recorder's r6 (+336) left out: StopCue (AudioManager::StopCue

@@ -53,5 +53,7 @@ archive::LoadCall NativeArchiveLoad(uint8_t* base);
 // r3 as Archive::Load's adapter leaves a serial: lwz's (zero-extended), or -1
 // (li's).
 void SetArchiveSerial(lifted::Regs& ctx, int64_t serial);
+// The same on the SDK's context (the harnesses' recorders and steps).
+void SetArchiveSerial(PPCContext& ctx, int64_t serial);
 
 }  // namespace hooks

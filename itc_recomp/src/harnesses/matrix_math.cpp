@@ -182,11 +182,15 @@ constexpr uint32_t kA = 0x100, kB = 0x200, kOut = 0x300;
 // and its locals (+84 to +224: the 16 floats and the pointers past r10)
 // compared with the matrices, r3 and the words added to the exit table.
 
-void NativeZeroMatrixStaticInit(PPCContext& ctx, uint8_t* base) {
+void NativeZeroMatrixStaticInit(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   hooks::GuestAtexit guest{ctx, base};
   ctx.r3.s64 = mm::ZeroMatrixStaticInit(base, ctx.r1.u32, guest.Call());
 }
-void NativeIdentityMatrixStaticInit(PPCContext& ctx, uint8_t* base) {
+void NativeIdentityMatrixStaticInit(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   hooks::GuestAtexit guest{ctx, base};
   ctx.r3.s64 = mm::IdentityMatrixStaticInit(base, ctx.r1.u32, guest.Call());
 }
