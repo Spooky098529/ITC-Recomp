@@ -558,4 +558,15 @@ void AddDistance(uint8_t* base, uint32_t save, double distance);
 // save's word +6092 that's clear, or 6.
 uint32_t FirstUnsetFlag(uint8_t* base, uint32_t save);
 
+// RaceManager::GiveVehicle (sub_821706E8, never seen in play): r3 = the
+// manager, r4 = an entry. The first of the 7 slot words (+2336) that's 0 or
+// -1 given: entry +20 its index, Vehicle::SetUp with the entry's record
+// (ResetForCar when the slot was -1), Vehicle::PlaceOnRoute (at the entry's
+// +8 with [0x82009974], or with flag 0x10 at the record's +3904 with its
+// +3908, at rest when that's 0.0), the input record cleared, the body's
+// set-up, a physics step with [0x826193C8], VehicleStatus::Update, flags |=
+// 0x240 and the slot 1; returns 1, or 0 with no slot free. From its 176-byte
+// frame below `sp`; its callees through the dispatch table.
+uint64_t GiveVehicle(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t manager, uint32_t entry);
+
 }  // namespace race_world

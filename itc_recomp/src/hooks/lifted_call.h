@@ -36,6 +36,18 @@ inline lifted::Result Call(uint8_t* base, uint32_t address, uint32_t sp, uint64_
   return lifted::Call(base, address, Args(sp, r13, r, f1));
 }
 
+// The same with f1 onward from `f`.
+inline lifted::Result CallFloats(uint8_t* base, uint32_t address, uint32_t sp, uint64_t r13,
+                                 std::initializer_list<uint64_t> r,
+                                 std::initializer_list<double> f) {
+  lifted::Args args = Args(sp, r13, r);
+  int i = 0;
+  for (const double value : f) {
+    args.f[i++] = value;
+  }
+  return lifted::Call(base, address, args);
+}
+
 // Calls an SDK import (a kernel or XAM function) as the original does.
 inline lifted::Result Import(uint8_t* base, lifted::ImportFunction* function, uint32_t sp,
                              uint64_t r13, std::initializer_list<uint64_t> r) {

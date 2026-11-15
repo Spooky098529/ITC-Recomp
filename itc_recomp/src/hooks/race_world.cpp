@@ -2,6 +2,7 @@
 // src/race_world/ (docs/functions/race-world.md), with the register steps
 // the harness shares (hooks/race_world.h).
 
+#include "hooks/lifted_call.h"
 #include "hooks/race_world.h"
 
 #include "base/flags.h"
@@ -38,7 +39,7 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "sub_82165E20 and PlaceRolling sub_821662E0 (their callees' originals where those "
               "refuse); RaceManager::StreamOpponents sub_82172118 (Vehicle::RemoveFromWorld's "
               "original unless --native_heap routes the game's heap to the allocation layer; "
-              "RaceManager::GiveVehicle sub_821706E8's original), StreamTraffic sub_821724F8 "
+              "RaceManager::GiveVehicle sub_821706E8, natively too), StreamTraffic sub_821724F8 "
               "(Vehicle::RemoveFromWorld's and the physics set-up's originals unless --native_heap "
               "routes the game's heap to the allocation layer; its callees' originals where those "
               "refuse) and MoveUnseen sub_82173E28; RaceManager::Stream sub_82174338 (with "
@@ -585,15 +586,24 @@ extern "C" REX_FUNC(sub_821743A8) {
   }
   __imp__sub_821743A8(ctx, base);
 }
-// RaceManager::GiveVehicle (sub_821706E8, never seen in play): the original,
-// or the harness's stand-in while it's set (hooks::g_give_vehicle_stand_in).
+// RaceManager::GiveVehicle (sub_821706E8, never seen in play): the harness's
+// stand-in while it's set (hooks::g_give_vehicle_stand_in); else its plain
+// C++ (race_world::GiveVehicle) with --native_race_world, or the original.
 extern "C" REX_FUNC(sub_821706E8) {
   REX_FUNC_PROLOGUE();
   if (hooks::g_give_vehicle_stand_in != nullptr) {
     hooks::g_give_vehicle_stand_in(ctx, base);
     return;
   }
-  __imp__sub_821706E8(ctx, base);
+  if (!ITC_FLAG(native_race_world)) {
+    __imp__sub_821706E8(ctx, base);
+    return;
+  }
+  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
+    return {race_world::GiveVehicle(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+                                    uint32_t(a.r[1])),
+            a.f[0]};
+  });
 }
 // RaceManager::NearSegment (sub_82170BC0) and RoutePosition::ToMainRoad
 // (sub_82143608) have no adapters: their callers in play

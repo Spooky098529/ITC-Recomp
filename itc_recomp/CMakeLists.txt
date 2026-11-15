@@ -200,6 +200,7 @@ set(ITC_SOURCES
     src/race_world/race_event.cpp
     src/race_world/race_manager.cpp
     src/race_world/race_stream.cpp
+    src/race_world/give_vehicle.cpp
     src/hooks/race_states.cpp
     src/race_states/race_progress.cpp
     src/race_states/race_checks.cpp
@@ -1041,6 +1042,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/race_world/race_event.cpp
     src/race_world/race_manager.cpp
     src/race_world/race_stream.cpp
+    src/race_world/give_vehicle.cpp
     src/race_states/race_progress.cpp
     src/race_states/race_checks.cpp
     src/race_states/racers.cpp
