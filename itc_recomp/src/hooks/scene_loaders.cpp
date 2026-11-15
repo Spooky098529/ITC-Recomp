@@ -3,6 +3,7 @@
 // steps the harness shares (hooks/scene_loaders.h).
 
 #include "hooks/scene_loaders.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -284,7 +285,7 @@ void SceneLoadersCockpitBindTextures(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_820D6108(ctx, base);
+  lifted::original::c820D6108(ctx, base);
 }
 
 void SceneLoadersTrafficBindTextures(PPCContext& ctx, uint8_t* base) {
@@ -294,7 +295,7 @@ void SceneLoadersTrafficBindTextures(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_820D7D38(ctx, base);
+  lifted::original::c820D7D38(ctx, base);
 }
 
 void SceneLoadersModelPointFind(PPCContext& ctx, uint8_t* base) {
@@ -312,7 +313,7 @@ void SceneLoadersModelPointFind(PPCContext& ctx, uint8_t* base) {
     r3 = sl::ModelPointFind(base, point, model, stack, [&](uint32_t skeleton) {
       ctx.r3.u64 = skeleton;
       ctx.lr = 0x820D03EC;
-      __imp__sub_825998A0(ctx, base);
+      lifted::original::c825998A0(ctx, base);
     });
   });
   ctx.lr = lr;
@@ -342,7 +343,7 @@ sl::FileLoadedCalls MakeFileLoadedCalls(PPCContext& ctx, uint8_t* base,
     ctx.r4.u64 = file;
     ctx.r5.u64 = 0;
     ctx.lr = at.model_load;
-    __imp__sub_82596920(ctx, base);
+    lifted::original::c82596920(ctx, base);
   };
   calls.xpr_create = [&ctx, base, at](uint32_t xpr, uint32_t file) {
     ctx.r3.u64 = xpr;
@@ -368,7 +369,7 @@ sl::FileLoadedCalls MakeFileLoadedCalls(PPCContext& ctx, uint8_t* base,
   calls.update_matrices = [&ctx, base, at](uint32_t skeleton) {
     ctx.r3.u64 = skeleton;
     ctx.lr = at.update_matrices;
-    __imp__sub_825998A0(ctx, base);
+    lifted::original::c825998A0(ctx, base);
   };
   calls.plate_release = [&ctx, base](uint32_t surface) {
     // From MakePlate's frame, below the callback's.
@@ -501,7 +502,7 @@ void SceneLoadersCarPartsConstruct(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_820D7428(ctx, base);
+  lifted::original::c820D7428(ctx, base);
 }
 
 ITC_SCENE_LOADERS_RESET(SceneLoadersCockpitRelease, 820D6238, CockpitRelease)
@@ -582,8 +583,8 @@ struct CreateAGuest {
   static void Construct(void* user, uint32_t pool, uint32_t object, uint32_t list) {
     using Original = void (*)(PPCContext&, uint8_t*);
     static constexpr Original kOriginals[7] = {
-        __imp__sub_820D5890, __imp__sub_820D7428, __imp__sub_820D63A0, __imp__sub_820D78B8,
-        __imp__sub_820D6A70, __imp__sub_820D9570, __imp__sub_820D8908};
+        lifted::original::c820D5890, lifted::original::c820D7428, lifted::original::c820D63A0, lifted::original::c820D78B8,
+        lifted::original::c820D6A70, lifted::original::c820D9570, lifted::original::c820D8908};
     static constexpr uint32_t kReturns[7] = {0x820C42A4, 0x820C4278, 0x820C4248, 0x820C421C,
                                              0x820C41F0, 0x820C41C4, 0x820C4198};
     auto& c = *static_cast<CreateAGuest*>(user);
@@ -610,7 +611,7 @@ struct PartLoadedGuest {
       c.ctx.r3.u64 = model;
       c.ctx.r4.u64 = file;
       c.ctx.r5.u64 = 0;
-      __imp__sub_82596920(c.ctx, c.base);
+      lifted::original::c82596920(c.ctx, c.base);
     });
   }
 };

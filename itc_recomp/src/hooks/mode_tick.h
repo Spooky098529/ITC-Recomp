@@ -19,5 +19,9 @@ void ModeTickScreenFadesUpdate(PPCContext& ctx, uint8_t* base);
 // [0x826C5C80]'s slot 4 from a 288-byte frame like the original's; r3 as
 // that call leaves it.
 void ModeTickMusicPlay(PPCContext& ctx, uint8_t* base);
+// Modes::Tick sub_82107910 (r3 the holder, r4 the layer): its plain C++
+// entered through lifted::Enter, without the flag (its wrap's in
+// src/frame_pacing/per_frame_logic.cpp, and the harness's).
+void ModesTickSteps(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -6,6 +6,7 @@
 // stays for every other semaphore.
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "hooks/archive.h"
 
@@ -155,7 +156,7 @@ struct FinishGuestCalls {
       ctx.r3.u64 = address;
       ctx.r4.u64 = size;
       ctx.r5.u64 = type;
-      __imp__sub_82295330(ctx, c.base);
+      lifted::original::c82295330(ctx, c.base);
     });
   }
   archive::FinishCalls Calls() { return {&Callback, &GuestFree, this}; }

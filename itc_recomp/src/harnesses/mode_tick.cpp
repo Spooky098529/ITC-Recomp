@@ -386,55 +386,59 @@ void WriteName(uint8_t* base, uint32_t address, Random& random) {
   }
 }
 
+// The sign-in watch's world for a case: its state 0 (the game's) or above
+// 9, the users, masks, counts, names and checks (SignInWatch::Update's
+// cases and Modes::Tick's).
+void WatchWorld(Context& h, Random& random) {
+  auto flag = [&]() -> uint32_t {
+    return random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(2);
+  };
+  // The state 0 (the game's), or above 9; not the prompts' 1 to 9,
+  // whose handlers (never seen in play) the original runs.
+  guest::StoreU32(h.base, mt::kWatchState,
+                  random.Below(8) == 0 ? 10 + random.Below(0x7FFFFFF0) : 0);
+  guest::StoreU32(h.base, mt::kPlayerUsers,
+                  random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(4));
+  // The masks and counts: ours (user 0 alone, one), or others.
+  const bool ours = random.Below(3) == 0;
+  guest::StoreU32(h.base, mt::kSignedInMask, ours ? 1 : random.Below(16));
+  guest::StoreU32(h.base, mt::kSignedInCount, ours ? 1 : random.Below(5));
+  guest::StoreU32(h.base, mt::kLastMask,
+                  ours || random.Below(2) ? guest::LoadU32(h.base, mt::kSignedInMask)
+                                          : random.Below(16));
+  guest::StoreU32(h.base, mt::kLastCount,
+                  random.Below(2) ? guest::LoadU32(h.base, mt::kSignedInCount)
+                                  : random.Below(5));
+  for (uint32_t slot = 0; slot < 4; slot++) {
+    WriteName(h.base, mt::kUserNames + 32 * slot, random);
+  }
+  if (random.Below(2)) {
+    const uint32_t from = mt::kUserNames + 32 * random.Below(4);
+    for (uint32_t i = 0; i < 32; i += 4) {
+      guest::StoreU32(h.base, mt::kLastName + i, guest::LoadU32(h.base, from + i));
+    }
+  } else {
+    WriteName(h.base, mt::kLastName, random);
+  }
+  guest::StoreU32(h.base, mt::kOtherUserSignedIn, random.Below(4) == 0 ? flag() : 0);
+  guest::StoreU32(h.base, mt::kUserSignedOut, random.Below(4) == 0 ? flag() : 0);
+  for (uint32_t i = 0; i < 7; i++) {
+    guest::StoreU32(h.base, mt::kChecks + 4 * i, flag());
+  }
+  guest::StoreU32(h.base, 0x82816118, random.Below(4) == 0 ? flag() : 0);
+  guest::StoreU32(h.base, 0x826C7824, flag());
+  guest::StoreU32(h.base, 0x826C7878, flag());
+  const uint32_t begin = 0x40000000 + 16 * random.Below(1024);
+  guest::StoreU32(h.base, 0x826C7308 + 4, begin);
+  guest::StoreU32(h.base, 0x826C7308 + 8, begin + 384 * random.Below(3));
+  guest::StoreU32(h.base, 0x826C795C, random.Below(16));
+}
+
 void WatchUpdate(Context& h) {
   Results results("SignInWatch::Update (sub_8209EEC8)");
   for (int c = 0; c < 256; c++) {
     Case(
-        h, results,
-        [&](Random& random) {
-          auto flag = [&]() -> uint32_t {
-            return random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(2);
-          };
-          // The state 0 (the game's), or above 9; not the prompts' 1 to 9,
-          // whose handlers (never seen in play) the original runs.
-          guest::StoreU32(h.base, mt::kWatchState,
-                          random.Below(8) == 0 ? 10 + random.Below(0x7FFFFFF0) : 0);
-          guest::StoreU32(h.base, mt::kPlayerUsers,
-                          random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(4));
-          // The masks and counts: ours (user 0 alone, one), or others.
-          const bool ours = random.Below(3) == 0;
-          guest::StoreU32(h.base, mt::kSignedInMask, ours ? 1 : random.Below(16));
-          guest::StoreU32(h.base, mt::kSignedInCount, ours ? 1 : random.Below(5));
-          guest::StoreU32(h.base, mt::kLastMask,
-                          ours || random.Below(2) ? guest::LoadU32(h.base, mt::kSignedInMask)
-                                                  : random.Below(16));
-          guest::StoreU32(h.base, mt::kLastCount,
-                          random.Below(2) ? guest::LoadU32(h.base, mt::kSignedInCount)
-                                          : random.Below(5));
-          for (uint32_t slot = 0; slot < 4; slot++) {
-            WriteName(h.base, mt::kUserNames + 32 * slot, random);
-          }
-          if (random.Below(2)) {
-            const uint32_t from = mt::kUserNames + 32 * random.Below(4);
-            for (uint32_t i = 0; i < 32; i += 4) {
-              guest::StoreU32(h.base, mt::kLastName + i, guest::LoadU32(h.base, from + i));
-            }
-          } else {
-            WriteName(h.base, mt::kLastName, random);
-          }
-          guest::StoreU32(h.base, mt::kOtherUserSignedIn, random.Below(4) == 0 ? flag() : 0);
-          guest::StoreU32(h.base, mt::kUserSignedOut, random.Below(4) == 0 ? flag() : 0);
-          for (uint32_t i = 0; i < 7; i++) {
-            guest::StoreU32(h.base, mt::kChecks + 4 * i, flag());
-          }
-          guest::StoreU32(h.base, 0x82816118, random.Below(4) == 0 ? flag() : 0);
-          guest::StoreU32(h.base, 0x826C7824, flag());
-          guest::StoreU32(h.base, 0x826C7878, flag());
-          const uint32_t begin = 0x40000000 + 16 * random.Below(1024);
-          guest::StoreU32(h.base, 0x826C7308 + 4, begin);
-          guest::StoreU32(h.base, 0x826C7308 + 8, begin + 384 * random.Below(3));
-          guest::StoreU32(h.base, 0x826C795C, random.Below(16));
-        },
+        h, results, [&](Random& random) { WatchWorld(h, random); },
         [&](PPCContext& t) {
           t.r3.u64 = 0x826C5B9C;
           t.r4.u64 = h.data + 256;
@@ -736,7 +740,98 @@ void SignInWatchStaticInits(Context& h) {
 
 }  // namespace
 
+// --- Modes::Tick, with a current mode (its making, Mode::Create with the
+// whole mode's set-up, checked by reading) ---
+//
+// In the scratch area from +0xE00: the holder (+4 the mode), the mode (its
+// vtable's slots 1 and 7 nothing, sub_82106540; +4 its delegate), the
+// delegate (slot 0 one of: sub_82126860, the answer's two words cleared, no
+// change; sub_825918E0, its first word a vtable's address, a change to the
+// type the frame's +108 holds; nothing, both words the frame's), the music
+// player at [0x826C5C80] (slot 4 BillboardMaterial::SetLights, sub_8209F5C8,
+// as Music::Play's cases; slot 5 sub_82465868, [r4] = r3) and the action
+// mappers' client list at [0x826BAB7C] (none bound). The fades stopped (no
+// rectangle recorded), the network's profile read pending (997: nothing
+// polled), the sign-in watch's world as SignInWatch::Update's cases. Also
+// compared: the network's counter, the mode types, the last error and the
+// tick's frame below the register saves (r25 to r31 and lr, 64 bytes).
+void NativeModesTick(PPCContext& ctx, uint8_t* base) { hooks::ModesTickSteps(ctx, base); }
+
+void ModesTickGroup(Context& h) {
+  constexpr uint32_t kHolder = 0xE00, kMode = 0xE40, kModeVtable = 0xE80, kDelegate = 0xEC0,
+                     kDelegateVtable = 0xEE0, kPlayer = 0xF00, kPlayerVtable = 0xF40,
+                     kClients = 0xF80, kLayer = 0xFC0;
+  constexpr uint32_t kNothing = 0x82106540, kClearTwo = 0x82126860, kStoreVtable = 0x825918E0,
+                     kSetLights = 0x8209F5C8, kStoreR3 = 0x82465868;
+  struct Extra {
+    uint32_t address, bytes;
+  };
+  constexpr Extra kExtra[] = {{0x82601850, 0x10}, {0x826032D0, 0x20}, {0x826C6080, 4}};
+  std::vector<std::vector<uint8_t>> saved;
+  for (const Extra& e : kExtra) {
+    saved.push_back(Read(h.base, e.address, e.bytes));
+  }
+  const uint32_t slot = guest::LoadU32(h.base, h.ctx.r13.u32 + 256) + 352;
+  const uint32_t saved_error = guest::LoadU32(h.base, slot);
+  Results results("Modes::Tick (sub_82107910)");
+  for (int c = 0; c < 200; c++) {
+    Case(
+        h, results,
+        [&](Random& random) {
+          const uint32_t d = h.data;
+          for (const Extra& e : kExtra) {
+            FillRandom(h.base, e.address, e.bytes, random);
+          }
+          guest::StoreU32(h.base, slot, 0xCDCDCDCD);
+          WatchWorld(h, random);
+          guest::StoreU32(h.base, 0x826C5B94, random.Below(2));
+          guest::StoreU32(h.base, 0x826C5B98, random.Below(2));
+          guest::StoreU32(h.base, 0x826032DC,
+                          random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(14));
+          for (uint32_t a = mt::kFadeOutDurations; a < mt::kFadeOutCounts + 8; a += 4) {
+            guest::StoreU32(h.base, a, 0);
+          }
+          guest::StoreU32(h.base, 0x826C6080, 997);
+          guest::StoreU32(h.base, d + kHolder + 4, d + kMode);
+          guest::StoreU32(h.base, d + kMode, d + kModeVtable);
+          guest::StoreU32(h.base, d + kMode + 4, d + kDelegate);
+          guest::StoreU32(h.base, d + kModeVtable + 4, kNothing);
+          guest::StoreU32(h.base, d + kModeVtable + 28, kNothing);
+          guest::StoreU32(h.base, d + kDelegate, d + kDelegateVtable);
+          const uint32_t answers[] = {kClearTwo, kClearTwo, kStoreVtable, kNothing};
+          guest::StoreU32(h.base, d + kDelegateVtable, answers[random.Below(4)]);
+          guest::StoreU32(h.base, mt::kMusicPlayer, d + kPlayer);
+          guest::StoreU32(h.base, d + kPlayer, d + kPlayerVtable);
+          guest::StoreU32(h.base, d + kPlayerVtable + 16, kSetLights);
+          guest::StoreU32(h.base, d + kPlayerVtable + 20, kStoreR3);
+          guest::StoreU32(h.base, 0x826BAB7C, d + kClients);
+          guest::StoreU32(h.base, d + kClients, 0x82007F18);
+          for (uint32_t k = 4; k < 36; k += 4) {
+            guest::StoreU32(h.base, d + kClients + k, 0);
+          }
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = h.data + kHolder;
+          t.r4.u64 = h.data + kLayer;
+        },
+        __imp__sub_82107910, NativeModesTick, fmt::format("case {}", c),
+        [&](const PPCContext& t, Outputs& out) {
+          for (const Extra& e : kExtra) {
+            out.Bytes(Read(h.base, e.address, e.bytes));
+          }
+          out.Word(guest::LoadU32(h.base, slot));
+          out.Bytes(Read(h.base, t.r1.u32 - 208, 208 - 64));
+        });
+  }
+  for (size_t i = 0; i < saved.size(); i++) {
+    Write(h.base, kExtra[i].address, saved[i].data(), kExtra[i].bytes);
+  }
+  guest::StoreU32(h.base, slot, saved_error);
+  results.Report();
+}
+
 void ModeTick(Context& h) {
+  ModesTickGroup(h);
   Ring(h);
   Fades(h);
   Players(h);

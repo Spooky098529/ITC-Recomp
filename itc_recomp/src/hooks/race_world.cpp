@@ -2,6 +2,8 @@
 // src/race_world/ (docs/functions/race-world.md), with the register steps
 // the harness shares (hooks/race_world.h).
 
+#include "hooks/lifted_call.h"
+#include "lifted/originals.h"
 #include "hooks/race_world.h"
 
 #include "base/flags.h"
@@ -38,7 +40,7 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "sub_82165E20 and PlaceRolling sub_821662E0 (their callees' originals where those "
               "refuse); RaceManager::StreamOpponents sub_82172118 (Vehicle::RemoveFromWorld's "
               "original unless --native_heap routes the game's heap to the allocation layer; "
-              "RaceManager::GiveVehicle sub_821706E8's original), StreamTraffic sub_821724F8 "
+              "RaceManager::GiveVehicle sub_821706E8, natively too), StreamTraffic sub_821724F8 "
               "(Vehicle::RemoveFromWorld's and the physics set-up's originals unless --native_heap "
               "routes the game's heap to the allocation layer; its callees' originals where those "
               "refuse) and MoveUnseen sub_82173E28; RaceManager::Stream sub_82174338 (with "
@@ -119,7 +121,7 @@ void RaceWorldCreate(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const auto r3 = NativeHeapActive() ? rw::Create(base) : std::nullopt;
   if (!r3) {
-    __imp__sub_821715B8(ctx, base);
+    lifted::original::c821715B8(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -162,22 +164,22 @@ rw::Original Originals(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = r3;
     switch (address) {
       case 0x820C0118:
-        __imp__sub_820C0118(ctx, base);
+        lifted::original::c820C0118(ctx, base);
         break;
       case 0x820C20E0:
-        __imp__sub_820C20E0(ctx, base);
+        lifted::original::c820C20E0(ctx, base);
         break;
       case 0x820C3B78:
-        __imp__sub_820C3B78(ctx, base);
+        lifted::original::c820C3B78(ctx, base);
         break;
       case 0x8213B2B8:
-        __imp__sub_8213B2B8(ctx, base);
+        lifted::original::c8213B2B8(ctx, base);
         break;
       case 0x820FEFB0:
-        __imp__sub_820FEFB0(ctx, base);
+        lifted::original::c820FEFB0(ctx, base);
         break;
       case 0x825A70E8:
-        __imp__sub_825A70E8(ctx, base);
+        lifted::original::c825A70E8(ctx, base);
         break;
     }
     ctx.r1.u64 = r1;
@@ -218,7 +220,7 @@ void RaceWorldReleaseForStage(PPCContext& ctx, uint8_t* base) {
                         ctx.r4.u64 = r4;
                         ctx.r5.u64 = int64_t(int32_t(r5));
                         if (address == 0x820FFD88) {
-                          __imp__sub_820FFD88(ctx, base);
+                          lifted::original::c820FFD88(ctx, base);
                         }
                         ctx.r1.u64 = r1;
                         ctx.fpscr.disableFlushMode();
@@ -328,25 +330,25 @@ rw::StartCalls StartCalls(PPCContext& ctx, uint8_t* base, uint32_t setup_frame) 
     ctx.r5.u64 = r5;
     switch (address) {
       case 0x820FFD88:
-        __imp__sub_820FFD88(ctx, base);
+        lifted::original::c820FFD88(ctx, base);
         break;
       case 0x820C3BD0:
-        __imp__sub_820C3BD0(ctx, base);
+        lifted::original::c820C3BD0(ctx, base);
         break;
       case 0x8213B1E0:
-        __imp__sub_8213B1E0(ctx, base);
+        lifted::original::c8213B1E0(ctx, base);
         break;
       case 0x821715B8:
-        __imp__sub_821715B8(ctx, base);
+        lifted::original::c821715B8(ctx, base);
         break;
       case 0x820C20E0:
-        __imp__sub_820C20E0(ctx, base);
+        lifted::original::c820C20E0(ctx, base);
         break;
       case 0x821706E8:
         sub_821706E8(ctx, base);  // the original, through the harness's stand-in
         break;
       case 0x820C0118:
-        __imp__sub_820C0118(ctx, base);
+        lifted::original::c820C0118(ctx, base);
         break;
       case 0x821743A8:
         ctx.lr = 0x82174CF4;  // as RaceWorld::Tick calls it
@@ -370,9 +372,9 @@ rw::StartCalls StartCalls(PPCContext& ctx, uint8_t* base, uint32_t setup_frame) 
       ctx.r7.u64 = 1;
       ctx.f1.f64 = r.f1;
       ctx.f2.f64 = r.f2;
-      __imp__sub_820C3608(ctx, base);
+      lifted::original::c820C3608(ctx, base);
     } else if (address == 0x820B7998) {
-      __imp__sub_820B7998(ctx, base);
+      lifted::original::c820B7998(ctx, base);
     } else {
       sub_825A7410(ctx, base);  // memcpy, through its override as the original
     }
@@ -442,7 +444,7 @@ rw::OriginalCall OpponentsCall(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
     if (address == 0x820C20E0) {
-      __imp__sub_820C20E0(ctx, base);
+      lifted::original::c820C20E0(ctx, base);
     } else if (address == 0x821706E8) {
       sub_821706E8(ctx, base);  // the original, through the harness's stand-in
     }
@@ -585,15 +587,24 @@ extern "C" REX_FUNC(sub_821743A8) {
   }
   __imp__sub_821743A8(ctx, base);
 }
-// RaceManager::GiveVehicle (sub_821706E8, never seen in play): the original,
-// or the harness's stand-in while it's set (hooks::g_give_vehicle_stand_in).
+// RaceManager::GiveVehicle (sub_821706E8, never seen in play): the harness's
+// stand-in while it's set (hooks::g_give_vehicle_stand_in); else its plain
+// C++ (race_world::GiveVehicle) with --native_race_world, or the original.
 extern "C" REX_FUNC(sub_821706E8) {
   REX_FUNC_PROLOGUE();
   if (hooks::g_give_vehicle_stand_in != nullptr) {
     hooks::g_give_vehicle_stand_in(ctx, base);
     return;
   }
-  __imp__sub_821706E8(ctx, base);
+  if (!ITC_FLAG(native_race_world)) {
+    __imp__sub_821706E8(ctx, base);
+    return;
+  }
+  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
+    return {race_world::GiveVehicle(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+                                    uint32_t(a.r[1])),
+            a.f[0]};
+  });
 }
 // RaceManager::NearSegment (sub_82170BC0) and RoutePosition::ToMainRoad
 // (sub_82143608) have no adapters: their callers in play

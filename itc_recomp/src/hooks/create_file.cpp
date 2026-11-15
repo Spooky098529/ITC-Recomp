@@ -9,10 +9,33 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "game_data/create_file.h"
+#include "hooks/create_file.h"
+#include "hooks/lifted_call.h"
 
 #include <string>
 
 ITC_FLAG_BOOL(log_file_opens, false, "ITC", "Log every file the game opens");
+ITC_FLAG_BOOL(native_create_file, true, "ITC",
+              "Run the game's CreateFile (sub_82295508, docs/functions/files-and-saves.md) "
+              "natively inside its --log_file_opens wrap instead of through the translated "
+              "code (NtCreateFile through its import as the original; checked by "
+              "--run_harnesses=create_file)");
+
+namespace hooks {
+
+// CreateFile's register steps (the adapter's and the harness's): r3 the
+// path, r4 the access, r5 the sharing, r7 the disposition, r8 the flags.
+void CreateFileSteps(PPCContext& ctx, uint8_t* base) {
+  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
+    return {game_data::CreateFile(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+                                  uint32_t(a.r[1]), uint32_t(a.r[2]), uint32_t(a.r[4]),
+                                  uint32_t(a.r[5])),
+            a.f[0]};
+  });
+}
+
+}  // namespace hooks
 
 // CreateFile: r3 = path; returns the handle, or -1.
 extern "C" REX_FUNC(sub_82295508) {
@@ -28,5 +51,9 @@ extern "C" REX_FUNC(sub_82295508) {
   if (ITC_FLAG(log_file_opens)) {
     ITC_LOG_INFO("file open: {} (from {:08X})", path, ctx.lr);
   }
-  __imp__sub_82295508(ctx, base);
+  if (ITC_FLAG(native_create_file)) {
+    hooks::CreateFileSteps(ctx, base);
+  } else {
+    __imp__sub_82295508(ctx, base);
+  }
 }

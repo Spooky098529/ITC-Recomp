@@ -3,6 +3,7 @@
 #pragma once
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "c_runtime/exit.h"
 
@@ -23,7 +24,7 @@ bool CRuntimeExitHostLock();
 bool NativeAtexit();
 
 // For adapters of native code that registers clean-ups: the game's atexit
-// (__imp__sub_825A7068) through `ctx` when c_runtime::Atexit can't, the
+// (lifted::original::c825A7068) through `ctx` when c_runtime::Atexit can't, the
 // call made below ctx's stack pointer (the adapter's caller's frame). Lives
 // as long as the adapter's call.
 struct GuestAtexit {

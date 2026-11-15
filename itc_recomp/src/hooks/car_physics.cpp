@@ -5,6 +5,7 @@
 // relies on callees leaving r3 as it was (sub_820B6498's row).
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "hooks/car_physics.h"
 
@@ -189,14 +190,14 @@ ITC_CAR_PHYSICS(820B3D10, ctx.f1.f64 = VehicleSetSteering(base, ctx.r3.u32, ctx.
 extern "C" REX_FUNC(sub_820B5FD8) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B5FD8(ctx, base);
+    lifted::original::c820B5FD8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
   double f1 = 0.0;
   if (!VehicleSteerTowards(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.r4.u32,
                            ctx.r5.u32, &f1)) {
-    __imp__sub_820B5FD8(ctx, base);
+    lifted::original::c820B5FD8(ctx, base);
     return;
   }
   ctx.f1.f64 = f1;
@@ -281,13 +282,13 @@ extern "C" REX_FUNC(sub_820C27E8) {
   REX_FUNC_PROLOGUE();
   const uint32_t frame = ctx.r1.u32 - 368;
   if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820C27E8(ctx, base);
+    lifted::original::c820C27E8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
   double f1 = 0.0;
   if (!VehicleSetupFromCar(base, ctx.r3.u32, ctx.r4.u32, frame, &f1)) {
-    __imp__sub_820C27E8(ctx, base);
+    lifted::original::c820C27E8(ctx, base);
     return;
   }
   ctx.f1.f64 = f1;
@@ -329,13 +330,13 @@ bool NativeLifetime() {
 extern "C" REX_FUNC(sub_820B7998) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B7998(ctx, base);
+    lifted::original::c820B7998(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint32_t object = ctx.r3.u32;
   if (!CollisionObjectResetTransform(base, object, ctx.r1.u32 - 112)) {
-    __imp__sub_820B7998(ctx, base);
+    lifted::original::c820B7998(ctx, base);
     return;
   }
   ctx.r3.u64 = object + 32;
@@ -372,7 +373,7 @@ extern "C" REX_FUNC(sub_820B62E8) {
 extern "C" REX_FUNC(sub_820B6498) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown(base)) {
-    __imp__sub_820B6498(ctx, base);
+    lifted::original::c820B6498(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -384,10 +385,10 @@ extern "C" REX_FUNC(sub_820B6498) {
     ctx.r3.u64 = vehicle;
     if (address == 0x820B18B8) {
       ctx.lr = 0x820B6514;
-      __imp__sub_820B18B8(ctx, base);
+      lifted::original::c820B18B8(ctx, base);
     } else {
       ctx.lr = 0x820B6538;
-      __imp__sub_820B2100(ctx, base);
+      lifted::original::c820B2100(ctx, base);
     }
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
@@ -400,7 +401,7 @@ extern "C" REX_FUNC(sub_820B6498) {
 extern "C" REX_FUNC(sub_820B5670) {
   REX_FUNC_PROLOGUE();
   if (!NativeLifetime()) {
-    __imp__sub_820B5670(ctx, base);
+    lifted::original::c820B5670(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -408,7 +409,7 @@ extern "C" REX_FUNC(sub_820B5670) {
   uint32_t r3 = 0;
   if (!VehicleSetUpPhysics(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                            ctx.r1.u32 - 208, &f1, &r3)) {
-    __imp__sub_820B5670(ctx, base);
+    lifted::original::c820B5670(ctx, base);
     return;
   }
   ctx.f1.f64 = f1;
@@ -418,7 +419,7 @@ extern "C" REX_FUNC(sub_820B5670) {
 extern "C" REX_FUNC(sub_820B5B08) {
   REX_FUNC_PROLOGUE();
   if (!NativeLifetime()) {
-    __imp__sub_820B5B08(ctx, base);
+    lifted::original::c820B5B08(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -426,7 +427,7 @@ extern "C" REX_FUNC(sub_820B5B08) {
   uint32_t r3 = 0;
   if (!VehicleResetPhysics(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 208, &f1,
                            &r3)) {
-    __imp__sub_820B5B08(ctx, base);
+    lifted::original::c820B5B08(ctx, base);
     return;
   }
   ctx.f1.f64 = f1;
@@ -469,13 +470,13 @@ car_physics::CollisionGuestCall CollisionWorldUpdateCalls(PPCContext& ctx, uint8
     ctx.lr = lr;
     switch (address) {
       case 0x820BB758:
-        __imp__sub_820BB758(ctx, base);
+        lifted::original::c820BB758(ctx, base);
         break;
       case 0x820BBE30:
-        __imp__sub_820BBE30(ctx, base);
+        lifted::original::c820BBE30(ctx, base);
         break;
       case 0x820B81C8:
-        __imp__sub_820B81C8(ctx, base);
+        lifted::original::c820B81C8(ctx, base);
         break;
       default:
         REX_CALL_INDIRECT_FUNC(address);

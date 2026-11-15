@@ -1,4 +1,5 @@
 #include "frame_state_diff.h"
+#include "lifted/originals.h"
 
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
@@ -13,6 +14,8 @@
 #include "hooks/second_set.h"
 #include "matrix_math/matrix_math.h"
 #include "models/xpr.h"
+#include "screen_objects/screen_objects.h"
+#include "lifted/sdk.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -32,6 +35,7 @@
 
 ITC_FLAG_DECLARE(bool, native_matrix_math);
 ITC_FLAG_DECLARE(bool, native_cameras);
+ITC_FLAG_DECLARE(bool, native_screen_objects);
 ITC_FLAG_DECLARE(bool, native_models);
 ITC_FLAG_DECLARE(bool, native_second_set);
 ITC_FLAG_DECLARE(bool, native_load_poll);
@@ -470,7 +474,25 @@ extern "C" REX_FUNC(sub_820F6068) {
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820F6068);
 }
-ITC_FRAME_STATE_WRAP(82130978)
+// ScreenObject::Record natively under --native_screen_objects
+// (src/screen_objects/record.cpp, lift.py's translation), inside the same
+// wrap.
+extern "C" REX_FUNC(sub_82130978) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x82130978)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_screen_objects)) {
+    lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
+      return screen_objects::Record(base, a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4],
+                                    a.r[5], a.r[6], a.r[7], a.f[0]);
+    });
+  } else {
+    __imp__sub_82130978(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x82130978);
+}
 // The render orchestrator's (sub_820C5DE8) callees. The camera passes'
 // work natively (src/cameras/cameras.cpp, --native_cameras) or translated,
 // inside the same wrap. CameraPasses::RenderTarget: r3 = the id; r3 = its
@@ -644,7 +666,7 @@ extern "C" REX_FUNC(sub_820C5C88) {
   if (ITC_FLAG(native_second_set)) {
     hooks::SecondSetReleaseB(ctx, base);
   } else {
-    __imp__sub_820C5C88(ctx, base);
+    lifted::original::c820C5C88(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820C5C88);
 }

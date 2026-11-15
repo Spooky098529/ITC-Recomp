@@ -11,9 +11,16 @@
 #include "hooks/c_runtime.h"
 #include "hooks/direct_slots.h"
 #include "hooks/guest_call.h"
+#include "hooks/lifted_call.h"
 #include "hooks/mode_tick.h"
 #include "mode_tick/mode_tick.h"
+#include "mode_tick/modes_tick.h"
 
+ITC_FLAG_BOOL(native_modes_tick, true, "ITC",
+              "Run the mode manager's tick itself (Modes::Tick sub_82107910, "
+              "docs/functions/game-modes.md) natively inside its play time wrap instead of "
+              "through the translated code (its callees through their overrides or the "
+              "recompiled code; checked by --run_harnesses=mode_tick)");
 ITC_FLAG_BOOL(native_mode_tick, true, "ITC",
               "Run the mode manager's tick services (docs/functions/mode-tick.md: "
               "Billboards::FlipRing sub_8209BD18, ScreenFades::Init sub_8209CDE8, FadeIn "
@@ -222,6 +229,14 @@ ITC_MODE_TICK(8209D130, hooks::ModeTickScreenFadesUpdate(ctx, base))
 // Music::Play: r3, r5 = two pointers passed on, r4 = the music's name; r3 as
 // the call through [0x826C5C80]'s slot 4 leaves it, made from a 288-byte
 // frame like the original's (the ids its r7 and r8 point at in it).
+void hooks::ModesTickSteps(PPCContext& ctx, uint8_t* base) {
+  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
+    return {mode_tick::ModesTick(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+                                 uint32_t(a.r[1])),
+            a.f[0]};
+  });
+}
+
 void hooks::ModeTickMusicPlay(PPCContext& ctx, uint8_t* base) {
   const uint32_t name = ctx.r4.u32;
   const uint64_t a = ctx.r3.u64, name64 = ctx.r4.u64, b = ctx.r5.u64;

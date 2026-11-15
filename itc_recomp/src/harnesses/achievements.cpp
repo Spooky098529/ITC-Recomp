@@ -234,6 +234,25 @@ void Words(uint8_t* base, uint32_t address, Random& r) {
 }  // namespace
 
 void Achievements(Context& h) {
+  // XUserWriteAchievements, XAPI's wrapper (called directly, not through the
+  // recorder's wrap): the import runs for real, so only calls that unlock
+  // nothing (count 0, or no list), synchronous or with an overlapped in the
+  // scratch area (event 0). r31 and lr saved in [sp - 16, sp).
+  Group(
+      h, "XUserWriteAchievements (sub_82294E58)", 60, __imp__sub_82294E58,
+      hooks::WriteAchievementsSteps, 112, 16,
+      [](PPCContext& t, Random& r, uint8_t* base, uint32_t data) {
+        if (r.Below(2) == 0) {
+          t.r3.u64 = 0;
+        } else {
+          t.r4.u64 = 0;
+        }
+        const uint32_t overlapped = data + kScratchBytes - 64;
+        for (uint32_t k = 0; k < 28; k += 4) {
+          guest::StoreU32(base, overlapped + k, 0);
+        }
+        t.r5.u64 = r.Below(2) == 0 ? 0 : overlapped;
+      });
   // Time::Less: a leaf.
   Group(
       h, "Time::Less (sub_820FF708)", 400, __imp__sub_820FF708, hooks::TimeLessSteps, 0, 0,

@@ -27,6 +27,8 @@ ITC_FLAG_DECLARE(bool, native_video_output);
 
 ITC_FLAG_BOOL(native_screen_objects, true, "ITC",
               "Run the race's screen objects (docs/functions/screen-objects.md): "
+              "ScreenObject::Record sub_82130978 (lift.py's translation, inside its wrap in "
+              "src/debug/frame_state_diff.cpp; without the native heap too), "
               "ScreenObject::BuildRings sub_821329B8 with AddRingPoint sub_82132778 (no adapter: only "
               "BuildRings' plain C++ calls it), SetSpeed sub_8212FCC8 (no adapter: only "
               "RaceScene::Update's plain C++ calls it, and --native_race_update switches that), ~ScreenObject sub_82132FC8 "

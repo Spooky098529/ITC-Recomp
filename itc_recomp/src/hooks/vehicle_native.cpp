@@ -3,6 +3,7 @@
 // harness shares (hooks/vehicle_native.h).
 
 #include "hooks/vehicle_native.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -67,7 +68,7 @@ void VehicleLinkTrackPositions(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
   if (!vh::VehicleLinkTrackPositions(base, ctx.r3.u32, &r3)) {
-    __imp__sub_820C1D08(ctx, base);
+    lifted::original::c820C1D08(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;
@@ -78,7 +79,7 @@ void VehicleRefresh(PPCContext& ctx, uint8_t* base) {
   double f1 = 0.0;
   uint32_t r3 = 0;
   if (!vh::VehicleRefresh(base, ctx.r3.u32, ctx.r1.u32 - 96, &f1, &r3)) {
-    __imp__sub_820C0118(ctx, base);
+    lifted::original::c820C0118(ctx, base);
     return;
   }
   ctx.f1.f64 = f1;
@@ -89,7 +90,7 @@ void VehicleRemoveFromWorld(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
   if (!NativeHeapActive() || !vh::VehicleRemoveFromWorld(base, ctx.r3.u32, &r3)) {
-    __imp__sub_820C20E0(ctx, base);
+    lifted::original::c820C20E0(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;
@@ -99,7 +100,7 @@ void VehiclesCreate(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const auto r3 = NativeHeapActive() ? vh::VehiclesCreate(base, ctx.r1.u32 - 112) : std::nullopt;
   if (!r3) {
-    __imp__sub_820C3BD0(ctx, base);
+    lifted::original::c820C3BD0(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -108,7 +109,7 @@ void VehiclesCreate(PPCContext& ctx, uint8_t* base) {
 void VehiclesDestroy(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   if (!NativeHeapActive() || !vh::VehiclesDestroy(base)) {
-    __imp__sub_820C3B78(ctx, base);
+    lifted::original::c820C3B78(ctx, base);
   }
   // r3 not set: the original leaves operator delete's (free's) there, or
   // its own r3 without a block; its callers don't read it.
@@ -127,12 +128,12 @@ void VehicleApplyInput(PPCContext& ctx, uint8_t* base) {
     ctx.f3.f64 = f3;
     ctx.r4.u64 = left;
     ctx.r5.u64 = right;
-    __imp__sub_820B5FD8(ctx, base);
+    lifted::original::c820B5FD8(ctx, base);
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
   };
   if (!vh::VehicleApplyInput(base, vehicle, ctx.r4.u32, frame, steer)) {
-    __imp__sub_820BFD30(ctx, base);
+    lifted::original::c820BFD30(ctx, base);
     return;
   }
   ctx.r3.u64 = vehicle;
@@ -185,16 +186,16 @@ vehicle::CalleeOriginal VehicleSetUpOriginals(PPCContext& ctx, uint8_t* base, ui
     ctx.r6.u64 = r6;
     switch (address) {
       case 0x820C27E8:
-        __imp__sub_820C27E8(ctx, base);
+        lifted::original::c820C27E8(ctx, base);
         break;
       case 0x820B5B08:
-        __imp__sub_820B5B08(ctx, base);
+        lifted::original::c820B5B08(ctx, base);
         break;
       case 0x820B5670:
-        __imp__sub_820B5670(ctx, base);
+        lifted::original::c820B5670(ctx, base);
         break;
       default:
-        __imp__sub_820C1D08(ctx, base);
+        lifted::original::c820C1D08(ctx, base);
         break;
     }
     ctx.r1.u64 = r1;
@@ -227,7 +228,7 @@ void VehicleStatusUpdate(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   if (!vh::VehicleStatusUpdate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                ctx.r1.u32 - 384)) {
-    __imp__sub_820C23E8(ctx, base);
+    lifted::original::c820C23E8(ctx, base);
   }
 }
 
@@ -244,24 +245,24 @@ vehicle::GuestCall VehicleTickCalls(PPCContext& ctx, uint8_t* base) {
     ctx.f3.f64 = r.f3;
     switch (address) {
       case 0x820B5FD8:
-        __imp__sub_820B5FD8(ctx, base);
+        lifted::original::c820B5FD8(ctx, base);
         break;
       case 0x820BFD30:
-        __imp__sub_820BFD30(ctx, base);
+        lifted::original::c820BFD30(ctx, base);
         break;
       case 0x820B6498:
-        __imp__sub_820B6498(ctx, base);
+        lifted::original::c820B6498(ctx, base);
         break;
       case 0x820B18B8:
         ctx.lr = 0x820B6514;
-        __imp__sub_820B18B8(ctx, base);
+        lifted::original::c820B18B8(ctx, base);
         break;
       case 0x820B2100:
         ctx.lr = 0x820B6538;
-        __imp__sub_820B2100(ctx, base);
+        lifted::original::c820B2100(ctx, base);
         break;
       default:
-        __imp__sub_820C23E8(ctx, base);
+        lifted::original::c820C23E8(ctx, base);
         break;
     }
     ctx.r1.u64 = saved;
@@ -284,7 +285,7 @@ void VehiclePlaceOnRoute(PPCContext& ctx, uint8_t* base) {
     ctx.r4.u64 = r.r4;
     ctx.r5.u64 = r.r5;
     if (address == 0x820B7998) {
-      __imp__sub_820B7998(ctx, base);
+      lifted::original::c820B7998(ctx, base);
     } else {
       sub_825A7410(ctx, base);  // memcpy, through its override as the original
     }
@@ -293,7 +294,7 @@ void VehiclePlaceOnRoute(PPCContext& ctx, uint8_t* base) {
   };
   if (!vh::VehiclePlaceOnRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64,
                                ctx.r6.s32, ctx.r7.u32, ctx.r1.u32 - 560, call)) {
-    __imp__sub_820C3608(ctx, base);
+    lifted::original::c820C3608(ctx, base);
   }
   // r3 not set: the original leaves SetAngularVelocity's there; no caller
   // reads it.

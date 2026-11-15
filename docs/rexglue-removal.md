@@ -3170,6 +3170,57 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     allocation (the creation side), memcpy's mirror recording (the
     `sub_825A7410` override has no plain C++ entry), and RaceOverlays::Run.
 
+## A4 brought forward: our start-up, rexglue as a library (2026-11-15)
+
+The user's call, after the lift sweep left `xstart` the only unported
+function (`docs/loops/lift-sweep.md`): rather than port `xstart`, the
+program's start becomes ours, and rexglue a library it uses for guest
+memory, the kernel and the image load.
+
+Today the SDK owns the program: its `main()`
+(`windowed_app_main_sdl.cpp`, compiled into our executable by
+`rexglue_configure_target`) parses the flags, makes an SDL app context
+(the event loop on the main thread), and runs `ReXApp`
+(`rex_app.cpp`, `src/itc_app.h` derives from it). `ReXApp` sets up the
+paths, `itc.toml` and the log, makes a window (which our renderer hides,
+routing its own window's events to it, `src/native/app_window.cpp`),
+builds `rex::Runtime`, loads `default.xex`, and makes the game's main
+thread through the kernel, starting at `xstart`.
+
+The new start-up:
+
+1. **Our `main()`** (`src/app/`), the executable's entry: the SDK's
+   flag parser (until a parser of our own), the paths (`--game_data_root`
+   or the executable's folder), `itc.toml`, the log (ours taking over
+   the SDK's file, A2), SDL, our own event loop on the main thread
+   (`SDL_RunOnMainThread` callbacks for the renderer's window, the
+   gamepads' event pump, our window's close ending the title as
+   `ReXApp::OnClosing` did).
+2. **`rex::Runtime` as a library**: built by our `main()` with the same
+   config (our audio, no SDK input, no graphics system, no app context:
+   XAM's dialogs, which drew on the hidden window, are skipped),
+   `Setup`, the modules registered, `default.xex` loaded, the C runtime
+   heap.
+3. **The game's main thread** is still made by the kernel
+   (`PrepareModuleLaunch`): the game needs a kernel thread for its
+   per-thread kernel state (its block in r13, TLS, thread IDs) and a
+   stack in guest memory, until E1 and E2. Its start routine is our
+   start-up (`REX_FUNC(xstart)`, the kernel's one way in, through
+   `lifted::Enter`): `xstart`'s work in plain C++, by "plug in data":
+   the C runtime's globals, the thread notify routines, `_mtinit`,
+   `_initterm_e` and `_cinit` (the static initializers), then `main`
+   with no arguments (the command line is split only when
+   `[0x829537B8]` is set, which nothing sets); the heap check kept (it
+   makes the process heap first, `CreateHeap`), the PAL-50 check
+   (Dropped) left out; `exit` after
+   `main` as the original does (never reached in play).
+4. **Gone**: the SDK's `main()` and `ReXApp` (taken out of our target's
+   sources), its window and ImGui overlays (unused since the native
+   renderer), the achievement toast (drawn on the hidden window).
+
+Checked by attract races, the pad replay, a drive by the user, and the
+Windows build under Wine (`wWinMain`: SDL's `SDL_main.h`).
+
 ## The end state: removing the core
 
 Only when no recompiled function is left (or none that touches what's
@@ -5649,3 +5700,62 @@ Imports: 186 called, 45 with a live caller. B7 (`b7_status.py`): ours
 6,772, work left 656 (Wrapped 51, with a row 354, no row yet 251).
 Static map: reachable 10,845, ours 6,138, unported 3,106 (624 seen in
 play, 2,482 never seen).
+
+**2026-11-15, the lift sweep (branch `lift-sweep`,
+`docs/loops/lift-sweep.md`):** `itc_recomp/tools/lift.py` translated
+2,749 of the static map's 3,106 unported functions from `generated/`
+into plain C++ (`src/lifted/`, 29 batches, `--native_lifted_000` to
+`028`), calling each other directly, through a dispatch table by
+address, or the SDK's imports. Refused: 205 vector functions, 64 with
+an override of ours (Wrapped), and about 90 that read registers another
+function left or their caller saved, or use the global lock. Every
+harness at 0 in `attract_race.sh 180 --run_harnesses=all`; the pad
+replay ran 124 s with no error lines (465 lifted functions ran in it).
+The boundary: 449 functions (916 pairs): overridden 264, Native 48,
+Dropped 24, never called 34, live 79. Imports: 186 called, 36 with a
+live caller. B7 (`b7_status.py`): ours 9,521, work left 111 (Wrapped
+51, with a row 39, no row yet 21); 1,577 lifted functions have no row
+yet. Static map: reachable 9,131, ours 8,793, unported 329 (75 seen in
+play, 254 never seen).
+
+**2026-11-15, the lift sweep's vector code (branch `lift-sweep`):**
+`lift.py` now lifts vector code (registers as locals of our own `Vec`,
+the simde calls and the SDK's vector helpers in `rex/ppc/intrinsics.h`
+called as the generated code calls them): 188 more functions, 2,937 in
+all (batches 029 and 030). Every harness at 0; the pad replay ran 127 s
+with no error lines. The boundary: 449 functions (916 pairs):
+overridden 265, Native 48, Dropped 24, never called 34, live 78.
+Imports: 186 called, 36 with a live caller. B7 (`b7_status.py`): ours
+9,709, work left 98 (Wrapped 51, with a row 28, no row yet 19). Static
+map: reachable 9,125, ours 8,975, unported 141 (62 seen in play).
+
+**2026-11-15, the lift sweep's leftover registers (branch `lift-sweep`):**
+the 360's compiler lets a caller keep a value in a volatile register
+across a call it knows doesn't touch it; `lift.py` now wipes, at a
+direct call, only what the callee (through its calls) may write, and
+our lift code's SDK boundary puts the argument registers it loads back
+after the call. `__chkstk` calls are left out (Dropped). 64 more
+functions lifted, 3,001 in all (batches 031 and 032); before them, two
+B7-style migration agents made 60 of the 67 Wrapped functions native or
+Dropped (the render replay's handlers, the draw packet writers, the
+frame pacing and diagnostics wraps, `CreateFile`, the achievements'
+wrapper). Every harness at 0; the pad replay ran 127 s with no error
+lines. The boundary: overridden 267, Native 48, Dropped 24, never called
+34, live 76. Imports: 186 called, 32 with a live caller. B7
+(`b7_status.py`): ours 9,833, work left 45 (Wrapped 7, with a row 19,
+no row yet 19). Static map: reachable 9,118, ours 9,092, unported 17
+(9 seen in play).
+
+**2026-11-15, the lift sweep's last functions (branch `lift-sweep`):**
+the spin locks (the SDK's global lock taken through our helpers), the
+time base (`helpers::PerformanceCounter`), nested fragments and the
+360's no-op moves in `lift.py` (3,010 lifted); a migration agent made
+the draw library's inline draws, `Device::Resolve` (checked against the
+original on 262,144 real calls) and `ScreenObject::Record` native inside
+their wraps. Every harness at 0; the pad replay ran 127 s with no error
+lines. The boundary: overridden 268, Native 48, Dropped 24, never called
+34, live 75. Imports: 186 called, 30 with a live caller. B7
+(`b7_status.py`): ours 9,848, work left 37 (Wrapped 3, with a row 16, no
+row yet 18). Static map: reachable 9,106, ours 9,095, **unported 2**:
+`sub_821743A8` (reached only by the Xbox Live mode's network battle)
+and `xstart`.

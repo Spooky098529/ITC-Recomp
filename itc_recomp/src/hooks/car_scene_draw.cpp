@@ -3,6 +3,7 @@
 // shares (hooks/car_scene_draw.h).
 
 #include "hooks/car_scene_draw.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "car_scene_draw/car_scene_draw.h"
@@ -76,7 +77,7 @@ void CarSceneDrawVector16Size(PPCContext& ctx, uint8_t* base) {
 void CarSceneDrawVector16PushBack(PPCContext& ctx, uint8_t* base) {
   const auto r3 = csd::Vector16PushBack(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
   if (!r3) {
-    __imp__sub_825986B8(ctx, base);
+    lifted::original::c825986B8(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -151,7 +152,7 @@ void CarSceneDrawSetLight(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = to;
     ctx.r4.u64 = from;
     ctx.r5.u64 = bytes;
-    __imp__sub_825A7410(ctx, base);
+    lifted::original::c825A7410(ctx, base);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
   };
@@ -184,7 +185,7 @@ void CarSceneDrawTextureProjectionFit(PPCContext& ctx, uint8_t* base) {
     ctx.lr = lr;
     ctx.r3.u64 = vector;
     ctx.r4.u64 = value;
-    __imp__sub_825986B8(ctx, base);
+    lifted::original::c825986B8(ctx, base);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
   };
@@ -233,7 +234,7 @@ car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(PPCContext& ctx, uint8_t* b
     ctx.r3.u64 = to;
     ctx.r4.u64 = from;
     ctx.r5.u64 = bytes;
-    __imp__sub_825A7410(ctx, base);
+    lifted::original::c825A7410(ctx, base);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
   };
@@ -243,7 +244,7 @@ car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(PPCContext& ctx, uint8_t* b
     ctx.lr = lr;
     ctx.r3.u64 = vector;
     ctx.r4.u64 = value;
-    __imp__sub_825986B8(ctx, base);
+    lifted::original::c825986B8(ctx, base);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
   };

@@ -41,6 +41,7 @@
 // and poses with the translated code's on logic passes.
 
 #include "frame_pacing/game_messages.h"
+#include "lifted/originals.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
 #include "interpolation/transform.h"
@@ -287,14 +288,14 @@ struct Check {
     StoreMatrix(base, m1, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
     guest::StoreFloat(base, angle_at, angle);
     ctx.r3.u32 = m0, ctx.r4.u32 = m1, ctx.r5.u32 = angle_at;
-    __imp__sub_820A2D30(ctx, base);  // m0 = RotZ
+    lifted::original::c820A2D30(ctx, base);  // m0 = RotZ
     ctx.r3.u32 = m1, ctx.r4.u32 = locals + 64, ctx.r5.u32 = m0;
-    __imp__sub_8209BD50(ctx, base);  // m1 = B * R
+    lifted::original::c8209BD50(ctx, base);  // m1 = B * R
     ctx.r3.u32 = m2, ctx.r4.u32 = m1, ctx.r5.u32 = locals;
-    __imp__sub_8209BD50(ctx, base);  // m2 = (B * R) * A
+    lifted::original::c8209BD50(ctx, base);  // m2 = (B * R) * A
     StoreMatrix(base, m1, car_world);
     ctx.r3.u32 = m0, ctx.r4.u32 = m2, ctx.r5.u32 = m1;
-    __imp__sub_8209BD50(ctx, base);  // m0 = ... * car
+    lifted::original::c8209BD50(ctx, base);  // m0 = ... * car
     Matrix4 game = LoadMatrix(base, m0);
     ctx.r1.u32 = r1;
     poses++;
@@ -307,7 +308,7 @@ struct Check {
     uint32_t r1 = ctx.r1.u32;
     ctx.r1.u32 = frame - 0x280;
     ctx.r3.u32 = range, ctx.r4.u32 = kind, ctx.r5.u32 = car;
-    __imp__sub_820D3688(ctx, base);
+    lifted::original::c820D3688(ctx, base);
     ctx.r1.u32 = r1;
     return float(ctx.f1.f64);
   }
@@ -318,7 +319,7 @@ struct Check {
     ctx.r1.u32 = frame - 0x280;
     ctx.r3.u32 = table, ctx.r4.u32 = car, ctx.r5.u32 = dash_type;
     ctx.r6.u32 = out, ctx.r7.u32 = out + 4;
-    __imp__sub_820D3740(ctx, base);
+    lifted::original::c820D3740(ctx, base);
     ctx.r1.u32 = r1;
     return {guest::LoadFloat(base, out), guest::LoadFloat(base, out + 4)};
   }

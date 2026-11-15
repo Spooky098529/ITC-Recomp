@@ -29,7 +29,8 @@ listener is an input processor (vtable `0x8206C0C4`, made by
 the other button tests (`sub_8258CEB0`, `sub_8258CEE0`, `sub_82592500`,
 `sub_82592520`) are the app's, in `input.md`. The read slots never
 seen in play (`sub_8210BA68` analog float, `sub_8210BED8` held before,
-`sub_8210BFA8` released; all Wrapped for `--log_pause_menu`) keep their
+`sub_8210BFA8` released; native since 2026-11-15, their adapters keeping the
+`--log_pause_menu` note) keep their
 rows in `functions.md`; slot 1 `sub_8210BDB8` (reset) and slot 13
 `sub_8210B6E8`, also never seen in play, have none. The rows were drafted by the B7
 loop's mapping agent (2026-10-23) from the generated code; vtable slots
@@ -70,6 +71,12 @@ Status:
   behind the caller's fallback flag.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
+- **Lifted**: translated from `generated/` by `itc_recomp/tools/lift.py`
+  into plain C++ in `itc_recomp/src/lifted/` (the lift sweep,
+  `docs/loops/lift-sweep.md`): typed parameters, registers as locals,
+  calls direct or through the dispatch table. While the SDK or code not
+  native yet still reaches it, its entry for them is an override in
+  `src/lifted/` (deleted when nothing reaches it that way).
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to

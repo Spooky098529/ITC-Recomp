@@ -116,6 +116,12 @@ Status:
   behind the caller's fallback flag.
 - **Patched**: the generated code was edited in place (search for
   `PATCH:`).
+- **Lifted**: translated from `generated/` by `itc_recomp/tools/lift.py`
+  into plain C++ in `itc_recomp/src/lifted/` (the lift sweep,
+  `docs/loops/lift-sweep.md`): typed parameters, registers as locals,
+  calls direct or through the dispatch table. While the SDK or code not
+  native yet still reaches it, its entry for them is an override in
+  `src/lifted/` (deleted when nothing reaches it that way).
 
 A function usually moves from recompiled or Wrapped to Overridden to
 Native as the `ctx` edge moves up through its callers, or straight to
@@ -128,7 +134,7 @@ run it after changing either, on any branch.
 | Address | Name | Status | Notes |
 |---|---|---|---|
 | `sub_82160AE0` | `RaceFlow::Init` | Overridden | Native in `src/race_flow/race_flow_init.cpp` (`--native_race_flow`, adapter `src/hooks/race_flow.cpp`; harness `race_flow`): the stores and copies replayed in the original's frame from a table decoded from the generated code, so the transitions keep the stack's leftovers as the original leaves them (the precedent of `RaceHudMachine::Init`, B7 changes no behavior), `StateMachine::Add`'s plain C++; the adapter stays while `RaceMode::Init` is recompiled. r3 = the race flow (race mode + 97548): +9604 = 1, +9608 = 0; +9612 = 0 and +9616 = 1, or both 0 when the race data's (`[0x826C5B2C]`) +0xA3AF0 is 6; then the 53 transitions in the intro, each through `StateMachine::Add` (a key of (state, message, 0, 0) at the frame's +80, r5 = a frame slot pointing at the functor's six words copied from another slot, the next state at r5 + 28). 1,661 lines, a 3,600-byte frame; no other calls. Returns `StateMachine::Add`'s last r3. From `RaceMode::Init` only (once a race set-up). Seen in play. Read in full (2026-11-04). |
-| `sub_8215F7B0` | `RaceFlow::OnAbort` | | r3 = the race flow: `CarInputs::ClearAll`, then +9604 (the state) = 3. Leaf otherwise. No direct callers: registered by `RaceFlow::Init` as state 32's handler (event 0), reached by message 44 from states 25 and 30 (probably an abort or a restart from the pause, back to waiting for a stage). Not seen in play. Read in full. |
-| `sub_821022B0` | `CarInputs::ClearAll` | | The seven car input records (`[0x826C5B30 + 4i]`, i 0 to 6) cleared, each by `CarInput::Clear`. From `RaceFlow::OnAbort` only. Not seen in play. Read in full. |
-| `sub_8215FC30` | `RaceFlow::OnState14` | | A jump to `RaceFlow::AiUnlessFlagged`. No direct callers: registered by `RaceFlow::Init` as state 14's handler (event 0), reached by message 22 from state 23. Not seen in play. Read in full. |
-| `sub_8215FB08` | `RaceFlow::AiUnlessFlagged` | | r3, r4 not read: each racer (`[0x826D82F4]` + 2308 + 4i, its +20 the index; `Race::RacerCount` read again every pass) by its AI driver (`RacerControl::DriveByAi`), `Vehicle::Get` called on the index first (its answer unused), held (1) unless the racer's word +0 has 0x10 and lacks 0x4000 (then 0). Returns 1. From `RaceFlow::OnState14` only. Not seen in play (it reaches `DriveByAi`'s adapter, `src/hooks/racer_controllers.cpp`). Read in full. |
+| `sub_8215F7B0` | `RaceFlow::OnAbort` | Lifted | r3 = the race flow: `CarInputs::ClearAll`, then +9604 (the state) = 3. Leaf otherwise. No direct callers: registered by `RaceFlow::Init` as state 32's handler (event 0), reached by message 44 from states 25 and 30 (probably an abort or a restart from the pause, back to waiting for a stage). Not seen in play. Read in full. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_007.cpp`, `--native_lifted_007`). |
+| `sub_821022B0` | `CarInputs::ClearAll` | Lifted | The seven car input records (`[0x826C5B30 + 4i]`, i 0 to 6) cleared, each by `CarInput::Clear`. From `RaceFlow::OnAbort` only. Not seen in play. Read in full. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_005.cpp`, `--native_lifted_005`). |
+| `sub_8215FC30` | `RaceFlow::OnState14` | Lifted | A jump to `RaceFlow::AiUnlessFlagged`. No direct callers: registered by `RaceFlow::Init` as state 14's handler (event 0), reached by message 22 from state 23. Not seen in play. Read in full. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_007.cpp`, `--native_lifted_007`). |
+| `sub_8215FB08` | `RaceFlow::AiUnlessFlagged` | Lifted | r3, r4 not read: each racer (`[0x826D82F4]` + 2308 + 4i, its +20 the index; `Race::RacerCount` read again every pass) by its AI driver (`RacerControl::DriveByAi`), `Vehicle::Get` called on the index first (its answer unused), held (1) unless the racer's word +0 has 0x10 and lacks 0x4000 (then 0). Returns 1. From `RaceFlow::OnState14` only. Not seen in play (it reaches `DriveByAi`'s adapter, `src/hooks/racer_controllers.cpp`). Read in full. Lifted by `lift.py` (2026-11-15, `src/lifted/batch_007.cpp`, `--native_lifted_007`). |

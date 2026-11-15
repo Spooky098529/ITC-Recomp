@@ -83,4 +83,13 @@ uint32_t Check(uint8_t* base, uint32_t kind, uint32_t out, uint32_t sp);
 // below `sp`. r3 as the original leaves it (the last call's, else `words`).
 uint64_t Write(uint8_t* base, uint64_t words, uint32_t sp, const Calls& calls);
 
+// XUserWriteAchievements (sub_82294E58, XAPI's wrapper over the import,
+// kept by the user's call of 2026-11-13): {count, list} on its 112-byte
+// frame's +80 and XMsgStartIORequest(251, 0xB0008, overlapped, the pair, 8)
+// through the import; 1627 when that fails, 997 (pending) with an
+// overlapped, else 0 or 1627 by GetLastError. Takes the stack pointer and
+// r13 (the PCR) it's called with.
+uint32_t WriteAchievements(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t count,
+                           uint32_t list, uint32_t overlapped);
+
 }  // namespace achievements

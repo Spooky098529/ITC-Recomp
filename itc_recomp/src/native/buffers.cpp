@@ -26,6 +26,7 @@
 // Every 5 s, a summary by caller.
 
 #include "buffers.h"
+#include "lifted/originals.h"
 
 #include "frame_pacing/game_messages.h"
 
@@ -720,7 +721,7 @@ extern "C" REX_FUNC(sub_825A7410) {
   native::CopyWithRecords(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr), [&] {
     if (!ITC_FLAG(native_memcpy) ||
         !c_runtime::Memcpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-      __imp__sub_825A7410(ctx, base);
+      lifted::original::c825A7410(ctx, base);
     }
   });
 }

@@ -3,6 +3,7 @@
 // harness shares (hooks/app_states.h).
 
 #include "hooks/app_states.h"
+#include "lifted/originals.h"
 
 #include "app_states/app.h"
 #include "app_states/containers.h"
@@ -196,7 +197,7 @@ as::AppCalls AppStatesCalls(PPCContext& ctx, uint8_t* base) {
   calls.increment = [&ctx, base](uint32_t iterator, uint32_t return_address) {
     ctx.r3.u64 = iterator;
     ctx.lr = return_address;
-    __imp__sub_82099B18(ctx, base);
+    lifted::original::c82099B18(ctx, base);
   };
   calls.clone = [&ctx, base](uint32_t delegate, uint32_t return_address) {
     const uint32_t target = as::VirtualTarget(base, delegate, 8);

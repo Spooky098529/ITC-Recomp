@@ -27,7 +27,7 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "table; CareerResults::Start; PauseMenu::StepVolume and StepAdjust; the pause menu's "
               "transitions RunTen, BackToMain, CloseMain, MoveMain, ShowOptionsRow, ToggleOptions, "
               "ShowVolumeRow, ShowAdjustRow, MoveOptions, MoveAdjust and ShowMain, ConfirmPage, "
-              "ShowItems, SetArrowA, ShowOptions, ShowVolumes, ShowSlider, RestoreNodes, "
+              "ShowItems, SetArrowA, ShowOptions, ShowVolumes, ShowVolume (in its log wrap), ShowSlider, RestoreNodes, "
               "ColorItems, ShowAdjust, Open, MainPage, AdjustPage, ShowCareer, SetUpMain, "
               "ShowVolumesB, ShowAdjustB, SetUpVolume and SetUpAdjust, the transitions OpenMain, "
               "CloseOptions, CloseVolume, CloseAdjust, OpenVolume and OpenAdjust, VolumePage (with "
@@ -319,6 +319,12 @@ void RaceScreensPauseMenuShowOptions(PPCContext& ctx, uint8_t* base) {
 void RaceScreensPauseMenuShowVolumes(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuShowVolumes(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensPauseMenuShowVolume(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::PauseMenuShowVolume(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
 }
 
 void RaceScreensPauseMenuShowSlider(PPCContext& ctx, uint8_t* base) {

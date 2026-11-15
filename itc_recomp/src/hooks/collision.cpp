@@ -6,6 +6,7 @@
 // box run the original.
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -128,12 +129,12 @@ ITC_COLLISION(820BAC00, CollisionShapeUpdateBounds(base, ctx.r3.u32))
 extern "C" REX_FUNC(sub_820BB758) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_collision)) {
-    __imp__sub_820BB758(ctx, base);
+    lifted::original::c820BB758(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
   if (!CollisionShapePlace(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 608)) {
-    __imp__sub_820BB758(ctx, base);
+    lifted::original::c820BB758(ctx, base);
   }
 }
 // CollisionShape::Translate (sub_820BACD0) has no adapter: its caller in

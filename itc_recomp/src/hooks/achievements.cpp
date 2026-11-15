@@ -10,13 +10,15 @@
 #include "achievements/achievements.h"
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
+#include "hooks/lifted_call.h"
 
 ITC_FLAG_BOOL(native_achievements, true, "ITC",
               "Run the achievements (docs/functions/achievements.md: Achievements::Check "
               "sub_82290788 with AllBeaten sub_82290698, BeatsCourseTime sub_82290710 and "
               "Time::Less sub_820FF708; Achievements::Write sub_82290A30, which still calls "
               "XUserWriteAchievements sub_82294E58 through the function table, so the SDK "
-              "records unlocks) natively (no adapters but Time::Less's: native RaceStates::OnRaceEnd "
+              "records unlocks; and XUserWriteAchievements, XAPI's wrapper over "
+              "XMsgStartIORequest, inside its harness wrap) natively (no adapters but Time::Less's: native RaceStates::OnRaceEnd "
               "calls Check and Write) instead of through the translated code (the same "
               "words; checked by --run_harnesses=achievements)");
 
@@ -69,6 +71,14 @@ void AchievementsCheckSteps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = achievements::Check(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
+void WriteAchievementsSteps(PPCContext& ctx, uint8_t* base) {
+  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
+    return {achievements::WriteAchievements(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+                                            uint32_t(a.r[1]), uint32_t(a.r[2])),
+            a.f[0]};
+  });
+}
+
 void AchievementsWriteSteps(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = achievements::Write(base, ctx.r3.u64, ctx.r1.u32, guest.calls());
@@ -95,13 +105,18 @@ ITC_ACHIEVEMENTS(820FF708, TimeLessSteps)
 // steps are the harness's.
 
 // XUserWriteAchievements (system-services.md) wrapped for the achievements
-// harness only: while its recorder is set (hooks::g_start_up_recorder), the
-// call is handed to it, so a harness case never unlocks anything in the
-// SDK; otherwise the original, always.
+// harness: while its recorder is set (hooks::g_start_up_recorder), the call
+// is handed to it, so a harness case never unlocks anything in the SDK;
+// otherwise XAPI's wrapper over the import (still the SDK's, the user's
+// call), natively with --native_achievements, else the original.
 extern "C" REX_FUNC(sub_82294E58) {
   REX_FUNC_PROLOGUE();
   if (hooks::StartUpRecorded(ctx, 0x82294E58)) {
     return;
   }
-  __imp__sub_82294E58(ctx, base);
+  if (!ITC_FLAG(native_achievements)) {
+    __imp__sub_82294E58(ctx, base);
+    return;
+  }
+  hooks::WriteAchievementsSteps(ctx, base);
 }

@@ -60,10 +60,12 @@ include(cmake/ffmpeg.cmake)
 
 # Sources
 set(ITC_SOURCES
-    src/main.cpp
+    src/app/main.cpp
+    src/app/start_up.cpp
     src/base/log.cpp
     src/base/log_sdk.cpp
     src/audio/native_audio.cpp
+    src/audio/render_driver.cpp
     src/audio/output_mix.cpp
     src/hooks/vehicle.cpp
     src/hooks/title_screen.cpp
@@ -109,6 +111,7 @@ set(ITC_SOURCES
     src/hooks/billboards.cpp
     src/sprites/billboards.cpp
     src/sprites/billboard_record.cpp
+    src/sprites/world_sprites.cpp
     src/hooks/ui_movies.cpp
     src/ui_movies/ui_movies.cpp
     src/ui_movies/keys.cpp
@@ -198,6 +201,7 @@ set(ITC_SOURCES
     src/race_world/race_event.cpp
     src/race_world/race_manager.cpp
     src/race_world/race_stream.cpp
+    src/race_world/give_vehicle.cpp
     src/hooks/race_states.cpp
     src/race_states/race_progress.cpp
     src/race_states/race_checks.cpp
@@ -397,6 +401,10 @@ set(ITC_SOURCES
     src/graphics/render_queue.cpp
     src/hooks/single_commands.cpp
     src/graphics/single_commands.cpp
+    src/graphics/replay_commands.cpp
+    src/graphics/shader_patch.cpp
+    src/graphics/inline_draws.cpp
+    src/graphics/resolve.cpp
     src/hooks/predicated_tiling.cpp
     src/graphics/predicated_tiling.cpp
     src/hooks/post_effects.cpp
@@ -417,6 +425,7 @@ set(ITC_SOURCES
     src/morph_jobs/morph_jobs.cpp
     src/hooks/race_update.cpp
     src/race_update/race_update.cpp
+    src/race_update/draw_step.cpp
     src/hooks/stand_models.cpp
     src/stand_models/setters.cpp
     src/stand_models/wheels.cpp
@@ -658,6 +667,7 @@ set(ITC_SOURCES
     src/hooks/mode_tick.cpp
     src/hooks/minimap.cpp
     src/mode_tick/mode_tick.cpp
+    src/mode_tick/modes_tick.cpp
     src/minimap/minimap.cpp
     src/minimap/draw.cpp
     src/hooks/scenery_lists.cpp
@@ -685,6 +695,7 @@ set(ITC_SOURCES
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
+    src/screen_objects/record.cpp
     src/hooks/course_scenery.cpp
     src/course_scenery/course_scenery.cpp
     src/course_scenery/collect.cpp
@@ -707,6 +718,7 @@ set(ITC_SOURCES
     src/hooks/std_string.cpp
     src/std_string/std_string.cpp
     src/hooks/sound_cues.cpp
+    src/sound_cues/manager_update.cpp
     src/sound_cues/sound_cues.cpp
     src/hooks/xact.cpp
     src/xact/xact.cpp
@@ -733,6 +745,7 @@ set(ITC_SOURCES
     src/c_runtime/core.cpp
     src/game_data/game_data.cpp
     src/game_data/data_file.cpp
+    src/game_data/create_file.cpp
     src/hooks/data_file.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
@@ -844,6 +857,7 @@ set(ITC_SOURCES
     src/harnesses/predicated_tiling.cpp
     src/harnesses/power_graph.cpp
     src/harnesses/menu_helpers.cpp
+    src/harnesses/lifted.cpp
     src/harnesses/morph_jobs.cpp
     src/harnesses/race_update.cpp
     src/harnesses/stand_models.cpp
@@ -908,6 +922,8 @@ set(ITC_SOURCES
     src/harnesses/cameras.cpp
     src/harnesses/strings_and_font.cpp
     src/harnesses/std_string.cpp
+    src/harnesses/audio_wraps.cpp
+    src/harnesses/create_file.cpp
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
     src/harnesses/xact_waves.cpp
@@ -1030,6 +1046,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/race_world/race_event.cpp
     src/race_world/race_manager.cpp
     src/race_world/race_stream.cpp
+    src/race_world/give_vehicle.cpp
     src/race_states/race_progress.cpp
     src/race_states/race_checks.cpp
     src/race_states/racers.cpp
@@ -1141,6 +1158,12 @@ target_link_libraries(itc_xenos_shaders PUBLIC
     rexruntime xxHash::xxhash Vulkan::Headers glslang::SPIRV glslang
     MachineIndependent GenericCodeGen OSDependent OGLCompiler)
 
+# The lift sweep's functions (docs/loops/lift-sweep.md): written by
+# tools/lift.py, so taken by glob rather than listed.
+file(GLOB ITC_LIFTED_SOURCES CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lifted/*.cpp")
+list(APPEND ITC_SOURCES ${ITC_LIFTED_SOURCES})
+
 # The game's executable, from our sources and the recompiled code.
 # The harnesses (src/harnesses/, --run_harnesses: "Checking with a harness" in
 # docs/rexglue-removal.md) are for development: CI's builds, the releases'
@@ -1159,6 +1182,13 @@ function(itc_add_executable name)
     endif()
 
     rexglue_setup_target(${name})
+
+    # Our own start-up (src/app/, "A4 brought forward" in
+    # docs/rexglue-removal.md): the SDK's main() and ReXApp, which
+    # rexglue_configure_target adds, are left out.
+    get_target_property(itc_sources ${name} SOURCES)
+    list(FILTER itc_sources EXCLUDE REGEX "(windowed_app_main_sdl|rex_app)\\.cpp$")
+    set_property(TARGET ${name} PROPERTY SOURCES ${itc_sources})
 
     target_include_directories(${name} PRIVATE src)
     if(NOT ITC_HARNESSES)

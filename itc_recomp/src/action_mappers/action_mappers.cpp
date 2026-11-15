@@ -487,6 +487,24 @@ uint32_t Fired(uint8_t* base, uint32_t mapper, uint32_t id) {
   return WordBit(base, mapper, id, kWords + 16);
 }
 
+uint32_t HeldBefore(uint8_t* base, uint32_t mapper, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_8210BED8 ActionMapper::HeldBefore");
+  return WordBit(base, mapper, id, kWords + 4);
+}
+
+uint32_t Released(uint8_t* base, uint32_t mapper, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_8210BFA8 ActionMapper::Released");
+  return WordBit(base, mapper, id, kWords + 12);
+}
+
+uint32_t AnalogValue(uint8_t* base, uint32_t mapper, uint32_t id, double* f1) {
+  ITC_NATIVE_RUNNING("sub_8210BA68 ActionMapper::AnalogValue");
+  constexpr uint32_t kOutOfRange = 0x82000A34;  // the float an id out of range reads
+  const uint32_t index = IndexOf(id);
+  *f1 = double(guest::LoadFloat(base, index == 30 ? kOutOfRange : mapper + kAnalog + 60 + 4 * index));
+  return index;
+}
+
 uint32_t AnalogRaw(uint8_t* base, uint32_t mapper, uint32_t id) {
   ITC_NATIVE_RUNNING("sub_8210BA28 ActionMapper::AnalogRaw");
   const uint32_t index = IndexOf(id);

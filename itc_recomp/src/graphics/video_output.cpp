@@ -146,4 +146,18 @@ void UnlockDevice(uint8_t* base, uint32_t video_output, uint32_t local) {
   lock.semaphore.release();
 }
 
+uint32_t ResolveFrontBuffer(uint8_t* base, uint32_t video_output, uint32_t sp,
+                            const replay_commands::GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8258D998 VideoOutput::ResolveFrontBuffer");
+  const uint32_t frame = sp - 112;
+  guest::StoreU32(base, frame, sp);
+  const uint32_t front = guest::LoadU32(base, video_output + 268);
+  const uint32_t device = guest::LoadU32(base, video_output + kDevice);
+  guest::StoreU32(base, frame + 100, 0);
+  guest::StoreU32(base, frame + 92, 0);
+  const double z = double(guest::LoadFloat(base, 0x82000A34));
+  const uint32_t texture = guest::LoadU32(base, video_output + 4 * (68 + front));
+  return uint32_t(call(0x822AFA58, frame, 0x8258D9E8, {device, 0, 0, texture, 0, 0, 0, 0}, z));
+}
+
 }  // namespace graphics::video_output

@@ -147,31 +147,9 @@ void NoteRead(int slot, uint32_t mapper, uint32_t action, uint32_t caller, bool 
 
 }  // namespace
 
-// The mapper read slots (vtable 0x82007F78; r3 the mapper, r4 the action id
-// 151-180). Bits return 0 or 1 in r3, analog values in f1 or r3.
-#define PAUSE_MENU_READ_SLOT(address, slot, result)                        \
-  extern "C" REX_FUNC(sub_##address) {                                     \
-    REX_FUNC_PROLOGUE();                                                   \
-    if (!ITC_FLAG(log_pause_menu)) {                                    \
-      __imp__sub_##address(ctx, base);                                     \
-      return;                                                              \
-    }                                                                      \
-    uint32_t mapper = ctx.r3.u32;                                          \
-    uint32_t action = ctx.r4.u32;                                          \
-    uint32_t caller = uint32_t(ctx.lr);                                    \
-    __imp__sub_##address(ctx, base);                                       \
-    double value = (result);                                               \
-    NoteRead(slot, mapper, action, caller, value != 0, value);             \
-  }
-
-PAUSE_MENU_READ_SLOT(8210BA68, 5, ctx.f1.f64)
-PAUSE_MENU_READ_SLOT(8210BED8, 9, double(ctx.r3.u32))
-PAUSE_MENU_READ_SLOT(8210BFA8, 11, double(ctx.r3.u32))
-
-#undef PAUSE_MENU_READ_SLOT
-
-// Slots 8, 10, 12 and 14 are native (hooks/action_mappers.cpp); their
-// adapters log through this.
+// The read slots (vtable 0x82007F78; r3 the mapper, r4 the action id
+// 151-180; slots 5, 8 to 12 and 14) are native (hooks/action_mappers.cpp);
+// their adapters log through this.
 void debug::PauseMenuLog_NoteSlotRead(int slot, uint32_t mapper, uint32_t action,
                                       uint32_t caller, double value) {
   if (ITC_FLAG(log_pause_menu)) {

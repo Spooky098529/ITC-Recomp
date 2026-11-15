@@ -339,5 +339,10 @@ void MorphJobs(Context& h);
 // The type 8 mode's panel screen (src/harnesses/type8_screens.cpp).
 void Type8Screens(Context& h);
 void Type8Mode(Context& h);
+void Lifted(Context& h);
+// The audio functions native inside their wraps (src/harnesses/audio_wraps.cpp).
+void AudioWraps(Context& h);
+// The game's CreateFile (src/harnesses/create_file.cpp).
+void CreateFile(Context& h);
 
 }  // namespace harness

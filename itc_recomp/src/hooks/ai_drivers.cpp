@@ -88,6 +88,7 @@
 // Extend.
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "ai_drivers/ai_drivers.h"
 #include "hooks/ai_drivers.h"
@@ -289,7 +290,7 @@ extern "C" REX_FUNC(sub_8213B1E0) {
       return;
     }
   }
-  __imp__sub_8213B1E0(ctx, base);
+  lifted::original::c8213B1E0(ctx, base);
 }
 
 // The original where the table can't be freed natively.
@@ -302,7 +303,7 @@ extern "C" REX_FUNC(sub_8213B2B8) {
       return;
     }
   }
-  __imp__sub_8213B2B8(ctx, base);
+  lifted::original::c8213B2B8(ctx, base);
 }
 
 // --- The path's offsets, narrowing and branches ---

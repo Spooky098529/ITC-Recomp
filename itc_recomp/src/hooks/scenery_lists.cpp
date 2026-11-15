@@ -11,6 +11,7 @@
 // (src/course_scenery/collect.cpp); their register steps are the harness's.
 
 #include "hooks/scenery_lists.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "hooks/guest_call.h"
@@ -135,7 +136,7 @@ struct ModelListLoadGuest {
       c.ctx.r3.u64 = model;
       c.ctx.r4.u64 = entry;
       c.ctx.r5.u64 = 0;
-      __imp__sub_82596920(c.ctx, c.base);
+      lifted::original::c82596920(c.ctx, c.base);
     });
   }
 };

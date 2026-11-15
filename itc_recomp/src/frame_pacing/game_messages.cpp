@@ -9,8 +9,10 @@
 #endif
 #include "hooks/framework.h"
 #include "hooks/input_update.h"
+#include "hooks/lifted_call.h"
 #include "interpolation/blend_state.h"
 #include "native/textures.h"
+#include "race_update/draw_step.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -26,6 +28,11 @@
 #include <tuple>
 #include <thread>
 
+ITC_FLAG_BOOL(native_race_draw_step, true, "ITC",
+              "Run the race's draw step (Race::DrawStep sub_8215B4F8, "
+              "docs/functions/functions.md) natively inside its wrap instead of through the "
+              "translated code (its callees through their overrides or the recompiled code; "
+              "render-path code, checked by frame dumps)");
 ITC_FLAG_BOOL(log_race_changes, false, "ITC",
               "Log when the game enters and leaves a race (the race's draw step starts or "
               "stops running)");
@@ -703,12 +710,18 @@ extern "C" REX_FUNC(sub_820990F0) {
 
 // The race's draw step: r3 = its argument. Noted to tell races from menus.
 // r31 isn't an argument: it's what the caller (sub_8215C770) left in it.
+// Its work: the plain C++ (src/race_update/draw_step.h) with
+// --native_race_draw_step, else the original.
 extern "C" REX_FUNC(sub_8215B4F8) {
   REX_FUNC_PROLOGUE();
   uint32_t r31_value = guest::LoadU32(base, ctx.r31.u32 + 588);
   frame_pacing::InputLog_PauseSigns(base, ctx.r31.u32, r31_value);
   frame_pacing::g_race_draw_step_seen = true;
-  __imp__sub_8215B4F8(ctx, base);
+  if (ITC_FLAG(native_race_draw_step)) {
+    lifted_call::EnterR3<race_update::RaceDrawStep>(ctx, base);
+  } else {
+    __imp__sub_8215B4F8(ctx, base);
+  }
 }
 
 // Message dispatcher: r3 = dispatcher object.

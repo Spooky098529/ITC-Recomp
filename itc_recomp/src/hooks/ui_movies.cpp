@@ -2,6 +2,7 @@
 // src/ui_movies/ (docs/functions/ui-movies.md).
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include <bit>
 #include <optional>
@@ -368,7 +369,7 @@ uint32_t CallFromWalk(void* user, ui_movies::DrawCall kind, uint32_t context, ui
       DrawPrimitive(ctx, walk.base);
       break;
     case ui_movies::DrawCall::kText:
-      __imp__sub_8259F770(ctx, walk.base);
+      lifted::original::c8259F770(ctx, walk.base);
       break;
   }
   ctx.r1.u64 = r1;
@@ -448,8 +449,8 @@ struct GuestKeys {
       ctx.fpscr.disableFlushMode();
       ctx.f1.f64 = t;
       switch (function) {
-        case 0x8259FB30: __imp__sub_8259FB30(ctx, base); break;
-        case 0x8259FC18: __imp__sub_8259FC18(ctx, base); break;
+        case 0x8259FB30: lifted::original::c8259FB30(ctx, base); break;
+        case 0x8259FC18: lifted::original::c8259FC18(ctx, base); break;
         case 0x8259FD40: sub_8259FD40(ctx, base); break;
         default: sub_8259FAA8(ctx, base); break;
       }

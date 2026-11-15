@@ -2,6 +2,7 @@
 // src/ui_movies/game.cpp (docs/functions/ui-movies-game.md).
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include <bit>
 
@@ -242,7 +243,7 @@ extern "C" REX_FUNC(sub_8211A8C8) {
 extern "C" REX_FUNC(sub_8211AED0) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_ui_movies_game) || !ui_movies::CopyTextItem(base, ctx.r3.u32, ctx.r4.u32)) {
-    __imp__sub_8211AED0(ctx, base);
+    lifted::original::c8211AED0(ctx, base);
   }
 }
 
@@ -361,7 +362,7 @@ extern "C" REX_FUNC(sub_8211AD00) {
 extern "C" REX_FUNC(sub_8211BD10) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_ui_movies_game) || !ui_movies::LayersFit(base, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_8211BD10(ctx, base);
+    lifted::original::c8211BD10(ctx, base);
     return;
   }
   ctx.r3.u64 = ui_movies::AssignLayers(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
@@ -514,7 +515,7 @@ void DrawTexts(PPCContext& ctx, uint8_t* base) {
         ctx.r3.u64 = item;
         ctx.r4.u64 = from;
         ctx.lr = 0x8211CE30;
-        __imp__sub_8211AED0(ctx, base);
+        lifted::original::c8211AED0(ctx, base);
       }
       ui_movies::DrawTextsItem(base, frame, movie, draw_only);
       // Text::Draw (its adapter: the render queue's guest call).
@@ -1146,17 +1147,17 @@ ui_movies::DeleteCalls DeleteCalls(PPCContext& ctx, uint8_t* base, uint32_t sp) 
   calls.unload.virtual_free = [from_unload](uint32_t which, uint32_t address) {
     static constexpr uint32_t kBack[3] = {0x8211B568, 0x8211B578, 0x8211B588};
     if (!hooks::VirtualFree(address, 0, 0x8000, kBack[which])) {
-      from_unload(kBack[which], __imp__sub_82295330, address, 0, 0x8000);
+      from_unload(kBack[which], lifted::original::c82295330, address, 0, 0x8000);
     }
   };
   calls.unload.free = [from_unload](uint32_t block) {
     if (!memory::crt::OperatorDelete(block)) {
-      from_unload(0x8211B5D8, __imp__sub_825A70E8, block);
+      from_unload(0x8211B5D8, lifted::original::c825A70E8, block);
     }
   };
   calls.unload.copy_item = [from_unload, base](uint32_t to, uint32_t from) {
     if (!ui_movies::CopyTextItem(base, to, from)) {
-      from_unload(0x8211B614, __imp__sub_8211AED0, to, from);
+      from_unload(0x8211B614, lifted::original::c8211AED0, to, from);
     }
   };
   calls.unload.release_xpr = [from_unload, base](uint32_t slot) {
@@ -1179,7 +1180,7 @@ ui_movies::DeleteCalls DeleteCalls(PPCContext& ctx, uint8_t* base, uint32_t sp) 
   };
   calls.free = [&ctx, base, sp](uint32_t movie) {
     if (!memory::crt::OperatorDelete(movie)) {
-      CallFrom(ctx, base, sp, 128, 0x8211E2A4, __imp__sub_825A70E8, movie);
+      CallFrom(ctx, base, sp, 128, 0x8211E2A4, lifted::original::c825A70E8, movie);
     }
   };
   calls.set = [&ctx, base, sp](uint32_t key_address, uint32_t value_address) {
@@ -1215,7 +1216,7 @@ ui_movies::OnLoadedCalls OnLoadedCalls(PPCContext& ctx, uint8_t* base, uint32_t 
         ctx.r5.u64 = scene;
         ctx.r6.u64 = 0;
         ctx.r7.u64 = 1;
-        __imp__sub_8211BD10(ctx, base);
+        lifted::original::c8211BD10(ctx, base);
       });
     });
   };
@@ -1268,7 +1269,7 @@ ui_movies::OnLoadedCalls OnLoadedCalls(PPCContext& ctx, uint8_t* base, uint32_t 
       graphics::TextureLevelDesc(base, texture, 0, desc);
       return;
     }
-    call(0x8211E740, __imp__sub_822A5B78, texture, 0, desc);
+    call(0x8211E740, lifted::original::c822A5B78, texture, 0, desc);
   };
   calls.append = [call, base](uint32_t vector, uint32_t word_address) {
     if (!ui_movies::WordsAppend(base, vector, guest::LoadU32(base, word_address))) {
@@ -1279,7 +1280,7 @@ ui_movies::OnLoadedCalls OnLoadedCalls(PPCContext& ctx, uint8_t* base, uint32_t 
     if (const auto r3 = hooks::VirtualFree(archive, 0, 0x8000, 0x8211E77C)) {
       return *r3;
     }
-    return call(0x8211E77C, __imp__sub_82295330, archive, 0, 0x8000);
+    return call(0x8211E77C, lifted::original::c82295330, archive, 0, 0x8000);
   };
   return calls;
 }

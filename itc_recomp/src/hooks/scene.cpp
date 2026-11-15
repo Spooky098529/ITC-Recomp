@@ -3,6 +3,7 @@
 // (hooks/scene.h).
 
 #include "hooks/scene.h"
+#include "lifted/originals.h"
 
 #include "accessories/accessories.h"
 #include "base/flags.h"
@@ -90,7 +91,7 @@ void SceneFreePagesIn(PPCContext& ctx, uint8_t* base) {
       return;
     }
   }
-  __imp__sub_820D09A0(ctx, base);
+  lifted::original::c820D09A0(ctx, base);
 }
 
 void SceneStartTeardownA(PPCContext& ctx, uint8_t* base) {
@@ -238,7 +239,7 @@ void SceneAssetsRelease(PPCContext& ctx, uint8_t* base) {
       guest::StoreU32(base, ctx.r1.u32, uint32_t(stack));
       ctx.r3.u64 = at;
       ctx.lr = 0x820C4CDC;
-      __imp__sub_820D09A0(ctx, base);
+      lifted::original::c820D09A0(ctx, base);
       ctx.r1.u64 = stack;
       ctx.lr = link;
     });
@@ -287,7 +288,7 @@ void SceneOnFileLoaded(PPCContext& ctx, uint8_t* base) {
       ctx.r4.u64 = file;
       ctx.r5.u64 = xpr;
       ctx.lr = 0x820C5480;
-      __imp__sub_82596920(ctx, base);
+      lifted::original::c82596920(ctx, base);
     };
     calls.xpr_create = [&](uint32_t xpr, uint32_t file) {
       ctx.r3.u64 = xpr;
@@ -350,7 +351,7 @@ uint64_t FreePages(PPCContext& ctx, uint8_t* base, uint32_t pages, uint32_t fram
   ctx.r4.u64 = 0;
   ctx.r5.u64 = 0x8000;
   ctx.lr = lr;
-  __imp__sub_82295330(ctx, base);
+  lifted::original::c82295330(ctx, base);
   ctx.r1.u64 = stack;
   ctx.lr = link;
   return ctx.r3.u64;

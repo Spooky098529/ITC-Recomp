@@ -21,6 +21,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "graphics/predicated_tiling.h"
 #include "hooks/predicated_tiling.h"
 
 #include <array>
@@ -30,6 +31,10 @@
 #include <mutex>
 #include <string>
 
+ITC_FLAG_BOOL(native_tiling_worker, true, "ITC",
+              "Run the tiling worker's wake (Device::WakeWorker sub_822B6A78) natively and drop "
+              "its job's work (Device::WorkerJob sub_822B6780: GPU work nothing reads); both "
+              "never seen in play (docs/functions/predicated-tiling.md)");
 ITC_FLAG_BOOL(native_renderer_log_gpu, false, "ITC",
               "Log what the graphics library hands the GPU that has effects outside it "
               "(memory writes, interrupts, waits, swaps), and the GPU's progress (a "
@@ -577,13 +582,28 @@ extern "C" REX_FUNC(sub_822B6BF8) {
   hooks::EndTiledSegments(ctx, base);
 }
 
+// Device::WakeWorker: its log kept; the work is its plain C++
+// (src/graphics/predicated_tiling.h, --native_tiling_worker), KeSetEvent
+// through its import as the original's tail call.
 extern "C" REX_FUNC(sub_822B6A78) {
   REX_FUNC_PROLOGUE();
   if (native::TilingLog()) {
     ITC_LOG_INFO("native renderer: tiling: callback 822B6A78({:08X}) on cpu {}", ctx.r3.u32,
                  native::Cpu(ctx, base));
   }
-  __imp__sub_822B6A78(ctx, base);
+  if (!ITC_FLAG(native_tiling_worker)) {
+    __imp__sub_822B6A78(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = graphics::predicated_tiling::WakeWorker(
+      base, ctx.r3.u32, native::Cpu(ctx, base),
+      [&ctx, base](uint32_t event, uint32_t increment, uint32_t wait) {
+        ctx.r3.u64 = event;
+        ctx.r4.u64 = increment;
+        ctx.r5.u64 = wait;
+        __imp__KeSetEvent(ctx, base);
+        return ctx.r3.u32;
+      });
 }
 
 extern "C" REX_FUNC(sub_822B6780) {
@@ -598,7 +618,17 @@ extern "C" REX_FUNC(sub_822B6780) {
                  state ? guest::LoadU32(base, state + 4) : 0,
                  state ? guest::LoadU32(base, state + 396) : 0);
   }
-  __imp__sub_822B6780(ctx, base);
+  // Its work is Dropped with --native_tiling_worker (the graphics rule; see
+  // docs/functions/predicated-tiling.md): the tiled segment chain kicked once
+  // a tile with the tile's bin select written into the primary ring, the
+  // draws' tile masks and its markers, GPU work nothing reads since our
+  // renderer draws the tiles from the command list replay. Never seen in
+  // play: its wake is skipped.
+  if (!ITC_FLAG(native_tiling_worker)) {
+    __imp__sub_822B6780(ctx, base);
+  } else {
+    ITC_NATIVE_RUNNING("sub_822B6780 Device::WorkerJob (dropped)");
+  }
   if (log) {
     ITC_LOG_INFO("native renderer: tiling: worker job done on cpu {}: state +4 {:08X} +396 {:08X}",
                  native::Cpu(ctx, base), state ? guest::LoadU32(base, state + 4) : 0,

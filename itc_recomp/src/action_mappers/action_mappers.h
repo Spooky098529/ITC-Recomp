@@ -149,6 +149,14 @@ uint32_t UpdateAll(uint8_t* base, uint32_t list, uint32_t stack_word, double* f1
 uint32_t Held(uint8_t* base, uint32_t mapper, uint32_t id);
 uint32_t Pressed(uint8_t* base, uint32_t mapper, uint32_t id);
 uint32_t Fired(uint8_t* base, uint32_t mapper, uint32_t id);
+// Slots 9 and 11 (sub_8210BED8, sub_8210BFA8): bit i of held before
+// (+452) or released (+460).
+uint32_t HeldBefore(uint8_t* base, uint32_t mapper, uint32_t id);
+uint32_t Released(uint8_t* base, uint32_t mapper, uint32_t id);
+// Slot 5 (sub_8210BA68): the float at +1132 + 4i into `f1` (the float at
+// 0x82000A34 for an id out of range); returns the original's r3, IndexOf's
+// result.
+uint32_t AnalogValue(uint8_t* base, uint32_t mapper, uint32_t id, double* f1);
 // Slot 14 (sub_8210BA28): the u16 at +1072 + 2i.
 uint32_t AnalogRaw(uint8_t* base, uint32_t mapper, uint32_t id);
 // Slot 2 (sub_8210B698): the threshold entry's on (f1), off (f2) and

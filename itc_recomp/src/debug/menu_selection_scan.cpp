@@ -5,6 +5,8 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "hooks/frame_passes.h"
+#include "hooks/lifted_call.h"
+#include "sound_cues/manager_update.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -19,6 +21,13 @@
 ITC_FLAG_BOOL(find_menu_selection, false, "ITC",
               "While paused, find words that change on render-only passes only while a "
               "direction is held, and log the code changing them by pass type");
+ITC_FLAG_BOOL(native_audio_manager_update, true, "ITC",
+              "Run AudioManager::Update's callees (docs/functions/sound-cues.md: "
+              "AudioEngine::DoWork sub_8259D1A8, AudioManager::FreeReleasedBanks sub_821184E8, "
+              "UpdateSounds sub_82118FB0 and RemoveStoppedSounds sub_82118C18) natively inside "
+              "their --find_menu_selection wraps instead of through the translated code (their "
+              "callees through the dispatch table; checked by "
+              "--run_harnesses=audio_wraps)");
 ITC_FLAG_STRING(menu_watch, "", "ITC",
                 "Guest words (hex, comma-separated) to watch like --find_menu_selection's "
                 "candidates, without its scan");
@@ -226,20 +235,26 @@ void MenuSelectionScan_After(uint8_t* base, const char* kind, uint32_t id) {
 // Wrapped to name them in --find_menu_selection's log. Scene::Update's two
 // screen calls (slot 6 and slot 2 of the render queue at scene + 64,
 // sub_8258E5E0 and sub_8258ED78) are wrapped in their adapters
-// (src/hooks/render_queue.cpp); others below.
-#define ITC_MENU_SCAN_WRAP(address)                         \
+// (src/hooks/render_queue.cpp); others below. Inside the wrap, the work is
+// its plain C++ (`step`, src/sound_cues/manager_update.h) with
+// --native_audio_manager_update, else the original.
+#define ITC_MENU_SCAN_WRAP(address, step)                   \
   extern "C" REX_FUNC(sub_##address) {                      \
     REX_FUNC_PROLOGUE();                                    \
     debug::MenuSelectionScan_Before(base);                  \
-    __imp__sub_##address(ctx, base);                        \
+    if (ITC_FLAG(native_audio_manager_update)) {            \
+      lifted_call::EnterR3<sound_cues::step>(ctx, base);    \
+    } else {                                                \
+      __imp__sub_##address(ctx, base);                      \
+    }                                                       \
     debug::MenuSelectionScan_After(base, "call", 0x##address); \
   }
 // The callees of component update 82119118 (component 40066EE0 in the
 // user's race), which posts the events the pause screen's Update consumes.
-ITC_MENU_SCAN_WRAP(8259D1A8)
-ITC_MENU_SCAN_WRAP(821184E8)
-ITC_MENU_SCAN_WRAP(82118FB0)
-ITC_MENU_SCAN_WRAP(82118C18)
+ITC_MENU_SCAN_WRAP(8259D1A8, AudioEngineDoWork)
+ITC_MENU_SCAN_WRAP(821184E8, ManagerFreeReleasedBanks)
+ITC_MENU_SCAN_WRAP(82118FB0, ManagerUpdateSounds)
+ITC_MENU_SCAN_WRAP(82118C18, ManagerRemoveStoppedSounds)
 #undef ITC_MENU_SCAN_WRAP
 
 // Job::Wait: its native body (src/hooks/frame_passes.cpp, --native_frame_passes)

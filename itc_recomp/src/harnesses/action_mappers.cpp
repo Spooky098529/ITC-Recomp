@@ -98,6 +98,14 @@ ITC_NATIVE_STEP(NativeHeld, ctx.r3.u64 = am::Held(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativePressed, ctx.r3.u64 = am::Pressed(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeFired, ctx.r3.u64 = am::Fired(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeAnalogRaw, ctx.r3.u64 = am::AnalogRaw(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeHeldBefore, ctx.r3.u64 = am::HeldBefore(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeReleased, ctx.r3.u64 = am::Released(base, ctx.r3.u32, ctx.r4.u32))
+ITC_NATIVE_STEP(NativeAnalogValue, {
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0;
+  ctx.r3.u64 = am::AnalogValue(base, ctx.r3.u32, ctx.r4.u32, &f1);
+  ctx.f1.f64 = f1;
+})
 ITC_NATIVE_STEP(NativeSetThreshold,
                 ctx.r3.u64 = am::SetThreshold(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64,
                                               ctx.f2.f64, ctx.r7.u32))
@@ -670,6 +678,9 @@ void Slots(Context& h) {
       {"sub_8210BF40 ActionMapper::Pressed", __imp__sub_8210BF40, NativePressed},
       {"sub_8210C010 ActionMapper::Fired", __imp__sub_8210C010, NativeFired},
       {"sub_8210BA28 ActionMapper::AnalogRaw", __imp__sub_8210BA28, NativeAnalogRaw},
+      {"sub_8210BED8 ActionMapper::HeldBefore", __imp__sub_8210BED8, NativeHeldBefore},
+      {"sub_8210BFA8 ActionMapper::Released", __imp__sub_8210BFA8, NativeReleased},
+      {"sub_8210BA68 ActionMapper::AnalogValue", __imp__sub_8210BA68, NativeAnalogValue},
   };
   for (const Slot& slot : reads) {
     Results results(slot.name);

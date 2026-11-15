@@ -168,4 +168,15 @@ struct WorkerLoopCalls {
 uint32_t WorkerThread(uint8_t* base, uint32_t block, uint32_t timeout,
                       const WorkerLoopCalls& calls);
 
+// Device::WakeWorker (sub_822B6A78), the callback the GPU raises at the
+// tiling's end (r3 `argument`, the segment chain's first block; `cpu` the
+// calling thread's CPU, the PCR's +268): [VdGlobalDevice] +10892 (the shared
+// state's +80) = `argument`, then KeSetEvent(+11244 + 56 x `cpu`, 1, 0) (the
+// CPU's worker's event; `set_event`, the import, as the original's tail
+// call). Returns KeSetEvent's r3. Never seen in play: our kick skips it
+// (Interrupt in src/native/gpu_link.cpp).
+uint32_t WakeWorker(uint8_t* base, uint32_t argument, uint32_t cpu,
+                    const std::function<uint32_t(uint32_t event, uint32_t increment,
+                                                 uint32_t wait)>& set_event);
+
 }  // namespace graphics::predicated_tiling

@@ -9,6 +9,7 @@
 // docs/native-memory.md.
 
 #include "hooks/heap.h"
+#include "lifted/originals.h"
 
 #include "guest.h"
 
@@ -174,7 +175,7 @@ extern "C" REX_FUNC(sub_82295330) {
   REX_FUNC_PROLOGUE();
   auto r3 = hooks::VirtualFree(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr));
   if (!r3) {
-    __imp__sub_82295330(ctx, base);
+    lifted::original::c82295330(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;

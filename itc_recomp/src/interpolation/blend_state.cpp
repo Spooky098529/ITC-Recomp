@@ -23,9 +23,11 @@
 // (amount 0) and the frames after it move towards the current one.
 
 #include "blend_state.h"
+#include "lifted/originals.h"
 #include "command_list/command_list.h"
 #include "debug/replay_stats.h"
 #include "native/renderer.h"
+#include "native/replay_hooks.h"
 
 #include "frame_pacing/frame_pacer.h"
 #include "frame_pacing/game_messages.h"
@@ -78,6 +80,7 @@ ITC_FLAG_BOOL(log_overlay_uploads, false, "ITC",
 ITC_FLAG_DECLARE(bool, log_frame_times);
 ITC_FLAG_DECLARE(bool, native_billboards);
 ITC_FLAG_DECLARE(bool, native_matrix_math);
+ITC_FLAG_DECLARE(bool, native_replay_commands);
 ITC_FLAG_BOOL(strict_pixel_pairing, true, "ITC",
               "Leave per-object pixel constants unblended after a draw that isn't a known "
               "camera product, instead of pairing them by the product before it");
@@ -4137,7 +4140,7 @@ extern "C" REX_FUNC(sub_8209BD50) {
     matrix_math::Multiply(base, out, a, b);
     ctx.fpscr.enableFlushMode();
   } else {
-    __imp__sub_8209BD50(ctx, base);
+    lifted::original::c8209BD50(ctx, base);
   }
   interpolation::GetDrawState().OnMultiply(base, out, a, b, caller);
 }
@@ -4363,6 +4366,23 @@ void interpolation::BlendState_TakeReplayTimes(int64_t& blend_ns, int64_t& uploa
   upload_ns = upload;
 }
 
+// The upload is Command::SetShaderConstants' plain C++
+// (src/graphics/replay_commands.h) with --native_replay_commands, else the
+// original.
+namespace {
+void SetShaderConstants(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_replay_commands)) {
+    __imp__sub_8258FD48(ctx, base);
+    return;
+  }
+  const uint32_t payload = ctx.r3.u32, count = ctx.r4.u32, packed = ctx.r5.u32;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = graphics::replay_commands::SetShaderConstants(base, payload, count, packed,
+                                                             ctx.r1.u32,
+                                                             native::ReplayCall(ctx, base));
+}
+}  // namespace
+
 extern "C" REX_FUNC(sub_8258FD48) {
   REX_FUNC_PROLOGUE();
   uint32_t payload = ctx.r3.u32, packed = ctx.r5.u32;
@@ -4370,14 +4390,14 @@ extern "C" REX_FUNC(sub_8258FD48) {
   native::Renderer_OnCommand(base, 7, payload, ctx.r4.u32, packed);
   if (!ITC_FLAG(log_frame_times)) {
     interpolation::BlendState_ReplayConstants(base, payload, packed,
-                                              [&] { __imp__sub_8258FD48(ctx, base); });
+                                              [&] { SetShaderConstants(ctx, base); });
     return;
   }
   using Clock = std::chrono::steady_clock;
   Clock::time_point start = Clock::now();
   interpolation::BlendState_ReplayConstants(base, payload, packed, [&] {
     Clock::time_point upload_start = Clock::now();
-    __imp__sub_8258FD48(ctx, base);
+    SetShaderConstants(ctx, base);
     g_replay_upload_ns += (Clock::now() - upload_start).count();
   });
   g_replay_total_ns += (Clock::now() - start).count();

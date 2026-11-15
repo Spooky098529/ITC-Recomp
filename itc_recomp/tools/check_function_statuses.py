@@ -11,6 +11,8 @@ For each table row, every sub_XXXXXXXX in its first column is checked:
            or a macro defining one) exists:
            it should be Overridden or Wrapped
   error    Overridden or Wrapped, but no override exists
+  error    Lifted, but an override exists outside src/lifted/ (its own entry
+           for the SDK, while it has one, is in src/lifted/)
   error    no status, but an override exists
   check    Wrapped, but nothing calls __imp__sub_X
   check    Dropped, but src/ calls __imp__sub_X (a fallback flag
@@ -142,6 +144,12 @@ def main():
                 continue
             override = found.get(sub)
             where = f"{place} {sub} ({status or 'no status'})"
+            if status == "Lifted":
+                # Its entry for the SDK, while it has one, is in src/lifted/.
+                if override and "/lifted/" not in override[0].replace(os.sep, "/"):
+                    print(f"error  {where}: an override outside src/lifted/ exists in {override[0]}")
+                    errors += 1
+                continue
             if status in ("Native", "Merged") and override:
                 print(f"error  {where}: an override exists in {override[0]}")
                 errors += 1

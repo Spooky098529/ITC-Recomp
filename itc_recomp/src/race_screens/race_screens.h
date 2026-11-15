@@ -363,9 +363,15 @@ uint32_t PauseMenuSetArrowA(uint8_t* base, uint64_t value, uint32_t sp);
 // matching edit (the data's +36 to +48, +144, copied to the frame's +80).
 // Returns r3 as the original leaves it.
 uint32_t PauseMenuShowOptions(uint8_t* base, uint32_t sp);
+// sub_8220D040 PauseMenu::ShowVolume (never seen in play): r3 a volume
+// node, r4 the volume. UiMovie::SetNodeText(movie, child 2, 8, volume) (the
+// unset varargs 0), then children 4 to 18's +80 = 1 for the one at the
+// volume, else 0. Returns the last child (the original's r3).
+uint64_t PauseMenuShowVolume(uint8_t* base, uint32_t node, uint64_t volume, uint32_t sp,
+                             const Calls& calls);
 // sub_8220D0B8 PauseMenu::ShowVolumes: the type-9 nodes 5 and 6 shown by
-// PauseMenu::ShowVolume (sub_8220D040, never seen in play: the original, its
-// --log_pause_movie line kept) with the data's +52 and +56. r3 its.
+// PauseMenu::ShowVolume (sub_8220D040: through its wrap, which keeps its
+// --log_pause_movie line) with the data's +52 and +56. r3 its.
 uint64_t PauseMenuShowVolumes(uint8_t* base, uint32_t sp, const Calls& calls);
 // sub_8220D130 PauseMenu::ShowSlider: UiMovie::SetNodeText(movie, child 0,
 // 8, value); child 2's +12 = 16 - (value + 10) x [0x8200A6AC] truncated, as

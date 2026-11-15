@@ -246,6 +246,23 @@ uint32_t PauseMenuShowOptions(uint8_t* base, uint32_t sp) {
   return r3;
 }
 
+uint64_t PauseMenuShowVolume(uint8_t* base, uint32_t node, uint64_t volume, uint32_t sp,
+                             const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220D040 PauseMenu::ShowVolume");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t movie = PauseMovie(base);
+  const uint32_t text = ui_movies::Child(base, node, 2);
+  const uint64_t args[8] = {movie, text, 8, volume, 0, 0, 0, 0};
+  calls.CallArgs(kSetNodeText, frame, 0x8220D07C, args);
+  // The bar's marks: children 4 to 18's +80, 1 for the one at the volume.
+  uint32_t mark = 0;
+  for (int32_t i = 1; i <= 15; i++) {
+    mark = ui_movies::Child(base, node, uint32_t(i + 3));
+    guest::StoreU32(base, mark + 80, i == int32_t(uint32_t(volume)) ? 1 : 0);
+  }
+  return mark;
+}
+
 uint64_t PauseMenuShowVolumes(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220D0B8 PauseMenu::ShowVolumes");
   const uint32_t frame = Frame(base, sp, 112);

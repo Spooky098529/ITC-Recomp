@@ -3,6 +3,7 @@
 // (hooks/race_setup.h).
 
 #include "hooks/race_setup.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
@@ -95,7 +96,7 @@ void RaceSetupSetupVehicle(PPCContext& ctx, uint8_t* base) {
   ctx.r11.u64 = car;
   ctx.r3.u64 = ctx.r4.u64;
   ctx.r4.u64 = car;
-  __imp__sub_820C27E8(ctx, base);
+  lifted::original::c820C27E8(ctx, base);
 }
 
 void RaceSetupSetModel(PPCContext& ctx, uint8_t* base) {

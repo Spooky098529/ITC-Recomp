@@ -725,6 +725,23 @@ pick the leads; no multiplayer: the main menu's Xbox Live and split
 screen items do nothing (`--multiplayer_menu_items`, off by default;
 `title-screen.md`), their modes left unreachable; functions that end
 the process or thread are checked by reading, not harnessed.
+The alternative to the loop is the lift sweep
+(`docs/loops/lift-sweep.md`, the user's call, 2026-11-15, on
+`lift-sweep`): B7's end state now. A tool (`itc_recomp/tools/lift.py`)
+translates every function still recompiled from `generated/` into
+plain C++ with typed parameters. Native code calls native code
+directly, or through a dispatch table by address for vtables and
+function pointers, and the SDK only for its imports. Agents rewire the
+existing ports and delete their adapters. "No behavior change" is
+loosened, there's no mapping or harness per function, lifted-looking
+code is accepted, and validation is done once at the end. The
+multiplayer modes are skipped. Its sweep (2026-11-15) lifted 3,010
+functions, vector code included (`src/lifted/`, `--native_lifted_000`
+to `033`; status **Lifted**, rows in place or in
+`docs/functions/lifted.md`), and B7-style agents made 66 of the 67
+Wrapped functions native: unported 3,106 -> 2 (`xstart` and
+`sub_821743A8`, reached only by the Xbox Live mode), every harness at 0;
+left is the rewiring.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
@@ -909,8 +926,8 @@ command-line options win over it). Since 2026-10-20 the once-a-frame mirrors
 are on by default (and the native renderer always draws: its switches,
 `--native_renderer` and `--native_renderer_exclusive`, went in B3), and without
 `--game_data_root` the game's files are looked for next to the executable
-(`ItcApp::OnConfigurePaths`; the SDK reads that flag before `itc.toml`
-loads), so a bare `./itc` plays as released.
+(`src/app/main.cpp`, our own start-up since 2026-11-15; the flag is read
+before `itc.toml` loads), so a bare `./itc` plays as released.
 
 ## Status (`main`, 2026-10-20, v0.4.7.1)
 

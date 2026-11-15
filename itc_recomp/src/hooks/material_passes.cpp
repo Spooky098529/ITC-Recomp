@@ -3,6 +3,7 @@
 // register steps the harness shares (hooks/material_passes.h).
 
 #include "hooks/material_passes.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "material_passes/material_passes.h"
@@ -85,7 +86,7 @@ void MaterialPassesSetMaterials(PPCContext& ctx, uint8_t* base) {
                             ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
   std::optional<uint64_t> r3;
   if (!mp::SetMaterials(base, ctx.r3.u32, regs, ctx.r1.u32, &r3)) {
-    __imp__sub_820D3318(ctx, base);
+    lifted::original::c820D3318(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();

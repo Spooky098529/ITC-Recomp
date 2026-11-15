@@ -8,7 +8,7 @@ itc_recomp/src. Reports only; changes nothing.
 usage: b7_status.py [repo root]   (default: this repo)
 
 Each function in play is counted once, in the first state that fits:
-  ours        an override in src/, or status Native, Merged or Dropped (an
+  ours        an override in src/, or status Native, Merged, Dropped or Lifted (an
               override's recompiled body no longer runs, so a function that
               is ours may be missing from the list: in play is the list
               plus what's ours)
@@ -69,7 +69,7 @@ def main():
 
     def ours(sub):
         return (sub in overrides and status.get(sub) != "Wrapped") or \
-            status.get(sub) in ("Native", "Merged", "Dropped")
+            status.get(sub) in ("Native", "Merged", "Dropped", "Lifted")
 
     def state(sub):
         if status.get(sub) == "Wrapped":  # an override, but not ours yet
