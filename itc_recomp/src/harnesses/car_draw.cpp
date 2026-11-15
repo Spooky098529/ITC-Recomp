@@ -390,15 +390,17 @@ void LightSets(uint8_t* base, uint32_t owner, uint32_t count, float px, float py
 // CarLighting::Gather's register steps (its adapter is gone: its callers in
 // play are plain C++): r3 = the record, r4 = the world matrix, r5 = the
 // flag.
-void NativeGather(PPCContext& ctx, uint8_t* base) {
+void NativeGather(PPCContext& sdk, uint8_t* base) {
   if (!hooks::CarDrawLightingCalleesNative()) {
-    __imp__sub_820C9170(ctx, base);
+    __imp__sub_820C9170(sdk, base);
     return;
   }
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   hooks::SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
   ctx.r3.u64 = car_draw::CarLightingGather(base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32,
                                            ctx.r5.u32);
   ctx.lr = lr;
@@ -728,19 +730,21 @@ void DrawOutputs(Context& h, uint32_t block, const PPCContext& t, Outputs& o, ui
 // matrix, r6 = the shape, r7 = the depth entry too; the original where the
 // plain C++ declines. r3 the last queue call's (left in ctx by the guest
 // call), else the draw's.
-void NativeModelDraw(PPCContext& ctx, uint8_t* base) {
+void NativeModelDraw(PPCContext& sdk, uint8_t* base) {
   if (!hooks::CarDrawModelCalleesNative()) {
-    __imp__sub_820D04E8(ctx, base);
+    __imp__sub_820D04E8(sdk, base);
     return;
   }
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   hooks::SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
   const auto draw = car_draw::ModelDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
-                                        ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r24.u32);
+                                        ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, sdk.r24.u32);
   if (!draw) {
-    __imp__sub_820D04E8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820D04E8);
     return;
   }
   ctx.lr = lr;
@@ -848,13 +852,15 @@ void NativeAllocVertexBuffer(PPCContext& ctx, uint8_t* base) {
 // Model::QueueJobRelease's register steps (its adapter is gone: its caller
 // in play, Model::MorphShape, calls the plain C++): the original where the
 // plain C++ declines (no room).
-void NativeQueueJobRelease(PPCContext& ctx, uint8_t* base) {
+void NativeQueueJobRelease(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   hooks::SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
   const auto left = car_draw::ModelQueueJobRelease(base, calls, ctx.r4.u32, ctx.r1.u32);
   if (!left) {
-    __imp__sub_82594E88(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82594E88);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -864,19 +870,21 @@ void NativeQueueJobRelease(PPCContext& ctx, uint8_t* base) {
 // play, the morphed wheel draws and WheelPoints::DrawBrakes, call the plain
 // C++): the original where its callees aren't native or the plain C++
 // declines (an allocation or the release wouldn't fit).
-void NativeMorphShape(PPCContext& ctx, uint8_t* base) {
+void NativeMorphShape(PPCContext& sdk, uint8_t* base) {
   if (!hooks::CarDrawMorphCalleesNative()) {
-    __imp__sub_82595110(ctx, base);
+    __imp__sub_82595110(sdk, base);
     return;
   }
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   hooks::SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
   const auto left = car_draw::ModelMorphShape(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u64,
                                               ctx.r1.u32);
   if (!left) {
-    __imp__sub_82595110(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82595110);
     return;
   }
   ctx.lr = lr;
@@ -1104,12 +1112,14 @@ void Morphs(Context& h, Random& r, uint32_t block) {
 // --- The light kit ---
 
 template <car_draw::LightGroup W>
-void NativeLightPointsDraw(PPCContext& ctx, uint8_t* base) {
+void NativeLightPointsDraw(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   hooks::SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
   const auto left = car_draw::LightPointsDraw(base, calls, W, ctx.r1.u32, ctx.r3.u32, ctx.r4.u64,
-                                              ctx.r5.u32, ctx.r6.u32, ctx.r24.u32, ctx.r28.u32);
+                                              ctx.r5.u32, ctx.r6.u32, sdk.r24.u32, sdk.r28.u32);
   if (!left.in_ctx) {
     ctx.r3.u64 = left.r3;
   }
@@ -1117,13 +1127,15 @@ void NativeLightPointsDraw(PPCContext& ctx, uint8_t* base) {
 }
 
 template <car_draw::LightGroup W>
-void NativeLightPointsDrawNeon(PPCContext& ctx, uint8_t* base) {
+void NativeLightPointsDrawNeon(PPCContext& sdk, uint8_t* base) {
+  lifted::RegsScope scope(sdk);
+  lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   hooks::SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
   const auto left =
       car_draw::LightPointsDrawNeon(base, calls, W, ctx.r1.u32, ctx.r3.u32, ctx.r4.u64,
-                                    ctx.r5.u32, ctx.r6.u32, ctx.r24.u32, ctx.r28.u32);
+                                    ctx.r5.u32, ctx.r6.u32, sdk.r24.u32, sdk.r28.u32);
   if (!left.in_ctx) {
     ctx.r3.u64 = left.r3;
   }
