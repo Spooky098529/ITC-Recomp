@@ -16,5 +16,8 @@ void AchievementsCheckSteps(PPCContext& ctx, uint8_t* base);
 // Achievements::Write sub_82290A30: r3 = the 27 words; XUserWriteAchievements
 // through the function table.
 void AchievementsWriteSteps(PPCContext& ctx, uint8_t* base);
+// XUserWriteAchievements sub_82294E58 (r3 the count, r4 the list, r5 the
+// overlapped): XAPI's wrapper natively, entered through lifted::Enter.
+void WriteAchievementsSteps(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
