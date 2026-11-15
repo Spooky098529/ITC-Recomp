@@ -110,6 +110,7 @@ set(ITC_SOURCES
     src/hooks/billboards.cpp
     src/sprites/billboards.cpp
     src/sprites/billboard_record.cpp
+    src/sprites/world_sprites.cpp
     src/hooks/ui_movies.cpp
     src/ui_movies/ui_movies.cpp
     src/ui_movies/keys.cpp

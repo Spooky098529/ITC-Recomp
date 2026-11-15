@@ -15,10 +15,12 @@
 #include "hooks/cameras.h"
 #include "hooks/car_draw.h"
 #include "hooks/minimap.h"
+#include "hooks/lifted_call.h"
 #include "hooks/mode_tick.h"
 #include "hooks/race_hud.h"
 #include "hooks/ui_movies.h"
 #include "interpolation/blend_state.h"
+#include "sprites/world_sprites.h"
 
 #include "base/flags.h"
 
@@ -39,6 +41,12 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_modes_tick);
+ITC_FLAG_BOOL(native_world_sprites, true, "ITC",
+              "Run the world-space sprites' recorders (Sprite::Record sub_821281A8, the marker "
+              "above opponents, and SpriteList::Record sub_82128750, the light trails; "
+              "docs/functions/sprites.md) natively inside their blending wraps instead of "
+              "through the translated code (their command list calls through the overrides "
+              "and wraps; render-path code, checked by frame dumps)");
 ITC_FLAG_DECLARE(bool, interpolate_draw_state);
 ITC_FLAG_DECLARE(bool, native_course_scenery);
 ITC_FLAG_DECLARE(bool, log_pause_movie);
@@ -683,6 +691,33 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
   }
 }
 
+// The recorders' work: their plain C++ (src/sprites/world_sprites.h) with
+// --native_world_sprites, else the originals.
+namespace {
+void RecordSpriteList(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_world_sprites)) {
+    __imp__sub_82128750(ctx, base);
+    return;
+  }
+  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
+    return {sprites::SpriteListRecord(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+                                      uint32_t(a.r[1]), uint32_t(a.r[2])),
+            a.f[0]};
+  });
+}
+void RecordSprite(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_world_sprites)) {
+    __imp__sub_821281A8(ctx, base);
+    return;
+  }
+  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
+    return {sprites::SpriteRecord(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
+                                  uint32_t(a.r[1]), uint32_t(a.r[2])),
+            a.f[0]};
+  });
+}
+}  // namespace
+
 // World-space sprite recorder (sub_82128750: r3 = sprite list, r4 = camera;
 // the light trails): blends the corners around the original.
 extern "C" REX_FUNC(sub_82128750) {
@@ -690,7 +725,7 @@ extern "C" REX_FUNC(sub_82128750) {
   if (debug::IsHidden(0x82128750)) {
     return;
   }
-  PerFrameLogic_RecordWorldSprites(base, ctx.r3.u32, [&] { __imp__sub_82128750(ctx, base); });
+  PerFrameLogic_RecordWorldSprites(base, ctx.r3.u32, [&] { RecordSpriteList(ctx, base); });
 }
 
 // Diagnostics (--log_camera_pass_records): which camera passes are recorded
@@ -812,7 +847,7 @@ extern "C" REX_FUNC(sub_821281A8) {
     }
   }
   if (!blend) {
-    __imp__sub_821281A8(ctx, base);
+    RecordSprite(ctx, base);
     return;
   }
   for (uint32_t k = 0; k < 16; k++) {
@@ -821,7 +856,7 @@ extern "C" REX_FUNC(sub_821281A8) {
                         state.before[k] + (state.now[k] - state.before[k]) * amount);
     }
   }
-  __imp__sub_821281A8(ctx, base);
+  RecordSprite(ctx, base);
   for (uint32_t k = 0; k < 16; k++) {
     guest::StoreFloat(base, sprite + kSpriteCornersOffset + 4 * k, corners[k]);
   }
