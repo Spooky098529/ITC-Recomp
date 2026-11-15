@@ -154,8 +154,24 @@ outside:
   classes (the user's question, 2026-11-15). It's our code, not
   rexglue's: its fallback into the SDK's function table goes once
   every function is native.
-- Left: the 141 still unported (overrides of ours, registers another
-  function left, the global lock), then rewiring (piece 4).
+- Registers kept across calls (2026-11-15): every "reads a register a
+  call left" refusal was a caller keeping a value in a volatile register
+  across a call its compiler knew doesn't touch it (none was an extra
+  output). `lift.py` works out what each function may write, through its
+  calls, and a direct call wipes only that; the SDK boundary
+  (`lifted::Call`'s fallback, `Import`) puts back the argument registers
+  it loads into the context (r4-r10, f2-f13, v1-v13), so a recompiled
+  caller further up keeps its values too. `__chkstk` (`sub_825A9934`,
+  Dropped) calls are left out. 64 more functions, 3,001 in all.
+- The Wrapped functions (2026-11-15): by the user's call, B7-style
+  migration agents rather than lifting: 60 of 67 made native or Dropped
+  (their wrappers' own work kept). Left: `Device::Resolve`,
+  `ScreenObject::Record` and `sub_821743A8` (probably the network
+  battle's placement), and four in `825BD8F0`-`825BE300`.
+- Left (static map: unported 17): those, the global lock's six, two
+  with an SDK macro, `xstart`, `sub_822997B0` (an `r8` read after a
+  call) and `sub_82121760` (an unfolded fragment); then rewiring
+  (piece 4).
 - Wrapped functions (2026-11-15, after the render path's): the game's
   work inside our wraps made native by hand, the wraps kept: the action
   mappers' last read slots, the sound manager's per-frame callees,

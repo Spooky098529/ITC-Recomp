@@ -3440,8 +3440,8 @@ loc_82582124:
 // sub_82582158: lifted from generated/ by lift.py.
 lifted::Result f82582158(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5) {
   ITC_NATIVE_RUNNING("sub_82582158 (lifted)");
-  uint64_t r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
-  double f0 = 0.0, f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r6 = 0, r11 = 0, r12 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f0 = 0.0, f1 = 0.0, f2 = 0.0, f3 = 0.0;
   lifted::Temp temp{};
   uint32_t ea{};
   // mflr r12
@@ -3529,7 +3529,7 @@ lifted::Result f82582158(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   f1 = double(temp.f32);
   // bl 0x82583910
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82583910, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = f82583910(base, r1, r13, r3, r4, r5, f1); r3 = o.r3; f1 = o.f1; }
   // lfs f0,0(r27)
   lifted::ScalarFloatMode();
   temp.u32 = REX_LOAD_U32(uint32_t(r27) + 0);
@@ -10034,7 +10034,7 @@ loc_82586B60:
 lifted::Result f82586B68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6) {
   ITC_NATIVE_RUNNING("sub_82586B68 (lifted)");
   uint64_t r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
-  double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0;
   lifted::Cr cr6;
   uint8_t so = 0;
   lifted::Temp temp{};
@@ -10118,7 +10118,7 @@ loc_82586BA8:
   REX_STORE_U32(uint32_t(r1) + 84, uint32_t(r30));
   // bl 0x82587238
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82587238, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = f82587238(base, r1, r13, r3, r4, r5, r6, r9, r10, f1, f2, f3, f4, f5); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // addi r11,r11,80

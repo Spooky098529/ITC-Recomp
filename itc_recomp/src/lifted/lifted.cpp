@@ -46,6 +46,17 @@ Result Boundary(const Args& args, Invoke invoke) {
   PPCContext& ctx = Current();
   const uint64_t r1 = ctx.r1.u64;
   const uint64_t r13 = ctx.r13.u64;
+  // The argument registers the call overwrites, put back after it (but r3
+  // and f1, its results): a recompiled caller further up may keep a value
+  // in one across a call the 360's compiler knew doesn't touch it.
+  uint64_t saved_r[7];
+  for (int i = 0; i < 7; i++) {
+    saved_r[i] = (&ctx.r4)[i].u64;
+  }
+  PPCRegister saved_f[12];
+  std::memcpy(saved_f, &ctx.f2, sizeof(saved_f));
+  PPCVRegister saved_v[13];
+  std::memcpy(saved_v, &ctx.v1, sizeof(saved_v));
   ctx.r1.u64 = args.r1;
   ctx.r13.u64 = args.r13;
   ctx.r3.u64 = args.r[0];
@@ -70,6 +81,11 @@ Result Boundary(const Args& args, Invoke invoke) {
   Result result{ctx.r3.u64, ctx.f1.f64};
   ctx.r1.u64 = r1;
   ctx.r13.u64 = r13;
+  for (int i = 0; i < 7; i++) {
+    (&ctx.r4)[i].u64 = saved_r[i];
+  }
+  std::memcpy(&ctx.f2, saved_f, sizeof(saved_f));
+  std::memcpy(&ctx.v1, saved_v, sizeof(saved_v));
   return result;
 }
 

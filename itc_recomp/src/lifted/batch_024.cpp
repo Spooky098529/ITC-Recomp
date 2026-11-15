@@ -5248,7 +5248,7 @@ loc_825CE888:
   r6 = r29;
   // bl 0x825d3778
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825D3778, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f825D3778(base, r1, r13, r3, r4, r5, r6);
   // mr r30,r3
   r30 = r3;
   // cmpwi cr6,r30,0

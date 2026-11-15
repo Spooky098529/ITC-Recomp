@@ -136,6 +136,11 @@ class Stmt:
         self.__dict__.update(kw)
 
 
+# Calls left out: `__chkstk` (sub_825A9934, the stack probe, Dropped in
+# docs/functions/c-runtime.md: its size comes in r12, and touching the
+# stack's pages ahead of the frame isn't needed).
+LEFT_OUT = {"sub_825A9934"}
+
 CALL_RE = re.compile(r"^(sub_[0-9A-F]{8}|__imp__\w+|__(?:save|rest)\w+)\(ctx, base\);$")
 INDIRECT_RE = re.compile(r"^REX_CALL_INDIRECT_FUNC\((.*)\);$")
 IF_GOTO_RE = re.compile(r"^if \((.*)\) goto (loc_[0-9A-F]+);$")
@@ -167,7 +172,7 @@ def parse(name, lines):
         m = CALL_RE.match(s)
         if m:
             target = m.group(1)
-            if target.startswith("__save") or target.startswith("__rest"):
+            if target.startswith("__save") or target.startswith("__rest") or target in LEFT_OUT:
                 stmts.append(Stmt("skip", s, comment))
             elif target.startswith("__imp__"):
                 stmts.append(Stmt("call", s, comment, how="import", target=target))
@@ -308,6 +313,7 @@ class Info:
         self.params = []
         self.returns = (False, False)
         self.analyzed = False   # params and returns worked out from its body
+        self.may_write = None   # registers it (or its callees) may write
 
 
 def successors(stmts, labels):
@@ -350,6 +356,61 @@ def call_defs(info_by_name, st):
         r3, f1 = callee.returns
         return ({"r3"} if r3 else set()) | ({"f1"} if f1 else set())
     return {"r3", "f1"}
+
+
+def call_clobbers(info_by_name, st):
+    """The volatile registers a call may change: what a direct callee whose
+    body could be read may write (through its own calls too), else all of
+    them. The 360's compiler relies on the difference between functions it
+    compiled together: a caller keeps a value in a volatile register across
+    a call it knows doesn't touch it."""
+    callee = info_by_name.get(st.target) if st.how == "direct" else None
+    if callee is not None and callee.analyzed and callee.may_write is not None:
+        return callee.may_write & VOLATILE
+    return VOLATILE
+
+
+def written(st):
+    """The registers a statement writes, whole or in part."""
+    if st.kind not in ("plain", "if", "switch"):
+        return set()
+    d, _ = defs_uses(st)
+    out = set(d)
+    m = re.match(r"^(?:--|\+\+)?ctx\.(\w+)(?:\.(\w+))?", st.code)
+    if m:
+        reg = register_of(m.group(1), m.group(2))
+        if reg is not None:
+            out.add(reg)
+    return out
+
+
+def compute_may_write(infos):
+    """Each analyzed function's may-write set, through its calls, to a
+    fixed point (a call it can't follow may write every volatile register)."""
+    everything = frozenset(VOLATILE | {"r3", "f1"})
+    for info in infos.values():
+        if info.analyzed:
+            own = set()
+            for st in info.stmts:
+                own |= written(st)
+            info.may_write = own
+    changed = True
+    while changed:
+        changed = False
+        for info in infos.values():
+            if not info.analyzed:
+                continue
+            before = len(info.may_write)
+            for st in info.stmts:
+                if st.kind != "call":
+                    continue
+                callee = infos.get(st.target) if st.how == "direct" else None
+                if callee is not None and callee.analyzed:
+                    info.may_write |= callee.may_write
+                else:
+                    info.may_write |= everything
+            if len(info.may_write) != before:
+                changed = True
 
 
 def prepare(info):
@@ -395,7 +456,7 @@ def analyze(info, info_by_name):
         de, nc = de_in[i], nc_in[i]
         d = per_stmt[i][0]
         if stmts[i].kind == "call":
-            de_out, nc_out = de | d, (nc - VOLATILE) | d
+            de_out, nc_out = de | d, (nc - call_clobbers(info_by_name, stmts[i])) | d
         else:
             de_out, nc_out = de | d, nc | d
         for j in succ[i]:
@@ -515,6 +576,7 @@ def build(names, bodies, skip):
             continue
         info.analyzed = True
         prepare(info)
+    compute_may_write(infos)
     callers = collections.defaultdict(set)
     for info in infos.values():
         if info.analyzed:

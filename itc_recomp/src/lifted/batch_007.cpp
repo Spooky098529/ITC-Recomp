@@ -967,7 +967,7 @@ loc_8213A3E8:
   REX_STORE_U32(uint32_t(r30) + 40, uint32_t(r11));
   // bl 0x82139a08
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82139A08, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82139A08(base, r1, r13, r3, r4);
   // b 0x8213a408
   goto loc_8213A408;
 loc_8213A400:
@@ -999,8 +999,7 @@ loc_8213A408:
 // sub_8213AB40: lifted from generated/ by lift.py.
 lifted::Result f8213AB40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, double f1) {
   ITC_NATIVE_RUNNING("sub_8213AB40 (lifted)");
-  uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0;
-  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r5 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0;
   lifted::Cr cr0;
   uint8_t so = 0;
   uint32_t ea{};
@@ -1043,7 +1042,7 @@ loc_8213AB78:
   REX_STORE_U32(uint32_t(r4) + 40, uint32_t(r11));
   // bl 0x82139a08
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82139A08, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82139A08(base, r1, r13, r3, r4);
 loc_8213AB84:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));

@@ -1384,8 +1384,8 @@ loc_82576FD0:
 // sub_82577088: lifted from generated/ by lift.py.
 uint64_t f82577088(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82577088 (lifted)");
-  uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0;
-  double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r5 = 0, r11 = 0, r12 = 0;
+  double f1 = 0.0;
   uint32_t ea{};
   // mflr r12
   r12 = 0;
@@ -1403,7 +1403,7 @@ uint64_t f82577088(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x82578530
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82578530, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82578530(base, r1, r13, r3, r4, r5);
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
@@ -1417,8 +1417,8 @@ uint64_t f82577088(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
 // sub_825770B8: lifted from generated/ by lift.py.
 uint64_t f825770B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_825770B8 (lifted)");
-  uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
-  double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r5 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
+  double f1 = 0.0;
   lifted::Cr cr0;
   uint8_t so = 0;
   uint32_t ea{};
@@ -1446,7 +1446,7 @@ uint64_t f825770B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x82578530
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82578530, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82578530(base, r1, r13, r3, r4, r5);
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x825770f8
@@ -1476,8 +1476,8 @@ loc_825770F8:
 // sub_82577110: lifted from generated/ by lift.py.
 uint64_t f82577110(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82577110 (lifted)");
-  uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0;
-  double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r5 = 0, r11 = 0, r12 = 0;
+  double f1 = 0.0;
   uint32_t ea{};
   // mflr r12
   r12 = 0;
@@ -1495,7 +1495,7 @@ uint64_t f82577110(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x82578530
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82578530, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82578530(base, r1, r13, r3, r4, r5);
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
@@ -1509,8 +1509,8 @@ uint64_t f82577110(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
 // sub_82577140: lifted from generated/ by lift.py.
 uint64_t f82577140(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5) {
   ITC_NATIVE_RUNNING("sub_82577140 (lifted)");
-  uint64_t r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r29 = 0, r30 = 0, r31 = 0;
-  double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r11 = 0, r12 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f1 = 0.0;
   lifted::Cr cr0;
   uint8_t so = 0;
   uint32_t ea{};
@@ -1537,7 +1537,7 @@ uint64_t f82577140(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x82578530
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82578530, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82578530(base, r1, r13, r3, r4, r5);
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x82577188
@@ -1567,8 +1567,8 @@ loc_82577188:
 // sub_82577190: lifted from generated/ by lift.py.
 uint64_t f82577190(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82577190 (lifted)");
-  uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
-  double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r5 = 0, r10 = 0, r11 = 0, r12 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
+  double f1 = 0.0;
   lifted::Cr cr0, cr6;
   uint8_t so = 0;
   uint32_t ea{};
@@ -1599,7 +1599,7 @@ uint64_t f82577190(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   REX_STORE_U32(uint32_t(r1) + 92, uint32_t(r27));
   // bl 0x82578530
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82578530, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82578530(base, r1, r13, r3, r4, r5);
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x82577314
@@ -1647,7 +1647,7 @@ loc_825771E4:
   r3 = r31;
   // bl 0x82578530
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82578530, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82578530(base, r1, r13, r3, r4, r5);
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x82577314
@@ -1691,7 +1691,7 @@ loc_82577240:
   r3 = r31;
   // bl 0x82578530
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82578530, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82578530(base, r1, r13, r3, r4, r5);
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x82577314
@@ -1770,7 +1770,7 @@ loc_825772C0:
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // bl 0x82578530
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82578530, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82578530(base, r1, r13, r3, r4, r5);
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x82577314
@@ -1800,7 +1800,7 @@ loc_8257731C:
   r4 = uint64_t(int64_t(int64_t(r1) + 82));
   // bl 0x825784a8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825784A8, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f825784A8(base, r1, r13, r3, r4);
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x82577314
@@ -1881,7 +1881,7 @@ loc_825773A4:
   REX_STORE_U32(uint32_t(r1) + 92, uint32_t(r27));
   // bl 0x82578530
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82578530, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82578530(base, r1, r13, r3, r4, r5);
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x82577314
@@ -1959,7 +1959,7 @@ loc_82577428:
   r3 = r31;
   // bl 0x82578530
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82578530, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82578530(base, r1, r13, r3, r4, r5);
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x82577314
@@ -2001,7 +2001,7 @@ loc_8257746C:
   r3 = r31;
   // bl 0x82578530
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82578530, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82578530(base, r1, r13, r3, r4, r5);
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x82577314
@@ -2949,7 +2949,7 @@ loc_82577B6C:
   r4 = uint64_t(int64_t(int64_t(r1) + 82));
   // bl 0x825784a8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825784A8, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f825784A8(base, r1, r13, r3, r4);
   // mr. r31,r3
   r31 = r3;
   cr0 = lifted::Compare<int32_t>(int32_t(r31), 0, so);
@@ -4165,8 +4165,8 @@ loc_82578464:
 // sub_82578500: lifted from generated/ by lift.py.
 uint64_t f82578500(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82578500 (lifted)");
-  uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0;
-  double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r5 = 0, r6 = 0, r11 = 0, r12 = 0;
+  double f1 = 0.0;
   uint32_t ea{};
   // mflr r12
   r12 = 0;
@@ -4186,7 +4186,7 @@ uint64_t f82578500(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x82578168
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82578168, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82578168(base, r1, r13, r3, r4, r5, r6);
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)

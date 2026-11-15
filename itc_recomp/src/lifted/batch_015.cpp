@@ -13162,8 +13162,8 @@ loc_824228C4:
 // sub_824228D8: lifted from generated/ by lift.py.
 lifted::Result f824228D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, double f1) {
   ITC_NATIVE_RUNNING("sub_824228D8 (lifted)");
-  uint64_t r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0;
-  double f0 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0;
+  double f0 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   lifted::Cr cr0;
   uint8_t ca = 0, so = 0;
   lifted::Temp temp{};
@@ -13234,7 +13234,7 @@ loc_824228F8:
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // bl 0x824227f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x824227F0, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = f824227F0(base, r1, r13, r3, r4, r5, f1); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt 0x8242294c
@@ -13303,8 +13303,7 @@ loc_82422A4C:
 // sub_82422A50: lifted from generated/ by lift.py.
 lifted::Result f82422A50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, double f1) {
   ITC_NATIVE_RUNNING("sub_82422A50 (lifted)");
-  uint64_t r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0;
-  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  uint64_t r11 = 0;
   lifted::Cr cr6;
   uint8_t so = 0;
   // lis r11,-32107
@@ -13320,7 +13319,7 @@ lifted::Result f82422A50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 loc_82422A64:
   // b 0x824227f0
-  { const lifted::Result o = lifted::Call(base, 0x824227F0, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = f824227F0(base, r1, r13, r3, r4, r5, f1); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 

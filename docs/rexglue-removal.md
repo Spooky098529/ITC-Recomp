@@ -5677,3 +5677,20 @@ overridden 265, Native 48, Dropped 24, never called 34, live 78.
 Imports: 186 called, 36 with a live caller. B7 (`b7_status.py`): ours
 9,709, work left 98 (Wrapped 51, with a row 28, no row yet 19). Static
 map: reachable 9,125, ours 8,975, unported 141 (62 seen in play).
+
+**2026-11-15, the lift sweep's leftover registers (branch `lift-sweep`):**
+the 360's compiler lets a caller keep a value in a volatile register
+across a call it knows doesn't touch it; `lift.py` now wipes, at a
+direct call, only what the callee (through its calls) may write, and
+our lift code's SDK boundary puts the argument registers it loads back
+after the call. `__chkstk` calls are left out (Dropped). 64 more
+functions lifted, 3,001 in all (batches 031 and 032); before them, two
+B7-style migration agents made 60 of the 67 Wrapped functions native or
+Dropped (the render replay's handlers, the draw packet writers, the
+frame pacing and diagnostics wraps, `CreateFile`, the achievements'
+wrapper). Every harness at 0; the pad replay ran 127 s with no error
+lines. The boundary: overridden 267, Native 48, Dropped 24, never called
+34, live 76. Imports: 186 called, 32 with a live caller. B7
+(`b7_status.py`): ours 9,833, work left 45 (Wrapped 7, with a row 19,
+no row yet 19). Static map: reachable 9,118, ours 9,092, unported 17
+(9 seen in play).

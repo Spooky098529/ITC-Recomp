@@ -5767,7 +5767,7 @@ loc_8246C514:
   r3 = r31;
   // bl 0x8246bb98
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8246BB98, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = f8246BB98(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
 loc_8246C530:
   // lbz r11,56(r31)
   r11 = REX_LOAD_U8(uint32_t(r31) + 56);
@@ -5990,7 +5990,7 @@ loc_8246C6B8:
   r3 = r31;
   // bl 0x8246b480
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8246B480, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = f8246B480(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // mr r28,r3
   r28 = r3;
   // bl 0x825dbe44

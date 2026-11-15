@@ -735,11 +735,12 @@ function pointers, and the SDK only for its imports. Agents rewire the
 existing ports and delete their adapters. "No behavior change" is
 loosened, there's no mapping or harness per function, lifted-looking
 code is accepted, and validation is done once at the end. The
-multiplayer modes are skipped. Its sweep (2026-11-15) lifted 2,937
+multiplayer modes are skipped. Its sweep (2026-11-15) lifted 3,001
 functions, vector code included (`src/lifted/`, `--native_lifted_000`
-to `030`; status **Lifted**, rows in place or in
-`docs/functions/lifted.md`): unported 3,106 -> 141, every harness at 0;
-left are those 141 and the rewiring.
+to `032`; status **Lifted**, rows in place or in
+`docs/functions/lifted.md`), and B7-style agents made 60 of the 67
+Wrapped functions native: unported 3,106 -> 17, every harness at 0;
+left are those 17 and the rewiring.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
