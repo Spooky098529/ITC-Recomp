@@ -62,10 +62,12 @@ void MinimapTriangleRecordFlat(lifted::Regs& ctx, uint8_t* base);
 // description (r24 the map's draws' context); lr put back, r3 not given
 // (its caller doesn't read it). Run by frame interpolation's wrap when
 // MinimapDrawNative: --native_minimap with native atexit, its callees'
-// flags and the command list's diagnostics off.
+// flags and the command list's diagnostics off. On the SDK's context (the
+// rewiring, stage 3): r24 is its caller's (Scenery::Draw's), read from the
+// context; the view form takes it as `caller_r24`.
 bool MinimapDrawNative();
 void MinimapDraw(PPCContext& ctx, uint8_t* base);
-void MinimapDraw(lifted::Regs& ctx, uint8_t* base);
+void MinimapDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24);
 
 void MinimapDrawCarMarker(PPCContext& ctx, uint8_t* base);
 void MinimapDrawCarMarker(lifted::Regs& ctx, uint8_t* base);

@@ -53,7 +53,7 @@ ITC_REGS_STEP(MaterialPassesRecordAt) {
 
 ITC_REGS_STEP(MaterialPassesTransposeRotation) {
   if (!mp::TransposeRotation(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32)) {
-    __imp__sub_820D1CB0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820D1CB0);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -128,7 +128,7 @@ ITC_REGS_STEP(MaterialPassesProjectorMatrices) {
   ctx.fpscr.disableFlushMode();
   const auto r3 = mp::ProjectorMatrices(base, args, ctx.r1.u32);
   if (!r3) {
-    __imp__sub_820D1EB8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820D1EB8);
     return;
   }
   ctx.fpscr.disableFlushMode();

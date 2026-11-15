@@ -489,7 +489,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822AD0B0) {
     ctx.r3.u64 = ramp;
     ctx.r4.u64 = 0;
     ctx.lr = piecewise_linear ? 0x822AD114 : 0x822AD0F4;
-    (piecewise_linear ? sub_822B0E60 : sub_822B0E08)(ctx, base);  // the default ramp
+    lifted::CallFromContext(ctx, base, piecewise_linear ? 0x822B0E60 : 0x822B0E08);  // the default ramp
     // Set as the gamma ramp (Device::SetGammaRamp's plain C++ with
     // --native_device_state; the original where it can't copy).
     if (!piecewise_linear && ITC_FLAG(native_device_state) &&
@@ -500,7 +500,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822AD0B0) {
     ctx.r4.u64 = 0;
     ctx.r5.u64 = ramp;
     ctx.lr = piecewise_linear ? 0x822AD128 : 0x822AD104;
-    (piecewise_linear ? sub_822A3AA8 : sub_822A3A20)(ctx, base);
+    lifted::CallFromContext(ctx, base, piecewise_linear ? 0x822A3AA8 : 0x822A3A20);
   });
   guest::StoreU32(base, device + kDeviceDisplayWidth, display::kWidth);
   guest::StoreU32(base, device + kDeviceDisplayHeight, display::kHeight);

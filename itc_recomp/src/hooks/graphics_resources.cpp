@@ -75,7 +75,7 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                      \
     \
     if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive()) { \
-      __imp__sub_##address(ctx, base);                                      \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                      \
       return;                                                               \
     }                                                                       \
     __VA_ARGS__;                                                            \

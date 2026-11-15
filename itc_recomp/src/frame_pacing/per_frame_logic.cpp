@@ -117,18 +117,21 @@ ITC_NATIVE_ENTRY_ALWAYS(820F11A8) {
 // the logic pass's phase and the clock advances once per tick.
 // Minimap::Draw's body is native under --native_minimap (src/minimap/draw.cpp,
 // hooks::MinimapDraw), inside the same wrap.
+// On the SDK's context (not in the dispatch table): the native body reads
+// its caller's r24, the map's draws' context Scenery::Draw sets (the
+// rewiring, stage 3; left for later).
 namespace {
-ITC_REGS_STEP(MinimapDrawBody) {
+void MinimapDrawBody(PPCContext& ctx, uint8_t* base) {
   if (hooks::MinimapDrawNative()) {
     hooks::MinimapDraw(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820F5740);
+    __imp__sub_820F5740(ctx, base);
   }
 }
 }  // namespace
 
-ITC_NATIVE_ENTRY_ALWAYS(820F5740) {
-  
+extern "C" REX_FUNC(sub_820F5740) {
+  REX_FUNC_PROLOGUE();
   constexpr uint32_t kBlinkFrames = 0x826C5AA4, kBlinkPhase = 0x826C5AA8;
   if (!frame_pacing::GameMessages_IsRenderOnlyPass() || !ITC_FLAG(per_tick_minimap_blink)) {
     MinimapDrawBody(ctx, base);

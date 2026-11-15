@@ -125,11 +125,14 @@ namespace {
 
 // _ctrlfp's steps on the context (for its adapter and its callers'): returns
 // what it leaves in r3.
-uint64_t CtrlFp(lifted::Regs& ctx, uint64_t new_bits, uint64_t mask) {
-  const uint32_t old_word = ctx.fpscr.loadFromHost();
-  ctx.fpscr.disableFlushMode();
+uint64_t CtrlFp([[maybe_unused]] lifted::Regs& ctx, uint64_t new_bits, uint64_t mask) {
+  // The float mode is the host's (MXCSR): read and set it through the SDK's
+  // register type, as the context's did.
+  PPCFPSCRRegister fpscr;
+  const uint32_t old_word = fpscr.loadFromHost();
+  fpscr.disableFlushMode();
   const uint64_t word = c_runtime::CtrlFpWord(old_word, new_bits, mask);
-  ctx.fpscr.storeFromGuest(uint32_t(word));
+  fpscr.storeFromGuest(uint32_t(word));
   return old_word ^ 0xF8u;
 }
 

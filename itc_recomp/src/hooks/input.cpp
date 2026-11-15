@@ -24,8 +24,11 @@ ITC_FLAG_BOOL(input_mappers_by_tick, true, "ITC",
               "Update the action mappers (sub_8210B018) on logic passes only, so menu "
               "input repeats at the game's rate at any frame rate");
 
-ITC_NATIVE_ENTRY_ALWAYS(8210B018) {
-  
+// On the SDK's context (not in the dispatch table): the native body reads
+// its caller's r25 (its upper word seeds the mappers' held bits 30 and 31,
+// stored into each mapper's words) (the rewiring, stage 3; left for later).
+extern "C" REX_FUNC(sub_8210B018) {
+  REX_FUNC_PROLOGUE();
   if (ITC_FLAG(input_mappers_by_tick) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
     return;
   }
@@ -40,5 +43,5 @@ ITC_NATIVE_ENTRY_ALWAYS(8210B018) {
     ctx.f1.f64 = f1;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8210B018);
+  __imp__sub_8210B018(ctx, base);
 }

@@ -149,7 +149,7 @@ ITC_GAME_MODES(8215E6C8, hooks::GameModesRaceOverlaysMachineInit(ctx, base))
     \
     if (!ITC_FLAG(native_game_modes) || !hooks::NativeHeapActive() ||      \
         !freeable(base, ctx.r3.u32)) {                                     \
-      __imp__sub_##address(ctx, base);                                     \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                     \
       return;                                                              \
     }                                                                      \
     ctx.r3.u64 = function(base, ctx.r3.u32);                               \

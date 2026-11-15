@@ -173,7 +173,7 @@ struct MarkerContext {
     m.ctx.r3.u64 = triangle;
     m.ctx.r4.u64 = pass;
     m.ctx.r5.u64 = key;
-    sub_8217DAA0(m.ctx, m.base);
+    lifted::CallFromContext(m.ctx, m.base, 0x8217DAA0);
     m.ctx.r1.u64 = stack;
   }
   static void Memcpy(void* self, uint32_t to, uint32_t from, uint32_t size) {
@@ -184,7 +184,7 @@ struct MarkerContext {
     m.ctx.r3.u64 = to;
     m.ctx.r4.u64 = from;
     m.ctx.r5.u64 = size;
-    sub_825A7410(m.ctx, m.base);
+    lifted::CallFromContext(m.ctx, m.base, 0x825A7410);
     m.ctx.r1.u64 = stack;
   }
 };
@@ -217,7 +217,11 @@ bool MinimapDrawNative() {
          !hooks::SceneryListsSlotDiagnostics();
 }
 
-ITC_REGS_STEP(MinimapDraw) {
+void MinimapDraw(PPCContext& ctx, uint8_t* base) {
+  lifted::RegsScope scope(ctx);
+  MinimapDraw(scope.regs, base, ctx.r24.u32);
+}
+void MinimapDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   constexpr uint32_t kFrame = 28336;
@@ -243,7 +247,7 @@ ITC_REGS_STEP(MinimapDraw) {
   all.car_marker = &car_calls;
   all.point_marker = &point_calls;
   all.atexit = atexit.Call();
-  minimap::Draw(base, all, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r24.u32);
+  minimap::Draw(base, all, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, caller_r24);
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }

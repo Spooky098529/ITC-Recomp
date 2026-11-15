@@ -50,12 +50,11 @@ ITC_NATIVE_ENTRY_ALWAYS(82296E88) {
 }
 
 // GetLastError, reached by a jump to sub_82296EC0 (after failed file and
-// allocation calls): r3 the error; r11 left as the original leaves it
-// ([PCR+336], or the current thread when that's 0). sub_82296EC0 itself has
-// no adapter: its only caller in play is this one.
+// allocation calls): r3 the error. The original also leaves r11 ([PCR+336],
+// or the current thread when that's 0): a leftover for recompiled callers,
+// none now. sub_82296EC0 itself has no adapter: its only caller in play is
+// this one.
 ITC_NATIVE_ENTRY_ALWAYS(82295F18) {
   
-  const uint32_t in_dpc = guest::LoadU32(base, ctx.r13.u32 + 336);
-  ctx.r11.u64 = in_dpc ? in_dpc : guest::LoadU32(base, ctx.r13.u32 + 256);
   ctx.r3.u64 = last_error::Get(base, ctx.r13.u32);
 }

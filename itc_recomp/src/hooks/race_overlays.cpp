@@ -254,7 +254,7 @@ ITC_OVERLAY_SET(8212BFE8, ParticlesBConstruct(base, ctx.r3.u32))
     \
     if (!ITC_FLAG(native_race_overlays) || !hooks::NativeHeapActive() || \
         !(call)) {                                                   \
-      __imp__sub_##address(ctx, base);                               \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                               \
     }                                                                \
   }
 ITC_OVERLAY_DELETING(8212B358, SmokeDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32))

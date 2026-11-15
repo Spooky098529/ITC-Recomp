@@ -57,7 +57,7 @@ namespace race_hud_hooks {
 // and the finished flag set. From a frame like the original's (112 bytes).
 ITC_REGS_STEP(DrawRivalLogo) {
   if (!ITC_FLAG(native_race_hud)) {
-    __imp__sub_82211A28(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82211A28);
     return;
   }
   const uint32_t entry = ctx.r3.u32;
