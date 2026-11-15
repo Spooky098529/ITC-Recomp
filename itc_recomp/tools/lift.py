@@ -394,6 +394,16 @@ def analyze(info, info_by_name):
         for reg in soft:
             if reg not in de_in[i] and reg in PARAMS:
                 params.add(reg)
+    # A return reads what the function returns: on a path that didn't write
+    # it, the value it was called with (a parameter).
+    for i, st in enumerate(stmts):
+        if de_in[i] is None:
+            continue
+        if st.kind == "return" or (st.kind == "plain" and st.code.endswith("return;")):
+            if returns_r3 and "r3" not in de_in[i]:
+                params.add("r3")
+            if returns_f1 and "f1" not in de_in[i]:
+                params.add("f1")
     # A function that calls passes its stack pointer and r13 (the thread's
     # block) on: ports and imports use them even where the original callee
     # doesn't read them.
@@ -404,12 +414,53 @@ def analyze(info, info_by_name):
     info.final_problems = problems
 
 
+def load_fragments():
+    """Jump-table cases the recompiler split off as functions, by parent (the
+    static map's `folded` column): each is a copy of the rest of its parent
+    from the case on, using the parent's registers and frame."""
+    out = {}
+    with open(TSV) as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            if r["folded"]:
+                out[r["function"]] = r["folded"].split(",")
+    return out
+
+
+def fold(info, frag, stmts):
+    """Puts a fragment's statements at the end of its parent (its labels
+    renamed apart from the parent's) and turns the parent's calls into it
+    into gotos."""
+    suffix = "_" + frag[4:]
+    entry = "loc_frag" + suffix
+    renamed = [Stmt("label", entry + ":", None, label=entry)]
+    for st in stmts:
+        if hasattr(st, "label") and st.label:
+            st.label = st.label + suffix
+            if st.kind == "label":
+                st.code = st.label + ":"
+            elif st.kind == "goto":
+                st.code = f"goto {st.label};"
+            elif st.kind == "if":
+                st.code = f"if ({st.cond}) goto {st.label};"
+        if st.kind == "switch":
+            st.labels = [l + suffix for l in st.labels]
+        renamed.append(st)
+    for i, st in enumerate(info.stmts):
+        if st.kind == "call" and st.how == "direct" and st.target == frag:
+            info.stmts[i] = Stmt("goto", f"goto {entry};", st.comment, label=entry)
+    for st in renamed:
+        if st.kind == "call" and st.how == "direct" and st.target == frag:
+            raise Refused(f"a fragment calling itself ({frag})")
+    info.stmts.extend(renamed)
+
+
 def build(names, bodies, skip):
     """The Info of each function to a fixed point: `names` may be lifted;
     every other function with a body is analyzed too (its parameters and
     returns, for its callers' calls)."""
     infos = {}
     wanted = set(names)
+    fragments = load_fragments()
     for name in bodies:
         if not name.startswith("sub_"):
             continue
@@ -418,6 +469,10 @@ def build(names, bodies, skip):
         infos[name] = info
         try:
             info.stmts = parse(name, bodies[name])
+            for frag in fragments.get(name, ()):
+                if frag not in bodies:
+                    raise Refused(f"a fragment with no body ({frag})")
+                fold(info, frag, parse(frag, bodies[frag]))
         except Refused as e:
             info.error = str(e)
             continue
@@ -446,6 +501,17 @@ def build(names, bodies, skip):
                     work.append(c)
         if steps > 50 * len(infos):
             raise SystemExit("lift.py: the analysis didn't settle")
+    # A call into a function that reads its caller's saved registers is a
+    # call into a fragment the static map didn't fold: refused.
+    for info in infos.values():
+        if not info.analyzed:
+            continue
+        for st in info.stmts:
+            callee = infos.get(st.target) if st.kind == "call" and st.how == "direct" else None
+            if callee is not None and callee.analyzed and any(
+                    "a caller's" in p for p in callee.final_problems):
+                info.final_problems.append(f"calls {st.target}, which reads its caller's registers")
+                break
     for info in infos.values():
         if not info.analyzed:
             continue
@@ -612,6 +678,7 @@ def emit_function(info, infos, emitting):
     out = []
     used = set()
     body = []
+    decls = {}  # the generated code's scratch declarations, once each
     for st in info.stmts:
         c = st.comment
         if c:
@@ -654,8 +721,11 @@ def emit_function(info, infos, emitting):
             body.append(f"  if ({rewrite(st.cond)}) goto {st.label};")
         elif st.kind == "switch":
             body.append(f"  switch ({rewrite(st.expr)}) {{")
-        elif st.kind in ("case", "end", "goto", "decl"):
-            body.append("  " + (plain(st.code) if st.kind == "decl" else st.code))
+        elif st.kind == "decl":
+            decls.setdefault(st.code, plain(st.code))
+            continue
+        elif st.kind in ("case", "end", "goto"):
+            body.append("  " + st.code)
         else:
             body.append("  " + plain(st.code))
         # A conditional return (a conditional branch to the link register)
@@ -686,6 +756,7 @@ def emit_function(info, infos, emitting):
     xer = [r for r in ("ca", "so", "ov") if r in used]
     if xer:
         out.append("  uint8_t " + ", ".join(f"{r} = 0" for r in xer) + ";")
+    out.extend("  " + d for d in decls.values())
     out.extend(body)
     if not info.stmts or info.stmts[-1].kind not in ("return", "abort", "goto"):
         out.append("  " + return_stmt(info))

@@ -29,6 +29,9 @@ REX_FUNC(sub_825CD358);
 REX_FUNC(sub_825CFF70);
 REX_FUNC(sub_825D36F0);
 REX_FUNC(sub_825DAD90);
+REX_FUNC(sub_8213AB40);
+REX_FUNC(sub_8213A200);
+REX_FUNC(sub_821392D8);
 REX_FUNC(__imp__sub_820951D8);
 REX_FUNC(__imp__sub_821128A0);
 REX_FUNC(__imp__sub_822ADA28);
@@ -40,6 +43,9 @@ REX_FUNC(__imp__sub_825CD358);
 REX_FUNC(__imp__sub_825CFF70);
 REX_FUNC(__imp__sub_825D36F0);
 REX_FUNC(__imp__sub_825DAD90);
+REX_FUNC(__imp__sub_8213AB40);
+REX_FUNC(__imp__sub_8213A200);
+REX_FUNC(__imp__sub_821392D8);
 }
 
 namespace harness {
@@ -68,6 +74,9 @@ const Function kFunctions[] = {
     {"sub_825CFF70", __imp__sub_825CFF70, sub_825CFF70},
     {"sub_825D36F0", __imp__sub_825D36F0, sub_825D36F0},
     {"sub_825DAD90", __imp__sub_825DAD90, sub_825DAD90},
+    {"sub_8213AB40", __imp__sub_8213AB40, sub_8213AB40},
+    {"sub_8213A200", __imp__sub_8213A200, sub_8213A200},
+    {"sub_821392D8", __imp__sub_821392D8, sub_821392D8},
 };
 
 // A word for the block or a register: always an address in the block (so
