@@ -198,6 +198,11 @@ outside:
   only the Xbox Live mode's network battle (race kind 6 with two human
   cars, `RaceWorld::Init`'s +9608) reaches it, out of scope.
 
+- `sub_821743A8` (2026-11-15, the user's call): left recompiled and
+  ignored. Its only caller, `RaceWorld::Tick`, calls it for a race of
+  kind 6 with two human cars, which only the Xbox Live mode makes, so
+  single-player never reaches it.
+
 ## The user's calls (2026-11-15)
 
 - The end state is the goal: native C++ calling native C++, no `ctx`,
