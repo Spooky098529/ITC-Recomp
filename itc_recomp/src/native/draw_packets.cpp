@@ -166,10 +166,11 @@ void LogCheck() {
         dropped;                                                                          \
         return;                                                                           \
       }                                                                                   \
-      __imp__sub_##address(ctx, base);                                                    \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                                       \
       return;                                                                             \
     }                                                                                     \
-    native::Checked(helper, base, ctx.r3.u32, [&] { __imp__sub_##address(ctx, base); }); \
+    native::Checked(helper, base, ctx.r3.u32,                                             \
+                    [&] { lifted::Sdk(ctx, base, __imp__sub_##address); });               \
   }
 
 NATIVE_CHECKED_HELPER(822AE1D0, native::kConstants, , ITC_NATIVE_RUNNING("sub_822AE1D0 (dropped)"))
@@ -239,7 +240,7 @@ void native::DrawPackets_IndexedDraw(lifted::Regs& ctx, uint8_t* base) {
         guest::StoreU32(base, shader + kShaderFence, 0);
       }
     }
-    PPCContext saved = ctx;
+    lifted::Regs saved = ctx;
     ctx.r3.u64 = device;
     ctx.r4.u64 = shader_state;
     lifted::CallFromContext(ctx, base, 0x822AED18);

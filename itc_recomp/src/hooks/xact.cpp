@@ -53,7 +53,7 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
 #define ITC_XACT_FALLBACK(address)    \
   REX_FUNC_PROLOGUE();                \
   if (!ITC_FLAG(native_xact)) {       \
-    __imp__sub_##address(ctx, base);  \
+    lifted::Sdk(ctx, base, __imp__sub_##address); \
     return;                           \
   }                                   \
   ctx.fpscr.disableFlushMode();
@@ -80,7 +80,7 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
   ITC_NATIVE_ENTRY_ALWAYS(address) {                         \
     ITC_XACT_FALLBACK(address)                                 \
     if (!hooks::NativeHeapActive()) {                          \
-      __imp__sub_##address(ctx, base);                         \
+      lifted::Sdk(ctx, base, __imp__sub_##address);            \
       return;                                                  \
     }                                                          \
     ctx.r3.u64 = uint32_t(expr);                               \
@@ -94,7 +94,7 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
     ITC_XACT_FALLBACK(address)           \
     const auto itc_result_ = (expr);     \
     if (!itc_result_) {                  \
-      __imp__sub_##address(ctx, base);   \
+      lifted::Sdk(ctx, base, __imp__sub_##address); \
       return;                            \
     }                                    \
     ctx.r3.u64 = *itc_result_;           \

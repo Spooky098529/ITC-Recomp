@@ -100,7 +100,7 @@ class GuestCalls {
 // StateMachine::Add's r3: a new transition's address from the machine's
 // 64-bit r3, as the title screen's Inits.
 template <uint32_t (*InitStates)(uint8_t*, uint32_t, uint32_t, bool*)>
-ITC_REGS_STEP(InitStatesStep) {
+void InitStatesStep(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
   bool replaced = false;

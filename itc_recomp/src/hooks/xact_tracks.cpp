@@ -477,7 +477,7 @@ ITC_REGS_STEP(XactTrackPlay) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                 \
     \
     if (!ITC_FLAG(native_xact_tracks) || !hooks::NativeHeapActive()) { \
-      __imp__sub_##address(ctx, base);                                 \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                    \
       return;                                                          \
     }                                                                  \
     hooks::step(ctx, base);                                            \

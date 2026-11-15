@@ -423,7 +423,7 @@ namespace {
 // original's call from the constructor's frame (as the constructors'
 // adapters do).
 struct PanelNew {
-  PPCContext* ctx;
+  lifted::Regs* ctx;
   uint8_t* base;
   static uint32_t New(void* user, uint32_t size, uint32_t frame) {
     auto* p = static_cast<PanelNew*>(user);
@@ -434,7 +434,7 @@ struct PanelNew {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = frame;
     ctx.r3.u64 = size;
-    __imp__sub_825A6880(ctx, p->base);
+    lifted::Sdk(ctx, p->base, __imp__sub_825A6880);
     const uint32_t block = ctx.r3.u32;
     ctx.r1.u64 = stack;
     ctx.lr = link;
@@ -455,7 +455,11 @@ void ModeInit(lifted::Regs& ctx, uint8_t* base, bool type7) {
       ctx.r1.u64 = sp;
       ctx.lr = type7 ? 0x82246CE4 : 0x822368D4;
       ctx.r3.u64 = block;
-      (type7 ? __imp__sub_82246B28 : __imp__sub_822366F0)(ctx, base);
+      if (type7) {
+        lifted::Sdk(ctx, base, __imp__sub_82246B28);
+      } else {
+        lifted::Sdk(ctx, base, __imp__sub_822366F0);
+      }
       ctx.r1.u64 = stack;
       ctx.lr = link;
       return;
@@ -483,22 +487,22 @@ ITC_REGS_STEP(Type7ModeInit) { ModeInit(ctx, base, true); }
 
 ITC_REGS_STEP(StandSceneCreate) {
   const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
-  auto guest = [&](uint32_t frame, uint32_t link, void (*target)(lifted::Regs&, uint8_t*)) {
+  auto guest = [&](uint32_t frame, uint32_t link, auto&& target) {
     ctx.r1.u64 = frame;
     ctx.lr = link;
-    target(ctx, base);
+    target();
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   };
   t67::StandSceneCalls calls;
-  calls.viewports_init = [&](uint32_t frame) { return guest(frame, 0x82180B14, sub_820AB358); };
-  calls.scene_create = [&](uint32_t frame) { return guest(frame, 0x82180B18, sub_820C8A50); };
+  calls.viewports_init = [&](uint32_t frame) { return guest(frame, 0x82180B14, [&] { lifted::CallFromContext(ctx, base, 0x820AB358); }); };
+  calls.scene_create = [&](uint32_t frame) { return guest(frame, 0x82180B18, [&] { lifted::CallFromContext(ctx, base, 0x820C8A50); }); };
   calls.scene_set_up = [&](uint32_t scene, uint32_t record, uint32_t frame) {
     ctx.r3.u64 = scene;
     ctx.r4.u64 = record;
     ctx.r5.u64 = 0;
-    return guest(frame, 0x82180BF4, ITC_REGS_FN(CarModelsSceneSetUp));
+    return guest(frame, 0x82180BF4, [&] { CarModelsSceneSetUp(ctx, base); });
   };
   ctx.fpscr.disableFlushMode();
   const uint64_t r3 = t67::StandSceneCreate(base, ctx.r3.u32, ctx.r1.u32, NativeArchiveLoad(base),
@@ -915,7 +919,7 @@ ITC_TYPE67_MODES(822470A8, Type67Init, 0x822470A8)
   ITC_NATIVE_ENTRY_ALWAYS(address) {                              \
     \
     if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive()) { \
-      __imp__sub_##address(ctx, base);                              \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                 \
       return;                                                       \
     }                                                               \
     hooks::step(ctx, base);                                         \
@@ -928,7 +932,7 @@ ITC_TYPE67_MODES(822470A8, Type67Init, 0x822470A8)
     \
     if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||     \
         !hooks::step(ctx, base)) {                                          \
-      __imp__sub_##address(ctx, base);                                      \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                         \
     }                                                                       \
   }
 
@@ -1034,7 +1038,7 @@ ITC_TYPE67_MODES(82242218, Type7DialogUpdate)
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                          \
     \
     if (!ITC_FLAG(native_type67_modes) || !hooks::Type67TextsNative(base)) {    \
-      __imp__sub_##address(ctx, base);                                          \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                             \
       return;                                                                   \
     }                                                                           \
     hooks::step(ctx, base);                                                     \

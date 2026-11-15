@@ -86,7 +86,15 @@ void Update(lifted::Regs& ctx, uint8_t* base);
 // (sub_8211D2F8, for UiMovie::Run's cases) and of sub_8259EBE8 (for
 // sub_8211BEE8's), by address, and runs instead of them when it returns
 // true.
-using UpdateCalleeStandIn = bool (*)(uint32_t function, lifted::Regs& ctx, uint8_t* base);
+// The stand-in is on the SDK's context (the harnesses' functions); from a
+// view, it runs on the thread's context with the view's registers (as
+// lifted::Sdk), its r3 and f1 back in the view.
+using UpdateCalleeStandIn = bool (*)(uint32_t function, PPCContext& ctx, uint8_t* base);
 extern UpdateCalleeStandIn g_update_callee_stand_in;
+bool UpdateCalleeStoodInOnView(uint32_t function, lifted::Regs& ctx, uint8_t* base);
+// Whether the stand-in is set and ran instead of `function`.
+inline bool UpdateCalleeStoodIn(uint32_t function, lifted::Regs& ctx, uint8_t* base) {
+  return g_update_callee_stand_in != nullptr && UpdateCalleeStoodInOnView(function, ctx, base);
+}
 
 }  // namespace ui_movies_hooks

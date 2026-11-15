@@ -734,7 +734,14 @@ bool TuningUpdateStandCalleesNative() {
          ITC_FLAG(native_vehicle_accessors) && ITC_FLAG(native_scene_models);
 }
 
-ITC_REGS_STEP(TuningUpdateStand) {
+// On the SDK's context (the rewiring, stage 3): r24, handed to
+// GarageStage::Draw's Floor::Draw, is the caller's, read from the context;
+// the view form takes it as `caller_r24`.
+void TuningUpdateStand(PPCContext& ctx, uint8_t* base) {
+  lifted::RegsScope scope(ctx);
+  TuningUpdateStand(scope.regs, base, ctx.r24.u32);
+}
+void TuningUpdateStand(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   load_poll::Calls poll = LoadPollCalls(ctx, base);
@@ -744,7 +751,7 @@ ITC_REGS_STEP(TuningUpdateStand) {
   calls.draw = SceneryListsDrawCalls(&guest);
   const ts::GuestCall call = StandModelsGuestCall(ctx, base);
   const ts::StandCalls stand{call, calls};
-  const front_end_car_draw::DrawCallees draw = FrontEndCarDrawDrawCallees(ctx);
+  const front_end_car_draw::DrawCallees draw = FrontEndCarDrawDrawCallees(caller_r24);
   // SceneModel::ApplyWheelPaint's plain C++ under StepSecondWheels with the
   // load poll's flags (as its adapter).
   load_poll::Calls* paint_poll =
@@ -812,7 +819,14 @@ bool TuningUpdateCalleesNative() {
          ITC_FLAG(native_car_specs);
 }
 
-ITC_REGS_STEP(TuningUpdate) {
+// On the SDK's context (the rewiring, stage 3): r24, handed to
+// GarageStage::Draw's Floor::Draw, is the caller's, read from the context;
+// the view form takes it as `caller_r24`.
+void TuningUpdate(PPCContext& ctx, uint8_t* base) {
+  lifted::RegsScope scope(ctx);
+  TuningUpdate(scope.regs, base, ctx.r24.u32);
+}
+void TuningUpdate(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   const uint64_t lr = ctx.lr;
   const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64;
   const uint32_t sp = ctx.r1.u32;
@@ -838,7 +852,7 @@ ITC_REGS_STEP(TuningUpdate) {
     return inner(function, args, frame, back);
   };
   const ts::StandCalls stand{call, calls};
-  const front_end_car_draw::DrawCallees draw = FrontEndCarDrawDrawCallees(ctx);
+  const front_end_car_draw::DrawCallees draw = FrontEndCarDrawDrawCallees(caller_r24);
   load_poll::Calls* paint_poll =
       ITC_FLAG(native_load_poll) && LoadPollCalleesNative() ? &poll : nullptr;
   const ts::UpdateCalls update{
@@ -848,19 +862,16 @@ ITC_REGS_STEP(TuningUpdate) {
       ITC_FLAG(native_action_mappers),
       ITC_FLAG(native_car_specs),
       ITC_FLAG(native_tuning_pages),
-      [&](uint32_t frame, uint64_t screen, uint64_t r30) {
+      [&](uint32_t frame, uint64_t screen, [[maybe_unused]] uint64_t r30) {
         apply_f1();
         const uint64_t stack = ctx.r1.u64;
-        const uint64_t r30_was = ctx.r30.u64, r31_was = ctx.r31.u64;
+        // (r30 and r31 as the original holds them, which DrawPowerGraph's
+        // adapter saves in its frame: not carried by the view.)
         ctx.r1.u64 = frame;
         ctx.r3.u64 = screen;
-        ctx.r30.u64 = r30;
-        ctx.r31.u64 = screen;
         ctx.lr = 0x821E7318;
         lifted::CallFromContext(ctx, base, 0x821DF350);
         ctx.r1.u64 = stack;
-        ctx.r30.u64 = r30_was;
-        ctx.r31.u64 = r31_was;
         ctx.fpscr.disableFlushMode();
       }};
   const uint64_t answer = ts::Update(base, update, r3, r4, sp, &f1);
@@ -966,10 +977,12 @@ void TuningWithRefreshStand(
 
 // Update: the original unless its callees' adapters would run their plain
 // C++ (the refresh's, UpdateStand's and SetCarStats' checks).
-ITC_NATIVE_ENTRY_ALWAYS(821E6C50) {
-  
+// On the SDK's context (not in the dispatch table): the native body reads
+// its caller's r24 (the rewiring, stage 3; left for later).
+extern "C" REX_FUNC(sub_821E6C50) {
+  REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningUpdateCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_821E6C50);
+    __imp__sub_821E6C50(ctx, base);
     return;
   }
   hooks::TuningUpdate(ctx, base);

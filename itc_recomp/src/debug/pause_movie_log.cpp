@@ -483,8 +483,7 @@ void WatchMovingTargets(const char* name, lifted::Regs& ctx, uint8_t* base, Call
 // src/hooks/ui_movies_game.cpp.
 ITC_NATIVE_ENTRY_ALWAYS(8211CD90) {
   
-  if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
-      ui_movies_hooks::g_update_callee_stand_in(0x8211CD90, ctx, base)) {
+  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8211CD90, ctx, base)) {
     return;
   }
   if (!ITC_FLAG(log_pause_movie)) {
@@ -499,8 +498,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211CD90) {
 // --native_ui_movies) is in src/hooks/ui_movies.cpp.
 ITC_NATIVE_ENTRY_ALWAYS(8259FA00) {
   
-  if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
-      ui_movies_hooks::g_update_callee_stand_in(0x8259FA00, ctx, base)) {
+  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8259FA00, ctx, base)) {
     return;
   }
   if (!ITC_FLAG(log_pause_movie)) {
@@ -537,8 +535,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211B080) {
 // watched as the others (its recursive calls come back here, each watched).
 ITC_NATIVE_ENTRY_ALWAYS(82119B80) {
   
-  if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
-      ui_movies_hooks::g_update_callee_stand_in(0x82119B80, ctx, base)) {
+  if (ui_movies_hooks::UpdateCalleeStoodIn(0x82119B80, ctx, base)) {
     return;
   }
   if (!ITC_FLAG(log_pause_movie)) {
@@ -552,8 +549,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82119B80) {
 // --native_ui_movies) is in src/hooks/ui_movies.cpp.
 ITC_NATIVE_ENTRY_ALWAYS(8259DAC0) {
   
-  if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
-      ui_movies_hooks::g_update_callee_stand_in(0x8259DAC0, ctx, base)) {
+  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8259DAC0, ctx, base)) {
     return;
   }
   if (!ITC_FLAG(log_pause_movie)) {

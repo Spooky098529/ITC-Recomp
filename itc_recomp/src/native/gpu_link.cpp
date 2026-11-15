@@ -341,7 +341,7 @@ void Interrupt(lifted::Regs& ctx, uint8_t* base, uint32_t device, uint32_t mask)
       ITC_LOG_INFO("native renderer: gpu: interrupt on cpu {} (the kicking thread's is {}): "
                    "calling {:08X}({:08X})",
                    cpu, own_cpu, function, guest::LoadU32(base, block + 20));
-      PPCContext saved = ctx;
+      lifted::Regs saved = ctx;
       guest::StoreU8(base, ctx.r13.u32 + 268, uint8_t(cpu));
       ctx.r3.u32 = guest::LoadU32(base, block + 20);
       lifted::CallFromContext(ctx, base, function);
@@ -651,7 +651,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822B6780) {
 ITC_NATIVE_ENTRY_ALWAYS(8229E848) {
   
   uint32_t device = ctx.r3.u32, result = ctx.r4.u32;
-  PPCContext saved = ctx;
+  lifted::Regs saved = ctx;
   {
     guest::StackFrame frame(ctx, 96);
     uint32_t pair = frame.Local(80);

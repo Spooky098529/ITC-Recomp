@@ -140,13 +140,13 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
     };
     set(kVideoFrontBuffers, front_buffer(0x8258D718));
     set(kVideoFrontBuffers + 4, front_buffer(0x8258D744));
-    auto on_device = [&](uint32_t value, uint32_t return_address, auto function) {
+    auto on_device = [&](uint32_t value, uint32_t return_address, uint32_t function) {
       ctx.r3.u64 = field(kVideoDevice);
       ctx.r4.u64 = value;
       ctx.lr = return_address;
-      function(ctx, base);
+      lifted::CallFromContext(ctx, base, function);
     };
-    on_device(6, 0x8258D754, sub_822A1950);  // the Z function
+    on_device(6, 0x8258D754, 0x822A1950);  // the Z function
     const uint32_t viewport = frame + 112;
     guest::StoreU32(base, viewport, 0);
     guest::StoreU32(base, viewport + 4, 0);
@@ -154,15 +154,15 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
     guest::StoreU32(base, viewport + 12, height);
     guest::StoreFloat(base, viewport + 16, kMinZ);
     guest::StoreFloat(base, viewport + 20, kMaxZ);
-    on_device(viewport, 0x8258D788, sub_822A3518);  // SetViewport
-    on_device(1, 0x8258D794, sub_822A2480);  // the render targets' format switches
-    on_device(1, 0x8258D7A0, sub_822A2530);
-    on_device(1, 0x8258D7AC, sub_822A25E0);
-    on_device(1, 0x8258D7B8, sub_822A2690);
-    on_device(0, 0x8258D7C4, sub_822A1EE8);
-    on_device(0, 0x8258D7D0, sub_822A1F20);
-    on_device(0, 0x8258D7DC, sub_822A1F58);
-    on_device(kVblankCallback, 0x8258D7EC, sub_8229DA20);
+    on_device(viewport, 0x8258D788, 0x822A3518);  // SetViewport
+    on_device(1, 0x8258D794, 0x822A2480);  // the render targets' format switches
+    on_device(1, 0x8258D7A0, 0x822A2530);
+    on_device(1, 0x8258D7AC, 0x822A25E0);
+    on_device(1, 0x8258D7B8, 0x822A2690);
+    on_device(0, 0x8258D7C4, 0x822A1EE8);
+    on_device(0, 0x8258D7D0, 0x822A1F20);
+    on_device(0, 0x8258D7DC, 0x822A1F58);
+    on_device(kVblankCallback, 0x8258D7EC, 0x8229DA20);
     const float w = float(field(16)), h = float(field(20));
     const int32_t x0 = int32_t(w * kSafeNear), x1 = int32_t(w * kSafeFar);
     const int32_t y0 = int32_t(h * kSafeNear), y1 = int32_t(h * kSafeFar);

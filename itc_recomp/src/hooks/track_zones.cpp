@@ -99,7 +99,7 @@ ITC_TRACK_ZONES(8228B4F8, ctx.r3.u64 = ZoneIsInside(base, ctx.r3.u32))
 namespace {
 
 struct GuestCalls {
-  PPCContext* ctx;
+  lifted::Regs* ctx;
   uint8_t* base;
 };
 

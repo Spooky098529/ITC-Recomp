@@ -269,7 +269,7 @@ ITC_REGS_STEP(XAudioReformat) {
   const uint32_t voice = ctx.r3.u32, format = ctx.r4.u32, outputs = ctx.r5.u32;
   const uint64_t r6 = ctx.r6.u64;
   bool refused = false;
-  const PPCContext saved = ctx;
+  const lifted::Regs saved = ctx;
   Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
     if (const auto r3 = xa::Reformat(base, voice, format, outputs, r6, frame, call)) {
       return *r3;
@@ -311,7 +311,7 @@ ITC_REGS_STEP(XAudioBaseSize) {
 ITC_REGS_STEP(XAudioBufferConstruct) {
   const uint32_t buffer = ctx.r3.u32, format = ctx.r4.u32, allocator = ctx.r5.u32;
   bool refused = false;
-  const PPCContext saved = ctx;
+  const lifted::Regs saved = ctx;
   Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
     if (const auto r3 = xa::BufferConstruct(base, buffer, format, allocator, call)) {
       return *r3;
@@ -352,7 +352,7 @@ ITC_REGS_STEP(XAudioDefaultAllocator) {
 ITC_REGS_STEP(XAudioGetAllocator) {
   const uint32_t attributes = ctx.r3.u32, size = ctx.r4.u32, inout = ctx.r5.u32;
   bool refused = false;
-  const PPCContext saved = ctx;
+  const lifted::Regs saved = ctx;
   Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
     if (const auto r3 = xa::GetAllocator(base, attributes, size, inout, frame,
                                          NativeHeapActive(), call)) {

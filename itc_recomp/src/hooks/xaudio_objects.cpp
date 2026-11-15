@@ -493,7 +493,8 @@ ITC_REGS_STEP(XAudioRenderDriverSetUp) {
   uint32_t r4 = 0;
   const uint32_t function = xa::RenderDriverSetUpThunk(base, ctx.r3.u32, ctx.r4.u32, &r4);
   ctx.r4.u64 = r4;
-  ctx.r11.u64 = function;
+  // (r11 = the function, the tail call's target: a leftover for recompiled
+  // callers, none now)
   lifted::CallFromContext(ctx, base, function);
 }
 
@@ -669,7 +670,7 @@ ITC_XAUDIO_KERNEL_STEP(XAudioCopyStereoScalar, CopyStereoScalar)
 #define ITC_XAUDIO_FILL_STEP(name, groups)                       \
   ITC_REGS_STEP(name) {                    \
     xa::FillDelayLine(base, ctx.r3.u32, groups);                 \
-    ctx.r11.u64 = 0;                                             \
+    /* (r11 = 0: a leftover for recompiled callers, none now) */ \
   }
 ITC_XAUDIO_FILL_STEP(XAudioFillDelayLine2048, 2048)
 ITC_XAUDIO_FILL_STEP(XAudioFillDelayLine64, 64)

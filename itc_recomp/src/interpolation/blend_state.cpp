@@ -4259,10 +4259,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CAA0) {
     first = command_list::AllocateSlots(base, list, count);
   }
   if (first != 0) {
-    ctx.cr6.compare<uint32_t>(guest::LoadU32(base, list + 12), guest::LoadU32(base, list + 8),
-                              ctx.xer);
-    ctx.r12.u64 = ctx.lr;
-    ctx.r11.u64 = list;
+    // (cr6, r11 and r12 as the original leaves them: leftovers for
+    // recompiled callers, none now)
     ctx.r10.u64 = uint64_t(count << 4) + first;
     ctx.r9.u64 = count << 4;
     ctx.r3.u64 = first;
@@ -4275,9 +4273,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CAA0) {
   }
 }
 
-// Matrix_Copy: r3 = destination, r4 = source; copies a 4x4 matrix.
-ITC_NATIVE_ENTRY_ALWAYS(820A0AC0) {
-  
+// Matrix_Copy: r3 = destination, r4 = source; copies a 4x4 matrix. On the
+// SDK's context (not in the dispatch table): from 0x8213653C it reads its
+// caller's r29, the view (the rewiring, stage 3; left for later).
+extern "C" REX_FUNC(sub_820A0AC0) {
+  REX_FUNC_PROLOGUE();
   uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
   uint32_t caller = uint32_t(ctx.lr);
   uint32_t noted_src = src;
@@ -4294,7 +4294,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A0AC0) {
     ctx.fpscr.disableFlushMode();
     matrix_math::Copy(base, dst, src);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820A0AC0);
+    __imp__sub_820A0AC0(ctx, base);
   }
   interpolation::GetDrawState().OnCopy(base, dst, noted_src, caller);
 }
@@ -4319,7 +4319,7 @@ uint32_t AllocateBillboardSlots(void* user, uint32_t count, uint32_t return_addr
   guest_call::InFrame(s.ctx, s.base, 304, return_address, [&](uint32_t) {
     s.ctx.r3.u64 = s.list;
     s.ctx.r4.u64 = count;
-    sub_8258CAA0(s.ctx, s.base);
+    lifted::CallFromContext(s.ctx, s.base, 0x8258CAA0);
     first = s.ctx.r3.u32;
   });
   return first;
@@ -4406,17 +4406,25 @@ ITC_NATIVE_ENTRY_ALWAYS(8258FD48) {
 
 // The per-object recorder (~150 calls a pass in a race): r4 = camera
 // view-projection, r5 = the object's world matrix. Its interpolation hooks
-// stay here around the recording, native or translated.
-ITC_NATIVE_ENTRY_ALWAYS(825953D0) {
-  
+// stay here around the recording, native or translated. On the SDK's
+// context (not in the dispatch table): the record context is the caller's
+// lr and r24 to r31, read from the context (the rewiring, stage 3; left for
+// later).
+extern "C" REX_FUNC(sub_825953D0) {
+  REX_FUNC_PROLOGUE();
   interpolation::BlendState_BeforeRecordObject(base, ctx.r4.u32, ctx.r5.u32);
   interpolation::g_record_context = {uint32_t(ctx.lr), ctx.r24.u32, ctx.r25.u32, ctx.r26.u32,
                                      ctx.r27.u32,      ctx.r28.u32, ctx.r29.u32, ctx.r30.u32,
                                      ctx.r31.u32};
   // The recording natively (src/scenery_lists/model_draws.cpp,
   // --native_scenery_lists) or translated.
-  if (!hooks::SceneryListsRecordObject(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_825953D0);
+  bool recorded = false;
+  {
+    lifted::RegsScope scope(ctx);
+    recorded = hooks::SceneryListsRecordObject(scope.regs, base);
+  }
+  if (!recorded) {
+    __imp__sub_825953D0(ctx, base);
   }
   interpolation::g_record_context = {};
   interpolation::BlendState_AfterRecordObject(base);

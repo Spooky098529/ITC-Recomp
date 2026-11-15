@@ -398,8 +398,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825A0548) {
 
 ITC_NATIVE_ENTRY_ALWAYS(8211D2F8) {
   
-  if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
-      ui_movies_hooks::g_update_callee_stand_in(0x8211D2F8, ctx, base)) {
+  if (ui_movies_hooks::UpdateCalleeStoodIn(0x8211D2F8, ctx, base)) {
     return;
   }
   uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32, caller = uint32_t(ctx.lr);

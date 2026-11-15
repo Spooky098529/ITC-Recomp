@@ -104,7 +104,7 @@ ITC_FLAG_DECLARE(bool, native_graphics_resources);
 
 #define NATIVE_OR_ORIGINAL(address)          \
   if (!ITC_FLAG(native_ui_movies_game)) {    \
-    __imp__sub_##address(ctx, base);         \
+    lifted::Sdk(ctx, base, __imp__sub_##address); \
     return;                                  \
   }
 
@@ -414,7 +414,7 @@ uint64_t MovedR3(const ui_movies::Moved& moved, uint32_t r1, uint32_t movie) {
 
 #define NATIVE_UNWATCHED_OR_ORIGINAL(address) \
   if (!NativeUnwatched()) {                   \
-    __imp__sub_##address(ctx, base);          \
+    lifted::Sdk(ctx, base, __imp__sub_##address); \
     return;                                   \
   }
 
@@ -728,7 +728,7 @@ bool NativeHeap() {
       return;                                  \
     }                                          \
   }                                            \
-  __imp__sub_##address(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_##address);
 
 // sub_8211B0E8: r3 = a vector of pairs; returned.
 ITC_NATIVE_ENTRY_ALWAYS(8211B0E8) {
@@ -1085,6 +1085,21 @@ uint32_t CallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t bytes,
   });
   return ctx.r3.u32;
 }
+// The same for an SDK function (a recompiled original), run on the
+// thread's context with the view's registers.
+uint32_t CallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t bytes, uint32_t back,
+                  lifted::ImportFunction* function, uint32_t r3, uint32_t r4 = 0,
+                  uint32_t r5 = 0) {
+  AtStack(ctx, sp, [&] {
+    guest_call::InFrame(ctx, base, bytes, back, [&](uint32_t) {
+      ctx.r3.u64 = r3;
+      ctx.r4.u64 = r4;
+      ctx.r5.u64 = r5;
+      lifted::Sdk(ctx, base, function);
+    });
+  });
+  return ctx.r3.u32;
+}
 
 // sub_8211C168 on the movie table, natively where PairsSet can, else the
 // original from the caller's frame; r3 as it leaves it.
@@ -1142,7 +1157,7 @@ ui_movies::DeleteCalls DeleteCalls(lifted::Regs& ctx, uint8_t* base, uint32_t sp
   ui_movies::DeleteCalls calls;
   // Unload's frame (240 bytes) below Delete's (128), called from 0x8211E294.
   const uint32_t unload_sp = sp - 128;
-  auto from_unload = [&ctx, base, unload_sp](uint32_t back, void (*function)(lifted::Regs&, uint8_t*),
+  auto from_unload = [&ctx, base, unload_sp](uint32_t back, auto function,
                                              uint32_t r3, uint32_t r4 = 0, uint32_t r5 = 0) {
     return CallFrom(ctx, base, unload_sp, 240, back, function, r3, r4, r5);
   };
@@ -1195,14 +1210,18 @@ ui_movies::OnLoadedCalls OnLoadedCalls(lifted::Regs& ctx, uint8_t* base, uint32_
   ui_movies::OnLoadedCalls calls;
   // Each callee's original (or override) from OnLoaded's 192-byte frame
   // below `sp`, returning to `back`.
-  const auto call = [&ctx, base, sp](uint32_t back, void (*function)(lifted::Regs&, uint8_t*),
+  const auto call = [&ctx, base, sp](uint32_t back, auto function,
                                      uint32_t r3, uint32_t r4 = 0, uint32_t r5 = 0) {
     return CallFrom(ctx, base, sp, 192, back, function, r3, r4, r5);
   };
   calls.copy = [call, base](uint32_t which, uint32_t to, uint32_t from, uint32_t size) {
     static constexpr uint32_t kBack[3] = {0x8211E5AC, 0x8211E5BC, 0x8211E5CC};
     if (!native::Buffers_Memcpy(base, to, from, size, kBack[which])) {
-      call(kBack[which], sub_825A7410, to, from, size);
+      call(kBack[which],
+           +[](lifted::Regs& ctx, uint8_t* base) {
+             lifted::CallFromContext(ctx, base, 0x825A7410);
+           },
+           to, from, size);
     }
   };
   calls.layers = [&ctx, base, sp](uint32_t which, uint32_t movie, uint32_t scene) {

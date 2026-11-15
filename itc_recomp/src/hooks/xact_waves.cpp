@@ -194,7 +194,7 @@ ITC_REGS_STEP(XactTrackGetVolume) {
     ctx.r3.u64 = done->r3;
     return;
   }
-  __imp__sub_825D0268(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825D0268);
 }
 
 ITC_REGS_STEP(XactTrackGetPitch) {
@@ -210,7 +210,7 @@ ITC_REGS_STEP(XactWaveGetStartPosition) {
     ctx.r3.s64 = int32_t(*done);  // li or lis, as the original's
     return;
   }
-  __imp__sub_825D2170(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_825D2170);
 }
 
 ITC_REGS_STEP(XactWaveRequestNext) {
@@ -307,7 +307,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825C31D8) {
     return;
   }
   const hooks::CreateVoiceStandIn& s = *hooks::create_voice_stand_in;
-  const PPCRegister* const r[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+  const lifted::Temp* const r[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
                                    &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
   for (uint32_t i = 0; i < 8; i++) {
     guest::StoreU32(base, s.record + 4 * i, r[i]->u32);
@@ -330,7 +330,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825C31D8) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                \
     \
     if (!ITC_FLAG(native_xact_waves) || !hooks::NativeHeapActive()) { \
-      __imp__sub_##address(ctx, base);                                \
+      lifted::Sdk(ctx, base, __imp__sub_##address);                   \
       return;                                                         \
     }                                                                 \
     hooks::step(ctx, base);                                           \

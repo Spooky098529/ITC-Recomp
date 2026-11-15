@@ -78,7 +78,7 @@ class GuestCalls {
 
 // A delegate function's step: r3 the answer, left as it is.
 template <void (*Function)(uint8_t*, uint32_t, uint32_t, uint32_t, const t2m::Calls&)>
-ITC_REGS_STEP(Delegate) {
+void Delegate(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t answer = ctx.r3.u64;
   GuestCalls guest(ctx, base);
   Function(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
