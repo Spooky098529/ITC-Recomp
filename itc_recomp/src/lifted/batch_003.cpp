@@ -11,6 +11,8 @@
 #include <bit>
 #include <cstdlib>
 
+#include "helpers/clock.h"
+
 ITC_FLAG_BOOL(native_lifted_003, true, "ITC",
               "Run lift sweep batch 003's functions as lifted C++ (src/lifted/, "
               "docs/loops/lift-sweep.md) instead of the recompiled ones.");

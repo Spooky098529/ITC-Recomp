@@ -11,6 +11,8 @@
 #include <bit>
 #include <cstdlib>
 
+#include "helpers/clock.h"
+
 ITC_FLAG_BOOL(native_lifted_029, true, "ITC",
               "Run lift sweep batch 029's functions as lifted C++ (src/lifted/, "
               "docs/loops/lift-sweep.md) instead of the recompiled ones.");
@@ -10490,7 +10492,7 @@ loc_821245B8:
   r3 = r28;
   // bl 0x82121760
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82121760, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
+  r3 = f82121760(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10);
   // b 0x8212460c
   goto loc_8212460C;
 loc_82124600:

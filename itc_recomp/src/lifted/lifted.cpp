@@ -105,6 +105,12 @@ void VectorFloatMode() {
   }
 }
 
+void EnterGlobalLock() { REX_ENTER_GLOBAL_LOCK(); }
+
+void LeaveGlobalLock() { REX_LEAVE_GLOBAL_LOCK(); }
+
+uint64_t CheckGlobalLock() { return REX_CHECK_GLOBAL_LOCK(); }
+
 void Trap(uint32_t type) {
   // 20 and 26 are debug prints, 25 nothing (the SDK's handler).
   if (type != 20 && type != 26 && type != 25) {

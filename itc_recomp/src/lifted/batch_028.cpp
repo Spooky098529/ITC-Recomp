@@ -11,6 +11,8 @@
 #include <bit>
 #include <cstdlib>
 
+#include "helpers/clock.h"
+
 ITC_FLAG_BOOL(native_lifted_028, true, "ITC",
               "Run lift sweep batch 028's functions as lifted C++ (src/lifted/, "
               "docs/loops/lift-sweep.md) instead of the recompiled ones.");
@@ -348,16 +350,17 @@ void f825DB3F0(uint8_t* base) {
 }
 
 // sub_825DB428: lifted from generated/ by lift.py.
-lifted::Result f825DB428(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, double f2, double f3, double f4, double f5, double f6, double f7, double f8, double f9, double f10, double f11, double f12, double f13) {
+uint64_t f825DB428(uint8_t* base, uint64_t r1, uint64_t r13) {
   ITC_NATIVE_RUNNING("sub_825DB428 (lifted)");
   uint64_t r3 = 0, r11 = 0;
+  double f1 = 0.0;
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
   // addi r3,r11,4224
   r3 = uint64_t(int64_t(int64_t(r11) + 4224));
   // b 0x825a6c40
-  { const lifted::Result o = lifted::Call(base, 0x825A6C40, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
-  return {r3, f1};
+  r3 = f825A6C40(base, r1, r13, r3);
+  return r3;
 }
 
 // sub_825DB438: lifted from generated/ by lift.py.
@@ -414,16 +417,17 @@ loc_825DB474:
 }
 
 // sub_825DB488: lifted from generated/ by lift.py.
-lifted::Result f825DB488(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, double f2, double f3, double f4, double f5, double f6, double f7, double f8, double f9, double f10, double f11, double f12, double f13) {
+uint64_t f825DB488(uint8_t* base, uint64_t r1, uint64_t r13) {
   ITC_NATIVE_RUNNING("sub_825DB488 (lifted)");
   uint64_t r3 = 0, r11 = 0;
+  double f1 = 0.0;
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
   // addi r3,r11,4408
   r3 = uint64_t(int64_t(int64_t(r11) + 4408));
   // b 0x825a6c40
-  { const lifted::Result o = lifted::Call(base, 0x825A6C40, LIFTED_ARGS); r3 = o.r3; f1 = o.f1; }
-  return {r3, f1};
+  r3 = f825A6C40(base, r1, r13, r3);
+  return r3;
 }
 
 // sub_825DB498: lifted from generated/ by lift.py.
@@ -556,7 +560,7 @@ lifted::Result e825DB3F0(uint8_t* base, const lifted::Args& a) {
 }
 
 lifted::Result e825DB428(uint8_t* base, const lifted::Args& a) {
-  return f825DB428(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.f[1], a.f[2], a.f[3], a.f[4], a.f[5], a.f[6], a.f[7], a.f[8], a.f[9], a.f[10], a.f[11], a.f[12]);
+  return {f825DB428(base, a.r1, a.r13), a.f[0]};
 }
 
 lifted::Result e825DB438(uint8_t* base, const lifted::Args& a) {
@@ -564,7 +568,7 @@ lifted::Result e825DB438(uint8_t* base, const lifted::Args& a) {
 }
 
 lifted::Result e825DB488(uint8_t* base, const lifted::Args& a) {
-  return f825DB488(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.f[1], a.f[2], a.f[3], a.f[4], a.f[5], a.f[6], a.f[7], a.f[8], a.f[9], a.f[10], a.f[11], a.f[12]);
+  return {f825DB488(base, a.r1, a.r13), a.f[0]};
 }
 
 lifted::Result e825DB498(uint8_t* base, const lifted::Args& a) {

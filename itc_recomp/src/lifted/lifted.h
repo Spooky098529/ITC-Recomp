@@ -136,6 +136,14 @@ void ScalarFloatMode();
 // denormals flushed to zero.
 void VectorFloatMode();
 
+// The SDK's stand-in for the 360 turning interrupts off (what the kernel's
+// spin locks and the game's own do around a few words): the same lock the
+// SDK's kernel functions take, so both exclude each other. Check answers
+// what mfmsr's interrupt bit would (0x8000 when none is held).
+void EnterGlobalLock();
+void LeaveGlobalLock();
+uint64_t CheckGlobalLock();
+
 // A trap instruction the original reaches (an assert): logged, as the
 // SDK's handler does, and run on past.
 void Trap(uint32_t type);

@@ -70,15 +70,13 @@ VOLATILE = ({"r0"} | {f"r{i}" for i in range(4, 13)} | {"f0"} | {f"f{i}" for i i
             | {"cr0", "cr1", "cr5", "cr6", "cr7", "ctr", "reserved", "ca", "ov"} | VR_VOLATILE)
 NONVOLATILE = ({f"r{i}" for i in range(14, 32)} | {f"f{i}" for i in range(14, 32)}
                | {"cr2", "cr3", "cr4"} | (set(VRS) - VR_VOLATILE))
-ZERO_AT_ENTRY = {"so", "ov", "vscr_sat"}  # the XER's overflow bits and the vector
+ZERO_AT_ENTRY = {"so", "ov", "vscr_sat", "msr"}  # the XER's overflow bits and the vector
 # saturation flag: never read for a result by the game's code
 
 TOKEN = re.compile(r"ctx\.(\w+)(?:\.(\w+))?")
 REFUSE_TEXT = [
     (re.compile(r"ppc_setjmp|ppc_longjmp"), "setjmp"),
-    (re.compile(r"ctx\.msr"), "the machine state register"),
-    (re.compile(r"REX_(ENTER|LEAVE|CHECK)_GLOBAL_LOCK"), "the global lock"),
-    (re.compile(r"last_indirect_target|REX_UNIMPLEMENTED|REX_MM_|REX_QUERY_TIMEBASE"), "an SDK macro"),
+    (re.compile(r"last_indirect_target|REX_UNIMPLEMENTED|REX_MM_"), "an SDK macro"),
 ]
 
 
@@ -211,7 +209,9 @@ def parse(name, lines):
         elif re.match(r"^(uint32_t ea\{\};|PPCRegister temp\{\};|PPCVRegister vTemp\{\};)$", s):
             stmts.append(Stmt("decl", s, comment))
         elif s.endswith(";") and not s.endswith("{") and "{" not in s:
-            if re.match(r"^ctx\.lr = ", s):
+            if re.match(r"^ctx\.lr = ", s) or re.match(r"^ctx\.(r\d+)\.u64 = ctx\.\1\.u64;$", s):
+                # A return address (dead in C++), or a register moved to
+                # itself (`mr rN,rN`, the 360's no-op hints).
                 stmts.append(Stmt("skip", s, comment))
             else:
                 stmts.append(Stmt("plain", s, comment))
@@ -235,7 +235,7 @@ def register_of(name, field):
     """A ctx member's register for the analysis, or None (lr, fpscr)."""
     if name in GPR_LIKE or name in FPRS or name in CRS or name in VRS:
         return name
-    if name == "vscr_sat":
+    if name in ("vscr_sat", "msr"):
         return name
     if name == "xer":
         return field if field in XER else "so"
@@ -253,7 +253,9 @@ def defs_uses(st):
     if m:
         reg = register_of(m.group(1), m.group(2))
         view = m.group(2)
-        if reg in GPR_LIKE and view in ("u64", "s64"):
+        if reg in GPR_LIKE and (view in ("u64", "s64") or reg == "reserved"):
+            # (The reservation is only a scratch value for the atomic
+            # compare that follows: any write to it is a whole write.)
             defs.add(reg)
             skip = m.start()
         elif reg in FPRS and view in ("f64", "u64", "s64"):
@@ -278,6 +280,9 @@ def defs_uses(st):
     if m:
         defs.add(m.group(1))
         skip = m.start(1) - 4
+    if re.match(r"^ctx\.msr = ", code):
+        defs.add("msr")
+        skip = 0
     if re.match(r"^ctx\.vscr_sat = ", code):
         defs.add("vscr_sat")
         skip = 0
@@ -543,13 +548,20 @@ def fold(info, frag, stmts):
         if st.kind == "switch":
             st.labels = [l + suffix for l in st.labels]
         renamed.append(st)
-    for i, st in enumerate(info.stmts):
-        if st.kind == "call" and st.how == "direct" and st.target == frag:
-            info.stmts[i] = Stmt("goto", f"goto {entry};", st.comment, label=entry)
     for st in renamed:
         if st.kind == "call" and st.how == "direct" and st.target == frag:
             raise Refused(f"a fragment calling itself ({frag})")
     info.stmts.extend(renamed)
+    info.folded = getattr(info, "folded", set()) | {frag}
+
+
+def link_fragments(info):
+    """Turns every call into a folded fragment (from the parent or from
+    another fragment: they nest) into a goto to its copy."""
+    for i, st in enumerate(info.stmts):
+        if st.kind == "call" and st.how == "direct" and st.target in getattr(info, "folded", ()):
+            entry = "loc_frag_" + st.target[4:]
+            info.stmts[i] = Stmt("goto", f"goto {entry};", st.comment, label=entry)
 
 
 def build(names, bodies, skip):
@@ -571,6 +583,7 @@ def build(names, bodies, skip):
                 if frag not in bodies:
                     raise Refused(f"a fragment with no body ({frag})")
                 fold(info, frag, parse(frag, bodies[frag]))
+            link_fragments(info)
         except Refused as e:
             info.error = str(e)
             continue
@@ -662,12 +675,20 @@ def rewrite(text):
             return "0" if field is None else "0"
         if name in VRS:
             return name if field is None else f"{name}.{field}"
-        if name == "vscr_sat":
+        if name in ("vscr_sat", "msr"):
             return name
         if field is None:
             raise Refused(f"ctx.{name} bare")
         return read_expr(name, field)
     text = re.sub(r"ppc_trap\(ctx, base, (\d+)\)", r"lifted::Trap(\1)", text)
+    # The time base (mftb): our clock at the 360's 50 MHz, the one
+    # QueryPerformanceCounter answers from (the user's call, 2026-10-29).
+    text = text.replace("REX_QUERY_TIMEBASE()", "helpers::PerformanceCounter()")
+    # The SDK's stand-in for interrupts off (the kernel's spin locks): the
+    # same lock, through our helpers.
+    text = text.replace("REX_ENTER_GLOBAL_LOCK()", "lifted::EnterGlobalLock()")
+    text = text.replace("REX_LEAVE_GLOBAL_LOCK()", "lifted::LeaveGlobalLock()")
+    text = text.replace("REX_CHECK_GLOBAL_LOCK()", "lifted::CheckGlobalLock()")
     out = TOKEN.sub(sub, text)
     if "ctx" in re.sub(r"\w*ctx\w+", "", out):
         raise Refused(f"ctx left in: {out[:60]}")
@@ -856,7 +877,7 @@ def emit_function(info, infos, emitting):
     out.append(f"// {info.name}: lifted from generated/ by lift.py.")
     out.append(signature(info) + " {")
     out.append(f'  ITC_NATIVE_RUNNING("{info.name} (lifted)");')
-    locals_ = [r for r in GPRS + ["ctr", "reserved"] if r in used and r not in info.params]
+    locals_ = [r for r in GPRS + ["ctr", "reserved", "msr"] if r in used and r not in info.params]
     if locals_:
         out.append("  uint64_t " + ", ".join(f"{r} = 0" for r in locals_) + ";")
     flocals = [r for r in FPRS if r in used and r not in info.params]
@@ -923,6 +944,8 @@ def emit_batch(batch, names, infos, emitting):
         "",
         "#include <bit>",
         "#include <cstdlib>",
+        "",
+        '#include "helpers/clock.h"',
         "",
         f"ITC_FLAG_BOOL({flag}, true, \"ITC\",",
         f"              \"Run lift sweep batch {batch}'s functions as lifted C++ (src/lifted/, \"",

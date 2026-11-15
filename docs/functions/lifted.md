@@ -434,6 +434,7 @@ Status:
 | `sub_82120BB8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_8211EB60`, `sub_82126630`, `sub_82129298`. Not seen in play. Not read. |
 | `sub_82121280` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_8211EB60`, `sub_82126630`, `sub_82129298`. Not seen in play. Not read. |
 | `sub_82121590` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls nothing. Not seen in play. Not read. |
+| `sub_82121760` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_033.cpp`, `--native_lifted_033`). Calls `sub_82121590`, `sub_82121860`. Not seen in play. Not read. |
 | `sub_82121D78` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_029.cpp`, `--native_lifted_029`). Calls `sub_8211EB60`, `sub_82126630`, `sub_82129298`. Not seen in play. Not read. |
 | `sub_82122DB8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_82126550`, `sub_82126BB0`, `sub_82127198`. Not seen in play. Not read. |
 | `sub_82126818` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_006.cpp`, `--native_lifted_006`). Calls `sub_825A70E8`. Not seen in play. Not read. |
@@ -1300,6 +1301,8 @@ Status:
 | `sub_825A6070` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_8245ED60`. Not seen in play. Not read. |
 | `sub_825A6110` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls nothing. Not seen in play. Not read. |
 | `sub_825A6B18` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_82091968`, `sub_825931D0`, `sub_825AD198`. Not seen in play. Not read. |
+| `sub_825A6BD0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_033.cpp`, `--native_lifted_033`). Calls `sub_825A6D20`. Not seen in play. Not read. |
+| `sub_825A6C40` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_033.cpp`, `--native_lifted_033`). Calls `sub_82106540`. Not seen in play. Not read. |
 | `sub_825A6CC0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_825A6D28`. Not seen in play. Not read. |
 | `sub_825A6D08` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Calls `sub_8258E578`. Not seen in play. Not read. |
 | `sub_825A6D20` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_021.cpp`, `--native_lifted_021`). Imports `RtlInitializeCriticalSection`. Not seen in play. Not read. |
