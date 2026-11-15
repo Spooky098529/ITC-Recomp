@@ -48,7 +48,7 @@ bool NativeLifetime() {
 #define ITC_MODEL_ANIMATION_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                        \
   if (!ITC_FLAG(native_model_animation)) {    \
-    __imp__sub_##address(ctx, base);          \
+    lifted::Sdk(ctx, base, __imp__sub_##address);          \
     return;                                   \
   }
 
@@ -73,7 +73,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825A1B70) {
         return;                                      \
       }                                              \
     }                                                \
-    __imp__sub_##address(ctx, base);                 \
+    lifted::Sdk(ctx, base, __imp__sub_##address);                 \
   }
 
 ITC_MODEL_ANIMATION_LIFETIME(825A11D0, TrackSetReleaseArray(base, ctx.r3.u32))
