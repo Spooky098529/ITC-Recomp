@@ -6,6 +6,7 @@
 // have none (their register steps are the harness's).
 
 #include "hooks/accessories.h"
+#include "lifted/originals.h"
 
 #include "accessories/accessories.h"
 #include "base/flags.h"
@@ -214,7 +215,7 @@ accessories::FinishCalls FinishGuestCalls(PPCContext& ctx, uint8_t* base,
     ctx.r4.u64 = file;
     ctx.r5.u64 = xpr;
     ctx.lr = 0x820EF3A8;
-    __imp__sub_82596920(ctx, base);
+    lifted::original::c82596920(ctx, base);
     ctx.r1.u64 = stack;
     ctx.lr = link;
   };
@@ -223,7 +224,7 @@ accessories::FinishCalls FinishGuestCalls(PPCContext& ctx, uint8_t* base,
     ctx.r1.u64 = frame;
     ctx.r3.u64 = skeleton;
     ctx.lr = 0x820EF3CC;
-    __imp__sub_820F0070(ctx, base);
+    lifted::original::c820F0070(ctx, base);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u32;

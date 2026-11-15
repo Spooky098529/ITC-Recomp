@@ -5,6 +5,7 @@
 // exit lock in src/c_runtime/exit.cpp.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -120,7 +121,7 @@ extern "C" REX_FUNC(sub_825A7068) {
       return;
     }
   }
-  __imp__sub_825A7068(ctx, base);
+  lifted::original::c825A7068(ctx, base);
 }
 
 // __onexitinit: no arguments; r3 = 0, or 24 when calloc fails. Natively
@@ -141,7 +142,7 @@ extern "C" REX_FUNC(sub_825A6F00) {
 int32_t hooks::GuestAtexit::Run(void* self, uint32_t function) {
   auto& call = *static_cast<GuestAtexit*>(self);
   call.ctx.r3.u64 = function;
-  __imp__sub_825A7068(call.ctx, call.base);
+  lifted::original::c825A7068(call.ctx, call.base);
   return call.ctx.r3.s32;
 }
 

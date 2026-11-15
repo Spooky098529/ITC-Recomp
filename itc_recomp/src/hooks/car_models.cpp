@@ -3,6 +3,7 @@
 // shares (hooks/car_models.h).
 
 #include "hooks/car_models.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "car_models/car_model.h"
@@ -191,7 +192,7 @@ void CarModelsFileLoaded(PPCContext& ctx, uint8_t* base, cm::FileLoadedSet set) 
   const uint32_t request = ctx.r3.u32, buffer = ctx.r4.u32, car = ctx.r6.u32;
   if (!hooks::ModelsNativeLifetime() || !native::Buffers_NativeMemcpy() ||
       !cm::FileLoadedNative(base, set, request, car)) {
-    (a ? __imp__sub_820D47A8 : __imp__sub_820D4F80)(ctx, base);
+    (a ? lifted::original::c820D47A8 : lifted::original::c820D4F80)(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -212,7 +213,7 @@ void CarModelsFileLoaded(PPCContext& ctx, uint8_t* base, cm::FileLoadedSet set) 
     calls.update_matrices = [&](uint32_t skeleton) {
       ctx.r3.u64 = skeleton;
       ctx.lr = a ? 0x820D4854 : 0x820D5030;
-      __imp__sub_825998A0(ctx, base);
+      lifted::original::c825998A0(ctx, base);
     };
     calls.xpr_create = [&](uint32_t xpr, uint32_t file) {
       ctx.r3.u64 = xpr;

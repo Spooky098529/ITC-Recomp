@@ -6,6 +6,7 @@
 #pragma once
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "graphics/device_state.h"
 
@@ -47,7 +48,7 @@ inline graphics::device_state::DeviceCalls DeviceStateCalls(PPCContext& ctx, uin
     ctx.r5.u64 = texture;
     ctx.r6.u64 = dirty;
     ctx.lr = 0x822ACC8C;
-    __imp__sub_822A6008(ctx, base);
+    lifted::original::c822A6008(ctx, base);
   };
   return calls;
 }

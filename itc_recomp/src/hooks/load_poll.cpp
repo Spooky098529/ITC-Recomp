@@ -5,6 +5,7 @@
 // src/debug/frame_state_diff.cpp, calling these steps.
 
 #include "hooks/load_poll.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "hooks/second_set.h"
@@ -87,14 +88,14 @@ lp::Calls LoadPollCalls(PPCContext& ctx, uint8_t* base) {
       ctx.r3.u64 = to;
       ctx.r4.u64 = from;
       ctx.r5.u64 = bytes;
-      __imp__sub_825A7410(ctx, base);
+      lifted::original::c825A7410(ctx, base);
     });
   };
   calls.cockpit_bind = [&ctx, base](uint32_t object, uint32_t sp, uint32_t lr) {
     uint64_t r3 = 0;
     FromFrame(ctx, sp, lr, [&] {
       ctx.r3.u64 = object;
-      __imp__sub_820D6108(ctx, base);
+      lifted::original::c820D6108(ctx, base);
       r3 = ctx.r3.u64;
     });
     return r3;
@@ -103,7 +104,7 @@ lp::Calls LoadPollCalls(PPCContext& ctx, uint8_t* base) {
     uint64_t r3 = 0;
     FromFrame(ctx, sp, lr, [&] {
       ctx.r3.u64 = object;
-      __imp__sub_820D7D38(ctx, base);
+      lifted::original::c820D7D38(ctx, base);
       r3 = ctx.r3.u64;
     });
     return r3;
@@ -120,7 +121,7 @@ lp::Calls LoadPollCalls(PPCContext& ctx, uint8_t* base) {
       ctx.r8.u64 = regs[4];
       ctx.r9.u64 = regs[5];
       ctx.r10.u64 = regs[6];
-      __imp__sub_820D3318(ctx, base);
+      lifted::original::c820D3318(ctx, base);
       r3 = ctx.r3.u64;
     });
     return r3;

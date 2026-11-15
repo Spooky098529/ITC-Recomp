@@ -11,6 +11,7 @@
 // return address), the originals run.
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "hooks/direct_slots.h"
@@ -70,7 +71,7 @@ void hooks::SceneTargetTexturedRect(PPCContext& ctx, uint8_t* base) {
   });
   ctx.lr = lr;
   if (!done) {
-    __imp__sub_8217C368(ctx, base);
+    lifted::original::c8217C368(ctx, base);
   }
 }
 

@@ -6,6 +6,7 @@
 // getter, which returns its value in r3.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "guest_call.h"
 #include "hooks/device_state_calls.h"
 
@@ -210,7 +211,7 @@ ITC_DEVICE_STATE_CALL(822A3908, {
 })
 ITC_DEVICE_STATE_CALL(822A6008, {
   if (!ds::SetTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u64)) {
-    __imp__sub_822A6008(ctx, base);
+    lifted::original::c822A6008(ctx, base);
   }
 })
 ITC_DEVICE_STATE_CALL(822A3B30, ds::SetBlendControl(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))

@@ -23,6 +23,7 @@
 // (amount 0) and the frames after it move towards the current one.
 
 #include "blend_state.h"
+#include "lifted/originals.h"
 #include "command_list/command_list.h"
 #include "debug/replay_stats.h"
 #include "native/renderer.h"
@@ -4139,7 +4140,7 @@ extern "C" REX_FUNC(sub_8209BD50) {
     matrix_math::Multiply(base, out, a, b);
     ctx.fpscr.enableFlushMode();
   } else {
-    __imp__sub_8209BD50(ctx, base);
+    lifted::original::c8209BD50(ctx, base);
   }
   interpolation::GetDrawState().OnMultiply(base, out, a, b, caller);
 }

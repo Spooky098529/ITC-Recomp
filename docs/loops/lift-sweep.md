@@ -208,6 +208,18 @@ outside:
   forward" in `docs/rexglue-removal.md`). The kernel's start of the
   game's main thread lands in our start-up.
 
+- The originals our C++ still reached (2026-11-15): 72 native functions
+  handed some case back to the recompiled original (`__imp__sub_X`: a
+  block not in our heap, a flag of the callee's off). Each original is
+  lifted by `itc_recomp/tools/lift_originals.py` into
+  `src/lifted/originals.{cpp,h}` (namespace `lifted::original`: not in
+  the dispatch table, no entry of its own, its calls through the
+  dispatch table as the original's went through the function table),
+  and every `__imp__sub_X` of these outside the harnesses now names
+  `lifted::original::cX` (168 references in 42 files). Static map: no
+  original reachable from our C++. Every harness at 0; the pad replay
+  ran 127 s with no error lines.
+
 ## The user's calls (2026-11-15)
 
 - The end state is the goal: native C++ calling native C++, no `ctx`,

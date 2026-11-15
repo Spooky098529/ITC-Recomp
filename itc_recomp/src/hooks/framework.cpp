@@ -7,6 +7,7 @@
 // DebugText::SetPosition's plain C++ call them.
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "framework/framework.h"
@@ -124,7 +125,7 @@ extern "C" REX_FUNC(sub_82099B18) {
   ITC_FRAMEWORK_FALLBACK(82099B18)
   fw::Iterator it = IteratorAt(base, ctx.r3.u32);
   if (!fw::MapIncrement(base, it)) {
-    __imp__sub_82099B18(ctx, base);
+    lifted::original::c82099B18(ctx, base);
     return;
   }
   guest::StoreU32(base, ctx.r3.u32 + 4, it.node);
@@ -167,7 +168,7 @@ extern "C" REX_FUNC(sub_82093740) {
 extern "C" REX_FUNC(sub_8209A080) {
   ITC_FRAMEWORK_FALLBACK(8209A080)
   if (!fw::RequestsClear(base, ctx.r3.u32)) {
-    __imp__sub_8209A080(ctx, base);
+    lifted::original::c8209A080(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r1.u32 - 16;
@@ -547,12 +548,12 @@ fw::MainLoopCalls hooks::MainLoopCalls(PPCContext& ctx, uint8_t* base) {
   calls.increment = [&ctx, base](uint32_t iterator) {
     ctx.r3.u64 = iterator;
     ctx.lr = 0x82099DFC;
-    __imp__sub_82099B18(ctx, base);
+    lifted::original::c82099B18(ctx, base);
   };
   calls.clear = [&ctx, base](uint32_t vector) {
     ctx.r3.u64 = vector;
     ctx.lr = 0x8209A870;
-    __imp__sub_8209A080(ctx, base);
+    lifted::original::c8209A080(ctx, base);
   };
   calls.construct_run_loop = [&ctx, base](uint32_t loop) {
     if (NativeHeap() && fw::CanAllocate(base)) {

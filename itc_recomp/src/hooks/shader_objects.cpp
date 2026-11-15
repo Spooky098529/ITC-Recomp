@@ -2,6 +2,7 @@
 // (docs/functions/shader-objects.md).
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "hooks/guest_call.h"
@@ -85,7 +86,7 @@ struct CreateContext {
     guest_call::InFrame(c.ctx, c.base, 128, 0x822AA0CC, [&](uint32_t) {
       c.ctx.r3.u64 = object;
       c.ctx.r4.u64 = microcode;
-      __imp__sub_822A8740(c.ctx, c.base);
+      lifted::original::c822A8740(c.ctx, c.base);
     });
   }
 };

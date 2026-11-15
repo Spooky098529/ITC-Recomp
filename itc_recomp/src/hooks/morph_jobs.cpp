@@ -7,6 +7,7 @@
 // (src/car_draw/morph.cpp), which calls the plain C++.
 
 #include "hooks/morph_jobs.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -64,7 +65,7 @@ void Delete(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t lr) {
   ctx.r1.u64 = ctx.r1.u32 - 96;
   ctx.r3.u64 = object;
   ctx.lr = lr;
-  __imp__sub_825A70E8(ctx, base);
+  lifted::original::c825A70E8(ctx, base);
   ctx.r1.u64 = stack;
   ctx.lr = link;
 }
@@ -99,7 +100,7 @@ mj::ConstructCalls MorphJobsConstructCalls(PPCContext& ctx, uint8_t* base) {
     ctx.r4.u64 = from;
     ctx.r5.u64 = bytes;
     ctx.lr = lr;
-    __imp__sub_825A7410(ctx, base);
+    lifted::original::c825A7410(ctx, base);
     ctx.r1.u64 = stack;
     ctx.lr = link;
   };
@@ -111,9 +112,9 @@ void MorphJobsMake(PPCContext& ctx, uint8_t* base, mj::Kind kind) {
                                MorphJobsConstructCalls(ctx, base));
   if (!job) {
     if (kind == mj::Kind::kMorph) {
-      __imp__sub_820AC7F0(ctx, base);
+      lifted::original::c820AC7F0(ctx, base);
     } else {
-      __imp__sub_820AC8A0(ctx, base);
+      lifted::original::c820AC8A0(ctx, base);
     }
     return;
   }
@@ -246,7 +247,7 @@ void MorphJobsWorkItemCall(PPCContext& ctx, uint8_t* base) {
 extern "C" REX_FUNC(sub_820AC7F0) {
   REX_FUNC_PROLOGUE();
   if (!hooks::MorphJobsMakersNative()) {
-    __imp__sub_820AC7F0(ctx, base);
+    lifted::original::c820AC7F0(ctx, base);
     return;
   }
   hooks::MorphJobsMake(ctx, base, morph_jobs::Kind::kMorph);
@@ -255,7 +256,7 @@ extern "C" REX_FUNC(sub_820AC7F0) {
 extern "C" REX_FUNC(sub_820AC8A0) {
   REX_FUNC_PROLOGUE();
   if (!hooks::MorphJobsMakersNative()) {
-    __imp__sub_820AC8A0(ctx, base);
+    lifted::original::c820AC8A0(ctx, base);
     return;
   }
   hooks::MorphJobsMake(ctx, base, morph_jobs::Kind::kSkin);

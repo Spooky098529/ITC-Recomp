@@ -5,6 +5,7 @@
 // leaves a value there) as the original does.
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "hooks/car_physics.h"
@@ -97,7 +98,7 @@ ITC_COLLISION_WORLD_PAGES(820F8618, uint32_t r3 = 0;
 // No arguments; r3 isn't kept (its caller doesn't read it). A block to free
 // that isn't the layer's: the original.
 ITC_COLLISION_WORLD_PAGES(820FEFB0, if (!TrackCollisionUnload(base)) {
-  __imp__sub_820FEFB0(ctx, base);
+  lifted::original::c820FEFB0(ctx, base);
   return;
 })
 // Archive::Load's callback: r6 = the mesh.

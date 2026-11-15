@@ -2,6 +2,7 @@
 // src/sprites/sprites.cpp (docs/functions/sprites.md).
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include <bit>
 
@@ -139,7 +140,7 @@ bool RecordScreenRect(PPCContext& ctx, uint8_t* base) {
 extern "C" REX_FUNC(sub_82128E70) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_sprites) || SlotDiagnostics() || !RecordScreenRect(ctx, base)) {
-    __imp__sub_82128E70(ctx, base);
+    lifted::original::c82128E70(ctx, base);
   }
 }
 
@@ -157,6 +158,6 @@ extern "C" REX_FUNC(sub_82129280) {
     return;
   }
   if (!RecordScreenRect(ctx, base)) {
-    __imp__sub_82128E70(ctx, base);
+    lifted::original::c82128E70(ctx, base);
   }
 }

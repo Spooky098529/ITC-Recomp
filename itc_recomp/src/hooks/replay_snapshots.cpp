@@ -3,6 +3,7 @@
 // register steps the harness shares (hooks/replay_snapshots.h).
 
 #include "hooks/replay_snapshots.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "hooks/heap.h"
@@ -38,9 +39,9 @@ replay_snapshots::ReplayCalls ReplayCalls(PPCContext& ctx, uint8_t* base, uint32
     ctx.r1.u64 = sp;
     ctx.r3.u64 = r3;
     if (address == 0x820C1D08) {
-      __imp__sub_820C1D08(ctx, base);
+      lifted::original::c820C1D08(ctx, base);
     } else {
-      __imp__sub_820B7998(ctx, base);
+      lifted::original::c820B7998(ctx, base);
     }
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
@@ -53,7 +54,7 @@ replay_snapshots::ReplayCalls ReplayCalls(PPCContext& ctx, uint8_t* base, uint32
     ctx.r4.u64 = r.r4;
     ctx.r5.u64 = r.r5;
     if (address == 0x820B7998) {
-      __imp__sub_820B7998(ctx, base);
+      lifted::original::c820B7998(ctx, base);
     } else {
       sub_825A7410(ctx, base);  // memcpy, through its override as the original
     }
@@ -71,7 +72,7 @@ replay_snapshots::ReplayCalls ReplayCalls(PPCContext& ctx, uint8_t* base, uint32
     ctx.f2.f64 = offset;
     ctx.r6.u64 = lane;
     ctx.r7.u64 = direction;
-    __imp__sub_820C3608(ctx, base);
+    lifted::original::c820C3608(ctx, base);
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
   };
@@ -90,7 +91,7 @@ void ReplayKeep(PPCContext& ctx, uint8_t* base) {
         ctx.r3.u64 = out;
         ctx.r4.u64 = stages;
         ctx.r5.u64 = int64_t(int32_t(stage));
-        __imp__sub_820FFD88(ctx, base);
+        lifted::original::c820FFD88(ctx, base);
         ctx.r1.u64 = r1;
         ctx.fpscr.disableFlushMode();
       });

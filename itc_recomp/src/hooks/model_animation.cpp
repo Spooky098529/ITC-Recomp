@@ -14,6 +14,7 @@
 // only callers in play are native.
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "hooks/heap.h"
@@ -142,7 +143,7 @@ extern "C" REX_FUNC(sub_825998A0) {
       ctx.fpscr.enableFlushMode();
       return;
     case MatricesResult::kOriginal:
-      __imp__sub_825998A0(ctx, base);
+      lifted::original::c825998A0(ctx, base);
       return;
   }
 }

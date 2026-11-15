@@ -7,6 +7,7 @@
 // directly), and for the error paths the plain C++ leaves to it.
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "hooks/app_start_up.h"
@@ -150,7 +151,7 @@ extern "C" REX_FUNC(sub_825A6940) {
 extern "C" REX_FUNC(sub_825A70E8) {
   REX_FUNC_PROLOGUE();
   if (!Native() || !memory::crt::OperatorDelete(ctx.r3.u32)) {
-    __imp__sub_825A70E8(ctx, base);
+    lifted::original::c825A70E8(ctx, base);
   }
 }
 

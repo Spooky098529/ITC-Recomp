@@ -5,6 +5,7 @@
 // its state machine's functors, so their adapters stay.
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "camera_modes/camera_modes.h"
@@ -398,7 +399,7 @@ void CameraModesStep82150960(PPCContext& ctx, uint8_t* base) {
           ctx.r4.u64 = object;
           ctx.r5.u64 = out;
           ctx.r6.u64 = time;
-          __imp__sub_82150350(ctx, base);
+          lifted::original::c82150350(ctx, base);
         });
         ctx.fpscr.disableFlushMode();
       },
@@ -537,7 +538,7 @@ struct MakeShotAtexit {
     call.ctx.r1.u64 = call.sp;
     call.ctx.lr = function == 0x825DB150 ? 0x82154214 : 0x8215425C;
     call.ctx.r3.u64 = function;
-    __imp__sub_825A7068(call.ctx, call.base);
+    lifted::original::c825A7068(call.ctx, call.base);
     call.ctx.r1.u64 = stack;
     call.ctx.fpscr.disableFlushMode();
     return call.ctx.r3.s32;
@@ -567,7 +568,7 @@ void CameraModesStep82158F70(PPCContext& ctx, uint8_t* base) {
           ctx.r3.u64 = out;
           ctx.r4.u64 = stages;
           ctx.r5.u64 = stage;
-          __imp__sub_820FFD88(ctx, base);
+          lifted::original::c820FFD88(ctx, base);
         });
         ctx.fpscr.disableFlushMode();
       },
@@ -690,7 +691,7 @@ void ShotCameraOriginal(PPCContext& ctx, uint8_t* base, uint32_t shot, uint32_t 
       ctx.r4.u64 = object;
       ctx.r5.u64 = frame + 144;
       ctx.r6.u64 = time;
-      __imp__sub_82150350(ctx, base);
+      lifted::original::c82150350(ctx, base);
     });
   });
   ctx.r1.u64 = stack;
@@ -740,7 +741,7 @@ struct SplineAtexit {
     call.ctx.r1.u64 = call.sp;
     call.ctx.lr = 0x820ABB20;
     call.ctx.r3.u64 = function;
-    __imp__sub_825A7068(call.ctx, call.base);
+    lifted::original::c825A7068(call.ctx, call.base);
     call.ctx.r1.u64 = stack;
     call.ctx.fpscr.disableFlushMode();
     return call.ctx.r3.s32;
@@ -845,7 +846,7 @@ struct ChaseAtexit {
     call.ctx.r1.u64 = call.sp;
     call.ctx.lr = function == 0x825DB100 ? 0x821546D4 : 0x8215471C;
     call.ctx.r3.u64 = function;
-    __imp__sub_825A7068(call.ctx, call.base);
+    lifted::original::c825A7068(call.ctx, call.base);
     call.ctx.r1.u64 = stack;
     call.ctx.fpscr.disableFlushMode();
     return call.ctx.r3.s32;
@@ -877,7 +878,7 @@ struct ViewAtexit {
     call.ctx.r1.u64 = call.sp;
     call.ctx.lr = back;
     call.ctx.r3.u64 = function;
-    __imp__sub_825A7068(call.ctx, call.base);
+    lifted::original::c825A7068(call.ctx, call.base);
     call.ctx.r1.u64 = stack;
     call.ctx.fpscr.disableFlushMode();
     return call.ctx.r3.s32;
@@ -1367,7 +1368,7 @@ cm::StagesCopyCall StagesCopyFrom(PPCContext& ctx, uint8_t* base, uint32_t frame
       ctx.r3.u64 = out;
       ctx.r4.u64 = stages;
       ctx.r5.u64 = int64_t(int32_t(stage));
-      __imp__sub_820FFD88(ctx, base);
+      lifted::original::c820FFD88(ctx, base);
     });
   };
 }
@@ -1564,7 +1565,7 @@ void CameraModesStep82156CC0(PPCContext& ctx, uint8_t* base) {
       ctx.r3.u64 = out;
       ctx.r4.u64 = stages;
       ctx.r5.u64 = stage;
-      __imp__sub_820FFD88(ctx, base);
+      lifted::original::c820FFD88(ctx, base);
     });
   };
   calls.scripts.insert32 = [&](uint32_t to, uint32_t from, uint32_t size, uint32_t back) {

@@ -16,6 +16,7 @@
 // and Mesh::Parse (sub_825963F0), from Mesh::Parse and Model::Load.
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "app_start_up/start_up.h"
 
@@ -492,7 +493,7 @@ void ModelLoadInit(void* user, uint32_t object, uint32_t microcode) {
   guest_call::InFrame(c.ctx, c.base, 512, 0x82594DEC, [&](uint32_t) {
     c.ctx.r3.u64 = object;
     c.ctx.r4.u64 = microcode;
-    __imp__sub_822A8740(c.ctx, c.base);
+    lifted::original::c822A8740(c.ctx, c.base);
   });
 }
 void ModelLoadCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5,
@@ -538,7 +539,7 @@ extern "C" REX_FUNC(sub_82596920) {
     ctx.r4.u64 = file;
     ctx.r5.u64 = xpr;
   }
-  __imp__sub_82596920(ctx, base);
+  lifted::original::c82596920(ctx, base);
 }
 
 // Shaders::LoadAll: no arguments; r3 as the original leaves it (the vertex
@@ -580,7 +581,7 @@ struct PairLoadedCalls {
     guest_call::InFrame(c.ctx, c.base, 144, 0x820A0760, [&](uint32_t) {
       c.ctx.r3.u64 = object;
       c.ctx.r4.u64 = microcode;
-      __imp__sub_822A8740(c.ctx, c.base);
+      lifted::original::c822A8740(c.ctx, c.base);
     });
   }
 };
@@ -607,7 +608,7 @@ extern "C" REX_FUNC(sub_820A06D0) {
       if (!*freed) {
         guest_call::InFrame(ctx, base, 144, 0x820A07E4, [&](uint32_t) {
           ctx.r3.u64 = r6;
-          __imp__sub_825A70E8(ctx, base);
+          lifted::original::c825A70E8(ctx, base);
         });
         ctx.lr = lr;
       }

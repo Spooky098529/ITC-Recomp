@@ -1,4 +1,5 @@
 #include "frame_state_diff.h"
+#include "lifted/originals.h"
 
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
@@ -665,7 +666,7 @@ extern "C" REX_FUNC(sub_820C5C88) {
   if (ITC_FLAG(native_second_set)) {
     hooks::SecondSetReleaseB(ctx, base);
   } else {
-    __imp__sub_820C5C88(ctx, base);
+    lifted::original::c820C5C88(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820C5C88);
 }

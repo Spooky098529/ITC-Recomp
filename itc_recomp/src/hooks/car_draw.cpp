@@ -7,6 +7,7 @@
 // flag.
 
 #include "hooks/car_draw.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "frame_pacing/game_messages.h"
@@ -154,7 +155,7 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
     ctx.r3.u64 = to;
     ctx.r4.u64 = from;
     ctx.r5.u64 = bytes;
-    __imp__sub_825A7410(ctx, base);
+    lifted::original::c825A7410(ctx, base);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
   };
@@ -173,7 +174,7 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
     ctx.f2.f64 = f2;
     ctx.f3.f64 = f3;
     ctx.fpscr.disableFlushMode();
-    __imp__sub_820F4128(ctx, base);
+    lifted::original::c820F4128(ctx, base);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;

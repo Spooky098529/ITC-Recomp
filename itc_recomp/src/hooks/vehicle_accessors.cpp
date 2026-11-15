@@ -3,6 +3,7 @@
 // (docs/functions/vehicle-accessors.md).
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "debug/frame_state_diff.h"
@@ -209,7 +210,7 @@ extern "C" REX_FUNC(sub_820FFD88) {
   debug::FrameStateDiff_Before(base);
   if (!ITC_FLAG(native_vehicle_accessors) ||
       !StagesCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_820FFD88(ctx, base);
+    lifted::original::c820FFD88(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820FFD88);
 }

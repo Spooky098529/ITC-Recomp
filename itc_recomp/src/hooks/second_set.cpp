@@ -3,6 +3,7 @@
 // (hooks/second_set.h).
 
 #include "hooks/second_set.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 
@@ -323,7 +324,7 @@ ss::ReleaseCalls SecondSetReleaseCalls(PPCContext& ctx, uint8_t* base) {
     ctx.r3.u64 = set;
     ctx.r4.u64 = pool;
     ctx.r5.u64 = index;
-    __imp__sub_820C5C88(ctx, base);
+    lifted::original::c820C5C88(ctx, base);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     ctx.fpscr.disableFlushMode();
@@ -334,7 +335,7 @@ ss::ReleaseCalls SecondSetReleaseCalls(PPCContext& ctx, uint8_t* base) {
 
 void SecondSetReleaseB(PPCContext& ctx, uint8_t* base) {
   if (!SecondSetReleaseNative(ctx.r4.u32 <= 7 ? ctx.r4.u32 : 7)) {
-    __imp__sub_820C5C88(ctx, base);
+    lifted::original::c820C5C88(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -519,7 +520,7 @@ void SecondSetMorphRun(PPCContext& ctx, uint8_t* base) {
   const auto result = ss::MorphRun(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
   if (!result) {
     SetFlush(ctx, ss::Flush::kUnchanged, was_on);
-    __imp__sub_82594D10(ctx, base);
+    lifted::original::c82594D10(ctx, base);
     return;
   }
   ctx.r3.u64 = result->r3;
@@ -569,7 +570,7 @@ ss::WheelCalls SecondSetWheelCalls(PPCContext& ctx, uint8_t* base) {
       ctx.r4.u64 = record;
       ctx.r5.u64 = out1;
       ctx.r6.u64 = out2;
-      __imp__sub_82594D10(ctx, base);
+      lifted::original::c82594D10(ctx, base);
       on = (ctx.fpscr.csr & uint32_t(decltype(ctx.fpscr)::FlushMask)) != 0;
     });
     return on;
@@ -580,14 +581,14 @@ ss::WheelCalls SecondSetWheelCalls(PPCContext& ctx, uint8_t* base) {
       ctx.r3.u64 = to;
       ctx.r4.u64 = from;
       ctx.r5.u64 = bytes;
-      __imp__sub_825A7410(ctx, base);
+      lifted::original::c825A7410(ctx, base);
     });
   };
   calls.free_pages_in = [&ctx, base](uint32_t at, uint32_t sp, uint32_t lr) {
     uint64_t r3 = 0;
     FromFrame(ctx, sp, lr, [&] {
       ctx.r3.u64 = at;
-      __imp__sub_820D09A0(ctx, base);
+      lifted::original::c820D09A0(ctx, base);
       r3 = ctx.r3.u64;
     });
     return r3;
@@ -635,7 +636,7 @@ ss::FindCalls SecondSetFindCalls(PPCContext& ctx, uint8_t* base) {
     ctx.r1.u64 = frame;
     ctx.r3.u64 = skeleton;
     ctx.lr = 0x820D03EC;
-    __imp__sub_825998A0(ctx, base);
+    lifted::original::c825998A0(ctx, base);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     ctx.fpscr.disableFlushMode();

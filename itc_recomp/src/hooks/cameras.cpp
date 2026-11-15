@@ -11,6 +11,7 @@
 // left the same.
 
 #include "guest.h"
+#include "lifted/originals.h"
 
 #include "base/flags.h"
 #include "cameras/cameras.h"
@@ -316,7 +317,7 @@ void CameraPassesInit(PPCContext& ctx, uint8_t* base, bool all) {
         ctx.r3.u64 = 1;
         ctx.r4.u64 = mode;
         ctx.lr = 0x8209F9B0;
-        __imp__sub_8209F738(ctx, base);
+        lifted::original::c8209F738(ctx, base);
       }};
   uint32_t mode = 0;
   guest_call::InFrame(ctx, base, 128, 0x8209F968, [&](uint32_t) {
