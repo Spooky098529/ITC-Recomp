@@ -108,6 +108,7 @@ set(ITC_SOURCES
     src/memory/c_runtime_heap.cpp
     src/kernel/native_imports.cpp
     src/kernel/spin_locks.cpp
+    src/kernel/critical_sections.cpp
     src/hooks/voice.cpp
     src/hooks/sprites.cpp
     src/sprites/sprites.cpp
