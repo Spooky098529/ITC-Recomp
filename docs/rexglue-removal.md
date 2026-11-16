@@ -4229,39 +4229,47 @@ Each leaves the game working, smallest and most independent first.
      two runs' dumps are: 0.26% of pixels against 0.24%) clean. The link:
      70 symbols from `librexruntime.so` (SDL 39, and the translator's: its
      logging, flags, `StringBuffer` and float conversions).
-5. **The shaders** (the user's decision, below; recommended: translated
-   at build time and shipped). A tool of ours (`itc_shader_bake`, built
-   from the SDK's translator sources while the submodule is still there)
-   turns the cache's records into a source file of SPIR-V and bindings,
-   compiled into the executable, as the 14 HLSL shaders became
-   `--use_hardcoded_shaders`. The renderer looks a shader up by its key
-   and logs and stops on one it doesn't have, as an address with no
-   entry does. The device features are fixed for the set: the renderer
-   needs them, or asks for them when the device is made (to check:
-   whether clip and cull distance are common enough to require, or the
-   set is baked twice). The register and format definitions the renderer
-   reads (`RegisterFile`, the `reg::` layouts, the `xenos::` enums,
-   `draw_util`'s few constants) become our own small header of what's
-   used, by "plug in data". glslang and the translator leave the build
-   with the bake.
-   - Checks: step 1's completeness run first; frame dumps the same
-     before and after (menus, a race, the replay theater), a drive by the
-     user through the modes.
-6. **Our own third-party libraries** (A1): SDL3 (a submodule at the SDK's
-   pinned version, built as our own shared or static library; only one
-   SDL is loaded, so this goes with the SDK's removal or just before it),
-   the Vulkan headers (and the platform defines `rex/ui/vulkan/api.h`
-   set), simde (step 2). Checks: the build, the pad replay, gamepads and
-   rumble in a drive.
-7. **The SDK deleted**: the submodule, `patches/rexglue-sdk/`,
-   `cmake/rexglue.cmake`, `librexruntime.so` from packaging, `LD_LIBRARY_PATH`
-   in the tools (`attract_race.sh`, `scripted_run.sh`,
-   `profile_render_thread.sh`) and CLAUDE.md (the build line, packaging,
-   the note on the submodule showing modified), the Linux CI workflow; the
-   Windows workflow disabled until the user asks. `generated/` too, or kept
-   as the tools' input (decision below). Checks: a clean clone builds
-   (`git clone`, submodules, configure, build), the test zip runs from its
-   own folder, an attract race, the pad replay, a drive by the user.
+5. **The SDK out of our build** (the user's calls, 2026-11-16: we act as
+   if the SDK were deleted; the submodule stays only as the source of its
+   shader translator, a static dependency; every other third-party library
+   is ours). Was "the shaders" and "our own third-party libraries" (A1):
+   - Our own copies in `itc_recomp/thirdparty/` (submodules, pinned to the
+     SDK's versions): SDL3 (static, with the SDK's options), Vulkan-Headers,
+     simde, glslang (the SPIR-V builder only, as the SDK configured it) and
+     fmt (the translator's formatting).
+   - The translator (`itc_xenos_shaders`): its 14 sources and the few SDK
+     sources with the helpers it calls (the string buffer, the Xenos float
+     conversions, the format table, the tiled address math and the like),
+     built from the submodule's tree as a static library; its logging and
+     flags through small shims of ours (`itc_recomp/src/translator_shims/`:
+     its lines into our log, its flags at their defaults), so no spdlog,
+     no SDK flag registry and no `librexruntime`.
+   - The SDK no longer added to our build (`cmake/rexglue.cmake`, the
+     patches' application, `rex::runtime`), `base/log_sdk.cpp` gone, our own
+     version string for the window title.
+   - The tools (`attract_race.sh`, `scripted_run.sh`,
+     `profile_render_thread.sh`), CLAUDE.md and the Linux CI workflow
+     without `librexruntime.so`; the Windows workflow ignored for now.
+   - Checks: a clean configure and build, the test zip running from its own
+     folder, an attract race, the pad replay, frame dumps, gamepads and
+     rumble in a drive by the user.
+   - A lead for later (the user, 2026-11-16, "worth investigating later"):
+     no translator at all, the game's fixed set of shaders (105 programs,
+     109 translations) translated once with the game's data and the
+     SPIR-V committed, as the 14 HLSL shaders' microcode is; the open
+     points then were committing SPIR-V made from the game's shaders, the
+     device features the translations depend on (clip and cull distance to
+     require), and the set's coverage (a run from an empty cache through
+     the modes).
+6. (Folded into step 5.)
+7. **What's left of the SDK** (the user's calls, 2026-11-16: the submodule
+   stays, as the translator's source; `generated/` stays in the repo, out
+   of the build, to compare our behavior against later):
+   `patches/rexglue-sdk/` (the SDK's own build is no longer made, so its
+   patches no longer apply to anything we build) and the leftovers step 5
+   finds. Checks: a clean clone builds (`git clone`, submodules,
+   configure, build), the test zip runs from its own folder, an attract
+   race, the pad replay, a drive by the user.
 
 Checks at each step: the build, `timeout 120 attract_race.sh 40`, the
 pad replay (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`,
