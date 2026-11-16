@@ -22,6 +22,7 @@
 // Drawing runs a tick behind: the logic pass's frame shows the previous tick
 // (amount 0) and the frames after it move towards the current one.
 
+#include <format>
 #include "blend_state.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -547,7 +548,7 @@ bool IsSameCamera(const PerspectiveCamera& a, const PerspectiveCamera& b,
   if (!same && ITC_FLAG(log_blend_state)) {
     std::lock_guard lock(g_camera_rejects_mutex);
     if (g_camera_rejects.size() < 1500) {
-      g_camera_rejects += fmt::format(
+      g_camera_rejects += std::format(
           "\n  camera {:08X}, world {:08X}, handler {:08X}, from {:08X}->{:08X}: "
           "moved {:.2f} m, turned {:.3f} rad, x {:.4g}->{:.4g}, y {:.4g}->{:.4g}, w {:.4g}->{:.4g}, "
           "depth {:.4g}->{:.4g} {:.4g}->{:.4g}",
@@ -1380,7 +1381,7 @@ class DrawState {
       std::string before;
       for (const auto& [old, old_inputs] : previous_tick_) {
         if (old.world == 0 && old.camera == key.camera && old.handler == key.handler) {
-          before += fmt::format(" [id {} occurrence {}{}]", old.signature, old.occurrence,
+          before += std::format(" [id {} occurrence {}{}]", old.signature, old.occurrence,
                                 current_tick_.count(old) ? " still here" : "");
           // The same occurrence under another number: a cut, or the same
           // camera changed (its eye's movement and turn, and its scales).
@@ -1388,7 +1389,7 @@ class DrawState {
             std::optional<PerspectiveCamera> a = SplitViewProjection(old_inputs.view_projection);
             std::optional<PerspectiveCamera> b = SplitViewProjection(inputs.view_projection);
             if (a && b) {
-              before += fmt::format(
+              before += std::format(
                   " (moved {:.3f} m, turned {:.3f} rad, x {:.4f}->{:.4f} y {:.4f}->{:.4f} depth "
                   "{:.6g}->{:.6g} {:.6g}->{:.6g})",
                   Distance(a->camera.position, b->camera.position),
@@ -2287,14 +2288,14 @@ class MovingProductsLog {
   }
   bool Line() { return lines_++ < 40; }
   std::string Describe(const Record& r) const {
-    std::string before = r.before ? fmt::format("{:.3f} {:.3f} {:.3f}", (*r.before)[0],
+    std::string before = r.before ? std::format("{:.3f} {:.3f} {:.3f}", (*r.before)[0],
                                                 (*r.before)[1], (*r.before)[2])
                                   : std::string("-");
     auto context = [](const std::array<uint32_t, 9>& c) {
-      return fmt::format("lr {:08X} r24-r31 {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X}",
+      return std::format("lr {:08X} r24-r31 {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X}",
                          c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8]);
     };
-    return fmt::format("id {:016X} payload {:08X} handler {:08X} {}: before {} now {:.3f} {:.3f} "
+    return std::format("id {:016X} payload {:08X} handler {:08X} {}: before {} now {:.3f} {:.3f} "
                        "{:.3f} shown {:.3f} {:.3f} {:.3f}, moved {:.3f} turned {:.3f}; now {}; "
                        "before {}",
                        r.identity, r.payload, r.handler, Name(r.outcome), before, r.now[0],
@@ -2835,14 +2836,14 @@ class ReplayedConstantsLog {
       full_lines_++;
       std::string values;
       for (uint32_t i = 0; i < 20; i++) {
-        values += fmt::format("{}{:.4g}", i % 4 == 0 ? (i ? " | " : "") : " ",
+        values += std::format("{}{:.4g}", i % 4 == 0 ? (i ? " | " : "") : " ",
                               guest::LoadFloat(base, payload + 4 * i));
       }
-      lines_.push_back(fmt::format("#{} c9 x5 from {:08X} {}: {}", index, payload,
+      lines_.push_back(std::format("#{} c9 x5 from {:08X} {}: {}", index, payload,
                                    changed ? "changed" : "same", values));
     }
     if (logging_ && lines_.size() < 120) {
-      lines_.push_back(fmt::format(
+      lines_.push_back(std::format(
           "#{} c{} x{} from {:08X} {}{} [{:.3g} {:.3g} {:.3g} {:.3g} | ... | {:.4g} {:.4g} "
           "{:.4g} {:.4g}]",
           index, start, count, payload, changed ? "changed" : "same",
@@ -3193,7 +3194,7 @@ void PixelConstantBlender::LogRejection(uint32_t i, float a, float b) {
   last = now;
   std::string line;
   for (const auto& [index, n] : rejections) {
-    line += fmt::format(" c{}.{}:{}", index / 4, "xyzw"[index % 4], n);
+    line += std::format(" c{}.{}:{}", index / 4, "xyzw"[index % 4], n);
   }
   ITC_LOG_INFO("pixel constants rejected (register.component:count):{}; e.g. c{}.{} {} -> {}", line,
                i / 4, "xyzw"[i % 4], a, b);
@@ -3231,20 +3232,20 @@ class PixelOutcomesLog {
       for (const auto& d : blender.differing()) {
         differing_[d.i]++;
         if (components.size() < 160) {
-          components += fmt::format(" c{}.{} {:.4g}->{:.4g}", start + d.i / 4, "xyzw"[d.i % 4],
+          components += std::format(" c{}.{} {:.4g}->{:.4g}", start + d.i / 4, "xyzw"[d.i % 4],
                                     d.first, d.now);
         }
       }
       if (not_as_recorded_examples_.size() < 6) {
         not_as_recorded_examples_.push_back(
-            fmt::format("{} differ:{}", blender.differing().size(), components));
+            std::format("{} differ:{}", blender.differing().size(), components));
       }
     }
     if (outcome == Outcome::kRejected && moving) {
       auto [a, b] = blender.rejected_values();
       rejected_[blender.rejected()]++;
       if (rejected_examples_.size() < 400) {
-        rejected_examples_ += fmt::format(" c{}.{} {:.4g}->{:.4g}", start + blender.rejected() / 4,
+        rejected_examples_ += std::format(" c{}.{} {:.4g}->{:.4g}", start + blender.rejected() / 4,
                                           "xyzw"[blender.rejected() % 4], a, b);
       }
       const ReplayedProduct* product = GetReplayCameras().last_parts().product;
@@ -3255,7 +3256,7 @@ class PixelOutcomesLog {
         if (product->tick->before) {
           const Matrix4& v = product->tick->before->world;
           const auto& d = product->tick->before->context;
-          before = fmt::format("{:.3f} {:.3f} {:.3f} (lr {:08X} r31 {:08X})", v[12], v[13], v[14],
+          before = std::format("{:.3f} {:.3f} {:.3f} (lr {:08X} r31 {:08X})", v[12], v[13], v[14],
                                d[0], d[8]);
         }
         ITC_LOG_INFO("pixel outcomes: rejected c{}.{} {:.4g}->{:.4g}, object {:016X}: now {:.3f} "
@@ -3279,7 +3280,7 @@ class PixelOutcomesLog {
     std::map<std::pair<std::string, uint32_t>, std::string> lines;
     for (const auto& [key, n] : counts_) {
       const auto& [kind, start, outcome] = key;
-      lines[{kind, start}] += fmt::format(" {} {:.1f}", kNames[outcome], double(n) / frames_);
+      lines[{kind, start}] += std::format(" {} {:.1f}", kNames[outcome], double(n) / frames_);
     }
     for (const auto& [key, line] : lines) {
       auto jumps = switch_jumps_.find(key);
@@ -3290,7 +3291,7 @@ class PixelOutcomesLog {
     if (!rejected_.empty()) {
       std::string line;
       for (const auto& [i, n] : rejected_) {
-        line += fmt::format(" +{}.{}:{}", i / 4, "xyzw"[i % 4], n);
+        line += std::format(" +{}.{}:{}", i / 4, "xyzw"[i % 4], n);
       }
       ITC_LOG_INFO("pixel outcomes: moving objects rejected by (register from start.component:count):{}; e.g.{}",
                    line, rejected_examples_);
@@ -3298,7 +3299,7 @@ class PixelOutcomesLog {
     if (!differing_.empty()) {
       std::string line;
       for (const auto& [i, n] : differing_) {
-        line += fmt::format(" +{}.{}:{}", i / 4, "xyzw"[i % 4], n);
+        line += std::format(" +{}.{}:{}", i / 4, "xyzw"[i % 4], n);
       }
       ITC_LOG_INFO("pixel outcomes: moving objects not as recorded, differing (register from "
                    "start.component:count):{}", line);
@@ -3312,7 +3313,7 @@ class PixelOutcomesLog {
       }
       std::string line;
       for (const auto& [i, n] : *changes) {
-        line += fmt::format(" c{}.{}:{}", i / 4, "xyzw"[i % 4], n);
+        line += std::format(" c{}.{}:{}", i / 4, "xyzw"[i % 4], n);
       }
       ITC_LOG_INFO("pixel outcomes: moving objects' lighting, frame-to-frame {} (register from "
                    "start.component:count):{}",
@@ -3367,7 +3368,7 @@ class PixelOutcomesLog {
           follow_key_ = {object, occurrence, start};
           follow_frames_ = 10;
           auto line = [&](const std::vector<float>& v) {
-            return fmt::format("c3 {:.4g} {:.4g} {:.4g} {:.4g} | c4 {:.4g} {:.4g} {:.4g} {:.4g} | "
+            return std::format("c3 {:.4g} {:.4g} {:.4g} {:.4g} | c4 {:.4g} {:.4g} {:.4g} {:.4g} | "
                                "c8 {:.4g} {:.4g} {:.4g} | c9 {:.4g} {:.4g} {:.4g} | c47 {:.4g} "
                                "{:.4g} {:.4g} {:.4g} | c48 {:.4g} {:.4g} {:.4g} {:.4g}",
                                v[12], v[13], v[14], v[15], v[16], v[17], v[18], v[19], v[32],
@@ -3386,7 +3387,7 @@ class PixelOutcomesLog {
                        "{:.4g}, tick {} amount {:.2f} (last frame tick {} amount {:.2f}), {}",
                        flip ? "flip" : "jump", start + r, "xyzw"[i % 4],
                        slot ? "light slot" : "other", object,
-                       has_older ? fmt::format("{:.4g}", o) : std::string("-"), a, b, tick, amount,
+                       has_older ? std::format("{:.4g}", o) : std::string("-"), a, b, tick, amount,
                        h.tick, h.amount, kOutcomeNames[int(blender.outcome())]);
         }
       }
@@ -3397,7 +3398,7 @@ class PixelOutcomesLog {
       follow_frames_--;
       const std::vector<float>& rec = blender.last_values();
       auto line = [&](const std::vector<float>& v) {
-        return fmt::format("c3 {:.4g} {:.4g} {:.4g} {:.4g} | c4 {:.4g} {:.4g} {:.4g} {:.4g} | c8 "
+        return std::format("c3 {:.4g} {:.4g} {:.4g} {:.4g} | c4 {:.4g} {:.4g} {:.4g} {:.4g} | c8 "
                            "{:.4g} {:.4g} {:.4g} | c9 {:.4g} {:.4g} {:.4g} | c47 {:.4g} {:.4g} "
                            "{:.4g} {:.4g} | c48 {:.4g} {:.4g} {:.4g} {:.4g}",
                            v[12], v[13], v[14], v[15], v[16], v[17], v[18], v[19], v[32], v[33],
@@ -3469,12 +3470,12 @@ class PixelOutcomesLog {
     const std::vector<float>& u = blender.last_blended();
     auto uploaded = [&](uint32_t r) {
       return r * 4 + 2 < u.size()
-                 ? fmt::format("{:.3f} {:.3f} {:.3f}", u[r * 4], u[r * 4 + 1], u[r * 4 + 2])
+                 ? std::format("{:.3f} {:.3f} {:.3f}", u[r * 4], u[r * 4 + 1], u[r * 4 + 2])
                  : std::string("-");
     };
     auto reg = [&](uint32_t r) {
       return r * 4 + 2 < v.size()
-                 ? fmt::format("{:.3f} {:.3f} {:.3f}", v[r * 4], v[r * 4 + 1], v[r * 4 + 2])
+                 ? std::format("{:.3f} {:.3f} {:.3f}", v[r * 4], v[r * 4 + 1], v[r * 4 + 2])
                  : std::string("-");
     };
     ITC_LOG_INFO("pixel trace: tick {} amount {:.2f} {} | world now {:.3f} {:.3f} {:.3f} blend "
@@ -3579,7 +3580,7 @@ class SteppingConstantsLog {
     entry.last = value;
     if (entry.sample.empty()) {
       for (uint32_t i = 0; i < std::min<uint32_t>(words, 8); i++) {
-        entry.sample += fmt::format("{:.4g} ", value[i]);
+        entry.sample += std::format("{:.4g} ", value[i]);
       }
     }
   }
@@ -3647,12 +3648,12 @@ class OverlayUploadsLog {
     uint32_t stage = packed >> 24, start = (packed >> 8) & 0xFF, count = packed & 0xFF;
     std::string values;
     for (uint32_t i = 0; i < std::min<uint32_t>(count * 4, 20); i++) {
-      values += fmt::format("{}{:.5g}", i % 4 == 0 ? (i ? " | " : "") : " ",
+      values += std::format("{}{:.5g}", i % 4 == 0 ? (i ? " | " : "") : " ",
                             guest::LoadFloat(base, payload + 4 * i));
     }
     std::string was;
     if (original) {
-      was = fmt::format(" (was row3 {:.5g} {:.5g} {:.5g} {:.5g})", (*original)[12],
+      was = std::format(" (was row3 {:.5g} {:.5g} {:.5g} {:.5g})", (*original)[12],
                         (*original)[13], (*original)[14], (*original)[15]);
     }
     ITC_LOG_INFO("overlay upload: frame {} tick {} amount {:.2f} #{} recorded on {} pass {} "
@@ -3694,8 +3695,8 @@ void BlendState_LogOverlayAllocations(uint8_t* base) {
         std::memcpy(&f, &w, 4);
         words += (i % 4 == 0 && i) ? " | " : " ";
         words += (std::isfinite(f) && std::abs(f) > 1e-4f && std::abs(f) < 1e6f)
-                     ? fmt::format("{:.5g}", f)
-                     : fmt::format("{:08X}", w);
+                     ? std::format("{:.5g}", f)
+                     : std::format("{:08X}", w);
       }
       ITC_LOG_INFO("overlay alloc: {:08X} x{} by {:08X}:{}", a.address, a.count, a.caller, words);
     }
@@ -3791,7 +3792,7 @@ class ObjectExtrasLog {
       world_changes_ += world;
       c8_changes_ += c8;
       if ((world || c8) && examples_.size() < 6) {
-        examples_.push_back(fmt::format(
+        examples_.push_back(std::format(
             "{:08X} c7 {:.4g} {:.4g} {:.4g} {:.4g} -> {:.4g} {:.4g} {:.4g} {:.4g}; "
             "c8 {:.4g} {:.4g} {:.4g} {:.4g} -> {:.4g} {:.4g} {:.4g} {:.4g}",
             payload, it->second[12], it->second[13], it->second[14], it->second[15], extras[12],
@@ -3867,11 +3868,11 @@ class MotionBlurLog {
     std::optional<PerspectiveCamera> b = SplitViewProjection(at_8144);
     std::string motion = "not perspective";
     if (a && b) {
-      motion = fmt::format("+8080->+8144 moved {:.3f} m, turned {:.4f} rad",
+      motion = std::format("+8080->+8144 moved {:.3f} m, turned {:.4f} rad",
                            Distance(a->camera.position, b->camera.position),
                            AngleBetween(a->camera.rotation, b->camera.rotation));
     }
-    copies_.lines += fmt::format(
+    copies_.lines += std::format(
         "\n  {} pass, amount {:.3f}, view {:08X} (+44 {}, +48 {}), copied +{}{}, {}; "
         "+8080 row 3 {:.6g} {:.6g} {:.6g} {:.6g}, +8144 row 3 {:.6g} {:.6g} {:.6g} {:.6g}",
         frame_pacing::GameMessages_IsRenderOnlyPass() ? "render-only" : "logic",
@@ -3893,12 +3894,12 @@ class MotionBlurLog {
     if (original) {
       std::optional<PerspectiveCamera> a = SplitViewProjection(*original);
       std::optional<PerspectiveCamera> b = SplitViewProjection(uploaded);
-      change = a && b ? fmt::format("substituted, moved {:.3f} m, turned {:.4f} rad",
+      change = a && b ? std::format("substituted, moved {:.3f} m, turned {:.4f} rad",
                                     Distance(a->camera.position, b->camera.position),
                                     AngleBetween(a->camera.rotation, b->camera.rotation))
                       : "substituted (not perspective)";
     }
-    uploads_.lines += fmt::format("\n  tick {}, amount {:.3f}: {}", tick, amount, change);
+    uploads_.lines += std::format("\n  tick {}, amount {:.3f}: {}", tick, amount, change);
     uploads_.count++;
   }
 
@@ -4090,7 +4091,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
         last = now;
         std::string line;
         for (const auto& [who, n] : owners) {
-          line += fmt::format(" {:08X}:{}", who, n / std::max(frames, 1));
+          line += std::format(" {:08X}:{}", who, n / std::max(frames, 1));
         }
         ITC_LOG_INFO("upload owners (caller:uploads per tick):{}", line);
         owners.clear();
@@ -4101,7 +4102,7 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
   // Vertex or pixel constants, by the code that allocated the header.
   if (const std::string& list = ITC_FLAG(debug_zero_owners); !list.empty()) {
     uint32_t owner = SlotOwner(payload - 16);
-    if (owner != 0 && list.find(fmt::format("{:08X}", owner)) != std::string::npos) {
+    if (owner != 0 && list.find(std::format("{:08X}", owner)) != std::string::npos) {
       for (uint32_t i = 0; i < count * 4; i++) {
         zeroed.push_back(guest::LoadU32(base, payload + 4 * i));
         guest::StoreU32(base, payload + 4 * i, 0);

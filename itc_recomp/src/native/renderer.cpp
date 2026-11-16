@@ -1,3 +1,4 @@
+#include <format>
 #include "renderer.h"
 #include "frame_costs.h"
 #include "base/log.h"
@@ -143,7 +144,8 @@ ITC_FLAG_INT32(height, 0, "ITC",
                "from width at 16:9");
 // The SDK's (it also makes the SDK's own window, hidden in exclusive mode,
 // fullscreen); ours follows it.
-ITC_FLAG_DECLARE(bool, fullscreen);
+// The SDK's until A4, same name and default (itc.toml sets it false).
+ITC_FLAG_BOOL(fullscreen, true, "UI/Window", "Start the window in fullscreen mode");
 
 namespace native {
 namespace {
@@ -243,7 +245,7 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   setup->window =
       SDL_CreateWindow("ITC native renderer", int(size.width), int(size.height), flags);
   if (!setup->window) {
-    return finish(fmt::format("SDL_CreateWindow: {}", SDL_GetError()));
+    return finish(std::format("SDL_CreateWindow: {}", SDL_GetError()));
   }
   if (const SDL_DisplayMode* mode =
           SDL_GetDesktopDisplayMode(SDL_GetDisplayForWindow(setup->window))) {
@@ -265,7 +267,7 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
   auto get_instance_proc_addr =
       reinterpret_cast<PFN_vkGetInstanceProcAddr>(SDL_Vulkan_GetVkGetInstanceProcAddr());
   if (!get_instance_proc_addr || !vk::LoadGlobal(get_instance_proc_addr)) {
-    return finish(fmt::format("no Vulkan loader: {}", SDL_GetError()));
+    return finish(std::format("no Vulkan loader: {}", SDL_GetError()));
   }
   Uint32 extension_count = 0;
   const char* const* extensions = SDL_Vulkan_GetInstanceExtensions(&extension_count);
@@ -290,13 +292,13 @@ void SDLCALL CreateWindowOnMainThread(void* data) {
     result = vk::vkCreateInstance(&info, nullptr, &setup->instance);
   }
   if (result != VK_SUCCESS) {
-    return finish(fmt::format("vkCreateInstance: {}", int(result)));
+    return finish(std::format("vkCreateInstance: {}", int(result)));
   }
   if (!vk::LoadInstance(setup->instance)) {
     return finish("missing instance functions");
   }
   if (!SDL_Vulkan_CreateSurface(setup->window, setup->instance, nullptr, &setup->surface)) {
-    return finish(fmt::format("SDL_Vulkan_CreateSurface: {}", SDL_GetError()));
+    return finish(std::format("SDL_Vulkan_CreateSurface: {}", SDL_GetError()));
   }
   finish("");
 }
@@ -700,7 +702,7 @@ VkCommandBuffer Renderer::BeginFrame() {
         dumping_ = true;
         dump_step_ = 0;
         dump_steps_.clear();
-        dump_directory_ = fmt::format("{}/{}", dump_root, dumps_++);
+        dump_directory_ = std::format("{}/{}", dump_root, dumps_++);
         std::filesystem::create_directories(dump_directory_, error);
         ITC_LOG_INFO("native renderer: dumping into {}", dump_directory_);
       }
@@ -712,14 +714,14 @@ VkCommandBuffer Renderer::BeginFrame() {
       if (cycle_steps_.empty() && std::filesystem::remove(cycle_root + "/now", error)) {
         cycle_steps_.push_back({"none", 0});
         for (uint64_t hash : passes_.main_view_pixel_shaders()) {
-          cycle_steps_.push_back({fmt::format("skip_ps_{:016X}", hash), hash});
+          cycle_steps_.push_back({std::format("skip_ps_{:016X}", hash), hash});
         }
         cycle_steps_.push_back({"skip_no_pixel_shader", Passes::kSkipNoPixelShader});
         cycle_steps_.push_back({"none_again", 0});
         cycle_step_ = 0;
         cycle_step_start_ = Clock::now();
         cycle_captured_ = false;
-        cycle_directory_ = fmt::format("{}/{}", cycle_root, cycles_++);
+        cycle_directory_ = std::format("{}/{}", cycle_root, cycles_++);
         std::filesystem::create_directories(cycle_directory_, error);
         ITC_LOG_INFO("native renderer: cycling {} steps into {}", cycle_steps_.size(),
                      cycle_directory_);
@@ -807,7 +809,7 @@ void Renderer::EndFrame() {
                               dump_step_ == 0 && ITC_FLAG(native_renderer_dump_every) <= 0)
       : cycle_capture
           ? passes_.EndFrame(commands, ITC_FLAG(native_renderer_show_resolve), true,
-                             fmt::format("{:02}_{}", cycle_step_, cycle_steps_[cycle_step_].name),
+                             std::format("{:02}_{}", cycle_step_, cycle_steps_[cycle_step_].name),
                              false)
           : passes_.EndFrame(commands, ITC_FLAG(native_renderer_show_resolve), false);
   Frame& frame = frames_[frame_index_];
@@ -953,7 +955,7 @@ void Renderer::EndFrame() {
       // textures from memory, and all resolve destinations, hidden.
       using Hide = TextureCache::Hide;
       for (uint64_t hash : passes_.main_view_pixel_shaders()) {
-        dump_steps_.push_back({fmt::format("skip_ps_{:016X}", hash), Hide::kNone, 0, hash});
+        dump_steps_.push_back({std::format("skip_ps_{:016X}", hash), Hide::kNone, 0, hash});
       }
       dump_steps_.push_back({"hide_memory", Hide::kMemory, 0, 0});
       dump_steps_.push_back({"hide_resolved", Hide::kResolved, 0, 0});
@@ -1004,7 +1006,7 @@ void Renderer::LogStats() {
     std::string reasons;
     for (size_t i = 0; i < view.failed_by.size(); i++) {
       if (view.failed_by[i]) {
-        reasons += fmt::format(" {} {:.1f};", kFailedDrawReasons[i],
+        reasons += std::format(" {} {:.1f};", kFailedDrawReasons[i],
                                double(view.failed_by[i]) / frames);
       }
     }
@@ -1024,7 +1026,7 @@ void Renderer::LogStats() {
     ITC_LOG_INFO("native renderer: mirror check: of {} ranges not copied and checked, {} "
                  "differed from guest memory ({:.1f} MB){}",
                  view.mirror_checked, view.mirror_stale, view.mirror_stale_bytes / 1048576.0,
-                 view.mirror_stale ? fmt::format(", e.g. {} {:08X} ({} bytes)",
+                 view.mirror_stale ? std::format(", e.g. {} {:08X} ({} bytes)",
                                                 view.mirror_stale_sample_index ? "index" : "vertex",
                                                 view.mirror_stale_sample_address,
                                                 view.mirror_stale_sample_size)
@@ -1339,12 +1341,12 @@ std::string Describe() {
   for (size_t i = 0; i < size_t(Kind::kCount); i++) {
     int64_t bytes = totals.bytes[i].load(std::memory_order_relaxed);
     total += bytes;
-    out += fmt::format("{} {:.1f} MB ({}); ", kKinds[i], bytes / 1048576.0,
+    out += std::format("{} {:.1f} MB ({}); ", kKinds[i], bytes / 1048576.0,
                        totals.allocations[i].load(std::memory_order_relaxed));
   }
-  out = fmt::format("{:.1f} MB: ", total / 1048576.0) + out;
+  out = std::format("{:.1f} MB: ", total / 1048576.0) + out;
   for (size_t i = 0; i < size_t(Object::kCount); i++) {
-    out += fmt::format("{}{} {}", i ? ", " : "", kObjects[i],
+    out += std::format("{}{} {}", i ? ", " : "", kObjects[i],
                        totals.objects[i].load(std::memory_order_relaxed));
   }
   return out;

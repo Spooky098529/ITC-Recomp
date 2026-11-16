@@ -62,6 +62,7 @@ include(cmake/ffmpeg.cmake)
 set(ITC_SOURCES
     src/app/main.cpp
     src/app/start_up.cpp
+    src/base/flags.cpp
     src/base/log.cpp
     src/base/log_sdk.cpp
     src/audio/native_audio.cpp

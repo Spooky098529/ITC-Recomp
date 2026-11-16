@@ -8,6 +8,7 @@
 // every tick handler and message handler on logic passes, and the first
 // change each handler makes to one is logged, to name the code that counts.
 
+#include <format>
 #include "idle_timer_scan.h"
 
 #include "guest.h"
@@ -133,7 +134,7 @@ class IdleTimerScan {
         next[address] = s;
         if (s.count >= kStreakToLog && logged < 60) {
           logged++;
-          sample += fmt::format(" {:08X}:{}x{}={}({})", address, s.count, step, after,
+          sample += std::format(" {:08X}:{}x{}={}({})", address, s.count, step, after,
                                 AsFloat(after));
         }
       }
@@ -180,7 +181,7 @@ class IdleTimerScan {
     for (const auto& [address, s] : streaks_) {
       if (s.count >= kStreakToLog) {
         uint32_t now = guest::LoadU32(base, address);
-        list += fmt::format(" {:08X}:{}x{} last {}({}) now {}({})", address, s.count, s.step,
+        list += std::format(" {:08X}:{}x{} last {}({}) now {}({})", address, s.count, s.step,
                             s.value, AsFloat(s.value), now, AsFloat(now));
       }
     }

@@ -1,3 +1,4 @@
+#include <format>
 #include "frame_state_diff.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -277,8 +278,8 @@ class FrameStateDiff {
         found++;
         if (sample.size() < 3000) {
           sample += std::string(step) == "float"
-                        ? fmt::format(" {:08X}:{}->{}", address, AsFloat(before), AsFloat(after))
-                        : fmt::format(" {:08X}:{}->{}", address, before, after);
+                        ? std::format(" {:08X}:{}->{}", address, AsFloat(before), AsFloat(after))
+                        : std::format(" {:08X}:{}->{}", address, before, after);
         }
         stepped_now.push_back(address);
       }

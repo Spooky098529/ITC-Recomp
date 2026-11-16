@@ -1,3 +1,4 @@
+#include <format>
 #include "textures.h"
 #include "frame_costs.h"
 
@@ -637,7 +638,7 @@ struct TextureCache::State {
 std::string WriteCallers(const std::map<uint32_t, uint64_t>& callers) {
   std::string text;
   for (auto& [caller, count] : callers) {
-    text += fmt::format(" {:08X}={}", caller, count);
+    text += std::format(" {:08X}={}", caller, count);
   }
   return text.empty() ? " none" : text;
 }
@@ -678,7 +679,7 @@ void TextureCache::State::LogFirstLoad(const Texture& t) {
     ITC_LOG_INFO("native renderer: texture writes: {:08X} ({}x{}, {} bytes) first loaded with "
                  "{} bytes written by memcpy{}",
                  address, t.layout.width, t.layout.height, size, bytes,
-                 bytes ? fmt::format(" (first from {:08X})", first_caller) : std::string());
+                 bytes ? std::format(" (first from {:08X})", first_caller) : std::string());
   }
 }
 
@@ -688,7 +689,7 @@ void TextureCache::State::LogUnrecordedChange(uint8_t* base, const Texture& t) {
   uint32_t address = t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
   auto& [count, text] = writes.unrecorded_by[address];
   if (!count++) {
-    text = fmt::format("{}x{} format {} levels {}-{}", t.layout.width, t.layout.height,
+    text = std::format("{}x{} format {} levels {}-{}", t.layout.width, t.layout.height,
                        int(t.format.format), t.layout.min_level, t.layout.max_level);
   }
   auto [start, range_size] = t.ranges[0].second ? t.ranges[0] : t.ranges[1];
@@ -1065,7 +1066,7 @@ void TextureCache::State::LogAges() {
   }
   std::string ages;
   for (size_t i = 0; i < 5; i++) {
-    ages += fmt::format("{}{} {} ({:.1f} MB)", i ? ", " : "", kNames[i], counts[i],
+    ages += std::format("{}{} {} ({:.1f} MB)", i ? ", " : "", kNames[i], counts[i],
                         bytes[i] / 1048576.0);
   }
   ITC_LOG_INFO("native renderer: textures by time since drawn: {}; new {}, {} overlapping "

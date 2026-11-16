@@ -14,6 +14,7 @@
 // Render thread: draws exactly one frame each time it's asked (as the game
 // originally did), without the game's 2-vblank wait.
 
+#include <format>
 #include "lifted/originals.h"
 #include "debug/frame_state_diff.h"
 #include "hooks/native_entry.h"
@@ -89,7 +90,7 @@ class FrameTimes {
     int frames = std::max(stats_[kDraw].count, 1);
     for (int i = 0; i < kParts; i++) {
       const Stat& s = stats_[i];
-      line += fmt::format(" | {} {:.2f} avg {:.2f} worst ({})", kNames[i],
+      line += std::format(" | {} {:.2f} avg {:.2f} worst ({})", kNames[i],
                           s.count ? s.total / s.count : 0.0, s.worst, s.count);
       stats_[i] = {};
     }

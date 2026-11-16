@@ -4189,6 +4189,46 @@ Each leaves the game working, smallest and most independent first.
    - Checks: `--log_flags` the same before and after (with and without
      `itc.toml`, and command-line values over it), the build, an attract
      race, the pad replay, `--log_level=off`.
+
+   Done (2026-11-16, `e4-sdk-removal-16-11-26`), by the user's calls
+   (2026-11-16): no `REX_*` environment variables, no log file with
+   `--log_level=off`, and `itc.toml` may set `game_data_root`.
+   - `--log_flags` first, on the old parser (`rex::cvar::ListFlags`).
+   - Our registry and parser (`base/flags.h`, `base/flags.cpp`): each flag a
+     function-local static (`itc_flag_<name>()`, as the SDK's storage was)
+     registered by name; `--name=value`, `--name value`, `--name` and
+     `--no-name` for booleans; `itc.toml` read as flat `name = value` lines
+     (booleans, numbers, basic and literal strings, comments) for the flags
+     the command line didn't set. Unknown flags, stray arguments, unknown
+     settings and bad values are logged as warnings once the log is open,
+     never fatal; the SDK's `user_data_root`, `update_data_root`,
+     `cache_root` and `metadata_root` (only logged) are gone and so warned
+     about if given.
+   - The SDK's flags our code read are ours, same names and defaults:
+     `game_data_root`, `log_level`, `log_file`, `log_verbose`,
+     `video_driver` (`app/main.cpp`), `fullscreen` (`native/renderer.cpp`,
+     default true as the SDK's; `itc.toml` sets false), `audio_mute` and
+     `audio_maxqframes` (`audio/native_audio.cpp`).
+   - `main()`: the command line, then `itc.toml` (next to the executable,
+     found through `/proc/self/exe`), then the paths, then the log. Our
+     logger names the file (`base::NextLogPath`: `logs/itc_<n>.log`, as the
+     SDK numbered it); the SDK's logging is set up with no file of its own,
+     only to forward its shader translator's lines into ours
+     (`base/log_sdk.cpp`, until step 5).
+   - The 137 `fmt::format` calls are `std::format` (`fmt` came in through
+     `rex/cvar.h`).
+   - Checked: `--log_flags` in three runs before and after (no `itc.toml`;
+     an `itc.toml`; an `itc.toml` with command-line values over it, in
+     every form): all 343 of our flags the same, but for one difference by
+     design: a flag given twice (`--fullscreen=false --fullscreen=true`) took
+     the first value with the SDK's parser and takes the last with ours.
+     `--log_level=off` made no file; `game_data_root` from `itc.toml`
+     worked; unknown flags and settings were warned about. An attract race
+     (`itc_5733`), the pad replay (127 s, no error lines, the race at the
+     cap, 28 imports, all ours) and a frame dump (as close to step 3's as
+     two runs' dumps are: 0.26% of pixels against 0.24%) clean. The link:
+     70 symbols from `librexruntime.so` (SDL 39, and the translator's: its
+     logging, flags, `StringBuffer` and float conversions).
 5. **The shaders** (the user's decision, below; recommended: translated
    at build time and shipped). A tool of ours (`itc_shader_bake`, built
    from the SDK's translator sources while the submodule is still there)
@@ -4231,6 +4271,15 @@ boundary over time" (its figures read the docs' rows, not the running
 code); a drive by the user before the merge.
 
 ### Decisions for the user
+
+**Decided (the user, 2026-11-16):** the shader translator stays the SDK's,
+as a static dependency (the user's reason: what it makes depends on the GPU
+and driver; ours note that the SPIR-V is portable but the translations
+depend on the device's features); A4's three open questions yes (no
+`REX_*` environment variables, no log file with `--log_level=off`,
+`itc.toml` may set `game_data_root`); `generated/` kept in the repo, out
+of the build, to compare our behavior against later; the Windows CI job
+ignored for now. The order: as recommended. What was proposed:
 
 - **The shader translator** (step 5). The rule: don't port ReXGlue or
   Xenia into `src/`.

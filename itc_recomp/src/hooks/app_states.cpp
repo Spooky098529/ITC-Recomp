@@ -16,7 +16,7 @@
 #include "hooks/app_start_up.h"
 #include "hooks/guest_call.h"
 
-#include <fmt/format.h>
+#include <format>
 
 #include <string>
 #include "hooks/heap.h"
@@ -789,6 +789,6 @@ ITC_NATIVE_ENTRY_ALWAYS(82092968) {
   debug::MenuSelectionScan_Before(base);
   run();
   static thread_local std::string kind;
-  kind = fmt::format("component {:08X}", component);
+  kind = std::format("component {:08X}", component);
   debug::MenuSelectionScan_After(base, kind.c_str(), update);
 }

@@ -19,6 +19,7 @@
 // the words they moved are logged at the start and end of each update and
 // whenever a setting track writes them.
 
+#include <format>
 #include "debug/pause_movie_log.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -327,7 +328,7 @@ void LogMovingTargets(uint8_t* base, uint32_t movie, const char* when) {
   }
   std::string line;
   for (uint32_t target : g_moving_targets) {
-    line += fmt::format(" {:08X}={:g}", target, guest::LoadFloat(base, target));
+    line += std::format(" {:08X}={:g}", target, guest::LoadFloat(base, target));
   }
   ITC_LOG_INFO("pause movie targets: tick {} pass {} {} movie {:08X} {}:{}", Ticks(),
                frame_pacing::GameMessages_PassNumber(), PassType(), movie, when, line);
@@ -408,8 +409,8 @@ void PauseMovieLog_Track(uint32_t movie, uint32_t node, uint32_t property, uint3
       "target {:08X} (+{:X}) {} -> {} ({:+}){}",
       Ticks(), frame_pacing::GameMessages_PassNumber(), PassType(), movie,
       adds ? "adds" : "sets", property, type, node,
-      target, target - node, type == 0 ? fmt::format("{:g}", before_f) : fmt::format("{}", int32_t(before)),
-      type == 0 ? fmt::format("{:g}", after_f) : fmt::format("{}", int32_t(after)),
+      target, target - node, type == 0 ? std::format("{:g}", before_f) : std::format("{}", int32_t(before)),
+      type == 0 ? std::format("{:g}", after_f) : std::format("{}", int32_t(after)),
       type == 0 ? double(after_f - before_f) : double(int32_t(after - before)),
       skipped ? " skipped" : "");
 }

@@ -1,3 +1,4 @@
+#include <format>
 #include "thread_cpu.h"
 
 #include "base/flags.h"
@@ -127,7 +128,7 @@ std::map<int, ThreadSample> SampleThreads() {
 // `samples` times 4 ms apart.
 std::string SampleSyscalls(int tid, int samples) {
   std::map<std::string, int> counts;
-  std::string path = fmt::format("/proc/self/task/{}/syscall", tid);
+  std::string path = std::format("/proc/self/task/{}/syscall", tid);
   for (int i = 0; i < samples; i++) {
     std::ifstream f(path);
     std::string first;
@@ -138,7 +139,7 @@ std::string SampleSyscalls(int tid, int samples) {
   }
   std::string out;
   for (const auto& [call, count] : counts) {
-    out += fmt::format("{}{}x{}", out.empty() ? "" : " ", call, count);
+    out += std::format("{}{}x{}", out.empty() ? "" : " ", call, count);
   }
   return out;
 }
@@ -227,7 +228,7 @@ class ThreadCpu {
       std::string machine;
       uint64_t busy, total;
       if (have_machine && SampleMachine(busy, total) && total > machine_total) {
-        machine = fmt::format(", machine {:.0f}% busy",
+        machine = std::format(", machine {:.0f}% busy",
                               100.0 * (busy - machine_busy) / (total - machine_total));
         machine_busy = busy;
         machine_total = total;
@@ -235,7 +236,7 @@ class ThreadCpu {
       std::string line;
       std::vector<std::pair<int, std::string>> kernel_heavy;
       for (const Row& r : rows) {
-        line += fmt::format(" | {} ({}) {:.0f}% (sys {:.0f}%) cpu{} sw {}/{} faults {}/{}",
+        line += std::format(" | {} ({}) {:.0f}% (sys {:.0f}%) cpu{} sw {}/{} faults {}/{}",
                             r.s->name, r.tid, 100 * (r.user + r.system), 100 * r.system,
                             r.s->cpu, r.voluntary, r.involuntary, r.minor_faults, r.major_faults);
         if (r.system >= kSyscallSampleShare) {

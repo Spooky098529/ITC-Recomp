@@ -25,6 +25,7 @@
 // vertex and index ranges drawn around it and the textures the cache holds.
 // Every 5 s, a summary by caller.
 
+#include <format>
 #include "buffers.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -225,7 +226,7 @@ void Seen(uint8_t* base, uint32_t object, bool index, uint32_t stream, uint32_t 
                    "{:08X} size {}{}",
                    seconds, index ? "index" : "vertex", object, now.type, now.address, now.size,
                    index ? std::string()
-                        : fmt::format(" (stream {}, offset {}, stride {})", stream, offset,
+                        : std::format(" (stream {}, offset {}, stride {})", stream, offset,
                                       stride));
     }
     return;
@@ -248,7 +249,7 @@ void Seen(uint8_t* base, uint32_t object, bool index, uint32_t stream, uint32_t 
 std::string Callers(const std::map<uint32_t, uint64_t>& callers) {
   std::string text;
   for (auto& [caller, count] : callers) {
-    text += fmt::format(" {:08X}={}", caller, count);
+    text += std::format(" {:08X}={}", caller, count);
   }
   return text.empty() ? " none" : text;
 }
@@ -347,7 +348,7 @@ uint32_t g_write_lines = 200;
 Clock::time_point g_last_write_log = Clock::now();
 
 std::string ThreadName(uint16_t thread) {
-  return thread ? fmt::format("thread {}", thread) : std::string("main");
+  return thread ? std::format("thread {}", thread) : std::string("main");
 }
 
 void LogWriteSummary() {

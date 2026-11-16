@@ -108,9 +108,12 @@ new code). The logger is ours (`src/base/log.cpp`, `std::format` and
 stdio, no rotation) and takes over the log file the SDK opens, forwarding
 the SDK's own lines into it (`src/base/log_sdk.cpp`, until A4); hashes
 use our own xxHash (`itc_recomp/thirdparty/xxHash`, A1's first library).
-The flags are still parsed by the SDK until A4, which is deferred until
-the code has no guest dependency (the user's call, 2026-10-21; the survey
-is under A4 in the plan). B7 (the game logic) is in progress: its
+The flags were parsed by the SDK until A4, done in E4's step 4
+(2026-11-16, "E4: the plan"): our own registry and parser
+(`src/base/flags.cpp`; the command line, then `itc.toml`, which may set
+`game_data_root`; the last of a repeated flag wins; no `REXCVAR_*`
+environment variables) and our own log file naming (none with
+`--log_level=off`). B7 (the game logic) is in progress: its
 first loop run (`docs/loops/b7-loop.md`, 2026-10-22, on `b7-loop-test`,
 merged into `rexglue-removal-project` the same day, its rows not yet
 reviewed by the user) made five subsystems native as far as they were ready

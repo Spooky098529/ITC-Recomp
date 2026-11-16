@@ -1,5 +1,6 @@
 // Finds the pause menu's selection (--find_menu_selection).
 
+#include <format>
 #include "menu_selection_scan.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -178,7 +179,7 @@ class MenuSelectionScan {
       }
       candidates.push_back(address);
       const Hits& hits = hits_[address];
-      list += fmt::format(" {:08X}x{}({}->{})", address, n, hits.before, hits.after);
+      list += std::format(" {:08X}x{}({}->{})", address, n, hits.before, hits.after);
     }
     ITC_LOG_INFO(
         "menu selection: sample ({}): {} words changed; {} held and {} idle samples; "

@@ -16,6 +16,7 @@
 //
 // --native_renderer_library_packets turns the replacement off.
 
+#include <format>
 #include "lifted/originals.h"
 #include "draw_packets.h"
 #include "hooks/native_entry.h"
@@ -129,7 +130,7 @@ void LogCheck() {
     HelperStats& s = c.helpers[i];
     std::string changed;
     for (auto& [offset, count] : s.changed) {
-      changed += fmt::format(" +{}={}", offset, count);
+      changed += std::format(" +{}={}", offset, count);
     }
     ITC_LOG_INFO("native renderer: draw writes: {}: {} calls ({} ending a segment, not "
                  "compared); device fields changed:{}",

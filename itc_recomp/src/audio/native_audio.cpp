@@ -28,7 +28,6 @@
 
 #include "guest.h"
 
-#include <rex/audio/flags.h>
 #include "base/flags.h"
 #include "base/log.h"
 
@@ -56,7 +55,11 @@ ITC_FLAG_BOOL(native_render_driver, true, "ITC",
               "through the translated code (XAudioUnregisterRenderDriverClient through its "
               "import as the original; checked by --run_harnesses=audio_wraps)");
 
-ITC_FLAG_DECLARE(int32_t, audio_maxqframes);
+// The SDK's audio flags until A4, same names and defaults.
+ITC_FLAG_BOOL(audio_mute, false, "Audio", "Mute audio output");
+ITC_FLAG_INT32(audio_maxqframes, 8, "Audio",
+               "Max buffered audio frames (range 4-64). Lower reduces latency but may cause "
+               "stuttering.");
 
 namespace native_audio {
 namespace {

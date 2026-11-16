@@ -1,10 +1,14 @@
-// Our log takes over the SDK's log file (log_sdk.cpp), until A4.
+// The SDK's own log lines (its shader translator's, until step 5 of E4 in
+// docs/rexglue-removal.md) forwarded into our log (log_sdk.cpp).
 
 #pragma once
 
+#include <string_view>
+
 namespace base {
 
-// From the app's OnPostInitLogging, after the SDK opened its log file.
-void TakeOverSdkLogFile();
+// Sets up the SDK's logging with no file of its own, at `level` (the
+// --log_level spelling), its lines going into ours.
+void ForwardSdkLog(std::string_view level);
 
 }  // namespace base

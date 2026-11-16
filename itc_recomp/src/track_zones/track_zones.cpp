@@ -11,7 +11,7 @@
 #include "memory/heap.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
-#include <fmt/format.h>
+#include <format>
 
 #include <array>
 #include <string>
@@ -807,7 +807,7 @@ const Setup kSetups[kZones] = {
 constexpr uint32_t kSetupRange = 96;
 
 std::string SetupName(uint32_t number) {
-  return fmt::format("sub_{:08X} Zone{}::Setup", kSetups[number].address, number);
+  return std::format("sub_{:08X} Zone{}::Setup", kSetups[number].address, number);
 }
 
 uint32_t RunSetup(uint8_t* base, uint32_t number, uint32_t zone, uint32_t index,

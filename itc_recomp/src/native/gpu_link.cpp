@@ -15,6 +15,7 @@
 // docs/native-renderer.md), so the library sees everything done at once.
 // Our renderer draws from the command list replay instead.
 
+#include <format>
 #include "guest.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -134,7 +135,7 @@ uint32_t ReadPhysical(uint8_t* base, uint32_t physical) {
 std::string Words(uint8_t* base, uint32_t address, uint32_t count) {
   std::string out;
   for (uint32_t i = 0; i < count && i < 8; i++) {
-    out += fmt::format("{}{:08X}", i ? " " : "", ReadPhysical(base, address + 4 * i));
+    out += std::format("{}{:08X}", i ? " " : "", ReadPhysical(base, address + 4 * i));
   }
   return out;
 }
@@ -166,7 +167,7 @@ void WalkBuffer(uint8_t* base, uint32_t address, uint32_t size, int depth, std::
           s.registers[reg]++;
           s.register_values[reg] = ReadPhysical(base, address + 4 * (i + 1 + k));
           if (trace) {
-            *trace += fmt::format(" [reg {:04X}={:08X}]", reg, s.register_values[reg]);
+            *trace += std::format(" [reg {:04X}={:08X}]", reg, s.register_values[reg]);
           }
         }
       }
@@ -192,7 +193,7 @@ void WalkBuffer(uint8_t* base, uint32_t address, uint32_t size, int depth, std::
         g_rare |= opcode != 0x58 && opcode != 0x3C && opcode != 0x46 && opcode != 0x64;
         s.opcode_samples[opcode] = Words(base, payload, count);
         if (trace) {
-          *trace += fmt::format(" [{} {}]", OpcodeName(opcode), Words(base, payload, count));
+          *trace += std::format(" [{} {}]", OpcodeName(opcode), Words(base, payload, count));
         }
       }
       if ((opcode == 0x3F || opcode == 0x37) && depth < 4) {
@@ -209,7 +210,7 @@ std::string ProgressBlock(uint8_t* base, uint32_t device) {
   if (!block) {
     return "no progress block";
   }
-  return fmt::format("block {:08X}: +0 {:08X} +4 {:08X} +8 {:08X} +60 {:08X}; command position "
+  return std::format("block {:08X}: +0 {:08X} +4 {:08X} +8 {:08X} +60 {:08X}; command position "
                      "{:08X}, primary write {:08X}, pending kicks {}, vblanks {}",
                      block, guest::LoadU32(base, block), guest::LoadU32(base, block + 4),
                      guest::LoadU32(base, block + 8), guest::LoadU32(base, block + 60),
@@ -223,7 +224,7 @@ void LogStats(uint8_t* base, uint32_t device) {
   Stats& s = g_stats;
   std::string opcodes;
   for (auto& [opcode, count] : s.opcodes) {
-    opcodes += fmt::format(" {}({:02X})={}", OpcodeName(opcode), opcode, count);
+    opcodes += std::format(" {}({:02X})={}", OpcodeName(opcode), opcode, count);
   }
   ITC_LOG_INFO("native renderer: gpu: {} kicks ({} by the other path), {} buffers, {} words "
                "({} unreadable); type-3 packets:{}",
@@ -233,7 +234,7 @@ void LogStats(uint8_t* base, uint32_t device) {
   }
   std::string registers;
   for (auto& [reg, count] : s.registers) {
-    registers += fmt::format(" {:04X}={} (last {:08X})", reg, count, s.register_values[reg]);
+    registers += std::format(" {:04X}={} (last {:08X})", reg, count, s.register_values[reg]);
   }
   ITC_LOG_INFO("native renderer: gpu: register writes below 0x2000:{}", registers);
   ITC_LOG_INFO("native renderer: gpu: {}", ProgressBlock(base, device));
@@ -474,7 +475,7 @@ void LogEffects() {
   Effects& e = g_effects;
   std::string unhandled;
   for (auto& [opcode, count] : e.unhandled) {
-    unhandled += fmt::format(" {}({:02X})={}", OpcodeName(opcode & 0xFF), opcode, count);
+    unhandled += std::format(" {}({:02X})={}", OpcodeName(opcode & 0xFF), opcode, count);
   }
   ITC_LOG_INFO("native renderer: exclusive: {} kicks ({} words) made by us: {} fences, {} scratch "
                "write-backs, {} memory writes, {} interrupts ({} callbacks, {} deferred kick "
@@ -519,7 +520,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8229E3F0) {
       for (uint32_t i = 0; i < count; i++) {
         uint32_t size = guest::LoadU32(base, pairs + 8 * i);
         uint32_t address = guest::LoadU32(base, pairs + 8 * i + 4);
-        trace += fmt::format(" buffer {:08X} {} words:", address, size);
+        trace += std::format(" buffer {:08X} {} words:", address, size);
         WalkBuffer(base, address, size, 0, &trace);
       }
       g_trace_kicks -= g_trace_kicks != 0;
@@ -539,7 +540,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8229E3F0) {
       g_tiling_logs--;
       std::string buffers;
       for (uint32_t i = 0; i < count; i++) {
-        buffers += fmt::format(" {:08X} ({} words)", guest::LoadU32(base, pairs + 8 * i + 4),
+        buffers += std::format(" {:08X} ({} words)", guest::LoadU32(base, pairs + 8 * i + 4),
                                guest::LoadU32(base, pairs + 8 * i));
       }
       ITC_LOG_INFO("native renderer: tiling: kick on cpu {} (lr {:08X}):{}", cpu,

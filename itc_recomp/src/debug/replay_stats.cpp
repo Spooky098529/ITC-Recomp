@@ -1,3 +1,4 @@
+#include <format>
 #include "replay_stats.h"
 
 #include "guest.h"
@@ -70,7 +71,7 @@ Stats& GetStats() {
 std::string Words(uint8_t* base, uint32_t address, uint32_t count) {
   std::string words;
   for (uint32_t i = 0; i < count; i++) {
-    words += fmt::format(" {:08X}", guest::LoadU32(base, address + 4 * i));
+    words += std::format(" {:08X}", guest::LoadU32(base, address + 4 * i));
   }
   return words;
 }
@@ -81,7 +82,7 @@ std::string Surface(uint8_t* base, uint32_t surface) {
   if (!surface) {
     return "none";
   }
-  return fmt::format("{:08X} [info{}]", surface, Words(base, surface + 24, 3));
+  return std::format("{:08X} [info{}]", surface, Words(base, surface + 24, 3));
 }
 
 // A texture: its fetch constant (+28..+48).
@@ -89,7 +90,7 @@ std::string Texture(uint8_t* base, uint32_t texture) {
   if (!texture) {
     return "none";
   }
-  return fmt::format("{:08X} [fetch{}]", texture, Words(base, texture + 28, 6));
+  return std::format("{:08X} [fetch{}]", texture, Words(base, texture + 28, 6));
 }
 
 // One line per pass-structure command of a traced frame.
@@ -103,7 +104,7 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
   switch (id) {
     case 23:
       for (uint32_t i = 0; i < arg1; i++) {
-        what += fmt::format(" rt{}={}", guest::LoadU32(base, payload + 16 * i),
+        what += std::format(" rt{}={}", guest::LoadU32(base, payload + 16 * i),
                             Surface(base, guest::LoadU32(base, payload + 16 * i + 4)));
       }
       break;
@@ -116,7 +117,7 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
       for (uint32_t i = 0; i < arg1; i++) {
         uint32_t item = payload + 68 * i;
         uint32_t present = guest::LoadU32(base, item);
-        what += fmt::format(" [flags {:08X}", guest::LoadU32(base, item + 4));
+        what += std::format(" [flags {:08X}", guest::LoadU32(base, item + 4));
         if (present & 1) {
           what += " rect" + Words(base, item + 8, 4);
         }
@@ -126,26 +127,26 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
         if (present & 4) {
           what += " point" + Words(base, item + 28, 2);
         }
-        what += fmt::format(" level {} slice {}", guest::LoadU32(base, item + 36),
+        what += std::format(" level {} slice {}", guest::LoadU32(base, item + 36),
                             guest::LoadU32(base, item + 40));
         if (present & 8) {
-          what += fmt::format(" clear color {:08X}", guest::LoadU32(base, item + 44));
+          what += std::format(" clear color {:08X}", guest::LoadU32(base, item + 44));
         }
-        what += fmt::format(" z {:08X} stencil {}]", guest::LoadU32(base, item + 48),
+        what += std::format(" z {:08X} stencil {}]", guest::LoadU32(base, item + 48),
                             guest::LoadU32(base, item + 52));
       }
       break;
     case 26:
       for (uint32_t i = 0; i < arg1; i++) {
         uint32_t item = payload + 280 * i;
-        what += fmt::format(" [rects {} flags {:08X} color {:08X} z {:08X} stencil {}]",
+        what += std::format(" [rects {} flags {:08X} color {:08X} z {:08X} stencil {}]",
                             guest::LoadU32(base, item + 4), guest::LoadU32(base, item + 8),
                             guest::LoadU32(base, item + 268), guest::LoadU32(base, item + 272),
                             guest::LoadU32(base, item + 276));
       }
       break;
     case 29:
-      what = fmt::format(" mask {:08X}", guest::LoadU32(base, payload));
+      what = std::format(" mask {:08X}", guest::LoadU32(base, payload));
       break;
     case 30:
       what = Words(base, payload, 4 * arg1);
@@ -226,7 +227,7 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
       if (s.shaders.emplace(shader, hash).second) {
         std::string header;
         for (uint32_t i = 0; i < 20; i++) {
-          header += fmt::format(" {:08X}", guest::LoadU32(base, shader + 4 * i));
+          header += std::format(" {:08X}", guest::LoadU32(base, shader + 4 * i));
         }
         ITC_LOG_INFO("replay {} shader (new) {:08X}: microcode {:08X}, {} bytes, hash {:016X}; "
                      "words 0-19:{}",
@@ -241,7 +242,7 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
     if (object && seen.insert(object).second) {
       std::string words;
       for (uint32_t i = 0; i < 16; i++) {
-        words += fmt::format(" {:08X}", guest::LoadU32(base, object + 4 * i));
+        words += std::format(" {:08X}", guest::LoadU32(base, object + 4 * i));
       }
       ITC_LOG_INFO("replay {} (new) {:08X}: words 0-15:{}",
                    id == 10 ? "vertex declaration" : "index buffer", object, words);
@@ -250,9 +251,9 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
   if (IsUnknown(id)) {
     std::string words;
     for (uint32_t i = 0; i < 8; i++) {
-      words += fmt::format(" {:08X}", guest::LoadU32(base, payload + 4 * i));
+      words += std::format(" {:08X}", guest::LoadU32(base, payload + 4 * i));
     }
-    s.sample[id] = fmt::format("arg1 {} arg2 {:08X} payload{}", arg1, arg2, words);
+    s.sample[id] = std::format("arg1 {} arg2 {:08X} payload{}", arg1, arg2, words);
   }
 }
 
@@ -287,7 +288,7 @@ void debug::ReplayStats_OnFrame() {
   std::string line;
   for (uint32_t id = 0; id < kCommandCount; id++) {
     if (s.commands[id]) {
-      line += fmt::format(" | {}: {:.1f} ({:.1f} items)", id, double(s.commands[id]) / s.frames,
+      line += std::format(" | {}: {:.1f} ({:.1f} items)", id, double(s.commands[id]) / s.frames,
                           double(s.items[id]) / s.frames);
     }
   }

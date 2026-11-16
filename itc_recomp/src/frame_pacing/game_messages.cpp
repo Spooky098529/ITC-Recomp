@@ -1,3 +1,4 @@
+#include <format>
 #include "game_messages.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -280,7 +281,7 @@ void InputLog_OnPassStart() {
       auto [combo, kind, id, target] = key;
       if (combo != last_combo || kind != last_kind || id != last_id) {
         flush();
-        line = fmt::format("input runs: {} in_race {} record0 {} ({} passes): {} {:X}:",
+        line = std::format("input runs: {} in_race {} record0 {} ({} passes): {} {:X}:",
                            (combo & 1) ? "render-only" : "logic", (combo >> 1) & 1,
                            (combo >> 3) & 1, g_input_log_passes[combo],
                            kind == kMessageRun ? "message" : "tick", id);
@@ -288,7 +289,7 @@ void InputLog_OnPassStart() {
         last_kind = kind;
         last_id = id;
       }
-      line += fmt::format(" {:08X}x{}", target, n);
+      line += std::format(" {:08X}x{}", target, n);
     }
     flush();
     g_input_log_runs.clear();
@@ -637,7 +638,7 @@ void LogInputManager(lifted::Regs& ctx, uint8_t* base, uint32_t manager) {
         ctx.lr = 0x82591970;
         lifted::CallFromContext(ctx, base, function);
         uint32_t v = ctx.r3.u32;
-        values = fmt::format("returns {:08X} (device + 8: {})", v, v == device + 8);
+        values = std::format("returns {:08X} (device + 8: {})", v, v == device + 8);
       }
       ITC_LOG_INFO(
           "input logical pad {} binding {}: enabled {} device {:08X} (physical pad {}) vtable "

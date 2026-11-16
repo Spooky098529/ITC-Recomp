@@ -7,6 +7,7 @@
 // state (+4) to 5, which loads an attract-mode race. See
 // docs/title-screen.md.
 
+#include <format>
 #include "title_screen.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -99,9 +100,9 @@ ITC_NATIVE_ENTRY_ALWAYS(820988C8) {
     std::string now;
     for (uint32_t pointer : {0x82814E2Cu, 0x82814E30u, kTitleScreenPointer}) {
       uint32_t object = guest::LoadU32(base, pointer);
-      now += fmt::format(" [{:08X}]={:08X}:", pointer, object);
+      now += std::format(" [{:08X}]={:08X}:", pointer, object);
       for (uint32_t i = 0; object && i < 24; i += 4) {
-        now += fmt::format(" {}", int32_t(guest::LoadU32(base, object + i)));
+        now += std::format(" {}", int32_t(guest::LoadU32(base, object + i)));
       }
     }
     if (now != last) {

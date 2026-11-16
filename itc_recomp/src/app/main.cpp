@@ -4,8 +4,9 @@
 // (src/app/image_load.h), starts our audio output and the game's main
 // thread (one of ours, in our start-up, src/app/start_up.cpp, in place of
 // the game's xstart), and runs the main thread's event loop. Since E2 (step
-// 5) the SDK's Runtime (its memory, kernel, loader and VFS) isn't made; the
-// SDK is used only as a library (the flags, the log, paths). Before 2026-11-15 the SDK's main() and its ReXApp
+// 5) the SDK's Runtime (its memory, kernel, loader and VFS) isn't made, and
+// since A4 (E4's step 4) the flags, the paths and the log file are ours too.
+// Before 2026-11-15 the SDK's main() and its ReXApp
 // did all this (rexglue-sdk/src/ui/windowed_app_main_sdl.cpp and
 // rex_app.cpp, no longer built into our executable); what they did that we
 // don't need (their window, ImGui overlays, achievement toasts, the GPU
@@ -27,11 +28,7 @@
 #include "input/gamepads.h"
 
 #include <SDL3/SDL.h>
-#include <fmt/format.h>
 #include <SDL3/SDL_main.h>
-#include <rex/cvar.h>
-#include <rex/filesystem.h>
-#include <rex/logging.h>
 
 #include <atomic>
 #include <cstring>
@@ -42,17 +39,21 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
-// The SDK's flags this start-up reads (defined in its library).
-ITC_FLAG_DECLARE(std::string, game_data_root);
-ITC_FLAG_DECLARE(std::string, user_data_root);
-ITC_FLAG_DECLARE(std::string, update_data_root);
-ITC_FLAG_DECLARE(std::string, cache_root);
-ITC_FLAG_DECLARE(std::string, metadata_root);
-ITC_FLAG_DECLARE(std::string, log_file);
-ITC_FLAG_DECLARE(std::string, log_level);
-ITC_FLAG_DECLARE(bool, log_verbose);
-ITC_FLAG_DECLARE(std::string, video_driver);
+// The start-up's flags (the SDK's until A4, same names and defaults; its
+// user_data_root, update_data_root, cache_root and metadata_root, which
+// nothing used, are gone: given, they're reported as unknown).
+ITC_FLAG_STRING(game_data_root, "", "Runtime",
+                "The game's files (default.xex, DATA/); empty: the executable's folder. "
+                "itc.toml may set it too");
+ITC_FLAG_STRING(log_level, "info", "Log",
+                "Log level: trace, debug, info, warn, error, critical, off (off: no log file)");
+ITC_FLAG_STRING(log_file, "", "Log", "Log file path (empty: logs/itc_<n>.log, the next number)");
+ITC_FLAG_BOOL(log_verbose, false, "Log", "Log at trace (debug) when log_level is info");
+ITC_FLAG_STRING(video_driver, "", "UI/Window",
+                "SDL video driver to use, such as \"wayland\" or \"x11\". Empty picks SDL's "
+                "default for the session");
 
 namespace app {
 namespace {
@@ -61,10 +62,6 @@ constexpr const char* kName = "itc";
 
 struct Paths {
   std::filesystem::path game_data;
-  std::filesystem::path user_data;
-  std::filesystem::path update_data;
-  std::filesystem::path cache;
-  std::filesystem::path metadata;
   std::filesystem::path config;
 };
 
@@ -74,56 +71,47 @@ std::mutex g_queue_mutex;
 std::deque<std::function<void()>> g_queue;
 uint32_t g_wake_event = 0;
 
-std::filesystem::path FlagPath(const std::string& value) {
-  return value.empty() ? std::filesystem::path{} : std::filesystem::path(value);
+// The executable's folder (itc.toml, logs/ and, by default, the game's
+// files are there).
+std::filesystem::path ExecutableFolder() {
+  std::error_code error;
+  const std::filesystem::path exe = std::filesystem::read_symlink("/proc/self/exe", error);
+  return error ? std::filesystem::current_path() : exe.parent_path();
 }
 
-// The paths, as ReXApp::SetupEnvironment worked them out (with our
-// OnConfigurePaths: without --game_data_root, the executable's folder).
-Paths ResolvePaths() {
-  const std::filesystem::path exe_dir = rex::filesystem::GetExecutableFolder();
+// The game's files: --game_data_root (the command line or itc.toml), else
+// the executable's folder.
+Paths ResolvePaths(const std::filesystem::path& exe_dir) {
   Paths paths;
-  paths.game_data = FlagPath(ITC_FLAG(game_data_root));
-  if (paths.game_data.empty()) {
-    paths.game_data = exe_dir;
-  }
-  paths.user_data = FlagPath(ITC_FLAG(user_data_root));
-  if (paths.user_data.empty()) {
-    paths.user_data = rex::filesystem::GetUserFolder() / kName;
-  }
-  paths.update_data = FlagPath(ITC_FLAG(update_data_root));
-  paths.cache = FlagPath(ITC_FLAG(cache_root));
-  if (paths.cache.empty()) {
-    paths.cache = paths.user_data / "cache";
-  }
-  paths.metadata = FlagPath(ITC_FLAG(metadata_root));
   paths.config = exe_dir / (std::string(kName) + ".toml");
+  const std::string& root = ITC_FLAG(game_data_root);
+  paths.game_data = root.empty() ? exe_dir : std::filesystem::path(root);
   return paths;
 }
 
-// itc.toml, then the log (ours taking over the file the SDK's logger
-// opens: src/base/log_sdk.cpp).
-void SetUpLogging(const Paths& paths) {
-  if (std::filesystem::exists(paths.config)) {
-    rex::cvar::LoadConfig(paths.config);
-  }
+// The log: our file (logs/itc_<n>.log next to the executable, or --log_file;
+// none with log_level off), the SDK's lines forwarded into it.
+void SetUpLogging(const std::filesystem::path& exe_dir, const Paths& paths,
+                  const std::vector<std::string>& others) {
   std::string level = ITC_FLAG(log_level);
   if (ITC_FLAG(log_verbose) && level == "info") {
     level = "trace";
   }
-  const std::string& file = ITC_FLAG(log_file);
-  auto config = rex::BuildLogConfig(file.empty() ? nullptr : file.c_str(), level,
-                                    rex::ParseCategoryLevelsFromConfig(paths.config));
-  if (file.empty()) {
-    config.app_name = kName;
-    config.log_dir = (rex::filesystem::GetExecutableFolder() / "logs").string();
+  if (level == "off") {
+    base::StartLogFile("", level);
+  } else {
+    const std::string& file = ITC_FLAG(log_file);
+    base::StartLogFile(file.empty() ? base::NextLogPath(exe_dir / "logs", kName).string() : file,
+                       level);
   }
-  rex::InitLogging(config);
-  rex::RegisterLogLevelCallback();
-  base::TakeOverSdkLogFile();
+  base::ForwardSdkLog(level);
   ITC_LOG_INFO("{} starting", kName);
   ITC_LOG_INFO("  Game directory: {}", paths.game_data.string());
-  ITC_LOG_INFO("  User data:      {}", paths.user_data.string());
+  base::flags::WarnAboutProblems();
+  for (const std::string& other : others) {
+    ITC_LOG_WARN("flags: not a flag on the command line: {}", other);
+  }
+  base::LogFlags();
 }
 
 bool SetUpSdl() {
@@ -185,7 +173,6 @@ void RunQueued() {
 [[noreturn]] void Close() {
   ITC_LOG_INFO("Window closing, shutting down...");
   ITC_LOG_INFO("Hard-exiting process.");
-  rex::FlushLogging();
   std::_Exit(0);
 }
 
@@ -225,11 +212,13 @@ void RequestQuit() {
 }  // namespace app
 
 int main(int argc, char* argv[]) {
-  rex::cvar::Init(argc, argv);
-  rex::cvar::ApplyEnvironment();
-  rex::InitLoggingEarly();
-  const app::Paths paths = app::ResolvePaths();
-  app::SetUpLogging(paths);
+  // The flags: the command line, then itc.toml for what it didn't set (so
+  // itc.toml may set game_data_root too).
+  const std::vector<std::string> others = base::flags::ParseCommandLine(argc, argv);
+  const std::filesystem::path exe_dir = app::ExecutableFolder();
+  base::flags::LoadConfig(exe_dir / "itc.toml");
+  const app::Paths paths = app::ResolvePaths(exe_dir);
+  app::SetUpLogging(exe_dir, paths, others);
   // Guest memory (ours: src/memory/mapping.h), before anything that
   // allocates in it.
   if (!memory::MapGuest()) {

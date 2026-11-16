@@ -1,3 +1,4 @@
+#include <format>
 #include "passes.h"
 #include "frame_costs.h"
 #include "base/log.h"
@@ -1642,7 +1643,7 @@ void Passes::State::CheckClobbers(uint8_t* base, uint32_t address, uint32_t size
     clobbers_by_shaders[{it->second.vertex_shader, it->second.pixel_shader, current_vertex_shader,
                          current_pixel_shader}]++;
     if (clobber_sample.empty()) {
-      clobber_sample = fmt::format(
+      clobber_sample = std::format(
           "{} {:08X}-{:08X} of vs {:016X} ps {:016X} by {} {:08X}-{:08X} of vs {:016X} ps "
           "{:016X}: {} bytes differ from {:08X}",
           it->second.index ? "index" : "vertex", it->first, it->second.end,
@@ -2029,7 +2030,7 @@ VkDescriptorSet Passes::State::BuildTextureSet(uint8_t* base, const TranslatedSh
     }
     // Which shaders sample a texture of another dimension than declared.
     if (mismatched && mismatch_lines.size() < 20 && base::InfoLogEnabled()) {
-      std::string key = fmt::format(
+      std::string key = std::format(
           "{} shader {:016X} fetch constant {} declares view type {}; texture {:08X} format {} "
           "dimension {} {}x{}",
           shader->stage == ShaderStage::kVertex ? "vertex" : "pixel", shader->hash,
@@ -3238,7 +3239,7 @@ void Passes::State::OpenPipelineCache() {
   pipeline_cache_saved = std::chrono::steady_clock::now();
   if (!pipeline_cache_file.empty()) {
     ITC_LOG_INFO("native renderer: pipeline disk cache {}: {}", pipeline_cache_file.string(),
-                 matches        ? fmt::format("{} KB loaded", data.size() / 1024)
+                 matches        ? std::format("{} KB loaded", data.size() / 1024)
                  : data.empty() ? std::string("new")
                                : std::string("another device's or driver's; starting over"));
   }
@@ -3449,7 +3450,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.stats.declaration_mismatches++;
     s.stats.declaration_mismatches_patched += patched;
     if (s.declaration_lines.size() < 6) {
-      s.declaration_lines.push_back(fmt::format(
+      s.declaration_lines.push_back(std::format(
           "vs object {:08X} patched for {} ({:016X}), bound declaration {:08X} id {}; this "
           "draw patched {}; last patch: object {:08X} declaration {:08X} id {}",
           vertex_object, patched_for, base::Hash64(vertex_ucode, vertex_size), declaration,
@@ -3604,7 +3605,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       // Its weight: the vertices' color alpha (the shader outputs the
       // history times the color, and the color's alpha).
       uint8_t* vertices = draw_mirror().mapped;
-      glow_frame.constants += fmt::format(
+      glow_frame.constants += std::format(
           "vertex color {:.4g} {:.4g} {:.4g} {:.4g}; ",
           guest::LoadFloat(vertices, call.vertex_address + 16),
           guest::LoadFloat(vertices, call.vertex_address + 20),
@@ -3614,7 +3615,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     for (uint32_t c = 0; c < 256; c++) {
       if (pixel->float_constants[c >> 6] & (uint64_t(1) << (c & 63))) {
         uint32_t at = device + kDevicePixelFloatConstants + 16 * c;
-        glow_frame.constants += fmt::format(
+        glow_frame.constants += std::format(
             "c{} {:.4g} {:.4g} {:.4g} {:.4g}; ", c, guest::LoadFloat(base, at),
             guest::LoadFloat(base, at + 4), guest::LoadFloat(base, at + 8),
             guest::LoadFloat(base, at + 12));
@@ -4540,7 +4541,7 @@ void Passes::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t paylo
     }
     width = std::max(width, uint32_t(std::max(r[2], 0)));
     height = std::max(height, uint32_t(std::max(r[3], 0)));
-    tiles += fmt::format(" {},{}-{},{}", r[0], r[1], r[2], r[3]);
+    tiles += std::format(" {},{}-{},{}", r[0], r[1], r[2], r[3]);
   }
   uint32_t clear_bits = guest::LoadU32(base, 0x82000A34);
   float clear;
@@ -4642,7 +4643,7 @@ void Passes::State::LogGlow() {
   }
   if (glow_addresses[logic].empty()) {
     for (uint32_t address : glow_frame.addresses) {
-      glow_addresses[logic] += fmt::format("{:08X} ", address);
+      glow_addresses[logic] += std::format("{:08X} ", address);
     }
   }
   // A frame: L (logic) or r, then x if it cross-faded, h if it wrote the
@@ -4731,7 +4732,7 @@ std::string Passes::TakeIndexRanges() {
   double frames = double(std::max<uint64_t>(c.frames, 1));
   double scans = double(std::max<uint64_t>(c.scans, 1));
   double asked = double(std::max<uint64_t>(c.newest_asked, 1));
-  std::string text = fmt::format(
+  std::string text = std::format(
       "index ranges: {:.1f} scans a frame ({:.0f} indices), {:.1f} distinct; of the scans, "
       "first seen {:.1f}%, seen earlier this frame {:.1f}%, written by memcpy since last "
       "scanned {:.1f}%, unchanged {:.1f}% ({:.0f} indices a frame), unchanged with another "
@@ -4746,7 +4747,7 @@ std::string Passes::TakeIndexRanges() {
       state_->index_ranges_seen.size());
   if (c.mismatched) {
     const uint32_t* m = c.mismatch_sample;
-    text += fmt::format(" (e.g. {:08X} x{}: {}-{} kept, {}-{} scanned)", m[0], m[1], m[2], m[3],
+    text += std::format(" (e.g. {:08X} x{}: {}-{} kept, {}-{} scanned)", m[0], m[1], m[2], m[3],
                         m[4], m[5]);
   }
   uint64_t frame_sequence = c.frame_sequence;
@@ -4770,7 +4771,7 @@ std::string Passes::TakeTextureBindings() {
   double frames = double(std::max<uint64_t>(c.frames, 1));
   auto share = [](uint64_t n, uint64_t of) { return 100.0 * double(n) / double(std::max<uint64_t>(of, 1)); };
   uint64_t generations = s.textures.generation() - c.generation;
-  std::string text = fmt::format(
+  std::string text = std::format(
       "texture bindings: {:.1f} draws a frame ({:.1f} with textures or samplers), repeating the "
       "last draw's shaders and the fetch constants they read {:.1f}% ({:.1f}% ignoring "
       "generations; vertex stage {:.1f}%, pixel {:.1f}%); {:.1f} views a frame, the same as the "
@@ -4804,7 +4805,7 @@ std::string Passes::TakeShaderLookups() {
   State::ShaderLookupCounts& c = s.lookup_counts;
   double frames = double(std::max<uint64_t>(c.frames, 1));
   auto share = [](uint64_t n, uint64_t of) { return 100.0 * double(n) / double(std::max<uint64_t>(of, 1)); };
-  std::string text = fmt::format(
+  std::string text = std::format(
       "shader lookups: {:.1f} draws a frame ({:.1f} with the patched copy); the same keys as "
       "the last draw: vertex {:.1f}%, pixel {:.1f}%, whole lookup {:.1f}%; seen before: vertex "
       "{:.1f}%, pixel {:.1f}%, whole lookup {:.1f}%; stale (seen, microcode changed): vertex {} "
@@ -4819,7 +4820,7 @@ std::string Passes::TakeShaderLookups() {
   for (int stage = 0; stage < 2; stage++) {
     const State::ShaderKey& k = c.stale_sample[stage];
     if (k.object) {
-      text += fmt::format(
+      text += std::format(
           "; stale {} sample without a patch: object {:08X} microcode {:08X} size {} patched for "
           "{} declaration {} copy {}, hash {:016X} then {:016X}",
           kStage[stage], k.object, k.microcode, k.size, k.patched_for, k.declaration_id, k.copy,
@@ -4858,7 +4859,7 @@ std::string Passes::TakeMirrorByTick() {
     return {};
   }
   State::MirrorByTickStats& b = s.by_tick;
-  std::string text = fmt::format(
+  std::string text = std::format(
       "{} frames, {} swaps; {} writes applied ({:.1f} MB); drawn ranges missing a write: {} in "
       "logic passes' lists ({:.2f} MB), {} in render-only passes' ({:.2f} MB)",
       b.frames, b.swaps, b.writes, b.bytes / 1048576.0, b.stale[0], b.stale_bytes[0] / 1048576.0,
@@ -4891,7 +4892,7 @@ std::string Passes::TakeMirrorChanges() {
   std::sort(changed.begin(), changed.end(),
             [](const auto& a, const auto& b) { return a.second.changes > b.second.changes; });
   double frames = double(std::max<uint64_t>(s.mirror_frames, 1));
-  std::string text = fmt::format(
+  std::string text = std::format(
       "per frame {:.2f} MB copied with changed contents, {:.2f} MB of ranges new, vertex "
       "buffers {:.2f} MB copied but {:.2f} MB within the draws' vertices; {} of {} ranges "
       "changed ({:.1f} MB)",
@@ -4901,7 +4902,7 @@ std::string Passes::TakeMirrorChanges() {
   s.mirror_frames = s.mirror_changed_bytes = s.mirror_new_bytes = s.mirror_vertex_bytes =
       s.used_vertex_bytes = 0;
   for (size_t i = 0; i < changed.size() && i < 12; i++) {
-    text += fmt::format("; {} {:08X} {} bytes x{}", changed[i].second.index ? "index" : "vertex",
+    text += std::format("; {} {:08X} {} bytes x{}", changed[i].second.index ? "index" : "vertex",
                         uint32_t(changed[i].first >> 32), uint32_t(changed[i].first),
                         changed[i].second.changes);
   }
@@ -4947,14 +4948,14 @@ std::string DescribeChange(const char* name, const std::vector<uint32_t>& before
       std::memcpy(&a, &before[i], 4);
       std::memcpy(&b, &after[i], 4);
       if (float_registers) {
-        text += fmt::format(" c{}.{} {:.4g}->{:.4g}", (*float_registers)[i / 4], "xyzw"[i % 4], a,
+        text += std::format(" c{}.{} {:.4g}->{:.4g}", (*float_registers)[i / 4], "xyzw"[i % 4], a,
                             b);
       } else {
-        text += fmt::format(" word {} {:08X}->{:08X}", i, before[i], after[i]);
+        text += std::format(" word {} {:08X}->{:08X}", i, before[i], after[i]);
       }
     }
   }
-  return changed ? fmt::format("; {} ({} words):{}", name, changed, text) : std::string();
+  return changed ? std::format("; {} ({} words):{}", name, changed, text) : std::string();
 }
 
 }  // namespace
@@ -5004,7 +5005,7 @@ void Passes::State::WatchDraw(const TranslatedShader* vertex, const TranslatedSh
     if (!change.empty()) {
       watched_changes++;
       if (watch_lines.size() < (watch_pixel_shader ? 200u : 40u)) {
-        watch_lines.push_back(fmt::format("vs {:016X} ps {:016X} indices {:08X} x{} #{}{}",
+        watch_lines.push_back(std::format("vs {:016X} ps {:016X} indices {:08X} x{} #{}{}",
                                           vertex->hash, ps, index_address, primitive_count,
                                           occurrence, change));
       }
@@ -5025,10 +5026,10 @@ std::string Passes::TakeInterfaces() {
   State& s = *state_;
   std::string text;
   for (const auto& [hash, interpolators] : s.param_gen_by_shader) {
-    text += fmt::format(" ps {:016X} param gen in {:04X};", hash, interpolators);
+    text += std::format(" ps {:016X} param gen in {:04X};", hash, interpolators);
   }
   for (const auto& [hash, masks] : s.interpolators_by_shader) {
-    text += fmt::format(" ps {:016X} interpolators {:08X};", hash, masks);
+    text += std::format(" ps {:016X} interpolators {:08X};", hash, masks);
   }
   s.param_gen_by_shader.clear();
   s.interpolators_by_shader.clear();
@@ -5062,12 +5063,12 @@ void Passes::set_check_late_writes(bool check) {
 
 std::string Passes::TakeLateWrites() {
   State& s = *state_;
-  std::string text = fmt::format("{} of {} copied ranges changed by the end of the frame",
+  std::string text = std::format("{} of {} copied ranges changed by the end of the frame",
                                  s.late_written, s.late_checked);
   if (!s.late_sample.empty()) {
     text += ", e.g. " + s.late_sample + "; by vertex shader:";
     for (const auto& [shader, count] : s.late_by_shader) {
-      text += fmt::format(" {:016X} x{}", shader, count);
+      text += std::format(" {:016X} x{}", shader, count);
     }
   }
   s.late_written = s.late_checked = 0;
@@ -5087,7 +5088,7 @@ std::vector<std::string> Passes::TakeDeclarationLines() {
 std::string Passes::TakeClobbers() {
   State& s = *state_;
   std::string text =
-      fmt::format("{} of {} copies changed bytes an earlier copy this frame put in the mirror "
+      std::format("{} of {} copies changed bytes an earlier copy this frame put in the mirror "
                   "({} bytes)",
                   s.clobbers, s.clobber_copies, s.clobbered_bytes);
   if (!s.clobber_sample.empty()) {
@@ -5099,7 +5100,7 @@ std::string Passes::TakeClobbers() {
     std::sort(pairs.rbegin(), pairs.rend());
     for (size_t i = 0; i < std::min<size_t>(pairs.size(), 12); i++) {
       const auto& [count, k] = pairs[i];
-      text += fmt::format(" {:08X}/{:08X} by {:08X}/{:08X} x{};", k[0] >> 32, k[1] >> 32,
+      text += std::format(" {:08X}/{:08X} by {:08X}/{:08X} x{};", k[0] >> 32, k[1] >> 32,
                           k[2] >> 32, k[3] >> 32, count);
     }
   }
@@ -5146,7 +5147,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
         s.late_written++;
         s.late_by_shader[r.vertex_shader]++;
         if (s.late_sample.empty()) {
-          s.late_sample = fmt::format("{} {:08X} ({} bytes) of vs {:016X}",
+          s.late_sample = std::format("{} {:08X} ({} bytes) of vs {:016X}",
                                       r.index ? "index" : "vertex", r.address, r.size,
                                       r.vertex_shader);
         }
@@ -5160,7 +5161,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
     std::string list;
     for (size_t i = 0; i < s.frame_resolves.size(); i++) {
       const State::Resolved& r = s.frame_resolves[i];
-      list += fmt::format("{}{}: {:08X} format {} {}x{} flags {:X}", i ? "; " : "", i, r.address,
+      list += std::format("{}{}: {:08X} format {} {}x{} flags {:X}", i ? "; " : "", i, r.address,
                           r.format, r.extent.width, r.extent.height, r.flags);
     }
     ITC_LOG_INFO("native renderer: this frame's resolves: {}", list);
@@ -5341,7 +5342,7 @@ void Passes::State::RecordDump(VkCommandBuffer commands, VkExtent2D shown_extent
   std::vector<VkImage> images = {shown.image};
   for (size_t i = 0; with_resolves && i < frame_resolves.size(); i++) {
     const Resolved& r = frame_resolves[i];
-    add(fmt::format("resolve_{:02}_{:08X}_format{}", i, r.address, r.format), r.host_format,
+    add(std::format("resolve_{:02}_{:08X}_format{}", i, r.address, r.format), r.host_format,
         r.extent);
     images.push_back(r.image);
   }
@@ -5405,7 +5406,7 @@ void Passes::State::DumpGuestResolves() {
     if (!TextureCache::DecodeGuest(last_base, r.fetch, d.cpu, d.format, width, height)) {
       continue;
     }
-    d.name = fmt::format("guest_resolve_{:02}_{:08X}_format{}", i, r.address, r.format);
+    d.name = std::format("guest_resolve_{:02}_{:08X}_format{}", i, r.address, r.format);
     d.extent = {width, height};
     d.offset = 0;
     dumped.push_back(std::move(d));
@@ -5445,7 +5446,7 @@ void Passes::WriteDump(const std::string& directory) {
     if (FILE* file = std::fopen((directory + "/draws.txt").c_str(), "w")) {
       for (size_t n = 0; n < s.recorded_draws.size(); n++) {
         const State::RecordedDraw& r = s.recorded_draws[n];
-        std::string line = fmt::format(
+        std::string line = std::format(
             "draw {}: {} target pitch {} MSAA {} format {}, color {}, depth {}; vs {:016X} ps "
             "{:016X}; primitive {} x{}{}",
             n, r.main_view ? "main view" : "other", r.surface.pitch, r.surface.msaa,
@@ -5455,17 +5456,17 @@ void Passes::WriteDump(const std::string& directory) {
         float blend[4], alpha_ref;
         std::memcpy(blend, &rs[5], 16);
         std::memcpy(&alpha_ref, &rs[9], 4);
-        line += fmt::format(
+        line += std::format(
             "; depthcontrol {:08X} blendcontrol {:08X} colorcontrol {:08X} modecontrol {:08X} "
             "color mask {:08X} blend constant {:.3g} {:.3g} {:.3g} {:.3g} alpha ref {:.3g}",
             rs[0], rs[1], rs[2], rs[3], rs[4], blend[0], blend[1], blend[2], blend[3], alpha_ref);
         for (const auto& v : r.vertex_fetches) {
-          line += fmt::format("; vfetch {}: {:08X} {:08X} (address {:08X}, {} bytes)", v[0], v[1],
+          line += std::format("; vfetch {}: {:08X} {:08X} (address {:08X}, {} bytes)", v[0], v[1],
                               v[2], v[1] & 0x1FFFFFFCu, ((v[2] >> 2) & 0xFFFFFFu) * 4);
         }
         for (const State::RecordedDraw::Texture& t : r.textures) {
           const uint32_t* f = t.fetch;
-          line += fmt::format(
+          line += std::format(
               "; {} tex {}{}: {:08X} format {} {}x{} dim {} declared {} words {:08X} {:08X} "
               "{:08X} {:08X} {:08X} {:08X}",
               t.pixel ? "ps" : "vs", t.texture.fetch_constant, t.texture.is_signed ? "s" : "",
