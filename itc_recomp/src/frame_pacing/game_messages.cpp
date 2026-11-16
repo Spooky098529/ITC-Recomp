@@ -151,16 +151,14 @@ uint32_t g_input_listener0 = 0;
 struct PauseSigns {
   uint32_t records[3] = {};  // LoadU32(0x826BAC00 + 588 + 592k)
   uint32_t mode = 0;         // LoadU32([0x826C5B2C] + 0xA3AF0)
-  uint32_t r31 = 0;
-  uint32_t r31_value = 0;  // LoadU32(r31 + 588)
   bool operator==(const PauseSigns&) const = default;
 };
 PauseSigns g_pause_signs;
 
-// Bits: 1 render-only, 2 in a race, 4 r31 + 588 non-zero, 8 record 0's +588
-// non-zero.
+// Bits: 1 render-only, 2 in a race, 8 record 0's +588 non-zero (4, the
+// draw step's caller's r31 + 588, isn't carried since the rewiring: 0).
 int InputLogCombo() {
-  return (g_render_only_pass ? 1 : 0) | (g_in_race ? 2 : 0) | (g_pause_signs.r31_value ? 4 : 0) |
+  return (g_render_only_pass ? 1 : 0) | (g_in_race ? 2 : 0) |
          (g_pause_signs.records[0] ? 8 : 0);
 }
 
@@ -252,10 +250,9 @@ void InputWatch_Flush() {
     }
     const InputRange& r = g_input_ranges[std::min<size_t>(range, g_input_ranges.size() - 1)];
     ITC_LOG_INFO(
-        "input writes: {} in_race {} r31+588 {} record0 {} ({} passes): {} {:08X}: {} {} +{:X} "
+        "input writes: {} in_race {} record0 {} ({} passes): {} {:08X}: {} {} +{:X} "
         "x{} (last {:08X} -> {:08X})",
-        (combo & 1) ? "render-only" : "logic", (combo >> 1) & 1, (combo >> 2) & 1,
-        (combo >> 3) & 1, g_input_log_passes[combo], kind == kMessageRun ? "message" : "tick",
+        (combo & 1) ? "render-only" : "logic", (combo >> 1) & 1, (combo >> 3) & 1, g_input_log_passes[combo], kind == kMessageRun ? "message" : "tick",
         target, r.name, r.index, offset, write.count, write.before, write.after);
   }
   g_input_writes.clear();
@@ -282,9 +279,9 @@ void InputLog_OnPassStart() {
       auto [combo, kind, id, target] = key;
       if (combo != last_combo || kind != last_kind || id != last_id) {
         flush();
-        line = fmt::format("input runs: {} in_race {} r31+588 {} record0 {} ({} passes): {} {:X}:",
+        line = fmt::format("input runs: {} in_race {} record0 {} ({} passes): {} {:X}:",
                            (combo & 1) ? "render-only" : "logic", (combo >> 1) & 1,
-                           (combo >> 2) & 1, (combo >> 3) & 1, g_input_log_passes[combo],
+                           (combo >> 3) & 1, g_input_log_passes[combo],
                            kind == kMessageRun ? "message" : "tick", id);
         last_combo = combo;
         last_kind = kind;
@@ -301,7 +298,7 @@ void InputLog_OnPassStart() {
 }
 
 // As the race draw step is entered: logs the pause signs when any changed.
-void InputLog_PauseSigns(uint8_t* base, uint32_t r31, uint32_t r31_value);
+void InputLog_PauseSigns(uint8_t* base);
 
 struct Counts {
   int updates = 0;
@@ -537,7 +534,7 @@ bool GameMessages_IsRenderOnlyPass() {
 
 namespace {
 
-void InputLog_PauseSigns(uint8_t* base, uint32_t r31, uint32_t r31_value) {
+void InputLog_PauseSigns(uint8_t* base) {
   if (!ITC_FLAG(log_input)) {
     return;
   }
@@ -551,17 +548,14 @@ void InputLog_PauseSigns(uint8_t* base, uint32_t r31, uint32_t r31_value) {
   }
   uint32_t mode_object = guest::LoadU32(base, 0x826C5B2C);
   signs.mode = mode_object ? guest::LoadU32(base, mode_object + 0xA3AF0) : ~0u;
-  signs.r31 = r31;
-  signs.r31_value = r31_value;
   if (signs == g_pause_signs) {
     return;
   }
   g_pause_signs = signs;
   ITC_LOG_INFO(
-      "input pause signs: pass {} {}: record0+588 {:08X} record1 {:08X} record2 {:08X} mode {:X} "
-      "r31 {:08X} r31+588 {:08X}",
+      "input pause signs: pass {} {}: record0+588 {:08X} record1 {:08X} record2 {:08X} mode {:X}",
       GameMessages_PassNumber(), g_render_only_pass ? "render-only" : "logic", signs.records[0],
-      signs.records[1], signs.records[2], signs.mode, signs.r31, signs.r31_value);
+      signs.records[1], signs.records[2], signs.mode);
 }
 
 }  // namespace
@@ -712,20 +706,17 @@ ITC_NATIVE_ENTRY_ALWAYS(820990F0) {
 }
 
 // The race's draw step: r3 = its argument. Noted to tell races from menus.
-// r31 isn't an argument: it's what the caller (sub_8215C770) left in it.
 // Its work: the plain C++ (src/race_update/draw_step.h) with
-// --native_race_draw_step, else the original. On the SDK's context (not in
-// the dispatch table): it reads its caller's r31 (the rewiring, stage 3;
-// left for later).
-extern "C" REX_FUNC(sub_8215B4F8) {
-  REX_FUNC_PROLOGUE();
-  uint32_t r31_value = guest::LoadU32(base, ctx.r31.u32 + 588);
-  frame_pacing::InputLog_PauseSigns(base, ctx.r31.u32, r31_value);
+// --native_race_draw_step, else the original. (The input log once also
+// read the record the caller's r31 pointed at: not carried since the
+// rewiring; it reads the records themselves.)
+ITC_NATIVE_ENTRY_ALWAYS(8215B4F8) {
+  frame_pacing::InputLog_PauseSigns(base);
   frame_pacing::g_race_draw_step_seen = true;
   if (ITC_FLAG(native_race_draw_step)) {
     lifted_call::EnterR3<race_update::RaceDrawStep>(ctx, base);
   } else {
-    __imp__sub_8215B4F8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8215B4F8);
   }
 }
 
