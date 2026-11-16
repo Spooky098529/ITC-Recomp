@@ -3779,6 +3779,34 @@ guest address space stays until E5 makes the code real C++ (the old E2's
    another, or at its physical address), and every physical address the
    renderer reads, by the block it falls in. Recorded here; it decides
    steps 2 and 4.
+
+   Done (2026-11-16). **The kernel's variables**: the image imports 10
+   (the SDK binds each slot in the image's import table, logged at
+   `--log_level=debug`; slots found in the image's first pages under
+   gdb). Read by code that runs (the lifted functions found by scanning
+   `src/lifted/` for loads at `0x82000000` + the slot, checked against
+   `coverage/seen_in_play.txt`; our hand ports by their constants):
+
+   | Slot | Variable | Read by | What the SDK leaves there | To plug in |
+   | --- | --- | --- | --- | --- |
+   | `0x820007B0` | `VdGlobalDevice` | the graphics library's lifted functions, `Device::WorkerThread`, `hooks/graphics_device.cpp`, `graphics/predicated_tiling.cpp` | a word the game writes itself (the device, `0x001B6900`) | a word of ours |
+   | `0x820007B4` | `KeCertMonitorData` | `Device::BeginTiling` `825BED08`, `822B1E70` (seen in play) | zeros | a zeroed block |
+   | `0x820007F0` | `KeDebugMonitorData` | the same two, `CheckHeap`, XAudio (`xaudio/engine.h`), the C runtime (`c_runtime/core.h`) | zeros | a zeroed block |
+   | `0x820007EC` | `ExLoadedCommandLine` | `GetCommandLineA` `sub_822979D0` (`c_runtime/core.cpp`) | `"default.xex"` with its quotes | the same string |
+   | `0x820007FC` | `ExThreadObjectType` | `SetThreadPriority`, `XSetThreadProcessor`, XAudio: passed to `ObReferenceObjectByHandle`, which ours ignores | a zeroed type record, `Thrd` at +0x18 | the same |
+   | `0x8200088C` | `XboxKrnlVersion` | `sub_822AC918` (not seen in play) | 2, 0xFFFF, 0xFFFF, 0x8000 | the same |
+   | `0x82000734`, `0x82000744`, `0x820007DC`, `0x82000854` | `VdGpuClockInMHz`, `VdHSIOCalibrationLock`, `XexExecutableModuleHandle`, `KeTimeStampBundle` | nothing that runs (their readers aren't lifted, or our ports don't read them: `CreateHeap`'s size is fixed, `GetTickCount` is the host clock) | | left out |
+
+   **The physical aliases**: the renderer reads physical memory as one
+   flat 512 MB range (`native/state.h`'s `PhysicalHostAddress`: base +
+   4 GB + the physical address, from the GPU addresses the game computes;
+   the guest memory mirrors copy it as flat buffers; textures, index
+   ranges, shader microcode and the copy hashes read it there). Dropping
+   the aliases would mean a new memory model for the renderer, so the
+   views stay (step 4): one memory file of physical memory mapped at +4 GB
+   and at `0xA0000000`, `0xC0000000` and `0xE0000000` (the last at
+   physical + 0x1000, as the SDK maps it; `GpuPhysicalAddress` has the
+   same offset). The CPU-side alias check is then not needed.
 2. **The SDK's guest data plugged in**: the export variables the game
    reads written by us as fixed data (plug in data), in our layer's
    memory; the rest left out.
@@ -3819,11 +3847,13 @@ by the user, the Windows build under Wine for step 4, and saves loading
 ### Decisions for the user
 
 - **The physical aliases** (step 4): drop them if step 1 shows nothing
-  uses them (recommended), or keep the SDK's aliased views.
+  uses them, or keep the SDK's aliased views. After step 1: keep the views
+  (recommended now: the renderer reads physical memory as one flat range).
 - **The image load** (step 3): our own loader with an upstream LZX
   library (recommended; only the US `default.xex`), or keep the SDK's
   loader as a library writing into our mapping (less work now, but it
-  keeps the SDK's memory classes alive until it's replaced).
+  keeps the SDK's memory classes alive until it's replaced). **Decided
+  (the user, 2026-11-16): our own loader with libmspack**, not the SDK's.
 - **The order**: steps 2 and 3 before 4 (the image and the SDK's data
   have to land somewhere before the SDK's memory goes), as above.
 
