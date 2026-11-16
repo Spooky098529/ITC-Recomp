@@ -750,7 +750,12 @@ go through `lifted::CallFromContext` (stage 2, done), so only
 port's adapter is a dispatch table entry on our register view
 (`lifted::Regs`, `ITC_NATIVE_ENTRY` in `src/hooks/native_entry.h`; stage
 3, done 2026-11-16), 169 harness groups expected to differ since
-(`harnesses/rewiring_expected.cpp`, the user's call).
+(`harnesses/rewiring_expected.cpp`, the user's call). Stage 4 (done
+2026-11-16): no recompiled code in play, the overrides deleted but the
+kernel's thread starts (`ITC_KERNEL_ENTRY`), `xstart` and five
+`__finally` blocks; an address with no entry stops the program. Since
+stage 4 the harnesses no longer compare single functions: the game
+(attract races, the pad replay, frame dumps) is the check.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

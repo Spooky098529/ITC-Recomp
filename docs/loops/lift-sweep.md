@@ -227,7 +227,8 @@ outside:
   (stage 1), the hand ports' guest calls through
   `lifted::CallFromContext` (stage 2), every hand port an entry on our
   register view, calls carrying their return address and caller's r31
-  (stage 3, 2026-11-16; the batches emitted again).
+  (stage 3, 2026-11-16; the batches emitted again), the overrides
+  deleted and batches 034 and 035 lifted (stage 4, 2026-11-16).
 
 ## The user's calls (2026-11-15)
 

@@ -3351,6 +3351,27 @@ The stages, each leaving the game working and checked:
    tool-written "unpack the context, call native code" entries.
    `lifted::Call`'s fallback into the SDK goes: an unknown address logs
    and stops. The user is asked before the deletions.
+   Done (2026-11-16, by the recommended option: the user was asleep and
+   had said to take it): first no recompiled code in play (logged once
+   each: calls falling to the SDK's function table and what `lifted::Sdk`
+   runs, in an attract race and the pad replay), by entries for the 188
+   import thunks (`src/lifted/imports.cpp`, `tools/import_entries.py`),
+   batch 034 (a worker thread's loop `sub_82095AF0`, the D3DX buffer's
+   slots) and 8 more lifted originals (FrameDriver::Present and seven
+   declines'); then the overrides deleted: `ITC_NATIVE_ENTRY` makes none,
+   `lift.py` writes none, and only `ITC_KERNEL_ENTRY` (the four thread
+   starts), `xstart` and the C runtime's five `__finally` blocks (only the
+   recompiled parents' fallbacks reach them) keep a REX_FUNC.
+   `lifted::Call`: an entry whose flag is off still runs the recompiled
+   original until stage 5; an address with no entry logs and stops.
+   Functions only the harnesses called by address with no entry: batch
+   035 (15). The harnesses call ours through `harness::Ours<address>`,
+   but their reference side now runs the original's whole call tree (its
+   `sub_X` callees are the originals' thunks), so they no longer compare
+   single functions (UiMovie::DrawTexts' writes through its fake world):
+   from here the game is the check, as `lift-sweep.md` planned ("once
+   adapters are gone"). Checked by attract races, the pad replay (127 s,
+   clean, no call without an entry) and a frame dump.
 5. **`generated/` out of the build**: our own small function table for
    the SDK (`PPCImageConfig`: the image layout and the kernel entries
    only) instead of `generated/`'s `itc_init.cpp` and
@@ -5970,3 +5991,14 @@ frame dumps look right. The boundary: overridden 268, Native 48, Dropped
 24, never called 34, live 75. Imports: 186 called, 30 with a live caller.
 B7 (`b7_status.py`): ours 9,848, work left 37. Static map: reachable
 9,076, ours 9,063, unported 2.
+
+**2026-11-16, the rewiring's stage 4 (branch `rewiring-15-11-26`):** no
+recompiled code in play (import thunk entries, batches 034 and 035, 80
+lifted originals), the overrides deleted but the kernel's (four thread
+starts, `xstart`) and the five `__finally` blocks; an address with no
+entry stops the program. The harnesses no longer compare single
+functions; attract races and the pad replay (127 s) clean, a frame dump
+right. The boundary: overridden 128, Native (with Lifted) 188, Dropped 24,
+never called 34, live 75. Imports: 186 called, 30 with a live caller. B7
+(`b7_status.py`): ours 9,858, work left 32. Static map: reachable 9,091,
+ours 9,082, unported 2.
