@@ -17,7 +17,7 @@
 #include "base/log_sdk.h"
 #include "debug/thread_cpu.h"
 #include "game_data/game_data.h"
-#include "generated/default/itc_init.h"
+#include "guest_code.h"
 #include "input/gamepads.h"
 
 #include <SDL3/SDL.h>

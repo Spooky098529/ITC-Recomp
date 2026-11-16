@@ -1,6 +1,6 @@
 # itc - ReXGlue Recompiled Project
 #
-# SDK boilerplate lives in generated/rexglue.cmake.
+# SDK boilerplate lives in cmake/rexglue.cmake (generated/ isn't built).
 
 cmake_minimum_required(VERSION 3.25)
 project(itc LANGUAGES CXX)
@@ -55,12 +55,13 @@ if(WIN32 AND ITC_WIN_LTO)
     add_link_options(-flto=thin "LINKER:/lldltocache:${CMAKE_BINARY_DIR}/thinlto-cache")
 endif()
 
-include(generated/rexglue.cmake)
+include(cmake/rexglue.cmake)
 include(cmake/ffmpeg.cmake)
 
 # Sources
 set(ITC_SOURCES
     src/app/main.cpp
+    src/app/image.cpp
     src/app/start_up.cpp
     src/base/log.cpp
     src/base/log_sdk.cpp
@@ -748,190 +749,6 @@ set(ITC_SOURCES
     src/game_data/create_file.cpp
     src/hooks/data_file.cpp
     src/display/gamma.cpp
-    src/harnesses/harness.cpp
-    src/harnesses/rewiring_expected.cpp
-    src/harnesses/clock.cpp
-    src/harnesses/last_error.cpp
-    src/harnesses/gamma.cpp
-    src/harnesses/object_attributes.cpp
-    src/harnesses/strings.cpp
-    src/harnesses/time.cpp
-    src/harnesses/start_up.cpp
-    src/harnesses/user.cpp
-    src/harnesses/xmp.cpp
-    src/harnesses/network.cpp
-    src/harnesses/notify.cpp
-    src/harnesses/profile.cpp
-    src/harnesses/saves.cpp
-    src/harnesses/file_class.cpp
-    src/harnesses/movie_files.cpp
-    src/harnesses/xma.cpp
-    src/harnesses/sprites.cpp
-    src/harnesses/billboards.cpp
-    src/harnesses/billboards_record.cpp
-    src/harnesses/command_list.cpp
-    src/harnesses/c_runtime.cpp
-    src/harnesses/heap.cpp
-    src/harnesses/c_runtime_heap.cpp
-    src/harnesses/math.cpp
-    src/harnesses/ui_movies.cpp
-    src/harnesses/ui_movies_game.cpp
-    src/harnesses/race_overlays.cpp
-    src/harnesses/vehicle_accessors.cpp
-    src/harnesses/matrix_math.cpp
-    src/harnesses/car_physics.cpp
-    src/harnesses/car_physics_objects.cpp
-    src/harnesses/vehicle.cpp
-    src/harnesses/app_states.cpp
-    src/harnesses/scene_loaders.cpp
-    src/harnesses/second_set.cpp
-    src/harnesses/load_poll.cpp
-    src/harnesses/car_draw.cpp
-    src/harnesses/car_draw_parts.cpp
-    src/harnesses/car_draw_lamps.cpp
-    src/harnesses/car_draw_shadows.cpp
-    src/harnesses/car_draw_top.cpp
-    src/harnesses/car_draw_interior.cpp
-    src/harnesses/car_draw_cockpit.cpp
-    src/harnesses/car_draw_traffic.cpp
-    src/harnesses/car_draw_wheels.cpp
-    src/harnesses/car_draw_root.cpp
-    src/harnesses/boot_mode.cpp
-    src/harnesses/car_models.cpp
-    src/harnesses/save_data.cpp
-    src/harnesses/race_world.cpp
-    src/harnesses/race_states.cpp
-    src/harnesses/archive.cpp
-    src/harnesses/save_interface.cpp
-    src/harnesses/save_handlers.cpp
-    src/harnesses/app_start_up.cpp
-    src/harnesses/data_load.cpp
-    src/harnesses/career.cpp
-    src/harnesses/race_event.cpp
-    src/harnesses/camera_modes.cpp
-    src/harnesses/location_screen.cpp
-    src/harnesses/material_passes.cpp
-    src/harnesses/race_hud_object.cpp
-    src/harnesses/alt_hud.cpp
-    src/harnesses/race_scene.cpp
-    src/harnesses/race_hud_machine.cpp
-    src/harnesses/race_flow.cpp
-    src/harnesses/race_loading.cpp
-    src/harnesses/race_end.cpp
-    src/harnesses/car_scene_draw.cpp
-    src/harnesses/car_scene_draw_root.cpp
-    src/harnesses/front_end_car_draw.cpp
-    src/harnesses/replay_snapshots.cpp
-    src/harnesses/race_screens.cpp
-    src/harnesses/menu_sounds.cpp
-    src/harnesses/race_sounds.cpp
-    src/harnesses/accessories.cpp
-    src/harnesses/scene.cpp
-    src/harnesses/car_sounds.cpp
-    src/harnesses/x3daudio.cpp
-    src/harnesses/xaudio.cpp
-    src/harnesses/xaudio_engine.cpp
-    src/harnesses/xaudio_objects.cpp
-    src/harnesses/file_layer.cpp
-    src/harnesses/c_runtime_format.cpp
-    src/harnesses/texture_compression.cpp
-    src/harnesses/collision.cpp
-    src/harnesses/collision_world.cpp
-    src/harnesses/collision_world_walls.cpp
-    src/harnesses/track_route.cpp
-    src/harnesses/ai_drivers.cpp
-    src/harnesses/racer_controllers.cpp
-    src/harnesses/track_zones.cpp
-    src/harnesses/graphics_resources.cpp
-    src/harnesses/video_output.cpp
-    src/harnesses/device_state.cpp
-    src/harnesses/device_shaders.cpp
-    src/harnesses/render_queue.cpp
-    src/harnesses/course_scenery.cpp
-    src/harnesses/course_scenery_headlights.cpp
-    src/harnesses/post_effects.cpp
-    src/harnesses/scene_target.cpp
-    src/harnesses/frame_passes.cpp
-    src/harnesses/frame_driver.cpp
-    src/harnesses/command_buffer.cpp
-    src/harnesses/single_commands.cpp
-    src/harnesses/predicated_tiling.cpp
-    src/harnesses/power_graph.cpp
-    src/harnesses/menu_helpers.cpp
-    src/harnesses/lifted.cpp
-    src/harnesses/morph_jobs.cpp
-    src/harnesses/race_update.cpp
-    src/harnesses/stand_models.cpp
-    src/harnesses/build_screen.cpp
-    src/harnesses/tuning_screen.cpp
-    src/harnesses/tuning_screen_pages.cpp
-    src/harnesses/tuning_refresh.cpp
-    src/harnesses/tuning_pages.cpp
-    src/harnesses/tuning_pages_movie.cpp
-    src/harnesses/screen_constructors.cpp
-    src/harnesses/options_screen.cpp
-    src/harnesses/type67_modes.cpp
-    src/harnesses/type67_screens.cpp
-    src/harnesses/type67_list_helpers.cpp
-    src/harnesses/type67_list_part.cpp
-    src/harnesses/type67_titled_list.cpp
-    src/harnesses/type67_color_list.cpp
-    src/harnesses/type67_node_screen.cpp
-    src/harnesses/type67_screen_tables.cpp
-    src/harnesses/car_list.cpp
-    src/harnesses/type8_screens.cpp
-    src/harnesses/type8_mode.cpp
-    src/harnesses/type8_list_screen.cpp
-    src/harnesses/front_end_screen_helpers.cpp
-    src/harnesses/car_dealer.cpp
-    src/harnesses/type2_screens.cpp
-    src/harnesses/save_screen.cpp
-    src/harnesses/type2_dialog.cpp
-    src/harnesses/power_graph_screen.cpp
-    src/harnesses/achievements.cpp
-    src/harnesses/garage_screen.cpp
-    src/harnesses/tuning_machine.cpp
-    src/harnesses/race_menu.cpp
-    src/harnesses/car_settings.cpp
-    src/harnesses/user_info.cpp
-    src/harnesses/title_screen.cpp
-    src/harnesses/type10_mode.cpp
-    src/harnesses/type5_mode.cpp
-    src/harnesses/todays_result.cpp
-    src/harnesses/network_mode.cpp
-    src/harnesses/network_mode_select.cpp
-    src/harnesses/car_makers.cpp
-    src/harnesses/screen_objects.cpp
-    src/harnesses/hardcoded_shaders.cpp
-    src/harnesses/framework.cpp
-    src/harnesses/game_modes.cpp
-    src/harnesses/mode_tick.cpp
-    src/harnesses/minimap.cpp
-    src/harnesses/minimap_draw.cpp
-    src/harnesses/scene_models.cpp
-    src/harnesses/scenery_lists.cpp
-    src/harnesses/shader_objects.cpp
-    src/harnesses/data_file.cpp
-    src/harnesses/race_hud.cpp
-    src/harnesses/race_setup.cpp
-    src/harnesses/ui_movie_objects.cpp
-    src/harnesses/models.cpp
-    src/harnesses/action_mappers.cpp
-    src/harnesses/data_tables.cpp
-    src/harnesses/model_animation.cpp
-    src/harnesses/car_specs.cpp
-    src/harnesses/cameras.cpp
-    src/harnesses/strings_and_font.cpp
-    src/harnesses/std_string.cpp
-    src/harnesses/audio_wraps.cpp
-    src/harnesses/create_file.cpp
-    src/harnesses/sound_cues.cpp
-    src/harnesses/xact.cpp
-    src/harnesses/xact_waves.cpp
-    src/harnesses/xact_tracks.cpp
-    src/harnesses/input.cpp
-    src/harnesses/c_runtime_exit.cpp
-    src/harnesses/c_runtime_core.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
@@ -1165,15 +982,12 @@ file(GLOB ITC_LIFTED_SOURCES CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lifted/*.cpp")
 list(APPEND ITC_SOURCES ${ITC_LIFTED_SOURCES})
 
-# The game's executable, from our sources and the recompiled code.
-# The harnesses (src/harnesses/, --run_harnesses: "Checking with a harness" in
-# docs/rexglue-removal.md) are for development: CI's builds, the releases'
-# among them, leave them out (-DITC_HARNESSES=OFF; the user's call,
-# 2026-10-25), and so does --run_harnesses with them.
-option(ITC_HARNESSES "Build the harnesses (src/harnesses/, --run_harnesses)" ON)
-if(NOT ITC_HARNESSES)
-    list(FILTER ITC_SOURCES EXCLUDE REGEX "^src/harnesses/")
-endif()
+# The game's executable, from our sources (the recompiled code, generated/,
+# and the harnesses that compared against it, src/harnesses/, aren't built
+# since the rewiring's stage 5: docs/rexglue-removal.md, "Before E1: the
+# rewiring"; the user's call: translated code needs no harnesses, git
+# history keeps them).
+set(ITC_HARNESSES OFF)
 
 function(itc_add_executable name)
     if(WIN32)
@@ -1218,22 +1032,10 @@ endfunction()
 
 itc_add_executable(itc ${ITC_SOURCES})
 
-# The coverage build: which recompiled functions run in play ("Functions
-# seen in play" in docs/rexglue-removal.md). A second executable beside itc,
-# not built by default ('cmake --build ... --target itc_coverage'), whose
-# copy of the recompiled code marks each function the first time it runs;
-# src/debug/coverage.cpp writes the marks out. Its own target rather than a
-# build directory of its own, as the SDK writes its libraries to one place
-# (rexglue-sdk/out/<platform>) whatever the build directory. Linux only.
-option(ITC_COVERAGE "Add the itc_coverage target" OFF)
-if(ITC_COVERAGE)
-    itc_add_executable(itc_coverage ${ITC_SOURCES} src/debug/coverage.cpp)
-    set_target_properties(itc_coverage itc_coverage_recomp PROPERTIES EXCLUDE_FROM_ALL ON)
-    # Without LTO: ThinLTO's import leaves the coverage tables' private
-    # globals (__sancov_gen_*) undefined at the link.
-    target_compile_options(itc_coverage_recomp PRIVATE
-        -fsanitize-coverage=func,inline-bool-flag,pc-table -fno-lto)
-endif()
+# The coverage build (itc_coverage: which recompiled functions ran in play,
+# docs/coverage.md) instrumented the recompiled code, which isn't built since
+# the rewiring's stage 5: no recompiled function runs. Its last list stays in
+# coverage/seen_in_play.txt.
 
 # Decodes one XMA wave from a game bank with our FFmpeg (B2 in
 # docs/rexglue-removal.md; how to run it is at the top of the file). Not

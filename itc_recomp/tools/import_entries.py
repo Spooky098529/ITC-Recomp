@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Writes src/lifted/imports.cpp: a dispatch table entry for each of the
+"""Writes src/lifted/imports.h, the image's kernel and XAM imports declared
+(the SDK defines them), and src/lifted/imports.cpp: a dispatch table entry for each of the
 image's import thunks (docs/rexglue-removal.md, "Before E1: the rewiring",
 stage 4), read from generated/default/itc_init.cpp's function mappings.
 
@@ -20,6 +21,7 @@ TOOLS = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(TOOLS, "..", ".."))
 INIT = os.path.join(ROOT, "itc_recomp", "generated", "default", "itc_init.cpp")
 OUT = os.path.join(ROOT, "itc_recomp", "src", "lifted", "imports.cpp")
+HEADER = os.path.join(ROOT, "itc_recomp", "src", "lifted", "imports.h")
 
 
 def main():
@@ -62,6 +64,21 @@ def main():
     ]
     with open(OUT, "w") as f:
         f.write("\n".join(lines))
+    header = [
+        "// The image's kernel and XAM imports, which the SDK defines: written by",
+        "// itc_recomp/tools/import_entries.py. Don't edit it by hand: run the tool",
+        "// again.",
+        "",
+        "#pragma once",
+        "",
+        "#include <rex/ppc/func.h>",
+        "",
+    ]
+    for name in sorted({n for _, n in thunks}):
+        header.append(f"REX_EXTERN({name});")
+    header.append("")
+    with open(HEADER, "w") as f:
+        f.write("\n".join(header))
     print(f"wrote {len(thunks)} import entries")
     return 0
 

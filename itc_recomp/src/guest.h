@@ -1,12 +1,13 @@
 // Helpers for hand-written code that works with guest (Xbox 360) state.
 //
 // Guest memory is big-endian and addressed by 32-bit guest pointers relative
-// to `base`. Guest functions are called through their generated sub_XXXXXXXX
-// names, with arguments in ctx registers as the PowerPC ABI expects.
+// to `base`. Guest functions are called through the dispatch table by
+// address (lifted::Call; docs/rexglue-removal.md, "Before E1: the
+// rewiring").
 
 #pragma once
 
-#include "generated/default/itc_funcs.h"
+#include "guest_code.h"
 
 #include <bit>
 #include <cstdint>

@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "lifted/imports.h"
 #include "lifted/lifted.h"
 #include "lifted/regs.h"
 
