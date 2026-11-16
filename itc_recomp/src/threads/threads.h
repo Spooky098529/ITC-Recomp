@@ -4,11 +4,18 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <thread>
 
 #include "lifted/lifted.h"
 
 namespace threads {
+
+// A host thread of ours for our own code that runs game code (native
+// audio's mixer thread): `body` gets the call arguments with r1 at a stack
+// of `stack_size` and r13 our per-thread block. `name` is for the log.
+std::thread StartThread(uint8_t* base, uint32_t stack_size, const char* name,
+                        std::function<void(lifted::Args)> body);
 
 // The game's main thread as one of ours (in place of the SDK's
 // PrepareModuleLaunch): `entry` (our start-up, xstart's) run on a host

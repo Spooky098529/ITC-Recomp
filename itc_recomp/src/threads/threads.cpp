@@ -412,11 +412,17 @@ const bool kRegistered = imports::RegisterNativeImports(kEntries, std::size(kEnt
 
 }  // namespace
 
-std::thread StartMainThread(uint8_t* base, uint32_t stack_size, lifted::Entry entry) {
+std::thread StartThread(uint8_t* base, uint32_t stack_size, const char* name,
+                        std::function<void(lifted::Args)> body) {
   const Made made = Make(base, stack_size, 0);
-  ITC_LOG_INFO("threads: the main thread {:08X} (ID {:X}) made, CPU {}", made.thread->handle,
-               made.id, made.thread->cpu);
-  return Run(base, made, [base, entry](lifted::Args call) { entry(base, call); });
+  ITC_LOG_INFO("threads: {} {:08X} (ID {:X}) made, CPU {}", name, made.thread->handle, made.id,
+               made.thread->cpu);
+  return Run(base, made, std::move(body));
+}
+
+std::thread StartMainThread(uint8_t* base, uint32_t stack_size, lifted::Entry entry) {
+  return StartThread(base, stack_size, "the main thread",
+                     [base, entry](lifted::Args call) { entry(base, call); });
 }
 
 uint32_t CurrentPcr() {

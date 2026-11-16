@@ -17,6 +17,7 @@
 
 #include "audio/output_mix.h"
 #include "audio/render_driver.h"
+#include "threads/threads.h"
 #include "hooks/lifted_call.h"
 #include "hooks/native_entry.h"
 #include "movies/player.h"
@@ -44,6 +45,7 @@
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <vector>
 #include "lifted/sdk.h"
 
@@ -119,15 +121,12 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
 
   // Only our thread: the base class would start the Audio Worker and the XMA
   // decoder (its thread and the XMA registers), which nothing uses since B2.
-  X_STATUS Setup(rex::system::KernelState* kernel_state) override {
+  X_STATUS Setup(rex::system::KernelState*) override {
     running_ = true;
-    thread_ = rex::system::object_ref<rex::system::XHostThread>(new rex::system::XHostThread(
-        kernel_state, 128 * 1024, 0, [this]() {
-          ThreadMain();
-          return 0;
-        }));
-    thread_->set_name("ITC Audio");
-    thread_->Create();
+    // One of our threads (E1, src/threads/): a guest stack and per-thread
+    // block for the game's mixer callback, no SDK thread behind it.
+    thread_ = threads::StartThread(memory()->virtual_membase(), 128 * 1024, "native audio",
+                                   [this](lifted::Args args) { ThreadMain(args); });
     g_system = this;
     ITC_LOG_INFO("native audio: started ({} frames queued at most)", queued_frames_limit_);
     return X_STATUS_SUCCESS;
@@ -142,18 +141,10 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       running_ = false;
     }
     wake_.notify_all();
-    if (thread_) {
-      // The thread may be inside the game's mixer; give it time to return
-      // before terminating, as the SDK's worker does.
-      rex::thread::Thread* host_thread = thread_->thread();
-      bool exited = host_thread && rex::thread::Wait(host_thread, false,
-                                                     std::chrono::milliseconds(500)) ==
-                                       rex::thread::WaitResult::kSuccess;
-      if (!exited) {
-        ITC_LOG_WARN("native audio: thread didn't exit within 500 ms; terminating");
-        thread_->Terminate(0);
-      }
-      thread_.reset();
+    if (thread_.joinable()) {
+      // The thread may be inside the game's mixer; the process ends with it
+      // (a host thread can't be terminated, as the SDK's was after 500 ms).
+      thread_.detach();
     }
     for (size_t i = 0; i < kMaxClients; i++) {
       if (clients_[i].in_use) {
@@ -271,28 +262,21 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
 
  private:
   // Runs the client's callback (XAudio::MixerCallback, sub_8245FBE0) with
-  // r3 = `arg`, as the SDK's FunctionDispatcher::Execute did: the thread's
-  // state bound, the stack padded by 176 bytes, the link register a marker;
-  // the call through lifted::CallFromContext instead of the SDK's table.
-  void RunCallback(rex::runtime::ThreadState* thread_state, uint32_t callback, uint64_t arg) {
-    PPCContext& ctx = *thread_state->context();
-    uint8_t* base = memory()->virtual_membase();
-    rex::runtime::ThreadState* const previous = rex::runtime::ThreadState::Get();
-    rex::runtime::ThreadState::Bind(thread_state);
-    ctx.r3.u64 = arg;
-    ctx.r1.u64 -= 64 + 112;
-    const uint64_t lr = ctx.lr;
-    ctx.lr = 0xBCBCBCBC;
-    lifted::CallFromContext(ctx, base, callback);
-    ctx.lr = lr;
-    ctx.r1.u64 += 64 + 112;
-    rex::runtime::ThreadState::Bind(previous);
+  // r3 = `arg`, as the SDK's FunctionDispatcher::Execute did: the stack
+  // padded by 176 bytes, the link register a marker; through our dispatch
+  // table on our thread's stack and per-thread block (`thread`).
+  void RunCallback(const lifted::Args& thread, uint32_t callback, uint64_t arg) {
+    lifted::Args call;
+    call.r1 = thread.r1 - (64 + 112);
+    call.r13 = thread.r13;
+    call.lr = 0xBCBCBCBC;
+    call.r[0] = arg;
+    lifted::Call(memory()->virtual_membase(), callback, call);
   }
 
   // Runs each client's mixer while it has credits. The mixer submits its
   // frame (Submit) before returning.
-  void ThreadMain() {
-    auto* thread_state = thread_->thread_state();
+  void ThreadMain(const lifted::Args& thread) {
     std::unique_lock<std::mutex> lock(mutex_);
     while (running_) {
       size_t index = kMaxClients;
@@ -311,7 +295,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       uint32_t callback = client.callback;
       uint64_t args[] = {client.wrapped_arg};
       lock.unlock();
-      RunCallback(thread_state, callback, args[0]);
+      RunCallback(thread, callback, args[0]);
       lock.lock();
     }
   }
@@ -424,7 +408,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
   }
 
   uint32_t queued_frames_limit_ = 8;
-  rex::system::object_ref<rex::system::XHostThread> thread_;
+  std::thread thread_;
   bool running_ = false;
   std::mutex mutex_;
   std::condition_variable wake_;

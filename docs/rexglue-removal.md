@@ -3712,9 +3712,11 @@ Guest stacks stay until E2 (frames are still in guest memory).
    context struct of its own (`lifted::BindThreadContext`), a register
    carrier for the hand ports that still run lifted originals and
    stand-ins through `lifted::Sdk` (4,411 calls in an attract race; to go
-   with `PPCContext` in E4). Only native audio's thread is still the
-   SDK's (it binds an SDK thread state for the mixer callback). Attract
-   races, the pad replay (127 s) and a frame dump clean.
+   with `PPCContext` in E4). Native audio's thread too: it was an SDK
+   `XHostThread`, made only for a guest stack and r13 for the mixer
+   callback; now `threads::StartThread` (our blocks, a host body) and the
+   callback through our dispatch table. Every thread that runs game code
+   is ours. Attract races, the pad replay (127 s) and a frame dump clean.
 
 Checks at each step: `attract_race.sh 40` as a smoke run, the pad replay
 (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`, ~127 s, no
