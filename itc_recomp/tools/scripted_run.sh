@@ -40,7 +40,7 @@ newest_log() { ls -t $B/logs/itc_*.log 2>/dev/null | head -1; }
 start_game() {
   local before; before=$(newest_log)
   SDL_GAMECONTROLLER_IGNORE_DEVICES=$REAL_PAD SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 \
-  XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
+  XDG_DATA_DIRS=/usr/local/share:/usr/share \
     timeout "$SECONDS_TO_RUN" "$B/itc" \
     --native_audio=true --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
     --game_data_root="$G" --max_fps=144 --fullscreen=false --log_fps=true \

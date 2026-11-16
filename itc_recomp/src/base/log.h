@@ -1,7 +1,7 @@
 // Logging for our code: lines formatted with std::format and written to the
 // log file (logs/itc_<n>.log) with stdio, one write a line, flushed. A2 in
-// docs/rexglue-removal.md; since A4 we name the file too, and the SDK's own
-// lines (its shader translator's) are forwarded into ours (log_sdk.cpp).
+// docs/rexglue-removal.md; since A4 we name the file too. The SDK's shader
+// translator logs into it through its shims (src/translator_shims/).
 
 #pragma once
 

@@ -1,10 +1,15 @@
 # Working on this repo
 
-A static recompilation of Import Tuner Challenge (Xbox 360) built on
-ReXGlue (`rexglue-sdk/`, a submodule patched from `patches/rexglue-sdk/`).
-`git status` showing `rexglue-sdk` as modified (`m`) is expected: those are
-our patches applied in the submodule, not something to look into
-(patch 0003, Windows SDL as a DLL, only changes Windows builds).
+A native port of Import Tuner Challenge (Xbox 360), started as a static
+recompilation on ReXGlue. Since E4's step 5 (2026-11-16) the SDK isn't part
+of our build: the `rexglue-sdk/` submodule is only the source of its shader
+translator, a static dependency (`itc_recomp/cmake/xenos_translator.cmake`,
+its logging and flags through `itc_recomp/src/translator_shims/`), and the
+third-party libraries are our own submodules in `itc_recomp/thirdparty/`
+(SDL, Vulkan-Headers, simde, glslang, fmt, FFmpeg, xxHash). Act as if the
+SDK were deleted (the user's call). `git status` showing `rexglue-sdk` as
+modified (`m`) is the old `patches/rexglue-sdk/` still applied in its
+worktree (no longer applied by the build, nor touching the translator).
 `docs/functions/` is the reference for the game's functions: their
 table, split by subsystem into one file per area since 2026-10-20
 (`functions.md` holds the rows not yet moved, `system-services.md` B5's,
@@ -859,7 +864,7 @@ From the repo root:
 ```sh
 cmake --build itc_recomp/out/build/linux-amd64-release -j$(nproc)
 G="$PWD/itc/Import Tuner Challenge (USA)"; B=itc_recomp/out/build/linux-amd64-release
-XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
+XDG_DATA_DIRS=/usr/local/share:/usr/share \
   $B/itc --native_audio=true \
   --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
   --game_data_root="$G" --max_fps=144 --fullscreen=false \
@@ -938,9 +943,9 @@ Package them into `itc_recomp/out/dist` with Python's zipfile:
 ```sh
 name=itc-<label>-linux-amd64; D=itc_recomp/out/dist/$name
 rm -rf $D $D.zip; mkdir -p $D
-cp itc_recomp/out/build/linux-amd64-release/itc rexglue-sdk/out/linux-amd64/librexruntime.so $D/
+cp itc_recomp/out/build/linux-amd64-release/itc $D/
 cp itc_recomp/itc.toml $D/
-(cd $D && python3 -I -m zipfile -c ../$name.zip itc librexruntime.so itc.toml)
+(cd $D && python3 -I -m zipfile -c ../$name.zip itc itc.toml)
 ```
 
 Release and test zips ship `itc.toml` (the player settings, with comments;
@@ -1093,11 +1098,11 @@ since v0.3.2): our thread runs the game's mixer, replacing the
 SDK's Audio Worker, whose polling took ~80% of a core. The SDK's XMA
 decoder is kept. See `docs/native-audio.md`.
 
-Releases are made by pushing a `v*` tag, which must be `vX.Y`, `vX.Y.Z`
-or `vX.Y.Z.W` (the SDK's `cmake/rex_version.cmake` parses it: anything
-else, like `v0.4.7b`, fails to configure, and so does every later
-untagged build while it's the nearest tag; a release without
-improvements gets a fourth number, like `v0.4.7.1`): CI builds the zip and publishes a
+Releases are made by pushing a `v*` tag, `vX.Y`, `vX.Y.Z` or `vX.Y.Z.W`
+(a release without improvements gets a fourth number, like `v0.4.7.1`;
+on `main` the SDK's `cmake/rex_version.cmake` still parses it and fails to
+configure on anything else, like `v0.4.7b`; since E4 our build only takes
+`git describe` for the window title, `cmake/version.cmake`): CI builds the zip and publishes a
 GitHub release with generated notes, which are then replaced with notes
 written for players: title "vX.Y.Z: <summary>", and just a couple of
 bullet points naming the changes (not the long layout of v0.3.5 and

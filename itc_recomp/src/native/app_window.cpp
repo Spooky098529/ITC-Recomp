@@ -2,15 +2,16 @@
 
 #include "base/log.h"
 
-#include <rex/version.h>
+#include <itc_version.h>
 
 #include <string>
 
 namespace native {
 
 void AppWindow_AdoptOurWindow(SDL_Window* window) {
-  // The title the SDK's window had: the app's name and the SDK's build stamp.
-  const std::string title = std::string("itc ") + REXGLUE_BUILD_TITLE;
+  // The app's name and our version (cmake/version.cmake; the SDK's build
+  // stamp until E4).
+  const std::string title = std::string("itc ") + ITC_VERSION;
   SDL_SetWindowTitle(window, title.c_str());
   ITC_LOG_INFO("native renderer: our window is the app's window ({})", title);
 }

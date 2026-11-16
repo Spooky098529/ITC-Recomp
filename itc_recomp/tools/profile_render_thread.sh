@@ -37,7 +37,7 @@ for flag in "${defaults[@]}"; do
   done
   flags+=("$flag")
 done
-XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
+XDG_DATA_DIRS=/usr/local/share:/usr/share \
   timeout 30 "$D/itc" "${flags[@]}" "${extra[@]}" > /dev/null 2>&1 &
 sleep 14
 P=$(pgrep -n -x itc)

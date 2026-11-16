@@ -1,45 +1,17 @@
-# itc - ReXGlue Recompiled Project
+# itc - Import Tuner Challenge, native
 #
-# SDK boilerplate lives in cmake/rexglue.cmake (generated/ isn't built).
+# Our own build: no ReXGlue SDK in it but its shader translator, a static
+# dependency (cmake/xenos_translator.cmake; E4 in docs/rexglue-removal.md);
+# the third-party libraries are our own copies (cmake/thirdparty.cmake).
+# generated/ (the recompiled code) stays in the repo, out of the build.
 
 cmake_minimum_required(VERSION 3.25)
-project(itc LANGUAGES CXX)
+project(itc LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Apply this project's patches to the rexglue-sdk submodule, skipping any
-# already applied. See patches/rexglue-sdk/ for what each one works around.
-if(REXSDK_DIR)
-    file(GLOB ITC_SDK_PATCHES "${CMAKE_CURRENT_SOURCE_DIR}/../patches/rexglue-sdk/*.patch")
-    list(SORT ITC_SDK_PATCHES)
-    # Patches touching nearby lines can't each be checked alone once a later
-    # one is applied. They're always applied in order, so if the last one is
-    # applied, they all are.
-    list(GET ITC_SDK_PATCHES -1 last_patch)
-    execute_process(
-        COMMAND git -C "${REXSDK_DIR}" apply --reverse --check "${last_patch}"
-        RESULT_VARIABLE all_applied OUTPUT_QUIET ERROR_QUIET)
-    if(all_applied EQUAL 0)
-        set(ITC_SDK_PATCHES "")
-    endif()
-    foreach(patch IN LISTS ITC_SDK_PATCHES)
-        execute_process(
-            COMMAND git -C "${REXSDK_DIR}" apply --reverse --check "${patch}"
-            RESULT_VARIABLE already_applied OUTPUT_QUIET ERROR_QUIET)
-        if(NOT already_applied EQUAL 0)
-            execute_process(
-                COMMAND git -C "${REXSDK_DIR}" apply "${patch}"
-                RESULT_VARIABLE apply_result)
-            if(NOT apply_result EQUAL 0)
-                message(FATAL_ERROR "Failed to apply SDK patch ${patch}")
-            endif()
-            message(STATUS "Applied SDK patch ${patch}")
-        endif()
-    endforeach()
-endif()
-
-# ThinLTO with lld, for the game and the SDK (set before the SDK is added).
+# ThinLTO with lld, for the game and its libraries (set before they're added).
 option(ITC_LTO "Build with ThinLTO (needs lld)" OFF)
 if(ITC_LTO)
     add_compile_options(-flto=thin)
@@ -55,7 +27,9 @@ if(WIN32 AND ITC_WIN_LTO)
     add_link_options(-flto=thin "LINKER:/lldltocache:${CMAKE_BINARY_DIR}/thinlto-cache")
 endif()
 
-include(cmake/rexglue.cmake)
+include(cmake/thirdparty.cmake)
+include(cmake/xenos_translator.cmake)
+include(cmake/version.cmake)
 include(cmake/ffmpeg.cmake)
 
 # Sources
@@ -64,7 +38,6 @@ set(ITC_SOURCES
     src/app/start_up.cpp
     src/base/flags.cpp
     src/base/log.cpp
-    src/base/log_sdk.cpp
     src/audio/native_audio.cpp
     src/audio/render_driver.cpp
     src/audio/output_mix.cpp
@@ -957,35 +930,6 @@ add_library(itc_movies STATIC src/movies/player.cpp)
 target_include_directories(itc_movies PUBLIC src)
 target_link_libraries(itc_movies PRIVATE itc_avformat)
 
-# The SDK's Xenos shader translator (to SPIR-V), built into our binary for
-# the native renderer (docs/native-renderer.md: reused for now, to be
-# replaced). The plugin has its own copy with hidden symbols.
-set(ITC_SDK_GRAPHICS ${REXSDK_DIR}/src/graphics)
-add_library(itc_xenos_shaders STATIC
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/shader.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/translator.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/translator_disasm.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_builder.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator_alu.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator_fetch.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator_memexport.cpp
-    ${ITC_SDK_GRAPHICS}/pipeline/shader/spirv_translator_rb.cpp
-    ${ITC_SDK_GRAPHICS}/format/ucode.cpp
-    ${ITC_SDK_GRAPHICS}/util/draw.cpp
-    ${ITC_SDK_GRAPHICS}/registers.cpp
-    ${ITC_SDK_GRAPHICS}/register_file.cpp
-)
-target_include_directories(itc_xenos_shaders PUBLIC ${REXSDK_DIR}/thirdparty/renderdoc)
-set_target_properties(itc_xenos_shaders PROPERTIES
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN ON)
-target_compile_options(itc_xenos_shaders PRIVATE -Wno-unused-variable)
-target_link_libraries(itc_xenos_shaders PUBLIC
-    rexruntime xxHash::xxhash Vulkan::Headers glslang::SPIRV glslang
-    MachineIndependent GenericCodeGen OSDependent OGLCompiler)
-
 # The lift sweep's functions (docs/loops/lift-sweep.md): written by
 # tools/lift.py, so taken by glob rather than listed.
 file(GLOB ITC_LIFTED_SOURCES CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -1006,38 +950,27 @@ function(itc_add_executable name)
         add_executable(${name} ${ARGN})
     endif()
 
-    rexglue_setup_target(${name})
-
-    # Our own start-up (src/app/, "A4 brought forward" in
-    # docs/rexglue-removal.md): the SDK's main() and ReXApp, which
-    # rexglue_configure_target adds, are left out.
-    get_target_property(itc_sources ${name} SOURCES)
-    list(FILTER itc_sources EXCLUDE REGEX "(windowed_app_main_sdl|rex_app)\\.cpp$")
-    set_property(TARGET ${name} PROPERTY SOURCES ${itc_sources})
-
-    target_include_directories(${name} PRIVATE src)
+    target_include_directories(${name} PRIVATE src ${CMAKE_BINARY_DIR}/itc_include)
     if(NOT ITC_HARNESSES)
         target_compile_definitions(${name} PRIVATE ITC_NO_HARNESSES)
     endif()
 
     # Our own copies of header-only libraries (A1 in docs/rexglue-removal.md),
-    # included with their folder (<xxHash/xxhash.h>) so the SDK's copies on the
-    # include path can't stand in for them.
+    # included with their folder (<xxHash/xxhash.h>).
     target_include_directories(${name} PRIVATE thirdparty)
 
-    target_link_libraries(${name} PRIVATE itc_xma itc_movies itc_xenos_shaders itc_avutil)
+    target_link_libraries(${name} PRIVATE itc_xma itc_movies itc_xenos_shaders itc_avutil
+        SDL3::SDL3-static itc_vulkan_headers itc_simde)
 
-    # The native renderer (src/native/) uses SDL, which lives in librexruntime,
-    # and loads Vulkan at runtime: it needs only the headers. Both are the SDK's
-    # third-party copies.
-    target_include_directories(${name} PRIVATE
-        ${REXSDK_DIR}/thirdparty/sdl3/include
-        ${REXSDK_DIR}/thirdparty/vulkan-headers/include)
-
-    # rex::runtime doesn't propagate imgui's include path, which rex_app.cpp and
-    # the app header need. Headers only: the symbols already live in librexruntime.
-    target_include_directories(${name} PRIVATE
-        $<TARGET_PROPERTY:imgui::imgui,INTERFACE_INCLUDE_DIRECTORIES>)
+    # The flags the SDK's target set-up gave us (rexglue_apply_target_settings),
+    # kept: the large code model (with no linker relaxation) and SSE4.1.
+    if(UNIX AND NOT APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+        target_compile_options(${name} PRIVATE -mcmodel=large)
+        target_link_options(${name} PRIVATE -Wl,--no-relax)
+    endif()
+    if(NOT MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+        target_compile_options(${name} PRIVATE -msse4.1)
+    endif()
 endfunction()
 
 itc_add_executable(itc ${ITC_SOURCES})

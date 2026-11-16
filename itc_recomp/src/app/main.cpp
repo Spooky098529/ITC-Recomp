@@ -21,7 +21,6 @@
 #include "audio/native_audio.h"
 #include "base/flags.h"
 #include "base/log.h"
-#include "base/log_sdk.h"
 #include "debug/thread_cpu.h"
 #include "game_data/game_data.h"
 #include "guest_code.h"
@@ -90,7 +89,8 @@ Paths ResolvePaths(const std::filesystem::path& exe_dir) {
 }
 
 // The log: our file (logs/itc_<n>.log next to the executable, or --log_file;
-// none with log_level off), the SDK's lines forwarded into it.
+// none with log_level off; the shader translator's lines come into it
+// through its shims, src/translator_shims/).
 void SetUpLogging(const std::filesystem::path& exe_dir, const Paths& paths,
                   const std::vector<std::string>& others) {
   std::string level = ITC_FLAG(log_level);
@@ -104,7 +104,6 @@ void SetUpLogging(const std::filesystem::path& exe_dir, const Paths& paths,
     base::StartLogFile(file.empty() ? base::NextLogPath(exe_dir / "logs", kName).string() : file,
                        level);
   }
-  base::ForwardSdkLog(level);
   ITC_LOG_INFO("{} starting", kName);
   ITC_LOG_INFO("  Game directory: {}", paths.game_data.string());
   base::flags::WarnAboutProblems();

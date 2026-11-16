@@ -31,7 +31,9 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          # Ours and rexglue-sdk (the shader translator's source); not the
+          # SDK's own third-party submodules, which our build doesn't use.
+          submodules: true
 
       # Same dependencies as the SDK's linux-amd64 CI.
       - name: Install clang 20
@@ -95,8 +97,6 @@ jobs:
           name="itc-${version}-linux-amd64"
           mkdir -p "dist/${name}"
           cp itc_recomp/out/build/linux-amd64-release/itc "dist/${name}/"
-          # The SDK writes librexruntime.so to its own output folder.
-          cp rexglue-sdk/out/linux-amd64/librexruntime.so "dist/${name}/"
           # Players' settings, with comments (the scripts stay for testing).
           cp itc_recomp/itc.toml "dist/${name}/"
 
@@ -105,7 +105,7 @@ jobs:
           # library needs to load stay). It doesn't change speed. Other
           # runs' artifacts and local builds keep both for debugging.
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            strip --strip-all "dist/${name}/itc" "dist/${name}/librexruntime.so"
+            strip --strip-all "dist/${name}/itc"
           fi
 
           # Fail if the executable needs a library the zip doesn't carry.
@@ -114,7 +114,7 @@ jobs:
             echo "Missing libraries:"; echo "$missing"; exit 1
           fi
 
-          (cd "dist/${name}" && zip -9 "../${name}.zip" itc librexruntime.so itc.toml)
+          (cd "dist/${name}" && zip -9 "../${name}.zip" itc itc.toml)
           echo "name=${name}" >> "$GITHUB_OUTPUT"
 
       - name: sccache stats

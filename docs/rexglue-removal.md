@@ -4253,6 +4253,37 @@ Each leaves the game working, smallest and most independent first.
    - Checks: a clean configure and build, the test zip running from its own
      folder, an attract race, the pad replay, frame dumps, gamepads and
      rumble in a drive by the user.
+   Done (2026-11-16, `e4-sdk-removal-16-11-26`): the executable links no
+   SDK library (`readelf -d`: only libc, libm, libstdc++, libgcc_s).
+   - Submodules `itc_recomp/thirdparty/SDL`, `Vulkan-Headers`, `simde`,
+     `glslang` and `fmt`, at the SDK's commits (cloned from its copies,
+     pointed at upstream); `cmake/thirdparty.cmake` builds SDL static with
+     the SDK's options (the same backends: X11, Wayland, PipeWire,
+     PulseAudio, ALSA, HIDAPI, libudev) and glslang's SPIR-V builder only.
+   - `cmake/xenos_translator.cmake`: the 14 translator sources and 9 of the
+     SDK's with the helpers they call (`graphics/xenos.cpp`, the texture
+     format table and tiling, `ui/graphics_util.cpp`, the string buffer,
+     `core/memory.cpp`, `math_gcc.cpp`, `filesystem_posix.cpp`, the DXBC
+     checksum), with the SDK's flags for them (`-fno-strict-aliasing
+     -ffp-model=strict -fno-char8_t`, the large code model); our shims
+     (`src/translator_shims/`: `rex/logging/types.h`, `api.h`, `format.h`,
+     `rex/cvar.h`) stand in for the SDK's spdlog logging and flag registry.
+   - `cmake/rexglue.cmake`, the patches' application, `base/log_sdk.cpp` and
+     `rex/version.h` gone (our `cmake/version.cmake`: `git describe` in the
+     window title); the executable keeps the flags the SDK's set-up gave it
+     (`-mcmodel=large`, `-Wl,--no-relax`, `-msse4.1`).
+   - The tools, CLAUDE.md (the build line, packaging, the release tags) and
+     the Linux CI (non-recursive submodules: the build reads only the SDK's
+     own tracked `dxbc` and `renderdoc` files; no `librexruntime.so` in the
+     zip) updated.
+   - Checked: a fresh configure and build; an attract race and the pad
+     replay (127 s, no error lines, the race at the cap); the translator
+     itself, by the pad replay from an empty shader cache: the 84
+     translations it made byte-identical to the SDK-built translator's (the
+     other 25 of the 109 are in parts the replay doesn't reach); a frame
+     dump; the test zip run from its own folder (with `XDG_DATA_DIRS` as the
+     standard command sets it, for the Vulkan drivers). Left for the user's
+     drive: gamepads and rumble, and sound, on our SDL build.
    - A lead for later (the user, 2026-11-16, "worth investigating later"):
      no translator at all, the game's fixed set of shaders (105 programs,
      109 translations) translated once with the game's data and the
@@ -6886,3 +6917,13 @@ and frame dumps clean. `boundary_status.py` reads the docs' function rows,
 not the running code, so its figures don't move: overridden 128, Native
 (with Lifted) 204, Dropped 24, never called 20, live 73; imports: 186
 called, 30 with a live caller.
+
+**2026-11-16, E4's steps 4 and 5 (branch `e4-sdk-removal-16-11-26`):** our
+own flag parser, `itc.toml` reader and log file naming (A4); the SDK out of
+our build: its shader translator a static library from the submodule, SDL,
+Vulkan-Headers, simde, glslang and fmt our own submodules; the executable
+links no SDK library. Attract races, the pad replay (127 s), frame dumps and
+fresh translations (byte-identical) clean. `boundary_status.py` reads the
+docs' function rows, not the running code, so its figures don't move:
+overridden 128, Native (with Lifted) 204, Dropped 24, never called 20, live
+73; imports: 186 called, 30 with a live caller.

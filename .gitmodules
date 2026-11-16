@@ -9,3 +9,23 @@
 	path = itc_recomp/thirdparty/xxHash
 	url = https://github.com/Cyan4973/xxHash.git
 	shallow = true
+[submodule "itc_recomp/thirdparty/SDL"]
+	path = itc_recomp/thirdparty/SDL
+	url = https://github.com/libsdl-org/SDL
+	shallow = true
+[submodule "itc_recomp/thirdparty/Vulkan-Headers"]
+	path = itc_recomp/thirdparty/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers.git
+	shallow = true
+[submodule "itc_recomp/thirdparty/simde"]
+	path = itc_recomp/thirdparty/simde
+	url = https://github.com/simd-everywhere/simde.git
+	shallow = true
+[submodule "itc_recomp/thirdparty/glslang"]
+	path = itc_recomp/thirdparty/glslang
+	url = https://github.com/KhronosGroup/glslang.git
+	shallow = true
+[submodule "itc_recomp/thirdparty/fmt"]
+	path = itc_recomp/thirdparty/fmt
+	url = https://github.com/fmtlib/fmt.git
+	shallow = true
