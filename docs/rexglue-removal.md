@@ -3521,11 +3521,12 @@ E5. **The native code made native** (the user's call, 2026-11-09):
     classes, normal calls and interfaces, no stack or register
     artifacts, harnesses comparing what the game observes instead of
     bytes. Its inputs are the function files (`docs/functions/`,
-    `docs/known-data.md`) and the transcribed C++. The functions kept
+    `docs/known-data.md`) and the transcribed C++. The functions once kept
     recompiled for a register leftover stored into live state
     (`BuildScreen::BackToBuilds` `sub_821A1258`, the garage screen's
-    `Transition11` `sub_82195F10` and `Transition15` `sub_82196030`)
-    need deciding before E4: they keep the PowerPC context alive.
+    `Transition11` `sub_82195F10` and `Transition15` `sub_82196030`) were
+    lifted by the sweep and turned out to store 0, not a leftover ("E4:
+    the plan", the measure).
 
 ## E1: the plan (2026-11-16)
 
