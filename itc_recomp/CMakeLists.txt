@@ -106,11 +106,12 @@ set(ITC_SOURCES
     src/memory/heap.cpp
     src/hooks/c_runtime_heap.cpp
     src/memory/c_runtime_heap.cpp
-    src/kernel/native_imports.cpp
-    src/kernel/spin_locks.cpp
-    src/kernel/critical_sections.cpp
-    src/kernel/events.cpp
-    src/kernel/tls.cpp
+    src/threads/native_imports.cpp
+    src/threads/spin_locks.cpp
+    src/threads/critical_sections.cpp
+    src/threads/events.cpp
+    src/threads/tls.cpp
+    src/threads/threads.cpp
     src/hooks/voice.cpp
     src/hooks/sprites.cpp
     src/sprites/sprites.cpp

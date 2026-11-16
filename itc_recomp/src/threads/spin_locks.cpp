@@ -9,7 +9,7 @@
 // answers only goes back to KfLowerIrql, so raising answers 0 and lowering
 // does nothing.
 
-#include "kernel/native_imports.h"
+#include "threads/native_imports.h"
 
 #include "base/log.h"
 
@@ -18,7 +18,7 @@
 #include <iterator>
 #include <thread>
 
-namespace kernel {
+namespace threads {
 
 namespace {
 
@@ -109,4 +109,4 @@ const bool kRegistered = RegisterNativeImports(kEntries, std::size(kEntries));
 
 }  // namespace
 
-}  // namespace kernel
+}  // namespace threads

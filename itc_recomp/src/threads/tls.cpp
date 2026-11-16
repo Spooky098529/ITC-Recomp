@@ -8,7 +8,7 @@
 // the SDK's process bitmap): only KeTlsAlloc hands them out, and all of
 // them come here.
 
-#include "kernel/native_imports.h"
+#include "threads/native_imports.h"
 
 #include "base/log.h"
 #include "guest.h"
@@ -17,7 +17,7 @@
 #include <iterator>
 #include <mutex>
 
-namespace kernel {
+namespace threads {
 
 namespace {
 
@@ -49,7 +49,7 @@ lifted::Result TlsAlloc(uint8_t* base, const lifted::Args& args) {
     }
   }
   if (slot == kOutOfIndexes) {
-    ITC_LOG_ERROR("kernel: out of TLS slots");
+    ITC_LOG_ERROR("threads: out of TLS slots");
   } else {
     guest::StoreU32(base, SlotAddress(base, args, slot), 0);
   }
@@ -94,4 +94,4 @@ const bool kRegistered = RegisterNativeImports(kEntries, std::size(kEntries));
 
 }  // namespace
 
-}  // namespace kernel
+}  // namespace threads

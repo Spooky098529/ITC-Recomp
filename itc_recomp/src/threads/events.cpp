@@ -6,14 +6,15 @@
 // notification event, 1 a synchronization (auto-reset) event, 5 a
 // semaphore), its signal state (+4, big-endian; a semaphore's count) and a
 // semaphore's limit (+0x10). Events made by handle (NtCreateEvent) are host
-// records under handles of ours (kHandleBase up). One host mutex guards
+// records under handles of ours (threads/handles.h). One host mutex guards
 // them all and one condition variable wakes every waiter on any signal; a
 // waiter checks its objects again.
 //
 // What isn't ours falls back to the SDK (lifted::ImportFromSdk): waits on
 // other objects (threads), on SDK handles, named events. Logged once each.
 
-#include "kernel/native_imports.h"
+#include "threads/handles.h"
+#include "threads/native_imports.h"
 
 #include "base/log.h"
 #include "guest.h"
@@ -23,11 +24,12 @@
 #include <iterator>
 #include <mutex>
 #include <optional>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <vector>
 
-namespace kernel {
+namespace threads {
 
 namespace {
 
@@ -42,8 +44,6 @@ constexpr uint8_t kSemaphore = 5;
 constexpr uint32_t kSignalState = 4;
 constexpr uint32_t kSemaphoreLimit = 0x10;
 
-// Ours, below the SDK's (0xF8000000 up), 4 apart as the kernel's.
-constexpr uint32_t kHandleBase = 0xE1000000;
 
 struct HostEvent {
   uint8_t type;
@@ -54,16 +54,12 @@ struct State {
   std::mutex mutex;
   std::condition_variable signaled;
   std::unordered_map<uint32_t, HostEvent> events;  // by handle
-  uint32_t next_handle = kHandleBase;
+  uint32_t next_handle = kEventHandleBase;
 };
 
 State& Get() {
   static State state;
   return state;
-}
-
-bool OurHandle(uint32_t handle) {
-  return handle >= kHandleBase && handle < 0xF0000000u;
 }
 
 // A waitable: a kernel object in guest memory, or a host event by handle.
@@ -106,7 +102,7 @@ void LogFallbackOnce(const char* what, uint32_t value) {
   std::lock_guard lock(mutex);
   if (!logged[what]) {
     logged[what] = true;
-    ITC_LOG_INFO("kernel: {} {:08X} left to the SDK", what, value);
+    ITC_LOG_INFO("threads: {} {:08X} left to the SDK", what, value);
   }
 }
 
@@ -233,7 +229,7 @@ lifted::Result ReleaseSemaphore(uint8_t* base, const lifted::Args& args) {
     if (adjustment > 0 && int64_t(previous) + adjustment <= limit) {
       object.SetSignal(previous + adjustment);
     } else {
-      ITC_LOG_ERROR("kernel: semaphore {:08X} released past its limit ({} + {} > {})", address,
+      ITC_LOG_ERROR("threads: semaphore {:08X} released past its limit ({} + {} > {})", address,
                     previous, adjustment, limit);
     }
   }
@@ -360,6 +356,7 @@ lifted::Result NtWaitForSingleObjectEx(uint8_t* base, const lifted::Args& args) 
     event = FindEvent(handle);
   }
   if (!event) {
+    ITC_LOG_ERROR("threads: NtWaitForSingleObjectEx on {:08X}, not an event of ours", handle);
     return {kStatusInvalidHandle, 0.0};
   }
   std::vector<Object> objects{Object{base, 0, event}};
@@ -373,6 +370,9 @@ lifted::Result NtClose(uint8_t* base, const lifted::Args& args) {
     return lifted::ImportFromSdk(base, __imp__NtClose, args);
   }
   ITC_NATIVE_RUNNING("import NtClose");
+  if (ThreadHandle(handle)) {
+    return {CloseThreadHandle(handle) ? kStatusSuccess : kStatusInvalidHandle, 0.0};
+  }
   std::lock_guard lock(Get().mutex);
   return {Get().events.erase(handle) != 0 ? kStatusSuccess : kStatusInvalidHandle, 0.0};
 }
@@ -407,4 +407,4 @@ const bool kRegistered = RegisterNativeImports(kEntries, std::size(kEntries));
 
 }  // namespace
 
-}  // namespace kernel
+}  // namespace threads

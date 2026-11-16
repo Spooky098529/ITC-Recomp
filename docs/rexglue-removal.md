@@ -3611,9 +3611,9 @@ Guest stacks stay until E2 (frames are still in guest memory).
    depth", 2026-10-29) become host recursive locks here. Done kind by
    kind, each checked before the next.
 
-   Done (2026-11-16): `src/kernel/`, behind `--native_kernel_sync` (on;
+   Done (2026-11-16): `src/threads/`, behind `--native_threads` (on;
    read once at start-up), routed in `lifted::Import` by a table of
-   native imports (`kernel/native_imports.h`), so every caller, lifted or
+   native imports (`threads/native_imports.h`), so every caller, lifted or
    hand port, reaches ours; `lifted::ImportFromSdk` is the way back to the
    SDK for objects ours don't handle.
    - Spin locks and IRQL (`spin_locks.cpp`): the lock stays a
@@ -3639,7 +3639,7 @@ Guest stacks stay until E2 (frames are still in guest memory).
    memory filled by our code (the fields the game reads, found by
    reading the lifted code), `KeTls*` over our own slots.
 
-   TLS done (2026-11-16, `kernel/tls.cpp`): each thread's slots are
+   TLS done (2026-11-16, `threads/tls.cpp`): each thread's slots are
    where its thread object points (`[[r13 + 256] + 0x68]` + 4 × slot), as
    the SDK sets them up; slot numbers from our own table (lowest free
    first, 256). Checked as above. What game code reads of the per-thread
@@ -3671,6 +3671,27 @@ Guest stacks stay until E2 (frames are still in guest memory).
    next: `ExCreateThread` and the thread calls ours, those threads host
    threads with a guest stack and a PCR and thread object of ours; the
    main thread after E2's memory imports.
+
+   Done (2026-11-16, `threads/threads.cpp`): `ExCreateThread` makes a
+   `std::thread` and, in guest memory from our allocation layer, only what
+   game code still reads through r1 and r13 (a stack, the code's frames
+   being there; a per-thread block with +256, +268 and +336; a thread
+   object with +0x58, +0x68 our TLS slots, +0x14C the thread ID and +0x160
+   the last error), then runs the start routine (through the XAPI
+   start-up when given) through our dispatch table; its handle is ours
+   (`threads/handles.h`, `0xE2000000` up). `NtResumeThread`,
+   `KeResumeThread`, `KeSetBasePriorityThread` (plugged in: kept and
+   answered, not applied), `KeSetAffinityThread` (the CPU number at
+   +268), `ObReferenceObjectByHandle` and `ObDereferenceObject` answer
+   for ours; `Device::CreateWorkers` hands `KeSetBasePriorityThread` the
+   handle where a thread object is expected (the SDK read it as a
+   pointer), so ours take either. Native code with no r13 at hand finds
+   its thread through `threads/current_thread.h` (`CurrentThreadId`,
+   `sub_825B9A60`, no longer asks the SDK on our threads). All seven of
+   the game's threads are ours (the frame driver's four, the tiling
+   worker, XAudio's master and worker); the main thread and native
+   audio's stay the SDK's. Attract races, the pad replay (127 s) and a
+   frame dump clean.
 
 Checks at each step: `attract_race.sh 40` as a smoke run, the pad replay
 (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`, ~127 s, no

@@ -11,7 +11,7 @@
 // in host order; nothing in the game reads it). The SDK made contended
 // waits on the struct as a kernel event; ours wait on the host lock.
 
-#include "kernel/native_imports.h"
+#include "threads/native_imports.h"
 
 #include "base/log.h"
 #include "guest.h"
@@ -23,7 +23,7 @@
 #include <shared_mutex>
 #include <unordered_map>
 
-namespace kernel {
+namespace threads {
 
 namespace {
 
@@ -75,7 +75,7 @@ uint32_t CurrentThread(uint8_t* base, const lifted::Args& args) {
     static bool logged = false;
     if (!logged) {
       logged = true;
-      ITC_LOG_ERROR("kernel: a critical section entered on a thread without a thread object "
+      ITC_LOG_ERROR("threads: a critical section entered on a thread without a thread object "
                     "(r13 {:08X})",
                     uint32_t(args.r13));
     }
@@ -153,7 +153,7 @@ lifted::Result LeaveCriticalSection(uint8_t* base, const lifted::Args& args) {
   {
     std::lock_guard lock(section.mutex);
     if (section.depth <= 0) {
-      ITC_LOG_ERROR("kernel: critical section {:08X} left while not entered", address);
+      ITC_LOG_ERROR("threads: critical section {:08X} left while not entered", address);
       return {0, 0.0};
     }
     section.lock_count--;
@@ -180,4 +180,4 @@ const bool kRegistered = RegisterNativeImports(kEntries, std::size(kEntries));
 
 }  // namespace
 
-}  // namespace kernel
+}  // namespace threads

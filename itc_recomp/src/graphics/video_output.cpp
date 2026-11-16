@@ -3,6 +3,8 @@
 
 #include "graphics/video_output.h"
 
+#include "threads/current_thread.h"
+
 #include "guest.h"
 
 #include "base/log.h"
@@ -80,6 +82,11 @@ Lock& LockOf(uint32_t video_output) {
 
 uint32_t CurrentThreadId() {
   ITC_NATIVE_RUNNING("sub_825B9A60 CurrentThreadId");
+  // The thread object's ID ([[r13 + 256] + 0x14C]) on our threads; the
+  // SDK's on its own (the main thread, until E2).
+  if (const uint32_t id = threads::CurrentThreadIdIfOurs()) {
+    return id;
+  }
   return rex::system::XThread::GetCurrentThreadId();
 }
 
