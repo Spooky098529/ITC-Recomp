@@ -3482,7 +3482,10 @@ E1. **Threads and sync**: host threads and locks in native code. The
     before the lift no longer applies (nothing recompiled runs).
 
 E2. **Memory**: native allocations once nothing uses guest addresses.
-    No guest mapping, no `/dev/shm` files.
+    No guest mapping, no `/dev/shm` files. Since the lift sweep, that end
+    comes only with E5 (the code reads and writes guest addresses
+    throughout); what E2 does before it, a guest address space of our own
+    with no SDK memory behind it, is under "E2: the plan" below.
 
 E3. **The image load**: the recompiled code reads strings, constants,
     vtables, tables and initialized globals from the image at
@@ -3723,6 +3726,106 @@ Checks at each step: `attract_race.sh 40` as a smoke run, the pad replay
 error lines), frame dumps, a drive by the user before the merge, and
 `boundary_status.py` recorded in "The boundary over time" (its "live"
 count reads rows, not running code, since stage 5).
+
+## E2: the plan (2026-11-16, a draft for the user's review)
+
+After E1 (every import the game calls in play is ours, every thread
+running game code ours), the SDK's runtime still owns the memory the game
+lives in. E2 here is that memory made ours, guest addresses kept: the
+lifted and hand-ported code reads and writes the game's objects at guest
+addresses (big-endian, by offset), and keeps its stack frames there, so a
+guest address space stays until E5 makes the code real C++ (the old E2's
+"no guest mapping" moves there).
+
+### Where guest memory comes from today
+
+- **The mapping** (`rexglue-sdk` `src/system/xmemory.cpp`): a shared
+  memory file (`/dev/shm/xenia_memory_*` on Linux, a file mapping on
+  Windows) of 4 GB of guest virtual addresses plus 512 MB of physical
+  memory at +4 GB, mapped as views so the physical ranges `0xA0000000`
+  (64 KB pages), `0xC0000000` (16 MB pages) and `0xE0000000` (4 KB pages)
+  all alias the same physical memory. Heaps over it: `0x00000000` (4 KB
+  pages), `0x40000000` (64 KB), `0x80000000` and `0x90000000` (the XEX's),
+  and the physical ones.
+- **Our allocation layer** (`src/memory/heap.cpp`, `docs/native-memory.md`):
+  every allocation the game makes, but its virtual range (384 MB at
+  `0x10000`) is one reservation from the SDK's `0x00000000` heap, and each
+  physical block one allocation from the SDK's physical heaps (by page
+  size). Since E1 it also holds our threads' stacks and blocks.
+- **The image** (E3): `Runtime::LoadXexImage` decrypts and decompresses
+  `default.xex` into `0x82000000`, resolves its imports, and writes the
+  kernel's variable exports the image imports (the SDK's
+  `export_resolver`); code reads the image's data, vtables and globals
+  there.
+- **The SDK's own guest data**: the kernel's guest globals (the title
+  process block, the TLS bitmap), the export variables
+  (`XboxHardwareInfo`, `ExLoadedImageName`, `XexExecutableModuleHandle`
+  and the like; `graphics/predicated_tiling.cpp` and
+  `hooks/graphics_device.cpp` read some), the loader's module records.
+- **Readers of the mapping's layout** in our code: the renderer
+  (`native/state.h`: physical memory at the virtual base + 4 GB, the GPU's
+  physical addresses read from the command data), its guest memory
+  mirrors, `hooks/xma.cpp` and `debug/thread_cpu.cpp` (the SDK's memory
+  object), `app/main.cpp` (the base). The game turns virtual addresses
+  into GPU physical ones inline (about 270 sites masking with
+  `0x1FFFFFFF` in `generated/`).
+
+### The steps
+
+1. **Measure** (logging, no change in behavior): which of the SDK's guest
+   data the game reads in play (the export variables by name, the kernel
+   globals), whether any CPU access goes through a second alias of a
+   physical block (written at one of `0xA`, `0xC`, `0xE` and read at
+   another, or at its physical address), and every physical address the
+   renderer reads, by the block it falls in. Recorded here; it decides
+   steps 2 and 4.
+2. **The SDK's guest data plugged in**: the export variables the game
+   reads written by us as fixed data (plug in data), in our layer's
+   memory; the rest left out.
+3. **The image loaded by us** (E3 brought forward: our mapping must hold
+   it, and the SDK's loader writes into the SDK's): `default.xex` read,
+   decrypted (AES, the title key) and decompressed (LZX, through an
+   upstream library: libmspack's LZX decoder is the candidate, as FFmpeg
+   was for XMA) into `0x82000000`, its imports bound to our dispatch
+   table's thunk entries and plugged-in variables. Only the US release's
+   `default.xex` is supported, checked by its hash; its header's few
+   fields read for that file. The player's own file stays the source (the
+   repo never ships game data).
+4. **Our own mapping**: one reservation of the guest's 4 GB (and the
+   physical range) by us: `memfd_create` and `mmap` on Linux,
+   `CreateFileMapping` and `MapViewOfFile` on Windows (`docs/windows.md`),
+   our allocation layer taking its ranges from it directly (its own
+   ranges for the 4 KB, 64 KB and physical pages) instead of from the
+   SDK's heaps. Whether the physical aliases are kept depends on step 1:
+   - if nothing reaches a block through a second alias, each physical
+     block lives once at its virtual address and the renderer maps a
+     GPU physical address to it through a table our layer keeps (no
+     aliased views: the "not emulating" rule's choice);
+   - if something does, the three views are mapped as the SDK maps them.
+   The renderer's `PhysicalHostAddress`, the mirrors, `xma.cpp` and
+   `thread_cpu.cpp` move to our layer's accessors.
+5. **The SDK's runtime not made**: with threads (E1), memory and the image
+   ours, `main()` stops making `rex::Runtime` (its kernel state, memory
+   and module loader); what's left of it for us (the flag parser, the log
+   forwarding, A4's) and the fallback paths into the SDK
+   (`lifted::ImportFromSdk`, the imports never seen in play, which then
+   log and stop like an address with no entry) are settled there, and
+   that is E4's start.
+
+Checks at each step: attract races, the pad replay, frame dumps, a drive
+by the user, the Windows build under Wine for step 4, and saves loading
+(the Risks below).
+
+### Decisions for the user
+
+- **The physical aliases** (step 4): drop them if step 1 shows nothing
+  uses them (recommended), or keep the SDK's aliased views.
+- **The image load** (step 3): our own loader with an upstream LZX
+  library (recommended; only the US `default.xex`), or keep the SDK's
+  loader as a library writing into our mapping (less work now, but it
+  keeps the SDK's memory classes alive until it's replaced).
+- **The order**: steps 2 and 3 before 4 (the image and the SDK's data
+  have to land somewhere before the SDK's memory goes), as above.
 
 ## Risks
 
