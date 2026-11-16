@@ -685,8 +685,8 @@ possible), the race's end (`race-end.md`, `--native_race_end`), the
 options' load and save pages (`options-load-save.md`), `Type6Screen0`,
 the type 5 mode (`type5-mode.md`), the vinyl editor (`tuning-pages.md`),
 the power graph screen (`power-graph-screen.md`), the achievements
-(`achievements.md`, `XUserWriteAchievements` kept through the SDK, the
-user's call) and the frame driver (`frame-driver.md`,
+(`achievements.md`; `XUserWriteAchievements`, first kept through the
+SDK, plugged in since 2026-11-16 with nothing recorded, the user's call) and the frame driver (`frame-driver.md`,
 `--native_frame_driver`: the game's object driving each frame, renamed
 from "renderer" by the user's call), with the course scenery finished
 (`Scene::Draw` and its group) and `TuningScreen::HandleInput` as leads

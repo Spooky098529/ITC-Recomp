@@ -3473,12 +3473,13 @@ no error lines); frame dumps on against off for the render path; and
 Only when no recompiled function is left (or none that touches what's
 being removed):
 
-E1. **Threads and sync** (291 boundary functions, plus every recompiled
-    function using the game's locks): host threads and locks in native
-    code. The graphics library's per-CPU workers read the CPU number from
-    the PCR (+268; "Interrupts are made at the library's level" in
+E1. **Threads and sync**: host threads and locks in native code. The
+    graphics library's per-CPU workers read the CPU number from the PCR
+    (+268; "Interrupts are made at the library's level" in
     `docs/native-renderer.md`), and timing has mattered before (the
-    deferred-kick race there).
+    deferred-kick race there). The plan as of 2026-11-16 is under "E1:
+    the plan" below; the count of 291 boundary functions written here
+    before the lift no longer applies (nothing recompiled runs).
 
 E2. **Memory**: native allocations once nothing uses guest addresses.
     No guest mapping, no `/dev/shm` files.
@@ -3522,6 +3523,75 @@ E5. **The native code made native** (the user's call, 2026-11-09):
     (`BuildScreen::BackToBuilds` `sub_821A1258`, the garage screen's
     `Transition11` `sub_82195F10` and `Transition15` `sub_82196030`)
     need deciding before E4: they keep the PowerPC context alive.
+
+## E1: the plan (2026-11-16)
+
+On `e1-threads-sync-16-11-26`, after the rewiring (agreed with the user,
+2026-11-16). Where things start: every function the game runs is ours
+(hand ports or lifted), and the game reaches the SDK only through its
+imports (`lifted::Import`, the import thunks' entries in
+`src/lifted/imports.cpp`) and the five kernel entries. Our code names 184
+imports; 43 are threads and sync: `ExCreateThread`, `ExTerminateThread`,
+`NtResumeThread`, `NtSuspendThread`, `KeResumeThread`,
+`KeSetBasePriorityThread`, `KeSetAffinityThread`; `NtCreateEvent`,
+`NtSetEvent`, `NtClearEvent`, `KeSetEvent`, `KeResetEvent`,
+`KeInitializeSemaphore`, `KeReleaseSemaphore`, `KeWaitForSingleObject`,
+`KeWaitForMultipleObjects`, `NtWaitForSingleObjectEx`;
+`RtlInitializeCriticalSection`, `RtlEnterCriticalSection`,
+`RtlTryEnterCriticalSection`, `RtlLeaveCriticalSection`, the spin locks
+and IRQL (`KfAcquireSpinLock`, `KfReleaseSpinLock`,
+`KeAcquireSpinLockAtRaisedIrql`, `KeReleaseSpinLockFromRaisedIrql`,
+`KeTryToAcquireSpinLockAtRaisedIrql`, `KeRaiseIrqlToDpcLevel`,
+`KfLowerIrql`, `KeEnterCriticalRegion`, `KeLeaveCriticalRegion`,
+`KeLockL2`); `KeTlsAlloc`, `KeTlsFree`, `KeTlsGetValue`,
+`KeTlsSetValue`; `NtCreateTimer`, `NtSetTimerEx`, `NtCancelTimer`,
+`KeDelayExecutionThread`; `NtClose`, `NtDuplicateObject`,
+`ObReferenceObjectByHandle`, `ObDereferenceObject`. Which of them run in
+play isn't known yet (lifted code names every import its original did).
+
+The constraint that orders the steps: the game's threads are kernel
+threads because the code reads the kernel's per-thread block through
+r13 (the PCR: the CPU number at +268, the TLS slots, the thread's
+kernel pointers) and because the SDK's import functions find the
+current `XThread` from the host thread they run on. A thread of ours
+can only start once nothing it reaches calls an import needing that.
+Guest stacks stay until E2 (frames are still in guest memory).
+
+1. **Measure.** A diagnostic flag (`--log_imports`) counting each
+   import's calls by name through `lifted::Import`, logged at exit and
+   now and then; run in attract races and the pad replay. The result
+   (which imports run in play, from which threads, how often) is
+   recorded here and picks the order below; imports never seen keep
+   running through the SDK until their step, and any we replace that
+   then turns up unseen logs once.
+2. **Sync objects as host primitives.** Events, semaphores, critical
+   sections, spin locks and the waits on them, the timers and
+   `KeDelayExecutionThread`. Some are kernel structures inside game
+   objects in guest memory (a `KEVENT`'s or `RTL_CRITICAL_SECTION`'s
+   words), others handles; each kind gets a host object (a table keyed
+   by the structure's guest address or by the handle), with the
+   structure's words the game itself reads (if any) kept as the kernel
+   leaves them. The locks the user's calls kept as the game's own
+   (XAudio's API lock and voice lists' spin lock, XACT's lock: "until
+   every user is native, then host recursive locks with a readable
+   depth", 2026-10-29) become host recursive locks here. Done kind by
+   kind, each checked before the next.
+3. **The per-thread block and TLS as ours.** r13's block in guest
+   memory filled by our code (the fields the game reads, found by
+   reading the lifted code), `KeTls*` over our own slots.
+4. **Threads as host threads.** `std::thread` (or SDL's) with a guest
+   stack from our memory layer and our per-thread block in r13, for the
+   four thread starts the kernel runs today, then the game's main thread
+   (`xstart`'s, made by `PrepareModuleLaunch`). Only once step 1's list
+   shows nothing these threads reach still needs the SDK's `XThread`;
+   what's left of that (memory imports, the file reads, the audio
+   output's) is checked first, and may move this step after part of E2.
+
+Checks at each step: `attract_race.sh 40` as a smoke run, the pad replay
+(`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`, ~127 s, no
+error lines), frame dumps, a drive by the user before the merge, and
+`boundary_status.py` recorded in "The boundary over time" (its "live"
+count reads rows, not running code, since stage 5).
 
 ## Risks
 
