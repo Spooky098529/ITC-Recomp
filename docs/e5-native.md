@@ -236,9 +236,9 @@ as well as the host type's):
 - the string tables and fonts, the data tables (`strings-and-font.md`,
   `data-tables.md`, `car-specs.md`);
 - the UI movies' data (`ui-movies.md`);
-- saves (`save-data.md`, `saves/`): read and written in their on-disk
-  format, converted to and from host structures, so players' saves keep
-  loading (and saves made after load on older builds; see the decisions).
+- saves (`save-data.md`, `saves/`): converted to and from host structures;
+  saves from older builds may stop loading (the user's call, 2026-11-16,
+  under "Decided").
 
 A type the game reads from a file and also builds in memory (a model the
 game edits, the vinyl sheets) moves with its loader.
@@ -327,8 +327,8 @@ The game is the check, as it has been since the rewiring's stage 4:
   first and either fixed under a flag or left out of the digest.
 - Frame dumps at fixed points of the pad replay, compared (dumps vary
   ~0.25% of pixels between runs today: the comparison allows that).
-- Saves: a save made before E5 loads after each step that touches the save
-  path, and one made after loads too.
+- Saves: after each step that touches the save path, a save made on that
+  build loads again (older builds' saves may break: "Decided").
 - A drive by the user before each merge into `rexglue-removal-project`.
 - `generated/` stays the reference for what the original did when a check
   differs (read, not run).
@@ -374,6 +374,26 @@ steps 4, 7 and 9.
 - **The names.** Entry and function names from the rows (step 0) where the
   row's name is marked "probably": take them, or keep `sub_X` until read.
 
+Decided (the user, 2026-11-16), on `e5-native-16-11-26`:
+
+- **Behavior**: as proposed. No change a player can see or the state
+  digest shows (the same game, tick for tick, on the same input); layouts,
+  allocation order and frees may change.
+- **Saves**: breaking saves from older builds is fine. The on-disk format
+  doesn't have to be kept for compatibility, either way. (The plan's save
+  check and the risk "byte-for-byte what the game wrote" no longer apply.)
+- **Order**: bottom-up, as drafted.
+- **The schema's form**: TOML files, one per area, in
+  `itc_recomp/schema/`; the tools read them and generate the C++.
+- **The state digest**: built as drafted (`--state_digest`).
+- **The image's data**: committed as C++ data, extracted by a tool from
+  the player's `default.xex` on the developer's machine; `default.xex` is
+  then no longer read.
+- **Process**: steps 2 to 5 run as loops with migration agents per area
+  (B7's rules carried over); steps 0, 1 and 6 to 9 done directly.
+- **The names**: rows' names taken even where marked "probably"; rows
+  without a name keep `sub_X`.
+
 ## Risks
 
 - **Scale.** E5 touches every function; B7 took 47 loop runs for less. The
@@ -390,5 +410,5 @@ steps 4, 7 and 9.
 - **Timing.** Host objects and direct calls change timing between threads
   (the frame driver's workers, the tiling workers, the audio threads); the
   state digest and drives are the check.
-- **Saves.** A save written from host structures must be byte-for-byte what
-  the game wrote (checked against saves from earlier builds).
+- **Saves.** A save written from host structures must load back the same
+  game state (older builds' saves need not load: "Decided").
