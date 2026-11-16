@@ -6049,7 +6049,7 @@ in the executable: every original our code falls back to lifted (1,408),
 the functions only those reach lifted (batches 036 to 042, 695), our own
 guest header, import declarations, image description and CMake set-up.
 Attract races and the pad replay (127 s) clean; frame dumps right. The
-boundary: overridden 128, Native (with Lifted) 188, Dropped 24, never
-called 34, live 75. Imports: 186 called, 30 with a live caller. Static
-map: unported 9 (the Xbox Live mode's two, `xstart`, six the lift can't
+boundary: overridden 128, Native (with Lifted) 204, Dropped 24, never
+called 20, live 73. Imports: 186 called, 30 with a live caller. B7
+(`b7_status.py`): ours 10,556, work left 32. Static map: unported 9 (the Xbox Live mode's two, `xstart`, six the lift can't
 translate, none seen in play).
