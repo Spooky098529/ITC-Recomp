@@ -3810,6 +3810,16 @@ guest address space stays until E5 makes the code real C++ (the old E2's
 2. **The SDK's guest data plugged in**: the export variables the game
    reads written by us as fixed data (plug in data), in our layer's
    memory; the rest left out.
+
+   Done (2026-11-16, `src/memory/kernel_variables.cpp`,
+   `--native_kernel_variables`): after the image is loaded, the six read
+   slots point at blocks of ours holding step 1's data; the four nothing
+   reads are left as the loader bound them (step 3's loader leaves them
+   out). The import table's page is read-only after the load, so it's
+   made writable around the binding (through the SDK's heap until step 4).
+   A first try without that faulted, and the SDK's fault handler retried
+   the write for ever: a hang, not a crash. Attract race and pad replay
+   clean.
 3. **The image loaded by us** (E3 brought forward: our mapping must hold
    it, and the SDK's loader writes into the SDK's): `default.xex` read,
    decrypted (AES, the title key) and decompressed (LZX, through an

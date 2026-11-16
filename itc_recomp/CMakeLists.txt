@@ -107,6 +107,7 @@ set(ITC_SOURCES
     src/hooks/c_runtime_heap.cpp
     src/memory/c_runtime_heap.cpp
     src/memory/memory_imports.cpp
+    src/memory/kernel_variables.cpp
     src/imports/native_imports.cpp
     src/threads/spin_locks.cpp
     src/threads/critical_sections.cpp
