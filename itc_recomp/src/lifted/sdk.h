@@ -19,6 +19,16 @@ using ImportFunction = void(PPCContext&, uint8_t*);
 
 Result Import(uint8_t* base, ImportFunction* function, const Args& args);
 
+// The import's name (written by itc_recomp/tools/import_entries.py into
+// imports.cpp), for diagnostics.
+const char* ImportName(ImportFunction* function);
+
+// --log_imports (src/lifted/import_log.cpp, E1's measure in
+// docs/rexglue-removal.md): notes one import call, its caller's return
+// address and thread (r13).
+void NoteImport(ImportFunction* function, const Args& args);
+bool LoggingImports();
+
 // Runs `entry` with the context's argument registers and puts its r3 and
 // f1 back.
 void Enter(PPCContext& ctx, uint8_t* base, Entry entry);

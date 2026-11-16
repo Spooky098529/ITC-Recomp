@@ -3564,6 +3564,40 @@ Guest stacks stay until E2 (frames are still in guest memory).
    recorded here and picks the order below; imports never seen keep
    running through the SDK until their step, and any we replace that
    then turns up unseen logs once.
+
+   Done (2026-11-16): `--log_imports` (`src/lifted/import_log.cpp`;
+   names from `lifted::ImportName`, written into `imports.cpp` by
+   `tools/import_entries.py`). An attract race (`itc_5673`, 68 s) and the
+   pad replay (`itc_5674`, 127 s: the menus, a save, a race) call the same
+   **30 imports**, nothing else (no file, XAM, graphics or network import
+   runs in play). Calls in the pad replay, by import:
+
+   | Import | Calls | Kind |
+   | --- | --- | --- |
+   | `KeRaiseIrqlToDpcLevel` | 2,572,463 | IRQL |
+   | `KeAcquireSpinLockAtRaisedIrql`, `KeReleaseSpinLockFromRaisedIrql`, `KfLowerIrql` | 2,477,245 each | spin locks, IRQL |
+   | `RtlEnterCriticalSection`, `RtlLeaveCriticalSection` | 331,752 each | critical sections |
+   | `KeWaitForSingleObject` | 49,018 | waits |
+   | `KeSetEvent` | 45,022 | events |
+   | `KeReleaseSemaphore`, `KeWaitForMultipleObjects` | 22,511 each | semaphores, waits |
+   | `NtSetEvent`, `NtWaitForSingleObjectEx` | 20,960, 20,959 | events by handle, waits |
+   | `KeTlsGetValue` | 4,320 | TLS |
+   | `RtlInitializeCriticalSection` | 38 | critical sections |
+   | `NtFreeVirtualMemory`, `NtAllocateVirtualMemory` | 32, 2 | memory (E2) |
+   | `NtCreateEvent` | 15 | events by handle |
+   | `ObReferenceObjectByHandle`, `ObDereferenceObject` | 10 each | threads (their objects) |
+   | `ExCreateThread`, `KeSetBasePriorityThread` | 7 each | threads |
+   | `NtResumeThread`, `KeSetAffinityThread` | 4 each | threads |
+   | `KeGetCurrentProcessType` | 3 | system |
+   | `KeTlsAlloc`, `KeTlsSetValue`, `KeResumeThread` | 2 each | TLS, threads |
+   | `KeInitializeSemaphore`, `ExRegisterTitleTerminateNotification` | 1 each | semaphores, threads |
+
+   Nine guest threads call them (by r13; the main thread `3001F000`
+   makes the others). Some hand ports still run lifted originals or
+   stand-ins of ours through `lifted::Sdk`, which `Import` also sees
+   (logged as "not an import"). Everything else our code names stays
+   behind its import, never seen; step 2 starts with the spin locks and
+   IRQL (nearly all the calls), then the critical sections.
 2. **Sync objects as host primitives.** Events, semaphores, critical
    sections, spin locks and the waits on them, the timers and
    `KeDelayExecutionThread`. Some are kernel structures inside game

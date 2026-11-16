@@ -165,6 +165,9 @@ Result Call(uint8_t* base, uint32_t address, const Args& args) {
 }
 
 Result Import(uint8_t* base, ImportFunction* function, const Args& args) {
+  if (LoggingImports()) {
+    NoteImport(function, args);
+  }
   return Boundary(args, [&](PPCContext& ctx) { function(ctx, base); });
 }
 
