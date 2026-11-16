@@ -309,24 +309,16 @@ ITC_COURSE_SCENERY(820F4558, hooks::CourseSceneryUpdate(ctx, base))
 
 // --- The course set's draws ---
 
-void hooks::CourseSceneryDrawSetLists(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): r24 is set in it for the
-  // callees' adapters, which read it from their caller; the rest on a view
-  // of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
+void hooks::CourseSceneryDrawSetLists(lifted::Regs& ctx, uint8_t* base) {
   if (hooks::SceneryListsSlotDiagnostics()) {
     lifted::Sdk(ctx, base, __imp__sub_820F52A8);
     return;
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  const uint64_t r24 = sdk.r24.u64;
-  sdk.r24.u64 = DrawSetListsViewProjection(base, ctx.r4.u32);
   hooks::SceneryDrawGuest guest{ctx, base};
   const scenery_lists::DrawCalls calls = hooks::SceneryListsDrawCalls(&guest);
   const uint32_t r3 = DrawSetLists(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
-  sdk.r24.u64 = r24;
   ctx.lr = lr;
   ctx.r3.u64 = r3;
   ctx.fpscr.disableFlushMode();
@@ -362,9 +354,7 @@ void hooks::CourseSceneryRecordHeadlightProjectors(lifted::Regs& ctx, uint8_t* b
 // area; lr put back, flush-to-zero off (r3 isn't read by its caller,
 // Scenery::Draw). The original runs where the headlights' or the light
 // groups' plain C++ may not, or without --native_post_effects,
-// --native_data_files or --native_scenery_lists. ctx's r24 is the camera
-// pass while it runs (as the original's), for SceneryModel::DrawShape's
-// adapter where its plain C++ declines.
+// --native_data_files or --native_scenery_lists.
 bool hooks::CourseSceneryDrawAreaNative() {
   return ITC_FLAG(native_course_scenery) && ITC_FLAG(native_cameras) &&
          ITC_FLAG(native_matrix_math) && ITC_FLAG(native_vehicle_accessors) &&
@@ -372,21 +362,14 @@ bool hooks::CourseSceneryDrawAreaNative() {
          hooks::LightGroupsNative() && !hooks::SceneryListsSlotDiagnostics();
 }
 
-void hooks::CourseSceneryDrawArea(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): r24 is set in it for the
-  // callees' adapters, which read it from their caller; the rest on a view
-  // of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
+void hooks::CourseSceneryDrawArea(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  const uint64_t r24 = sdk.r24.u64;
-  sdk.r24.u64 = guest::LoadU32(base, ctx.r4.u32 + 20) * 592u + 0x826BAC00u;
   hooks::SceneryDrawGuest guest{ctx, base};
   const scenery_lists::DrawCalls draws = hooks::SceneryListsDrawCalls(&guest);
-  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base, &sdk);
-  DrawArea(base, draws, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, sdk.r28.u32);
-  sdk.r24.u64 = r24;
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
+  // (the caller's r28: diagnostic only, not carried)
+  DrawArea(base, draws, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, 0);
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
@@ -397,27 +380,17 @@ void hooks::CourseSceneryDrawArea(PPCContext& sdk, uint8_t* base) {
 
 // Scenery::Draw: r3 = the manager. Its adapter is its frame-state wrap
 // (src/debug/frame_state_diff.cpp), which calls this where
-// CourseSceneryDrawNative holds. ctx's r24 is the original's (0x8265ECA0)
-// while it runs, the camera pass for DrawArea and the view-projection for
-// DrawSetLists (their callees' adapters read it where their plain C++
-// declines), then put back.
+// CourseSceneryDrawNative holds.
 bool hooks::CourseSceneryDrawNative() {
   return hooks::CourseSceneryDrawAreaNative();
 }
 
-void hooks::CourseSceneryDraw(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): r24 is set in it for the
-  // callees' adapters, which read it from their caller; the rest on a view
-  // of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
+void hooks::CourseSceneryDraw(lifted::Regs& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  const uint64_t r24 = sdk.r24.u64;
-  sdk.r24.u64 = 0x8265ECA0;
   hooks::SceneryDrawGuest guest{ctx, base};
   const scenery_lists::DrawCalls draws = hooks::SceneryListsDrawCalls(&guest);
-  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base, &sdk);
+  const car_scene_draw::SceneDrawCalls calls = hooks::CarSceneDrawRootCalls(ctx, base);
   // A call into our own code from `frame` with the original's return
   // address, r1 put back.
   auto in_frame = [&](uint32_t frame, uint32_t back, auto&& run) {
@@ -430,7 +403,9 @@ void hooks::CourseSceneryDraw(PPCContext& sdk, uint8_t* base) {
   };
   DrawSteps steps;
   steps.native_model_animation = ITC_FLAG(native_model_animation);
-  steps.set_r24 = [&](uint32_t value) { sdk.r24.u64 = value; };
+  // The r24 the original holds for its callees (only their recorder's
+  // context's diagnostic word reads it): not carried (the rewiring, stage 3).
+  steps.set_r24 = [](uint32_t) {};
   steps.advance = [&](uint32_t frame, uint32_t set) {
     in_frame(frame, 0x820F60B8, [&] {
       ctx.r3.u64 = set;
@@ -456,7 +431,6 @@ void hooks::CourseSceneryDraw(PPCContext& sdk, uint8_t* base) {
     });
   };
   Draw(base, draws, calls, steps, ctx.r1.u32, ctx.r3.u32);
-  sdk.r24.u64 = r24;
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
 }
@@ -601,4 +575,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F1208) {
   }
 ITC_CONTEXT_FORM(hooks::CourseSceneryRecordHeadlightProjectors)
 ITC_CONTEXT_FORM(hooks::CourseSceneryUpdate)
+ITC_CONTEXT_FORM(hooks::CourseSceneryDrawSetLists)
+ITC_CONTEXT_FORM(hooks::CourseSceneryDrawArea)
+ITC_CONTEXT_FORM(hooks::CourseSceneryDraw)
 #undef ITC_CONTEXT_FORM

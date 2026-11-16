@@ -102,6 +102,7 @@ void SceneryListsRecordShapeDepth(lifted::Regs& ctx, uint8_t* base);
 // r8 = the mask, r9 = the byte; the render queue's slot 4 a guest call from
 // a 160-byte frame like the original's.
 void SceneryListsDrawShapeDepth(PPCContext& ctx, uint8_t* base);
+void SceneryListsDrawShapeDepth(lifted::Regs& ctx, uint8_t* base);
 
 // SceneryModel::RecordShape (sub_82146BD0): r3 = the model, r4 = the
 // shape, r5 = the group, r6 = whether to set the shaders, r7 = pixel c76,
@@ -114,6 +115,7 @@ void SceneryListsRecordShape(lifted::Regs& ctx, uint8_t* base);
 // pass too, r8 = pixel c76, r9 = the range, r10 = the pair offset; from a
 // 208-byte frame.
 void SceneryListsDrawShape(PPCContext& ctx, uint8_t* base);
+void SceneryListsDrawShape(lifted::Regs& ctx, uint8_t* base);
 
 // Model::RecordShape (sub_82595550, behind --native_models): r3 = the
 // model, r4 = the shape, r5 = the group, r6 = whether to set the shaders,
@@ -130,9 +132,11 @@ void SceneryListsModelRecordMaterials(lifted::Regs& ctx, uint8_t* base);
 // r5 = the world matrix, r6 = the shape, r7 = the depth pass too, r8 =
 // pixel c76, r9 = the range; from a 208-byte frame.
 void SceneryListsModelDrawShape(PPCContext& ctx, uint8_t* base);
+void SceneryListsModelDrawShape(lifted::Regs& ctx, uint8_t* base);
 
 // PointList::Draw (sub_82148058): r3 = the list, r4 = the entry, r5 = the
 // camera pass; from a 464-byte frame.
 void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base);
+void SceneryListsPointListDraw(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

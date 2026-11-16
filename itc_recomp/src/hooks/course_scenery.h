@@ -13,10 +13,9 @@ namespace hooks {
 
 // Scenery::DrawSetLists (sub_820F52A8): r3 = the manager, r4 = the pass
 // description; r3 as the original leaves it. Its original runs with the
-// command list's diagnostics on (as the recorders'). r24 is the
-// view-projection's address while it runs (the draws' adapters read it
-// where their plain C++ declines), then put back.
+// command list's diagnostics on (as the recorders').
 void CourseSceneryDrawSetLists(PPCContext& ctx, uint8_t* base);
+void CourseSceneryDrawSetLists(lifted::Regs& ctx, uint8_t* base);
 
 // Scenery::RecordHeadlightProjectors (sub_820F34C8): r4 = the pass
 // description; r3 as the original leaves it, lr put back. The original
@@ -31,8 +30,9 @@ void CourseSceneryRecordHeadlightProjectors(lifted::Regs& ctx, uint8_t* base);
 // callees' flags, the command list's diagnostics off).
 bool CourseSceneryDrawAreaNative();
 void CourseSceneryDrawArea(PPCContext& ctx, uint8_t* base);
+void CourseSceneryDrawArea(lifted::Regs& ctx, uint8_t* base);
 
-// Scenery::Draw (sub_820F6068): r3 = the manager; lr, r24 and flush-to-zero
+// Scenery::Draw (sub_820F6068): r3 = the manager; lr and flush-to-zero
 // (off) put back, r3 not given (its callers don't read it). Run by its
 // frame-state wrap (src/debug/frame_state_diff.cpp) where
 // CourseSceneryDrawNative (DrawArea's condition) holds, else the original.
@@ -41,6 +41,7 @@ void CourseSceneryDrawArea(PPCContext& ctx, uint8_t* base);
 // through its adapter's work.
 bool CourseSceneryDrawNative();
 void CourseSceneryDraw(PPCContext& ctx, uint8_t* base);
+void CourseSceneryDraw(lifted::Regs& ctx, uint8_t* base);
 
 // Scenery::Update (sub_820F4558): r3 = the manager; the original's register
 // saves made, then the plain C++ (its guest calls putting flush-to-zero back

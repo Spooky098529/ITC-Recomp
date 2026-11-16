@@ -61,14 +61,13 @@ void LightSets(uint8_t* base, uint32_t owner, uint32_t count, float px, float py
 // it leaves it.
 template <typename Draw>
 void NativeStep(PPCContext& sdk, uint8_t* base, Draw draw) {
-  // The plain C++ on a view of the context (the rewiring, stage 3); the
-  // calls that hand r24 or r28 on put them in `sdk`.
+  // The plain C++ on a view of the context (the rewiring, stage 3).
   lifted::RegsScope scope(sdk);
   lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   hooks::SceneryDrawGuest guest{ctx, base};
-  const ::car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
+  const ::car_draw::Calls calls = hooks::CarDrawCalls(&guest);
   const ::car_draw::Left left = draw(calls);
   ctx.lr = lr;
   if (!left.in_ctx) {

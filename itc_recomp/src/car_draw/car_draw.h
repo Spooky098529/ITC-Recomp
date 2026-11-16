@@ -60,22 +60,17 @@ struct Calls {
   std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                          uint32_t lr)>
       call;
-  // As `call`, with r28 = `r28` (all 64 bits) during the call (put back
-  // after): what CarPart::Draw's depth pass and Model::DrawShapeDepth hand
-  // their recorder's context.
+  // As `call`, with the r28, r24 or both the original's callee would
+  // find (CarPart::Draw's depth pass and Model::DrawShapeDepth hand r28 to
+  // their recorder's context, Model::Draw r24): not carried (the rewiring,
+  // stage 3: only the recorder's context's diagnostic words read them), so
+  // `call` itself.
   std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                          uint32_t lr, uint64_t r28)>
       call_r28;
-  // As `call`, with r24 = `r24` (all 64 bits) during the call (put back
-  // after): what Model::Draw hands its recorder's context, for draws whose
-  // caller changed r24 (the head and tail lights' glows).
   std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                          uint32_t lr, uint64_t r24)>
       call_r24;
-  // As `call`, with r24 and r28 both set during the call (put back after):
-  // CarPart::Draw's original where its plain C++ declines under a native
-  // caller (its Model::Draw records r24, its depth pass r28, as the
-  // original caller's registers hold them).
   std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                          uint32_t lr, uint64_t r24, uint64_t r28)>
       call_r24_r28;  // PoolMaker2::MakeMorphJob's plain C++ (sub_820AC7F0, the second pool

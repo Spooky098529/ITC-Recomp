@@ -145,7 +145,7 @@ bool CarDrawCalleesNative() {
          CarDrawHeightCalleesNative();
 }
 
-car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest, PPCContext* sdk) {
+car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
   car_draw::Calls calls;
   calls.draw = SceneryListsDrawCalls(guest);
   calls.memcpy = [guest](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp, uint32_t lr) {
@@ -210,44 +210,20 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest, PPCContext* sdk) {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
   };
-  // r24 and r28 go in the SDK's context the view was made from (`sdk`, the
-  // one a call through the boundary runs on), as the callee reads them from
-  // its caller; without one (a caller on a view only), they aren't carried.
-  calls.call_r28 = [sdk, call = calls.call](uint32_t function, const uint64_t* regs, int count,
-                                            uint32_t sp, uint32_t lr, uint64_t r28) {
-    if (sdk == nullptr) {
-      return call(function, regs, count, sp, lr);
-    }
-    const uint64_t saved = sdk->r28.u64;
-    sdk->r28.u64 = r28;
-    const uint64_t r3 = call(function, regs, count, sp, lr);
-    sdk->r28.u64 = saved;
-    return r3;
+  // r24 and r28 aren't carried (the rewiring, stage 3): the callees only
+  // put them in their recorder's context's diagnostic words, so these are
+  // `call`.
+  calls.call_r28 = [call = calls.call](uint32_t function, const uint64_t* regs, int count,
+                                       uint32_t sp, uint32_t lr, uint64_t) {
+    return call(function, regs, count, sp, lr);
   };
-  calls.call_r24 = [sdk, call = calls.call](uint32_t function, const uint64_t* regs, int count,
-                                            uint32_t sp, uint32_t lr, uint64_t r24) {
-    if (sdk == nullptr) {
-      return call(function, regs, count, sp, lr);
-    }
-    const uint64_t saved = sdk->r24.u64;
-    sdk->r24.u64 = r24;
-    const uint64_t r3 = call(function, regs, count, sp, lr);
-    sdk->r24.u64 = saved;
-    return r3;
+  calls.call_r24 = [call = calls.call](uint32_t function, const uint64_t* regs, int count,
+                                       uint32_t sp, uint32_t lr, uint64_t) {
+    return call(function, regs, count, sp, lr);
   };
-  calls.call_r24_r28 = [sdk, call = calls.call](uint32_t function, const uint64_t* regs,
-                                                int count, uint32_t sp, uint32_t lr,
-                                                uint64_t r24, uint64_t r28) {
-    if (sdk == nullptr) {
-      return call(function, regs, count, sp, lr);
-    }
-    const uint64_t saved24 = sdk->r24.u64, saved28 = sdk->r28.u64;
-    sdk->r24.u64 = r24;
-    sdk->r28.u64 = r28;
-    const uint64_t r3 = call(function, regs, count, sp, lr);
-    sdk->r24.u64 = saved24;
-    sdk->r28.u64 = saved28;
-    return r3;
+  calls.call_r24_r28 = [call = calls.call](uint32_t function, const uint64_t* regs, int count,
+                                           uint32_t sp, uint32_t lr, uint64_t, uint64_t) {
+    return call(function, regs, count, sp, lr);
   };
   return calls;
 }
@@ -270,11 +246,7 @@ void LeaveDraw(lifted::Regs& ctx, const car_draw::Draw& draw) {
 
 }  // namespace
 
-void CarDrawCarPartDraw(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): it reads its caller's
-  // r24 and r28, which the view doesn't carry; its body on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
+ITC_REGS_STEP(CarDrawCarPartDraw) {
   if (!CarDrawModelCalleesNative()) {
     lifted::Sdk(ctx, base, __imp__sub_820D06F0);
     return;
@@ -282,10 +254,10 @@ void CarDrawCarPartDraw(PPCContext& sdk, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest, &sdk);
-  const auto draw =
-      car_draw::CarPartDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                            ctx.r6.u32, ctx.r7.u32, sdk.r24.u32, sdk.r28.u32);
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  // (the caller's r24 and r28: diagnostic only, not carried)
+  const auto draw = car_draw::CarPartDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                          ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, 0, 0);
   if (!draw) {
     lifted::Sdk(ctx, base, __imp__sub_820D06F0);
     return;
@@ -325,11 +297,7 @@ void LeaveLeft(lifted::Regs& ctx, const car_draw::Left& left) {
 
 }  // namespace
 
-void CarDrawSceneLightsDraw(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): it reads its caller's
-  // r24 and r28, which the view doesn't carry; its body on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
+ITC_REGS_STEP(CarDrawSceneLightsDraw) {
   if (!CarDrawLightKitCalleesNative()) {
     lifted::Sdk(ctx, base, __imp__sub_820DDE58);
     return;
@@ -337,10 +305,10 @@ void CarDrawSceneLightsDraw(PPCContext& sdk, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest, &sdk);
-  const auto left =
-      car_draw::SceneLightsDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
-                                !CarDrawBlinkTimersHeld(), sdk.r24.u32, sdk.r28.u32);
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  // (the caller's r24 and r28: diagnostic only, not carried)
+  const auto left = car_draw::SceneLightsDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                              !CarDrawBlinkTimersHeld(), 0, 0);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }
@@ -349,11 +317,7 @@ bool CarDrawShadowsCalleesNative() {
   return CarDrawPartsCalleesNative() && CarDrawLightingCalleesNative();
 }
 
-void CarDrawSceneParts(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): it reads its caller's
-  // r24 and r28, which the view doesn't carry; its body on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
+ITC_REGS_STEP(CarDrawSceneParts) {
   if (!CarDrawShadowsCalleesNative()) {
     lifted::Sdk(ctx, base, __imp__sub_820E2EE8);
     return;
@@ -361,9 +325,10 @@ void CarDrawSceneParts(PPCContext& sdk, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest, &sdk);
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  // (the caller's r24: diagnostic only, not carried)
   const car_draw::Left left =
-      car_draw::ScenePartsDraw(base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, sdk.r24.u32);
+      car_draw::ScenePartsDraw(base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, 0);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }
@@ -375,11 +340,7 @@ bool CarDrawInteriorCalleesNative() {
   return CarDrawPartsCalleesNative();
 }
 
-void CarDrawSceneInterior(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): it reads its caller's
-  // r24 and r28, which the view doesn't carry; its body on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
+ITC_REGS_STEP(CarDrawSceneInterior) {
   if (!CarDrawInteriorCalleesNative() || !ITC_FLAG(native_accessories) ||
       !ITC_FLAG(native_scene_models)) {
     lifted::Sdk(ctx, base, __imp__sub_820E53F0);
@@ -388,9 +349,10 @@ void CarDrawSceneInterior(PPCContext& sdk, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest, &sdk);
-  const car_draw::Left left = car_draw::SceneInteriorDraw(
-      base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, sdk.r24.u32, sdk.r28.u32);
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  // (the caller's r24 and r28: diagnostic only, not carried)
+  const car_draw::Left left =
+      car_draw::SceneInteriorDraw(base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, 0, 0);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }
@@ -402,11 +364,7 @@ bool CarDrawCockpitCalleesNative() {
          ITC_FLAG(native_scene_models) && CarDrawLightingCalleesNative();
 }
 
-void CarDrawSceneCockpit(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): it reads its caller's
-  // r24 and r28, which the view doesn't carry; its body on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
+ITC_REGS_STEP(CarDrawSceneCockpit) {
   if (!CarDrawCockpitCalleesNative()) {
     lifted::Sdk(ctx, base, __imp__sub_820DC498);
     return;
@@ -414,20 +372,17 @@ void CarDrawSceneCockpit(PPCContext& sdk, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest, &sdk);
-  const car_draw::Left left = car_draw::SceneCockpitDraw(
-      base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, sdk.r24.u32, sdk.r28.u32);
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  // (the caller's r24 and r28: diagnostic only, not carried)
+  const car_draw::Left left =
+      car_draw::SceneCockpitDraw(base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, 0, 0);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }
 
 // --- The traffic body ---
 
-void CarDrawSceneTraffic(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): it reads its caller's
-  // r24 and r28, which the view doesn't carry; its body on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
+ITC_REGS_STEP(CarDrawSceneTraffic) {
   if (!CarDrawShadowsCalleesNative()) {
     lifted::Sdk(ctx, base, __imp__sub_820E6A40);
     return;
@@ -435,9 +390,10 @@ void CarDrawSceneTraffic(PPCContext& sdk, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest, &sdk);
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  // (the caller's r24: diagnostic only, not carried)
   const car_draw::Left left =
-      car_draw::SceneTrafficDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, sdk.r24.u32);
+      car_draw::SceneTrafficDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, 0);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }
@@ -448,11 +404,7 @@ bool CarDrawWheelsCalleesNative() {
   return CarDrawPartsCalleesNative() && CarDrawMorphCalleesNative();
 }
 
-void CarDrawSceneWheels(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): it reads its caller's
-  // r24 and r28, which the view doesn't carry; its body on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
+ITC_REGS_STEP(CarDrawSceneWheels) {
   if (!CarDrawWheelsCalleesNative()) {
     lifted::Sdk(ctx, base, __imp__sub_820ECE28);
     return;
@@ -460,9 +412,10 @@ void CarDrawSceneWheels(PPCContext& sdk, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest, &sdk);
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  // (the caller's r24: diagnostic only, not carried)
   const car_draw::Left left =
-      car_draw::SceneWheelsDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, sdk.r24.u64);
+      car_draw::SceneWheelsDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, 0);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }
@@ -476,11 +429,7 @@ bool CarDrawUpdateCalleesNative() {
          ITC_FLAG(native_second_set);
 }
 
-void CarDrawUpdate(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): it reads its caller's
-  // r24 and r28, which the view doesn't carry; its body on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
+ITC_REGS_STEP(CarDrawUpdate) {
   if (!CarDrawUpdateCalleesNative()) {
     lifted::Sdk(ctx, base, __imp__sub_820DAC68);
     return;
@@ -488,28 +437,21 @@ void CarDrawUpdate(PPCContext& sdk, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest, &sdk);
+  const car_draw::Calls calls = CarDrawCalls(&guest);
   load_poll::Calls poll = LoadPollCalls(ctx, base);
   const second_set::ReleaseCalls release = SecondSetReleaseCalls(ctx, base);
-  const car_draw::Left left =
-      car_draw::CarDrawUpdate(base, calls, poll, release, ctx.r1.u32, ctx.r3.u64, sdk.r24.u64,
-                              !CarDrawBlinkTimersHeld());
+  // (the caller's r24: diagnostic only, not carried)
+  const car_draw::Left left = car_draw::CarDrawUpdate(base, calls, poll, release, ctx.r1.u32,
+                                                      ctx.r3.u64, 0, !CarDrawBlinkTimersHeld());
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }
 
 }  // namespace hooks
 
-// On the SDK's context (not in the dispatch table): CarPart::Draw reads its
-// caller's r24 and r28 (the rewiring, stage 3; left for later).
-#define ITC_CAR_DRAW(address, step)     \
-  extern "C" REX_FUNC(sub_##address) {  \
-    REX_FUNC_PROLOGUE();                \
-    if (!ITC_FLAG(native_car_draw)) {   \
-      __imp__sub_##address(ctx, base);  \
-      return;                           \
-    }                                   \
-    hooks::step(ctx, base);             \
+#define ITC_CAR_DRAW(address, step)                         \
+  ITC_NATIVE_ENTRY(address, ITC_FLAG(native_car_draw)) {    \
+    hooks::step(ctx, base);                                 \
   }
 
 // CarPart::Draw's adapter is also what the native cockpit dials call

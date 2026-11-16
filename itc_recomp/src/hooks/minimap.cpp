@@ -219,7 +219,8 @@ bool MinimapDrawNative() {
 
 void MinimapDraw(PPCContext& ctx, uint8_t* base) {
   lifted::RegsScope scope(ctx);
-  MinimapDraw(scope.regs, base, ctx.r24.u32);
+  // (the caller's r24: diagnostic only, not carried)
+  MinimapDraw(scope.regs, base, 0);
 }
 void MinimapDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   ctx.fpscr.disableFlushMode();

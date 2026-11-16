@@ -202,8 +202,7 @@ ITC_REGS_STEP(CarSceneDrawTextureProjectionFit) {
   ctx.fpscr.enableFlushMode();
 }
 
-car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(lifted::Regs& ctx, uint8_t* base,
-                                                      PPCContext* sdk) {
+car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(lifted::Regs& ctx, uint8_t* base) {
   car_scene_draw::SceneDrawCalls calls;
   calls.call = [&ctx, base](uint32_t function, const uint64_t* regs, int count,
                             const double* fregs, int fcount, uint32_t sp,
@@ -252,39 +251,26 @@ car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(lifted::Regs& ctx, uint8_t*
   };
   // Car::DrawUpdate's body as its wrap in src/debug/frame_state_diff.cpp
   // runs it (the root makes the wrap's checks).
-  // r24 goes in the SDK's context the view was made from (`sdk`, the one
-  // lifted::Sdk runs on), as Car::DrawUpdate reads it from its caller;
-  // without one (a caller on a view only), it isn't carried.
-  calls.car_draw_update = [&ctx, base, sdk](uint64_t model, uint64_t r24, uint32_t sp,
-                                            uint32_t lr) {
+  // The r24 the original hands it (only its recorder's context's
+  // diagnostic word reads it) isn't carried (the rewiring, stage 3).
+  calls.car_draw_update = [&ctx, base](uint64_t model, uint64_t, uint32_t sp, uint32_t lr) {
     const uint64_t stack = ctx.r1.u64;
-    const uint64_t saved_r24 = sdk != nullptr ? sdk->r24.u64 : 0;
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     ctx.r3.u64 = model;
-    if (sdk != nullptr) {
-      sdk->r24.u64 = r24;
-    }
     ctx.fpscr.disableFlushMode();
     if (ITC_FLAG(native_car_draw)) {
-      lifted::Sdk(ctx, base, CarDrawUpdate);
+      CarDrawUpdate(ctx, base);
     } else {
       lifted::Sdk(ctx, base, __imp__sub_820DAC68);
     }
     ctx.r1.u64 = stack;
-    if (sdk != nullptr) {
-      sdk->r24.u64 = saved_r24;
-    }
     ctx.fpscr.disableFlushMode();
   };
   return calls;
 }
 
-void CarSceneDrawRoot(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): it hands Car::DrawUpdate
-  // r24 in its own, which the view doesn't carry; its body on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
+ITC_REGS_STEP(CarSceneDrawRoot) {
   // The callees' fallbacks the car draw also declines on (its
   // CarDraw*CalleesNative), and the command list's diagnostics.
   if (!ITC_FLAG(native_models) || !ITC_FLAG(native_matrix_math) ||
@@ -295,7 +281,7 @@ void CarSceneDrawRoot(PPCContext& sdk, uint8_t* base) {
   }
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
-  const car_scene_draw::SceneDrawCalls calls = CarSceneDrawRootCalls(ctx, base, &sdk);
+  const car_scene_draw::SceneDrawCalls calls = CarSceneDrawRootCalls(ctx, base);
   const uint32_t r3 =
       car_scene_draw::CarSceneDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
   ctx.lr = lr;

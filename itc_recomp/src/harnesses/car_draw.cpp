@@ -400,7 +400,7 @@ void NativeGather(PPCContext& sdk, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   hooks::SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
   ctx.r3.u64 = car_draw::CarLightingGather(base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32,
                                            ctx.r5.u32);
   ctx.lr = lr;
@@ -740,7 +740,7 @@ void NativeModelDraw(PPCContext& sdk, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   hooks::SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
   const auto draw = car_draw::ModelDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                         ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, sdk.r24.u32);
   if (!draw) {
@@ -857,7 +857,7 @@ void NativeQueueJobRelease(PPCContext& sdk, uint8_t* base) {
   lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   hooks::SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
   const auto left = car_draw::ModelQueueJobRelease(base, calls, ctx.r4.u32, ctx.r1.u32);
   if (!left) {
     lifted::Sdk(ctx, base, __imp__sub_82594E88);
@@ -880,7 +880,7 @@ void NativeMorphShape(PPCContext& sdk, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   hooks::SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
   const auto left = car_draw::ModelMorphShape(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u64,
                                               ctx.r1.u32);
   if (!left) {
@@ -1117,7 +1117,7 @@ void NativeLightPointsDraw(PPCContext& sdk, uint8_t* base) {
   lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   hooks::SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
   const auto left = car_draw::LightPointsDraw(base, calls, W, ctx.r1.u32, ctx.r3.u32, ctx.r4.u64,
                                               ctx.r5.u32, ctx.r6.u32, sdk.r24.u32, sdk.r28.u32);
   if (!left.in_ctx) {
@@ -1132,7 +1132,7 @@ void NativeLightPointsDrawNeon(PPCContext& sdk, uint8_t* base) {
   lifted::Regs& ctx = scope.regs;
   ctx.fpscr.disableFlushMode();
   hooks::SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = hooks::CarDrawCalls(&guest, &sdk);
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
   const auto left =
       car_draw::LightPointsDrawNeon(base, calls, W, ctx.r1.u32, ctx.r3.u32, ctx.r4.u64,
                                     ctx.r5.u32, ctx.r6.u32, sdk.r24.u32, sdk.r28.u32);
