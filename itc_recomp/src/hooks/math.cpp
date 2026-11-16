@@ -4,6 +4,7 @@
 // code runs.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -159,7 +160,7 @@ ITC_NATIVE_ENTRY(825A8A50, ITC_FLAG(native_math)) {
   const bool done = c_runtime::Tan(x, &result);
   ctx.r3.u64 = CtrlFp(ctx, old, kRoundingMask);
   if (!done) {
-    lifted::Sdk(ctx, base, __imp__sub_825A8A50);
+    lifted::original::c825A8A50(ctx, base);
     return;
   }
   ctx.r4.u64 = kRoundingMask;
@@ -173,7 +174,7 @@ ITC_NATIVE_ENTRY(825AAD20, ITC_FLAG(native_math)) {
   ctx.fpscr.disableFlushMode();
   double result;
   if (!c_runtime::Ldexp(ctx.f1.f64, ctx.r4.s32, &result)) {
-    lifted::Sdk(ctx, base, __imp__sub_825AAD20);
+    lifted::original::c825AAD20(ctx, base);
     return;
   }
   const uint64_t old = CtrlFp(ctx, 0xF8, kRoundingMask);

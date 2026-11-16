@@ -28,6 +28,7 @@
 // refcount::AddRef, lock-free, either way).
 
 #include "native/refcount.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "guest.h"
@@ -110,7 +111,7 @@ void NoteSetVertexShader(bool same) {
 ITC_NATIVE_ENTRY_ALWAYS(822A6738) {
   
   if (ITC_FLAG(refcount_global_lock)) {
-    lifted::Sdk(ctx, base, __imp__sub_822A6738);
+    lifted::original::c822A6738(ctx, base);
     return;
   }
   ctx.r3.u64 = refcount::AddRef(base, ctx.r3.u32);
@@ -119,7 +120,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822A6738) {
 ITC_NATIVE_ENTRY_ALWAYS(822A67B0) {
   
   if (ITC_FLAG(refcount_global_lock)) {
-    lifted::Sdk(ctx, base, __imp__sub_822A67B0);
+    lifted::original::c822A67B0(ctx, base);
     return;
   }
   uint32_t object = ctx.r3.u32;

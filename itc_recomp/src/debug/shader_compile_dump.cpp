@@ -1,4 +1,5 @@
 #include "shader_compile_dump.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "guest.h"
@@ -86,7 +87,7 @@ void debug::ShaderCompileDump_Compile(lifted::Regs& ctx, uint8_t* base) {
     source_bytes[i] = guest::LoadU8(base, source + i);
   }
 
-  lifted::Sdk(ctx, base, __imp__sub_822B8F10);
+  lifted::original::c822B8F10(ctx, base);
   uint32_t result = ctx.r3.u32;
 
   std::filesystem::create_directories(dir);

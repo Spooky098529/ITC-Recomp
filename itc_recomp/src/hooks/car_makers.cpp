@@ -3,6 +3,7 @@
 // shares (hooks/car_makers.h). Each leaves r3 as the original does.
 
 #include "hooks/car_makers.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -79,7 +80,7 @@ ITC_REGS_STEP(CarMakersSetBytes) {
 
 ITC_REGS_STEP(CarMakersFromCar) {
   if (!ITC_FLAG(native_scene_models) || !ITC_FLAG(native_car_specs)) {
-    lifted::Sdk(ctx, base, __imp__sub_8215B878);
+    lifted::original::c8215B878(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -95,7 +96,7 @@ bool CarMakersGarageCalleesNative() {
 
 ITC_REGS_STEP(CarMakersGarageCarReset) {
   if (!CarMakersGarageCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_82110448);
+    lifted::original::c82110448(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -106,7 +107,7 @@ ITC_REGS_STEP(CarMakersGarageCarReset) {
 
 ITC_REGS_STEP(CarMakersStaticInit) {
   if (!CarMakersGarageCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_825D9EF0);
+    lifted::original::c825D9EF0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -117,7 +118,7 @@ ITC_REGS_STEP(CarMakersStaticInit) {
 
 ITC_REGS_STEP(CarMakersFromGarageCar) {
   if (!CarMakersGarageCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_82179A60);
+    lifted::original::c82179A60(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -130,7 +131,7 @@ ITC_REGS_STEP(CarMakersFromGarageCar) {
 
 ITC_REGS_STEP(CarMakersSetUpCarData) {
   if (!CarMakersGarageCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_821DF2F8);
+    lifted::original::c821DF2F8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -143,7 +144,7 @@ ITC_REGS_STEP(CarMakersSetUpCarData) {
 
 ITC_REGS_STEP(CarMakersFitCar) {
   if (!ITC_FLAG(native_car_physics) || !ITC_FLAG(native_math)) {
-    lifted::Sdk(ctx, base, __imp__sub_82178C40);
+    lifted::original::c82178C40(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -156,7 +157,7 @@ ITC_REGS_STEP(CarMakersFitCar) {
 
 ITC_REGS_STEP(CarMakersCopyRecord) {
   if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
-    lifted::Sdk(ctx, base, __imp__sub_8217FC60);
+    lifted::original::c8217FC60(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -190,7 +191,7 @@ void Reapply(lifted::Regs& ctx, uint8_t* base, bool decals) {
 
 ITC_REGS_STEP(CarMakersReapplyRecord) {
   if (!CarMakersReapplyCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_82178DF8);
+    lifted::original::c82178DF8(ctx, base);
     return;
   }
   Reapply(ctx, base, true);
@@ -198,7 +199,7 @@ ITC_REGS_STEP(CarMakersReapplyRecord) {
 
 ITC_REGS_STEP(CarMakersReapplyRecordNoDecals) {
   if (!CarMakersReapplyCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_82178E60);
+    lifted::original::c82178E60(ctx, base);
     return;
   }
   Reapply(ctx, base, false);
@@ -216,7 +217,7 @@ bool CarMakersSetCarCalleesNative() {
 
 ITC_REGS_STEP(CarMakersSetCar) {
   if (!CarMakersSetCarCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_8217FD58);
+    lifted::original::c8217FD58(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -236,7 +237,7 @@ ITC_REGS_STEP(CarMakersSetCar) {
 
 ITC_REGS_STEP(CarMakersSetCarClass) {
   if (!CarMakersSetCarClassCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_8217FDC8);
+    lifted::original::c8217FDC8(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -279,7 +280,7 @@ void ShowCarById(lifted::Regs& ctx, uint8_t* base, bool with_class) {
 
 ITC_REGS_STEP(CarMakersShowCarById) {
   if (!CarMakersShowCarByIdCalleesNative(false)) {
-    lifted::Sdk(ctx, base, __imp__sub_82182C90);
+    lifted::original::c82182C90(ctx, base);
     return;
   }
   ShowCarById(ctx, base, false);
@@ -287,7 +288,7 @@ ITC_REGS_STEP(CarMakersShowCarById) {
 
 ITC_REGS_STEP(CarMakersShowCarByIdWithClass) {
   if (!CarMakersShowCarByIdCalleesNative(true)) {
-    lifted::Sdk(ctx, base, __imp__sub_82182D30);
+    lifted::original::c82182D30(ctx, base);
     return;
   }
   ShowCarById(ctx, base, true);
@@ -295,7 +296,7 @@ ITC_REGS_STEP(CarMakersShowCarByIdWithClass) {
 
 ITC_REGS_STEP(CarMakersShowBusyMarker) {
   if (!ITC_FLAG(native_ui_movies_game)) {
-    lifted::Sdk(ctx, base, __imp__sub_8219ED10);
+    lifted::original::c8219ED10(ctx, base);
     return;
   }
   const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
@@ -304,7 +305,7 @@ ITC_REGS_STEP(CarMakersShowBusyMarker) {
 
 ITC_REGS_STEP(CarMakersHideBusyMarker) {
   if (!ITC_FLAG(native_ui_movies_game)) {
-    lifted::Sdk(ctx, base, __imp__sub_8219EDB0);
+    lifted::original::c8219EDB0(ctx, base);
     return;
   }
   const front_end_car_draw::Calls calls = FrontEndCarDrawCalls(ctx, base);
@@ -314,7 +315,7 @@ ITC_REGS_STEP(CarMakersHideBusyMarker) {
 
 ITC_REGS_STEP(CarMakersReloadModel) {
   if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
-    lifted::Sdk(ctx, base, __imp__sub_8217F880);
+    lifted::original::c8217F880(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;

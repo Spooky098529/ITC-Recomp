@@ -5,6 +5,7 @@
 // until their callers are native.
 
 #include "hooks/xaudio_objects.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -401,7 +402,7 @@ ITC_REGS_STEP(XAudioCodecOnSubmit) {
 ITC_REGS_STEP(XAudioCodecSubmitPacket) {
   const uint32_t codec_base = ctx.r3.u32, packet = ctx.r4.u32, flags = ctx.r5.u32;
   const uint32_t thread = Thread(ctx, base);
-  FramedOr(ctx, base, 144, NoBlockSize(base, codec_base), __imp__sub_82469EF8,
+  FramedOr(ctx, base, 144, NoBlockSize(base, codec_base), lifted::original::c82469EF8,
            [&](const xa::GuestCall& call, uint32_t frame) {
              return xa::CodecSubmitPacket(base, codec_base, packet, flags, thread, frame, call);
            });
@@ -410,7 +411,7 @@ ITC_REGS_STEP(XAudioCodecSubmitPacket) {
 ITC_REGS_STEP(XAudioCodecSubmitRegion) {
   const uint32_t codec_base = ctx.r3.u32, region = ctx.r4.u32, flags = ctx.r5.u32;
   const uint32_t thread = Thread(ctx, base);
-  FramedOr(ctx, base, 144, NoBlockSize(base, codec_base), __imp__sub_8246A1C0,
+  FramedOr(ctx, base, 144, NoBlockSize(base, codec_base), lifted::original::c8246A1C0,
            [&](const xa::GuestCall& call, uint32_t frame) {
              return xa::CodecSubmitRegion(base, codec_base, region, flags, thread, frame, call);
            });
@@ -418,7 +419,7 @@ ITC_REGS_STEP(XAudioCodecSubmitRegion) {
 
 ITC_REGS_STEP(XAudioPcmCodecSubmitPacket) {
   if (NoBlockSize(base, ctx.r3.u32 + 16)) {
-    lifted::Sdk(ctx, base, __imp__sub_8246CEB8);
+    lifted::original::c8246CEB8(ctx, base);
     return;
   }
   ITC_NATIVE_RUNNING("sub_8246CEB8 PcmCodec's SubmitPacket");
@@ -432,7 +433,7 @@ ITC_REGS_STEP(XAudioXmaCodecSubmitRegion) {
   const uint32_t thread = Thread(ctx, base);
   const bool refuses =
       guest::LoadU8(base, codec + 266) != 1 && NoBlockSize(base, codec + 16);
-  FramedOr(ctx, base, 128, refuses, __imp__sub_8246A860,
+  FramedOr(ctx, base, 128, refuses, lifted::original::c8246A860,
            [&](const xa::GuestCall& call, uint32_t frame) {
              return xa::XmaCodecSubmitRegion(base, codec, region, flags, thread, frame, call);
            });

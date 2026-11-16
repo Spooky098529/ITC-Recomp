@@ -29,6 +29,7 @@
 // isn't native).
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -175,7 +176,7 @@ ITC_POST_EFFECTS(82135148, ctx.fpscr.disableFlushMode();
       r3 = __VA_ARGS__;                                       \
     }                                                         \
     if (!r3) {                                                \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                        \
+      lifted::original::c##address(ctx, base);                        \
       return;                                                 \
     }                                                         \
     ctx.r3.u64 = *r3;                                         \
@@ -240,7 +241,7 @@ ITC_REGS_STEP(PostEffectsReleaseTexture) {
     r3 = RenderTexturesRelease(base, ctx.r3.u32);
   }
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_821332F0);
+    lifted::original::c821332F0(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -252,7 +253,7 @@ ITC_REGS_STEP(PostEffectsReleaseTexture) {
 // body, as ReleaseTexture.
 ITC_REGS_STEP(PostEffectsReleaseSurface) {
   if (!ITC_FLAG(native_video_output)) {
-    lifted::Sdk(ctx, base, __imp__sub_82133C60);
+    lifted::original::c82133C60(ctx, base);
     return;
   }
   const uint32_t at = ctx.r3.u32;
@@ -327,7 +328,7 @@ CreateCalls MakeCreateCalls(lifted::Regs& ctx, uint8_t* base) {
 ITC_NATIVE_ENTRY_ALWAYS(82138A18) {
   
   if (!ITC_FLAG(native_post_effects) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82138A18);
+    lifted::original::c82138A18(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -349,7 +350,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82138A18) {
 // back, below CreateVertexDeclaration's, 160 bytes).
 void hooks::PostEffectsInitBoot(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_post_effects) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82138C38);
+    lifted::original::c82138C38(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -439,7 +440,7 @@ RecordCalls PostEffectsRecordCalls(lifted::Regs& ctx, uint8_t* base) {
       ctx.r3.u64 = effect;                                                             \
     }                                                                                  \
     if (!r3) {                                                                         \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                                 \
+      lifted::original::c##address(ctx, base);                                                 \
       return;                                                                          \
     }                                                                                  \
     ctx.r3.u64 = *r3;                                                                  \
@@ -456,7 +457,7 @@ void hooks::PostEffectsGlowRecord(lifted::Regs& ctx, uint8_t* base) {
     ctx.r3.u64 = glow;
   }
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_821379D8);
+    lifted::original::c821379D8(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -477,7 +478,7 @@ ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                                 \
     \
     if (!ITC_FLAG(native_post_effects) || ((ctx.r4.u32 & 1) != 0 && !FreesNative())) { \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                                 \
+      lifted::original::c##address(ctx, base);                                                 \
       return;                                                                          \
     }                                                                                  \
     const uint64_t lr = ctx.lr;                                                        \
@@ -489,7 +490,7 @@ ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
     });                                                                                \
     ctx.lr = lr;                                                                       \
     if (!r3) {                                                                         \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                                 \
+      lifted::original::c##address(ctx, base);                                                 \
       return;                                                                          \
     }                                                                                  \
     ctx.r3.u64 = *r3;                                                                  \

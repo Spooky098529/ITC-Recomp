@@ -3,6 +3,7 @@
 // steps the harness shares (hooks/stand_models.h).
 
 #include "hooks/stand_models.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -89,7 +90,7 @@ stand_models::GuestCall StandModelsGuestCall(lifted::Regs& ctx, uint8_t* base) {
 
 ITC_REGS_STEP(StandModelsMakeModel) {
   if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
-    lifted::Sdk(ctx, base, __imp__sub_8217FCB0);
+    lifted::original::c8217FCB0(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -104,7 +105,7 @@ ITC_REGS_STEP(StandModelsMakeModel) {
 #define ITC_STAND_SETTER(Name, address)                                          \
   void StandModels##Name(lifted::Regs& ctx, uint8_t* base) {                       \
     if (!ITC_FLAG(native_vehicle_accessors)) {                                   \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                           \
+      lifted::original::c##address(ctx, base);                                           \
       return;                                                                    \
     }                                                                            \
     ctx.fpscr.disableFlushMode();                                                \
@@ -119,7 +120,7 @@ ITC_STAND_SETTER(SetWheelWord, 82179A18)
 
 ITC_REGS_STEP(StandModelsSetLightsOn) {
   if (!ITC_FLAG(native_vehicle_accessors)) {
-    lifted::Sdk(ctx, base, __imp__sub_82179420);
+    lifted::original::c82179420(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -130,7 +131,7 @@ ITC_REGS_STEP(StandModelsSetLightsOn) {
 
 ITC_REGS_STEP(StandModelsSetDecalA) {
   if (!ITC_FLAG(native_vehicle_accessors)) {
-    lifted::Sdk(ctx, base, __imp__sub_82179818);
+    lifted::original::c82179818(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -140,7 +141,7 @@ ITC_REGS_STEP(StandModelsSetDecalA) {
 
 ITC_REGS_STEP(StandModelsSetDecalB) {
   if (!ITC_FLAG(native_vehicle_accessors)) {
-    lifted::Sdk(ctx, base, __imp__sub_821798D8);
+    lifted::original::c821798D8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -167,49 +168,49 @@ void Reapplying(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* origin
 }
 
 ITC_REGS_STEP(StandModelsSetPart) {
-  Reapplying(ctx, base, __imp__sub_82178F00, [&](const sm::GuestCall& call, uint32_t holder,
+  Reapplying(ctx, base, lifted::original::c82178F00, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t r5, uint32_t stack) {
     return sm::SetPart(base, call, holder, r4, r5, stack);
   });
 }
 
 ITC_REGS_STEP(StandModelsSetInteriorWord) {
-  Reapplying(ctx, base, __imp__sub_82179050, [&](const sm::GuestCall& call, uint32_t holder,
+  Reapplying(ctx, base, lifted::original::c82179050, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t r5, uint32_t stack) {
     return sm::SetInteriorWord(base, call, holder, r4, r5, stack);
   });
 }
 
 ITC_REGS_STEP(StandModelsSetInteriorLevel) {
-  Reapplying(ctx, base, __imp__sub_821791C0, [&](const sm::GuestCall& call, uint32_t holder,
+  Reapplying(ctx, base, lifted::original::c821791C0, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t, uint32_t stack) {
     return sm::SetInteriorLevel(base, call, holder, r4, stack);
   });
 }
 
 ITC_REGS_STEP(StandModelsSetInteriorPair) {
-  Reapplying(ctx, base, __imp__sub_82179250, [&](const sm::GuestCall& call, uint32_t holder,
+  Reapplying(ctx, base, lifted::original::c82179250, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t r5, uint32_t stack) {
     return sm::SetInteriorPair(base, call, holder, r4, r5, stack);
   });
 }
 
 ITC_REGS_STEP(StandModelsClearChoice) {
-  Reapplying(ctx, base, __imp__sub_82179378, [&](const sm::GuestCall& call, uint32_t holder,
+  Reapplying(ctx, base, lifted::original::c82179378, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t, uint32_t stack) {
     return sm::ClearChoice(base, call, holder, r4, stack);
   });
 }
 
 ITC_REGS_STEP(StandModelsSetAero) {
-  Reapplying(ctx, base, __imp__sub_82179548, [&](const sm::GuestCall& call, uint32_t holder,
+  Reapplying(ctx, base, lifted::original::c82179548, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t, uint32_t stack) {
     return sm::SetAero(base, call, holder, r4, stack);
   });
 }
 
 ITC_REGS_STEP(StandModelsReloadDecals) {
-  Reapplying(ctx, base, __imp__sub_82178EC0, [&](const sm::GuestCall& call, uint32_t holder,
+  Reapplying(ctx, base, lifted::original::c82178EC0, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t, uint32_t, uint32_t stack) {
     return sm::ReloadDecals(base, call, holder, stack);
   });
@@ -234,7 +235,7 @@ void WithCalls(lifted::Regs& ctx, uint8_t* base, Body body) {
 
 ITC_REGS_STEP(StandModelsSetTireGrade) {
   if (!ITC_FLAG(native_vehicle_accessors)) {
-    lifted::Sdk(ctx, base, __imp__sub_82179130);
+    lifted::original::c82179130(ctx, base);
     return;
   }
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
@@ -245,7 +246,7 @@ ITC_REGS_STEP(StandModelsSetTireGrade) {
 
 ITC_REGS_STEP(StandModelsTuningSetTireGrade) {
   if (!ITC_FLAG(native_vehicle_accessors)) {
-    lifted::Sdk(ctx, base, __imp__sub_821CCA38);
+    lifted::original::c821CCA38(ctx, base);
     return;
   }
   const uint64_t r3 = ctx.r3.u64;
@@ -271,7 +272,7 @@ ITC_REGS_STEP(StandModelsSetTireTextures) {
 
 ITC_REGS_STEP(StandModelsStepSecondWheels) {
   if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
-    lifted::Sdk(ctx, base, __imp__sub_821CC890);
+    lifted::original::c821CC890(ctx, base);
     return;
   }
   const uint32_t r3 = ctx.r3.u32, stack = ctx.r1.u32;
@@ -311,7 +312,7 @@ ITC_REGS_STEP(StandModelsSceneAddSecondWheels) {
 
 ITC_REGS_STEP(StandModelsFitAxles) {
   if (!ITC_FLAG(native_car_physics) || !ITC_FLAG(native_math)) {
-    lifted::Sdk(ctx, base, __imp__sub_82178B98);
+    lifted::original::c82178B98(ctx, base);
     return;
   }
   const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, stack = ctx.r1.u32;
@@ -339,7 +340,7 @@ bool WheelCalleesNative() {
 
 ITC_REGS_STEP(StandModelsSetWheel) {
   if (!WheelCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_8217DD38);
+    lifted::original::c8217DD38(ctx, base);
     return;
   }
   const uint32_t r3 = ctx.r3.u32, r5 = ctx.r5.u32, r6 = ctx.r6.u32, stack = ctx.r1.u32;
@@ -355,7 +356,7 @@ ITC_REGS_STEP(StandModelsSetWheel) {
 
 ITC_REGS_STEP(StandModelsPreviewWheel) {
   if (!WheelCalleesNative() || !ITC_FLAG(native_race_setup)) {
-    lifted::Sdk(ctx, base, __imp__sub_821DFA78);
+    lifted::original::c821DFA78(ctx, base);
     return;
   }
   const uint32_t r3 = ctx.r3.u32, r5 = ctx.r5.u32, stack = ctx.r1.u32;
@@ -416,7 +417,7 @@ ITC_REGS_STEP(StandModelsSetDecalWord) {
 
 ITC_REGS_STEP(StandModelsSetParts) {
   const uint32_t r6 = ctx.r6.u32, r7 = ctx.r7.u32, r8 = ctx.r8.u32, r9 = ctx.r9.u32;
-  Reapplying(ctx, base, __imp__sub_821797A8, [&](const sm::GuestCall& call, uint32_t holder,
+  Reapplying(ctx, base, lifted::original::c821797A8, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t r5, uint32_t stack) {
     return sm::SetParts(base, call, holder, r4, r5, r6, r7, r8, r9, stack);
   });
@@ -424,12 +425,12 @@ ITC_REGS_STEP(StandModelsSetParts) {
 
 ITC_REGS_STEP(StandModelsSetAeroSet) {
   if (!ITC_FLAG(native_car_specs)) {
-    lifted::Sdk(ctx, base, __imp__sub_8217DBC0);
+    lifted::original::c8217DBC0(ctx, base);
     return;
   }
   const uint64_t r4 = ctx.r4.u64;
   const uint32_t r6 = ctx.r6.u32;
-  Reapplying(ctx, base, __imp__sub_8217DBC0, [&](const sm::GuestCall& call, uint32_t holder,
+  Reapplying(ctx, base, lifted::original::c8217DBC0, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t, uint32_t r5, uint32_t stack) {
     return sm::SetAeroSet(base, call, holder, r4, r5, r6, stack);
   });
@@ -437,21 +438,21 @@ ITC_REGS_STEP(StandModelsSetAeroSet) {
 
 ITC_REGS_STEP(StandModelsSetChoice) {
   const uint32_t r6 = ctx.r6.u32;
-  Reapplying(ctx, base, __imp__sub_82179310, [&](const sm::GuestCall& call, uint32_t holder,
+  Reapplying(ctx, base, lifted::original::c82179310, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t r5, uint32_t stack) {
     return sm::SetChoice(base, call, holder, r4, r5, r6, stack);
   });
 }
 
 ITC_REGS_STEP(StandModelsSetAero2) {
-  Reapplying(ctx, base, __imp__sub_821794A8, [&](const sm::GuestCall& call, uint32_t holder,
+  Reapplying(ctx, base, lifted::original::c821794A8, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t, uint32_t stack) {
     return sm::SetAero2(base, call, holder, r4, stack);
   });
 }
 
 ITC_REGS_STEP(StandModelsSetDoorKind) {
-  Reapplying(ctx, base, __imp__sub_821794F8, [&](const sm::GuestCall& call, uint32_t holder,
+  Reapplying(ctx, base, lifted::original::c821794F8, [&](const sm::GuestCall& call, uint32_t holder,
                                                 uint32_t r4, uint32_t, uint32_t stack) {
     return sm::SetDoorKind(base, call, holder, r4, stack);
   });

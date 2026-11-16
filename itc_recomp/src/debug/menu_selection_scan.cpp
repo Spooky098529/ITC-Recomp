@@ -1,6 +1,7 @@
 // Finds the pause menu's selection (--find_menu_selection).
 
 #include "menu_selection_scan.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "frame_pacing/game_messages.h"
@@ -246,7 +247,7 @@ void MenuSelectionScan_After(uint8_t* base, const char* kind, uint32_t id) {
     if (ITC_FLAG(native_audio_manager_update)) {            \
       lifted_call::EnterR3<sound_cues::step>(ctx, base);    \
     } else {                                                \
-      lifted::Sdk(ctx, base, __imp__sub_##address);         \
+      lifted::original::c##address(ctx, base);         \
     }                                                       \
     debug::MenuSelectionScan_After(base, "call", 0x##address); \
   }

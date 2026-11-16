@@ -99,7 +99,7 @@ ITC_NATIVE_ENTRY(820B72C8, ITC_FLAG(native_car_physics)) {
   uint32_t r3 = 0;
   if (!RigidBodyContactImpulseWith(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                    ctx.r1.u32 - 272, &f1, &r3)) {
-    lifted::Sdk(ctx, base, __imp__sub_820B72C8);
+    lifted::original::c820B72C8(ctx, base);
     return;
   }
   ctx.f1.f64 = f1;
@@ -240,7 +240,7 @@ ITC_NATIVE_ENTRY(820B9448, ITC_FLAG(native_car_physics)) {
   if (!CollisionWorldRemoveObject(base, object, &r3)) {
     ctx.r3.u64 = object;
     ctx.r1.u64 = ctx.r1.u32 - 112;
-    lifted::Sdk(ctx, base, __imp__sub_820B8BA8);
+    lifted::original::c820B8BA8(ctx, base);
     ctx.r1.u64 = ctx.r1.u32 + 112;
     return;
   }
@@ -322,13 +322,13 @@ ITC_NATIVE_ENTRY_ALWAYS(820B7998) {
 ITC_NATIVE_ENTRY_ALWAYS(820B0E70) {
   
   if (!NativeLifetime()) {
-    lifted::Sdk(ctx, base, __imp__sub_820B0E70);
+    lifted::original::c820B0E70(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
   if (!VehicleDestroyPhysics(base, ctx.r3.u32, &r3)) {
-    lifted::Sdk(ctx, base, __imp__sub_820B0E70);
+    lifted::original::c820B0E70(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;
@@ -337,7 +337,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820B0E70) {
 ITC_NATIVE_ENTRY_ALWAYS(820B62E8) {
   
   if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_820B62E8);
+    lifted::original::c820B62E8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -416,13 +416,13 @@ ITC_NATIVE_ENTRY_ALWAYS(820B5B08) {
 ITC_NATIVE_ENTRY_ALWAYS(820FF250) {
   
   if (!NativeLifetime()) {
-    lifted::Sdk(ctx, base, __imp__sub_820FF250);
+    lifted::original::c820FF250(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
   if (!CollisionWorldSetup(base, &r3)) {
-    lifted::Sdk(ctx, base, __imp__sub_820FF250);
+    lifted::original::c820FF250(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;

@@ -4,6 +4,7 @@
 // those with none).
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "hooks/command_buffer.h"
@@ -48,7 +49,7 @@ ITC_COMMAND_BUFFER(8229E9D0, ctx.r3.u64 = cb::WriteCallback(base, ctx.r3.u32, ct
 // original's.
 ITC_COMMAND_BUFFER(8229E308, {
   if (guest::LoadU32(base, ctx.r3.u32 + cb::kRecorder) != 0) {
-    lifted::Sdk(ctx, base, __imp__sub_8229E308);
+    lifted::original::c8229E308(ctx, base);
     return;
   }
   ctx.r3.u64 = cb::Reserve(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
@@ -58,7 +59,7 @@ ITC_COMMAND_BUFFER(8229E308, {
 ITC_COMMAND_BUFFER(8229EB10, {
   if (guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32 + cb::kChainDevice) + cb::kRecorder) !=
       0) {
-    lifted::Sdk(ctx, base, __imp__sub_8229EB10);
+    lifted::original::c8229EB10(ctx, base);
     return;
   }
   ctx.r3.u64 = cb::NewBlock(base, ctx.r3.u32);
@@ -88,7 +89,7 @@ graphics::command_buffer::Kick hooks::CommandBufferKick(lifted::Regs& ctx, uint8
 
 void hooks::EndCommandSegment(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_8229EF48);
+    lifted::original::c8229EF48(ctx, base);
     return;
   }
   const uint32_t device = ctx.r3.u32;
@@ -97,7 +98,7 @@ void hooks::EndCommandSegment(lifted::Regs& ctx, uint8_t* base) {
 
 void hooks::NextCommandSegment(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_8229EC00);
+    lifted::original::c8229EC00(ctx, base);
     return;
   }
   const uint32_t device = ctx.r3.u32, words = ctx.r4.u32;
@@ -108,7 +109,7 @@ void hooks::NextCommandSegment(lifted::Regs& ctx, uint8_t* base) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                           \
     \
     if (!ITC_FLAG(native_command_buffer) || cb::Recording(base, ctx.r3.u32)) {   \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                              \
+      lifted::original::c##address(ctx, base);                              \
       return;                                                                    \
     }                                                                            \
     const cb::Kick kick = hooks::CommandBufferKick(ctx, base);                   \
@@ -158,7 +159,7 @@ ITC_NATIVE_ENTRY(8229E5D0, ITC_FLAG(native_command_buffer)) {
 ITC_NATIVE_ENTRY_ALWAYS(822AC470) {
   
   if (!ITC_FLAG(native_command_buffer)) {
-    lifted::Sdk(ctx, base, __imp__sub_822AC470);
+    lifted::original::c822AC470(ctx, base);
   }
 }
 

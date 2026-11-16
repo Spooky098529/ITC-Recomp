@@ -7,6 +7,7 @@
 // start, nothing having been done. B1's input update is in input_update.cpp.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -56,14 +57,14 @@ ITC_NATIVE_ENTRY_ALWAYS(82099C08) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82099C08);
+  lifted::original::c82099C08(ctx, base);
 }
 
 // PtrList: r3 = the list; r3 left as it came.
 ITC_NATIVE_ENTRY_ALWAYS(820AD058) {
   
   if (!NativeLifetime() || !std_list::Construct(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820AD058);
+    lifted::original::c820AD058(ctx, base);
   }
 }
 
@@ -73,7 +74,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82095958) {
   
   if (!NativeLifetime() || !std_list::Insert(base, ctx.r3.u32, ctx.r4.u32,
                                              guest::LoadU32(base, ctx.r5.u32))) {
-    lifted::Sdk(ctx, base, __imp__sub_82095958);
+    lifted::original::c82095958(ctx, base);
   }
 }
 
@@ -83,7 +84,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82095958) {
 #define ITC_INPUT_FALLBACK(address)    \
   REX_FUNC_PROLOGUE();                 \
   if (!ITC_FLAG(native_input)) {       \
-    lifted::Sdk(ctx, base, __imp__sub_##address);   \
+    lifted::original::c##address(ctx, base);   \
     return;                            \
   }
 
@@ -141,7 +142,7 @@ void NoteRead(uint32_t function, uint32_t caller, uint32_t object, uint32_t mask
     if (ITC_FLAG(native_input)) {                                              \
       ctx.r3.u64 = function(base, processor, ctx.r4.u32);                      \
     } else {                                                                   \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                         \
+      lifted::original::c##address(ctx, base);                                         \
     }                                                                          \
     NoteRead(0x##test, return_address, processor, mask, ctx.r3.u32 & 0xFF);    \
     NoteRead(0x##address, caller, processor, mask, ctx.r3.u32 & 0xFF);         \
@@ -158,7 +159,7 @@ ITC_INPUT_WRAPPER(8258CEE0, 82592520, input::InputProcessorTestRepeat, 0x8258CF0
     if (ITC_FLAG(native_input)) {                                              \
       ctx.r3.u64 = function(pad);                                              \
     } else {                                                                   \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                         \
+      lifted::original::c##address(ctx, base);                                         \
     }                                                                          \
     NoteRead(0x##address, caller, pad, 0, 0);                                  \
   }
@@ -223,7 +224,7 @@ bool ConstructManager(lifted::Regs& ctx, uint8_t* base) {
 ITC_NATIVE_ENTRY_ALWAYS(820991E0) {
   
   if (!ConstructManager(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_820991E0);
+    lifted::original::c820991E0(ctx, base);
   }
 }
 
@@ -234,7 +235,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820993E8) {
   
   const auto manager = NativeLifetime() ? input::ManagerAllocate(base) : std::nullopt;
   if (!manager) {
-    lifted::Sdk(ctx, base, __imp__sub_820993E8);
+    lifted::original::c820993E8(ctx, base);
     return;
   }
   if (*manager == 0) {
@@ -247,7 +248,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820993E8) {
     ctx.r3.u64 = *manager;
     ctx.r4.u64 = block;
     if (!ConstructManager(ctx, base)) {
-      lifted::Sdk(ctx, base, __imp__sub_820991E0);
+      lifted::original::c820991E0(ctx, base);
     }
   });
   ctx.lr = saved_lr;
@@ -261,7 +262,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82099430) {
   if (!NativeLifetime() || !input::ManagerAddListener(base, ctx.r3.u32,
                                                       guest::LoadU32(base, ctx.r4.u32),
                                                       listener)) {
-    lifted::Sdk(ctx, base, __imp__sub_82099430);
+    lifted::original::c82099430(ctx, base);
     return;
   }
   ctx.r3.u64 = listener;

@@ -3,6 +3,7 @@
 // (hooks/career.h).
 
 #include "hooks/career.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -115,7 +116,7 @@ ITC_REGS_STEP(CareerItemRecordsAddLoss) {
 
 ITC_REGS_STEP(CareerResultsPush) {
   if (!cr::ResultsPushNative(ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82111FC8);
+    lifted::original::c82111FC8(ctx, base);
     return;
   }
   ctx.r3.u64 = cr::ResultsPush(base, ctx.r3.u32, ctx.r4.u32);
@@ -145,7 +146,7 @@ ITC_REGS_STEP(CareerConditionTest) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_82112950);
+  lifted::original::c82112950(ctx, base);
 }
 
 ITC_REGS_STEP(CareerRewardsGrant) {
@@ -155,7 +156,7 @@ ITC_REGS_STEP(CareerRewardsGrant) {
 ITC_REGS_STEP(CareerAddRaceResult) {
   ctx.fpscr.disableFlushMode();
   if (!cr::AddRaceResultNative(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82115190);
+    lifted::original::c82115190(ctx, base);
     return;
   }
   ctx.r3.u64 = cr::StatsAddRaceResult(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
@@ -163,14 +164,14 @@ ITC_REGS_STEP(CareerAddRaceResult) {
 
 ITC_REGS_STEP(CareerPickNext) {
   if (!cr::PickNextSkips(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_821159B0);
+    lifted::original::c821159B0(ctx, base);
   }
 }
 
 ITC_REGS_STEP(CareerAfterRace) {
   ctx.fpscr.disableFlushMode();
   if (!cr::AfterRaceNative(base, ctx.r1.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82116588);
+    lifted::original::c82116588(ctx, base);
     return;
   }
   ctx.r3.s64 = int32_t(cr::ProgressAfterRace(base, ctx.r3.u32, ctx.r1.u32));
@@ -179,7 +180,7 @@ ITC_REGS_STEP(CareerAfterRace) {
 ITC_REGS_STEP(CareerCheckUnlocks) {
   ctx.fpscr.disableFlushMode();
   if (!cr::CheckUnlocksNative(base, ctx.r1.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_821162B0);
+    lifted::original::c821162B0(ctx, base);
     return;
   }
   ctx.r3.u64 = cr::ProgressCheckUnlocks(base, ctx.r3.u32, ctx.r1.u32);
@@ -249,7 +250,7 @@ uint64_t MakeThrough(void* user, uint32_t) {
     ctx.r3.u64 = guest.sp + 28;
     ctx.r4.u64 = guest.sp + 36;
     ctx.r5.u64 = frame + 80;
-    lifted::Sdk(ctx, guest.base, __imp__sub_82144E58);
+    lifted::Sdk(ctx, guest.base, lifted::original::c82144E58);
   });
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u64;
@@ -262,7 +263,7 @@ ITC_REGS_STEP(CareerSetUpEvent) {
   const uint32_t save = ctx.r3.u32, mode = ctx.r4.u32, location = ctx.r5.u32;
   const uint32_t sp = ctx.r1.u32;
   if (!cr::SetUpEventNative(base, sp)) {
-    lifted::Sdk(ctx, base, __imp__sub_82114268);
+    lifted::original::c82114268(ctx, base);
     return;
   }
   RaceEventGuest guest(ctx, base);
@@ -341,7 +342,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82116AF0) {
     return;
   }
   if (!ITC_FLAG(native_career)) {
-    lifted::Sdk(ctx, base, __imp__sub_82116AF0);
+    lifted::original::c82116AF0(ctx, base);
     return;
   }
   hooks::CareerNextDay(ctx, base);

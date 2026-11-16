@@ -66,7 +66,7 @@ namespace fw = framework;
 #define ITC_FRAMEWORK_FALLBACK(address)  \
   REX_FUNC_PROLOGUE();                   \
   if (!ITC_FLAG(native_framework)) {     \
-    lifted::Sdk(ctx, base, __imp__sub_##address); \
+    lifted::original::c##address(ctx, base); \
     return;                              \
   }
 
@@ -142,7 +142,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82099FB0) {
     return;
   }
   if (!NativeHeap() || !fw::CanAllocate(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82099FB0);
+    lifted::original::c82099FB0(ctx, base);
     return;
   }
   ctx.r3.u64 = fw::MapConstruct(base, ctx.r3.u32);
@@ -157,7 +157,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82093740) {
     result = fw::MapInsertUnique(base, ctx.r4.u32, ctx.r5.u32);
   }
   if (!result) {
-    lifted::Sdk(ctx, base, __imp__sub_82093740);
+    lifted::original::c82093740(ctx, base);
     return;
   }
   guest::StoreU32(base, ctx.r3.u32 + 0, result->where.container);
@@ -186,7 +186,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209A930) {
     inserted = fw::RequestsPushBack(base, ctx.r3.u32, ctx.r4.u32);
   }
   if (!inserted) {
-    lifted::Sdk(ctx, base, __imp__sub_8209A930);
+    lifted::original::c8209A930(ctx, base);
     return;
   }
   if (*inserted) {
@@ -206,7 +206,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209A458) {
                                        uint32_t(ctx.r5.u64 >> 32));
   }
   if (!inserted) {
-    lifted::Sdk(ctx, base, __imp__sub_8209A458);
+    lifted::original::c8209A458(ctx, base);
     return;
   }
   REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
@@ -343,7 +343,7 @@ void AddRequest(lifted::Regs& ctx, uint8_t* base, uint32_t type, uint32_t clone_
       ctx.r3.u64 = loop + fw::kRequests;
       ctx.r4.u64 = request;
       ctx.lr = push_return;
-      lifted::Sdk(ctx, base, __imp__sub_8209A930);
+      lifted::original::c8209A930(ctx, base);
       return;
     }
     ctx.r3.u64 = *inserted ? frame - 16 : loop + fw::kRequests;
@@ -356,7 +356,7 @@ void AddRequest(lifted::Regs& ctx, uint8_t* base, uint32_t type, uint32_t clone_
 ITC_NATIVE_ENTRY_ALWAYS(8209AAA8) {
   
   if (!NativeHeap()) {
-    lifted::Sdk(ctx, base, __imp__sub_8209AAA8);
+    lifted::original::c8209AAA8(ctx, base);
     return;
   }
   AddRequest(ctx, base, 0, 0x8209AAE0, 0x8209AAF0);
@@ -365,7 +365,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209AAA8) {
 ITC_NATIVE_ENTRY_ALWAYS(8209AB48) {
   
   if (!NativeHeap()) {
-    lifted::Sdk(ctx, base, __imp__sub_8209AB48);
+    lifted::original::c8209AB48(ctx, base);
     return;
   }
   AddRequest(ctx, base, 2, 0x8209AB80, 0x8209AB90);
@@ -441,7 +441,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82092710) {
 ITC_NATIVE_ENTRY_ALWAYS(82091160) {
   
   if (!NativeHeap()) {
-    lifted::Sdk(ctx, base, __imp__sub_82091160);
+    lifted::original::c82091160(ctx, base);
     return;
   }
   const uint32_t stack_word = guest::LoadU32(base, ctx.r1.u32 - 96 - 160 + 100);
@@ -456,7 +456,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82091160) {
         });
       });
   if (!text) {
-    lifted::Sdk(ctx, base, __imp__sub_82091160);
+    lifted::original::c82091160(ctx, base);
     return;
   }
   ctx.r3.u64 = *text;
@@ -502,7 +502,7 @@ void hooks::DebugFontInitSteps(lifted::Regs& ctx, uint8_t* base) {
 ITC_NATIVE_ENTRY_ALWAYS(82090CC0) {
   
   if (!NativeHeap() || !ITC_FLAG(native_file_layer)) {
-    lifted::Sdk(ctx, base, __imp__sub_82090CC0);
+    lifted::original::c82090CC0(ctx, base);
     return;
   }
   hooks::DebugTextLoadFontSteps(ctx, base);
@@ -558,7 +558,7 @@ fw::MainLoopCalls hooks::MainLoopCalls(lifted::Regs& ctx, uint8_t* base) {
     }
     ctx.r3.u64 = loop;
     ctx.lr = 0x8209AC04;
-    lifted::Sdk(ctx, base, __imp__sub_8209A9F0);
+    lifted::original::c8209A9F0(ctx, base);
   };
   calls.create_framework = [&ctx, base](uint32_t holder) {
     if (NativeHeap() && fw::FrameworkCreate(base, holder)) {
@@ -566,7 +566,7 @@ fw::MainLoopCalls hooks::MainLoopCalls(lifted::Regs& ctx, uint8_t* base) {
     }
     ctx.r3.u64 = holder;
     ctx.lr = 0x82090120;
-    lifted::Sdk(ctx, base, __imp__sub_820909B8);
+    lifted::original::c820909B8(ctx, base);
   };
   calls.destroy_run_loop = [&ctx, base](uint32_t loop) {
     ctx.r3.u64 = loop;

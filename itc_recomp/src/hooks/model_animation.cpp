@@ -48,7 +48,7 @@ bool NativeLifetime() {
 #define ITC_MODEL_ANIMATION_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                        \
   if (!ITC_FLAG(native_model_animation)) {    \
-    lifted::Sdk(ctx, base, __imp__sub_##address);          \
+    lifted::original::c##address(ctx, base);          \
     return;                                   \
   }
 
@@ -73,7 +73,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825A1B70) {
         return;                                      \
       }                                              \
     }                                                \
-    lifted::Sdk(ctx, base, __imp__sub_##address);                 \
+    lifted::original::c##address(ctx, base);                 \
   }
 
 ITC_MODEL_ANIMATION_LIFETIME(825A11D0, TrackSetReleaseArray(base, ctx.r3.u32))
@@ -107,7 +107,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825A1378) {
   if (NativeLifetime() && PrimitiveDrawerConstruct(base, ctx.r3.u32)) {
     return;  // r3: the drawer, as given
   }
-  lifted::Sdk(ctx, base, __imp__sub_825A1378);
+  lifted::original::c825A1378(ctx, base);
 }
 
 // SkeletonCursor::Clear and sub_825A18D8: r3 = the cursor or record.

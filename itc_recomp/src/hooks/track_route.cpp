@@ -29,6 +29,7 @@
 // --native_collision_world, which calls them whatever this flag says).
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -139,5 +140,5 @@ ITC_NATIVE_ENTRY_ALWAYS(820F9768) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820F9768);
+  lifted::original::c820F9768(ctx, base);
 }

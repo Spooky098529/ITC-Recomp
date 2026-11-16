@@ -16,6 +16,7 @@
 // Our renderer draws from the command list replay instead.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "renderer.h"
 #include "state.h"
@@ -594,7 +595,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822B6A78) {
                  native::Cpu(ctx, base));
   }
   if (!ITC_FLAG(native_tiling_worker)) {
-    lifted::Sdk(ctx, base, __imp__sub_822B6A78);
+    lifted::original::c822B6A78(ctx, base);
     return;
   }
   ctx.r3.u64 = graphics::predicated_tiling::WakeWorker(
@@ -627,7 +628,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822B6780) {
   // renderer draws the tiles from the command list replay. Never seen in
   // play: its wake is skipped.
   if (!ITC_FLAG(native_tiling_worker)) {
-    lifted::Sdk(ctx, base, __imp__sub_822B6780);
+    lifted::original::c822B6780(ctx, base);
   } else {
     ITC_NATIVE_RUNNING("sub_822B6780 Device::WorkerJob (dropped)");
   }

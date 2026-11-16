@@ -3,6 +3,7 @@
 // originals call them (B7's goal, the user's call, 2026-11-14).
 
 #include "hooks/c_runtime_core.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "c_runtime/exit.h"
@@ -288,7 +289,7 @@ void hooks::CoreMtInit(lifted::Regs& ctx, uint8_t* base) {
 void hooks::CoreStrtol(lifted::Regs& ctx, uint8_t* base) {
   uint64_t result = 0;
   if (!cc::Strtol(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, &result)) {
-    lifted::Sdk(ctx, base, __imp__sub_825A85C0);
+    lifted::original::c825A85C0(ctx, base);
     return;
   }
   ctx.r3.u64 = result;
@@ -521,7 +522,7 @@ void hooks::CoreCropzeros(lifted::Regs& ctx, uint8_t* base) {
 void hooks::CoreAtodbl(lifted::Regs& ctx, uint8_t* base) {
   const auto r3 = cc::AtoNumber(base, ctx.r3.u32, ctx.r4.u32, true);
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_825B6098);
+    lifted::original::c825B6098(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -530,7 +531,7 @@ void hooks::CoreAtodbl(lifted::Regs& ctx, uint8_t* base) {
 void hooks::CoreAtoflt(lifted::Regs& ctx, uint8_t* base) {
   const auto r3 = cc::AtoNumber(base, ctx.r3.u32, ctx.r4.u32, false);
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_825B6140);
+    lifted::original::c825B6140(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -539,7 +540,7 @@ void hooks::CoreAtoflt(lifted::Regs& ctx, uint8_t* base) {
 void hooks::CoreFassign(lifted::Regs& ctx, uint8_t* base) {
   const auto r3 = cc::Fassign(base, ctx.r3.s32 != 0, ctx.r4.u32, ctx.r5.u32);
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_825ADEB0);
+    lifted::original::c825ADEB0(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -759,7 +760,7 @@ void hooks::CoreVsprintf(lifted::Regs& ctx, uint8_t* base) {
   const auto r3 = cc::Vsprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
                                CRuntimeCoreCalls(ctx, base));
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_825A71B0);
+    lifted::original::c825A71B0(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -776,18 +777,10 @@ void hooks::CoreCftog(lifted::Regs& ctx, uint8_t* base) {
   ITC_NATIVE_ENTRY(address, ITC_FLAG(native_c_runtime_core)) { \
     hooks::step(ctx, base);                     \
   }
-// The __finally funclets' adapters stay on the SDK's context (not in the
-// dispatch table): they read and reload their parent's registers (the
-// rewiring, stage 3; left for later).
-#define ITC_C_RUNTIME_CORE_SDK(address, step)   \
-  extern "C" REX_FUNC(sub_##address) {          \
-    REX_FUNC_PROLOGUE();                        \
-    if (!ITC_FLAG(native_c_runtime_core)) {     \
-      __imp__sub_##address(ctx, base);          \
-      return;                                   \
-    }                                           \
-    hooks::step(ctx, base);                     \
-  }
+// The __finally funclets (sub_825B7A20, sub_825B0E50, sub_825B1304,
+// sub_825B6730, sub_825B4978) have no adapters since the rewiring's stage 5:
+// only their recompiled parents called them (their native parents run the
+// funclets' work themselves), and the recompiled code is gone.
 
 // __crtTlsAlloc: r3 = the FLS callback (ignored); r3 = the TLS index.
 ITC_C_RUNTIME_CORE(825AA3F8, CoreCrtTlsAlloc)
@@ -890,7 +883,6 @@ ITC_C_RUNTIME_CORE(825AFD10, CoreInvokeWatson)
 // __lock_fhandle: r3 = a file handle; r3 = 1, or 0.
 ITC_C_RUNTIME_CORE(825B7958, CoreLockFhandle)
 // __lock_fhandle's __finally: r31 = its frame; r3, r29 and r11 reloaded.
-ITC_C_RUNTIME_CORE_SDK(825B7A20, CoreLockFhandleFinally)
 // _free_osfhnd, _get_osfhandle: r3 = a file handle.
 ITC_C_RUNTIME_CORE(825B77E8, CoreFreeOsfhnd)
 ITC_C_RUNTIME_CORE(825B7880, CoreGetOsfhandle)
@@ -913,9 +905,6 @@ ITC_C_RUNTIME_CORE(825B70D0, CoreLd12ToFloat)
 // _fileno: r3 = a stream; r3 = its handle, or -1.
 ITC_C_RUNTIME_CORE(825B0E88, CoreFileno)
 // _close's and _write's __finally: r30 = the handle; _commit's: r27.
-ITC_C_RUNTIME_CORE_SDK(825B0E50, CoreCloseFinally)
-ITC_C_RUNTIME_CORE_SDK(825B1304, CoreCloseFinally)
-ITC_C_RUNTIME_CORE_SDK(825B4978, CoreCommitFinally)
 // (fclose's __finally, sub_825A9664, has no adapter: fclose is native.)
 // (doexit's unwind funclet, sub_825AA338, has no adapter: doexit is native.)
 // terminate: no registers; ends in KeBugCheck(0xC0000144).
@@ -934,7 +923,6 @@ ITC_C_RUNTIME_CORE(825B4828, CoreCommit)
 ITC_C_RUNTIME_CORE(825B6500, CoreLseekNolock)
 ITC_C_RUNTIME_CORE(825B65D0, CoreLseek)
 // _lseeki64's __finally: r30 = the handle.
-ITC_C_RUNTIME_CORE_SDK(825B6730, CoreCloseFinally)
 // _write: r3 = a file handle, r4 = the bytes, r5 = their count; r3 = the
 // count written, or -1. (_write_nolock, sub_825B0F48, and WriteFile,
 // sub_82295D50, have no adapters: _write is _write_nolock's only caller, and

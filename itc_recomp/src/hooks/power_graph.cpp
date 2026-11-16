@@ -5,6 +5,7 @@
 // slots by the return address), the original runs.
 
 #include "hooks/power_graph.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -77,7 +78,7 @@ void StoreDoubleword(uint8_t* base, uint32_t address, uint64_t value) {
 
 void hooks::PowerGraphDraw(lifted::Regs& ctx, uint8_t* base) {
   if (!pg::DrawReady(base, ctx.r6.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_8217C708);
+    lifted::original::c8217C708(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -162,7 +163,7 @@ bool hooks::CarListDrawEntryCalleesNative() {
 
 void hooks::CarListDrawEntryPowerGraph(lifted::Regs& ctx, uint8_t* base) {
   if (!CarListDrawEntryCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_82250670);
+    lifted::original::c82250670(ctx, base);
     return;
   }
   const uint32_t entry = ctx.r3.u32;
@@ -194,7 +195,7 @@ void hooks::CarListDrawEntryPowerGraph(lifted::Regs& ctx, uint8_t* base) {
 
 void hooks::CarListDrawCarPowerGraph(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_car_makers) || !hooks::CarMakersGarageCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_82250700);
+    lifted::original::c82250700(ctx, base);
     return;
   }
   const uint32_t car = ctx.r3.u32;
@@ -228,7 +229,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8217C708) {
   
   if (!ITC_FLAG(native_power_graph) || ITC_FLAG(log_overlay_uploads) ||
       ITC_FLAG(log_slot_callers) || ITC_FLAG(log_recording_by_pass)) {
-    lifted::Sdk(ctx, base, __imp__sub_8217C708);
+    lifted::original::c8217C708(ctx, base);
     return;
   }
   hooks::PowerGraphDraw(ctx, base);

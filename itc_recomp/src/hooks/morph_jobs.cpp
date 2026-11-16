@@ -182,7 +182,7 @@ ITC_REGS_STEP(MorphJobsRun) {
   } else if (ITC_FLAG(native_second_set)) {
     SecondSetMorphBlend(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8258BD28);
+    lifted::original::c8258BD28(ctx, base);
   }
 }
 

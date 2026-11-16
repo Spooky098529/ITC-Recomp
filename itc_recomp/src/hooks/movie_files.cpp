@@ -12,6 +12,7 @@
 // and +48, and stay recompiled. See B4 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "game_data/game_data.h"
@@ -123,7 +124,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82487C48) {
   auto relative = game_data::RelativePath(path);
   if (!relative) {
     ITC_LOG_WARN("movie source: \"{}\" isn't game data: opened by the recompiled OpenFile", path);
-    lifted::Sdk(ctx, base, __imp__sub_82487C48);
+    lifted::original::c82487C48(ctx, base);
     return;
   }
   const uint32_t blocks = ctx.r6.u32, block_size = ctx.r7.u32, count = ctx.r8.u32,
@@ -159,7 +160,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82487F68) {
   
   const uint32_t source = ctx.r3.u32;
   if (!Ours(base, source)) {
-    lifted::Sdk(ctx, base, __imp__sub_82487F68);
+    lifted::original::c82487F68(ctx, base);
     return;
   }
   guest::StoreU32(base, source + 48, 0);
@@ -179,7 +180,7 @@ ITC_NATIVE_ENTRY_ALWAYS(824880D8) {
   const bool no_blocks =
       !guest::LoadU32(base, source + 124) && !guest::LoadU32(base, source + 132);
   if (!(game_data::IsHandle(handle) || handle == kClosed) || !no_blocks) {
-    lifted::Sdk(ctx, base, __imp__sub_824880D8);
+    lifted::original::c824880D8(ctx, base);
     return;
   }
   if (handle != kClosed && !(guest::LoadU32(base, source + 120) & 4)) {
@@ -193,7 +194,7 @@ ITC_NATIVE_ENTRY_ALWAYS(824880D8) {
 ITC_NATIVE_ENTRY_ALWAYS(82488598) {
   
   if (!Ours(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82488598);
+    lifted::original::c82488598(ctx, base);
     return;
   }
   Read(ctx, base);
@@ -204,7 +205,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82488598) {
 ITC_NATIVE_ENTRY_ALWAYS(82488A10) {
   
   if (!Ours(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82488A10);
+    lifted::original::c82488A10(ctx, base);
     return;
   }
   Read(ctx, base);

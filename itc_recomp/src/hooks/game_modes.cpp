@@ -17,6 +17,7 @@
 // (sub_82155118), from RaceModeMember::RaceModeMember.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -149,7 +150,7 @@ ITC_GAME_MODES(8215E6C8, hooks::GameModesRaceOverlaysMachineInit(ctx, base))
     \
     if (!ITC_FLAG(native_game_modes) || !hooks::NativeHeapActive() ||      \
         !freeable(base, ctx.r3.u32)) {                                     \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                     \
+      lifted::original::c##address(ctx, base);                                     \
       return;                                                              \
     }                                                                      \
     ctx.r3.u64 = function(base, ctx.r3.u32);                               \
@@ -188,7 +189,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82106AF0) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82106AF0);
+  lifted::original::c82106AF0(ctx, base);
 }
 
 // Mode::Create: r3 = the holder (unused), r4 = the type; r3 = the mode or 0.
@@ -202,7 +203,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821077A8) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_821077A8);
+  lifted::original::c821077A8(ctx, base);
 }
 
 // The forms on the SDK's context the header declares (a harness's), on a

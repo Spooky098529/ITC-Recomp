@@ -6,6 +6,7 @@
 // shows the dirty disc error.)
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -55,6 +56,6 @@ ITC_NATIVE_ENTRY_ALWAYS(82295508) {
   if (ITC_FLAG(native_create_file)) {
     hooks::CreateFileSteps(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_82295508);
+    lifted::original::c82295508(ctx, base);
   }
 }

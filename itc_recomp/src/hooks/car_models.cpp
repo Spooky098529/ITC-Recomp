@@ -76,7 +76,7 @@ ITC_REGS_STEP(CarModelsLoadSlotReleaseBuffer) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820D0758);
+  lifted::original::c820D0758(ctx, base);
 }
 
 ITC_REGS_STEP(CarModelsLoadSlotLoadShared) {
@@ -86,7 +86,7 @@ ITC_REGS_STEP(CarModelsLoadSlotLoadShared) {
 
 ITC_REGS_STEP(CarModelsLoadSlotLoad) {
   if (!hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820D07C8);
+    lifted::original::c820D07C8(ctx, base);
     return;
   }
   ctx.r3.u64 = cm::LoadSlotLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -101,12 +101,12 @@ ITC_REGS_STEP(CarModelsLoadExterior) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820D5EC8);
+  lifted::original::c820D5EC8(ctx, base);
 }
 
 ITC_REGS_STEP(CarModelsReloadDecals) {
   if (!hooks::NativeHeapActive() || int32_t(guest::LoadU32(base, ctx.r3.u32 + 3724)) == 1) {
-    lifted::Sdk(ctx, base, __imp__sub_820D5D20);
+    lifted::original::c820D5D20(ctx, base);
     return;
   }
   ctx.r3.u64 = cm::CarModelReloadDecals(base, ctx.r3.u32, ctx.r1.u32,
@@ -123,7 +123,7 @@ ITC_REGS_STEP(CarModelsWheelsSetUp) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_820D9110);
+  lifted::original::c820D9110(ctx, base);
 }
 
 ITC_REGS_STEP(CarModelsCockpitLoadSetC) {
@@ -134,7 +134,7 @@ ITC_REGS_STEP(CarModelsCockpitLoadSetC) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820D67E8);
+  lifted::original::c820D67E8(ctx, base);
 }
 
 ITC_REGS_STEP(CarModelsInteriorLoad) {
@@ -155,7 +155,7 @@ ITC_REGS_STEP(CarModelsInteriorLoad) {
   });
   ctx.lr = lr;
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_820D79B0);
+    lifted::original::c820D79B0(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -163,7 +163,7 @@ ITC_REGS_STEP(CarModelsInteriorLoad) {
 
 ITC_REGS_STEP(CarModelsMakePlate) {
   if (!hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820ED6D0);
+    lifted::original::c820ED6D0(ctx, base);
     return;
   }
   const uint64_t regs[4] = {ctx.r7.u64, ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
@@ -183,7 +183,7 @@ ITC_REGS_STEP(CarModelsMakePlate) {
   });
   ctx.lr = lr;
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_820ED6D0);
+    lifted::original::c820ED6D0(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -210,7 +210,7 @@ void CarModelsFileLoaded(lifted::Regs& ctx, uint8_t* base, cm::FileLoadedSet set
       ctx.r4.u64 = file;
       ctx.r5.u64 = 0;
       ctx.lr = a ? 0x820D483C : 0x820D5018;
-      lifted::Sdk(ctx, base, __imp__sub_82599A20);
+      lifted::original::c82599A20(ctx, base);
     };
     calls.update_matrices = [&](uint32_t skeleton) {
       ctx.r3.u64 = skeleton;
@@ -221,7 +221,7 @@ void CarModelsFileLoaded(lifted::Regs& ctx, uint8_t* base, cm::FileLoadedSet set
       ctx.r3.u64 = xpr;
       ctx.r4.u64 = file;
       ctx.lr = a ? 0x820D4DC8 : 0x820D55A0;
-      lifted::Sdk(ctx, base, __imp__sub_82596F68);
+      lifted::original::c82596F68(ctx, base);
     };
     calls.provider_set = [&](uint32_t provider, uint32_t xpr) {
       ctx.r3.u64 = provider;
@@ -259,12 +259,12 @@ ITC_REGS_STEP(CarModelsCarModelRelease) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820D4508);
+  lifted::original::c820D4508(ctx, base);
 }
 
 ITC_REGS_STEP(CarModelsTextureCreate) {
   if (!hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820ECF08);
+    lifted::original::c820ECF08(ctx, base);
     return;
   }
   ctx.r3.u64 = cm::TextureCreate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -273,7 +273,7 @@ ITC_REGS_STEP(CarModelsTextureCreate) {
 
 ITC_REGS_STEP(CarModelsTextureFree) {
   if (!hooks::NativeHeapActive() || !cm::TextureFreeable(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820ECFC8);
+    lifted::original::c820ECFC8(ctx, base);
     return;
   }
   ctx.r3.u64 = cm::TextureFree(base, ctx.r3.u32, ctx.r4.u32);
@@ -301,7 +301,7 @@ uint32_t CarModelsVinylCompressAt(lifted::Regs& ctx, uint8_t* base, uint32_t wid
 ITC_REGS_STEP(CarModelsOnDecalLoaded) {
   const uint32_t request = ctx.r3.u32, car = ctx.r6.u32;
   if (!hooks::NativeHeapActive() || !cm::DecalsNative(base, request, car)) {
-    lifted::Sdk(ctx, base, __imp__sub_820D5750);
+    lifted::original::c820D5750(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();  // as the original's lfs
@@ -335,7 +335,7 @@ ITC_REGS_STEP(CarModelsTgaCreateImage) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820ED020);
+  lifted::original::c820ED020(ctx, base);
 }
 
 bool CarModelsSceneSetUpNative() {
@@ -345,7 +345,7 @@ bool CarModelsSceneSetUpNative() {
 
 ITC_REGS_STEP(CarModelsSceneSetUp) {
   if (!CarModelsSceneSetUpNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820C8DE8);
+    lifted::original::c820C8DE8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -363,7 +363,7 @@ ITC_REGS_STEP(CarModelsSceneSetUp) {
 
 ITC_REGS_STEP(CarModelsDrawDecal) {
   if (!cm::DecalRegionPorted(ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820EE638);
+    lifted::original::c820EE638(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();  // as the original's lfs

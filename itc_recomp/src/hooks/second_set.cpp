@@ -117,7 +117,7 @@ ITC_REGS_STEP(SecondSetPointSetShape) {
 
 ITC_REGS_STEP(SecondSetPointClear) {
   if (!native::Buffers_NativeMemcpy()) {
-    lifted::Sdk(ctx, base, __imp__sub_820CEA08);
+    lifted::original::c820CEA08(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -126,7 +126,7 @@ ITC_REGS_STEP(SecondSetPointClear) {
 
 ITC_REGS_STEP(SecondSetPointConstruct) {
   if (!native::Buffers_NativeMemcpy()) {
-    lifted::Sdk(ctx, base, __imp__sub_820D0270);
+    lifted::original::c820D0270(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -135,7 +135,7 @@ ITC_REGS_STEP(SecondSetPointConstruct) {
 
 ITC_REGS_STEP(SecondSetFindShape) {
   if (!native::Buffers_NativeMemcpy()) {
-    lifted::Sdk(ctx, base, __imp__sub_820CEB30);
+    lifted::original::c820CEB30(ctx, base);
     return;
   }
   ctx.r3.u64 = ss::ModelPointFindShape(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
@@ -160,7 +160,7 @@ void GroupStep(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* origina
 
 #define ITC_SECOND_SET_GROUP(address, name)                         \
   void SecondSet##name(lifted::Regs& ctx, uint8_t* base) {            \
-    GroupStep(ctx, base, __imp__sub_##address, ss::name);           \
+    GroupStep(ctx, base, lifted::original::c##address, ss::name);           \
   }
 
 ITC_SECOND_SET_GROUP(820DE0E0, PartsResetFrontBumper)
@@ -219,15 +219,15 @@ ITC_SECOND_SET_GROUP(820D9F50, SceneModelBlockReset)
 
 ITC_REGS_STEP(SecondSetScenePartsReset) {
   if (!ITC_FLAG(native_material_passes)) {
-    lifted::Sdk(ctx, base, __imp__sub_820E0510);
+    lifted::original::c820E0510(ctx, base);
     return;
   }
-  GroupStep(ctx, base, __imp__sub_820E0510, ss::ScenePartsReset);
+  GroupStep(ctx, base, lifted::original::c820E0510, ss::ScenePartsReset);
 }
 
 ITC_REGS_STEP(SecondSetSceneCarModelRelease) {
   if (!native::Buffers_NativeMemcpy() || !SceneLoadersReleaseANative(0)) {
-    lifted::Sdk(ctx, base, __imp__sub_820DB6C0);
+    lifted::original::c820DB6C0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -235,7 +235,7 @@ ITC_REGS_STEP(SecondSetSceneCarModelRelease) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_820DB6C0);
+  lifted::original::c820DB6C0(ctx, base);
 }
 
 ITC_SECOND_SET_GROUP(820E88A8, SceneWheelsReset)
@@ -284,11 +284,11 @@ void ConstructStep(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* ori
 
 #define ITC_SECOND_SET_RELEASE(address, pool, name)                       \
   void SecondSet##name(lifted::Regs& ctx, uint8_t* base) {                  \
-    ReleaseStep(ctx, base, __imp__sub_##address, pool, ss::name);         \
+    ReleaseStep(ctx, base, lifted::original::c##address, pool, ss::name);         \
   }
 #define ITC_SECOND_SET_CONSTRUCT(address, name)                           \
   void SecondSet##name(lifted::Regs& ctx, uint8_t* base) {                  \
-    ConstructStep(ctx, base, __imp__sub_##address, ss::name);             \
+    ConstructStep(ctx, base, lifted::original::c##address, ss::name);             \
   }
 
 ITC_SECOND_SET_RELEASE(820E0590, 1, ScenePartsRelease)
@@ -347,7 +347,7 @@ ITC_REGS_STEP(SecondSetReleaseB) {
 
 ITC_REGS_STEP(SecondSetSceneCockpitRelease) {
   if (!SecondSetReleaseNative(2)) {
-    lifted::Sdk(ctx, base, __imp__sub_820DBF88);
+    lifted::original::c820DBF88(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -356,12 +356,12 @@ ITC_REGS_STEP(SecondSetSceneCockpitRelease) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_820DBF88);
+  lifted::original::c820DBF88(ctx, base);
 }
 
 ITC_REGS_STEP(SecondSetSceneModelRelease) {
   if (!SecondSetReleaseNative(7)) {
-    lifted::Sdk(ctx, base, __imp__sub_820DA5D0);
+    lifted::original::c820DA5D0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -404,11 +404,11 @@ void DeletingStep(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* orig
 
 #define ITC_SECOND_SET_DESTRUCT(address, pool, name)                      \
   void SecondSet##name(lifted::Regs& ctx, uint8_t* base) {                  \
-    DestructStep(ctx, base, __imp__sub_##address, pool, ss::name);        \
+    DestructStep(ctx, base, lifted::original::c##address, pool, ss::name);        \
   }
 #define ITC_SECOND_SET_DELETING(address, pool, name)                      \
   void SecondSet##name(lifted::Regs& ctx, uint8_t* base) {                  \
-    DeletingStep(ctx, base, __imp__sub_##address, pool, ss::name);        \
+    DeletingStep(ctx, base, lifted::original::c##address, pool, ss::name);        \
   }
 #define ITC_SECOND_SET_POINTS_DESTRUCT(name)                              \
   void SecondSet##name(lifted::Regs& ctx, uint8_t* base) {                  \
@@ -443,7 +443,7 @@ ITC_REGS_STEP(SecondSetSceneCockpitDestruct) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820DC2F8);
+  lifted::original::c820DC2F8(ctx, base);
 }
 
 ITC_REGS_STEP(SecondSetSceneCockpitDeletingDestruct) {
@@ -454,7 +454,7 @@ ITC_REGS_STEP(SecondSetSceneCockpitDeletingDestruct) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820DC448);
+  lifted::original::c820DC448(ctx, base);
 }
 
 ITC_REGS_STEP(SecondSetSceneTrafficDestruct) {
@@ -509,7 +509,7 @@ ITC_REGS_STEP(SecondSetMorphBlend) {
   const auto result = ss::MorphBlend(base, ctx.r3.u32, ctx.r1.u32);
   if (!result) {
     SetFlush(ctx, ss::Flush::kUnchanged, was_on);
-    lifted::Sdk(ctx, base, __imp__sub_8258BD28);
+    lifted::original::c8258BD28(ctx, base);
     return;
   }
   ctx.r3.u64 = result->r3;
@@ -606,7 +606,7 @@ void SecondSetWheelStep(lifted::Regs& ctx, uint8_t* base, WheelFunction step) {
 
 ITC_REGS_STEP(SecondSetWheelPointsSetUp) {
   if (!SecondSetWheelsNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820E8668);
+    lifted::original::c820E8668(ctx, base);
     return;
   }
   const bool was_on = FlushOffForMorph(ctx);
@@ -617,10 +617,10 @@ ITC_REGS_STEP(SecondSetWheelPointsSetUp) {
 
 ITC_REGS_STEP(SecondSetScenePartsConstruct) {
   if (!ITC_FLAG(native_material_passes)) {
-    lifted::Sdk(ctx, base, __imp__sub_820E2F18);
+    lifted::original::c820E2F18(ctx, base);
     return;
   }
-  ConstructStep(ctx, base, __imp__sub_820E2F18, ss::ScenePartsConstruct);
+  ConstructStep(ctx, base, lifted::original::c820E2F18, ss::ScenePartsConstruct);
 }
 
 ITC_REGS_STEP(SecondSetSceneModelBlockConstruct) {
@@ -667,7 +667,7 @@ bool SecondSetFindsNative() {
 
 ITC_REGS_STEP(SecondSetPartsFind) {
   if (!SecondSetFindsNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820E0258);
+    lifted::original::c820E0258(ctx, base);
     return;
   }
   SecondSetFindStep(ctx, base, ss::PartsFind);
@@ -675,7 +675,7 @@ ITC_REGS_STEP(SecondSetPartsFind) {
 
 ITC_REGS_STEP(SecondSetCockpitFind) {
   if (!SecondSetFindsNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820DBC88);
+    lifted::original::c820DBC88(ctx, base);
     return;
   }
   SecondSetFindStep(ctx, base, ss::CockpitFind);
@@ -683,7 +683,7 @@ ITC_REGS_STEP(SecondSetCockpitFind) {
 
 ITC_REGS_STEP(SecondSetInteriorFind) {
   if (!SecondSetFindsNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820E3660);
+    lifted::original::c820E3660(ctx, base);
     return;
   }
   SecondSetFindStep(ctx, base, ss::InteriorFind);
@@ -691,7 +691,7 @@ ITC_REGS_STEP(SecondSetInteriorFind) {
 
 ITC_REGS_STEP(SecondSetLightsFind) {
   if (!SecondSetFindsNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820DC900);
+    lifted::original::c820DC900(ctx, base);
     return;
   }
   SecondSetFindStep(ctx, base, ss::LightsFind);
@@ -699,7 +699,7 @@ ITC_REGS_STEP(SecondSetLightsFind) {
 
 ITC_REGS_STEP(SecondSetTrafficFind) {
   if (!SecondSetFindsNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820E58C8);
+    lifted::original::c820E58C8(ctx, base);
     return;
   }
   SecondSetFindStep(ctx, base, ss::TrafficFind);
@@ -707,26 +707,26 @@ ITC_REGS_STEP(SecondSetTrafficFind) {
 
 ITC_REGS_STEP(SecondSetPartsPointsConstruct) {
   if (!ITC_FLAG(native_material_passes)) {
-    lifted::Sdk(ctx, base, __imp__sub_820E2A10);
+    lifted::original::c820E2A10(ctx, base);
     return;
   }
-  GroupStep(ctx, base, __imp__sub_820E2A10, ss::PartsPointsConstruct);
+  GroupStep(ctx, base, lifted::original::c820E2A10, ss::PartsPointsConstruct);
 }
 
 ITC_REGS_STEP(SecondSetPartsPointsReset) {
   if (!ITC_FLAG(native_material_passes)) {
-    lifted::Sdk(ctx, base, __imp__sub_820E00F0);
+    lifted::original::c820E00F0(ctx, base);
     return;
   }
-  GroupStep(ctx, base, __imp__sub_820E00F0, ss::PartsPointsReset);
+  GroupStep(ctx, base, lifted::original::c820E00F0, ss::PartsPointsReset);
 }
 
 ITC_REGS_STEP(SecondSetPartsResetRightDoor) {
   if (!ITC_FLAG(native_material_passes)) {
-    lifted::Sdk(ctx, base, __imp__sub_820DE7E8);
+    lifted::original::c820DE7E8(ctx, base);
     return;
   }
-  GroupStep(ctx, base, __imp__sub_820DE7E8, ss::PartsResetRightDoor);
+  GroupStep(ctx, base, lifted::original::c820DE7E8, ss::PartsResetRightDoor);
 }
 
 }  // namespace hooks

@@ -22,6 +22,7 @@
 // (sub_822A6268), from Resource::Destroy.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -75,7 +76,7 @@ ITC_FLAG_BOOL(native_graphics_resources, true, "ITC",
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                      \
     \
     if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive()) { \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                      \
+      lifted::original::c##address(ctx, base);                                      \
       return;                                                               \
     }                                                                       \
     __VA_ARGS__;                                                            \
@@ -135,7 +136,7 @@ ITC_GRAPHICS_RESOURCES(822A5F50, ctx.r3.u64 = SurfaceDesc(base, ctx.r3.u32, ctx.
 ITC_NATIVE_ENTRY_ALWAYS(822A4FF0) {
   
   if (!ITC_FLAG(native_graphics_resources) || ctx.r5.u32 >= 0x80000000u) {
-    lifted::Sdk(ctx, base, __imp__sub_822A4FF0);
+    lifted::original::c822A4FF0(ctx, base);
     return;
   }
   StoreLevelPlace(base, ctx, TextureLevelOffset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
@@ -147,7 +148,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822A5D08) {
   
   if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive() ||
       !TextureTypeKnown(ctx.r10.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_822A5D08);
+    lifted::original::c822A5D08(ctx, base);
     return;
   }
   ctx.r3.u64 = CreateTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
@@ -167,7 +168,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8235A920) {
   const uint32_t stack = ctx.r1.u32;
   const uint32_t header = guest::LoadU32(base, stack + 92);
   if (!ITC_FLAG(native_graphics_resources) || !XgHeaderCopyFits(header)) {
-    lifted::Sdk(ctx, base, __imp__sub_8235A920);
+    lifted::original::c8235A920(ctx, base);
     return;
   }
   ctx.r3.u64 = XGSetTextureHeader(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -215,7 +216,7 @@ ITC_GRAPHICS_RESOURCES(822A3880, {
 ITC_NATIVE_ENTRY_ALWAYS(822A5C38) {
   
   if (!ITC_FLAG(native_graphics_resources) || ctx.r4.u32 >= 0x80000000u) {
-    lifted::Sdk(ctx, base, __imp__sub_822A5C38);
+    lifted::original::c822A5C38(ctx, base);
     return;
   }
   ctx.r3.u64 = LockTextureRectLevel(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -250,7 +251,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822A6210) {
   
   if (!ITC_FLAG(native_graphics_resources) || !hooks::NativeHeapActive() ||
       (guest::LoadU32(base, ctx.r3.u32) & 0xF) == 9) {
-    lifted::Sdk(ctx, base, __imp__sub_822A6210);
+    lifted::original::c822A6210(ctx, base);
     return;
   }
   ctx.r3.u64 = DestroyResource(base, ctx.r3.u32);

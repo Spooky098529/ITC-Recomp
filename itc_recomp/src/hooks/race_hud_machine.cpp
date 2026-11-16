@@ -318,7 +318,7 @@ ITC_REGS_STEP(RaceHudMachineInit) {
 }
 
 ITC_REGS_STEP(RaceHudMachinePreRaceUpdate) {
-  Handle(ctx, base, __imp__sub_8216C210, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216C210, [&](const rh::Calls& callees) {
     return rhm::PreRaceUpdate(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
@@ -330,146 +330,146 @@ ITC_REGS_STEP(RaceHudMachinePreRaceDraw) {
 }
 
 ITC_REGS_STEP(RaceHudMachineCountdownDraw) {
-  Handle(ctx, base, __imp__sub_8216C330, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216C330, [&](const rh::Calls& callees) {
     return rhm::CountdownDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineStartIntro) {
   const uint32_t lr = uint32_t(ctx.lr);
-  Handle(ctx, base, __imp__sub_8216C510, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216C510, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::StartIntro(base, ctx.r3.u32, ctx.r1.u32, lr, callees));
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineEndIntro) {
   const uint32_t lr = uint32_t(ctx.lr);
-  Handle(ctx, base, __imp__sub_8216C520, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216C520, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::EndIntro(base, ctx.r3.u32, ctx.r1.u32, lr, callees));
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineIntroUpdate) {
-  Handle(ctx, base, __imp__sub_8216C530, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216C530, [&](const rh::Calls& callees) {
     return rhm::IntroUpdate(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineIntroDraw) {
-  Handle(ctx, base, __imp__sub_8216C5B8, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216C5B8, [&](const rh::Calls& callees) {
     return rhm::IntroDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineCountdownUpdate) {
-  Handle(ctx, base, __imp__sub_8216CB98, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216CB98, [&](const rh::Calls& callees) {
     return rhm::CountdownUpdate(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineRaceDraw) {
-  Handle(ctx, base, __imp__sub_8216CE00, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216CE00, [&](const rh::Calls& callees) {
     return rhm::RaceDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineRaceUpdate) {
   const uint32_t dispatcher = ctx.r4.u32;
-  Handle(ctx, base, __imp__sub_8216D918, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216D918, [&](const rh::Calls& callees) {
     return rhm::RaceUpdate(base, ctx.r3.u64, dispatcher, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineSetUp) {
-  Handle(ctx, base, __imp__sub_8216D450, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216D450, [&](const rh::Calls& callees) {
     return rhm::SetUp(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineResultsUpdate) {
   const uint32_t dispatcher = ctx.r4.u32;
-  Handle(ctx, base, __imp__sub_8216DFD0, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216DFD0, [&](const rh::Calls& callees) {
     return rhm::ResultsUpdate(base, ctx.r3.u64, dispatcher, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachinePauseUpdate) {
   const uint32_t dispatcher = ctx.r4.u32;
-  Handle(ctx, base, __imp__sub_8216DB70, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216DB70, [&](const rh::Calls& callees) {
     return rhm::PauseUpdate(base, ctx.r3.u64, dispatcher, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineAfterRaceUpdate) {
   const uint32_t dispatcher = ctx.r4.u32;
-  Handle(ctx, base, __imp__sub_8216DD88, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216DD88, [&](const rh::Calls& callees) {
     return rhm::AfterRaceUpdate(base, ctx.r3.u64, dispatcher, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineCloseResults) {
-  Handle(ctx, base, __imp__sub_8216D198, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216D198, [&](const rh::Calls& callees) {
     return rhm::CloseResults(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineCreateScreens) {
-  Handle(ctx, base, __imp__sub_8216CA28, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216CA28, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::CreateScreens(base, ctx.r3.u32, ctx.r1.u32, callees));
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineClosePause) {
-  Handle(ctx, base, __imp__sub_8216C658, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216C658, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::ClosePause(base, ctx.r3.u64, ctx.r1.u32, callees));
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineResultsDraw) {
-  Handle(ctx, base, __imp__sub_8216D6D0, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216D6D0, [&](const rh::Calls& callees) {
     return rhm::ResultsDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineAfterRaceDraw) {
-  Handle(ctx, base, __imp__sub_8216C6D8, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216C6D8, [&](const rh::Calls& callees) {
     return rhm::AfterRaceDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachinePauseDraw) {
-  Handle(ctx, base, __imp__sub_8216CF08, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216CF08, [&](const rh::Calls& callees) {
     return rhm::PauseDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineRacePauseDraw) {
-  Handle(ctx, base, __imp__sub_8216CFE0, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216CFE0, [&](const rh::Calls& callees) {
     return rhm::RacePauseDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineDestroyScreens) {
   const uint32_t lr = uint32_t(ctx.lr);
-  Handle(ctx, base, __imp__sub_8216C208, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216C208, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::DestroyScreens(base, ctx.r3.u64, ctx.r1.u32, lr, callees));
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineStartCountdown) {
-  Handle(ctx, base, __imp__sub_8216CC60, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216CC60, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::StartCountdown(base, ctx.r3.u64, ctx.r1.u32, callees));
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineOnRaceEnd) {
-  Handle(ctx, base, __imp__sub_8216E5B0, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216E5B0, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::OnRaceEnd(base, ctx.r3.u64, ctx.r1.u32, callees));
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineAwardPrize) {
-  Handle(ctx, base, __imp__sub_8216E150, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216E150, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::AwardPrize(base, ctx.r3.u64, ctx.r1.u32, callees));
   });
 }
@@ -488,20 +488,20 @@ ITC_REGS_STEP(RaceHudMachineItemBonus) {
 
 ITC_REGS_STEP(RaceHudMachineOpenPause) {
   const uint32_t lr = uint32_t(ctx.lr);
-  Handle(ctx, base, __imp__sub_8216D600, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216D600, [&](const rh::Calls& callees) {
     return rhm::OpenPause(base, ctx.r3.u64, ctx.r1.u32, lr, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineOpenRacePause) {
   const uint32_t lr = uint32_t(ctx.lr);
-  Handle(ctx, base, __imp__sub_8216DA40, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216DA40, [&](const rh::Calls& callees) {
     return rhm::OpenRacePause(base, ctx.r3.u64, ctx.r1.u32, lr, callees);
   });
 }
 
 ITC_REGS_STEP(RaceHudMachineOpenCareerPause) {
-  Handle(ctx, base, __imp__sub_8216D8C8, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216D8C8, [&](const rh::Calls& callees) {
     return std::optional<uint64_t>(rhm::OpenCareerPause(base, ctx.r3.u32, ctx.r1.u32, callees));
   });
 }

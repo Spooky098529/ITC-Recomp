@@ -5,6 +5,7 @@
 // the adapters run the original instead (never seen in play).
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -51,7 +52,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C9D0) {
   
   if (!ITC_FLAG(native_command_list) ||
       command_list::OpenChunk(base, ctx.r3.u32) == command_list::OpenResult::kNested) {
-    lifted::Sdk(ctx, base, __imp__sub_8258C9D0);
+    lifted::original::c8258C9D0(ctx, base);
   }
 }
 
@@ -75,7 +76,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CB08) {
     first = command_list::AllocateVertices(base, ctx.r3.u32, ctx.r4.u32, header);
   }
   if (first == 0) {
-    lifted::Sdk(ctx, base, __imp__sub_8258CB08);
+    lifted::original::c8258CB08(ctx, base);
     return;
   }
   ctx.r3.u64 = first;
@@ -91,7 +92,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CB98) {
     first = command_list::AllocateBytes(base, ctx.r3.u32, ctx.r4.u32, header);
   }
   if (first == 0) {
-    lifted::Sdk(ctx, base, __imp__sub_8258CB98);
+    lifted::original::c8258CB98(ctx, base);
     return;
   }
   ctx.r3.u64 = first;
@@ -107,7 +108,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CC30) {
     first = command_list::AllocateResolve(base, ctx.r3.u32, header);
   }
   if (first == 0) {
-    lifted::Sdk(ctx, base, __imp__sub_8258CC30);
+    lifted::original::c8258CC30(ctx, base);
     return;
   }
   ctx.r3.u64 = first;

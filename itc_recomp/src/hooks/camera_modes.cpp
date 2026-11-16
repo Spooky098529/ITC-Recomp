@@ -112,7 +112,7 @@ void hooks::SetCameraConstructStandIn(CameraConstructStandIn stand_in) {
       return;                                                                            \
     }                                                                                    \
     if (!ITC_FLAG(native_camera_modes)) {                                                \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                      \
+      lifted::original::c##address(ctx, base);                                      \
       return;                                                                            \
     }                                                                                    \
     hooks::CameraModesStep##address(ctx, base);                                          \
@@ -206,7 +206,7 @@ ITC_REGS_STEP(CameraModesStep82152548) {
   ctx.fpscr.disableFlushMode();
   const auto zoom = cm::ZoomFromFov(base, ctx.f1.f64, ctx.f2.f64);
   if (!zoom) {
-    lifted::Sdk(ctx, base, __imp__sub_82152548);
+    lifted::original::c82152548(ctx, base);
     return;
   }
   ctx.f1.f64 = *zoom;
@@ -227,7 +227,7 @@ ITC_REGS_STEP(CameraModesStep821525F8) {
 // original).
 ITC_REGS_STEP(CameraModesStep82152698) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    lifted::Sdk(ctx, base, __imp__sub_82152698);
+    lifted::original::c82152698(ctx, base);
     return;
   }
   guest::StoreU32(base, ctx.r1.u32 + 32, uint32_t(ctx.r4.u64 >> 32));
@@ -317,7 +317,7 @@ ITC_REGS_STEP(CameraModesStep82150300) {
 ITC_REGS_STEP(CameraModesStep82152108) {
   ctx.fpscr.disableFlushMode();
   if (!cm::ColorFilterSetStyle(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82152108);
+    lifted::original::c82152108(ctx, base);
   }
 }
 
@@ -335,7 +335,7 @@ ITC_REGS_STEP(CameraModesStep82152290) {
 // leaves it). The original without --native_heap or the archive's queue.
 ITC_REGS_STEP(CameraModesStep82150B10) {
   if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
-    lifted::Sdk(ctx, base, __imp__sub_82150B10);
+    lifted::original::c82150B10(ctx, base);
     return;
   }
   hooks::SetArchiveSerial(ctx, cm::AnimsLoad(base, ctx.r3.u32, hooks::NativeArchiveLoad(base)));
@@ -348,7 +348,7 @@ ITC_REGS_STEP(CameraModesStep82150B10) {
 // frame below it, 0x821502B8).
 ITC_REGS_STEP(CameraModesStep82150878) {
   if (!hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82150878);
+    lifted::original::c82150878(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -362,7 +362,7 @@ ITC_REGS_STEP(CameraModesStep82150878) {
         GuestXMemCpy(ctx, base, 672 + 144, 0x821502B8, to, from, size);
       });
   if (!done) {
-    lifted::Sdk(ctx, base, __imp__sub_82150878);
+    lifted::original::c82150878(ctx, base);
     return;
   }
   ctx.r3.u64 = 1;
@@ -372,7 +372,7 @@ ITC_REGS_STEP(CameraModesStep82150878) {
 // memcpy's frame + 80, or unchanged).
 ITC_REGS_STEP(CameraModesStep821507D8) {
   if (!hooks::NativeHeapActive() || !cm::AnimsFreeable(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_821507D8);
+    lifted::original::c821507D8(ctx, base);
     return;
   }
   if (const auto r3 = cm::AnimsFreeAll(base, ctx.r1.u32 - 384 + 80)) {
@@ -423,7 +423,7 @@ ITC_REGS_STEP(CameraModesStep82150A98) {
 // stack pointer not 16-byte aligned runs the original.
 ITC_REGS_STEP(CameraModesStep82150A10) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    lifted::Sdk(ctx, base, __imp__sub_82150A10);
+    lifted::original::c82150A10(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -442,7 +442,7 @@ ITC_REGS_STEP(CameraModesStep82150A10) {
 ITC_REGS_STEP(CameraModesStep82152E08) {
   if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue() ||
       !game_modes::Buffer28Freeable(base, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82152E08);
+    lifted::original::c82152E08(ctx, base);
     return;
   }
   if (const auto serial =
@@ -468,7 +468,7 @@ ITC_REGS_STEP(CameraModesStep82211848) {
 // --log_pause_movie the original runs (PlayNamed's override logs it).
 ITC_REGS_STEP(CameraModesStep82211AB0) {
   if (ITC_FLAG(log_pause_movie)) {
-    lifted::Sdk(ctx, base, __imp__sub_82211AB0);
+    lifted::original::c82211AB0(ctx, base);
     return;
   }
   ctx.r3.u64 = cm::RivalLogoPlay(base, ctx.r3.u32, ctx.r1.u32 - 144 + 80);
@@ -482,7 +482,7 @@ ITC_REGS_STEP(CameraModesStep82211AB0) {
 // pointer not 16-byte aligned runs the original.
 ITC_REGS_STEP(CameraModesStep82153290) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    lifted::Sdk(ctx, base, __imp__sub_82153290);
+    lifted::original::c82153290(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -552,7 +552,7 @@ namespace hooks {
 // The original without native atexit.
 ITC_REGS_STEP(CameraModesStep82158F70) {
   if (!hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_82158F70);
+    lifted::original::c82158F70(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -586,7 +586,7 @@ ITC_REGS_STEP(CameraModesStep82152338) {
       if (viewport) {
         ctx.r3.u64 = *viewport;
       } else {
-        lifted::Sdk(ctx, base, __imp__sub_820AB358);
+        lifted::original::c820AB358(ctx, base);
       }
     });
     ctx.fpscr.disableFlushMode();
@@ -609,7 +609,7 @@ ITC_REGS_STEP(CameraModesStep82153098) {
           return;
         }
         guest_call::InFrame(ctx, base, 96, 0x821530B0,
-                            [&](uint32_t) { lifted::Sdk(ctx, base, __imp__sub_821507D8); });
+                            [&](uint32_t) { lifted::original::c821507D8(ctx, base); });
         ctx.fpscr.disableFlushMode();
       },
       [&] {
@@ -618,7 +618,7 @@ ITC_REGS_STEP(CameraModesStep82153098) {
           return;
         }
         guest_call::InFrame(ctx, base, 96, 0x82153138,
-                            [&](uint32_t) { lifted::Sdk(ctx, base, __imp__sub_820AA430); });
+                            [&](uint32_t) { lifted::original::c820AA430(ctx, base); });
         ctx.fpscr.disableFlushMode();
       });
 }
@@ -652,7 +652,7 @@ cm::CutsceneCalls ShotInitCalls(lifted::Regs& ctx, uint8_t* base) {
     }
     guest_call::InFrame(ctx, base, 192, 0x82156CB8, [&](uint32_t) {
       ctx.r3.u64 = id;
-      lifted::Sdk(ctx, base, __imp__sub_82150B10);
+      lifted::original::c82150B10(ctx, base);
     });
   };
   return calls;
@@ -785,7 +785,7 @@ ITC_REGS_STEP(CameraModesStep82156980) {
 // bytes below).
 ITC_REGS_STEP(CameraModesStep820AC248) {
   if (!hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_820AC248);
+    lifted::original::c820AC248(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -897,7 +897,7 @@ namespace hooks {
 // four vectors. A stack pointer not 16-byte aligned runs the original.
 ITC_REGS_STEP(CameraModesStep82153478) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    lifted::Sdk(ctx, base, __imp__sub_82153478);
+    lifted::original::c82153478(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -911,7 +911,7 @@ ITC_REGS_STEP(CameraModesStep82153478) {
 // says no.
 ITC_REGS_STEP(CameraModesStep82153640) {
   if (!ChaseNative(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82153640);
+    lifted::original::c82153640(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -924,7 +924,7 @@ ITC_REGS_STEP(CameraModesStep82153640) {
 // without native atexit.
 ITC_REGS_STEP(CameraModesStep82154548) {
   if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_82154548);
+    lifted::original::c82154548(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -938,7 +938,7 @@ ITC_REGS_STEP(CameraModesStep82154548) {
 // after): r3 = the camera. The original where ChaseNative says no.
 ITC_REGS_STEP(CameraModesStep82154808) {
   if (!ChaseNative(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82154808);
+    lifted::original::c82154808(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -950,7 +950,7 @@ ITC_REGS_STEP(CameraModesStep82154808) {
 // atexit (the fallback chase camera's statics).
 ITC_REGS_STEP(CameraModesStep82155288) {
   if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_82155288);
+    lifted::original::c82155288(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -970,7 +970,7 @@ namespace hooks {
 // ChaseNative says no or without native atexit.
 ITC_REGS_STEP(CameraModesStep82154A48) {
   if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_82154A48);
+    lifted::original::c82154A48(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -981,7 +981,7 @@ ITC_REGS_STEP(CameraModesStep82154A48) {
 }
 ITC_REGS_STEP(CameraModesStep82154D38) {
   if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_82154D38);
+    lifted::original::c82154D38(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -996,7 +996,7 @@ ITC_REGS_STEP(CameraModesStep82154D38) {
 // ChaseNative says no.
 ITC_REGS_STEP(CameraModesStep82153A50) {
   if (!ChaseNative(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82153A50);
+    lifted::original::c82153A50(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1004,7 +1004,7 @@ ITC_REGS_STEP(CameraModesStep82153A50) {
 }
 ITC_REGS_STEP(CameraModesStep82153E58) {
   if (!ChaseNative(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82153E58);
+    lifted::original::c82153E58(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1020,7 +1020,7 @@ namespace hooks {
 // original (CameraTarget::Track's frame).
 ITC_REGS_STEP(CameraModesStep82155E58) {
   if ((ctx.r1.u32 & 0xF) != 0) {
-    lifted::Sdk(ctx, base, __imp__sub_82155E58);
+    lifted::original::c82155E58(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1161,7 +1161,7 @@ cm::CutsceneTickCalls CutsceneTickCallsAt(lifted::Regs& ctx, uint8_t* base, uint
     calls.play_original = [&ctx, base, frame](uint32_t entry) {
       CallFrom(ctx, base, frame, 192, 0x82155A64, [&] {
         ctx.r3.u64 = entry;
-        lifted::Sdk(ctx, base, __imp__sub_82211AB0);
+        lifted::original::c82211AB0(ctx, base);
       });
     };
   }
@@ -1246,7 +1246,7 @@ namespace hooks {
 // from SplinePoint's frame, 272 + 208 + 720 bytes below Step's).
 ITC_REGS_STEP(CameraModesStep821562F8) {
   if ((ctx.r1.u32 & 0xF) != 0 || !hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_821562F8);
+    lifted::original::c821562F8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1265,7 +1265,7 @@ ITC_REGS_STEP(CameraModesStep821562F8) {
 // The original where ChaseNative says no or without native atexit.
 ITC_REGS_STEP(CameraModesStep821593D8) {
   if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_821593D8);
+    lifted::original::c821593D8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1285,7 +1285,7 @@ ITC_REGS_STEP(CameraModesStep821593D8) {
   calls.set_style_original = [&ctx, base, frame](uint32_t style) {
     CallFrom(ctx, base, frame, 128, 0x821594A0, [&] {
       ctx.r3.u64 = style;
-      lifted::Sdk(ctx, base, __imp__sub_82152108);
+      lifted::original::c82152108(ctx, base);
     });
   };
   cm::TvUpdate(base, camera, frame, calls, atexit.Call());
@@ -1397,7 +1397,7 @@ ITC_REGS_STEP(CameraModesStep821596B0) {
 // the ones done natively.
 ITC_REGS_STEP(CameraModesStep821597F0) {
   if (!cm::DirectorResumeReady(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_821597F0);
+    lifted::original::c821597F0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1445,7 +1445,7 @@ ITC_REGS_STEP(CameraModesStep821594B8) {
 // passes: natively with --native_camera_modes, else the original.
 ITC_REGS_STEP(CameraModesUpdate) {
   if (!ITC_FLAG(native_camera_modes)) {
-    lifted::Sdk(ctx, base, __imp__sub_821594B8);
+    lifted::original::c821594B8(ctx, base);
     return;
   }
   CameraModesStep821594B8(ctx, base);
@@ -1472,7 +1472,7 @@ namespace hooks {
 // where tan's native form can't stand in.
 ITC_REGS_STEP(CameraModesStep8217BE98) {
   if ((ctx.r1.u32 & 0xF) != 0 || !cm::GarageReady(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_8217BE98);
+    lifted::original::c8217BE98(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1534,7 +1534,7 @@ namespace hooks {
 // (CameraTarget::Track's frame, ZoomFromFov's tan of the same angle).
 ITC_REGS_STEP(CameraModesStep82156CC0) {
   if (!ChaseNative(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82156CC0);
+    lifted::original::c82156CC0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -1552,7 +1552,7 @@ ITC_REGS_STEP(CameraModesStep82156CC0) {
       cm::AnimsFreeAll(base, frame - 384 + 80);
       return;
     }
-    from_frame(0x82156E6C, [&] { lifted::Sdk(ctx, base, __imp__sub_821507D8); });
+    from_frame(0x82156E6C, [&] { lifted::original::c821507D8(ctx, base); });
   };
   calls.stages_copy = [&](uint32_t out, uint32_t stages, uint32_t stage) {
     from_frame(0x82156ED0, [&] {

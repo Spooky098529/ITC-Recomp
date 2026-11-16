@@ -17,6 +17,7 @@
 // docs/pause-menu-fix.md for the layout.
 
 #include "input_update.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "input/input_processor.h"
@@ -239,6 +240,6 @@ ITC_NATIVE_ENTRY_ALWAYS(82592188) {
   if (input_hooks::UpdateProcessor(ctx, base, ctx.r3.u32, ctx.r4.u32, &values_address)) {
     ctx.r3.u64 = values_address;
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_82592188);
+    lifted::original::c82592188(ctx, base);
   }
 }

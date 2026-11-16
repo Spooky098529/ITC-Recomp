@@ -3,6 +3,7 @@
 // shares (hooks/race_update.h).
 
 #include "hooks/race_update.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -146,7 +147,7 @@ ITC_RACE_UPDATE(8215D2B0, RaceUpdateUpdate)
 ITC_NATIVE_ENTRY_ALWAYS(8215B790) {
   
   if (!ITC_FLAG(native_race_update) || !hooks::CourseScenerySetUpNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_8215B790);
+    lifted::original::c8215B790(ctx, base);
     return;
   }
   hooks::RaceUpdateLoadScenery(ctx, base);

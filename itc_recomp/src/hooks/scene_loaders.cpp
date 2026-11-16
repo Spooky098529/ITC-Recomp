@@ -79,7 +79,7 @@ namespace sl = scene_loaders;
 
 ITC_REGS_STEP(SceneLoadersMakeA) {
   if (!hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820C3C40);
+    lifted::original::c820C3C40(ctx, base);
     return;
   }
   ctx.r3.u64 = sl::MakeA(base);
@@ -87,7 +87,7 @@ ITC_REGS_STEP(SceneLoadersMakeA) {
 
 ITC_REGS_STEP(SceneLoadersAllocPages) {
   if (!hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820D0960);
+    lifted::original::c820D0960(ctx, base);
     return;
   }
   ctx.r3.u64 = sl::AllocPages(base, ctx.r3.u32, ctx.r4.u32);
@@ -123,7 +123,7 @@ ITC_REGS_STEP(SceneLoadersAccessoriesAllLoaded) {
 
 ITC_REGS_STEP(SceneLoadersPool4SetRecord) {
   if (!sl::Pool4SetRecord(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820D6A60);
+    lifted::original::c820D6A60(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32 + 28;
@@ -164,49 +164,49 @@ void PaintWalk(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* origina
 }  // namespace
 
 ITC_REGS_STEP(SceneLoadersPartsApplyPalette) {
-  PaintWalk(ctx, base, __imp__sub_820D6F20,
+  PaintWalk(ctx, base, lifted::original::c820D6F20,
             [&](uint32_t object, uint64_t r3, const uint64_t*, uint32_t sp) {
               return sl::PartsApplyPalette(base, object, r3, sp);
             });
 }
 
 ITC_REGS_STEP(SceneLoadersPartsSetPaint) {
-  PaintWalk(ctx, base, __imp__sub_820D7388,
+  PaintWalk(ctx, base, lifted::original::c820D7388,
             [&](uint32_t object, uint64_t r3, const uint64_t* regs, uint32_t sp) {
               return sl::PartsSetPaint(base, object, r3, regs, sp);
             });
 }
 
 ITC_REGS_STEP(SceneLoadersCockpitApplyPalette) {
-  PaintWalk(ctx, base, __imp__sub_820D5FC8,
+  PaintWalk(ctx, base, lifted::original::c820D5FC8,
             [&](uint32_t object, uint64_t r3, const uint64_t*, uint32_t sp) {
               return sl::CockpitApplyPalette(base, object, r3, sp);
             });
 }
 
 ITC_REGS_STEP(SceneLoadersCockpitSetPaint) {
-  PaintWalk(ctx, base, __imp__sub_820D6328,
+  PaintWalk(ctx, base, lifted::original::c820D6328,
             [&](uint32_t object, uint64_t r3, const uint64_t* regs, uint32_t sp) {
               return sl::CockpitSetPaint(base, object, r3, regs, sp);
             });
 }
 
 ITC_REGS_STEP(SceneLoadersInteriorApplyPalette) {
-  PaintWalk(ctx, base, __imp__sub_820D7690,
+  PaintWalk(ctx, base, lifted::original::c820D7690,
             [&](uint32_t object, uint64_t r3, const uint64_t*, uint32_t sp) {
               return sl::InteriorApplyPalette(base, object, r3, sp);
             });
 }
 
 ITC_REGS_STEP(SceneLoadersInteriorSetPaint) {
-  PaintWalk(ctx, base, __imp__sub_820D7840,
+  PaintWalk(ctx, base, lifted::original::c820D7840,
             [&](uint32_t object, uint64_t r3, const uint64_t* regs, uint32_t sp) {
               return sl::InteriorSetPaint(base, object, r3, regs, sp);
             });
 }
 
 ITC_REGS_STEP(SceneLoadersTrafficApplyPalette) {
-  PaintWalk(ctx, base, __imp__sub_820D7BF8,
+  PaintWalk(ctx, base, lifted::original::c820D7BF8,
             [&](uint32_t object, uint64_t r3, const uint64_t*, uint32_t sp) {
               return sl::TrafficApplyPalette(base, object, r3, sp);
             });
@@ -231,7 +231,7 @@ ITC_REGS_STEP(SceneLoadersInteriorRelease) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820D75F8);
+  lifted::original::c820D75F8(ctx, base);
 }
 
 ITC_REGS_STEP(SceneLoadersInteriorDestruct) {
@@ -241,7 +241,7 @@ ITC_REGS_STEP(SceneLoadersInteriorDestruct) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820D76D8);
+  lifted::original::c820D76D8(ctx, base);
 }
 
 ITC_REGS_STEP(SceneLoadersInteriorDeletingDestruct) {
@@ -251,7 +251,7 @@ ITC_REGS_STEP(SceneLoadersInteriorDeletingDestruct) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820D7960);
+  lifted::original::c820D7960(ctx, base);
 }
 
 bool SceneLoadersReleaseANative(uint32_t pool) {
@@ -267,12 +267,12 @@ ITC_REGS_STEP(SceneLoadersReleaseA) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820C4488);
+  lifted::original::c820C4488(ctx, base);
 }
 
 ITC_REGS_STEP(SceneLoadersCarModelSelectedTexture) {
   if (!ITC_FLAG(native_models)) {
-    lifted::Sdk(ctx, base, __imp__sub_820D4588);
+    lifted::original::c820D4588(ctx, base);
     return;
   }
   ctx.r3.u64 = sl::CarModelSelectedTexture(base, ctx.r3.u32);
@@ -302,7 +302,7 @@ ITC_REGS_STEP(SceneLoadersTrafficBindTextures) {
 
 ITC_REGS_STEP(SceneLoadersModelPointFind) {
   if (!ITC_FLAG(native_models) || !native::Buffers_NativeMemcpy()) {
-    lifted::Sdk(ctx, base, __imp__sub_820D02D0);
+    lifted::original::c820D02D0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -351,7 +351,7 @@ sl::FileLoadedCalls MakeFileLoadedCalls(lifted::Regs& ctx, uint8_t* base,
     ctx.r3.u64 = xpr;
     ctx.r4.u64 = file;
     ctx.lr = at.xpr_create;
-    lifted::Sdk(ctx, base, __imp__sub_82596F68);
+    lifted::original::c82596F68(ctx, base);
   };
   calls.provider_set = [&ctx, base, at](uint32_t provider, uint32_t xpr) -> uint64_t {
     ctx.r3.u64 = provider;
@@ -366,7 +366,7 @@ sl::FileLoadedCalls MakeFileLoadedCalls(lifted::Regs& ctx, uint8_t* base,
     ctx.r4.u64 = file;
     ctx.r5.u64 = 0;
     ctx.lr = at.skeleton_bind;
-    lifted::Sdk(ctx, base, __imp__sub_82599A20);
+    lifted::original::c82599A20(ctx, base);
   };
   calls.update_matrices = [&ctx, base, at](uint32_t skeleton) {
     ctx.r3.u64 = skeleton;
@@ -388,7 +388,7 @@ sl::FileLoadedCalls MakeFileLoadedCalls(lifted::Regs& ctx, uint8_t* base,
 ITC_REGS_STEP(SceneLoadersCockpitOnFileLoaded) {
   const uint32_t request = ctx.r3.u32, buffer = ctx.r4.u32, cockpit = ctx.r6.u32;
   if (!hooks::ModelsNativeLifetime() || !sl::CockpitFileLoadedNative(base, request, cockpit)) {
-    lifted::Sdk(ctx, base, __imp__sub_820D6528);
+    lifted::original::c820D6528(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -410,7 +410,7 @@ ITC_REGS_STEP(SceneLoadersCockpitOnFileLoaded) {
 ITC_REGS_STEP(SceneLoadersTrafficOnFileLoaded) {
   const uint32_t request = ctx.r3.u32, traffic = ctx.r6.u32;
   if (!hooks::ModelsNativeLifetime() || !sl::TrafficFileLoadedNative(base, request, traffic)) {
-    lifted::Sdk(ctx, base, __imp__sub_820D8430);
+    lifted::original::c820D8430(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -427,7 +427,7 @@ ITC_REGS_STEP(SceneLoadersTrafficOnFileLoaded) {
   ctx.lr = lr;
   if (!r3) {
     ctx.r3.u64 = request;  // sprintf declined: nothing done
-    lifted::Sdk(ctx, base, __imp__sub_820D8430);
+    lifted::original::c820D8430(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -452,7 +452,7 @@ ITC_REGS_STEP(SceneLoadersXprFindByName) {
 
 ITC_REGS_STEP(SceneLoadersCarModelLoadsConstruct) {
   if (!hooks::ModelsNativeLifetime() || !sl::CarModelLoadsConstruct(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820D3DE0);
+    lifted::original::c820D3DE0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();  // as Skeleton::Skeleton leaves it
@@ -460,7 +460,7 @@ ITC_REGS_STEP(SceneLoadersCarModelLoadsConstruct) {
 
 ITC_REGS_STEP(SceneLoadersCarModelLoadsDestruct) {
   if (!hooks::ModelsNativeLifetime() || !sl::CarModelLoadsDestruct(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820D3E40);
+    lifted::original::c820D3E40(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -477,7 +477,7 @@ ITC_REGS_STEP(SceneLoadersCarModelLoadsDestruct) {
         return;                                                           \
       }                                                                   \
     }                                                                     \
-    lifted::Sdk(ctx, base, __imp__sub_##address);                                      \
+    lifted::original::c##address(ctx, base);                                      \
   }
 
 ITC_SCENE_LOADERS_RESET(SceneLoadersCarModelLoadsReset, 820D3B58, CarModelLoadsReset)
@@ -494,7 +494,7 @@ ITC_REGS_STEP(SceneLoadersCarPartsLoadsConstruct) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820D6F88);
+  lifted::original::c820D6F88(ctx, base);
 }
 
 ITC_REGS_STEP(SceneLoadersCarPartsConstruct) {
@@ -520,7 +520,7 @@ ITC_SCENE_LOADERS_RESET(SceneLoadersCockpitLoadsDestruct, 820D6090, CockpitLoads
         return;                                            \
       }                                                    \
     }                                                      \
-    lifted::Sdk(ctx, base, __imp__sub_##address);                       \
+    lifted::original::c##address(ctx, base);                       \
   }
 
 ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersCockpitLoadsConstruct, 820D6010,
@@ -622,7 +622,7 @@ struct PartLoadedGuest {
 
 ITC_REGS_STEP(SceneLoadersInteriorOnPartLoaded) {
   if (!hooks::ModelsNativeLifetime()) {
-    lifted::Sdk(ctx, base, __imp__sub_820D7578);
+    lifted::original::c820D7578(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -637,7 +637,7 @@ ITC_REGS_STEP(SceneLoadersInteriorOnPartLoaded) {
   const auto r3 = sl::InteriorOnPartLoaded(base, request, interior, calls);
   ctx.lr = lr;
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_820D7578);
+    lifted::original::c820D7578(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -645,7 +645,7 @@ ITC_REGS_STEP(SceneLoadersInteriorOnPartLoaded) {
 
 ITC_REGS_STEP(SceneLoadersCreateA) {
   if (!hooks::ModelsNativeLifetime()) {
-    lifted::Sdk(ctx, base, __imp__sub_820C3FD8);
+    lifted::original::c820C3FD8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();

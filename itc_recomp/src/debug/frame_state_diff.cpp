@@ -437,7 +437,7 @@ void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
       return;                                               \
     }                                                       \
     debug::FrameStateDiff_Before(base);                     \
-    lifted::Sdk(ctx, base, __imp__sub_##address);           \
+    lifted::original::c##address(ctx, base);           \
     debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
   }
 // CameraPasses::RecordBegins and RecordEnds: the passes' recording natively
@@ -453,7 +453,7 @@ void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
     if (ITC_FLAG(native_cameras)) {                                   \
       native(ctx, base);                                              \
     } else {                                                          \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                   \
+      lifted::original::c##address(ctx, base);                   \
     }                                                                 \
     debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
   }
@@ -470,7 +470,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F6068) {
   if (hooks::CourseSceneryDrawNative()) {
     hooks::CourseSceneryDraw(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820F6068);
+    lifted::original::c820F6068(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820F6068);
 }
@@ -489,7 +489,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82130978) {
                                     a.r[5], a.r[6], a.r[7], a.f[0]);
     });
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_82130978);
+    lifted::original::c82130978(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x82130978);
 }
@@ -506,7 +506,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209F7A8) {
   if (ITC_FLAG(native_cameras)) {
     ctx.r3.u64 = cameras::RenderTarget(base, ctx.r3.u32);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8209F7A8);
+    lifted::original::c8209F7A8(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x8209F7A8);
 }
@@ -520,7 +520,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A0958) {
   if (ITC_FLAG(native_cameras)) {
     cameras::Disable(base, ctx.r3.u32);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820A0958);
+    lifted::original::c820A0958(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820A0958);
 }
@@ -535,7 +535,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820AA1A8) {
   if (ITC_FLAG(native_cameras)) {
     ctx.r3.u64 = cameras::EnableForView(base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820AA1A8);
+    lifted::original::c820AA1A8(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820AA1A8);
 }
@@ -552,7 +552,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820AB560) {
     matrix_math::Vec4Transform(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
     ctx.fpscr.enableFlushMode();
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820AB560);
+    lifted::original::c820AB560(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820AB560);
 }
@@ -569,7 +569,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820AB560) {
     if (ITC_FLAG(native_car_scene_draw)) {                            \
       hooks::step(ctx, base);                                         \
     } else {                                                          \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                   \
+      lifted::original::c##address(ctx, base);                   \
     }                                                                 \
     debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
   }
@@ -583,7 +583,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820C5DE8) {
   if (ITC_FLAG(native_car_scene_draw)) {
     hooks::CarSceneDrawRoot(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820C5DE8);
+    lifted::original::c820C5DE8(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820C5DE8);
 }
@@ -603,7 +603,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82597118) {
   if (ITC_FLAG(native_models)) {
     ctx.r3.u64 = models::XprGetTexture(base, ctx.r3.u32, ctx.r4.u32);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_82597118);
+    lifted::original::c82597118(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x82597118);
 }
@@ -643,7 +643,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209CC38) {
   if (hooks::BillboardsNative()) {
     hooks::BillboardsRecord(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8209CC38);
+    lifted::original::c8209CC38(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x8209CC38);
 }
@@ -659,7 +659,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820DAC68) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawUpdate(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820DAC68);
+    lifted::original::c820DAC68(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820DAC68);
 }
@@ -693,7 +693,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820C5C88) {
     if (ITC_FLAG(native_load_poll)) {                               \
       hooks::step(ctx, base);                                       \
     } else {                                                        \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                 \
+      lifted::original::c##address(ctx, base);                 \
     }                                                               \
     debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
   }
@@ -718,7 +718,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820DAB58) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawIsNearPlayerHeight(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820DAB58);
+    lifted::original::c820DAB58(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820DAB58);
 }
@@ -734,7 +734,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820DC498) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawSceneCockpit(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820DC498);
+    lifted::original::c820DC498(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820DC498);
 }
@@ -751,7 +751,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820DDE58) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawSceneLightsDraw(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820DDE58);
+    lifted::original::c820DDE58(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820DDE58);
 }
@@ -767,7 +767,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820E2EE8) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawSceneParts(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820E2EE8);
+    lifted::original::c820E2EE8(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820E2EE8);
 }
@@ -783,7 +783,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820E53F0) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawSceneInterior(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820E53F0);
+    lifted::original::c820E53F0(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820E53F0);
 }
@@ -799,7 +799,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820E6A40) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawSceneTraffic(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820E6A40);
+    lifted::original::c820E6A40(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820E6A40);
 }
@@ -816,7 +816,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820ECE28) {
   if (ITC_FLAG(native_car_draw)) {
     hooks::CarDrawSceneWheels(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820ECE28);
+    lifted::original::c820ECE28(ctx, base);
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820ECE28);
 }
@@ -871,7 +871,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82096340) {
   if (hooks::NativeFramework()) {
     hooks::DelegateSlot1Thunk(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_82096340);
+    lifted::original::c82096340(ctx, base);
   }
   debug::FrameStateDiff_After(base, "thunk target", target);
 }

@@ -132,7 +132,7 @@ lp::Calls LoadPollCalls(lifted::Regs& ctx, uint8_t* base) {
 
 #define ITC_LOAD_POLL_ORIGINAL(address)   \
   if (!LoadPollCalleesNative()) {         \
-    lifted::Sdk(ctx, base, __imp__sub_##address);      \
+    lifted::original::c##address(ctx, base);      \
     return;                               \
   }                                       \
   const bool was_on =                     \

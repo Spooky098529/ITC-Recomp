@@ -4,6 +4,7 @@
 // Ported though never seen in play (the user's call, 2026-11-12).
 
 #include "hooks/race_screens_unseen.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -447,14 +448,14 @@ ITC_RACE_SCREENS_UNSEEN(821A66A8, RaceScreensUnseenReplayCopyFrom)
 ITC_NATIVE_ENTRY_ALWAYS(8214AB48) {
   
   if (!ITC_FLAG(native_race_screens_unseen)) {
-    lifted::Sdk(ctx, base, __imp__sub_8214AB48);
+    lifted::original::c8214AB48(ctx, base);
   }
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8214AA70) {
   
   if (!ITC_FLAG(native_race_screens_unseen)) {
-    lifted::Sdk(ctx, base, __imp__sub_8214AA70);
+    lifted::original::c8214AA70(ctx, base);
   }
 }
 

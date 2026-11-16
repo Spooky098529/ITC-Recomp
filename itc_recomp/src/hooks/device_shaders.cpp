@@ -14,6 +14,7 @@
 // C++.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -60,14 +61,14 @@ dsh::ShaderCalls Calls(lifted::Regs& ctx, uint8_t* base, uint32_t release_at) {
 // (the wrapper as it was), for the entry's fallback.
 ITC_REGS_STEP(RecompiledSetVertexShader) {
   if (ITC_FLAG(refcount_global_lock)) {
-    lifted::Sdk(ctx, base, __imp__sub_822A8808);
+    lifted::original::c822A8808(ctx, base);
     return;
   }
   const uint32_t shader = ctx.r4.u32;
   const bool same = shader && shader == guest::LoadU32(base, ctx.r3.u32 + 12436);
   refcount::NoteSetVertexShader(same);
   if (same) refcount::SetUnchangedShader(shader);
-  lifted::Sdk(ctx, base, __imp__sub_822A8808);
+  lifted::original::c822A8808(ctx, base);
   refcount::SetUnchangedShader(0);
 }
 
@@ -103,5 +104,5 @@ ITC_NATIVE_ENTRY_ALWAYS(825915E0) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_825915E0);
+  lifted::original::c825915E0(ctx, base);
 }

@@ -63,7 +63,7 @@ ITC_FLAG_DECLARE(bool, native_graphics_resources);
 #define ITC_CAMERAS_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                \
   if (!ITC_FLAG(native_cameras)) {    \
-    lifted::Sdk(ctx, base, __imp__sub_##address); \
+    lifted::original::c##address(ctx, base); \
     return;                           \
   }
 
@@ -79,7 +79,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82593278) {
 ITC_NATIVE_ENTRY_ALWAYS(82593500) {
   ITC_CAMERAS_FALLBACK(82593500)
   if ((ctx.r1.u32 & 0xF) != 0) {
-    lifted::Sdk(ctx, base, __imp__sub_82593500);
+    lifted::original::c82593500(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -93,7 +93,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82593500) {
 ITC_NATIVE_ENTRY_ALWAYS(82593568) {
   ITC_CAMERAS_FALLBACK(82593568)
   if (!hooks::CameraUpdate(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82593568);
+    lifted::original::c82593568(ctx, base);
   }
 }
 
@@ -102,7 +102,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82593568) {
 ITC_NATIVE_ENTRY_ALWAYS(82593908) {
   ITC_CAMERAS_FALLBACK(82593908)
   if (!hooks::CameraConstruct(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82593908);
+    lifted::original::c82593908(ctx, base);
   }
 }
 
@@ -397,7 +397,7 @@ std::optional<uint32_t> ViewportsInit(lifted::Regs& ctx, uint8_t* base) {
 ITC_NATIVE_ENTRY_ALWAYS(8209FBF0) {
   ITC_CAMERAS_FALLBACK(8209FBF0)
   if (!hooks::CameraPassesMakeRenderTarget(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_8209FBF0);
+    lifted::original::c8209FBF0(ctx, base);
   }
 }
 
@@ -405,7 +405,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209FBF0) {
 ITC_NATIVE_ENTRY_ALWAYS(820A2F40) {
   ITC_CAMERAS_FALLBACK(820A2F40)
   if (!hooks::CameraPassSetUpSurfaces(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_820A2F40);
+    lifted::original::c820A2F40(ctx, base);
   }
 }
 
@@ -430,7 +430,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A3DB0) {
     return;
   }
   if (!ITC_FLAG(native_cameras)) {
-    lifted::Sdk(ctx, base, __imp__sub_820A3DB0);
+    lifted::original::c820A3DB0(ctx, base);
     return;
   }
   hooks::CameraPassInit(ctx, base);
@@ -442,7 +442,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A3DB0) {
 ITC_NATIVE_ENTRY_ALWAYS(820AA430) {
   ITC_CAMERAS_FALLBACK(820AA430)
   if (!hooks::NativeHeapActive() || !cameras::ReleaseViewports(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_820AA430);
+    lifted::original::c820AA430(ctx, base);
     return;
   }
   ctx.r3.u64 = 1;
@@ -459,7 +459,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820AB358) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820AB358);
+  lifted::original::c820AB358(ctx, base);
 }
 
 // Viewport::SetZoom: r3 = the viewport, f1 = the zoom.
@@ -659,14 +659,14 @@ Route EndRoute(uint32_t type) {
 ITC_NATIVE_ENTRY_ALWAYS(820A0CC0) {
   ITC_CAMERAS_FALLBACK(820A0CC0)
   if (!hooks::CameraPassRecordBegin(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_820A0CC0);
+    lifted::original::c820A0CC0(ctx, base);
   }
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(820A1C30) {
   ITC_CAMERAS_FALLBACK(820A1C30)
   if (!hooks::CameraPassRecordEnd(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_820A1C30);
+    lifted::original::c820A1C30(ctx, base);
   }
 }
 
@@ -729,7 +729,7 @@ ITC_REGS_STEP(RecordClear) {
     ctx.r5 = in.r5;
     ctx.r6 = in.r6;
     ctx.r7 = in.r7;
-    lifted::Sdk(ctx, base, __imp__sub_8209FA38);
+    lifted::original::c8209FA38(ctx, base);
   }
 }
 
@@ -773,7 +773,7 @@ ITC_REGS_STEP(CameraPassesRecordBegins) {
       if (!ITC_FLAG(native_cameras) || !CameraPassRecordBegin(ctx, base)) {
         ctx.r3.u64 = pass;
         ctx.lr = 0x8209F8D4;
-        lifted::Sdk(ctx, base, __imp__sub_820A0CC0);
+        lifted::original::c820A0CC0(ctx, base);
       }
     });
   });
@@ -789,7 +789,7 @@ ITC_REGS_STEP(CameraPassesRecordEnds) {
       if (!ITC_FLAG(native_cameras) || !CameraPassRecordEnd(ctx, base)) {
         ctx.r3.u64 = pass;
         ctx.lr = 0x8209F934;
-        lifted::Sdk(ctx, base, __imp__sub_820A1C30);
+        lifted::original::c820A1C30(ctx, base);
       }
     });
   });
@@ -802,7 +802,7 @@ ITC_REGS_STEP(CameraPassRecordViewport) {
   if (!RecordViewportCalls(ctx, base, pass, uint32_t(key))) {
     ctx.r3.u64 = pass;
     ctx.r4.u64 = key;
-    lifted::Sdk(ctx, base, __imp__sub_820A0978);
+    lifted::original::c820A0978(ctx, base);
   }
 }
 
@@ -820,7 +820,7 @@ bool CameraPassUpdate(lifted::Regs& ctx, uint8_t* base) {
         ctx.r3.u64 = pass;
         ctx.r4.u64 = key;
         ctx.lr = 0x820A39C0;
-        lifted::Sdk(ctx, base, __imp__sub_820A0978);
+        lifted::original::c820A0978(ctx, base);
       }
     });
   });

@@ -4,6 +4,7 @@
 // adapters stay until their callers are native.
 
 #include "hooks/xaudio.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -75,7 +76,7 @@ ITC_REGS_STEP(XAudioBufferSize) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8245FA28);
+  lifted::original::c8245FA28(ctx, base);
 }
 
 ITC_REGS_STEP(XAudioBufferClear) {
@@ -83,7 +84,7 @@ ITC_REGS_STEP(XAudioBufferClear) {
     ctx.r3.s64 = int32_t(*r3);  // the errors as the original's lis/ori leave them
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8245F8E8);
+  lifted::original::c8245F8E8(ctx, base);
 }
 
 ITC_REGS_STEP(XAudioEngineBuffer) {
@@ -279,7 +280,7 @@ ITC_REGS_STEP(XAudioReformat) {
   });
   if (refused) {
     ctx = saved;
-    lifted::Sdk(ctx, base, __imp__sub_8245DCF0);
+    lifted::original::c8245DCF0(ctx, base);
   }
 }
 
@@ -290,7 +291,7 @@ ITC_REGS_STEP(XAudioAlloc) {
     ctx.r3.u64 = xa::Alloc(base, ctx.r4.u32, ctx.r5.u32);
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8245EF80);
+  lifted::original::c8245EF80(ctx, base);
 }
 
 ITC_REGS_STEP(XAudioBufferClearThunk) {
@@ -298,7 +299,7 @@ ITC_REGS_STEP(XAudioBufferClearThunk) {
     ctx.r3.s64 = int32_t(*r3);  // the errors as the original's lis/ori leave them
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8245FA10);
+  lifted::original::c8245FA10(ctx, base);
 }
 
 ITC_REGS_STEP(XAudioBaseSize) {
@@ -321,7 +322,7 @@ ITC_REGS_STEP(XAudioBufferConstruct) {
   });
   if (refused) {
     ctx = saved;
-    lifted::Sdk(ctx, base, __imp__sub_8245F750);
+    lifted::original::c8245F750(ctx, base);
   }
 }
 
@@ -343,7 +344,7 @@ ITC_REGS_STEP(XAudioDefaultAllocator) {
   // XAudio::Alloc's plain C++ (XMemAlloc's) while the heap is the native
   // layer's, else the original.
   if (!NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_824605E8);
+    lifted::original::c824605E8(ctx, base);
     return;
   }
   ctx.r3.u64 = xa::DefaultAllocator(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
@@ -363,7 +364,7 @@ ITC_REGS_STEP(XAudioGetAllocator) {
   });
   if (refused) {
     ctx = saved;
-    lifted::Sdk(ctx, base, __imp__sub_82460688);
+    lifted::original::c82460688(ctx, base);
   }
 }
 

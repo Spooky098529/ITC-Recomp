@@ -134,7 +134,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258E580) {
     app_start_up::MovieWrapperLockEnter(base, ctx.r3.u32, ctx.r4.u32);
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8258E580);
+  lifted::original::c8258E580(ctx, base);
 }
 
 // ScopedLock::~ScopedLock: r3 = the lock word; r3 = the critical section (the
@@ -150,7 +150,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258E5B8) {
     ctx.r3.u64 = app_start_up::MovieWrapperLockLeave(base, ctx.r3.u32);
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8258E5B8);
+  lifted::original::c8258E5B8(ctx, base);
 }
 
 // --- The XPR object ---
@@ -170,7 +170,7 @@ ITC_NATIVE_ENTRY(82596E68, ITC_FLAG(native_models)) {
         return;                                                      \
       }                                                              \
     }                                                                \
-    lifted::Sdk(ctx, base, __imp__sub_##address);                                 \
+    lifted::original::c##address(ctx, base);                                 \
   }
 
 ITC_MODELS_LIFETIME(825970A8, XprRelease)
@@ -204,7 +204,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82590EF0) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82590EF0);
+  lifted::original::c82590EF0(ctx, base);
 }
 
 // TextureProvider::Clear: r3 = the vector; r3 = its first element.
@@ -255,7 +255,7 @@ ITC_NATIVE_ENTRY(82594230, ITC_FLAG(native_models)) {
 ITC_NATIVE_ENTRY_ALWAYS(82594850) {
   
   if (!NativeLifetime() || !models::TextureProviderConstruct(base, ctx.r3.u32, ctx.r4.s32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82594850);
+    lifted::original::c82594850(ctx, base);
   }
 }
 
@@ -273,7 +273,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825948C0) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_825948C0);
+  lifted::original::c825948C0(ctx, base);
 }
 
 // Model::Release and Model::~Model: r3 = the model; r3 as the original
@@ -292,7 +292,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820CE928) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820CE928);
+  lifted::original::c820CE928(ctx, base);
 }
 
 // The part model's destructor: r3 = the model; r3 as Model::~Model leaves it.
@@ -405,7 +405,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82596F68) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82596F68);
+  lifted::original::c82596F68(ctx, base);
 }
 
 // SkeletonBase::SetUp: r3 = the skeleton, r4 = the node file, r5 = the
@@ -419,7 +419,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8259A9E0) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_8259A9E0);
+  lifted::original::c8259A9E0(ctx, base);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(82599A20) {
@@ -430,7 +430,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82599A20) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82599A20);
+  lifted::original::c82599A20(ctx, base);
 }
 
 namespace {
@@ -501,7 +501,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A08A0) {
     return;
   }
   if (!ITC_FLAG(native_models) || !hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
-    lifted::Sdk(ctx, base, __imp__sub_820A08A0);
+    lifted::original::c820A08A0(ctx, base);
     return;
   }
   const archive::LoadCall load = hooks::NativeArchiveLoad(base);
@@ -513,7 +513,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A08A0) {
     guest_call::InFrame(ctx, base, 112, at, [&](uint32_t) {
       ctx.r3.u64 = asset;
       ctx.r4.u64 = pair;
-      lifted::Sdk(ctx, base, __imp__sub_820A07F0);
+      lifted::original::c820A07F0(ctx, base);
     });
   });
   ctx.r3.s64 = int32_t(r3);
@@ -564,5 +564,5 @@ ITC_NATIVE_ENTRY_ALWAYS(820A06D0) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820A06D0);
+  lifted::original::c820A06D0(ctx, base);
 }

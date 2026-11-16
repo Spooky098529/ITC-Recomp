@@ -3,6 +3,7 @@
 // shares (hooks/race_event.h).
 
 #include "hooks/race_event.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -77,12 +78,12 @@ ITC_REGS_STEP(RaceEventMake) {
   ctx.r3.u64 = r3;
   ctx.r4.u64 = r4;
   ctx.r5.u64 = r5;
-  lifted::Sdk(ctx, base, __imp__sub_82144E58);
+  lifted::original::c82144E58(ctx, base);
 }
 
 ITC_REGS_STEP(RaceEventDestroy) {
   if (!re::DestroyNative(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82144DF0);
+    lifted::original::c82144DF0(ctx, base);
     return;
   }
   re::Destroy(base);
@@ -252,7 +253,7 @@ ITC_REGS_STEP(RaceEventInit) {
   ctx.r4.u64 = r4;
   ctx.r5.u64 = r5;
   ctx.r6.u64 = r6;
-  lifted::Sdk(ctx, base, __imp__sub_82144A50);
+  lifted::original::c82144A50(ctx, base);
 }
 
 ITC_REGS_STEP(RaceEventGroupPromoteFlagged) {

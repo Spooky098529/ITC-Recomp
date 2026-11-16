@@ -11,6 +11,7 @@
 // passes leaves what the logic pass set in place for them, as at 30 fps.
 
 #include "action_mappers/action_mappers.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "debug/pause_menu_log.h"
 #include "frame_pacing/game_messages.h"
@@ -41,5 +42,5 @@ ITC_NATIVE_ENTRY_ALWAYS(8210B018) {
     ctx.f1.f64 = f1;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8210B018);
+  lifted::original::c8210B018(ctx, base);
 }

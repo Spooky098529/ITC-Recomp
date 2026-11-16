@@ -119,7 +119,7 @@ void hooks::SceneTargetRecordPasses(lifted::Regs& ctx, uint8_t* base) {
       });
   ctx.lr = lr;
   if (!done) {
-    lifted::Sdk(ctx, base, __imp__sub_8209B3D0);
+    lifted::original::c8209B3D0(ctx, base);
   }
 }
 
@@ -129,7 +129,7 @@ void hooks::SceneTargetRecordPasses(lifted::Regs& ctx, uint8_t* base) {
 // adapter calls this.
 void hooks::SceneTargetRecordPassesOrOriginal(lifted::Regs& ctx, uint8_t* base) {
   if (!Native()) {
-    lifted::Sdk(ctx, base, __imp__sub_8209B3D0);
+    lifted::original::c8209B3D0(ctx, base);
     return;
   }
   hooks::SceneTargetRecordPasses(ctx, base);

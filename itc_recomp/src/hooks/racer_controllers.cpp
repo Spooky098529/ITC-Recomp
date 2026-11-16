@@ -25,6 +25,7 @@
 // per-racer states and Update.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -143,7 +144,7 @@ ITC_RACER_CONTROLLERS(8215F728, {
     ctx.r3.u64 = r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8215F728);
+  lifted::original::c8215F728(ctx, base);
 })
 // r3 left at the last record, as operator delete leaves it. The original
 // where a record isn't the layer's.
@@ -153,7 +154,7 @@ ITC_RACER_CONTROLLERS(8215F5E8, {
     ctx.r3.u64 = last;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8215F5E8);
+  lifted::original::c8215F5E8(ctx, base);
 })
 
 // --- The AI drivers' hand-off (r3 as the originals leave it; f1 DriveCar's) ---

@@ -174,7 +174,7 @@ ITC_NATIVE_ENTRY(822A2470, ITC_FLAG(native_device_state)) {
 
 ITC_DEVICE_STATE_CALL(822A3740, {
   if (!ds::GetViewport(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_822A3740);
+    lifted::original::c822A3740(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r4.u32;  // memcpy's: the destination
@@ -182,12 +182,12 @@ ITC_DEVICE_STATE_CALL(822A3740, {
 ITC_DEVICE_STATE_CALL(822A3758, {
   if (!ds::SetStreamSource(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                            ctx.r8.u64)) {
-    lifted::Sdk(ctx, base, __imp__sub_822A3758);
+    lifted::original::c822A3758(ctx, base);
   }
 })
 ITC_DEVICE_STATE_CALL(822A3908, {
   if (!ds::SetIndices(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_822A3908);
+    lifted::original::c822A3908(ctx, base);
   }
 })
 ITC_DEVICE_STATE_CALL(822A6008, {
@@ -217,7 +217,7 @@ ITC_DEVICE_STATE_CALL(822A8470, ds::SetPixelShaderConstantB(base, ctx.r3.u32, ct
 ITC_NATIVE_ENTRY_ALWAYS(822A0F80) {
   
   if (!ITC_FLAG(native_device_state)) {
-    lifted::Sdk(ctx, base, __imp__sub_822A0F80);
+    lifted::original::c822A0F80(ctx, base);
   }
 }
 

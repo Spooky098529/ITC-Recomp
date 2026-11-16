@@ -3,6 +3,7 @@
 // (hooks/car_sounds.h).
 
 #include "hooks/car_sounds.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -61,7 +62,7 @@ ITC_REGS_STEP(CarSoundsWaveBankEntry) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8210C998);
+  lifted::original::c8210C998(ctx, base);
 }
 
 ITC_REGS_STEP(CarSoundsSetBanks) {
@@ -263,7 +264,7 @@ ITC_REGS_STEP(CarSoundsX3DCalculate) {
   if (!r3) {
     // EmitterAngle or Delay asked for: the original, its callees through
     // their adapters.
-    lifted::Sdk(ctx, base, __imp__sub_82481880);
+    lifted::original::c82481880(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -680,7 +681,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82110258) {
     return;
   }
   if (!ITC_FLAG(native_car_sounds) || !hooks::CarSoundsGlobalsNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_82110258);
+    lifted::original::c82110258(ctx, base);
     return;
   }
   hooks::CarSoundsGlobalsInit(ctx, base);

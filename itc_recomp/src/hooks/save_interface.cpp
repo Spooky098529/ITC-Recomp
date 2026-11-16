@@ -3,6 +3,7 @@
 // steps the harness shares (hooks/save_interface.h).
 
 #include "hooks/save_interface.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -88,7 +89,7 @@ ITC_REGS_STEP(SaveInterfaceAppDevices) {
     ctx.r3.u64 = *devices;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_820943B0);
+  lifted::original::c820943B0(ctx, base);
 }
 
 ITC_REGS_STEP(SaveInterfaceAppUsers) {
@@ -96,7 +97,7 @@ ITC_REGS_STEP(SaveInterfaceAppUsers) {
     ctx.r3.u64 = *users;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_820943C8);
+  lifted::original::c820943C8(ctx, base);
 }
 
 ITC_REGS_STEP(SaveInterfaceFrameworkUsers) {
@@ -147,7 +148,7 @@ ITC_REGS_STEP(SaveInterfaceSlotRequestSave) {
   const auto answer = si::SlotRequestSave(base, ctx.r3.u32, ctx.r4.u32,
                                           RequestFrom(ctx, 5, guest::LoadU32(base, ctx.r1.u32 + 84)));
   if (!answer) {
-    lifted::Sdk(ctx, base, __imp__sub_820A52E0);
+    lifted::original::c820A52E0(ctx, base);
     return;
   }
   ctx.r3.u64 = *answer;
@@ -156,7 +157,7 @@ ITC_REGS_STEP(SaveInterfaceSlotRequestSave) {
 ITC_REGS_STEP(SaveInterfaceSlotRequestLoad) {
   const auto answer = si::SlotRequestLoad(base, ctx.r3.u32, ctx.r4.u32, RequestFrom(ctx, 5, 0));
   if (!answer) {
-    lifted::Sdk(ctx, base, __imp__sub_820A53E8);
+    lifted::original::c820A53E8(ctx, base);
     return;
   }
   ctx.r3.u64 = *answer;
@@ -178,7 +179,7 @@ void SaveInterfaceContentSize(lifted::Regs& ctx, uint8_t*) {
       ctx.r3.u64 = *answer;                             \
       return;                                           \
     }                                                   \
-    lifted::Sdk(ctx, base, __imp__sub_##address);                    \
+    lifted::original::c##address(ctx, base);                    \
   }
 
 ITC_SAVE_INTERFACE_WRAPPER(8209FFB8, SaveInterfaceInit, si::Init(base, ctx.r3.u32))
@@ -221,7 +222,7 @@ ITC_SAVE_INTERFACE_WRAPPER(8228FC50, SaveInterfaceGameDataCheck,
 
 ITC_REGS_STEP(SaveInterfaceBuffersCreate) {
   if (!hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_8228F6B0);
+    lifted::original::c8228F6B0(ctx, base);
     return;
   }
   if (const auto r3 = si::SaveBuffersCreate(base)) {
@@ -232,7 +233,7 @@ ITC_REGS_STEP(SaveInterfaceBuffersCreate) {
 ITC_REGS_STEP(SaveInterfaceBuffersFreeReplayList) {
   const uint32_t records = guest::LoadU32(base, guest::LoadU32(base, si::kSaveBuffers) + 12);
   if (!hooks::NativeHeapActive() || (records != 0 && !memory::IsPages(records))) {
-    lifted::Sdk(ctx, base, __imp__sub_8228F7E8);
+    lifted::original::c8228F7E8(ctx, base);
     return;
   }
   if (const auto r3 = si::SaveBuffersFreeReplayList(base)) {
@@ -242,7 +243,7 @@ ITC_REGS_STEP(SaveInterfaceBuffersFreeReplayList) {
 
 ITC_REGS_STEP(SaveInterfaceBuffersDestroy) {
   if (!si::SaveBuffersDestroyNative(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_8228F8F8);
+    lifted::original::c8228F8F8(ctx, base);
     return;
   }
   ctx.r3.u64 = si::SaveBuffersDestroy(base);
@@ -282,12 +283,12 @@ ITC_REGS_STEP(SaveInterfaceGameDataSave) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8228FB00);
+  lifted::original::c8228FB00(ctx, base);
 }
 
 ITC_REGS_STEP(SaveInterfaceReplaysBuildList) {
   if (!si::ReplaysBuildListNative(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82290378);
+    lifted::original::c82290378(ctx, base);
     return;
   }
   const uint64_t stack = ctx.r1.u64;
@@ -307,12 +308,12 @@ ITC_REGS_STEP(SaveInterfaceReplaysBuildList) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_82290378);
+  lifted::original::c82290378(ctx, base);
 }
 
 ITC_REGS_STEP(SaveInterfaceReplaysSort) {
   if (!native::Buffers_NativeMemcpy()) {
-    lifted::Sdk(ctx, base, __imp__sub_8228F840);
+    lifted::original::c8228F840(ctx, base);
     return;
   }
   if (const auto r3 = si::ReplaysSort(base, ctx.r3.u32, ctx.r1.u32 - 176 + 80)) {
@@ -400,7 +401,7 @@ ITC_REGS_STEP(SaveDevicesConstructSteps) {
   const uint32_t block = ctx.r4.u32;
   const uint32_t saves = ctx.r5.u32;
   if (!hooks::NativeHeapActive() || !si::CanAllocBuffers(base, saves)) {
-    lifted::Sdk(ctx, base, __imp__sub_820A6160);
+    lifted::original::c820A6160(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -428,7 +429,7 @@ ITC_REGS_STEP(SaveDevicesCreateSteps) {
   const uint32_t block = ctx.r3.u32;
   const uint32_t saves = ctx.r4.u32;
   if (!hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820A63C8);
+    lifted::original::c820A63C8(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -447,7 +448,7 @@ ITC_REGS_STEP(SaveDevicesCreateSteps) {
     ctx.lr = lr;
   });
   if (!devices) {
-    lifted::Sdk(ctx, base, __imp__sub_820A63C8);
+    lifted::original::c820A63C8(ctx, base);
     return;
   }
   if (*devices == 0) {
@@ -458,7 +459,7 @@ ITC_REGS_STEP(SaveDevicesCreateSteps) {
 
 ITC_REGS_STEP(SaveSlotAllocBuffersSteps) {
   if (!hooks::NativeHeapActive() || !si::CanAllocBuffers(base, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820A4560);
+    lifted::original::c820A4560(ctx, base);
     return;
   }
   const auto regs = Regs(ctx, 29);
@@ -470,7 +471,7 @@ ITC_REGS_STEP(SaveSlotAllocBuffersSteps) {
 
 ITC_REGS_STEP(SaveDevicesDeleteSteps) {
   if (!hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820A6110);
+    lifted::original::c820A6110(ctx, base);
     return;
   }
   const uint32_t devices = ctx.r3.u32;
@@ -489,7 +490,7 @@ ITC_REGS_STEP(SaveDevicesDeleteSteps) {
 
 ITC_REGS_STEP(SaveDevicesDestroySteps) {
   if (!hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820A56E8);
+    lifted::original::c820A56E8(ctx, base);
     return;
   }
   const uint32_t devices = ctx.r3.u32;
@@ -501,7 +502,7 @@ ITC_REGS_STEP(SaveDevicesDestroySteps) {
 
 ITC_REGS_STEP(SlotArrayResetSteps) {
   if (!hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820A55F0);
+    lifted::original::c820A55F0(ctx, base);
     return;
   }
   const uint32_t frame = ResetPrologue(base, ctx.r1.u32, uint32_t(ctx.lr),
@@ -741,7 +742,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209FFB8) {
     return;
   }
   if (!ITC_FLAG(native_save_interface)) {
-    lifted::Sdk(ctx, base, __imp__sub_8209FFB8);
+    lifted::original::c8209FFB8(ctx, base);
     return;
   }
   hooks::SaveInterfaceInit(ctx, base);

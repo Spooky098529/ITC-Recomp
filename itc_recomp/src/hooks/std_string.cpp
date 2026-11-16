@@ -14,6 +14,7 @@
 // are left the same.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -56,7 +57,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82091328) {
   const bool frees = built && guest::LoadU32(base, string + kCapacity) >= kInPlace;
   const uint32_t block = guest::LoadU32(base, string + kText);
   if (!NativeLifetime() || !Tidy(base, string, built, ctx.r5.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82091328);
+    lifted::original::c82091328(ctx, base);
     return;
   }
   if (frees) {
@@ -70,7 +71,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82091720) {
   
   if (!NativeLifetime() ||
       !AssignFrom(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82091720);
+    lifted::original::c82091720(ctx, base);
   }
 }
 
@@ -79,7 +80,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82091720) {
 ITC_NATIVE_ENTRY_ALWAYS(82091808) {
   
   if (!NativeLifetime() || !AssignText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82091808);
+    lifted::original::c82091808(ctx, base);
   }
 }
 
@@ -88,7 +89,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82091808) {
 ITC_NATIVE_ENTRY_ALWAYS(820A6F60) {
   
   if (!NativeLifetime() || !Append(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820A6F60);
+    lifted::original::c820A6F60(ctx, base);
   }
 }
 
@@ -103,7 +104,7 @@ ITC_NATIVE_ENTRY(825929E8, ITC_FLAG(native_std_string)) {
 ITC_NATIVE_ENTRY_ALWAYS(825931D0) {
   
   if (!NativeLifetime() || !ConstructFromText(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_825931D0);
+    lifted::original::c825931D0(ctx, base);
   }
 }
 
@@ -112,7 +113,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825931D0) {
 ITC_NATIVE_ENTRY_ALWAYS(82593248) {
   
   if (!NativeLifetime() || !ConstructFromTextWithAllocator(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82593248);
+    lifted::original::c82593248(ctx, base);
   }
 }
 
@@ -123,7 +124,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82593040) {
   
   if (!NativeLifetime() ||
       !ConstructFrom(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82593040);
+    lifted::original::c82593040(ctx, base);
   }
 }
 
@@ -139,7 +140,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82593088) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82593088);
+  lifted::original::c82593088(ctx, base);
 }
 
 // The global strings' static set-ups: no arguments; r3 = atexit's.
@@ -153,7 +154,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82593088) {
         return;                                                          \
       }                                                                  \
     }                                                                    \
-    lifted::Sdk(ctx, base, __imp__sub_##address);                        \
+    lifted::original::c##address(ctx, base);                        \
   }
 
 ITC_STD_STRING_STATIC_INIT(825DA540, InitGlobalString8265EE7C)

@@ -3,6 +3,7 @@
 // (hooks/car_dealer.h).
 
 #include "hooks/car_dealer.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -401,7 +402,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82180CE8) {
     return;
   }
   if (!ITC_FLAG(native_car_dealer)) {
-    lifted::Sdk(ctx, base, __imp__sub_82180CE8);
+    lifted::original::c82180CE8(ctx, base);
     return;
   }
   hooks::CarDealerStartFirstRace(ctx, base);

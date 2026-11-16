@@ -100,7 +100,7 @@ ITC_REGS_STEP(AccessoryFileOnArchiveDone) {
 
 ITC_REGS_STEP(AccessoriesCreate) {
   if (!NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F1038);
+    lifted::original::c820F1038(ctx, base);
     return;
   }
   if (const auto r3 = accessories::SetCreate(base)) {
@@ -116,7 +116,7 @@ ITC_REGS_STEP(AccessoriesSetScale) {
 
 ITC_REGS_STEP(AccessoriesDestroy) {
   if (!NativeHeapActive() || !AccessoriesSetFreeable(base, accessories::kSet)) {
-    lifted::Sdk(ctx, base, __imp__sub_820F1078);
+    lifted::original::c820F1078(ctx, base);
     return;
   }
   ctx.r3.u64 = accessories::SetDestroy(base, ctx.r1.u32, AccessoriesSetDestructor(ctx, base));
@@ -135,7 +135,7 @@ ITC_REGS_STEP(AccessoriesDestroy) {
 ITC_REGS_STEP(AccessoriesReleaseAll) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
       !accessories::SetReleasable(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820F0AD8);
+    lifted::original::c820F0AD8(ctx, base);
     return;
   }
   if (const auto r3 = accessories::SetReleaseAll(base, ctx.r3.u32)) {
@@ -148,7 +148,7 @@ ITC_REGS_STEP(AccessoriesReleaseAll) {
 ITC_REGS_STEP(AccessoriesRelease) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
       !accessories::SetReleaseNative(base, ctx.r3.u32, ctx.r4.s32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820F0A90);
+    lifted::original::c820F0A90(ctx, base);
     return;
   }
   const uint32_t set = ctx.r3.u32;
@@ -173,7 +173,7 @@ ITC_REGS_STEP(AccessoriesDestruct) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
       !accessories::SetReleasable(base, ctx.r3.u32) ||
       ((ctx.r4.u32 & 1) && !memory::IsHeapBlock(ctx.r3.u32))) {
-    lifted::Sdk(ctx, base, __imp__sub_820F0FE0);
+    lifted::original::c820F0FE0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -241,7 +241,7 @@ bool AccessoriesFinishNative(uint8_t* base, uint32_t accessory) {
 
 ITC_REGS_STEP(AccessoryFinish) {
   if (!AccessoriesFinishNative(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820EF368);
+    lifted::original::c820EF368(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -259,7 +259,7 @@ ITC_REGS_STEP(AccessoryFinish) {
 
 ITC_REGS_STEP(AccessoryEntryOnLoaded) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() || !native::Buffers_NativeMemcpy()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F0820);
+    lifted::original::c820F0820(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -286,7 +286,7 @@ bool AccessoriesAcquireNative(uint8_t* base) {
 // the accessory or 0.
 ITC_REGS_STEP(AccessoriesAcquire) {
   if (!AccessoriesAcquireNative(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_820F0EB8);
+    lifted::original::c820F0EB8(ctx, base);
     return;
   }
   const uint32_t set = ctx.r3.u32;
@@ -300,7 +300,7 @@ ITC_REGS_STEP(AccessoriesAcquire) {
 
 ITC_REGS_STEP(MatrixFromScaleRotationTranslation) {
   if (!native::Buffers_NativeMemcpy()) {
-    lifted::Sdk(ctx, base, __imp__sub_820EF660);
+    lifted::original::c820EF660(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();

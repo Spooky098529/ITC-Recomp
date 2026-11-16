@@ -3,6 +3,7 @@
 // steps the harness shares (hooks/tuning_machine.h).
 
 #include "hooks/tuning_machine.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -269,7 +270,7 @@ ITC_TUNING_MACHINE(821E7568, TuningMachineInit)
 ITC_NATIVE_ENTRY_ALWAYS(821E7368) {
   
   if (!ITC_FLAG(native_tuning_machine) || !hooks::TuningMachineStartNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_821E7368);
+    lifted::original::c821E7368(ctx, base);
     return;
   }
   hooks::TuningMachineStart(ctx, base);

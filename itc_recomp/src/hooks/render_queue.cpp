@@ -5,6 +5,7 @@
 // wrapped them before), around both paths.
 
 #include "hooks/render_queue.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "guest.h"
@@ -57,7 +58,7 @@ void hooks::NativeRenderQueueAdd(lifted::Regs& ctx, uint8_t* base) {
   const auto r3 = rq::Add(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.r1.u32,
                           RenderQueueCall(ctx, base));
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_8258EDC8);
+    lifted::original::c8258EDC8(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -81,7 +82,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82591540) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82591540);
+  lifted::original::c82591540(ctx, base);
 }
 
 void hooks::NativeRenderQueueReplay(lifted::Regs& ctx, uint8_t* base) {
@@ -111,7 +112,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258ED78) {
     ctx.fpscr.disableFlushMode();
     hooks::NativeRenderQueueClearRecording(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8258ED78);
+    lifted::original::c8258ED78(ctx, base);
   }
   debug::MenuSelectionScan_After(base, "call", 0x8258ED78);
 }
@@ -123,7 +124,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258E5E0) {
   if (ITC_FLAG(native_render_queue)) {
     rq::Flip(base, ctx.r3.u32);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8258E5E0);
+    lifted::original::c8258E5E0(ctx, base);
   }
   debug::MenuSelectionScan_After(base, "call", 0x8258E5E0);
 }

@@ -6,6 +6,7 @@
 // on render-only passes. Found with --find_per_frame_state.
 
 #include "game_messages.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "guest.h"
 #include "frame_pacer.h"
@@ -88,7 +89,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820DC958) {
     hooks::CarDrawBlinkTimersAdvance(ctx, base);
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_820DC958);
+  lifted::original::c820DC958(ctx, base);
 }
 
 // Texture animations (sub_820F11A8, from the draw step part sub_820F6068):
@@ -106,7 +107,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F11A8) {
     ctx.r3.u64 = course_scenery::AdvanceTextureAnimations(base, ctx.r3.u32);
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_820F11A8);
+  lifted::original::c820F11A8(ctx, base);
 }
 
 // Minimap blink clock (sub_820F5740, from the draw step part sub_820F6068):
@@ -123,7 +124,7 @@ void MinimapDrawBody(lifted::Regs& ctx, uint8_t* base) {
     // (the caller's r24: diagnostic only, not carried)
     hooks::MinimapDraw(ctx, base, 0);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820F5740);
+    lifted::original::c820F5740(ctx, base);
   }
 }
 }  // namespace
@@ -156,7 +157,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82107910) {
   if (ITC_FLAG(native_modes_tick)) {
     hooks::ModesTickSteps(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_82107910);
+    lifted::original::c82107910(ctx, base);
   }
 }
 
@@ -697,7 +698,7 @@ void PerFrameLogic_RecordWorldSprites(uint8_t* base, uint32_t list,
 namespace {
 ITC_REGS_STEP(RecordSpriteList) {
   if (!ITC_FLAG(native_world_sprites)) {
-    lifted::Sdk(ctx, base, __imp__sub_82128750);
+    lifted::original::c82128750(ctx, base);
     return;
   }
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
@@ -708,7 +709,7 @@ ITC_REGS_STEP(RecordSpriteList) {
 }
 ITC_REGS_STEP(RecordSprite) {
   if (!ITC_FLAG(native_world_sprites)) {
-    lifted::Sdk(ctx, base, __imp__sub_821281A8);
+    lifted::original::c821281A8(ctx, base);
     return;
   }
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
@@ -765,7 +766,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A3978) {
   // The work natively (src/cameras/cameras.cpp, --native_cameras) or
   // translated.
   if (!hooks::CameraPassUpdate(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_820A3978);
+    lifted::original::c820A3978(ctx, base);
   }
 }
 

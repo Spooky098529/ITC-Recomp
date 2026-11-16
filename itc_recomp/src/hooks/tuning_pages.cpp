@@ -4,6 +4,7 @@
 // recompiled and call these, so the adapters stay.
 
 #include "hooks/tuning_pages.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -392,7 +393,7 @@ ITC_REGS_STEP(TuningPagesSetCurrentChoice) {
 
 ITC_REGS_STEP(TuningPagesUpdateImages) {
   if (!NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_821FE628);
+    lifted::original::c821FE628(ctx, base);
     return;
   }
   const uint64_t images = ctx.r3.u64;
@@ -404,7 +405,7 @@ ITC_REGS_STEP(TuningPagesUpdateImages) {
 
 ITC_REGS_STEP(TuningPagesUnloadAll) {
   if (!NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82208738);
+    lifted::original::c82208738(ctx, base);
     return;
   }
   const uint64_t images = ctx.r3.u64;

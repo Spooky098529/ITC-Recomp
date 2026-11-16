@@ -18,6 +18,7 @@
 // through the codecs' vtables and the DXT codec's +144 stay.
 
 #include "hooks/texture_compression.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -82,7 +83,7 @@ ITC_REGS_STEP(TextureCompressionDecodeA8R8G8B8Row) {
   const auto r3 =
       tc::DecodeA8R8G8B8Row(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_823F2620);
+    lifted::original::c823F2620(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -107,7 +108,7 @@ tc::GuestCall TextureCompressionGuestCall(lifted::Regs& ctx, uint8_t* base) {
 
 ITC_REGS_STEP(TextureCompressionDxtEncodeRow) {
   if (!NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_823F6298);
+    lifted::original::c823F6298(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -117,7 +118,7 @@ ITC_REGS_STEP(TextureCompressionDxtEncodeRow) {
   const auto r3 = tc::DxtEncodeRow(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                    ctx.r1.u32, call);
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_823F6298);
+    lifted::original::c823F6298(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -139,11 +140,11 @@ void DeleteWith(lifted::Regs& ctx, uint8_t* base,
 }  // namespace
 
 ITC_REGS_STEP(TextureCompressionImageCodecDelete) {
-  DeleteWith(ctx, base, tc::ImageCodecDelete, __imp__sub_823F6B70);
+  DeleteWith(ctx, base, tc::ImageCodecDelete, lifted::original::c823F6B70);
 }
 
 ITC_REGS_STEP(TextureCompressionDxtCodecDelete) {
-  DeleteWith(ctx, base, tc::DxtCodecDelete, __imp__sub_823F6BC0);
+  DeleteWith(ctx, base, tc::DxtCodecDelete, lifted::original::c823F6BC0);
 }
 
 }  // namespace hooks

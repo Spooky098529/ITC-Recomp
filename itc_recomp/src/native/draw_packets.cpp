@@ -167,11 +167,11 @@ void LogCheck() {
         dropped;                                                                          \
         return;                                                                           \
       }                                                                                   \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                       \
+      lifted::original::c##address(ctx, base);                                       \
       return;                                                                             \
     }                                                                                     \
     native::Checked(helper, base, ctx.r3.u32,                                             \
-                    [&] { lifted::Sdk(ctx, base, __imp__sub_##address); });               \
+                    [&] { lifted::original::c##address(ctx, base); });               \
   }
 
 NATIVE_CHECKED_HELPER(822AE1D0, native::kConstants, , ITC_NATIVE_RUNNING("sub_822AE1D0 (dropped)"))

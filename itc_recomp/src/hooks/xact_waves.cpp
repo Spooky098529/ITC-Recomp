@@ -195,7 +195,7 @@ ITC_REGS_STEP(XactTrackGetVolume) {
     ctx.r3.u64 = done->r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_825D0268);
+  lifted::original::c825D0268(ctx, base);
 }
 
 ITC_REGS_STEP(XactTrackGetPitch) {
@@ -211,7 +211,7 @@ ITC_REGS_STEP(XactWaveGetStartPosition) {
     ctx.r3.s64 = int32_t(*done);  // li or lis, as the original's
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_825D2170);
+  lifted::original::c825D2170(ctx, base);
 }
 
 ITC_REGS_STEP(XactWaveRequestNext) {
@@ -331,7 +331,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825C31D8) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                \
     \
     if (!ITC_FLAG(native_xact_waves) || !hooks::NativeHeapActive()) { \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                   \
+      lifted::original::c##address(ctx, base);                   \
       return;                                                         \
     }                                                                 \
     hooks::step(ctx, base);                                           \

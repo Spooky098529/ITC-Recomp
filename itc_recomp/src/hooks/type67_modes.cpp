@@ -5,6 +5,7 @@
 // their adapters stay.
 
 #include "hooks/type67_modes.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -434,7 +435,7 @@ struct PanelNew {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
     ctx.r1.u64 = frame;
     ctx.r3.u64 = size;
-    lifted::Sdk(ctx, p->base, __imp__sub_825A6880);
+    lifted::Sdk(ctx, p->base, lifted::original::c825A6880);
     const uint32_t block = ctx.r3.u32;
     ctx.r1.u64 = stack;
     ctx.lr = link;
@@ -456,9 +457,9 @@ void ModeInit(lifted::Regs& ctx, uint8_t* base, bool type7) {
       ctx.lr = type7 ? 0x82246CE4 : 0x822368D4;
       ctx.r3.u64 = block;
       if (type7) {
-        lifted::Sdk(ctx, base, __imp__sub_82246B28);
+        lifted::original::c82246B28(ctx, base);
       } else {
-        lifted::Sdk(ctx, base, __imp__sub_822366F0);
+        lifted::original::c822366F0(ctx, base);
       }
       ctx.r1.u64 = stack;
       ctx.lr = link;
@@ -919,7 +920,7 @@ ITC_TYPE67_MODES(822470A8, Type67Init, 0x822470A8)
   ITC_NATIVE_ENTRY_ALWAYS(address) {                              \
     \
     if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive()) { \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                 \
+      lifted::original::c##address(ctx, base);                 \
       return;                                                       \
     }                                                               \
     hooks::step(ctx, base);                                         \
@@ -932,7 +933,7 @@ ITC_TYPE67_MODES(822470A8, Type67Init, 0x822470A8)
     \
     if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||     \
         !hooks::step(ctx, base)) {                                          \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                         \
+      lifted::original::c##address(ctx, base);                         \
     }                                                                       \
   }
 
@@ -1038,7 +1039,7 @@ ITC_TYPE67_MODES(82242218, Type7DialogUpdate)
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                          \
     \
     if (!ITC_FLAG(native_type67_modes) || !hooks::Type67TextsNative(base)) {    \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                             \
+      lifted::original::c##address(ctx, base);                             \
       return;                                                                   \
     }                                                                           \
     hooks::step(ctx, base);                                                     \
@@ -1123,7 +1124,7 @@ ITC_TYPE67_MODES(821808F0, GarageStageCameraCommand)
 ITC_NATIVE_ENTRY_ALWAYS(82236880) {
   
   if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82236880);
+    lifted::original::c82236880(ctx, base);
     return;
   }
   hooks::Type6ModeInit(ctx, base);
@@ -1131,7 +1132,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82236880) {
 ITC_NATIVE_ENTRY_ALWAYS(82246C90) {
   
   if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82246C90);
+    lifted::original::c82246C90(ctx, base);
     return;
   }
   hooks::Type7ModeInit(ctx, base);
@@ -1142,7 +1143,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82180B00) {
   
   if (!ITC_FLAG(native_type67_modes) || !hooks::NativeHeapActive() ||
       !hooks::NativeArchiveQueue()) {
-    lifted::Sdk(ctx, base, __imp__sub_82180B00);
+    lifted::original::c82180B00(ctx, base);
     return;
   }
   hooks::StandSceneCreate(ctx, base);

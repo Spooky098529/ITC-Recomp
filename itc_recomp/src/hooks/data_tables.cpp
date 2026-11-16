@@ -7,6 +7,7 @@
 // callbacks).
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -31,7 +32,7 @@ ITC_FLAG_BOOL(native_data_tables, true, "ITC",
 #define ITC_DATA_TABLES_FALLBACK(address)  \
   REX_FUNC_PROLOGUE();                     \
   if (!ITC_FLAG(native_data_tables)) {     \
-    lifted::Sdk(ctx, base, __imp__sub_##address); \
+    lifted::original::c##address(ctx, base); \
     return;                                \
   }
 
@@ -93,7 +94,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82116DB0) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82116DB0);
+  lifted::original::c82116DB0(ctx, base);
 }
 
 // DataTables::Load: the loads through the archive's queue's plain C++.
@@ -103,7 +104,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82117240) {
     return;
   }
   if (!ITC_FLAG(native_data_tables) || !hooks::NativeArchiveQueue()) {
-    lifted::Sdk(ctx, base, __imp__sub_82117240);
+    lifted::original::c82117240(ctx, base);
     return;
   }
   hooks::SetArchiveSerial(ctx, Load(base, hooks::NativeArchiveLoad(base)));

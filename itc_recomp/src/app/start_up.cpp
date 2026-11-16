@@ -73,10 +73,8 @@ lifted::Result StartUp(uint8_t* base, const lifted::Args& in) {
 }  // namespace
 }  // namespace app
 
-extern "C" REX_FUNC(xstart) {
-  if (!ITC_FLAG(native_start_up)) {
-    __imp__xstart(ctx, base);
-    return;
-  }
-  lifted::Enter(ctx, base, app::StartUp);
-}
+// The kernel starts the game's main thread here (one of its entries: "The
+// kernel's entries" in docs/rexglue-removal.md). (--native_start_up once
+// chose the recompiled xstart instead; there's no recompiled code since the
+// rewiring's stage 5.)
+extern "C" REX_FUNC(xstart) { lifted::Enter(ctx, base, app::StartUp); }

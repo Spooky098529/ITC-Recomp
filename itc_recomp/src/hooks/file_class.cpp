@@ -8,6 +8,7 @@
 // See B4 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "guest_call.h"
 
@@ -55,7 +56,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C688) {
   if (!relative) {
     ITC_LOG_WARN("file class: \"{}\" isn't game data: opened by the recompiled File::OpenRead",
                  path);
-    lifted::Sdk(ctx, base, __imp__sub_8258C688);
+    lifted::original::c8258C688(ctx, base);
     return;
   }
   if (guest::LoadU32(base, file + 4) != kClosed) {
@@ -84,7 +85,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C820) {
   const uint32_t file = ctx.r3.u32, buffer = ctx.r4.u32;
   const uint32_t handle = guest::LoadU32(base, file + 4);
   if (!game_data::IsHandle(handle)) {
-    lifted::Sdk(ctx, base, __imp__sub_8258C820);
+    lifted::original::c8258C820(ctx, base);
     return;
   }
   const uint32_t size = guest::LoadU32(base, ctx.r5.u32);
@@ -116,7 +117,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C768) {
   const uint32_t file = ctx.r3.u32;
   const uint32_t handle = guest::LoadU32(base, file + 4);
   if (!game_data::IsHandle(handle)) {
-    lifted::Sdk(ctx, base, __imp__sub_8258C768);
+    lifted::original::c8258C768(ctx, base);
     return;
   }
   const int32_t offset = int32_t(guest::LoadU32(base, ctx.r4.u32));
@@ -140,7 +141,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C718) {
   const uint32_t file = ctx.r3.u32;
   const uint32_t handle = guest::LoadU32(base, file + 4);
   if (!game_data::IsHandle(handle)) {
-    lifted::Sdk(ctx, base, __imp__sub_8258C718);
+    lifted::original::c8258C718(ctx, base);
     return;
   }
   game_data::Close(handle);

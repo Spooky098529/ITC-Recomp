@@ -8,6 +8,7 @@
 // docs/title-screen.md.
 
 #include "title_screen.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "hooks/boot_mode.h"
@@ -75,7 +76,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822221A0) {
   if (hooks::TitleScreenNative()) {
     hooks::TitleScreenPressStart(ctx, base);  // src/title_screen/press_start.cpp
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_822221A0);
+    lifted::original::c822221A0(ctx, base);
   }
   if (after <= 0 || !title || guest::LoadU32(base, kTitleScreenPointer) != title) {
     return;
@@ -111,7 +112,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820988C8) {
   if (hooks::NativeFrameDriver()) {
     hooks::AppSceneUpdate(ctx, base);  // src/frame_driver/
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820988C8);
+    lifted::original::c820988C8(ctx, base);
   }
 }
 
@@ -131,7 +132,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82107C58) {
   if (hooks::BootModeNative()) {
     hooks::BootWaitForMovie(ctx, base, MovieFinishedEarly);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_82107C58);
+    lifted::original::c82107C58(ctx, base);
   }
   g_in_movie_wait = false;
 }
@@ -149,7 +150,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A4450) {
     ctx.r3.u64 = 1;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_820A4450);
+  lifted::original::c820A4450(ctx, base);
 }
 
 namespace hooks {

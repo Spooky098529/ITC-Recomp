@@ -16,6 +16,7 @@
 // Tire::InchUp sub_820C46B8) have none: only its plain C++ calls them.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -43,7 +44,7 @@ using namespace car_specs;
 #define ITC_CAR_SPECS_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                  \
   if (!ITC_FLAG(native_car_specs)) {    \
-    lifted::Sdk(ctx, base, __imp__sub_##address); \
+    lifted::original::c##address(ctx, base); \
     return;                             \
   }
 
@@ -123,7 +124,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820C9E00) {
       parts[i] = guest::LoadU32(base, ctx.r4.u32 + 4 * i);             \
     }                                                                  \
     if (!function(base, ctx.r3.u32, parts, ctx.r5.s32)) {              \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                    \
+      lifted::original::c##address(ctx, base);                    \
       return;                                                          \
     }                                                                  \
     ctx.fpscr.disableFlushMode();                                      \
@@ -149,7 +150,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820C4998) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3;
   if (!CarRefresh(base, ctx.r3.u32, &r3)) {
-    lifted::Sdk(ctx, base, __imp__sub_820C4998);
+    lifted::original::c820C4998(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;
@@ -166,7 +167,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820C9960) {
     return;
   }
   if (!ITC_FLAG(native_car_specs) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820C9960);
+    lifted::original::c820C9960(ctx, base);
     return;
   }
   uint32_t tocs[12];
@@ -175,7 +176,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820C9960) {
   }
   uint32_t r3;
   if (!ParamsInit(base, tocs, &r3)) {
-    lifted::Sdk(ctx, base, __imp__sub_820C9960);
+    lifted::original::c820C9960(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;
@@ -189,7 +190,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820CC2A8) {
     return;
   }
   if (!ITC_FLAG(native_car_specs) || !hooks::NativeArchiveQueue()) {
-    lifted::Sdk(ctx, base, __imp__sub_820CC2A8);
+    lifted::original::c820CC2A8(ctx, base);
     return;
   }
   hooks::SetArchiveSerial(ctx, ParamsLoad(base, hooks::NativeArchiveLoad(base)));

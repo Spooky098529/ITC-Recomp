@@ -3,6 +3,7 @@
 // (hooks/car_list.h).
 
 #include "hooks/car_list.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -398,7 +399,7 @@ ITC_CAR_LIST(8224B8D8, CarListCarPage)
 ITC_NATIVE_ENTRY_ALWAYS(8224C450) {
   
   if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {
-    lifted::Sdk(ctx, base, __imp__sub_8224C450);
+    lifted::original::c8224C450(ctx, base);
     return;
   }
   hooks::CarListStep17(ctx, base);
@@ -414,7 +415,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8224C450) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                                       \
     \
     if (!ITC_FLAG(native_car_list) || !hooks::CarMakersShowCarByIdCalleesNative(true)) {      \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                          \
+      lifted::original::c##address(ctx, base);                                          \
       return;                                                                                \
     }                                                                                        \
     hooks::step(ctx, base);                                                                  \

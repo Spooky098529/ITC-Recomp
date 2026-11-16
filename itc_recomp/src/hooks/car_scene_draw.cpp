@@ -89,7 +89,7 @@ ITC_REGS_STEP(CarSceneDrawVector16Insert) {
   const auto r3 =
       csd::Vector16Insert(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_82598648);
+    lifted::original::c82598648(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -99,7 +99,7 @@ ITC_REGS_STEP(CarSceneDrawVector16InsertN) {
   const auto r3 =
       csd::Vector16InsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_82598288);
+    lifted::original::c82598288(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -108,7 +108,7 @@ ITC_REGS_STEP(CarSceneDrawVector16InsertN) {
 ITC_REGS_STEP(CarSceneDrawVector16Allocate) {
   const auto r3 = csd::Vector16Allocate(base, ctx.r4.u32, ctx.r1.u32);
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_82598158);
+    lifted::original::c82598158(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -123,7 +123,7 @@ ITC_REGS_STEP(CarSceneDrawPerspective) {
   ctx.fpscr.disableFlushMode();
   if (!csd::Perspective(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64, ctx.f4.f64,
                         ctx.r1.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_825972A8);
+    lifted::original::c825972A8(ctx, base);
   }
 }
 
@@ -131,7 +131,7 @@ ITC_REGS_STEP(CarSceneDrawProjectorBuild) {
   ctx.fpscr.disableFlushMode();
   if (!csd::ProjectorBuild(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64,
                            ctx.f2.f64, ctx.f3.f64, ctx.f4.f64, ctx.r1.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82597610);
+    lifted::original::c82597610(ctx, base);
     return;
   }
   ctx.fpscr.enableFlushMode();
@@ -195,7 +195,7 @@ ITC_REGS_STEP(CarSceneDrawTextureProjectionFit) {
   if (!csd::TextureProjectionFit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64,
                                  ctx.f2.f64, ctx.f3.f64, ctx.f4.f64, ctx.f5.f64, ctx.r1.u32,
                                  push_back, &r3)) {
-    lifted::Sdk(ctx, base, __imp__sub_82598768);
+    lifted::original::c82598768(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;
@@ -262,7 +262,7 @@ car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(lifted::Regs& ctx, uint8_t*
     if (ITC_FLAG(native_car_draw)) {
       CarDrawUpdate(ctx, base);
     } else {
-      lifted::Sdk(ctx, base, __imp__sub_820DAC68);
+      lifted::original::c820DAC68(ctx, base);
     }
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
@@ -276,7 +276,7 @@ ITC_REGS_STEP(CarSceneDrawRoot) {
   if (!ITC_FLAG(native_models) || !ITC_FLAG(native_matrix_math) ||
       !ITC_FLAG(native_vehicle_accessors) || ITC_FLAG(log_overlay_uploads) ||
       ITC_FLAG(log_slot_callers) || ITC_FLAG(log_recording_by_pass)) {
-    lifted::Sdk(ctx, base, __imp__sub_820C5DE8);
+    lifted::original::c820C5DE8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();

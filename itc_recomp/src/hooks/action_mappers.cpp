@@ -4,6 +4,7 @@
 // their adapters stay until every caller is native.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "action_mappers/action_mappers.h"
@@ -36,7 +37,7 @@ ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
 #define ITC_MAPPERS_FALLBACK(address)       \
   REX_FUNC_PROLOGUE();                      \
   if (!ITC_FLAG(native_action_mappers)) {   \
-    lifted::Sdk(ctx, base, __imp__sub_##address); \
+    lifted::original::c##address(ctx, base); \
     return;                                 \
   }                                         \
   ctx.fpscr.disableFlushMode();
@@ -66,7 +67,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825924E0) {
   if (ITC_FLAG(native_action_mappers)) {
     ctx.r3.u64 = ListenerHeld(base, listener, mask);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_825924E0);
+    lifted::original::c825924E0(ctx, base);
   }
   if (frame_pacing::GameMessages_LogInputReads()) {
     frame_pacing::GameMessages_NoteInputRead(0x825924E0, caller, listener, mask,
@@ -79,7 +80,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CF10) {
   const uint32_t listener = ctx.r3.u32;
   const uint32_t mask = guest::LoadU32(base, ctx.r4.u32);
   if (!ITC_FLAG(native_action_mappers)) {
-    lifted::Sdk(ctx, base, __imp__sub_8258CF10);  // its call to sub_825924E0 is counted there
+    lifted::original::c8258CF10(ctx, base);  // its call to sub_825924E0 is counted there
     if (frame_pacing::GameMessages_LogInputReads()) {
       frame_pacing::GameMessages_NoteInputRead(0x8258CF10, caller, listener, mask,
                                                ctx.r3.u32 & 0xFF);
@@ -118,7 +119,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210C370) {
     ctx.r3.u64 = MapperUpdate(base, mapper, 0, &f1);
     ctx.f1.f64 = f1;
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8210C370);
+    lifted::original::c8210C370(ctx, base);
   }
   debug::PauseMenuLog_AfterMapperUpdate(base, mapper, caller, fired_before);
 }
@@ -135,7 +136,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210C370) {
     if (ITC_FLAG(native_action_mappers)) {                                     \
       ctx.r3.u64 = function(base, mapper, action);                             \
     } else {                                                                   \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                            \
+      lifted::original::c##address(ctx, base);                            \
     }                                                                          \
     debug::PauseMenuLog_NoteSlotRead(slot, mapper, action, caller,             \
                                      double(slot == 14 ? ctx.r3.u32 & 0xFFFF   \
@@ -162,7 +163,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210BA68) {
     ctx.r3.u64 = AnalogValue(base, mapper, action, &f1);
     ctx.f1.f64 = f1;
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8210BA68);
+    lifted::original::c8210BA68(ctx, base);
   }
   debug::PauseMenuLog_NoteSlotRead(5, mapper, action, caller, ctx.f1.f64);
 }
@@ -221,7 +222,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210AF08) {
         ctx.r3.u64 = mapper;
         ctx.r4.u64 = object;
         ctx.lr = 0x8210AF64;
-        lifted::Sdk(ctx, base, __imp__sub_8210B270);
+        lifted::original::c8210B270(ctx, base);
       }
       ClientListBoundCount(base, list, 2, 1);
     }
@@ -244,7 +245,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209F430) {
   uint32_t list = 0;
   if (!hooks::NativeHeapActive() || !MapperConstructKnown(base) ||
       !InitCreate(base, ctx.r3.u32, &list)) {
-    lifted::Sdk(ctx, base, __imp__sub_8209F430);
+    lifted::original::c8209F430(ctx, base);
     return;
   }
   const uint32_t index = ctx.r4.u32;

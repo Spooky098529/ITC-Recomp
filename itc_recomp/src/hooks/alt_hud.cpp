@@ -3,6 +3,7 @@
 // (hooks/alt_hud.h).
 
 #include "hooks/alt_hud.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "alt_hud/alt_hud.h"
@@ -85,7 +86,7 @@ ITC_REGS_STEP(AltHudMenuListRelease) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_8220BBB0);
+  lifted::original::c8220BBB0(ctx, base);
 }
 
 ITC_REGS_STEP(AltHudMenuListPressedX) {
@@ -197,7 +198,7 @@ ITC_REGS_STEP(AltHudDestroy) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82216BA8);
+  lifted::original::c82216BA8(ctx, base);
 }
 
 ITC_REGS_STEP(AltHudRunMovie) {

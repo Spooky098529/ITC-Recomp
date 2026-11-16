@@ -14,6 +14,7 @@
 // InsertUnique, ~UvMap) went once those callers were native.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -64,7 +65,7 @@ bool Native() { return ITC_FLAG(native_screen_objects) && hooks::NativeHeapActiv
 #define ITC_SCREEN_OBJECTS_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                       \
   if (!Native()) {                           \
-    lifted::Sdk(ctx, base, __imp__sub_##address); \
+    lifted::original::c##address(ctx, base); \
     return;                                  \
   }                                          \
   ctx.fpscr.disableFlushMode();
@@ -75,7 +76,7 @@ bool Native() { return ITC_FLAG(native_screen_objects) && hooks::NativeHeapActiv
 ITC_NATIVE_ENTRY_ALWAYS(82130198) {
   ITC_SCREEN_OBJECTS_FALLBACK(82130198)
   if (!so::CanAllocate(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82130198);
+    lifted::original::c82130198(ctx, base);
     return;
   }
   so::MapConstruct(base, ctx.r3.u32);
@@ -89,7 +90,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821329B8) {
   ITC_SCREEN_OBJECTS_FALLBACK(821329B8)
   const auto r3 = so::BuildRings(base, ctx.r3.u32, ctx.r1.u32);
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_821329B8);
+    lifted::original::c821329B8(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -166,7 +167,7 @@ ITC_REGS_STEP(ScreenObjectDestroy) {
 ITC_NATIVE_ENTRY_ALWAYS(82132FC8) {
   
   if (!Native() || !ITC_FLAG(native_video_output)) {
-    lifted::Sdk(ctx, base, __imp__sub_82132FC8);
+    lifted::original::c82132FC8(ctx, base);
     return;
   }
   hooks::ScreenObjectDestroy(ctx, base);

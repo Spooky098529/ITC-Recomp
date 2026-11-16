@@ -13,6 +13,7 @@
 // --native_audio=false brings back the SDK's driver, for comparison.
 
 #include "audio/native_audio.h"
+#include "lifted/originals.h"
 
 #include "audio/output_mix.h"
 #include "audio/render_driver.h"
@@ -453,7 +454,7 @@ using native_audio::g_system;
 // earlier handle first. Returns 0 (S_OK).
 ITC_NATIVE_ENTRY_ALWAYS(824657E0) {
   if (!g_system) {
-    lifted::Sdk(ctx, base, __imp__sub_824657E0);
+    lifted::original::c824657E0(ctx, base);
     return;
   }
   uint32_t object = ctx.r3.u32;
@@ -478,7 +479,7 @@ ITC_NATIVE_ENTRY_ALWAYS(824657E0) {
 // failure.
 ITC_NATIVE_ENTRY_ALWAYS(82465870) {
   if (!g_system) {
-    lifted::Sdk(ctx, base, __imp__sub_82465870);
+    lifted::original::c82465870(ctx, base);
     return;
   }
   uint32_t object = ctx.r3.u32;
@@ -507,6 +508,6 @@ ITC_NATIVE_ENTRY_ALWAYS(824658C8) {
   if (ITC_FLAG(native_render_driver)) {
     lifted_call::EnterR3<audio::RenderDriverDestroy>(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_824658C8);
+    lifted::original::c824658C8(ctx, base);
   }
 }

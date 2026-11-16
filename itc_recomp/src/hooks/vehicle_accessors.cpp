@@ -204,7 +204,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82593FC0) {
   }
   debug::FrameStateDiff_Before(base);
   if (!ITC_FLAG(native_vehicle_accessors)) {
-    lifted::Sdk(ctx, base, __imp__sub_82593FC0);
+    lifted::original::c82593FC0(ctx, base);
   } else {
     ctx.r3.u64 = ListAt(base, ctx.r3.u32, ctx.r4.u32);
   }

@@ -5,6 +5,7 @@
 // (src/frame_pacing/per_frame_logic.cpp), which runs them.
 
 #include "hooks/minimap.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -65,7 +66,7 @@ ITC_REGS_STEP(MinimapSetListPoint) {
 ITC_REGS_STEP(MinimapRacerMarkerType) {
   const auto type = minimap::RacerMarkerType(base, ctx.r3.u32, ctx.r4.s32);
   if (!type) {
-    lifted::Sdk(ctx, base, __imp__sub_820F2D28);
+    lifted::original::c820F2D28(ctx, base);
     return;
   }
   ctx.r3.s64 = *type;
@@ -73,7 +74,7 @@ ITC_REGS_STEP(MinimapRacerMarkerType) {
 
 ITC_REGS_STEP(MinimapScaling) {
   if (!minimap::Scaling(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820F2EF8);
+    lifted::original::c820F2EF8(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32;
@@ -90,7 +91,7 @@ ITC_REGS_STEP(MinimapList80Insert) {
 
 ITC_REGS_STEP(MinimapList80Copy) {
   if (!minimap::List80Copy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820F51A8);
+    lifted::original::c820F51A8(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32;
@@ -99,13 +100,13 @@ ITC_REGS_STEP(MinimapList80Copy) {
 ITC_REGS_STEP(MinimapRecordTransform) {
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
       ITC_FLAG(log_recording_by_pass)) {
-    lifted::Sdk(ctx, base, __imp__sub_8217AEA8);
+    lifted::original::c8217AEA8(ctx, base);
     return;
   }
   const auto slot = minimap::RecordTransform(base, ctx.r3.u32, ctx.r4.u32,
                                              ctx.r1.u32 - minimap::kTransformProduct);
   if (!slot) {
-    lifted::Sdk(ctx, base, __imp__sub_8217AEA8);
+    lifted::original::c8217AEA8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -115,14 +116,14 @@ ITC_REGS_STEP(MinimapRecordTransform) {
 ITC_REGS_STEP(MinimapTriangleRecordFlat) {
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
       ITC_FLAG(log_recording_by_pass)) {
-    lifted::Sdk(ctx, base, __imp__sub_8217C370);
+    lifted::original::c8217C370(ctx, base);
     return;
   }
   const uint32_t key = ctx.r5.u32;
   const auto chunk = minimap::TriangleRecordFlat(
       base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - minimap::kRecordFlatFrame);
   if (!chunk) {
-    lifted::Sdk(ctx, base, __imp__sub_8217C370);
+    lifted::original::c8217C370(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;

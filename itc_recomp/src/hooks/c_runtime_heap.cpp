@@ -49,14 +49,14 @@ ITC_NATIVE_ENTRY_ALWAYS(825A9A90) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_825A9A90);
+  lifted::original::c825A9A90(ctx, base);
 }
 
 // free: r3 = block.
 ITC_NATIVE_ENTRY_ALWAYS(825A9B58) {
   
   if (!Native() || !memory::crt::Free(ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_825A9B58);
+    lifted::original::c825A9B58(ctx, base);
   }
 }
 
@@ -69,7 +69,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825AC320) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_825AC320);
+  lifted::original::c825AC320(ctx, base);
 }
 
 // realloc: r3 = block, r4 = size; returns the block.
@@ -81,7 +81,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825AEBC8) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_825AEBC8);
+  lifted::original::c825AEBC8(ctx, base);
 }
 
 // _msize: r3 = block; returns its size.
@@ -93,14 +93,14 @@ ITC_NATIVE_ENTRY_ALWAYS(825AED30) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_825AED30);
+  lifted::original::c825AED30(ctx, base);
 }
 
 // XMemAlloc: r3 = size, r4 = attributes; returns the block.
 ITC_NATIVE_ENTRY_ALWAYS(822976F8) {
   
   if (!Native()) {
-    lifted::Sdk(ctx, base, __imp__sub_822976F8);
+    lifted::original::c822976F8(ctx, base);
     return;
   }
   ctx.r3.u64 = memory::crt::XMemAlloc(base, ctx.r3.u32, ctx.r4.u32);
@@ -110,7 +110,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822976F8) {
 ITC_NATIVE_ENTRY_ALWAYS(82297790) {
   
   if (!Native()) {
-    lifted::Sdk(ctx, base, __imp__sub_82297790);
+    lifted::original::c82297790(ctx, base);
     return;
   }
   ctx.r3.u64 = memory::crt::XMemFree(ctx.r3.u32, ctx.r4.u32);
@@ -128,7 +128,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825A6880) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_825A6880);
+  lifted::original::c825A6880(ctx, base);
 }
 
 // operator new[]: r3 = size; returns the block.
@@ -140,7 +140,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825A6940) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_825A6940);
+  lifted::original::c825A6940(ctx, base);
 }
 
 // operator delete: r3 = block.
@@ -155,6 +155,6 @@ ITC_NATIVE_ENTRY_ALWAYS(825A70E8) {
 ITC_NATIVE_ENTRY_ALWAYS(825A71C0) {
   
   if (!Native() || !memory::crt::OperatorDeleteArray(ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_825A71C0);
+    lifted::original::c825A71C0(ctx, base);
   }
 }

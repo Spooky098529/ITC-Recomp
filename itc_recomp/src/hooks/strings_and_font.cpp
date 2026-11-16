@@ -21,6 +21,7 @@
 // originals leave that a caller could read (r3) are left the same.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -76,7 +77,7 @@ ITC_FLAG_DECLARE(bool, log_recording_by_pass);
 #define ITC_STRINGS_AND_FONT_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                         \
   if (!ITC_FLAG(native_strings_and_font)) {    \
-    lifted::Sdk(ctx, base, __imp__sub_##address);           \
+    lifted::original::c##address(ctx, base);           \
     return;                                    \
   }
 
@@ -99,7 +100,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210A538) {
   
   if (!ITC_FLAG(native_strings_and_font) || !hooks::NativeHeapActive() ||
       !StringsRelease(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_8210A538);
+    lifted::original::c8210A538(ctx, base);
   }
 }
 
@@ -125,7 +126,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210A490) {
   int32_t count;
   if (!Swprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 + 32, ctx.r1.u32 - 96 - 144 - 2336,
                 &count)) {
-    lifted::Sdk(ctx, base, __imp__sub_8210A490);
+    lifted::original::c8210A490(ctx, base);
     return;
   }
   ctx.r3.u64 = uint32_t(count);
@@ -274,7 +275,7 @@ void FontDraw(lifted::Regs& ctx, uint8_t* base, SetUp set_up) {
       ctx.r3.u64 = font;
       ctx.r4.u64 = text;
       ctx.r5.u64 = 0;
-      lifted::Sdk(ctx, base, __imp__sub_82109EF0);
+      lifted::original::c82109EF0(ctx, base);
     }
   });
   ctx.lr = lr;
@@ -288,14 +289,14 @@ void FontDraw(lifted::Regs& ctx, uint8_t* base, SetUp set_up) {
 ITC_NATIVE_ENTRY_ALWAYS(82109EF0) {
   ITC_STRINGS_AND_FONT_FALLBACK(82109EF0)
   if (ctx.r5.u32 != 0 || SlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_82109EF0);
+    lifted::original::c82109EF0(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;
   ctx.fpscr.disableFlushMode();
   if (!DrawPass(ctx, base, ctx.r3.u32, ctx.r4.u32)) {
     ctx.lr = lr;
-    lifted::Sdk(ctx, base, __imp__sub_82109EF0);
+    lifted::original::c82109EF0(ctx, base);
     return;
   }
   ctx.lr = lr;
@@ -305,7 +306,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82109EF0) {
 ITC_NATIVE_ENTRY_ALWAYS(8210A400) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210A400)
   if (guest::LoadU32(base, ctx.r4.u32 + 112) != 0 || SlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_8210A400);
+    lifted::original::c8210A400(ctx, base);
     return;
   }
   const uint32_t font = ctx.r3.u32;
@@ -324,11 +325,11 @@ ITC_NATIVE_ENTRY_ALWAYS(8210A758) {
     return;
   }
   if (!ITC_FLAG(native_strings_and_font)) {
-    lifted::Sdk(ctx, base, __imp__sub_8210A758);
+    lifted::original::c8210A758(ctx, base);
     return;
   }
   if (guest::LoadU32(base, ctx.r4.u32 + 112) != 0 || SlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_8210A758);
+    lifted::original::c8210A758(ctx, base);
     return;
   }
   FontDraw(ctx, base, [&](uint32_t params) { return TextDrawSetUp(base, params); });
@@ -345,7 +346,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82108860) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82108860);
+  lifted::original::c82108860(ctx, base);
 }
 
 // --- The loads ---
@@ -367,7 +368,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210A8D0) {
     return;  // a harness's (the race HUD object's)
   }
   if (!LoadsNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_8210A8D0);
+    lifted::original::c8210A8D0(ctx, base);
     return;
   }
   if (const auto last = StringsLoad(base, ctx.r3.u32, ctx.r4.u32, hooks::NativeArchiveLoad(base))) {
@@ -381,7 +382,7 @@ void hooks::TextLoadSteps(lifted::Regs& ctx, uint8_t* base) {
     guest_call::InFrame(ctx, base, 96, 0x8210AE14, [&](uint32_t) {
       ctx.r3.u64 = font;
       ctx.r4.u64 = mask;
-      lifted::Sdk(ctx, base, __imp__sub_82109498);  // Font::Load
+      lifted::original::c82109498(ctx, base);  // Font::Load
     });
   });
   hooks::SetArchiveSerial(ctx, r3);
@@ -394,7 +395,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210ADF8) {
     return;
   }
   if (!LoadsNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_8210ADF8);
+    lifted::original::c8210ADF8(ctx, base);
     return;
   }
   hooks::TextLoadSteps(ctx, base);

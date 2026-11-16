@@ -232,7 +232,7 @@ ITC_REGS_STEP(RaceWorldReleaseForStage) {
 ITC_REGS_STEP(RaceWorldResetWorld) {
   ctx.fpscr.disableFlushMode();
   if (!NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82170668);
+    lifted::original::c82170668(ctx, base);
     return;
   }
   rw::ResetWorld(base, ctx.r3.u32, ctx.r1.u32 - 128, Originals(ctx, base));
@@ -241,7 +241,7 @@ ITC_REGS_STEP(RaceWorldResetWorld) {
 ITC_REGS_STEP(RaceWorldResetVehicles) {
   ctx.fpscr.disableFlushMode();
   if (!NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82171718);
+    lifted::original::c82171718(ctx, base);
     return;
   }
   const uint32_t frame = ctx.r1.u32 - 224;
@@ -252,7 +252,7 @@ ITC_REGS_STEP(RaceWorldResetVehicles) {
 ITC_REGS_STEP(RaceWorldUnload) {
   ctx.fpscr.disableFlushMode();
   if (!NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82171250);
+    lifted::original::c82171250(ctx, base);
     return;
   }
   rw::Unload(base, ctx.r1.u32 - 112, Originals(ctx, base));
@@ -413,7 +413,7 @@ rw::StartCalls StartCalls(lifted::Regs& ctx, uint8_t* base, uint32_t setup_frame
 ITC_REGS_STEP(RaceWorldOnLoaded) {
   ctx.fpscr.disableFlushMode();
   if (!NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82173A90);
+    lifted::original::c82173A90(ctx, base);
     return;
   }
   const uint32_t frame = ctx.r1.u32 - 352;
@@ -582,7 +582,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821743A8) {
     lifted::Sdk(ctx, base, hooks::g_recorded_stand_in);
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_821743A8);
+  lifted::original::c821743A8(ctx, base);
 }
 // RaceManager::GiveVehicle (sub_821706E8, never seen in play): the harness's
 // stand-in while it's set (hooks::g_give_vehicle_stand_in); else its plain
@@ -594,7 +594,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821706E8) {
     return;
   }
   if (!ITC_FLAG(native_race_world)) {
-    lifted::Sdk(ctx, base, __imp__sub_821706E8);
+    lifted::original::c821706E8(ctx, base);
     return;
   }
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {

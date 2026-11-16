@@ -4265,7 +4265,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CAA0) {
     ctx.r9.u64 = count << 4;
     ctx.r3.u64 = first;
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8258CAA0);
+    lifted::original::c8258CAA0(ctx, base);
   }
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
       ITC_FLAG(log_recording_by_pass)) [[unlikely]] {
@@ -4289,7 +4289,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A0AC0) {
     ctx.fpscr.disableFlushMode();
     matrix_math::Copy(base, dst, src);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820A0AC0);
+    lifted::original::c820A0AC0(ctx, base);
   }
   interpolation::GetDrawState().OnCopy(base, dst, src, caller);
 }
@@ -4345,7 +4345,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209C6E0) {
   }
   uint32_t pass = guest::LoadU32(base, ctx.r3.u32);
   interpolation::GetDrawState().BeforeBillboards(base, pass);
-  lifted::Sdk(ctx, base, __imp__sub_8209C6E0);
+  lifted::original::c8209C6E0(ctx, base);
   interpolation::GetDrawState().AfterBillboards(base);
 }
 
@@ -4368,7 +4368,7 @@ void interpolation::BlendState_TakeReplayTimes(int64_t& blend_ns, int64_t& uploa
 namespace {
 ITC_REGS_STEP(SetShaderConstants) {
   if (!ITC_FLAG(native_replay_commands)) {
-    lifted::Sdk(ctx, base, __imp__sub_8258FD48);
+    lifted::original::c8258FD48(ctx, base);
     return;
   }
   const uint32_t payload = ctx.r3.u32, count = ctx.r4.u32, packed = ctx.r5.u32;
@@ -4411,7 +4411,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825953D0) {
   // The recording natively (src/scenery_lists/model_draws.cpp,
   // --native_scenery_lists) or translated.
   if (!hooks::SceneryListsRecordObject(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_825953D0);
+    lifted::original::c825953D0(ctx, base);
   }
   interpolation::g_record_context = {};
   interpolation::BlendState_AfterRecordObject(base);

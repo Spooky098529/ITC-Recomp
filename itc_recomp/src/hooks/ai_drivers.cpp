@@ -260,7 +260,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8213ADF8) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_8213ADF8);
+  lifted::original::c8213ADF8(ctx, base);
 }
 
 // --- Resets, steering input and the path's lists ---
@@ -359,7 +359,7 @@ void hooks::AiUpdateAll(lifted::Regs& ctx, uint8_t* base) {
     return;
   }
   if (!ITC_FLAG(native_ai_drivers)) {
-    lifted::Sdk(ctx, base, __imp__sub_82139628);
+    lifted::original::c82139628(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -438,7 +438,7 @@ void hooks::AiDriveCar(lifted::Regs& ctx, uint8_t* base) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_8215F678);
+  lifted::original::c8215F678(ctx, base);
 }
 ITC_NATIVE_ENTRY_ALWAYS(8215F678) {
   
@@ -461,7 +461,7 @@ void hooks::AiUpdateIdle(lifted::Regs& ctx, uint8_t* base) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_821399A8);
+  lifted::original::c821399A8(ctx, base);
 }
 ITC_NATIVE_ENTRY_ALWAYS(821399A8) {
   

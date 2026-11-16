@@ -126,7 +126,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82128E70) {
 ITC_NATIVE_ENTRY_ALWAYS(82129280) {
   
   if (!ITC_FLAG(native_sprites) || SlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_82129280);
+    lifted::original::c82129280(ctx, base);
     return;
   }
   // (r11 and cr6 as the original leaves them: leftovers for recompiled

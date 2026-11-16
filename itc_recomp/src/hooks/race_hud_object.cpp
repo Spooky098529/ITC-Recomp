@@ -3,6 +3,7 @@
 // shares (hooks/race_hud_object.h).
 
 #include "hooks/race_hud_object.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 
@@ -409,7 +410,7 @@ ITC_REGS_STEP(RaceHudObjectScreensInit) {
 
 ITC_REGS_STEP(RaceHudObjectScreensCreate) {
   if (!NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82211F40);
+    lifted::original::c82211F40(ctx, base);
     return;
   }
   GuestCalls guest(ctx, base);
@@ -418,7 +419,7 @@ ITC_REGS_STEP(RaceHudObjectScreensCreate) {
 
 ITC_REGS_STEP(RaceHudObjectScreensDestruct) {
   if (!NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82211B98);
+    lifted::original::c82211B98(ctx, base);
     return;
   }
   GuestCalls guest(ctx, base);
@@ -427,7 +428,7 @@ ITC_REGS_STEP(RaceHudObjectScreensDestruct) {
 
 ITC_REGS_STEP(RaceHudObjectScreensDestroy) {
   if (!NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82211D18);
+    lifted::original::c82211D18(ctx, base);
     return;
   }
   GuestCalls guest(ctx, base);

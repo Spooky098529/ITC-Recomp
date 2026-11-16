@@ -6,6 +6,7 @@
 // Time::Clamp (recompiled).
 
 #include "hooks/achievements.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "achievements/achievements.h"
@@ -111,7 +112,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82294E58) {
     return;
   }
   if (!ITC_FLAG(native_achievements)) {
-    lifted::Sdk(ctx, base, __imp__sub_82294E58);
+    lifted::original::c82294E58(ctx, base);
     return;
   }
   hooks::WriteAchievementsSteps(ctx, base);

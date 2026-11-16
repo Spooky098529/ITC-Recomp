@@ -4,6 +4,7 @@
 // their callers are native.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -26,7 +27,7 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
 #define ITC_SOUND_FALLBACK(address)        \
   REX_FUNC_PROLOGUE();                     \
   if (!ITC_FLAG(native_sound_cues)) {      \
-    lifted::Sdk(ctx, base, __imp__sub_##address);       \
+    lifted::original::c##address(ctx, base);       \
     return;                                \
   }                                        \
   ctx.fpscr.disableFlushMode();
@@ -53,7 +54,7 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
     ITC_SOUND_FALLBACK(address)                                          \
     uint32_t result = 0;                                                 \
     if (!function(base, ctx.r3.u32, ctx.r4.u32, &result)) {              \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                   \
+      lifted::original::c##address(ctx, base);                                   \
       return;                                                            \
     }                                                                    \
     ctx.r3.u64 = result;                                                 \
@@ -102,7 +103,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82118720) {
   ITC_SOUND_FALLBACK(82118720)
   uint32_t copy = 0;
   if (!hooks::NativeHeapActive() || !DelegateClone(base, ctx.r3.u32, &copy)) {
-    lifted::Sdk(ctx, base, __imp__sub_82118720);
+    lifted::original::c82118720(ctx, base);
     return;
   }
   ctx.r3.u64 = copy;
@@ -120,7 +121,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821194A0) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_821194A0);
+  lifted::original::c821194A0(ctx, base);
 }
 
 ITC_SOUND_WORD(82480710, X3DAudioInitialize(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32))
@@ -136,7 +137,7 @@ ITC_SOUND_WORD(8259CE10, AudioEngineStart3D(base, ctx.r3.u32))
     ITC_SOUND_FALLBACK(address)                                           \
     uint32_t r3 = 0;                                                      \
     if (!hooks::NativeHeapActive() || !function(base, ctx.r3.u32, &r3)) { \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                    \
+      lifted::original::c##address(ctx, base);                                    \
       return;                                                             \
     }                                                                     \
     ctx.r3.u64 = r3;                                                      \

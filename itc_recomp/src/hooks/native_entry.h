@@ -7,9 +7,9 @@
 //     ctx.r3.u64 = uint32_t(ContactOtherObject(base, ctx.r3.u32));
 //   }
 //
-// defines the entry and registers it under the address with the flag that
-// turns it on (off: lifted::Call runs the recompiled original through the
-// SDK, until the flags' fallbacks go in stage 5). No override in the SDK's
+// defines the entry and registers it under the address. The flag that once
+// turned it on (off: the recompiled original) is no longer read: there's no
+// recompiled code since the rewiring's stage 5. No override in the SDK's
 // function table since stage 4: native code reaches it through the
 // dispatch table (lifted::Call).
 #pragma once
@@ -48,13 +48,7 @@
 // table, which unpacks the context into the entry (lifted::Enter).
 #define ITC_KERNEL_ENTRY(address, flag)                                                  \
   ITC_NATIVE_ENTRY_DEFINE(address, &(flag))                                              \
-  extern "C" REX_FUNC(sub_##address) {                                                   \
-    if (!(flag)) {                                                                       \
-      __imp__sub_##address(ctx, base);                                                   \
-      return;                                                                            \
-    }                                                                                    \
-    lifted::Enter(ctx, base, itc_entry_##address);                                       \
-  }                                                                                      \
+  extern "C" REX_FUNC(sub_##address) { lifted::Enter(ctx, base, itc_entry_##address); }  \
   ITC_NATIVE_ENTRY_BODY(address)
 
 #define ITC_KERNEL_ENTRY_ALWAYS(address)                                                 \

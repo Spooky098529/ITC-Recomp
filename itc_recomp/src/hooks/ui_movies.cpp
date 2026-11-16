@@ -158,7 +158,7 @@ bool RecordQuad(lifted::Regs& ctx, uint8_t* base, bool textured, uint32_t return
 ITC_NATIVE_ENTRY_ALWAYS(8259DAD0) {
   
   if (!RecordQuad(ctx, base, true, 0x8259E090)) {
-    lifted::Sdk(ctx, base, __imp__sub_8259DAD0);
+    lifted::original::c8259DAD0(ctx, base);
   }
 }
 
@@ -166,7 +166,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8259DAD0) {
 ITC_NATIVE_ENTRY_ALWAYS(8259E098) {
   
   if (!RecordQuad(ctx, base, false, 0x8259E618)) {
-    lifted::Sdk(ctx, base, __imp__sub_8259E098);
+    lifted::original::c8259E098(ctx, base);
   }
 }
 
@@ -178,7 +178,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8259D7B0) {
   if (!ITC_FLAG(native_ui_movies) || SlotDiagnostics() ||
       !ui_movies::ChunksFit(base, list,
                             {ui_movies::kResetChunkSlots, ui_movies::kResetChunkSlots})) {
-    lifted::Sdk(ctx, base, __imp__sub_8259D7B0);
+    lifted::original::c8259D7B0(ctx, base);
     return;
   }
   const uint32_t key = ctx.r3.u32;
@@ -218,7 +218,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8259EBE8) {
     return;
   }
   if (!ITC_FLAG(native_ui_movies)) {
-    lifted::Sdk(ctx, base, __imp__sub_8259EBE8);
+    lifted::original::c8259EBE8(ctx, base);
     return;
   }
   const uint32_t quad = ctx.r3.u32, key = ctx.r4.u32;
@@ -270,13 +270,13 @@ void BuildAndRecord(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes,
 
 ITC_REGS_STEP(DrawPicture) {
   if (!ITC_FLAG(native_ui_movies)) {
-    lifted::Sdk(ctx, base, __imp__sub_8259ED40);
+    lifted::original::c8259ED40(ctx, base);
     return;
   }
   // Without a texture the original faults (its size read at guest address
   // 4; never so in play): it's left to run.
   if (ui_movies::PictureTextureOf(base, ctx.r3.u32, ctx.r5.u32) == 0) {
-    lifted::Sdk(ctx, base, __imp__sub_8259ED40);
+    lifted::original::c8259ED40(ctx, base);
     return;
   }
   RecordPicture(ctx, base);
@@ -291,7 +291,7 @@ ITC_REGS_STEP(RecordPicture) {
 
 ITC_REGS_STEP(DrawPrimitive) {
   if (!ITC_FLAG(native_ui_movies)) {
-    lifted::Sdk(ctx, base, __imp__sub_8259F348);
+    lifted::original::c8259F348(ctx, base);
     return;
   }
   RecordPrimitive(ctx, base);
@@ -342,7 +342,7 @@ uint32_t CallFromWalk(void* user, ui_movies::DrawCall kind, uint32_t context, ui
 
 ITC_REGS_STEP(Draw) {
   if (!ITC_FLAG(native_ui_movies)) {
-    lifted::Sdk(ctx, base, __imp__sub_8259FA00);
+    lifted::original::c8259FA00(ctx, base);
     return;
   }
   ITC_NATIVE_RUNNING("sub_8259FA00 UiMovie::Draw");
@@ -364,7 +364,7 @@ ITC_REGS_STEP(RecordDrawNode) {
 
 ITC_REGS_STEP(ResetAfterMovie) {
   if (!ITC_FLAG(native_ui_movies)) {
-    lifted::Sdk(ctx, base, __imp__sub_8259DAC0);
+    lifted::original::c8259DAC0(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r4.u64;
@@ -375,7 +375,7 @@ ITC_REGS_STEP(ResetAfterMovie) {
 
 ITC_REGS_STEP(RestorePose) {
   if (!ITC_FLAG(native_ui_movies)) {
-    lifted::Sdk(ctx, base, __imp__sub_82119B80);
+    lifted::original::c82119B80(ctx, base);
     return;
   }
   ctx.r3.u64 = ui_movies::RestorePose(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -433,7 +433,7 @@ ITC_REGS_STEP(ApplyTrackNative) {
 
 ITC_REGS_STEP(ApplyTrack) {
   if (!ITC_FLAG(native_ui_movies) || !hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_825A0548);
+    lifted::original::c825A0548(ctx, base);
     return;
   }
   ApplyTrackNative(ctx, base);
@@ -485,7 +485,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825A08E0) {
     return;
   }
   if (!ITC_FLAG(native_ui_movies)) {
-    lifted::Sdk(ctx, base, __imp__sub_825A08E0);
+    lifted::original::c825A08E0(ctx, base);
     return;
   }
   ui_movies_hooks::ApplyAnimationNative(ctx, base);
@@ -513,7 +513,7 @@ bool ui_movies_hooks::UpdateCalleeStoodInOnView(uint32_t function, lifted::Regs&
 // return address after each call), the rest in src/ui_movies/update.cpp.
 void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_ui_movies)) {
-    lifted::Sdk(ctx, base, __imp__sub_8211D2F8);
+    lifted::original::c8211D2F8(ctx, base);
     return;
   }
   const uint32_t movie = ctx.r3.u32;

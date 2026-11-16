@@ -86,7 +86,7 @@ uint32_t High(uint64_t value) { return uint32_t(value >> 32); }
 ITC_REGS_STEP(AppMessagesErase) {
   if (!as::MessagesErase(base, ctx.r4.u32, High(ctx.r5.u64), ctx.r5.u32, High(ctx.r6.u64),
                          ctx.r6.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82092E70);
+    lifted::original::c82092E70(ctx, base);
     return;
   }
   REX_STORE_U64(ctx.r1.u32 + 32, ctx.r5.u64);
@@ -96,7 +96,7 @@ ITC_REGS_STEP(AppMessagesErase) {
 
 ITC_REGS_STEP(AppMessagesClear) {
   if (!as::MessagesClear(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82092F98);
+    lifted::original::c82092F98(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r1.u32 - 16;
@@ -109,7 +109,7 @@ ITC_REGS_STEP(AppMessagesAllocate) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82092B78);
+  lifted::original::c82092B78(ctx, base);
 }
 
 ITC_REGS_STEP(AppOpAllocateNodes) {
@@ -119,18 +119,18 @@ ITC_REGS_STEP(AppOpAllocateNodes) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820ACF10);
+  lifted::original::c820ACF10(ctx, base);
 }
 
 ITC_REGS_STEP(AppOpIncSize) {
   if (!as::OpIncSize(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820AD768);
+    lifted::original::c820AD768(ctx, base);
   }
 }
 
 ITC_REGS_STEP(AppListClear) {
   if (!Heap()) {
-    lifted::Sdk(ctx, base, __imp__sub_820ACF88);
+    lifted::original::c820ACF88(ctx, base);
     return;
   }
   ctx.r3.u64 = as::ListClear(base, ctx.r3.u32);
@@ -142,7 +142,7 @@ ITC_REGS_STEP(AppPtrListErase) {
     next = std_list::Erase(base, ctx.r4.u32, High(ctx.r5.u64), ctx.r5.u32);
   }
   if (!next) {
-    lifted::Sdk(ctx, base, __imp__sub_82098E80);
+    lifted::original::c82098E80(ctx, base);
     return;
   }
   const uint64_t result = (ctx.r5.u64 & 0xFFFFFFFF00000000ull) | *next;
@@ -157,7 +157,7 @@ ITC_REGS_STEP(AppDelegateClone) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820ACA48);
+  lifted::original::c820ACA48(ctx, base);
 }
 
 ITC_REGS_STEP(AppLayerIsEmpty) {
@@ -283,7 +283,7 @@ ITC_REGS_STEP(AppApplyRequest) {
     inserted = as::AppApplyRequest(base, ctx.r3.u32, type, ctx.r4.u32, High(ctx.r5.u64));
   }
   if (!inserted) {
-    lifted::Sdk(ctx, base, __imp__sub_82093BE0);
+    lifted::original::c82093BE0(ctx, base);
     return;
   }
   REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
@@ -324,7 +324,7 @@ void AddRequestStep(lifted::Regs& ctx, uint8_t* base, uint32_t type, uint32_t cl
       ctx.r3.u64 = vector;
       ctx.r4.u64 = request;
       ctx.lr = push_return;
-      lifted::Sdk(ctx, base, __imp__sub_8209A930);
+      lifted::original::c8209A930(ctx, base);
       return;
     }
     ctx.r3.u64 = *inserted ? frame - 16 : vector;
@@ -348,7 +348,7 @@ ITC_REGS_STEP(AppAddListener) {
 
 ITC_REGS_STEP(AppOpConstruct) {
   if (!Heap() || !as::OpConstruct(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820AD0B8);
+    lifted::original::c820AD0B8(ctx, base);
   }
 }
 
@@ -359,7 +359,7 @@ ITC_REGS_STEP(AppOpBuyNode) {
                          guest::LoadU32(base, ctx.r6.u32 + 4));
   }
   if (!node) {
-    lifted::Sdk(ctx, base, __imp__sub_820ACFF8);
+    lifted::original::c820ACFF8(ctx, base);
     return;
   }
   ctx.r3.u64 = *node;
@@ -367,7 +367,7 @@ ITC_REGS_STEP(AppOpBuyNode) {
 
 ITC_REGS_STEP(AppLayerPush) {
   if (!Heap() || !as::LayerPush(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820ADAD0);
+    lifted::original::c820ADAD0(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32 + as::kLayerOps;
@@ -376,7 +376,7 @@ ITC_REGS_STEP(AppLayerPush) {
 ITC_REGS_STEP(AppMessagesInsertN) {
   if (!Heap() || !as::MessagesInsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                       guest::LoadU32(base, ctx.r6.u32))) {
-    lifted::Sdk(ctx, base, __imp__sub_820938C0);
+    lifted::original::c820938C0(ctx, base);
     return;
   }
   REX_STORE_U64(ctx.r1.u32 + 24, ctx.r4.u64);
@@ -388,7 +388,7 @@ ITC_REGS_STEP(AppMessagesInsert) {
     where = as::MessagesInsert(base, ctx.r4.u32, High(ctx.r5.u64), ctx.r5.u32, ctx.r6.u32);
   }
   if (!where) {
-    lifted::Sdk(ctx, base, __imp__sub_82094110);
+    lifted::original::c82094110(ctx, base);
     return;
   }
   REX_STORE_U64(ctx.r1.u32 + 32, ctx.r5.u64);
@@ -402,7 +402,7 @@ ITC_REGS_STEP(AppMessagesPushBack) {
     inserted = as::MessagesPushBack(base, ctx.r3.u32, ctx.r4.u32);
   }
   if (!inserted) {
-    lifted::Sdk(ctx, base, __imp__sub_820944E0);
+    lifted::original::c820944E0(ctx, base);
     return;
   }
   if (*inserted) {
@@ -416,7 +416,7 @@ ITC_REGS_STEP(AppSendMessage) {
     inserted = as::AppSendMessage(base, ctx.r3.u32, ctx.r4.u32);
   }
   if (!inserted) {
-    lifted::Sdk(ctx, base, __imp__sub_82094AB0);
+    lifted::original::c82094AB0(ctx, base);
     return;
   }
   ctx.r3.u64 = *inserted ? ctx.r1.u32 - 16 : ctx.r3.u32 + as::kInterfaceMessages;
@@ -466,10 +466,10 @@ void LayerConstructStep(lifted::Regs& ctx, uint8_t* base, bool with_state,
 }  // namespace
 
 ITC_REGS_STEP(AppLayerConstruct) {
-  LayerConstructStep(ctx, base, false, __imp__sub_820AD118);
+  LayerConstructStep(ctx, base, false, lifted::original::c820AD118);
 }
 ITC_REGS_STEP(AppLayerConstructWithState) {
-  LayerConstructStep(ctx, base, true, __imp__sub_820ADBD8);
+  LayerConstructStep(ctx, base, true, lifted::original::c820ADBD8);
 }
 
 ITC_REGS_STEP(AppLayerAddChild) {
@@ -479,7 +479,7 @@ ITC_REGS_STEP(AppLayerAddChild) {
         as::LayerAddChild(base, layer, child, frame, calls);
         return true;
       })) {
-    lifted::Sdk(ctx, base, __imp__sub_820ADA08);
+    lifted::original::c820ADA08(ctx, base);
     return;
   }
   ctx.r3.u64 = layer + as::kLayerChildren;
@@ -491,7 +491,7 @@ ITC_REGS_STEP(AppStatesAddLayer) {
   if (!InOwnFrame(ctx, base, 112, calls, [&](uint32_t frame) {
         return as::StatesAddLayer(base, states, state, frame, calls);
       })) {
-    lifted::Sdk(ctx, base, __imp__sub_820AE130);
+    lifted::original::c820AE130(ctx, base);
     return;
   }
   ctx.r3.u64 = guest::LoadU32(base, states + as::kStatesRoot) + as::kLayerChildren;
@@ -503,7 +503,7 @@ ITC_REGS_STEP(AppStatesConstruct) {
   if (!InOwnFrame(ctx, base, 176, calls, [&](uint32_t frame) {
         return as::StatesConstruct(base, states, setup, frame, calls);
       })) {
-    lifted::Sdk(ctx, base, __imp__sub_820AE348);
+    lifted::original::c820AE348(ctx, base);
     return;
   }
   ctx.r3.u64 = states;
@@ -517,7 +517,7 @@ ITC_REGS_STEP(AppStatesCreate) {
         states = as::StatesCreate(base, setup, frame, calls);
         return states.has_value();
       })) {
-    lifted::Sdk(ctx, base, __imp__sub_820AE498);
+    lifted::original::c820AE498(ctx, base);
     return;
   }
   ctx.r3.u64 = *states;
@@ -531,7 +531,7 @@ ITC_REGS_STEP(AppStart) {
         r3 = as::AppStart(base, interface, frame, calls);
         return r3.has_value();
       })) {
-    lifted::Sdk(ctx, base, __imp__sub_82092878);
+    lifted::original::c82092878(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -575,7 +575,7 @@ ITC_REGS_STEP(AppToggleOffChild) {
 
 ITC_REGS_STEP(AppLayerApplyOps) {
   if (!Heap()) {
-    lifted::Sdk(ctx, base, __imp__sub_820ADE68);
+    lifted::original::c820ADE68(ctx, base);
     return;
   }
   const uint32_t layer = ctx.r3.u32;
@@ -642,7 +642,7 @@ ITC_REGS_STEP(AppLayerApplyOp) {
                  [&](uint32_t frame) { answer = as::LayerApplyOp(base, layer, op, frame, calls); });
   if (!answer) {
     ctx.r4.u64 = op;
-    lifted::Sdk(ctx, base, __imp__sub_820ADC60);
+    lifted::original::c820ADC60(ctx, base);
     return;
   }
   ctx.r3.u64 = *answer;
@@ -686,7 +686,7 @@ ITC_REGS_STEP(AppStatesOnMessage) {
     ctx.r3.u64 = states;
     ctx.r4.u64 = r4;
     ctx.r5.u64 = message;
-    lifted::Sdk(ctx, base, __imp__sub_820AE1C8);
+    lifted::original::c820AE1C8(ctx, base);
     return;
   }
   ctx.r3.u64 = *answer;
@@ -745,7 +745,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820AE498) {
     return;
   }
   if (!ITC_FLAG(native_app_states)) {
-    lifted::Sdk(ctx, base, __imp__sub_820AE498);
+    lifted::original::c820AE498(ctx, base);
     return;
   }
   hooks::AppStatesCreate(ctx, base);
@@ -772,7 +772,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82092968) {
   
   const auto run = [&] {
     if (!ITC_FLAG(native_app_states)) {
-      lifted::Sdk(ctx, base, __imp__sub_82092968);
+      lifted::original::c82092968(ctx, base);
       return;
     }
     hooks::AppRunHandler(ctx, base);

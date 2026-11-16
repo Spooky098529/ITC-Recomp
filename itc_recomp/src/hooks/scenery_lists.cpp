@@ -121,7 +121,7 @@ struct ModelListLoadGuest {
     auto& c = *static_cast<ModelListLoadGuest*>(self);
     guest_call::InFrame(c.ctx, c.base, 512, 0x821484C0, [&](uint32_t) {
       c.ctx.r3.u64 = size;
-      lifted::Sdk(c.ctx, c.base, __imp__sub_825A6880);
+      lifted::Sdk(c.ctx, c.base, lifted::original::c825A6880);
     });
     return c.ctx.r3.u32;
   }
@@ -129,7 +129,7 @@ struct ModelListLoadGuest {
     auto& c = *static_cast<ModelListLoadGuest*>(self);
     guest_call::InFrame(c.ctx, c.base, 512, 0x821484D0, [&](uint32_t) {
       c.ctx.r3.u64 = model;
-      lifted::Sdk(c.ctx, c.base, __imp__sub_825948C0);
+      lifted::Sdk(c.ctx, c.base, lifted::original::c825948C0);
     });
   }
   static void Load(void* self, uint32_t model, uint32_t entry) {
@@ -166,7 +166,7 @@ void ModelListLoadSteps(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, 
 
 ITC_REGS_STEP(SceneryListsModelListLoad) {
   if (!ModelsNativeLifetime()) {
-    lifted::Sdk(ctx, base, __imp__sub_82148428);
+    lifted::original::c82148428(ctx, base);
     return;
   }
   ModelListLoadSteps(ctx, base, 160, [&](uint32_t list, uint32_t container, uint32_t frame,
@@ -177,7 +177,7 @@ ITC_REGS_STEP(SceneryListsModelListLoad) {
 
 ITC_REGS_STEP(SceneryListsModelListLoadPoints) {
   if (!ModelsNativeLifetime()) {
-    lifted::Sdk(ctx, base, __imp__sub_82148528);
+    lifted::original::c82148528(ctx, base);
     return;
   }
   ModelListLoadSteps(ctx, base, 192, [&](uint32_t list, uint32_t container, uint32_t frame,
@@ -224,7 +224,7 @@ ITC_REGS_STEP(SceneryListsTextureProviderClearAll) {
 
 ITC_REGS_STEP(SceneryListsTextureProviderSet) {
   if (!scenery_lists::TextureProviderSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82594718);
+    lifted::original::c82594718(ctx, base);
   }
 }
 
@@ -250,7 +250,7 @@ ITC_REGS_STEP(SceneryListsRecordObjectSteps) {
                           ? std::nullopt
                           : scenery_lists::RecordObject(base, ctx.r4.u32, ctx.r5.u32);
   if (!header) {
-    lifted::Sdk(ctx, base, __imp__sub_825953D0);
+    lifted::original::c825953D0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -276,7 +276,7 @@ ITC_REGS_STEP(SceneryListsRecordSceneLights) {
   const auto header =
       SlotDiagnostics() ? std::nullopt : scenery_lists::RecordSceneLights(base);
   if (!header) {
-    lifted::Sdk(ctx, base, __imp__sub_82595490);
+    lifted::original::c82595490(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -289,7 +289,7 @@ ITC_REGS_STEP(SceneryListsRecordShapeDepth) {
                         : scenery_lists::RecordShapeDepth(base, ctx.r3.u32, ctx.r4.u32,
                                                           ctx.r5.s32, ctx.r7.u32, ctx.r8.u32);
   if (!first) {
-    lifted::Sdk(ctx, base, __imp__sub_825960D0);
+    lifted::original::c825960D0(ctx, base);
     return;
   }
   ctx.r3.u64 = *first;
@@ -314,7 +314,7 @@ ITC_REGS_STEP(SceneryListsDrawShapeDepth) {
                                           ctx.r7.u32, ctx.r8.u32, ctx.r9.u32,
                                           ctx.r1.u32 - kFrame, context);
   if (!draw) {
-    lifted::Sdk(ctx, base, __imp__sub_82596D48);
+    lifted::original::c82596D48(ctx, base);
     return;
   }
   if (!draw->submit) {
@@ -402,7 +402,7 @@ scenery_lists::DrawCalls SceneryListsDrawCalls(SceneryDrawGuest* guest) {
 
 ITC_REGS_STEP(SceneryListsRecordShape) {
   if (SlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_82146BD0);
+    lifted::original::c82146BD0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -423,7 +423,7 @@ ITC_REGS_STEP(SceneryListsRecordShape) {
                                                        set_shaders, c76, range, pair_offset);
   if (!first) {
     guest::StoreU32(base, frame, chain);
-    lifted::Sdk(ctx, base, __imp__sub_82146BD0);
+    lifted::original::c82146BD0(ctx, base);
     return;
   }
   ctx.lr = lr;
@@ -433,7 +433,7 @@ ITC_REGS_STEP(SceneryListsRecordShape) {
 
 ITC_REGS_STEP(SceneryListsDrawShape) {
   if (SlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_82147D88);
+    lifted::original::c82147D88(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -452,7 +452,7 @@ ITC_REGS_STEP(SceneryListsDrawShape) {
       ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, 0);
   if (!draw) {
     guest::StoreU32(base, frame, chain);
-    lifted::Sdk(ctx, base, __imp__sub_82147D88);
+    lifted::original::c82147D88(ctx, base);
     return;
   }
   ctx.lr = lr;
@@ -468,7 +468,7 @@ ITC_REGS_STEP(SceneryListsDrawShape) {
 
 ITC_REGS_STEP(SceneryListsModelRecordShape) {
   if (SlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_82595550);
+    lifted::original::c82595550(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -487,7 +487,7 @@ ITC_REGS_STEP(SceneryListsModelRecordShape) {
                                                      ctx.r8.u32);
   if (!first) {
     guest::StoreU32(base, frame, chain);
-    lifted::Sdk(ctx, base, __imp__sub_82595550);
+    lifted::original::c82595550(ctx, base);
     return;
   }
   ctx.lr = lr;
@@ -497,7 +497,7 @@ ITC_REGS_STEP(SceneryListsModelRecordShape) {
 
 ITC_REGS_STEP(SceneryListsModelRecordMaterials) {
   if (SlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_820CECA0);
+    lifted::original::c820CECA0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -512,7 +512,7 @@ ITC_REGS_STEP(SceneryListsModelRecordMaterials) {
                                                          ctx.r4.u32, ctx.r5.s32, ctx.r6.u32);
   if (!first) {
     guest::StoreU32(base, frame, chain);
-    lifted::Sdk(ctx, base, __imp__sub_820CECA0);
+    lifted::original::c820CECA0(ctx, base);
     return;
   }
   ctx.lr = lr;
@@ -522,7 +522,7 @@ ITC_REGS_STEP(SceneryListsModelRecordMaterials) {
 
 ITC_REGS_STEP(SceneryListsModelDrawShape) {
   if (SlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_82596B18);
+    lifted::original::c82596B18(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -541,7 +541,7 @@ ITC_REGS_STEP(SceneryListsModelDrawShape) {
                                                   ctx.r8.u32, ctx.r9.u32, 0);
   if (!draw) {
     guest::StoreU32(base, frame, chain);
-    lifted::Sdk(ctx, base, __imp__sub_82596B18);
+    lifted::original::c82596B18(ctx, base);
     return;
   }
   ctx.lr = lr;
@@ -557,7 +557,7 @@ ITC_REGS_STEP(SceneryListsModelDrawShape) {
 
 ITC_REGS_STEP(SceneryListsPointListDraw) {
   if (SlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_82148058);
+    lifted::original::c82148058(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -575,7 +575,7 @@ ITC_REGS_STEP(SceneryListsPointListDraw) {
                                                ctx.r5.u32, 0, ctx.r3.u32);
   if (!r3) {
     guest::StoreU32(base, frame, chain);
-    lifted::Sdk(ctx, base, __imp__sub_82148058);
+    lifted::original::c82148058(ctx, base);
     return;
   }
   ctx.lr = lr;

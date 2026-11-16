@@ -6,6 +6,7 @@
 // function); they read this flag too.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -84,7 +85,7 @@ ITC_MATRIX_SCALAR(820B0E10, ctx.f1.f64 = SinCos(base, ctx.f1.f64, ctx.r4.u32, ct
 ITC_NATIVE_ENTRY_ALWAYS(825D8F88) {
   
   if (!ITC_FLAG(native_matrix_math) || !hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_825D8F88);
+    lifted::original::c825D8F88(ctx, base);
     return;
   }
   hooks::GuestAtexit guest{ctx, base};
@@ -94,7 +95,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825D8F88) {
 ITC_NATIVE_ENTRY_ALWAYS(825D9060) {
   
   if (!ITC_FLAG(native_matrix_math) || !hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_825D9060);
+    lifted::original::c825D9060(ctx, base);
     return;
   }
   hooks::GuestAtexit guest{ctx, base};

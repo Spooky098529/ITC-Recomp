@@ -33,6 +33,7 @@
 // (sub_820F14E8) and CourseSet::Parse (sub_820F1A70).
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -217,7 +218,7 @@ ITC_COURSE_SCENERY(820F1CD8, uint32_t size = 0;
 ITC_NATIVE_ENTRY_ALWAYS(820F2F88) {
   
   if (!ITC_FLAG(native_course_scenery) || !hooks::CourseScenerySetUpNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F2F88);
+    lifted::original::c820F2F88(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -226,7 +227,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F2F88) {
 ITC_NATIVE_ENTRY_ALWAYS(820F3020) {
   
   if (!ITC_FLAG(native_course_scenery) || !hooks::CourseScenerySetUpNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F3020);
+    lifted::original::c820F3020(ctx, base);
     return;
   }
   ITC_SCENERY_CALLS;
@@ -247,14 +248,14 @@ ITC_NATIVE_ENTRY_ALWAYS(820F2B38) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820F2B38);
+  lifted::original::c820F2B38(ctx, base);
 }
 // Scenery::Destroy: no arguments; r3 = 0. From sub_8215AA88 and the front
 // end's sub_82228548 (recompiled).
 ITC_NATIVE_ENTRY_ALWAYS(820F2AF8) {
   
   if (!ITC_FLAG(native_course_scenery) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F2AF8);
+    lifted::original::c820F2AF8(ctx, base);
     return;
   }
   ctx.r3.u64 = Destroy(base);
@@ -311,7 +312,7 @@ ITC_COURSE_SCENERY(820F4558, hooks::CourseSceneryUpdate(ctx, base))
 
 void hooks::CourseSceneryDrawSetLists(lifted::Regs& ctx, uint8_t* base) {
   if (hooks::SceneryListsSlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F52A8);
+    lifted::original::c820F52A8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -337,7 +338,7 @@ void hooks::CourseSceneryDrawSetLists(lifted::Regs& ctx, uint8_t* base) {
 void hooks::CourseSceneryRecordHeadlightProjectors(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_cameras) || !ITC_FLAG(native_matrix_math) ||
       !ITC_FLAG(native_vehicle_accessors) || hooks::SceneryListsSlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F34C8);
+    lifted::original::c820F34C8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -459,7 +460,7 @@ ITC_COURSE_SCENERY(820F1C30, guest::StoreU32(base, ctx.r1.u32 - 96, ctx.r1.u32);
 ITC_NATIVE_ENTRY_ALWAYS(820F1CE8) {
   
   if (!NativeParses()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F1CE8);
+    lifted::original::c820F1CE8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -475,7 +476,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F2520) {
   
   const archive::LoadCall* load = SceneryLoads(base);
   if (load == nullptr) {
-    lifted::Sdk(ctx, base, __imp__sub_820F2520);
+    lifted::original::c820F2520(ctx, base);
     return;
   }
   ctx.r3.u64 = CourseSetLoad(base, ctx.r3.u32, *load);
@@ -486,7 +487,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F22F8) {
   
   const archive::LoadCall* load = SceneryLoads(base);
   if (load == nullptr) {
-    lifted::Sdk(ctx, base, __imp__sub_820F22F8);
+    lifted::original::c820F22F8(ctx, base);
     return;
   }
   ctx.r3.u64 = AreaLightsLoad(base, ctx.r3.u32, *load);
@@ -495,7 +496,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F23C0) {
   
   const archive::LoadCall* load = SceneryLoads(base);
   if (load == nullptr) {
-    lifted::Sdk(ctx, base, __imp__sub_820F23C0);
+    lifted::original::c820F23C0(ctx, base);
     return;
   }
   ctx.r3.u64 = AreaModelLoad(base, ctx.r3.u32, *load);
@@ -506,7 +507,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F23C0) {
 ITC_NATIVE_ENTRY_ALWAYS(820F22B8) {
   
   if (!NativeParses() || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F22B8);
+    lifted::original::c820F22B8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -525,7 +526,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F22B8) {
 ITC_NATIVE_ENTRY_ALWAYS(820F2638) {
   
   if (!NativeParses()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F2638);
+    lifted::original::c820F2638(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -538,7 +539,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F2638) {
 ITC_NATIVE_ENTRY_ALWAYS(820F1138) {
   
   if (!NativeParses()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F1138);
+    lifted::original::c820F1138(ctx, base);
     return;
   }
   ITC_SCENERY_CALLS;
@@ -547,7 +548,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F1138) {
 ITC_NATIVE_ENTRY_ALWAYS(820F12F8) {
   
   if (!NativeParses()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F12F8);
+    lifted::original::c820F12F8(ctx, base);
     return;
   }
   ITC_SCENERY_CALLS;
@@ -559,7 +560,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820F12F8) {
 ITC_NATIVE_ENTRY_ALWAYS(820F1208) {
   
   if (!NativeParses()) {
-    lifted::Sdk(ctx, base, __imp__sub_820F1208);
+    lifted::original::c820F1208(ctx, base);
     return;
   }
   ITC_SCENERY_CALLS;

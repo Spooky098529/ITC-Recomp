@@ -5,6 +5,7 @@
 // do.
 
 #include "hooks/predicated_tiling.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "guest.h"
@@ -45,7 +46,7 @@ pt::GuestCalls hooks::PredicatedTilingCalls(lifted::Regs& ctx, uint8_t* base) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                             \
     \
     if (!ITC_FLAG(native_predicated_tiling) || cb::Recording(base, ctx.r3.u32)) {  \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                             \
+      lifted::original::c##address(ctx, base);                                             \
       return;                                                                      \
     }                                                                              \
     __VA_ARGS__;                                                                   \
@@ -62,7 +63,7 @@ ITC_PREDICATED_TILING(822B6AD8, {
 
 void hooks::EndTiledSegments(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_predicated_tiling) || cb::Recording(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_822B6BF8);
+    lifted::original::c822B6BF8(ctx, base);
     return;
   }
   const uint32_t device = ctx.r3.u32, tiles = ctx.r4.u32, cpus = ctx.r5.u32;

@@ -1,4 +1,5 @@
 #include "game_messages.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "debug/frame_state_diff.h"
@@ -716,7 +717,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8215B4F8) {
   if (ITC_FLAG(native_race_draw_step)) {
     lifted_call::EnterR3<race_update::RaceDrawStep>(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8215B4F8);
+    lifted::original::c8215B4F8(ctx, base);
   }
 }
 
@@ -770,7 +771,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82099A98) {
   if (hooks::NativeFramework()) {
     hooks::TickHandlerInvoke(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_82099A98);
+    lifted::original::c82099A98(ctx, base);
   }
   frame_pacing::g_current_tick = 0;
   frame_pacing::InputWatch_After(base, frame_pacing::kTickRun, target);

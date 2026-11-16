@@ -73,7 +73,7 @@ ITC_REGS_STEP(SceneModelsSetWord11452) {
 
 ITC_REGS_STEP(SceneModelsCarModelSetRecord) {
   if (!sm::CarModelSetRecord(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820D3C70);
+    lifted::original::c820D3C70(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32 + 32;
@@ -161,7 +161,7 @@ ITC_REGS_STEP(SceneModelsApplyRecord) {
   const auto r3 = sm::SceneModelApplyRecord(base, call, ctx.r3.u32, ctx.r1.u32);
   ctx.lr = lr;
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_820DA758);
+    lifted::original::c820DA758(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -208,7 +208,7 @@ ITC_REGS_STEP(SceneModelUpdate) {
     if (ITC_FLAG(native_scene_models)) {
       SceneModelBuild(ctx, base);
     } else {
-      lifted::Sdk(ctx, base, __imp__sub_820D9870);
+      lifted::original::c820D9870(ctx, base);
     }
     ctx.r1.u64 = stack;
     return ctx.r3.u64;
@@ -280,7 +280,7 @@ ITC_SCENE_MODELS(820D34E0, SceneModelsPool4RecordReset)
 ITC_NATIVE_ENTRY_ALWAYS(820C3CA0) {
   
   if (!ITC_FLAG(native_scene_models) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820C3CA0);
+    lifted::original::c820C3CA0(ctx, base);
     return;
   }
   hooks::SceneModelsAllocPages(ctx, base);

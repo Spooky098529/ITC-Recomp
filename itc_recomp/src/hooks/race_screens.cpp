@@ -3,6 +3,7 @@
 // shares (hooks/race_screens.h).
 
 #include "hooks/race_screens.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -158,7 +159,7 @@ ITC_RACE_SCREENS_PRESSED(Pressed166)
 #define ITC_RACE_SCREENS_CREATE(name, address)                       \
   void RaceScreens##name##Create(lifted::Regs& ctx, uint8_t* base) {   \
     if (!NativeHeapActive()) {                                       \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                               \
+      lifted::original::c##address(ctx, base);                               \
       return;                                                        \
     }                                                                \
     ctx.r3.u64 = race_screens::name##Create(base, ctx.r1.u32);       \
@@ -181,7 +182,7 @@ ITC_RACE_SCREENS_CREATE(Kind6Menu, 8221BDD0)
         return;                                                            \
       }                                                                    \
     }                                                                      \
-    lifted::Sdk(ctx, base, __imp__sub_##address);                                       \
+    lifted::original::c##address(ctx, base);                                       \
   }
 ITC_RACE_SCREENS_FREE(PauseMenuDestroy, 8220C4C8)
 ITC_RACE_SCREENS_FREE(PauseMenu4Destroy, 8220FC98)
@@ -478,7 +479,7 @@ ITC_REGS_STEP(RaceScreensRaceDialogShowMessage) {
     r3 = race_screens::RaceDialogShowMessage(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
   }
   if (!r3) {
-    lifted::Sdk(ctx, base, __imp__sub_82218C10);
+    lifted::original::c82218C10(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;

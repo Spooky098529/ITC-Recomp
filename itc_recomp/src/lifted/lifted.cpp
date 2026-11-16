@@ -134,40 +134,34 @@ void Register(const Registration* entries, size_t count, const bool* enabled) {
 
 Entry Find(uint32_t address) {
   const auto& table = Table();
-  if (const auto it = table.find(address); it != table.end() && *it->second.enabled) {
+  if (const auto it = table.find(address); it != table.end()) {
     return it->second.entry;
   }
   return nullptr;
 }
 
-// A call the dispatch table can't take. An entry whose flag is off goes to
-// the SDK's function table, which runs the recompiled original (until the
-// flags' fallbacks go, stage 5), logged once per address. An address with
-// no entry at all is no function of ours (the rewiring's stage 4: every
-// function the game runs has one): logged, and the program stops.
-void Fallback(uint32_t address) {
-  static std::mutex mutex;
-  static std::unordered_map<uint32_t, bool> seen;
-  std::lock_guard lock(mutex);
-  if (!Table().contains(address)) {
-    ITC_LOG_ERROR("lifted: a call to {:08X}, which has no entry in the dispatch table", address);
-    std::abort();
-  }
-  if (seen.emplace(address, true).second) {
-    ITC_LOG_INFO("lifted: {:08X}'s entry is off: the recompiled original", address);
-  }
+void NoOriginal(uint32_t address) {
+  ITC_LOG_ERROR("lifted: {:08X}'s original was asked for (a flag off or a case the port "
+                "declines), and there's none: the recompiled code is gone and it couldn't be "
+                "lifted",
+                address);
+  std::abort();
+}
+
+// A call to an address with no entry in the dispatch table: no function of
+// ours (the rewiring: every function the game runs has one, and nothing is
+// recompiled since stage 5): logged, and the program stops.
+[[noreturn]] void Unknown(uint32_t address) {
+  ITC_LOG_ERROR("lifted: a call to {:08X}, which has no entry in the dispatch table", address);
+  std::abort();
 }
 
 Result Call(uint8_t* base, uint32_t address, const Args& args) {
   const auto& table = Table();
-  if (const auto it = table.find(address); it != table.end() && *it->second.enabled) {
+  if (const auto it = table.find(address); it != table.end()) {
     return it->second.entry(base, args);
   }
-  Fallback(address);
-  return Boundary(args, [&](PPCContext& ctx) {
-    ctx.ctr.u64 = address;
-    REX_CALL_INDIRECT_FUNC(address);
-  });
+  Unknown(address);
 }
 
 Result Import(uint8_t* base, ImportFunction* function, const Args& args) {
@@ -261,8 +255,7 @@ void CallFromContext(PPCContext& ctx, uint8_t* base, uint32_t address) {
     Enter(ctx, base, entry);
     return;
   }
-  Fallback(address);
-  REX_CALL_INDIRECT_FUNC(address);
+  Unknown(address);
 }
 
 }  // namespace lifted

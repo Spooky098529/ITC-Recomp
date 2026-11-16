@@ -6,6 +6,7 @@
 // r3 but State's: the rest leave r3 as it came. See docs/native-movies.md.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -41,7 +42,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820AE958) {
   if (ITC_FLAG(play_movies_with_ffmpeg)) {
     mv::RenderFrame(base, ctx.r3.u32);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_820AE958);
+    lifted::original::c820AE958(ctx, base);
   }
   hooks::TitleScreen_MovieRendered();
 }

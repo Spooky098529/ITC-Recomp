@@ -3,6 +3,7 @@
 // shares (hooks/options_screen.h).
 
 #include "hooks/options_screen.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -678,7 +679,7 @@ ITC_OPTIONS_INIT(821C8A60)
 ITC_NATIVE_ENTRY_ALWAYS(821BB9A8) {
   
   if (!ITC_FLAG(native_options_screen) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_821BB9A8);
+    lifted::original::c821BB9A8(ctx, base);
     return;
   }
   hooks::OptionsOnEnter(ctx, base);
@@ -689,7 +690,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821BB9A8) {
 ITC_NATIVE_ENTRY_ALWAYS(821B9E70) {
   
   if (!ITC_FLAG(native_options_screen) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_821B9E70);
+    lifted::original::c821B9E70(ctx, base);
     return;
   }
   hooks::OptionsOnLeft(ctx, base);

@@ -4,6 +4,7 @@
 // (hooks/front_end_screen_helpers.h).
 
 #include "hooks/front_end_screen_helpers.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -248,7 +249,7 @@ ITC_REGS_STEP(FrontEndCarDetailOpen) {
     \
     if (!ITC_FLAG(native_front_end_screen_helpers) || !hooks::NativeHeapActive() ||  \
         !hooks::step(ctx, base)) {                                                   \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                               \
+      lifted::original::c##address(ctx, base);                                               \
     }                                                                                \
   }
 

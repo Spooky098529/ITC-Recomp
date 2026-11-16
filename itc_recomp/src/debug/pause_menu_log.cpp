@@ -17,6 +17,7 @@
 // "Step 1").
 
 #include "debug/pause_menu_log.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
@@ -170,7 +171,7 @@ static ITC_REGS_STEP(MenuListUpdate) {
   if (ITC_FLAG(native_race_screens)) {
     hooks::RaceScreensListUpdate(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8220C1E0);
+    lifted::original::c8220C1E0(ctx, base);
   }
 }
 

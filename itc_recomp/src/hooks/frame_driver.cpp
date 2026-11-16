@@ -3,6 +3,7 @@
 // the harness shares (hooks/frame_driver.h).
 
 #include "hooks/frame_driver.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "app_states/app.h"
@@ -79,7 +80,7 @@ ITC_REGS_STEP(FrameDriverAddListener) {
       ctx.r3.u64 = vector;
       ctx.r4.u64 = request;
       ctx.lr = 0x82092300;
-      lifted::Sdk(ctx, base, __imp__sub_8209A930);
+      lifted::original::c8209A930(ctx, base);
       return;
     }
     ctx.r3.u64 = *inserted ? frame - 16 : vector;
@@ -93,7 +94,7 @@ ITC_REGS_STEP(FrameDriverApplyRequest) {
     inserted = fd::ApplyRequest(base, ctx.r3.u32, type, ctx.r4.u32, High(ctx.r5.u64));
   }
   if (!inserted) {
-    lifted::Sdk(ctx, base, __imp__sub_82091FF0);
+    lifted::original::c82091FF0(ctx, base);
     return;
   }
   REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
@@ -116,7 +117,7 @@ ITC_REGS_STEP(FrameDriverCallListener) {
 
 ITC_REGS_STEP(FrameDriverDrawFrame) {
   if (!NativeFrameDriver() || !ITC_FLAG(native_video_output)) {
-    lifted::Sdk(ctx, base, __imp__sub_82091E58);
+    lifted::original::c82091E58(ctx, base);
     return;
   }
   const uint32_t driver = ctx.r3.u32;
@@ -146,7 +147,7 @@ ITC_REGS_STEP(AppSceneDraw) {
         ctx.r5.u64 = vertex;
         ctx.r6.u64 = pixel;
         ctx.lr = 0x8258D978;
-        lifted::Sdk(ctx, base, __imp__sub_822A8A60);
+        lifted::original::c822A8A60(ctx, base);
         return;
       }
       guest_call::InFrame(ctx, base, 112, 0x822A8AF4, [&](uint32_t) {
@@ -350,7 +351,7 @@ fd::SceneSetUpCalls SceneSetUpCallsOn(lifted::Regs& ctx, uint8_t* base) {
 
 ITC_REGS_STEP(SceneConstruct) {
   if (!ITC_FLAG(native_video_output)) {
-    lifted::Sdk(ctx, base, __imp__sub_82098A98);
+    lifted::original::c82098A98(ctx, base);
     return;
   }
   const uint32_t scene = ctx.r3.u32, block = ctx.r4.u32;
@@ -392,7 +393,7 @@ ITC_REGS_STEP(PrimitiveDeclInitStep) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {              \
     \
     if (!hooks::NativeFrameDriver()) {          \
-      lifted::Sdk(ctx, base, __imp__sub_##address); \
+      lifted::original::c##address(ctx, base); \
       return;                                       \
     }                                               \
     hooks::step(ctx, base);                         \

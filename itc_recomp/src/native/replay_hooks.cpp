@@ -2,6 +2,7 @@
 // docs/gpu-functions.md), wrapped to pass each command on before it runs.
 
 #include "native/replay_hooks.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "debug/replay_stats.h"
@@ -95,7 +96,7 @@ rc::GuestCall native::ReplayCall(lifted::Regs& ctx, uint8_t* base) {
       ctx.fpscr.disableFlushMode();                                                 \
       ctx.r3.u64 = (body);                                                          \
     } else {                                                                        \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                                 \
+      lifted::original::c##address(ctx, base);                                 \
     }                                                                               \
     native::g_current_command = outer_command;                                      \
     native::Renderer_AfterCommand(base, id, payload, arg1, arg2);                   \
@@ -161,7 +162,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822AE340) {
     ctx.fpscr.disableFlushMode();
     NativePatchVertexShader(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_822AE340);
+    lifted::original::c822AE340(ctx, base);
   }
   if (copy) {
     native::LoadedVertexShader& loaded = native::g_loaded_vertex_shader;
@@ -208,7 +209,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825BD8F0) {
               a.f[0]};
     });
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_825BD8F0);
+    lifted::original::c825BD8F0(ctx, base);
   }
   g_pending_inline = {ctx.r3.u32 != 0, type, count, stride, ctx.r3.u32, caller};
 }
@@ -230,7 +231,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825BDDA0) {
     inline_draws::EndVertices(base, ctx.r3.u32);  // r3 left as the device, as the original
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_825BDDA0);
+  lifted::original::c825BDDA0(ctx, base);
 }
 
 REPLAY_COUNTED_HANDLER(8258FBD0, 1, rc::SetRenderStates(base, payload, arg1, sp, call))
@@ -285,7 +286,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258F5C0) {
   }
   uint32_t outer_command = native::g_current_command;
   native::g_current_command = 15;
-  lifted::Sdk(ctx, base, __imp__sub_8258F5C0);
+  lifted::original::c8258F5C0(ctx, base);
   native::g_current_command = outer_command;
 }
 
@@ -300,7 +301,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D998) {
       guest::LoadU32(base, video_output + 4 * (68 + guest::LoadU32(base, video_output + 268)));
   native::Renderer_FrontBufferResolve(base, guest::LoadU32(base, video_output + 140), front_buffer);
   if (!ITC_FLAG(native_replay_commands)) {
-    lifted::Sdk(ctx, base, __imp__sub_8258D998);
+    lifted::original::c8258D998(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -318,7 +319,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825BE300) {
     LogOutside("DrawVertices", 0x825BE300, uint32_t(ctx.lr), native::g_current_command);
   }
   if (!ITC_FLAG(native_inline_draws)) {
-    lifted::Sdk(ctx, base, __imp__sub_825BE300);
+    lifted::original::c825BE300(ctx, base);
     return;
   }
   // r3 left as the device (its callers don't read it).
@@ -334,7 +335,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825BDDC0) {
     LogOutside("BeginIndexedVertices", 0x825BDDC0, uint32_t(ctx.lr), native::g_current_command);
   }
   if (!ITC_FLAG(native_inline_draws)) {
-    lifted::Sdk(ctx, base, __imp__sub_825BDDC0);
+    lifted::original::c825BDDC0(ctx, base);
     return;
   }
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
@@ -378,7 +379,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822AFA58) {
     LogOutside("Resolve", 0x822AFA58, uint32_t(ctx.lr), command);
   }
   if (!ITC_FLAG(native_resolve)) {
-    lifted::Sdk(ctx, base, __imp__sub_822AFA58);
+    lifted::original::c822AFA58(ctx, base);
     return;
   }
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {

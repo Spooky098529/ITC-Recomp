@@ -20,6 +20,7 @@
 // whenever a setting track writes them.
 
 #include "debug/pause_movie_log.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
@@ -542,7 +543,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82119B80) {
     ui_movies_hooks::RestorePose(ctx, base);
     return;
   }
-  debug::WatchMovingTargets("82119B80", ctx, base, [&] { lifted::Sdk(ctx, base, __imp__sub_82119B80); });
+  debug::WatchMovingTargets("82119B80", ctx, base, [&] { lifted::original::c82119B80(ctx, base); });
 }
 
 // sub_8259DAC0, watched as the others; its work (natively with
@@ -574,7 +575,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211C7E8) {
     return;
   }
   debug::LogCall("8211C7E8 movie node", ctx);
-  lifted::Sdk(ctx, base, __imp__sub_8211C7E8);
+  lifted::original::c8211C7E8(ctx, base);
 }
 
 // sub_821BE5A8 (Options::ShowVolumeBar) natively under
@@ -589,7 +590,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821BE5A8) {
     hooks::OptionsShowVolumeBar(ctx, base);
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_821BE5A8);
+  lifted::original::c821BE5A8(ctx, base);
 }
 
 // PauseMenu::ShowVolume: natively with --native_race_screens
@@ -602,7 +603,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8220D040) {
   if (ITC_FLAG(native_race_screens)) {
     hooks::RaceScreensPauseMenuShowVolume(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8220D040);
+    lifted::original::c8220D040(ctx, base);
   }
 }
 
@@ -620,7 +621,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DAC8) {
     return;
   }
   debug::LogCall("8211DAC8 start animation", ctx);
-  lifted::Sdk(ctx, base, __imp__sub_8211DAC8);
+  lifted::original::c8211DAC8(ctx, base);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(8211D978) {
@@ -630,7 +631,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211D978) {
     return;
   }
   debug::LogCall("8211D978 start item animation", ctx);
-  lifted::Sdk(ctx, base, __imp__sub_8211D978);
+  lifted::original::c8211D978(ctx, base);
 }
 
 // Its work (natively with --native_ui_movies_game) is in
@@ -642,7 +643,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DE38) {
     return;
   }
   debug::LogCall("8211DE38", ctx);
-  lifted::Sdk(ctx, base, __imp__sub_8211DE38);
+  lifted::original::c8211DE38(ctx, base);
 }
 
 // Its work (natively with --native_ui_movies_game) is in
@@ -654,7 +655,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DDD8) {
     return;
   }
   debug::LogCall("8211DDD8", ctx);
-  lifted::Sdk(ctx, base, __imp__sub_8211DDD8);
+  lifted::original::c8211DDD8(ctx, base);
 }
 
 // Its work (natively with --native_ui_movies_game) is in
@@ -666,7 +667,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DF20) {
     return;
   }
   debug::LogCall("8211DF20", ctx);
-  lifted::Sdk(ctx, base, __imp__sub_8211DF20);
+  lifted::original::c8211DF20(ctx, base);
 }
 
 // ScreenPages::Go (natively with --native_race_screens: the adapter's step,
@@ -679,6 +680,6 @@ ITC_NATIVE_ENTRY_ALWAYS(8220BA68) {
   if (ITC_FLAG(native_race_screens)) {
     hooks::RaceScreensPagesGo(ctx, base);
   } else {
-    lifted::Sdk(ctx, base, __imp__sub_8220BA68);
+    lifted::original::c8220BA68(ctx, base);
   }
 }

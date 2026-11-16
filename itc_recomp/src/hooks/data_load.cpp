@@ -2,6 +2,7 @@
 // (docs/functions/data-load.md).
 
 #include "base/flags.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "data_load/data_load.h"
 #include "guest.h"
@@ -40,7 +41,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820CCDC0) {
     return;
   }
   if (!ITC_FLAG(native_data_load)) {
-    lifted::Sdk(ctx, base, __imp__sub_820CCDC0);
+    lifted::original::c820CCDC0(ctx, base);
     return;
   }
   // r3 as lis and addi leave the address: sign-extended.
@@ -59,7 +60,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82102208) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82102208);
+  lifted::original::c82102208(ctx, base);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(82105508) {
@@ -74,7 +75,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82105508) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82105508);
+  lifted::original::c82105508(ctx, base);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(82105560) {
@@ -89,7 +90,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82105560) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82105560);
+  lifted::original::c82105560(ctx, base);
 }
 
 // The static replays' set-ups (no direct callers: _cinit's initializer
@@ -97,7 +98,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82105560) {
 ITC_NATIVE_ENTRY_ALWAYS(825D9E60) {
   
   if (!ITC_FLAG(native_data_load) || !hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_825D9E60);
+    lifted::original::c825D9E60(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -108,7 +109,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825D9E60) {
 ITC_NATIVE_ENTRY_ALWAYS(825D9F68) {
   
   if (!ITC_FLAG(native_data_load) || !hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_825D9F68);
+    lifted::original::c825D9F68(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -179,7 +180,7 @@ void hooks::LoadingScreenLoadSteps(lifted::Regs& ctx, uint8_t* base) {
     }
     guest_call::InFrame(ctx, base, 96, at, [&](uint32_t) {
       ctx.r3.u64 = id;
-      lifted::Sdk(ctx, base, __imp__sub_82247AA0);  // LoadingScreen::AddMovie
+      lifted::original::c82247AA0(ctx, base);  // LoadingScreen::AddMovie
     });
     return ctx.r3.s32 < 0 ? -1 : int64_t(ctx.r3.u32);
   });
@@ -198,7 +199,7 @@ void hooks::OtherMoviesLoadSteps(lifted::Regs& ctx, uint8_t* base) {
         }
         guest_call::InFrame(ctx, base, 112, 0x82291350, [&](uint32_t) {
           ctx.r3.u64 = id;
-          lifted::Sdk(ctx, base, __imp__sub_822912A0);
+          lifted::original::c822912A0(ctx, base);
         });
         return ctx.r3.s32 < 0 ? -1 : int64_t(ctx.r3.u32);
       },
@@ -214,7 +215,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82247B98) {
     return;
   }
   if (!BootNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_82247B98);
+    lifted::original::c82247B98(ctx, base);
     return;
   }
   hooks::LoadingScreenLoadSteps(ctx, base);
@@ -227,7 +228,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82291328) {
     return;
   }
   if (!BootNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_82291328);
+    lifted::original::c82291328(ctx, base);
     return;
   }
   hooks::OtherMoviesLoadSteps(ctx, base);
@@ -283,7 +284,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82105868) {
     return;
   }
   if (!BootNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_82105868);
+    lifted::original::c82105868(ctx, base);
     return;
   }
   hooks::CreateObjectsSteps(ctx, base);
@@ -296,7 +297,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82106618) {
     return;
   }
   if (!BootNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_82106618);
+    lifted::original::c82106618(ctx, base);
     return;
   }
   hooks::BootDataLoadSteps(ctx, base);

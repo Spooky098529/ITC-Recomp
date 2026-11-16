@@ -2,6 +2,7 @@
 // (docs/functions/app-start-up.md).
 
 #include "hooks/app_start_up.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "hooks/direct_slots.h"
 
@@ -91,7 +92,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822A8980) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_822A8980);
+  lifted::original::c822A8980(ctx, base);
 }
 
 // --- The network manager's set-up ---
@@ -120,7 +121,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8214E190) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up)) {
-    lifted::Sdk(ctx, base, __imp__sub_8214E190);
+    lifted::original::c8214E190(ctx, base);
     return;
   }
   ctx.r3.u64 = asu::NetworkSetUp(base, ctx.r3.u32, ctx.r1.u32 - 144, XNetMemcpy(ctx, base));
@@ -173,7 +174,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209B378) {
     return;
   }
   if (!DeviceUsersNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_8209B378);
+    lifted::original::c8209B378(ctx, base);
     return;
   }
   const uint32_t interface = ctx.r3.u32;
@@ -186,7 +187,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209B378) {
   });
   ctx.lr = lr;
   if (!result) {
-    lifted::Sdk(ctx, base, __imp__sub_8209B378);
+    lifted::original::c8209B378(ctx, base);
     return;
   }
   ctx.r3.u64 = *result;
@@ -217,7 +218,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209BE88) {
     return;
   }
   if (!DeviceUsersNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_8209BE88);
+    lifted::original::c8209BE88(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -425,7 +426,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8210ADD0) {
     return;
   }
   if (!DeviceUsersNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_8210ADD0);
+    lifted::original::c8210ADD0(ctx, base);
     return;
   }
   hooks::TextInitSteps(ctx, base);
@@ -474,7 +475,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82106548) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up)) {
-    lifted::Sdk(ctx, base, __imp__sub_82106548);
+    lifted::original::c82106548(ctx, base);
     return;
   }
   hooks::AppStartUpSteps(ctx, base);
@@ -508,7 +509,7 @@ void hooks::MovieWrapperSteps(lifted::Regs& ctx, uint8_t* base) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_82593DC0);
+  lifted::original::c82593DC0(ctx, base);
 }
 
 // MovieWrapper::MovieWrapper (sub_82593DC0) has no adapter: only Movie::Movie's
@@ -542,7 +543,7 @@ void hooks::MovieConstructSteps(lifted::Regs& ctx, uint8_t* base) {
   if (!result) {
     ctx.r3.u64 = movie;
     ctx.r4.u64 = block;
-    lifted::Sdk(ctx, base, __imp__sub_820AEA88);
+    lifted::original::c820AEA88(ctx, base);
     return;
   }
   ctx.r3.u64 = *result;
@@ -556,7 +557,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820AEA88) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820AEA88);
+    lifted::original::c820AEA88(ctx, base);
     return;
   }
   hooks::MovieConstructSteps(ctx, base);
@@ -632,7 +633,7 @@ void hooks::AudioManagerCreateSteps(lifted::Regs& ctx, uint8_t* base) {
     ctx.r3.u64 = entry_r3;
     ctx.r4.u64 = entry_r4;
     ctx.r5.u64 = entry_r5;
-    lifted::Sdk(ctx, base, __imp__sub_82119B38);
+    lifted::original::c82119B38(ctx, base);
     return;
   }
   if (*result != 0) {
@@ -660,7 +661,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82119B38) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82119B38);
+    lifted::original::c82119B38(ctx, base);
     return;
   }
   hooks::AudioManagerCreateSteps(ctx, base);
@@ -707,7 +708,7 @@ uint32_t AppCameraListSteps(lifted::Regs& ctx, uint8_t* base, uint32_t list, uin
   const uint64_t lr = ctx.lr;
   ctx.r3.u64 = list;
   ctx.lr = 0x820A8C64;
-  lifted::Sdk(ctx, base, __imp__sub_820A98C0);
+  lifted::original::c820A98C0(ctx, base);
   ctx.lr = lr;
   return ctx.r3.u32;
 }
@@ -773,7 +774,7 @@ void hooks::AppCameraSteps(lifted::Regs& ctx, uint8_t* base) {
   if (!result) {
     ctx.r3.u64 = entry_r3;
     ctx.r4.u64 = entry_r4;
-    lifted::Sdk(ctx, base, __imp__sub_820A8B88);
+    lifted::original::c820A8B88(ctx, base);
     return;
   }
   ctx.r3.u64 = *result;
@@ -803,7 +804,7 @@ void hooks::AppCameraListConstructSteps(lifted::Regs& ctx, uint8_t* base) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_820A98C0);
+  lifted::original::c820A98C0(ctx, base);
 }
 
 // The second camera class: r3 = the object (368 bytes), r4 = the block
@@ -816,7 +817,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A8B88) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_820A8B88);
+    lifted::original::c820A8B88(ctx, base);
     return;
   }
   hooks::AppCameraSteps(ctx, base);
@@ -869,7 +870,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82094590) {
     return;
   }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82094590);
+    lifted::original::c82094590(ctx, base);
     return;
   }
   hooks::AppConstructSteps(ctx, base);
@@ -899,7 +900,7 @@ void hooks::AppCreateSteps(lifted::Regs& ctx, uint8_t* base) {
   ctx.lr = lr;
   if (!result) {
     ctx.r3.u64 = entry_r3;
-    lifted::Sdk(ctx, base, __imp__sub_82094AB8);
+    lifted::original::c82094AB8(ctx, base);
     return;
   }
   ctx.r3.u64 = *result;
@@ -910,7 +911,7 @@ void hooks::AppCreateSteps(lifted::Regs& ctx, uint8_t* base) {
 ITC_NATIVE_ENTRY_ALWAYS(82094AB8) {
   
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    lifted::Sdk(ctx, base, __imp__sub_82094AB8);
+    lifted::original::c82094AB8(ctx, base);
     return;
   }
   hooks::AppCreateSteps(ctx, base);

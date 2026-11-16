@@ -5,6 +5,7 @@
 // (sub_8209ED58), from SignInWatch::Update.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -80,7 +81,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82106868) {
   
   const uint32_t frame = ctx.r1.u32 - kSetChecksFrame;
   if (!ITC_FLAG(native_mode_tick) || !ModesSetChecks(base, ctx.r4.u32, frame)) {
-    lifted::Sdk(ctx, base, __imp__sub_82106868);
+    lifted::original::c82106868(ctx, base);
     return;
   }
   if (ctx.r4.s32 == 1) {
@@ -104,7 +105,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209EEC8) {
   
   if (!ITC_FLAG(native_mode_tick) ||
       !SignInWatchUpdate(base, ctx.r1.u32 - kSignInWatchUpdateFrame)) {
-    lifted::Sdk(ctx, base, __imp__sub_8209EEC8);
+    lifted::original::c8209EEC8(ctx, base);
     return;
   }
   ctx.r3.s64 = int32_t(kLastName);
@@ -176,7 +177,7 @@ void RecordScissor(lifted::Regs& ctx, uint8_t* base, uint32_t key) {
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = double(guest::LoadFloat(base, 0x82001C00));
     ctx.lr = 0x8209D348;
-    lifted::Sdk(ctx, base, __imp__sub_8209CE68);
+    lifted::original::c8209CE68(ctx, base);
   }
 }
 
@@ -191,7 +192,7 @@ void RecordColorRect(lifted::Regs& ctx, uint8_t* base, uint32_t rect, uint32_t k
     ctx.r4.u64 = mode_tick::kFadeCameraPass;
     ctx.r5.u64 = key;
     ctx.lr = 0x8209D35C;
-    lifted::Sdk(ctx, base, __imp__sub_8217A370);
+    lifted::original::c8217A370(ctx, base);
     return;
   }
   guest_call::InFrame(ctx, base, 368, 0x8217A74C, [&](uint32_t) {
@@ -205,7 +206,7 @@ void RecordColorRect(lifted::Regs& ctx, uint8_t* base, uint32_t rect, uint32_t k
 void hooks::ModeTickScreenFadesUpdate(lifted::Regs& ctx, uint8_t* base) {
   if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
       ITC_FLAG(log_recording_by_pass)) {
-    lifted::Sdk(ctx, base, __imp__sub_8209D130);
+    lifted::original::c8209D130(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -258,7 +259,7 @@ ITC_MODE_TICK(821063B0, hooks::ModeTickMusicPlay(ctx, base))
 ITC_NATIVE_ENTRY_ALWAYS(825D9518) {
   
   if (!ITC_FLAG(native_mode_tick) || !hooks::NativeAtexit()) {
-    lifted::Sdk(ctx, base, __imp__sub_825D9518);
+    lifted::original::c825D9518(ctx, base);
     return;
   }
   hooks::GuestAtexit guest{ctx, base};

@@ -46,7 +46,7 @@ bool NativeBlocks() {
 ITC_NATIVE_ENTRY_ALWAYS(8258DFF0) {
   
   if (!NativeBlocks()) {
-    lifted::Sdk(ctx, base, __imp__sub_8258DFF0);
+    lifted::original::c8258DFF0(ctx, base);
     return;
   }
   ctx.r3.u64 = models::AllocVirtual(base, ctx.r3.u32);
@@ -58,7 +58,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258DFF0) {
 ITC_NATIVE_ENTRY_ALWAYS(8258E098) {
   
   if (!NativeBlocks()) {
-    lifted::Sdk(ctx, base, __imp__sub_8258E098);
+    lifted::original::c8258E098(ctx, base);
     return;
   }
   ctx.r3.u64 = models::AllocPhysicalEx(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
@@ -70,7 +70,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258E098) {
 ITC_NATIVE_ENTRY_ALWAYS(8258E1D8) {
   
   if (!NativeBlocks() || !models::FreeDue(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_8258E1D8);
+    lifted::original::c8258E1D8(ctx, base);
   }
 }
 
@@ -111,7 +111,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822AA018) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_822AA018);
+  lifted::original::c822AA018(ctx, base);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(822A9EE8) {
@@ -122,5 +122,5 @@ ITC_NATIVE_ENTRY_ALWAYS(822A9EE8) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_822A9EE8);
+  lifted::original::c822A9EE8(ctx, base);
 }

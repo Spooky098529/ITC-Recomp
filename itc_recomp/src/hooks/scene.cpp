@@ -105,7 +105,7 @@ ITC_REGS_STEP(SceneStartTeardown) {
   if (guest::LoadU32(base, scene::kScene) != 0 &&
       (set == 0 || !ITC_FLAG(native_accessories) || !AccessoriesNativeLoads() ||
        !ModelsNativeLifetime() || !accessories::SetReleasable(base, set))) {
-    lifted::Sdk(ctx, base, __imp__sub_820C4D88);
+    lifted::original::c820C4D88(ctx, base);
     return;
   }
   const auto r3 = scene::StartTeardown(base, [&](uint32_t set) -> uint64_t {
@@ -136,7 +136,7 @@ ITC_REGS_STEP(SceneLoadsDone) {
 
 ITC_REGS_STEP(SceneDestroyA) {
   if (!hooks::NativeHeapActive() || !scene::DestroyAFreeable(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820C3CF8);
+    lifted::original::c820C3CF8(ctx, base);
     return;
   }
   scene::DestroyA(base, ctx.r3.u32, ctx.r1.u32, [&](uint32_t object, uint32_t frame) {
@@ -148,13 +148,13 @@ ITC_REGS_STEP(SceneDestroyA) {
 
 ITC_REGS_STEP(SceneAssetsConstruct) {
   if (!ModelsNativeLifetime() || !scene::AssetsConstruct(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820C5008);
+    lifted::original::c820C5008(ctx, base);
   }
 }
 
 ITC_REGS_STEP(SceneCarSceneConstruct) {
   if (!ModelsNativeLifetime() || !scene::CarSceneConstruct(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820C89A8);
+    lifted::original::c820C89A8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -167,7 +167,7 @@ ITC_REGS_STEP(SceneAssetsReset) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820C4A70);
+  lifted::original::c820C4A70(ctx, base);
 }
 
 ITC_REGS_STEP(SceneAssetsDestruct) {
@@ -177,7 +177,7 @@ ITC_REGS_STEP(SceneAssetsDestruct) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820C5168);
+  lifted::original::c820C5168(ctx, base);
 }
 
 ITC_REGS_STEP(SceneListDeleteAll) {
@@ -193,7 +193,7 @@ ITC_REGS_STEP(SceneListDestruct) {
 ITC_REGS_STEP(SceneCarSceneDestruct) {
   if (!ModelsNativeLifetime() ||
       !scene::CarSceneDestructible(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820C9110);
+    lifted::original::c820C9110(ctx, base);
     return;
   }
   const auto r3 = scene::CarSceneDestruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
@@ -203,7 +203,7 @@ ITC_REGS_STEP(SceneCarSceneDestruct) {
 
 ITC_REGS_STEP(SceneUpdateA) {
   if (!hooks::NativeHeapActive() || !scene::UpdateANative(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_820C3DA0);
+    lifted::original::c820C3DA0(ctx, base);
     return;
   }
   const auto texture_free = [&](uint32_t header_in, uint32_t data_in,
@@ -249,12 +249,12 @@ ITC_REGS_STEP(SceneAssetsRelease) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_820C4C80);
+  lifted::original::c820C4C80(ctx, base);
 }
 
 ITC_REGS_STEP(SceneCreate) {
   if (!hooks::NativeHeapActive() || !ModelsNativeLifetime() || !scene::CreateNative(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_820C8A50);
+    lifted::original::c820C8A50(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -263,7 +263,7 @@ ITC_REGS_STEP(SceneCreate) {
 
 ITC_REGS_STEP(SceneLoadAssets) {
   if (!hooks::NativeHeapActive() || !NativeArchiveQueue()) {
-    lifted::Sdk(ctx, base, __imp__sub_820C8B40);
+    lifted::original::c820C8B40(ctx, base);
     return;
   }
   ctx.r3.u64 = scene::LoadAssets(base, ctx.r3.u32, ctx.r13.u32, NativeArchiveLoad(base));
@@ -272,7 +272,7 @@ ITC_REGS_STEP(SceneLoadAssets) {
 ITC_REGS_STEP(SceneOnFileLoaded) {
   const uint32_t request = ctx.r3.u32, data = ctx.r4.u32, scene_at = ctx.r6.u32;
   if (!ModelsNativeLifetime() || !scene::FileLoadedNative(base, request, scene_at)) {
-    lifted::Sdk(ctx, base, __imp__sub_820C52A0);
+    lifted::original::c820C52A0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -295,7 +295,7 @@ ITC_REGS_STEP(SceneOnFileLoaded) {
       ctx.r3.u64 = xpr;
       ctx.r4.u64 = file;
       ctx.lr = 0x820C52D0;
-      lifted::Sdk(ctx, base, __imp__sub_82596F68);
+      lifted::original::c82596F68(ctx, base);
     };
     calls.provider_set = [&](uint32_t provider, uint32_t xpr) -> uint64_t {
       ctx.r3.u64 = provider;
@@ -311,7 +311,7 @@ ITC_REGS_STEP(SceneOnFileLoaded) {
       ctx.r5.u64 = buffer_at;
       ctx.r6.u64 = pixels;
       ctx.lr = 0x820C54F0;
-      lifted::Sdk(ctx, base, __imp__sub_820ED020);
+      lifted::original::c820ED020(ctx, base);
     };
     r3 = scene::FileLoaded(base, request, data, scene_at, stack, calls);
   });
@@ -388,7 +388,7 @@ ITC_REGS_STEP(SceneUpdateModels) {
                                                           if (ITC_FLAG(native_scene_models)) {
                                                             hooks::SceneModelUpdate(c, b);
                                                           } else {
-                                                            lifted::Sdk(c, b, __imp__sub_820DA180);
+                                                            lifted::Sdk(c, b, lifted::original::c820DA180);
                                                           }
                                                         },
                                                         frame, 0x820C5A9C, model, ctx.r4.u64);
@@ -427,7 +427,7 @@ ITC_REGS_STEP(SceneUpdate) {
                       if (ITC_FLAG(native_vehicle_accessors)) {
                         SceneUpdateModels(c, b);
                       } else {
-                        lifted::Sdk(c, b, __imp__sub_820C5A60);
+                        lifted::Sdk(c, b, lifted::original::c820C5A60);
                       }
                     },
                     frame, 0x820C96A4, scene, ctx.r4.u64);
@@ -441,7 +441,7 @@ ITC_REGS_STEP(SceneUpdate) {
                       if (ITC_FLAG(native_accessories)) {
                         AccessoriesDestroy(c, b);
                       } else {
-                        lifted::Sdk(c, b, __imp__sub_820F1078);
+                        lifted::Sdk(c, b, lifted::original::c820F1078);
                       }
                     },
                     frame, 0x820C96D0, ctx.r3.u64, ctx.r4.u64);

@@ -3,6 +3,7 @@
 // register steps the harness shares (hooks/location_screen.h).
 
 #include "hooks/location_screen.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -101,7 +102,7 @@ ITC_REGS_STEP(LocationScreenOpponentHasCard) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_82227708);
+  lifted::original::c82227708(ctx, base);
 }
 
 ITC_REGS_STEP(LocationScreenNextResultText) {
@@ -109,7 +110,7 @@ ITC_REGS_STEP(LocationScreenNextResultText) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_822271F8);
+  lifted::original::c822271F8(ctx, base);
 }
 
 ITC_REGS_STEP(LocationScreenShowPictures) {
@@ -196,7 +197,7 @@ ITC_REGS_STEP(LocationScreenReenter) { ls::Reenter(base, ctx.r3.u32); }
 ITC_REGS_STEP(LocationScreenReset) {
   const uint32_t screen = ctx.r3.u32;
   if (!ls::ResetNative(screen)) {
-    lifted::Sdk(ctx, base, __imp__sub_822279A8);
+    lifted::original::c822279A8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -207,7 +208,7 @@ ITC_REGS_STEP(LocationScreenReset) {
 ITC_REGS_STEP(LocationScreenResetView) {
   const uint32_t view = ctx.r3.u32;
   if (!ls::ResetNative(view - 560)) {
-    lifted::Sdk(ctx, base, __imp__sub_82227818);
+    lifted::original::c82227818(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -371,26 +372,26 @@ void Texts(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original, S
 }  // namespace
 
 ITC_REGS_STEP(LocationScreenResetMovie) {
-  Texts(ctx, base, __imp__sub_8222CD60, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+  Texts(ctx, base, lifted::original::c8222CD60, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::ResetMovie(base, sp, calls);
   });
 }
 
 ITC_REGS_STEP(LocationScreenShowUnlockEntry) {
-  Texts(ctx, base, __imp__sub_8222A978, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+  Texts(ctx, base, lifted::original::c8222A978, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::ShowUnlockEntry(base, sp, calls);
   });
 }
 
 ITC_REGS_STEP(LocationScreenShowListEntry) {
-  Texts(ctx, base, __imp__sub_8222B048, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+  Texts(ctx, base, lifted::original::c8222B048, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::ShowListEntry(base, sp, calls);
   });
 }
 
 #define LOCATION_SCREEN_TRANSITION(address, name)                                     \
   void LocationScreen##name(lifted::Regs& ctx, uint8_t* base) {                         \
-    Texts(ctx, base, __imp__sub_##address,                                            \
+    Texts(ctx, base, lifted::original::c##address,                                            \
           [&](uint32_t sp, uint32_t step, const ls::Calls& calls) {                   \
             return ls::name(base, sp, step, calls);                                   \
           });                                                                         \
@@ -414,19 +415,19 @@ LOCATION_SCREEN_TRANSITION(8222DEE0, Transition9)
 #undef LOCATION_SCREEN_TRANSITION
 
 ITC_REGS_STEP(LocationScreenShowOpponentInfo) {
-  Texts(ctx, base, __imp__sub_8222B438, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+  Texts(ctx, base, lifted::original::c8222B438, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::ShowOpponentInfo(base, sp, calls);
   });
 }
 
 ITC_REGS_STEP(LocationScreenStart) {
-  Texts(ctx, base, __imp__sub_8222F0B0, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+  Texts(ctx, base, lifted::original::c8222F0B0, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::Start(base, sp, calls);
   });
 }
 
 ITC_REGS_STEP(LocationScreenShowOpponentSpecs) {
-  Texts(ctx, base, __imp__sub_8222C188, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+  Texts(ctx, base, lifted::original::c8222C188, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::ShowOpponentSpecs(base, sp, calls);
   });
 }
@@ -435,7 +436,7 @@ ITC_REGS_STEP(LocationScreenPoseCar) {
   const uint32_t sp = ctx.r1.u32, model = ctx.r3.u32, index = ctx.r4.u32;
   const uint64_t r3 = ctx.r3.u64;
   if (((sp - ls::kPoseCarFrame) & 0xF) != 0) {
-    lifted::Sdk(ctx, base, __imp__sub_82228588);
+    lifted::original::c82228588(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -449,7 +450,7 @@ ITC_REGS_STEP(LocationScreenPoseCar) {
 
 ITC_REGS_STEP(LocationScreenShowCard) {
   if (!LocationScreenTextsNative(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_8222BBD0);
+    lifted::original::c8222BBD0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -468,7 +469,7 @@ ITC_REGS_STEP(LocationScreenShowOpponentPictures) {
 // movies' nodes through their plain C++).
 ITC_REGS_STEP(LocationScreenPollLoad) {
   if (!LocationScreenTextsNative(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82229238);
+    lifted::original::c82229238(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();

@@ -2,6 +2,7 @@
 // src/race_overlays/race_overlays.cpp (docs/functions/race-overlays.md).
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -122,7 +123,7 @@ ITC_OVERLAY_SET(8212CBE0, MarkerUpdate(base, ctx.r3.u32))
 ITC_NATIVE_ENTRY(821292E8, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!TrailUpdate(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_821292E8);
+    lifted::original::c821292E8(ctx, base);
   }
 }
 
@@ -174,7 +175,7 @@ ITC_NATIVE_ENTRY(8212D818, ITC_FLAG(native_race_overlays)) {
   uint32_t result = 0;
   double last = ctx.f1.f64;
   if (!SparksEmit(base, ctx.r3.u32, ctx.r4.u32, ctx.f2.f64, vector, &result, &last)) {
-    lifted::Sdk(ctx, base, __imp__sub_8212D818);
+    lifted::original::c8212D818(ctx, base);
     return;
   }
   ctx.r3.u64 = result;
@@ -225,7 +226,7 @@ ITC_OVERLAY_SET(8212D6E0, SparksReset(base, ctx.r3.u32))
 ITC_NATIVE_ENTRY(8212DDC8, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!SparksUpdate(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_8212DDC8);
+    lifted::original::c8212DDC8(ctx, base);
   }
 }
 
@@ -254,7 +255,7 @@ ITC_OVERLAY_SET(8212BFE8, ParticlesBConstruct(base, ctx.r3.u32))
     \
     if (!ITC_FLAG(native_race_overlays) || !hooks::NativeHeapActive() || \
         !(call)) {                                                   \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                               \
+      lifted::original::c##address(ctx, base);                               \
     }                                                                \
   }
 ITC_OVERLAY_DELETING(8212B358, SmokeDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32))
@@ -273,7 +274,7 @@ ITC_NATIVE_ENTRY(8212AA78, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = ctx.r3.u32;
   if (!SmokeUpdate(base, ctx.r3.u32, &r3)) {
-    lifted::Sdk(ctx, base, __imp__sub_8212AA78);
+    lifted::original::c8212AA78(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;
@@ -286,7 +287,7 @@ ITC_NATIVE_ENTRY(8212AA78, ITC_FLAG(native_race_overlays)) {
 ITC_NATIVE_ENTRY(8212B748, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!ParticlesBUpdate(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_8212B748);
+    lifted::original::c8212B748(ctx, base);
   }
 }
 
@@ -298,7 +299,7 @@ ITC_NATIVE_ENTRY(8212C2F0, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = ctx.r3.u32;
   if (!ParticlesCUpdate(base, ctx.r3.u32, &r3)) {
-    lifted::Sdk(ctx, base, __imp__sub_8212C2F0);
+    lifted::original::c8212C2F0(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;
@@ -338,7 +339,7 @@ ITC_OVERLAY_WORD(82126B50, RacerInCurrentStage(base, ctx.r4.u32))
 ITC_NATIVE_ENTRY(82124EE0, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!UpdateTrails(base, ctx.r3.u32, ctx.r1.u32 - 336 + 112)) {
-    lifted::Sdk(ctx, base, __imp__sub_82124EE0);
+    lifted::original::c82124EE0(ctx, base);
   }
 }
 
@@ -361,7 +362,7 @@ ITC_NATIVE_ENTRY(821251C0, ITC_FLAG(native_race_overlays)) {
 ITC_NATIVE_ENTRY(821252D0, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!UpdateParticlesB(base, ctx.r3.u32, ctx.r1.u32 - 256)) {
-    lifted::Sdk(ctx, base, __imp__sub_821252D0);
+    lifted::original::c821252D0(ctx, base);
   }
 }
 
@@ -378,7 +379,7 @@ ITC_NATIVE_ENTRY(82125798, ITC_FLAG(native_race_overlays)) {
 ITC_NATIVE_ENTRY(82125B60, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!UpdateSmoke(base, ctx.r3.u32, ctx.r1.u32 - 400)) {
-    lifted::Sdk(ctx, base, __imp__sub_82125B60);
+    lifted::original::c82125B60(ctx, base);
   }
 }
 
@@ -388,6 +389,6 @@ ITC_NATIVE_ENTRY(82125B60, ITC_FLAG(native_race_overlays)) {
 ITC_NATIVE_ENTRY(821270E8, ITC_FLAG(native_race_overlays)) {
   ctx.fpscr.disableFlushMode();
   if (!ModelMatrix(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_821270E8);
+    lifted::original::c821270E8(ctx, base);
   }
 }

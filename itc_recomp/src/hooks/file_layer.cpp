@@ -2,6 +2,7 @@
 // (docs/functions/file-layer.md).
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -53,7 +54,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A6BF0) {
   uint32_t result;
   if (!ITC_FLAG(native_file_layer) ||
       !file_layer::GamePathSetGame(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, &result)) {
-    lifted::Sdk(ctx, base, __imp__sub_820A6BF0);
+    lifted::original::c820A6BF0(ctx, base);
     return;
   }
   ctx.r3.u64 = result;
@@ -70,7 +71,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A6AB8) {
   uint32_t text;
   if (!ITC_FLAG(native_file_layer) ||
       !file_layer::OpenPathBuild(base, ctx.r4.u32, ctx.r1.u32, &text)) {
-    lifted::Sdk(ctx, base, __imp__sub_820A6AB8);
+    lifted::original::c820A6AB8(ctx, base);
     return;
   }
   ITC_NATIVE_RUNNING("sub_820A6AB8 GameFile::OpenRead (by name)");

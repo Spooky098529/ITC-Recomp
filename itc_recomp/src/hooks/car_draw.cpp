@@ -248,7 +248,7 @@ void LeaveDraw(lifted::Regs& ctx, const car_draw::Draw& draw) {
 
 ITC_REGS_STEP(CarDrawCarPartDraw) {
   if (!CarDrawModelCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820D06F0);
+    lifted::original::c820D06F0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -259,7 +259,7 @@ ITC_REGS_STEP(CarDrawCarPartDraw) {
   const auto draw = car_draw::CarPartDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                           ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, 0, 0);
   if (!draw) {
-    lifted::Sdk(ctx, base, __imp__sub_820D06F0);
+    lifted::original::c820D06F0(ctx, base);
     return;
   }
   ctx.lr = lr;
@@ -273,7 +273,7 @@ ITC_REGS_STEP(CarDrawBlinkTimersAdvance) {
 
 ITC_REGS_STEP(CarDrawIsNearPlayerHeight) {
   if (!CarDrawHeightCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820DAB58);
+    lifted::original::c820DAB58(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -299,7 +299,7 @@ void LeaveLeft(lifted::Regs& ctx, const car_draw::Left& left) {
 
 ITC_REGS_STEP(CarDrawSceneLightsDraw) {
   if (!CarDrawLightKitCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820DDE58);
+    lifted::original::c820DDE58(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -319,7 +319,7 @@ bool CarDrawShadowsCalleesNative() {
 
 ITC_REGS_STEP(CarDrawSceneParts) {
   if (!CarDrawShadowsCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820E2EE8);
+    lifted::original::c820E2EE8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -343,7 +343,7 @@ bool CarDrawInteriorCalleesNative() {
 ITC_REGS_STEP(CarDrawSceneInterior) {
   if (!CarDrawInteriorCalleesNative() || !ITC_FLAG(native_accessories) ||
       !ITC_FLAG(native_scene_models)) {
-    lifted::Sdk(ctx, base, __imp__sub_820E53F0);
+    lifted::original::c820E53F0(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -366,7 +366,7 @@ bool CarDrawCockpitCalleesNative() {
 
 ITC_REGS_STEP(CarDrawSceneCockpit) {
   if (!CarDrawCockpitCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820DC498);
+    lifted::original::c820DC498(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -384,7 +384,7 @@ ITC_REGS_STEP(CarDrawSceneCockpit) {
 
 ITC_REGS_STEP(CarDrawSceneTraffic) {
   if (!CarDrawShadowsCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820E6A40);
+    lifted::original::c820E6A40(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -406,7 +406,7 @@ bool CarDrawWheelsCalleesNative() {
 
 ITC_REGS_STEP(CarDrawSceneWheels) {
   if (!CarDrawWheelsCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820ECE28);
+    lifted::original::c820ECE28(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -431,7 +431,7 @@ bool CarDrawUpdateCalleesNative() {
 
 ITC_REGS_STEP(CarDrawUpdate) {
   if (!CarDrawUpdateCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_820DAC68);
+    lifted::original::c820DAC68(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();

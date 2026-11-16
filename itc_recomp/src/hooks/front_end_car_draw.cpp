@@ -3,6 +3,7 @@
 // register steps the harness shares (hooks/front_end_car_draw.h).
 
 #include "hooks/front_end_car_draw.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -82,7 +83,7 @@ fe::Calls FrontEndCarDrawCalls(lifted::Regs& ctx, uint8_t* base) {
 // The original unless the callees are native; else flush-to-zero off.
 #define ITC_FRONT_END_ORIGINAL(address)  \
   if (!FrontEndCarDrawCalleesNative()) { \
-    lifted::Sdk(ctx, base, __imp__sub_##address);     \
+    lifted::original::c##address(ctx, base);     \
     return;                              \
   }                                      \
   ctx.fpscr.disableFlushMode();
@@ -213,7 +214,7 @@ void FrontEndCarDrawFloorDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_
   // list's diagnostics (as its adapter).
   if (!FrontEndCarDrawCalleesNative() || !ITC_FLAG(native_scenery_lists) ||
       SceneryListsSlotDiagnostics()) {
-    lifted::Sdk(ctx, base, __imp__sub_820C8480);
+    lifted::original::c820C8480(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -236,7 +237,7 @@ ITC_REGS_STEP(FrontEndCarDrawPoseCar) {
   // only where their adapters would run it.
   if (!FrontEndCarDrawCalleesNative() || !ITC_FLAG(native_matrix_math) ||
       !ITC_FLAG(native_accessories) || !native::Buffers_NativeMemcpy()) {
-    lifted::Sdk(ctx, base, __imp__sub_8217CAB8);
+    lifted::original::c8217CAB8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();

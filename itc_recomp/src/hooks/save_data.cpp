@@ -3,6 +3,7 @@
 // (hooks/save_data.h).
 
 #include "hooks/save_data.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -58,7 +59,7 @@ ITC_REGS_STEP(SaveDataBitSetAll) {
 
 ITC_REGS_STEP(SaveDataProgressSetDefaults) {
   if (!sd::SetDefaultsNative(ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82113E60);
+    lifted::original::c82113E60(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -92,7 +93,7 @@ ITC_REGS_STEP(SaveDataDelete) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_821055D8);
+  lifted::original::c821055D8(ctx, base);
 }
 
 ITC_REGS_STEP(SaveDataCreate) {
@@ -106,7 +107,7 @@ ITC_REGS_STEP(SaveDataCreate) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_821057C8);
+  lifted::original::c821057C8(ctx, base);
 }
 
 ITC_REGS_STEP(SaveDataCreateTwoPlayerBlock) {
@@ -117,7 +118,7 @@ ITC_REGS_STEP(SaveDataCreateTwoPlayerBlock) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_82105740);
+  lifted::original::c82105740(ctx, base);
 }
 
 ITC_REGS_STEP(SaveDataResetControllers) {
@@ -129,7 +130,7 @@ ITC_REGS_STEP(SaveDataResetControllers) {
 
 ITC_REGS_STEP(SaveDataMenuListInit) {
   if (!hooks::NativeHeapActive() || !sd::MenuListInitNative(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_8220BAC0);
+    lifted::original::c8220BAC0(ctx, base);
     return;
   }
   const sd::MenuListArgs args{ctx.r4.u32,
@@ -146,7 +147,7 @@ ITC_REGS_STEP(SaveDataMenuListInit) {
 
 ITC_REGS_STEP(SaveDataResetPlayer) {
   if (!hooks::NativeHeapActive() || !sd::ResetPlayerNative(base)) {
-    lifted::Sdk(ctx, base, __imp__sub_82221D00);
+    lifted::original::c82221D00(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -217,7 +218,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209F5E0) {
     return;
   }
   if (!ITC_FLAG(native_save_data)) {
-    lifted::Sdk(ctx, base, __imp__sub_8209F5E0);
+    lifted::original::c8209F5E0(ctx, base);
     return;
   }
   hooks::SaveDataResetControllers(ctx, base);
@@ -230,7 +231,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8220BAC0) {
     return;
   }
   if (!ITC_FLAG(native_save_data)) {
-    lifted::Sdk(ctx, base, __imp__sub_8220BAC0);
+    lifted::original::c8220BAC0(ctx, base);
     return;
   }
   hooks::SaveDataMenuListInit(ctx, base);

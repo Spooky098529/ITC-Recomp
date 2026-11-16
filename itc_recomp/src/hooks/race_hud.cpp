@@ -4,6 +4,7 @@
 // the originals' return addresses, from frames like theirs.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -57,7 +58,7 @@ namespace race_hud_hooks {
 // and the finished flag set. From a frame like the original's (112 bytes).
 ITC_REGS_STEP(DrawRivalLogo) {
   if (!ITC_FLAG(native_race_hud)) {
-    lifted::Sdk(ctx, base, __imp__sub_82211A28);
+    lifted::original::c82211A28(ctx, base);
     return;
   }
   const uint32_t entry = ctx.r3.u32;

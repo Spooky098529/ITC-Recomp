@@ -73,7 +73,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82592670) {
     s->Wait(base);
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_82592670);
+  lifted::original::c82592670(ctx, base);
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(825926E8) {
@@ -82,13 +82,13 @@ ITC_NATIVE_ENTRY_ALWAYS(825926E8) {
     s->Signal(base);
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_825926E8);
+  lifted::original::c825926E8(ctx, base);
 }
 
 #define ITC_ARCHIVE_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                \
   if (!ITC_FLAG(native_archive)) {    \
-    lifted::Sdk(ctx, base, __imp__sub_##address); \
+    lifted::original::c##address(ctx, base); \
     return;                           \
   }
 
@@ -118,7 +118,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8224FB10) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                            \
     \
     if (!ITC_FLAG(native_archive) || !hooks::NativeAtexit()) {    \
-      lifted::Sdk(ctx, base, __imp__sub_##address);               \
+      lifted::original::c##address(ctx, base);               \
       return;                                                     \
     }                                                             \
     hooks::GuestAtexit guest{ctx, base};                          \
@@ -224,7 +224,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82294610) {
 #define ITC_ARCHIVE_QUEUE_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                      \
   if (!hooks::NativeArchiveQueue()) {       \
-    lifted::Sdk(ctx, base, __imp__sub_##address); \
+    lifted::original::c##address(ctx, base); \
     return;                                 \
   }
 
@@ -371,7 +371,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
   
   if (!ITC_FLAG(native_archive) || !ITC_FLAG(native_std_string) || !hooks::NativeHeapActive() ||
       !ITC_FLAG(native_file_layer)) {
-    lifted::Sdk(ctx, base, __imp__sub_8209DFA8);
+    lifted::original::c8209DFA8(ctx, base);
     return;
   }
   ITC_NATIVE_RUNNING("sub_8209DFA8 Archive::ReadLoose");
@@ -388,7 +388,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
         ctx.r3.u64 = string;
         ctx.r4.u64 = text;
         ctx.r5.u64 = allocator;
-        lifted::Sdk(ctx, base, __imp__sub_82593248);
+        lifted::original::c82593248(ctx, base);
       });
     }
   };
@@ -399,7 +399,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
         ctx.r4.u64 = source;
         ctx.r5.u64 = 0;
         ctx.r6.s64 = -1;
-        lifted::Sdk(ctx, base, __imp__sub_82091720);
+        lifted::original::c82091720(ctx, base);
       });
     }
   };
@@ -409,7 +409,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
         ctx.r3.u64 = string;
         ctx.r4.u64 = 1;
         ctx.r5.u64 = 0;
-        lifted::Sdk(ctx, base, __imp__sub_82091328);
+        lifted::original::c82091328(ctx, base);
       });
     }
   };
@@ -428,7 +428,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
       ctx.r4.u64 = 0x82001DE8;
       ctx.r5.u64 = 0x82001DEC;
       ctx.r6.u64 = 0;
-      lifted::Sdk(ctx, base, __imp__sub_82593088);
+      lifted::original::c82593088(ctx, base);
     });
     text = ctx.r3.u32;
   }

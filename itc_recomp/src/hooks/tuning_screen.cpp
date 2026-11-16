@@ -5,6 +5,7 @@
 // functor); the others went once their callers were native.
 
 #include "hooks/tuning_screen.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -981,7 +982,7 @@ void TuningWithRefreshStand(
 // C++ (the refresh's, UpdateStand's and SetCarStats' checks).
 ITC_NATIVE_ENTRY_ALWAYS(821E6C50) {
   if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningUpdateCalleesNative()) {
-    lifted::Sdk(ctx, base, __imp__sub_821E6C50);
+    lifted::NoOriginal(0x821E6C50);
     return;
   }
   // (the caller's r24: diagnostic only, not carried)

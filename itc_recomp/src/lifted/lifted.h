@@ -156,19 +156,25 @@ uint64_t CheckGlobalLock();
 void Trap(uint32_t type);
 
 // Registers lifted functions' entries under their addresses (a batch's
-// table, at start-up), with the flag that turns the batch on.
+// table, at start-up). `enabled`, the flag that once turned the batch on (off:
+// the recompiled original), is no longer read: since the rewiring's stage 5
+// there's no recompiled code to run instead.
 struct Registration {
   uint32_t address;
   Entry entry;
 };
 void Register(const Registration* entries, size_t count, const bool* enabled);
 
-// The entry registered at `address` when its batch is on, else null.
+// The entry registered at `address`, else null.
 Entry Find(uint32_t address);
 
-// Calls the function at `address`: its lifted entry when there is one
-// (and its batch is on), else the function the SDK has there (a port's
-// override or the recompiled original) through the boundary.
+// Calls the function at `address`: its entry in the dispatch table (lifted,
+// a hand port's or an import thunk's). An address with none is logged and
+// stops the program.
 Result Call(uint8_t* base, uint32_t address, const Args& args);
+
+// A function's original asked for where it couldn't be lifted (a flag off,
+// or a case the port declines): logged, and the program stops.
+[[noreturn]] void NoOriginal(uint32_t address);
 
 }  // namespace lifted

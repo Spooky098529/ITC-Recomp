@@ -3,6 +3,7 @@
 // the harness shares (hooks/xact_tracks.h).
 
 #include "hooks/xact_tracks.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -212,7 +213,7 @@ ITC_REGS_STEP(XactTrackSetVolume) {
   if (declined) {
     ctx.r3.u64 = track;
     ctx.f1.f64 = f1;
-    lifted::Sdk(ctx, base, __imp__sub_825D0BF8);
+    lifted::original::c825D0BF8(ctx, base);
   }
 }
 
@@ -227,7 +228,7 @@ ITC_REGS_STEP(XactTrackUpdateVolume) {
   });
   if (declined) {
     ctx.r3.u64 = track;
-    lifted::Sdk(ctx, base, __imp__sub_825D0428);
+    lifted::original::c825D0428(ctx, base);
   }
 }
 
@@ -236,7 +237,7 @@ ITC_REGS_STEP(XactTrackCreateRpcs) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_825D06B8);
+  lifted::original::c825D06B8(ctx, base);
 }
 
 ITC_REGS_STEP(XactTrackStartRpcs) {
@@ -244,7 +245,7 @@ ITC_REGS_STEP(XactTrackStartRpcs) {
     ctx.r3.u64 = *r3;
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_825D0800);
+  lifted::original::c825D0800(ctx, base);
 }
 
 ITC_REGS_STEP(XactTrackConstruct) {
@@ -367,7 +368,7 @@ ITC_REGS_STEP(XactEventCreate) {
   });
   if (declined) {
     ctx.r3.u64 = engine;
-    lifted::Sdk(ctx, base, __imp__sub_825D0F00);
+    lifted::original::c825D0F00(ctx, base);
   }
 }
 
@@ -477,7 +478,7 @@ ITC_REGS_STEP(XactTrackPlay) {
   ITC_NATIVE_ENTRY_ALWAYS(address) {                                 \
     \
     if (!ITC_FLAG(native_xact_tracks) || !hooks::NativeHeapActive()) { \
-      lifted::Sdk(ctx, base, __imp__sub_##address);                    \
+      lifted::original::c##address(ctx, base);                    \
       return;                                                          \
     }                                                                  \
     hooks::step(ctx, base);                                            \

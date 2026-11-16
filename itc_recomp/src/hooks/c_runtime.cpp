@@ -100,7 +100,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825B3430) {
     ctx.r3.u64 = c_runtime::LockExit(base);
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_825B3430);
+  lifted::original::c825B3430(ctx, base);
 }
 
 // _unlock: r3 = the lock number; r3 = its critical section, as _lock's.
@@ -110,7 +110,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825B32D0) {
     ctx.r3.u64 = c_runtime::UnlockExit(base);
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_825B32D0);
+  lifted::original::c825B32D0(ctx, base);
 }
 
 // atexit: r3 = the function; returns 0, or -1 when the table can't take it.
@@ -138,7 +138,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825A6F00) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_825A6F00);
+  lifted::original::c825A6F00(ctx, base);
 }
 
 int32_t hooks::GuestAtexit::Run(void* self, uint32_t function) {
@@ -185,7 +185,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82295890) {
   
   if (!ITC_FLAG(native_c_runtime) ||
       !c_runtime::XMemCpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_82295890);
+    lifted::original::c82295890(ctx, base);
   }
 }
 
@@ -221,7 +221,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825AC710) {
   
   if (!ITC_FLAG(native_c_runtime) || ctx.r3.u32 == 0 || ctx.r4.u32 == 0 ||
       ctx.r5.u32 > 0x7FFFFFFFu) {
-    lifted::Sdk(ctx, base, __imp__sub_825AC710);
+    lifted::original::c825AC710(ctx, base);
     return;
   }
   ctx.r3.s64 = c_runtime::AsciiStrnicmp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
@@ -257,7 +257,7 @@ ITC_NATIVE_ENTRY(825AA840, ITC_FLAG(native_c_runtime)) {
     return;
   }
   if (!c_runtime::MemmoveDown(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_825AA840);
+    lifted::original::c825AA840(ctx, base);
   }
 }
 
@@ -274,7 +274,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825A7348) {
       return;
     }
   }
-  lifted::Sdk(ctx, base, __imp__sub_825A7348);
+  lifted::original::c825A7348(ctx, base);
 }
 
 // memcpy_s: r3 = destination, r4 = its size, r5 = source, r6 = count;
@@ -290,7 +290,7 @@ ITC_NATIVE_ENTRY(825A7270, ITC_FLAG(native_c_runtime)) {
     return;
   }
   if (ctx.r3.u32 == 0 || ctx.r5.u32 == 0 || ctx.r4.u32 < ctx.r6.u32) {
-    lifted::Sdk(ctx, base, __imp__sub_825A7270);
+    lifted::original::c825A7270(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -356,7 +356,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825A85E0) {
   uint64_t result = 0;
   if (!ITC_FLAG(native_c_runtime) ||
       !StrToXl(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, 1, &result)) {
-    lifted::Sdk(ctx, base, __imp__sub_825A85E0);
+    lifted::original::c825A85E0(ctx, base);
     return;
   }
   ctx.r3.u64 = result;
@@ -383,7 +383,7 @@ bool Atof(lifted::Regs& ctx, uint8_t* base) {
 ITC_NATIVE_ENTRY_ALWAYS(825AB1C0) {
   
   if (!Atof(ctx, base)) {
-    lifted::Sdk(ctx, base, __imp__sub_825AB1C0);
+    lifted::original::c825AB1C0(ctx, base);
   }
 }
 
@@ -399,7 +399,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825AB1C0) {
 namespace {
 ITC_REGS_STEP(CftofL) {
   if (!c_runtime::Cftof(base, REX_LOAD_U64(ctx.r3.u32), ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
-    lifted::Sdk(ctx, base, __imp__sub_825AE8E0);
+    lifted::original::c825AE8E0(ctx, base);
     return;
   }
   ctx.r3.u64 = 0;
@@ -437,7 +437,7 @@ ITC_NATIVE_ENTRY(825AEB20, ITC_FLAG(native_c_runtime)) {
 ITC_NATIVE_ENTRY(825AF000, ITC_FLAG(native_c_runtime)) {
   const int32_t done = c_runtime::WriteChar(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
   if (done < 0) {
-    lifted::Sdk(ctx, base, __imp__sub_825AF000);
+    lifted::original::c825AF000(ctx, base);
     return;
   }
   if (done == 1) {
@@ -455,7 +455,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825AF098) {
   int32_t last;
   if (!ITC_FLAG(native_c_runtime) ||
       !c_runtime::WriteMultiChar(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32, ctx.r6.u32, &last)) {
-    lifted::Sdk(ctx, base, __imp__sub_825AF098);
+    lifted::original::c825AF098(ctx, base);
     return;
   }
   if (last >= 0) {
@@ -479,7 +479,7 @@ ITC_NATIVE_ENTRY(825A93D0, ITC_FLAG(native_c_runtime)) {
   int32_t count;
   if (!c_runtime::Sprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 + 32,
                           ctx.r1.u32 - 144 - 1328, &count)) {
-    lifted::Sdk(ctx, base, __imp__sub_825A93D0);
+    lifted::original::c825A93D0(ctx, base);
     return;
   }
   ctx.r3.u64 = uint32_t(count);
@@ -496,7 +496,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825AB010) {
   if (!ITC_FLAG(native_c_runtime) ||
       !c_runtime::Vsnprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                             ctx.r1.u32 - 144 - 1328, &count)) {
-    lifted::Sdk(ctx, base, __imp__sub_825AB010);
+    lifted::original::c825AB010(ctx, base);
     return;
   }
   ctx.r3.u64 = uint32_t(count);

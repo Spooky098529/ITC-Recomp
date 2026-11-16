@@ -211,7 +211,7 @@ ITC_REGS_STEP(RaceSetupRouteSet) {
   ctx.fpscr.disableFlushMode();
   if (!rs::RouteSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                     ctx.r1.u32 - rs::kRouteFrameBytes)) {
-    lifted::Sdk(ctx, base, __imp__sub_82101A10);
+    lifted::original::c82101A10(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
@@ -220,7 +220,7 @@ ITC_REGS_STEP(RaceSetupRouteSet) {
 ITC_REGS_STEP(RaceSetupRouteReset) {
   ctx.fpscr.disableFlushMode();
   if (!rs::RouteReset(base, ctx.r3.u32, ctx.r1.u32 - rs::kRouteFrameBytes)) {
-    lifted::Sdk(ctx, base, __imp__sub_82101990);
+    lifted::original::c82101990(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
@@ -230,7 +230,7 @@ ITC_REGS_STEP(RaceSetupStartPosition) {
   ctx.fpscr.disableFlushMode();
   uint32_t result = 0;
   if (!rs::StartPosition(base, ctx.r3.u32, ctx.r1.u32 - rs::kStartFrameBytes, &result)) {
-    lifted::Sdk(ctx, base, __imp__sub_82101A98);
+    lifted::original::c82101A98(ctx, base);
     return;
   }
   ctx.r3.u64 = result;
@@ -244,7 +244,7 @@ ITC_REGS_STEP(RaceSetupRacersReset) {
 ITC_REGS_STEP(RaceSetupRacersAdd) {
   ctx.fpscr.disableFlushMode();
   if (!rs::RacersAddNative(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820FF860);
+    lifted::original::c820FF860(ctx, base);
     return;
   }
   ctx.r3.s64 = rs::RacersAdd(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32);
@@ -253,7 +253,7 @@ ITC_REGS_STEP(RaceSetupRacersAdd) {
 ITC_REGS_STEP(RaceSetupAddRacer) {
   ctx.fpscr.disableFlushMode();
   if (!rs::AddRacerNative(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_821017C0);
+    lifted::original::c821017C0(ctx, base);
     return;
   }
   ctx.r3.s64 = rs::AddRacer(base, ctx.r3.u32, ctx.r5.u32, ctx.f1.f64, ctx.r6.u32);
@@ -263,7 +263,7 @@ ITC_REGS_STEP(RaceSetupRecordReset) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 128;
   if (!rs::RecordReset(base, ctx.r3.u32, frame)) {
-    lifted::Sdk(ctx, base, __imp__sub_82101F68);
+    lifted::original::c82101F68(ctx, base);
     return;
   }
   // Route::Reset's r3 (its frame + 80), and f1 as the entries' resets leave
@@ -275,7 +275,7 @@ ITC_REGS_STEP(RaceSetupRecordReset) {
 ITC_REGS_STEP(RaceSetupRaceSetRoute) {
   ctx.fpscr.disableFlushMode();
   if (!rs::RaceSetRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - rs::kRouteFrameBytes)) {
-    lifted::Sdk(ctx, base, __imp__sub_82101D38);
+    lifted::original::c82101D38(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
@@ -285,7 +285,7 @@ ITC_REGS_STEP(RaceSetupStagesSetRoute) {
   ctx.fpscr.disableFlushMode();
   if (!rs::StagesSetRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                           ctx.r1.u32 - rs::kRouteFrameBytes)) {
-    lifted::Sdk(ctx, base, __imp__sub_82101E90);
+    lifted::original::c82101E90(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
@@ -294,7 +294,7 @@ ITC_REGS_STEP(RaceSetupStagesSetRoute) {
 ITC_REGS_STEP(RaceSetupRaceDataReset) {
   ctx.fpscr.disableFlushMode();
   if (!rs::RaceDataReset(base, ctx.r1.u32 - 112)) {
-    lifted::Sdk(ctx, base, __imp__sub_821020F0);
+    lifted::original::c821020F0(ctx, base);
     return;
   }
   // The last sub_82101F68's r3 (its Route::Reset's frame + 80) and f1.
@@ -308,7 +308,7 @@ ITC_REGS_STEP(RaceSetupRaceDataResetGlobal) {
   }
   ctx.fpscr.disableFlushMode();
   if (!rs::RaceDataResetGlobal(base, ctx.r1.u32 - 112)) {
-    lifted::Sdk(ctx, base, __imp__sub_821021A8);
+    lifted::original::c821021A8(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - 112 - 112 - 128 - rs::kRouteFrameBytes + 80;
@@ -343,7 +343,7 @@ ITC_REGS_STEP(RaceSetupSetStart) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 4096;
   if (!rs::SetStartNative(base, ctx.r3.u32, ctx.r4.u32, frame)) {
-    lifted::Sdk(ctx, base, __imp__sub_82101D50);
+    lifted::original::c82101D50(ctx, base);
     return;
   }
   RefreshCall call{&ctx, base, frame, 0x82101DC8};
@@ -354,7 +354,7 @@ ITC_REGS_STEP(RaceSetupPlaceRacers) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 128;
   if (!rs::PlaceRacersNative(base, frame)) {
-    lifted::Sdk(ctx, base, __imp__sub_82102048);
+    lifted::original::c82102048(ctx, base);
     return;
   }
   RefreshCall call{&ctx, base, frame - 4096, 0x82101DC8};
@@ -365,7 +365,7 @@ ITC_REGS_STEP(RaceSetupSetUpRival) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 4112;
   if (!rs::SetUpRivalNative(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, frame)) {
-    lifted::Sdk(ctx, base, __imp__sub_82112DB0);
+    lifted::original::c82112DB0(ctx, base);
     return;
   }
   RefreshCall call{&ctx, base, frame, 0x82112EC4};
@@ -428,7 +428,7 @@ ITC_REGS_STEP(RaceSetupSetUp) {
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 11984;
   if (!rs::SetUpNative(base, ctx.r3.u32, frame)) {
-    lifted::Sdk(ctx, base, __imp__sub_82115D98);
+    lifted::original::c82115D98(ctx, base);
     return;
   }
   SetUpCall call{&ctx, base};

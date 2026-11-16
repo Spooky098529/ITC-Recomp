@@ -4,6 +4,7 @@
 // through vtables, so the adapters stay until their callers are native.
 
 #include "hooks/xaudio_engine.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -86,7 +87,7 @@ ITC_REGS_STEP(XAudioFree) {
     ctx.r3.u64 = xa::Free(ctx.r4.u32, ctx.r5.u32);
     return;
   }
-  lifted::Sdk(ctx, base, __imp__sub_8245EF90);
+  lifted::original::c8245EF90(ctx, base);
 }
 
 ITC_REGS_STEP(XAudioAllocatorAlloc) {

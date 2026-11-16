@@ -53,7 +53,7 @@ ITC_FLAG_BOOL(native_collision, true, "ITC",
     \
     uint32_t value = 0;                     \
     if (!ITC_FLAG(native_collision) || !call) { \
-      lifted::Sdk(ctx, base, __imp__sub_##address); \
+      lifted::original::c##address(ctx, base); \
       return;                               \
     }                                       \
     ctx.r3.u64 = value;                     \
@@ -99,7 +99,7 @@ ITC_COLLISION(822BE2C8, ctx.r3.u64 = WordAt8(base, ctx.r3.u32))
 ITC_NATIVE_ENTRY(820B9C40, ITC_FLAG(native_collision)) {
   ctx.fpscr.disableFlushMode();
   if (!BoxPlace(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 288)) {
-    lifted::Sdk(ctx, base, __imp__sub_820B9C40);
+    lifted::original::c820B9C40(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32 + 96;
@@ -144,12 +144,12 @@ ITC_NATIVE_ENTRY_ALWAYS(820BB758) {
     \
     uint32_t result = 0;                    \
     if (!ITC_FLAG(native_collision)) {      \
-      lifted::Sdk(ctx, base, __imp__sub_##address); \
+      lifted::original::c##address(ctx, base); \
       return;                               \
     }                                       \
     ctx.fpscr.disableFlushMode();           \
     if (!call) {                            \
-      lifted::Sdk(ctx, base, __imp__sub_##address); \
+      lifted::original::c##address(ctx, base); \
       return;                               \
     }                                       \
     ctx.r3.u64 = result;                    \
@@ -171,7 +171,7 @@ ITC_COLLISION(820BBB20, uint32_t r3 = 0;
 ITC_NATIVE_ENTRY(820BF038, ITC_FLAG(native_collision)) {
   ctx.fpscr.disableFlushMode();
   if (!BoxBoxFindImpact(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820BF038);
+    lifted::original::c820BF038(ctx, base);
     return;
   }
   ctx.r3.u64 = ctx.r3.u32 + 64;
@@ -189,7 +189,7 @@ ITC_NATIVE_ENTRY(820BFB28, ITC_FLAG(native_collision)) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
   if (!BoxBoxFindPushOut(base, ctx.r3.u32, ctx.r1.u32 - 96, &r3)) {
-    lifted::Sdk(ctx, base, __imp__sub_820BFB28);
+    lifted::original::c820BFB28(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;
@@ -224,7 +224,7 @@ bool NativeLifetime() {
 ITC_NATIVE_ENTRY_ALWAYS(820BB140) {
   
   if (!NativeLifetime() || !ShapeDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820BB140);
+    lifted::original::c820BB140(ctx, base);
   }
 }
 // Slot 5: r4 = memory or 0; r3 comes back as the copy (or 0).
@@ -232,12 +232,12 @@ ITC_NATIVE_ENTRY_ALWAYS(820BB218) {
   
   uint32_t copy = 0;
   if (!NativeLifetime()) {
-    lifted::Sdk(ctx, base, __imp__sub_820BB218);
+    lifted::original::c820BB218(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
   if (!BoxClone(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 96, &copy)) {
-    lifted::Sdk(ctx, base, __imp__sub_820BB218);
+    lifted::original::c820BB218(ctx, base);
     return;
   }
   ctx.r3.u64 = copy;

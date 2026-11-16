@@ -7,6 +7,7 @@
 // originals run.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -48,7 +49,7 @@ bool hooks::NativeFramePasses() {
 #define ITC_FRAME_PASSES_FALLBACK(address) \
   REX_FUNC_PROLOGUE();                     \
   if (!hooks::NativeFramePasses()) {       \
-    lifted::Sdk(ctx, base, __imp__sub_##address); \
+    lifted::original::c##address(ctx, base); \
     return;                                \
   }
 
@@ -74,7 +75,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82096360) {
   ITC_FRAME_PASSES_FALLBACK(82096360)
   const auto last = fp::RecordConstants(base, ctx.r4.u32);
   if (!last) {
-    lifted::Sdk(ctx, base, __imp__sub_82096360);
+    lifted::original::c82096360(ctx, base);
     return;
   }
   ctx.r3.u64 = *last;
@@ -85,7 +86,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82096030) {
   ITC_FRAME_PASSES_FALLBACK(82096030)
   const auto last = fp::RecordSamplers(base, ctx.r4.u32);
   if (!last) {
-    lifted::Sdk(ctx, base, __imp__sub_82096030);
+    lifted::original::c82096030(ctx, base);
     return;
   }
   ctx.r3.u64 = *last;
@@ -114,14 +115,14 @@ void hooks::FramePassesRecordPrimitiveReset(lifted::Regs& ctx, uint8_t* base) {
   });
   ctx.lr = lr;
   if (!done) {
-    lifted::Sdk(ctx, base, __imp__sub_82589990);
+    lifted::original::c82589990(ctx, base);
   }
 }
 
 
 void hooks::FramePassesJobWait(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_frame_passes)) {
-    lifted::Sdk(ctx, base, __imp__sub_82094B10);
+    lifted::original::c82094B10(ctx, base);
     return;
   }
   const uint32_t job = ctx.r3.u32;
@@ -151,7 +152,7 @@ void hooks::FramePassesJobWait(lifted::Regs& ctx, uint8_t* base) {
 // (the original without --native_video_output). r3 the video output.
 void hooks::FramePassesBoot(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_frame_passes) || !ITC_FLAG(native_video_output)) {
-    lifted::Sdk(ctx, base, __imp__sub_820962B8);
+    lifted::original::c820962B8(ctx, base);
     return;
   }
   const uint32_t passes = ctx.r3.u32;
@@ -192,7 +193,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820962B8) {
 // word it reads at its +164 read there); r3 it.
 void hooks::FramePassesConstruct(lifted::Regs& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_frame_passes)) {
-    lifted::Sdk(ctx, base, __imp__sub_82098630);
+    lifted::original::c82098630(ctx, base);
     return;
   }
   const uint32_t passes = ctx.r3.u32;
@@ -243,7 +244,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82098630) {
 // command list's diagnostics on.
 void hooks::FramePassesRecord(lifted::Regs& ctx, uint8_t* base) {
   if (!hooks::NativeFramePasses()) {
-    lifted::Sdk(ctx, base, __imp__sub_82096418);
+    lifted::original::c82096418(ctx, base);
     return;
   }
   const uint32_t passes = ctx.r3.u32;
@@ -285,7 +286,7 @@ void hooks::FramePassesRecord(lifted::Regs& ctx, uint8_t* base) {
   ctx.lr = lr;
   if (!done) {
     ctx.r3.u64 = passes;  // the getters left their answers
-    lifted::Sdk(ctx, base, __imp__sub_82096418);
+    lifted::original::c82096418(ctx, base);
   }
 }
 

@@ -3,6 +3,7 @@
 // vtables, so these adapters stay until their callers are native.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -53,7 +54,7 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
 #define ITC_XACT_FALLBACK(address)    \
   REX_FUNC_PROLOGUE();                \
   if (!ITC_FLAG(native_xact)) {       \
-    lifted::Sdk(ctx, base, __imp__sub_##address); \
+    lifted::original::c##address(ctx, base); \
     return;                           \
   }                                   \
   ctx.fpscr.disableFlushMode();
@@ -80,7 +81,7 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
   ITC_NATIVE_ENTRY_ALWAYS(address) {                         \
     ITC_XACT_FALLBACK(address)                                 \
     if (!hooks::NativeHeapActive()) {                          \
-      lifted::Sdk(ctx, base, __imp__sub_##address);            \
+      lifted::original::c##address(ctx, base);            \
       return;                                                  \
     }                                                          \
     ctx.r3.u64 = uint32_t(expr);                               \
@@ -94,7 +95,7 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
     ITC_XACT_FALLBACK(address)           \
     const auto itc_result_ = (expr);     \
     if (!itc_result_) {                  \
-      lifted::Sdk(ctx, base, __imp__sub_##address); \
+      lifted::original::c##address(ctx, base); \
       return;                            \
     }                                    \
     ctx.r3.u64 = *itc_result_;           \
@@ -107,7 +108,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825BFC50) {
   ITC_XACT_FALLBACK(825BFC50)
   uint32_t hash = 0;
   if (!HashName(base, ctx.r4.u32, ctx.r5.u32, &hash)) {
-    lifted::Sdk(ctx, base, __imp__sub_825BFC50);
+    lifted::original::c825BFC50(ctx, base);
     return;
   }
   ctx.r3.u64 = hash;
@@ -149,7 +150,7 @@ ITC_XACT_WORD(825C85E8, WaveBankGetEntryCount(base, ctx.r3.u32))
 ITC_NATIVE_ENTRY_ALWAYS(825CC320) {
   ITC_XACT_FALLBACK(825CC320)
   if (!WaveBankGetWaveFormat(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_825CC320);
+    lifted::original::c825CC320(ctx, base);
     return;
   }
   // The original leaves the entry's address (GetEntry's r3).
@@ -175,7 +176,7 @@ ITC_XACT_OPTIONAL(825C0408, EngineForgetWaveBank(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_ENTRY_ALWAYS(825CA980) {
   ITC_XACT_FALLBACK(825CA980)
   if (!SoundSetTrackParameter(base, ctx.r3.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_825CA980);
+    lifted::original::c825CA980(ctx, base);
   }
 }
 ITC_XACT_OPTIONAL(825CC1D0, FaderStep(base, ctx.r3.u32))
@@ -204,7 +205,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825C67E8) {
   const uint32_t cue = ctx.r3.u32;
   if (!hooks::NativeHeapActive() ||
       !CueConstruct(base, cue, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_825C67E8);
+    lifted::original::c825C67E8(ctx, base);
     return;
   }
   ctx.r3.u64 = cue;
@@ -225,7 +226,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825C7E40) {
                                           ctx.r7.u32)
                           : std::nullopt;
   if (!result) {
-    lifted::Sdk(ctx, base, __imp__sub_825C7E40);
+    lifted::original::c825C7E40(ctx, base);
     return;
   }
   ctx.r3.u64 = *result;
@@ -285,7 +286,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825C7218) {
                           ? SoundBankGetWaveBank(base, ctx.r3.u32, ctx.r4.u32)
                           : std::nullopt;
   if (!result) {
-    lifted::Sdk(ctx, base, __imp__sub_825C7218);
+    lifted::original::c825C7218(ctx, base);
     return;
   }
   ctx.r3.u64 = *result;
@@ -301,7 +302,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825CB5E8) {
   ITC_XACT_FALLBACK(825CB5E8)
   const auto result = SoundGetVolume(base, ctx.r3.u32);
   if (!result) {
-    lifted::Sdk(ctx, base, __imp__sub_825CB5E8);
+    lifted::original::c825CB5E8(ctx, base);
     return;
   }
   ctx.f1.f64 = result->f1;
@@ -314,7 +315,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825C5E28) {
   const auto result =
       hooks::NativeHeapActive() ? CueMakeInstanceVariable(base, ctx.r3.u32) : std::nullopt;
   if (!result) {
-    lifted::Sdk(ctx, base, __imp__sub_825C5E28);
+    lifted::original::c825C5E28(ctx, base);
     return;
   }
   ctx.r3.u64 = *result;
@@ -333,7 +334,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825C26E0) {
                                          ctx.r7.u32)
                           : std::nullopt;
   if (!result) {
-    lifted::Sdk(ctx, base, __imp__sub_825C26E0);
+    lifted::original::c825C26E0(ctx, base);
     return;
   }
   ctx.r3.u64 = *result;
@@ -346,7 +347,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825CC380) {
   ITC_XACT_FALLBACK(825CC380)
   const auto result = WaveBankGetWaveDurations(base, ctx.r3.u32, ctx.r4.u32);
   if (!result) {
-    lifted::Sdk(ctx, base, __imp__sub_825CC380);
+    lifted::original::c825CC380(ctx, base);
     return;
   }
   guest::StoreU32(base, ctx.r5.u32, result->duration_ms);
@@ -360,7 +361,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825C6A20) {
   const auto result =
       hooks::NativeHeapActive() ? SoundBankReleaseWaveBanks(base, ctx.r3.u32) : std::nullopt;
   if (!result) {
-    lifted::Sdk(ctx, base, __imp__sub_825C6A20);
+    lifted::original::c825C6A20(ctx, base);
     return;
   }
   ctx.r3.u64 = *result;
@@ -380,7 +381,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825BFE28) {
   ITC_XACT_FALLBACK(825BFE28)
   const auto ms = GetTimeMs(base);
   if (!ms) {
-    lifted::Sdk(ctx, base, __imp__sub_825BFE28);
+    lifted::original::c825BFE28(ctx, base);
     return;
   }
   ctx.r3.u64 = *ms;

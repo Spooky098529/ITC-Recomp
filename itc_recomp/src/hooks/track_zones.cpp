@@ -11,6 +11,7 @@
 // from TrackZones::Create.
 
 #include "guest.h"
+#include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
 #include "base/flags.h"
@@ -154,7 +155,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8228E788) {
     return;  // a harness's (the race HUD object's)
   }
   if (!ITC_FLAG(native_track_zones)) {
-    lifted::Sdk(ctx, base, __imp__sub_8228E788);
+    lifted::original::c8228E788(ctx, base);
     return;
   }
   const uint64_t lr = ctx.lr;
@@ -163,7 +164,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8228E788) {
   const SetupCalls setup_calls{&user, CopyRange};
   uint64_t r3 = 0;
   if (!OwnerCreate(base, ctx.r1.u32, calls, setup_calls, &r3)) {
-    lifted::Sdk(ctx, base, __imp__sub_8228E788);
+    lifted::original::c8228E788(ctx, base);
     return;
   }
   ctx.lr = lr;
@@ -176,7 +177,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8228B500) {
   
   uint32_t r3 = 0;
   if (!ITC_FLAG(native_track_zones) || !OwnerDestroy(base, &r3)) {
-    lifted::Sdk(ctx, base, __imp__sub_8228B500);
+    lifted::original::c8228B500(ctx, base);
     return;
   }
   ctx.r3.u64 = r3;
