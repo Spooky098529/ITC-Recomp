@@ -15,6 +15,7 @@
 // DbgPrint and XamLoaderTerminateTitle, never reached in play (closing the
 // window ends the process).
 
+#include "app/app.h"
 #include "base/flags.h"
 #include "base/log.h"
 #include "guest.h"
@@ -39,6 +40,8 @@ constexpr uint32_t kInittermE = 0x82297AC0;
 constexpr uint32_t kCInit = 0x822979E0;
 constexpr uint32_t kMain = 0x82090108;
 constexpr uint32_t kCExit = 0x825AA388;
+
+}  // namespace
 
 lifted::Result StartUp(uint8_t* base, const lifted::Args& in) {
   ITC_NATIVE_RUNNING("xstart StartUp");
@@ -70,7 +73,6 @@ lifted::Result StartUp(uint8_t* base, const lifted::Args& in) {
   return {result, in.f[0]};
 }
 
-}  // namespace
 }  // namespace app
 
 // The kernel starts the game's main thread here (one of its entries: "The

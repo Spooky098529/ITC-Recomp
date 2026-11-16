@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <bit>
 #include <condition_variable>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <mutex>
@@ -149,6 +150,66 @@ void SetCpu(uint8_t* base, Thread& thread, uint8_t cpu) {
   guest::StoreU8(base, thread.pcr + kPcrCurrentCpu, cpu);
 }
 
+// A thread of ours, made but not started.
+struct Made {
+  std::shared_ptr<Thread> thread;
+  uint32_t stack_base;
+  uint32_t id;
+};
+
+// Our blocks for a new thread (stack, thread object, per-thread block,
+// TLS slots), registered under a new handle; the creation flags' suspend
+// bit and CPU mask applied.
+Made Make(uint8_t* base, uint32_t stack_size, uint32_t flags) {
+  const uint32_t size = std::max(kMinimumStack, (stack_size + 0xFFF) & ~0xFFFu);
+  const uint32_t stack_limit = memory::AllocPages(size, 65536);
+  const uint32_t object = memory::Alloc(kThreadSize, memory::kHeapZeroMemory);
+  const uint32_t pcr = memory::Alloc(kPcrSize, memory::kHeapZeroMemory);
+  const uint32_t tls = memory::Alloc(kTlsBytes, memory::kHeapZeroMemory);
+  Made made{std::make_shared<Thread>(), stack_limit + size, 0};
+  Threads& threads = All();
+  std::lock_guard lock(threads.mutex);
+  made.thread->handle = threads.next_handle;
+  threads.next_handle += 4;
+  made.id = threads.next_id;
+  threads.next_id += 4;
+  made.thread->object = object;
+  made.thread->pcr = pcr;
+  made.thread->suspend_count = (flags & kCreateSuspended) ? 1 : 0;
+  threads.by_handle[made.thread->handle] = made.thread;
+  threads.by_object[object] = made.thread;
+  guest::StoreU32(base, object + kThreadTls, tls);
+  guest::StoreU32(base, object + kThreadId, made.id);
+  guest::StoreU32(base, pcr + kPcrCurrentThread, object);
+  SetCpu(base, *made.thread, CpuFor(threads, uint8_t(flags >> 24)));
+  return made;
+}
+
+// The host thread: once resumed, `body` with r1 at the stack's top and r13
+// the per-thread block. A context struct of its own is bound for code that
+// runs a function through lifted::Sdk (a register carrier only; no SDK
+// thread behind it).
+std::thread Run(uint8_t* base, const Made& made, std::function<void(lifted::Args)> body) {
+  return std::thread([base, made, body = std::move(body)] {
+    {
+      Threads& threads = All();
+      std::unique_lock lock(threads.mutex);
+      threads.resumed.wait(lock, [&] { return made.thread->suspend_count == 0; });
+    }
+    t_pcr = made.thread->pcr;
+    t_base = base;
+    auto context = std::make_unique<PPCContext>();
+    context->r1.u64 = made.stack_base;
+    context->r13.u64 = made.thread->pcr;
+    lifted::BindThreadContext(context.get());
+    lifted::Args call;
+    call.r1 = made.stack_base;
+    call.r13 = made.thread->pcr;
+    body(call);
+    ITC_LOG_INFO("threads: thread {:08X} ended", made.thread->handle);
+  });
+}
+
 // ExCreateThread(handle out, stack size, thread ID out, XAPI start-up,
 // start routine, start context, creation flags).
 lifted::Result CreateThread(uint8_t* base, const lifted::Args& args) {
@@ -175,57 +236,17 @@ lifted::Result CreateThread(uint8_t* base, const lifted::Args& args) {
   }
   ITC_NATIVE_RUNNING("import ExCreateThread");
 
-  const uint32_t size = std::max(kMinimumStack, (stack_size + 0xFFF) & ~0xFFFu);
-  const uint32_t stack_limit = memory::AllocPages(size, 65536);
-  const uint32_t stack_base = stack_limit + size;
-  const uint32_t object = memory::Alloc(kThreadSize, memory::kHeapZeroMemory);
-  const uint32_t pcr = memory::Alloc(kPcrSize, memory::kHeapZeroMemory);
-  const uint32_t tls = memory::Alloc(kTlsBytes, memory::kHeapZeroMemory);
-
-  auto thread = std::make_shared<Thread>();
-  Threads& threads = All();
-  uint32_t id;
-  {
-    std::lock_guard lock(threads.mutex);
-    thread->handle = threads.next_handle;
-    threads.next_handle += 4;
-    id = threads.next_id;
-    threads.next_id += 4;
-    thread->object = object;
-    thread->pcr = pcr;
-    thread->suspend_count = (flags & kCreateSuspended) ? 1 : 0;
-    threads.by_handle[thread->handle] = thread;
-    threads.by_object[object] = thread;
-  }
-  guest::StoreU32(base, object + kThreadTls, tls);
-  guest::StoreU32(base, object + kThreadId, id);
-  guest::StoreU32(base, pcr + kPcrCurrentThread, object);
-  {
-    std::lock_guard lock(threads.mutex);
-    SetCpu(base, *thread, CpuFor(threads, uint8_t(flags >> 24)));
-  }
-
+  const Made made = Make(base, stack_size, flags);
   if (handle_out) {
-    guest::StoreU32(base, handle_out, thread->handle);
+    guest::StoreU32(base, handle_out, made.thread->handle);
   }
   if (id_out) {
-    guest::StoreU32(base, id_out, id);
+    guest::StoreU32(base, id_out, made.id);
   }
-
   ITC_LOG_INFO("threads: thread {:08X} (ID {:X}) made: start {:08X}, context {:08X}{}, CPU {}",
-               thread->handle, id, start, context, startup ? " through the XAPI start-up" : "",
-               thread->cpu);
-  std::thread([base, thread, stack_base, pcr, startup, start, context] {
-    {
-      Threads& threads = All();
-      std::unique_lock lock(threads.mutex);
-      threads.resumed.wait(lock, [&] { return thread->suspend_count == 0; });
-    }
-    t_pcr = pcr;
-    t_base = base;
-    lifted::Args call;
-    call.r1 = stack_base;
-    call.r13 = pcr;
+               made.thread->handle, made.id, start, context,
+               startup ? " through the XAPI start-up" : "", made.thread->cpu);
+  Run(base, made, [base, startup, start, context](lifted::Args call) {
     if (startup) {
       call.r[0] = start;
       call.r[1] = context;
@@ -234,7 +255,6 @@ lifted::Result CreateThread(uint8_t* base, const lifted::Args& args) {
       call.r[0] = context;
       lifted::Call(base, start, call);
     }
-    ITC_LOG_INFO("threads: thread {:08X} ended", thread->handle);
   }).detach();
   return {kStatusSuccess, 0.0};
 }
@@ -391,6 +411,13 @@ const imports::NativeImportEntry kEntries[] = {
 const bool kRegistered = imports::RegisterNativeImports(kEntries, std::size(kEntries), Enabled);
 
 }  // namespace
+
+std::thread StartMainThread(uint8_t* base, uint32_t stack_size, lifted::Entry entry) {
+  const Made made = Make(base, stack_size, 0);
+  ITC_LOG_INFO("threads: the main thread {:08X} (ID {:X}) made, CPU {}", made.thread->handle,
+               made.id, made.thread->cpu);
+  return Run(base, made, [base, entry](lifted::Args call) { entry(base, call); });
+}
 
 uint32_t CurrentPcr() {
   return t_pcr;

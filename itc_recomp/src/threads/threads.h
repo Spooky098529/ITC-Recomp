@@ -4,8 +4,16 @@
 #pragma once
 
 #include <cstdint>
+#include <thread>
+
+#include "lifted/lifted.h"
 
 namespace threads {
+
+// The game's main thread as one of ours (in place of the SDK's
+// PrepareModuleLaunch): `entry` (our start-up, xstart's) run on a host
+// thread with a stack of `stack_size` and our per-thread block; joinable.
+std::thread StartMainThread(uint8_t* base, uint32_t stack_size, lifted::Entry entry);
 
 // --native_threads: our answers to the thread, sync and TLS imports.
 bool Enabled();

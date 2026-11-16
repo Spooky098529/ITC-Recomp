@@ -175,6 +175,10 @@ Result Import(uint8_t* base, ImportFunction* function, const Args& args) {
   return Boundary(args, [&](PPCContext& ctx) { function(ctx, base); });
 }
 
+void BindThreadContext(PPCContext* context) {
+  current = context;
+}
+
 Result ImportFromSdk(uint8_t* base, ImportFunction* function, const Args& args) {
   return Boundary(args, [&](PPCContext& ctx) { function(ctx, base); });
 }

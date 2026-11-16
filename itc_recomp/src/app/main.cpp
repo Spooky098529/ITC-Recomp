@@ -10,6 +10,7 @@
 // plugin) is left out.
 
 #include "app/app.h"
+#include "threads/threads.h"
 
 #include "audio/native_audio.h"
 #include "base/flags.h"
@@ -31,6 +32,7 @@
 #include <rex/logging.h>
 #include <rex/runtime.h>
 #include <rex/system/kernel_state.h>
+#include <rex/system/user_module.h>
 #include <rex/system/xthread.h>
 
 #include <atomic>
@@ -266,8 +268,23 @@ int main(int argc, char* argv[]) {
   input::Gamepads_Start([](std::function<void()> function) {
     app::RunOnMainThread(std::move(function));
   });
-  // The game's main thread, made by the kernel: its start routine is our
-  // start-up (src/app/start_up.cpp, at xstart's address).
+  // The game's main thread: one of our threads (E1, src/threads/) running
+  // our start-up (src/app/start_up.cpp) with the module's stack size; with
+  // --native_threads off, the kernel's, started at xstart's address.
+  if (threads::Enabled()) {
+    uint8_t* base = app::g_runtime->memory()->virtual_membase();
+    const uint32_t stack_size =
+        app::g_runtime->kernel_state()->GetExecutableModule()->stack_size();
+    std::thread main_thread = threads::StartMainThread(base, stack_size, app::StartUp);
+    std::thread waiter([thread = std::move(main_thread)]() mutable {
+      thread.join();
+      ITC_LOG_INFO("Execution complete");
+      app::RequestQuit();
+    });
+    waiter.detach();
+    app::RunLoop();
+    return EXIT_SUCCESS;
+  }
   auto main_thread = app::g_runtime->PrepareModuleLaunch();
   if (!main_thread) {
     app::Fail("Failed to launch module");

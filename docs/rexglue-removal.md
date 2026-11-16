@@ -3693,6 +3693,29 @@ Guest stacks stay until E2 (frames are still in guest memory).
    audio's stay the SDK's. Attract races, the pad replay (127 s) and a
    frame dump clean.
 
+   The main thread too (2026-11-16): first its last imports, none left to
+   the SDK in play. E2's first step (`src/memory/memory_imports.cpp`,
+   `--native_memory_imports`): the process heap's reserve and commit
+   (`RtlCreateHeap` `sub_822997B0`, from `CreateHeap` at start-up)
+   answered from our allocation layer, and `VirtualFree(0)` (34 in the pad
+   replay, from `0x820E85BC` and `0x820F864C`) plugged in as the original
+   answers it (0, `ERROR_INVALID_ADDRESS`), so `NtFreeVirtualMemory` isn't
+   called; `KeGetCurrentProcessType` plugged in (1, a title's process,
+   what `RtlCreateHeap` and XAudio read) and
+   `ExRegisterTitleTerminateNotification` (nothing kept: the SDK never ran
+   them). The native import table moved to `src/imports/`, with a flag per
+   group. Then `main()` starts the main thread through
+   `threads::StartMainThread` (our blocks, the module's stack size, our
+   start-up `app::StartUp` on a `std::thread`) in place of the SDK's
+   `PrepareModuleLaunch`, which only made the thread
+   (`SetExecutableModule` had run at load). Each of our threads binds a
+   context struct of its own (`lifted::BindThreadContext`), a register
+   carrier for the hand ports that still run lifted originals and
+   stand-ins through `lifted::Sdk` (4,411 calls in an attract race; to go
+   with `PPCContext` in E4). Only native audio's thread is still the
+   SDK's (it binds an SDK thread state for the mixer callback). Attract
+   races, the pad replay (127 s) and a frame dump clean.
+
 Checks at each step: `attract_race.sh 40` as a smoke run, the pad replay
 (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`, ~127 s, no
 error lines), frame dumps, a drive by the user before the merge, and

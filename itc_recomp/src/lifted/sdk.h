@@ -33,6 +33,12 @@ const char* ImportName(ImportFunction* function);
 void NoteImport(ImportFunction* function, const Args& args);
 bool LoggingImports();
 
+// Binds `context` as the calling host thread's context for calls through the
+// boundary (lifted::Sdk, ImportFromSdk) when nothing entered it through the
+// SDK: our own threads (src/threads/), whose context is a register carrier
+// only.
+void BindThreadContext(PPCContext* context);
+
 // Runs `entry` with the context's argument registers and puts its r3 and
 // f1 back.
 void Enter(PPCContext& ctx, uint8_t* base, Entry entry);
