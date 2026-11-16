@@ -832,6 +832,120 @@ loc_822BE430:
   return {r3, f1};
 }
 
+// sub_822BE330: lifted from generated/ by lift.py.
+lifted::Result f822BE330(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, double f1) {
+  ITC_NATIVE_RUNNING("sub_822BE330 (lifted)");
+  uint64_t r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r31 = 0, ctr = 0;
+  double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
+  lifted::Cr cr0, cr6;
+  uint8_t so = 0;
+  uint32_t ea{};
+  // mflr r12
+  r12 = 0;
+  // stw r12,-8(r1)
+  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  // stwu r1,-96(r1)
+  ea = -96 + uint32_t(r1);
+  REX_STORE_U32(ea, uint32_t(r1));
+  r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
+  // li r9,0
+  r9 = uint64_t(int64_t(0));
+  // mr r11,r4
+  r11 = r4;
+  // lis r10,-32254
+  r10 = uint64_t(int64_t(-2113798144));
+  // addi r10,r10,-4888
+  r10 = uint64_t(int64_t(int64_t(r10) + -4888));
+  // stw r9,0(r5)
+  REX_STORE_U32(uint32_t(r5) + 0, uint32_t(r9));
+  // addi r9,r11,16
+  r9 = uint64_t(int64_t(int64_t(r11) + 16));
+loc_822BE354:
+  // lbz r8,0(r11)
+  r8 = REX_LOAD_U8(uint32_t(r11) + 0);
+  // lbz r7,0(r10)
+  r7 = REX_LOAD_U8(uint32_t(r10) + 0);
+  // subf. r8,r7,r8
+  r8 = r8 - r7;
+  cr0 = lifted::Compare<int32_t>(int32_t(r8), 0, so);
+  // bne 0x822be374
+  if (!cr0.eq) goto loc_822BE374;
+  // addi r11,r11,1
+  r11 = uint64_t(int64_t(int64_t(r11) + 1));
+  // addi r10,r10,1
+  r10 = uint64_t(int64_t(int64_t(r10) + 1));
+  // cmpw cr6,r11,r9
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r9), so);
+  // bne cr6,0x822be354
+  if (!cr6.eq) goto loc_822BE354;
+loc_822BE374:
+  // cmpwi r8,0
+  cr0 = lifted::Compare<int32_t>(int32_t(r8), 0, so);
+  // beq 0x822be3b4
+  if (cr0.eq) goto loc_822BE3B4;
+  // mr r11,r4
+  r11 = r4;
+  // lis r10,-32254
+  r10 = uint64_t(int64_t(-2113798144));
+  // addi r9,r11,16
+  r9 = uint64_t(int64_t(int64_t(r11) + 16));
+  // addi r10,r10,-4920
+  r10 = uint64_t(int64_t(int64_t(r10) + -4920));
+loc_822BE38C:
+  // lbz r8,0(r11)
+  r8 = REX_LOAD_U8(uint32_t(r11) + 0);
+  // lbz r7,0(r10)
+  r7 = REX_LOAD_U8(uint32_t(r10) + 0);
+  // subf. r8,r7,r8
+  r8 = r8 - r7;
+  cr0 = lifted::Compare<int32_t>(int32_t(r8), 0, so);
+  // bne 0x822be3ac
+  if (!cr0.eq) goto loc_822BE3AC;
+  // addi r11,r11,1
+  r11 = uint64_t(int64_t(int64_t(r11) + 1));
+  // addi r10,r10,1
+  r10 = uint64_t(int64_t(int64_t(r10) + 1));
+  // cmpw cr6,r11,r9
+  cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r9), so);
+  // bne cr6,0x822be38c
+  if (!cr6.eq) goto loc_822BE38C;
+loc_822BE3AC:
+  // cmpwi r8,0
+  cr0 = lifted::Compare<int32_t>(int32_t(r8), 0, so);
+  // bne 0x822be3d0
+  if (!cr0.eq) goto loc_822BE3D0;
+loc_822BE3B4:
+  // stw r3,0(r5)
+  REX_STORE_U32(uint32_t(r5) + 0, uint32_t(r3));
+  // lwz r11,0(r3)
+  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  // lwz r11,4(r11)
+  r11 = REX_LOAD_U32(uint32_t(r11) + 4);
+  // mtctr r11
+  ctr = r11;
+  // bctrl
+  // (left out: dead in C++)
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x822BE3C8, r31)); r3 = o.r3; f1 = o.f1; }
+  // li r3,0
+  r3 = uint64_t(int64_t(0));
+  // b 0x822be3d8
+  goto loc_822BE3D8;
+loc_822BE3D0:
+  // lis r3,-32768
+  r3 = uint64_t(int64_t(-2147483648));
+  // ori r3,r3,16386
+  r3 = r3 | 16386;
+loc_822BE3D8:
+  // addi r1,r1,96
+  r1 = uint64_t(int64_t(int64_t(r1) + 96));
+  // lwz r12,-8(r1)
+  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  // mtlr r12
+  // (left out: dead in C++)
+  // blr
+  return {r3, f1};
+}
+
 namespace {
 
 lifted::Result e82095AF0(uint8_t* base, const lifted::Args& a) {
@@ -854,12 +968,17 @@ lifted::Result e822BE3E8(uint8_t* base, const lifted::Args& a) {
   return f822BE3E8(base, a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
 
+lifted::Result e822BE330(uint8_t* base, const lifted::Args& a) {
+  return f822BE330(base, a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.f[0]);
+}
+
 const Registration kEntries[] = {
     {0x82095AF0, e82095AF0},
     {0x822BE278, e822BE278},
     {0x822BE450, e822BE450},
     {0x822BE2D0, e822BE2D0},
     {0x822BE3E8, e822BE3E8},
+    {0x822BE330, e822BE330},
 };
 
 const bool kRegistered =
@@ -868,45 +987,3 @@ const bool kRegistered =
 }  // namespace
 
 }  // namespace lifted
-
-// The entries for the SDK and the code not native yet (the function table
-// reaches these): to go once nothing recompiled calls them.
-extern "C" REX_FUNC(sub_82095AF0) {
-  if (!ITC_FLAG(native_lifted_034)) {
-    __imp__sub_82095AF0(ctx, base);
-    return;
-  }
-  lifted::Enter(ctx, base, lifted::e82095AF0);
-}
-
-extern "C" REX_FUNC(sub_822BE278) {
-  if (!ITC_FLAG(native_lifted_034)) {
-    __imp__sub_822BE278(ctx, base);
-    return;
-  }
-  lifted::Enter(ctx, base, lifted::e822BE278);
-}
-
-extern "C" REX_FUNC(sub_822BE450) {
-  if (!ITC_FLAG(native_lifted_034)) {
-    __imp__sub_822BE450(ctx, base);
-    return;
-  }
-  lifted::Enter(ctx, base, lifted::e822BE450);
-}
-
-extern "C" REX_FUNC(sub_822BE2D0) {
-  if (!ITC_FLAG(native_lifted_034)) {
-    __imp__sub_822BE2D0(ctx, base);
-    return;
-  }
-  lifted::Enter(ctx, base, lifted::e822BE2D0);
-}
-
-extern "C" REX_FUNC(sub_822BE3E8) {
-  if (!ITC_FLAG(native_lifted_034)) {
-    __imp__sub_822BE3E8(ctx, base);
-    return;
-  }
-  lifted::Enter(ctx, base, lifted::e822BE3E8);
-}

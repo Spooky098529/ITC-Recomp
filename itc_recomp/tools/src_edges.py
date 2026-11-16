@@ -75,6 +75,7 @@ TOKEN = re.compile(r'(?P<str>"(?:\\.|[^"\\\n])*")|(?P<chr>\'(?:\\.|[^\'\\\n])*\'
                    r"|(?P<op>::|->|##|&&|\|\||[#{}()\[\];,<>=:.!&|?*+\-/%^~])")
 SUB = re.compile(r"^sub_([0-9A-F]{8})$")
 IMP = re.compile(r"^__imp__sub_([0-9A-F]{8})$")
+ENTRY_BODY = re.compile(r"^itc_entry_body_([0-9A-F]{8})$")
 FLAG_BOOL = re.compile(r"ITC_FLAG_BOOL\s*\(\s*(\w+)\s*,\s*(true|false)")
 # Macros whose arguments name nothing: the logging, the native prints, and
 # the lifted code's call arguments (LIFTED_ARGS(lr, r31): registers and the
@@ -954,6 +955,12 @@ def native_edges(is_function, classify_hex):
 
     entries = collections.defaultdict(set)
     for d in defs:
+        # A hand port's entry body (hooks/native_entry.h's
+        # itc_entry_body_X, since the rewiring's stage 3): its function's C++,
+        # as an override's was.
+        m = ENTRY_BODY.match(d.name)
+        if m and not d.adapter:
+            d.adapter = "sub_" + m.group(1)
         if d.adapter:
             entries[d.adapter].add(d.id)
         for s in d.prints:

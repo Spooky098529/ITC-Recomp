@@ -68,7 +68,7 @@ void CommandList(Context& h) {
     Results results("CommandList::CommandList (sub_8258C960)");
     for (int i = 0; i < 20; i++) {
       const Fields fields(h);
-      Case(h, results, __imp__sub_8258C960, sub_8258C960,
+      Case(h, results, __imp__sub_8258C960, harness::Ours<0x8258C960>,
            [&](uint32_t list) { fields.Write(h, list); }, no_args, fmt::format("random {}", i));
     }
     results.Report();
@@ -82,7 +82,7 @@ void CommandList(Context& h) {
     }
     for (uint32_t buffer : buffers) {
       const Fields fields(h);
-      Case(h, results, __imp__sub_8258C9C0, sub_8258C9C0,
+      Case(h, results, __imp__sub_8258C9C0, harness::Ours<0x8258C9C0>,
            [&](uint32_t list) {
              fields.Write(h, list);
              guest::StoreU32(h.base, list + 4, buffer);
@@ -98,7 +98,7 @@ void CommandList(Context& h) {
     for (uint32_t buffer = 0; buffer < 5; buffer++) {
       for (int i = 0; i < 10; i++) {
         const Fields fields(h);
-        Case(h, results, __imp__sub_8258C998, sub_8258C998,
+        Case(h, results, __imp__sub_8258C998, harness::Ours<0x8258C998>,
              [&](uint32_t list) {
                fields.Write(h, list);
                guest::StoreU32(h.base, list + 4, buffer);
@@ -119,7 +119,7 @@ void CommandList(Context& h) {
       for (uint32_t count : counts) {
         for (int i = 0; i < 5; i++) {
           const Fields fields(h);
-          Case(h, results, __imp__sub_8258C9D0, sub_8258C9D0,
+          Case(h, results, __imp__sub_8258C9D0, harness::Ours<0x8258C9D0>,
                [&](uint32_t list) {
                  fields.Write(h, list);
                  guest::StoreU8(h.base, list + 52, flag);
@@ -140,7 +140,7 @@ void CommandList(Context& h) {
       for (uint32_t count : counts) {
         for (int i = 0; i < 5; i++) {
           const Fields fields(h);
-          Case(h, results, __imp__sub_8258CA50, sub_8258CA50,
+          Case(h, results, __imp__sub_8258CA50, harness::Ours<0x8258CA50>,
                [&](uint32_t list) {
                  fields.Write(h, list);
                  guest::StoreU8(h.base, list + 52, flag);
@@ -165,7 +165,7 @@ void CommandList(Context& h) {
         end = uint32_t(h.random.Next());
       }
       const Fields fields(h);
-      Case(h, results, __imp__sub_8258CA88, sub_8258CA88,
+      Case(h, results, __imp__sub_8258CA88, harness::Ours<0x8258CA88>,
            [&](uint32_t list) {
              fields.Write(h, list);
              guest::StoreU32(h.base, list + 36, start);
@@ -187,9 +187,9 @@ void CommandList(Context& h) {
     int kind;  // 0 vertices, 1 bytes, 2 resolve
   };
   const Allocator allocators[] = {
-      {"CommandList::AllocateVertices (sub_8258CB08)", __imp__sub_8258CB08, sub_8258CB08, 0},
-      {"CommandList::AllocateBytes (sub_8258CB98)", __imp__sub_8258CB98, sub_8258CB98, 1},
-      {"CommandList::AllocateResolve (sub_8258CC30)", __imp__sub_8258CC30, sub_8258CC30, 2},
+      {"CommandList::AllocateVertices (sub_8258CB08)", __imp__sub_8258CB08, harness::Ours<0x8258CB08>, 0},
+      {"CommandList::AllocateBytes (sub_8258CB98)", __imp__sub_8258CB98, harness::Ours<0x8258CB98>, 1},
+      {"CommandList::AllocateResolve (sub_8258CC30)", __imp__sub_8258CC30, harness::Ours<0x8258CC30>, 2},
   };
   for (const Allocator& a : allocators) {
     Results results(a.name);

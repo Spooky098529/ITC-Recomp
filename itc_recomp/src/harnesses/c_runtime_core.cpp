@@ -1629,7 +1629,7 @@ bool BootLock(Context& h, uint32_t n) {
 void GuestLock(Context& h, uint32_t n, bool lock) {
   PPCContext t = CallContext(h);
   t.r3.u64 = n;
-  (lock ? sub_825B3430 : sub_825B32D0)(t, h.base);
+  (lock ? harness::Ours<0x825B3430> : harness::Ours<0x825B32D0>)(t, h.base);
 }
 
 // __lock_fhandle: a handle in the first block, its entry's +8 0 (the section
@@ -2385,7 +2385,7 @@ struct SeekFile {
     t.r7.u64 = 3;  // OPEN_EXISTING
     t.r8.u64 = 0x80;
     t.r9.u64 = 0;
-    sub_82295508(t, h.base);
+    harness::Ours<0x82295508>(t, h.base);
     handle = t.r3.u32 == 0xFFFFFFFFu ? 0 : t.r3.u32;
   }
   ~SeekFile() {

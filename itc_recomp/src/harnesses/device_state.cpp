@@ -718,7 +718,7 @@ ds::DeviceCalls HarnessCalls(PPCContext& ctx, uint8_t* base, uint32_t device) {
     ctx.r4.u64 = mask;
     ctx.r5.u64 = hiz;
     ctx.r6.u64 = 0;
-    sub_822ADC08(ctx, base);
+    harness::Ours<0x822ADC08>(ctx, base);
     return ctx.r3.u64;
   };
   calls.flush_registers = [&ctx, base, device](uint64_t mask, uint32_t first, uint32_t shadow) {
@@ -726,7 +726,7 @@ ds::DeviceCalls HarnessCalls(PPCContext& ctx, uint8_t* base, uint32_t device) {
     ctx.r4.u64 = mask;
     ctx.r5.u64 = first;
     ctx.r6.u64 = shadow;
-    sub_822ADE30(ctx, base);
+    harness::Ours<0x822ADE30>(ctx, base);
   };
   calls.setter = [&ctx, base, device](uint32_t setter, uint32_t r4, uint32_t r5) {
     ctx.r3.u64 = device;

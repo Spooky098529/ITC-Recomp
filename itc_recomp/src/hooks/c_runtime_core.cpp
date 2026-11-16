@@ -868,7 +868,11 @@ ITC_C_RUNTIME_CORE(825AD198, CoreCxxThrowException)
 ITC_C_RUNTIME_CORE(825AFCC8, CoreInvalidParameter)
 // XapiThreadStartup: r3 = the start routine, r4 = its parameter; never
 // returns.
-ITC_C_RUNTIME_CORE(825BA558, CoreThreadStartup)
+// XapiThreadStartup: the kernel starts XAPI threads there (ExCreateThread's
+// start-up), so it keeps an override in its function table.
+ITC_KERNEL_ENTRY(825BA558, ITC_FLAG(native_c_runtime_core)) {
+  hooks::CoreThreadStartup(ctx, base);
+}
 // _amsg_exit: r3 = a run-time error number.
 ITC_C_RUNTIME_CORE(825AA158, CoreAmsgExit)
 // _getptd: r3 = the calling thread's data.

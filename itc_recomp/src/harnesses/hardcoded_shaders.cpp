@@ -66,7 +66,7 @@ void HardcodedShaders(Context& h) {
                 "(expected to differ)");
   for (const auto& shader : graphics::compiled_shaders::kShaders) {
     (shader.source == kOrderDiffers ? order : results)
-        .Check(Compile(h, shader, __imp__sub_822B8F10), Compile(h, shader, sub_822B8F10),
+        .Check(Compile(h, shader, __imp__sub_822B8F10), Compile(h, shader, harness::Ours<0x822B8F10>),
                std::format("source {:08X} {}", shader.source, shader.profile));
   }
   results.Report();

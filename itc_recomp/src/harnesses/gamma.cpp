@@ -24,7 +24,7 @@ void RecompiledRamp(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = 0;
 }
 void NativeRamp(PPCContext& ctx, uint8_t* base) {
-  sub_822B0910(ctx, base);
+  harness::Ours<0x822B0910>(ctx, base);
   ctx.r3.u64 = 0;
 }
 void RecompiledPwl(PPCContext& ctx, uint8_t* base) {
@@ -32,7 +32,7 @@ void RecompiledPwl(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = 0;
 }
 void NativePwl(PPCContext& ctx, uint8_t* base) {
-  sub_822B0AB0(ctx, base);
+  harness::Ours<0x822B0AB0>(ctx, base);
   ctx.r3.u64 = 0;
 }
 
@@ -130,7 +130,7 @@ void Pow(Context& h, Results& results, float x, double y) {
   PPCContext t = CallContext(h);
   t.f1.f64 = double(x);
   t.f2.f64 = y;
-  sub_825A8ED0(t, h.base);
+  harness::Ours<0x825A8ED0>(t, h.base);
   results.Check(FloatBytes(float(t.f1.f64)), FloatBytes(float(display::Pow(x, y))),
                 fmt::format("{} ^ {}", x, y));
 }
@@ -150,12 +150,12 @@ void Gamma(Context& h) {
   }
   {
     Results results("sRGB's curve (sub_822B07B0)");
-    Curves(h, results, sub_822B07B0, display::Srgb);
+    Curves(h, results, harness::Ours<0x822B07B0>, display::Srgb);
     results.Report();
   }
   {
     Results results("BT.709's curve (sub_822B0860)");
-    Curves(h, results, sub_822B0860, display::Bt709);
+    Curves(h, results, harness::Ours<0x822B0860>, display::Bt709);
     results.Report();
   }
   {

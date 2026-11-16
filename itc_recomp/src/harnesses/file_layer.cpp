@@ -183,7 +183,7 @@ void Opens(Context& h) {
         t.r4.u64 = name + i;
         t.r5.u64 = h.data + 8;
         ITC_FLAG(native_file_layer) = v == 1;
-        (v == 0 ? __imp__sub_820A6AB8 : sub_820A6AB8)(t, h.base);
+        (v == 0 ? __imp__sub_820A6AB8 : harness::Ours<0x820A6AB8>)(t, h.base);
         ITC_FLAG(native_file_layer) = true;
         const uint32_t r3 = t.r3.u32, high = uint32_t(t.r3.u64 >> 32);
         const uint32_t handle = guest::LoadU32(h.base, file + 4);
@@ -196,7 +196,7 @@ void Opens(Context& h) {
           guest::StoreU32(h.base, file + 4, handle);
           t = CallContext(h);
           t.r3.u64 = file;
-          sub_8258C718(t, h.base);  // File::Close
+          harness::Ours<0x8258C718>(t, h.base);  // File::Close
         }
       }
       results.Check(out[0], out[1], fmt::format("\"{}\" at +{}", n, i));

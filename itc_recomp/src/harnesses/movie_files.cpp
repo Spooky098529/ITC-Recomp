@@ -67,25 +67,25 @@ void MovieFiles(Context& h) {
         t.r7.u64 = 0x20000;
         t.r8.u64 = 8;
         t.r9.u64 = 1;
-        (v == 0 ? __imp__sub_82487C48 : sub_82487C48)(t, base);
+        (v == 0 ? __imp__sub_82487C48 : harness::Ours<0x82487C48>)(t, base);
         guest::StoreU32(base, source + 120, 1);
       } else if (s.kind == 1 || s.kind == 3) {
         t.r4.u64 = s.kind == 1 ? 1 : 3;
-        sub_82488548(t, base);
+        harness::Ours<0x82488548>(t, base);
         if (s.kind == 1) {
           PPCContext k = CallContext(h);
           k.r3.u64 = source;
           k.r4.u64 = s.skip;
-          sub_82488508(k, base);
+          harness::Ours<0x82488508>(k, base);
         }
       } else if (s.kind == 2) {
         Fill(base, buffer, kBuffer);
         t.r4.u64 = buffer;
         t.r5.u64 = kBuffer;
         t.r6.u64 = read_out;
-        (v == 0 ? __imp__sub_82488598 : sub_82488598)(t, base);
+        (v == 0 ? __imp__sub_82488598 : harness::Ours<0x82488598>)(t, base);
       } else {
-        (v == 0 ? __imp__sub_824880D8 : sub_824880D8)(t, base);
+        (v == 0 ? __imp__sub_824880D8 : harness::Ours<0x824880D8>)(t, base);
       }
       std::vector<uint8_t> step;
       step.push_back(guest::LoadU32(base, source + 44) == 0xFFFFFFFF ? 0xFF : 0x01);

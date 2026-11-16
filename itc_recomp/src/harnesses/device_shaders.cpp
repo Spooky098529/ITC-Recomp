@@ -49,7 +49,7 @@ dsh::ShaderCalls Calls(PPCContext& ctx, uint8_t* base) {
   calls.release = [&ctx, base](uint32_t resource) {
     ctx.r3.u64 = resource;
     ctx.lr = 0x822A883C;
-    sub_822A67B0(ctx, base);
+    harness::Ours<0x822A67B0>(ctx, base);
     return ctx.r3.u32;
   };
   calls.memcpy = [&ctx, base](uint32_t destination, uint32_t source, uint32_t size,
@@ -58,7 +58,7 @@ dsh::ShaderCalls Calls(PPCContext& ctx, uint8_t* base) {
     ctx.r4.u64 = source;
     ctx.r5.u64 = size;
     ctx.lr = at;
-    sub_825A7410(ctx, base);
+    harness::Ours<0x825A7410>(ctx, base);
   };
   return calls;
 }

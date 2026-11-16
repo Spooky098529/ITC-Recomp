@@ -161,8 +161,9 @@ void hooks::NativeWorkerThread(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
-// The thread's entry point (ExCreateThread's, CreateWorkers').
-ITC_NATIVE_ENTRY(822B69A8, ITC_FLAG(native_predicated_tiling)) {
+// The thread's entry point (ExCreateThread's, CreateWorkers'): the kernel
+// calls it by address, so it keeps an override in its function table.
+ITC_KERNEL_ENTRY(822B69A8, ITC_FLAG(native_predicated_tiling)) {
   hooks::NativeWorkerThread(ctx, base);
 }
 

@@ -205,7 +205,7 @@ void PrimitiveVertex(Context& h) {
            t.r3.u64 = primitive;
            t.r4.u64 = i;
          },
-         __imp__sub_8259D628, sub_8259D628, h.data,
+         __imp__sub_8259D628, harness::Ours<0x8259D628>, h.data,
          kScratchBytes, fmt::format("textures {:X} i {:X}", textures, i));
   }
   results.Report();
@@ -270,7 +270,7 @@ void FindChunkCases(Context& h) {
            t.r3.u64 = h.data;
            t.r4.u64 = wanted;
          },
-         __imp__sub_8259D5C8, sub_8259D5C8, h.data, 16,
+         __imp__sub_8259D5C8, harness::Ours<0x8259D5C8>, h.data, 16,
          fmt::format("case {}: {} chunks, tag {:08X}", i, chain.size(), wanted));
   }
   results.Report();
@@ -289,7 +289,7 @@ void FileSceneCases(Context& h) {
            guest::StoreU32(h.base, h.data + 4, offset);
            guest::StoreU32(h.base, h.data + offset, tag);
          },
-         [&](PPCContext& t) { t.r3.u64 = h.data; }, __imp__sub_825A0EB0, sub_825A0EB0, h.data, 16,
+         [&](PPCContext& t) { t.r3.u64 = h.data; }, __imp__sub_825A0EB0, harness::Ours<0x825A0EB0>, h.data, 16,
          fmt::format("offset {:X} tag {:08X}", offset, tag));
   }
   results.Report();
@@ -321,7 +321,7 @@ void XmdEntryCases(Context& h) {
            t.r3.u64 = h.data;
            t.r4.u64 = index;
          },
-         __imp__sub_825A0CD0, sub_825A0CD0, h.data, 16,
+         __imp__sub_825A0CD0, harness::Ours<0x825A0CD0>, h.data, 16,
          fmt::format("count {:X} i {:X}", count, index));
   }
   results.Report();
@@ -343,7 +343,7 @@ void SetRendererCases(Context& h) {
            t.r3.u64 = renderer;
            t.r4.u64 = list;
          },
-         __imp__sub_8259D798, sub_8259D798, ui_movies_kRenderer, 8,
+         __imp__sub_8259D798, harness::Ours<0x8259D798>, ui_movies_kRenderer, 8,
          fmt::format("{:08X} {:08X}", renderer, list));
   }
   guest::StoreU32(h.base, ui_movies_kRenderer, saved_renderer);
@@ -359,7 +359,7 @@ void ResetDrawContextCases(Context& h) {
     for (uint8_t fill : {uint8_t(0xCD), uint8_t(0x00), uint8_t(0xFF)}) {
       Both(h, results, [&] { Fill(h.base, h.data, 256, fill); },
            [&](PPCContext& t) { t.r3.u64 = h.data + 16 + offset; }, __imp__sub_8259D930,
-           sub_8259D930, h.data, 256, fmt::format("offset {} fill {:02X}", offset, fill));
+           harness::Ours<0x8259D930>, h.data, 256, fmt::format("offset {} fill {:02X}", offset, fill));
     }
   }
   results.Report();
@@ -486,11 +486,11 @@ void RecorderCases(Context& h) {
     int kind;  // 0 textured quad, 1 untextured, 2 the resets, 3 either by +84, 4 the resets by r4
   };
   const Recorder recorders[] = {
-      {"RecordQuad, textured (sub_8259DAD0)", __imp__sub_8259DAD0, sub_8259DAD0, 0},
-      {"RecordQuad, untextured (sub_8259E098)", __imp__sub_8259E098, sub_8259E098, 1},
-      {"the clip and state resets (sub_8259D7B0)", __imp__sub_8259D7B0, sub_8259D7B0, 2},
-      {"RecordQuad and the resets when clipped (sub_8259EBE8)", __imp__sub_8259EBE8, sub_8259EBE8, 3},
-      {"the resets after a movie (sub_8259DAC0)", __imp__sub_8259DAC0, sub_8259DAC0, 4},
+      {"RecordQuad, textured (sub_8259DAD0)", __imp__sub_8259DAD0, harness::Ours<0x8259DAD0>, 0},
+      {"RecordQuad, untextured (sub_8259E098)", __imp__sub_8259E098, harness::Ours<0x8259E098>, 1},
+      {"the clip and state resets (sub_8259D7B0)", __imp__sub_8259D7B0, harness::Ours<0x8259D7B0>, 2},
+      {"RecordQuad and the resets when clipped (sub_8259EBE8)", __imp__sub_8259EBE8, harness::Ours<0x8259EBE8>, 3},
+      {"the resets after a movie (sub_8259DAC0)", __imp__sub_8259DAC0, harness::Ours<0x8259DAC0>, 4},
   };
   constexpr uint32_t kList = 0, kRendererObject = 64, kVtable = 128, kQuad = 256,
                      kPositions = 512, kColors = 640, kUvs = 768, kSlots = 1024;
@@ -607,7 +607,7 @@ void HeaderCases(Context& h) {
   };
   const Header headers[] = {
       {"IsXmd (sub_825A0C60)", __imp__sub_825A0C60, ITC_CONTEXT_FN(NativeIsXmd), 0, {'X', 'M', 'D', 0, '0', '0', '1', 0}},
-      {"CheckXmd (sub_825A0CF8)", __imp__sub_825A0CF8, sub_825A0CF8, 0, {'X', 'M', 'D', 0, '0', '0', '1', 0}},
+      {"CheckXmd (sub_825A0CF8)", __imp__sub_825A0CF8, harness::Ours<0x825A0CF8>, 0, {'X', 'M', 'D', 0, '0', '0', '1', 0}},
       {"IsMovieFile (sub_825A0E40)", __imp__sub_825A0E40, ITC_CONTEXT_FN(NativeIsMovieFile), 8, {'X', '2', 'D', 0, '0', '0', '5', 0}},
   };
   for (const Header& f : headers) {
@@ -879,7 +879,7 @@ void FixUpFileCases(Context& h) {
       }
       PPCContext t = CallContext(h);
       t.r3.u64 = file + (kind == 1 ? misalign : 0);
-      (v == 0 ? __imp__sub_825A0EF0 : sub_825A0EF0)(t, h.base);
+      (v == 0 ? __imp__sub_825A0EF0 : harness::Ours<0x825A0EF0>)(t, h.base);
       result[v] = Read(h.base, h.data, kScratchBytes);
       AppendWord(result[v], t.r3.u32);
     }
@@ -990,7 +990,7 @@ void RestorePoseCases(Context& h) {
       t.r5.u64 = rest_scene;
       t.r6.u64 = use_group ? live_node(8) : 0;
       t.r7.u64 = use_group && !no_rest_group ? rest_node(8) : 0;
-      (v == 0 ? __imp__sub_82119B80 : sub_82119B80)(t, h.base);
+      (v == 0 ? __imp__sub_82119B80 : harness::Ours<0x82119B80>)(t, h.base);
       result[v] = Read(h.base, area, kAreaBytes);
       AppendWord(result[v], t.r3.u32);
     }
@@ -2122,8 +2122,8 @@ void UiMovies(Context& h) {
       {"NodeTrack (sub_825A6508)", __imp__sub_825A6508, ITC_CONTEXT_FN(NativeNodeTrack)},
       {"Key (sub_825A6518)", __imp__sub_825A6518, ITC_CONTEXT_FN(NativeKey)},
       {"VertexOffset (sub_8259D600)", __imp__sub_8259D600, ITC_CONTEXT_FN(NativeVertexOffset)},
-      {"PrimitiveTexture (sub_8259D618)", __imp__sub_8259D618, sub_8259D618},
-      {"PictureTexture (sub_8259D648)", __imp__sub_8259D648, sub_8259D648},
+      {"PrimitiveTexture (sub_8259D618)", __imp__sub_8259D618, harness::Ours<0x8259D618>},
+      {"PictureTexture (sub_8259D648)", __imp__sub_8259D648, harness::Ours<0x8259D648>},
   };
   for (const Function& f : arithmetic) {
     Arithmetic(h, f);
@@ -2131,8 +2131,8 @@ void UiMovies(Context& h) {
   Indexed(h, {"NodeTrackList (sub_825A6528)", __imp__sub_825A6528, ITC_CONTEXT_FN(NativeNodeTrackList)}, 64, 32);
   Indexed(h, {"KeyList (sub_825A6540)", __imp__sub_825A6540, ITC_CONTEXT_FN(NativeKeyList)}, 64, 40);
   Indexed(h, {"SubAnimation (sub_825A6558)", __imp__sub_825A6558, ITC_CONTEXT_FN(NativeSubAnimation)}, 64, 48);
-  Indexed(h, {"UiMovie::Child (sub_8259D658)", __imp__sub_8259D658, sub_8259D658}, 128, 108);
-  Indexed(h, {"SceneAnimation (sub_8259D670)", __imp__sub_8259D670, sub_8259D670}, 128, 116);
+  Indexed(h, {"UiMovie::Child (sub_8259D658)", __imp__sub_8259D658, harness::Ours<0x8259D658>}, 128, 108);
+  Indexed(h, {"SceneAnimation (sub_8259D670)", __imp__sub_8259D670, harness::Ours<0x8259D670>}, 128, 116);
   PrimitiveVertex(h);
   FindChunkCases(h);
   FileSceneCases(h);

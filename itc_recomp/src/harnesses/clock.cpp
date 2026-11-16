@@ -48,16 +48,16 @@ Count ReadCount(Context& h, GuestFunction function) {
 void Clock(Context& h) {
   Results results("QueryPerformanceFrequency (sub_825B9A70)");
   Both(h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = h.data; }, __imp__sub_825B9A70,
-       sub_825B9A70, h.data, 8, "the rate");
+       harness::Ours<0x825B9A70>, h.data, 8, "the rate");
   results.Report();
 
   Results ticks("GetTickCount (sub_822956F0)");
   for (int sleep_ms : {0, 1, 2, 5, 10, 16, 25, 33, 50, 100}) {
     const uint32_t recompiled_start = Read(h, __imp__sub_822956F0);
-    const uint32_t native_start = Read(h, sub_822956F0);
+    const uint32_t native_start = Read(h, harness::Ours<0x822956F0>);
     std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
     const uint32_t recompiled_end = Read(h, __imp__sub_822956F0);
-    const uint32_t native_end = Read(h, sub_822956F0);
+    const uint32_t native_end = Read(h, harness::Ours<0x822956F0>);
     const int32_t recompiled_advance = int32_t(recompiled_end - recompiled_start);
     const int32_t native_advance = int32_t(native_end - native_start);
     const bool agrees =
@@ -78,10 +78,10 @@ void Clock(Context& h) {
   Results counts("QueryPerformanceCounter (sub_825BA0C8)");
   for (int sleep_ms : {0, 1, 2, 5, 10, 16, 25, 33, 50, 100}) {
     const Count recompiled_start = ReadCount(h, __imp__sub_825BA0C8);
-    const Count native_start = ReadCount(h, sub_825BA0C8);
+    const Count native_start = ReadCount(h, harness::Ours<0x825BA0C8>);
     std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
     const Count recompiled_end = ReadCount(h, __imp__sub_825BA0C8);
-    const Count native_end = ReadCount(h, sub_825BA0C8);
+    const Count native_end = ReadCount(h, harness::Ours<0x825BA0C8>);
     const int64_t recompiled_advance = int64_t(recompiled_end.count - recompiled_start.count);
     const int64_t native_advance = int64_t(native_end.count - native_start.count);
     const bool agrees = native_advance >= 0 &&

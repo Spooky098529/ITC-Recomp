@@ -1094,7 +1094,7 @@ void InitCases(Context& h, uint32_t block) {
       t.f3.f64 = double(RandomFloat(h.random, 1.0f));
       ITC_FLAG(native_action_mappers) = v == 1;
       ITC_FLAG(native_input) = v == 1;
-      (v == 0 ? __imp__sub_8209F430 : sub_8209F430)(t, h.base);
+      (v == 0 ? __imp__sub_8209F430 : harness::Ours<0x8209F430>)(t, h.base);
       ITC_FLAG(native_action_mappers) = true;
       ITC_FLAG(native_input) = true;
 
@@ -1256,7 +1256,7 @@ void ActionMappersBinding(Context& h) {
         ITC_FLAG(native_action_mappers) = v == 1;
         ITC_FLAG(native_input) = v == 1;
         if (f.all) {
-          (v == 0 ? __imp__sub_8210AF08 : sub_8210AF08)(t, h.base);
+          (v == 0 ? __imp__sub_8210AF08 : harness::Ours<0x8210AF08>)(t, h.base);
         } else {
           (v == 0 ? __imp__sub_8210B270 : ITC_CONTEXT_FN(NativeBind))(t, h.base);
         }

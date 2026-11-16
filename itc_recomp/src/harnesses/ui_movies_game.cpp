@@ -318,14 +318,14 @@ void NodeCases(Context& h, const Block& block) {
     GuestFunction recompiled, native;
   };
   const Setter setters[] = {
-      {"UiMovie::FindNode (sub_8211A578)", __imp__sub_8211A578, sub_8211A578},
-      {"UiMovie::SetNodeColor (sub_8211A5B8)", __imp__sub_8211A5B8, sub_8211A5B8},
-      {"UiMovie::SetNodeTexture (sub_8211A708)", __imp__sub_8211A708, sub_8211A708},
-      {"UiMovie::ShowNode (sub_8211AC00)", __imp__sub_8211AC00, sub_8211AC00},
-      {"UiMovie::HideNode (sub_8211AC48)", __imp__sub_8211AC48, sub_8211AC48},
-      {"UiMovie::SetPictureTexture (sub_8211AAA8)", __imp__sub_8211AAA8, sub_8211AAA8},
+      {"UiMovie::FindNode (sub_8211A578)", __imp__sub_8211A578, harness::Ours<0x8211A578>},
+      {"UiMovie::SetNodeColor (sub_8211A5B8)", __imp__sub_8211A5B8, harness::Ours<0x8211A5B8>},
+      {"UiMovie::SetNodeTexture (sub_8211A708)", __imp__sub_8211A708, harness::Ours<0x8211A708>},
+      {"UiMovie::ShowNode (sub_8211AC00)", __imp__sub_8211AC00, harness::Ours<0x8211AC00>},
+      {"UiMovie::HideNode (sub_8211AC48)", __imp__sub_8211AC48, harness::Ours<0x8211AC48>},
+      {"UiMovie::SetPictureTexture (sub_8211AAA8)", __imp__sub_8211AAA8, harness::Ours<0x8211AAA8>},
       {"UiMovie::GetPictureTexture (sub_8211AB28)", __imp__sub_8211AB28, ITC_CONTEXT_FN(NativeGetPictureTexture)},
-      {"UiMovie::ResetNode (sub_8211A1E0)", __imp__sub_8211A1E0, sub_8211A1E0},
+      {"UiMovie::ResetNode (sub_8211A1E0)", __imp__sub_8211A1E0, harness::Ours<0x8211A1E0>},
   };
   const Movie m(block.at);
   for (const Setter& s : setters) {
@@ -335,10 +335,10 @@ void NodeCases(Context& h, const Block& block) {
       auto [sub, child] = Lookup(h.random);
       // The picture's texture: a leaf (entry 0 is the sub-scene, whose +108
       // isn't a texture entry).
-      if (s.native == sub_8211AAA8 || s.native == ITC_CONTEXT_FN(NativeGetPictureTexture)) {
+      if (s.native == harness::Ours<0x8211AAA8> || s.native == ITC_CONTEXT_FN(NativeGetPictureTexture)) {
         child = 1 + h.random.Below(5);
       }
-      const uint32_t r6 = s.native == sub_8211A5B8 || h.random.Below(3) == 0
+      const uint32_t r6 = s.native == harness::Ours<0x8211A5B8> || h.random.Below(3) == 0
                               ? h.random.Below(40)
                               : uint32_t(h.random.Next());
       Compare(h, results, block.at, 256 + 3 * Movie::kCopyBytes,
@@ -361,7 +361,7 @@ void ResetPoseCases(Context& h, const Block& block) {
   for (int i = 0; i < 300; i++) {
     const MovieSpec spec(h.random);
     Compare(h, results, block.at, 256 + 3 * Movie::kCopyBytes, [&] { spec.Write(h.base, m); },
-            [&](PPCContext& t) { t.r3.u64 = m.movie; }, __imp__sub_8211ABA8, sub_8211ABA8,
+            [&](PPCContext& t) { t.r3.u64 = m.movie; }, __imp__sub_8211ABA8, harness::Ours<0x8211ABA8>,
             fmt::format("case {}: range {} {}", i, spec.first, spec.count));
   }
   results.Report();
@@ -382,7 +382,7 @@ void LeafSetterCases(Context& h, const Block& block) {
                 t.r4.u64 = node;
                 t.r5.u64 = color;
               },
-              __imp__sub_8211A630, sub_8211A630, fmt::format("color {}", color));
+              __imp__sub_8211A630, harness::Ours<0x8211A630>, fmt::format("color {}", color));
     }
     results.Report();
   }
@@ -439,7 +439,7 @@ void ClearTextIdsCases(Context& h, const Block& block) {
               }
               guest::StoreU32(h.base, block.at + 16, chunks);
             },
-            [&](PPCContext& t) { t.r3.u64 = block.at; }, __imp__sub_8211A6C0, sub_8211A6C0,
+            [&](PPCContext& t) { t.r3.u64 = block.at; }, __imp__sub_8211A6C0, harness::Ours<0x8211A6C0>,
             fmt::format("case {}: {} chunks", i, chain.size()));
   }
   results.Report();
@@ -468,7 +468,7 @@ void SwapTextureCases(Context& h, const Block& block) {
               t.r4.u64 = index;
               t.r5.u64 = texture;
             },
-            __imp__sub_8211AB90, sub_8211AB90, fmt::format("i {}", index));
+            __imp__sub_8211AB90, harness::Ours<0x8211AB90>, fmt::format("i {}", index));
   }
   results.Report();
 }
@@ -482,10 +482,10 @@ void ItemCases(Context& h, const Block& block) {
     GuestFunction recompiled, native;
   };
   const Maker makers[] = {
-      {"Quad::Quad (sub_8211A948)", __imp__sub_8211A948, sub_8211A948},
-      {"TextItem::TextItem (sub_8211A818)", __imp__sub_8211A818, sub_8211A818},
-      {"TextItem::~TextItem (sub_8211A8C8)", __imp__sub_8211A8C8, sub_8211A8C8},
-      {"sub_8211AED0 (a text item copied)", __imp__sub_8211AED0, sub_8211AED0},
+      {"Quad::Quad (sub_8211A948)", __imp__sub_8211A948, harness::Ours<0x8211A948>},
+      {"TextItem::TextItem (sub_8211A818)", __imp__sub_8211A818, harness::Ours<0x8211A818>},
+      {"TextItem::~TextItem (sub_8211A8C8)", __imp__sub_8211A8C8, harness::Ours<0x8211A8C8>},
+      {"sub_8211AED0 (a text item copied)", __imp__sub_8211AED0, harness::Ours<0x8211AED0>},
   };
   for (const Maker& f : makers) {
     Results results(f.name);
@@ -579,7 +579,7 @@ void AnimationListCases(Context& h, const Block& block) {
     for (int i = 0; i < 40; i++) {
       const uint32_t movie = block.at + 16 * h.random.Below(16);
       Compare(h, results, block.at, 0xA100, [] {}, [&](PPCContext& t) { t.r3.u64 = movie; },
-              __imp__sub_8211A9E8, sub_8211A9E8, fmt::format("movie +{:X}", movie - block.at));
+              __imp__sub_8211A9E8, harness::Ours<0x8211A9E8>, fmt::format("movie +{:X}", movie - block.at));
     }
     results.Report();
   }
@@ -589,14 +589,14 @@ void AnimationListCases(Context& h, const Block& block) {
   };
   const Op ops[] = {
       {"sub_8211B230 (a free link linked in)", __imp__sub_8211B230, ITC_CONTEXT_FN(NativeLinkFree)},
-      {"AnimationList::Insert (sub_8211B4D0)", __imp__sub_8211B4D0, sub_8211B4D0},
-      {"AnimationList::RemoveAt (sub_8211B080)", __imp__sub_8211B080, sub_8211B080},
+      {"AnimationList::Insert (sub_8211B4D0)", __imp__sub_8211B4D0, harness::Ours<0x8211B4D0>},
+      {"AnimationList::RemoveAt (sub_8211B080)", __imp__sub_8211B080, harness::Ours<0x8211B080>},
       {"AnimationList::Get (sub_8211B298)", __imp__sub_8211B298, ITC_CONTEXT_FN(NativeGet)},
   };
   for (const Op& op : ops) {
     Results results(op.name);
     for (int i = 0; i < 400; i++) {
-      const bool links = op.native == ITC_CONTEXT_FN(NativeLinkFree) || op.native == sub_8211B4D0;
+      const bool links = op.native == ITC_CONTEXT_FN(NativeLinkFree) || op.native == harness::Ours<0x8211B4D0>;
       // Linking needs a free link; removing and getting a used one.
       const uint32_t used = links ? h.random.Below(32) : 1 + h.random.Below(32);
       const ListSpec spec(h.random, i == 0 ? (links ? 0 : 32) : used);
@@ -622,7 +622,7 @@ void AnimationListCases(Context& h, const Block& block) {
                   t.r5.u64 = position;
                 } else {
                   t.r3.u64 = list;
-                  t.r4.u64 = op.native == sub_8211B4D0 ? other : position;
+                  t.r4.u64 = op.native == harness::Ours<0x8211B4D0> ? other : position;
                   t.r5.u64 = position;
                 }
               },
@@ -640,8 +640,8 @@ void AnimationListCases(Context& h, const Block& block) {
     bool f1 = true;  // IsNamedActive answers in r3 only
   };
   const Lookup lookups[] = {
-      {"UiMovie::AnimationTime (sub_8211BA00)", __imp__sub_8211BA00, sub_8211BA00},
-      {"UiMovie::NamedAnimationTime (sub_8211BB18)", __imp__sub_8211BB18, sub_8211BB18},
+      {"UiMovie::AnimationTime (sub_8211BA00)", __imp__sub_8211BA00, harness::Ours<0x8211BA00>},
+      {"UiMovie::NamedAnimationTime (sub_8211BB18)", __imp__sub_8211BB18, harness::Ours<0x8211BB18>},
       {"UiMovie::IsNamedActive (sub_8211BC18)", __imp__sub_8211BC18, ITC_CONTEXT_FN(NativeIsNamedActive), false},
   };
   const uint32_t movie = block.at;
@@ -681,9 +681,9 @@ void PairsCases(Context& h, const Block& block) {
     bool in_place;  // the pairs at +0 and the count at +1024, else +0 a pointer and +8 the count
   };
   const Lookup lookups[] = {
-      {"TextMap::Find (sub_8211B310)", __imp__sub_8211B310, sub_8211B310, true},
-      {"TextMap::Set (sub_8211B370)", __imp__sub_8211B370, sub_8211B370, true},
-      {"UiMovies::Find (sub_8211B3F0)", __imp__sub_8211B3F0, sub_8211B3F0, false},
+      {"TextMap::Find (sub_8211B310)", __imp__sub_8211B310, harness::Ours<0x8211B310>, true},
+      {"TextMap::Set (sub_8211B370)", __imp__sub_8211B370, harness::Ours<0x8211B370>, true},
+      {"UiMovies::Find (sub_8211B3F0)", __imp__sub_8211B3F0, harness::Ours<0x8211B3F0>, false},
   };
   const uint32_t map = block.at + 64;
   const uint32_t pairs = block.at + 2048;
@@ -691,7 +691,7 @@ void PairsCases(Context& h, const Block& block) {
   for (const Lookup& f : lookups) {
     Results results(f.name);
     for (int i = 0; i < 500; i++) {
-      const bool set = f.native == sub_8211B370;
+      const bool set = f.native == harness::Ours<0x8211B370>;
       uint32_t count = i < 3 ? uint32_t(i) : h.random.Below(129);
       if (!set && i % 50 == 49) {
         count = 129 + h.random.Below(64);  // past the 128 pairs: they read on
@@ -768,7 +768,7 @@ void ScreenStartCases(Context& h, const Block& block) {
       if (v == 0) {
         RunRecompiled(__imp__sub_8211AD00, t, h.base);
       } else {
-        sub_8211AD00(t, h.base);
+        harness::Ours<0x8211AD00>(t, h.base);
       }
       result[v] = Read(h.base, block.at, 1024);
       std::vector<uint8_t> g = Read(h.base, kGlobals, kGlobalBytes);
@@ -882,7 +882,7 @@ void LayersCases(Context& h, const Block& block) {
               t.r6.u64 = layer;
               t.r7.u64 = by_bucket;
             },
-            __imp__sub_8211BD10, sub_8211BD10,
+            __imp__sub_8211BD10, harness::Ours<0x8211BD10>,
             fmt::format("case {}: top {:X} range {} {} by bucket {}", i, top - block.at, top_first,
                         top_count, by_bucket));
   }
@@ -908,8 +908,8 @@ void TextCases(Context& h, const Block& block) {
     bool writes;  // a record of 0 is written through
   };
   const Accessor accessors[] = {
-      {"UiMovie::TextString (sub_8211B720)", __imp__sub_8211B720, sub_8211B720, false},
-      {"sub_8211B770 (a text's +20)", __imp__sub_8211B770, sub_8211B770, false},
+      {"UiMovie::TextString (sub_8211B720)", __imp__sub_8211B720, harness::Ours<0x8211B720>, false},
+      {"sub_8211B770 (a text's +20)", __imp__sub_8211B770, harness::Ours<0x8211B770>, false},
       {"sub_8211B7B8 (a text's +24)", __imp__sub_8211B7B8, ITC_CONTEXT_FN(NativeTextField24), false},
       {"sub_8211B9B8 (a text's +4)", __imp__sub_8211B9B8, ITC_CONTEXT_FN(NativeTextField4), false},
       {"sub_8211B940 (a text's scroll counter)", __imp__sub_8211B940, ITC_CONTEXT_FN(NativeAdvanceTextScroll), true},
@@ -978,7 +978,7 @@ void TextCases(Context& h, const Block& block) {
                 guest::StoreU32(h.base, 0x826C5CD4, count);
                 guest::StoreU32(h.base, 0x826C5CDC, none);
               },
-              [&](PPCContext& t) { t.r3.u64 = id; }, __imp__sub_8211BE98, sub_8211BE98,
+              [&](PPCContext& t) { t.r3.u64 = id; }, __imp__sub_8211BE98, harness::Ours<0x8211BE98>,
               fmt::format("case {}: count {} id {}", i, count, id), false, put_back);
     }
     results.Report();
@@ -995,14 +995,14 @@ void MoveCases(Context& h, const Block& block) {
     GuestFunction recompiled, native;
   };
   const Move moves[] = {
-      {"UiMovie::MoveAnimation (sub_8211DBE0)", __imp__sub_8211DBE0, sub_8211DBE0},
+      {"UiMovie::MoveAnimation (sub_8211DBE0)", __imp__sub_8211DBE0, harness::Ours<0x8211DBE0>},
       {"UiMovie::MoveNamedAnimation (sub_8211DCE8)", __imp__sub_8211DCE8,
        ITC_CONTEXT_FN(NativeMoveNamedAnimation)},
-      {"UiMovie::Loop (sub_8211DDD8)", __imp__sub_8211DDD8, sub_8211DDD8},
-      {"UiMovie::LoopNamed (sub_8211DDE0)", __imp__sub_8211DDE0, sub_8211DDE0},
-      {"UiMovie::LoopLast (sub_8211DDE8)", __imp__sub_8211DDE8, sub_8211DDE8},
-      {"UiMovie::UnloopNamed (sub_8211DE30)", __imp__sub_8211DE30, sub_8211DE30},
-      {"UiMovie::Unloop (sub_8211DE28)", __imp__sub_8211DE28, sub_8211DE28},
+      {"UiMovie::Loop (sub_8211DDD8)", __imp__sub_8211DDD8, harness::Ours<0x8211DDD8>},
+      {"UiMovie::LoopNamed (sub_8211DDE0)", __imp__sub_8211DDE0, harness::Ours<0x8211DDE0>},
+      {"UiMovie::LoopLast (sub_8211DDE8)", __imp__sub_8211DDE8, harness::Ours<0x8211DDE8>},
+      {"UiMovie::UnloopNamed (sub_8211DE30)", __imp__sub_8211DE30, harness::Ours<0x8211DE30>},
+      {"UiMovie::Unloop (sub_8211DE28)", __imp__sub_8211DE28, harness::Ours<0x8211DE28>},
   };
   const uint32_t movie = block.at;
   for (const Move& f : moves) {
@@ -1053,8 +1053,8 @@ void PlayCases(Context& h, const Block& block) {
     bool named;
   };
   const Start starts[] = {
-      {"UiMovie::Play (sub_8211D978)", __imp__sub_8211D978, sub_8211D978, false},
-      {"UiMovie::PlayNamed (sub_8211DAC8)", __imp__sub_8211DAC8, sub_8211DAC8, true},
+      {"UiMovie::Play (sub_8211D978)", __imp__sub_8211D978, harness::Ours<0x8211D978>, false},
+      {"UiMovie::PlayNamed (sub_8211DAC8)", __imp__sub_8211DAC8, harness::Ours<0x8211DAC8>, true},
   };
   const uint32_t movie = block.at;
   const uint32_t scene = block.at + 0xA100;
@@ -1429,7 +1429,7 @@ void DrawTextsCases(Context& h, const Block& block) {
       if (v == 0) {
         RunRecompiled(__imp__sub_8211CD90, t, h.base);
       } else {
-        sub_8211CD90(t, h.base);
+        harness::Ours<0x8211CD90>(t, h.base);
       }
       std::vector<uint8_t> bytes = Read(h.base, block.at, TextWorld::kBytes);
       std::vector<uint32_t> node_floats;
@@ -1631,8 +1631,8 @@ void DrawAndRunCases(Context& h, const Block& block) {
     const char* name;
     GuestFunction recompiled, native;
   };
-  for (const Case& f : {Case{"UiMovie::Draw (sub_8211D280)", __imp__sub_8211D280, sub_8211D280},
-                        Case{"UiMovie::Run (sub_8211E1B8)", __imp__sub_8211E1B8, sub_8211E1B8}}) {
+  for (const Case& f : {Case{"UiMovie::Draw (sub_8211D280)", __imp__sub_8211D280, harness::Ours<0x8211D280>},
+                        Case{"UiMovie::Run (sub_8211E1B8)", __imp__sub_8211E1B8, harness::Ours<0x8211E1B8>}}) {
     Results results(f.name);
     for (int i = 0; i < 100; i++) {
       const Random start = h.random;
@@ -1703,7 +1703,7 @@ void FinishCases(Context& h, const Block& block) {
              false},
         Case{"UiMovie::FinishNamed (sub_8211DF20)", __imp__sub_8211DF20,
              ui_movies_game_hooks::FinishNamed, false},
-        Case{"UiMovie::FinishAll (sub_8211DFF8)", __imp__sub_8211DFF8, sub_8211DFF8, true}}) {
+        Case{"UiMovie::FinishAll (sub_8211DFF8)", __imp__sub_8211DFF8, harness::Ours<0x8211DFF8>, true}}) {
     Results results(f.name);
     for (int i = 0; i < 600; i++) {
       const Random start = h.random;

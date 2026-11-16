@@ -4558,7 +4558,7 @@ void Type8ModeInits(Context& h) {
         // member's screens' vtables the Inits call through).
         PPCContext m = CallContext(h);
         m.r3.u64 = mode.address;
-        sub_82107670(m, base);
+        harness::Ours<0x82107670>(m, base);
       }
       const uint32_t handlers = r.Below(8);
       guest::StoreU32(base, mode.address + 36 + 200, handlers);

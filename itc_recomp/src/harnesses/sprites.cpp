@@ -50,8 +50,8 @@ void Sprites(Context& h) {
     GuestFunction recompiled, native;
   };
   const Function resets[] = {
-      {"SpriteList::Reset (sub_821298C0)", __imp__sub_821298C0, sub_821298C0},
-      {"Sprite::Reset (sub_8211EB60)", __imp__sub_8211EB60, sub_8211EB60},
+      {"SpriteList::Reset (sub_821298C0)", __imp__sub_821298C0, harness::Ours<0x821298C0>},
+      {"Sprite::Reset (sub_8211EB60)", __imp__sub_8211EB60, harness::Ours<0x8211EB60>},
   };
   for (const Function& f : resets) {
     Results results(f.name);
@@ -79,7 +79,7 @@ void Sprites(Context& h) {
              t.r3.u64 = h.data;
              t.r4.u64 = index;
            },
-           __imp__sub_82126630, sub_82126630, h.data, 16, fmt::format("index {:X}", index));
+           __imp__sub_82126630, harness::Ours<0x82126630>, h.data, 16, fmt::format("index {:X}", index));
     }
     results.Report();
   }
@@ -118,7 +118,7 @@ void Sprites(Context& h) {
              t.r3.u64 = h.data;
              t.r4.u64 = h.data + 16;
            },
-           __imp__sub_82123300, sub_82123300, h.data, 32,
+           __imp__sub_82123300, harness::Ours<0x82123300>, h.data, 32,
            fmt::format("{:08X} {:08X} {:08X} {:08X} against {:08X} {:08X} {:08X} {:08X}", a[0], a[1],
                        a[2], a[3], b[0], b[1], b[2], b[3]));
     }
@@ -168,7 +168,7 @@ void Sprites(Context& h) {
              t.r5.u64 = (uint64_t(b[0]) << 32) | b[1];
              t.r6.u64 = (uint64_t(b[2]) << 32) | b[3];
            },
-           __imp__sub_82129940, sub_82129940, h.data, 0,
+           __imp__sub_82129940, harness::Ours<0x82129940>, h.data, 0,
            fmt::format("{:08X} {:08X} {:08X} {:08X} to {:08X} {:08X} {:08X} {:08X}", a[0], a[1],
                        a[2], a[3], b[0], b[1], b[2], b[3]));
     }
@@ -193,8 +193,8 @@ void Sprites(Context& h) {
     bool draw;
   };
   const RectFunction rect_functions[] = {
-      {"ScreenRect::Record (sub_82128E70)", __imp__sub_82128E70, sub_82128E70, false},
-      {"ScreenRect::Draw (sub_82129280)", __imp__sub_82129280, sub_82129280, true},
+      {"ScreenRect::Record (sub_82128E70)", __imp__sub_82128E70, harness::Ours<0x82128E70>, false},
+      {"ScreenRect::Draw (sub_82129280)", __imp__sub_82129280, harness::Ours<0x82129280>, true},
   };
   for (const RectFunction& f : rect_functions) {
     Results results(f.name);

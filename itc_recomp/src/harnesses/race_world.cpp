@@ -1176,7 +1176,7 @@ void TrackCollisionTicks(Context& h, const Block& manager, const Block& vehicles
       PPCContext t = CallContext(h);
       t.fpscr.disableFlushModeUnconditional();
       ITC_FLAG(native_collision_world) = v == 1;
-      (v == 0 ? __imp__sub_820FF050 : sub_820FF050)(t, h.base);
+      (v == 0 ? __imp__sub_820FF050 : harness::Ours<0x820FF050>)(t, h.base);
       ITC_FLAG(native_collision_world) = true;
       car_objects::UpdateWorldOutputs(out[v], h.base, world.address);
       for (uint32_t i = 0; i < 3; i++) {

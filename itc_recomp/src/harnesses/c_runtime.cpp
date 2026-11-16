@@ -520,7 +520,7 @@ void CRuntime(Context& h) {
         PPCContext t = CallContext(h);
         t.r12.s64 = -int64_t(size);
         t.r3.u64 = 0x12345678;
-        (v == 0 ? __imp__sub_825A9934 : sub_825A9934)(t, h.base);
+        (v == 0 ? __imp__sub_825A9934 : harness::Ours<0x825A9934>)(t, h.base);
         result[v] = Read(h.base, h.data, kScratchBytes);
         Append(result[v], t.r1.u64);
         Append(result[v], t.r12.u64);
@@ -556,7 +556,7 @@ void CRuntime(Context& h) {
                t.r4.u64 = value;
                t.r5.u64 = count;
              },
-             __imp__sub_825A71D0, sub_825A71D0, h.data, kScratchBytes,
+             __imp__sub_825A71D0, harness::Ours<0x825A71D0>, h.data, kScratchBytes,
              fmt::format("count {} offset {} value {:X}", count, offset, value));
       }
     }
@@ -743,13 +743,13 @@ void CRuntime(Context& h) {
                      t.r3.u64 = destination;
                      t.r4.u64 = at;
                    },
-                   __imp__sub_825A7F30, sub_825A7F30, what);
+                   __imp__sub_825A7F30, harness::Ours<0x825A7F30>, what);
         StringCase(h, copies, [&] { WriteUnits(h, at, units); },
                    [&](PPCContext& t) {
                      t.r3.u64 = at - 2;
                      t.r4.u64 = at;
                    },
-                   __imp__sub_825A7F30, sub_825A7F30, what + " overlapping");
+                   __imp__sub_825A7F30, harness::Ours<0x825A7F30>, what + " overlapping");
         for (uint32_t prefix : {0u, 1u, 9u, 120u}) {
           const std::vector<uint16_t> start = RandomUnits(h, prefix);
           StringCase(h, joins,
@@ -761,7 +761,7 @@ void CRuntime(Context& h) {
                        t.r3.u64 = destination;
                        t.r4.u64 = at;
                      },
-                     __imp__sub_825A7EF8, sub_825A7EF8, what + fmt::format(" prefix {}", prefix));
+                     __imp__sub_825A7EF8, harness::Ours<0x825A7EF8>, what + fmt::format(" prefix {}", prefix));
         }
       }
     }
@@ -858,7 +858,7 @@ void CRuntime(Context& h) {
                          t.r4.u64 = at;
                          t.r5.u64 = count;
                        },
-                       __imp__sub_825A7F50, sub_825A7F50, what);
+                       __imp__sub_825A7F50, harness::Ours<0x825A7F50>, what);
             if (count > length) {
               StringCase(h, safe, [&] { WriteBytes(h, at, bytes); },
                          [&](PPCContext& t) {
@@ -915,7 +915,7 @@ void CRuntime(Context& h) {
                          t.r3.u64 = first;
                          t.r4.u64 = second;
                        },
-                       __imp__sub_825AA100, sub_825AA100, what);
+                       __imp__sub_825AA100, harness::Ours<0x825AA100>, what);
             for (uint64_t count : {uint64_t(0), uint64_t(1), uint64_t(length), uint64_t(length) + 1,
                                    uint64_t(length / 2 + 1), uint64_t(0x7FFFFFFF), uint64_t(0xFFFFFFFF),
                                    uint64_t(0x100000003)}) {
@@ -925,10 +925,10 @@ void CRuntime(Context& h) {
                 t.r5.u64 = count;
               };
               const std::string with = what + fmt::format(" count {:X}", count);
-              StringCase(h, ncmp, setup, args, __imp__sub_825AACD0, sub_825AACD0, with);
+              StringCase(h, ncmp, setup, args, __imp__sub_825AACD0, harness::Ours<0x825AACD0>, with);
               StringCase(h, ascii, setup, args, __imp__sub_825AC6B0, ITC_CONTEXT_FN(NativeAsciiStrnicmp), with);
               if (count <= 0x7FFFFFFF) {  // above, EINVAL through _errno
-                StringCase(h, nicmp, setup, args, __imp__sub_825AC710, sub_825AC710, with);
+                StringCase(h, nicmp, setup, args, __imp__sub_825AC710, harness::Ours<0x825AC710>, with);
               }
             }
           }
@@ -975,7 +975,7 @@ void CRuntime(Context& h) {
                        t.r3.u64 = at;
                        t.r4.u64 = needle_at;
                      },
-                     __imp__sub_825A98A8, sub_825A98A8,
+                     __imp__sub_825A98A8, harness::Ours<0x825A98A8>,
                      fmt::format("length {} offset {} needle {}", length, offset, n));
           // r3 with its high word set (as a sign-extended pointer has).
           StringCase(h, finds,
@@ -987,7 +987,7 @@ void CRuntime(Context& h) {
                        t.r3.u64 = 0xFFFFFFFF00000000ull | at;
                        t.r4.u64 = needle_at;
                      },
-                     __imp__sub_825A98A8, sub_825A98A8,
+                     __imp__sub_825A98A8, harness::Ours<0x825A98A8>,
                      fmt::format("length {} offset {} needle {} high r3", length, offset, n));
         }
       }
@@ -1020,7 +1020,7 @@ void CRuntime(Context& h) {
                          t.r4.u64 = source;
                          t.r5.u64 = count;
                        },
-                       __imp__sub_825A7830, sub_825A7830,
+                       __imp__sub_825A7830, harness::Ours<0x825A7830>,
                        fmt::format("count {} destination {} source {} shift {}", count, d, sa,
                                    shift));
           }
@@ -1034,7 +1034,7 @@ void CRuntime(Context& h) {
                    t.r4.u64 = h.data + 65;
                    t.r5.u64 = count;
                  },
-                 __imp__sub_825A7830, sub_825A7830, fmt::format("count {} across a page end", count));
+                 __imp__sub_825A7830, harness::Ours<0x825A7830>, fmt::format("count {} across a page end", count));
     }
     copies.Report();
   }
@@ -1056,12 +1056,12 @@ void CRuntime(Context& h) {
       GuestFunction recompiled, native;
     };
     const Function functions[] = {
-        {"toupper (sub_825A8600)", __imp__sub_825A8600, sub_825A8600},
-        {"tolower (sub_825A8618)", __imp__sub_825A8618, sub_825A8618},
-        {"isalpha (sub_825AB020)", __imp__sub_825AB020, sub_825AB020},
-        {"isdigit (sub_825AB040)", __imp__sub_825AB040, sub_825AB040},
-        {"isalnum (sub_825AB0A0)", __imp__sub_825AB0A0, sub_825AB0A0},
-        {"isleadbyte (sub_825B6898)", __imp__sub_825B6898, sub_825B6898},
+        {"toupper (sub_825A8600)", __imp__sub_825A8600, harness::Ours<0x825A8600>},
+        {"tolower (sub_825A8618)", __imp__sub_825A8618, harness::Ours<0x825A8618>},
+        {"isalpha (sub_825AB020)", __imp__sub_825AB020, harness::Ours<0x825AB020>},
+        {"isdigit (sub_825AB040)", __imp__sub_825AB040, harness::Ours<0x825AB040>},
+        {"isalnum (sub_825AB0A0)", __imp__sub_825AB0A0, harness::Ours<0x825AB0A0>},
+        {"isleadbyte (sub_825B6898)", __imp__sub_825B6898, harness::Ours<0x825B6898>},
     };
     for (const Function& f : functions) {
       Results results(f.name);
@@ -1152,7 +1152,7 @@ void CRuntime(Context& h) {
                          t.r4.u64 = end_out;
                          t.r5.s64 = text.radix;
                        },
-                       __imp__sub_825A85E0, sub_825A85E0, what);
+                       __imp__sub_825A85E0, harness::Ours<0x825A85E0>, what);
           }
           if (text.value <= (text.negative ? 0x80000000ull : 0x7FFFFFFFull)) {
             StringCase(h, signed_results, setup,
@@ -1326,7 +1326,7 @@ void CRuntime(Context& h) {
                            t.r4.u64 = stream;
                            t.r5.u64 = count;
                          },
-                         __imp__sub_825AF000, sub_825AF000,
+                         __imp__sub_825AF000, harness::Ours<0x825AF000>,
                          fmt::format("flags {:X} base {:X} room {:X} pointer {:X} count {:X}",
                                      flag, base_word, room, pointer, c));
             }
@@ -1385,7 +1385,7 @@ void CRuntime(Context& h) {
                              t.r5.u64 = stream;
                              t.r6.u64 = count;
                            },
-                           __imp__sub_825AF098, sub_825AF098,
+                           __imp__sub_825AF098, harness::Ours<0x825AF098>,
                            fmt::format("flags {:X} base {:X} room {:X} length {} pointer +{} "
                                        "count {:X}",
                                        flag, base_word, room, length, pointer - h.data, c));
@@ -1467,7 +1467,7 @@ void CRuntime(Context& h) {
     const std::vector<std::pair<uint32_t, uint32_t>> table = {{0x8266BA5C, 40}};
     for (auto [recompiled, native, name] :
          {std::tuple{__imp__sub_825A6DB0, NativeCfltcvtInit, "_cfltcvt_init"},
-          std::tuple{__imp__sub_825A6E48, sub_825A6E48, "sub_825A6E48"}}) {
+          std::tuple{__imp__sub_825A6E48, harness::Ours<0x825A6E48>, "sub_825A6E48"}}) {
       GlobalsCase(h, results, table, [&] { Fill(h.base, 0x8266BA5C, 40); },
                   [](PPCContext&) {}, recompiled, native, name, false);
     }
@@ -1515,9 +1515,9 @@ void CRuntime(Context& h) {
             t.r10.u64 = h.random.Next();
             t.r11.u64 = h.random.Next();
             if (empty) {
-              (v == 0 ? __imp__sub_82106540 : sub_82106540)(t, h.base);
+              (v == 0 ? __imp__sub_82106540 : harness::Ours<0x82106540>)(t, h.base);
             } else {
-              (v == 0 ? __imp__sub_825AA398 : sub_825AA398)(t, h.base);
+              (v == 0 ? __imp__sub_825AA398 : harness::Ours<0x825AA398>)(t, h.base);
             }
             for (int k = 0; k < 6; k++) {
               out[v].Word(guest::LoadU32(h.base, kGlobals[k]));
@@ -1549,7 +1549,7 @@ void CRuntime(Context& h) {
                     guest::StoreU32(h.base, 0x8297136C, 0x12345678);
                     Fill(h.base, info, 544);
                   },
-                  [](PPCContext& t) { t.r3.u64 = 0x5555; }, __imp__sub_825B6958, sub_825B6958,
+                  [](PPCContext& t) { t.r3.u64 = 0x5555; }, __imp__sub_825B6958, harness::Ours<0x825B6958>,
                   fmt::format("__initmbctable done {}", done));
     }
     for (uint32_t offset : {64u, 67u, 1024u}) {
@@ -1575,7 +1575,7 @@ void CRuntime(Context& h) {
                    t.r4.u64 = from;
                    t.r5.u64 = size;
                  },
-                 __imp__sub_825A7410, sub_825A7410,
+                 __imp__sub_825A7410, harness::Ours<0x825A7410>,
                  fmt::format("to +{} from +{} size {}", to - h.data, from - h.data, size));
     };
     std::vector<uint32_t> sizes;
@@ -1623,7 +1623,7 @@ void CRuntime(Context& h) {
                    t.r4.u64 = from;
                    t.r5.u64 = size;
                  },
-                 __imp__sub_825AA840, sub_825AA840,
+                 __imp__sub_825AA840, harness::Ours<0x825AA840>,
                  fmt::format("to +{} from +{} size {}", to - h.data, from - h.data, size));
     };
     for (uint32_t size : {0u, 1u, 2u, 3u, 4u, 5u, 7u, 8u, 9u, 13u, 16u, 31u, 64u, 100u, 257u}) {
@@ -1736,7 +1736,7 @@ void CRuntime(Context& h) {
                        t.r5.u64 = from;
                        t.r6.u64 = count;
                      },
-                     __imp__sub_825A7270, sub_825A7270,
+                     __imp__sub_825A7270, harness::Ours<0x825A7270>,
                      fmt::format("to +{} size {} from +{} count {}", to - h.data, size,
                                  from - h.data, count));
         }
@@ -1748,7 +1748,7 @@ void CRuntime(Context& h) {
       t.r4.u64 = 0;
       t.r5.u64 = 0;
       t.r6.u64 = 0;
-    }, __imp__sub_825A7270, sub_825A7270, "all 0");
+    }, __imp__sub_825A7270, harness::Ours<0x825A7270>, "all 0");
     results.Report();
   }
 
@@ -1900,7 +1900,7 @@ void CRuntime(Context& h) {
         if (which == 0) {
           (v == 0 ? __imp__sub_825AB0C0 : ITC_CONTEXT_FN(NativeAtofL))(t, h.base);
         } else {
-          (v == 0 ? __imp__sub_825AB1C0 : sub_825AB1C0)(t, h.base);
+          (v == 0 ? __imp__sub_825AB1C0 : harness::Ours<0x825AB1C0>)(t, h.base);
         }
         result[v] = Read(h.base, h.data, kScratchBytes);
         Append(result[v], t.f1.u64);
@@ -2078,7 +2078,7 @@ void CRuntime(Context& h) {
                        }
                      },
                      direct ? __imp__sub_825AE8E0 : __imp__sub_825AEB20,
-                     direct ? ITC_CONTEXT_FN(NativeCftofL) : sub_825AEB20,
+                     direct ? ITC_CONTEXT_FN(NativeCftofL) : harness::Ours<0x825AEB20>,
                      fmt::format("{:016X} %{}.{}{}", d, char(format), precision,
                                  direct ? " (_cftof_l)" : ""));
         }
@@ -2187,7 +2187,7 @@ void CRuntime(Context& h) {
     for (int i = 0; i < 16; i++) {
       const uint64_t r3 = h.random.Next();
       StringCase(h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = r3; }, __imp__sub_825AD4C0,
-                 sub_825AD4C0, fmt::format("r3 {:X}", r3));
+                 harness::Ours<0x825AD4C0>, fmt::format("r3 {:X}", r3));
     }
     results.Report();
   }
@@ -2250,9 +2250,9 @@ void CRuntime(Context& h) {
               t.r30.u64 = 0x3030303030303030ull;
               t.r31.u64 = 0x3131313131313131ull;
               if (which == 0) {
-                (v == 0 ? __imp__sub_820911A8 : sub_820911A8)(t, h.base);
+                (v == 0 ? __imp__sub_820911A8 : harness::Ours<0x820911A8>)(t, h.base);
               } else {
-                (v == 0 ? __imp__sub_820900C0 : sub_820900C0)(t, h.base);
+                (v == 0 ? __imp__sub_820900C0 : harness::Ours<0x820900C0>)(t, h.base);
               }
               out[v].Bytes(Read(h.base, h.data, kScratchBytes));
               out[v].Word(t.r1.u32);

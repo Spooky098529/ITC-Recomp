@@ -1059,11 +1059,11 @@ void Dispatchers(Context& h) {
     GuestFunction native;
   };
   const Thunk thunks[] = {
-      {"Delegate slot 0 thunk (sub_82096330)", __imp__sub_82096330, sub_82096330},
+      {"Delegate slot 0 thunk (sub_82096330)", __imp__sub_82096330, harness::Ours<0x82096330>},
       {"Delegate slot 1 thunk (sub_82096340)", __imp__sub_82096340, ITC_CONTEXT_FN(hooks::DelegateSlot1Thunk)},
-      {"Framework::Start (sub_820902B0)", __imp__sub_820902B0, sub_820902B0},
-      {"App input source (sub_82094350)", __imp__sub_82094350, sub_82094350},
-      {"App +16 slot +36 (sub_820944C8)", __imp__sub_820944C8, sub_820944C8},
+      {"Framework::Start (sub_820902B0)", __imp__sub_820902B0, harness::Ours<0x820902B0>},
+      {"App input source (sub_82094350)", __imp__sub_82094350, harness::Ours<0x82094350>},
+      {"App +16 slot +36 (sub_820944C8)", __imp__sub_820944C8, harness::Ours<0x820944C8>},
   };
   for (const Thunk& thunk : thunks) {
     Results results(thunk.name);
@@ -1136,7 +1136,7 @@ void Dispatchers(Context& h) {
             t.r4.u64 = ObjectAt(h, 2);
             Fill(h.base, t.r1.u32 - 128 + 80, 4);
           },
-          __imp__sub_820902C8, sub_820902C8,
+          __imp__sub_820902C8, harness::Ours<0x820902C8>,
           [&](Outputs& out, const PPCContext& t) {
             DispatchOut(h, out, t);
             out.Bytes(Read(h.base, t.r1.u32 - 128 + 80, 4));
@@ -1185,7 +1185,7 @@ void Dispatchers(Context& h) {
             Fill(h.base, t.r1.u32 - 112 + 80, 12);
           },
           which == 0 ? __imp__sub_8209AAA8 : __imp__sub_8209AB48,
-          which == 0 ? sub_8209AAA8 : sub_8209AB48,
+          which == 0 ? harness::Ours<0x8209AAA8> : harness::Ours<0x8209AB48>,
           [&](Outputs& out, const PPCContext& t) {
             const uint32_t vector = loop + rl::kRequests;
             const uint32_t first = Load(h.base, vector + rl::kVectorFirst);
@@ -1302,7 +1302,7 @@ void Constructors(Context& h) {
             t.r4.u64 = ObjectAt(h, 0);
           },
           which == 0 ? __imp__sub_820AC8F8 : __imp__sub_820AC848,
-          which == 0 ? sub_820AC8F8 : sub_820AC848,
+          which == 0 ? harness::Ours<0x820AC8F8> : harness::Ours<0x820AC848>,
           [&](Outputs& out, const PPCContext& t) { DispatchOut(h, out, t); },
           fmt::format("case {}", c));
     }
@@ -1329,7 +1329,7 @@ void Constructors(Context& h) {
             t.r4.u64 = h.data + 16;
             Fill(h.base, t.r1.u32 - 144, 144);
           },
-          __imp__sub_82092710, sub_82092710,
+          __imp__sub_82092710, harness::Ours<0x82092710>,
           [&](Outputs& out, const PPCContext& t) {
             out.Bytes(Read(h.base, h.data, 2048 + 0x210));
             out.Bytes(Read(h.base, t.r1.u32 - 144 + 80, 36));
@@ -1405,7 +1405,7 @@ void Constructors(Context& h) {
                 guest::StoreU32(h.base, t.r1.u32 - at, uint32_t(h.random.Next()));
               }
             },
-            __imp__sub_82091160, sub_82091160,
+            __imp__sub_82091160, harness::Ours<0x82091160>,
             [&](Outputs& out, const PPCContext& t) {
               const uint32_t text = t.r3.u32;
               // The job's address recorded by the pool, and the global, by

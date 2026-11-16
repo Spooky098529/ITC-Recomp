@@ -86,7 +86,7 @@ void Time(Context& h) {
              t.r3.u64 = data;
              t.r4.u64 = data + 16;
            },
-           __imp__sub_8229B720, sub_8229B720, data + 16, 16, fmt::format("{:016X}", time));
+           __imp__sub_8229B720, harness::Ours<0x8229B720>, data + 16, 16, fmt::format("{:016X}", time));
     }
     results.Report();
   }
@@ -112,7 +112,7 @@ void Time(Context& h) {
              t.r3.u64 = data;
              t.r4.u64 = data + 16;
            },
-           __imp__sub_8229B680, sub_8229B680, data + 16, 8,
+           __imp__sub_8229B680, harness::Ours<0x8229B680>, data + 16, 8,
            fmt::format("{}-{}-{} {}:{}:{}.{} weekday {}", f[0], f[1], f[3], f[4], f[5], f[6], f[7], f[2]));
     }
     results.Report();
@@ -150,7 +150,7 @@ void Time(Context& h) {
              t.r5.u64 = data + 16;
              t.r6.u64 = from_this_year;
            },
-           __imp__sub_8229B1E8, sub_8229B1E8, data + 32, 8,
+           __imp__sub_8229B1E8, harness::Ours<0x8229B1E8>, data + 32, 8,
            fmt::format("rule {}-{}-{} weekday {} {}:{} now {:016X} from this year {}", f[0], f[1], f[3],
                        f[2], f[4], f[5], now, from_this_year));
     }
@@ -183,7 +183,7 @@ void Time(Context& h) {
     for (const Zone& z : zones) {
       SetFakeZone(z);
       Both(h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = data; }, __imp__sub_82297DC8,
-           sub_82297DC8, data, 172, z.name);
+           harness::Ours<0x82297DC8>, data, 172, z.name);
       time_hooks::ClearFakeZone();
     }
     results.Report();
@@ -221,7 +221,7 @@ void Time(Context& h) {
       Fill(base, data, kScratchBytes);
       PPCContext t = CallContext(h);
       t.r3.u64 = data;
-      (v == 0 ? __imp__sub_822968B8 : sub_822968B8)(t, base);
+      (v == 0 ? __imp__sub_822968B8 : harness::Ours<0x822968B8>)(t, base);
       result[v] = Read(base, data, 14);
       helpers::SystemTime s;
       uint16_t* fields = &s.year;
@@ -250,7 +250,7 @@ void Time(Context& h) {
              t.r3.u64 = data;
              t.r4.u64 = given ? data + 172 : 0;
            },
-           __imp__sub_8229B440, sub_8229B440, data, 176,
+           __imp__sub_8229B440, harness::Ours<0x8229B440>, data, 176,
            given ? "uses daylight given" : "uses daylight not given");
     }
     results.Report();

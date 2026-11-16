@@ -66,7 +66,7 @@ ITC_NATIVE_SWAP(NativeSwapWheels, SwapWheels)
 
 uint32_t TocOf(PPCContext& ctx, uint8_t* base, uint32_t id) {
   ctx.r3.u64 = id;
-  sub_8209D868(ctx, base);
+  harness::Ours<0x8209D868>(ctx, base);
   return ctx.r3.u32;
 }
 

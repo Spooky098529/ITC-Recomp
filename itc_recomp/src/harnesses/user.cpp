@@ -23,7 +23,7 @@ void User(Context& h) {
                t.r4.u64 = data;
                t.r5.u64 = size;
              },
-             __imp__sub_82295020, sub_82295020, data, 24,
+             __imp__sub_82295020, harness::Ours<0x82295020>, data, 24,
              fmt::format("user {} size {}", index, size));
       }
     }
@@ -33,7 +33,7 @@ void User(Context& h) {
     Results results("XUserGetSigninState (sub_82295028)");
     for (uint32_t index = 0; index < 6; index++) {
       Both(h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = index; }, __imp__sub_82295028,
-           sub_82295028, data, 0, fmt::format("user {}", index));
+           harness::Ours<0x82295028>, data, 0, fmt::format("user {}", index));
     }
     results.Report();
   }
@@ -46,7 +46,7 @@ void User(Context& h) {
                t.r3.u64 = index;
                t.r4.u64 = null_out ? 0 : data;
              },
-             __imp__sub_82295268, sub_82295268, data, 8,
+             __imp__sub_82295268, harness::Ours<0x82295268>, data, 8,
              fmt::format("user {}{}", index, null_out ? ", no out" : ""));
       }
     }
@@ -62,7 +62,7 @@ void User(Context& h) {
         default: title_id = uint32_t(r.Next()); break;
       }
       Both(h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = title_id; }, __imp__sub_82296EE0,
-           sub_82296EE0, data, 0, fmt::format("{:08X}", title_id));
+           harness::Ours<0x82296EE0>, data, 0, fmt::format("{:08X}", title_id));
     }
     results.Report();
   }
@@ -81,7 +81,7 @@ void User(Context& h) {
              t.r4.u64 = context;
              t.r5.u64 = value;
            },
-           __imp__sub_82294F70, sub_82294F70, slot, 4,
+           __imp__sub_82294F70, harness::Ours<0x82294F70>, slot, 4,
            fmt::format("user {} context {:X} value {}", index, context, value));
     }
     guest::StoreU32(base, slot, saved);
@@ -98,7 +98,7 @@ void User(Context& h) {
                t.r3.u64 = panes;
                t.r4.u64 = flags;
              },
-             __imp__sub_822952C0, sub_822952C0, h.data, 0,
+             __imp__sub_822952C0, harness::Ours<0x822952C0>, h.data, 0,
              fmt::format("panes {} flags {}", panes, flags));
       }
     }

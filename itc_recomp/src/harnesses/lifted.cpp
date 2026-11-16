@@ -21,26 +21,6 @@
 #include <bit>
 
 extern "C" {
-REX_FUNC(sub_820951D8);
-REX_FUNC(sub_821128A0);
-REX_FUNC(sub_822ADA28);
-REX_FUNC(sub_822B43C0);
-REX_FUNC(sub_82578470);
-REX_FUNC(sub_8257D6F8);
-REX_FUNC(sub_825BFCC8);
-REX_FUNC(sub_825CD358);
-REX_FUNC(sub_825CFF70);
-REX_FUNC(sub_825D36F0);
-REX_FUNC(sub_825DAD90);
-REX_FUNC(sub_8213A200);
-REX_FUNC(sub_8213AB40);
-REX_FUNC(sub_822AF328);
-REX_FUNC(sub_820F8FA0);
-REX_FUNC(sub_82421938);
-REX_FUNC(sub_820A6470);
-REX_FUNC(sub_823F6170);
-REX_FUNC(sub_8211FF20);
-REX_FUNC(sub_821392D8);
 REX_FUNC(__imp__sub_820951D8);
 REX_FUNC(__imp__sub_821128A0);
 REX_FUNC(__imp__sub_822ADA28);
@@ -78,26 +58,26 @@ struct Function {
 };
 
 const Function kFunctions[] = {
-    {"sub_820951D8", __imp__sub_820951D8, sub_820951D8},
-    {"sub_821128A0", __imp__sub_821128A0, sub_821128A0},
-    {"sub_822ADA28", __imp__sub_822ADA28, sub_822ADA28},
-    {"sub_822B43C0", __imp__sub_822B43C0, sub_822B43C0},
-    {"sub_82578470", __imp__sub_82578470, sub_82578470},
-    {"sub_8257D6F8", __imp__sub_8257D6F8, sub_8257D6F8},
-    {"sub_825BFCC8", __imp__sub_825BFCC8, sub_825BFCC8},
-    {"sub_825CD358", __imp__sub_825CD358, sub_825CD358},
-    {"sub_825CFF70", __imp__sub_825CFF70, sub_825CFF70},
-    {"sub_825D36F0", __imp__sub_825D36F0, sub_825D36F0},
-    {"sub_825DAD90", __imp__sub_825DAD90, sub_825DAD90},
-    {"sub_8213A200", __imp__sub_8213A200, sub_8213A200},
-    {"sub_8213AB40", __imp__sub_8213AB40, sub_8213AB40},
-    {"sub_822AF328", __imp__sub_822AF328, sub_822AF328},
-    {"sub_820F8FA0", __imp__sub_820F8FA0, sub_820F8FA0},
-    {"sub_82421938", __imp__sub_82421938, sub_82421938},
-    {"sub_820A6470", __imp__sub_820A6470, sub_820A6470},
-    {"sub_823F6170", __imp__sub_823F6170, sub_823F6170},
-    {"sub_8211FF20", __imp__sub_8211FF20, sub_8211FF20},
-    {"sub_821392D8", __imp__sub_821392D8, sub_821392D8},
+    {"sub_820951D8", __imp__sub_820951D8, harness::Ours<0x820951D8>},
+    {"sub_821128A0", __imp__sub_821128A0, harness::Ours<0x821128A0>},
+    {"sub_822ADA28", __imp__sub_822ADA28, harness::Ours<0x822ADA28>},
+    {"sub_822B43C0", __imp__sub_822B43C0, harness::Ours<0x822B43C0>},
+    {"sub_82578470", __imp__sub_82578470, harness::Ours<0x82578470>},
+    {"sub_8257D6F8", __imp__sub_8257D6F8, harness::Ours<0x8257D6F8>},
+    {"sub_825BFCC8", __imp__sub_825BFCC8, harness::Ours<0x825BFCC8>},
+    {"sub_825CD358", __imp__sub_825CD358, harness::Ours<0x825CD358>},
+    {"sub_825CFF70", __imp__sub_825CFF70, harness::Ours<0x825CFF70>},
+    {"sub_825D36F0", __imp__sub_825D36F0, harness::Ours<0x825D36F0>},
+    {"sub_825DAD90", __imp__sub_825DAD90, harness::Ours<0x825DAD90>},
+    {"sub_8213A200", __imp__sub_8213A200, harness::Ours<0x8213A200>},
+    {"sub_8213AB40", __imp__sub_8213AB40, harness::Ours<0x8213AB40>},
+    {"sub_822AF328", __imp__sub_822AF328, harness::Ours<0x822AF328>},
+    {"sub_820F8FA0", __imp__sub_820F8FA0, harness::Ours<0x820F8FA0>},
+    {"sub_82421938", __imp__sub_82421938, harness::Ours<0x82421938>},
+    {"sub_820A6470", __imp__sub_820A6470, harness::Ours<0x820A6470>},
+    {"sub_823F6170", __imp__sub_823F6170, harness::Ours<0x823F6170>},
+    {"sub_8211FF20", __imp__sub_8211FF20, harness::Ours<0x8211FF20>},
+    {"sub_821392D8", __imp__sub_821392D8, harness::Ours<0x821392D8>},
 };
 
 // A word for the block or a register: always an address in the block (so

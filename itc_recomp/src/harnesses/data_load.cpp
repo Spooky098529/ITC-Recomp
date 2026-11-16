@@ -113,7 +113,7 @@ void DefaultsInit(Context& h) {
       }
       PPCContext t = CallContext(h);
       ITC_FLAG(native_data_load) = v == 1;
-      (v == 0 ? __imp__sub_820CCDC0 : sub_820CCDC0)(t, h.base);
+      (v == 0 ? __imp__sub_820CCDC0 : harness::Ours<0x820CCDC0>)(t, h.base);
       ITC_FLAG(native_data_load) = true;
       out[v].Bytes(Read(h.base, dl::kDefaultsFirst, dl::kDefaultsBytes));
       // The frame's five indices (the stack below the scratch area).
@@ -450,9 +450,9 @@ void StaticReplayInits(Context& h) {
     return;
   }
   StaticReplayInit(h, "Replay826D8520::StaticInit (sub_825D9E60)", __imp__sub_825D9E60,
-                   sub_825D9E60, dl::kStaticReplayA);
+                   harness::Ours<0x825D9E60>, dl::kStaticReplayA);
   StaticReplayInit(h, "Replay82816E50::StaticInit (sub_825D9F68)", __imp__sub_825D9F68,
-                   sub_825D9F68, dl::kStaticReplayB);
+                   harness::Ours<0x825D9F68>, dl::kStaticReplayB);
 }
 
 }  // namespace
@@ -475,11 +475,11 @@ void DataLoad(Context& h) {
     ITC_LOG_WARN("harness: data_load: the makers need --native_heap");
     return;
   }
-  Maker(h, "RaceData::Create (sub_82102208)", __imp__sub_82102208, sub_82102208,
+  Maker(h, "RaceData::Create (sub_82102208)", __imp__sub_82102208, harness::Ours<0x82102208>,
         dl::kRaceDataSlot, dl::kRaceDataBytes);
-  Maker(h, "InputRecordings::Create (sub_82105508)", __imp__sub_82105508, sub_82105508,
+  Maker(h, "InputRecordings::Create (sub_82105508)", __imp__sub_82105508, harness::Ours<0x82105508>,
         dl::kInputRecordingsSlot, dl::kInputRecordingsBytes);
-  Maker(h, "Replay::Create (sub_82105560)", __imp__sub_82105560, sub_82105560, dl::kReplaySlot,
+  Maker(h, "Replay::Create (sub_82105560)", __imp__sub_82105560, harness::Ours<0x82105560>, dl::kReplaySlot,
         dl::kReplayBytes);
   if (!hooks::NativeArchiveQueue()) {
     ITC_LOG_WARN("harness: data_load: the movie sets and the load need the archive's queue native");

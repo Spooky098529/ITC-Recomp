@@ -18,13 +18,13 @@ void Network(Context& h) {
            t.r4.u64 = 2;
            t.r5.u64 = data;
          },
-         __imp__sub_82459B68, sub_82459B68, data, 0, "version 2");
+         __imp__sub_82459B68, harness::Ours<0x82459B68>, data, 0, "version 2");
     results.Report();
   }
   {
     Results results("XNetGetTitleXnAddr (sub_82459D50)");
     Both(h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = data; }, __imp__sub_82459D50,
-         sub_82459D50, data, 40, "the address");
+         harness::Ours<0x82459D50>, data, 40, "the address");
     results.Report();
   }
   {
@@ -34,7 +34,7 @@ void Network(Context& h) {
            t.r3.u64 = data;
            t.r4.u64 = data + 64;
          },
-         __imp__sub_82459D40, sub_82459D40, data + 64, 8, "the address");
+         __imp__sub_82459D40, harness::Ours<0x82459D40>, data + 64, 8, "the address");
     results.Report();
   }
 }

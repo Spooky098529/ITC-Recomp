@@ -9,7 +9,7 @@ usage: boundary_status.py [repo root]   (default: this repo)
 
 Each boundary function is counted once, in the first state that fits:
   overridden    an override in src/ (REX_FUNC, or a macro defining one)
-  native        status Native (no override: its callers are native)
+  native        status Native, Merged or Lifted (no override: its callers are native)
   dropped       status Dropped (no override: its callers leave it out)
   never called  its row says "Never called" (in play)
   live          still called by recompiled code
@@ -104,7 +104,7 @@ def main():
     def state(function):
         if function in overrides:
             return "overridden"
-        if status.get(function) in ("Native", "Merged"):
+        if status.get(function) in ("Native", "Merged", "Lifted"):
             return "native"
         if status.get(function) == "Dropped":
             return "dropped"

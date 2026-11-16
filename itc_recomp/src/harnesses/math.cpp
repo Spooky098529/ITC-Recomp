@@ -197,12 +197,12 @@ void Math(Context& h) {
     }
     AddRandom(h, values, 1.0, 2000);
     AddRandom(h, values, 1.5, 200);
-    Unary(h, "acos (sub_825A8170)", __imp__sub_825A8170, sub_825A8170, values);
+    Unary(h, "acos (sub_825A8170)", __imp__sub_825A8170, harness::Ours<0x825A8170>, values);
     Unary(h, "asin and acos's kernel, acos (sub_825A7FB0)", __imp__sub_825A7FB0, NativeAsinAcos,
           values, [](PPCContext& t) { t.r4.u64 = 1; });
     Unary(h, "asin and acos's kernel, asin (sub_825A7FB0)", __imp__sub_825A7FB0, NativeAsinAcos,
           values, [](PPCContext& t) { t.r4.u64 = 0; });
-    Unary(h, "asin (sub_825A80A8)", __imp__sub_825A80A8, sub_825A80A8, values);
+    Unary(h, "asin (sub_825A80A8)", __imp__sub_825A80A8, harness::Ours<0x825A80A8>, values);
   }
 
   // sin and cos: multiples of pi/2 (where k changes and r is near 0), the
@@ -219,8 +219,8 @@ void Math(Context& h) {
     AddRandom(h, values, 8.0, 2000);
     AddRandom(h, values, 1000.0, 500);
     AddRandom(h, values, 3e8, 300);
-    Unary(h, "sin (sub_825A88A0)", __imp__sub_825A88A0, sub_825A88A0, values);
-    Unary(h, "cos (sub_825A8978)", __imp__sub_825A8978, sub_825A8978, values);
+    Unary(h, "sin (sub_825A88A0)", __imp__sub_825A88A0, harness::Ours<0x825A88A0>, values);
+    Unary(h, "cos (sub_825A8978)", __imp__sub_825A8978, harness::Ours<0x825A8978>, values);
   }
 
   // atan and atan2: 1.0 (where 1/|x| starts), 2 - sqrt(3) (where the
@@ -236,7 +236,7 @@ void Math(Context& h) {
     AddRandom(h, values, 1.0, 1000);
     AddRandom(h, values, 10.0, 1000);
     AddRandom(h, values, 1e6, 200);
-    Unary(h, "atan (sub_825A8688)", __imp__sub_825A8688, sub_825A8688, values);
+    Unary(h, "atan (sub_825A8688)", __imp__sub_825A8688, harness::Ours<0x825A8688>, values);
 
     std::vector<std::pair<double, double>> pairs;
     const std::vector<double> specials = SpecialValues();
@@ -256,7 +256,7 @@ void Math(Context& h) {
       pairs.push_back({random[i], random[i]});
       pairs.push_back({random[i], -std::nextafter(random[i], 0.0)});
     }
-    Binary(h, "atan2 (sub_825A8770)", __imp__sub_825A8770, sub_825A8770, pairs);
+    Binary(h, "atan2 (sub_825A8770)", __imp__sub_825A8770, harness::Ours<0x825A8770>, pairs);
   }
   // pow and what it calls: copysign, _set_exp, _get_exp, _decomp, the
   // integer test and log, each against its recompiled version. pow's
@@ -278,7 +278,7 @@ void Math(Context& h) {
       values.push_back(i * 0.5);
     }
 
-    Cases(h, "log (sub_825A9C00)", __imp__sub_825A9C00, sub_825A9C00, values.size(),
+    Cases(h, "log (sub_825A9C00)", __imp__sub_825A9C00, harness::Ours<0x825A9C00>, values.size(),
           [&](size_t i, PPCContext& t) { t.f1.f64 = values[i]; },
           [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.f1.u64); },
           [&](size_t i) { return "x " + Bits(values[i]); });
@@ -349,14 +349,14 @@ void Math(Context& h) {
       pairs.push_back({2.0, -1080.0 + unit() * 20.0});
       pairs.push_back({D(h.random.Next()), D(h.random.Next())});
     }
-    Cases(h, "copysign (sub_825AB1C8)", __imp__sub_825AB1C8, sub_825AB1C8, pairs.size(),
+    Cases(h, "copysign (sub_825AB1C8)", __imp__sub_825AB1C8, harness::Ours<0x825AB1C8>, pairs.size(),
           [&](size_t i, PPCContext& t) {
             t.f1.f64 = pairs[i].first;
             t.f2.f64 = pairs[i].second;
           },
           [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.f1.u64); },
           [&](size_t i) { return Bits(pairs[i].first) + " " + Bits(pairs[i].second); });
-    Cases(h, "pow (sub_825A8ED0)", __imp__sub_825A8ED0, sub_825A8ED0, pairs.size(),
+    Cases(h, "pow (sub_825A8ED0)", __imp__sub_825A8ED0, harness::Ours<0x825A8ED0>, pairs.size(),
           [&](size_t i, PPCContext& t) {
             t.f1.f64 = pairs[i].first;
             t.f2.f64 = pairs[i].second;
@@ -378,8 +378,8 @@ void Math(Context& h) {
     }
     AddRandom(h, values, 10.0, 1000);
     AddRandom(h, values, 1e20, 300);
-    Unary(h, "floor (sub_825A8CA0)", __imp__sub_825A8CA0, sub_825A8CA0, values);
-    Unary(h, "ceil (sub_825AA0B8)", __imp__sub_825AA0B8, sub_825AA0B8, values);
+    Unary(h, "floor (sub_825A8CA0)", __imp__sub_825A8CA0, harness::Ours<0x825A8CA0>, values);
+    Unary(h, "ceil (sub_825AA0B8)", __imp__sub_825AA0B8, harness::Ours<0x825AA0B8>, values);
   }
 
   // log10, __ultod and _fpclass.
@@ -389,8 +389,8 @@ void Math(Context& h) {
       AddAround(values, x);
     }
     AddRandom(h, values, 1000.0, 500);
-    Unary(h, "log10 (sub_825A9D80)", __imp__sub_825A9D80, sub_825A9D80, values);
-    Cases(h, "_fpclass (sub_825AB268)", __imp__sub_825AB268, sub_825AB268, values.size(),
+    Unary(h, "log10 (sub_825A9D80)", __imp__sub_825A9D80, harness::Ours<0x825A9D80>, values);
+    Cases(h, "_fpclass (sub_825AB268)", __imp__sub_825AB268, harness::Ours<0x825AB268>, values.size(),
           [&](size_t i, PPCContext& t) { t.f1.f64 = values[i]; },
           [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.r3.u32); },
           [&](size_t i) { return "x " + Bits(values[i]); });
@@ -409,7 +409,7 @@ void Math(Context& h) {
       integers.push_back(r);
       integers.push_back(r >> h.random.Below(64));
     }
-    Cases(h, "__ultod (sub_825A9DB0)", __imp__sub_825A9DB0, sub_825A9DB0, integers.size(),
+    Cases(h, "__ultod (sub_825A9DB0)", __imp__sub_825A9DB0, harness::Ours<0x825A9DB0>, integers.size(),
           [&](size_t i, PPCContext& t) { t.r3.u64 = integers[i]; },
           [](PPCContext& t, std::vector<uint8_t>& b) {
             Append(b, t.f1.u64);
@@ -468,7 +468,7 @@ void Math(Context& h) {
     }
     for (uint32_t mode = 0; mode < 4; mode++) {
       Cases(h, fmt::format("_ctrlfp, rounding mode {} (sub_825B0B80)", mode).c_str(),
-            __imp__sub_825B0B80, sub_825B0B80, words.size(),
+            __imp__sub_825B0B80, harness::Ours<0x825B0B80>, words.size(),
             [&](size_t i, PPCContext& t) {
               t.r3.u64 = words[i].first;
               t.r4.u64 = words[i].second;
@@ -492,7 +492,7 @@ void Math(Context& h) {
     for (int i = 0; i < 200; i++) {
       registers.push_back(h.random.Next());
     }
-    Cases(h, "_abstract_sw (sub_825AB380)", __imp__sub_825AB380, sub_825AB380, registers.size(),
+    Cases(h, "_abstract_sw (sub_825AB380)", __imp__sub_825AB380, harness::Ours<0x825AB380>, registers.size(),
           [&](size_t i, PPCContext& t) { t.r3.u64 = registers[i]; },
           [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.r3.u64); },
           [&](size_t i) { return fmt::format("r3 {:X}", registers[i]); });
@@ -506,7 +506,7 @@ void Math(Context& h) {
       ints.push_back(uint64_t(int64_t(int32_t(uint32_t(r)))));
       ints.push_back(uint32_t(r));
     }
-    Cases(h, "abs (sub_825AC870)", __imp__sub_825AC870, sub_825AC870, ints.size(),
+    Cases(h, "abs (sub_825AC870)", __imp__sub_825AC870, harness::Ours<0x825AC870>, ints.size(),
           [&](size_t i, PPCContext& t) { t.r3.u64 = ints[i]; },
           [](PPCContext& t, std::vector<uint8_t>& b) { Append(b, t.r3.u64); },
           [&](size_t i) { return fmt::format("r3 {:X}", ints[i]); });
@@ -558,7 +558,7 @@ void Math(Context& h) {
     }
     for (uint32_t mode = 0; mode < 4; mode++) {
       Cases(h, fmt::format("tan, rounding mode {} (sub_825A8A50)", mode).c_str(),
-            __imp__sub_825A8A50, sub_825A8A50, values.size(),
+            __imp__sub_825A8A50, harness::Ours<0x825A8A50>, values.size(),
             [&](size_t i, PPCContext& t) {
               t.f1.f64 = values[i];
               set_mode(t, mode);
@@ -596,7 +596,7 @@ void Math(Context& h) {
     }
     for (uint32_t mode = 0; mode < 4; mode++) {
       Cases(h, fmt::format("ldexp, rounding mode {} (sub_825AAD20)", mode).c_str(),
-            __imp__sub_825AAD20, sub_825AAD20, in_range.size(),
+            __imp__sub_825AAD20, harness::Ours<0x825AAD20>, in_range.size(),
             [&](size_t i, PPCContext& t) {
               t.f1.f64 = in_range[i].first;
               t.r4.s64 = in_range[i].second;
@@ -611,7 +611,7 @@ void Math(Context& h) {
     // _clearfp: random registers in, from each mode.
     for (uint32_t mode = 0; mode < 4; mode++) {
       Cases(h, fmt::format("_clearfp, rounding mode {} (sub_825AB568)", mode).c_str(),
-            __imp__sub_825AB568, sub_825AB568, 64,
+            __imp__sub_825AB568, harness::Ours<0x825AB568>, 64,
             [&](size_t i, PPCContext& t) {
               t.r3.u64 = i * 0x9E3779B97F4A7C15ull;
               t.r4.u64 = i;

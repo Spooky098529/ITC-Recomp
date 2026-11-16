@@ -203,10 +203,10 @@ void EffectsCases(Context& h, uint32_t block) {
     GuestFunction recompiled, native;
   };
   const Function functions[] = {
-      {"sub_82133AE8 PostEffects::Get", __imp__sub_82133AE8, sub_82133AE8},
+      {"sub_82133AE8 PostEffects::Get", __imp__sub_82133AE8, harness::Ours<0x82133AE8>},
       {"sub_82133A08 PostEffects::MarkUpdated", __imp__sub_82133A08, NativeMarkUpdated},
       {"sub_82133A38 PostEffects::ToggleNoHistory", __imp__sub_82133A38, NativeToggleNoHistory},
-      {"sub_82133A70 PostEffects::DestroyRace", __imp__sub_82133A70, sub_82133A70},
+      {"sub_82133A70 PostEffects::DestroyRace", __imp__sub_82133A70, harness::Ours<0x82133A70>},
   };
   constexpr uint32_t kVtable = 0x3F00;  // in the block: slot 1 ToggleHidden
   for (const Function& f : functions) {
@@ -331,21 +331,21 @@ void SetterCases(Context& h, uint32_t block) {
     uint32_t count;  // floats stored from f1 on (SetColor0: 3, and +8092)
   };
   const Setter setters[] = {
-      {"sub_82136EF8 Glow::Set8436", __imp__sub_82136EF8, sub_82136EF8, 8436, 1},
-      {"sub_82136F00 Glow::Set8440", __imp__sub_82136F00, sub_82136F00, 8440, 1},
-      {"sub_82136F08 Glow::Set8444", __imp__sub_82136F08, sub_82136F08, 8444, 1},
-      {"sub_82136F10 Glow::Set8448", __imp__sub_82136F10, sub_82136F10, 8448, 1},
-      {"sub_82136F18 Glow::SetStrength", __imp__sub_82136F18, sub_82136F18, 8452, 1},
-      {"sub_82136F20 Glow::Set8456", __imp__sub_82136F20, sub_82136F20, 8456, 1},
-      {"sub_82136F28 Glow::SetHistoryWeight", __imp__sub_82136F28, sub_82136F28, 8460, 1},
-      {"sub_82136F30 Glow::Set8464", __imp__sub_82136F30, sub_82136F30, 8464, 1},
-      {"sub_82136F38 Glow::Set8468", __imp__sub_82136F38, sub_82136F38, 8468, 1},
-      {"sub_82136F40 Glow::Set8472", __imp__sub_82136F40, sub_82136F40, 8472, 1},
-      {"sub_82136F48 Glow::Set8476", __imp__sub_82136F48, sub_82136F48, 8476, 1},
-      {"sub_821350F8 ColorFilter::SetColor0", __imp__sub_821350F8, sub_821350F8, 8080, 4},
-      {"sub_82135138 ColorFilter::Set8112", __imp__sub_82135138, sub_82135138, 8112, 1},
-      {"sub_82135140 ColorFilter::Set8116", __imp__sub_82135140, sub_82135140, 8116, 1},
-      {"sub_82135148 ColorFilter::Set8120", __imp__sub_82135148, sub_82135148, 8120, 1},
+      {"sub_82136EF8 Glow::Set8436", __imp__sub_82136EF8, harness::Ours<0x82136EF8>, 8436, 1},
+      {"sub_82136F00 Glow::Set8440", __imp__sub_82136F00, harness::Ours<0x82136F00>, 8440, 1},
+      {"sub_82136F08 Glow::Set8444", __imp__sub_82136F08, harness::Ours<0x82136F08>, 8444, 1},
+      {"sub_82136F10 Glow::Set8448", __imp__sub_82136F10, harness::Ours<0x82136F10>, 8448, 1},
+      {"sub_82136F18 Glow::SetStrength", __imp__sub_82136F18, harness::Ours<0x82136F18>, 8452, 1},
+      {"sub_82136F20 Glow::Set8456", __imp__sub_82136F20, harness::Ours<0x82136F20>, 8456, 1},
+      {"sub_82136F28 Glow::SetHistoryWeight", __imp__sub_82136F28, harness::Ours<0x82136F28>, 8460, 1},
+      {"sub_82136F30 Glow::Set8464", __imp__sub_82136F30, harness::Ours<0x82136F30>, 8464, 1},
+      {"sub_82136F38 Glow::Set8468", __imp__sub_82136F38, harness::Ours<0x82136F38>, 8468, 1},
+      {"sub_82136F40 Glow::Set8472", __imp__sub_82136F40, harness::Ours<0x82136F40>, 8472, 1},
+      {"sub_82136F48 Glow::Set8476", __imp__sub_82136F48, harness::Ours<0x82136F48>, 8476, 1},
+      {"sub_821350F8 ColorFilter::SetColor0", __imp__sub_821350F8, harness::Ours<0x821350F8>, 8080, 4},
+      {"sub_82135138 ColorFilter::Set8112", __imp__sub_82135138, harness::Ours<0x82135138>, 8112, 1},
+      {"sub_82135140 ColorFilter::Set8116", __imp__sub_82135140, harness::Ours<0x82135140>, 8116, 1},
+      {"sub_82135148 ColorFilter::Set8120", __imp__sub_82135148, harness::Ours<0x82135148>, 8120, 1},
   };
   constexpr uint32_t kField = 0x100;  // where the first field lands
   for (const Setter& s : setters) {
@@ -406,7 +406,7 @@ void SetFromSpeedCases(Context& h, uint32_t block) {
       PPCContext t = CallContext(h);
       t.r3.u64 = glow;
       t.f1.f64 = speed;
-      Run(v, __imp__sub_82133878, sub_82133878, t, h.base);
+      Run(v, __imp__sub_82133878, harness::Ours<0x82133878>, t, h.base);
       out[v].Bytes(Read(h.base, block + 0x2000, 4));          // +8432
       out[v].Floats(h.base, block + 0x2000 + 4, 1);           // +8436
       out[v].Bytes(Read(h.base, block + 0x2000 + 8, 12));     // +8440 to +8448
@@ -489,13 +489,13 @@ void RecordCases(Context& h, uint32_t block) {
     uint32_t slots;
   };
   const Helper helpers[] = {
-      {"sub_82133340 PostEffect::RecordBeginStates", __imp__sub_82133340, sub_82133340, 24},
-      {"sub_82133608 PostEffect::RecordEndStates", __imp__sub_82133608, sub_82133608, 13},
-      {"sub_82133790 PostEffect::RecordTargets", __imp__sub_82133790, sub_82133790, 7},
-      {"sub_82133D00 PostEffect::RecordPixelConstants", __imp__sub_82133D00, sub_82133D00, 2},
+      {"sub_82133340 PostEffect::RecordBeginStates", __imp__sub_82133340, harness::Ours<0x82133340>, 24},
+      {"sub_82133608 PostEffect::RecordEndStates", __imp__sub_82133608, harness::Ours<0x82133608>, 13},
+      {"sub_82133790 PostEffect::RecordTargets", __imp__sub_82133790, harness::Ours<0x82133790>, 7},
+      {"sub_82133D00 PostEffect::RecordPixelConstants", __imp__sub_82133D00, harness::Ours<0x82133D00>, 2},
       {"sub_82133D70 PostEffect::RecordPixelBool", __imp__sub_82133D70, ITC_CONTEXT_FN(NativeRecordPixelBool), 2},
-      {"sub_82133DD8 PostEffect::RecordTexelSize", __imp__sub_82133DD8, sub_82133DD8, 2},
-      {"sub_82133F58 PostEffect::RecordResolve", __imp__sub_82133F58, sub_82133F58, 6},
+      {"sub_82133DD8 PostEffect::RecordTexelSize", __imp__sub_82133DD8, harness::Ours<0x82133DD8>, 2},
+      {"sub_82133F58 PostEffect::RecordResolve", __imp__sub_82133F58, harness::Ours<0x82133F58>, 6},
   };
   Random& r = h.random;
   for (const Helper& helper : helpers) {
@@ -586,7 +586,7 @@ void AddQuadCases(Context& h, uint32_t block) {
       t.r5.u64 = k.r5;
       t.r7.u64 = r7;
       t.f1.f64 = k.f1;
-      Run(v, __imp__sub_82133E30, sub_82133E30, t, h.base);
+      Run(v, __imp__sub_82133E30, harness::Ours<0x82133E30>, t, h.base);
       out[v].Bytes(Read(h.base, block, vertices - block));
       out[v].Floats(h.base, vertices, 30);
       out[v].Bytes(Read(h.base, vertices + 120, block + kBlockBytes - vertices - 120));
@@ -842,7 +842,7 @@ void InitEdramBaseCases(Context& h) {
       guest::StoreU32(h.base, pe::kEdramBase, before);
       PPCContext t = CallContext(h);
       t.r3.u64 = h.random.Next();
-      Run(v, __imp__sub_825D99D0, sub_825D99D0, t, h.base);
+      Run(v, __imp__sub_825D99D0, harness::Ours<0x825D99D0>, t, h.base);
       out[v].Word(guest::LoadU32(h.base, pe::kEdramBase));
       out[v].Word(t.r3.u32);
     }
@@ -1280,7 +1280,7 @@ void CreateCases(Context& h, uint32_t block) {
       FillStack(h.base, t.r1.u32, stack);
       t.r3.u64 = device;
       t.r4.u64 = index;
-      Run(v, __imp__sub_82138A18, sub_82138A18, t, h.base);
+      Run(v, __imp__sub_82138A18, harness::Ours<0x82138A18>, t, h.base);
       const uint32_t made = present ? 0 : guest::LoadU32(h.base, pe::kEffects + 4 * index);
       for (uint32_t i = 0; i < pe::kCount; i++) {
         out[v].Word(i == index && made != 0 ? 1 : guest::LoadU32(h.base, pe::kEffects + 4 * i));
@@ -1442,9 +1442,9 @@ void EffectRecordCases(Context& h, uint32_t block) {
     uint32_t size;
   };
   const Record records[] = {
-      {"sub_821351F0 ColorFilter::Record", __imp__sub_821351F0, sub_821351F0, 8128},
-      {"sub_82135B50 TargetFilter::Record", __imp__sub_82135B50, sub_82135B50, 8068},
-      {"sub_821363F0 MotionBlur::Record", __imp__sub_821363F0, sub_821363F0, 8224},
+      {"sub_821351F0 ColorFilter::Record", __imp__sub_821351F0, harness::Ours<0x821351F0>, 8128},
+      {"sub_82135B50 TargetFilter::Record", __imp__sub_82135B50, harness::Ours<0x82135B50>, 8068},
+      {"sub_821363F0 MotionBlur::Record", __imp__sub_821363F0, harness::Ours<0x821363F0>, 8224},
   };
   for (const Record& k : records) {
     Results results(k.name);
@@ -1543,11 +1543,11 @@ void DestroyCases(Context& h, uint32_t block) {
        false},
       {"sub_82136390 MotionBlur::~MotionBlur", __imp__sub_82136390, NativeDestroy<pe::MotionBlurDestroy>, 8224,
        {8076, 8072}, {8068, 8064}, false},
-      {"sub_821389C8 Glow::~Glow (deleting)", __imp__sub_821389C8, sub_821389C8, 8480,
+      {"sub_821389C8 Glow::~Glow (deleting)", __imp__sub_821389C8, harness::Ours<0x821389C8>, 8480,
        {8432, 8428, 8424, 8420, 8416, 8412}, glow_textures, true},
-      {"sub_82138570 ColorFilter::~ColorFilter (deleting)", __imp__sub_82138570, sub_82138570, 8128,
+      {"sub_82138570 ColorFilter::~ColorFilter (deleting)", __imp__sub_82138570, harness::Ours<0x82138570>, 8128,
        {}, {8064}, true},
-      {"sub_821385C0 MotionBlur::~MotionBlur (deleting)", __imp__sub_821385C0, sub_821385C0, 8224,
+      {"sub_821385C0 MotionBlur::~MotionBlur (deleting)", __imp__sub_821385C0, harness::Ours<0x821385C0>, 8224,
        {8076, 8072}, {8068, 8064}, true},
   };
   constexpr uint32_t kSurfaces = 0x100, kPool = 0x400;  // 16 and 36 bytes each

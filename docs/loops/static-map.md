@@ -2,19 +2,19 @@
 
 Made by `itc_recomp/tools/static_map.py` on every run; never edit it by hand (run the tool again). What it reads, how edges are found and its gaps: the tool's docstring and "The static map" in `docs/coverage.md`.
 
-Made 2026-11-16 at commit `3aec3119` (`rewiring-15-11-26`).
+Made 2026-11-16 at commit `4e982909` (`rewiring-15-11-26`).
 
 ## Totals
 
 - Recompiled `sub_` functions: 16552; 144 jump-table cases folded into their parents, leaving 16408.
-- Reachable: 9076 (7322 from `main`, 1754 more from 190 extra roots: functions seen in play that `main` doesn't reach, 2 of them not under another).
-- Ours: 9063. Excluded (replaced libraries): 11.
+- Reachable: 9091 (7359 from `main`, 1732 more from 190 extra roots: functions seen in play that `main` doesn't reach, 2 of them not under another).
+- Ours: 9082. Excluded (replaced libraries): 7.
 - **Unported: 2** (1 under `main`): seen in play 1, never seen 1; 805 generated lines.
 - Of the unported, 1 hang under unported code (or a root); 1 are reached only through ours (0 seen in play), 1 of them called by our C++ itself (a guest call by name or address, a fallback for a branch, a table or vtable it stores) and the rest under those; the TSV's `behind_ours` column lists them.
-- Ours functions' edges come from our C++ (`src_edges.py`): 51793 definitions in 1203 files of `src/` (harnesses left out), 9689 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 9055 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
+- Ours functions' edges come from our C++ (`src_edges.py`): 45514 definitions in 1206 files of `src/` (harnesses left out), 9706 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 9074 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
 - Ours functions whose original body is still reachable: 0 (0 from our C++: an `__imp__` fallback when the native C++ declines, or a guest call to a function with neither override nor C++); listed below.
-- Host code no native function's C++ reaches but that names guest functions (constants defined but not resolved to a user, a few hooks' helpers): 3050 functions named, taken as roots; they add 1513 reachable functions.
-- Before 2026-11-14's fix the graph followed the original's edges through ours too: 15901 reachable. **Originals no longer called: 1701** (980 not ours, 721 ours whose work our C++ took in; 143158 lines, 301 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.
+- Host code no native function's C++ reaches but that names guest functions (constants defined but not resolved to a user, a few hooks' helpers): 3065 functions named, taken as roots; they add 1491 reachable functions.
+- Before 2026-11-14's fix the graph followed the original's edges through ours too: 15901 reachable. **Originals no longer called: 1691** (978 not ours, 713 ours whose work our C++ took in; 139338 lines, 298 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.
 - Frontier (ready now): 2 functions.
 - Reachable functions calling imports: 295 (1 unported).
 - Image read: 13492 code-built data addresses scanned; 181 function pointers in data that no code-built address reaches (136 functions; not edges).
@@ -55,63 +55,74 @@ Reachable through the original's graph but not through ours: the native function
 
 | Native caller | File | Status | Lost callees | Under them | Not ours | Lines | Seen |
 |---|---|---|---|---|---|---|---|
-| `sub_821077A8` | game-modes.md | Overridden | `sub_82106F88`, `sub_82107670` | 834 | 476 | 77737 | 131 |
-| `sub_8214E268` | system-services.md | Overridden | `sub_82149080`, `sub_8214AC68`, `sub_8214ADC0`, `sub_8214AEA8`, `sub_8214D7A0`, `sub_8214F160`, `sub_8214F290`, `sub_8214F810`, ... 7 more | 100 | 77 | 7400 | 15 |
+| `sub_821077A8` | game-modes.md | Overridden | `sub_82106F88`, `sub_82107670` | 836 | 476 | 77754 | 133 |
+| `sub_8209EEC8` | mode-tick.md | Overridden | `sub_8209E4F0`, `sub_8209E540`, `sub_8209E610`, `sub_8209E698`, `sub_8209E730`, `sub_8209E790`, `sub_8209E860`, `sub_8209E9A8`, ... 5 more | 100 | 81 | 7256 | 17 |
 | `sub_822ACB90` | device-state.md | Native | `sub_822A1280`, `sub_822A12B0`, `sub_822A12F0`, `sub_822A1380`, `sub_822A1410`, `sub_822A14A0`, `sub_822A1530`, `sub_822A15A0`, ... 92 more | 100 | 98 | 766 | 2 |
-| `sub_8209EEC8` | mode-tick.md | Overridden | `sub_8209E4F0`, `sub_8209E540`, `sub_8209E610`, `sub_8209E698`, `sub_8209E730`, `sub_8209E790`, `sub_8209E860`, `sub_8209E9A8`, ... 5 more | 98 | 81 | 7239 | 15 |
-| `sub_825D0F00` | xact-tracks.md | Native | `__savegprlr_26`, `__restgprlr_26`, `sub_825D0F4C`, `sub_825D1A80`, `sub_825D5F40`, `sub_825D5FE8`, `sub_825D6308`, `sub_825D67E8`, ... 5 more | 76 | 68 | 3571 | 8 |
-| `sub_8235AAC0` | texture-compression.md | Native | `sub_82365D88`, `sub_82366458`, `sub_82368170`, `sub_8236D380` | 73 | 54 | 5748 | 18 |
-| `sub_8216DD88` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_8221F1E8`, `__restgprlr_28` | 67 | 16 | 4435 | 16 |
-| `sub_8222ED98` | location-screen.md | Lifted | `sub_8222A470`, `sub_8222A718`, `sub_8222AD50`, `sub_8222AE00`, `sub_8222B8A8`, `sub_8222BE60`, `sub_8222CFF0`, `sub_8222D108`, ... 10 more | 37 | 0 | 3432 | 36 |
-| `sub_821A1380` | car-makers.md | Lifted | `sub_8219C528`, `sub_8219C6D0`, `sub_8219C850`, `sub_8219C8F8`, `sub_8219CA08`, `sub_8219CB18`, `sub_8219CBD8`, `sub_8219FC60`, ... 8 more | 36 | 0 | 2173 | 36 |
-| `sub_8221BD20` | race-screens.md | Native | `sub_8221A4A8`, `sub_8221A610`, `sub_8221A680`, `sub_8221A6C8`, `sub_8221A720`, `sub_8221B298`, `sub_8221B860`, `sub_8221B8A8` | 31 | 15 | 1900 | 13 |
-| `sub_8220F638` | race-screens.md | Native | `sub_8220C578`, `sub_8220C5D0`, `sub_8220D898`, `sub_8220DB98`, `sub_8220E988`, `sub_8220EBD8` | 29 | 10 | 2320 | 18 |
-| `sub_822900E0` | save-interface.md | Native | `__savegprlr_27`, `__restgprlr_27`, `sub_825A9EC0`, `sub_825AA058` | 28 | 15 | 3214 | 9 |
-| `sub_825CB470` | xact.md | Overridden | `__savegprlr_26`, `__restgprlr_26`, `sub_825C07C8`, `sub_825C95F8`, `sub_825C9A80`, `sub_825CABC8` | 28 | 25 | 1500 | 3 |
+| `sub_8214E268` | system-services.md | Overridden | `sub_82149080`, `sub_8214AC68`, `sub_8214ADC0`, `sub_8214AEA8`, `sub_8214D7A0`, `sub_8214F160`, `sub_8214F290`, `sub_8214F810`, ... 7 more | 99 | 76 | 7230 | 15 |
+| `sub_825D0F00` | xact-tracks.md | Native | `__savegprlr_26`, `__restgprlr_26`, `sub_825D0F4C`, `sub_825D1A80`, `sub_825D5F40`, `sub_825D5FE8`, `sub_825D6308`, `sub_825D67E8`, ... 5 more | 78 | 68 | 3588 | 10 |
+| `sub_8235AAC0` | texture-compression.md | Native | `sub_82365D88`, `sub_82366458`, `sub_82368170`, `sub_8236D380` | 75 | 54 | 5765 | 20 |
+| `sub_8216DD88` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_8221F1E8`, `__restgprlr_28` | 69 | 16 | 4452 | 18 |
+| `sub_8222ED98` | location-screen.md | Lifted | `sub_8222A470`, `sub_8222A718`, `sub_8222AD50`, `sub_8222AE00`, `sub_8222B8A8`, `sub_8222BE60`, `sub_8222CFF0`, `sub_8222D108`, ... 10 more | 39 | 0 | 3449 | 38 |
+| `sub_821A1380` | car-makers.md | Lifted | `sub_8219C528`, `sub_8219C6D0`, `sub_8219C850`, `sub_8219C8F8`, `sub_8219CA08`, `sub_8219CB18`, `sub_8219CBD8`, `sub_8219FC60`, ... 8 more | 38 | 0 | 2190 | 38 |
+| `sub_8221BD20` | race-screens.md | Native | `sub_8221A4A8`, `sub_8221A610`, `sub_8221A680`, `sub_8221A6C8`, `sub_8221A720`, `sub_8221B298`, `sub_8221B860`, `sub_8221B8A8` | 33 | 15 | 1917 | 15 |
+| `sub_8220F638` | race-screens.md | Native | `sub_8220C578`, `sub_8220C5D0`, `sub_8220D898`, `sub_8220DB98`, `sub_8220E988`, `sub_8220EBD8` | 31 | 10 | 2337 | 20 |
+| `sub_825CB470` | xact.md | Overridden | `__savegprlr_26`, `__restgprlr_26`, `sub_825C07C8`, `sub_825C95F8`, `sub_825C9A80`, `sub_825CABC8` | 30 | 25 | 1517 | 5 |
+| `sub_825D06B8` | xact-tracks.md | Overridden | `__savegprlr_26`, `__restgprlr_26`, `sub_825C07C8`, `sub_825C95F8`, `sub_825C9788`, `sub_825CB3D8` | 29 | 24 | 1471 | 5 |
 | `sub_821159B0` | career.md | Overridden | `sub_82110CA8`, `sub_82111140`, `sub_821115C8`, `sub_82112260`, `sub_82115550`, `sub_82115708`, `__savegprlr_27`, `__restgprlr_27` | 27 | 19 | 2712 | 8 |
-| `sub_825D06B8` | xact-tracks.md | Overridden | `__savegprlr_26`, `__restgprlr_26`, `sub_825C07C8`, `sub_825C95F8`, `sub_825C9788`, `sub_825CB3D8` | 27 | 24 | 1454 | 3 |
+| `sub_8216C6D8` | race-hud-machine.md | Overridden | `sub_8221EF60` | 27 | 0 | 1780 | 7 |
+| `sub_8216DB70` | race-hud-machine.md | Overridden | `sub_82211458`, `__savegprlr_27`, `__restgprlr_27` | 27 | 10 | 1769 | 10 |
+| `sub_825C2910` | xact.md | Overridden | `__savegprlr_24`, `__restgprlr_24`, `sub_825C95F8`, `sub_825C9878` | 27 | 22 | 1406 | 5 |
 | `sub_822979E0` | c-runtime-core.md | Lifted | `sub_825A6E48`, `sub_825B6958`, `sub_825D9590` | 26 | 0 | 2778 | 6 |
-| `sub_8216C6D8` | race-hud-machine.md | Overridden | `sub_8221EF60` | 25 | 0 | 1763 | 5 |
-| `sub_8216DB70` | race-hud-machine.md | Overridden | `sub_82211458`, `__savegprlr_27`, `__restgprlr_27` | 25 | 10 | 1752 | 8 |
-| `sub_825C2910` | xact.md | Overridden | `__savegprlr_24`, `__restgprlr_24`, `sub_825C95F8`, `sub_825C9878` | 25 | 22 | 1389 | 3 |
-| `sub_8216CB98` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_82216A40` | 22 | 14 | 1133 | 8 |
-| `sub_8216D918` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_82216A40` | 22 | 14 | 1133 | 8 |
-| `sub_8259C3A8` | models.md | Native | `sub_8259B748`, `sub_8259BE40`, `__savegprlr_26`, `__restgprlr_26` | 20 | 11 | 1941 | 9 |
-| `sub_825A8A50` | c-runtime.md | Overridden | `sub_825AFEC0`, `sub_825AFEF8`, `sub_825B0860`, `sub_825B0968`, `sub_825B0B80` | 18 | 11 | 1020 | 4 |
-| `sub_825AAD20` | c-runtime.md | Overridden | `sub_825AB1C8`, `sub_825AFEF8`, `sub_825B08E8`, `sub_825B0A40`, `sub_825B0B80` | 18 | 10 | 1022 | 4 |
-| `sub_8216E5B0` | race-hud-machine.md | Overridden | `sub_8216D328`, `sub_8216D7B8` | 17 | 5 | 1152 | 5 |
+| `sub_822900E0` | save-interface.md | Native | `__savegprlr_27`, `__restgprlr_27`, `sub_825A9EC0`, `sub_825AA058` | 25 | 14 | 3027 | 7 |
+| `sub_8216CB98` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_82216A40` | 24 | 14 | 1150 | 10 |
+| `sub_8216D918` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_82216A40` | 24 | 14 | 1150 | 10 |
+| `sub_8259C3A8` | models.md | Native | `sub_8259B748`, `sub_8259BE40`, `__savegprlr_26`, `__restgprlr_26` | 22 | 11 | 1958 | 11 |
+| `sub_825A8A50` | c-runtime.md | Overridden | `sub_825AFEC0`, `sub_825AFEF8`, `sub_825B0860`, `sub_825B0968`, `sub_825B0B80` | 20 | 11 | 1037 | 6 |
+| `sub_825AAD20` | c-runtime.md | Overridden | `__savegprlr_29`, `__restgprlr_29`, `sub_825AB1C8`, `sub_825AFEF8`, `sub_825B08E8`, `sub_825B0A40`, `sub_825B0B80` | 20 | 10 | 1039 | 6 |
+| `sub_8216E5B0` | race-hud-machine.md | Overridden | `sub_8216D328`, `sub_8216D7B8` | 19 | 5 | 1169 | 7 |
 | `sub_825C3050` | lifted.md | Lifted | `sub_825C31D8` | 17 | 2 | 888 | 16 |
 | `sub_825C3110` | xact.md | Lifted | `__savegprlr_27`, `__restgprlr_27`, `sub_825C31D8` | 17 | 2 | 888 | 16 |
-| `sub_8216DFD0` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_8221F930`, `sub_8221FFF0`, `__savegprlr_26`, `__restgprlr_26` | 14 | 6 | 664 | 4 |
+| `sub_8216DFD0` | race-hud-machine.md | Overridden | `sub_82216850`, `sub_8221F930`, `sub_8221FFF0`, `__savegprlr_26`, `__restgprlr_26` | 16 | 6 | 681 | 6 |
+| `sub_82092358` | frame-driver.md | Lifted | `sub_82091A60`, `sub_82091EF8`, `sub_820920D8`, `__savegprlr_24`, `__restgprlr_24` | 13 | 5 | 438 | 9 |
 | `sub_825B13D0` | c-runtime.md | Native | `sub_825AC108`, `sub_825AD4C0`, `sub_825B1368`, `sub_825B6898`, `sub_825B7EB8`, `sub_825BA4A0` | 13 | 6 | 750 | 2 |
-| `sub_82092358` | frame-driver.md | Lifted | `sub_82091A60`, `sub_82091EF8`, `sub_820920D8`, `__savegprlr_24`, `__restgprlr_24` | 11 | 5 | 421 | 7 |
+| `sub_8216D6D0` | race-hud-machine.md | Overridden | `sub_8221F7D0`, `sub_822200E0` | 12 | 0 | 821 | 4 |
+| `sub_82593088` | std-string.md | Overridden | `sub_82592E18`, `__savegprlr_26`, `__restgprlr_26` | 12 | 3 | 718 | 8 |
 | `sub_820990F0` | input.md | Overridden | `sub_82591918`, `sub_82591C18`, `__savegprlr_27`, `__restgprlr_27` | 10 | 2 | 648 | 3 |
-| `sub_8211CD90` | ui-movies-game.md | Overridden | `sub_8211B720`, `sub_8211B770`, `sub_8211B800`, `sub_8211B940`, `__savegprlr_20`, `__restgprlr_20`, `__savefpr_26`, `__restfpr_26` | 10 | 0 | 397 | 5 |
-| `sub_8216D6D0` | race-hud-machine.md | Overridden | `sub_8221F7D0`, `sub_822200E0` | 10 | 0 | 804 | 2 |
+| `sub_8216C210` | race-hud-machine.md | Overridden | `sub_82216850` | 10 | 6 | 410 | 4 |
+| `sub_8216C530` | race-hud-machine.md | Overridden | `sub_82216850` | 10 | 6 | 410 | 4 |
+| `sub_822968B8` | functions.md | Overridden | `sub_82297678` | 10 | 0 | 665 | 4 |
 | `sub_82299D60` | heap.md | Overridden | `sub_82299208`, `sub_8229A5F4`, `__savegprlr_22`, `__restgprlr_22` | 10 | 4 | 781 | 10 |
 | `sub_8229A930` | heap.md | Overridden | `sub_82298A88`, `sub_8229B16C`, `__savegprlr_19`, `__restgprlr_19` | 10 | 4 | 1031 | 10 |
 | `sub_822A08A0` | functions.md | Overridden | `sub_822A05A8`, `sub_822B1F68`, `sub_822B20D8`, `sub_822B2388`, `sub_822B3FE0`, `sub_822B5C58`, `__savegprlr_25`, `__restgprlr_25` | 10 | 2 | 793 | 3 |
-| `sub_82593088` | std-string.md | Overridden | `sub_82592E18`, `__savegprlr_26`, `__restgprlr_26` | 10 | 3 | 701 | 6 |
+| `sub_82579DA0` | lifted.md | Lifted | `sub_82579D18`, `sub_82579E18`, `sub_8257A498`, `__savegprlr_29`, `__restgprlr_29` | 10 | 4 | 515 | 6 |
 | `sub_825AF130` | c-runtime.md | Native | `sub_825AB010`, `sub_825AC108`, `sub_825AD4C0`, `sub_825AF000`, `sub_825AF098`, `sub_825B6890`, `sub_825B6898` | 10 | 3 | 332 | 3 |
 | `sub_8209D130` | mode-tick.md | Overridden | `sub_8217C348`, `__savegprlr_21`, `__restgprlr_21`, `__savevmx_124`, `__restvmx_124` | 8 | 1 | 389 | 7 |
+| `sub_82109EF0` | strings-and-font.md | Overridden | `sub_82109D80`, `__savegprlr_19`, `__restgprlr_19` | 8 | 2 | 405 | 6 |
 | `sub_8211E500` | ui-movies-game.md | Overridden | `sub_8211A6C0`, `sub_8259D5C8`, `sub_825A0CD0`, `sub_825A0CF8`, `sub_825A0EB0`, `sub_825A0EF0`, `__savegprlr_25`, `__restgprlr_25` | 8 | 0 | 270 | 2 |
-| `sub_8216C210` | race-hud-machine.md | Overridden | `sub_82216850` | 8 | 6 | 393 | 2 |
-| `sub_8216C530` | race-hud-machine.md | Overridden | `sub_82216850` | 8 | 6 | 393 | 2 |
-| `sub_822968B8` | functions.md | Overridden | `sub_82297678` | 8 | 0 | 648 | 2 |
-| `sub_82579DA0` | lifted.md | Lifted | `sub_82579D18`, `sub_82579E18`, `sub_8257A498` | 8 | 4 | 498 | 4 |
+| `sub_82091720` | std-string.md | Overridden | `sub_82091398`, `__savegprlr_27`, `__restgprlr_27`, `sub_825A7270` | 7 | 1 | 190 | 5 |
 | `sub_8209CC38` | sprites.md | Overridden | `sub_8209C6E0`, `__savegprlr_25`, `__restgprlr_25` | 7 | 0 | 551 | 6 |
+| `sub_820A6F60` | std-string.md | Overridden | `sub_820A6E60`, `sub_825A6A20`, `__savegprlr_27`, `__restgprlr_27`, `sub_825A7270` | 7 | 2 | 230 | 4 |
+| `sub_8211CD90` | ui-movies-game.md | Overridden | `sub_8211B720`, `sub_8211B770`, `__savegprlr_20`, `__restgprlr_20`, `__savefpr_26`, `__restfpr_26` | 7 | 0 | 142 | 4 |
 | `sub_8216D450` | race-hud-machine.md | Overridden | `sub_822157E8`, `sub_82215870`, `sub_822158E8`, `__savegprlr_24`, `__restgprlr_24` | 7 | 3 | 195 | 4 |
 | `sub_8229A648` | heap.md | Overridden | `sub_82298548`, `sub_82299448`, `sub_8229A8DC`, `__savegprlr_25`, `__restgprlr_25` | 7 | 3 | 643 | 7 |
-| `sub_822B0AB0` | functions.md | Overridden | `sub_822B0760`, `sub_822B07B0`, `sub_822B0860`, `__savegprlr_27`, `__restgprlr_27`, `__savefpr_28`, `__restfpr_28` | 7 | 0 | 205 | 4 |
+| `sub_825963F0` | models.md | Native | `__savegprlr_26`, `__restgprlr_26`, `sub_825ABFE8` | 7 | 2 | 147 | 4 |
 | `sub_8259F348` | ui-movies.md | Overridden | `sub_8211A948`, `sub_8259D618`, `sub_8259D628`, `__savegprlr_24`, `__restgprlr_24`, `__savefpr_28`, `__restfpr_28` | 7 | 0 | 128 | 4 |
-| `sub_82109EF0` | strings-and-font.md | Overridden | `sub_82109D80`, `__savegprlr_19`, `__restgprlr_19` | 6 | 2 | 388 | 4 |
+| `sub_820921A8` | frame-driver.md | Lifted | `sub_82091EF8`, `__restgprlr_28` | 6 | 0 | 141 | 5 |
 | `sub_8211BEE8` | ui-movies-game.md | Overridden | `sub_8211A948`, `sub_8259D628`, `__savegprlr_27`, `__restgprlr_27`, `__savefpr_27`, `__restfpr_27` | 6 | 0 | 117 | 4 |
-| `sub_822B0910` | functions.md | Overridden | `sub_822B07B0`, `sub_822B0860`, `__savegprlr_27`, `__restgprlr_27`, `__savefpr_28`, `__restfpr_28` | 6 | 0 | 181 | 4 |
-| `sub_82091720` | std-string.md | Overridden | `sub_82091398`, `__savegprlr_27`, `__restgprlr_27`, `sub_825A7270` | 5 | 1 | 173 | 3 |
-| `sub_82094F30` | lifted.md | Lifted | `sub_82095AF0`, `__savegprlr_25`, `__restgprlr_25` | 5 | 1 | 345 | 5 |
-| `sub_82095DF8` | lifted.md | Lifted | `sub_82095AF0`, `__savegprlr_24`, `__restgprlr_24` | 5 | 1 | 347 | 5 |
-| `sub_820A6F60` | std-string.md | Overridden | `sub_820A6E60`, `sub_825A6A20`, `__savegprlr_27`, `__restgprlr_27`, `sub_825A7270` | 5 | 2 | 213 | 2 |
+| `sub_8221A090` | race-screens.md | Native | `sub_822191D0`, `sub_82219A78`, `sub_82219B60`, `sub_82219C30` | 6 | 2 | 266 | 4 |
+| `sub_8229EC00` | command-buffer.md | Native | `sub_822AD690`, `sub_822AD8F8`, `__savegprlr_29`, `__restgprlr_29` | 6 | 2 | 133 | 4 |
+| `sub_82481880` | car-sounds.md | Native | `sub_82480780`, `sub_82481708`, `__savegprlr_27`, `__restgprlr_27` | 6 | 2 | 234 | 4 |
+| `sub_825A6880` | heap.md | Overridden | `sub_820911E8`, `sub_825A67A8`, `sub_825AD150`, `sub_825DB3F8` | 6 | 4 | 116 | 2 |
+| `sub_82090A08` | framework.md | Lifted | `sub_820902C8`, `__savegprlr_25`, `__restgprlr_25` | 5 | 0 | 88 | 5 |
+| `sub_82091458` | std-string.md | Native | `__savegprlr_27`, `__restgprlr_27`, `sub_825A7270` | 5 | 0 | 115 | 4 |
+| `sub_82093BE0` | app-states.md | Overridden | `sub_82091F58` | 5 | 3 | 138 | 2 |
+| `sub_8209A458` | framework.md | Overridden | `sub_82091F58` | 5 | 3 | 138 | 2 |
+| `sub_820A7AF8` | lifted.md | Lifted | `sub_820A7C50`, `__savegprlr_29`, `__restgprlr_29` | 5 | 1 | 414 | 4 |
+| `sub_820A7B78` | lifted.md | Lifted | `sub_820A7C50` | 5 | 1 | 414 | 4 |
+| `sub_820BE150` | collision.md | Native | `sub_820BC8A8`, `__savegprlr_23`, `__restgprlr_23` | 5 | 1 | 85 | 4 |
 | `sub_820CDC18` | race-setup.md | Native | `sub_820CC450`, `sub_820CC458`, `sub_820CC460`, `sub_820CC468`, `sub_820CC478` | 5 | 1 | 37 | 4 |
+| `sub_82109AA8` | strings-and-font.md | Native | `sub_821097F0`, `__savegprlr_23`, `__restgprlr_23` | 5 | 1 | 252 | 4 |
+| `sub_8211C680` | build-screen.md | Overridden | `sub_8211B720`, `sub_8211B770`, `__savegprlr_29`, `__restgprlr_29` | 5 | 0 | 102 | 2 |
 | `sub_8212ACF0` | sprites.md | Lifted | `__savegprlr_27`, `__restgprlr_27`, `__savefpr_27`, `__restfpr_27`, `sub_825A9934` | 5 | 0 | 60 | 4 |
 | `sub_8212BB20` | sprites.md | Lifted | `__savegprlr_27`, `__restgprlr_27`, `__savefpr_21`, `__restfpr_21`, `sub_825A9934` | 5 | 0 | 72 | 4 |
 | `sub_8212C6D0` | sprites.md | Lifted | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_28`, `__restfpr_28`, `sub_825A9934` | 5 | 0 | 60 | 4 |
@@ -119,11 +130,11 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82131DD8` | screen-objects.md | Native | `sub_8212F030`, `sub_821318B8`, `__restgprlr_28` | 5 | 2 | 393 | 3 |
 | `sub_82132BD8` | screen-objects.md | Native | `sub_8212EFA8`, `sub_82132318`, `__restgprlr_28` | 5 | 2 | 396 | 3 |
 | `sub_82229238` | location-screen.md | Overridden | `sub_8211AB28`, `sub_8211BE98`, `__savegprlr_21`, `__restgprlr_21` | 5 | 0 | 102 | 2 |
-| `sub_825963F0` | models.md | Native | `__savegprlr_26`, `__restgprlr_26`, `sub_825ABFE8` | 5 | 2 | 130 | 2 |
+| `sub_822A6210` | graphics-resources.md | Overridden | `sub_822AD9D8`, `__savegprlr_29`, `__restgprlr_29` | 5 | 3 | 103 | 2 |
+| `sub_822B0AB0` | functions.md | Overridden | `sub_822B0760`, `__savegprlr_27`, `__restgprlr_27`, `__savefpr_28`, `__restfpr_28` | 5 | 0 | 63 | 4 |
+| `sub_8245C650` | audio.md | Overridden | `sub_82295728`, `__savegprlr_23`, `__restgprlr_23` | 5 | 1 | 173 | 4 |
 | `sub_825A6F60` | c-runtime.md | Native | `__savegprlr_23`, `__restgprlr_23`, `sub_825A7044`, `sub_825AA1A8` | 5 | 0 | 56 | 5 |
-| `sub_825BD8F0` | functions.md | Overridden | `sub_822ADEF0`, `sub_822AE070`, `sub_822AE1D0`, `__savegprlr_22`, `__restgprlr_22` | 5 | 0 | 417 | 5 |
-| `sub_825BE300` | functions.md | Overridden | `sub_822ADEF0`, `sub_822AE070`, `sub_822AE1D0`, `__savegprlr_18`, `__restgprlr_18` | 5 | 0 | 425 | 5 |
-| `sub_820921A8` | frame-driver.md | Lifted | `sub_82091EF8`, `__restgprlr_28` | 4 | 0 | 124 | 3 |
+| `sub_82091808` | std-string.md | Overridden | `__restgprlr_28`, `sub_825A7270` | 4 | 0 | 104 | 3 |
 | `sub_820A4610` | system-services.md | Overridden | `sub_820A45C0`, `__savegprlr_27`, `__restgprlr_27` | 4 | 0 | 54 | 2 |
 | `sub_820A4C58` | files-and-saves.md | Overridden | `sub_82295BC8`, `sub_82295C10`, `__savegprlr_27`, `__restgprlr_27` | 4 | 0 | 39 | 2 |
 | `sub_820AB6A0` | camera-modes.md | Native | `__savegprlr_19`, `__restgprlr_19`, `__savefpr_14`, `__restfpr_14` | 4 | 0 | 83 | 4 |
@@ -144,6 +155,7 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_820BE8A8` | lifted.md | Lifted | `__savegprlr_23`, `__restgprlr_23`, `__savefpr_25`, `__restfpr_25` | 4 | 0 | 53 | 4 |
 | `sub_820BF320` | collision.md | Native | `__savegprlr_20`, `__restgprlr_20`, `__savefpr_24`, `__restfpr_24` | 4 | 0 | 61 | 4 |
 | `sub_820BF690` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_26`, `__restfpr_26` | 4 | 0 | 45 | 4 |
+| `sub_820BFD30` | vehicle.md | Native | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_27`, `__restfpr_27` | 4 | 0 | 37 | 4 |
 | `sub_820C0D28` | car-physics.md | Native | `__savegprlr_23`, `__restgprlr_23`, `__savefpr_14`, `__restfpr_14` | 4 | 0 | 75 | 4 |
 | `sub_820C1E00` | vehicle.md | Native | `__savegprlr_20`, `__restgprlr_20`, `__savefpr_24`, `__restfpr_24` | 4 | 0 | 61 | 4 |
 | `sub_820C3608` | vehicle.md | Overridden | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_26`, `__restfpr_26` | 4 | 0 | 45 | 4 |
@@ -161,9 +173,15 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_820F6068` | course-scenery.md | Overridden | `__savegprlr_15`, `__restgprlr_15`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 63 | 4 |
 | `sub_820FC3C8` | collision-world.md | Native | `__savegprlr_22`, `__restgprlr_22`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 49 | 4 |
 | `sub_820FC900` | collision-world.md | Native | `__savegprlr_15`, `__restgprlr_15`, `__savefpr_15`, `__restfpr_15` | 4 | 0 | 89 | 4 |
+| `sub_82106158` | game-modes.md | Overridden | `sub_82105FE0`, `sub_82106100`, `__savegprlr_29`, `__restgprlr_29` | 4 | 0 | 74 | 4 |
+| `sub_8210A680` | strings-and-font.md | Native | `__savegprlr_29`, `__restgprlr_29`, `sub_825A7EF8`, `sub_825A7F30` | 4 | 0 | 49 | 2 |
 | `sub_8210D478` | car-sounds.md | Native | `__savegprlr_22`, `__restgprlr_22`, `__savefpr_23`, `__restfpr_23` | 4 | 0 | 59 | 4 |
+| `sub_8210D718` | car-sounds.md | Native | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 35 | 4 |
+| `sub_8210E938` | car-sounds.md | Native | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_23`, `__restfpr_23` | 4 | 0 | 45 | 4 |
+| `sub_8210EEE0` | car-sounds.md | Native | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 35 | 4 |
 | `sub_8210F118` | car-sounds.md | Native | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 41 | 4 |
 | `sub_82120008` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25`, `__savefpr_15`, `__restfpr_15` | 4 | 0 | 69 | 4 |
+| `sub_82120868` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_23`, `__restfpr_23` | 4 | 0 | 45 | 4 |
 | `sub_82120BB8` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_14`, `__restfpr_14` | 4 | 0 | 69 | 4 |
 | `sub_82121D78` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25`, `__savefpr_15`, `__restfpr_15` | 4 | 0 | 69 | 4 |
 | `sub_82123A80` | race-overlays.md | Lifted | `__savegprlr_25`, `__restgprlr_25`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 43 | 4 |
@@ -175,16 +193,22 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8212B4A8` | race-overlays.md | Native | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_25`, `__restfpr_25` | 4 | 0 | 47 | 4 |
 | `sub_8212D818` | race-overlays.md | Overridden | `__savegprlr_27`, `__restgprlr_27`, `__savefpr_25`, `__restfpr_25` | 4 | 0 | 45 | 4 |
 | `sub_8212F148` | screen-objects.md | Lifted | `__savegprlr_25`, `__restgprlr_25`, `__savefpr_14`, `__restfpr_14` | 4 | 0 | 71 | 4 |
+| `sub_8212F538` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 35 | 4 |
+| `sub_82130330` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_27`, `__restfpr_27` | 4 | 0 | 37 | 4 |
 | `sub_82130618` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24`, `__savefpr_18`, `__restfpr_18` | 4 | 0 | 65 | 4 |
 | `sub_82130978` | screen-objects.md | Overridden | `__savegprlr_15`, `__restgprlr_15`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 63 | 4 |
+| `sub_82132778` | screen-objects.md | Native | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_27`, `__restfpr_27` | 4 | 0 | 37 | 4 |
 | `sub_821329B8` | screen-objects.md | Overridden | `__savegprlr_27`, `__restgprlr_27`, `__savefpr_25`, `__restfpr_25` | 4 | 0 | 45 | 4 |
 | `sub_82134060` | post-effects.md | Native | `__savegprlr_24`, `__restgprlr_24`, `__savefpr_23`, `__restfpr_23` | 4 | 0 | 55 | 4 |
 | `sub_821351F0` | post-effects.md | Overridden | `__savegprlr_23`, `__restgprlr_23`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 47 | 4 |
 | `sub_82136FA8` | post-effects.md | Native | `__savegprlr_17`, `__restgprlr_17`, `__savefpr_23`, `__restfpr_23` | 4 | 0 | 69 | 4 |
+| `sub_8213CB30` | ai-drivers.md | Native | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 35 | 4 |
+| `sub_82145A48` | ai-drivers.md | Native | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 35 | 4 |
 | `sub_82145CA8` | ai-drivers.md | Native | `__savegprlr_20`, `__restgprlr_20`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 53 | 4 |
 | `sub_82147D88` | scenery-lists.md | Native | `sub_82146BD0`, `__savegprlr_18`, `__restgprlr_18` | 4 | 1 | 1091 | 3 |
 | `sub_82148058` | scenery-lists.md | Overridden | `__savegprlr_23`, `__restgprlr_23`, `__savefpr_25`, `__restfpr_25` | 4 | 0 | 53 | 4 |
 | `sub_82148658` | sprites.md | Native | `sub_8209F5A0`, `sub_8209F5C8`, `__savegprlr_24`, `__restgprlr_24` | 4 | 0 | 48 | 2 |
+| `sub_82150590` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_26`, `__restfpr_26` | 4 | 0 | 39 | 4 |
 | `sub_82153290` | camera-modes.md | Native | `__savegprlr_27`, `__restgprlr_27`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 39 | 4 |
 | `sub_82154108` | camera-modes.md | Native | `__savegprlr_27`, `__restgprlr_27`, `__savefpr_27`, `__restfpr_27` | 4 | 0 | 41 | 4 |
 | `sub_82154548` | camera-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_27`, `__restfpr_27` | 4 | 0 | 43 | 4 |
@@ -194,7 +218,11 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8216DA40` | race-hud-machine.md | Overridden | `sub_8216C798`, `sub_82211390` | 4 | 1 | 152 | 1 |
 | `sub_82170920` | race-world.md | Native | `__savegprlr_25`, `__restgprlr_25`, `__savefpr_27`, `__restfpr_27` | 4 | 0 | 45 | 4 |
 | `sub_82172118` | race-world.md | Native | `__savegprlr_23`, `__restgprlr_23`, `__savefpr_27`, `__restfpr_27` | 4 | 0 | 49 | 4 |
+| `sub_82172E60` | race-world.md | Native | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_27`, `__restfpr_27` | 4 | 0 | 37 | 4 |
 | `sub_82173E28` | race-world.md | Native | `__savegprlr_21`, `__restgprlr_21`, `__savefpr_24`, `__restfpr_24` | 4 | 0 | 59 | 4 |
+| `sub_82174200` | race-world.md | Native | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_27`, `__restfpr_27` | 4 | 0 | 37 | 4 |
+| `sub_82179818` | stand-models.md | Native | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 35 | 4 |
+| `sub_821798D8` | stand-models.md | Native | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 35 | 4 |
 | `sub_8217BA20` | front-end-car-draw.md | Native | `__savegprlr_18`, `__restgprlr_18`, `__savefpr_25`, `__restfpr_25` | 4 | 0 | 63 | 4 |
 | `sub_8217CAB8` | front-end-car-draw.md | Native | `__savegprlr_24`, `__restgprlr_24`, `__savefpr_27`, `__restfpr_27` | 4 | 0 | 47 | 4 |
 | `sub_8217D3C8` | type6-type7-modes.md | Native | `__savegprlr_19`, `__restgprlr_19`, `__savefpr_26`, `__restfpr_26` | 4 | 0 | 59 | 4 |
@@ -204,12 +232,12 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_821F7B90` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 39 | 4 |
 | `sub_821F86C0` | tuning-pages.md | Native | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_27`, `__restfpr_27` | 4 | 0 | 43 | 4 |
 | `sub_82211AB0` | camera-modes.md | Native | `sub_8211AB90`, `sub_8211BE98`, `__savegprlr_27`, `__restgprlr_27` | 4 | 0 | 56 | 2 |
-| `sub_8221A090` | race-screens.md | Native | `sub_822191D0`, `sub_82219A78`, `sub_82219B60`, `sub_82219C30` | 4 | 2 | 249 | 2 |
 | `sub_82228588` | location-screen.md | Native | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_20`, `__restfpr_20` | 4 | 0 | 57 | 4 |
 | `sub_82293998` | matrix-math.md | Native | `sub_822936D8` | 4 | 0 | 139 | 2 |
 | `sub_8229E308` | command-buffer.md | Overridden | `sub_822AD690`, `sub_822AD8F8` | 4 | 2 | 116 | 2 |
 | `sub_8229E848` | command-buffer.md | Overridden | `sub_8229DFF8`, `__savegprlr_23`, `__restgprlr_23` | 4 | 1 | 87 | 3 |
-| `sub_8229EC00` | command-buffer.md | Native | `sub_822AD690`, `sub_822AD8F8` | 4 | 2 | 116 | 2 |
+| `sub_8229EDA8` | command-buffer.md | Native | `sub_822AD850`, `__restgprlr_28` | 4 | 1 | 85 | 3 |
+| `sub_822B0910` | functions.md | Overridden | `__savegprlr_27`, `__restgprlr_27`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 39 | 4 |
 | `sub_8236AB00` | texture-compression.md | Lifted | `__savegprlr_19`, `__restgprlr_19`, `__savefpr_26`, `__restfpr_26` | 4 | 0 | 59 | 4 |
 | `sub_8236B418` | texture-compression.md | Lifted | `__savegprlr_22`, `__restgprlr_22`, `__savefpr_19`, `__restfpr_19` | 4 | 0 | 67 | 4 |
 | `sub_823EB4A0` | texture-compression.md | Lifted | `__savegprlr_23`, `__restgprlr_23`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 47 | 4 |
@@ -222,12 +250,12 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_823EFC18` | texture-compression.md | Lifted | `__savegprlr_23`, `__restgprlr_23`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 47 | 4 |
 | `sub_823F0370` | texture-compression.md | Lifted | `__savegprlr_23`, `__restgprlr_23`, `__savefpr_26`, `__restfpr_26` | 4 | 0 | 51 | 4 |
 | `sub_823F07E8` | texture-compression.md | Lifted | `__savegprlr_23`, `__restgprlr_23`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 47 | 4 |
+| `sub_823F6C60` | texture-compression.md | Native | `sub_823EAB58`, `sub_823F55B0` | 4 | 2 | 214 | 2 |
 | `sub_82420AB8` | texture-compression.md | Native | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_15`, `__restfpr_15` | 4 | 0 | 67 | 4 |
 | `sub_82422178` | texture-compression.md | Native | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_23`, `__restfpr_23` | 4 | 0 | 51 | 4 |
 | `sub_82466440` | xaudio-objects.md | Overridden | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_26`, `__restfpr_26` | 4 | 0 | 45 | 4 |
 | `sub_82468848` | xaudio-objects.md | Native | `__savegprlr_20`, `__restgprlr_20`, `__savefpr_17`, `__restfpr_17` | 4 | 0 | 75 | 4 |
 | `sub_82481390` | car-sounds.md | Native | `__savegprlr_26`, `__restgprlr_26`, `__savefpr_23`, `__restfpr_23` | 4 | 0 | 51 | 4 |
-| `sub_82481880` | car-sounds.md | Native | `sub_82480780`, `sub_82481708`, `__savegprlr_27`, `__restgprlr_27` | 4 | 2 | 217 | 2 |
 | `sub_82582498` | lifted.md | Lifted | `__savegprlr_21`, `__restgprlr_21`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 51 | 4 |
 | `sub_82582AD8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27`, `__savefpr_26`, `__restfpr_26` | 4 | 0 | 43 | 4 |
 | `sub_82583180` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 43 | 4 |
@@ -250,29 +278,25 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8259ED40` | ui-movies.md | Overridden | `sub_8211A948`, `sub_8259D648`, `__savegprlr_26`, `__restgprlr_26` | 4 | 0 | 96 | 2 |
 | `sub_825A08E0` | ui-movies.md | Overridden | `__savegprlr_19`, `__restgprlr_19`, `__savefpr_28`, `__restfpr_28` | 4 | 0 | 55 | 4 |
 | `sub_825A1A38` | model-animation.md | Overridden | `sub_825A1938`, `sub_825A6608`, `__restgprlr_28` | 4 | 3 | 133 | 1 |
+| `sub_825A3B80` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29`, `__savefpr_25`, `__restfpr_25` | 4 | 0 | 41 | 4 |
 | `sub_825A3E18` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25`, `__savefpr_21`, `__restfpr_21` | 4 | 0 | 57 | 4 |
 | `sub_825A4680` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24`, `__savefpr_14`, `__restfpr_14` | 4 | 0 | 73 | 4 |
 | `sub_825A5BF0` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27`, `__savefpr_27`, `__restfpr_27` | 4 | 0 | 41 | 4 |
-| `sub_825A6880` | heap.md | Overridden | `sub_820911E8`, `sub_825A67A8`, `sub_825AD150`, `sub_825DB3F8` | 4 | 4 | 99 | 0 |
 | `sub_825A8ED0` | c-runtime.md | Overridden | `__savefpr_25`, `__restfpr_25`, `sub_825A8D50`, `sub_825AB1C8` | 4 | 1 | 168 | 2 |
+| `sub_825BF7A8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29`, `sub_825BF8D8`, `sub_825BFA68` | 4 | 2 | 270 | 2 |
 | `sub_825C27C0` | xact.md | Overridden | `__savegprlr_27`, `__restgprlr_27`, `sub_825C35C0` | 4 | 2 | 234 | 2 |
-| `sub_82090A08` | framework.md | Lifted | `sub_820902C8`, `__savegprlr_25`, `__restgprlr_25` | 3 | 0 | 71 | 3 |
-| `sub_82091458` | std-string.md | Native | `__savegprlr_27`, `__restgprlr_27`, `sub_825A7270` | 3 | 0 | 98 | 2 |
-| `sub_82093BE0` | app-states.md | Overridden | `sub_82091F58` | 3 | 3 | 121 | 0 |
+| `sub_825CA980` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29`, `sub_825D0540` | 4 | 2 | 36 | 2 |
+| `sub_82091328` | std-string.md | Overridden | `__savegprlr_29`, `__restgprlr_29`, `sub_825A7270` | 3 | 0 | 94 | 2 |
 | `sub_82098A98` | frame-driver.md | Overridden | `sub_8258C960`, `__savegprlr_27`, `__restgprlr_27` | 3 | 0 | 37 | 2 |
+| `sub_820998B8` | system-services.md | Lifted | `sub_82099828`, `__savegprlr_29`, `__restgprlr_29` | 3 | 0 | 62 | 2 |
 | `sub_8209A0E8` | framework.md | Native | `sub_82091CD0`, `__savegprlr_23`, `__restgprlr_23` | 3 | 1 | 54 | 2 |
-| `sub_8209A458` | framework.md | Overridden | `sub_82091F58` | 3 | 3 | 121 | 0 |
 | `sub_8209E118` | files-and-saves.md | Overridden | `sub_8209DD00`, `sub_822954C8`, `__savegprlr_27` | 3 | 1 | 73 | 1 |
-| `sub_8209F8A0` | cameras.md | Overridden | `sub_820A0CC0` | 3 | 0 | 1268 | 2 |
-| `sub_8209F900` | cameras.md | Overridden | `sub_820A1C30` | 3 | 0 | 1395 | 2 |
+| `sub_820A51E0` | files-and-saves.md | Overridden | `sub_82295BE8`, `__savegprlr_29`, `__restgprlr_29` | 3 | 0 | 22 | 2 |
 | `sub_820A70F8` | lifted.md | Lifted | `sub_820A7218` | 3 | 1 | 376 | 2 |
 | `sub_820A7180` | lifted.md | Lifted | `sub_820A7218` | 3 | 1 | 376 | 2 |
 | `sub_820A7688` | lifted.md | Lifted | `sub_820A7720` | 3 | 1 | 380 | 2 |
-| `sub_820A7AF8` | lifted.md | Lifted | `sub_820A7C50` | 3 | 1 | 397 | 2 |
-| `sub_820A7B78` | lifted.md | Lifted | `sub_820A7C50` | 3 | 1 | 397 | 2 |
 | `sub_820B2808` | car-physics.md | Native | `sub_820B6938`, `sub_820B6940`, `__restgprlr_28` | 3 | 2 | 21 | 1 |
 | `sub_820B7658` | car-physics.md | Overridden | `__restgprlr_28`, `__savefpr_28`, `__restfpr_28` | 3 | 0 | 28 | 3 |
-| `sub_820BE150` | collision.md | Native | `sub_820BC8A8`, `__savegprlr_23`, `__restgprlr_23` | 3 | 1 | 68 | 2 |
 | `sub_820C8528` | scene.md | Native | `__restgprlr_28`, `__savefpr_26`, `__restfpr_26` | 3 | 0 | 32 | 3 |
 | `sub_820CE800` | scene-loaders.md | Overridden | `__savegprlr_27`, `__restgprlr_27`, `sub_825A8600` | 3 | 0 | 29 | 2 |
 | `sub_820D3E98` | scene-loaders.md | Native | `__restgprlr_28`, `__savevmx_123`, `__restvmx_123` | 3 | 0 | 50 | 3 |
@@ -280,40 +304,49 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_820F2D28` | minimap.md | Native | `sub_820F2CA8`, `__savegprlr_27`, `__restgprlr_27` | 3 | 1 | 63 | 2 |
 | `sub_820F5740` | minimap.md | Overridden | `__savefpr_28`, `__restfpr_28`, `sub_825A9934` | 3 | 0 | 37 | 2 |
 | `sub_82109560` | strings-and-font.md | Native | `sub_82108F68`, `__savegprlr_27`, `__restgprlr_27` | 3 | 1 | 74 | 2 |
-| `sub_82109AA8` | strings-and-font.md | Native | `sub_821097F0`, `__savegprlr_23`, `__restgprlr_23` | 3 | 1 | 235 | 2 |
+| `sub_8210A5E8` | strings-and-font.md | Overridden | `__savegprlr_29`, `__restgprlr_29`, `sub_825A7EF8` | 3 | 0 | 37 | 2 |
 | `sub_8210A990` | strings-and-font.md | Overridden | `__savegprlr_23`, `__restgprlr_23`, `sub_825A7EF8` | 3 | 0 | 49 | 2 |
 | `sub_8210ABC0` | strings-and-font.md | Overridden | `__savegprlr_24`, `__restgprlr_24`, `sub_825A7EF8` | 3 | 0 | 47 | 2 |
 | `sub_8210E470` | car-sounds.md | Native | `__restgprlr_28`, `__savefpr_28`, `__restfpr_28` | 3 | 0 | 28 | 3 |
 | `sub_82114128` | save-data.md | Lifted | `__savegprlr_22`, `__restgprlr_22`, `sub_825A9934` | 3 | 0 | 50 | 2 |
 | `sub_82114268` | career.md | Overridden | `__savegprlr_19`, `__restgprlr_19`, `sub_825A9934` | 3 | 0 | 56 | 2 |
 | `sub_82119B80` | ui-movies.md | Overridden | `sub_8259D628`, `__savegprlr_18`, `__restgprlr_18` | 3 | 0 | 49 | 2 |
-| `sub_8211C680` | build-screen.md | Overridden | `sub_8211B720`, `sub_8211B770` | 3 | 0 | 85 | 0 |
+| `sub_8211AAA8` | ui-movies-game.md | Overridden | `sub_8259D648`, `__savegprlr_29`, `__restgprlr_29` | 3 | 0 | 24 | 2 |
+| `sub_8211D880` | ui-movies-game.md | Overridden | `sub_8211C930` | 3 | 0 | 66 | 3 |
 | `sub_8211D978` | ui-movies-game.md | Overridden | `sub_8259D670`, `__savegprlr_24`, `__restgprlr_24` | 3 | 0 | 36 | 2 |
 | `sub_8211DBE0` | ui-movies-game.md | Overridden | `sub_8211B298`, `__savegprlr_26`, `__restgprlr_26` | 3 | 0 | 63 | 2 |
 | `sub_8211DCE8` | ui-movies-game.md | Native | `sub_8211B298`, `__savegprlr_27`, `__restgprlr_27` | 3 | 0 | 61 | 2 |
 | `sub_8211E1C0` | ui-movies-game.md | Overridden | `sub_8259D930`, `__savegprlr_27`, `__restgprlr_27` | 3 | 0 | 102 | 2 |
 | `sub_8211E378` | ui-movies-game.md | Overridden | `sub_8259D670`, `__savegprlr_25`, `__restgprlr_25` | 3 | 0 | 34 | 2 |
+| `sub_8211E808` | ui-movies-game.md | Overridden | `sub_8211A9E8`, `__savegprlr_29`, `__restgprlr_29` | 3 | 0 | 69 | 2 |
 | `sub_8211EC18` | sprites.md | Lifted | `__restgprlr_28`, `__savefpr_27`, `__restfpr_27` | 3 | 0 | 30 | 3 |
 | `sub_8211F530` | lifted.md | Lifted | `__restgprlr_28`, `__savefpr_26`, `__restfpr_26` | 3 | 0 | 32 | 3 |
 | `sub_8211F6F8` | lifted.md | Lifted | `__restgprlr_28`, `__savefpr_26`, `__restfpr_26` | 3 | 0 | 32 | 3 |
 | `sub_8212CE40` | sprites.md | Lifted | `__restgprlr_28`, `__savefpr_26`, `__restfpr_26` | 3 | 0 | 32 | 3 |
+| `sub_82134410` | lifted.md | Lifted | `sub_82134698`, `__savegprlr_29`, `__restgprlr_29` | 3 | 1 | 746 | 2 |
 | `sub_8214E190` | system-services.md | Overridden | `sub_82148958`, `sub_82459D40`, `sub_82459D50` | 3 | 0 | 55 | 0 |
 | `sub_82153640` | camera-modes.md | Native | `__restgprlr_28`, `__savefpr_27`, `__restfpr_27` | 3 | 0 | 30 | 3 |
 | `sub_82167610` | race-states.md | Overridden | `sub_821653E8`, `__savegprlr_24`, `__restgprlr_24` | 3 | 1 | 112 | 2 |
 | `sub_8218C678` | race-menu.md | Overridden | `sub_8211BA00`, `__savegprlr_23`, `__restgprlr_23` | 3 | 0 | 121 | 2 |
+| `sub_821955E0` | garage-screen.md | Native | `sub_8211A630`, `__savegprlr_29`, `__restgprlr_29` | 3 | 0 | 32 | 2 |
+| `sub_82199688` | type2-screens.md | Native | `sub_8211A630`, `__savegprlr_29`, `__restgprlr_29` | 3 | 0 | 32 | 2 |
 | `sub_821E6C50` | tuning-screen.md | Overridden | `sub_821E6F90`, `__savegprlr_26`, `__restgprlr_26` | 3 | 0 | 101 | 3 |
 | `sub_821E9488` | tuning-pages.md | Native | `sub_8259D628`, `__savegprlr_26`, `__restgprlr_26` | 3 | 0 | 33 | 2 |
 | `sub_821EA130` | tuning-pages.md | Native | `sub_8259D628`, `__savegprlr_26`, `__restgprlr_26` | 3 | 0 | 33 | 2 |
 | `sub_821EAE68` | tuning-pages.md | Native | `sub_8259D628`, `__savegprlr_27`, `__restgprlr_27` | 3 | 0 | 31 | 2 |
+| `sub_82206A50` | tuning-pages.md | Native | `sub_82200DC0` | 3 | 0 | 435 | 3 |
+| `sub_82206F48` | tuning-pages.md | Native | `sub_822012E8` | 3 | 0 | 285 | 2 |
+| `sub_82207320` | tuning-pages.md | Native | `sub_82201620` | 3 | 0 | 337 | 2 |
 | `sub_82218C10` | race-screens.md | Overridden | `sub_82218838`, `__savegprlr_27`, `__restgprlr_27` | 3 | 0 | 93 | 3 |
+| `sub_8224FB20` | car-list.md | Native | `sub_8211A630`, `__savegprlr_29`, `__restgprlr_29` | 3 | 0 | 32 | 2 |
 | `sub_82295890` | c-runtime.md | Overridden | `sub_82296FE0`, `__savegprlr_27`, `__restgprlr_27` | 3 | 0 | 95 | 3 |
+| `sub_8229E100` | command-buffer.md | Native | `sub_8229DC28`, `__savegprlr_29`, `__restgprlr_29` | 3 | 0 | 72 | 3 |
 | `sub_8229F680` | device-state.md | Native | `sub_822A0F80`, `__savegprlr_19`, `__restgprlr_19` | 3 | 0 | 304 | 2 |
-| `sub_822A6210` | graphics-resources.md | Overridden | `sub_822AD9D8` | 3 | 3 | 86 | 0 |
+| `sub_822A0718` | functions.md | Lifted | `sub_822A0688`, `__savegprlr_29`, `__restgprlr_29` | 3 | 1 | 60 | 2 |
 | `sub_822A63F8` | graphics-resources.md | Native | `sub_8229DDD8`, `__savegprlr_22`, `__restgprlr_22` | 3 | 0 | 86 | 3 |
 | `sub_822AC918` | functions.md | Lifted | `sub_822AC5A0`, `__savegprlr_25`, `__restgprlr_25` | 3 | 1 | 32 | 2 |
 | `sub_822B6BF8` | predicated-tiling.md | Overridden | `sub_8229E5D0`, `__savegprlr_26`, `__restgprlr_26` | 3 | 0 | 142 | 3 |
 | `sub_823F56A0` | texture-compression.md | Lifted | `__restgprlr_28`, `__savefpr_28`, `__restfpr_28` | 3 | 0 | 28 | 3 |
-| `sub_8245C650` | audio.md | Overridden | `sub_82295728`, `__savegprlr_23`, `__restgprlr_23` | 3 | 1 | 156 | 2 |
 | `sub_82465258` | xaudio-objects.md | Native | `sub_82467A00`, `__savegprlr_26`, `__restgprlr_26` | 3 | 0 | 35 | 2 |
 | `sub_8246AEE0` | audio.md | Lifted | `__savegprlr_24`, `__restgprlr_24`, `sub_825A9934` | 3 | 0 | 46 | 2 |
 | `sub_825850E0` | lifted.md | Lifted | `__restgprlr_28`, `__savefpr_28`, `__restfpr_28` | 3 | 0 | 28 | 3 |
@@ -322,6 +355,7 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8259F700` | ui-movies.md | Native | `sub_8259EC58` | 3 | 1 | 105 | 2 |
 | `sub_8259FC18` | ui-movies.md | Native | `__restgprlr_28`, `__savefpr_28`, `__restfpr_28` | 3 | 0 | 28 | 3 |
 | `sub_8259FD40` | lifted.md | Lifted | `__restgprlr_28`, `__savefpr_28`, `__restfpr_28` | 3 | 0 | 28 | 3 |
+| `sub_825A5020` | lifted.md | Lifted | `sub_825A5610`, `__savegprlr_29`, `__restgprlr_29` | 3 | 1 | 148 | 2 |
 | `sub_825A82C8` | c-runtime.md | Native | `__savegprlr_23`, `__restgprlr_23`, `sub_825AFD98` | 3 | 1 | 45 | 2 |
 | `sub_825A96A0` | c-runtime-core.md | Native | `__savegprlr_24`, `__restgprlr_24`, `sub_825AD4C0` | 3 | 0 | 33 | 2 |
 | `sub_825ACD90` | c-runtime-core.md | Native | `__savegprlr_27`, `__restgprlr_27`, `sub_825ACEB4` | 3 | 0 | 37 | 2 |
@@ -329,66 +363,112 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_825AEBC8` | heap.md | Overridden | `__savegprlr_27`, `__restgprlr_27`, `sub_825AD150` | 3 | 1 | 47 | 2 |
 | `sub_825B11A8` | c-runtime-core.md | Overridden | `__savegprlr_25`, `__restgprlr_25`, `sub_825B1304` | 3 | 0 | 46 | 2 |
 | `sub_825B3430` | c-runtime.md | Overridden | `sub_825B32F0` | 3 | 2 | 117 | 1 |
+| `sub_825B40B8` | c-runtime-core.md | Overridden | `__savegprlr_29`, `__restgprlr_29`, `sub_825AD4C0` | 3 | 0 | 23 | 2 |
 | `sub_825B4828` | files-and-saves.md | Overridden | `__savegprlr_27`, `__restgprlr_27`, `sub_825B4978` | 3 | 0 | 42 | 2 |
 | `sub_825B65D0` | c-runtime-core.md | Overridden | `__savegprlr_24`, `__restgprlr_24`, `sub_825B6730` | 3 | 0 | 48 | 2 |
-| `sub_825BDDC0` | functions.md | Overridden | `sub_822ADEF0`, `sub_822AE070`, `sub_822AE1D0` | 3 | 0 | 386 | 3 |
-| `sub_825BE708` | functions.md | Overridden | `sub_822ADEF0`, `sub_822AE070`, `sub_822AE1D0` | 3 | 0 | 386 | 3 |
 | `sub_825C09A8` | sound-cues.md | Lifted | `sub_82295FC8`, `__savegprlr_26`, `__restgprlr_26` | 3 | 0 | 136 | 2 |
+| `sub_825C7F98` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29`, `sub_825C7FE8` | 3 | 1 | 70 | 2 |
+| `sub_825C8230` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29`, `sub_825C7B10` | 3 | 1 | 49 | 2 |
+| `sub_825CC9C8` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29`, `sub_825CC858` | 3 | 1 | 65 | 2 |
 | `sub_825CDEA8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27`, `sub_825CE05C` | 3 | 1 | 197 | 2 |
 | `sub_825D3178` | xact-waves.md | Lifted | `__savegprlr_25`, `__restgprlr_25`, `sub_825D31D8` | 3 | 1 | 127 | 2 |
 | `sub_82090420` | framework.md | Native | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_820905E0` | lifted.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_82090EA8` | framework.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82090F88` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82091540` | std-string.md | Native | `sub_825A6A20`, `__restgprlr_28` | 2 | 1 | 38 | 1 |
-| `sub_82091808` | std-string.md | Overridden | `__restgprlr_28`, `sub_825A7270` | 2 | 0 | 87 | 1 |
+| `sub_82092DE0` | app-start-up.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82093000` | frame-driver.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82093400` | framework.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82093740` | framework.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820938C0` | app-states.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82093DC0` | app-states.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82094110` | app-states.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82094590` | app-start-up.md | Overridden | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_82094BE8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82094E30` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82094F30` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82095370` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820956F0` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82095958` | input.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820959D0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82095AF0` | functions.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82095DF8` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82096030` | frame-passes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82096360` | frame-passes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820988C8` | frame-driver.md | Overridden | `sub_8258C998`, `sub_8258C9C0` | 2 | 0 | 20 | 0 |
+| `sub_82098940` | frame-driver.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82098F30` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820991E0` | input.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82099430` | input.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82099600` | system-services.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82099E20` | framework.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8209A600` | framework.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8209A760` | framework.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8209B070` | app-start-up.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_8209B2C0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8209C1A0` | sprites.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8209CE68` | mode-tick.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8209D038` | mode-tick.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8209D0C8` | mode-tick.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8209D950` | files-and-saves.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_8209DB20` | files-and-saves.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8209DC18` | files-and-saves.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8209DD98` | files-and-saves.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8209DE48` | files-and-saves.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8209E210` | files-and-saves.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_8209F228` | action-mappers.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8209F430` | action-mappers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8209FA38` | cameras.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_820A0490` | save-interface.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_820A0510` | save-interface.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820A07F0` | models.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820A0978` | cameras.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820A0CC0` | cameras.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_820A1C30` | cameras.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_820A4560` | save-interface.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820A49D0` | files-and-saves.md | Overridden | `sub_82295C08`, `__restgprlr_28` | 2 | 0 | 15 | 1 |
 | `sub_820A4B18` | files-and-saves.md | Overridden | `sub_82295BC8`, `__restgprlr_28` | 2 | 0 | 23 | 1 |
 | `sub_820A52E0` | save-interface.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_820A53E8` | save-interface.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_820A5A88` | save-interface.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820A5BE8` | files-and-saves.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820A5E68` | files-and-saves.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820A6010` | save-interface.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820A6160` | save-interface.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820A6A50` | file-layer.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820A6AB8` | files-and-saves.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820A6B20` | file-layer.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820A6D28` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820A8508` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820A8B88` | cameras.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820A8F20` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820A93E8` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_820A9738` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820AA088` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820AA550` | cameras.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820AAFF0` | cameras.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820AC000` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820ACAA8` | morph-jobs.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820ACC08` | morph-jobs.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820ACFF8` | app-states.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820AD8D0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820ADA70` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820ADAD0` | app-states.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820ADB28` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820ADB80` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820ADC60` | app-states.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820AE130` | app-states.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820AEC10` | movies.md | Overridden | `sub_820AE7F8`, `__restgprlr_28` | 2 | 1 | 18 | 2 |
 | `sub_820AF018` | car-physics.md | Native | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
 | `sub_820AFBD8` | car-physics.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820B0718` | car-physics.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820B0908` | car-physics.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820B0E70` | car-physics.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820B0EE8` | car-physics.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820B13C8` | car-physics.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820B18B8` | car-physics.md | Native | `__savefpr_27`, `__restfpr_27` | 2 | 0 | 20 | 2 |
+| `sub_820B31D0` | car-physics.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820B3D10` | car-physics.md | Overridden | `__savefpr_27`, `__restfpr_27` | 2 | 0 | 20 | 2 |
 | `sub_820B4420` | car-physics.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820B4778` | car-physics.md | Native | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
@@ -398,19 +478,36 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_820B5B08` | car-physics.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_820B5FD8` | car-physics.md | Overridden | `__savefpr_27`, `__restfpr_27` | 2 | 0 | 20 | 2 |
 | `sub_820B6170` | lifted.md | Lifted | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
+| `sub_820B6498` | car-physics.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820B6710` | car-physics.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820B67E0` | vehicle-accessors.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820B6C78` | car-physics.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820B7478` | car-physics.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820B75B8` | car-physics.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820B7A00` | car-physics.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820B7DF8` | car-physics.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820B7ED0` | car-physics.md | Native | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
+| `sub_820B8548` | car-physics.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820B87B0` | car-physics.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_820B8A88` | car-physics.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820B8AF8` | car-physics.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820B8D30` | car-physics.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_820B9570` | car-physics.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820B9C40` | collision.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_820BA1D0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820BA228` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820BA408` | collision.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_820BA5D8` | collision.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820BA688` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_820BA888` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820BAE78` | collision.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_820BB188` | collision.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820BB300` | collision.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820BB450` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820BB580` | collision.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820BBB20` | collision.md | Overridden | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
+| `sub_820BBE30` | collision.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820BC068` | car-physics.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820BC560` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820BC978` | collision.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820BD280` | collision.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
@@ -418,31 +515,44 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_820BD740` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820BECA0` | collision.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820BF080` | collision.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
-| `sub_820BFD30` | vehicle.md | Native | `__savefpr_27`, `__restfpr_27` | 2 | 0 | 20 | 2 |
 | `sub_820C0310` | vehicle.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820C05C8` | car-physics.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820C1D08` | vehicle.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820C1D78` | vehicle.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820C2248` | vehicle.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_820C23E8` | vehicle.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820C27E8` | car-physics.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820C3020` | vehicle.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820C3150` | vehicle.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820C33B8` | vehicle.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820C3BD0` | vehicle.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820C3DA0` | scene.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820C3FD8` | scene-loaders.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_820C42C8` | vehicle-accessors.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820C4338` | vehicle-accessors.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820C4888` | car-specs.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820C4A70` | scene.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820C4DD8` | car-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820C5168` | scene.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820C5798` | scene.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820C5A60` | vehicle-accessors.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820C5AB0` | vehicle-accessors.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820C5B28` | scene-models.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820C5D70` | vehicle-accessors.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820C5DE8` | car-scene-draw.md | Overridden | `__savefpr_18`, `__restfpr_18` | 2 | 0 | 38 | 2 |
 | `sub_820C8480` | front-end-car-draw.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820C89A8` | scene.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820C8DE8` | car-models.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820C9170` | car-draw.md | Native | `__savefpr_24`, `__restfpr_24` | 2 | 0 | 26 | 2 |
 | `sub_820C9E00` | car-specs.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820CBD20` | car-specs.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820CC1F0` | car-specs.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820CD8A8` | race-setup.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820CDCE0` | race-setup.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820CEB30` | second-set.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820D02D0` | scene-loaders.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_820D04E8` | car-draw.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_820D07C8` | car-models.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820D0860` | car-models.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820D0A98` | scene-models.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820D0EA8` | material-passes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
@@ -455,56 +565,146 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_820D2330` | material-passes.md | Overridden | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
 | `sub_820D2EA8` | material-passes.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_820D3318` | material-passes.md | Overridden | `__savegprlr_17`, `__restgprlr_17` | 2 | 0 | 41 | 2 |
+| `sub_820D3C80` | car-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D3DE0` | scene-loaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D3E40` | scene-loaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820D4078` | car-models.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_820D4508` | car-models.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820D47A8` | car-models.md | Overridden | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
 | `sub_820D4F80` | car-models.md | Overridden | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
 | `sub_820D5750` | car-models.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820D59D8` | car-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D5AC0` | car-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820D5B50` | car-models.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820D5D20` | car-models.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820D5F88` | car-models.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D5FC8` | scene-loaders.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D6010` | scene-loaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D6090` | scene-loaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820D6108` | scene-loaders.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820D6328` | scene-loaders.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_820D6C10` | scene-models.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D6C88` | scene-models.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D6D00` | scene-loaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D6EB8` | scene-loaders.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D6F20` | scene-loaders.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D6F88` | scene-loaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D70F0` | scene-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820D72D8` | load-poll.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820D7388` | scene-loaders.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_820D7428` | scene-loaders.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820D7690` | scene-loaders.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D76D8` | scene-loaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820D7840` | scene-loaders.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_820D78B8` | scene-loaders.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820D79B0` | car-models.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D7BF8` | scene-loaders.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D7C40` | scene-loaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D7CC0` | scene-loaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820D7D38` | scene-loaders.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_820D7E18` | load-poll.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_820D8430` | scene-loaders.md | Overridden | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_820D8AA8` | scene-loaders.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820D8E68` | scene-loaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820D8F60` | scene-loaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820D91E0` | load-poll.md | Native | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
 | `sub_820D92A0` | load-poll.md | Overridden | `__savegprlr_17`, `__restgprlr_17` | 2 | 0 | 41 | 2 |
 | `sub_820D9638` | load-poll.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_820DA758` | scene-models.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820DAB58` | car-draw.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820DAC68` | car-draw.md | Overridden | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_820DB458` | scene-models.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_820DB770` | second-set.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DB818` | scene-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DB878` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DB8C8` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DB930` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DB980` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DB9E8` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DBA38` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DBB88` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DBC10` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820DBC88` | second-set.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820DBD38` | car-draw.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820DBE20` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820DC138` | load-poll.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_820DC258` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DC748` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DC7A0` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DC7F8` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DC850` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DCA40` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DCC10` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820DCC70` | car-draw.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820DCF98` | car-draw.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820DD0B0` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820DD110` | car-draw.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820DD438` | car-draw.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820DD5C0` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820DD620` | car-draw.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820DD948` | car-draw.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820DDAE8` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DDB98` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DDC48` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DDD90` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DDE58` | car-draw.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DE0E0` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820DE1C8` | car-draw.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820DE2C8` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DE498` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DE5B0` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DE760` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820DE7E8` | second-set.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820DE878` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DE948` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DE9D0` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DEA88` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DECD0` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DED88` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820DEDD8` | car-draw.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820DEE88` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DEF38` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DF020` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DF070` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DF128` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DF250` | load-poll.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DF308` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DF458` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DF5B8` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820DF610` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820DF740` | second-set.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820E0010` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820E0258` | second-set.md | Overridden | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_820E0998` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820E1388` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820E1690` | car-draw.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_820E1D88` | car-draw.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820E2448` | car-draw.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_820E2760` | car-draw.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_820E2C10` | second-set.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820E3170` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820E3200` | second-set.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820E3298` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820E32E8` | load-poll.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820E33F0` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820E34A8` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820E34F8` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820E3548` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820E3660` | second-set.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820E3938` | load-poll.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820E39F8` | car-draw.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820E4140` | load-poll.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820E4258` | scene-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820E42E8` | functions.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820E45A8` | functions.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820E51D0` | car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820E5220` | car-draw.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_820E53F0` | car-draw.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820E54E8` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820E55A0` | car-draw.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820E61D8` | car-draw.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_820E6820` | car-draw.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820E6980` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820E6A40` | car-draw.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_820E70C0` | car-models.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_820E7598` | second-set.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
@@ -512,14 +712,22 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_820E7CA0` | second-set.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820E8028` | second-set.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820E8A00` | load-poll.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_820E8A80` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820E9318` | car-draw.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_820E99C0` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820E9A28` | car-draw.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_820EA148` | car-draw.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_820EA8E8` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820EB320` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820EB388` | car-draw.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820EBEB8` | car-draw.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820ECCB8` | second-set.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820ECF08` | car-models.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820ECFC8` | car-models.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820ED090` | car-models.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820ED1E8` | car-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820ED2A0` | car-models.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_820ED498` | car-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820ED630` | car-models.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820EF468` | accessories.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820EF4E8` | accessories.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
@@ -528,112 +736,187 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_820EF9B8` | accessories.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_820EFD70` | accessories.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820F0120` | accessories.md | Lifted | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
+| `sub_820F0628` | accessories.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820F09E0` | accessories.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820F0C90` | accessories.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820F1258` | course-scenery.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820F1598` | course-scenery.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_820F16C0` | course-scenery.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_820F17C0` | course-scenery.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820F1E00` | course-scenery.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820F2030` | course-scenery.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_820F2478` | course-scenery.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820F2520` | course-scenery.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820F2720` | course-scenery.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_820F2B80` | course-scenery.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820F3020` | course-scenery.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820F34C8` | course-scenery.md | Native | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
 | `sub_820F3B70` | course-scenery.md | Native | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_820F4128` | course-scenery.md | Native | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
 | `sub_820F4558` | course-scenery.md | Overridden | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_820F4888` | minimap.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820F4BA8` | minimap.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_820F5238` | minimap.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820F52A8` | course-scenery.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_820F6940` | collision-world.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820F6BE8` | collision-world.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820F6C88` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820F6E18` | collision-world.md | Native | `__savefpr_27`, `__restfpr_27` | 2 | 0 | 20 | 2 |
 | `sub_820F71B0` | collision-world.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_820F7590` | collision-world.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820F7818` | collision-world.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_820F7AA0` | collision-world.md | Native | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
 | `sub_820F7E30` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820F7EE8` | lifted.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_820F8578` | collision-world.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820F8720` | track-route.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_820F93A0` | track-route.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820F9448` | track-route.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820F9600` | track-route.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820F9768` | track-route.md | Overridden | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
 | `sub_820F9E28` | collision-world.md | Lifted | `sub_820F9050` | 2 | 0 | 176 | 1 |
+| `sub_820F9F58` | track-route.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_820F9FE8` | track-route.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820FA728` | track-route.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820FA8F8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820FA9D0` | track-route.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_820FAE78` | track-route.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820FB100` | track-route.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820FB2B0` | lifted.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_820FB680` | track-route.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_820FBBE8` | course-scenery.md | Native | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_820FBDC8` | course-scenery.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820FC038` | course-scenery.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820FC188` | collision-world.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_820FDC18` | collision-world.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_820FDF98` | track-zones.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_820FE120` | track-zones.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_820FE330` | track-zones.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820FE398` | track-zones.md | Native | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
 | `sub_820FE598` | camera-modes.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_820FE6F8` | track-zones.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_820FE830` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820FEBD0` | collision-world.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_820FF050` | collision-world.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_820FF368` | collision-world.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82101D50` | race-setup.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82101F68` | race-setup.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82102048` | race-setup.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821020F0` | race-setup.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821021B8` | race-setup.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82102488` | racer-controllers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82102AA8` | replay-snapshots.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82102B98` | replay-snapshots.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82102C60` | replay-snapshots.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82103300` | replay-snapshots.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821033F0` | replay-snapshots.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821034B8` | replay-snapshots.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82103CB8` | replay-snapshots.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821041C0` | replay-snapshots.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82104310` | replay-snapshots.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82104380` | replay-snapshots.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821046F8` | replay-snapshots.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82104898` | replay-snapshots.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82104AB8` | replay-snapshots.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82104D40` | replay-snapshots.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82104F68` | replay-snapshots.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82105228` | type10-mode.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
-| `sub_82106158` | game-modes.md | Overridden | `sub_82105FE0`, `sub_82106100` | 2 | 0 | 57 | 2 |
+| `sub_821054A8` | data-load.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82105560` | data-load.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82105D08` | save-data.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82105E30` | race-states.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82105EA0` | race-states.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821063B0` | mode-tick.md | Overridden | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82107168` | game-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821073B8` | game-modes.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82107910` | game-modes.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82107C58` | boot-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82108018` | boot-mode.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82108210` | strings-and-font.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821088B8` | strings-and-font.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82109400` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82109498` | strings-and-font.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8210A538` | strings-and-font.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
-| `sub_8210A680` | strings-and-font.md | Native | `sub_825A7EF8`, `sub_825A7F30` | 2 | 0 | 32 | 0 |
 | `sub_8210A8D0` | files-and-saves.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8210AF08` | action-mappers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8210B270` | action-mappers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8210B438` | action-mappers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8210B7D0` | action-mappers.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_8210B8A8` | action-mappers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8210BBA0` | action-mappers.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8210C0E0` | action-mappers.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8210C180` | action-mappers.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8210CE38` | car-sounds.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
-| `sub_8210D718` | car-sounds.md | Native | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
+| `sub_8210D410` | car-sounds.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8210D6C0` | car-sounds.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8210D890` | car-sounds.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8210E3E8` | car-sounds.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8210E778` | car-sounds.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
-| `sub_8210E938` | car-sounds.md | Native | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
-| `sub_8210EEE0` | car-sounds.md | Native | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
+| `sub_8210F4E8` | car-sounds.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8210F820` | car-sounds.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_8210FD78` | car-sounds.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8210FE00` | car-sounds.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_82110048` | car-sounds.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821104D8` | career.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821109B8` | save-interface.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821116E0` | career.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82111B30` | data-tables.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82112088` | career.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82112950` | career.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82112DB0` | race-setup.md | Overridden | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_82113BD8` | save-data.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82113E60` | save-data.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82114C08` | career.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82115190` | career.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_821154E0` | career.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82115D98` | race-setup.md | Overridden | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_821162B0` | career.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82116588` | career.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_82116DB0` | data-tables.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82117240` | data-tables.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82117438` | sound-cues.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82117B88` | sound-cues.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82117D08` | sound-cues.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82117EB8` | menu-sounds.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821180B8` | sound-cues.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821184E8` | sound-cues.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82118790` | menu-sounds.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82118930` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82118A90` | sound-cues.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82118B58` | sound-cues.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82118C70` | menu-sounds.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82118F50` | sound-cues.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82119278` | menu-sounds.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821194A0` | sound-cues.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82119500` | sound-cues.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82119690` | menu-sounds.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821197E0` | sound-cues.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82119B38` | sound-cues.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211A788` | ui-movies-game.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211AC90` | ui-movies-game.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211B160` | ui-movies-game.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211B4D0` | ui-movies-game.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211B540` | ui-movies-game.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211B800` | ui-movies-game.md | Native | `sub_8211B310`, `sub_8211B720` | 2 | 0 | 59 | 0 |
 | `sub_8211BD10` | ui-movies-game.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_8211C370` | build-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211C470` | ui-movies-game.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211C4F0` | ui-movies-game.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211C570` | ui-movies-game.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8211CBD8` | ui-movies-game.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8211CCC0` | build-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211D280` | ui-movies-game.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8211D2F8` | ui-movies.md | Overridden | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_8211D930` | ui-movies-game.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211DAC8` | ui-movies-game.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211DF20` | ui-movies-game.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8211DFF8` | ui-movies-game.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
-| `sub_82120868` | lifted.md | Lifted | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
+| `sub_8211E258` | ui-movies-game.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8211E2C8` | ui-movies-game.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82121280` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82122DB8` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82123450` | race-overlays.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82123880` | race-overlays.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821251C0` | race-overlays.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_821252D0` | race-overlays.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821253F0` | race-overlays.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
@@ -643,32 +926,46 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_821281A8` | sprites.md | Overridden | `__savegprlr_17`, `__restgprlr_17` | 2 | 0 | 41 | 2 |
 | `sub_82128750` | sprites.md | Overridden | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
 | `sub_82128E70` | sprites.md | Overridden | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_821292E8` | race-overlays.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8212AA78` | race-overlays.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8212B1B0` | race-overlays.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8212B288` | race-overlays.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8212B2E8` | race-overlays.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8212BF88` | race-overlays.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8212BFE8` | race-overlays.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8212C2F0` | race-overlays.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8212EA98` | post-effects.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8212EC90` | post-effects.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
-| `sub_8212F538` | lifted.md | Lifted | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
+| `sub_8212F0B8` | screen-objects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8212F778` | lifted.md | Lifted | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
 | `sub_8212FDB0` | screen-objects.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
-| `sub_82130330` | lifted.md | Lifted | `__savefpr_27`, `__restfpr_27` | 2 | 0 | 20 | 2 |
+| `sub_821301F0` | screen-objects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82130290` | screen-objects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82130490` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82131680` | screen-objects.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82131CB8` | screen-objects.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82131FB0` | screen-objects.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_821321F8` | screen-objects.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
-| `sub_82132778` | screen-objects.md | Native | `__savefpr_27`, `__restfpr_27` | 2 | 0 | 20 | 2 |
+| `sub_82132720` | screen-objects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82132CE0` | screen-objects.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82133000` | screen-objects.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82133190` | post-effects.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82133340` | post-effects.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82133608` | post-effects.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82133790` | post-effects.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82133960` | post-effects.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82133D70` | post-effects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82133F58` | post-effects.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_821356B0` | lifted.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_82135B50` | post-effects.md | Overridden | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
+| `sub_82136130` | post-effects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82136E30` | post-effects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82138610` | post-effects.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82138A18` | post-effects.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82138D78` | ai-drivers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82139248` | ai-drivers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82139628` | ai-drivers.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_82139E40` | ai-drivers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8213A000` | ai-drivers.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8213A140` | ai-drivers.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8213A620` | ai-drivers.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
@@ -677,10 +974,14 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8213B058` | ai-drivers.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8213B1E0` | ai-drivers.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8213B650` | ai-drivers.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
-| `sub_8213CB30` | ai-drivers.md | Native | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
+| `sub_8213BCD0` | ai-drivers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8213D020` | ai-drivers.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_8213D140` | ai-drivers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8213D1F0` | ai-drivers.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8213D550` | ai-drivers.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_8213D670` | ai-drivers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8213D9D8` | ai-drivers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8213DB08` | ai-drivers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8213DE30` | ai-drivers.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8213E018` | ai-drivers.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8213E1D0` | ai-drivers.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
@@ -697,18 +998,26 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82140340` | race-event.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82140868` | race-event.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82140AC8` | race-event.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82142D40` | race-event.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82142E18` | race-event.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82142F68` | race-event.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821430A0` | race-setup.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82143150` | race-world.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82143210` | race-event.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82143620` | race-event.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821436C8` | race-event.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82143740` | race-event.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_82143920` | race-world.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_82143A40` | race-world.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_82143B78` | race-world.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82143DC8` | race-event.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82143F90` | race-event.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821440F8` | race-event.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82144170` | race-event.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821444D0` | race-event.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82144798` | race-world.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82144A50` | race-event.md | Native | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
-| `sub_82145A48` | ai-drivers.md | Native | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
+| `sub_82144EF8` | ai-drivers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82145B08` | ai-drivers.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82146608` | ai-drivers.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_821467F0` | ai-drivers.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
@@ -716,21 +1025,40 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82148528` | scenery-lists.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82148D00` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82149178` | system-services.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_821495E8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8214B188` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8214BF20` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_8214ED30` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8214F790` | system-services.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82150098` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82150100` | camera-modes.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82150350` | camera-modes.md | Native | `__savefpr_27`, `__restfpr_27` | 2 | 0 | 20 | 2 |
-| `sub_82150590` | camera-modes.md | Native | `__savefpr_26`, `__restfpr_26` | 2 | 0 | 22 | 2 |
+| `sub_821507D8` | camera-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82150878` | camera-modes.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82150960` | camera-modes.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82150B10` | camera-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82150E00` | race-end.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821511B8` | race-loading.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821517D8` | race-loading.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82151D20` | game-modes.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_82152078` | camera-modes.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82152338` | camera-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82152BD8` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82152E08` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82153A50` | camera-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82153E58` | camera-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82154378` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821543E8` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82154458` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821544E0` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82154A48` | camera-modes.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_82154D38` | camera-modes.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_82155118` | game-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82155288` | camera-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82155800` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82155A28` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82155E58` | camera-modes.md | Overridden | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
+| `sub_82156248` | camera-modes.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821562F8` | camera-modes.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82156980` | camera-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82156B68` | camera-modes.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
@@ -740,26 +1068,41 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_821596B0` | camera-modes.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_821597F0` | camera-modes.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82159950` | camera-modes.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_8215B0E0` | car-makers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8215B4F8` | functions.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8215B720` | race-scene.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8215B790` | race-update.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8215B878` | car-makers.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_8215C0D8` | race-update.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8215C248` | race-scene.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8215CF78` | race-scene.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8215D100` | race-scene.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8215D6C8` | race-scene.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8215D808` | race-scene.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8215DEA0` | race-overlays.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8215E000` | race-overlays.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8215E208` | race-overlays.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8215E2E0` | race-overlays.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_8215E6C8` | game-modes.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_8215F728` | racer-controllers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8215FA10` | racer-controllers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8215FA68` | racer-controllers.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8215FCA8` | racer-controllers.md | Native | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
 | `sub_821604C8` | racer-controllers.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_821606D0` | racer-controllers.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_821607A0` | racer-controllers.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82160880` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821609E0` | racer-controllers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82160AE0` | race-flow.md | Overridden | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
 | `sub_82162330` | race-states.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82162D80` | race-states.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82163000` | race-states.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82163218` | race-states.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821634D8` | race-states.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82163C50` | race-states.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82164090` | race-states.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82164228` | race-states.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821643E0` | race-states.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821644D8` | race-states.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82164A90` | race-states.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82164B50` | race-states.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
@@ -769,6 +1112,7 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82165C78` | race-states.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_821662E0` | race-world.md | Overridden | `__savegprlr_17`, `__restgprlr_17` | 2 | 0 | 41 | 2 |
 | `sub_82166B40` | race-states.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82166E50` | race-states.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82166F98` | race-states.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821672F0` | race-states.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82167BE0` | race-states.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
@@ -779,30 +1123,39 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82168C80` | race-states.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82169030` | race-states.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821692C8` | race-states.md | Overridden | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_8216CC60` | race-hud-machine.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8216E150` | race-hud-machine.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8216E6E8` | race-hud-machine.md | Overridden | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
 | `sub_821706E8` | race-world.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82170CB8` | race-world.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82171070` | race-world.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82171360` | race-world.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821713C0` | race-world.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821714D8` | race-world.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82171560` | race-world.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82171718` | race-world.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82171978` | race-world.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_82171E50` | race-world.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_821724F8` | race-world.md | Native | `__savefpr_27`, `__restfpr_27` | 2 | 0 | 20 | 2 |
-| `sub_82172E60` | race-world.md | Native | `__savefpr_27`, `__restfpr_27` | 2 | 0 | 20 | 2 |
+| `sub_82172D20` | race-world.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82172F90` | race-world.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821737F8` | race-world.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82173A90` | race-world.md | Overridden | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
-| `sub_82174200` | race-world.md | Native | `__savefpr_27`, `__restfpr_27` | 2 | 0 | 20 | 2 |
 | `sub_82174D28` | race-world.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_821758A0` | race-sounds.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82176188` | race-sounds.md | Native | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
 | `sub_82176C10` | race-sounds.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821772D8` | race-sounds.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82177378` | race-sounds.md | Overridden | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
+| `sub_821790D0` | stand-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82179310` | stand-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821793D0` | stand-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82179678` | front-end-car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821797A8` | stand-models.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
-| `sub_82179818` | stand-models.md | Native | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
-| `sub_821798D8` | stand-models.md | Native | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
 | `sub_82179AE8` | type6-type7-modes.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82179DF0` | front-end-car-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82179F60` | front-end-car-draw.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8217A0A8` | front-end-car-draw.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8217A370` | mode-tick.md | Native | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_8217AA98` | scene-target.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_8217B508` | power-graph.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
@@ -811,17 +1164,29 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8217C4C0` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8217C708` | power-graph.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8217D120` | front-end-car-draw.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8217D888` | type6-type7-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8217DAC0` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8217DBC0` | stand-models.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8217F880` | car-makers.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_8217F9E0` | front-end-car-draw.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_8217FBE8` | type6-type7-modes.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8217FD58` | car-makers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821802D8` | type6-type7-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82180B00` | type6-type7-modes.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821813B0` | car-dealer.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821816B8` | car-dealer.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82181C38` | car-dealer.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82181E10` | car-dealer.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82181ED0` | car-dealer.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821820C0` | car-dealer.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821821C8` | front-end-screen-helpers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821822F8` | front-end-screen-helpers.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821826C0` | car-dealer.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821827E0` | front-end-screen-helpers.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_82182990` | car-dealer.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82182B30` | car-dealer.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82182C90` | car-makers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82182D30` | car-makers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82182E68` | car-dealer.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82183600` | car-dealer.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82183BD8` | car-dealer.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
@@ -831,27 +1196,54 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82184338` | car-dealer.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82184488` | car-dealer.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_821847A0` | car-dealer.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_82184DA0` | car-dealer.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82184FB8` | car-dealer.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82185220` | car-dealer.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82185400` | car-dealer.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82185600` | car-dealer.md | Overridden | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
 | `sub_82185920` | car-dealer.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82186428` | type2-dialog.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82186568` | menu-helpers.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82187160` | type2-dialog.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82187330` | type2-dialog.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82187728` | type2-dialog.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821879F8` | type2-dialog.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82187EC8` | type2-dialog.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82188178` | type2-dialog.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82188A98` | race-menu.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_82188E20` | race-menu.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821891C8` | race-menu.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_821896A0` | race-menu.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82189740` | race-menu.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821898C0` | race-menu.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82189C28` | race-menu.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82189FE8` | race-menu.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8218A7F0` | race-menu.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8218A928` | race-menu.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8218ACE8` | race-menu.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8218AF08` | race-menu.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8218B2C8` | race-menu.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_8218B9F0` | race-menu.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8218BB68` | race-menu.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8218BC18` | race-menu.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8218CE10` | race-menu.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8218DA48` | type2-screens.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8218DCC0` | type2-screens.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8218DE88` | type2-screens.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8218DF38` | type2-screens.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8218EC78` | type2-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8218EE48` | type2-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8218F530` | type2-screens.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_8218F800` | type2-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821907F8` | type2-screens.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82190B18` | type2-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821915B0` | garage-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82191B20` | garage-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82192378` | garage-screen.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82192958` | garage-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82192D60` | garage-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82192FD0` | garage-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821930D8` | garage-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821933D0` | garage-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821934D0` | garage-screen.md | Native | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
 | `sub_821939A0` | garage-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
@@ -864,10 +1256,21 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_821951A8` | garage-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821956C0` | garage-screen.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_821958D0` | garage-screen.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82195D10` | garage-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82196230` | garage-screen.md | Overridden | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_82196520` | garage-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82196EC0` | front-end-screen-helpers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82197278` | type2-mode.md | Overridden | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
+| `sub_82197C88` | type2-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82197D50` | type2-mode.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82198008` | type2-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82198118` | type2-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82198360` | type2-screens.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82198A40` | type2-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82198B58` | type2-screens.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82198D00` | type2-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82198DC8` | type2-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82198E70` | type2-screens.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82198FB8` | type2-screens.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_821990D0` | type2-screens.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_82199220` | type2-screens.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
@@ -876,16 +1279,25 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_821998F0` | type2-screens.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82199990` | type2-screens.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8219A450` | type2-screens.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_8219A5E8` | type2-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8219A6B8` | type2-screens.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8219A820` | type2-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8219AA00` | type2-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8219AAB0` | type2-screens.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_8219AC88` | type2-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8219AD68` | type2-screens.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8219AF50` | type2-screens.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8219B108` | type2-screens.md | Overridden | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_8219B2E8` | type2-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8219B8C8` | type2-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8219C230` | build-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8219CE08` | build-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8219D248` | build-screen.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8219D550` | build-screen.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_8219D6F0` | build-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8219D820` | build-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8219DA58` | build-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8219DB50` | build-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8219DBC8` | type2-screens.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8219DDB8` | type2-screens.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8219DFA8` | type2-screens.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
@@ -901,24 +1313,59 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_821A0D38` | build-screen.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_821A0E50` | build-screen.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_821A16C0` | type2-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821A1CA0` | save-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821A1E18` | save-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821A24B0` | save-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821A2FB0` | save-screen.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821A3A08` | save-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821A3ED8` | save-screen.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821A4AC0` | save-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821A4EF8` | save-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821A5038` | save-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821A51C8` | front-end-screen-helpers.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821A5360` | front-end-screen-helpers.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821A5450` | front-end-screen-helpers.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821A5668` | front-end-screen-helpers.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821A5980` | front-end-screen-helpers.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821A5D00` | front-end-screen-helpers.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821A6030` | front-end-screen-helpers.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821A63B0` | front-end-screen-helpers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821A6E18` | save-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821A7470` | save-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821A7AC8` | save-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821A8210` | type6-type7-modes.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821A8EF8` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AB698` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821AB898` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_821ABC00` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821ABD30` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821ABDC0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821ABFD8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AC068` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AC0F8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AC188` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AC218` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AC2A8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821ACFB0` | car-settings.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821AD200` | car-settings.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821ADA08` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821ADF28` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821ADF98` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE018` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE098` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE118` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE198` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE240` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE2C0` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE340` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE3C0` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE440` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE4C0` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE540` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE5C0` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE6D8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AE988` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821AEA08` | car-settings.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821AEC18` | lifted.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_821AED18` | car-settings.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_821AF0A8` | car-settings.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
@@ -927,34 +1374,86 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_821B1B40` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821B1DA0` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_821B2100` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821B25C8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821B2728` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821B2870` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B29D0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821B2B30` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821B2C78` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821B2DD8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821B2F20` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B3080` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B31E0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B3340` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821B34A0` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821B35E0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B3740` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B39A8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B3B08` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B3D70` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B3FD8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821B4068` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821B4298` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821B4848` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821B49F8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821B4BA0` | car-settings.md | Lifted | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
+| `sub_821B4E10` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B4F00` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821B4FD8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821B50E8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B52D0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B53A8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B5498` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B5818` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B5A00` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B5AF8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B5BF0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B5F08` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B5FF8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B60E8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821B61D8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821B6FC0` | car-settings.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821B7878` | car-settings.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821B80B8` | type2-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821B8688` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821B8728` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821B8ED0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821B90D8` | type2-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821B9E70` | options-screen.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_821BA0F0` | options-screen.md | Lifted | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
+| `sub_821BA380` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821BAE10` | options-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821BBF00` | options-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821BCFF0` | options-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821BD468` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821BD5B0` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821BD728` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821BDAD0` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821BDCB0` | options-screen.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821BDE88` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821BE040` | options-screen.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821BE290` | options-screen.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_821BE518` | options-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821BE5A8` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821BE988` | options-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821BECA8` | options-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821BED38` | options-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821BEE48` | options-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821BEED8` | options-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821BEFE8` | options-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821BF0F0` | options-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821BF2B8` | options-screen.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821BF520` | options-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821BF630` | options-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821BF7F8` | options-screen.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821C02B8` | options-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821C0348` | options-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821C03D8` | options-screen.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821C0640` | options-screen.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821C08B0` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821C09B0` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821C0A50` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821C0B50` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821C0BF0` | front-end-screen-helpers.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821C0D70` | front-end-screen-helpers.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821C1068` | options-screen.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
@@ -969,8 +1468,17 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_821C47A0` | options-screen.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821C4BE0` | options-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821C4DB0` | options-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821C4FD0` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821C5350` | options-screen.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821C5580` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821C56B0` | options-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821C57D0` | options-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821C5900` | options-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821C5D68` | type6-type7-modes.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821C6238` | options-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821C6350` | options-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821C6468` | options-load-save.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821C6550` | options-load-save.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821C6638` | front-end-screen-helpers.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821C69D0` | front-end-screen-helpers.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821C7188` | options-screen.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
@@ -984,24 +1492,56 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_821CA458` | options-screen.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821CB090` | type6-type7-modes.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821CB6E8` | type6-type7-modes.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821CBE08` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821CC620` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821CE1D0` | tuning-pages.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821CE4C8` | tuning-machine.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821D06B0` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821D07D8` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821D0A48` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821D0CC0` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821D12C0` | tuning-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821D2A80` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821D4180` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821D5028` | tuning-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821D8898` | tuning-machine.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821D9F10` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821DA3F8` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821DA4B0` | tuning-machine.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_821DAD58` | tuning-machine.md | Native | `__savegprlr_17`, `__restgprlr_17` | 2 | 0 | 41 | 2 |
 | `sub_821DBAB0` | tuning-machine.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821DCC28` | tuning-screen.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_821DE2D8` | tuning-screen.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_821DFA78` | stand-models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821DFB20` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821E0FB0` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821E1B48` | tuning-machine.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821E22E8` | tuning-screen.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_821E2660` | tuning-pages.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821E7568` | tuning-machine.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821E7E48` | tuning-screen.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_821E8128` | tuning-screen.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_821E8298` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E8440` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E84F8` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E8758` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E8800` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E88C0` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E8998` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E8B68` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E8CE0` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E9050` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E9110` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E9920` | tuning-pages.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E9CA0` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821E9DD8` | tuning-pages.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821EA898` | tuning-pages.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821EB2A0` | tuning-pages.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821EBA00` | tuning-pages.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821EC7E0` | tuning-pages.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821ECC68` | tuning-screen.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_821ED108` | tuning-pages.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821EDCA8` | tuning-pages.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821EE390` | tuning-pages.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821EE9B0` | tuning-screen.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_821F1130` | tuning-pages.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
@@ -1012,19 +1552,33 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_821F4768` | tuning-pages.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_821F4BF8` | tuning-screen.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_821F5B98` | tuning-pages.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821F5F70` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821F60E0` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821F6688` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821F6C90` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821F6CE8` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821F7518` | sticker-editor.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821F7618` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821F77F0` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821F8160` | sticker-editor.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821F8868` | sticker-editor.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_821F8A50` | sticker-editor.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821F8C30` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821F8D68` | sticker-editor.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_821F9050` | sticker-editor.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821F9328` | sticker-editor.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821F9608` | sticker-editor.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821F99A8` | sticker-editor.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821F9D30` | sticker-editor.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821F9FB8` | sticker-editor.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821FA508` | sticker-editor.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821FA658` | tuning-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821FAD00` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821FB0B8` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821FB1F0` | tuning-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821FB450` | tuning-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821FB6B0` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821FB8D8` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821FBA40` | sticker-editor.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821FBB60` | sticker-editor.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_821FC270` | sticker-editor.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
@@ -1033,36 +1587,84 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_821FCC48` | tuning-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821FCED0` | tuning-screen.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_821FD3F8` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821FD518` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821FD710` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821FD880` | tuning-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821FDA80` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_821FDCB8` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_821FE190` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821FE230` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821FE2D0` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_821FEAF0` | tuning-pages.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_821FF1D0` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821FF3A0` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821FF6F0` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_821FFB20` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82200100` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82200230` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82200600` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82200760` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82201B40` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82201C58` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82201FA0` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82202090` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82202530` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82202750` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82202928` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82202C08` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82203110` | tuning-screen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82203570` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822036E8` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82203B00` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822040A8` | tuning-pages.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822042D8` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82204730` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82204888` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82204980` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82204A78` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82204B70` | tuning-pages.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_822076E8` | tuning-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82207F38` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822081A0` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822081D8` | tuning-pages.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822087C8` | tuning-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82208CE0` | tuning-pages.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_82209738` | tuning-pages.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_8220A1C8` | tuning-pages.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_8220A9D8` | user-info.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8220AD08` | user-info.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8220B408` | user-info.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8220C1E0` | race-screens.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8220C668` | race-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8220C7B8` | race-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8220C868` | race-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8220CB38` | race-screens.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8220CC60` | race-screens.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_8220D040` | race-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8220D130` | race-screens.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8220DD98` | race-screens.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_8220DF30` | race-screens.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8220E1F8` | race-screens.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8220E700` | race-screens.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8220E888` | race-screens.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8220E908` | race-screens.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8220EE28` | race-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8220FB10` | race-screens.md | Native | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
+| `sub_82210010` | race-screens-unseen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822100D8` | race-screens-unseen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82210228` | race-screens-unseen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82210360` | race-screens-unseen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_822105F8` | race-screens-unseen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82210940` | race-screens-unseen.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82210CD0` | race-screens-unseen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82211590` | race-screens-unseen.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_822118E0` | camera-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82211980` | camera-modes.md | Native | `sub_8211AB90`, `__restgprlr_28` | 2 | 0 | 18 | 1 |
 | `sub_82211DA0` | race-hud-object.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822122B0` | race-hud-object.md | Native | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
 | `sub_822123C8` | race-hud-object.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_822125B8` | race-hud-object.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82212D08` | race-hud-object.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82212F00` | race-hud-object.md | Native | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
 | `sub_82213638` | race-hud-object.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82213750` | race-hud-object.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
@@ -1070,6 +1672,7 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82213968` | race-hud-object.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82213AE0` | race-hud-object.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82213C90` | race-hud-object.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82213DB0` | race-hud-object.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82213F20` | race-hud-object.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82214260` | race-hud-object.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82214330` | race-hud-object.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
@@ -1078,10 +1681,14 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82214790` | race-hud-object.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_82214A50` | race-hud-object.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82214BA8` | race-hud-object.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_82214D78` | race-hud-object.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82214E78` | race-hud-object.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82215160` | race-hud-object.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82215260` | race-hud-object.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822153A0` | race-hud-object.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822155C0` | race-hud-object.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82215B48` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_82216A60` | race-hud-object.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82216C40` | alt-hud.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82216E00` | alt-hud.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82216EE8` | alt-hud.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
@@ -1090,101 +1697,199 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82217270` | alt-hud.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_822178A0` | alt-hud.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82217A30` | alt-hud.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82217AC8` | alt-hud.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82217CD0` | race-screens.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822186A8` | race-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82218788` | race-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8221AA20` | race-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8221AAD8` | race-screens.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8221AC00` | race-screens.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8221ACC0` | race-screens.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_8221AE58` | race-screens.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8221B3C8` | race-screens.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_8221B6A0` | race-screens.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8221BB48` | race-screens.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8221F628` | race-screens-unseen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82220580` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82220720` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822207B0` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82220840` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822208D0` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82220960` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822209F0` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82220A80` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82221228` | title-screen.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_822213B0` | title-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82221D98` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822221A0` | title-screen.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82222700` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82222E88` | title-screen.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82223050` | title-screen.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_822231B0` | title-screen.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82223328` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82223428` | title-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822235D0` | title-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82223940` | title-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82223D70` | title-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82223E58` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82223F30` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82223FD8` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822240B0` | title-screen.md | Overridden | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
 | `sub_82224270` | title-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_822252C8` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82225390` | title-screen.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82225698` | title-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822257A8` | type5-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82225878` | type5-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82225D10` | type5-mode.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82225F30` | type5-mode.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82226088` | type5-mode.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_822261E0` | type5-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82226788` | type5-mode.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82226A10` | type5-mode.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_822271F8` | location-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82227430` | location-screen.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82227A50` | location-screen.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_82227E20` | location-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82228138` | location-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82228220` | location-screen.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82228438` | location-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82228498` | location-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82228A90` | location-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82228B80` | location-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82228CC0` | location-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82228E88` | location-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82228FC8` | location-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82229798` | location-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8222A218` | location-screen.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8222AC78` | location-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8222B200` | location-screen.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8222B438` | location-screen.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_8222C188` | location-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8222C270` | location-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8222C300` | location-screen.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_8222CD60` | location-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8222CEB0` | location-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8222DCE8` | location-screen.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8222E1A0` | location-screen.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8222E368` | location-screen.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8222EC08` | location-screen.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_8222F0B0` | location-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8222F258` | location-screen.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8222FB90` | front-end-screen-helpers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8222FD68` | type5-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82230050` | type5-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82230260` | type5-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82230328` | type5-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82230458` | type5-mode.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82230800` | screen-constructors.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822309C8` | screen-constructors.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_82230BA8` | type67-screens.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82230C88` | type67-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82230F80` | type6-type7-modes.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_822321B8` | type6-type7-modes.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82232328` | type6-type7-modes.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82232798` | type6-type7-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822329A8` | type6-type7-modes.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822330F0` | screen-constructors.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822334C8` | type67-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_822336C0` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82233730` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82233B70` | type6-type7-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82233C80` | type6-type7-modes.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_822346A8` | type6-type7-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82234C20` | type6-type7-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82234D50` | type6-type7-modes.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82234E38` | type6-type7-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82234F08` | type6-type7-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82235138` | type6-type7-modes.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82235C18` | type6-type7-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82235F28` | type6-type7-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82236100` | type6-type7-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822363B8` | type6-type7-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82236880` | type6-type7-modes.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82236F00` | type67-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_822370A0` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822372A0` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82237320` | type6-type7-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82237B78` | type6-type7-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8223AA10` | type6-type7-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8223AB50` | type6-type7-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8223F9A8` | type6-type7-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_822403A0` | screen-constructors.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_82240518` | type67-screens.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822405F8` | type67-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82240998` | type6-type7-modes.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_82241C18` | type6-type7-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82241CE8` | type6-type7-modes.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82241EF8` | type6-type7-modes.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82242218` | type6-type7-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82242420` | type6-type7-modes.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82242BE8` | screen-constructors.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82243018` | type67-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82243238` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822432A8` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82243308` | type67-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82243448` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82243588` | type67-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822436A0` | type6-type7-modes.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_822440D8` | type6-type7-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822441D8` | type6-type7-modes.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82244AB8` | type6-type7-modes.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82244E70` | type6-type7-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82244FC0` | type6-type7-modes.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_822450A8` | type6-type7-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82245200` | type6-type7-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_822454B8` | type6-type7-modes.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_82246098` | type6-type7-modes.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_822463D8` | type6-type7-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82246590` | type6-type7-modes.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82246800` | type6-type7-modes.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82246C90` | type6-type7-modes.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822470A8` | type6-type7-modes.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82247ED0` | type67-screens.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_822480F0` | type67-screens.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82248198` | type67-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82248800` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82248F00` | car-list.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82248FE0` | car-list.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82249098` | car-list.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82249128` | car-list.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82249198` | car-list.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822491F8` | car-list.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822492C8` | car-list.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_822494A8` | car-list.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8224A178` | car-list.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8224A718` | car-list.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8224A7E0` | car-list.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8224A8E0` | car-list.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8224A978` | car-list.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8224AEA8` | car-list.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8224B248` | car-list.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_8224B538` | car-list.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8224B660` | screen-constructors.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8224B8D8` | car-list.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8224BF30` | car-list.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8224C008` | car-list.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_8224C560` | car-list.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8224C698` | car-list.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_8224CB28` | car-list.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8224D090` | car-list.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8224D118` | car-list.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8224D288` | car-list.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8224D580` | car-list.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_8224D7F0` | car-list.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8224D860` | car-list.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8224DA20` | car-list.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8224DC50` | car-list.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8224DCF0` | car-list.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8224DDF8` | car-list.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8224E878` | car-list.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8224EA10` | car-list.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8224EBF0` | car-list.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8224EC50` | car-list.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8224ED38` | car-list.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8224EF18` | car-list.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8224F018` | car-list.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8224F680` | car-list.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8224F758` | car-list.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
@@ -1192,45 +1897,98 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8224F8F8` | car-list.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_8224FF88` | car-list.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_822501C8` | car-list.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_822502C0` | power-graph-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82250900` | power-graph-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82250948` | power-graph-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82250BA0` | power-graph-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82250C40` | power-graph-screen.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82250DD8` | power-graph-screen.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82251320` | power-graph-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822513B8` | power-graph-screen.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822518B0` | type67-screens.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82251F98` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82252198` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82252778` | type67-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82252C98` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82252DF0` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822550F8` | screen-constructors.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822552B8` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82255490` | type67-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82255658` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82255B58` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82255CD0` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82255EB0` | type67-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82256030` | type67-screens.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_822561D0` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82256258` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82256740` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82256AC0` | type67-screens.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_82256CA0` | type67-screens.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82256E08` | type67-screens.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82257148` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822579E8` | type67-screens.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82257B78` | type67-screens.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_82257D48` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82259410` | type67-screens.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82259750` | type67-screens.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_82259A78` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82259CA0` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82259D80` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82259EC0` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8225A2C0` | type67-screens.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8225A520` | todays-result.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8225B258` | todays-result.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8225B358` | todays-result.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8225BAB8` | todays-result.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8225BC60` | todays-result.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8225BD10` | todays-result.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8225BE50` | todays-result.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8225C1F8` | todays-result.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8225C278` | todays-result.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8225CF30` | todays-result.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8225D590` | front-end-screen-helpers.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8225DB70` | todays-result.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8225DC38` | todays-result.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8225DE78` | todays-result.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82288CA0` | type10-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82288DA0` | type10-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822890D8` | type10-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82289768` | type10-mode.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82289D70` | type10-mode.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82289F48` | type10-mode.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_8228A3B8` | type10-mode.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8228A560` | type10-mode.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8228A658` | type10-mode.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_8228AC48` | type10-mode.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8228BBA8` | track-zones.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8228BC18` | track-zones.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8228BC80` | track-zones.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8228D070` | track-zones.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8228DA08` | track-zones.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8228DD00` | track-zones.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8228E6A0` | track-zones.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8228F0B0` | race-scene.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8228F408` | scenery-lists.md | Overridden | `sub_8228F484`, `__restgprlr_28` | 2 | 0 | 167 | 2 |
+| `sub_8228F780` | save-interface.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8228F840` | save-interface.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8228F8F8` | save-interface.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8228FC50` | files-and-saves.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82290378` | save-interface.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82290698` | achievements.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82290788` | achievements.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_82290A30` | achievements.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_822917B8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82291858` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_822919A0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82291A40` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82291AD0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82291F20` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82292020` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82292A48` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82292B28` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82292CC0` | network-mode.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82293028` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82293190` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82293600` | matrix-math.md | Native | `__savefpr_26`, `__restfpr_26` | 2 | 0 | 22 | 2 |
 | `sub_82293AD8` | matrix-math.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82294610` | files-and-saves.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
@@ -1239,53 +1997,83 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_822951A8` | system-services.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82295208` | system-services.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82295508` | files-and-saves.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82295D50` | files-and-saves.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82296270` | functions.md | Overridden | `sub_822972D0` | 2 | 2 | 12 | 0 |
+| `sub_82296F48` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82297100` | mode-tick.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82297340` | functions.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_822976F8` | heap.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82297B98` | c-runtime-core.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82298950` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822990A0` | heap.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_822997B0` | system-services.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_8229D688` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8229D8A0` | command-buffer.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8229DA28` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8229DB38` | functions.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8229DCC0` | command-buffer.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8229DD70` | command-buffer.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8229E3F0` | command-buffer.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_8229E908` | command-buffer.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8229E9D0` | command-buffer.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
-| `sub_8229EDA8` | command-buffer.md | Native | `sub_822AD850`, `__restgprlr_28` | 2 | 1 | 68 | 1 |
+| `sub_8229EB10` | command-buffer.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8229F148` | command-buffer.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8229F280` | functions.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8229FC40` | lifted.md | Lifted | `__savegprlr_17`, `__restgprlr_17` | 2 | 0 | 41 | 2 |
 | `sub_822A04F8` | functions.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822A3518` | device-state.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_822A3758` | device-state.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_822A3908` | device-state.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822A3D30` | device-state.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822A4060` | device-state.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822A45B8` | graphics-resources.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_822A4A40` | graphics-resources.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_822A4B98` | graphics-resources.md | Native | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
 | `sub_822A54B0` | graphics-resources.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_822A5578` | graphics-resources.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822A5608` | graphics-resources.md | Native | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
 | `sub_822A5910` | graphics-resources.md | Native | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_822A5B80` | graphics-resources.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822A5D08` | graphics-resources.md | Overridden | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_822A5E28` | graphics-resources.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_822A6008` | device-state.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_822A6A88` | device-state.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822A8740` | shader-objects.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822A8980` | app-start-up.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_822A9EA8` | models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822A9EE8` | shader-objects.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_822A9FD8` | models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822AA018` | shader-objects.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_822AC2A0` | functions.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822AC638` | functions.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_822AC858` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822ACE00` | functions.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_822ACFB8` | functions.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822AD0B0` | functions.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822AD298` | functions.md | Overridden | `sub_822AD190`, `sub_822B2388` | 2 | 0 | 128 | 0 |
+| `sub_822AD790` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822ADB50` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822AE340` | functions.md | Overridden | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_822AEAA0` | lifted.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_822AEBF0` | lifted.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_822AED18` | functions.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_822AF8A0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822AF978` | command-buffer.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_822B0D18` | functions.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822B43E8` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_822B4F10` | functions.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_822B5EA8` | graphics-resources.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822B5EF8` | graphics-resources.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_822B60C8` | predicated-tiling.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_822B6188` | predicated-tiling.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_822B6288` | predicated-tiling.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_822B62E8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_822B69A8` | predicated-tiling.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_822B6AD8` | predicated-tiling.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_822B6D70` | predicated-tiling.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
+| `sub_822BE450` | functions.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8235A720` | graphics-resources.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_8235A920` | graphics-resources.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82368D98` | texture-compression.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82368F58` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82369050` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
@@ -1293,6 +2081,7 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_823692D0` | texture-compression.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_823693C8` | texture-compression.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_823694C8` | texture-compression.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_823695C0` | texture-compression.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82369678` | texture-compression.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82369770` | texture-compression.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82369860` | texture-compression.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
@@ -1301,10 +2090,13 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82369DB8` | texture-compression.md | Lifted | `__savegprlr_17`, `__restgprlr_17` | 2 | 0 | 41 | 2 |
 | `sub_82369FF8` | texture-compression.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8236A4F0` | texture-compression.md | Lifted | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
+| `sub_8236A9C8` | texture-compression.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8236AEA8` | texture-compression.md | Lifted | `__savefpr_20`, `__restfpr_20` | 2 | 0 | 34 | 2 |
 | `sub_8236BF40` | texture-compression.md | Lifted | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
+| `sub_8236C630` | texture-compression.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_823EA800` | texture-compression.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_823EACC8` | texture-compression.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_823EB180` | texture-compression.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_823EB910` | texture-compression.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_823EBCD0` | texture-compression.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_823EC0A0` | texture-compression.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
@@ -1322,7 +2114,11 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_823F0EF0` | texture-compression.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_823F1640` | texture-compression.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_823F1D90` | texture-compression.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_823F24A8` | texture-compression.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_823F2530` | texture-compression.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_823F25C0` | texture-compression.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_823F3A88` | texture-compression.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_823F3D10` | texture-compression.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_823F3E90` | texture-compression.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_823F40C8` | texture-compression.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_823F4738` | texture-compression.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
@@ -1331,15 +2127,28 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_823F5FA0` | texture-compression.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_823F6298` | texture-compression.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_823F6858` | texture-compression.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
-| `sub_823F6C60` | texture-compression.md | Native | `sub_823EAB58`, `sub_823F55B0` | 2 | 2 | 197 | 0 |
+| `sub_824207D8` | texture-compression.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82420F50` | texture-compression.md | Native | `__savefpr_19`, `__restfpr_19` | 2 | 0 | 36 | 2 |
 | `sub_82421938` | texture-compression.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82422000` | texture-compression.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82422A68` | texture-compression.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82459E80` | xaudio.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82459EF0` | xaudio.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82459F48` | xaudio.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82459FA0` | xaudio.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8245A168` | xaudio.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8245A1B0` | xaudio.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8245A270` | xaudio.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8245A3B8` | xaudio.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8245A410` | sound-cues.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8245A5E8` | xaudio.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8245A768` | xaudio.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8245A7C8` | xaudio.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8245AB60` | xaudio-engine.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8245ACE0` | xaudio-engine.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8245AE60` | xaudio.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8245AFA0` | xaudio.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8245B2C0` | xaudio-engine.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8245B3A0` | xaudio-engine.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8245B480` | xaudio-engine.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8245B638` | xaudio-engine.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
@@ -1348,27 +2157,47 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8245BE08` | xaudio-engine.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8245C198` | xaudio-engine.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8245C958` | audio.md | Overridden | `sub_8245D118`, `__restgprlr_28` | 2 | 1 | 20 | 1 |
+| `sub_8245CBB0` | audio.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8245D138` | audio.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_8245D760` | xaudio-engine.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_8245DC10` | xaudio-engine.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8245DDC8` | xaudio.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8245DED0` | xaudio.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8245E0D8` | xaudio.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8245E1B8` | xaudio.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8245E428` | xaudio.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8245E6A8` | xaudio.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8245E7D0` | xaudio.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8245E9F0` | xaudio.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8245ED60` | xaudio.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8245F108` | xaudio.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8245F298` | xaudio.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8245F4E0` | xaudio-engine.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8245F750` | xaudio.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8245FA80` | xaudio.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82460000` | xaudio-engine.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_824605E8` | xaudio.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82460998` | xaudio.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82460AB8` | xaudio.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82460BF0` | xaudio.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82460EF0` | xaudio.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82461158` | xaudio.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82461308` | xaudio.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82461600` | xaudio.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82461E88` | xaudio.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82461F20` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82462148` | xaudio-objects.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_824624F8` | xaudio-objects.md | Native | `__savegprlr_15`, `__restgprlr_15` | 2 | 0 | 45 | 2 |
 | `sub_82462CF8` | xaudio-objects.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82462DC8` | xaudio-objects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82463060` | xaudio-objects.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82463130` | xaudio-objects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_824632A0` | xaudio-objects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82463578` | xaudio-objects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82463620` | xaudio-objects.md | Native | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_82463B90` | xaudio-objects.md | Native | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
+| `sub_82465608` | xaudio-objects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_824657E0` | audio.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82465970` | xaudio-objects.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82465CF8` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82465E50` | xaudio-objects.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
@@ -1378,8 +2207,10 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82466F40` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82467078` | xaudio-objects.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82467230` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_824674D8` | xaudio-objects.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_824675B8` | xaudio-objects.md | Native | `__savefpr_26`, `__restfpr_26` | 2 | 0 | 22 | 2 |
 | `sub_82467A18` | xaudio-objects.md | Native | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
+| `sub_82469978` | xaudio-objects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82469AF8` | xaudio-objects.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82469EF8` | xaudio-objects.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_8246A1C0` | xaudio-objects.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
@@ -1392,10 +2223,12 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8246BFD8` | audio.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8246C1D0` | xaudio-objects.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8246C320` | audio.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_8246CDB0` | xaudio-objects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8246D348` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8246D500` | xaudio-objects.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8246D750` | xaudio-objects.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8246D860` | xaudio-objects.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_8246DF78` | xaudio-objects.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8246E208` | xaudio-objects.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8246E4C8` | xaudio-objects.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8246E7F8` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
@@ -1404,6 +2237,7 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8246F540` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8246F7C0` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8246FAC0` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8246FE48` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82470668` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82470CA0` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_82471510` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
@@ -1437,8 +2271,12 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8247F558` | xaudio-objects.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8247F7A8` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8247FB28` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82480BA8` | car-sounds.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82481B98` | lifted.md | Lifted | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_82482068` | lifted.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82483130` | functions.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82483770` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_824878D0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82575B08` | system-services.md | Native | `sub_82459C10` | 2 | 0 | 67 | 1 |
 | `sub_82575BF0` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82575C90` | system-services.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
@@ -1446,43 +2284,67 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82575E50` | system-services.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_825761D8` | system-services.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825763D0` | system-services.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_825764A8` | system-services.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825765F0` | system-services.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_825766E0` | system-services.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82576BE0` | system-services.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82576E78` | system-services.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82577140` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82577190` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82577560` | system-services.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825776A8` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82577788` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_82577850` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825786B8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825788C0` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82578AF0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82578F00` | lifted.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_825791B0` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82579318` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82579448` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82579590` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_825796C0` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82579898` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82579968` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82579A88` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8257BC48` | lifted.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
 | `sub_8257BEC0` | lifted.md | Lifted | `__savegprlr_17`, `__restgprlr_17` | 2 | 0 | 41 | 2 |
 | `sub_8257C2B0` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8257CCD8` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8257CF10` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8257D020` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8257D298` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_8257D518` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8257E9B8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8257EF80` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8257EFF8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8257F070` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8257F198` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8257FEB8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8257FF68` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825820E8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82582158` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_825821F0` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82582658` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_825828D0` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82582CC8` | lifted.md | Lifted | `__savegprlr_20`, `__restgprlr_20` | 2 | 0 | 35 | 2 |
+| `sub_82583090` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82583688` | lifted.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_82583910` | lifted.md | Lifted | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
+| `sub_82583D68` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825840D0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82584270` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825845A8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82584758` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82584A70` | lifted.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_82584B90` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_82584C70` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82584CB0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82584CF0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82584ED8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82585D30` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82585D78` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82585EB8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82586048` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_825862D8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82586460` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
@@ -1501,42 +2363,70 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8258B368` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8258B678` | second-set.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8258B980` | scenery-lists.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8258BD58` | files-and-saves.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8258C0B8` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8258C3A8` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8258C768` | files-and-saves.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8258CB08` | command-list.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8258CD28` | command-list.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8258CE00` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8258D568` | video-output.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8258D9F8` | video-output.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8258DAA8` | video-output.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8258E098` | shader-objects.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8258E398` | models.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_8258E718` | device-shaders.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8258E780` | device-shaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8258EC38` | device-shaders.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8258ED00` | device-shaders.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8258EDC8` | device-shaders.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8258F080` | single-commands.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8258F4E8` | single-commands.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8258F6A0` | single-commands.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8258F898` | single-commands.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_8258FB20` | single-commands.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8258FCE0` | functions.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82590040` | functions.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82590108` | functions.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825901B0` | functions.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82590268` | functions.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825902E0` | functions.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_825903D8` | functions.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825904C8` | functions.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82590698` | functions.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82590B38` | device-shaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82590CB0` | device-shaders.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_825911C8` | device-shaders.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82591238` | device-shaders.md | Overridden | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
+| `sub_825915E0` | device-shaders.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82591B68` | input.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82591BB8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82592670` | video-output.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82593E78` | movies.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_82594440` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82594570` | models.md | Native | `sub_825981C8`, `__restgprlr_28` | 2 | 1 | 72 | 1 |
+| `sub_82594718` | scenery-lists.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825947D0` | models.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82594970` | models.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_82594B60` | model-animation.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82594C18` | second-set.md | Overridden | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_82594D20` | models.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_82594E88` | car-draw.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_82594FD0` | car-draw.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_82595110` | car-draw.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825960D0` | scenery-lists.md | Overridden | `__savegprlr_16`, `__restgprlr_16` | 2 | 0 | 43 | 2 |
+| `sub_82596920` | models.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_82596B18` | scenery-lists.md | Native | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_82596D48` | scenery-lists.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_82597518` | car-scene-draw.md | Overridden | `__savefpr_27`, `__restfpr_27` | 2 | 0 | 20 | 2 |
 | `sub_82597610` | car-scene-draw.md | Overridden | `__savefpr_28`, `__restfpr_28` | 2 | 0 | 18 | 2 |
+| `sub_82598648` | car-scene-draw.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825998B8` | model-animation.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_82599AF0` | models.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8259A2B0` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8259A9E0` | models.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_8259AF20` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_8259D160` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_8259D1F0` | files-and-saves.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_8259D478` | sound-cues.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_8259D7B0` | ui-movies.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
@@ -1544,23 +2434,36 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8259E098` | ui-movies.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_8259F848` | ui-movies.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_8259FB30` | ui-movies.md | Native | `__savefpr_26`, `__restfpr_26` | 2 | 0 | 22 | 2 |
+| `sub_8259FE68` | ui-movies.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825A0548` | ui-movies.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_825A0FE0` | model-animation.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_825A10A8` | model-animation.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825A1218` | model-animation.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825A1438` | model-animation.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825A1810` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_825A1BE8` | model-animation.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825A1C88` | model-animation.md | Native | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_825A1D68` | model-animation.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825A1E08` | model-animation.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825A2CD8` | lifted.md | Lifted | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
 | `sub_825A3108` | lifted.md | Lifted | `__savefpr_22`, `__restfpr_22` | 2 | 0 | 30 | 2 |
 | `sub_825A31F0` | lifted.md | Lifted | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
 | `sub_825A3408` | lifted.md | Lifted | `__savefpr_14`, `__restfpr_14` | 2 | 0 | 46 | 2 |
 | `sub_825A3980` | lifted.md | Lifted | `__savefpr_23`, `__restfpr_23` | 2 | 0 | 28 | 2 |
-| `sub_825A3B80` | lifted.md | Lifted | `__savefpr_25`, `__restfpr_25` | 2 | 0 | 24 | 2 |
+| `sub_825A5150` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825A5408` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_825A5838` | lifted.md | Lifted | `__savefpr_22`, `__restfpr_22` | 2 | 0 | 30 | 2 |
+| `sub_825A5CC0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825A5E28` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_825A6BD0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825A94C0` | c-runtime-core.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825A9A90` | heap.md | Overridden | `__restgprlr_28`, `sub_825AD150` | 2 | 1 | 36 | 1 |
+| `sub_825AA4C0` | c-runtime-core.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825AA670` | c-runtime-core.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825AA708` | c-runtime-core.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825AC248` | heap.md | Native | `__restgprlr_28`, `sub_825AD150` | 2 | 1 | 36 | 1 |
 | `sub_825AC970` | c-runtime-core.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_825ACC78` | c-runtime-core.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825ACF70` | c-runtime-core.md | Overridden | `sub_825AD02C`, `sub_825AD4C0` | 2 | 0 | 27 | 0 |
 | `sub_825ADF28` | c-runtime-core.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_825AE1A8` | c-runtime-core.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
@@ -1568,16 +2471,22 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_825AE708` | c-runtime.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_825AE9D0` | c-runtime-core.md | Overridden | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_825AEE28` | c-runtime-core.md | Overridden | `__restgprlr_28`, `sub_825AD4C0` | 2 | 0 | 16 | 1 |
+| `sub_825B0C28` | c-runtime-core.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825B0D10` | c-runtime-core.md | Native | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825B0F48` | files-and-saves.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_825B49C8` | c-runtime-core.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_825B4E78` | c-runtime-core.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_825B6458` | c-runtime.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825B7958` | c-runtime-core.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825B9DD8` | files-and-saves.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825BD8F0` | functions.md | Overridden | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_825BE300` | functions.md | Overridden | `__savegprlr_18`, `__restgprlr_18` | 2 | 0 | 39 | 2 |
 | `sub_825BED08` | predicated-tiling.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_825BF200` | predicated-tiling.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
-| `sub_825BF7A8` | lifted.md | Lifted | `sub_825BF8D8`, `sub_825BFA68` | 2 | 2 | 253 | 0 |
 | `sub_825BFF38` | xact.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825C0178` | xact.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825C0248` | xact.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_825C0408` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825C05C8` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_825C08C0` | xact.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825C0B60` | xact.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
@@ -1589,16 +2498,33 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_825C1788` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825C1990` | xact.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_825C1BC0` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_825C1F30` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C2268` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C2368` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C23C8` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C2428` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C2548` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C25B0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C26E0` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C2D90` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C3398` | xact-waves.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825C38A8` | xact.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825C39F8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825C3B68` | xact.md | Native | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_825C4138` | xact.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_825C4580` | lifted.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_825C4940` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C4A98` | xact.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C4B38` | xact.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C4E30` | xact.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825C4FE8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825C5060` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_825C5128` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825C5238` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_825C5350` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C53F8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825C54A0` | lifted.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
+| `sub_825C56D0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825C5790` | xact.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_825C5960` | xact.md | Native | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_825C5A70` | xact.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
@@ -1610,52 +2536,87 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_825C6B50` | xact.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825C6C10` | xact.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_825C6DF8` | lifted.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_825C7070` | xact.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825C70C0` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_825C7218` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C72B0` | xact.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825C7798` | xact.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_825C7C30` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C7D40` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C7E40` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825C8440` | xact.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825CA560` | xact-waves.md | Lifted | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_825CA6F8` | xact.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
-| `sub_825CA980` | xact.md | Overridden | `sub_825D0540` | 2 | 2 | 19 | 0 |
+| `sub_825CA808` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825CA900` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825CA940` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825CA9C0` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825CAA00` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_825CB348` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825CB708` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_825CB958` | xact.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825CBD10` | xact.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_825CC3F8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825CC470` | xact.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_825CC6D0` | xact.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825CCA88` | xact.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_825CD270` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825CD990` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825CDA40` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_825CDBD8` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825CE2F8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825CE5D8` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825CE7C8` | lifted.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_825CE968` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825CF080` | xact.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825CF348` | lifted.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825CF598` | lifted.md | Lifted | `__savegprlr_21`, `__restgprlr_21` | 2 | 0 | 33 | 2 |
 | `sub_825CFB28` | lifted.md | Lifted | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
+| `sub_825D01D8` | xact-tracks.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825D0800` | xact-tracks.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825D0AA0` | xact-tracks.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825D0D88` | xact-tracks.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825D1918` | xact-tracks.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825D1DF8` | xact-waves.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825D2170` | xact-waves.md | Native | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
+| `sub_825D2300` | xact-waves.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825D2560` | xact-waves.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825D2AE8` | xact-waves.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_825D2B80` | xact-waves.md | Lifted | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
 | `sub_825D2D68` | xact-waves.md | Lifted | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
 | `sub_825D2EF0` | xact-waves.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_825D2F90` | xact-waves.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825D3030` | xact-waves.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_825D3A28` | xact-waves.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825D3B10` | xact-waves.md | Overridden | `__savegprlr_19`, `__restgprlr_19` | 2 | 0 | 37 | 2 |
 | `sub_825D3F28` | xact-waves.md | Lifted | `sub_825D3FD0`, `sub_825D41F0` | 2 | 2 | 177 | 0 |
 | `sub_825D4020` | xact-waves.md | Lifted | `sub_825D3FD0`, `sub_825D41F0` | 2 | 2 | 177 | 0 |
+| `sub_825D4300` | xact-waves.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825D4420` | xact-waves.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825D45D0` | xact-waves.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825D46E8` | xact-waves.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_825D4B78` | xact-waves.md | Lifted | `__savegprlr_25`, `__restgprlr_25` | 2 | 0 | 25 | 2 |
 | `sub_825D50F8` | xact-waves.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
+| `sub_825D52A8` | xact-waves.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825D5520` | xact-tracks.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825D5A48` | xact-tracks.md | Native | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
+| `sub_825D5D18` | xact-tracks.md | Native | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825D7480` | xact-tracks.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
+| `sub_825D83F8` | xact-tracks.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825D85C8` | xact-tracks.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_825D8F88` | matrix-math.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_825D9060` | matrix-math.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
+| `sub_825D91B0` | archive.md | Overridden | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
+| `sub_825DAD98` | lifted.md | Lifted | `__savegprlr_29`, `__restgprlr_29` | 2 | 0 | 17 | 2 |
 | `sub_820900C0` | c-runtime.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82090CC0` | files-and-saves.md | Overridden | `sub_8258BE48` | 1 | 0 | 6 | 1 |
 | `sub_820911A8` | c-runtime.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_82091328` | std-string.md | Overridden | `sub_825A7270` | 1 | 0 | 77 | 0 |
 | `sub_82091C48` | app-states.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82092CD0` | app-states.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82093638` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_820941F0` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_820954F8` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82098630` | frame-passes.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_820998B8` | system-services.md | Lifted | `sub_82099828` | 1 | 0 | 45 | 0 |
 | `sub_82099EE8` | framework.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8209AE48` | scene-target.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8209AF40` | scene-target.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
@@ -1671,7 +2632,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_820A4960` | files-and-saves.md | Overridden | `sub_822952E0` | 1 | 0 | 5 | 0 |
 | `sub_820A4EF8` | files-and-saves.md | Overridden | `sub_82295FC8` | 1 | 0 | 113 | 0 |
 | `sub_820A5110` | files-and-saves.md | Overridden | `sub_82295BF8` | 1 | 0 | 5 | 0 |
-| `sub_820A51E0` | files-and-saves.md | Overridden | `sub_82295BE8` | 1 | 0 | 5 | 0 |
 | `sub_820A54E8` | save-interface.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_820A5660` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_820A8F80` | cameras.md | Merged | `__restgprlr_28` | 1 | 0 | 10 | 1 |
@@ -1810,7 +2770,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82107DD0` | boot-mode.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82108A70` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8210A490` | strings-and-font.md | Overridden | `sub_825A9A80` | 1 | 0 | 7 | 0 |
-| `sub_8210A5E8` | strings-and-font.md | Overridden | `sub_825A7EF8` | 1 | 0 | 20 | 0 |
 | `sub_8210ADD0` | strings-and-font.md | Overridden | `sub_82109A00` | 1 | 0 | 23 | 1 |
 | `sub_8210BAB0` | action-mappers.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8210BB38` | action-mappers.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
@@ -1835,22 +2794,20 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_821189F0` | menu-sounds.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82118CF0` | menu-sounds.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82118E50` | menu-sounds.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_8211AAA8` | ui-movies-game.md | Overridden | `sub_8259D648` | 1 | 0 | 7 | 0 |
 | `sub_8211AD00` | ui-movies-game.md | Overridden | `sub_8259D798` | 1 | 0 | 8 | 0 |
 | `sub_8211AF90` | ui-movies-game.md | Merged | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8211B018` | ui-movies-game.md | Merged | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8211B660` | ui-movies-game.md | Overridden | `sub_8211B310` | 1 | 0 | 30 | 0 |
 | `sub_8211B7B8` | ui-movies-game.md | Native | `sub_8211B310` | 1 | 0 | 30 | 0 |
+| `sub_8211B940` | ui-movies-game.md | Native | `sub_8211B310` | 1 | 0 | 30 | 0 |
 | `sub_8211B9B8` | ui-movies-game.md | Native | `sub_8211B310` | 1 | 0 | 30 | 0 |
 | `sub_8211C1F8` | ui-movies-game.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8211C2C8` | ui-movies-game.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8211C740` | ui-movies-game.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8211C7E8` | ui-movies-game.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8211CA18` | ui-movies-game.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_8211D880` | ui-movies-game.md | Overridden | `sub_8211C930` | 1 | 0 | 49 | 1 |
 | `sub_8211D8D8` | ui-movies-game.md | Overridden | `sub_8211C9C0` | 1 | 0 | 31 | 1 |
 | `sub_8211DE38` | ui-movies-game.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_8211E808` | ui-movies-game.md | Overridden | `sub_8211A9E8` | 1 | 0 | 52 | 0 |
 | `sub_8211F300` | race-overlays.md | Overridden | `sub_8211F3B4` | 1 | 0 | 5 | 0 |
 | `sub_82121760` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82122958` | race-overlays.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
@@ -1860,7 +2817,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8212FE80` | screen-objects.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82131F50` | screen-objects.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82133D00` | post-effects.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_82134410` | lifted.md | Lifted | `sub_82134698` | 1 | 1 | 729 | 0 |
 | `sub_82134618` | lifted.md | Lifted | `sub_82134698` | 1 | 1 | 729 | 0 |
 | `sub_82139750` | ai-drivers.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82139EA8` | ai-drivers.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
@@ -1945,7 +2901,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82193320` | garage-screen.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82193B10` | garage-screen.md | Native | `sub_825A9934` | 1 | 0 | 19 | 0 |
 | `sub_82193BA8` | garage-screen.md | Native | `sub_825A9934` | 1 | 0 | 19 | 0 |
-| `sub_821955E0` | garage-screen.md | Native | `sub_8211A630` | 1 | 0 | 15 | 0 |
 | `sub_82195E30` | garage-screen.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82195F10` | garage-screen.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82196030` | garage-screen.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
@@ -1955,7 +2910,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82198830` | type2-screens.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82198F08` | type2-screens.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82199350` | type2-screens.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_82199688` | type2-screens.md | Native | `sub_8211A630` | 1 | 0 | 15 | 0 |
 | `sub_821997E8` | type2-screens.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82199AA8` | type2-screens.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8219A8E0` | type2-screens.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
@@ -2048,9 +3002,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_822019D0` | tuning-screen.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82203400` | tuning-screen.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82203A30` | tuning-pages.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_82206A50` | tuning-pages.md | Native | `sub_82200DC0` | 1 | 0 | 418 | 1 |
-| `sub_82206F48` | tuning-pages.md | Native | `sub_822012E8` | 1 | 0 | 268 | 0 |
-| `sub_82207320` | tuning-pages.md | Native | `sub_82201620` | 1 | 0 | 320 | 0 |
 | `sub_8220B070` | user-info.md | Overridden | `sub_8211BE98` | 1 | 0 | 27 | 0 |
 | `sub_8220C4C8` | race-screens.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8220D5D0` | race-screens.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
@@ -2128,7 +3079,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8224E1A8` | car-list.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8224E288` | car-list.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8224E7E8` | car-list.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_8224FB20` | car-list.md | Native | `sub_8211A630` | 1 | 0 | 15 | 0 |
 | `sub_82250488` | type6-type7-modes.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82250D70` | power-graph-screen.md | Overridden | `sub_8211BE98` | 1 | 0 | 27 | 0 |
 | `sub_82251D00` | type67-screens.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
@@ -2175,11 +3125,9 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82297CE0` | system-services.md | Overridden | `sub_82297C08` | 1 | 0 | 66 | 0 |
 | `sub_82297D58` | video-output.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_82298198` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_8229E100` | command-buffer.md | Native | `sub_8229DC28` | 1 | 0 | 55 | 1 |
 | `sub_8229E768` | command-buffer.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8229EF48` | command-buffer.md | Overridden | `sub_8229E5D0` | 1 | 0 | 119 | 1 |
 | `sub_8229F228` | command-buffer.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_822A0718` | functions.md | Lifted | `sub_822A0688` | 1 | 1 | 43 | 0 |
 | `sub_822A3450` | device-state.md | Overridden | `sub_822A0F80` | 1 | 0 | 267 | 0 |
 | `sub_822A3A20` | device-state.md | Native | `sub_822B0C38` | 1 | 0 | 92 | 0 |
 | `sub_822A3B90` | device-state.md | Overridden | `sub_822A0F80` | 1 | 0 | 267 | 0 |
@@ -2317,7 +3265,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_825A17A0` | model-animation.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825A2250` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825A22E8` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_825A5020` | lifted.md | Lifted | `sub_825A5610` | 1 | 1 | 131 | 0 |
 | `sub_825A5320` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825A5790` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825A5D48` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
@@ -2329,7 +3276,7 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_825AA218` | c-runtime.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825AE8E0` | c-runtime.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825B31D8` | c-runtime-core.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_825B40B8` | c-runtime-core.md | Overridden | `sub_825AD4C0` | 1 | 0 | 6 | 0 |
+| `sub_825BA558` | c-runtime-core.md | Overridden | `__savegprlr_29` | 1 | 0 | 8 | 1 |
 | `sub_825BFCC8` | lifted.md | Lifted | `sub_825BFCFC` | 1 | 1 | 44 | 0 |
 | `sub_825C0360` | xact.md | Native | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825C0E88` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
@@ -2347,8 +3294,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_825C7018` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825C7A38` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825C7F30` | xact.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_825C7F98` | xact.md | Overridden | `sub_825C7FE8` | 1 | 1 | 53 | 0 |
-| `sub_825C8230` | xact.md | Overridden | `sub_825C7B10` | 1 | 1 | 32 | 0 |
 | `sub_825C8C98` | lifted.md | Lifted | `sub_825C8CD4` | 1 | 1 | 65 | 0 |
 | `sub_825CA4B8` | xact-waves.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825CAE90` | xact.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
@@ -2356,7 +3301,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_825CBC58` | xact.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825CC1D0` | xact.md | Overridden | `sub_825CC148` | 1 | 1 | 56 | 0 |
 | `sub_825CC380` | xact.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
-| `sub_825CC9C8` | xact.md | Overridden | `sub_825CC858` | 1 | 1 | 48 | 0 |
 | `sub_825CCDB0` | xact.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825CCF10` | xact.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_825CD020` | lifted.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |

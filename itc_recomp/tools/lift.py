@@ -1024,17 +1024,9 @@ def emit_batch(batch, names, infos, emitting):
     lines.append("")
     lines.append("}  // namespace lifted")
     lines.append("")
-    lines.append("// The entries for the SDK and the code not native yet (the function table")
-    lines.append("// reaches these): to go once nothing recompiled calls them.")
-    for name in names:
-        lines.append(f"extern \"C\" REX_FUNC({name}) {{")
-        lines.append(f"  if (!ITC_FLAG({flag})) {{")
-        lines.append(f"    __imp__{name}(ctx, base);")
-        lines.append("    return;")
-        lines.append("  }")
-        lines.append(f"  lifted::Enter(ctx, base, lifted::{ename(name)});")
-        lines.append("}")
-        lines.append("")
+    # No REX_FUNC entries for the SDK (the rewiring's stage 4): nothing
+    # reaches the lifted functions through the SDK's function table; native
+    # code calls them directly or through the dispatch table.
     # The functions with LIFTED_ARGS but without some of its registers as
     # locals or parameters would not build: every call adds them to `used`.
     return "\n".join(lines)

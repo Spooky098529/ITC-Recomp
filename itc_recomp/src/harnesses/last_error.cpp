@@ -52,7 +52,7 @@ void LastError(Context& h) {
     }
     const GuestFunction recompiled =
         which == 0 ? __imp__sub_82296E70 : which == 1 ? __imp__sub_82296FD0 : __imp__sub_82296E88;
-    const GuestFunction native = which == 0 ? sub_82296E70 : which == 1 ? sub_82296FD0 : sub_82296E88;
+    const GuestFunction native = which == 0 ? harness::Ours<0x82296E70> : which == 1 ? harness::Ours<0x82296FD0> : harness::Ours<0x82296E88>;
     Both(h, which == 2 ? from_status : set, [&] { guest::StoreU32(base, slot, 0xCDCDCDCD); },
          [&](PPCContext& t) { t.r3.u64 = value; }, recompiled, native, slot, 4,
          fmt::format("entry {} value {:08X}", which, value));
@@ -69,7 +69,7 @@ void LastError(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = 0xCDCDCDCDCDCDCDCDull;
       t.r11.u64 = 0xCDCDCDCDCDCDCDCDull;
-      (v == 0 ? __imp__sub_82296EC0 : i % 2 ? sub_82295F18 : ITC_CONTEXT_FN(NativeGetLastError))(t, base);
+      (v == 0 ? __imp__sub_82296EC0 : i % 2 ? harness::Ours<0x82295F18> : ITC_CONTEXT_FN(NativeGetLastError))(t, base);
       guest::StoreU32(base, pcr + 336, saved_dpc);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));

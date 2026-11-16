@@ -188,8 +188,8 @@ void RecorderCases(Context& h, uint32_t block) {
     uint32_t slots;
   };
   const Function functions[] = {
-      {"FramePasses::RecordConstants (sub_82096360)", __imp__sub_82096360, sub_82096360, 4},
-      {"FramePasses::RecordSamplers (sub_82096030)", __imp__sub_82096030, sub_82096030, 24},
+      {"FramePasses::RecordConstants (sub_82096360)", __imp__sub_82096360, harness::Ours<0x82096360>, 4},
+      {"FramePasses::RecordSamplers (sub_82096030)", __imp__sub_82096030, harness::Ours<0x82096030>, 24},
   };
   for (const Function& f : functions) {
     Results results(f.name);
@@ -233,7 +233,7 @@ void WorkMemCases(Context& h, uint32_t block) {
     GuestFunction recompiled, native;
   };
   const Function functions[] = {
-      {"FramePasses::FlipWorkMem (sub_82096218)", __imp__sub_82096218, sub_82096218},
+      {"FramePasses::FlipWorkMem (sub_82096218)", __imp__sub_82096218, harness::Ours<0x82096218>},
       {"WorkMem::Flip (sub_82589A78)", __imp__sub_82589A78, NativeWorkMemFlip},
   };
   for (const Function& f : functions) {
@@ -268,7 +268,7 @@ void ThunkCases(Context& h, uint32_t block) {
           t.r3.u64 = block + kObject;
           t.r4.u64 = r4;
         },
-        __imp__sub_82096350, sub_82096350, fmt::format("case {}", c));
+        __imp__sub_82096350, harness::Ours<0x82096350>, fmt::format("case {}", c));
   }
   results.Report();
 }

@@ -891,9 +891,9 @@ void ProviderGetterCases(Context& h) {
         t.r5.u64 = which == 0 ? index : (name == 0 ? 0 : lookup);
         Side(v, [&] {
           if (which == 0) {
-            (v == 0 ? __imp__sub_825941D0 : sub_825941D0)(t, h.base);
+            (v == 0 ? __imp__sub_825941D0 : harness::Ours<0x825941D0>)(t, h.base);
           } else {
-            (v == 0 ? __imp__sub_82594230 : sub_82594230)(t, h.base);
+            (v == 0 ? __imp__sub_82594230 : harness::Ours<0x82594230>)(t, h.base);
           }
         });
         out[v].Bytes(Read(h.base, b, block.bytes));

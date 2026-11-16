@@ -265,7 +265,7 @@ void SingleCommands(Context& h) {
   const uint32_t video_output = GameVideoOutput(h);
   PPCContext lock = CallContext(h);
   lock.r3.u64 = video_output;
-  sub_8258D8C8(lock, h.base);  // VideoOutput::LockDevice
+  harness::Ours<0x8258D8C8>(lock, h.base);  // VideoOutput::LockDevice
   const uint32_t locked_device = lock.r3.u32;
   const std::vector<uint8_t> saved_device = Read(h.base, kDeviceGlobal, 4);
   const std::vector<uint8_t> saved_drawer = Read(h.base, kDrawerGlobal, 8);
@@ -282,7 +282,7 @@ void SingleCommands(Context& h) {
   guest::StoreU32(h.base, h.data, locked_device);
   lock.r3.u64 = video_output;
   lock.r4.u64 = h.data;
-  sub_8258D908(lock, h.base);  // VideoOutput::UnlockDevice
+  harness::Ours<0x8258D908>(lock, h.base);  // VideoOutput::UnlockDevice
   memory::Free(device);
 }
 

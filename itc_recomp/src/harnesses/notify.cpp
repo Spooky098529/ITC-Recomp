@@ -74,7 +74,7 @@ void SaveDevicesUpdate(Context& h) {
            t.r3.u64 = devices;
            t.r4.u64 = r4;
          },
-         __imp__sub_820A4610, sub_820A4610, h.data, kScratchBytes,
+         __imp__sub_820A4610, harness::Ours<0x820A4610>, h.data, kScratchBytes,
          fmt::format("{} slots, listener {}", count, listener));
   }
   results.Report();
@@ -119,7 +119,7 @@ void Notify(Context& h) {
       notify_hooks::SetUsersBuilt(!queued);
       PPCContext c = CallContext(h);
       c.r3.u64 = app;
-      (v == 0 ? __imp__sub_82099828 : sub_82099828)(c, base);
+      (v == 0 ? __imp__sub_82099828 : harness::Ours<0x82099828>)(c, base);
       guest::StoreU32(base, app + 240, 0);  // the handles differ by design
       result[v] = Read(base, app, 256);
       for (int i = 0; i < 4; i++) {

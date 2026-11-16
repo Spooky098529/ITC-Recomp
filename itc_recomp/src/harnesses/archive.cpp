@@ -172,12 +172,12 @@ struct QueueLock {
   explicit QueueLock(Context& h_) : h(h_) {
     PPCContext t = CallContext(h);
     t.r3.u64 = kQueueLock;
-    sub_82592670(t, h.base);
+    harness::Ours<0x82592670>(t, h.base);
   }
   ~QueueLock() {
     PPCContext t = CallContext(h);
     t.r3.u64 = kQueueLock;
-    sub_825926E8(t, h.base);
+    harness::Ours<0x825926E8>(t, h.base);
   }
 };
 
@@ -1375,7 +1375,7 @@ void Queues(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = request;
         ITC_FLAG(native_archive) = v == 1;
-        (v == 0 ? __imp__sub_8209DFA8 : sub_8209DFA8)(t, h.base);
+        (v == 0 ? __imp__sub_8209DFA8 : harness::Ours<0x8209DFA8>)(t, h.base);
         ITC_FLAG(native_archive) = true;
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(test.request_done.Count()));

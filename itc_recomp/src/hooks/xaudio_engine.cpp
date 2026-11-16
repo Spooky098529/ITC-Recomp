@@ -452,8 +452,14 @@ ITC_XAUDIO_ENGINE_ADAPTER(824603A8, XAudioInterfaceFree)
 // the original; the threads' entry points stay these addresses).
 // No adapter (removed 2026-10-29: only XAudio::MixerCallback's plain C++ calls it in play) for XAudioEngine::Mix sub_8245BF80.
 ITC_XAUDIO_ENGINE_ADAPTER(8245FBE0, XAudioMixerCallback)
-ITC_XAUDIO_ENGINE_ADAPTER(8245BE08, XAudioMasterThread)
-ITC_XAUDIO_ENGINE_ADAPTER(8245BED0, XAudioWorkerThread)
+// The master and worker threads' starts: the kernel calls them by address
+// (ExCreateThread), so they keep an override in its function table.
+ITC_KERNEL_ENTRY(8245BE08, ITC_FLAG(native_xaudio_engine)) {
+  hooks::XAudioMasterThread(ctx, base);
+}
+ITC_KERNEL_ENTRY(8245BED0, ITC_FLAG(native_xaudio_engine)) {
+  hooks::XAudioWorkerThread(ctx, base);
+}
 // The engine's making (its kernel objects through the imports, as the
 // original).
 // No adapter (removed 2026-10-29: only XAudioEngine::Create's plain C++ calls it in play) for XAudioEngine::Init sub_8245C198.

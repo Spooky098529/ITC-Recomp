@@ -185,7 +185,7 @@ class QueueControl {
   explicit QueueControl(Context& h) : h_(h) {
     PPCContext t = CallContext(h_);
     t.r3.u64 = archive::kQueueLock;
-    sub_82592670(t, h_.base);  // Semaphore::Wait: the live lock
+    harness::Ours<0x82592670>(t, h_.base);  // Semaphore::Wait: the live lock
     scope_.emplace(h_.base);
     scope_->Set().queue_lock.SetCount(h_.base, 1);
     saved_ = guest::LoadU32(h_.base, archive::kQueue + 8);
@@ -195,7 +195,7 @@ class QueueControl {
     scope_.reset();
     PPCContext t = CallContext(h_);
     t.r3.u64 = archive::kQueueLock;
-    sub_825926E8(t, h_.base);  // Semaphore::Signal
+    harness::Ours<0x825926E8>(t, h_.base);  // Semaphore::Signal
   }
   QueueControl(const QueueControl&) = delete;
   QueueControl& operator=(const QueueControl&) = delete;

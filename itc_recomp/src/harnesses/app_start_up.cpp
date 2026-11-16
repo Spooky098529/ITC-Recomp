@@ -152,7 +152,7 @@ void CreateVertexDeclaration(Context& h) {
       guest::StoreU32(h.base, elements + 12 * count + 4, end_word1);
       PPCContext t = CallContext(h);
       t.r3.u64 = elements;
-      (v == 0 ? __imp__sub_822A8980 : sub_822A8980)(t, h.base);
+      (v == 0 ? __imp__sub_822A8980 : harness::Ours<0x822A8980>)(t, h.base);
       const uint32_t declaration = t.r3.u32;
       out[v].Word(declaration != 0);
       if (declaration != 0) {
@@ -258,7 +258,7 @@ asu::MemcpyCall GuestMemcpy(PPCContext& t, uint8_t* base) {
     t.r3.u64 = to;
     t.r4.u64 = from;
     t.r5.u64 = size;
-    sub_825A7410(t, base);
+    harness::Ours<0x825A7410>(t, base);
   };
 }
 void NativeSignInSetUp(PPCContext& t, uint8_t* base) {
@@ -365,7 +365,7 @@ void NetworkSetUp(Context& h) {
           before[0][0x194C + b] = 0;
         }
       }
-      NetworkCase(h, results, state, before, __imp__sub_8214E190, sub_8214E190,
+      NetworkCase(h, results, state, before, __imp__sub_8214E190, harness::Ours<0x8214E190>,
                   [&](PPCContext& t) { t.r3.u64 = app; },
                   [&](PPCContext& t, Outputs& out) {
                     // The XNADDR in the original's 144-byte frame.
@@ -430,7 +430,7 @@ void SceneTargetCases(Context& h) {
         __imp__sub_8209B378(t, h.base);
         ITC_FLAG(native_app_start_up) = flag;
       } else {
-        sub_8209B378(t, h.base);
+        harness::Ours<0x8209B378>(t, h.base);
       }
       const uint32_t target = t.r3.u32;
       out[v].Word(target != 0);
@@ -519,7 +519,7 @@ void BillboardsInitCases(Context& h) {
         __imp__sub_8209BE88(t, h.base);
         ITC_FLAG(native_app_start_up) = flag;
       } else {
-        sub_8209BE88(t, h.base);
+        harness::Ours<0x8209BE88>(t, h.base);
       }
       out[v].Word(t.r3.u32);
       out[v].Word(guest::LoadU32(h.base, kGlobals + 0));
@@ -1600,9 +1600,9 @@ void InterfaceSlotCases(Context& h) {
         t.r3.u64 = which == 0 ? interface : interface + 8;
         StartUpSide(v, [&] {
           if (which == 0) {
-            sub_82094368(t, h.base);
+            harness::Ours<0x82094368>(t, h.base);
           } else {
-            sub_820944A8(t, h.base);
+            harness::Ours<0x820944A8>(t, h.base);
           }
         });
         out[v].Word(t.r3.u32);
@@ -1624,11 +1624,11 @@ void InterfaceSlotCases(Context& h) {
     bool scene;       // +16 and slot +12 (else +20 and slot +8)
   };
   const Slot slots[] = {
-      {"sub_82094338 App::SceneFromInterface8", sub_82094338, 0, true},
-      {"sub_820944D8 App::SceneFromInterface16", sub_820944D8, 8, true},
-      {"sub_82094320 App::FrameDriver", sub_82094320, 0, false},
-      {"sub_82094498 App::FrameDriverFromInterface16", sub_82094498, 12, false},
-      {"sub_82094480 App::FrameDriverFromInterface8", sub_82094480, 4, false},
+      {"sub_82094338 App::SceneFromInterface8", harness::Ours<0x82094338>, 0, true},
+      {"sub_820944D8 App::SceneFromInterface16", harness::Ours<0x820944D8>, 8, true},
+      {"sub_82094320 App::FrameDriver", harness::Ours<0x82094320>, 0, false},
+      {"sub_82094498 App::FrameDriverFromInterface16", harness::Ours<0x82094498>, 12, false},
+      {"sub_82094480 App::FrameDriverFromInterface8", harness::Ours<0x82094480>, 4, false},
   };
   for (const Slot& slot : slots) {
     Results results(slot.name);
@@ -1703,7 +1703,7 @@ void InterfaceSlotCases(Context& h) {
             }
             out[v].Word(direct == !stand_in);
             if (!direct) {
-              (scene ? sub_820944D8 : sub_82094498)(t, h.base);
+              (scene ? harness::Ours<0x820944D8> : harness::Ours<0x82094498>)(t, h.base);
             }
           }
         });

@@ -44,7 +44,7 @@ void Profile(Context& h) {
       t.r7.u64 = size;
       t.r8.u64 = c.buffer;
       t.r9.u64 = c.overlapped;
-      (v == 0 ? __imp__sub_82576E78 : sub_82576E78)(t, base);
+      (v == 0 ? __imp__sub_82576E78 : harness::Ours<0x82576E78>)(t, base);
       guest::StoreU32(base, overlapped + 8, 0);  // the SDK's thread handle
       result[v] = Read(base, buffer, 4192);
       for (uint8_t b : Read(base, size, 4 + 12 + 28)) {

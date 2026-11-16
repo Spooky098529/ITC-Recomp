@@ -86,7 +86,7 @@ void Xma(Context& h) {
              t.r5.u64 = stream;
              t.r6.u64 = sample;
            },
-           __imp__sub_8246A5F8, sub_8246A5F8, h.data, 0,
+           __imp__sub_8246A5F8, harness::Ours<0x8246A5F8>, h.data, 0,
            fmt::format("{} streams, stream {}, sample {}", streams, stream, sample));
     }
   }

@@ -55,7 +55,7 @@ void Strings(Context& h) {
              t.r9.u64 = 0;
              t.r10.u64 = used;
            },
-           wide ? __imp__sub_82296720 : __imp__sub_82296648, wide ? sub_82296720 : sub_82296648,
+           wide ? __imp__sub_82296720 : __imp__sub_82296648, wide ? harness::Ours<0x82296720> : harness::Ours<0x82296648>,
            data + 128, 300,
            fmt::format("code page {} length {} room {} characters {}", code_page, length, room, chars));
     }
@@ -96,7 +96,7 @@ void Strings(Context& h) {
              t.r3.u64 = data;
              t.r4.u64 = format;
            },
-           __imp__sub_82296870, sub_82296870, data, 250,
+           __imp__sub_82296870, harness::Ours<0x82296870>, data, 250,
            i == 0 ? std::string("the game's format") : fmt::format("{} characters", text.size()));
     }
     results.Report();

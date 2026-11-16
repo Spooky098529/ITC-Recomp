@@ -731,6 +731,7 @@ Status:
 | `sub_822B4680` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Calls `sub_82297790`, `sub_825A71D0`. Imports `MmFreePhysicalMemory`. Not seen in play. Not read. |
 | `sub_822B4E78` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Calls nothing. Not seen in play. Not read. |
 | `sub_822B62E8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Imports `KeSetEvent`, `KeWaitForSingleObject`. Not seen in play. Not read. |
+| `sub_822BE330` | | Lifted | Lifted by `lift.py` (2026-11-16, `src/lifted/batch_034.cpp`, `--native_lifted_034`; the rewiring's stage 4): the D3DX buffer's vtable `0x82019DC0`, a slot the lifted buffer code reaches. Not seen in play. Not read. |
 | `sub_822C3958` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Calls nothing. Not seen in play. Not read. |
 | `sub_822F1218` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Calls nothing. Not seen in play. Not read. |
 | `sub_82304258` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Calls nothing. Not seen in play. Not read. |
@@ -738,9 +739,12 @@ Status:
 | `sub_82369050` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Calls nothing. Not seen in play. Not read. |
 | `sub_82369138` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Calls through a function pointer or vtable. Not seen in play. Not read. |
 | `sub_82369188` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Calls through a function pointer or vtable. Not seen in play. Not read. |
+| `sub_82379320` | | Lifted | Lifted by `lift.py` (2026-11-16, `src/lifted/batch_035.cpp`, `--native_lifted_035`; the rewiring's stage 4): called by address with no entry, on paths only the harnesses took. Not seen in play. Not read. |
 | `sub_82379360` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Calls nothing. Not seen in play. Not read. |
 | `sub_82379368` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Calls nothing. Not seen in play. Not read. |
 | `sub_8243DC88` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Calls nothing. Not seen in play. Not read. |
+| `sub_82445798` | | Lifted | Lifted by `lift.py` (2026-11-16, `src/lifted/batch_035.cpp`, `--native_lifted_035`; the rewiring's stage 4): the function `sub_824457CC` (a part called by address) belongs to. Not seen in play. Not read. |
+| `sub_824457CC` | | Lifted | Lifted by `lift.py` (2026-11-16, `src/lifted/batch_035.cpp`, `--native_lifted_035`; the rewiring's stage 4): called by address with no entry, on paths only the harnesses took. Not seen in play. Not read. |
 | `sub_8244A528` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_015.cpp`, `--native_lifted_015`). Calls nothing. Not seen in play. Not read. |
 | `sub_82461F10` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). Calls nothing. Not seen in play. Not read. |
 | `sub_82461F20` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_016.cpp`, `--native_lifted_016`). Calls `sub_825B9A70`. Imports `KeAcquireSpinLockAtRaisedIrql`, `KeRaiseIrqlToDpcLevel`, `KeReleaseSpinLockFromRaisedIrql`, `KfLowerIrql`. Not seen in play. Not read. |
@@ -955,6 +959,7 @@ Status:
 | `sub_824892D0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls nothing. Not seen in play. Not read. |
 | `sub_82489300` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_82489048`. Not seen in play. Not read. |
 | `sub_824893B8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_8248CB58`. Calls through a function pointer or vtable. Not seen in play. Not read. |
+| `sub_8248CA78` | | Lifted | Lifted by `lift.py` (2026-11-16, `src/lifted/batch_035.cpp`, `--native_lifted_035`; the rewiring's stage 4): called by address with no entry, on paths only the harnesses took. Not seen in play. Not read. |
 | `sub_8248CA80` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_824960B8`, `sub_82496148`, `sub_825A71D0`. Not seen in play. Not read. |
 | `sub_8248CB58` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls nothing. Not seen in play. Not read. |
 | `sub_8248CBD0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_8248CB58`. Calls through a function pointer or vtable. Not seen in play. Not read. |
@@ -965,6 +970,7 @@ Status:
 | `sub_82490960` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_82489048`, `sub_8248F550`. Not seen in play. Not read. |
 | `sub_824960B8` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_825A71D0`. Not seen in play. Not read. |
 | `sub_82496148` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_82489048`, `sub_825A71D0`. Not seen in play. Not read. |
+| `sub_824F65C0` | | Lifted | Lifted by `lift.py` (2026-11-16, `src/lifted/batch_035.cpp`, `--native_lifted_035`; the rewiring's stage 4): called by address with no entry, on paths only the harnesses took. Not seen in play. Not read. |
 | `sub_82575B68` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_825AC970`. Not seen in play. Not read. |
 | `sub_82575BF0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_017.cpp`, `--native_lifted_017`). Calls `sub_825774D0`. Not seen in play. Not read. |
 | `sub_825767A0` | | Lifted | Lifted by `lift.py` (2026-11-15, `src/lifted/batch_018.cpp`, `--native_lifted_018`). Calls nothing. Not seen in play. Not read. |

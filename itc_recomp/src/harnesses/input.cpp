@@ -639,7 +639,7 @@ void ManagerCases(Context& h) {
         t.r3.u64 = manager;
         t.r4.u64 = d.arguments;
         ITC_FLAG(native_input) = v == 1;
-        (v == 0 ? __imp__sub_820991E0 : sub_820991E0)(t, h.base);
+        (v == 0 ? __imp__sub_820991E0 : harness::Ours<0x820991E0>)(t, h.base);
         ITC_FLAG(native_input) = true;
         std::vector<uint32_t> blocks = {0};
         for (uint32_t node : HeadNodes(h, manager)) {
@@ -664,7 +664,7 @@ void ManagerCases(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = d.arguments;
         ITC_FLAG(native_input) = v == 1;
-        (v == 0 ? __imp__sub_820993E8 : sub_820993E8)(t, h.base);
+        (v == 0 ? __imp__sub_820993E8 : harness::Ours<0x820993E8>)(t, h.base);
         ITC_FLAG(native_input) = true;
         const uint32_t manager = t.r3.u32;
         std::vector<uint32_t> blocks = {manager};

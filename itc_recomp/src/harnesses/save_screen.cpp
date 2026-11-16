@@ -501,7 +501,7 @@ void PlaySome(uint8_t* base, const World& w, const PPCContext& from, Random& r) 
     t.r6.u64 = 0;
     t.r7.u64 = 0;
     t.r8.u64 = 0;
-    sub_8211DAC8(t, base);
+    harness::Ours<0x8211DAC8>(t, base);
   }
 }
 

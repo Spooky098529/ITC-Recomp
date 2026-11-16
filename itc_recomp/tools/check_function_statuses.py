@@ -84,12 +84,15 @@ def overrides():
             body = m.group(3)
             params = [p.strip() for p in m.group(2).split(",")]
             definitions.append((m.group(1), params, body))
-            made = re.search(r"REX_FUNC\(\s*sub_\s*##\s*(\w+)", body)
+            made = (re.search(r"REX_FUNC\(\s*sub_\s*##\s*(\w+)", body) or
+                    re.search(r"RegisterEntry\(\s*0x\s*##\s*(\w+)", body))
             if made and made.group(1) in params:
                 macros[m.group(1)] = params.index(made.group(1))
             built = re.search(r"__imp__sub_\s*##\s*(\w+)", body)
             if built and built.group(1) in params:
                 imp_macros[m.group(1)] = params.index(built.group(1))
+    # (A dispatch table entry, hooks/native_entry.h's RegisterEntry since the
+    # rewiring's stage 4, counts as the override it replaced.)
     # A macro handing one of its parameters to an override-making macro as
     # the address (ITC_ACCESSOR_WORD(address, ...) -> ITC_NATIVE_ENTRY(address,
     # ...), hooks/native_entry.h, since the rewiring's stage 3) makes them too.

@@ -85,6 +85,15 @@ class Outputs {
   std::vector<Entry> entries_;
 };
 
+// Our version of the function at `address`, on the context: its dispatch
+// table entry (the recompiled original when its flag is off). What calling
+// its override `sub_X` did before the rewiring's stage 4 removed the
+// overrides (`sub_X` is the recompiled original's thunk since).
+template <uint32_t address>
+void Ours(PPCContext& ctx, uint8_t* base) {
+  lifted::CallFromContext(ctx, base, address);
+}
+
 // Whether a group is one the rewiring's stage 3 made differ
 // (rewiring_expected.cpp).
 bool RewiringExpected(const std::string& name);

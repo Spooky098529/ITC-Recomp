@@ -182,7 +182,7 @@ bool HasPattern(uint8_t* base, uint32_t address, uint32_t bytes) {
 
 // errno (through the game's _errno, sub_825A81E0).
 uint32_t ErrnoAddress(Context& h) {
-  return Call(h, sub_825A81E0, {});
+  return Call(h, harness::Ours<0x825A81E0>, {});
 }
 
 // Runs `body(side, out)` for the recompiled side (0), then the native one

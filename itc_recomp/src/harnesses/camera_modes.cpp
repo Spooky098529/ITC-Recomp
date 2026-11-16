@@ -695,7 +695,7 @@ cm::GuestCopy GuestXMemCpy(PPCContext& t, uint8_t* base, uint32_t frame, uint32_
       t.r3.u64 = to;
       t.r4.u64 = from;
       t.r5.u64 = size;
-      sub_82295890(t, base);
+      harness::Ours<0x82295890>(t, base);
     });
   };
 }
@@ -705,7 +705,7 @@ cm::GuestCopy GuestMemcpy(PPCContext& t, uint8_t* base, uint32_t frame, uint32_t
       t.r3.u64 = to;
       t.r4.u64 = from;
       t.r5.u64 = size;
-      sub_825A7410(t, base);
+      harness::Ours<0x825A7410>(t, base);
     });
   };
 }

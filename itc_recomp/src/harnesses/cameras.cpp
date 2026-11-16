@@ -106,7 +106,7 @@ void NativeReleaseSurfaces(PPCContext& ctx, uint8_t* base) {
   const bool has_surfaces =
       cm::ReleaseSurfaces(base, pass, [&](uint32_t surface, uint32_t field) {
         ctx.r3.u64 = surface;
-        sub_822A67B0(ctx, base);
+        harness::Ours<0x822A67B0>(ctx, base);
         released_580 = field == 580;
       });
   if (!has_surfaces) {
@@ -180,7 +180,7 @@ void NativeFromViewport(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   cm::FromViewport(base, pass, ctx.r4.u32, ctx.r5.u32);
   ctx.r3.u64 = pass;
-  sub_820A3978(ctx, base);
+  harness::Ours<0x820A3978>(ctx, base);
 }
 
 // Runs the recompiled version with the flag off, so the functions it calls
@@ -1358,7 +1358,7 @@ void SetUpSurfacesCases(Context& h) {
           if (device && surface != 0) {
             PPCContext r = CallContext(h);
             r.r3.u64 = surface;
-            sub_822A67B0(r, h.base);
+            harness::Ours<0x822A67B0>(r, h.base);
           }
           continue;
         }
@@ -1564,7 +1564,7 @@ void InitPassCases(Context& h) {
           if (device && surface != 0) {
             PPCContext r = CallContext(h);
             r.r3.u64 = surface;
-            sub_822A67B0(r, h.base);
+            harness::Ours<0x822A67B0>(r, h.base);
           }
           continue;
         }

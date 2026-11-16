@@ -84,7 +84,7 @@ void MakePairsCases(Context& h) {
       if (v == 0) {
         RunRecompiled(__imp__sub_8211B0E8, t, h.base);
       } else {
-        sub_8211B0E8(t, h.base);
+        harness::Ours<0x8211B0E8>(t, h.base);
       }
       std::vector<uint32_t> made;
       const uint32_t vector = h.data + 4 * (i % 4);
@@ -121,8 +121,8 @@ struct VectorFunction {
 void VectorCases(Context& h) {
   const VectorFunction functions[] = {
       {"sub_8211C168 (a pair set; sub_8211B458, sub_8211B160)", __imp__sub_8211C168,
-       sub_8211C168, 8, true},
-      {"sub_8211AE68 (a word appended; sub_8211A788)", __imp__sub_8211AE68, sub_8211AE68, 4,
+       harness::Ours<0x8211C168>, 8, true},
+      {"sub_8211AE68 (a word appended; sub_8211A788)", __imp__sub_8211AE68, harness::Ours<0x8211AE68>, 4,
        false},
   };
   for (const VectorFunction& f : functions) {
@@ -219,7 +219,7 @@ void ConstructCases(Context& h, uint32_t movie) {
       if (v == 0) {
         RunRecompiled(__imp__sub_8211E1C0, t, h.base);
       } else {
-        sub_8211E1C0(t, h.base);
+        harness::Ours<0x8211E1C0>(t, h.base);
       }
       std::vector<uint32_t> made;
       const uint32_t textures = Load(h.base, movie + 28);
@@ -302,7 +302,7 @@ void DestroyCases(Context& h, uint32_t movie) {
       if (v == 0) {
         RunRecompiled(__imp__sub_8211E160, t, h.base);
       } else {
-        sub_8211E160(t, h.base);
+        harness::Ours<0x8211E160>(t, h.base);
       }
       out[v].Word(uint32_t(blocks.size()));
       for (uint32_t block : blocks) {
@@ -354,7 +354,7 @@ void FreeTextsCases(Context& h, uint32_t movie) {
       if (v == 0) {
         RunRecompiled(__imp__sub_8211AC90, t, h.base);
       } else {
-        sub_8211AC90(t, h.base);
+        harness::Ours<0x8211AC90>(t, h.base);
       }
       std::vector<uint32_t> masked;
       for (uint32_t k = 0; k < count; k++) {
@@ -417,7 +417,7 @@ void GetTextCases(Context& h, uint32_t movie) {
       if (v == 0) {
         RunRecompiled(__imp__sub_8211B660, t, h.base);
       } else {
-        sub_8211B660(t, h.base);
+        harness::Ours<0x8211B660>(t, h.base);
       }
       Store(h.base, kMissing, missing);
       out[v].Bytes(Read(h.base, h.data, 512));
@@ -548,7 +548,7 @@ void AddNamedAnimationsCases(Context& h, uint32_t movie) {
       if (v == 0) {
         RunRecompiled(__imp__sub_8211E378, t, h.base);
       } else {
-        sub_8211E378(t, h.base);
+        harness::Ours<0x8211E378>(t, h.base);
       }
       const uint32_t after = Load(h.base, movie + 176 + 0x9000);
       out[v].Word(after);
@@ -650,7 +650,7 @@ void EffectCases(Context& h) {
       if (v == 0) {
         RunRecompiled(__imp__sub_8211BEE8, t, h.base);
       } else {
-        sub_8211BEE8(t, h.base);
+        harness::Ours<0x8211BEE8>(t, h.base);
       }
       g_effect_call = nullptr;
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
@@ -801,49 +801,49 @@ class NameStrings {
 
 void SetterCases(Context& h, uint32_t movie) {
   const SetterFunction functions[] = {
-      {"UiMovie::ClearText (sub_8211C470)", __imp__sub_8211C470, sub_8211C470},
-      {"sub_8211C4F0 (a text's scroll delay and speed)", __imp__sub_8211C4F0, sub_8211C4F0},
-      {"UiMovie::ScrollText (sub_8211C570)", __imp__sub_8211C570, sub_8211C570},
-      {"sub_8211C5F8 (a text's scroll counter reset)", __imp__sub_8211C5F8, sub_8211C5F8},
-      {"UiMovie::RevealText (sub_8211D880; sub_8211C930)", __imp__sub_8211D880, sub_8211D880},
+      {"UiMovie::ClearText (sub_8211C470)", __imp__sub_8211C470, harness::Ours<0x8211C470>},
+      {"sub_8211C4F0 (a text's scroll delay and speed)", __imp__sub_8211C4F0, harness::Ours<0x8211C4F0>},
+      {"UiMovie::ScrollText (sub_8211C570)", __imp__sub_8211C570, harness::Ours<0x8211C570>},
+      {"sub_8211C5F8 (a text's scroll counter reset)", __imp__sub_8211C5F8, harness::Ours<0x8211C5F8>},
+      {"UiMovie::RevealText (sub_8211D880; sub_8211C930)", __imp__sub_8211D880, harness::Ours<0x8211D880>},
       {"sub_8211D8D8 (whether a text has another page; sub_8211C9C0)", __imp__sub_8211D8D8,
-       sub_8211D8D8},
+       harness::Ours<0x8211D8D8>},
       // Its node always a TXT (the original loops forever on others), r6 a
       // string id (mostly in the table), r7 to r10 its arguments; also
       // compared: the caller's parameter area (r1 + 48, the varargs).
-      {kSetText, __imp__sub_8211C1F8, sub_8211C1F8},
+      {kSetText, __imp__sub_8211C1F8, harness::Ours<0x8211C1F8>},
       // The same with the node in r4 (one of the 8, a TXT), the string id in
       // r5 and r6 to r10 its arguments; also compared: r1 + 40 to + 79.
-      {kSetNodeText, __imp__sub_8211C7E8, sub_8211C7E8},
+      {kSetNodeText, __imp__sub_8211C7E8, harness::Ours<0x8211C7E8>},
       // The same without the TXT check (r4 any of the 8 nodes, a TXT or
       // not) and r6 a va_list's address (r1 + 40, five slots of small
       // ints); also compared: r1 + 40 to + 79.
-      {kSetNodeTextV, __imp__sub_8211CBD8, sub_8211CBD8},
+      {kSetNodeTextV, __imp__sub_8211CBD8, harness::Ours<0x8211CBD8>},
       // The 8-bit string setter (never seen in play): r4 one of the 8 nodes
       // (TXT: the original loops forever on others), r5 a string of the
       // case's in the scratch area (letters, newlines and bytes of
       // double-byte leads, 0x81 to 0x9F and 0xE0 to 0xFE, with their next).
-      {kSetNodeCharText, __imp__sub_8211C8A0, sub_8211C8A0},
+      {kSetNodeCharText, __imp__sub_8211C8A0, harness::Ours<0x8211C8A0>},
       // The build screen's text helpers (docs/functions/build-screen.md):
       // SetFirstLine (r6 the line) and FirstLine on TXT nodes only (the
       // originals loop forever on others); LineCount (also compared: its
       // 4 KB buffer below r1); ScrollNodeText (r4 one of the 8 nodes, r5
       // scrolling) and ResetNodeTextScroll (r4 a node).
-      {kSetFirstLine, __imp__sub_8211C370, sub_8211C370},
-      {kFirstLine, __imp__sub_8211C3F8, sub_8211C3F8},
-      {kLineCount, __imp__sub_8211C680, sub_8211C680},
-      {kScrollNodeText, __imp__sub_8211CCC0, sub_8211CCC0},
-      {kResetNodeTextScroll, __imp__sub_8211CD28, sub_8211CD28},
+      {kSetFirstLine, __imp__sub_8211C370, harness::Ours<0x8211C370>},
+      {kFirstLine, __imp__sub_8211C3F8, harness::Ours<0x8211C3F8>},
+      {kLineCount, __imp__sub_8211C680, harness::Ours<0x8211C680>},
+      {kScrollNodeText, __imp__sub_8211CCC0, harness::Ours<0x8211CCC0>},
+      {kResetNodeTextScroll, __imp__sub_8211CD28, harness::Ours<0x8211CD28>},
       // UiMovie::ClearNodeText (r4 one of the 8 nodes; ui-movies-game.md).
-      {kClearNodeText, __imp__sub_8211CC50, sub_8211CC50},
+      {kClearNodeText, __imp__sub_8211CC50, harness::Ours<0x8211CC50>},
       // On TXT nodes (SetNodeText's original loops forever on others); r6
       // the value (0, a low word of 0, small, any) or a name record of
       // the case's (kinds 0 to 6 and others, indexes around their bounds),
       // with the table above. 40 cases each.
-      {kSetNumberText, __imp__sub_8211C740, sub_8211C740},
+      {kSetNumberText, __imp__sub_8211C740, harness::Ours<0x8211C740>},
       // The same with the node in r4 (one of the 8) and the value in r5.
-      {kSetNodeNumberText, __imp__sub_8211CA18, sub_8211CA18},
-      {kSetChildNameText, __imp__sub_8211D930, sub_8211D930},
+      {kSetNodeNumberText, __imp__sub_8211CA18, harness::Ours<0x8211CA18>},
+      {kSetChildNameText, __imp__sub_8211D930, harness::Ours<0x8211D930>},
   };
   constexpr uint32_t kMissing = 0x826C5CD8;
   constexpr uint32_t kOdd[] = {0x7FC00000, 0xFF800001, 0x7F800000, 0x80000000, 0x00000001};
@@ -1443,7 +1443,7 @@ void DeleteAllCases(Context& h) {
   };
   const Function functions[] = {
       {"UiMovies::DeleteAll (sub_8211E2C8)", __imp__sub_8211E2C8, NativeDeleteAll},
-      {"UiMovies::DeleteAll's jump (sub_8211E370)", __imp__sub_8211E370, sub_8211E370},
+      {"UiMovies::DeleteAll's jump (sub_8211E370)", __imp__sub_8211E370, harness::Ours<0x8211E370>},
   };
   for (const Function& f : functions) {
     Results results(f.name);

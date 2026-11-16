@@ -934,9 +934,9 @@ void FontDrawing(Context& h) {
   AddGlyphCases(h, l);
   BuildVerticesCases(h, l, area);
   // The adapters (the flag on) against the originals (the flag off).
-  DrawCases(h, l, area, "sub_82109EF0 Font::DrawPass", sub_82109EF0, __imp__sub_82109EF0, 600);
-  DrawCases(h, l, area, "sub_8210A400 Font::Draw", sub_8210A400, __imp__sub_8210A400, 300);
-  DrawCases(h, l, area, "sub_8210A758 Text::Draw", sub_8210A758, __imp__sub_8210A758, 300);
+  DrawCases(h, l, area, "sub_82109EF0 Font::DrawPass", harness::Ours<0x82109EF0>, __imp__sub_82109EF0, 600);
+  DrawCases(h, l, area, "sub_8210A400 Font::Draw", harness::Ours<0x8210A400>, __imp__sub_8210A400, 300);
+  DrawCases(h, l, area, "sub_8210A758 Text::Draw", harness::Ours<0x8210A758>, __imp__sub_8210A758, 300);
 }
 
 // swprintf: formats made of literal characters (some 0xFFxx, a few 0xFFFF:

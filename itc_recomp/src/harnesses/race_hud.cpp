@@ -129,7 +129,7 @@ void RunMovieCases(Context& h, uint32_t block) {
       if (v == 0) {
         RunRecompiled(__imp__sub_822141E8, t, h.base);
       } else {
-        sub_822141E8(t, h.base);
+        harness::Ours<0x822141E8>(t, h.base);
       }
       out[v].Bytes(Read(h.base, block, kBytes));
       Record(out[v], calls);
