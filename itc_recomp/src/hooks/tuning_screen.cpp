@@ -734,12 +734,13 @@ bool TuningUpdateStandCalleesNative() {
          ITC_FLAG(native_vehicle_accessors) && ITC_FLAG(native_scene_models);
 }
 
-// On the SDK's context (the rewiring, stage 3): r24, handed to
-// GarageStage::Draw's Floor::Draw, is the caller's, read from the context;
-// the view form takes it as `caller_r24`.
+// `caller_r24`, handed to GarageStage::Draw's Floor::Draw (a diagnostic
+// word of its draws' recorder's context), isn't carried (the rewiring,
+// stage 3): 0.
 void TuningUpdateStand(PPCContext& ctx, uint8_t* base) {
   lifted::RegsScope scope(ctx);
-  TuningUpdateStand(scope.regs, base, ctx.r24.u32);
+  // (the caller's r24: diagnostic only, not carried)
+  TuningUpdateStand(scope.regs, base, 0);
 }
 void TuningUpdateStand(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   const uint64_t lr = ctx.lr;
@@ -819,12 +820,13 @@ bool TuningUpdateCalleesNative() {
          ITC_FLAG(native_car_specs);
 }
 
-// On the SDK's context (the rewiring, stage 3): r24, handed to
-// GarageStage::Draw's Floor::Draw, is the caller's, read from the context;
-// the view form takes it as `caller_r24`.
+// `caller_r24`, handed to GarageStage::Draw's Floor::Draw (a diagnostic
+// word of its draws' recorder's context), isn't carried (the rewiring,
+// stage 3): 0.
 void TuningUpdate(PPCContext& ctx, uint8_t* base) {
   lifted::RegsScope scope(ctx);
-  TuningUpdate(scope.regs, base, ctx.r24.u32);
+  // (the caller's r24: diagnostic only, not carried)
+  TuningUpdate(scope.regs, base, 0);
 }
 void TuningUpdate(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   const uint64_t lr = ctx.lr;
@@ -977,15 +979,13 @@ void TuningWithRefreshStand(
 
 // Update: the original unless its callees' adapters would run their plain
 // C++ (the refresh's, UpdateStand's and SetCarStats' checks).
-// On the SDK's context (not in the dispatch table): the native body reads
-// its caller's r24 (the rewiring, stage 3; left for later).
-extern "C" REX_FUNC(sub_821E6C50) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(821E6C50) {
   if (!ITC_FLAG(native_tuning_screen) || !hooks::TuningUpdateCalleesNative()) {
-    __imp__sub_821E6C50(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_821E6C50);
     return;
   }
-  hooks::TuningUpdate(ctx, base);
+  // (the caller's r24: diagnostic only, not carried)
+  hooks::TuningUpdate(ctx, base, 0);
 }
 
 // The forms on the SDK's context the header declares (a harness's), on a

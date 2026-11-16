@@ -201,12 +201,12 @@ ITC_REGS_STEP(FrontEndCarDrawClearLightKit) {
   ctx.fpscr.disableFlushMode();
 }
 
-// On the SDK's context (the rewiring, stage 3): r24, handed to
-// Model::DrawShape, is the caller's, read from the context; the view form
-// takes it as `caller_r24`.
+// `caller_r24`, handed to Model::DrawShape's recorder's context (a
+// diagnostic word), isn't carried (the rewiring, stage 3): 0.
 void FrontEndCarDrawFloorDraw(PPCContext& ctx, uint8_t* base) {
   lifted::RegsScope scope(ctx);
-  FrontEndCarDrawFloorDraw(scope.regs, base, ctx.r24.u32);
+  // (the caller's r24: diagnostic only, not carried)
+  FrontEndCarDrawFloorDraw(scope.regs, base, 0);
 }
 void FrontEndCarDrawFloorDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   // Model::DrawShape's plain C++ only with its flag and without the command
@@ -261,12 +261,12 @@ fe::DrawCallees FrontEndCarDrawDrawCallees(uint32_t caller_r24) {
   return callees;
 }
 
-// On the SDK's context (the rewiring, stage 3): r24, handed to Floor::Draw,
-// is the caller's, read from the context; the view form takes it as
-// `caller_r24`.
+// `caller_r24`, handed to Floor::Draw (a diagnostic word of its draws'
+// recorder's context), isn't carried (the rewiring, stage 3): 0.
 void FrontEndCarDrawDraw(PPCContext& ctx, uint8_t* base) {
   lifted::RegsScope scope(ctx);
-  FrontEndCarDrawDraw(scope.regs, base, ctx.r24.u32);
+  // (the caller's r24: diagnostic only, not carried)
+  FrontEndCarDrawDraw(scope.regs, base, 0);
 }
 void FrontEndCarDrawDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   ITC_FRONT_END_ORIGINAL(8217FE60)
@@ -295,15 +295,10 @@ ITC_FRONT_END_CAR_DRAW(82179BE0, FrontEndCarDrawIsBusy)
 ITC_FRONT_END_CAR_DRAW(82178B40, FrontEndCarDrawSetDrawWord)
 ITC_FRONT_END_CAR_DRAW(82180108, FrontEndCarDrawCommand)
 
-// GarageStage::Draw, on the SDK's context (not in the dispatch table): the
-// native body reads its caller's r24 (the rewiring, stage 3; left for later).
-extern "C" REX_FUNC(sub_8217FE60) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_front_end_car_draw)) {
-    __imp__sub_8217FE60(ctx, base);
-    return;
-  }
-  hooks::FrontEndCarDrawDraw(ctx, base);
+// GarageStage::Draw.
+ITC_NATIVE_ENTRY(8217FE60, ITC_FLAG(native_front_end_car_draw)) {
+  // (the caller's r24: diagnostic only, not carried)
+  hooks::FrontEndCarDrawDraw(ctx, base, 0);
 }
 
 // SceneModel::ApplyLightKit sub_820D9D10 has no adapter (removed, B7 loop,

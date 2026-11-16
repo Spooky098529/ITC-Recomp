@@ -304,9 +304,8 @@ void TuningWithRefreshStand(
 // FrontEndCarDrawDrawNative, --native_vehicle_accessors and
 // --native_scene_models.
 bool TuningUpdateStandCalleesNative();
-// On the SDK's context, r24 the caller's (handed to GarageStage::Draw's
-// Floor::Draw; the rewiring, stage 3); the view form takes it as
-// `caller_r24`.
+// `caller_r24` (handed to GarageStage::Draw's Floor::Draw, a diagnostic
+// word) isn't carried (the rewiring, stage 3): callers pass 0.
 void TuningUpdateStand(PPCContext& ctx, uint8_t* base);
 void TuningUpdateStand(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24);
 
@@ -317,9 +316,8 @@ void TuningUpdateStand(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24);
 // --native_car_specs (the refresh's and its other callees' adapters'
 // checks).
 bool TuningUpdateCalleesNative();
-// On the SDK's context, r24 the caller's (handed to GarageStage::Draw's
-// Floor::Draw; the rewiring, stage 3); the view form takes it as
-// `caller_r24`.
+// `caller_r24` (handed to GarageStage::Draw's Floor::Draw, a diagnostic
+// word) isn't carried (the rewiring, stage 3): callers pass 0.
 void TuningUpdate(PPCContext& ctx, uint8_t* base);
 void TuningUpdate(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24);
 

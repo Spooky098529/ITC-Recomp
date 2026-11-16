@@ -79,16 +79,16 @@ void FrontEndCarDrawSetLights(lifted::Regs& ctx, uint8_t* base);
 void FrontEndCarDrawPoseCar(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawPoseCar(lifted::Regs& ctx, uint8_t* base);
 // GarageStage::Draw sub_8217FE60 (r3 the holder, r5 turn the car); r3 as
-// CarScene::Draw leaves it. On the SDK's context, r24 the caller's (the
-// rewiring, stage 3); the view form takes it as `caller_r24`.
+// CarScene::Draw leaves it. `caller_r24` (handed to Floor::Draw, a
+// diagnostic word) isn't carried (the rewiring, stage 3): callers pass 0.
 void FrontEndCarDrawDraw(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24);
 // Whether GarageStage::Draw's adapter runs its plain C++ (its flag and
 // FrontEndCarDrawCalleesNative()), and the callees' choices it makes
 // (PoseCar's and Floor::Draw's adapters' checks, r24), for native callers.
 bool FrontEndCarDrawDrawNative();
-// `caller_r24` is the caller's r24 (not carried by the view: the rewiring,
-// stage 3).
+// `caller_r24`: the caller's r24 for the recorder's context's diagnostic
+// word, not carried (the rewiring, stage 3): callers pass 0.
 front_end_car_draw::DrawCallees FrontEndCarDrawDrawCallees(uint32_t caller_r24);
 
 }  // namespace hooks
