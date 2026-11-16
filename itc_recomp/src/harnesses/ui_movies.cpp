@@ -1268,7 +1268,11 @@ void QuadDrawCases(Context& h) {
           (picture ? __imp__sub_8259ED40 : __imp__sub_8259F348)(t, h.base);
           ITC_FLAG(native_ui_movies) = true;
         } else {
-          (picture ? ui_movies_hooks::RecordPicture : ui_movies_hooks::RecordPrimitive)(t, h.base);
+          if (picture) {
+            ui_movies_hooks::RecordPicture(t, h.base);
+          } else {
+            ui_movies_hooks::RecordPrimitive(t, h.base);
+          }
         }
         result[v] = Read(h.base, h.data, kScratchBytes);
         AppendWord(result[v], guest::LoadU32(h.base, command_list::kOpenChunks));
@@ -1680,7 +1684,11 @@ void TreeDrawCases(Context& h) {
         (through_draw ? __imp__sub_8259FA00 : __imp__sub_8259F848)(t, h.base);
         ITC_FLAG(native_ui_movies) = true;
       } else {
-        (through_draw ? ui_movies_hooks::Draw : ui_movies_hooks::RecordDrawNode)(t, h.base);
+        if (through_draw) {
+          ui_movies_hooks::Draw(t, h.base);
+        } else {
+          ui_movies_hooks::RecordDrawNode(t, h.base);
+        }
       }
       result[v] = Read(h.base, h.data, kScratchBytes);
       const std::vector<uint8_t> after = Read(h.base, block, kBlockBytes);
@@ -1712,8 +1720,10 @@ void TreeDrawCases(Context& h) {
 
 void NativeTrackProperty(PPCContext& ctx, uint8_t* base) {
   const uint64_t id = ctx.r3.u64;
-  hooks::GuestAtexit guest{ctx, base};
-  ctx.r3.u64 = ui_movies::TrackProperty(base, id, ctx.r1.u32 - 128, guest.Call());
+  harness::OnView(ctx, [&](lifted::Regs& ctx) {
+    hooks::GuestAtexit guest{ctx, base};
+    ctx.r3.u64 = ui_movies::TrackProperty(base, id, ctx.r1.u32 - 128, guest.Call());
+  });
 }
 
 void TrackPropertyCases(Context& h) {
@@ -1892,7 +1902,11 @@ void ApplyTrackCases(Context& h) {
       x.r5.u64 = no_k0 ? 0 : keys;
       x.r6.u64 = no_k1 ? 0 : keys + 32;
       x.f1.f64 = t;
-      (v == 0 ? __imp__sub_825A0548 : ui_movies_hooks::ApplyTrackNative)(x, h.base);
+      if (v == 0) {
+        __imp__sub_825A0548(x, h.base);
+      } else {
+        ui_movies_hooks::ApplyTrackNative(x, h.base);
+      }
       // The target, from the descriptor as it is now.
       const uint32_t descriptor = table + 12 * id;
       const uint32_t type = guest::LoadU32(h.base, descriptor + 4);

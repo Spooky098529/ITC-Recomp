@@ -135,7 +135,7 @@ bool Record(PPCContext& ctx, uint32_t address) {
   return false;
 }
 
-t8m::ScreenCalls RecordingCalls(PPCContext& t, uint8_t* base) {
+t8m::ScreenCalls RecordingCalls(lifted::Regs& t, uint8_t* base) {
   t8m::ScreenCalls calls = hooks::Type67ScreensCalls(t, base);
   calls.open = [](uint32_t id, uint32_t asset, uint32_t sp, uint32_t lr) -> uint64_t {
     g_records.insert(g_records.end(), {kOpen, id, asset, sp, lr});
@@ -327,8 +327,10 @@ void NoSetup(PPCContext&, Random&, uint32_t) {}
 
 Native WithRecording(uint64_t (*step)(uint8_t*, uint64_t, uint32_t, const t8m::ScreenCalls&)) {
   return [step](PPCContext& t, uint8_t* b) {
-    const t8m::ScreenCalls c = RecordingCalls(t, b);
-    t.r3.u64 = step(b, t.r3.u64, t.r1.u32, c);
+    harness::OnView(t, [&](lifted::Regs& t) {
+      const t8m::ScreenCalls c = RecordingCalls(t, b);
+      t.r3.u64 = step(b, t.r3.u64, t.r1.u32, c);
+    });
   };
 }
 
@@ -596,8 +598,10 @@ void Type8Screen0s(Context& h, uint32_t world) {
       __imp__sub_8223B630, ITC_CONTEXT_FN(hooks::Type8Screen0OnEnter), item_outputs);
   Group(h, world, "Type8Screen0::OpenMovie", 0x8223B530, 3, {0, 0}, NoSetup, __imp__sub_8223B530,
         [](PPCContext& t, uint8_t* b) {
-          const t8m::ScreenCalls c = RecordingCalls(t, b);
-          t.r3.u64 = t8m::Screen0OpenMovie(t.r1.u32, uint32_t(t.lr), c);
+          harness::OnView(t, [&](lifted::Regs& t) {
+            const t8m::ScreenCalls c = RecordingCalls(t, b);
+            t.r3.u64 = t8m::Screen0OpenMovie(t.r1.u32, uint32_t(t.lr), c);
+          });
         });
   Group(
       h, world, "Type8Screen0::WaitForMovie", 0x8223B6D8, 6, {96, 16},
@@ -647,8 +651,10 @@ void Type8Screen0s(Context& h, uint32_t world) {
       },
       __imp__sub_8223BA48,
       [](PPCContext& t, uint8_t* b) {
-        const t8m::ScreenCalls c = RecordingCalls(t, b);
-        t.r3.u64 = t8m::Screen0Leave(b, t.r4.u32, t.r1.u32, c);
+        harness::OnView(t, [&](lifted::Regs& t) {
+          const t8m::ScreenCalls c = RecordingCalls(t, b);
+          t.r3.u64 = t8m::Screen0Leave(b, t.r4.u32, t.r1.u32, c);
+        });
       });
   Group(h, world, "Type8Screen0::OnLeft", 0x8223B588, 6, {0, 0, false}, items,
         __imp__sub_8223B588, ITC_CONTEXT_FN(hooks::Type8Screen0OnLeft), item_outputs);

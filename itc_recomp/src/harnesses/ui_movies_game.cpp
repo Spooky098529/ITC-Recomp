@@ -1733,7 +1733,9 @@ void FinishCases(Context& h, const Block& block) {
                                           : std::bit_cast<uint32_t>(float(r.Below(40)) / 4.0f));
         }
         g_apply_answers = Random(r.Next());
-        r4 = r.Below(5) == 0 ? 0xFFFFFFFFu : r.Below(f.native == ui_movies_game_hooks::Finish ? 3 : 6);
+        r4 = r.Below(5) == 0
+                 ? 0xFFFFFFFFu
+                 : r.Below(f.native == ITC_CONTEXT_FN(ui_movies_game_hooks::Finish) ? 3 : 6);
         r5 = r.Below(4);
         PPCContext t = CallContext(h);
         const uint32_t copy = t.r1.u32 - 176 + 80;

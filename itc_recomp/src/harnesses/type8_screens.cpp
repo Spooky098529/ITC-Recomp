@@ -138,7 +138,7 @@ bool Record(PPCContext& ctx, uint32_t address) {
 }
 
 // The adapters' calls with UiMovies::Open and Delete recorded.
-t8::Calls RecordingCalls(PPCContext& t, uint8_t* base) {
+t8::Calls RecordingCalls(lifted::Regs& t, uint8_t* base) {
   t8::Calls calls = hooks::Type67ScreensCalls(t, base);
   calls.open = [](uint32_t id, uint32_t asset, uint32_t sp, uint32_t lr) -> uint64_t {
     g_records.insert(g_records.end(), {kOpen, id, asset, sp, lr});
@@ -306,8 +306,10 @@ void NoSetup(PPCContext&, Random&, uint32_t) {}
 // The step with the recording calls (UiMovies::Open and Delete).
 Native Recording(uint64_t (*step)(uint32_t, uint32_t, const t8::Calls&)) {
   return [step](PPCContext& t, uint8_t* base) {
-    const t8::Calls calls = RecordingCalls(t, base);
-    t.r3.u64 = step(t.r1.u32, uint32_t(t.lr), calls);
+    harness::OnView(t, [&](lifted::Regs& t) {
+      const t8::Calls calls = RecordingCalls(t, base);
+      t.r3.u64 = step(t.r1.u32, uint32_t(t.lr), calls);
+    });
   };
 }
 
@@ -358,14 +360,18 @@ void Leaves(Context& h, uint32_t world) {
   Group(
       h, world, "Type8ListScreen::OpenMovie", 0x8223F3E0, 4, {0, 0}, list_id,
       __imp__sub_8223F3E0, [](PPCContext& t, uint8_t* b) {
-        const t8::Calls c = RecordingCalls(t, b);
-        t.r3.u64 = t8::ListScreen8OpenMovie(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+        harness::OnView(t, [&](lifted::Regs& t) {
+          const t8::Calls c = RecordingCalls(t, b);
+          t.r3.u64 = t8::ListScreen8OpenMovie(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+        });
       });
   Group(
       h, world, "Type8ListScreen::Release", 0x8223F588, 4, {0, 0}, list_id, __imp__sub_8223F588,
       [](PPCContext& t, uint8_t* b) {
-        const t8::Calls c = RecordingCalls(t, b);
-        t.r3.u64 = t8::ListScreen8Release(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+        harness::OnView(t, [&](lifted::Regs& t) {
+          const t8::Calls c = RecordingCalls(t, b);
+          t.r3.u64 = t8::ListScreen8Release(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+        });
       });
   Group(
       h, world, "Type8ListScreen::ItemInfo", 0x8223F598, 12, {0, 0},
@@ -380,8 +386,10 @@ void Leaves(Context& h, uint32_t world) {
   Group(
       h, world, "Type8ColorListScreen::OpenMovie", 0x8223E310, 4, {0, 0}, list_id,
       __imp__sub_8223E310, [](PPCContext& t, uint8_t* b) {
-        const t8::Calls c = RecordingCalls(t, b);
-        t.r3.u64 = t8::ColorList8OpenMovie(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+        harness::OnView(t, [&](lifted::Regs& t) {
+          const t8::Calls c = RecordingCalls(t, b);
+          t.r3.u64 = t8::ColorList8OpenMovie(b, t.r3.u64, t.r1.u32, uint32_t(t.lr), c);
+        });
       });
   Group(
       h, world, "Type8ColorListScreen::ItemInfo", 0x8223E4D0, 12, {0, 0, false},
@@ -476,12 +484,16 @@ void NativeShowPlayerNodes(PPCContext& t, uint8_t* b) {
   t.r3.u64 = t8::ShowPlayerNodes(b, t.r3.u64, t.r4.u64, t.r5.u64, t.r1.u32);
 }
 void NativeAskQuit(PPCContext& t, uint8_t* b) {
-  const t8::Calls c = hooks::Type67ScreensCalls(t, b);
-  t.r3.u64 = t8::AskQuit(b, t.r3.u64, t.r4.u64, t.r5.u32, t.r1.u32, c);
+  harness::OnView(t, [&](lifted::Regs& t) {
+    const t8::Calls c = hooks::Type67ScreensCalls(t, b);
+    t.r3.u64 = t8::AskQuit(b, t.r3.u64, t.r4.u64, t.r5.u32, t.r1.u32, c);
+  });
 }
 void NativeDrawList(PPCContext& t, uint8_t* b) {
-  const t8::Calls c = hooks::Type67ScreensCalls(t, b);
-  t.r3.u64 = t8::DrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+  harness::OnView(t, [&](lifted::Regs& t) {
+    const t8::Calls c = hooks::Type67ScreensCalls(t, b);
+    t.r3.u64 = t8::DrawList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+  });
 }
 
 void Handlers(Context& h, uint32_t world) {

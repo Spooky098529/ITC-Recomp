@@ -497,12 +497,16 @@ void Deleting(Context& h) {
 
 // The functions without adapters: their plain C++ with the adapters' calls.
 void NativeDimList(PPCContext& t, uint8_t* b) {
-  const t8::Calls c = hooks::Type67ScreensCalls(t, b);
-  t.r3.u64 = t8::ListBaseDimList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+  harness::OnView(t, [&](lifted::Regs& t) {
+    const t8::Calls c = hooks::Type67ScreensCalls(t, b);
+    t.r3.u64 = t8::ListBaseDimList(b, t.r3.u64, t.r4.u64, t.r1.u32, c);
+  });
 }
 void NativeClear(PPCContext& t, uint8_t* b) {
-  const t8::Calls c = hooks::Type67ScreensCalls(t, b);
-  t.r3.u64 = t8::PairedNodeTableClear(b, t.r3.u64, t.r1.u32, c);
+  harness::OnView(t, [&](lifted::Regs& t) {
+    const t8::Calls c = hooks::Type67ScreensCalls(t, b);
+    t.r3.u64 = t8::PairedNodeTableClear(b, t.r3.u64, t.r1.u32, c);
+  });
 }
 
 }  // namespace

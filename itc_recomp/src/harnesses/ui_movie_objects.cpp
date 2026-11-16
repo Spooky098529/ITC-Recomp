@@ -1215,8 +1215,10 @@ void OpenCases(Context& h) {
       if (v == 0) {
         RunRecompiled(__imp__sub_8211E808, t, h.base);
       } else {
-        t.r3.u64 = ui_movies::OpenMovie(h.base, id, asset, frame, loads.Native(),
-                                        ui_movies_game_hooks::OpenCalls(t, h.base, t.r1.u32));
+        harness::OnView(t, [&](lifted::Regs& t) {
+          t.r3.u64 = ui_movies::OpenMovie(h.base, id, asset, frame, loads.Native(),
+                                          ui_movies_game_hooks::OpenCalls(t, h.base, t.r1.u32));
+        });
       }
       out[v].Word(t.r3.u32);
       const uint32_t movie = kind == 1 ? 0 : Load(h.base, frame + 80);
@@ -1342,9 +1344,11 @@ void UnloadCases(Context& h, uint32_t movie) {
       if (v == 0) {
         RunRecompiled(__imp__sub_8211B540, t, h.base);
       } else {
-        t.r3.u64 = ui_movies::UnloadMovie(
-            h.base, movie, frame,
-            ui_movies_game_hooks::DeleteCalls(t, h.base, t.r1.u32 + 128).unload);
+        harness::OnView(t, [&](lifted::Regs& t) {
+          t.r3.u64 = ui_movies::UnloadMovie(
+              h.base, movie, frame,
+              ui_movies_game_hooks::DeleteCalls(t, h.base, t.r1.u32 + 128).unload);
+        });
       }
       out[v].Bytes(Read(h.base, frame + 80, 128));
       uint32_t r3 = t.r3.u32 == movie ? 0 : 0xFFFFFFFFu;
@@ -1388,8 +1392,10 @@ void DeleteCases(Context& h) {
       if (v == 0) {
         RunRecompiled(__imp__sub_8211E258, t, h.base);
       } else {
-        t.r3.u64 = ui_movies::DeleteMovie(h.base, id, frame,
-                                          ui_movies_game_hooks::DeleteCalls(t, h.base, t.r1.u32));
+        harness::OnView(t, [&](lifted::Regs& t) {
+          t.r3.u64 = ui_movies::DeleteMovie(h.base, id, frame,
+                                            ui_movies_game_hooks::DeleteCalls(t, h.base, t.r1.u32));
+        });
       }
       const uint32_t now = Load(h.base, ui_movies::kMovieTable);
       const uint32_t r3 = t.r3.u32;
@@ -1419,8 +1425,10 @@ void DeleteCases(Context& h) {
 // frame.
 void NativeDeleteAll(PPCContext& t, uint8_t* base) {
   const uint32_t sp = t.r1.u32 - 112;
-  t.r3.u64 = ui_movies::DeleteAll(base, sp, ui_movies_game_hooks::DeleteCalls(t, base, sp),
-                                  t.r3.u32);
+  harness::OnView(t, [&](lifted::Regs& t) {
+    t.r3.u64 = ui_movies::DeleteAll(base, sp, ui_movies_game_hooks::DeleteCalls(t, base, sp),
+                                    t.r3.u32);
+  });
 }
 
 // UiMovies::DeleteAll (and its jump sub_8211E370) over a table of the
@@ -1510,8 +1518,10 @@ void DeleteAllCases(Context& h) {
 // UiMovie::OnLoaded's register steps (the adapter's, without its flags).
 void NativeOnLoaded(PPCContext& t, uint8_t* base) {
   const uint32_t sp = t.r1.u32;
-  t.r3.u64 = ui_movies::OnLoaded(base, t.r4.u32, t.r6.u32, sp - 192,
-                                 ui_movies_game_hooks::OnLoadedCalls(t, base, sp));
+  harness::OnView(t, [&](lifted::Regs& t) {
+    t.r3.u64 = ui_movies::OnLoaded(base, t.r4.u32, t.r6.u32, sp - 192,
+                                   ui_movies_game_hooks::OnLoadedCalls(t, base, sp));
+  });
 }
 
 // A word of a block the run made, as an offset into it when it points
