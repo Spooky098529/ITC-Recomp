@@ -3526,7 +3526,8 @@ E5. **The native code made native** (the user's call, 2026-11-09):
     (`BuildScreen::BackToBuilds` `sub_821A1258`, the garage screen's
     `Transition11` `sub_82195F10` and `Transition15` `sub_82196030`) were
     lifted by the sweep and turned out to store 0, not a leftover ("E4:
-    the plan", the measure).
+    the plan", the measure). The plan as of 2026-11-16 (after E4) is its own
+    document, `docs/e5-native.md` (a draft for the user's review).
 
 ## E1: the plan (2026-11-16)
 

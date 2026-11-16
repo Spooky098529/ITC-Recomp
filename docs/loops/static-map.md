@@ -2,19 +2,19 @@
 
 Made by `itc_recomp/tools/static_map.py` on every run; never edit it by hand (run the tool again). What it reads, how edges are found and its gaps: the tool's docstring and "The static map" in `docs/coverage.md`.
 
-Made 2026-11-16 at commit `f723d5ca` (`rewiring-15-11-26`).
+Made 2026-11-16 at commit `ec9c86b4` (`rexglue-removal-project`).
 
 ## Totals
 
 - Recompiled `sub_` functions: 16552; 144 jump-table cases folded into their parents, leaving 16408.
-- Reachable: 13779 (11868 from `main`, 1911 more from 190 extra roots: functions seen in play that `main` doesn't reach, 2 of them not under another).
-- Ours: 10189. Excluded (replaced libraries): 3581.
+- Reachable: 13777 (11866 from `main`, 1911 more from 190 extra roots: functions seen in play that `main` doesn't reach, 2 of them not under another).
+- Ours: 10187. Excluded (replaced libraries): 3581.
 - **Unported: 9** (6 under `main`): seen in play 1, never seen 8; 1282 generated lines.
 - Of the unported, 6 hang under unported code (or a root); 3 are reached only through ours (0 seen in play), 2 of them called by our C++ itself (a guest call by name or address, a fallback for a branch, a table or vtable it stores) and the rest under those; the TSV's `behind_ours` column lists them.
-- Ours functions' edges come from our C++ (`src_edges.py`): 52229 definitions in 1216 files of `src/` (harnesses left out), 10398 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 10168 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
+- Ours functions' edges come from our C++ (`src_edges.py`): 47610 definitions in 1238 files of `src/` (harnesses left out), 10398 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 10166 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
 - Ours functions whose original body is still reachable: 7 (7 from our C++: an `__imp__` fallback when the native C++ declines, or a guest call to a function with neither override nor C++); listed below.
-- Host code no native function's C++ reaches but that names guest functions (constants defined but not resolved to a user, a few hooks' helpers): 3766 functions named, taken as roots; they add 1674 reachable functions.
-- Before 2026-11-14's fix the graph followed the original's edges through ours too: 15901 reachable. **Originals no longer called: 536** (279 not ours, 257 ours whose work our C++ took in; 38295 lines, 135 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.
+- Host code no native function's C++ reaches but that names guest functions (constants defined but not resolved to a user, a few hooks' helpers): 3760 functions named, taken as roots; they add 1674 reachable functions.
+- Before 2026-11-14's fix the graph followed the original's edges through ours too: 15901 reachable. **Originals no longer called: 538** (279 not ours, 259 ours whose work our C++ took in; 38483 lines, 135 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.
 - Frontier (ready now): 7 functions.
 - Reachable functions calling imports: 325 (2 unported).
 - Image read: 13492 code-built data addresses scanned; 181 function pointers in data that no code-built address reaches (136 functions; not edges).
@@ -177,6 +177,8 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_820BCDD0` | collision.md | Native | `sub_820BACB8` | 1 | 0 | 9 | 0 |
 | `sub_820BCE80` | collision.md | Native | `sub_820BACB8` | 1 | 0 | 9 | 0 |
 | `sub_820BE150` | collision.md | Native | `sub_820BC8A8` | 1 | 1 | 39 | 0 |
+| `sub_820E42E8` | functions.md | Overridden | `sub_820D3740` | 1 | 0 | 114 | 0 |
+| `sub_820E45A8` | functions.md | Overridden | `sub_820D3688` | 1 | 0 | 74 | 0 |
 | `sub_820F77A0` | collision-world.md | Lifted | `sub_820F69B0` | 1 | 0 | 27 | 0 |
 | `sub_820F9E28` | collision-world.md | Lifted | `sub_820F9050` | 1 | 0 | 166 | 0 |
 | `sub_82107B90` | boot-mode.md | Overridden | `sub_825894C8` | 1 | 0 | 75 | 0 |
