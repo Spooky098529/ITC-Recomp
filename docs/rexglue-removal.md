@@ -4309,7 +4309,10 @@ Each leaves the game working, smallest and most independent first.
    emulated GPU's glow switch, `--glow`, gone with it) and 0003 (the SDK's
    Windows SDL as a DLL). CLAUDE.md, `docs/windows.md` and
    `docs/frame-interpolation.md` say so; older mentions in the docs are
-   history.
+   history. Checked: a fresh clone of the branch from GitHub with non-recursive
+   submodules (all fetched from upstream) configured and built from
+   scratch, its executable needing no SDK library and racing clean; on the
+   main build an attract race and the pad replay (127 s) clean.
 
 Checks at each step: the build, `timeout 120 attract_race.sh 40`, the
 pad replay (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`,
