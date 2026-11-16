@@ -19,6 +19,10 @@ using ImportFunction = void(PPCContext&, uint8_t*);
 
 Result Import(uint8_t* base, ImportFunction* function, const Args& args);
 
+// The SDK's import itself, past ours (src/kernel/native_imports.h): for our
+// code falling back to it on objects it doesn't handle.
+Result ImportFromSdk(uint8_t* base, ImportFunction* function, const Args& args);
+
 // The import's name (written by itc_recomp/tools/import_entries.py into
 // imports.cpp), for diagnostics.
 const char* ImportName(ImportFunction* function);

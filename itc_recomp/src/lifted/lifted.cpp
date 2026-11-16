@@ -175,6 +175,10 @@ Result Import(uint8_t* base, ImportFunction* function, const Args& args) {
   return Boundary(args, [&](PPCContext& ctx) { function(ctx, base); });
 }
 
+Result ImportFromSdk(uint8_t* base, ImportFunction* function, const Args& args) {
+  return Boundary(args, [&](PPCContext& ctx) { function(ctx, base); });
+}
+
 void Enter(PPCContext& ctx, uint8_t* base, Entry entry) {
   PPCContext* const outer = current;
   current = &ctx;
