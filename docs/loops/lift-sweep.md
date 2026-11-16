@@ -228,7 +228,9 @@ outside:
   `lifted::CallFromContext` (stage 2), every hand port an entry on our
   register view, calls carrying their return address and caller's r31
   (stage 3, 2026-11-16; the batches emitted again), the overrides
-  deleted and batches 034 and 035 lifted (stage 4, 2026-11-16).
+  deleted and batches 034 and 035 lifted (stage 4, 2026-11-16), every
+  original our code falls back to lifted and batches 036 to 042, with
+  `generated/` and the harnesses out of the build (stage 5, 2026-11-16).
 
 ## The user's calls (2026-11-15)
 

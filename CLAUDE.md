@@ -755,7 +755,12 @@ port's adapter is a dispatch table entry on our register view
 kernel's thread starts (`ITC_KERNEL_ENTRY`), `xstart` and five
 `__finally` blocks; an address with no entry stops the program. Since
 stage 4 the harnesses no longer compare single functions: the game
-(attract races, the pad replay, frame dumps) is the check.
+(attract races, the pad replay, frame dumps) is the check. Stage 5 (done
+2026-11-16): `generated/` and `src/harnesses/` aren't built (our own
+`src/guest_code.h`, `src/app/image.cpp`, `cmake/rexglue.cmake`); every
+original our code falls back to is lifted (`lifted::original`); the
+executable holds no recompiled function. `--run_harnesses` and the
+coverage build are gone with them; `generated/` stays as the tools' input.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

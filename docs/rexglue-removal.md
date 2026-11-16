@@ -3420,6 +3420,46 @@ table: native audio's thread runs the game's mixer callback
 `sub_824657E0`) with `function_dispatcher()->Execute`
 (`src/audio/native_audio.cpp`); it moves to `lifted::Call` in stage 2.
 
+   Done (2026-11-16, autonomously by the recommended options while the
+   user slept):
+   - Every original our code named (`__imp__sub_X`: flag-off fallbacks and
+     declines, 1,408 with those macros build) is lifted
+     (`lifted::original::cX`, `lift_originals.py`); four couldn't be
+     (HeapAlloc, HeapFree, HeapReAlloc, TuningScreen::Update: they read
+     registers `lift.py` can't), reached only with a flag off: they log and
+     stop (`lifted::NoOriginal`). Entries run whatever their flag (the
+     `--native_*` flags no longer choose anything for an entry); `xstart`
+     and the kernel's thread starts always enter our code; the `__finally`
+     adapters removed (Merged).
+   - The functions only those lifted originals reach (695) lifted too
+     (batches 036 to 042, with rows). Left unported (static map, 9): the
+     Xbox Live mode's two, `xstart` (ours runs there), two C runtime float
+     control functions reading the FPSCR (`sub_825B0BB0`, `sub_825B0BE4`)
+     and four funclets reading their parent's registers: none seen in
+     play; reaching one logs and stops.
+   - `generated/` and `src/harnesses/` out of the build: our own
+     `src/guest_code.h` (what we used of `itc_pch.h`),
+     `src/lifted/imports.h` (the imports declared, by
+     `tools/import_entries.py`), `src/app/image.cpp` (`PPCImageConfig`
+     with the five kernel entries as its only function mappings) and
+     `cmake/rexglue.cmake` (the SDK's set-up without the recompiled code);
+     the coverage target removed (it instrumented the recompiled code).
+     `generated/` stays in the repo as the tools' input (`lift.py`,
+     `import_entries.py`, the static map). The executable holds no
+     recompiled function.
+   - The kernel without a context (the report asked for): the SDK's typed
+     kernel functions behind its import shims (`REX_EXPORT(__imp__X,
+     X_entry)`, `HostToGuestFunction` unpacking the context) are exported
+     from `librexruntime.so` (470 `rex::kernel::xboxkrnl::*_entry` and the
+     like), take plain values and guest pointers (`MappedPtr`), and find
+     the current thread through thread-local state, not the context. So
+     our code could call them directly, with declarations matching the
+     SDK's sources (they aren't in its public headers) and on a guest
+     thread; the raw hooks (`REX_HOOK_RAW`) and varargs ones (`DbgPrint`)
+     read the context and would need their own. Not done: for E1.
+   Checked by attract races, the pad replay (127 s, clean, no call without
+   an entry) and frame dumps.
+
 Checks at each stage: `attract_race.sh 40` as a smoke run;
 `attract_race.sh 180 --run_harnesses=all` while the harnesses exist (0
 differing outside the expected groups); the pad replay
@@ -6002,3 +6042,14 @@ right. The boundary: overridden 128, Native (with Lifted) 188, Dropped 24,
 never called 34, live 75. Imports: 186 called, 30 with a live caller. B7
 (`b7_status.py`): ours 9,858, work left 32. Static map: reachable 9,091,
 ours 9,082, unported 2.
+
+**2026-11-16, the rewiring's stage 5 (branch `rewiring-15-11-26`):**
+`generated/` and the harnesses out of the build, no recompiled function
+in the executable: every original our code falls back to lifted (1,408),
+the functions only those reach lifted (batches 036 to 042, 695), our own
+guest header, import declarations, image description and CMake set-up.
+Attract races and the pad replay (127 s) clean; frame dumps right. The
+boundary: overridden 128, Native (with Lifted) 188, Dropped 24, never
+called 34, live 75. Imports: 186 called, 30 with a live caller. Static
+map: unported 9 (the Xbox Live mode's two, `xstart`, six the lift can't
+translate, none seen in play).
