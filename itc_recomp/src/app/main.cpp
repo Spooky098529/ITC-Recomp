@@ -1,9 +1,11 @@
 // The program's start ("A4 brought forward" in docs/rexglue-removal.md):
-// our own `main`, which sets up the flags, the paths, the log and SDL, uses
-// rexglue's Runtime as a library (guest memory, the kernel, default.xex),
-// has the kernel make the game's main thread (it starts in our start-up,
-// src/app/start_up.cpp, in place of the game's xstart), and runs the main
-// thread's event loop. Before 2026-11-15 the SDK's main() and its ReXApp
+// our own `main`, which sets up the flags, the paths, the log and SDL, maps
+// guest memory (src/memory/mapping.h), loads default.xex into it
+// (src/app/image_load.h), starts our audio output and the game's main
+// thread (one of ours, in our start-up, src/app/start_up.cpp, in place of
+// the game's xstart), and runs the main thread's event loop. Since E2 (step
+// 5) the SDK's Runtime (its memory, kernel, loader and VFS) isn't made; the
+// SDK is used only as a library (the flags, the log, paths). Before 2026-11-15 the SDK's main() and its ReXApp
 // did all this (rexglue-sdk/src/ui/windowed_app_main_sdl.cpp and
 // rex_app.cpp, no longer built into our executable); what they did that we
 // don't need (their window, ImGui overlays, achievement toasts, the GPU
@@ -27,16 +29,9 @@
 #include <SDL3/SDL.h>
 #include <fmt/format.h>
 #include <SDL3/SDL_main.h>
-#include <rex/audio/sdl/sdl_audio_system.h>
 #include <rex/cvar.h>
 #include <rex/filesystem.h>
-#include <rex/kernel/crt/heap.h>
-#include <rex/kernel/init.h>
 #include <rex/logging.h>
-#include <rex/runtime.h>
-#include <rex/system/kernel_state.h>
-#include <rex/system/user_module.h>
-#include <rex/system/xthread.h>
 
 #include <atomic>
 #include <cstring>
@@ -57,8 +52,6 @@ ITC_FLAG_DECLARE(std::string, metadata_root);
 ITC_FLAG_DECLARE(std::string, log_file);
 ITC_FLAG_DECLARE(std::string, log_level);
 ITC_FLAG_DECLARE(bool, log_verbose);
-ITC_FLAG_DECLARE(uint32_t, rexcrt_heap_size_mb);
-ITC_FLAG_DECLARE(bool, check_image_load);
 ITC_FLAG_DECLARE(std::string, video_driver);
 
 namespace app {
@@ -75,7 +68,6 @@ struct Paths {
   std::filesystem::path config;
 };
 
-std::unique_ptr<rex::Runtime> g_runtime;
 std::atomic<bool> g_quitting{false};
 
 std::mutex g_queue_mutex;
@@ -155,10 +147,9 @@ void Fail(const std::string& message) {
   SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, kName, message.c_str(), nullptr);
 }
 
-// rexglue's Runtime with the config ReXApp gave it (our audio unless
-// --native_audio is off, no SDK input, no graphics system, no app
-// context), the modules, default.xex and the C runtime heap.
-bool SetUpRuntime(const Paths& paths) {
+// The game's files: default.xex where they are, and the root our file
+// layer reads from (src/game_data/).
+bool CheckGameData(const Paths& paths) {
   if (!std::filesystem::is_directory(paths.game_data)) {
     Fail("--game_data_root does not exist: " + paths.game_data.string());
     return false;
@@ -168,31 +159,6 @@ bool SetUpRuntime(const Paths& paths) {
     return false;
   }
   game_data::SetRoot(paths.game_data);
-  rex::RuntimeConfig config;
-  config.audio_factory = REX_AUDIO_BACKEND(rex::audio::sdl::SDLAudioSystem);
-  config.input_factory = nullptr;
-  config.kernel_init = rex::kernel::InitializeKernel;
-  native_audio::Configure(config);
-  g_runtime = std::make_unique<rex::Runtime>(paths.game_data, paths.user_data, paths.update_data,
-                                             paths.cache, paths.metadata);
-  rex::X_STATUS status = g_runtime->Setup(PPCImageConfig, std::move(config));
-  if (XFAILED(status)) {
-    Fail(fmt::format("Runtime setup failed: {:08X}", status));
-    return false;
-  }
-  if (PPCImageConfig.register_modules) {
-    PPCImageConfig.register_modules(g_runtime->kernel_state());
-  }
-  status = g_runtime->LoadXexImage("game:\\default.xex");
-  if (XFAILED(status)) {
-    Fail(fmt::format("Failed to load XEX (game:\\default.xex): {:08X}", status));
-    return false;
-  }
-  if (PPCImageConfig.rexcrt_heap &&
-      !rex::kernel::crt::InitHeap(ITC_FLAG(rexcrt_heap_size_mb), g_runtime->memory())) {
-    Fail("Failed to initialize rexcrt heap");
-    return false;
-  }
   return true;
 }
 
@@ -213,14 +179,12 @@ void RunQueued() {
   }
 }
 
-// Closing: as ReXApp::OnClosing did (the title's threads ended, the log
-// flushed, the process exited at once).
+// Closing: as ReXApp::OnClosing did, less the SDK's title termination (the
+// game's threads are ours and end with the process): the log flushed, the
+// process exited at once.
 [[noreturn]] void Close() {
   ITC_LOG_INFO("Window closing, shutting down...");
-  if (g_runtime && g_runtime->kernel_state()) {
-    g_runtime->kernel_state()->TerminateTitle();
-  }
-  ITC_LOG_INFO("Title terminated; hard-exiting process.");
+  ITC_LOG_INFO("Hard-exiting process.");
   rex::FlushLogging();
   std::_Exit(0);
 }
@@ -272,7 +236,7 @@ int main(int argc, char* argv[]) {
     app::Fail("Failed to map guest memory");
     return EXIT_FAILURE;
   }
-  if (!app::SetUpSdl() || !app::SetUpRuntime(paths)) {
+  if (!app::SetUpSdl() || !app::CheckGameData(paths)) {
     return EXIT_FAILURE;
   }
   debug::ThreadCpu_Start();
@@ -288,11 +252,9 @@ int main(int argc, char* argv[]) {
     app::Fail("Failed to load default.xex: " + error);
     return EXIT_FAILURE;
   }
-  if (ITC_FLAG(check_image_load)) {
-    app::CheckImageAgainstGuest(image, app::g_runtime->memory()->virtual_membase());
-  }
   std::memcpy(base + image.load_address, image.bytes.data(), image.bytes.size());
   memory::BindKernelVariables(base);
+  native_audio::Start();
   // The game's main thread: one of our threads (E1, src/threads/) running
   // our start-up (src/app/start_up.cpp) with the image's stack size.
   if (!threads::Enabled()) {

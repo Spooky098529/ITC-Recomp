@@ -111,7 +111,7 @@ void LogOnce(const char* what, uint32_t value) {
   std::lock_guard lock(mutex);
   if (!logged[what]) {
     logged[what] = true;
-    ITC_LOG_INFO("threads: {} {:08X} left to the SDK", what, value);
+    ITC_LOG_INFO("threads: {} {:08X} not handled by ours (the SDK's runtime is gone: stopping)", what, value);
   }
 }
 

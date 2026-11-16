@@ -10,7 +10,9 @@
 // sounds are decoded by our own code (hooks/xma.cpp), so the SDK's XMA
 // decoder isn't set up.
 //
-// --native_audio=false brings back the SDK's driver, for comparison.
+// Since E2 (step 5, docs/rexglue-removal.md) this is a class of its own,
+// started from main(), not an audio system in the SDK's runtime (which
+// isn't made any more); --native_audio=false (the SDK's driver) is gone.
 
 #include "audio/native_audio.h"
 #include "lifted/originals.h"
@@ -26,15 +28,9 @@
 
 #include "guest.h"
 
-#include <rex/audio/audio_driver.h>
-#include <rex/audio/audio_system.h>
 #include <rex/audio/flags.h>
 #include "base/flags.h"
 #include "base/log.h"
-#include <rex/system/function_dispatcher.h>
-#include <rex/system/kernel_state.h>
-#include <rex/system/xthread.h>
-#include <rex/thread.h>
 
 #include <SDL3/SDL.h>
 
@@ -52,7 +48,8 @@
 #include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_audio, true, "ITC",
-              "Our own audio output instead of the SDK's render driver and Audio Worker");
+              "Our own audio output (always on since E2: the SDK's render driver and Audio "
+              "Worker are gone; false is ignored, with a warning)");
 ITC_FLAG_BOOL(native_render_driver, true, "ITC",
               "Run the game's render driver's destructor (AudioRenderDriver::Destroy "
               "sub_824658C8, docs/functions/audio.md) natively inside its wrap instead of "
@@ -63,8 +60,6 @@ ITC_FLAG_DECLARE(int32_t, audio_maxqframes);
 
 namespace native_audio {
 namespace {
-
-using rex::X_STATUS;
 
 // A frame as the game's XAudio mixes it: 256 samples a channel, 6 channels
 // one after another, big-endian floats, at 48 kHz.
@@ -103,27 +98,14 @@ struct Client {
   std::chrono::steady_clock::time_point logged_at = {};
 };
 
-class ItcAudioSystem : public rex::audio::AudioSystem {
+class ItcAudioSystem {
  public:
-  explicit ItcAudioSystem(rex::runtime::FunctionDispatcher* function_dispatcher)
-      : AudioSystem(function_dispatcher) {
+  ItcAudioSystem() {
     queued_frames_limit_ = uint32_t(std::clamp<int32_t>(ITC_FLAG(audio_maxqframes), 4, 64));
   }
 
-  ~ItcAudioSystem() override {
-    if (g_system == this) {
-      g_system = nullptr;
-    }
-  }
-
-  static std::unique_ptr<rex::system::IAudioSystem> Create(
-      rex::runtime::FunctionDispatcher* function_dispatcher) {
-    return std::make_unique<ItcAudioSystem>(function_dispatcher);
-  }
-
-  // Only our thread: the base class would start the Audio Worker and the XMA
-  // decoder (its thread and the XMA registers), which nothing uses since B2.
-  X_STATUS Setup(rex::system::KernelState*) override {
+  // Our thread (no Audio Worker or XMA decoder: nothing uses them since B2).
+  void Setup() {
     running_ = true;
     // One of our threads (E1, src/threads/): a guest stack and per-thread
     // block for the game's mixer callback, no SDK thread behind it.
@@ -131,28 +113,6 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
                                    [this](lifted::Args args) { ThreadMain(args); });
     g_system = this;
     ITC_LOG_INFO("native audio: started ({} frames queued at most)", queued_frames_limit_);
-    return X_STATUS_SUCCESS;
-  }
-
-  void Shutdown() override {
-    if (!running_) {
-      return;
-    }
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      running_ = false;
-    }
-    wake_.notify_all();
-    if (thread_.joinable()) {
-      // The thread may be inside the game's mixer; the process ends with it
-      // (a host thread can't be terminated, as the SDK's was after 500 ms).
-      thread_.detach();
-    }
-    for (size_t i = 0; i < kMaxClients; i++) {
-      if (clients_[i].in_use) {
-        Unregister(kHandleBase | uint32_t(i));
-      }
-    }
   }
 
   // Returns the driver handle, or 0.
@@ -251,16 +211,6 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
     std::memcpy(frame->data(), input, sizeof(Frame));
     client.queued.push_back(std::move(frame));
   }
-
- protected:
-  // Not used: the game's driver object calls Register, not the kernel's
-  // XAudioRegisterRenderDriverClient.
-  X_STATUS CreateDriver(size_t index, rex::thread::Semaphore*,
-                        rex::audio::AudioDriver**) override {
-    ITC_LOG_ERROR("native audio: the SDK's render driver was asked for (client {})", index);
-    return X_STATUS_NOT_IMPLEMENTED;
-  }
-  void DestroyDriver(rex::audio::AudioDriver*) override {}
 
  private:
   // Runs the client's callback (XAudio::MixerCallback, sub_8245FBE0) with
@@ -423,10 +373,14 @@ bool IsOurHandle(uint32_t handle) {
 
 }  // namespace
 
-void Configure(rex::RuntimeConfig& config) {
-  if (ITC_FLAG(native_audio)) {
-    config.audio_factory = REX_AUDIO_BACKEND(ItcAudioSystem);
+void Start() {
+  if (!ITC_FLAG(native_audio)) {
+    ITC_LOG_WARN("native audio: --native_audio=false is ignored (the SDK's driver is gone)");
   }
+  // Never destroyed: its thread may be inside the game's mixer when the
+  // process ends (a host thread can't be terminated).
+  static ItcAudioSystem* const system = new ItcAudioSystem;
+  system->Setup();
 }
 
 }  // namespace native_audio

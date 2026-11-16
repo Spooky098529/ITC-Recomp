@@ -3896,6 +3896,40 @@ guest address space stays until E5 makes the code real C++ (the old E2's
    log and stop like an address with no entry) are settled there, and
    that is E4's start.
 
+   Done (2026-11-16): `main()` (`src/app/main.cpp`) no longer makes
+   `rex::Runtime`: no SDK memory, kernel state, module loader, VFS,
+   function table, audio system or C runtime heap. It parses the flags,
+   sets up the log and SDL (SDK library calls, until E4), maps guest
+   memory (now at `0x100000000`, the SDK's address, as nothing else maps
+   there), loads the image, binds the kernel variables, starts our audio
+   output and the main thread, and runs the event loop; closing flushes
+   the log and exits (no `TerminateTitle`: the game's threads are ours).
+   - Native audio (`src/audio/native_audio.cpp`) is a class of its own
+     started from `main()`, no longer an `AudioSystem` in the runtime's
+     config; `--native_audio=false` (the SDK's driver) is gone (the flag
+     stays accepted and is ignored with a warning, as scripts pass it).
+   - The guest timebase (`REX_QUERY_TIMEBASE`, nothing lifted reads it)
+     is our 50 MHz performance counter (`helpers/clock.h`), not the SDK's
+     guest clock, whose rate only the runtime set.
+   - `debug/thread_cpu.cpp` no longer labels threads with the SDK's
+     `XThread` starts (ours aren't `XThread`s); `CurrentThreadId` has no
+     SDK fallback (0, logged once, on a thread not ours).
+   - The fallbacks into the SDK (`lifted::ImportFromSdk`, and `Import` of
+     an SDK import with no answer of ours) log the import's name and the
+     caller and stop the program, as a call with no dispatch table entry
+     does; `lifted::Sdk` on our own functions and lifted originals still
+     runs them. Turning `--native_threads` or `--native_memory_imports`
+     off therefore stops at the first such import, and
+     `--check_image_load` is gone (no SDK loader to compare with).
+   - Left for E4: the SDK-facing entries nothing calls without the runtime
+     (`REX_FUNC(xstart)` in `app/start_up.cpp`, the `ITC_KERNEL_ENTRY`
+     functions, `app/image.cpp`'s `PPCImageConfig`), and the library
+     pieces that don't need the runtime (flags, logging, `rex::filesystem`
+     paths, `fpscr.h`, the shader translator, `xeRtlNtStatusToDosError`,
+     `global_critical_region`). The Windows build isn't kept working:
+     `memory/mapping.cpp` is Linux only (no Windows code until the user
+     asks).
+
 Checks at each step: attract races, the pad replay, frame dumps, a drive
 by the user, the Windows build under Wine for step 4, and saves loading
 (the Risks below).
@@ -6454,3 +6488,17 @@ dumps clean. `boundary_status.py` reads the function rows, not the running
 code, so its figures don't move with E1: overridden 128, Native (with Lifted)
 204, Dropped 24, never called 20, live 73; imports: 186 called, 30 with a live
 caller.
+
+**2026-11-16, E2's steps 2 to 5 (branch `e1-threads-sync-16-11-26`):** the
+kernel variables the game reads plugged in, `default.xex` loaded by our
+own loader, guest memory mapped by us (`src/memory/mapping.cpp`: one
+memfd as the SDK's nine views, nothing in `/dev/shm`) with the allocation
+layer's ranges and its own physical allocator, and `rex::Runtime` no
+longer made: no SDK memory, kernel, loader or VFS; the SDK is a library
+(flags, log, paths) until E4. Attract races, the pad replay (127 s, no
+error lines, the race at the frame cap) and frame dumps clean;
+`--log_imports`: 28 imports in play, all ours (any other now stops the
+program). `boundary_status.py` reads the docs' function rows, not the
+running code, so its figures don't move with E2: overridden 128, Native
+(with Lifted) 204, Dropped 24, never called 20, live 73; imports: 186
+called, 30 with a live caller.

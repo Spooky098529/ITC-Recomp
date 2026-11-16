@@ -8,7 +8,8 @@
 // (committed and cleared already), a commit inside the layer's range has
 // nothing left to do; both answer the rounded address and size as the
 // kernel does. Anything else (a reserve at an address, a commit outside the
-// layer, a free) stays the SDK's, logged once.
+// layer, a free) is logged and, since E2 (no SDK runtime), stops the
+// program.
 
 #include "imports/native_imports.h"
 #include "memory/heap.h"
@@ -47,7 +48,7 @@ void LogOnce(const char* what, uint32_t value) {
   std::lock_guard lock(mutex);
   if (!logged[what]) {
     logged[what] = true;
-    ITC_LOG_INFO("memory imports: {} {:08X} left to the SDK", what, value);
+    ITC_LOG_INFO("memory imports: {} {:08X} not handled by ours (the SDK's runtime is gone: stopping)", what, value);
   }
 }
 

@@ -19,8 +19,11 @@ using ImportFunction = void(PPCContext&, uint8_t*);
 
 Result Import(uint8_t* base, ImportFunction* function, const Args& args);
 
-// The SDK's import itself, past ours (src/kernel/native_imports.h): for our
-// code falling back to it on objects it doesn't handle.
+// The SDK's import itself, past ours (src/imports/native_imports.h): where
+// our code fell back to it on objects it doesn't handle. Since E2 (step 5)
+// the SDK's runtime isn't made: it logs the import's name and stops the
+// program (none is reached in play). So does Import for an SDK import with
+// no answer of ours.
 Result ImportFromSdk(uint8_t* base, ImportFunction* function, const Args& args);
 
 // The import's name (written by itc_recomp/tools/import_entries.py into

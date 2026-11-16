@@ -34,10 +34,6 @@ void ThreadCpu_Stop() {}
 #include <unistd.h>
 #include <vector>
 
-#include "guest.h"
-#include <rex/system/kernel_state.h>
-#include <rex/system/xmemory.h>
-#include <rex/system/xthread.h>
 
 namespace {
 
@@ -124,41 +120,6 @@ std::map<int, ThreadSample> SampleThreads() {
   }
   closedir(dir);
   return threads;
-}
-
-// The game starts its threads through sub_8258DE50, which calls slot 1 of
-// the vtable of the object at start context + 8: that function is the
-// thread's own code.
-constexpr uint32_t kGameThreadStart = 0x8258DE50;
-
-// Game threads by their host name ("XThread" and the low 32 bits of the
-// pthread handle, as the SDK names them; /proc shows 15 characters), with
-// their guest entry points, so a busy thread can be found in the code.
-std::map<std::string, std::string> GuestThreadStarts() {
-  std::map<std::string, std::string> starts;
-  auto* kernel = rex::system::kernel_state();
-  if (!kernel) {
-    return starts;
-  }
-  for (auto& thread : kernel->object_table()->GetObjectsByType<rex::system::XThread>()) {
-    if (!thread->is_guest_thread() || !thread->thread()) {
-      continue;
-    }
-    std::string name = fmt::format("XThread{:04X}", thread->thread()->system_id()).substr(0, 15);
-    uint32_t start = thread->creation_params()->start_address;
-    uint32_t context = thread->creation_params()->start_context;
-    std::string label = fmt::format("{:08X}", start);
-    uint8_t* base = kernel->memory()->virtual_membase();
-    if (start == kGameThreadStart && context) {
-      uint32_t object = guest::LoadU32(base, context + 8);
-      uint32_t vtable = object ? guest::LoadU32(base, object) : 0;
-      if (vtable) {
-        label += fmt::format(" -> {:08X} object {:08X}", guest::LoadU32(base, vtable + 4), object);
-      }
-    }
-    starts[name] = label;
-  }
-  return starts;
 }
 
 // What a thread spending time in the kernel is doing: the system call it's
@@ -272,21 +233,13 @@ class ThreadCpu {
         machine_total = total;
       }
       std::string line;
-      std::map<std::string, std::string> starts;
-      if (!rows.empty()) {
-        starts = GuestThreadStarts();
-      }
       std::vector<std::pair<int, std::string>> kernel_heavy;
       for (const Row& r : rows) {
-        std::string guest;
-        if (auto it = starts.find(r.s->name); it != starts.end()) {
-          guest = fmt::format(" [guest {}]", it->second);
-        }
-        line += fmt::format(" | {}{} ({}) {:.0f}% (sys {:.0f}%) cpu{} sw {}/{} faults {}/{}",
-                            r.s->name, guest, r.tid, 100 * (r.user + r.system), 100 * r.system,
+        line += fmt::format(" | {} ({}) {:.0f}% (sys {:.0f}%) cpu{} sw {}/{} faults {}/{}",
+                            r.s->name, r.tid, 100 * (r.user + r.system), 100 * r.system,
                             r.s->cpu, r.voluntary, r.involuntary, r.minor_faults, r.major_faults);
         if (r.system >= kSyscallSampleShare) {
-          kernel_heavy.emplace_back(r.tid, r.s->name + guest);
+          kernel_heavy.emplace_back(r.tid, r.s->name);
         }
       }
       ITC_LOG_INFO("thread cpu: process {:.0f}% of a core, {} threads{}{}", 100 * process,

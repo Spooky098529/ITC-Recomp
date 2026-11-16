@@ -10,7 +10,6 @@
 
 #include "app/image_load.h"
 
-#include "base/flags.h"
 #include "base/log.h"
 
 extern "C" {
@@ -25,11 +24,6 @@ extern "C" {
 #include <fstream>
 #include <iterator>
 #include <memory>
-
-ITC_FLAG_BOOL(check_image_load, false, "ITC",
-              "Load default.xex with our own loader (src/app/image_load.cpp) as well and log "
-              "where its image differs from the SDK's in guest memory (E2 in "
-              "docs/rexglue-removal.md)");
 
 namespace app {
 
@@ -138,29 +132,6 @@ bool LoadImage(const std::filesystem::path& path, Image& image, std::string& err
   ITC_LOG_INFO("image load: {} ({} bytes at {:08X}, stack {:#x})", path.filename().string(),
                image_size, image.load_address, image.stack_size);
   return true;
-}
-
-void CheckImageAgainstGuest(const Image& image, const uint8_t* base) {
-  const uint8_t* guest = base + image.load_address;
-  size_t ranges = 0, bytes = 0;
-  for (size_t i = 0; i < image.bytes.size();) {
-    if (image.bytes[i] == guest[i]) {
-      i++;
-      continue;
-    }
-    size_t end = i;
-    while (end < image.bytes.size() && image.bytes[end] != guest[end]) {
-      end++;
-    }
-    if (ranges < 64) {
-      ITC_LOG_INFO("image load: differs at {:08X}-{:08X}", image.load_address + i,
-                   image.load_address + end - 1);
-    }
-    ranges++;
-    bytes += end - i;
-    i = end;
-  }
-  ITC_LOG_INFO("image load: {} ranges ({} bytes) differ from the SDK's image", ranges, bytes);
 }
 
 }  // namespace app

@@ -35,9 +35,9 @@ constexpr uint64_t kGuestBytes = 0x100000000ull;
 constexpr uint64_t kPhysicalBytes = 0x20000000ull;
 constexpr uint64_t kReserveBytes = kGuestBytes + kPhysicalBytes;
 constexpr uint64_t kFileBytes = kReserveBytes + 0x1000;
-// Where the SDK's mapping landed (its first try). 0 for now: the SDK's
-// runtime, still made, maps its own there with MAP_FIXED over anything.
-constexpr uint64_t kPreferredBase = 0;
+// Where the SDK's mapping landed (its first try); anywhere else when it's
+// taken.
+constexpr uint64_t kPreferredBase = 0x100000000ull;
 
 struct View {
   uint64_t start;  // guest address (or past 4 GB: the flat physical range)

@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <rex/chrono/clock.h>
 #include <rex/image_info.h>
 #include <rex/logging.h>
 #include <rex/ppc.h>
@@ -18,6 +17,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string_view>
+
+#include "helpers/clock.h"
 
 // The image (default.xex): its base and size, and its code's.
 #define REX_IMAGE_BASE 0x82000000ull
@@ -62,8 +63,9 @@ extern const rex::PPCImageInfo PPCImageConfig;
 #define REX_STORE_U64(x, y) \
   (*(volatile u64*)(base + (u32)(x) + REX_PHYS_HOST_OFFSET(x)) = __builtin_bswap64(y))
 
-// The guest's time base (the SDK's guest clock).
-#define REX_QUERY_TIMEBASE() rex::chrono::Clock::QueryGuestTickCount()
+// The guest's time base (mftb): our performance counter at the 360's 50 MHz
+// (helpers/clock.h), the SDK's guest clock's rate when its runtime set it.
+#define REX_QUERY_TIMEBASE() helpers::PerformanceCounter()
 
 // The SDK's stand-in for the 360 turning interrupts off: one lock, shared
 // with the SDK's kernel functions, and a count of how deep it's held

@@ -21,8 +21,4 @@ struct Image {
 // AES-128 encrypted, basic compression). False with `error` set otherwise.
 bool LoadImage(const std::filesystem::path& path, Image& image, std::string& error);
 
-// --check_image_load: compares `image` with the guest memory at its load
-// address (as the SDK's loader left it) and logs every range that differs.
-void CheckImageAgainstGuest(const Image& image, const uint8_t* base);
-
 }  // namespace app

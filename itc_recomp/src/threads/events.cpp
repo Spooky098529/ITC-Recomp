@@ -10,8 +10,9 @@
 // them all and one condition variable wakes every waiter on any signal; a
 // waiter checks its objects again.
 //
-// What isn't ours falls back to the SDK (lifted::ImportFromSdk): waits on
-// other objects (threads), on SDK handles, named events. Logged once each.
+// What isn't ours went to the SDK (lifted::ImportFromSdk): waits on other
+// objects (threads), on SDK handles, named events. Logged, then (since E2:
+// no SDK runtime) the program stops; none happens in play.
 
 #include "threads/handles.h"
 #include "imports/native_imports.h"
@@ -103,7 +104,7 @@ void LogFallbackOnce(const char* what, uint32_t value) {
   std::lock_guard lock(mutex);
   if (!logged[what]) {
     logged[what] = true;
-    ITC_LOG_INFO("threads: {} {:08X} left to the SDK", what, value);
+    ITC_LOG_INFO("threads: {} {:08X} not handled by ours (the SDK's runtime is gone: stopping)", what, value);
   }
 }
 

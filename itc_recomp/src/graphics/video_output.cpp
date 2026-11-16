@@ -9,7 +9,6 @@
 
 #include "base/log.h"
 
-#include <rex/system/xthread.h>
 
 #include <atomic>
 #include <cstdlib>
@@ -82,12 +81,16 @@ Lock& LockOf(uint32_t video_output) {
 
 uint32_t CurrentThreadId() {
   ITC_NATIVE_RUNNING("sub_825B9A60 CurrentThreadId");
-  // The thread object's ID ([[r13 + 256] + 0x14C]) on our threads; the
-  // SDK's on its own (the main thread, until E2).
+  // The thread object's ID ([[r13 + 256] + 0x14C]): every thread running
+  // game code is ours since E1; 0 (logged once) on any other.
   if (const uint32_t id = threads::CurrentThreadIdIfOurs()) {
     return id;
   }
-  return rex::system::XThread::GetCurrentThreadId();
+  static std::once_flag logged;
+  std::call_once(logged, [] {
+    ITC_LOG_ERROR("video output: CurrentThreadId on a thread that isn't one of ours");
+  });
+  return 0;
 }
 
 uint32_t AcquireThreadOwnership(uint8_t* base, uint32_t device) {
