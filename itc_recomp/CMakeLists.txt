@@ -749,6 +749,7 @@ set(ITC_SOURCES
     src/hooks/data_file.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
+    src/harnesses/rewiring_expected.cpp
     src/harnesses/clock.cpp
     src/harnesses/last_error.cpp
     src/harnesses/gamma.cpp

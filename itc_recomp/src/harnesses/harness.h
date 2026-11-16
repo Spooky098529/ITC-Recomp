@@ -85,10 +85,18 @@ class Outputs {
   std::vector<Entry> entries_;
 };
 
+// Whether a group is one the rewiring's stage 3 made differ
+// (rewiring_expected.cpp).
+bool RewiringExpected(const std::string& name);
+
 // Counts a harness's cases and differences; logs the first ten.
 class Results {
  public:
-  explicit Results(std::string name) : name_(std::move(name)) {}
+  explicit Results(std::string name) : name_(std::move(name)) {
+    if (RewiringExpected(name_)) {
+      name_ += " (expected to differ: the rewiring)";
+    }
+  }
   void Check(const std::vector<uint8_t>& recompiled, const std::vector<uint8_t>& native,
              const std::string& what);
   void Check(const Outputs& recompiled, const Outputs& native, const std::string& what);

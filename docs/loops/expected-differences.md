@@ -93,6 +93,39 @@ NaN groups below stay as recorded.
   probably state of its own, such as heap addresses. The same program
   either way: only the constants' registers differ.
 
+## The rewiring's stage 3 (2026-11-16)
+
+169 groups named "... (expected to differ: the rewiring)", listed by name
+in `itc_recomp/src/harnesses/rewiring_expected.cpp` (the user's call,
+2026-11-16; the run itc_5635 has no other group differing). Since stage 3
+("Before E1: the rewiring" in `docs/rexglue-removal.md`) our native
+functions run on a register view that carries only a call's registers.
+Each group was checked to differ only in what the user's calls loosened,
+never in memory the game reads, r3 or f1:
+
+- **Leftover registers:** r11 or ctr a native function no longer leaves
+  for its caller (GetLastError, App::IsRunning, the `Defaults::Table*`
+  getters, CourseRecords::Of, SaveData::TwoPlayerBlock,
+  RaceWorld::OnPausedTick, the morph jobs and work items, the app's
+  interface slots, RenderManagerSlotDirect's stand-in cases).
+- **Registers after a call through an entry:** only r3 and f1 come back
+  (r4 after tan and ldexp, the framework's tick, DebugText::Create and the
+  frame passes; f2 and f3 after ActionMappers::Init; the r4 and r5 pair the
+  draws' harnesses read after the last render queue call, in Model::Draw*,
+  CarPart::Draw and every car part, light, interior, cockpit, traffic and
+  wheel group; the leftovers the XAudio voices' and race sounds' fake
+  objects record).
+- **Stack saves of a caller's register:** 0 where the original saves a
+  register the view doesn't hold (the save slots and devices, X3DAudio and
+  the car sound, the app's start-up, constructor and creation with the
+  constructors under them, the power graph's three groups, including a few
+  render-block slot words its sprites read from such stack words).
+- **Harness artifacts:** Quaternion::FromAngles' inputs (the recompiled
+  run now switches the host's float mode for real, so its angles keep
+  denormals the native run's are flushed of; the output matches) and
+  Device::SetDefaultState's FVF pad byte (uninitialized stack, as the
+  pad byte groups above), intermittent.
+
 ## By function file
 
 Review: "accepted" once the user has agreed, else "for review" (the run
