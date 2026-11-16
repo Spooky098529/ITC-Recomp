@@ -359,6 +359,23 @@ lifted::Result DereferenceObject(uint8_t* base, const lifted::Args& args) {
   return {0, 0.0};
 }
 
+// KeGetCurrentProcessType(): plugged in, 1 (a title's process, X_PROCTYPE_USER,
+// as the SDK answers for every thread of the game). Read by RtlCreateHeap
+// (sub_822997B0, kept in the heap's +379) and XAudio (sub_8245A828, checks
+// for 1).
+lifted::Result GetCurrentProcessType(uint8_t*, const lifted::Args&) {
+  ITC_NATIVE_RUNNING("import KeGetCurrentProcessType");
+  return {1, 0.0};
+}
+
+// ExRegisterTitleTerminateNotification(record, register): plugged in, nothing
+// kept: the SDK never runs title terminate routines either (XAudio's
+// sub_8245B0D0 is the one registered in play).
+lifted::Result RegisterTitleTerminateNotification(uint8_t*, const lifted::Args&) {
+  ITC_NATIVE_RUNNING("import ExRegisterTitleTerminateNotification");
+  return {0, 0.0};
+}
+
 const imports::NativeImportEntry kEntries[] = {
     {__imp__ExCreateThread, CreateThread},
     {__imp__NtResumeThread, NtResumeThread},
@@ -367,6 +384,8 @@ const imports::NativeImportEntry kEntries[] = {
     {__imp__KeSetAffinityThread, SetAffinityThread},
     {__imp__ObReferenceObjectByHandle, ReferenceObjectByHandle},
     {__imp__ObDereferenceObject, DereferenceObject},
+    {__imp__KeGetCurrentProcessType, GetCurrentProcessType},
+    {__imp__ExRegisterTitleTerminateNotification, RegisterTitleTerminateNotification},
 };
 
 const bool kRegistered = imports::RegisterNativeImports(kEntries, std::size(kEntries), Enabled);
