@@ -14,6 +14,7 @@
 // Render thread: draws exactly one frame each time it's asked (as the game
 // originally did), without the game's 2-vblank wait.
 
+#include "lifted/originals.h"
 #include "debug/frame_state_diff.h"
 #include "hooks/native_entry.h"
 #include "debug/idle_timer_scan.h"
@@ -198,7 +199,7 @@ void Renderer_WaitForFrame(lifted::Regs& ctx, uint8_t* base, uint32_t renderer) 
   debug::ImageDump_OnPass(base);
   native::Renderer_OnListHandedOver(!frame_pacing::GameMessages_IsRenderOnlyPass());
   ctx.r3.u64 = renderer;
-  lifted::Sdk(ctx, base, __imp__sub_820920D8);
+  lifted::original::c820920D8(ctx, base);
   auto pacing_start = FrameTimes::Clock::now();
 
   auto& pacer = GetFramePacer();
@@ -267,11 +268,16 @@ ITC_NATIVE_ENTRY_ALWAYS(820920D8) {
   ctx.r1.u32 = r1;
 }
 
-// FrameDriver::Present: r3 = the frame driver. Wrapped only to time it
-// (--log_frame_times).
-ITC_NATIVE_ENTRY(82091A60, ITC_FLAG(log_frame_times)) {
+// FrameDriver::Present: r3 = the frame driver. Its work is the original,
+// lifted (lifted::original, the rewiring's stage 4: no recompiled code in
+// play); timed for --log_frame_times.
+ITC_NATIVE_ENTRY_ALWAYS(82091A60) {
+  if (!ITC_FLAG(log_frame_times)) {
+    lifted::original::c82091A60(ctx, base);
+    return;
+  }
   auto start = FrameTimes::Clock::now();
-  lifted::Sdk(ctx, base, __imp__sub_82091A60);
+  lifted::original::c82091A60(ctx, base);
   GetFrameTimes().Add(FrameTimes::kPresent, FrameTimes::Clock::now() - start);
 }
 

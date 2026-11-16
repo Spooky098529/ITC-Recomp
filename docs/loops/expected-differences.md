@@ -106,7 +106,9 @@ never in memory the game reads, r3 or f1:
 - **Leftover registers:** r11 or ctr a native function no longer leaves
   for its caller (GetLastError, App::IsRunning, the `Defaults::Table*`
   getters, CourseRecords::Of, SaveData::TwoPlayerBlock,
-  RaceWorld::OnPausedTick, the morph jobs and work items, the app's
+  RaceWorld::OnPausedTick, Players::ResetControllers (intermittent: the
+  original leaves r11 at 1 only in some cases), the morph jobs and work
+  items, the app's
   interface slots, RenderManagerSlotDirect's stand-in cases).
 - **Registers after a call through an entry:** only r3 and f1 come back
   (r4 after tan and ldexp, the framework's tick, DebugText::Create and the

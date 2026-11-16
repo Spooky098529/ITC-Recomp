@@ -16,6 +16,7 @@
 //
 // --native_renderer_library_packets turns the replacement off.
 
+#include "lifted/originals.h"
 #include "draw_packets.h"
 #include "hooks/native_entry.h"
 #include "guest.h"
@@ -217,14 +218,14 @@ void native::DrawPackets_IndexedDraw(lifted::Regs& ctx, uint8_t* base) {
       }
     }
     if (shader_load) {
-      lifted::Sdk(ctx, base, __imp__sub_825BE708);  // its writes are expected
+      lifted::original::c825BE708(ctx, base);  // its writes are expected
     } else {
-      Checked(kDraw, base, device, [&] { lifted::Sdk(ctx, base, __imp__sub_825BE708); });
+      Checked(kDraw, base, device, [&] { lifted::original::c825BE708(ctx, base); });
     }
     return;
   }
   if (ITC_FLAG(native_renderer_library_packets) || predicated) {
-    lifted::Sdk(ctx, base, __imp__sub_825BE708);
+    lifted::original::c825BE708(ctx, base);
     return;
   }
   REX_STORE_U64(device + kDeviceVertexConstantsDirty, 0);

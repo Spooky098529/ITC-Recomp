@@ -88,7 +88,7 @@ ITC_COLLISION_WORLD_PAGES(820F6940, uint32_t r3 = 0;
 ITC_COLLISION_WORLD(820F8600, TrackRoutePrepare(base, ctx.r3.u32))
 ITC_COLLISION_WORLD_PAGES(820F8618, uint32_t r3 = 0;
                           if (!TrackRouteFree(base, ctx.r3.u32, &r3)) {
-                            lifted::Sdk(ctx, base, __imp__sub_820F8618);
+                            lifted::original::c820F8618(ctx, base);
                             return;
                           } ctx.r3.u64 = r3)
 // No arguments; r3 isn't kept (its caller doesn't read it). A block to free

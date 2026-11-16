@@ -7,6 +7,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <unordered_map>
 
 namespace lifted {
@@ -139,11 +140,27 @@ Entry Find(uint32_t address) {
   return nullptr;
 }
 
+// A call the dispatch table can't take (no entry at the address, or its
+// flag off) goes to the SDK's function table: logged once per address, to
+// show what still does (the rewiring, stage 4).
+void NoteFallback(uint32_t address) {
+  static std::mutex mutex;
+  static std::unordered_map<uint32_t, bool> seen;
+  std::lock_guard lock(mutex);
+  if (seen.emplace(address, true).second) {
+    const auto& table = Table();
+    const bool known = table.contains(address);
+    ITC_LOG_INFO("lifted: {:08X} through the SDK's function table ({})", address,
+                 known ? "its entry's flag off" : "no entry");
+  }
+}
+
 Result Call(uint8_t* base, uint32_t address, const Args& args) {
   const auto& table = Table();
   if (const auto it = table.find(address); it != table.end() && *it->second.enabled) {
     return it->second.entry(base, args);
   }
+  NoteFallback(address);
   return Boundary(args, [&](PPCContext& ctx) {
     ctx.ctr.u64 = address;
     REX_CALL_INDIRECT_FUNC(address);
@@ -241,6 +258,7 @@ void CallFromContext(PPCContext& ctx, uint8_t* base, uint32_t address) {
     Enter(ctx, base, entry);
     return;
   }
+  NoteFallback(address);
   REX_CALL_INDIRECT_FUNC(address);
 }
 

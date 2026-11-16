@@ -110,6 +110,7 @@ bool RewiringExpected(const std::string& name) {
     "PartsPoints::DrawTailLights (sub_820DF8B0)",
     "PartsPoints::DrawWithShadow (sub_820E1260)",
     "Quaternion::FromAngles (sub_8217C120)",
+    "Players::ResetControllers (sub_8209F5E0)",
     "RaceSounds::AfterRaceTick (sub_82176C10)",
     "RaceSounds::IdleTick (sub_821767A8)",
     "RaceSounds::RaceTick (sub_821769D0)",

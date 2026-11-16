@@ -2,6 +2,7 @@
 // (docs/functions/scene-models.md), with the register steps the harness
 // shares (hooks/scene_models.h). Each leaves r3 as the original does.
 
+#include "lifted/originals.h"
 #include "hooks/scene_models.h"
 #include "hooks/native_entry.h"
 
@@ -80,7 +81,7 @@ ITC_REGS_STEP(SceneModelsCarModelSetRecord) {
 
 ITC_REGS_STEP(SceneModelsCarRecordCopy) {
   if (!sm::CarRecordCopy(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820D7EE8);
+    lifted::original::c820D7EE8(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();
@@ -89,7 +90,7 @@ ITC_REGS_STEP(SceneModelsCarRecordCopy) {
 
 ITC_REGS_STEP(SceneModelsSceneModelRecordCopy) {
   if (!sm::SceneModelRecordCopy(base, ctx.r3.u32, ctx.r4.u32)) {
-    lifted::Sdk(ctx, base, __imp__sub_820DB290);
+    lifted::original::c820DB290(ctx, base);
     return;
   }
   ctx.fpscr.disableFlushMode();

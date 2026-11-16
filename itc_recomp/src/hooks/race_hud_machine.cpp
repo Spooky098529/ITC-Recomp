@@ -4,6 +4,7 @@
 // and the alternate HUD's functions, run as their plain C++ (their guest
 // calls through this context).
 
+#include "lifted/originals.h"
 #include "hooks/race_hud_machine.h"
 #include "hooks/native_entry.h"
 
@@ -323,7 +324,7 @@ ITC_REGS_STEP(RaceHudMachinePreRaceUpdate) {
 }
 
 ITC_REGS_STEP(RaceHudMachinePreRaceDraw) {
-  Handle(ctx, base, __imp__sub_8216C2A0, [&](const rh::Calls& callees) {
+  Handle(ctx, base, lifted::original::c8216C2A0, [&](const rh::Calls& callees) {
     return rhm::PreRaceDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
   });
 }

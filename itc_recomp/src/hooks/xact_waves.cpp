@@ -2,6 +2,7 @@
 // src/xact/waves.h (docs/functions/xact-waves.md), with the register steps
 // the harness shares (hooks/xact_waves.h).
 
+#include "lifted/originals.h"
 #include "hooks/xact_waves.h"
 #include "hooks/native_entry.h"
 
@@ -303,7 +304,7 @@ void SetCreateVoiceForHarness(std::optional<CreateVoiceStandIn> stand_in) {
 ITC_NATIVE_ENTRY_ALWAYS(825C31D8) {
   
   if (!hooks::create_voice_stand_in) {
-    lifted::Sdk(ctx, base, __imp__sub_825C31D8);
+    lifted::original::c825C31D8(ctx, base);
     return;
   }
   const hooks::CreateVoiceStandIn& s = *hooks::create_voice_stand_in;

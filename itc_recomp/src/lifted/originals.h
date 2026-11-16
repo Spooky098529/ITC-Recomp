@@ -9,6 +9,16 @@
 
 namespace lifted::original {
 
+// sub_82091A60's original.
+Result e82091A60(uint8_t* base, const Args& a);
+// The same for code still holding a context (in place of __imp__sub_82091A60).
+void c82091A60(PPCContext& ctx, uint8_t* base);
+inline void c82091A60(Regs& regs, uint8_t* base) { regs.Apply(e82091A60(base, regs.ToArgs())); }
+// sub_820920D8's original.
+Result e820920D8(uint8_t* base, const Args& a);
+// The same for code still holding a context (in place of __imp__sub_820920D8).
+void c820920D8(PPCContext& ctx, uint8_t* base);
+inline void c820920D8(Regs& regs, uint8_t* base) { regs.Apply(e820920D8(base, regs.ToArgs())); }
 // sub_82099B18's original.
 Result e82099B18(uint8_t* base, const Args& a);
 // The same for code still holding a context (in place of __imp__sub_82099B18).
@@ -224,6 +234,11 @@ Result e820D7D38(uint8_t* base, const Args& a);
 // The same for code still holding a context (in place of __imp__sub_820D7D38).
 void c820D7D38(PPCContext& ctx, uint8_t* base);
 inline void c820D7D38(Regs& regs, uint8_t* base) { regs.Apply(e820D7D38(base, regs.ToArgs())); }
+// sub_820D7EE8's original.
+Result e820D7EE8(uint8_t* base, const Args& a);
+// The same for code still holding a context (in place of __imp__sub_820D7EE8).
+void c820D7EE8(PPCContext& ctx, uint8_t* base);
+inline void c820D7EE8(Regs& regs, uint8_t* base) { regs.Apply(e820D7EE8(base, regs.ToArgs())); }
 // sub_820D8908's original.
 Result e820D8908(uint8_t* base, const Args& a);
 // The same for code still holding a context (in place of __imp__sub_820D8908).
@@ -234,6 +249,11 @@ Result e820D9570(uint8_t* base, const Args& a);
 // The same for code still holding a context (in place of __imp__sub_820D9570).
 void c820D9570(PPCContext& ctx, uint8_t* base);
 inline void c820D9570(Regs& regs, uint8_t* base) { regs.Apply(e820D9570(base, regs.ToArgs())); }
+// sub_820DB290's original.
+Result e820DB290(uint8_t* base, const Args& a);
+// The same for code still holding a context (in place of __imp__sub_820DB290).
+void c820DB290(PPCContext& ctx, uint8_t* base);
+inline void c820DB290(Regs& regs, uint8_t* base) { regs.Apply(e820DB290(base, regs.ToArgs())); }
 // sub_820F0070's original.
 Result e820F0070(uint8_t* base, const Args& a);
 // The same for code still holding a context (in place of __imp__sub_820F0070).
@@ -244,6 +264,11 @@ Result e820F4128(uint8_t* base, const Args& a);
 // The same for code still holding a context (in place of __imp__sub_820F4128).
 void c820F4128(PPCContext& ctx, uint8_t* base);
 inline void c820F4128(Regs& regs, uint8_t* base) { regs.Apply(e820F4128(base, regs.ToArgs())); }
+// sub_820F8618's original.
+Result e820F8618(uint8_t* base, const Args& a);
+// The same for code still holding a context (in place of __imp__sub_820F8618).
+void c820F8618(PPCContext& ctx, uint8_t* base);
+inline void c820F8618(Regs& regs, uint8_t* base) { regs.Apply(e820F8618(base, regs.ToArgs())); }
 // sub_820FEFB0's original.
 Result e820FEFB0(uint8_t* base, const Args& a);
 // The same for code still holding a context (in place of __imp__sub_820FEFB0).
@@ -284,6 +309,11 @@ Result e82150350(uint8_t* base, const Args& a);
 // The same for code still holding a context (in place of __imp__sub_82150350).
 void c82150350(PPCContext& ctx, uint8_t* base);
 inline void c82150350(Regs& regs, uint8_t* base) { regs.Apply(e82150350(base, regs.ToArgs())); }
+// sub_8216C2A0's original.
+Result e8216C2A0(uint8_t* base, const Args& a);
+// The same for code still holding a context (in place of __imp__sub_8216C2A0).
+void c8216C2A0(PPCContext& ctx, uint8_t* base);
+inline void c8216C2A0(Regs& regs, uint8_t* base) { regs.Apply(e8216C2A0(base, regs.ToArgs())); }
 // sub_821715B8's original.
 Result e821715B8(uint8_t* base, const Args& a);
 // The same for code still holding a context (in place of __imp__sub_821715B8).
@@ -369,5 +399,15 @@ Result e825A7410(uint8_t* base, const Args& a);
 // The same for code still holding a context (in place of __imp__sub_825A7410).
 void c825A7410(PPCContext& ctx, uint8_t* base);
 inline void c825A7410(Regs& regs, uint8_t* base) { regs.Apply(e825A7410(base, regs.ToArgs())); }
+// sub_825BE708's original.
+Result e825BE708(uint8_t* base, const Args& a);
+// The same for code still holding a context (in place of __imp__sub_825BE708).
+void c825BE708(PPCContext& ctx, uint8_t* base);
+inline void c825BE708(Regs& regs, uint8_t* base) { regs.Apply(e825BE708(base, regs.ToArgs())); }
+// sub_825C31D8's original.
+Result e825C31D8(uint8_t* base, const Args& a);
+// The same for code still holding a context (in place of __imp__sub_825C31D8).
+void c825C31D8(PPCContext& ctx, uint8_t* base);
+inline void c825C31D8(Regs& regs, uint8_t* base) { regs.Apply(e825C31D8(base, regs.ToArgs())); }
 
 }  // namespace lifted::original
