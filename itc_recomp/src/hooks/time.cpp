@@ -6,6 +6,7 @@
 
 #include "guest.h"
 #include "hooks/native_entry.h"
+#include "lifted/sdk.h"
 #include "guest_call.h"
 #include "last_error.h"
 
@@ -181,6 +182,12 @@ int64_t GetTimeZoneBias(lifted::Regs& ctx, uint8_t* base) {
     bias = helpers::TimeZoneBias(LoadZone(base, frame + 80), state);
   });
   return bias;
+}
+// The form taking the SDK's context (for the harness, which passes one): on
+// a view of the context.
+int64_t GetTimeZoneBias(PPCContext& ctx, uint8_t* base) {
+  lifted::RegsScope scope(ctx);
+  return GetTimeZoneBias(scope.regs, base);
 }
 
 }  // namespace time_hooks

@@ -122,3 +122,17 @@ ITC_NATIVE_ENTRY(8258F0F0, ITC_FLAG(native_single_commands)) {
 ITC_NATIVE_ENTRY(8258E9B8, ITC_FLAG(native_single_commands)) {
   hooks::NativeSingleCallback(ctx, base);
 }
+
+// The forms taking the SDK's context (for the harnesses, which pass one; the
+// header declares both): each on a view of the context.
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::NativeSingleInlineVertices)
+ITC_CONTEXT_FORM(hooks::NativeSingleSetUpDrawer)
+ITC_CONTEXT_FORM(hooks::NativeSingleSetShaderConstants)
+ITC_CONTEXT_FORM(hooks::NativeSingleDrawerDraw)
+ITC_CONTEXT_FORM(hooks::NativeSingleCallback)
+#undef ITC_CONTEXT_FORM

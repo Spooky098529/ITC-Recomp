@@ -718,3 +718,19 @@ ITC_OPTIONS_LOAD_SAVE(821BCC10, SavePageNote)
 ITC_OPTIONS_LOAD_SAVE(821BBD18, SavePageWait)
 ITC_OPTIONS_LOAD_SAVE(821C6468, LoadPageLeave)
 ITC_OPTIONS_LOAD_SAVE(821C6550, SavePageLeave)
+
+// The forms taking the SDK's context (for the harnesses, which pass one; the
+// header declares both): each on a view of the context.
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::LoadPageClose)
+ITC_CONTEXT_FORM(hooks::OptionsAnalogIndex)
+ITC_CONTEXT_FORM(hooks::OptionsAnalogPicture)
+ITC_CONTEXT_FORM(hooks::OptionsButtonCode)
+ITC_CONTEXT_FORM(hooks::OptionsButtonIndex)
+ITC_CONTEXT_FORM(hooks::SavePageClose)
+ITC_CONTEXT_FORM(hooks::SavePagesCancel)
+#undef ITC_CONTEXT_FORM

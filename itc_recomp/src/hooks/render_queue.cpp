@@ -142,3 +142,16 @@ ITC_NATIVE_ENTRY(8258E5C0, ITC_FLAG(native_render_queue)) {
   ctx.fpscr.disableFlushMode();
   ctx.f1.f64 = double(rq::Sequence(base, ctx.r3.u32));
 }
+
+// The forms taking the SDK's context (for the harnesses, which pass one; the
+// header declares both): each on a view of the context.
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::NativeRenderQueueClearRecording)
+ITC_CONTEXT_FORM(hooks::NativeRenderQueueInit)
+ITC_CONTEXT_FORM(hooks::NativeRenderQueueAdd)
+ITC_CONTEXT_FORM(hooks::NativeRenderQueueReplay)
+#undef ITC_CONTEXT_FORM

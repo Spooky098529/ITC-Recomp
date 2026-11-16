@@ -5,6 +5,7 @@
 
 #include "guest.h"
 #include "hooks/native_entry.h"
+#include "lifted/sdk.h"
 
 #include "base/flags.h"
 #include "car_scene_draw/car_scene_draw.h"
@@ -85,3 +86,15 @@ void hooks::LightGroupsDraw(lifted::Regs& ctx, uint8_t* base) {
 // LightGroups::Draw (sub_82148658) has no adapter (removed 2026-11-13, B7
 // loop): its callers in play, Scenery::DrawArea and Scenery::Draw, call its
 // plain C++; LightGroupsDraw stays as the harness's steps.
+
+// The forms taking the SDK's context (for the harnesses, which pass one; the
+// header declares both): each on a view of the context.
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::BillboardsRecord)
+ITC_CONTEXT_FORM(hooks::BillboardsDraw)
+ITC_CONTEXT_FORM(hooks::LightGroupsDraw)
+#undef ITC_CONTEXT_FORM

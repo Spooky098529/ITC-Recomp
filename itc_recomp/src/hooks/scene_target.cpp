@@ -134,3 +134,14 @@ void hooks::SceneTargetRecordPassesOrOriginal(lifted::Regs& ctx, uint8_t* base) 
   }
   hooks::SceneTargetRecordPasses(ctx, base);
 }
+
+// The forms taking the SDK's context (for the harnesses, which pass one; the
+// header declares both): each on a view of the context.
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::SceneTargetTexturedRect)
+ITC_CONTEXT_FORM(hooks::SceneTargetRecordPasses)
+#undef ITC_CONTEXT_FORM

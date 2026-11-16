@@ -301,3 +301,16 @@ ITC_NATIVE_ENTRY_ALWAYS(82106618) {
   }
   hooks::BootDataLoadSteps(ctx, base);
 }
+
+// The forms taking the SDK's context (for the harnesses, which pass one; the
+// header declares both): each on a view of the context.
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::LoadingScreenLoadSteps)
+ITC_CONTEXT_FORM(hooks::OtherMoviesLoadSteps)
+ITC_CONTEXT_FORM(hooks::CreateObjectsSteps)
+ITC_CONTEXT_FORM(hooks::BootDataLoadSteps)
+#undef ITC_CONTEXT_FORM

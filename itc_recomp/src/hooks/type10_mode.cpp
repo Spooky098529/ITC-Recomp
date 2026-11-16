@@ -297,3 +297,29 @@ ITC_TYPE10_MODE(82289D70, ReplayTheaterShowCursor)
 ITC_TYPE10_MODE(8228A658, ReplayTheaterMoveCursor)
 ITC_TYPE10_MODE(82289E08, ReplayTheaterHideCursor)
 ITC_TYPE10_MODE(82289EB8, ReplayTheaterPickReplay)
+
+// The forms taking the SDK's context (for the harnesses, which pass one; the
+// header declares both): each on a view of the context.
+#define ITC_CONTEXT_FORM(name)                      \
+  void name(PPCContext& ctx, uint8_t* base) {       \
+    lifted::RegsScope scope(ctx);                   \
+    name(scope.regs, base);                         \
+  }
+ITC_CONTEXT_FORM(hooks::ModeType10LeaveScreen)
+ITC_CONTEXT_FORM(hooks::ModeType10Leaving)
+ITC_CONTEXT_FORM(hooks::ModeType10NextMode)
+ITC_CONTEXT_FORM(hooks::ModeType10WaitForLoads)
+ITC_CONTEXT_FORM(hooks::ModeType10WaitForShown)
+ITC_CONTEXT_FORM(hooks::ReplayTheaterFadeInList)
+ITC_CONTEXT_FORM(hooks::ReplayTheaterFadeOut)
+ITC_CONTEXT_FORM(hooks::ReplayTheaterHideCursor)
+ITC_CONTEXT_FORM(hooks::ReplayTheaterIntro)
+ITC_CONTEXT_FORM(hooks::ReplayTheaterMoveCursor)
+ITC_CONTEXT_FORM(hooks::ReplayTheaterOnBack)
+ITC_CONTEXT_FORM(hooks::ReplayTheaterOnFailed)
+ITC_CONTEXT_FORM(hooks::ReplayTheaterOnInterrupt)
+ITC_CONTEXT_FORM(hooks::ReplayTheaterOnResume)
+ITC_CONTEXT_FORM(hooks::ReplayTheaterPickReplay)
+ITC_CONTEXT_FORM(hooks::ReplayTheaterShowCursor)
+ITC_CONTEXT_FORM(hooks::ReplayTheaterShowRecord)
+#undef ITC_CONTEXT_FORM
