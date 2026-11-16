@@ -3610,9 +3610,44 @@ Guest stacks stay until E2 (frames are still in guest memory).
    every user is native, then host recursive locks with a readable
    depth", 2026-10-29) become host recursive locks here. Done kind by
    kind, each checked before the next.
+
+   Done (2026-11-16): `src/kernel/`, behind `--native_kernel_sync` (on;
+   read once at start-up), routed in `lifted::Import` by a table of
+   native imports (`kernel/native_imports.h`), so every caller, lifted or
+   hand port, reaches ours; `lifted::ImportFromSdk` is the way back to the
+   SDK for objects ours don't handle.
+   - Spin locks and IRQL (`spin_locks.cpp`): the lock stays a
+     compare-and-swap of the owner's r13 (big-endian) on the game's word;
+     IRQL plugged in (no game code reads the PCR's IRQL byte, +0x18:
+     raising answers 0, lowering does nothing).
+   - Critical sections (`critical_sections.cpp`): a host lock each, by
+     guest address, made on first use; the struct's lock count, recursion
+     count and owner (`[r13 + 256]`) written as the SDK writes them (the
+     lock count big-endian, where the SDK wrote host order).
+   - Events, semaphores and waits (`events.cpp`): objects in guest memory
+     keep their state in their own dispatcher header (type +0, signal
+     state +4, a semaphore's limit +0x10), as the original kernel did;
+     events by handle (`NtCreateEvent`) are host records under handles of
+     ours (`0xE1000000` up, below the SDK's `0xF8000000`); one host mutex
+     and condition variable; timeouts relative, absolute or a poll.
+     Waits on other objects (threads), SDK handles and named events fall
+     back to the SDK, logged once: none did in play.
+     `KeDelayExecutionThread` a host sleep.
+   Checked by attract races, the pad replay (127 s, no error lines, the
+   race at the frame cap) and a frame dump.
 3. **The per-thread block and TLS as ours.** r13's block in guest
    memory filled by our code (the fields the game reads, found by
    reading the lifted code), `KeTls*` over our own slots.
+
+   TLS done (2026-11-16, `kernel/tls.cpp`): each thread's slots are
+   where its thread object points (`[[r13 + 256] + 0x68]` + 4 × slot), as
+   the SDK sets them up; slot numbers from our own table (lowest free
+   first, 256). Checked as above. What game code reads of the per-thread
+   block, from `generated/`: the PCR's +256 (the thread object), +268 (the
+   CPU number, a byte) and +336 (0 for a normal thread: `SetLastError`'s
+   check, `sub_82296E88`); the thread object's +88, +300, +332 and +352
+   (the last error), +0x68 (TLS, through our code). Those are what a block
+   of ours must fill.
 4. **Threads as host threads.** `std::thread` (or SDL's) with a guest
    stack from our memory layer and our per-thread block in r13, for the
    four thread starts the kernel runs today, then the game's main thread
@@ -3620,6 +3655,22 @@ Guest stacks stay until E2 (frames are still in guest memory).
    shows nothing these threads reach still needs the SDK's `XThread`;
    what's left of that (memory imports, the file reads, the audio
    output's) is checked first, and may move this step after part of E2.
+
+   Found (2026-11-16, `--log_imports`' callers): every import still
+   answered by the SDK is called only from the main thread
+   (`NtAllocateVirtualMemory` and `NtFreeVirtualMemory` from the
+   allocation wrappers `82299AE4`, `82299B34`, `82295384`;
+   `KeGetCurrentProcessType`; `ExRegisterTitleTerminateNotification`;
+   the thread calls: `ExCreateThread` from `CreateThread` `825BA3C8`,
+   `Device::CreateWorkers` `822B6ED4` and `XAudioEngine::Init`
+   `8245C3F8`, `NtResumeThread`, `KeResumeThread`,
+   `KeSetBasePriorityThread`, `KeSetAffinityThread`, and
+   `ObReferenceObjectByHandle`/`ObDereferenceObject` on thread handles).
+   The other threads (XAudio's master and workers, the tiling workers,
+   the frame driver's, native audio's) reach only our sync and TLS. So
+   next: `ExCreateThread` and the thread calls ours, those threads host
+   threads with a guest stack and a PCR and thread object of ours; the
+   main thread after E2's memory imports.
 
 Checks at each step: `attract_race.sh 40` as a smoke run, the pad replay
 (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`, ~127 s, no
