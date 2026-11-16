@@ -6254,3 +6254,14 @@ boundary: overridden 128, Native (with Lifted) 204, Dropped 24, never
 called 20, live 73. Imports: 186 called, 30 with a live caller. B7
 (`b7_status.py`): ours 10,556, work left 32. Static map: unported 9 (the Xbox Live mode's two, `xstart`, six the lift can't
 translate, none seen in play).
+
+**2026-11-16, E1's threads and sync (branch `e1-threads-sync-16-11-26`):**
+every import the game calls in play is answered by our code (`src/threads/`,
+`src/memory/memory_imports.cpp`, `src/imports/`; `--log_imports`: 30 imports
+in play, none reaching the SDK), and every thread running game code is a host
+thread of ours (the main thread, the frame driver's four, the tiling worker,
+XAudio's two, native audio's). Attract races, the pad replay (127 s) and frame
+dumps clean. `boundary_status.py` reads the function rows, not the running
+code, so its figures don't move with E1: overridden 128, Native (with Lifted)
+204, Dropped 24, never called 20, live 73; imports: 186 called, 30 with a live
+caller.
