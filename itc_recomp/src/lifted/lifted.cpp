@@ -4,6 +4,7 @@
 #include "lifted/sdk.h"
 
 #include "base/log.h"
+#include "kernel/native_imports.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -167,6 +168,9 @@ Result Call(uint8_t* base, uint32_t address, const Args& args) {
 Result Import(uint8_t* base, ImportFunction* function, const Args& args) {
   if (LoggingImports()) {
     NoteImport(function, args);
+  }
+  if (const kernel::NativeImport native = kernel::FindNativeImport(function)) {
+    return native(base, args);
   }
   return Boundary(args, [&](PPCContext& ctx) { function(ctx, base); });
 }
