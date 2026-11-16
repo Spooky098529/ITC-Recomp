@@ -3303,6 +3303,36 @@ The stages, each leaving the game working and checked:
    the input reads' counts. Today a lifted caller reaches them through
    `lifted::Call`'s boundary with the context's last lr, not its own.
 
+   Done (2026-11-16): every hand port's adapter is a dispatch table entry
+   on our register view (`lifted::Regs`, `src/lifted/regs.h`: r1, r3-r10,
+   r13, f1-f13, ctr, lr and the caller's r31, under the SDK context's
+   names) through `ITC_NATIVE_ENTRY` / `ITC_NATIVE_ENTRY_ALWAYS`
+   (`src/hooks/native_entry.h`), registered under its address with its
+   flag; their REX_FUNCs only check the flag and `lifted::Enter` the entry
+   (stage 4 removes them). Steps have both forms (`ITC_REGS_STEP`: the
+   harnesses keep the context), SDK functions and recompiled fallbacks run
+   on a view through `lifted::Sdk`. Made by
+   `itc_recomp/tools/native_entries.py sweep` and six migration agents,
+   then checked group by group. The registers the view doesn't carry, by
+   the user's calls (2026-11-16, recorded in
+   `docs/loops/expected-differences.md`, 169 harness groups marked
+   "(expected to differ: the rewiring)"): leftover volatile registers for
+   callers (r11, r12, cr) deleted; stack saves of a caller's register 0;
+   registers other than r3 and f1 after a call through an entry not the
+   callee's leftovers. The callers' registers adapters read were passed
+   instead, by what they turned out to be: the per-object recorder's
+   pairing key reads lr and r31 (the part), now carried
+   (`lifted::Args::r31`, `lift.py`'s `LIFTED_ARGS(lr, r31)`); the draws'
+   r24 and r28 (the record context's slots 1-7) and the race draw step's
+   r31 only fed diagnostics, and the action mappers' r25 (held bits 30
+   and 31) came from an uninitialized stack word: 0. `Matrix_Copy`'s motion
+   blur branch only ran for the recompiled MotionBlur::Record (its port
+   notes the copy itself). Left as REX_FUNCs outside `src/lifted/`:
+   `xstart` (the kernel's main thread start) and the C runtime's five
+   `__finally` blocks, which only the recompiled parents' fallbacks reach.
+   The status tools follow the entries (macros making overrides through
+   `ITC_NATIVE_ENTRY`; registrations and `LIFTED_ARGS` name no callee).
+
    The return address travels with the call (the user's call,
    2026-11-15): `lifted::Args::lr`, filled by `Enter` from the context,
    put in the context's lr by the boundary for code still on the SDK
@@ -5928,3 +5958,15 @@ boundary: overridden 268, Native 48, Dropped 24, never called 34, live
 75. Imports: 186 called, 30 with a live caller. B7 (`b7_status.py`):
 ours 9,848, work left 37. Static map: reachable 9,081, ours 9,068,
 unported 2.
+
+**2026-11-16, the rewiring's stage 3 (branch `rewiring-15-11-26`):**
+every hand port's adapter a dispatch table entry on our register view
+(3,548 adapters; `native_entries.py sweep`, six migration agents, a
+validation); calls carry their return address and caller's r31 (the
+batches emitted again). Left as REX_FUNCs outside `src/lifted/`: `xstart`
+and five `__finally` blocks. 169 harness groups expected to differ (the
+user's call), none other; the pad replay ran 127 s with no error lines;
+frame dumps look right. The boundary: overridden 268, Native 48, Dropped
+24, never called 34, live 75. Imports: 186 called, 30 with a live caller.
+B7 (`b7_status.py`): ours 9,848, work left 37. Static map: reachable
+9,076, ours 9,063, unported 2.

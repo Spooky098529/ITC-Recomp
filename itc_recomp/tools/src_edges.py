@@ -49,7 +49,8 @@ How src/ is read (no compiler: a small preprocessor and a brace parser):
              original), reached where the address is and never from the
              dispatcher's callers; when it's a table or vtable, no one's
              (unless it holds a print); else (a plain constant) its parent's
-  key tables KEY_TABLES: tables naming addresses only as lookup keys
+  key tables KEY_TABLES, and the hand ports' dispatch table registrations
+             (itc_entry_registered_X): naming addresses only as lookup keys
              (`info.address == address`) give no edges
   entries    a native function's C++ is its override (`REX_FUNC(sub_X)`,
              written out or made by a macro), every definition holding
@@ -75,7 +76,11 @@ TOKEN = re.compile(r'(?P<str>"(?:\\.|[^"\\\n])*")|(?P<chr>\'(?:\\.|[^\'\\\n])*\'
 SUB = re.compile(r"^sub_([0-9A-F]{8})$")
 IMP = re.compile(r"^__imp__sub_([0-9A-F]{8})$")
 FLAG_BOOL = re.compile(r"ITC_FLAG_BOOL\s*\(\s*(\w+)\s*,\s*(true|false)")
-OPAQUE = re.compile(r"^ITC_(LOG_\w+|NATIVE_RUNNING)$")
+# Macros whose arguments name nothing: the logging, the native prints, and
+# the lifted code's call arguments (LIFTED_ARGS(lr, r31): registers and the
+# call's return address, which after a call that doesn't return can be the
+# next function's start; kept unexpanded).
+OPAQUE = re.compile(r"^(ITC_(LOG_\w+|NATIVE_RUNNING)|LIFTED_ARGS)$")
 RANK = {"plain": 0, "native": 1, "imp": 2, "table": 3}
 KEYWORDS = {"if", "for", "while", "switch", "return", "sizeof", "alignof", "decltype",
             "static_assert", "catch", "new", "delete", "case", "do", "else", "throw"}
@@ -785,6 +790,8 @@ def parse_all():
         if rel.startswith("base" + os.sep):
             continue
         for name, m in macros.items():
+            if OPAQUE.match(name):
+                continue
             macros_by_name[name].append((rel, m))
 
     parsers = {}
@@ -848,6 +855,11 @@ def parse_all():
             analyze_body(d, flag_default, aliases, file_ns[d.file])
     for d in defs:
         if (d.file.replace(os.sep, "/"), d.name) in KEY_TABLES:
+            d.hexes = set()
+        # A hand port's registration in the dispatch table
+        # (hooks/native_entry.h's ITC_NATIVE_ENTRY, since the rewiring's
+        # stage 3) names its own address only as the key.
+        elif d.name.startswith("itc_entry_registered_"):
             d.hexes = set()
 
     # Resolution: visible definitions of a name.

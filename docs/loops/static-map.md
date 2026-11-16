@@ -2,19 +2,19 @@
 
 Made by `itc_recomp/tools/static_map.py` on every run; never edit it by hand (run the tool again). What it reads, how edges are found and its gaps: the tool's docstring and "The static map" in `docs/coverage.md`.
 
-Made 2026-11-15 at commit `1a330454` (`rewiring-15-11-26`).
+Made 2026-11-16 at commit `3aec3119` (`rewiring-15-11-26`).
 
 ## Totals
 
 - Recompiled `sub_` functions: 16552; 144 jump-table cases folded into their parents, leaving 16408.
-- Reachable: 9081 (7362 from `main`, 1719 more from 190 extra roots: functions seen in play that `main` doesn't reach, 2 of them not under another).
-- Ours: 9068. Excluded (replaced libraries): 11.
+- Reachable: 9076 (7322 from `main`, 1754 more from 190 extra roots: functions seen in play that `main` doesn't reach, 2 of them not under another).
+- Ours: 9063. Excluded (replaced libraries): 11.
 - **Unported: 2** (1 under `main`): seen in play 1, never seen 1; 805 generated lines.
 - Of the unported, 1 hang under unported code (or a root); 1 are reached only through ours (0 seen in play), 1 of them called by our C++ itself (a guest call by name or address, a fallback for a branch, a table or vtable it stores) and the rest under those; the TSV's `behind_ours` column lists them.
-- Ours functions' edges come from our C++ (`src_edges.py`): 37225 definitions in 1201 files of `src/` (harnesses left out), 9689 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 9060 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
+- Ours functions' edges come from our C++ (`src_edges.py`): 51793 definitions in 1203 files of `src/` (harnesses left out), 9689 functions with C++ (an override or `ITC_NATIVE_RUNNING`), 9055 of them reachable. Ours functions without C++ (Merged, or whose print names no address) keep the original's edges where something still reaches them.
 - Ours functions whose original body is still reachable: 0 (0 from our C++: an `__imp__` fallback when the native C++ declines, or a guest call to a function with neither override nor C++); listed below.
-- Host code no native function's C++ reaches but that names guest functions (constants defined but not resolved to a user, a few hooks' helpers): 3045 functions named, taken as roots; they add 1478 reachable functions.
-- Before 2026-11-14's fix the graph followed the original's edges through ours too: 15901 reachable. **Originals no longer called: 1696** (980 not ours, 716 ours whose work our C++ took in; 140298 lines, 300 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.
+- Host code no native function's C++ reaches but that names guest functions (constants defined but not resolved to a user, a few hooks' helpers): 3050 functions named, taken as roots; they add 1513 reachable functions.
+- Before 2026-11-14's fix the graph followed the original's edges through ours too: 15901 reachable. **Originals no longer called: 1701** (980 not ours, 721 ours whose work our C++ took in; 143158 lines, 301 seen in play): reachable through the original's graph (outside the replaced libraries), not through ours; below, by the native function that left the call out.
 - Frontier (ready now): 2 functions.
 - Reachable functions calling imports: 295 (1 unported).
 - Image read: 13492 code-built data addresses scanned; 181 function pointers in data that no code-built address reaches (136 functions; not edges).
@@ -86,6 +86,7 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_825B13D0` | c-runtime.md | Native | `sub_825AC108`, `sub_825AD4C0`, `sub_825B1368`, `sub_825B6898`, `sub_825B7EB8`, `sub_825BA4A0` | 13 | 6 | 750 | 2 |
 | `sub_82092358` | frame-driver.md | Lifted | `sub_82091A60`, `sub_82091EF8`, `sub_820920D8`, `__savegprlr_24`, `__restgprlr_24` | 11 | 5 | 421 | 7 |
 | `sub_820990F0` | input.md | Overridden | `sub_82591918`, `sub_82591C18`, `__savegprlr_27`, `__restgprlr_27` | 10 | 2 | 648 | 3 |
+| `sub_8211CD90` | ui-movies-game.md | Overridden | `sub_8211B720`, `sub_8211B770`, `sub_8211B800`, `sub_8211B940`, `__savegprlr_20`, `__restgprlr_20`, `__savefpr_26`, `__restfpr_26` | 10 | 0 | 397 | 5 |
 | `sub_8216D6D0` | race-hud-machine.md | Overridden | `sub_8221F7D0`, `sub_822200E0` | 10 | 0 | 804 | 2 |
 | `sub_82299D60` | heap.md | Overridden | `sub_82299208`, `sub_8229A5F4`, `__savegprlr_22`, `__restgprlr_22` | 10 | 4 | 781 | 10 |
 | `sub_8229A930` | heap.md | Overridden | `sub_82298A88`, `sub_8229B16C`, `__savegprlr_19`, `__restgprlr_19` | 10 | 4 | 1031 | 10 |
@@ -99,7 +100,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_822968B8` | functions.md | Overridden | `sub_82297678` | 8 | 0 | 648 | 2 |
 | `sub_82579DA0` | lifted.md | Lifted | `sub_82579D18`, `sub_82579E18`, `sub_8257A498` | 8 | 4 | 498 | 4 |
 | `sub_8209CC38` | sprites.md | Overridden | `sub_8209C6E0`, `__savegprlr_25`, `__restgprlr_25` | 7 | 0 | 551 | 6 |
-| `sub_8211CD90` | ui-movies-game.md | Overridden | `sub_8211B720`, `sub_8211B770`, `__savegprlr_20`, `__restgprlr_20`, `__savefpr_26`, `__restfpr_26` | 7 | 0 | 142 | 4 |
 | `sub_8216D450` | race-hud-machine.md | Overridden | `sub_822157E8`, `sub_82215870`, `sub_822158E8`, `__savegprlr_24`, `__restgprlr_24` | 7 | 3 | 195 | 4 |
 | `sub_8229A648` | heap.md | Overridden | `sub_82298548`, `sub_82299448`, `sub_8229A8DC`, `__savegprlr_25`, `__restgprlr_25` | 7 | 3 | 643 | 7 |
 | `sub_822B0AB0` | functions.md | Overridden | `sub_822B0760`, `sub_822B07B0`, `sub_822B0860`, `__savegprlr_27`, `__restgprlr_27`, `__savefpr_28`, `__restfpr_28` | 7 | 0 | 205 | 4 |
@@ -263,6 +263,8 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8209A0E8` | framework.md | Native | `sub_82091CD0`, `__savegprlr_23`, `__restgprlr_23` | 3 | 1 | 54 | 2 |
 | `sub_8209A458` | framework.md | Overridden | `sub_82091F58` | 3 | 3 | 121 | 0 |
 | `sub_8209E118` | files-and-saves.md | Overridden | `sub_8209DD00`, `sub_822954C8`, `__savegprlr_27` | 3 | 1 | 73 | 1 |
+| `sub_8209F8A0` | cameras.md | Overridden | `sub_820A0CC0` | 3 | 0 | 1268 | 2 |
+| `sub_8209F900` | cameras.md | Overridden | `sub_820A1C30` | 3 | 0 | 1395 | 2 |
 | `sub_820A70F8` | lifted.md | Lifted | `sub_820A7218` | 3 | 1 | 376 | 2 |
 | `sub_820A7180` | lifted.md | Lifted | `sub_820A7218` | 3 | 1 | 376 | 2 |
 | `sub_820A7688` | lifted.md | Lifted | `sub_820A7720` | 3 | 1 | 380 | 2 |
@@ -368,8 +370,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_820A0510` | save-interface.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820A07F0` | models.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_820A0978` | cameras.md | Overridden | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
-| `sub_820A0CC0` | cameras.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
-| `sub_820A1C30` | cameras.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_820A49D0` | files-and-saves.md | Overridden | `sub_82295C08`, `__restgprlr_28` | 2 | 0 | 15 | 1 |
 | `sub_820A4B18` | files-and-saves.md | Overridden | `sub_82295BC8`, `__restgprlr_28` | 2 | 0 | 23 | 1 |
 | `sub_820A52E0` | save-interface.md | Overridden | `__savegprlr_24`, `__restgprlr_24` | 2 | 0 | 27 | 2 |
@@ -626,7 +626,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_82119278` | menu-sounds.md | Lifted | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_82119500` | sound-cues.md | Lifted | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
 | `sub_821197E0` | sound-cues.md | Native | `__savegprlr_26`, `__restgprlr_26` | 2 | 0 | 23 | 2 |
-| `sub_8211B800` | ui-movies-game.md | Native | `sub_8211B310`, `sub_8211B720` | 2 | 0 | 59 | 0 |
 | `sub_8211BD10` | ui-movies-game.md | Overridden | `__savegprlr_23`, `__restgprlr_23` | 2 | 0 | 29 | 2 |
 | `sub_8211CBD8` | ui-movies-game.md | Overridden | `__savegprlr_27`, `__restgprlr_27` | 2 | 0 | 21 | 2 |
 | `sub_8211D2F8` | ui-movies.md | Overridden | `__savegprlr_22`, `__restgprlr_22` | 2 | 0 | 31 | 2 |
@@ -1842,7 +1841,6 @@ Reachable through the original's graph but not through ours: the native function
 | `sub_8211B018` | ui-movies-game.md | Merged | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8211B660` | ui-movies-game.md | Overridden | `sub_8211B310` | 1 | 0 | 30 | 0 |
 | `sub_8211B7B8` | ui-movies-game.md | Native | `sub_8211B310` | 1 | 0 | 30 | 0 |
-| `sub_8211B940` | ui-movies-game.md | Native | `sub_8211B310` | 1 | 0 | 30 | 0 |
 | `sub_8211B9B8` | ui-movies-game.md | Native | `sub_8211B310` | 1 | 0 | 30 | 0 |
 | `sub_8211C1F8` | ui-movies-game.md | Overridden | `__restgprlr_28` | 1 | 0 | 10 | 1 |
 | `sub_8211C2C8` | ui-movies-game.md | Lifted | `__restgprlr_28` | 1 | 0 | 10 | 1 |

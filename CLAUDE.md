@@ -746,7 +746,11 @@ left is the rewiring ("Before E1: the rewiring" in
 was merged into `rexglue-removal-project` 2026-11-15): the kernel's
 entries are listed (five thread starts), and the hand ports' guest calls
 go through `lifted::CallFromContext` (stage 2, done), so only
-`src/lifted/lifted.cpp` reaches the SDK's function table.
+`src/lifted/lifted.cpp` reaches the SDK's function table; every hand
+port's adapter is a dispatch table entry on our register view
+(`lifted::Regs`, `ITC_NATIVE_ENTRY` in `src/hooks/native_entry.h`; stage
+3, done 2026-11-16), 169 harness groups expected to differ since
+(`harnesses/rewiring_expected.cpp`, the user's call).
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

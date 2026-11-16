@@ -225,7 +225,9 @@ outside:
   rewiring goes on, on `rewiring-15-11-26`, as "Before E1: the
   rewiring" in `docs/rexglue-removal.md`: the kernel's entries listed
   (stage 1), the hand ports' guest calls through
-  `lifted::CallFromContext` (stage 2).
+  `lifted::CallFromContext` (stage 2), every hand port an entry on our
+  register view, calls carrying their return address and caller's r31
+  (stage 3, 2026-11-16; the batches emitted again).
 
 ## The user's calls (2026-11-15)
 
