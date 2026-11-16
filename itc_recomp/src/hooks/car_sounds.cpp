@@ -3,6 +3,7 @@
 // (hooks/car_sounds.h).
 
 #include "hooks/car_sounds.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -185,7 +186,7 @@ x3daudio::TanResult GuestTan(void* user, uint32_t sp, double x) {
   ctx.r1.u64 = sp;
   ctx.lr = 0x8248133C;
   ctx.f1.f64 = x;
-  lifted::Enter(ctx, u.base, lifted::entry::e825A8A50);
+  lifted::Enter(ctx, u.base, game::tan);
   ctx.r1.u64 = stack;
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();

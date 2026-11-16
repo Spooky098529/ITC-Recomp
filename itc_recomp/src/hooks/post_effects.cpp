@@ -29,6 +29,7 @@
 // isn't native).
 
 #include "guest.h"
+#include "lifted/names.h"
 #include "lifted/functions.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
@@ -270,7 +271,7 @@ ITC_REGS_STEP(PostEffectsReleaseSurface) {
         [&](uint32_t resource) {
           ctx.r3.u64 = resource;
           ctx.lr = 0x82133CB0;
-          lifted::Enter(ctx, base, lifted::entry::e822A67B0);
+          lifted::Enter(ctx, base, game::Resource::Release);
         }};
     r3 = ReleaseSurface(base, frame, at, calls);
   });
@@ -371,7 +372,7 @@ void hooks::PostEffectsInitBoot(lifted::Regs& ctx, uint8_t* base) {
             ctx.r3.u64 = to;
             ctx.r4.u64 = from;
             ctx.r5.u64 = size;
-            lifted::Enter(ctx, base, lifted::entry::e825A7410);  // memcpy
+            lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
           });
         },
         [&](const std::function<uint32_t(const CreateCalls&)>& create) {
@@ -417,7 +418,7 @@ RecordCalls PostEffectsRecordCalls(lifted::Regs& ctx, uint8_t* base) {
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     ctx.f1.f64 = x;
-    lifted::Enter(ctx, base, lifted::entry::e825A8A50);
+    lifted::Enter(ctx, base, game::tan);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.f1.f64;

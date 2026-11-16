@@ -4,6 +4,7 @@
 
 #include "lifted/entries.h"
 #include "lifted/functions.h"
+#include "lifted/names.h"
 #include "lifted/sdk.h"
 
 #include "base/flags.h"
@@ -27,7 +28,7 @@ ITC_FLAG_BOOL(native_lifted_035, true, "ITC",
 
 namespace lifted {
 
-// sub_82099BA0: lifted from generated/ by lift.py.
+// sub_82099BA0 game::XACTWaveEntry::GetPlayLength: lifted from generated/ by lift.py.
 uint64_t f82099BA0(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82099BA0 (lifted)");
   // lwz r3,24(r3)
@@ -401,7 +402,7 @@ loc_82297518:
   r3 = uint64_t(int64_t(122));
   // bl 0x82296fd0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82296FD0(base, LIFTED_ARGS(0x82297530, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::SetLastError_82296FD0(base, LIFTED_ARGS(0x82297530, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,0
   r3 = uint64_t(int64_t(0));
 loc_82297534:
@@ -412,7 +413,7 @@ loc_82297534:
   return r3;
 }
 
-// sub_822B07B0: lifted from generated/ by lift.py.
+// sub_822B07B0 game::SrgbCurve: lifted from generated/ by lift.py.
 lifted::Result f822B07B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, double f1) {
   ITC_NATIVE_RUNNING("sub_822B07B0 (lifted)");
   uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r31 = 0;
@@ -471,7 +472,7 @@ loc_822B07E0:
   f1 = double(float(f13 * f0));
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A8ED0(base, LIFTED_ARGS(0x822B0804, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x822B0804, r31)); r3 = o.r3; f1 = o.f1; }
   // frsp f1,f1
   lifted::ScalarFloatMode();
   f1 = double(float(f1));
@@ -506,7 +507,7 @@ loc_822B082C:
   f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + 17248)));
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A8ED0(base, LIFTED_ARGS(0x822B0838, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x822B0838, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // frsp f12,f1
@@ -533,7 +534,7 @@ loc_822B0850:
   return {r3, f1};
 }
 
-// sub_822B0860: lifted from generated/ by lift.py.
+// sub_822B0860 game::Bt709Curve: lifted from generated/ by lift.py.
 lifted::Result f822B0860(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, double f1) {
   ITC_NATIVE_RUNNING("sub_822B0860 (lifted)");
   uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r31 = 0;
@@ -592,7 +593,7 @@ loc_822B0890:
   f1 = double(float(f13 * f0));
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A8ED0(base, LIFTED_ARGS(0x822B08B4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x822B08B4, r31)); r3 = o.r3; f1 = o.f1; }
   // frsp f1,f1
   lifted::ScalarFloatMode();
   f1 = double(float(f1));
@@ -627,7 +628,7 @@ loc_822B08DC:
   f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + 17312)));
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A8ED0(base, LIFTED_ARGS(0x822B08E8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x822B08E8, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // frsp f12,f1
@@ -673,7 +674,7 @@ uint64_t f824457CC(uint8_t* base) {
   return r3;
 }
 
-// sub_82488508: lifted from generated/ by lift.py.
+// sub_82488508 game::MovieSource::Skip: lifted from generated/ by lift.py.
 uint64_t f82488508(uint8_t* base, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82488508 (lifted)");
   uint64_t r8 = 0, r9 = 0, r10 = 0, r11 = 0;
@@ -715,7 +716,7 @@ loc_82488538:
   return r3;
 }
 
-// sub_82488548: lifted from generated/ by lift.py.
+// sub_82488548 game::MovieSource::Seek: lifted from generated/ by lift.py.
 uint64_t f82488548(uint8_t* base, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82488548 (lifted)");
   uint64_t r8 = 0, r9 = 0, r10 = 0, r11 = 0;
@@ -781,7 +782,7 @@ uint64_t f824F65C0(uint8_t* base) {
   return r3;
 }
 
-// sub_825A9958: lifted from generated/ by lift.py.
+// sub_825A9958 game::wcslen: lifted from generated/ by lift.py.
 uint64_t f825A9958(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_825A9958 (lifted)");
   uint64_t r10 = 0, r11 = 0;

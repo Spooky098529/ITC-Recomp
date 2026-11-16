@@ -37,6 +37,7 @@ def main(argv):
         '#include "lifted/originals.h"',
         '#include "lifted/entries.h"',
         '#include "lifted/functions.h"',
+        '#include "lifted/names.h"',
         '#include "lifted/sdk.h"',
         "",
         '#include "base/log.h"',

@@ -4,6 +4,7 @@
 
 #include "lifted/entries.h"
 #include "lifted/functions.h"
+#include "lifted/names.h"
 #include "lifted/sdk.h"
 
 #include "base/flags.h"
@@ -82,7 +83,7 @@ uint64_t f825C6918(uint8_t* base, uint64_t r3) {
   return r3;
 }
 
-// sub_825C6988: lifted from generated/ by lift.py.
+// sub_825C6988 game::XACTSoundBank::Notify: lifted from generated/ by lift.py.
 lifted::Result f825C6988(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, double f1) {
   ITC_NATIVE_RUNNING("sub_825C6988 (lifted)");
   uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
@@ -113,7 +114,7 @@ lifted::Result f825C6988(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(int64_t(r1) + 81));
   // bl 0x825a71d0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A71D0(base, LIFTED_ARGS(0x825C69B4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::memset(base, LIFTED_ARGS(0x825C69B4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,104(r1)
   r11 = REX_LOAD_U32(uint32_t(r1) + 104);
   // lbz r10,108(r1)
@@ -147,7 +148,7 @@ lifted::Result f825C6988(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r5 = REX_LOAD_U64(uint32_t(r1) + 88);
   // bl 0x825c1388
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825C1388(base, LIFTED_ARGS(0x825C69F4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTEngine::SendNotification(base, LIFTED_ARGS(0x825C69F4, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,144
   r1 = uint64_t(int64_t(int64_t(r1) + 144));
   // lwz r12,-8(r1)
@@ -172,17 +173,17 @@ lifted::Result f825C6A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-// sub_825C6A18: lifted from generated/ by lift.py.
+// sub_825C6A18 game::XACTCue::DeletingDestructorThunk: lifted from generated/ by lift.py.
 lifted::Result f825C6A18(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, double f1) {
   ITC_NATIVE_RUNNING("sub_825C6A18 (lifted)");
   // addi r3,r3,-12
   r3 = uint64_t(int64_t(int64_t(r3) + -12));
   // b 0x825c7570
-  { const lifted::Result o = f825C7570(base, r1, r13, r3, r4, r5, r6, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTCue::Dtor(base, r1, r13, r3, r4, r5, r6, f1); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
-// sub_825C6B50: lifted from generated/ by lift.py.
+// sub_825C6B50 game::XACTSoundBank::Destroy: lifted from generated/ by lift.py.
 lifted::Result f825C6B50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825C6B50 (lifted)");
   uint64_t r11 = 0, r12 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0, ctr = 0;
@@ -214,7 +215,7 @@ lifted::Result f825C6B50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = REX_LOAD_U32(uint32_t(r31) + 24);
   // bl 0x825bfea0
   // (left out: dead in C++)
-  r3 = f825BFEA0(base, r1, r13, r3);
+  r3 = game::XACTEngine::CheckNotInCallback(base, r1, r13, r3);
   // mr r27,r3
   r27 = r3;
   // cmpwi cr6,r27,0
@@ -300,7 +301,7 @@ loc_825C6BF8:
   return {r3, f1};
 }
 
-// sub_825C6C10: lifted from generated/ by lift.py.
+// sub_825C6C10 game::XACTSoundBank::Prepare: lifted from generated/ by lift.py.
 lifted::Result f825C6C10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825C6C10 (lifted)");
   uint64_t r11 = 0, r12 = 0, r25 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0, ctr = 0;
@@ -338,7 +339,7 @@ lifted::Result f825C6C10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = REX_LOAD_U32(uint32_t(r31) + 24);
   // bl 0x825bfea0
   // (left out: dead in C++)
-  r3 = f825BFEA0(base, r1, r13, r3);
+  r3 = game::XACTEngine::CheckNotInCallback(base, r1, r13, r3);
   // mr r28,r3
   r28 = r3;
   // cmpwi cr6,r28,0
@@ -377,7 +378,7 @@ loc_825C6C78:
   r3 = r31;
   // bl 0x825c6928
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825C6928(base, LIFTED_ARGS(0x825C6C8C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSoundBank::GetCueCount(base, LIFTED_ARGS(0x825C6C8C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi r11,r3,16
   r11 = uint32_t(r3) & 0xFFFF;
   // cmplw cr6,r30,r11
@@ -425,7 +426,7 @@ loc_825C6CA0:
   r3 = uint64_t(int64_t(444));
   // bl 0x822976f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e822976F8(base, LIFTED_ARGS(0x825C6CE4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemAlloc(base, LIFTED_ARGS(0x825C6CE4, r31)); r3 = o.r3; f1 = o.f1; }
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq cr6,0x825c6d04
@@ -461,7 +462,7 @@ loc_825C6D0C:
   r4 = r4 | 32774;
   // bl 0x822976f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e822976F8(base, LIFTED_ARGS(0x825C6D24, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemAlloc(base, LIFTED_ARGS(0x825C6D24, r31)); r3 = o.r3; f1 = o.f1; }
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq cr6,0x825c6d04
@@ -484,7 +485,7 @@ loc_825C6D44:
   r4 = r4 | 32773;
   // bl 0x822976f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e822976F8(base, LIFTED_ARGS(0x825C6D4C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemAlloc(base, LIFTED_ARGS(0x825C6D4C, r31)); r3 = o.r3; f1 = o.f1; }
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq cr6,0x825c6d04
@@ -499,7 +500,7 @@ loc_825C6D44:
   r5 = r31;
   // bl 0x825c67e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825C67E8(base, LIFTED_ARGS(0x825C6D68, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTCue::Ctor(base, LIFTED_ARGS(0x825C6D68, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825C6D68:
   // mr r30,r3
   r30 = r3;
@@ -571,7 +572,7 @@ loc_825C6DB0:
   r3 = REX_LOAD_U32(uint32_t(r31) + 24);
   // bl 0x825c1518
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825C1518(base, LIFTED_ARGS(0x825C6DE4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTEngine::AddCue(base, LIFTED_ARGS(0x825C6DE4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r25
   r3 = r25;
   // bl 0x825db8d4
@@ -626,7 +627,7 @@ lifted::Result f825C6DF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = REX_LOAD_U32(uint32_t(r31) + 24);
   // bl 0x825bfea0
   // (left out: dead in C++)
-  r3 = f825BFEA0(base, r1, r13, r3);
+  r3 = game::XACTEngine::CheckNotInCallback(base, r1, r13, r3);
   // mr r30,r3
   r30 = r3;
   // cmpwi cr6,r30,0
@@ -950,7 +951,7 @@ lifted::Result f825C7018(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-// sub_825C7070: lifted from generated/ by lift.py.
+// sub_825C7070 game::XACTSoundBank::GetState: lifted from generated/ by lift.py.
 lifted::Result f825C7070(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825C7070 (lifted)");
   uint64_t r11 = 0, r12 = 0, r29 = 0, r30 = 0, r31 = 0;
@@ -1089,7 +1090,7 @@ lifted::Result f825C70C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r5 = REX_LOAD_U16(uint32_t(r11) + 15);
   // bl 0x825bfc50
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825BFC50(base, LIFTED_ARGS(0x825C7150, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTHashName(base, LIFTED_ARGS(0x825C7150, r31)); r3 = o.r3; f1 = o.f1; }
   // rlwinm r11,r3,1,15,30
   r11 = __builtin_rotateleft64(uint32_t(r3) | (r3 << 32), 1) & 0x1FFFE;
   // lhzx r4,r11,r30
@@ -1202,7 +1203,7 @@ loc_825C7200:
   return {r3, f1};
 }
 
-// sub_825C7510: lifted from generated/ by lift.py.
+// sub_825C7510 game::XACTSoundBank::AddCueInstance: lifted from generated/ by lift.py.
 lifted::Result f825C7510(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r7, uint64_t r8, double f1) {
   ITC_NATIVE_RUNNING("sub_825C7510 (lifted)");
   uint64_t r5 = 0, r6 = 0, r9 = 0, r10 = 0, r11 = 0;
@@ -1231,7 +1232,7 @@ lifted::Result f825C7510(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-// sub_825C7540: lifted from generated/ by lift.py.
+// sub_825C7540 game::XACTSoundBank::RemoveCueInstance: lifted from generated/ by lift.py.
 lifted::Result f825C7540(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r7, uint64_t r8, double f1) {
   ITC_NATIVE_RUNNING("sub_825C7540 (lifted)");
   uint64_t r5 = 0, r6 = 0, r9 = 0, r10 = 0, r11 = 0;
@@ -1260,7 +1261,7 @@ lifted::Result f825C7540(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-// sub_825C7570: lifted from generated/ by lift.py.
+// sub_825C7570 game::XACTCue::Dtor: lifted from generated/ by lift.py.
 lifted::Result f825C7570(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, double f1) {
   ITC_NATIVE_RUNNING("sub_825C7570 (lifted)");
   uint64_t r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
@@ -1316,7 +1317,7 @@ lifted::Result f825C7570(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r31) + 24, uint32_t(r7));
   // bl 0x825c6148
   // (left out: dead in C++)
-  { const lifted::Result o = f825C6148(base, r1, r13, r3, r5, r6, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTCueBase::Dtor(base, r1, r13, r3, r5, r6, f1); r3 = o.r3; f1 = o.f1; }
   // clrlwi r11,r30,31
   r11 = uint32_t(r30) & 0x1;
   // mr r3,r31
@@ -1331,7 +1332,7 @@ lifted::Result f825C7570(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = r4 | 32773;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825C75E8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825C75E8, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
 loc_825C75EC:
@@ -1405,7 +1406,7 @@ lifted::Result f825C7608(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r31) + 24, uint32_t(r7));
   // bl 0x825c6148
   // (left out: dead in C++)
-  { const lifted::Result o = f825C6148(base, r1, r13, r3, r5, r6, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTCueBase::Dtor(base, r1, r13, r3, r5, r6, f1); r3 = o.r3; f1 = o.f1; }
   // clrlwi r11,r30,31
   r11 = uint32_t(r30) & 0x1;
   // mr r3,r31
@@ -1420,7 +1421,7 @@ lifted::Result f825C7608(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = r4 | 32774;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825C7680, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825C7680, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
 loc_825C7684:
@@ -1448,7 +1449,7 @@ lifted::Result f825C7750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-// sub_825C7860: lifted from generated/ by lift.py.
+// sub_825C7860 game::XACTSoundBankBase::Dtor: lifted from generated/ by lift.py.
 lifted::Result f825C7860(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, double f1) {
   ITC_NATIVE_RUNNING("sub_825C7860 (lifted)");
   uint64_t r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
@@ -1529,14 +1530,14 @@ loc_825C78E4:
   r3 = r31;
   // bl 0x825c6a20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825C6A20(base, LIFTED_ARGS(0x825C78EC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSoundBank::ReleaseWaveBanks(base, LIFTED_ARGS(0x825C78EC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,6
   r4 = uint64_t(int64_t(6));
   // mr r3,r31
   r3 = r31;
   // bl 0x825c6988
   // (left out: dead in C++)
-  { const lifted::Result o = f825C6988(base, r1, r13, r3, r4, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSoundBank::Notify(base, r1, r13, r3, r4, f1); r3 = o.r3; f1 = o.f1; }
   // addi r3,r31,28
   r3 = uint64_t(int64_t(int64_t(r31) + 28));
   // lwz r11,204(r3)
@@ -1573,7 +1574,7 @@ loc_825C792C:
   REX_STORE_U32(uint32_t(r3) + 208, uint32_t(r11));
   // bl 0x825c1f30
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825C1F30(base, LIFTED_ARGS(0x825C793C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTNodePool::FreeChunks(base, LIFTED_ARGS(0x825C793C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32249
   r11 = uint64_t(int64_t(-2113470464));
   // addi r11,r11,21316
@@ -1620,7 +1621,7 @@ lifted::Result f825C7960(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r30 = r4;
   // bl 0x825c7860
   // (left out: dead in C++)
-  { const lifted::Result o = f825C7860(base, r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSoundBankBase::Dtor(base, r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
   // clrlwi r11,r30,31
   r11 = uint32_t(r30) & 0x1;
   // mr r3,r31
@@ -1635,7 +1636,7 @@ lifted::Result f825C7960(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = r4 | 32861;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825C799C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825C799C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
 loc_825C79A0:
@@ -1653,13 +1654,13 @@ loc_825C79A0:
   return {r3, f1};
 }
 
-// sub_825C7A30: lifted from generated/ by lift.py.
+// sub_825C7A30 game::XACTSoundBank::DeletingDestructorThunk: lifted from generated/ by lift.py.
 lifted::Result f825C7A30(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825C7A30 (lifted)");
   // addi r3,r3,-12
   r3 = uint64_t(int64_t(int64_t(r3) + -12));
   // b 0x825c82b8
-  { const lifted::Result o = f825C82B8(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSoundBank::Dtor_825C82B8(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -1994,7 +1995,7 @@ lifted::Result f825C7D40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-// sub_825C7DA8: lifted from generated/ by lift.py.
+// sub_825C7DA8 game::XACTSoundBank::Dtor_825C7DA8: lifted from generated/ by lift.py.
 lifted::Result f825C7DA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, double f1) {
   ITC_NATIVE_RUNNING("sub_825C7DA8 (lifted)");
   uint64_t r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0, ctr = 0;
@@ -2042,7 +2043,7 @@ lifted::Result f825C7DA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r31) + 12, uint32_t(r8));
   // bl 0x825c6a20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825C6A20(base, LIFTED_ARGS(0x825C7DF4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSoundBank::ReleaseWaveBanks(base, LIFTED_ARGS(0x825C7DF4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,252(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 252);
   // cmpwi cr6,r11,0
@@ -2066,13 +2067,13 @@ lifted::Result f825C7DA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = r30;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825C7E20, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825C7E20, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825C7E20:
   // mr r3,r31
   r3 = r31;
   // bl 0x825c7860
   // (left out: dead in C++)
-  { const lifted::Result o = f825C7860(base, r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSoundBankBase::Dtor(base, r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -2087,7 +2088,7 @@ loc_825C7E20:
   return {r3, f1};
 }
 
-// sub_825C82B8: lifted from generated/ by lift.py.
+// sub_825C82B8 game::XACTSoundBank::Dtor_825C82B8: lifted from generated/ by lift.py.
 lifted::Result f825C82B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825C82B8 (lifted)");
   uint64_t r11 = 0, r12 = 0, r30 = 0, r31 = 0;
@@ -2113,7 +2114,7 @@ lifted::Result f825C82B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r30 = r4;
   // bl 0x825c7da8
   // (left out: dead in C++)
-  { const lifted::Result o = f825C7DA8(base, r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSoundBank::Dtor_825C7DA8(base, r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
   // clrlwi r11,r30,31
   r11 = uint32_t(r30) & 0x1;
   // mr r3,r31
@@ -2128,7 +2129,7 @@ lifted::Result f825C82B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = r4 | 32793;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825C82F4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825C82F4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
 loc_825C82F8:
@@ -2146,13 +2147,13 @@ loc_825C82F8:
   return {r3, f1};
 }
 
-// sub_825C8380: lifted from generated/ by lift.py.
+// sub_825C8380 game::XACTWaveBank::DeletingDestructorThunk: lifted from generated/ by lift.py.
 lifted::Result f825C8380(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, double f1) {
   ITC_NATIVE_RUNNING("sub_825C8380 (lifted)");
   // addi r3,r3,-8
   r3 = uint64_t(int64_t(int64_t(r3) + -8));
   // b 0x825c85f8
-  { const lifted::Result o = f825C85F8(base, r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveBank::Dtor(base, r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -2180,7 +2181,7 @@ uint64_t f825C83C8(uint8_t* base, uint64_t r3) {
   return r3;
 }
 
-// sub_825C83D8: lifted from generated/ by lift.py.
+// sub_825C83D8 game::XACTWaveBank::Load: lifted from generated/ by lift.py.
 lifted::Result f825C83D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, double f1) {
   ITC_NATIVE_RUNNING("sub_825C83D8 (lifted)");
   uint64_t r11 = 0, r12 = 0;
@@ -2227,7 +2228,7 @@ lifted::Result f825C83D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r3) + 272, uint32_t(r11));
   // bl 0x825cc610
   // (left out: dead in C++)
-  { const lifted::Result o = f825CC610(base, r1, r13, r3, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveBank::SetPrepared(base, r1, r13, r3, f1); r3 = o.r3; f1 = o.f1; }
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // addi r1,r1,96
@@ -2264,7 +2265,7 @@ uint64_t f825C85D8(uint8_t* base, uint64_t r3) {
   return r3;
 }
 
-// sub_825C85F8: lifted from generated/ by lift.py.
+// sub_825C85F8 game::XACTWaveBank::Dtor: lifted from generated/ by lift.py.
 lifted::Result f825C85F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, double f1) {
   ITC_NATIVE_RUNNING("sub_825C85F8 (lifted)");
   uint64_t r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
@@ -2318,13 +2319,13 @@ lifted::Result f825C85F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = REX_LOAD_U32(uint32_t(r31) + 280);
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825C8650, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825C8650, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825C8650:
   // mr r3,r31
   r3 = r31;
   // bl 0x825cec38
   // (left out: dead in C++)
-  { const lifted::Result o = f825CEC38(base, r1, r13, r3, r5, r6, r7, r8, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveBankBase::Dtor(base, r1, r13, r3, r5, r6, r7, r8, f1); r3 = o.r3; f1 = o.f1; }
   // clrlwi r11,r30,31
   r11 = uint32_t(r30) & 0x1;
   // mr r3,r31
@@ -2339,7 +2340,7 @@ loc_825C8650:
   r4 = r4 | 32796;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825C8674, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825C8674, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
 loc_825C8678:
@@ -2434,7 +2435,7 @@ lifted::Result f825C8708(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-// sub_825C8710: lifted from generated/ by lift.py.
+// sub_825C8710 game::XACTWaveBank::Notify: lifted from generated/ by lift.py.
 lifted::Result f825C8710(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, double f1) {
   ITC_NATIVE_RUNNING("sub_825C8710 (lifted)");
   uint64_t r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0;
@@ -2465,7 +2466,7 @@ lifted::Result f825C8710(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(int64_t(r1) + 81));
   // bl 0x825a71d0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A71D0(base, LIFTED_ARGS(0x825C873C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::memset(base, LIFTED_ARGS(0x825C873C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,104(r1)
   r11 = REX_LOAD_U32(uint32_t(r1) + 104);
   // lbz r10,108(r1)
@@ -2499,7 +2500,7 @@ lifted::Result f825C8710(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r5 = REX_LOAD_U64(uint32_t(r1) + 88);
   // bl 0x825c1388
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825C1388(base, LIFTED_ARGS(0x825C877C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTEngine::SendNotification(base, LIFTED_ARGS(0x825C877C, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,144
   r1 = uint64_t(int64_t(int64_t(r1) + 144));
   // lwz r12,-8(r1)
@@ -2644,7 +2645,7 @@ lifted::Result f825C8808(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = REX_LOAD_U32(uint32_t(r31) + 336);
   // bl 0x822976f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e822976F8(base, LIFTED_ARGS(0x825C8850, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemAlloc(base, LIFTED_ARGS(0x825C8850, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // cmplwi cr6,r4,0
@@ -2805,7 +2806,7 @@ loc_825C8924:
   REX_STORE_U32(uint32_t(r31) + 336, uint32_t(r11));
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825C8968, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825C8968, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r4,8324
   r4 = uint64_t(int64_t(545521664));
   // lwz r3,336(r31)
@@ -2814,7 +2815,7 @@ loc_825C8924:
   r4 = r4 | 1;
   // bl 0x822976f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e822976F8(base, LIFTED_ARGS(0x825C8978, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemAlloc(base, LIFTED_ARGS(0x825C8978, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // mr r4,r3
@@ -2863,7 +2864,7 @@ loc_825C89B8:
   r3 = r31;
   // bl 0x825c8710
   // (left out: dead in C++)
-  { const lifted::Result o = f825C8710(base, r1, r13, r3, r4, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveBank::Notify(base, r1, r13, r3, r4, f1); r3 = o.r3; f1 = o.f1; }
 loc_825C89D4:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
@@ -2898,7 +2899,7 @@ loc_825C89EC:
   REX_STORE_U32(uint32_t(r31) + 332, uint32_t(r11));
   // bl 0x825cc610
   // (left out: dead in C++)
-  { const lifted::Result o = f825CC610(base, r1, r13, r3, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTWaveBank::SetPrepared(base, r1, r13, r3, f1); r3 = o.r3; f1 = o.f1; }
   // b 0x825c89d4
   goto loc_825C89D4;
 }
@@ -3209,7 +3210,7 @@ loc_825C8BF8:
   r4 = r4 | 1;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825C8C10, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825C8C10, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825C8C10:
   // mr r3,r31
   r3 = r31;
@@ -3280,7 +3281,7 @@ lifted::Result f825C8C40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = r4 | 32797;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825C8C7C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825C8C7C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
 loc_825C8C80:
@@ -3398,7 +3399,7 @@ loc_825C8D10:
   if (cr6.eq) goto loc_825C8E00;
   // bl 0x825c6928
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825C6928(base, LIFTED_ARGS(0x825C8D44, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSoundBank::GetCueCount(base, LIFTED_ARGS(0x825C8D44, r31)); r3 = o.r3; f1 = o.f1; }
   // lhz r11,14(r31)
   r11 = REX_LOAD_U16(uint32_t(r31) + 14);
   // clrlwi r10,r3,16
@@ -3490,7 +3491,7 @@ loc_825C8DC8:
   if (cr6.eq) goto loc_825C8E00;
   // bl 0x825c6928
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825C6928(base, LIFTED_ARGS(0x825C8DF0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSoundBank::GetCueCount(base, LIFTED_ARGS(0x825C8DF0, r31)); r3 = o.r3; f1 = o.f1; }
   // lhz r11,14(r31)
   r11 = REX_LOAD_U16(uint32_t(r31) + 14);
   // clrlwi r10,r3,16
@@ -3552,7 +3553,7 @@ lifted::Result f825C8E18(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = r4 | 32799;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825C8E50, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825C8E50, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
 loc_825C8E54:
@@ -3602,7 +3603,7 @@ uint64_t f825C8E68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A7410(base, LIFTED_ARGS(0x825C8E9C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::memcpy_825A7410(base, LIFTED_ARGS(0x825C8E9C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
   // addi r1,r1,96
@@ -3698,7 +3699,7 @@ loc_825C93EC:
   if (cr6.eq) goto loc_825C9540;
   // bl 0x825bfe28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825BFE28(base, LIFTED_ARGS(0x825C942C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTGetTimeMs(base, LIFTED_ARGS(0x825C942C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,28(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 28);
   // mr r30,r3
@@ -3783,7 +3784,7 @@ loc_825C9488:
   if (cr6.eq) goto loc_825C9524;
   // bl 0x825bfe28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825BFE28(base, LIFTED_ARGS(0x825C94C8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTGetTimeMs(base, LIFTED_ARGS(0x825C94C8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,28(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 28);
   // mr r30,r3
@@ -3968,7 +3969,7 @@ loc_825C95E4:
   return {r3, f1};
 }
 
-// sub_825C9AF8: lifted from generated/ by lift.py.
+// sub_825C9AF8 game::XACTSpeakerMask: lifted from generated/ by lift.py.
 uint64_t f825C9AF8(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_825C9AF8 (lifted)");
   uint64_t r11 = 0;
@@ -4033,7 +4034,7 @@ loc_825C9B50:
   return r3;
 }
 
-// sub_825C9C30: lifted from generated/ by lift.py.
+// sub_825C9C30 game::XACTVoice::ExitLoop: lifted from generated/ by lift.py.
 lifted::Result f825C9C30(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825C9C30 (lifted)");
   uint64_t r4 = 0, r31 = 0;
@@ -4047,7 +4048,7 @@ lifted::Result f825C9C30(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-// sub_825C9D18: lifted from generated/ by lift.py.
+// sub_825C9D18 game::XACTVoice::SetOutputs: lifted from generated/ by lift.py.
 lifted::Result f825C9D18(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9) {
   ITC_NATIVE_RUNNING("sub_825C9D18 (lifted)");
   uint64_t r10 = 0, r11 = 0, r12 = 0, r31 = 0, ctr = 0;
@@ -4102,7 +4103,7 @@ loc_825C9D5C:
   REX_STORE_U32(uint32_t(r1) + 84, uint32_t(r11));
   // bl 0x82459ef0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82459EF0(base, LIFTED_ARGS(0x825C9D70, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XAudioVoice::SetOutputVoices_82459EF0(base, LIFTED_ARGS(0x825C9D70, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,0
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt cr6,0x825c9da0
@@ -4141,7 +4142,7 @@ loc_825C9DA0:
   return {r3, f1};
 }
 
-// sub_825C9E90: lifted from generated/ by lift.py.
+// sub_825C9E90 game::XACTVoice::SetMainMatrix: lifted from generated/ by lift.py.
 lifted::Result f825C9E90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9) {
   ITC_NATIVE_RUNNING("sub_825C9E90 (lifted)");
   uint64_t r10 = 0, r11 = 0, r12 = 0, r31 = 0;
@@ -4177,7 +4178,7 @@ lifted::Result f825C9E90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U8(uint32_t(r1) + 88, uint8_t(r10));
   // bl 0x82459f48
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82459F48(base, LIFTED_ARGS(0x825C9EC8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XAudioVoice::SetOutputMatrix(base, LIFTED_ARGS(0x825C9EC8, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -4188,7 +4189,7 @@ lifted::Result f825C9E90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-// sub_825C9ED8: lifted from generated/ by lift.py.
+// sub_825C9ED8 game::XACTVoice::SetOutputVoices: lifted from generated/ by lift.py.
 lifted::Result f825C9ED8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825C9ED8 (lifted)");
   uint64_t r31 = 0;
@@ -4196,11 +4197,11 @@ lifted::Result f825C9ED8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r3,4(r3)
   r3 = REX_LOAD_U32(uint32_t(r3) + 4);
   // b 0x82459ef0
-  { const lifted::Result o = lifted::entry::e82459EF0(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XAudioVoice::SetOutputVoices_82459EF0(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
-// sub_825C9EE0: lifted from generated/ by lift.py.
+// sub_825C9EE0 game::XACTVoice::SetOutputMatrices: lifted from generated/ by lift.py.
 lifted::Result f825C9EE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825C9EE0 (lifted)");
   uint64_t r31 = 0;
@@ -4208,11 +4209,11 @@ lifted::Result f825C9EE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r3,4(r3)
   r3 = REX_LOAD_U32(uint32_t(r3) + 4);
   // b 0x82459f48
-  { const lifted::Result o = lifted::entry::e82459F48(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XAudioVoice::SetOutputMatrix(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
-// sub_825CA3B8: lifted from generated/ by lift.py.
+// sub_825CA3B8 game::XACTVoice::SetReverbSend: lifted from generated/ by lift.py.
 lifted::Result f825CA3B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r9) {
   ITC_NATIVE_RUNNING("sub_825CA3B8 (lifted)");
   uint64_t r8 = 0, r10 = 0, r11 = 0, r12 = 0, r31 = 0;
@@ -4295,7 +4296,7 @@ loc_825CA404:
   REX_STORE_U32(uint32_t(r1) + 100, uint32_t(r11));
   // bl 0x82459f48
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82459F48(base, LIFTED_ARGS(0x825CA438, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XAudioVoice::SetOutputMatrix(base, LIFTED_ARGS(0x825CA438, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,192
   r1 = uint64_t(int64_t(int64_t(r1) + 192));
   // lwz r12,-8(r1)
@@ -4306,7 +4307,7 @@ loc_825CA404:
   return {r3, f1};
 }
 
-// sub_825CA4B8: lifted from generated/ by lift.py.
+// sub_825CA4B8 game::XACTReverb::Create: lifted from generated/ by lift.py.
 lifted::Result f825CA4B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825CA4B8 (lifted)");
   uint64_t r11 = 0, r12 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0, ctr = 0;
@@ -4335,7 +4336,7 @@ lifted::Result f825CA4B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(8));
   // bl 0x822976f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e822976F8(base, LIFTED_ARGS(0x825CA4DC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemAlloc(base, LIFTED_ARGS(0x825CA4DC, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r31,r3
   r31 = r3;
   // li r29,0
@@ -4358,7 +4359,7 @@ lifted::Result f825CA4B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
   // bl 0x8245a7c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e8245A7C8(base, LIFTED_ARGS(0x825CA508, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XAudioCreateSubmixVoice(base, LIFTED_ARGS(0x825CA508, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r30,r3
   r30 = r3;
   // cmpwi cr6,r30,0
@@ -4411,7 +4412,7 @@ loc_825CA538:
   return {r3, f1};
 }
 
-// sub_825CA560: lifted from generated/ by lift.py.
+// sub_825CA560 game::XACTReverb::SetParameters: lifted from generated/ by lift.py.
 lifted::Result f825CA560(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825CA560 (lifted)");
   uint64_t r5 = 0, r6 = 0, r7 = 0, r11 = 0, r12 = 0, r23 = 0, r24 = 0, r25 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
@@ -4594,7 +4595,7 @@ loc_825CA678:
   return {r3, f1};
 }
 
-// sub_825CA680: lifted from generated/ by lift.py.
+// sub_825CA680 game::XACTReverb::Dtor: lifted from generated/ by lift.py.
 lifted::Result f825CA680(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825CA680 (lifted)");
   uint64_t r11 = 0, r12 = 0, r30 = 0, r31 = 0;
@@ -4632,7 +4633,7 @@ lifted::Result f825CA680(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   if (cr6.eq) goto loc_825CA6B8;
   // bl 0x82459e18
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82459E18(base, LIFTED_ARGS(0x825CA6B8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XAudioVoice::Release_82459E18(base, LIFTED_ARGS(0x825CA6B8, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825CA6B8:
   // clrlwi r11,r30,31
   r11 = uint32_t(r30) & 0x1;
@@ -4648,7 +4649,7 @@ loc_825CA6B8:
   r4 = r4 | 32811;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825CA6D4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825CA6D4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
 loc_825CA6D8:
@@ -4674,11 +4675,11 @@ lifted::Result f825CA6F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mr r3,r4
   r3 = r4;
   // b 0x825d1830
-  { const lifted::Result o = f825D1830(base, r1, r13, r3, r5, r6, r7, r8, r9); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTEvent::Cancel(base, r1, r13, r3, r5, r6, r7, r8, r9); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
-// sub_825CA6F8: lifted from generated/ by lift.py.
+// sub_825CA6F8 game::XACTSound::Pause: lifted from generated/ by lift.py.
 lifted::Result f825CA6F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1) {
   ITC_NATIVE_RUNNING("sub_825CA6F8 (lifted)");
   uint64_t r10 = 0, r11 = 0, r12 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0, ctr = 0;
@@ -4735,7 +4736,7 @@ lifted::Result f825CA6F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   if (!cr6.eq) goto loc_825CA75C;
   // bl 0x825bfe28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825BFE28(base, LIFTED_ARGS(0x825CA754, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTGetTimeMs(base, LIFTED_ARGS(0x825CA754, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r3,108(r30)
   REX_STORE_U32(uint32_t(r30) + 108, uint32_t(r3));
   // b 0x825ca794
@@ -4743,7 +4744,7 @@ lifted::Result f825CA6F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
 loc_825CA75C:
   // bl 0x825bfe28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825BFE28(base, LIFTED_ARGS(0x825CA760, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTGetTimeMs(base, LIFTED_ARGS(0x825CA760, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,60(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 60);
   // lwz r10,108(r30)
@@ -4787,7 +4788,7 @@ loc_825CA79C:
   r3 = r31;
   // bl 0x825d05a8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825D05A8(base, LIFTED_ARGS(0x825CA7B0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::Pause(base, LIFTED_ARGS(0x825CA7B0, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r27,r3
   r27 = r3;
   // lwz r31,4(r31)
@@ -4873,7 +4874,7 @@ loc_825CA828:
   r3 = r31;
   // bl 0x825d03b0
   // (left out: dead in C++)
-  { const lifted::Result o = f825D03B0(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::UsesWaveBank(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,0
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne cr6,0x825ca854
@@ -4902,7 +4903,7 @@ loc_825CA854:
   return {r3, f1};
 }
 
-// sub_825CA860: lifted from generated/ by lift.py.
+// sub_825CA860 game::XACTSound::UpdateVolume: lifted from generated/ by lift.py.
 lifted::Result f825CA860(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825CA860 (lifted)");
   uint64_t r12 = 0, r30 = 0, r31 = 0;
@@ -4935,7 +4936,7 @@ loc_825CA884:
   r3 = r31;
   // bl 0x825d0428
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825D0428(base, LIFTED_ARGS(0x825CA88C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::UpdateVolume(base, LIFTED_ARGS(0x825CA88C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r31,4(r31)
   r31 = REX_LOAD_U32(uint32_t(r31) + 4);
   // cmplw cr6,r31,r30
@@ -4990,7 +4991,7 @@ loc_825CA920:
   r3 = r31;
   // bl 0x825d0510
   // (left out: dead in C++)
-  { const lifted::Result o = f825D0510(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1, 0x825CA92C); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::SetOutputVoices(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1, 0x825CA92C); r3 = o.r3; f1 = o.f1; }
   // lwz r31,4(r31)
   r31 = REX_LOAD_U32(uint32_t(r31) + 4);
   // cmplw cr6,r31,r30
@@ -5038,7 +5039,7 @@ loc_825CA960:
   r3 = r31;
   // bl 0x825d0528
   // (left out: dead in C++)
-  { const lifted::Result o = f825D0528(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1, 0x825CA96C); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::SetOutputMatrices(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1, 0x825CA96C); r3 = o.r3; f1 = o.f1; }
   // lwz r31,4(r31)
   r31 = REX_LOAD_U32(uint32_t(r31) + 4);
   // cmplw cr6,r31,r30
@@ -5086,7 +5087,7 @@ loc_825CA9E0:
   r3 = r31;
   // bl 0x825d0558
   // (left out: dead in C++)
-  { const lifted::Result o = f825D0558(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1, 0x825CA9EC); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::SetMainMatrix(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1, 0x825CA9EC); r3 = o.r3; f1 = o.f1; }
   // lwz r31,4(r31)
   r31 = REX_LOAD_U32(uint32_t(r31) + 4);
   // cmplw cr6,r31,r30
@@ -5146,7 +5147,7 @@ loc_825CAA28:
   r3 = r31;
   // bl 0x825d0570
   // (left out: dead in C++)
-  { const lifted::Result o = f825D0570(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, f1, 0x825CAA44); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::SetChannelMatrix(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, f1, 0x825CAA44); r3 = o.r3; f1 = o.f1; }
   // lwz r31,4(r31)
   r31 = REX_LOAD_U32(uint32_t(r31) + 4);
   // cmpwi cr6,r3,0
@@ -5161,7 +5162,7 @@ loc_825CAA50:
   return {r3, f1};
 }
 
-// sub_825CAA58: lifted from generated/ by lift.py.
+// sub_825CAA58 game::XACTSound::AnyTrackBusy: lifted from generated/ by lift.py.
 lifted::Result f825CAA58(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825CAA58 (lifted)");
   uint64_t r12 = 0, r30 = 0, r31 = 0;
@@ -5194,7 +5195,7 @@ loc_825CAA7C:
   r3 = r31;
   // bl 0x825d0590
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825D0590(base, LIFTED_ARGS(0x825CAA84, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::IsBusy(base, LIFTED_ARGS(0x825CAA84, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,0
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne cr6,0x825caab4
@@ -5228,7 +5229,7 @@ loc_825CAAB4:
   goto loc_825CAA9C;
 }
 
-// sub_825CAAC0: lifted from generated/ by lift.py.
+// sub_825CAAC0 game::XACTSound::CheckInstanceLimit: lifted from generated/ by lift.py.
 lifted::Result f825CAAC0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825CAAC0 (lifted)");
   uint64_t r11 = 0, r12 = 0, r31 = 0, ctr = 0;
@@ -5650,7 +5651,7 @@ loc_825CAE70:
   return {r3, f1};
 }
 
-// sub_825CAE90: lifted from generated/ by lift.py.
+// sub_825CAE90 game::XACTSound::Dtor: lifted from generated/ by lift.py.
 lifted::Result f825CAE90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, double f1) {
   ITC_NATIVE_RUNNING("sub_825CAE90 (lifted)");
   uint64_t r4 = 0, r10 = 0, r11 = 0, r12 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0, ctr = 0;
@@ -5831,7 +5832,7 @@ loc_825CAF94:
   REX_STORE_U32(uint32_t(r29) + 0, uint32_t(r11));
   // bl 0x825cc0d0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825CC0D0(base, LIFTED_ARGS(0x825CAFCC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTFader::Dtor(base, LIFTED_ARGS(0x825CAFCC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6ed8
@@ -5839,7 +5840,7 @@ loc_825CAF94:
   return {r3, f1};
 }
 
-// sub_825CAFD8: lifted from generated/ by lift.py.
+// sub_825CAFD8 game::XACTSound::OnCueGone: lifted from generated/ by lift.py.
 lifted::Result f825CAFD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825CAFD8 (lifted)");
   uint64_t r11 = 0, r12 = 0, r31 = 0, ctr = 0;
@@ -5904,7 +5905,7 @@ lifted::Result f825CAFD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-// sub_825CB040: lifted from generated/ by lift.py.
+// sub_825CB040 game::XACTSound::Update: lifted from generated/ by lift.py.
 lifted::Result f825CB040(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825CB040 (lifted)");
   uint64_t r11 = 0, r12 = 0, r30 = 0, r31 = 0, ctr = 0;
@@ -5934,7 +5935,7 @@ lifted::Result f825CB040(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   if (!cr6.eq) goto loc_825CB08C;
   // bl 0x825caa58
   // (left out: dead in C++)
-  { const lifted::Result o = f825CAA58(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::AnyTrackBusy(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,0
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne cr6,0x825cb08c
@@ -5968,7 +5969,7 @@ loc_825CB09C:
   r3 = r31;
   // bl 0x825d0e30
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825D0E30(base, LIFTED_ARGS(0x825CB0A4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::Update(base, LIFTED_ARGS(0x825CB0A4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r31,4(r31)
   r31 = REX_LOAD_U32(uint32_t(r31) + 4);
   // cmplw cr6,r31,r30
@@ -6012,7 +6013,7 @@ void f825CB188(uint8_t* base, uint64_t r3, uint64_t r4) {
   return;
 }
 
-// sub_825CB1A8: lifted from generated/ by lift.py.
+// sub_825CB1A8 game::XACTSound::SetState: lifted from generated/ by lift.py.
 lifted::Result f825CB1A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825CB1A8 (lifted)");
   uint64_t r0 = 0, r11 = 0, r12 = 0, r30 = 0, r31 = 0, ctr = 0;
@@ -6097,7 +6098,7 @@ loc_825CB1F8:
   r3 = REX_LOAD_U32(uint32_t(r31) + 48);
   // bl 0x825c4a98
   // (left out: dead in C++)
-  { const lifted::Result o = f825C4A98(base, r1, r13, r3, r4, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTCue::Notify(base, r1, r13, r3, r4, f1); r3 = o.r3; f1 = o.f1; }
   // b 0x825cb2c0
   goto loc_825CB2C0;
 loc_825CB238:
@@ -6464,7 +6465,7 @@ uint64_t f825CB708(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   r28 = r6;
   // bl 0x825bfe28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825BFE28(base, LIFTED_ARGS(0x825CB728, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTGetTimeMs(base, LIFTED_ARGS(0x825CB728, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r27,r3
   r27 = r3;
   // lwz r26,40(r31)
@@ -6477,7 +6478,7 @@ uint64_t f825CB708(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   r3 = uint64_t(int64_t(int64_t(r1) + 80));
   // bl 0x825a71d0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A71D0(base, LIFTED_ARGS(0x825CB740, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::memset(base, LIFTED_ARGS(0x825CB740, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,60(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 60);
   // addi r6,r31,56
@@ -6597,7 +6598,7 @@ loc_825CB810:
   return r3;
 }
 
-// sub_825CB958: lifted from generated/ by lift.py.
+// sub_825CB958 game::XACTSound::Ctor: lifted from generated/ by lift.py.
 lifted::Result f825CB958(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6) {
   ITC_NATIVE_RUNNING("sub_825CB958 (lifted)");
   uint64_t r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0, ctr = 0;
@@ -6635,7 +6636,7 @@ lifted::Result f825CB958(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
   // bl 0x825cc0a0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825CC0A0(base, LIFTED_ARGS(0x825CB98C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTFader::Ctor(base, LIFTED_ARGS(0x825CB98C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lis r7,-32249
@@ -6810,7 +6811,7 @@ loc_825CBAB0:
   r3 = r31;
   // bl 0x825cb1a8
   // (left out: dead in C++)
-  { const lifted::Result o = f825CB1A8(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::SetState(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
   // addi r1,r1,144
@@ -6846,7 +6847,7 @@ lifted::Result f825CBAD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r30 = r4;
   // bl 0x825cae90
   // (left out: dead in C++)
-  { const lifted::Result o = f825CAE90(base, r1, r13, r3, r5, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::Dtor(base, r1, r13, r3, r5, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
   // clrlwi r11,r30,31
   r11 = uint32_t(r30) & 0x1;
   // mr r3,r31
@@ -6861,7 +6862,7 @@ lifted::Result f825CBAD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = r4 | 32864;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x825CBB0C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XMemFree(base, LIFTED_ARGS(0x825CBB0C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
 loc_825CBB10:
@@ -6879,7 +6880,7 @@ loc_825CBB10:
   return {r3, f1};
 }
 
-// sub_825CBB28: lifted from generated/ by lift.py.
+// sub_825CBB28 game::XACTSound::Play: lifted from generated/ by lift.py.
 lifted::Result f825CBB28(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_825CBB28 (lifted)");
   uint64_t r11 = 0, r12 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0, ctr = 0;
@@ -6925,7 +6926,7 @@ lifted::Result f825CBB28(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x825caac0
   // (left out: dead in C++)
-  { const lifted::Result o = f825CAAC0(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::CheckInstanceLimit(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,1
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 1, so);
   // beq cr6,0x825cbb88
@@ -6948,7 +6949,7 @@ loc_825CBB88:
   r3 = r31;
   // bl 0x825cb1a8
   // (left out: dead in C++)
-  { const lifted::Result o = f825CB1A8(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::SetState(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // lis r3,-30009
   r3 = uint64_t(int64_t(-1966669824));
   // ori r3,r3,8
@@ -6972,7 +6973,7 @@ loc_825CBBAC:
   r3 = r30;
   // bl 0x825d01d0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825D01D0(base, LIFTED_ARGS(0x825CBBBC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::Play(base, LIFTED_ARGS(0x825CBBBC, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r29,r3
   r29 = r3;
   // lwz r30,4(r30)
@@ -6990,7 +6991,7 @@ loc_825CBBD0:
   if (cr6.lt) goto loc_825CBC14;
   // bl 0x825bfe28
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825BFE28(base, LIFTED_ARGS(0x825CBBDC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTGetTimeMs(base, LIFTED_ARGS(0x825CBBDC, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r4,4
@@ -7001,7 +7002,7 @@ loc_825CBBD0:
   REX_STORE_U32(uint32_t(r31) + 100, uint32_t(r11));
   // bl 0x825cb1a8
   // (left out: dead in C++)
-  { const lifted::Result o = f825CB1A8(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::SetState(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // b 0x825cbc14
   goto loc_825CBC14;
 loc_825CBBF4:
@@ -7061,7 +7062,7 @@ loc_825CBC14:
   return {r3, f1};
 }
 
-// sub_825CBC58: lifted from generated/ by lift.py.
+// sub_825CBC58 game::XACTSound::Stop: lifted from generated/ by lift.py.
 lifted::Result f825CBC58(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825CBC58 (lifted)");
   uint64_t r11 = 0, r12 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0;
@@ -7096,7 +7097,7 @@ lifted::Result f825CBC58(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = uint64_t(int64_t(0));
   // bl 0x825ca6f8
   // (left out: dead in C++)
-  { const lifted::Result o = f825CA6F8(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::Pause(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
   // li r28,1
   r28 = uint64_t(int64_t(1));
 loc_825CBC8C:
@@ -7139,7 +7140,7 @@ loc_825CBCC8:
   r3 = r30;
   // bl 0x825cb1a8
   // (left out: dead in C++)
-  { const lifted::Result o = f825CB1A8(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::SetState(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // lwz r31,40(r30)
   r31 = REX_LOAD_U32(uint32_t(r30) + 40);
   // addi r30,r30,36
@@ -7155,7 +7156,7 @@ loc_825CBCDC:
   r3 = r31;
   // bl 0x825d01d8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825D01D8(base, LIFTED_ARGS(0x825CBCF0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::Stop(base, LIFTED_ARGS(0x825CBCF0, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r29,r3
   r29 = r3;
   // lwz r31,4(r31)
@@ -7174,7 +7175,7 @@ loc_825CBD00:
   return {r3, f1};
 }
 
-// sub_825CBD10: lifted from generated/ by lift.py.
+// sub_825CBD10 game::XACTSound::AudioUpdate: lifted from generated/ by lift.py.
 lifted::Result f825CBD10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1) {
   ITC_NATIVE_RUNNING("sub_825CBD10 (lifted)");
   uint64_t r11 = 0, r12 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0, ctr = 0;
@@ -7249,7 +7250,7 @@ loc_825CBD80:
   r3 = r28;
   // bl 0x825cb1a8
   // (left out: dead in C++)
-  { const lifted::Result o = f825CB1A8(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::SetState(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // lbz r11,52(r28)
   r11 = REX_LOAD_U8(uint32_t(r28) + 52);
   // rlwinm r10,r11,0,25,25
@@ -7267,7 +7268,7 @@ loc_825CBD80:
   REX_STORE_U8(uint32_t(r28) + 52, uint8_t(r11));
   // bl 0x825cbb28
   // (left out: dead in C++)
-  { const lifted::Result o = f825CBB28(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::Play(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,0
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // blt cr6,0x825cc088
@@ -7328,7 +7329,7 @@ loc_825CBE10:
   r3 = r31;
   // bl 0x825d0d88
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825D0D88(base, LIFTED_ARGS(0x825CBE18, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTrack::AudioUpdate(base, LIFTED_ARGS(0x825CBE18, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r31,4(r31)
   r31 = REX_LOAD_U32(uint32_t(r31) + 4);
   // cmplw cr6,r31,r30
@@ -7399,7 +7400,7 @@ loc_825CBE84:
   r3 = uint64_t(int64_t(int64_t(r1) + 80));
   // bl 0x825ba0c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825BA0C8(base, LIFTED_ARGS(0x825CBE9C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::QueryPerformanceCounter(base, LIFTED_ARGS(0x825CBE9C, r31)); r3 = o.r3; f1 = o.f1; }
   // ld r11,80(r1)
   r11 = REX_LOAD_U64(uint32_t(r1) + 80);
   // mulli r9,r11,1000
@@ -7429,7 +7430,7 @@ loc_825CBECC:
   r3 = uint64_t(int64_t(int64_t(r28) + 4));
   // bl 0x825cc1d0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825CC1D0(base, LIFTED_ARGS(0x825CBED4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTFader::Step(base, LIFTED_ARGS(0x825CBED4, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,0
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq cr6,0x825cbee4
@@ -7438,7 +7439,7 @@ loc_825CBECC:
   r3 = r28;
   // bl 0x825ca860
   // (left out: dead in C++)
-  { const lifted::Result o = f825CA860(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::UpdateVolume(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
 loc_825CBEE4:
   // lwz r10,40(r28)
   r10 = REX_LOAD_U32(uint32_t(r28) + 40);
@@ -7485,7 +7486,7 @@ loc_825CBF2C:
   r3 = r28;
   // bl 0x825cb1a8
   // (left out: dead in C++)
-  { const lifted::Result o = f825CB1A8(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::SetState(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,144
   r1 = uint64_t(int64_t(int64_t(r1) + 144));
   // b 0x825a6ed0
@@ -7494,7 +7495,7 @@ loc_825CBF2C:
 loc_825CBF40:
   // bl 0x822956f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e822956F0(base, LIFTED_ARGS(0x825CBF44, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::GetTickCount(base, LIFTED_ARGS(0x825CBF44, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825CBF44:
   // lwz r11,32(r28)
   r11 = REX_LOAD_U32(uint32_t(r28) + 32);
@@ -7536,7 +7537,7 @@ loc_825CBF88:
   r3 = r31;
   // bl 0x825d1b40
   // (left out: dead in C++)
-  { const lifted::Result o = f825D1B40(base, r1, r13, r3, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTTransitionEvent::IsDue(base, r1, r13, r3, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,0
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq cr6,0x825cbfc8
@@ -7558,7 +7559,7 @@ loc_825CBFB0:
   r31 = REX_LOAD_U32(uint32_t(r3) + 4);
   // bl 0x825d1830
   // (left out: dead in C++)
-  { const lifted::Result o = f825D1830(base, r1, r13, r3, r5, r6, r7, r8, r9); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTEvent::Cancel(base, r1, r13, r3, r5, r6, r7, r8, r9); r3 = o.r3; f1 = o.f1; }
   // mr r3,r31
   r3 = r31;
   // cmplw cr6,r31,r30
@@ -7572,7 +7573,7 @@ loc_825CBFC8:
   r3 = r31;
   // bl 0x825d1830
   // (left out: dead in C++)
-  { const lifted::Result o = f825D1830(base, r1, r13, r3, r5, r6, r7, r8, r9); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTEvent::Cancel(base, r1, r13, r3, r5, r6, r7, r8, r9); r3 = o.r3; f1 = o.f1; }
 loc_825CBFD0:
   // mr r31,r29
   r31 = r29;
@@ -7639,7 +7640,7 @@ loc_825CC038:
   r29 = REX_LOAD_U32(uint32_t(r10) + 24);
   // bl 0x825d18f0
   // (left out: dead in C++)
-  r3 = f825D18F0(base, r3);
+  r3 = game::XACTEvent::GetStartTime(base, r3);
   // subf r11,r30,r29
   r11 = r29 - r30;
   // cmpw cr6,r11,r3
@@ -7666,7 +7667,7 @@ loc_825CC038:
   REX_STORE_U32(uint32_t(r31) + 8, uint32_t(r31));
   // bl 0x825d1918
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825D1918(base, LIFTED_ARGS(0x825CC07C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTEvent::Schedule(base, LIFTED_ARGS(0x825CC07C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825CC07C:
   // mr r31,r27
   r31 = r27;
@@ -7691,7 +7692,7 @@ lifted::Result f825CC090(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r3,r3,-4
   r3 = uint64_t(int64_t(int64_t(r3) + -4));
   // b 0x825cbc58
-  { const lifted::Result o = f825CBC58(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::XACTSound::Stop(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 

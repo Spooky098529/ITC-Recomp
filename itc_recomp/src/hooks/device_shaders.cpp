@@ -14,6 +14,7 @@
 // C++.
 
 #include "guest.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -44,7 +45,7 @@ dsh::ShaderCalls Calls(lifted::Regs& ctx, uint8_t* base, uint32_t release_at) {
   calls.release = [&ctx, base, release_at](uint32_t resource) {
     ctx.r3.u64 = resource;
     ctx.lr = release_at;
-    lifted::Enter(ctx, base, lifted::entry::e822A67B0);
+    lifted::Enter(ctx, base, game::Resource::Release);
     return ctx.r3.u32;
   };
   calls.memcpy = [&ctx, base](uint32_t destination, uint32_t source, uint32_t size,
@@ -53,7 +54,7 @@ dsh::ShaderCalls Calls(lifted::Regs& ctx, uint8_t* base, uint32_t release_at) {
     ctx.r4.u64 = source;
     ctx.r5.u64 = size;
     ctx.lr = at;
-    lifted::Enter(ctx, base, lifted::entry::e825A7410);
+    lifted::Enter(ctx, base, game::memcpy_825A7410);
   };
   return calls;
 }

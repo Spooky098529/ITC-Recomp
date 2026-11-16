@@ -12,6 +12,7 @@
 // docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "lifted/names.h"
 #include "lifted/functions.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
@@ -157,7 +158,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E210) {
     ctx.r4.u64 = size;
     ctx.r5.u64 = type;
     ctx.r6.u64 = 4;
-    call(return_address, [&] { lifted::Enter(ctx, base, lifted::entry::e82295398); });
+    call(return_address, [&] { lifted::Enter(ctx, base, game::VirtualAlloc); });
     return ctx.r3.u32;
   };
   auto report_error = [&](uint32_t return_address) {
@@ -207,7 +208,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E210) {
       continue;
     }
     ctx.r3.u64 = object_address;
-    call(return_address, [&] { lifted::Enter(ctx, base, lifted::entry::e82592670); });
+    call(return_address, [&] { lifted::Enter(ctx, base, game::Semaphore::Wait); });
   }
   // BUILD.TOC and BUILD_CRS.TOC, then BUILD.DAT and BUILD_CRS.DAT.
   if (!ReadWhole(base, 0x82001E54, toc[0], toc_size[0])) {
@@ -248,7 +249,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E118) {
       return;
     }
     ctx.r3.u64 = object;
-    call(return_address, [&] { lifted::Enter(ctx, base, lifted::entry::e82592670); });
+    call(return_address, [&] { lifted::Enter(ctx, base, game::Semaphore::Wait); });
   };
   auto signal = [&](uint32_t object, uint32_t return_address) {
     if (archive::HostSemaphore* s = hooks::ArchiveSemaphore(object)) {
@@ -256,7 +257,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E118) {
       return;
     }
     ctx.r3.u64 = object;
-    call(return_address, [&] { lifted::Enter(ctx, base, lifted::entry::e825926E8); });
+    call(return_address, [&] { lifted::Enter(ctx, base, game::Semaphore::Signal); });
   };
   // The next request (r3 the current one or 0; r3 the next).
   auto next = [&](uint32_t current) {
@@ -265,7 +266,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E118) {
       if (hooks::NativeArchiveQueue()) {
         hooks::ArchiveNextRequest(ctx, base);
       } else {
-        lifted::Enter(ctx, base, lifted::entry::e8209DD98);
+        lifted::Enter(ctx, base, game::Archive::NextRequest);
       }
     });
     return ctx.r3.u32;
@@ -289,7 +290,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E118) {
         ctx.r3.u64 = guest::LoadU32(base, chained + 88);
         ctx.r4.u64 = guest::LoadU32(base, chained + 76);
         ctx.r5.u64 = guest::LoadU32(base, chained + 72);
-        call(0x8209E1B4, [&] { lifted::Enter(ctx, base, lifted::entry::e82294610); });
+        call(0x8209E1B4, [&] { lifted::Enter(ctx, base, game::Ucl::Unpack); });
       }
       if (int32_t(guest::LoadU32(base, request + 52)) == 5) {
         // The read is done: what the APC's routine (sub_8209D808) did.

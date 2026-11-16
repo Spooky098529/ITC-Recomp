@@ -4,6 +4,7 @@
 // the originals' return addresses, from frames like theirs.
 
 #include "guest.h"
+#include "lifted/names.h"
 #include "lifted/functions.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
@@ -32,11 +33,11 @@ ITC_NATIVE_ENTRY(822141E8, ITC_FLAG(native_race_hud)) {
       return;
     case race_hud::HudCall::kRun:
       ctx.r3.u64 = movie.movie;
-      lifted::Enter(ctx, base, lifted::entry::e8211E1B8);
+      lifted::Enter(ctx, base, game::UiMovie::Run);
       return;
     case race_hud::HudCall::kDraw:
       ctx.r3.u64 = movie.movie;
-      lifted::Enter(ctx, base, lifted::entry::e8211D280);
+      lifted::Enter(ctx, base, game::UiMovie::Draw_8211D280);
       return;
     case race_hud::HudCall::kState3:
       // Never seen in play: the original, r3 and r4 as they came.
@@ -46,7 +47,7 @@ ITC_NATIVE_ENTRY(822141E8, ITC_FLAG(native_race_hud)) {
       const uint64_t lr = ctx.lr;
       guest_call::InFrame(ctx, base, 112, 0x8221293C, [&](uint32_t) {
         ctx.r3.u64 = movie.movie;
-        lifted::Enter(ctx, base, lifted::entry::e8211E1B8);
+        lifted::Enter(ctx, base, game::UiMovie::Run);
       });
       ctx.lr = lr;
       return;
@@ -73,14 +74,14 @@ ITC_REGS_STEP(DrawRivalLogo) {
     ctx.r3.u64 = *movie;
     ctx.r4.u64 = 0;
     ctx.lr = 0x82211A74;
-    lifted::Enter(ctx, base, lifted::entry::e8211E1B8);
+    lifted::Enter(ctx, base, game::UiMovie::Run);
     if (ctx.r3.u32 != 0) {
       return;
     }
     ctx.r3.u64 = *movie;
     ctx.r4.u64 = guest::LoadU32(base, entry + 8);
     ctx.lr = 0x82211A88;
-    lifted::Enter(ctx, base, lifted::entry::e8211DF20);
+    lifted::Enter(ctx, base, game::UiMovie::FinishNamed);
     race_hud::RivalLogoFinished(base, entry);
   });
   ctx.lr = lr;

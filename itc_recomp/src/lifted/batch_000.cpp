@@ -4,6 +4,7 @@
 
 #include "lifted/entries.h"
 #include "lifted/functions.h"
+#include "lifted/names.h"
 #include "lifted/sdk.h"
 
 #include "base/flags.h"
@@ -34,7 +35,7 @@ uint64_t f82090840(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // addi r3,r3,-12
   r3 = uint64_t(int64_t(int64_t(r3) + -12));
   // b 0x824936e8
-  r3 = f824936E8(base, r3);
+  r3 = game::MovieSource::AtEnd(base, r3);
   return r3;
 }
 
@@ -45,7 +46,7 @@ uint64_t f82090890(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // addi r3,r3,-20
   r3 = uint64_t(int64_t(int64_t(r3) + -20));
   // b 0x824936e8
-  r3 = f824936E8(base, r3);
+  r3 = game::MovieSource::AtEnd(base, r3);
   return r3;
 }
 
@@ -82,7 +83,7 @@ double f820951D8(uint8_t* base, uint64_t r1, uint64_t r3) {
   return f1;
 }
 
-// sub_821128A0: lifted from generated/ by lift.py.
+// sub_821128A0 game::Bits24::SetAll: lifted from generated/ by lift.py.
 void f821128A0(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_821128A0 (lifted)");
   uint64_t r8 = 0, r9 = 0, r10 = 0, r11 = 0;
@@ -288,7 +289,7 @@ loc_822B43D0:
   return r3;
 }
 
-// sub_822B6070: lifted from generated/ by lift.py.
+// sub_822B6070 game::Device::LockL2: lifted from generated/ by lift.py.
 lifted::Result f822B6070(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_822B6070 (lifted)");
   uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r11 = 0, r12 = 0, r31 = 0;
@@ -762,7 +763,7 @@ lifted::Result f825C09A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   r3 = r30;
   // bl 0x825b9a70
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825B9A70(base, LIFTED_ARGS(0x825C0AFC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::QueryPerformanceFrequency(base, LIFTED_ARGS(0x825C0AFC, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32153
   r11 = uint64_t(int64_t(-2107179008));
   // cmpwi cr6,r3,0
@@ -856,7 +857,7 @@ void f825CFF70(uint8_t* base, uint64_t r3, uint64_t r4) {
   return;
 }
 
-// sub_825D36F0: lifted from generated/ by lift.py.
+// sub_825D36F0 game::XACTTransitionTable::Entry: lifted from generated/ by lift.py.
 uint64_t f825D36F0(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5) {
   ITC_NATIVE_RUNNING("sub_825D36F0 (lifted)");
   uint64_t r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0;
@@ -1014,7 +1015,7 @@ uint64_t f825D9C40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t lr) {
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // b 0x825a71d0
-  { const lifted::Result o = lifted::entry::e825A71D0(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::memset(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return r3;
 }
 

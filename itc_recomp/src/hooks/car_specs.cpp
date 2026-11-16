@@ -16,6 +16,7 @@
 // Tire::InchUp sub_820C46B8) have none: only its plain C++ calls them.
 
 #include "guest.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -54,7 +55,7 @@ namespace {
 // The archive's TOC for an asset (r3 = the id): the guest function.
 uint32_t Toc(lifted::Regs& ctx, uint8_t* base, uint32_t id) {
   ctx.r3.u64 = id;
-  lifted::Enter(ctx, base, lifted::entry::e8209D868);
+  lifted::Enter(ctx, base, game::Archive::Toc);
   return ctx.r3.u32;
 }
 

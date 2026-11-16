@@ -28,6 +28,7 @@
 // refcount::AddRef, lock-free, either way).
 
 #include "native/refcount.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -137,10 +138,10 @@ ITC_NATIVE_ENTRY_ALWAYS(822A67B0) {
   if (HoldsChild(base, object)) {
     ctx.r3.u64 = guest::LoadU32(base, object + kChild);
     ctx.lr = 0x822A6810;
-    lifted::Enter(ctx, base, lifted::entry::e822A67B0);
+    lifted::Enter(ctx, base, game::Resource::Release);
   }
   ctx.r3.u64 = object;
   ctx.lr = 0x822A6818;
-  lifted::Enter(ctx, base, lifted::entry::e822A6210);
+  lifted::Enter(ctx, base, game::Resource::Destroy);
   ctx.r3.u64 = 0;
 }

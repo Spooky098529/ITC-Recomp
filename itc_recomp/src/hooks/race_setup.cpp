@@ -3,6 +3,7 @@
 // (hooks/race_setup.h).
 
 #include "hooks/race_setup.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -188,7 +189,7 @@ ITC_REGS_STEP(RaceSetupCourseRoutesGet) {
     ctx.r4.u64 = source;
     ctx.r5.u64 = rs::kRouteBytes;
     ctx.lr = 0x82101624;
-    lifted::Enter(ctx, base, lifted::entry::e825A7410);
+    lifted::Enter(ctx, base, game::memcpy_825A7410);
     ctx.r1.u64 = r1;
   }
   ctx.r3.u64 = result;
@@ -334,7 +335,7 @@ void GuestRefresh(void* user, uint32_t car) {
   ctx.r1.u64 = call.r1;
   ctx.r3.u64 = car;
   ctx.lr = call.lr;
-  lifted::Enter(ctx, call.base, lifted::entry::e820C4998);
+  lifted::Enter(ctx, call.base, game::Car::Refresh);
   ctx.r1.u64 = r1;
 }
 
@@ -395,22 +396,22 @@ uint64_t SetUpGuestCall(void* user, uint32_t function, const uint64_t args[4], d
   ctx.lr = lr;
   switch (function) {
     case 0x820C4998:
-      lifted::Enter(ctx, call.base, lifted::entry::e820C4998);
+      lifted::Enter(ctx, call.base, game::Car::Refresh);
       break;
     case 0x82112DB0:
-      lifted::Enter(ctx, call.base, lifted::entry::e82112DB0);
+      lifted::Enter(ctx, call.base, game::Race::SetUpRival);
       break;
     case 0x82102048:
-      lifted::Enter(ctx, call.base, lifted::entry::e82102048);
+      lifted::Enter(ctx, call.base, game::Race::PlaceRacers);
       break;
     case 0x821017C0:
-      lifted::Enter(ctx, call.base, lifted::entry::e821017C0);
+      lifted::Enter(ctx, call.base, game::Race::AddRacer);
       break;
     case 0x821021A8:
-      lifted::Enter(ctx, call.base, lifted::entry::e821021A8);
+      lifted::Enter(ctx, call.base, game::RaceData::ResetGlobal);
       break;
     case 0x82101D38:
-      lifted::Enter(ctx, call.base, lifted::entry::e82101D38);
+      lifted::Enter(ctx, call.base, game::Race::SetRoute);
       break;
     default:
       ITC_LOG_ERROR("race_setup: no guest call for {:08X}", function);

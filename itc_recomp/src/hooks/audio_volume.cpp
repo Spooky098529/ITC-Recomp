@@ -6,6 +6,7 @@
 // the recompiled function's order.
 
 #include "guest.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "hooks/guest_call.h"
@@ -23,7 +24,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8245B808) {
       ctx.r3.u64 = object;
       ctx.r4.u64 = 0;
       ctx.lr = 0x8245B830;
-      lifted::Enter(ctx, base, lifted::entry::e8245ACE0);
+      lifted::Enter(ctx, base, game::XAudioEngine::RunCallbacks);
       // The change mask: none.
       guest::StoreU32(base, object + 140, 0);
       // The pending count at [82954F08]+304, less one, released to the
@@ -41,21 +42,21 @@ ITC_NATIVE_ENTRY_ALWAYS(8245B808) {
     ctx.r3.u64 = object;
     ctx.r4.u64 = object + 80;
     ctx.lr = 0x8245B8C0;
-    lifted::Enter(ctx, base, lifted::entry::e8245B480);
+    lifted::Enter(ctx, base, game::XAudioEngine::RunStage);
     ctx.r3.u64 = object;
     ctx.r4.u64 = object + 356;
     ctx.lr = 0x8245B8CC;
-    lifted::Enter(ctx, base, lifted::entry::e8245A940);
+    lifted::Enter(ctx, base, game::XAudioEngine::Barrier);
     uint32_t which = 1;
     for (uint32_t i = 0; i < guest::LoadU8(base, object + 128); i++) {
       ctx.r3.u64 = object;
       ctx.r4.u64 = guest::LoadU32(base, object + 124) + 44 * i;
       ctx.lr = 0x8245B8F0;
-      lifted::Enter(ctx, base, lifted::entry::e8245B480);
+      lifted::Enter(ctx, base, game::XAudioEngine::RunStage);
       ctx.r3.u64 = object;
       ctx.r4.u64 = object + 8 * which + 356;
       ctx.lr = 0x8245B904;
-      lifted::Enter(ctx, base, lifted::entry::e8245A940);
+      lifted::Enter(ctx, base, game::XAudioEngine::Barrier);
       which ^= 1;
     }
     if (read_volumes) {
@@ -63,7 +64,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8245B808) {
       ctx.r3.u64 = object;
       ctx.r4.u64 = 1;
       ctx.lr = 0x8245B938;
-      lifted::Enter(ctx, base, lifted::entry::e8245ACE0);
+      lifted::Enter(ctx, base, game::XAudioEngine::RunCallbacks);
     }
   });
 }

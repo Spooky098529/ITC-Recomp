@@ -3,6 +3,7 @@
 // the harness shares (hooks/race_world.h).
 
 #include "hooks/lifted_call.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -348,7 +349,7 @@ rw::StartCalls StartCalls(lifted::Regs& ctx, uint8_t* base, uint32_t setup_frame
         lifted::original::c820C20E0(ctx, base);
         break;
       case 0x821706E8:
-        lifted::Enter(ctx, base, lifted::entry::e821706E8);  // the original, through the harness's stand-in
+        lifted::Enter(ctx, base, game::RaceManager::GiveVehicle);  // the original, through the harness's stand-in
         break;
       case 0x820C0118:
         lifted::original::c820C0118(ctx, base);
@@ -379,7 +380,7 @@ rw::StartCalls StartCalls(lifted::Regs& ctx, uint8_t* base, uint32_t setup_frame
     } else if (address == 0x820B7998) {
       lifted::original::c820B7998(ctx, base);
     } else {
-      lifted::Enter(ctx, base, lifted::entry::e825A7410);  // memcpy, through its override as the original
+      lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy, through its override as the original
     }
     ctx.r1.u64 = saved;
     ctx.fpscr.disableFlushMode();
@@ -449,7 +450,7 @@ rw::OriginalCall OpponentsCall(lifted::Regs& ctx, uint8_t* base) {
     if (address == 0x820C20E0) {
       lifted::original::c820C20E0(ctx, base);
     } else if (address == 0x821706E8) {
-      lifted::Enter(ctx, base, lifted::entry::e821706E8);  // the original, through the harness's stand-in
+      lifted::Enter(ctx, base, game::RaceManager::GiveVehicle);  // the original, through the harness's stand-in
     }
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();

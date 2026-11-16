@@ -25,7 +25,8 @@ How a function is translated (it reads generated/, never edits it):
               address or an import passes them all)
   return      r3 and f1 when the function writes them (a call writes what
               its callee returns); void, uint64_t, double or lifted::Result
-  calls       a lifted function directly, typed; a hand port's entry
+  calls       by the game's names (lifted/names.h) where the rows give one;
+              a lifted function directly, typed; a hand port's entry
               (lifted/entries.h) directly, with every argument register;
               any other address through the dispatch table (lifted::Call,
               which stops the program: none is reached); imports through
@@ -825,6 +826,24 @@ def assign_result(info_callee, call):
 
 
 _ENTRIES = None
+_NAMES = None
+
+
+def names():
+    """The game's names of our functions by address (`game::A::B`, from the
+    rows of docs/functions/: tools/function_names.py, which writes
+    lifted/names.h)."""
+    global _NAMES
+    if _NAMES is None:
+        sys.path.insert(0, TOOLS)
+        import function_names
+        _NAMES = function_names.names_by_address()
+    return _NAMES
+
+
+def name_of(target, fallback):
+    """A call's callee under its game name (lifted/names.h), else `fallback`."""
+    return names().get(target[4:], fallback)
 
 
 def entries():
@@ -886,12 +905,12 @@ def emit_function(info, infos, emitting):
             lr = st.lr or "lr"  # a tail call passes on the function's own
             if is_direct(st, infos, emitting):
                 callee = infos[st.target]
-                call = f"{fname(st.target)}({', '.join(['base'] + callee.params + ([lr] if callee.needs_lr else []))})"
+                call = f"{name_of(st.target, fname(st.target))}({', '.join(['base'] + callee.params + ([lr] if callee.needs_lr else []))})"
                 used.update(callee.params)
                 line = assign_result(callee, call)
             elif st.how == "direct" and st.target[4:] in entries():
                 # A hand port's entry (lifted/entries.h): called directly.
-                line = assign_result(None, f"lifted::entry::e{st.target[4:]}(base, LIFTED_ARGS({lr}, r31))")
+                line = assign_result(None, f"{name_of(st.target, 'lifted::entry::e' + st.target[4:])}(base, LIFTED_ARGS({lr}, r31))")
                 used.update(ALL_ARGS | {"r31"})
             elif st.how == "direct":
                 # No function of ours at the address (not seen in play):
@@ -941,7 +960,8 @@ def emit_function(info, infos, emitting):
         used.add("r3")
     if f1:
         used.add("f1")
-    out.append(f"// {info.name}: lifted from generated/ by lift.py.")
+    named = names().get(info.name[4:])
+    out.append(f"// {info.name}{' ' + named if named else ''}: lifted from generated/ by lift.py.")
     out.append(signature(info) + " {")
     out.append(f'  ITC_NATIVE_RUNNING("{info.name} (lifted)");')
     locals_ = [r for r in GPRS + ["ctr", "reserved", "msr"] if r in used and r not in info.params]
@@ -1007,6 +1027,7 @@ def emit_batch(batch, names, infos, emitting):
         "",
         '#include "lifted/entries.h"',
         '#include "lifted/functions.h"',
+        '#include "lifted/names.h"',
         '#include "lifted/sdk.h"',
         "",
         '#include "base/flags.h"',

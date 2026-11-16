@@ -7,6 +7,7 @@
 // (src/car_draw/morph.cpp), which calls the plain C++.
 
 #include "hooks/morph_jobs.h"
+#include "lifted/names.h"
 #include "lifted/functions.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
@@ -163,7 +164,7 @@ ITC_REGS_STEP(MorphJobsWorkItemInterfaceDestroy) {
 ITC_REGS_STEP(MorphJobsWait) {
   ITC_NATIVE_RUNNING("sub_820AC9B8 MorphJob::Wait");
   ctx.r3.s64 = ctx.r3.s64 + mj::kItem;
-  lifted::Enter(ctx, base, lifted::entry::e82094B10);  // Job::Wait (--find_menu_selection's wrap)
+  lifted::Enter(ctx, base, game::Job::Wait);  // Job::Wait (--find_menu_selection's wrap)
 }
 
 ITC_REGS_STEP(MorphJobsIsReleased) {

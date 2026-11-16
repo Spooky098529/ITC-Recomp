@@ -5,6 +5,7 @@
 // (src/frame_pacing/per_frame_logic.cpp), which runs them.
 
 #include "hooks/minimap.h"
+#include "lifted/names.h"
 #include "lifted/functions.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
@@ -176,7 +177,7 @@ struct MarkerContext {
     m.ctx.r3.u64 = triangle;
     m.ctx.r4.u64 = pass;
     m.ctx.r5.u64 = key;
-    lifted::Enter(m.ctx, m.base, lifted::entry::e8217DAA0);
+    lifted::Enter(m.ctx, m.base, game::Triangle::Record);
     m.ctx.r1.u64 = stack;
   }
   static void Memcpy(void* self, uint32_t to, uint32_t from, uint32_t size) {
@@ -187,7 +188,7 @@ struct MarkerContext {
     m.ctx.r3.u64 = to;
     m.ctx.r4.u64 = from;
     m.ctx.r5.u64 = size;
-    lifted::Enter(m.ctx, m.base, lifted::entry::e825A7410);
+    lifted::Enter(m.ctx, m.base, game::memcpy_825A7410);
     m.ctx.r1.u64 = stack;
   }
 };

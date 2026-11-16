@@ -2,6 +2,7 @@
 // src/ui_movies/ (docs/functions/ui-movies.md).
 
 #include "guest.h"
+#include "lifted/names.h"
 #include "lifted/functions.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
@@ -463,7 +464,7 @@ struct GuestTracks {
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = t;
     ctx.lr = 0x825A0AF4;
-    lifted::Enter(ctx, base, lifted::entry::e825A0548);
+    lifted::Enter(ctx, base, game::UiMovie::ApplyTrack);
     ctx.r1.u64 = stack;
     ctx.lr = lr;
   }
@@ -526,7 +527,7 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
       ctx.r6.u64 = 0;
       ctx.r7.u64 = 0;
       ctx.lr = return_address;
-      lifted::Enter(ctx, base, lifted::entry::e82119B80);
+      lifted::Enter(ctx, base, game::UiMovie::RestorePose);
     };
     // UiMovie::ApplyAnimation on a slot (+12 the tree, +16 the animation,
     // +20 the time); its r3.
@@ -537,7 +538,7 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
       ctx.fpscr.disableFlushMode();
       ctx.f1.f64 = double(guest::LoadFloat(base, slot + 20));
       ctx.lr = return_address;
-      lifted::Enter(ctx, base, lifted::entry::e825A08E0);
+      lifted::Enter(ctx, base, game::UiMovie::ApplyAnimation);
       ctx.fpscr.disableFlushMode();
       return ctx.r3.s32;
     };
@@ -547,7 +548,7 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
       ctx.r4.u64 = slot;
       ctx.r5.s64 = count(local);
       ctx.lr = return_address;
-      lifted::Enter(ctx, base, lifted::entry::e8211B4D0);
+      lifted::Enter(ctx, base, game::AnimationList::Insert);
     };
     // The drawing: UiMovie::Draw, DrawTexts, and sub_8259DAC0 with 678 and
     // 148.
@@ -558,12 +559,12 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
       ctx.r6.u64 = movie + 40;
       ctx.r7.s64 = -1;
       ctx.lr = returns[0];
-      lifted::Enter(ctx, base, lifted::entry::e8259FA00);
+      lifted::Enter(ctx, base, game::UiMovie::Draw_8259FA00);
       ctx.r3.u64 = movie;
       ctx.r4.u64 = movie + 40;
       ctx.r5.u64 = texts_r5;
       ctx.lr = returns[1];
-      lifted::Enter(ctx, base, lifted::entry::e8211CD90);
+      lifted::Enter(ctx, base, game::UiMovie::DrawTexts);
       for (uint32_t k = 0; k < 2; k++) {
         ctx.r3.u64 = movie + 64;
         ctx.r4.u64 = k == 0 ? 678 : 148;
@@ -621,7 +622,7 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
           ctx.r3.u64 = queue;
           ctx.r4.u64 = uint32_t(i);
           ctx.lr = 0x8211D614;
-          lifted::Enter(ctx, base, lifted::entry::e8211B080);
+          lifted::Enter(ctx, base, game::AnimationList::RemoveAt);
           applied--;
           queued--;
           i--;

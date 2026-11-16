@@ -2,6 +2,7 @@
 // (docs/functions/app-start-up.md).
 
 #include "hooks/app_start_up.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -71,7 +72,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822A8980) {
             ctx.r3.u64 = to;
             ctx.r4.u64 = from;
             ctx.r5.u64 = size;
-            lifted::Enter(ctx, base, lifted::entry::e825A7410);  // memcpy
+            lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
           });
         });
     if (declaration) {
@@ -98,7 +99,7 @@ asu::MemcpyCall XNetMemcpy(lifted::Regs& ctx, uint8_t* base) {
       ctx.r3.u64 = to;
       ctx.r4.u64 = from;
       ctx.r5.u64 = size;
-      lifted::Enter(ctx, base, lifted::entry::e825A7410);  // memcpy
+      lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
     });
   };
 }
@@ -225,7 +226,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209BE88) {
       ctx.r9.u64 = 0;
       ctx.r10.u64 = out;
       ctx.lr = which == 0 ? 0x8209BF18 : 0x8209C01C;
-      lifted::Enter(ctx, base, lifted::entry::e822B8F10);  // D3DXCompileShader (the stored shaders)
+      lifted::Enter(ctx, base, game::D3DXCompileShader);  // D3DXCompileShader (the stored shaders)
       return ctx.r3.u32;
     };
     calls.buffer_data = [&](int which, uint32_t buffer) {
@@ -244,13 +245,13 @@ ITC_NATIVE_ENTRY_ALWAYS(8209BE88) {
     calls.vertex_shader = [&](uint32_t data) {
       ctx.r3.u64 = data;
       ctx.lr = 0x8209BF84;
-      lifted::Enter(ctx, base, lifted::entry::e822AA018);  // VertexShader::Create
+      lifted::Enter(ctx, base, game::VertexShader::Create);  // VertexShader::Create
       return ctx.r3.u32;
     };
     calls.pixel_shader = [&](uint32_t data) {
       ctx.r3.u64 = data;
       ctx.lr = 0x8209C084;
-      lifted::Enter(ctx, base, lifted::entry::e822A9EE8);  // PixelShader::Create
+      lifted::Enter(ctx, base, game::PixelShader::Create);  // PixelShader::Create
       return ctx.r3.u32;
     };
     calls.memcpy_call = [&](uint32_t to, uint32_t from, uint32_t size) {
@@ -258,7 +259,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209BE88) {
         ctx.r3.u64 = to;
         ctx.r4.u64 = from;
         ctx.r5.u64 = size;
-        lifted::Enter(ctx, base, lifted::entry::e825A7410);  // memcpy
+        lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
       });
     };
     asu::BillboardsInit(base, frame, calls);
@@ -316,7 +317,7 @@ asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_fram
       ctx.r9.u64 = 0;
       ctx.r10.u64 = out;
       ctx.lr = which == 0 ? 0x8210893C : 0x821089B8;
-      lifted::Enter(ctx, base, lifted::entry::e822B8F10);  // D3DXCompileShader (the stored shaders)
+      lifted::Enter(ctx, base, game::D3DXCompileShader);  // D3DXCompileShader (the stored shaders)
       return ctx.r3.u32;
     });
   };
@@ -334,7 +335,7 @@ asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_fram
     return At(ctx, shaders_frame, [&] {
       ctx.r3.u64 = data;
       ctx.lr = 0x82108954;
-      lifted::Enter(ctx, base, lifted::entry::e822AA018);  // VertexShader::Create
+      lifted::Enter(ctx, base, game::VertexShader::Create);  // VertexShader::Create
       return ctx.r3.u32;
     });
   };
@@ -342,7 +343,7 @@ asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_fram
     return At(ctx, shaders_frame, [&] {
       ctx.r3.u64 = data;
       ctx.lr = 0x821089D0;
-      lifted::Enter(ctx, base, lifted::entry::e822A9EE8);  // PixelShader::Create
+      lifted::Enter(ctx, base, game::PixelShader::Create);  // PixelShader::Create
       return ctx.r3.u32;
     });
   };
@@ -352,7 +353,7 @@ asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_fram
         ctx.r3.u64 = to;
         ctx.r4.u64 = from;
         ctx.r5.u64 = size;
-        lifted::Enter(ctx, base, lifted::entry::e825A7410);  // memcpy
+        lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy
       });
       return 0u;
     });
@@ -883,7 +884,7 @@ void hooks::AppCreateSteps(lifted::Regs& ctx, uint8_t* base) {
       ctx.r3.u64 = app;
       ctx.r4.u64 = entry_r3;
       ctx.lr = 0x82094AE4;
-      lifted::Enter(ctx, base, lifted::entry::e82094590);  // App::App (its adapter: the harness's recorder)
+      lifted::Enter(ctx, base, game::App::Ctor);  // App::App (its adapter: the harness's recorder)
       return ctx.r3.u32;
     });
   });

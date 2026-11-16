@@ -23,6 +23,7 @@
 // (amount 0) and the frames after it move towards the current one.
 
 #include <format>
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "blend_state.h"
 #include "hooks/native_entry.h"
@@ -4316,7 +4317,7 @@ uint32_t AllocateBillboardSlots(void* user, uint32_t count, uint32_t return_addr
   guest_call::InFrame(s.ctx, s.base, 304, return_address, [&](uint32_t) {
     s.ctx.r3.u64 = s.list;
     s.ctx.r4.u64 = count;
-    lifted::Enter(s.ctx, s.base, lifted::entry::e8258CAA0);
+    lifted::Enter(s.ctx, s.base, game::CommandList::AllocateSlots);
     first = s.ctx.r3.u32;
   });
   return first;

@@ -3,6 +3,7 @@
 // shares (hooks/car_models.h).
 
 #include "hooks/car_models.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -179,7 +180,7 @@ ITC_REGS_STEP(CarModelsMakePlate) {
                        [&ctx, base](uint32_t surface) {
                          ctx.r3.u64 = surface;
                          ctx.lr = 0x820ED8E4;
-                         lifted::Enter(ctx, base, lifted::entry::e822A67B0);
+                         lifted::Enter(ctx, base, game::Resource::Release);
                        });
   });
   ctx.lr = lr;
@@ -235,7 +236,7 @@ void CarModelsFileLoaded(lifted::Regs& ctx, uint8_t* base, cm::FileLoadedSet set
       // From MakePlate's frame (944 bytes below this one).
       guest_call::InFrame(ctx, base, cm::kPlateFrameBytes, 0x820ED8E4, [&](uint32_t) {
         ctx.r3.u64 = surface;
-        lifted::Enter(ctx, base, lifted::entry::e822A67B0);
+        lifted::Enter(ctx, base, game::Resource::Release);
       });
     };
     cm::FileLoaded(base, set, request, buffer, car, stack, calls);
@@ -291,7 +292,7 @@ uint32_t CarModelsVinylCompressAt(lifted::Regs& ctx, uint8_t* base, uint32_t wid
                                [&ctx, base](uint32_t surface, int which) {
                                  ctx.r3.u64 = surface;
                                  ctx.lr = which == 0 ? 0x820ED1C0 : 0x820ED1C8;
-                                 lifted::Enter(ctx, base, lifted::entry::e822A67B0);
+                                 lifted::Enter(ctx, base, game::Resource::Release);
                                }};
     r3 = cm::VinylCompress(base, width, height, header_in, data_in, stack, calls);
   });

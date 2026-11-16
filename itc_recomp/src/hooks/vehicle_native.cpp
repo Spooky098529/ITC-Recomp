@@ -3,6 +3,7 @@
 // harness shares (hooks/vehicle_native.h).
 
 #include "hooks/vehicle_native.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -290,7 +291,7 @@ ITC_REGS_STEP(VehiclePlaceOnRoute) {
     if (address == 0x820B7998) {
       lifted::original::c820B7998(ctx, base);
     } else {
-      lifted::Enter(ctx, base, lifted::entry::e825A7410);  // memcpy, through its override as the original
+      lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy, through its override as the original
     }
     ctx.r1.u64 = saved;
     ctx.fpscr.disableFlushMode();

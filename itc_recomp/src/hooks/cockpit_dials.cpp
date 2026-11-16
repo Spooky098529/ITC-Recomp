@@ -41,6 +41,7 @@
 // and poses with the translated code's on logic passes.
 
 #include "frame_pacing/game_messages.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -354,7 +355,7 @@ void DrawNeedle(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t part,
   ctx.r6.u64 = 0, ctx.r7.u64 = 0;
   ctx.lr = lr;
   interpolation::BlendState_SetLivePose(world.data());
-  lifted::Enter(ctx, base, lifted::entry::e820D06F0);
+  lifted::Enter(ctx, base, game::CarPart::Draw);
   interpolation::BlendState_SetLivePose(nullptr);
   ctx.r1.u32 = r1;
 }

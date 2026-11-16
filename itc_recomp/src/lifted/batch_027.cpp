@@ -4,6 +4,7 @@
 
 #include "lifted/entries.h"
 #include "lifted/functions.h"
+#include "lifted/names.h"
 #include "lifted/sdk.h"
 
 #include "base/flags.h"
@@ -36,7 +37,7 @@ lifted::Result f825DACC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-21792
   r3 = uint64_t(int64_t(int64_t(r11) + -21792));
   // b 0x82592638
-  { const lifted::Result o = f82592638(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Semaphore::Dtor(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -49,7 +50,7 @@ lifted::Result f825DACD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-21872
   r3 = uint64_t(int64_t(int64_t(r11) + -21872));
   // b 0x82592638
-  { const lifted::Result o = f82592638(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Semaphore::Dtor(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -62,7 +63,7 @@ lifted::Result f825DACE8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-21832
   r3 = uint64_t(int64_t(int64_t(r11) + -21832));
   // b 0x82592638
-  { const lifted::Result o = f82592638(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Semaphore::Dtor(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -75,7 +76,7 @@ lifted::Result f825DACF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r3,r11,-21912
   r3 = uint64_t(int64_t(int64_t(r11) + -21912));
   // b 0x82592638
-  { const lifted::Result o = f82592638(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Semaphore::Dtor(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -146,7 +147,7 @@ loc_825DAD60:
   r3 = r31;
   // bl 0x8224fb10
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e8224FB10(base, LIFTED_ARGS(0x825DAD6C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::ListNode::Dtor(base, LIFTED_ARGS(0x825DAD6C, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r30,r30,-1
   ca = uint32_t(r30) > 0;
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
@@ -970,7 +971,7 @@ lifted::Result f825DB170(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // addi r3,r11,-18928
   r3 = uint64_t(int64_t(int64_t(r11) + -18928));
   // b 0x82104630
-  { const lifted::Result o = f82104630(base, r1, r13, r3, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::RaceSnapshot::Destroy(base, r1, r13, r3, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -1022,7 +1023,7 @@ lifted::Result f825DB1B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // addi r3,r11,-18928
   r3 = uint64_t(int64_t(int64_t(r11) + -18928));
   // b 0x82104630
-  { const lifted::Result o = f82104630(base, r1, r13, r3, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::RaceSnapshot::Destroy(base, r1, r13, r3, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 

@@ -3,6 +3,7 @@
 // register steps the harness shares (hooks/replay_snapshots.h).
 
 #include "hooks/replay_snapshots.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -59,7 +60,7 @@ replay_snapshots::ReplayCalls ReplayCalls(lifted::Regs& ctx, uint8_t* base, uint
     if (address == 0x820B7998) {
       lifted::original::c820B7998(ctx, base);
     } else {
-      lifted::Enter(ctx, base, lifted::entry::e825A7410);  // memcpy, through its override as the original
+      lifted::Enter(ctx, base, game::memcpy_825A7410);  // memcpy, through its override as the original
     }
     ctx.r1.u64 = saved;
     ctx.fpscr.disableFlushMode();

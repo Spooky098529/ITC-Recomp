@@ -4,6 +4,7 @@
 
 #include "lifted/entries.h"
 #include "lifted/functions.h"
+#include "lifted/names.h"
 #include "lifted/sdk.h"
 
 #include "base/flags.h"
@@ -1156,7 +1157,7 @@ loc_822997FC:
   r3 = uint64_t(int64_t(int64_t(r31) + 128));
   // bl 0x825aa840
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825AA840(base, LIFTED_ARGS(0x82299834, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::memmove(base, LIFTED_ARGS(0x82299834, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r5,308(r31)
   r5 = REX_LOAD_U32(uint32_t(r31) + 308);
 loc_82299838:
@@ -1407,7 +1408,7 @@ loc_822999B8:
   REX_STORE_U32(uint32_t(r31) + 308, uint32_t(r11));
   // bl 0x825a71d0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A71D0(base, LIFTED_ARGS(0x82299A10, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::memset(base, LIFTED_ARGS(0x82299A10, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x82299ab0
   goto loc_82299AB0;
 loc_82299A14:
@@ -1448,7 +1449,7 @@ loc_82299A14:
   r4 = uint64_t(int64_t(0));
   // bl 0x825a71d0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e825A71D0(base, LIFTED_ARGS(0x82299A5C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::memset(base, LIFTED_ARGS(0x82299A5C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,108(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 108);
   // lwz r10,84(r31)
@@ -1997,7 +1998,7 @@ loc_8229D7D0:
   return {r3, f1};
 }
 
-// sub_822AED18: lifted from generated/ by lift.py.
+// sub_822AED18 game::Device::LoadShaders: lifted from generated/ by lift.py.
 lifted::Result f822AED18(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r7, uint64_t r9, double f1, double f2, double f3, double f4, double f5, double f6, double f7, double f8, double f9, double f10, double f11, double f12, double f13) {
   ITC_NATIVE_RUNNING("sub_822AED18 (lifted)");
   uint64_t r5 = 0, r6 = 0, r8 = 0, r10 = 0, r11 = 0, r12 = 0, r20 = 0, r21 = 0, r22 = 0, r23 = 0, r24 = 0, r25 = 0, r26 = 0, r27 = 0, r28 = 0, r29 = 0, r30 = 0, r31 = 0, reserved = 0, msr = 0;
@@ -2225,7 +2226,7 @@ loc_822AEE98:
   r6 = r28;
   // bl 0x822ae340
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e822AE340(base, LIFTED_ARGS(0x822AEEB0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Device::PatchVertexShader(base, LIFTED_ARGS(0x822AEEB0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,48(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 48);
   // cmplwi cr6,r11,0
@@ -2299,7 +2300,7 @@ loc_822AEF0C:
   r3 = r31;
   // bl 0x8229ef48
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e8229EF48(base, LIFTED_ARGS(0x822AEF24, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Device::EndSegment(base, LIFTED_ARGS(0x822AEF24, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
 loc_822AEF28:
@@ -2448,7 +2449,7 @@ loc_822AEFCC:
   r3 = r31;
   // bl 0x8229ef48
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e8229EF48(base, LIFTED_ARGS(0x822AF02C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Device::EndSegment(base, LIFTED_ARGS(0x822AF02C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
 loc_822AF030:
@@ -2647,7 +2648,7 @@ loc_822AF12C:
   r3 = r31;
   // bl 0x8229ef48
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e8229EF48(base, LIFTED_ARGS(0x822AF190, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Device::EndSegment(base, LIFTED_ARGS(0x822AF190, r31)); r3 = o.r3; f1 = o.f1; }
 loc_822AF190:
   // lis r11,-16384
   r11 = uint64_t(int64_t(-1073741824));
@@ -2750,7 +2751,7 @@ loc_822AF224:
   r3 = r31;
   // bl 0x8229ef48
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::entry::e8229EF48(base, LIFTED_ARGS(0x822AF23C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = game::Device::EndSegment(base, LIFTED_ARGS(0x822AF23C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
 loc_822AF240:
@@ -3035,7 +3036,7 @@ loc_825A6CA8:
   return r3;
 }
 
-// sub_825BFEA0: lifted from generated/ by lift.py.
+// sub_825BFEA0 game::XACTEngine::CheckNotInCallback: lifted from generated/ by lift.py.
 uint64_t f825BFEA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_825BFEA0 (lifted)");
   uint64_t r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r12 = 0, r31 = 0, reserved = 0, msr = 0;
@@ -3143,7 +3144,7 @@ loc_825BFF1C:
   return r3;
 }
 
-// sub_825D1C50: lifted from generated/ by lift.py.
+// sub_825D1C50 game::XACTWave::RequestNotify: lifted from generated/ by lift.py.
 void f825D1C50(uint8_t* base, uint64_t r13, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_825D1C50 (lifted)");
   uint64_t r8 = 0, r9 = 0, r10 = 0, r11 = 0, reserved = 0, msr = 0;

@@ -4,6 +4,7 @@
 // recompiled and call these, so the adapters stay.
 
 #include "hooks/tuning_pages.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -237,7 +238,7 @@ ITC_REGS_STEP(TuningPagesFreeTexture) {
     }
     ctx.r3.u64 = header_in;
     ctx.r4.u64 = data_in;
-    lifted::Enter(ctx, base, lifted::entry::e820ECFC8);
+    lifted::Enter(ctx, base, game::Texture::Free);
     return ctx.r3.u64;
   };
   ctx.r3.u64 = tp::FreeTexture(base, ctx.r3.u64, ctx.r4.u64, free);

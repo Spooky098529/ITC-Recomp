@@ -2,6 +2,7 @@
 // docs/gpu-functions.md), wrapped to pass each command on before it runs.
 
 #include "native/replay_hooks.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -133,7 +134,7 @@ void PatchCopy(void* context, uint32_t destination, uint32_t source, uint32_t si
   ctx.r4.u64 = source;
   ctx.r5.u64 = size;
   ctx.lr = 0x822AE900;
-  lifted::Enter(ctx, base, lifted::entry::e825A7410);
+  lifted::Enter(ctx, base, game::memcpy_825A7410);
   ctx.r1.u64 = stack;
 }
 ITC_REGS_STEP(NativePatchVertexShader) {

@@ -3,6 +3,7 @@
 // steps the harness shares (hooks/save_interface.h).
 
 #include "hooks/save_interface.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -263,7 +264,7 @@ ITC_REGS_STEP(SaveInterfaceGameDataSave) {
   calls.local_time = [&](uint32_t out) {
     in_frame(0x8228FB34, [&] {
       ctx.r3.u64 = out;
-      lifted::Enter(ctx, base, lifted::entry::e822968B8);
+      lifted::Enter(ctx, base, game::GetLocalTime);
     });
   };
   calls.swprintf = [&](const std::array<uint64_t, 8>& regs) {
@@ -276,7 +277,7 @@ ITC_REGS_STEP(SaveInterfaceGameDataSave) {
       ctx.r8.u64 = regs[5];
       ctx.r9.u64 = regs[6];
       ctx.r10.u64 = regs[7];
-      lifted::Enter(ctx, base, lifted::entry::e8210A490);
+      lifted::Enter(ctx, base, game::swprintf_8210A490);
     });
   };
   if (const auto r3 = si::GameDataSave(base, frame, calls)) {

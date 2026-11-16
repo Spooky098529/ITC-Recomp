@@ -5,6 +5,7 @@
 // exit lock in src/c_runtime/exit.cpp.
 
 #include "guest.h"
+#include "lifted/names.h"
 #include "lifted/functions.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
@@ -255,7 +256,7 @@ ITC_NATIVE_ENTRY(825AA840, ITC_FLAG(native_c_runtime)) {
     return;
   }
   if (ctx.r3.s32 < ctx.r4.s32) {
-    lifted::Enter(ctx, base, lifted::entry::e825A7410);
+    lifted::Enter(ctx, base, game::memcpy_825A7410);
     return;
   }
   if (!c_runtime::MemmoveDown(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
@@ -299,7 +300,7 @@ ITC_NATIVE_ENTRY(825A7270, ITC_FLAG(native_c_runtime)) {
   ctx.r4.u64 = ctx.r5.u64;
   ctx.r5.u64 = ctx.r6.u64;
   ctx.lr = 0x825A72F0;
-  lifted::Enter(ctx, base, lifted::entry::e825A7410);
+  lifted::Enter(ctx, base, game::memcpy_825A7410);
   ctx.lr = lr;
   ctx.r3.u64 = 0;
 }
@@ -422,14 +423,14 @@ ITC_NATIVE_ENTRY(825AEB20, ITC_FLAG(native_c_runtime)) {
   ctx.r7.u64 = ctx.r8.u64;
   ctx.r8.u64 = ctx.r9.u64;
   if (format == 'e' || format == 'E') {
-    lifted::Enter(ctx, base, lifted::entry::e825AE1A8);
+    lifted::Enter(ctx, base, game::_cftoe_l);
   } else if (format == 'f') {
     ctx.r7.u64 = ctx.r8.u64;
     CftofL(ctx, base);
   } else if (format == 'a' || format == 'A') {
     lifted::Enter(ctx, base, lifted::e825AE2C0);
   } else {
-    lifted::Enter(ctx, base, lifted::entry::e825AE9D0);
+    lifted::Enter(ctx, base, game::_cftog_l);
   }
 }
 

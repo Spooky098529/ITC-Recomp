@@ -5,6 +5,7 @@
 // its state machine's functors, so their adapters stay.
 
 #include "guest.h"
+#include "lifted/names.h"
 #include "lifted/functions.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
@@ -131,7 +132,7 @@ void GuestMemcpy(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t retu
     ctx.r3.u64 = destination;
     ctx.r4.u64 = source;
     ctx.r5.u64 = size;
-    lifted::Enter(ctx, base, lifted::entry::e825A7410);
+    lifted::Enter(ctx, base, game::memcpy_825A7410);
   });
 }
 
@@ -143,7 +144,7 @@ void GuestXMemCpy(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t ret
     ctx.r3.u64 = destination;
     ctx.r4.u64 = source;
     ctx.r5.u64 = size;
-    lifted::Enter(ctx, base, lifted::entry::e82295890);
+    lifted::Enter(ctx, base, game::XMemCpy);
   });
 }
 
@@ -1088,7 +1089,7 @@ RivalLogoOpenCalls RivalLogoOpenCallsAt(lifted::Regs& ctx, uint8_t* base, uint32
     CallFrom(ctx, base, sp, 112, 0x8221195C, [&] {
       ctx.r3.u64 = id;
       ctx.r4.u64 = asset;
-      lifted::Enter(ctx, base, lifted::entry::e8211E808);
+      lifted::Enter(ctx, base, game::UiMovies::Open);
     });
     return ctx.r3.u32;
   };
@@ -1170,7 +1171,7 @@ cm::CutsceneTickCalls CutsceneTickCallsAt(lifted::Regs& ctx, uint8_t* base, uint
   calls.draw = [&ctx, base, frame](uint32_t entry) {
     CallFrom(ctx, base, frame, 192, 0x82155BE0, [&] {
       ctx.r3.u64 = entry;
-      lifted::Enter(ctx, base, lifted::entry::e82211A28);
+      lifted::Enter(ctx, base, game::RivalLogo::Draw);
     });
   };
   return calls;
@@ -1228,7 +1229,7 @@ cm::TvStepCalls TvStepCallsAt(lifted::Regs& ctx, uint8_t* base, uint32_t frame,
       ctx.r3.u64 = to;
       ctx.r4.u64 = from;
       ctx.r5.u64 = size;
-      lifted::Enter(ctx, base, lifted::entry::e825A7410);
+      lifted::Enter(ctx, base, game::memcpy_825A7410);
     });
   };
   calls.request = [&ctx, base, frame, camera](uint32_t buffer, uint32_t index, uint32_t back) {
@@ -1505,7 +1506,7 @@ ITC_REGS_STEP(CameraModesStep8217BE98) {
   calls.pass_update = [&ctx, base](uint32_t pass, uint32_t f) {
     CallFrom(ctx, base, f - 112, 112, 0x820AA534, [&] {
       ctx.r3.u64 = pass;
-      lifted::Enter(ctx, base, lifted::entry::e820A3978);
+      lifted::Enter(ctx, base, game::CameraPass::Update);
     });
   };
   cm::GarageUpdate(base, ctx.r3.u32, frame, calls);

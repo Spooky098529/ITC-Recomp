@@ -5,6 +5,7 @@
 // functor); the others went once their callers were native.
 
 #include "hooks/tuning_screen.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -872,7 +873,7 @@ void TuningUpdate(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
         ctx.r1.u64 = frame;
         ctx.r3.u64 = screen;
         ctx.lr = 0x821E7318;
-        lifted::Enter(ctx, base, lifted::entry::e821DF350);
+        lifted::Enter(ctx, base, game::TuningScreen::DrawPowerGraph);
         ctx.r1.u64 = stack;
         ctx.fpscr.disableFlushMode();
       }};

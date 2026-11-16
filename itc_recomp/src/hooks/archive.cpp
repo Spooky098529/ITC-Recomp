@@ -6,6 +6,7 @@
 // stays for every other semaphore.
 
 #include "guest.h"
+#include "lifted/names.h"
 #include "lifted/functions.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
@@ -208,7 +209,7 @@ void hooks::ArchiveUclUnpack(lifted::Regs& ctx, uint8_t* base) {
         ctx.r3.u64 = destination;
         ctx.r4.u64 = source;
         ctx.r5.u64 = size;
-        lifted::Enter(ctx, g.base, lifted::entry::e825A7410);
+        lifted::Enter(ctx, g.base, game::memcpy_825A7410);
       });
     }
   } guest{ctx, base};
@@ -254,7 +255,7 @@ struct SetUpGuestCalls {
       ctx.r4.u64 = size;
       ctx.r5.u64 = 4096;
       ctx.r6.u64 = 4;
-      lifted::Enter(ctx, c.base, lifted::entry::e82295398);
+      lifted::Enter(ctx, c.base, game::VirtualAlloc);
     });
     return ctx.r3.u32;
   }
@@ -445,20 +446,20 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
       ctx.r3.u64 = file;
       ctx.r4.u64 = frame + 84;
       ctx.r5.u64 = frame + 88;
-      lifted::Enter(ctx, base, lifted::entry::e8258C768);
+      lifted::Enter(ctx, base, game::File::Seek);
     });
     call(0x8209E0BC, [&] {
       ctx.r3.u64 = file;
       ctx.r4.u64 = guest::LoadU32(base, request + 76);
       ctx.r5.u64 = request + 68;
-      lifted::Enter(ctx, base, lifted::entry::e8258C820);
+      lifted::Enter(ctx, base, game::File::Read);
     });
     if (ctx.r3.u32 == 0) {
       call(0x8209E0C8, [&] { lifted::Enter(ctx, base, lifted::e8209AC78); });
     }
     call(0x8209E0D0, [&] {
       ctx.r3.u64 = file;
-      lifted::Enter(ctx, base, lifted::entry::e8258C718);
+      lifted::Enter(ctx, base, game::File::Close);
     });
   } else {
     call(0x8209E0D8, [&] { lifted::Enter(ctx, base, lifted::e8209AC78); });
@@ -468,7 +469,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
   } else {
     call(0x8209E0E4, [&] {
       ctx.r3.u64 = archive::kRequestDone;
-      lifted::Enter(ctx, base, lifted::entry::e825926E8);
+      lifted::Enter(ctx, base, game::Semaphore::Signal);
     });
   }
   release(path, 0x8209E0F4);

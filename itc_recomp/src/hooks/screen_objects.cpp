@@ -14,6 +14,7 @@
 // InsertUnique, ~UvMap) went once those callers were native.
 
 #include "guest.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -128,7 +129,7 @@ so::ReleaseCalls ReleaseCalls(lifted::Regs& ctx, uint8_t* base, int& releases) {
           [&ctx, base, &releases](uint32_t resource) {
             ctx.r3.u64 = resource;
             ctx.lr = releases++ == 0 ? 0x8212F100 : 0x8212F110;
-            lifted::Enter(ctx, base, lifted::entry::e822A67B0);
+            lifted::Enter(ctx, base, game::Resource::Release);
           }};
 }
 

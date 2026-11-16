@@ -1,4 +1,5 @@
 #include <format>
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "game_messages.h"
 #include "lifted/originals.h"
@@ -361,7 +362,7 @@ void Deliver(lifted::Regs& ctx, uint8_t* base, uint32_t dispatcher, uint32_t mes
     ctx.r3.u64 = guest::LoadU32(base, dispatcher + kHandlersOffset + 4 * i);
     ctx.r4.u64 = message;
     ctx.lr = 0x82106370;
-    lifted::Enter(ctx, base, lifted::entry::e82106280);
+    lifted::Enter(ctx, base, game::StateMachine::Handle);
     uint32_t object = guest::LoadU32(base, ctx.r3.u32);
     uint32_t method = guest::LoadU32(base, guest::LoadU32(base, object));
     ctx.r3.u64 = object;

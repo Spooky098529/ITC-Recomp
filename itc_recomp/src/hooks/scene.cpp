@@ -3,6 +3,7 @@
 // (hooks/scene.h).
 
 #include "hooks/scene.h"
+#include "lifted/names.h"
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -217,7 +218,7 @@ ITC_REGS_STEP(SceneUpdateA) {
     ctx.r3.u64 = header_in;
     ctx.r4.u64 = data_in;
     ctx.lr = 0x820C3E1C;
-    lifted::Enter(ctx, base, lifted::entry::e820ECFC8);
+    lifted::Enter(ctx, base, game::Texture::Free);
     ctx.r1.u64 = stack;
     ctx.lr = link;
     return ctx.r3.u32;
