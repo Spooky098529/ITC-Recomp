@@ -3729,6 +3729,10 @@ count reads rows, not running code, since stage 5).
 
 ## E2: the plan (2026-11-16, a draft for the user's review)
 
+Steps 1 to 5 done on `e1-threads-sync-16-11-26` with E1, and merged into
+`rexglue-removal-project` 2026-11-16 after a drive (sound, saves, a race
+and closing the window fine).
+
 After E1 (every import the game calls in play is ours, every thread
 running game code ours), the SDK's runtime still owns the memory the game
 lives in. E2 here is that memory made ours, guest addresses kept: the
