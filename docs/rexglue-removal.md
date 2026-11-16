@@ -3951,6 +3951,266 @@ by the user, the Windows build under Wine for step 4, and saves loading
 - **The order**: steps 2 and 3 before 4 (the image and the SDK's data
   have to land somewhere before the SDK's memory goes), as above.
 
+## E4: the plan (2026-11-16, a draft for the user's review)
+
+A4 (the app shell) with E4 (`PPCContext`, `rex/ppc.h`, the function
+table, `generated/` and the SDK). After E1 and E2 (merged into
+`rexglue-removal-project` 2026-11-16), `rex::Runtime` isn't made: the SDK
+is a library our executable links (`librexruntime.so`) and a source tree
+it compiles part of (the shader translator). E4 ends with neither: no
+submodule, no `librexruntime`, no SDK header. Guest addresses stay until
+E5 (the user's call): E4 doesn't remove the guest mapping or the
+big-endian access. Linux only: the Windows build is already broken since
+E2 (`src/memory/mapping.cpp` is Linux only) and stays so until the user
+asks.
+
+### What still uses the SDK (the measure, 2026-11-16)
+
+From the sources (`grep -rn "rex::\|#include <rex" itc_recomp/src`,
+without `harnesses/`, which isn't built) and the link (`nm -D` of `itc`'s
+undefined symbols against `librexruntime.so`'s exports, on the merged
+`rexglue-removal-project` build).
+
+**The link**: 296 symbols from `librexruntime.so`, by kind:
+
+| Kind | Symbols | Who |
+| --- | --- | --- |
+| `__imp__*` import functions | 188 | `src/lifted/imports.cpp` and our native import tables use their addresses as keys only (`lifted::ImportFunction*`): since E2 none is run (an import with no answer of ours stops the program) |
+| SDL3 | 39 | `app/main.cpp` (the loop), `native/` (the window, the Vulkan surface), `input/gamepads.cpp`, `audio/native_audio.cpp`: SDL is built inside `librexruntime` |
+| spdlog | 23 | `base/log_sdk.cpp`: the SDK's logger, whose lines ours takes over (A2) |
+| `rex::` functions | 32 | below |
+| SDK flags' storage | 12 | `app/main.cpp`, `audio/native_audio.cpp`: `game_data_root`, `user_data_root`, `update_data_root`, `cache_root`, `metadata_root`, `log_file`, `log_level`, `log_verbose`, `video_driver`, `fullscreen`, `audio_mute`, `audio_maxqframes` |
+| fmt | 2 | the 158 `fmt::format` calls in `src/` (A2's leftover) |
+
+The 32 `rex::` functions: the flag registry and parser (`cvar::Init`,
+`ApplyEnvironment`, `LoadConfig`, `RegisterFlag`, `UnregisterFlag`);
+the logging set-up (`InitLoggingEarly`, `BuildLogConfig`,
+`ParseCategoryLevelsFromConfig`, `InitLogging`, `RegisterLogLevelCallback`,
+`RegisterLogCategory`, `GetLogger`, `GetLoggerRaw`, `AddSink`,
+`RemoveSink`, `FlushLogging`); the paths (`filesystem::GetExecutableFolder`,
+`GetUserFolder`, `OpenFile`); `kernel::xboxkrnl::xeRtlNtStatusToDosError`
+(`hooks/last_error.cpp`); `thread::global_critical_region::mutex`
+(`guest_code.h`, `lifted/lifted.cpp`: the lock lifted code takes for the
+360's interrupts off); and helpers that come with the translator's and the
+renderer's SDK headers (`string::StringBuffer`, `memory::copy_and_swap_32_*`,
+`bit_scan_forward`, `graphics::xenos::Float20e4To32` and `Float32To20e4`).
+
+**Compiled from the SDK's tree into our build**: `itc_xenos_shaders`
+(`itc_recomp/CMakeLists.txt`), the SDK's Xenos-to-SPIR-V translator, 14
+sources (`shader.cpp`, the `translator*.cpp`, the `spirv*.cpp`,
+`ucode.cpp`, `draw.cpp`, `registers.cpp`, `register_file.cpp`), linking
+glslang's SPIR-V builder; and the include paths of the SDK's third-party
+SDL3, Vulkan headers, simde and imgui (headers only).
+
+**The headers our code includes** (41 files outside `lifted/`, and
+`lifted/` through `lifted.h` and `imports.h`):
+
+| Header | Files | What for |
+| --- | --- | --- |
+| `rex/platform/fpscr.h` | 26 (hand ports, `xaudio/`) | `FPSCRPlatform`: reading and setting the host's float mode (MXCSR) as the original's `mtfsf` does |
+| `rex/ppc/intrinsics.h` | 3 (`xaudio/`), and every lifted file through `lifted/lifted.h` | simde helpers for vector instructions SSE lacks: `simde_mm_perm_epi8` (138 uses in `lifted/`), `cvtepu8_epi32` (138), `vsr` (106), `sllv_epi8` (49), `vctsxs` (5), `avg_epi8` (2), and `VectorMaskL` (7, hand ports) |
+| `rex/ppc.h`, `rex/ppc/func.h`, `rex/image_info.h` | `guest_code.h` (so every file), `lifted/imports.h`, `app/image.cpp` | `PPCContext`, `REX_FUNC`, `REX_EXTERN`, `PPCImageInfo` |
+| `rex/thread/mutex.h`, `rex/logging.h` | `guest_code.h` | the global lock, the SDK's log for the lift runtime |
+| `rex/cvar.h`, `rex/logging.h`, `rex/logging/sink.h`, `rex/filesystem.h` | `base/flags.h`, `base/log_sdk.cpp`, `app/main.cpp` | flags, the log, the paths (A4) |
+| `rex/version.h`, `rex/audio/flags.h` | `native/app_window.cpp`, `audio/native_audio.cpp` | the window title's version, the audio flags |
+| `rex/kernel/xboxkrnl/error.h` | `hooks/last_error.cpp` | NTSTATUS to Win32 error (six callers: file opens, the save slots, the C runtime, the time functions, the frame driver) |
+| `rex/graphics/*`, `rex/string/buffer.h`, `rex/ui/vulkan/api.h` | `native/shaders.cpp`, `passes.cpp`, `textures.cpp`, `state.h`, `vulkan_functions.h` | the translator, the register file and register layouts (`RegisterFile`, `reg::RB_*`, `PA_*`), the formats (`xenos::ColorRenderTargetFormat`, `TextureFormat`, `Endian`, `xe_gpu_texture_fetch_t`, ...), `draw_util`, and the Vulkan header's platform defines |
+
+**`PPCContext`**, 3,921 mentions outside `lifted/` and 2,836 in it, nearly
+all dead since the harnesses left the build:
+- 2,634 `ITC_REGS_STEP`s, each also defining a form taking the context
+  (for the harnesses), and 3,836 declarations of those forms in
+  `hooks/*.h`; 54 hand-written definitions taking a context;
+- `lifted/originals.cpp`'s 1,408 `cX(PPCContext&, ...)` forms of the
+  lifted originals (each also has a `Regs` form);
+- what's still run: `lifted::Sdk`'s 69 call sites in 28 files, which pass
+  a `void(PPCContext&, uint8_t*)` (an import's address, a lifted original's
+  `cX` form, three stand-ins) to `lifted::Import`. An import is looked up
+  by that address in our native tables; anything else runs through
+  `Boundary` on the thread's carrier context (`lifted::BindThreadContext`,
+  one per thread of ours, `threads/threads.cpp`): E1's 4,411 calls an
+  attract race;
+- the SDK-facing entries nothing calls since E2: `REX_FUNC(xstart)`
+  (`app/start_up.cpp`), the four `ITC_KERNEL_ENTRY`s' `REX_FUNC`s
+  (`hooks/native_entry.h`), `app/image.cpp`'s `PPCImageConfig`,
+  `lifted::Enter(PPCContext&)`, `RegsScope`, `CallFromContext(PPCContext&)`.
+
+**The three functions kept recompiled for a register leftover**
+(`BuildScreen::BackToBuilds` `sub_821A1258`, the garage screen's
+`Transition11` `sub_82195F10` and `Transition15` `sub_82196030`; "decide
+before E4" under E5): all three were lifted by the sweep (2026-11-15,
+batches 008 and 009), so they no longer keep the context alive. Read
+again in `generated/`: none of them stores a leftover. Each sets the
+register just before the store, with no call between (`li r7,0` then
+`stw r7,24(r11)` in `BackToBuilds`; `li r8,0` then `stw r8,24(r11)` in
+both transitions), so the word gets 0, as in the other back transitions.
+The rows' 2026-11-06 "correction" (r7 as `UiMovie::Run` leaves it) and
+the transitions' notes look wrong. Corrected rows to be shown to the user.
+Nothing to decide for E4.
+
+**The shaders in play**: the renderer translates each shader once (the
+game's Xenos microcode, by its hash and the interface: interpolators,
+point and rectangle modes) and keeps the result in `cache/shaders.bin`:
+the SPIR-V, the float and fetch constants it reads, its textures,
+samplers and vertex strides. The main build's cache (its last new shader
+added 2026-11-15, after the user's drives, attract races and pad
+replays) holds **109 translations of 105 programs** (52 vertex, 53
+pixel; 3.7 MB of SPIR-V). Every older cache in `itc_recomp/out/` (25
+files, from 2026-10-15 on, profiles, A/B runs, release folders) is a
+subset of it. The translations depend on the device's features, which
+are in the cache's header: the storage buffer range and whether clip
+distance, cull distance and demote-to-helper are on (this PC: all on).
+The programs come from the game's data (models, the XPRs) and from the
+game's HLSL compiler at boot, whose 14 shaders have been stored since the
+thirteenth loop run (`graphics/compiled_shaders.h`,
+`--use_hardcoded_shaders`). How many of the 105 those 14 account for
+isn't checked yet (the cache hashes the microcode, not the compiler's
+container).
+
+### The steps
+
+Each leaves the game working, smallest and most independent first.
+
+1. **Measure**: above. Done (2026-11-16), but for one check, which goes
+   with step 5: the shader set's completeness, from an empty cache in an
+   attract race, the pad replay and a drive by the user through the
+   modes, with a log line for each new translation
+   (`--log_shader_translations`).
+2. **The small leftovers ours** (no change in behavior):
+   - `xeRtlNtStatusToDosError`: a table of the statuses our six callers
+     pass (plug in data), checked against the SDK's table for those.
+   - The global lock: our own `std::recursive_mutex`. The SDK's kernel
+     was the only other user, and it no longer runs.
+   - `FPSCRPlatform`: `base/float_mode.h`, MXCSR's flush and rounding bits
+     through `<xmmintrin.h>` (x86-64 only, as the build is).
+   - The vector helpers: our own copies of the six `simde_mm_*` helpers
+     and `VectorMaskL` (`lifted/vector_helpers.h`, the SDK's BSD-3
+     notice kept), over our own simde (A1: a submodule at the SDK's
+     commit); the lifted batches' `rex::ppc::` qualifier replaced by
+     script.
+   - `rex/version.h`: our version string from git (the window title);
+     `rex/audio/flags.h`: `audio_mute`, `audio_maxqframes` as our flags.
+   - Checks: the build, an attract race, the pad replay, a frame dump.
+3. **`PPCContext` out** (mechanical, by script; a change to
+   `guest_code.h` rebuilds every lifted file):
+   - Imports keyed by our own numbers (an enum written by
+     `tools/import_entries.py`) instead of the SDK's `__imp__` addresses.
+     `lifted::Import`'s fallback for an unknown import stays a log and a
+     stop, now by name.
+   - `lifted::Sdk`'s callables as `Regs` functions: the lifted originals'
+     `eX` forms, the three stand-ins; `Boundary` and the carrier context
+     go, and so do `BindThreadContext` and the context `threads.cpp` makes
+     for each thread.
+   - Deleted: `ITC_REGS_STEP`'s context form and the 3,836 declarations,
+     the 54 context definitions (or converted, where something still
+     calls them), the `cX` forms, `Enter(PPCContext&)`, `RegsScope`,
+     `CallFromContext(PPCContext&)`, `REX_FUNC(xstart)` (`app::StartUp` is
+     already what `threads::StartMainThread` runs), the kernel entries'
+     `REX_FUNC`s (`ITC_KERNEL_ENTRY` becomes `ITC_NATIVE_ENTRY`),
+     `app/image.cpp`, and `rex/ppc.h`, `rex/ppc/func.h` and
+     `rex/image_info.h` from `guest_code.h` and `lifted/imports.h`.
+   - The guest memory macros keep their `REX_` names (`REX_LOAD_U32` and
+     the like, ours since stage 5): renaming 3,010 lifted functions'
+     uses buys nothing before E5.
+   - Checks: as step 2, plus the link: no `__imp__` symbol and no
+     `PPCContext` left (`nm`, `grep`).
+4. **A4: the app shell** (the 2026-10-21 survey, with what A4 brought
+   forward already did: our `main()`, our loop, no SDK window):
+   - A `--log_flags` flag landed first on the old parser, logging every
+     flag's value, so a run before and after can be compared.
+   - Our own flag registry and parser (`base/flags.h`'s macros keep their
+     names: 334 flags, 313 of them booleans), the command line over
+     `itc.toml`. `itc.toml` is a flat list of 8 keys (booleans, integers,
+     strings), so a small parser of that subset, not a TOML library.
+   - The SDK's 12 flags ours where something reads them (`game_data_root`,
+     `log_file`, `log_level`, `log_verbose`, `video_driver`, `fullscreen`,
+     `audio_mute`, `audio_maxqframes`); `user_data_root`,
+     `update_data_root`, `cache_root` and `metadata_root` are only logged
+     (saves and `cache/` don't use them), so they go, still accepted with a
+     warning as `--native_audio` is.
+   - The log file named by our logger (`logs/itc_<n>.log`, one more than
+     the highest there; `--log_file` overrides), with `base/log_sdk.cpp`
+     and spdlog gone; the 158 `fmt::format` calls to `std::format`.
+   - The paths from `std::filesystem` and `/proc/self/exe`.
+   - Checks: `--log_flags` the same before and after (with and without
+     `itc.toml`, and command-line values over it), the build, an attract
+     race, the pad replay, `--log_level=off`.
+5. **The shaders** (the user's decision, below; recommended: translated
+   at build time and shipped). A tool of ours (`itc_shader_bake`, built
+   from the SDK's translator sources while the submodule is still there)
+   turns the cache's records into a source file of SPIR-V and bindings,
+   compiled into the executable, as the 14 HLSL shaders became
+   `--use_hardcoded_shaders`. The renderer looks a shader up by its key
+   and logs and stops on one it doesn't have, as an address with no
+   entry does. The device features are fixed for the set: the renderer
+   needs them, or asks for them when the device is made (to check:
+   whether clip and cull distance are common enough to require, or the
+   set is baked twice). The register and format definitions the renderer
+   reads (`RegisterFile`, the `reg::` layouts, the `xenos::` enums,
+   `draw_util`'s few constants) become our own small header of what's
+   used, by "plug in data". glslang and the translator leave the build
+   with the bake.
+   - Checks: step 1's completeness run first; frame dumps the same
+     before and after (menus, a race, the replay theater), a drive by the
+     user through the modes.
+6. **Our own third-party libraries** (A1): SDL3 (a submodule at the SDK's
+   pinned version, built as our own shared or static library; only one
+   SDL is loaded, so this goes with the SDK's removal or just before it),
+   the Vulkan headers (and the platform defines `rex/ui/vulkan/api.h`
+   set), simde (step 2). Checks: the build, the pad replay, gamepads and
+   rumble in a drive.
+7. **The SDK deleted**: the submodule, `patches/rexglue-sdk/`,
+   `cmake/rexglue.cmake`, `librexruntime.so` from packaging, `LD_LIBRARY_PATH`
+   in the tools (`attract_race.sh`, `scripted_run.sh`,
+   `profile_render_thread.sh`) and CLAUDE.md (the build line, packaging,
+   the note on the submodule showing modified), the Linux CI workflow; the
+   Windows workflow disabled until the user asks. `generated/` too, or kept
+   as the tools' input (decision below). Checks: a clean clone builds
+   (`git clone`, submodules, configure, build), the test zip runs from its
+   own folder, an attract race, the pad replay, a drive by the user.
+
+Checks at each step: the build, `timeout 120 attract_race.sh 40`, the
+pad replay (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`,
+~127 s, no error lines, the race at the frame cap), a frame dump,
+`--log_imports` for only our imports, and `boundary_status.py` in "The
+boundary over time" (its figures read the docs' rows, not the running
+code); a drive by the user before the merge.
+
+### Decisions for the user
+
+- **The shader translator** (step 5). The rule: don't port ReXGlue or
+  Xenia into `src/`.
+  - (Recommended) **Translate at build time, ship the SPIR-V**: the game's
+    shaders are a fixed set (105 programs), so a bake tool translates
+    them once and the executable carries the result, as with the 14 HLSL
+    shaders. No translator in `src/` or at run time. Part of this
+    decision: whether the translated shaders (derived from the game's
+    microcode) may be committed to the public repo, as the 14 stored
+    HLSL shaders' microcode already is. If not, the bake has to run on
+    the player's machine, which brings the translator back at run time.
+  - **Bring the translator into `src/`** (A3 as planned: 14 sources, BSD-3,
+    notices kept). Shaders unseen in testing still work, but it's the
+    porting the rule forbids.
+  - **Keep it as an outside library** (only the translator's files, as a
+    small vendored library): doesn't remove the SDK's code, only the rest
+    of it.
+- **The order of A4 against `PPCContext`**. Recommended: steps 2 and 3
+  first (what E4 is named for; it leaves only libraries in the link), then
+  A4 (4), the shaders (5, while the SDK is still there for the bake), the
+  libraries (6) and the deletion (7).
+- **`generated/`** (96 MB, 192 files): deleted with the SDK, as E4 says
+  (then `lift.py`, `lift_originals.py`, `import_entries.py`,
+  `static_map.py`, `static_reachability.py` and `init_step_tables.py` lose
+  their input, and `src/lifted/` is the source from then on), or kept as
+  the tools' input until E5.
+- **A4's open questions from 2026-10-21**: drop the `REX_*` environment
+  variables (nothing of ours uses them; recommended); no log file at all
+  with `--log_level=off` (recommended: the SDK made an empty one); whether
+  `itc.toml` may set `game_data_root` (our `main()` reads the flag before
+  loading the toml today).
+- **The Windows CI job** until Windows is asked for: disabled
+  (recommended) or left failing.
+
 ## Risks
 
 - Saves (B4): players' saves must keep loading.
