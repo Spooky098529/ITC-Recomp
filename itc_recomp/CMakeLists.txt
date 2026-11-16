@@ -110,6 +110,7 @@ set(ITC_SOURCES
     src/kernel/spin_locks.cpp
     src/kernel/critical_sections.cpp
     src/kernel/events.cpp
+    src/kernel/tls.cpp
     src/hooks/voice.cpp
     src/hooks/sprites.cpp
     src/sprites/sprites.cpp
