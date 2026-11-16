@@ -6,6 +6,8 @@
 // stays for every other semaphore.
 
 #include "guest.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -206,7 +208,7 @@ void hooks::ArchiveUclUnpack(lifted::Regs& ctx, uint8_t* base) {
         ctx.r3.u64 = destination;
         ctx.r4.u64 = source;
         ctx.r5.u64 = size;
-        lifted::CallFromContext(ctx, g.base, 0x825A7410);
+        lifted::Enter(ctx, g.base, lifted::entry::e825A7410);
       });
     }
   } guest{ctx, base};
@@ -252,7 +254,7 @@ struct SetUpGuestCalls {
       ctx.r4.u64 = size;
       ctx.r5.u64 = 4096;
       ctx.r6.u64 = 4;
-      lifted::CallFromContext(ctx, c.base, 0x82295398);
+      lifted::Enter(ctx, c.base, lifted::entry::e82295398);
     });
     return ctx.r3.u32;
   }
@@ -434,7 +436,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
     ctx.r3.u64 = file;
     ctx.r4.u64 = std_string::Text(base, path);
     ctx.r5.u64 = frame + 80;
-    lifted::CallFromContext(ctx, base, 0x820A6AB8);
+    lifted::Enter(ctx, base, lifted::entry::e820A6AB8);
   });
   if ((ctx.r3.u32 & 0xFF) != 0) {
     guest::StoreU32(base, frame + 84, guest::LoadU32(base, request + 64));
@@ -443,30 +445,30 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
       ctx.r3.u64 = file;
       ctx.r4.u64 = frame + 84;
       ctx.r5.u64 = frame + 88;
-      lifted::CallFromContext(ctx, base, 0x8258C768);
+      lifted::Enter(ctx, base, lifted::entry::e8258C768);
     });
     call(0x8209E0BC, [&] {
       ctx.r3.u64 = file;
       ctx.r4.u64 = guest::LoadU32(base, request + 76);
       ctx.r5.u64 = request + 68;
-      lifted::CallFromContext(ctx, base, 0x8258C820);
+      lifted::Enter(ctx, base, lifted::entry::e8258C820);
     });
     if (ctx.r3.u32 == 0) {
-      call(0x8209E0C8, [&] { lifted::CallFromContext(ctx, base, 0x8209AC78); });
+      call(0x8209E0C8, [&] { lifted::Enter(ctx, base, lifted::e8209AC78); });
     }
     call(0x8209E0D0, [&] {
       ctx.r3.u64 = file;
-      lifted::CallFromContext(ctx, base, 0x8258C718);
+      lifted::Enter(ctx, base, lifted::entry::e8258C718);
     });
   } else {
-    call(0x8209E0D8, [&] { lifted::CallFromContext(ctx, base, 0x8209AC78); });
+    call(0x8209E0D8, [&] { lifted::Enter(ctx, base, lifted::e8209AC78); });
   }
   if (archive::HostSemaphore* done = hooks::ArchiveSemaphore(archive::kRequestDone)) {
     done->Signal(base);
   } else {
     call(0x8209E0E4, [&] {
       ctx.r3.u64 = archive::kRequestDone;
-      lifted::CallFromContext(ctx, base, 0x825926E8);
+      lifted::Enter(ctx, base, lifted::entry::e825926E8);
     });
   }
   release(path, 0x8209E0F4);

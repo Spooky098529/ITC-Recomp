@@ -5,6 +5,8 @@
 // (src/frame_pacing/per_frame_logic.cpp), which runs them.
 
 #include "hooks/minimap.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -147,7 +149,7 @@ ITC_REGS_STEP(MinimapTriangleRecord) {
       MinimapTriangleRecordFlat(ctx, base);
       return;
     case minimap::TriangleRecording::kOther:
-      lifted::CallFromContext(ctx, base, 0x8217C4C0);
+      lifted::Enter(ctx, base, lifted::e8217C4C0);
       return;
     case minimap::TriangleRecording::kNone:
       return;
@@ -174,7 +176,7 @@ struct MarkerContext {
     m.ctx.r3.u64 = triangle;
     m.ctx.r4.u64 = pass;
     m.ctx.r5.u64 = key;
-    lifted::CallFromContext(m.ctx, m.base, 0x8217DAA0);
+    lifted::Enter(m.ctx, m.base, lifted::entry::e8217DAA0);
     m.ctx.r1.u64 = stack;
   }
   static void Memcpy(void* self, uint32_t to, uint32_t from, uint32_t size) {
@@ -185,7 +187,7 @@ struct MarkerContext {
     m.ctx.r3.u64 = to;
     m.ctx.r4.u64 = from;
     m.ctx.r5.u64 = size;
-    lifted::CallFromContext(m.ctx, m.base, 0x825A7410);
+    lifted::Enter(m.ctx, m.base, lifted::entry::e825A7410);
     m.ctx.r1.u64 = stack;
   }
 };

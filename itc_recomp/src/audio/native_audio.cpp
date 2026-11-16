@@ -15,6 +15,7 @@
 // isn't made any more); --native_audio=false (the SDK's driver) is gone.
 
 #include "audio/native_audio.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 
 #include "audio/output_mix.h"
@@ -429,7 +430,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82465870) {
   guest::StackFrame frame(ctx, 112);
   ctx.r3.u64 = ctx.r4.u64;
   ctx.r4.u64 = frame.Local(80);
-  lifted::CallFromContext(ctx, base, 0x8245F718);
+  lifted::Enter(ctx, base, lifted::entry::e8245F718);
   if (ctx.r3.s32 < 0) {
     return;
   }

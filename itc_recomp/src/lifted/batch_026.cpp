@@ -3371,8 +3371,6 @@ lifted::Result f825DACB8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   return {r3, f1};
 }
 
-namespace {
-
 lifted::Result e825D97A0(uint8_t* base, const lifted::Args& a) {
   return f825D97A0(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
@@ -3795,6 +3793,8 @@ lifted::Result e825DACA8(uint8_t* base, const lifted::Args& a) {
 lifted::Result e825DACB8(uint8_t* base, const lifted::Args& a) {
   return f825DACB8(base, a.r1, a.r13, a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
+
+namespace {
 
 const Registration kEntries[] = {
     {0x825D97A0, e825D97A0},

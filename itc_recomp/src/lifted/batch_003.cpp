@@ -4777,8 +4777,6 @@ loc_820ACD1C:
   return {r3, f1};
 }
 
-namespace {
-
 lifted::Result e820A70A8(uint8_t* base, const lifted::Args& a) {
   f820A70A8(base, a.r[0], a.r[1]);
   return {a.r[0], a.f[0]};
@@ -5206,6 +5204,8 @@ lifted::Result e820AC950(uint8_t* base, const lifted::Args& a) {
 lifted::Result e820ACCF0(uint8_t* base, const lifted::Args& a) {
   return f820ACCF0(base, a.r1, a.r13, a.r[0], a.r[1], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0]);
 }
+
+namespace {
 
 const Registration kEntries[] = {
     {0x820A70A8, e820A70A8},

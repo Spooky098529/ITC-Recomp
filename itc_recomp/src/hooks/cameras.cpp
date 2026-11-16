@@ -11,6 +11,8 @@
 // left the same.
 
 #include "guest.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -166,7 +168,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820A0C40) {
     has_surfaces = cameras::ReleaseSurfaces(base, pass, [&](uint32_t surface, uint32_t field) {
       ctx.r3.u64 = surface;
       ctx.lr = field == 576 ? 0x820A0C8C : 0x820A0CA0;
-      lifted::CallFromContext(ctx, base, 0x822A67B0);
+      lifted::Enter(ctx, base, lifted::entry::e822A67B0);
       released_580 = field == 580;
     });
   });
@@ -225,13 +227,13 @@ bool CameraPassesMakeRenderTarget(lifted::Regs& ctx, uint8_t* base) {
          [&](uint32_t target) {
            ctx.r3.u64 = target;
            ctx.lr = 0x8209FC40;
-           lifted::CallFromContext(ctx, base, 0x8209F7A8);
+           lifted::Enter(ctx, base, lifted::entry::e8209F7A8);
            return ctx.r3.u32;
          },
          [&](uint32_t resource) {
            ctx.r3.u64 = resource;
            ctx.lr = 0x8209FC4C;
-           lifted::CallFromContext(ctx, base, 0x822A67B0);
+           lifted::Enter(ctx, base, lifted::entry::e822A67B0);
          }});
   });
   ctx.lr = lr;
@@ -273,26 +275,26 @@ bool CameraPassSetUpSurfaces(lifted::Regs& ctx, uint8_t* base) {
          [&](uint32_t id) {
            ctx.r3.u64 = id;
            ctx.lr = 0x820A2FF0;
-           lifted::CallFromContext(ctx, base, 0x8209F7A8);
+           lifted::Enter(ctx, base, lifted::entry::e8209F7A8);
            return ctx.r3.u32;
          },
          [&](uint32_t id) {
            ctx.r3.u64 = id;
            ctx.lr = 0x820A2FE8;
-           lifted::CallFromContext(ctx, base, 0x8209FBF0);
+           lifted::Enter(ctx, base, lifted::entry::e8209FBF0);
          },
          [&](uint32_t texture, uint32_t face) {
            ctx.r3.u64 = texture;
            ctx.r4.u64 = face;
            ctx.r5.u64 = 0;
            ctx.lr = 0x820A30BC;
-           lifted::CallFromContext(ctx, base, 0x822A5C50);
+           lifted::Enter(ctx, base, lifted::e822A5C50);
            return ctx.r3.u32;
          },
          [&] {
            ctx.r3.u64 = pass;
            ctx.lr = 0x820A2F60;
-           lifted::CallFromContext(ctx, base, 0x820A0C40);
+           lifted::Enter(ctx, base, lifted::entry::e820A0C40);
          }});
   });
   ctx.lr = lr;
@@ -311,7 +313,7 @@ void CameraPassesInit(lifted::Regs& ctx, uint8_t* base, bool all) {
         ctx.r4.u64 = type;
         ctx.r5.u64 = r5;
         ctx.lr = 0x8209F990;
-        lifted::CallFromContext(ctx, base, 0x820A3DB0);
+        lifted::Enter(ctx, base, lifted::entry::e820A3DB0);
       },
       [&](uint32_t mode) {
         original_set_mode = true;
@@ -347,7 +349,7 @@ bool CameraPassInit(lifted::Regs& ctx, uint8_t* base) {
                       {[&] {
                          ctx.r3.u64 = pass;
                          ctx.lr = 0x820A3DD4;
-                         lifted::CallFromContext(ctx, base, 0x82593908);
+                         lifted::Enter(ctx, base, lifted::entry::e82593908);
                          ctx.fpscr.disableFlushMode();
                        },
                        [&](int at) {
@@ -357,12 +359,12 @@ bool CameraPassInit(lifted::Regs& ctx, uint8_t* base) {
                        [&] {
                          ctx.r3.u64 = pass;
                          ctx.lr = 0x820A4348;
-                         lifted::CallFromContext(ctx, base, 0x820A3978);
+                         lifted::Enter(ctx, base, lifted::entry::e820A3978);
                        },
                        [&] {
                          ctx.r3.u64 = pass;
                          ctx.lr = 0x820A4350;
-                         lifted::CallFromContext(ctx, base, 0x820A2F40);
+                         lifted::Enter(ctx, base, lifted::entry::e820A2F40);
                        }});
   });
   ctx.lr = lr;
@@ -754,7 +756,7 @@ bool CameraPassRecordEnd(lifted::Regs& ctx, uint8_t* base) {
           // Through its override (the diagnostics' wrapper), as the original.
           ctx.r3.u64 = id;
           ctx.lr = route.render_target;
-          lifted::CallFromContext(ctx, base, 0x8209F7A8);
+          lifted::Enter(ctx, base, lifted::entry::e8209F7A8);
           return ctx.r3.u32;
         });
       })) {
@@ -851,7 +853,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820AA4A8) {
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, 112, 0x820AA534, [&](uint32_t) {
     ctx.r3.u64 = pass;
-    lifted::CallFromContext(ctx, base, 0x820A3978);
+    lifted::Enter(ctx, base, lifted::entry::e820A3978);
   });
   ctx.lr = lr;
 }

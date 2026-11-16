@@ -10,7 +10,8 @@ usage:
   lift.py emit <batch> sub_X ...    writes src/lifted/batch_<batch>.cpp with
                                     those functions, and functions.h
   lift.py reemit                    writes every batch again (its functions
-                                    from its registration table, in order)
+                                    from its registration table, in order),
+                                    and functions.h
 
 How a function is translated (it reads generated/, never edits it):
   registers   one local each: r0-r31, ctr and the reservation as uint64_t,
@@ -1033,11 +1034,13 @@ def emit_batch(batch, names, infos, emitting):
     for name in names:
         lines.extend(emit_function(infos[name], infos, emitting))
         lines.append("")
-    lines.append("namespace {")
-    lines.append("")
+    # The uniform entries (functions.h declares them: hand ports call a
+    # lifted function by them, docs/e5-native.md, step 0).
     for name in names:
         lines.extend(emit_entry(infos[name]))
         lines.append("")
+    lines.append("namespace {")
+    lines.append("")
     lines.append("const Registration kEntries[] = {")
     for name in names:
         lines.append(f"    {{0x{name[4:]}, {ename(name)}}},")
@@ -1072,6 +1075,10 @@ def emit_header(signatures):
     ]
     for name in sorted(signatures):
         lines.append(signatures[name] + ";")
+    lines += ["", "// Their uniform entries (the dispatch table's), for code that holds a",
+              "// call's registers (a hand port's lifted::Regs: lifted::Enter).", ""]
+    for name in sorted(signatures):
+        lines.append(f"Result {ename(name)}(uint8_t* base, const Args& a);")
     lines += ["", "}  // namespace lifted", ""]
     return "\n".join(lines)
 
@@ -1165,6 +1172,8 @@ def main(argv):
         for batch, names in batches.items():
             with open(os.path.join(OUT, f"batch_{batch}.cpp"), "w") as f:
                 f.write(emit_batch(batch, names, infos, emitting))
+        with open(os.path.join(OUT, "functions.h"), "w") as f:
+            f.write(emit_header(lifted_before))
         print(f"rewrote {len(batches)} batches: {len(everything)} functions")
         return 0
     print(__doc__)

@@ -2,6 +2,8 @@
 // (src/display/display.h). See B3 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "guest_call.h"
 
@@ -71,7 +73,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
     ctx.r4.u64 = 0;
     ctx.r5.u64 = 124;
     ctx.lr = 0x8258D5B8;
-    lifted::CallFromContext(ctx, base, 0x825A71D0);  // memset
+    lifted::Enter(ctx, base, lifted::entry::e825A71D0);  // memset
     // The parameters (see Device::SetUpDisplay in graphics_device.cpp).
     set(16, display::kWidth);
     set(20, display::kHeight);
@@ -99,7 +101,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
       ctx.r6.u64 = 0;
       ctx.r7.u64 = protection;
       ctx.lr = return_address;
-      lifted::CallFromContext(ctx, base, 0x82296550);  // physical memory
+      lifted::Enter(ctx, base, lifted::entry::e82296550);  // physical memory
       return ctx.r3.u32;
     };
     const uint32_t small = allocate(65536, 0x404, 0x8258D660);
@@ -117,7 +119,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
     ctx.r7.u64 = parameters;
     ctx.r8.u64 = object + kVideoDevice;
     ctx.lr = 0x8258D6C8;
-    lifted::CallFromContext(ctx, base, 0x8229DB38);  // makes the device (Device::Init)
+    lifted::Enter(ctx, base, lifted::e8229DB38);  // makes the device (Device::Init)
     if (ctx.r3.s32 < 0) {
       set(kVideoDevice, 0);
       return;
@@ -135,7 +137,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
       ctx.r9.u64 = 0;
       ctx.r10.u64 = 3;
       ctx.lr = return_address;
-      lifted::CallFromContext(ctx, base, 0x822A5D08);  // probably creates a texture
+      lifted::Enter(ctx, base, lifted::entry::e822A5D08);  // probably creates a texture
       return ctx.r3.u32;
     };
     set(kVideoFrontBuffers, front_buffer(0x8258D718));
@@ -199,7 +201,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82482B18) {
     ctx.r5.u64 = 1;
     ctx.r6.u64 = 0;
     ctx.lr = 0x82482BE4;
-    lifted::CallFromContext(ctx, base, 0x822A6968);  // probably CreateIndexBuffer
+    lifted::Enter(ctx, base, lifted::entry::e822A6968);  // probably CreateIndexBuffer
     const uint32_t indices = ctx.r3.u32;
     guest::StoreU32(base, object + 60, indices);
     if (!indices) {
@@ -210,26 +212,26 @@ ITC_NATIVE_ENTRY_ALWAYS(82482B18) {
     ctx.r5.u64 = 0;
     ctx.r6.u64 = 0;
     ctx.lr = 0x82482C10;
-    lifted::CallFromContext(ctx, base, 0x822A6A18);  // probably Lock
+    lifted::Enter(ctx, base, lifted::entry::e822A6A18);  // probably Lock
     const uint32_t data = ctx.r3.u32;
     for (uint16_t i = 0; i < 6; i++) {
       guest::StoreU16(base, data + 2 * i, i);
     }
     ctx.r3.u64 = guest::LoadU32(base, object + 60);
     ctx.lr = 0x82482C44;
-    lifted::CallFromContext(ctx, base, 0x822A6A78);  // probably Unlock
+    lifted::Enter(ctx, base, lifted::entry::e822A6A78);  // probably Unlock
     ctx.r3.u64 = 120;
     ctx.r4.u64 = 0;
     ctx.r5.u64 = 0;
     ctx.lr = 0x82482C54;
-    lifted::CallFromContext(ctx, base, 0x822A6830);  // probably CreateVertexBuffer
+    lifted::Enter(ctx, base, lifted::entry::e822A6830);  // probably CreateVertexBuffer
     guest::StoreU32(base, object + 64, ctx.r3.u32);
     if (!ctx.r3.u32) {
       return;
     }
     ctx.r3.u64 = 0x8264D550;  // the declaration's elements
     ctx.lr = 0x82482C6C;
-    lifted::CallFromContext(ctx, base, 0x822A8980);  // probably CreateVertexDeclaration
+    lifted::Enter(ctx, base, lifted::entry::e822A8980);  // probably CreateVertexDeclaration
     guest::StoreU32(base, object + 68, ctx.r3.u32);
     if (!ctx.r3.u32) {
       return;

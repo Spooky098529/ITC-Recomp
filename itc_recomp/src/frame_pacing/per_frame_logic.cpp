@@ -6,6 +6,7 @@
 // on render-only passes. Found with --find_per_frame_state.
 
 #include "game_messages.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "guest.h"
@@ -547,7 +548,7 @@ ITC_NATIVE_ENTRY_ALWAYS(821594B8) {
   guest::StackFrame frame(ctx, 176);
   ctx.r3.u64 = g_rival_logo;
   ctx.lr = 0x82155BE0;
-  lifted::CallFromContext(ctx, base, 0x82211A28);
+  lifted::Enter(ctx, base, lifted::entry::e82211A28);
 }
 
 // World-space sprite lists (sub_82128750: r3 = list, r4 = camera; from the

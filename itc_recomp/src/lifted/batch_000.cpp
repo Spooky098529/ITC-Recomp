@@ -1111,8 +1111,6 @@ void f825DAD90(uint8_t* base) {
   return;
 }
 
-namespace {
-
 lifted::Result e82090840(uint8_t* base, const lifted::Args& a) {
   return {f82090840(base, a.r1, a.r13, a.r[0]), a.f[0]};
 }
@@ -1204,6 +1202,8 @@ lifted::Result e825DAD90(uint8_t* base, const lifted::Args& a) {
   f825DAD90(base);
   return {a.r[0], a.f[0]};
 }
+
+namespace {
 
 const Registration kEntries[] = {
     {0x82090840, e82090840},

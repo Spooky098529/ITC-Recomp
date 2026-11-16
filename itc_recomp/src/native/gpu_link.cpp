@@ -16,6 +16,7 @@
 // Our renderer draws from the command list replay instead.
 
 #include <format>
+#include "lifted/entries.h"
 #include "guest.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
@@ -662,7 +663,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8229E848) {
     ctx.r3.u32 = device;
     ctx.r4.u32 = pair;
     ctx.r5.u32 = 1;
-    lifted::CallFromContext(ctx, base, 0x8229E3F0);
+    lifted::Enter(ctx, base, lifted::entry::e8229E3F0);
   }
   ctx = saved;
   ctx.r3.u32 = result;

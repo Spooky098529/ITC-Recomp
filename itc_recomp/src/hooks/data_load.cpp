@@ -2,6 +2,7 @@
 // (docs/functions/data-load.md).
 
 #include "base/flags.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "data_load/data_load.h"
@@ -153,7 +154,7 @@ dl::MovieCalls MovieCalls(lifted::Regs& ctx, uint8_t* base, uint32_t construct_a
     }
     guest_call::InFrame(ctx, base, 112, construct_at, [&](uint32_t) {
       ctx.r3.u64 = movie;
-      lifted::CallFromContext(ctx, base, 0x8211E1C0);  // UiMovie::UiMovie
+      lifted::Enter(ctx, base, lifted::entry::e8211E1C0);  // UiMovie::UiMovie
     });
     return ctx.r3.u32;
   };

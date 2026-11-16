@@ -17993,8 +17993,6 @@ loc_821B5BE0:
   return {r3, f1};
 }
 
-namespace {
-
 lifted::Result e821AE4C0(uint8_t* base, const lifted::Args& a) {
   return {f821AE4C0(base, a.r1, a.r13), a.f[0]};
 }
@@ -18394,6 +18392,8 @@ lifted::Result e821B5A00(uint8_t* base, const lifted::Args& a) {
 lifted::Result e821B5AF8(uint8_t* base, const lifted::Args& a) {
   return f821B5AF8(base, a.r1, a.r13, a.r[0], a.r[4], a.r[5], a.f[0]);
 }
+
+namespace {
 
 const Registration kEntries[] = {
     {0x821AE4C0, e821AE4C0},

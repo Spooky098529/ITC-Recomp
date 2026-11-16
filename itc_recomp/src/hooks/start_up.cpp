@@ -3,6 +3,7 @@
 // docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "lifted/functions.h"
 #include "hooks/native_entry.h"
 #include "guest_call.h"
 
@@ -38,7 +39,7 @@ bool MakeHeap(lifted::Regs& ctx, uint8_t* base) {
       ctx.r6.u64 = 4096;
       ctx.r7.u64 = 0;
       ctx.r8.u64 = attributes;
-      lifted::CallFromContext(ctx, base, 0x822997B0);
+      lifted::Enter(ctx, base, lifted::e822997B0);
       guest::StoreU32(base, kHeap, ctx.r3.u32);
     });
   }

@@ -7,6 +7,7 @@
 // originals run.
 
 #include "guest.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -218,7 +219,7 @@ void hooks::FramePassesConstruct(lifted::Regs& ctx, uint8_t* base) {
         [&](uint32_t job) {
           ctx.r3.u64 = job;
           ctx.lr = 0x82098710;
-          lifted::CallFromContext(ctx, base, 0x82094B10);  // --find_menu_selection's wrap
+          lifted::Enter(ctx, base, lifted::entry::e82094B10);  // --find_menu_selection's wrap
         },
         [&](uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate, uint32_t lr) {
           ctx.r5.u64 = delegate;

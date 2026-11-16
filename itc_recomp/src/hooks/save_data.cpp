@@ -3,6 +3,7 @@
 // (hooks/save_data.h).
 
 #include "hooks/save_data.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -158,8 +159,8 @@ ITC_REGS_STEP(SaveDataResetPlayer) {
   // SaveData::Create's plain C++ refused after the delete (operator new's
   // error paths, never seen): the rest as the original does it.
   ctx.r3.u64 = 0;
-  lifted::CallFromContext(ctx, base, 0x821057C8);
-  lifted::CallFromContext(ctx, base, 0x8209F5E0);
+  lifted::Enter(ctx, base, lifted::entry::e821057C8);
+  lifted::Enter(ctx, base, lifted::entry::e8209F5E0);
 }
 
 #define ITC_SAVE_DATA_TABLE(name)                        \

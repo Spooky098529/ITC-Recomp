@@ -10,6 +10,7 @@
 // compiles instead, dumping what's made (src/debug/shader_compile_dump.h).
 
 #include "guest.h"
+#include "lifted/functions.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -67,7 +68,7 @@ ITC_NATIVE_ENTRY_ALWAYS(822B8F10) {
   const uint32_t table_out = guest::LoadU32(base, ctx.r1.u32 + 92);
   ctx.r3.u64 = shader->size;
   ctx.r4.u64 = shader_out;
-  lifted::CallFromContext(ctx, base, 0x822BE450);
+  lifted::Enter(ctx, base, lifted::e822BE450);
   if (ctx.r3.s32 < 0) {
     return;
   }

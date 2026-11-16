@@ -12,6 +12,7 @@
 // and +48, and stay recompiled. See B4 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -129,7 +130,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82487C48) {
   }
   const uint32_t blocks = ctx.r6.u32, block_size = ctx.r7.u32, count = ctx.r8.u32,
                  ahead = ctx.r9.u32;
-  lifted::CallFromContext(ctx, base, 0x824880D8);
+  lifted::Enter(ctx, base, lifted::entry::e824880D8);
   if (ctx.r3.s32 < 0) {
     return;
   }
@@ -147,7 +148,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82487C48) {
   ctx.r5.u64 = block_size;
   ctx.r6.u64 = count;
   ctx.r7.u64 = ahead;
-  lifted::CallFromContext(ctx, base, 0x82487F68);
+  lifted::Enter(ctx, base, lifted::entry::e82487F68);
 }
 
 // The set-up (vtable +116): r3 = source, r4 = the blocks' memory (0: allocate

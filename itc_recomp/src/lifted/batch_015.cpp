@@ -16047,8 +16047,6 @@ lifted::Result f8245FC70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-namespace {
-
 lifted::Result e822B2598(uint8_t* base, const lifted::Args& a) {
   f822B2598(base, a.r[1], a.r[2]);
   return {a.r[0], a.f[0]};
@@ -16454,6 +16452,8 @@ lifted::Result e8245FB10(uint8_t* base, const lifted::Args& a) {
 lifted::Result e8245FC70(uint8_t* base, const lifted::Args& a) {
   return f8245FC70(base, a.r1, a.r13, a.r[0], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
+
+namespace {
 
 const Registration kEntries[] = {
     {0x822B2598, e822B2598},

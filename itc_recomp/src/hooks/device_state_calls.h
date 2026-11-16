@@ -6,6 +6,7 @@
 #pragma once
 
 #include "guest.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -26,7 +27,7 @@ inline graphics::device_state::DeviceCalls DeviceStateCalls(lifted::Regs& ctx, u
     ctx.r5.u64 = hiz;
     ctx.r6.u64 = 0;
     ctx.lr = 0x8229F6B8;
-    lifted::CallFromContext(ctx, base, 0x822ADC08);
+    lifted::Enter(ctx, base, lifted::entry::e822ADC08);
     return ctx.r3.u64;
   };
   calls.flush_registers = [&ctx, base, device](uint64_t mask, uint32_t first, uint32_t shadow) {
@@ -35,7 +36,7 @@ inline graphics::device_state::DeviceCalls DeviceStateCalls(lifted::Regs& ctx, u
     ctx.r5.u64 = first;
     ctx.r6.u64 = shadow;
     ctx.lr = 0x8229F6E8;
-    lifted::CallFromContext(ctx, base, 0x822ADE30);
+    lifted::Enter(ctx, base, lifted::entry::e822ADE30);
   };
   calls.setter = [&ctx, base, device](uint32_t setter, uint32_t r4, uint32_t r5) {
     ctx.r3.u64 = device;

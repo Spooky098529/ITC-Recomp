@@ -3,6 +3,7 @@
 // steps the harness shares (hooks/scene_loaders.h).
 
 #include "hooks/scene_loaders.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -377,7 +378,7 @@ sl::FileLoadedCalls MakeFileLoadedCalls(lifted::Regs& ctx, uint8_t* base,
     // From MakePlate's frame, below the callback's.
     guest_call::InFrame(ctx, base, car_models::kPlateFrameBytes, 0x820ED8E4, [&](uint32_t) {
       ctx.r3.u64 = surface;
-      lifted::CallFromContext(ctx, base, 0x822A67B0);
+      lifted::Enter(ctx, base, lifted::entry::e822A67B0);
     });
   };
   return calls;

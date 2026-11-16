@@ -5,6 +5,7 @@
 // data the game reads from it. See B5 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "lifted/functions.h"
 #include "hooks/native_entry.h"
 #include "guest_call.h"
 
@@ -166,7 +167,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8214E268) {
       const uint32_t profile_user = ProfileUser(base);
       InFrame(ctx, base, 512, 0x8214E4A8, [&](uint32_t) {
         ctx.r3.u64 = profile_user;
-        lifted::CallFromContext(ctx, base, 0x82149178);  // the game's profile read
+        lifted::Enter(ctx, base, lifted::e82149178);  // the game's profile read
       });
       guest::StoreU32(base, kProfileRequested, 0);
       guest::StoreU32(base, kProfileWasRead, 1);

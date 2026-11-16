@@ -949,8 +949,6 @@ loc_frag_824457CC:
   return r3;
 }
 
-namespace {
-
 lifted::Result e82099BA0(uint8_t* base, const lifted::Args& a) {
   return {f82099BA0(base, a.r[0]), a.f[0]};
 }
@@ -1012,6 +1010,8 @@ lifted::Result e825A9958(uint8_t* base, const lifted::Args& a) {
 lifted::Result e82445798(uint8_t* base, const lifted::Args& a) {
   return {f82445798(base, a.r[0]), a.f[0]};
 }
+
+namespace {
 
 const Registration kEntries[] = {
     {0x82099BA0, e82099BA0},

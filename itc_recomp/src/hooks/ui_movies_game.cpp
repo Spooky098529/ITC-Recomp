@@ -2,6 +2,7 @@
 // src/ui_movies/game.cpp (docs/functions/ui-movies-game.md).
 
 #include "guest.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -269,7 +270,7 @@ void CopySlot(lifted::Regs& ctx, uint8_t* base, uint32_t to, uint32_t from, uint
     ctx.r3.u64 = to;
     ctx.r4.u64 = from;
     ctx.r5.u64 = 40;
-    lifted::CallFromContext(ctx, base, 0x825A7410);
+    lifted::Enter(ctx, base, lifted::entry::e825A7410);
   });
   ctx.lr = lr;
 }
@@ -525,7 +526,7 @@ ITC_REGS_STEP(DrawTexts) {
       ctx.r4.u64 = frame + ui_movies::kDrawTextsParams;
       ctx.r5.u64 = frame + ui_movies::kDrawTextsBuffer;
       ctx.lr = 0x8211D190;
-      lifted::CallFromContext(ctx, base, 0x8210A758);
+      lifted::Enter(ctx, base, lifted::entry::e8210A758);
       ctx.fpscr.disableFlushMode();
       ctx.r3.u64 = ui_movies::ClearTextItem(base, item);
     } while (guest::LoadU32(base, list + 8) != 0);
@@ -562,7 +563,7 @@ void FinishIn(lifted::Regs& ctx, uint8_t* base, uint32_t movie, uint32_t frame_b
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = double(std::bit_cast<float>(found->time));
     ctx.lr = apply_return;
-    lifted::CallFromContext(ctx, base, 0x825A08E0);
+    lifted::Enter(ctx, base, lifted::entry::e825A08E0);
     const uint32_t queue = movie + ui_movies::kMovieQueue;
     ui_movies::RemoveAt(base, queue, found->position);
     ctx.r3.u64 = queue;
@@ -608,24 +609,24 @@ ITC_NATIVE_ENTRY_ALWAYS(8211D280) {
     ctx.r6.u64 = 0;
     ctx.r7.u64 = 0;
     ctx.lr = 0x8211D2A4;
-    lifted::CallFromContext(ctx, base, 0x82119B80);
+    lifted::Enter(ctx, base, lifted::entry::e82119B80);
     ctx.r3.u64 = movie + 64;
     ctx.r4.u64 = guest::LoadU32(base, movie + ui_movies::kMovieLive);
     ctx.r5.u64 = movie + ui_movies::kMovieTextures;
     ctx.r6.u64 = movie + 40;
     ctx.r7.s64 = -1;
     ctx.lr = 0x8211D2C4;
-    lifted::CallFromContext(ctx, base, 0x8259FA00);
+    lifted::Enter(ctx, base, lifted::entry::e8259FA00);
     ctx.r3.u64 = movie;
     ctx.r4.u64 = movie + 40;
     ctx.r5.u64 = 0;
     ctx.lr = 0x8211D2D4;
-    lifted::CallFromContext(ctx, base, 0x8211CD90);
+    lifted::Enter(ctx, base, lifted::entry::e8211CD90);
     for (uint32_t k = 0; k < 2; k++) {
       ctx.r3.u64 = movie + 64;
       ctx.r4.u64 = k == 0 ? 678 : 148;
       ctx.lr = k == 0 ? 0x8211D2E0 : 0x8211D2EC;
-      lifted::CallFromContext(ctx, base, 0x8259DAC0);
+      lifted::Enter(ctx, base, lifted::entry::e8259DAC0);
     }
   });
   ctx.lr = lr;
@@ -639,7 +640,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211E1B8) {
   
   NATIVE_OR_ORIGINAL(8211E1B8);
   ITC_NATIVE_RUNNING("sub_8211E1B8 UiMovie::Run");
-  lifted::CallFromContext(ctx, base, 0x8211D2F8);
+  lifted::Enter(ctx, base, lifted::entry::e8211D2F8);
 }
 
 // UiMovie::FinishAll (sub_8211DFF8): r3 = movie. Every looping slot moved
@@ -673,7 +674,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DFF8) {
         ctx.r4.u64 = from;
         ctx.r5.u64 = 40;
         ctx.lr = return_address;
-        lifted::CallFromContext(ctx, base, 0x825A7410);
+        lifted::Enter(ctx, base, lifted::entry::e825A7410);
       }
       ctx.r3.u64 = copy;
     };
@@ -686,7 +687,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DFF8) {
         ctx.r4.u64 = copy;
         ctx.r5.s64 = int32_t(count(queue));
         ctx.lr = 0x8211E0A0;
-        lifted::CallFromContext(ctx, base, 0x8211B4D0);
+        lifted::Enter(ctx, base, lifted::entry::e8211B4D0);
       } while (--n != 0);
     }
     n = count(queue);
@@ -699,7 +700,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211DFF8) {
         ctx.fpscr.disableFlushMode();
         ctx.f1.f64 = double(std::bit_cast<float>(ui_movies::FinishTime(base, copy)));
         ctx.lr = 0x8211E118;
-        lifted::CallFromContext(ctx, base, 0x825A08E0);
+        lifted::Enter(ctx, base, lifted::entry::e825A08E0);
         ui_movies::UnlinkQueueFirst(base, queue);
       } while (--n != 0);
     }
@@ -802,7 +803,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211BEE8) {
     ui_movies::EffectBegin(base, frame);
     ctx.r3.u64 = 0;
     ctx.lr = 0x8211BF9C;
-    lifted::CallFromContext(ctx, base, 0x8209F7A8);
+    lifted::Enter(ctx, base, lifted::entry::e8209F7A8);
     const uint32_t texture = ctx.r3.u32;
     ctx.fpscr.disableFlushMode();
     const double depth = ui_movies::EffectQuad(base, frame, primitive, texture);
@@ -811,7 +812,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211BEE8) {
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = depth;
     ctx.lr = 0x8211C154;
-    lifted::CallFromContext(ctx, base, 0x8259EBE8);
+    lifted::Enter(ctx, base, lifted::entry::e8259EBE8);
   });
   ctx.lr = lr;
 }
@@ -1204,7 +1205,7 @@ ui_movies::OnLoadedCalls OnLoadedCalls(lifted::Regs& ctx, uint8_t* base, uint32_
     if (!native::Buffers_Memcpy(base, to, from, size, kBack[which])) {
       call(kBack[which],
            +[](lifted::Regs& ctx, uint8_t* base) {
-             lifted::CallFromContext(ctx, base, 0x825A7410);
+             lifted::Enter(ctx, base, lifted::entry::e825A7410);
            },
            to, from, size);
     }

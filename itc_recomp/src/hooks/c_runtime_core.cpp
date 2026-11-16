@@ -3,6 +3,7 @@
 // originals call them (B7's goal, the user's call, 2026-11-14).
 
 #include "hooks/c_runtime_core.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -168,7 +169,7 @@ cc::Calls hooks::CRuntimeCoreCalls(lifted::Regs& ctx, uint8_t* base) {
     const uint64_t lr = ctx.lr;
     ctx.r3.u64 = count;
     ctx.r4.u64 = size;
-    lifted::CallFromContext(ctx, base, 0x825AC320);
+    lifted::Enter(ctx, base, lifted::entry::e825AC320);
     ctx.lr = lr;
     return ctx.r3.u32;
   };
@@ -180,7 +181,7 @@ cc::Calls hooks::CRuntimeCoreCalls(lifted::Regs& ctx, uint8_t* base) {
     }
     const uint64_t lr = ctx.lr;
     ctx.r3.u64 = size;
-    lifted::CallFromContext(ctx, base, 0x825A9A90);
+    lifted::Enter(ctx, base, lifted::entry::e825A9A90);
     ctx.lr = lr;
     return ctx.r3.u32;
   };
@@ -190,7 +191,7 @@ cc::Calls hooks::CRuntimeCoreCalls(lifted::Regs& ctx, uint8_t* base) {
     }
     const uint64_t lr = ctx.lr;
     ctx.r3.u64 = block;
-    lifted::CallFromContext(ctx, base, 0x825A9B58);
+    lifted::Enter(ctx, base, lifted::entry::e825A9B58);
     ctx.lr = lr;
   };
   calls.thread_id = []() { return graphics::video_output::CurrentThreadId(); };

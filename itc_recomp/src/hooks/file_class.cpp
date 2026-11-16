@@ -8,6 +8,7 @@
 // See B4 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "lifted/functions.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "guest_call.h"
@@ -40,7 +41,7 @@ std::string GuestString(uint8_t* base, uint32_t address, uint32_t max = 260) {
 // The read error report (sub_8209AC78), as the recompiled class calls it
 // (from its own frame).
 void ReportError(lifted::Regs& ctx, uint8_t* base, uint32_t return_address) {
-  InFrame(ctx, base, 112, return_address, [&](uint32_t) { lifted::CallFromContext(ctx, base, 0x8209AC78); });
+  InFrame(ctx, base, 112, return_address, [&](uint32_t) { lifted::Enter(ctx, base, lifted::e8209AC78); });
 }
 
 }  // namespace

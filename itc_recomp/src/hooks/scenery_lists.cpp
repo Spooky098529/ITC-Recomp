@@ -11,6 +11,7 @@
 // (src/course_scenery/collect.cpp); their register steps are the harness's.
 
 #include "hooks/scenery_lists.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -80,7 +81,7 @@ struct ReleaseContext {
       ctx.r4.s64 = 1;
       lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, model)));
     } else {
-      lifted::CallFromContext(ctx, base, 0x82594970);
+      lifted::Enter(ctx, base, lifted::entry::e82594970);
     }
     ctx.r1.u64 = stack;
     return ctx.r3.u32;

@@ -12873,8 +12873,6 @@ loc_822637F4:
   return {r3, f1};
 }
 
-namespace {
-
 lifted::Result e8216C798(uint8_t* base, const lifted::Args& a) {
   return f8216C798(base, a.r1, a.r13, a.r[0], a.r[4], a.r[5]);
 }
@@ -13293,6 +13291,8 @@ lifted::Result e82263508(uint8_t* base, const lifted::Args& a) {
 lifted::Result e82263790(uint8_t* base, const lifted::Args& a) {
   return f82263790(base, a.r1, a.r13, a.r[1], a.r[5], a.f[0]);
 }
+
+namespace {
 
 const Registration kEntries[] = {
     {0x8216C798, e8216C798},

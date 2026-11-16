@@ -29,6 +29,8 @@
 // isn't native).
 
 #include "guest.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -268,7 +270,7 @@ ITC_REGS_STEP(PostEffectsReleaseSurface) {
         [&](uint32_t resource) {
           ctx.r3.u64 = resource;
           ctx.lr = 0x82133CB0;
-          lifted::CallFromContext(ctx, base, 0x822A67B0);
+          lifted::Enter(ctx, base, lifted::entry::e822A67B0);
         }};
     r3 = ReleaseSurface(base, frame, at, calls);
   });
@@ -311,10 +313,10 @@ CreateCalls MakeCreateCalls(lifted::Regs& ctx, uint8_t* base) {
             ctx.r5.u64 = device;
             if (function == 0x82134410) {
               ctx.lr = 0x82138BB8;
-              lifted::CallFromContext(ctx, base, 0x82134410);
+              lifted::Enter(ctx, base, lifted::e82134410);
             } else {
               ctx.lr = 0x82138B10;
-              lifted::CallFromContext(ctx, base, 0x82133B10);
+              lifted::Enter(ctx, base, lifted::e82133B10);
             }
             return ctx.r3.u32;
           }};
@@ -369,7 +371,7 @@ void hooks::PostEffectsInitBoot(lifted::Regs& ctx, uint8_t* base) {
             ctx.r3.u64 = to;
             ctx.r4.u64 = from;
             ctx.r5.u64 = size;
-            lifted::CallFromContext(ctx, base, 0x825A7410);  // memcpy
+            lifted::Enter(ctx, base, lifted::entry::e825A7410);  // memcpy
           });
         },
         [&](const std::function<uint32_t(const CreateCalls&)>& create) {
@@ -415,7 +417,7 @@ RecordCalls PostEffectsRecordCalls(lifted::Regs& ctx, uint8_t* base) {
     ctx.r1.u64 = sp;
     ctx.lr = lr;
     ctx.f1.f64 = x;
-    lifted::CallFromContext(ctx, base, 0x825A8A50);
+    lifted::Enter(ctx, base, lifted::entry::e825A8A50);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.f1.f64;

@@ -5,6 +5,7 @@
 // slots by the return address), the original runs.
 
 #include "hooks/power_graph.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -151,7 +152,7 @@ void hooks::TuningScreenDrawPowerGraph(lifted::Regs& ctx, uint8_t* base) {
     // PowerGraph::Draw saves in its frame: not carried by the view.)
     (void)movie;
     ctx.lr = pg::kTuningDrawReturn;
-    lifted::CallFromContext(ctx, base, 0x8217C708);
+    lifted::Enter(ctx, base, lifted::entry::e8217C708);
   });
   ctx.lr = lr;
 }
@@ -188,7 +189,7 @@ void hooks::CarListDrawEntryPowerGraph(lifted::Regs& ctx, uint8_t* base) {
     // PowerGraph::Draw saves in its frame, where a count above 32 reads it
     // back: not carried by the view.)
     ctx.lr = pg::kEntryDrawReturn;
-    lifted::CallFromContext(ctx, base, 0x8217C708);
+    lifted::Enter(ctx, base, lifted::entry::e8217C708);
   });
   ctx.lr = lr;
 }
@@ -220,7 +221,7 @@ void hooks::CarListDrawCarPowerGraph(lifted::Regs& ctx, uint8_t* base) {
     // PowerGraph::Draw saves in its frame, where a count above 32 reads it
     // back: not carried by the view.)
     ctx.lr = pg::kCarDrawReturn;
-    lifted::CallFromContext(ctx, base, 0x8217C708);
+    lifted::Enter(ctx, base, lifted::entry::e8217C708);
   });
   ctx.lr = lr;
 }

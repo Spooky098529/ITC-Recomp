@@ -13031,8 +13031,6 @@ loc_82588D18:
   return;
 }
 
-namespace {
-
 lifted::Result e8257CF10(uint8_t* base, const lifted::Args& a) {
   return {f8257CF10(base, a.r1, a.r13, a.r[0], a.r[1]), a.f[0]};
 }
@@ -13447,6 +13445,8 @@ lifted::Result e82588B68(uint8_t* base, const lifted::Args& a) {
   f82588B68(base, a.r[1], a.f[0]);
   return {a.r[0], a.f[0]};
 }
+
+namespace {
 
 const Registration kEntries[] = {
     {0x8257CF10, e8257CF10},

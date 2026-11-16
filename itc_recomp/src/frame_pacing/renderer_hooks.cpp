@@ -15,6 +15,7 @@
 // originally did), without the game's 2-vblank wait.
 
 #include <format>
+#include "lifted/functions.h"
 #include "lifted/originals.h"
 #include "debug/frame_state_diff.h"
 #include "hooks/native_entry.h"
@@ -148,13 +149,13 @@ bool Event_Wait(lifted::Regs& ctx, uint8_t* base, uint32_t event,
   guest::StoreU32(base, timeout, timeout_ms);
   ctx.r3.u64 = event;
   ctx.r4.u64 = timeout;
-  lifted::CallFromContext(ctx, base, 0x8258DD90);
+  lifted::Enter(ctx, base, lifted::e8258DD90);
   return ctx.r3.u32 != 0;
 }
 
 void Event_Signal(lifted::Regs& ctx, uint8_t* base, uint32_t event) {
   ctx.r3.u64 = event;
-  lifted::CallFromContext(ctx, base, 0x8258DD78);
+  lifted::Enter(ctx, base, lifted::e8258DD78);
 }
 
 void Renderer_DrawFrame(lifted::Regs& ctx, uint8_t* base, uint32_t renderer) {
@@ -244,7 +245,7 @@ void VideoOutput_WaitForVblank(lifted::Regs& ctx, uint8_t* base, uint32_t video_
   // Keep the graphics device call that precedes the wait; drop the wait
   // itself, which held each frame for the game's 2-vblank interval.
   ctx.r3.u64 = guest::LoadU32(base, video_output + kVideoOutputDeviceOffset);
-  lifted::CallFromContext(ctx, base, 0x822A0718);
+  lifted::Enter(ctx, base, lifted::e822A0718);
 }
 
 }  // namespace

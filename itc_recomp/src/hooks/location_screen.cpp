@@ -3,6 +3,7 @@
 // register steps the harness shares (hooks/location_screen.h).
 
 #include "hooks/location_screen.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -153,7 +154,7 @@ uint64_t RunThrough(void* user, uint32_t movie, uint32_t draw_only, uint32_t fra
   guest_call::InFrame(ctx, guest.base, frame_bytes, lr, [&](uint32_t) {
     ctx.r3.u64 = movie;
     ctx.r4.u64 = draw_only;
-    lifted::CallFromContext(ctx, guest.base, 0x8211E1B8);
+    lifted::Enter(ctx, guest.base, lifted::entry::e8211E1B8);
   });
   return ctx.r3.u64;
 }

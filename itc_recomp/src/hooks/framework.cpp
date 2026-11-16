@@ -7,6 +7,7 @@
 // DebugText::SetPosition's plain C++ call them.
 
 #include "guest.h"
+#include "lifted/functions.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -571,12 +572,12 @@ fw::MainLoopCalls hooks::MainLoopCalls(lifted::Regs& ctx, uint8_t* base) {
   calls.destroy_run_loop = [&ctx, base](uint32_t loop) {
     ctx.r3.u64 = loop;
     ctx.lr = 0x8209AC18;
-    lifted::CallFromContext(ctx, base, 0x8209A6E0);
+    lifted::Enter(ctx, base, lifted::e8209A6E0);
   };
   calls.delete_framework = [&ctx, base](uint32_t holder) {
     ctx.r3.u64 = holder;
     ctx.lr = 0x82090130;
-    lifted::CallFromContext(ctx, base, 0x82090350);
+    lifted::Enter(ctx, base, lifted::e82090350);
   };
   return calls;
 }

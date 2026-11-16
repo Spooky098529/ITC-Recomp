@@ -1102,8 +1102,6 @@ void f825DB228(uint8_t* base) {
   return;
 }
 
-namespace {
-
 lifted::Result e825DACC8(uint8_t* base, const lifted::Args& a) {
   return f825DACC8(base, a.r1, a.r13, a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
@@ -1588,6 +1586,8 @@ lifted::Result e825DB228(uint8_t* base, const lifted::Args& a) {
   f825DB228(base);
   return {a.r[0], a.f[0]};
 }
+
+namespace {
 
 const Registration kEntries[] = {
     {0x825DACC8, e825DACC8},

@@ -13357,8 +13357,6 @@ lifted::Result f821356B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-namespace {
-
 lifted::Result e82118638(uint8_t* base, const lifted::Args& a) {
   return f82118638(base, a.r1, a.r13, a.r[0], a.r[3], a.r[4], a.r[5], a.r[6], a.f[0]);
 }
@@ -13766,6 +13764,8 @@ lifted::Result e821351A0(uint8_t* base, const lifted::Args& a) {
 lifted::Result e821356B0(uint8_t* base, const lifted::Args& a) {
   return f821356B0(base, a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
+
+namespace {
 
 const Registration kEntries[] = {
     {0x82118638, e82118638},

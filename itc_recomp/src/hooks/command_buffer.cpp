@@ -4,6 +4,7 @@
 // those with none).
 
 #include "guest.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -80,7 +81,7 @@ graphics::command_buffer::Kick hooks::CommandBufferKick(lifted::Regs& ctx, uint8
       ctx.r6.u64 = words;
       ctx.r7.u64 = interrupts;
       ctx.r8.u64 = list;
-      lifted::CallFromContext(ctx, base, 0x8229E848);
+      lifted::Enter(ctx, base, lifted::entry::e8229E848);
       r3 = ctx.r3.u32;
     });
     return r3;

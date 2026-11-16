@@ -7,6 +7,8 @@
 // (src/car_draw/morph.cpp), which calls the plain C++.
 
 #include "hooks/morph_jobs.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -161,7 +163,7 @@ ITC_REGS_STEP(MorphJobsWorkItemInterfaceDestroy) {
 ITC_REGS_STEP(MorphJobsWait) {
   ITC_NATIVE_RUNNING("sub_820AC9B8 MorphJob::Wait");
   ctx.r3.s64 = ctx.r3.s64 + mj::kItem;
-  lifted::CallFromContext(ctx, base, 0x82094B10);  // Job::Wait (--find_menu_selection's wrap)
+  lifted::Enter(ctx, base, lifted::entry::e82094B10);  // Job::Wait (--find_menu_selection's wrap)
 }
 
 ITC_REGS_STEP(MorphJobsIsReleased) {
@@ -178,7 +180,7 @@ ITC_REGS_STEP(MorphJobsRun) {
   // (r11 a leftover for recompiled callers: none now)
   ctx.r3.s64 = ctx.r3.s64 + (run.morph ? 56 : 8);  // run.record, all 64 bits
   if (!run.morph) {
-    lifted::CallFromContext(ctx, base, 0x8258BCD8);  // the skinning blend (not seen in play)
+    lifted::Enter(ctx, base, lifted::e8258BCD8);  // the skinning blend (not seen in play)
   } else if (ITC_FLAG(native_second_set)) {
     SecondSetMorphBlend(ctx, base);
   } else {

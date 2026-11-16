@@ -9194,8 +9194,6 @@ lifted::Result f825D1D50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   return {r3, f1};
 }
 
-namespace {
-
 lifted::Result e825CC3F8(uint8_t* base, const lifted::Args& a) {
   return f825CC3F8(base, a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7]);
 }
@@ -9598,6 +9596,8 @@ lifted::Result e825D1D30(uint8_t* base, const lifted::Args& a) {
 lifted::Result e825D1D50(uint8_t* base, const lifted::Args& a) {
   return f825D1D50(base, a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0], a.lr);
 }
+
+namespace {
 
 const Registration kEntries[] = {
     {0x825CC3F8, e825CC3F8},

@@ -17,6 +17,7 @@
 // --native_renderer_library_packets turns the replacement off.
 
 #include <format>
+#include "lifted/functions.h"
 #include "lifted/originals.h"
 #include "draw_packets.h"
 #include "hooks/native_entry.h"
@@ -245,7 +246,7 @@ void native::DrawPackets_IndexedDraw(lifted::Regs& ctx, uint8_t* base) {
     lifted::Regs saved = ctx;
     ctx.r3.u64 = device;
     ctx.r4.u64 = shader_state;
-    lifted::CallFromContext(ctx, base, 0x822AED18);
+    lifted::Enter(ctx, base, lifted::e822AED18);
     // The mask with the bits for what it wrote in the shadow.
     shader_state |= ctx.r3.u64;
     ctx = saved;

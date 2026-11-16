@@ -17967,8 +17967,6 @@ loc_821654CC:
   goto loc_821654B0;
 }
 
-namespace {
-
 lifted::Result e82091398(uint8_t* base, const lifted::Args& a) {
   return f82091398(base, a.r1, a.r13, a.r[0], a.r[1], a.r[2], a.r[3], a.r[4], a.r[5], a.r[6], a.r[7], a.f[0]);
 }
@@ -18374,6 +18372,8 @@ lifted::Result e8214FF78(uint8_t* base, const lifted::Args& a) {
 lifted::Result e821653E8(uint8_t* base, const lifted::Args& a) {
   return {f821653E8(base, a.r1, a.r13, a.r[0], a.r[1]), a.f[0]};
 }
+
+namespace {
 
 const Registration kEntries[] = {
     {0x82091398, e82091398},

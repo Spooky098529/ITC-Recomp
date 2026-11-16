@@ -5,6 +5,8 @@
 // do.
 
 #include "hooks/predicated_tiling.h"
+#include "lifted/functions.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -35,7 +37,7 @@ pt::GuestCalls hooks::PredicatedTilingCalls(lifted::Regs& ctx, uint8_t* base) {
   calls.end_segment = [&ctx, base](uint32_t device) {
     guest_call::InFrame(ctx, base, 128, 0x822B6AEC, [&](uint32_t) {
       ctx.r3.u64 = device;
-      lifted::CallFromContext(ctx, base, 0x8229EF48);
+      lifted::Enter(ctx, base, lifted::entry::e8229EF48);
     });
   };
   calls.kick = CommandBufferKick(ctx, base);
@@ -138,17 +140,17 @@ pt::WorkerLoopCalls hooks::PredicatedTilingWorkerLoopCalls(lifted::Regs& ctx, ui
   calls.job = [&ctx, base](uint32_t block) {
     ctx.r3.u64 = block;
     ctx.lr = 0x822B6A68;
-    lifted::CallFromContext(ctx, base, 0x822B6780);
+    lifted::Enter(ctx, base, lifted::entry::e822B6780);
   };
   calls.present = [&ctx, base](uint32_t device) {
     ctx.r3.u64 = device;
     ctx.lr = 0x822B6A14;
-    lifted::CallFromContext(ctx, base, 0x822A0718);
+    lifted::Enter(ctx, base, lifted::e822A0718);
     ctx.r3.u64 = device;
     ctx.r4.u64 = device + 13444;
     ctx.r5.u64 = 0;
     ctx.lr = 0x822B6A24;
-    lifted::CallFromContext(ctx, base, 0x822A08A0);
+    lifted::Enter(ctx, base, lifted::entry::e822A08A0);
   };
   return calls;
 }

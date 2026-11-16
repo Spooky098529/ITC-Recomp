@@ -11,6 +11,7 @@
 // from TrackZones::Create.
 
 #include "guest.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -117,7 +118,7 @@ void CopyRange(void* user, uint32_t to, uint32_t from, uint32_t frame) {
     ctx.r3.u64 = to;
     ctx.r4.u64 = from;
     ctx.r5.u64 = kRangeBytes;
-    lifted::CallFromContext(ctx, base, 0x825A7410);
+    lifted::Enter(ctx, base, lifted::entry::e825A7410);
   });
   ctx.r1.u64 = stack;
   ctx.lr = lr;

@@ -9,6 +9,7 @@
 // src/hooks/network.cpp). See B5 in docs/rexglue-removal.md.
 
 #include "guest.h"
+#include "lifted/functions.h"
 #include "hooks/native_entry.h"
 #include "guest_call.h"
 #include "base/flags.h"
@@ -63,7 +64,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82099828) {
   guest::StoreU32(base, app + 244, 1);
   InFrame(ctx, base, 112, 0x820998A0, [&](uint32_t) {
     ctx.r3.u64 = app;
-    lifted::CallFromContext(ctx, base, 0x82099600);
+    lifted::Enter(ctx, base, lifted::e82099600);
   });
 }
 

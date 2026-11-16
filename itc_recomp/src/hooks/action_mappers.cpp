@@ -4,6 +4,7 @@
 // their adapters stay until every caller is native.
 
 #include "guest.h"
+#include "lifted/entries.h"
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 
@@ -252,7 +253,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209F430) {
   const uint64_t saved_lr = ctx.lr;
   guest_call::InFrame(ctx, base, 112, 0x8209F56C, [&](uint32_t) {
     ctx.r3.u64 = list;
-    lifted::CallFromContext(ctx, base, 0x8210AF08);
+    lifted::Enter(ctx, base, lifted::entry::e8210AF08);
     if (ConfigureKnown(base)) {
       double f[3] = {ctx.f1.f64, ctx.f2.f64, ctx.f3.f64};
       ctx.r3.u64 = Configure(base, index, f);

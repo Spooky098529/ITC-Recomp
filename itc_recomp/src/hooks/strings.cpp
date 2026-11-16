@@ -4,6 +4,7 @@
 // last_error::Set.
 
 #include "guest.h"
+#include "lifted/functions.h"
 #include "hooks/native_entry.h"
 #include "guest_call.h"
 #include "last_error.h"
@@ -40,7 +41,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82296648) {
       ctx.r4.s64 = source_length;
       ctx.r5.u64 = destination;
       ctx.r6.s64 = destination_length;
-      lifted::CallFromContext(ctx, base, 0x82297340);
+      lifted::Enter(ctx, base, lifted::e82297340);
     });
     return;
   }
@@ -95,7 +96,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82296720) {
       ctx.r4.s64 = source_length;
       ctx.r5.u64 = destination;
       ctx.r6.s64 = destination_length;
-      lifted::CallFromContext(ctx, base, 0x82297540);
+      lifted::Enter(ctx, base, lifted::e82297540);
     });
     return;
   }
