@@ -21,6 +21,9 @@ struct Regs {
   Temp f1{}, f2{}, f3{}, f4{}, f5{}, f6{}, f7{}, f8{}, f9{}, f10{}, f11{}, f12{}, f13{};
   Temp ctr{};
   uint64_t lr = 0;
+  // The caller's r31 (lifted::Args::r31): read by the per-object
+  // recorder's pairing key only, passed on to calls.
+  uint32_t caller_r31 = 0;
 
   // The float modes the SDK's context switches (its fpscr): the host's.
   struct FloatMode {
@@ -41,6 +44,7 @@ struct Regs {
       f[i].f64 = args.f[i];
     }
     lr = args.lr;
+    caller_r31 = args.r31;
   }
 
   // A call's arguments from these registers.
@@ -57,6 +61,7 @@ struct Regs {
       args.f[i] = f[i].f64;
     }
     args.lr = uint32_t(lr);
+    args.r31 = caller_r31;
     return args;
   }
 

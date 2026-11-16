@@ -4273,30 +4273,25 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CAA0) {
   }
 }
 
-// Matrix_Copy: r3 = destination, r4 = source; copies a 4x4 matrix. On the
-// SDK's context (not in the dispatch table): from 0x8213653C it reads its
-// caller's r29, the view (the rewiring, stage 3; left for later).
-extern "C" REX_FUNC(sub_820A0AC0) {
-  REX_FUNC_PROLOGUE();
-  uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
-  uint32_t caller = uint32_t(ctx.lr);
-  uint32_t noted_src = src;
-  if (caller == 0x8213653C) [[unlikely]] {
-    // The motion blur's previous view-projection (c100 x4); r29 is the view.
-    if (ITC_FLAG(log_motion_blur_velocity)) {
-      interpolation::BlendState_LogMotionBlurCopy(base, ctx.r29.u32, src);
-    }
-    noted_src = interpolation::BlendState_MotionBlurNotedSource(base, ctx.r29.u32, src);
-  }
+// Matrix_Copy: r3 = destination, r4 = source; copies a 4x4 matrix, then
+// noted. The motion blur's copy of its previous view-projection (from
+// 0x8213653C, MotionBlur::Record) is noted by MotionBlur::Record's port
+// itself (BlendState_MotionBlurCopy, with the view it has); only the
+// recompiled MotionBlur::Record (--native_post_effects off) still reaches
+// this from there, and its r29 (the view) isn't carried: noted as a plain
+// copy then.
+ITC_NATIVE_ENTRY_ALWAYS(820A0AC0) {
+  const uint32_t dst = ctx.r3.u32, src = ctx.r4.u32;
+  const uint32_t caller = uint32_t(ctx.lr);
   // The copy natively (src/matrix_math/matrix_math.cpp, --native_matrix_math)
   // or translated, then noted.
   if (ITC_FLAG(native_matrix_math)) {
     ctx.fpscr.disableFlushMode();
     matrix_math::Copy(base, dst, src);
   } else {
-    __imp__sub_820A0AC0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_820A0AC0);
   }
-  interpolation::GetDrawState().OnCopy(base, dst, noted_src, caller);
+  interpolation::GetDrawState().OnCopy(base, dst, src, caller);
 }
 
 // Billboards_BuildVertices: r3 = billboard set (its +0 is the camera pass it
@@ -4406,25 +4401,17 @@ ITC_NATIVE_ENTRY_ALWAYS(8258FD48) {
 
 // The per-object recorder (~150 calls a pass in a race): r4 = camera
 // view-projection, r5 = the object's world matrix. Its interpolation hooks
-// stay here around the recording, native or translated. On the SDK's
-// context (not in the dispatch table): the record context is the caller's
-// lr and r24 to r31, read from the context (the rewiring, stage 3; left for
-// later).
-extern "C" REX_FUNC(sub_825953D0) {
-  REX_FUNC_PROLOGUE();
+// stay here around the recording, native or translated. The record context
+// is the caller's lr and r24 to r31: the pairing key reads lr and r31 (the
+// part being drawn), both carried by the call (lifted::Args); r24 to r30
+// were only logged and aren't carried (0).
+ITC_NATIVE_ENTRY_ALWAYS(825953D0) {
   interpolation::BlendState_BeforeRecordObject(base, ctx.r4.u32, ctx.r5.u32);
-  interpolation::g_record_context = {uint32_t(ctx.lr), ctx.r24.u32, ctx.r25.u32, ctx.r26.u32,
-                                     ctx.r27.u32,      ctx.r28.u32, ctx.r29.u32, ctx.r30.u32,
-                                     ctx.r31.u32};
+  interpolation::g_record_context = {uint32_t(ctx.lr), 0, 0, 0, 0, 0, 0, 0, ctx.caller_r31};
   // The recording natively (src/scenery_lists/model_draws.cpp,
   // --native_scenery_lists) or translated.
-  bool recorded = false;
-  {
-    lifted::RegsScope scope(ctx);
-    recorded = hooks::SceneryListsRecordObject(scope.regs, base);
-  }
-  if (!recorded) {
-    __imp__sub_825953D0(ctx, base);
+  if (!hooks::SceneryListsRecordObject(ctx, base)) {
+    lifted::Sdk(ctx, base, __imp__sub_825953D0);
   }
   interpolation::g_record_context = {};
   interpolation::BlendState_AfterRecordObject(base);

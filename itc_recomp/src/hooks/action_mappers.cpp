@@ -105,20 +105,20 @@ ITC_NATIVE_ENTRY_ALWAYS(8258CF10) {
 // half of r25 at sub_8210C370.
 
 // The mapper's update, also logged for --log_pause_menu (moved from
-// src/debug/pause_menu_log.cpp). On the SDK's context (not in the dispatch
-// table): it reads its caller's r25 (the rewiring, stage 3; left for later).
-extern "C" REX_FUNC(sub_8210C370) {
-  REX_FUNC_PROLOGUE();
+// src/debug/pause_menu_log.cpp). The held word's bits 30 and 31 (no
+// action's; the original's come from an uninitialized stack word, the high
+// half of its caller's r25) are 0 (the rewiring, stage 3).
+ITC_NATIVE_ENTRY_ALWAYS(8210C370) {
   const uint32_t mapper = ctx.r3.u32;
   const uint32_t caller = uint32_t(ctx.lr);
   const uint32_t fired_before = debug::PauseMenuLog_BeforeMapperUpdate(base, mapper);
   if (ITC_FLAG(native_action_mappers) && MapperCallsKnown(base, mapper)) {
     ctx.fpscr.disableFlushMode();
     double f1 = 0;
-    ctx.r3.u64 = MapperUpdate(base, mapper, uint32_t(ctx.r25.u64 >> 32), &f1);
+    ctx.r3.u64 = MapperUpdate(base, mapper, 0, &f1);
     ctx.f1.f64 = f1;
   } else {
-    __imp__sub_8210C370(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_8210C370);
   }
   debug::PauseMenuLog_AfterMapperUpdate(base, mapper, caller, fired_before);
 }

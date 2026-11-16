@@ -18,10 +18,11 @@ ITC_FLAG_BOOL(native_lifted_027, true, "ITC",
               "docs/loops/lift-sweep.md) instead of the recompiled ones.");
 
 // A call by address or an import passes every argument register and its
-// return address.
-#define LIFTED_ARGS(lr) \
+// return address and r31 (the per-object recorder's pairing key reads it).
+#define LIFTED_ARGS(lr, r31) \
   lifted::Args { r1, r13, {r3, r4, r5, r6, r7, r8, r9, r10}, \
-                 {f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}, {}, uint32_t(lr) }
+                 {f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}, {}, uint32_t(lr), \
+                 uint32_t(r31) }
 
 namespace lifted {
 
@@ -144,7 +145,7 @@ loc_825DAD60:
   r3 = r31;
   // bl 0x8224fb10
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8224FB10, LIFTED_ARGS(0x825DAD6C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8224FB10, LIFTED_ARGS(0x825DAD6C, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r30,r30,-1
   ca = uint32_t(r30) > 0;
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
@@ -211,7 +212,7 @@ loc_825DADBC:
   REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r29));
   // bl 0x820900c0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x820900C0, LIFTED_ARGS(0x825DADDC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x820900C0, LIFTED_ARGS(0x825DADDC, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r30,r30,-1
   ca = uint32_t(r30) > 0;
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
@@ -317,7 +318,7 @@ loc_825DAE4C:
   r3 = r31;
   // bl 0x820900c0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x820900C0, LIFTED_ARGS(0x825DAE68)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x820900C0, LIFTED_ARGS(0x825DAE68, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r30,r30,-1
   ca = uint32_t(r30) > 0;
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
@@ -467,14 +468,14 @@ void f825DAF10(uint8_t* base) {
 // sub_825DAF18: lifted from generated/ by lift.py.
 lifted::Result f825DAF18(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DAF18 (lifted)");
-  uint64_t r3 = 0, r4 = 0, r5 = 0, r11 = 0;
+  uint64_t r3 = 0, r4 = 0, r5 = 0, r11 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // lwz r3,23756(r11)
   r3 = REX_LOAD_U32(uint32_t(r11) + 23756);
   // b 0x825a71c0
-  { const lifted::Result o = lifted::Call(base, 0x825A71C0, LIFTED_ARGS(lr)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A71C0, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -766,7 +767,7 @@ lifted::Result f825DB050(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   if (cr6.eq) goto loc_825DB078;
   // bl 0x825a70e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A70E8, LIFTED_ARGS(0x825DB078)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A70E8, LIFTED_ARGS(0x825DB078, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825DB078:
   // li r11,0
   r11 = uint64_t(int64_t(0));
@@ -1075,14 +1076,14 @@ void f825DB1F8(uint8_t* base) {
 // sub_825DB210: lifted from generated/ by lift.py.
 uint64_t f825DB210(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825DB210 (lifted)");
-  uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0;
+  uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
   // addi r3,r11,-18128
   r3 = uint64_t(int64_t(int64_t(r11) + -18128));
   // b 0x82106540
-  { const lifted::Result o = lifted::Call(base, 0x82106540, LIFTED_ARGS(lr)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82106540, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return r3;
 }
 

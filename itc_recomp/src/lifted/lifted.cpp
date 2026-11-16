@@ -47,6 +47,7 @@ Result Boundary(const Args& args, Invoke invoke) {
   const uint64_t r1 = ctx.r1.u64;
   const uint64_t r13 = ctx.r13.u64;
   const uint64_t lr = ctx.lr;
+  const uint64_t r31 = ctx.r31.u64;
   // The argument registers the call overwrites, put back after it (but r3
   // and f1, its results): a recompiled caller further up may keep a value
   // in one across a call the 360's compiler knew doesn't touch it.
@@ -61,6 +62,7 @@ Result Boundary(const Args& args, Invoke invoke) {
   ctx.r1.u64 = args.r1;
   ctx.r13.u64 = args.r13;
   ctx.lr = args.lr;
+  ctx.r31.u64 = args.r31;
   ctx.r3.u64 = args.r[0];
   ctx.r4.u64 = args.r[1];
   ctx.r5.u64 = args.r[2];
@@ -84,6 +86,7 @@ Result Boundary(const Args& args, Invoke invoke) {
   ctx.r1.u64 = r1;
   ctx.r13.u64 = r13;
   ctx.lr = lr;
+  ctx.r31.u64 = r31;
   for (int i = 0; i < 7; i++) {
     (&ctx.r4)[i].u64 = saved_r[i];
   }
@@ -158,6 +161,7 @@ void Enter(PPCContext& ctx, uint8_t* base, Entry entry) {
   args.r1 = ctx.r1.u64;
   args.r13 = ctx.r13.u64;
   args.lr = uint32_t(ctx.lr);
+  args.r31 = ctx.r31.u32;
   args.r[0] = ctx.r3.u64;
   args.r[1] = ctx.r4.u64;
   args.r[2] = ctx.r5.u64;
@@ -210,6 +214,7 @@ RegsScope::RegsScope(PPCContext& ctx) : ctx_(ctx), outer_(current) {
   }
   regs.ctr.u64 = ctx.ctr.u64;
   regs.lr = ctx.lr;
+  regs.caller_r31 = ctx.r31.u32;
 }
 
 RegsScope::~RegsScope() {

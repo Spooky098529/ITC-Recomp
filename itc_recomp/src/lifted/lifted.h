@@ -41,7 +41,9 @@ union alignas(16) Vec {
 // r13 (the thread's block), r3 to r10, f1 to f13 and v1 to v13; and its
 // return address (the link register the original's call sets: a tail call
 // passes on its caller's), which wraps acting on their caller read (0 when
-// a caller doesn't know it).
+// a caller doesn't know it); and the caller's r31, which the per-object
+// recorder's pairing key reads (interpolation: the part being drawn; 0 when
+// a caller doesn't keep one).
 struct Args {
   uint64_t r1 = 0;
   uint64_t r13 = 0;
@@ -49,6 +51,7 @@ struct Args {
   double f[13] = {};
   Vec v[13] = {};
   uint32_t lr = 0;
+  uint32_t r31 = 0;
 };
 
 // What a call leaves in r3 and f1.

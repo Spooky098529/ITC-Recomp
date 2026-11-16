@@ -24,11 +24,10 @@ ITC_FLAG_BOOL(input_mappers_by_tick, true, "ITC",
               "Update the action mappers (sub_8210B018) on logic passes only, so menu "
               "input repeats at the game's rate at any frame rate");
 
-// On the SDK's context (not in the dispatch table): the native body reads
-// its caller's r25 (its upper word seeds the mappers' held bits 30 and 31,
-// stored into each mapper's words) (the rewiring, stage 3; left for later).
-extern "C" REX_FUNC(sub_8210B018) {
-  REX_FUNC_PROLOGUE();
+// The held word's bits 30 and 31 (actions 30 and 31: none; the original's
+// come from an uninitialized stack word, the high half of its caller's r25)
+// are 0 (the rewiring, stage 3: stack words aren't carried).
+ITC_NATIVE_ENTRY_ALWAYS(8210B018) {
   if (ITC_FLAG(input_mappers_by_tick) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
     return;
   }
@@ -38,10 +37,9 @@ extern "C" REX_FUNC(sub_8210B018) {
   if (ITC_FLAG(native_action_mappers) && action_mappers::UpdateAllKnown(base, ctx.r3.u32)) {
     ctx.fpscr.disableFlushMode();
     double f1 = ctx.f1.f64;
-    ctx.r3.u64 =
-        action_mappers::UpdateAll(base, ctx.r3.u32, uint32_t(ctx.r25.u64 >> 32), &f1);
+    ctx.r3.u64 = action_mappers::UpdateAll(base, ctx.r3.u32, 0, &f1);
     ctx.f1.f64 = f1;
     return;
   }
-  __imp__sub_8210B018(ctx, base);
+  lifted::Sdk(ctx, base, __imp__sub_8210B018);
 }

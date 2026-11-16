@@ -18,10 +18,11 @@ ITC_FLAG_BOOL(native_lifted_000, true, "ITC",
               "docs/loops/lift-sweep.md) instead of the recompiled ones.");
 
 // A call by address or an import passes every argument register and its
-// return address.
-#define LIFTED_ARGS(lr) \
+// return address and r31 (the per-object recorder's pairing key reads it).
+#define LIFTED_ARGS(lr, r31) \
   lifted::Args { r1, r13, {r3, r4, r5, r6, r7, r8, r9, r10}, \
-                 {f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}, {}, uint32_t(lr) }
+                 {f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}, {}, uint32_t(lr), \
+                 uint32_t(r31) }
 
 namespace lifted {
 
@@ -289,7 +290,7 @@ loc_822B43D0:
 // sub_822B6070: lifted from generated/ by lift.py.
 lifted::Result f822B6070(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r8, uint64_t r9, uint64_t r10) {
   ITC_NATIVE_RUNNING("sub_822B6070 (lifted)");
-  uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r11 = 0, r12 = 0;
+  uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r11 = 0, r12 = 0, r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   lifted::Cr cr6;
   uint8_t so = 0;
@@ -314,7 +315,7 @@ lifted::Result f822B6070(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r8, 
   r3 = uint64_t(int64_t(0));
   // bl 0x825dbb94
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__KeLockL2, LIFTED_ARGS(0x822B6094)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Import(base, __imp__KeLockL2, LIFTED_ARGS(0x822B6094, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,0
   r11 = uint64_t(int64_t(0));
 loc_822B6098:
@@ -719,7 +720,7 @@ lifted::Result f825C09A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   REX_STORE_U32(uint32_t(r9) + 0, uint32_t(r8));
   // bl 0x825db954
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Import(base, __imp__RtlInitializeCriticalSection, LIFTED_ARGS(0x825C0AAC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Import(base, __imp__RtlInitializeCriticalSection, LIFTED_ARGS(0x825C0AAC, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32215
   r11 = uint64_t(int64_t(-2111242240));
   // stw r30,180(r31)
@@ -760,7 +761,7 @@ lifted::Result f825C09A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   r3 = r30;
   // bl 0x825b9a70
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825B9A70, LIFTED_ARGS(0x825C0AFC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825B9A70, LIFTED_ARGS(0x825C0AFC, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32153
   r11 = uint64_t(int64_t(-2107179008));
   // cmpwi cr6,r3,0
@@ -1001,7 +1002,7 @@ loc_825D99B4:
 // sub_825D9C40: lifted from generated/ by lift.py.
 uint64_t f825D9C40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_825D9C40 (lifted)");
-  uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0;
+  uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0, r7 = 0, r8 = 0, r9 = 0, r10 = 0, r11 = 0, r31 = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -1012,7 +1013,7 @@ uint64_t f825D9C40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t lr) {
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // b 0x825a71d0
-  { const lifted::Result o = lifted::Call(base, 0x825A71D0, LIFTED_ARGS(lr)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A71D0, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return r3;
 }
 

@@ -17,6 +17,7 @@
 #include "audio/output_mix.h"
 #include "audio/render_driver.h"
 #include "hooks/lifted_call.h"
+#include "hooks/native_entry.h"
 #include "movies/player.h"
 
 #include "guest.h"
@@ -450,10 +451,9 @@ using native_audio::g_system;
 
 // Register: r4 = the mixer callback (0 only unregisters). Unregisters any
 // earlier handle first. Returns 0 (S_OK).
-extern "C" REX_FUNC(sub_824657E0) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(824657E0) {
   if (!g_system) {
-    __imp__sub_824657E0(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_824657E0);
     return;
   }
   uint32_t object = ctx.r3.u32;
@@ -476,10 +476,9 @@ extern "C" REX_FUNC(sub_824657E0) {
 // Submit: r4 = the mixed buffer; sub_8245F718 gives its descriptor, whose
 // third word (+8) is the samples' address. Returns 0, or the descriptor's
 // failure.
-extern "C" REX_FUNC(sub_82465870) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(82465870) {
   if (!g_system) {
-    __imp__sub_82465870(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_82465870);
     return;
   }
   uint32_t object = ctx.r3.u32;
@@ -498,8 +497,7 @@ extern "C" REX_FUNC(sub_82465870) {
 // destructor (which would call the kernel's XAudioUnregisterRenderDriverClient)
 // sees none. The destructor's work: its plain C++ (audio/render_driver.h)
 // with --native_render_driver, else the original.
-extern "C" REX_FUNC(sub_824658C8) {
-  REX_FUNC_PROLOGUE();
+ITC_NATIVE_ENTRY_ALWAYS(824658C8) {
   uint32_t object = ctx.r3.u32;
   uint32_t handle = guest::LoadU32(base, object + 16);
   if (g_system && native_audio::IsOurHandle(handle)) {
@@ -509,6 +507,6 @@ extern "C" REX_FUNC(sub_824658C8) {
   if (ITC_FLAG(native_render_driver)) {
     lifted_call::EnterR3<audio::RenderDriverDestroy>(ctx, base);
   } else {
-    __imp__sub_824658C8(ctx, base);
+    lifted::Sdk(ctx, base, __imp__sub_824658C8);
   }
 }

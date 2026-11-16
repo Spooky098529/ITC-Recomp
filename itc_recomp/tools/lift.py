@@ -870,15 +870,15 @@ def emit_function(info, infos, emitting):
                 used.update(callee.params)
                 line = assign_result(callee, call)
             elif st.how == "direct":
-                line = assign_result(None, f"lifted::Call(base, 0x{st.target[4:]}, LIFTED_ARGS({lr}))")
-                used.update(ALL_ARGS)
+                line = assign_result(None, f"lifted::Call(base, 0x{st.target[4:]}, LIFTED_ARGS({lr}, r31))")
+                used.update(ALL_ARGS | {"r31"})
             elif st.how == "import":
-                line = assign_result(None, f"lifted::Import(base, {st.target}, LIFTED_ARGS({lr}))")
-                used.update(ALL_ARGS)
+                line = assign_result(None, f"lifted::Import(base, {st.target}, LIFTED_ARGS({lr}, r31))")
+                used.update(ALL_ARGS | {"r31"})
             else:
                 target = rewrite(st.target)
-                line = assign_result(None, f"lifted::Call(base, uint32_t({target}), LIFTED_ARGS({lr}))")
-                used.update(ALL_ARGS)
+                line = assign_result(None, f"lifted::Call(base, uint32_t({target}), LIFTED_ARGS({lr}, r31))")
+                used.update(ALL_ARGS | {"r31"})
             body.append("  " + line)
             used.update({"r3", "f1"})
             continue
@@ -995,10 +995,11 @@ def emit_batch(batch, names, infos, emitting):
         "              \"docs/loops/lift-sweep.md) instead of the recompiled ones.\");",
         "",
         "// A call by address or an import passes every argument register and its",
-        "// return address.",
-        "#define LIFTED_ARGS(lr) \\",
+        "// return address and r31 (the per-object recorder's pairing key reads it).",
+        "#define LIFTED_ARGS(lr, r31) \\",
         "  lifted::Args { r1, r13, {r3, r4, r5, r6, r7, r8, r9, r10}, \\",
-        "                 {f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}, {}, uint32_t(lr) }",
+        "                 {f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}, {}, uint32_t(lr), \\",
+        "                 uint32_t(r31) }",
         "",
         "namespace lifted {",
         "",

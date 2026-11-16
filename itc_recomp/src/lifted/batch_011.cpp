@@ -18,10 +18,11 @@ ITC_FLAG_BOOL(native_lifted_011, true, "ITC",
               "docs/loops/lift-sweep.md) instead of the recompiled ones.");
 
 // A call by address or an import passes every argument register and its
-// return address.
-#define LIFTED_ARGS(lr) \
+// return address and r31 (the per-object recorder's pairing key reads it).
+#define LIFTED_ARGS(lr, r31) \
   lifted::Args { r1, r13, {r3, r4, r5, r6, r7, r8, r9, r10}, \
-                 {f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}, {}, uint32_t(lr) }
+                 {f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}, {}, uint32_t(lr), \
+                 uint32_t(r31) }
 
 namespace lifted {
 
@@ -56,7 +57,7 @@ lifted::Result f821B5BF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B5C18)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B5C18, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // li r29,1
@@ -83,7 +84,7 @@ lifted::Result f821B5BF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B5C4C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B5C4C, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b5c60
   goto loc_821B5C60;
 loc_821B5C50:
@@ -111,7 +112,7 @@ loc_821B5C60:
   r3 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B5C7C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B5C7C, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821b4298
   // (left out: dead in C++)
   { const lifted::Result o = f821B4298(base, r1, r13, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
@@ -124,7 +125,7 @@ loc_821B5C84:
   r3 = r30;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B5C90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B5C90, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b5cd8
@@ -207,7 +208,7 @@ lifted::Result f821B5CE8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B5D18)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B5D18, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // lwz r31,0(r3)
@@ -232,7 +233,7 @@ lifted::Result f821B5CE8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B5D48)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B5D48, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b5d5c
   goto loc_821B5D5C;
 loc_821B5D4C:
@@ -260,7 +261,7 @@ loc_821B5D5C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B5D78)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B5D78, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821b4548
   // (left out: dead in C++)
   { const lifted::Result o = f821B4548(base, r1, r13, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
@@ -275,7 +276,7 @@ loc_821B5D84:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B5D90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B5D90, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b5dd8
@@ -364,7 +365,7 @@ lifted::Result f821B5DF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B5E28)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B5E28, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // lwz r31,0(r3)
@@ -389,7 +390,7 @@ lifted::Result f821B5DF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B5E58)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B5E58, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b5e6c
   goto loc_821B5E6C;
 loc_821B5E5C:
@@ -417,7 +418,7 @@ loc_821B5E6C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B5E88)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B5E88, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821b4548
   // (left out: dead in C++)
   { const lifted::Result o = f821B4548(base, r1, r13, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
@@ -432,7 +433,7 @@ loc_821B5E94:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B5EA0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B5EA0, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b5ee8
@@ -518,7 +519,7 @@ lifted::Result f821B5F08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r29));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B5F30)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B5F30, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r30,0(r3)
@@ -543,7 +544,7 @@ lifted::Result f821B5F08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B5F60)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B5F60, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b5f74
   goto loc_821B5F74;
 loc_821B5F64:
@@ -571,7 +572,7 @@ loc_821B5F74:
   r3 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B5F90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B5F90, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821b46d8
   // (left out: dead in C++)
   { const lifted::Result o = f821B46D8(base, r1, r13, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
@@ -586,7 +587,7 @@ loc_821B5F9C:
   r3 = r30;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B5FA8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B5FA8, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b5fec
@@ -663,7 +664,7 @@ lifted::Result f821B5FF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r29));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6020)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6020, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r30,0(r3)
@@ -688,7 +689,7 @@ lifted::Result f821B5FF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6050)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6050, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b6064
   goto loc_821B6064;
 loc_821B6054:
@@ -716,7 +717,7 @@ loc_821B6064:
   r3 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6080)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6080, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821b46d8
   // (left out: dead in C++)
   { const lifted::Result o = f821B46D8(base, r1, r13, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
@@ -731,7 +732,7 @@ loc_821B608C:
   r3 = r30;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6098)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6098, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b60dc
@@ -808,7 +809,7 @@ lifted::Result f821B60E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r29));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6110)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6110, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r30,0(r3)
@@ -833,7 +834,7 @@ lifted::Result f821B60E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6140)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6140, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b6154
   goto loc_821B6154;
 loc_821B6144:
@@ -861,7 +862,7 @@ loc_821B6154:
   r3 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6170)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6170, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821b46d8
   // (left out: dead in C++)
   { const lifted::Result o = f821B46D8(base, r1, r13, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
@@ -876,7 +877,7 @@ loc_821B617C:
   r3 = r30;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6188)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6188, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b61cc
@@ -953,7 +954,7 @@ lifted::Result f821B61D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r29));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6200)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6200, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r30,0(r3)
@@ -978,7 +979,7 @@ lifted::Result f821B61D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6230)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6230, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b6244
   goto loc_821B6244;
 loc_821B6234:
@@ -1006,7 +1007,7 @@ loc_821B6244:
   r3 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6260)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6260, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821b46d8
   // (left out: dead in C++)
   { const lifted::Result o = f821B46D8(base, r1, r13, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
@@ -1021,7 +1022,7 @@ loc_821B626C:
   r3 = r30;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6278)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6278, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b62bc
@@ -1101,7 +1102,7 @@ lifted::Result f821B62C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B62F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B62F8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // lwz r31,0(r3)
@@ -1126,7 +1127,7 @@ lifted::Result f821B62C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6328)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6328, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b633c
   goto loc_821B633C;
 loc_821B632C:
@@ -1154,7 +1155,7 @@ loc_821B633C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6358)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6358, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821b4848
   // (left out: dead in C++)
   { const lifted::Result o = f821B4848(base, r1, r13, r6, f1); r3 = o.r3; f1 = o.f1; }
@@ -1169,7 +1170,7 @@ loc_821B6364:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6370)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6370, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b63bc
@@ -1261,7 +1262,7 @@ lifted::Result f821B63D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6408)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6408, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // lwz r31,0(r3)
@@ -1286,7 +1287,7 @@ lifted::Result f821B63D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6438)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6438, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b644c
   goto loc_821B644C;
 loc_821B643C:
@@ -1314,7 +1315,7 @@ loc_821B644C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6468)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6468, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821b4848
   // (left out: dead in C++)
   { const lifted::Result o = f821B4848(base, r1, r13, r6, f1); r3 = o.r3; f1 = o.f1; }
@@ -1329,7 +1330,7 @@ loc_821B6474:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6480)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6480, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b64cc
@@ -1421,7 +1422,7 @@ lifted::Result f821B64E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6518)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6518, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // lwz r31,0(r3)
@@ -1446,7 +1447,7 @@ lifted::Result f821B64E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6548)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6548, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b655c
   goto loc_821B655C;
 loc_821B654C:
@@ -1474,7 +1475,7 @@ loc_821B655C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6578)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6578, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821b4848
   // (left out: dead in C++)
   { const lifted::Result o = f821B4848(base, r1, r13, r6, f1); r3 = o.r3; f1 = o.f1; }
@@ -1489,7 +1490,7 @@ loc_821B6584:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6590)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6590, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b65dc
@@ -1581,7 +1582,7 @@ lifted::Result f821B65F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6628)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6628, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // lwz r31,0(r3)
@@ -1606,7 +1607,7 @@ lifted::Result f821B65F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6658)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6658, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b666c
   goto loc_821B666C;
 loc_821B665C:
@@ -1634,7 +1635,7 @@ loc_821B666C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6688)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6688, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821b4848
   // (left out: dead in C++)
   { const lifted::Result o = f821B4848(base, r1, r13, r6, f1); r3 = o.r3; f1 = o.f1; }
@@ -1649,7 +1650,7 @@ loc_821B6694:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B66A0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B66A0, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b66ec
@@ -1741,7 +1742,7 @@ lifted::Result f821B6708(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6738)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B6738, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // lwz r31,0(r3)
@@ -1766,7 +1767,7 @@ lifted::Result f821B6708(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6768)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821B6768, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b677c
   goto loc_821B677C;
 loc_821B676C:
@@ -1794,7 +1795,7 @@ loc_821B677C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6798)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821B6798, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821b4848
   // (left out: dead in C++)
   { const lifted::Result o = f821B4848(base, r1, r13, r6, f1); r3 = o.r3; f1 = o.f1; }
@@ -1809,7 +1810,7 @@ loc_821B67A4:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B67B0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B67B0, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b67fc
@@ -1900,7 +1901,7 @@ lifted::Result f821B6818(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(100));
   // bl 0x82106540
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82106540, LIFTED_ARGS(0x821B6844)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82106540, LIFTED_ARGS(0x821B6844, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // addi r4,r1,80
@@ -1913,7 +1914,7 @@ lifted::Result f821B6818(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B685C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B685C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r10,-32229
   r10 = uint64_t(int64_t(-2112159744));
   // lis r14,-32229
@@ -2626,7 +2627,7 @@ lifted::Result f821B6818(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821B6DEC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821B6DEC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31656(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31656);
   // cmpwi r3,0
@@ -2697,7 +2698,7 @@ loc_821B6E54:
   r3 = REX_LOAD_U32(uint32_t(r1) + 132);
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6E6C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B6E6C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821B6E6C:
   // lis r30,-32146
   r30 = uint64_t(int64_t(-2106720256));
@@ -2719,7 +2720,7 @@ loc_821B6E6C:
   r3 = uint64_t(int64_t(0));
   // bl 0x82105620
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82105620, LIFTED_ARGS(0x821B6E94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82105620, LIFTED_ARGS(0x821B6E94, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,1
   r11 = uint64_t(int64_t(65536));
   // ori r10,r11,39200
@@ -2762,12 +2763,12 @@ loc_821B6EB8:
   r4 = uint64_t(int64_t(int64_t(r11) + 212));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821B6EE0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821B6EE0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,572(r1)
   r3 = REX_LOAD_U32(uint32_t(r1) + 572);
   // bl 0x8215aad0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8215AAD0, LIFTED_ARGS(0x821B6EE8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8215AAD0, LIFTED_ARGS(0x821B6EE8, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r31,-32146
   r31 = uint64_t(int64_t(-2106720256));
   // mr r4,r3
@@ -2778,7 +2779,7 @@ loc_821B6EB8:
   r3 = REX_LOAD_U32(uint32_t(r11) + 0);
   // bl 0x8217f880
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8217F880, LIFTED_ARGS(0x821B6EFC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8217F880, LIFTED_ARGS(0x821B6EFC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31648(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + -31648);
   // stw r3,744(r11)
@@ -2795,7 +2796,7 @@ loc_821B6EB8:
   r3 = uint64_t(int64_t(int64_t(r1) + 2528));
   // bl 0x820cd5d8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x820CD5D8, LIFTED_ARGS(0x821B6F1C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x820CD5D8, LIFTED_ARGS(0x821B6F1C, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r3,r1,2528
   r3 = uint64_t(int64_t(int64_t(r1) + 2528));
   // addi r4,r1,560
@@ -2804,7 +2805,7 @@ loc_821B6EB8:
   r5 = uint64_t(int64_t(1884));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821B6F2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821B6F2C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,6416(r1)
   r11 = REX_LOAD_U32(uint32_t(r1) + 6416);
   // addi r3,r1,2528
@@ -2815,7 +2816,7 @@ loc_821B6EB8:
   REX_STORE_U32(uint32_t(r1) + 6416, uint32_t(r11));
   // bl 0x820c4998
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x820C4998, LIFTED_ARGS(0x821B6F40)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x820C4998, LIFTED_ARGS(0x821B6F40, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31776(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31776);
   // li r5,-1
@@ -2826,7 +2827,7 @@ loc_821B6EB8:
   r3 = REX_LOAD_U32(uint32_t(r11) + 0);
   // bl 0x8217fd58
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8217FD58, LIFTED_ARGS(0x821B6F54)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8217FD58, LIFTED_ARGS(0x821B6F54, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821b6f94
   goto loc_821B6F94;
 loc_821B6F58:
@@ -2851,7 +2852,7 @@ loc_821B6F58:
 loc_821B6F7C:
   // bl 0x82178b40
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82178B40, LIFTED_ARGS(0x821B6F80)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82178B40, LIFTED_ARGS(0x821B6F80, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // li r5,0
@@ -2862,7 +2863,7 @@ loc_821B6F7C:
   r3 = REX_LOAD_U32(uint32_t(r11) + 0);
   // bl 0x8217fe60
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8217FE60, LIFTED_ARGS(0x821B6F94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8217FE60, LIFTED_ARGS(0x821B6F94, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821B6F94:
   // lwz r11,-31648(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + -31648);
@@ -2971,7 +2972,7 @@ lifted::Result f821B83A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = REX_LOAD_U32(uint32_t(r31) + -31640);
   // bl 0x82186568
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82186568, LIFTED_ARGS(0x821B83CC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82186568, LIFTED_ARGS(0x821B83CC, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r11,-31636(r11)
@@ -2992,7 +2993,7 @@ lifted::Result f821B83A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = REX_LOAD_U32(uint32_t(r31) + -31640);
   // bl 0x821864c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821B83F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821B83F4, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b842c
@@ -3008,7 +3009,7 @@ loc_821B8404:
   r3 = REX_LOAD_U32(uint32_t(r31) + -31640);
   // bl 0x821864c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821B8410)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821B8410, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821b842c
@@ -3020,7 +3021,7 @@ loc_821B841C:
   r3 = REX_LOAD_U32(uint32_t(r31) + -31640);
   // bl 0x821864c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821B8424)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821B8424, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821b84b0
@@ -3093,7 +3094,7 @@ loc_821B8444:
   REX_STORE_U32(uint32_t(r11) + 8, uint32_t(r8));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821B84B0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821B84B0, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821B84B0:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
@@ -3197,7 +3198,7 @@ lifted::Result f821B8588(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B85B8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B85B8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r30,0(r3)
@@ -3222,7 +3223,7 @@ lifted::Result f821B8588(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x8211d978
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821B85E8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821B85E8, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // li r10,0
@@ -3242,7 +3243,7 @@ loc_821B8600:
   r3 = r30;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B860C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B860C, r31)); r3 = o.r3; f1 = o.f1; }
   // cntlzw r11,r3
   r11 = uint32_t(r3) == 0 ? 32 : __builtin_clz(uint32_t(r3));
   // rlwinm r3,r11,27,31,31
@@ -3291,7 +3292,7 @@ uint64_t f821B8630(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B865C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B865C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r3,0(r3)
@@ -3300,7 +3301,7 @@ uint64_t f821B8630(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   r4 = uint64_t(int64_t(3));
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821B866C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821B866C, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r31,108(r3)
   REX_STORE_U32(uint32_t(r3) + 108, uint32_t(r31));
   // addi r1,r1,112
@@ -3346,7 +3347,7 @@ uint64_t f821B8688(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B86B0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B86B0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r28,0(r3)
   r28 = REX_LOAD_U32(uint32_t(r3) + 0);
   // li r5,2
@@ -3357,7 +3358,7 @@ uint64_t f821B8688(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   r3 = r28;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821B86C4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821B86C4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r31,r3
   r31 = r3;
   // li r30,0
@@ -3381,7 +3382,7 @@ loc_821B86D8:
   r5 = r11 + r30;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821B86F0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821B86F0, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r29,10
   cr6 = lifted::Compare<int32_t>(int32_t(r29), 10, so);
   // beq cr6,0x821b8704
@@ -3447,7 +3448,7 @@ uint64_t f821B8728(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B8750)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B8750, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r31,0(r3)
   r31 = REX_LOAD_U32(uint32_t(r3) + 0);
   // li r5,1
@@ -3458,7 +3459,7 @@ uint64_t f821B8728(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821B8764)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821B8764, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r27,r3
   r27 = r3;
   // li r30,0
@@ -3476,7 +3477,7 @@ loc_821B876C:
   r5 = r30 + r11;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821B8784)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821B8784, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r28,37
   cr6 = lifted::Compare<int32_t>(int32_t(r28), 37, so);
   // bge cr6,0x821b8798
@@ -3596,7 +3597,7 @@ loc_821B87F8:
 // sub_821B8840: lifted from generated/ by lift.py.
 lifted::Result f821B8840(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, double f1) {
   ITC_NATIVE_RUNNING("sub_821B8840 (lifted)");
-  uint64_t r9 = 0, r10 = 0, r11 = 0, r12 = 0, ctr = 0;
+  uint64_t r9 = 0, r10 = 0, r11 = 0, r12 = 0, r31 = 0, ctr = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   lifted::Cr cr6;
   uint8_t so = 0;
@@ -3643,7 +3644,7 @@ lifted::Result f821B8840(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821B8890)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821B8890, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821B8890:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
@@ -3686,7 +3687,7 @@ lifted::Result f821B8ED0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B8EF8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B8EF8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // li r29,1
@@ -3716,7 +3717,7 @@ lifted::Result f821B8ED0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x8211d978
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821B8F30)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821B8F30, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r29,0(r31)
   REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r29));
 loc_821B8F34:
@@ -3726,7 +3727,7 @@ loc_821B8F34:
   r3 = r30;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B8F40)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B8F40, r31)); r3 = o.r3; f1 = o.f1; }
   // cntlzw r11,r3
   r11 = uint32_t(r3) == 0 ? 32 : __builtin_clz(uint32_t(r3));
   // rlwinm. r3,r11,27,31,31
@@ -3783,7 +3784,7 @@ lifted::Result f821B8F60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(100));
   // bl 0x82106540
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82106540, LIFTED_ARGS(0x821B8F90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82106540, LIFTED_ARGS(0x821B8F90, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // addi r4,r1,80
@@ -3796,7 +3797,7 @@ lifted::Result f821B8F60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B8FA8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821B8FA8, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r31,-32146
   r31 = uint64_t(int64_t(-2106720256));
   // lwz r3,0(r3)
@@ -3837,7 +3838,7 @@ lifted::Result f821B8F60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821B8FF8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821B8FF8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31644(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31644);
   // cmpwi r3,0
@@ -3900,7 +3901,7 @@ loc_821B9060:
   r4 = uint64_t(int64_t(0));
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B9068)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821B9068, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821B9068:
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
@@ -3950,7 +3951,7 @@ loc_821B9090:
   f1 = double(temp.f32);
   // bl 0x8217c708
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8217C708, LIFTED_ARGS(0x821B90C0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8217C708, LIFTED_ARGS(0x821B90C0, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821B90C0:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
@@ -4032,7 +4033,7 @@ lifted::Result f821BA010(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA060)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA060, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31624);
   // li r10,1
@@ -4070,7 +4071,7 @@ loc_821BA070:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA0A8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA0A8, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -4159,7 +4160,7 @@ lifted::Result f821BA0F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA13C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA13C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31624);
   // li r10,1
@@ -4198,7 +4199,7 @@ loc_821BA14C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA184)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA184, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -4233,7 +4234,7 @@ loc_821BA1A8:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA1C4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA1C4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31624);
   // stw r30,700(r11)
@@ -4261,7 +4262,7 @@ loc_821BA1D0:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA1F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA1F8, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -4391,7 +4392,7 @@ loc_821BA1D0:
   r4 = REX_LOAD_U32(uint32_t(r19) + uint32_t(r20));
   // bl 0x821063b0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821063B0, LIFTED_ARGS(0x821BA2F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821063B0, LIFTED_ARGS(0x821BA2F8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31624);
   // li r9,3
@@ -4419,7 +4420,7 @@ loc_821BA314:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA32C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821BA32C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -4437,7 +4438,7 @@ loc_821BA314:
   REX_STORE_U32(uint32_t(r1) + 108, uint32_t(r11));
   // bl 0x82175850
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82175850, LIFTED_ARGS(0x821BA34C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82175850, LIFTED_ARGS(0x821BA34C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r11,-31632(r11)
@@ -5231,7 +5232,7 @@ lifted::Result f821BD680(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BD6B0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BD6B0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r30,0(r3)
@@ -5244,7 +5245,7 @@ lifted::Result f821BD680(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x8211dff8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DFF8, LIFTED_ARGS(0x821BD6C8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DFF8, LIFTED_ARGS(0x821BD6C8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // li r6,0
@@ -5257,7 +5258,7 @@ lifted::Result f821BD680(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = uint64_t(int64_t(15));
   // bl 0x8209d0c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8209D0C8, LIFTED_ARGS(0x821BD6E0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8209D0C8, LIFTED_ARGS(0x821BD6E0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
@@ -5269,7 +5270,7 @@ loc_821BD6E8:
   r3 = r30;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821BD6F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821BD6F4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32150
   r11 = uint64_t(int64_t(-2106982400));
   // lis r10,-32150
@@ -5332,7 +5333,7 @@ lifted::Result f821BDA38(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BDA68)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BDA68, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r30,0(r3)
@@ -5355,14 +5356,14 @@ lifted::Result f821BDA38(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDA94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDA94, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,341
   r4 = uint64_t(int64_t(341));
   // mr r3,r30
   r3 = r30;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BDAA0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BDAA0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
@@ -5374,7 +5375,7 @@ loc_821BDAA8:
   r3 = r30;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821BDAB4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821BDAB4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // addi r1,r1,112
@@ -5425,7 +5426,7 @@ lifted::Result f821BDC18(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BDC48)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BDC48, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r30,0(r3)
@@ -5448,14 +5449,14 @@ lifted::Result f821BDC18(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDC74)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDC74, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,510
   r4 = uint64_t(int64_t(510));
   // mr r3,r30
   r3 = r30;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BDC80)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BDC80, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
@@ -5467,7 +5468,7 @@ loc_821BDC88:
   r3 = r30;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821BDC94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821BDC94, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // addi r1,r1,112
@@ -5515,7 +5516,7 @@ lifted::Result f821BDCB0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BDCD8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BDCD8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r10,459
   r10 = uint64_t(int64_t(459));
   // lwz r11,0(r27)
@@ -5596,7 +5597,7 @@ lifted::Result f821BDCB0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = uint64_t(int64_t(int64_t(r30) + 510));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BDD78)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BDD78, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821bddcc
   goto loc_821BDDCC;
 loc_821BDD7C:
@@ -5615,7 +5616,7 @@ loc_821BDD7C:
 loc_821BDD94:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BDD98)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BDD98, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -5630,14 +5631,14 @@ loc_821BDD94:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDDB4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDDB4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,526
   r4 = uint64_t(int64_t(526));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BDDC0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BDDC0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + -31624);
   // li r10,0
@@ -5665,7 +5666,7 @@ loc_821BDDCC:
   r4 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDDF4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDDF4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // b 0x821bde60
@@ -5683,14 +5684,14 @@ loc_821BDDFC:
   r4 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDE14)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDE14, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BDE20)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BDE20, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + -31624);
   // li r8,0
@@ -5713,7 +5714,7 @@ loc_821BDDFC:
   r4 = uint64_t(int64_t(528));
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDE4C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDE4C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,528
   r4 = uint64_t(int64_t(528));
   // b 0x821bde60
@@ -5723,7 +5724,7 @@ loc_821BDE54:
   r4 = uint64_t(int64_t(527));
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDE5C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BDE5C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,527
   r4 = uint64_t(int64_t(527));
 loc_821BDE60:
@@ -5731,7 +5732,7 @@ loc_821BDE60:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BDE68)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BDE68, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r27)
@@ -5743,7 +5744,7 @@ loc_821BDE70:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821BDE7C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821BDE7C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // addi r1,r1,208
@@ -5787,7 +5788,7 @@ lifted::Result f821BDFA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BDFD8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BDFD8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r30,0(r3)
@@ -5810,14 +5811,14 @@ lifted::Result f821BDFA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BE004)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BE004, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,749
   r4 = uint64_t(int64_t(749));
   // mr r3,r30
   r3 = r30;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BE010)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BE010, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
@@ -5829,7 +5830,7 @@ loc_821BE018:
   r3 = r30;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821BE024)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821BE024, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // addi r1,r1,112
@@ -5877,7 +5878,7 @@ lifted::Result f821BE040(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BE068)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BE068, r31)); r3 = o.r3; f1 = o.f1; }
   // li r10,698
   r10 = uint64_t(int64_t(698));
   // lwz r11,0(r27)
@@ -5958,7 +5959,7 @@ lifted::Result f821BE040(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = uint64_t(int64_t(int64_t(r30) + 749));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BE108)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BE108, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821be15c
   goto loc_821BE15C;
 loc_821BE10C:
@@ -5977,7 +5978,7 @@ loc_821BE10C:
 loc_821BE124:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BE128)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BE128, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -5992,14 +5993,14 @@ loc_821BE124:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BE144)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BE144, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,765
   r4 = uint64_t(int64_t(765));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BE150)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BE150, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + -31624);
   // li r10,0
@@ -6027,7 +6028,7 @@ loc_821BE15C:
   r4 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BE184)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BE184, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // b 0x821be1f0
@@ -6045,14 +6046,14 @@ loc_821BE18C:
   r4 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BE1A4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BE1A4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BE1B0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BE1B0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + -31624);
   // li r8,0
@@ -6075,7 +6076,7 @@ loc_821BE18C:
   r4 = uint64_t(int64_t(767));
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BE1DC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BE1DC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,767
   r4 = uint64_t(int64_t(767));
   // b 0x821be1f0
@@ -6085,7 +6086,7 @@ loc_821BE1E4:
   r4 = uint64_t(int64_t(766));
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BE1EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BE1EC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,766
   r4 = uint64_t(int64_t(766));
 loc_821BE1F0:
@@ -6093,7 +6094,7 @@ loc_821BE1F0:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BE1F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BE1F8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r27)
@@ -6105,7 +6106,7 @@ loc_821BE200:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821BE20C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821BE20C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // addi r1,r1,208
@@ -6149,7 +6150,7 @@ uint64_t f821BE4A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BE4D0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BE4D0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r3,0(r3)
@@ -6158,7 +6159,7 @@ uint64_t f821BE4A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   r4 = uint64_t(int64_t(5));
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BE4E0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BE4E0, r31)); r3 = o.r3; f1 = o.f1; }
   // extsw r11,r31
   r11 = uint64_t(int64_t(int32_t(r31)));
   // li r4,0
@@ -6174,7 +6175,7 @@ uint64_t f821BE4A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   f31 = double(float(f0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BE4FC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BE4FC, r31)); r3 = o.r3; f1 = o.f1; }
   // stfs f31,16(r3)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
@@ -6227,7 +6228,7 @@ uint64_t f821BE7A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BE7D8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BE7D8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r3,0(r3)
@@ -6236,7 +6237,7 @@ uint64_t f821BE7A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   r4 = uint64_t(int64_t(6));
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BE7E8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BE7E8, r31)); r3 = o.r3; f1 = o.f1; }
   // extsw r11,r31
   r11 = uint64_t(int64_t(int32_t(r31)));
   // li r4,0
@@ -6252,7 +6253,7 @@ uint64_t f821BE7A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   f31 = double(float(f0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BE804)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BE804, r31)); r3 = o.r3; f1 = o.f1; }
   // stfs f31,16(r3)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
@@ -6305,7 +6306,7 @@ uint64_t f821BEDC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BEDF8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BEDF8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r3,0(r3)
@@ -6314,12 +6315,12 @@ uint64_t f821BEDC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   r4 = uint64_t(int64_t(7));
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BEE08)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BEE08, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BEE10)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BEE10, r31)); r3 = o.r3; f1 = o.f1; }
   // extsw r11,r31
   r11 = uint64_t(int64_t(int32_t(r31)));
   // li r4,0
@@ -6335,7 +6336,7 @@ uint64_t f821BEDC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   f31 = double(float(f0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BEE2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BEE2C, r31)); r3 = o.r3; f1 = o.f1; }
   // stfs f31,16(r3)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
@@ -6383,7 +6384,7 @@ lifted::Result f821BEE48(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BEE6C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BEE6C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r3,0(r3)
@@ -6408,7 +6409,7 @@ lifted::Result f821BEE48(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   REX_STORE_U32(uint32_t(r1) + 96, uint32_t(r11));
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BEE9C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BEE9C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r29,r3
   r29 = r3;
   // li r31,0
@@ -6422,12 +6423,12 @@ loc_821BEEA8:
   r3 = r29;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BEEB4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BEEB4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r4,0(r30)
   r4 = REX_LOAD_U32(uint32_t(r30) + 0);
   // bl 0x821be988
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BE988, LIFTED_ARGS(0x821BEEBC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BE988, LIFTED_ARGS(0x821BEEBC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // addi r30,r30,4
@@ -6472,7 +6473,7 @@ uint64_t f821BEED8(uint8_t* base, uint64_t r1, uint64_t r13) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BEEFC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BEEFC, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r3,0(r3)
@@ -6497,7 +6498,7 @@ uint64_t f821BEED8(uint8_t* base, uint64_t r1, uint64_t r13) {
   REX_STORE_U32(uint32_t(r1) + 96, uint32_t(r11));
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BEF2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BEF2C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r29,r3
   r29 = r3;
   // li r31,0
@@ -6511,12 +6512,12 @@ loc_821BEF38:
   r3 = r29;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BEF44)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BEF44, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r4,0(r30)
   r4 = REX_LOAD_U32(uint32_t(r30) + 0);
   // bl 0x821bea48
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BEA48, LIFTED_ARGS(0x821BEF4C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BEA48, LIFTED_ARGS(0x821BEF4C, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // addi r30,r30,4
@@ -6566,7 +6567,7 @@ uint64_t f821BEF68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BEF98)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BEF98, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,2
   r5 = uint64_t(int64_t(2));
   // lwz r3,0(r3)
@@ -6575,12 +6576,12 @@ uint64_t f821BEF68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   r4 = uint64_t(int64_t(8));
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BEFA8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BEFA8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BEFB0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BEFB0, r31)); r3 = o.r3; f1 = o.f1; }
   // extsw r11,r31
   r11 = uint64_t(int64_t(int32_t(r31)));
   // li r4,0
@@ -6596,7 +6597,7 @@ uint64_t f821BEF68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   f31 = double(float(f0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BEFCC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BEFCC, r31)); r3 = o.r3; f1 = o.f1; }
   // stfs f31,16(r3)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
@@ -6644,7 +6645,7 @@ lifted::Result f821BF2B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BF2DC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BF2DC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r28,0(r3)
   r28 = REX_LOAD_U32(uint32_t(r3) + 0);
   // li r5,2
@@ -6655,7 +6656,7 @@ lifted::Result f821BF2B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r28;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BF2F0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BF2F0, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // mr r26,r3
@@ -6723,14 +6724,14 @@ loc_821BF368:
   r3 = r26;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BF374)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BF374, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // mr r27,r3
   r27 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BF380)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BF380, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // mr r5,r31
@@ -6739,14 +6740,14 @@ loc_821BF368:
   r3 = r28;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821BF390)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821BF390, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // mr r3,r27
   r3 = r27;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BF39C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BF39C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 0);
   // addic. r30,r30,-1
@@ -6797,7 +6798,7 @@ lifted::Result f821BF3C0(uint8_t* base, uint64_t r1, uint64_t r13, double f1) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BF3E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BF3E4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,460
   r11 = uint64_t(int64_t(460));
   // lwz r30,0(r3)
@@ -6913,7 +6914,7 @@ loc_821BF4C0:
   r3 = r28;
   // bl 0x821ba7e0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BA7E0, LIFTED_ARGS(0x821BF4C8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BA7E0, LIFTED_ARGS(0x821BF4C8, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,1
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 1, so);
   // li r8,0
@@ -6939,14 +6940,14 @@ loc_821BF4EC:
   r4 = r29;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BF4F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BF4F8, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r29
   r4 = r29;
   // mr r3,r30
   r3 = r30;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BF504)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BF504, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r31,r31,4
   r31 = uint64_t(int64_t(int64_t(r31) + 4));
   // addi r28,r28,1
@@ -6991,7 +6992,7 @@ lifted::Result f821BF7F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BF81C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BF81C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r30,0(r3)
   r30 = REX_LOAD_U32(uint32_t(r3) + 0);
   // li r5,2
@@ -7002,7 +7003,7 @@ lifted::Result f821BF7F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r30;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BF830)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821BF830, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // mr r27,r3
@@ -7070,14 +7071,14 @@ loc_821BF8A4:
   r4 = r29;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BF8B4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BF8B4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // mr r28,r3
   r28 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BF8C0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BF8C0, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r11,r1,96
   r11 = uint64_t(int64_t(int64_t(r1) + 96));
   // mr r4,r3
@@ -7088,7 +7089,7 @@ loc_821BF8A4:
   r5 = REX_LOAD_U32(uint32_t(r31) + uint32_t(r11));
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821BF8D4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821BF8D4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r28
   r3 = r28;
   // li r4,1
@@ -7097,7 +7098,7 @@ loc_821BF8A4:
   r28 = uint64_t(int64_t(int64_t(r1) + 128));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BF8E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821BF8E4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwzx r10,r31,r28
   r10 = REX_LOAD_U32(uint32_t(r31) + uint32_t(r28));
   // addi r31,r31,4
@@ -7146,7 +7147,7 @@ lifted::Result f821BF908(uint8_t* base, uint64_t r1, uint64_t r13, double f1) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BF92C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BF92C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,699
   r11 = uint64_t(int64_t(699));
   // lwz r30,0(r3)
@@ -7262,7 +7263,7 @@ loc_821BFA08:
   r3 = r28;
   // bl 0x821bab58
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BAB58, LIFTED_ARGS(0x821BFA10)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BAB58, LIFTED_ARGS(0x821BFA10, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r3,1
   cr6 = lifted::Compare<int32_t>(int32_t(r3), 1, so);
   // li r8,0
@@ -7288,14 +7289,14 @@ loc_821BFA34:
   r4 = r29;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFA40)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFA40, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r29
   r4 = r29;
   // mr r3,r30
   r3 = r30;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BFA4C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BFA4C, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r31,r31,4
   r31 = uint64_t(int64_t(int64_t(r31) + 4));
   // addi r28,r28,1
@@ -7345,7 +7346,7 @@ uint64_t f821BFBD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BFC08)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BFC08, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r30,0(r3)
@@ -7368,14 +7369,14 @@ uint64_t f821BFBD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   r3 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFC34)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFC34, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,346
   r4 = uint64_t(int64_t(346));
   // mr r3,r30
   r3 = r30;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BFC40)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BFC40, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
@@ -7429,7 +7430,7 @@ lifted::Result f821BFC68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BFC94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BFC94, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r3,0(r3)
@@ -7476,7 +7477,7 @@ loc_821BFCE0:
 loc_821BFCE4:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BFCE8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BFCE8, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821BFCE8:
   // li r11,1
   r11 = uint64_t(int64_t(1));
@@ -7531,7 +7532,7 @@ uint64_t f821BFD08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BFD38)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BFD38, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r30,0(r3)
@@ -7554,14 +7555,14 @@ uint64_t f821BFD08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   r3 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFD64)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFD64, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,581
   r4 = uint64_t(int64_t(581));
   // mr r3,r30
   r3 = r30;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BFD70)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BFD70, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
@@ -7614,7 +7615,7 @@ lifted::Result f821BFD98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BFDC0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BFDC0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r10,530
   r10 = uint64_t(int64_t(530));
   // lwz r11,0(r28)
@@ -7698,7 +7699,7 @@ loc_821BFE5C:
   r4 = uint64_t(int64_t(599));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BFE64)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BFE64, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -7713,7 +7714,7 @@ loc_821BFE5C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFE80)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFE80, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,597
   r4 = uint64_t(int64_t(597));
   // mr r3,r31
@@ -7721,7 +7722,7 @@ loc_821BFE5C:
 loc_821BFE88:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BFE8C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BFE8C, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r29,12
   cr6 = lifted::Compare<int32_t>(int32_t(r29), 12, so);
   // li r8,0
@@ -7742,7 +7743,7 @@ loc_821BFE88:
   r4 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFEB4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFEB4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // b 0x821bff00
@@ -7760,14 +7761,14 @@ loc_821BFEBC:
   r4 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFED4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFED4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BFEE0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BFEE0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -7782,7 +7783,7 @@ loc_821BFEBC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFEFC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFEFC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,599
   r4 = uint64_t(int64_t(599));
 loc_821BFF00:
@@ -7790,7 +7791,7 @@ loc_821BFF00:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BFF08)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821BFF08, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r28)
@@ -7837,7 +7838,7 @@ lifted::Result f821BFF20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BFF4C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BFF4C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r3,0(r3)
@@ -7863,7 +7864,7 @@ lifted::Result f821BFF20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
 loc_821BFF78:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BFF7C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821BFF7C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
@@ -7917,7 +7918,7 @@ uint64_t f821BFFA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BFFD0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821BFFD0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r30,0(r3)
@@ -7940,14 +7941,14 @@ uint64_t f821BFFA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   r3 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFFFC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821BFFFC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,820
   r4 = uint64_t(int64_t(820));
   // mr r3,r30
   r3 = r30;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C0008)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C0008, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
@@ -8000,7 +8001,7 @@ lifted::Result f821C0030(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C0058)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C0058, r31)); r3 = o.r3; f1 = o.f1; }
   // li r10,769
   r10 = uint64_t(int64_t(769));
   // lwz r11,0(r28)
@@ -8084,7 +8085,7 @@ loc_821C00F4:
   r4 = uint64_t(int64_t(838));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C00FC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C00FC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -8099,7 +8100,7 @@ loc_821C00F4:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C0118)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C0118, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,836
   r4 = uint64_t(int64_t(836));
   // mr r3,r31
@@ -8107,7 +8108,7 @@ loc_821C00F4:
 loc_821C0120:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C0124)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C0124, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r29,6
   cr6 = lifted::Compare<int32_t>(int32_t(r29), 6, so);
   // li r8,0
@@ -8128,7 +8129,7 @@ loc_821C0120:
   r4 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C014C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C014C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // b 0x821c0198
@@ -8146,14 +8147,14 @@ loc_821C0154:
   r4 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C016C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C016C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C0178)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C0178, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -8168,7 +8169,7 @@ loc_821C0154:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C0194)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C0194, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,838
   r4 = uint64_t(int64_t(838));
 loc_821C0198:
@@ -8176,7 +8177,7 @@ loc_821C0198:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C01A0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C01A0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r28)
@@ -8223,7 +8224,7 @@ lifted::Result f821C01B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C01E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C01E4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 0);
   // lwz r3,0(r3)
@@ -8249,7 +8250,7 @@ lifted::Result f821C01B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
 loc_821C0210:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C0214)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C0214, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
@@ -8298,7 +8299,7 @@ lifted::Result f821C02B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C02DC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C02DC, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r3,0(r3)
@@ -8323,7 +8324,7 @@ lifted::Result f821C02B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   REX_STORE_U32(uint32_t(r1) + 96, uint32_t(r11));
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C030C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C030C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r29,r3
   r29 = r3;
   // li r31,0
@@ -8337,12 +8338,12 @@ loc_821C0318:
   r3 = r29;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C0324)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C0324, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r4,0(r30)
   r4 = REX_LOAD_U32(uint32_t(r30) + 0);
   // bl 0x821be988
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BE988, LIFTED_ARGS(0x821C032C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BE988, LIFTED_ARGS(0x821C032C, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // addi r30,r30,4
@@ -8387,7 +8388,7 @@ uint64_t f821C0348(uint8_t* base, uint64_t r1, uint64_t r13) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C036C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C036C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r3,0(r3)
@@ -8412,7 +8413,7 @@ uint64_t f821C0348(uint8_t* base, uint64_t r1, uint64_t r13) {
   REX_STORE_U32(uint32_t(r1) + 96, uint32_t(r11));
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C039C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C039C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r29,r3
   r29 = r3;
   // li r31,0
@@ -8426,12 +8427,12 @@ loc_821C03A8:
   r3 = r29;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C03B4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C03B4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r4,0(r30)
   r4 = REX_LOAD_U32(uint32_t(r30) + 0);
   // bl 0x821bea48
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BEA48, LIFTED_ARGS(0x821C03BC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BEA48, LIFTED_ARGS(0x821C03BC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // addi r30,r30,4
@@ -8476,7 +8477,7 @@ lifted::Result f821C03D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C03FC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C03FC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r28,0(r3)
   r28 = REX_LOAD_U32(uint32_t(r3) + 0);
   // li r5,5
@@ -8487,7 +8488,7 @@ lifted::Result f821C03D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r28;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C0410)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C0410, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // mr r26,r3
@@ -8555,14 +8556,14 @@ loc_821C0488:
   r3 = r26;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C0494)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C0494, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // mr r27,r3
   r27 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C04A0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C04A0, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // mr r5,r31
@@ -8571,14 +8572,14 @@ loc_821C0488:
   r3 = r28;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C04B0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C04B0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // mr r3,r27
   r3 = r27;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C04BC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C04BC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 0);
   // addic. r30,r30,-1
@@ -8629,7 +8630,7 @@ lifted::Result f821C04E0(uint8_t* base, uint64_t r1, uint64_t r13, double f1) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C0504)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C0504, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,531
   r11 = uint64_t(int64_t(531));
   // lwz r30,0(r3)
@@ -8771,14 +8772,14 @@ loc_821C060C:
   r4 = r29;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C0618)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C0618, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r29
   r4 = r29;
   // mr r3,r30
   r3 = r30;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C0624)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C0624, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r31,r31,4
   r31 = uint64_t(int64_t(int64_t(r31) + 4));
   // addi r28,r28,1
@@ -8823,7 +8824,7 @@ lifted::Result f821C0640(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C0664)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C0664, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r30,0(r3)
   r30 = REX_LOAD_U32(uint32_t(r3) + 0);
   // li r5,5
@@ -8834,7 +8835,7 @@ lifted::Result f821C0640(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r30;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C0678)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C0678, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // mr r27,r3
@@ -8902,14 +8903,14 @@ loc_821C06EC:
   r4 = r29;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C06FC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C06FC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // mr r28,r3
   r28 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C0708)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C0708, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r11,r1,96
   r11 = uint64_t(int64_t(int64_t(r1) + 96));
   // mr r4,r3
@@ -8920,7 +8921,7 @@ loc_821C06EC:
   r5 = REX_LOAD_U32(uint32_t(r31) + uint32_t(r11));
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C071C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C071C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r28
   r3 = r28;
   // li r4,1
@@ -8929,7 +8930,7 @@ loc_821C06EC:
   r28 = uint64_t(int64_t(int64_t(r1) + 128));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C072C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C072C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwzx r10,r31,r28
   r10 = REX_LOAD_U32(uint32_t(r31) + uint32_t(r28));
   // addi r31,r31,4
@@ -8978,7 +8979,7 @@ lifted::Result f821C0750(uint8_t* base, uint64_t r1, uint64_t r13, double f1) {
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C0774)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C0774, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,770
   r11 = uint64_t(int64_t(770));
   // lwz r30,0(r3)
@@ -9120,14 +9121,14 @@ loc_821C087C:
   r4 = r29;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C0888)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C0888, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r29
   r4 = r29;
   // mr r3,r30
   r3 = r30;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C0894)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C0894, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r31,r31,4
   r31 = uint64_t(int64_t(int64_t(r31) + 4));
   // addi r28,r28,1
@@ -9172,7 +9173,7 @@ lifted::Result f821C0EF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r28));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C0F14)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C0F14, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r31,-32146
   r31 = uint64_t(int64_t(-2106720256));
   // mr r11,r3
@@ -9187,7 +9188,7 @@ lifted::Result f821C0EF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   r29 = uint64_t(int64_t(int64_t(r10) + 12));
   // bl 0x82105620
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82105620, LIFTED_ARGS(0x821C0F30)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82105620, LIFTED_ARGS(0x821C0F30, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,6100(r3)
   r10 = REX_LOAD_U32(uint32_t(r3) + 6100);
   // mr r8,r29
@@ -9243,7 +9244,7 @@ loc_821C0F7C:
   r6 = uint64_t(int64_t(int64_t(r11) + 12));
   // bl 0x8211d930
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211D930, LIFTED_ARGS(0x821C0F98)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211D930, LIFTED_ARGS(0x821C0F98, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31624);
   // li r5,9
@@ -9256,7 +9257,7 @@ loc_821C0F7C:
   r6 = REX_LOAD_U32(uint32_t(r11) + 32);
   // bl 0x8211c740
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C740, LIFTED_ARGS(0x821C0FB0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C740, LIFTED_ARGS(0x821C0FB0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31624);
   // li r6,8
@@ -9271,7 +9272,7 @@ loc_821C0F7C:
   r7 = REX_LOAD_U32(uint32_t(r11) + 40);
   // bl 0x8211c1f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C1F8, LIFTED_ARGS(0x821C0FCC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C1F8, LIFTED_ARGS(0x821C0FCC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,11
   r5 = uint64_t(int64_t(11));
   // li r4,16
@@ -9280,7 +9281,7 @@ loc_821C0F7C:
   r3 = r30;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C0FDC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C0FDC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31624);
   // lwz r11,36(r11)
@@ -9318,7 +9319,7 @@ lifted::Result f821C1AA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r3 = REX_LOAD_U32(uint32_t(r31) + -31628);
   // bl 0x82186568
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82186568, LIFTED_ARGS(0x821C1ABC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82186568, LIFTED_ARGS(0x821C1ABC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31628(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31628);
   // lwz r11,8(r11)
@@ -9331,7 +9332,7 @@ lifted::Result f821C1AA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1AD4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1AD4, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821C1AD4:
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -9362,7 +9363,7 @@ loc_821C1AF0:
 loc_821C1B04:
   // bl 0x821beac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BEAC8, LIFTED_ARGS(0x821C1B08)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BEAC8, LIFTED_ARGS(0x821C1B08, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821c1b38
@@ -9371,7 +9372,7 @@ loc_821C1B04:
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1B18)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1B18, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r10,-31632(r11)
@@ -9396,7 +9397,7 @@ loc_821C1B38:
   r3 = REX_LOAD_U32(uint32_t(r31) + -31628);
   // bl 0x821864c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C1B44)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C1B44, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821c1c20
@@ -9405,7 +9406,7 @@ loc_821C1B38:
   r3 = uint64_t(int64_t(0));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1B54)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1B54, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31628(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31628);
   // lis r9,-32146
@@ -9519,7 +9520,7 @@ loc_821C1C20:
   r3 = REX_LOAD_U32(uint32_t(r31) + -31628);
   // bl 0x821864c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C1C2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C1C2C, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821c1cf0
@@ -9528,7 +9529,7 @@ loc_821C1C20:
   r3 = uint64_t(int64_t(2));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1C3C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1C3C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // lwz r11,-31624(r10)
@@ -9662,7 +9663,7 @@ lifted::Result f821C1ED8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r3 = REX_LOAD_U32(uint32_t(r31) + -31628);
   // bl 0x82186568
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82186568, LIFTED_ARGS(0x821C1EF4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82186568, LIFTED_ARGS(0x821C1EF4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31628(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31628);
   // lwz r11,8(r11)
@@ -9675,7 +9676,7 @@ lifted::Result f821C1ED8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1F0C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1F0C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r10,-31632(r11)
@@ -9696,7 +9697,7 @@ loc_821C1F24:
 loc_821C1F2C:
   // bl 0x821ba550
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BA550, LIFTED_ARGS(0x821C1F30)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BA550, LIFTED_ARGS(0x821C1F30, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821c1f78
@@ -9705,7 +9706,7 @@ loc_821C1F2C:
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1F40)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1F40, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r10,-31632(r11)
@@ -9744,7 +9745,7 @@ loc_821C1F78:
   r3 = REX_LOAD_U32(uint32_t(r31) + -31628);
   // bl 0x821864c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C1F84)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C1F84, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821c20dc
@@ -9769,7 +9770,7 @@ loc_821C1F78:
   if (!cr6.eq) goto loc_821C205C;
   // bl 0x821ba890
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BA890, LIFTED_ARGS(0x821C1FB4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BA890, LIFTED_ARGS(0x821C1FB4, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821c2054
@@ -9783,7 +9784,7 @@ loc_821C1F78:
   if (!cr0.eq) goto loc_821C2054;
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1FCC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C1FCC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31624);
   // li r5,48
@@ -9794,7 +9795,7 @@ loc_821C1F78:
   r3 = uint64_t(int64_t(int64_t(r11) + 92));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C1FE0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C1FE0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31624);
   // li r5,48
@@ -9805,7 +9806,7 @@ loc_821C1F78:
   r3 = uint64_t(int64_t(int64_t(r11) + 140));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C1FF4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C1FF4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r10,-31632(r11)
@@ -9880,7 +9881,7 @@ loc_821C205C:
   r5 = uint64_t(int64_t(48));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C2080)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C2080, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821bf2b8
   // (left out: dead in C++)
   { const lifted::Result o = f821BF2B8(base, r1, r13, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
@@ -9938,7 +9939,7 @@ loc_821C20DC:
   r3 = REX_LOAD_U32(uint32_t(r31) + -31628);
   // bl 0x821864c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C20E8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C20E8, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821c2194
@@ -9955,7 +9956,7 @@ loc_821C20DC:
   r3 = uint64_t(int64_t(int64_t(r11) + 284));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C2108)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C2108, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31624);
   // li r5,48
@@ -9966,7 +9967,7 @@ loc_821C20DC:
   r3 = uint64_t(int64_t(int64_t(r11) + 332));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C211C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C211C, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821bf2b8
   // (left out: dead in C++)
   { const lifted::Result o = f821BF2B8(base, r1, r13, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
@@ -10035,7 +10036,7 @@ loc_821C2184:
 loc_821C2190:
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C2194)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C2194, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821C2194:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
@@ -10080,7 +10081,7 @@ lifted::Result f821C36F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C3718)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C3718, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r26)
   r11 = REX_LOAD_U32(uint32_t(r26) + 0);
   // lwz r31,0(r3)
@@ -10128,7 +10129,7 @@ lifted::Result f821C36F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
 loc_821C3770:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3774)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3774, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + -31624);
   // li r10,0
@@ -10174,7 +10175,7 @@ loc_821C37B8:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C37C0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C37C0, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821C37C0:
   // cmplwi cr6,r29,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r29), 1, so);
@@ -10210,7 +10211,7 @@ loc_821C37C0:
   r4 = uint64_t(int64_t(344));
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3804)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3804, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,344
   r4 = uint64_t(int64_t(344));
   // b 0x821c3884
@@ -10220,7 +10221,7 @@ loc_821C380C:
   r4 = uint64_t(int64_t(345));
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3814)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3814, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,345
   r4 = uint64_t(int64_t(345));
   // b 0x821c3884
@@ -10240,7 +10241,7 @@ loc_821C381C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3838)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3838, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,343
   r4 = uint64_t(int64_t(343));
   // b 0x821c3884
@@ -10260,7 +10261,7 @@ loc_821C3840:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C385C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C385C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,342
   r4 = uint64_t(int64_t(342));
   // b 0x821c3884
@@ -10280,7 +10281,7 @@ loc_821C3864:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3880)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3880, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,341
   r4 = uint64_t(int64_t(341));
 loc_821C3884:
@@ -10288,7 +10289,7 @@ loc_821C3884:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C388C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C388C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821C388C:
   // li r4,243
   r4 = uint64_t(int64_t(243));
@@ -10296,14 +10297,14 @@ loc_821C388C:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3898)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3898, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,244
   r4 = uint64_t(int64_t(244));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C38A4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C38A4, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r29,3
   cr6 = lifted::Compare<int32_t>(int32_t(r29), 3, so);
   // beq cr6,0x821c38f0
@@ -10344,7 +10345,7 @@ loc_821C38D8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C38F0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C38F0, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821C38F0:
   // li r11,1
   r11 = uint64_t(int64_t(1));
@@ -10357,7 +10358,7 @@ loc_821C38F8:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C3904)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C3904, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // addi r1,r1,144
@@ -10401,7 +10402,7 @@ lifted::Result f821C3910(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C3940)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C3940, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // lwz r31,0(r3)
@@ -10436,7 +10437,7 @@ lifted::Result f821C3910(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = uint64_t(int64_t(345));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3984)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3984, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -10451,7 +10452,7 @@ lifted::Result f821C3910(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C39A0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C39A0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,344
   r4 = uint64_t(int64_t(344));
   // b 0x821c39d0
@@ -10461,7 +10462,7 @@ loc_821C39A8:
   r4 = uint64_t(int64_t(344));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C39B0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C39B0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -10476,7 +10477,7 @@ loc_821C39A8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C39CC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C39CC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,345
   r4 = uint64_t(int64_t(345));
 loc_821C39D0:
@@ -10484,7 +10485,7 @@ loc_821C39D0:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C39D8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C39D8, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821c39e0
   goto loc_821C39E0;
 loc_821C39DC:
@@ -10503,7 +10504,7 @@ loc_821C39E8:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C39F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C39F4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // addi r1,r1,112
@@ -10551,7 +10552,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C3A38)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C3A38, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,423
   r11 = uint64_t(int64_t(423));
   // lwz r10,0(r26)
@@ -10818,7 +10819,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r4 = uint64_t(int64_t(int64_t(r28) + 407));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3C4C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3C4C, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821c3c9c
   goto loc_821C3C9C;
 loc_821C3C50:
@@ -10835,7 +10836,7 @@ loc_821C3C50:
 loc_821C3C64:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3C68)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3C68, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -10850,14 +10851,14 @@ loc_821C3C64:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3C84)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3C84, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,352
   r4 = uint64_t(int64_t(352));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3C90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3C90, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + -31624);
   // li r10,0
@@ -10885,7 +10886,7 @@ loc_821C3C9C:
   r4 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3CC4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3CC4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // b 0x821c3d30
@@ -10903,14 +10904,14 @@ loc_821C3CCC:
   r4 = r30;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3CE4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3CE4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3CF0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3CF0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + -31624);
   // li r8,0
@@ -10933,7 +10934,7 @@ loc_821C3CCC:
   r4 = uint64_t(int64_t(354));
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3D1C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3D1C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,354
   r4 = uint64_t(int64_t(354));
   // b 0x821c3d30
@@ -10943,7 +10944,7 @@ loc_821C3D24:
   r4 = uint64_t(int64_t(353));
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3D2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3D2C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,353
   r4 = uint64_t(int64_t(353));
 loc_821C3D30:
@@ -10951,7 +10952,7 @@ loc_821C3D30:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C3D38)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C3D38, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r27,12
   cr6 = lifted::Compare<int32_t>(int32_t(r27), 12, so);
   // addi r10,r1,96
@@ -10986,7 +10987,7 @@ loc_821C3D30:
   r4 = REX_LOAD_U32(uint32_t(r29) + uint32_t(r11));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3D7C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3D7C, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r11,r1,144
   r11 = uint64_t(int64_t(int64_t(r1) + 144));
   // mr r3,r31
@@ -10995,7 +10996,7 @@ loc_821C3D30:
   r4 = REX_LOAD_U32(uint32_t(r29) + uint32_t(r11));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3D8C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3D8C, r31)); r3 = o.r3; f1 = o.f1; }
   // rlwinm r11,r30,2,0,29
   r11 = __builtin_rotateleft64(uint32_t(r30) | (r30 << 32), 2) & 0xFFFFFFFC;
   // addi r10,r1,144
@@ -11023,7 +11024,7 @@ loc_821C3DA4:
   r4 = REX_LOAD_U32(uint32_t(r11) + uint32_t(r9));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3DC0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C3DC0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,-1
   r3 = uint64_t(int64_t(-1));
   // b 0x821c3e20
@@ -11052,7 +11053,7 @@ loc_821C3DDC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3DF4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3DF4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -11067,20 +11068,20 @@ loc_821C3DDC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3E10)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C3E10, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r29
   r4 = r29;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C3E1C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C3E1C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r30
   r3 = r30;
 loc_821C3E20:
   // bl 0x821bf0f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BF0F0, LIFTED_ARGS(0x821C3E24)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BF0F0, LIFTED_ARGS(0x821C3E24, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821C3E24:
   // li r11,1
   r11 = uint64_t(int64_t(1));
@@ -11093,7 +11094,7 @@ loc_821C3E2C:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C3E38)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C3E38, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // addi r1,r1,416
@@ -11132,7 +11133,7 @@ lifted::Result f821C5350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C5374)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C5374, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r10,r3
   r10 = r3;
   // lis r11,-32146
@@ -11219,7 +11220,7 @@ lifted::Result f821C5350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r11) + 8, uint32_t(r10));
   // bl 0x821bfa68
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BFA68, LIFTED_ARGS(0x821C5420)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BFA68, LIFTED_ARGS(0x821C5420, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + -31624);
   // li r5,2
@@ -11232,12 +11233,12 @@ lifted::Result f821C5350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r11) + 660, uint32_t(r31));
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C5438)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C5438, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C5440)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C5440, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r27,r3
   r27 = r3;
   // li r29,345
@@ -11251,7 +11252,7 @@ loc_821C544C:
   r3 = r27;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C5458)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C5458, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // mr r5,r29
@@ -11260,7 +11261,7 @@ loc_821C544C:
   r3 = r30;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C5468)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C5468, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r28,r28,-1
   ca = uint32_t(r28) > 0;
   r28 = uint64_t(int64_t(int64_t(r28) + -1));
@@ -11277,12 +11278,12 @@ loc_821C544C:
   r3 = r30;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C5484)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C5484, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C548C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C548C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r27,r3
   r27 = r3;
   // li r29,345
@@ -11296,7 +11297,7 @@ loc_821C5498:
   r3 = r27;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C54A4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C54A4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // mr r5,r29
@@ -11305,7 +11306,7 @@ loc_821C5498:
   r3 = r30;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C54B4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C54B4, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r28,r28,-1
   ca = uint32_t(r28) > 0;
   r28 = uint64_t(int64_t(int64_t(r28) + -1));
@@ -11322,14 +11323,14 @@ loc_821C5498:
   r3 = r30;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C54D0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C54D0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,3
   r4 = uint64_t(int64_t(3));
   // mr r29,r3
   r29 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C54DC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C54DC, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // li r5,4
@@ -11338,14 +11339,14 @@ loc_821C5498:
   r3 = r30;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C54EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C54EC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,4
   r4 = uint64_t(int64_t(4));
   // mr r3,r29
   r3 = r29;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C54F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C54F8, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // li r5,7
@@ -11354,7 +11355,7 @@ loc_821C5498:
   r3 = r30;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C5508)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C5508, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,6
   r5 = uint64_t(int64_t(6));
   // li r4,8
@@ -11363,14 +11364,14 @@ loc_821C5498:
   r3 = r30;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C5518)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C5518, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,3
   r4 = uint64_t(int64_t(3));
   // mr r29,r3
   r29 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C5524)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C5524, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r4,5
@@ -11381,7 +11382,7 @@ loc_821C5498:
   REX_STORE_U32(uint32_t(r11) + 80, uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C5538)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C5538, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r4,7
@@ -11392,7 +11393,7 @@ loc_821C5498:
   REX_STORE_U32(uint32_t(r11) + 80, uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C554C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C554C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r4,4
@@ -11403,7 +11404,7 @@ loc_821C5498:
   REX_STORE_U32(uint32_t(r11) + 80, uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C5560)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C5560, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // li r5,7
@@ -11412,7 +11413,7 @@ loc_821C5498:
   r3 = r30;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C5570)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C5570, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821bee48
   // (left out: dead in C++)
   { const lifted::Result o = f821BEE48(base, r1, r13, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
@@ -11453,7 +11454,7 @@ lifted::Result f821C56B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C56D4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C56D4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r30,0(r3)
@@ -11506,7 +11507,7 @@ lifted::Result f821C56B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = uint64_t(int64_t(int64_t(r11) + 284));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C573C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C573C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + -31624);
   // li r4,10
@@ -11517,7 +11518,7 @@ lifted::Result f821C56B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r11) + 660, uint32_t(r31));
   // bl 0x821bfa68
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BFA68, LIFTED_ARGS(0x821C5750)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BFA68, LIFTED_ARGS(0x821C5750, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821bf2b8
   // (left out: dead in C++)
   { const lifted::Result o = f821BF2B8(base, r1, r13, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
@@ -11529,14 +11530,14 @@ lifted::Result f821C56B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r30;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C5764)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C5764, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,3
   r4 = uint64_t(int64_t(3));
   // mr r31,r3
   r31 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C5770)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C5770, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // li r5,4
@@ -11545,14 +11546,14 @@ lifted::Result f821C56B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r30;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C5780)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C5780, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,4
   r4 = uint64_t(int64_t(4));
   // mr r3,r31
   r3 = r31;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C578C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C578C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // li r5,7
@@ -11561,7 +11562,7 @@ lifted::Result f821C56B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r30;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C579C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C579C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r6,999
   r6 = uint64_t(int64_t(999));
   // li r5,0
@@ -11572,7 +11573,7 @@ lifted::Result f821C56B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r30;
   // bl 0x8211c1f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C1F8, LIFTED_ARGS(0x821C57B0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C1F8, LIFTED_ARGS(0x821C57B0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r6,1
   r6 = uint64_t(int64_t(1));
   // li r5,0
@@ -11583,7 +11584,7 @@ lifted::Result f821C56B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r30;
   // bl 0x8211c570
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C570, LIFTED_ARGS(0x821C57C4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C570, LIFTED_ARGS(0x821C57C4, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821bf3c0
   // (left out: dead in C++)
   { const lifted::Result o = f821BF3C0(base, r1, r13, f1); r3 = o.r3; f1 = o.f1; }
@@ -11621,7 +11622,7 @@ lifted::Result f821C5900(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C5924)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C5924, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r30,0(r3)
@@ -11674,7 +11675,7 @@ lifted::Result f821C5900(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = uint64_t(int64_t(int64_t(r11) + 380));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C598C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C598C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + -31624);
   // li r4,12
@@ -11685,7 +11686,7 @@ lifted::Result f821C5900(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r11) + 660, uint32_t(r31));
   // bl 0x821bfa68
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BFA68, LIFTED_ARGS(0x821C59A0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BFA68, LIFTED_ARGS(0x821C59A0, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821bf7f8
   // (left out: dead in C++)
   { const lifted::Result o = f821BF7F8(base, r1, r13, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
@@ -11697,14 +11698,14 @@ lifted::Result f821C5900(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r30;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C59B4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C59B4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,3
   r4 = uint64_t(int64_t(3));
   // mr r31,r3
   r31 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C59C0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C59C0, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // li r5,4
@@ -11713,14 +11714,14 @@ lifted::Result f821C5900(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r30;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C59D0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C59D0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,4
   r4 = uint64_t(int64_t(4));
   // mr r3,r31
   r3 = r31;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C59DC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C59DC, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // li r5,7
@@ -11729,7 +11730,7 @@ lifted::Result f821C5900(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r30;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C59EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C59EC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r6,999
   r6 = uint64_t(int64_t(999));
   // li r5,0
@@ -11740,7 +11741,7 @@ lifted::Result f821C5900(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r30;
   // bl 0x8211c1f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C1F8, LIFTED_ARGS(0x821C5A00)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C1F8, LIFTED_ARGS(0x821C5A00, r31)); r3 = o.r3; f1 = o.f1; }
   // li r6,1
   r6 = uint64_t(int64_t(1));
   // li r5,0
@@ -11751,7 +11752,7 @@ lifted::Result f821C5900(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r30;
   // bl 0x8211c570
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C570, LIFTED_ARGS(0x821C5A14)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C570, LIFTED_ARGS(0x821C5A14, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821bf908
   // (left out: dead in C++)
   { const lifted::Result o = f821BF908(base, r1, r13, f1); r3 = o.r3; f1 = o.f1; }
@@ -11786,7 +11787,7 @@ lifted::Result f821C5A20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r3 = REX_LOAD_U32(uint32_t(r31) + -31600);
   // bl 0x82186568
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82186568, LIFTED_ARGS(0x821C5A3C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82186568, LIFTED_ARGS(0x821C5A3C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31600(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31600);
   // lwz r11,8(r11)
@@ -11815,7 +11816,7 @@ loc_821C5A64:
 loc_821C5A6C:
   // bl 0x821bb290
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BB290, LIFTED_ARGS(0x821C5A70)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BB290, LIFTED_ARGS(0x821C5A70, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821c5ab8
@@ -11852,7 +11853,7 @@ loc_821C5A94:
   REX_STORE_U32(uint32_t(r11) + 0, uint32_t(r10));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5AB4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5AB4, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821c5b58
   goto loc_821C5B58;
 loc_821C5AB8:
@@ -11862,7 +11863,7 @@ loc_821C5AB8:
   r3 = REX_LOAD_U32(uint32_t(r31) + -31600);
   // bl 0x821864c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C5AC4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C5AC4, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821c5b58
@@ -11871,7 +11872,7 @@ loc_821C5AB8:
   r3 = uint64_t(int64_t(0));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5AD4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5AD4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31600(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31600);
   // lwz r10,0(r11)
@@ -11978,7 +11979,7 @@ lifted::Result f821C5B70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r3 = REX_LOAD_U32(uint32_t(r31) + -31600);
   // bl 0x82186568
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82186568, LIFTED_ARGS(0x821C5B8C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82186568, LIFTED_ARGS(0x821C5B8C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31600(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31600);
   // lwz r11,8(r11)
@@ -11991,7 +11992,7 @@ lifted::Result f821C5B70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5BA4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5BA4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r11,-31604(r11)
@@ -12012,7 +12013,7 @@ loc_821C5BBC:
 loc_821C5BC4:
   // bl 0x821bb3b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BB3B8, LIFTED_ARGS(0x821C5BC8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BB3B8, LIFTED_ARGS(0x821C5BC8, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821c5c10
@@ -12021,7 +12022,7 @@ loc_821C5BC4:
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5BD8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5BD8, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r11,-31604(r11)
@@ -12059,7 +12060,7 @@ loc_821C5C10:
   r3 = REX_LOAD_U32(uint32_t(r31) + -31600);
   // bl 0x821864c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C5C1C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C5C1C, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821c5c5c
@@ -12068,7 +12069,7 @@ loc_821C5C10:
   r3 = uint64_t(int64_t(0));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5C2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5C2C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31600(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31600);
   // lwz r11,0(r11)
@@ -12089,7 +12090,7 @@ loc_821C5C10:
   r3 = uint64_t(int64_t(int64_t(r11) + 332));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C5C54)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C5C54, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821c03d8
   // (left out: dead in C++)
   { const lifted::Result o = f821C03D8(base, r1, r13, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
@@ -12133,7 +12134,7 @@ lifted::Result f821C5C70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r3 = REX_LOAD_U32(uint32_t(r31) + -31600);
   // bl 0x82186568
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82186568, LIFTED_ARGS(0x821C5C8C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x82186568, LIFTED_ARGS(0x821C5C8C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31600(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31600);
   // lwz r11,8(r11)
@@ -12162,7 +12163,7 @@ loc_821C5CB4:
 loc_821C5CBC:
   // bl 0x821bb590
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821BB590, LIFTED_ARGS(0x821C5CC0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821BB590, LIFTED_ARGS(0x821C5CC0, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821c5d08
@@ -12199,7 +12200,7 @@ loc_821C5CE4:
   REX_STORE_U32(uint32_t(r11) + 0, uint32_t(r10));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5D04)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5D04, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821c5d54
   goto loc_821C5D54;
 loc_821C5D08:
@@ -12209,7 +12210,7 @@ loc_821C5D08:
   r3 = REX_LOAD_U32(uint32_t(r31) + -31600);
   // bl 0x821864c8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C5D14)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821864C8, LIFTED_ARGS(0x821C5D14, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821c5d54
@@ -12218,7 +12219,7 @@ loc_821C5D08:
   r3 = uint64_t(int64_t(0));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5D24)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821C5D24, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31600(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + -31600);
   // lwz r11,0(r11)
@@ -12239,7 +12240,7 @@ loc_821C5D08:
   r3 = uint64_t(int64_t(int64_t(r11) + 404));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C5D4C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C5D4C, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821c0640
   // (left out: dead in C++)
   { const lifted::Result o = f821C0640(base, r1, r13, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
@@ -12290,7 +12291,7 @@ lifted::Result f821C5D68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C5D90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C5D90, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r27)
   r11 = REX_LOAD_U32(uint32_t(r27) + 0);
   // lwz r31,0(r3)
@@ -12325,7 +12326,7 @@ lifted::Result f821C5D68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C5DD4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C5DD4, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r30,0
   cr6 = lifted::Compare<int32_t>(int32_t(r30), 0, so);
   // bne cr6,0x821c5de4
@@ -12344,7 +12345,7 @@ loc_821C5DE4:
 loc_821C5DF0:
   // bl 0x821c0238
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821C0238, LIFTED_ARGS(0x821C5DF4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821C0238, LIFTED_ARGS(0x821C5DF4, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821c5e14
   goto loc_821C5E14;
 loc_821C5DF8:
@@ -12365,7 +12366,7 @@ loc_821C5E0C:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C5E14)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C5E14, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821C5E14:
   // cmplwi cr6,r30,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r30), 1, so);
@@ -12393,7 +12394,7 @@ loc_821C5E14:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C5E48)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C5E48, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,350
   r4 = uint64_t(int64_t(350));
   // b 0x821c5eb8
@@ -12413,7 +12414,7 @@ loc_821C5E50:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C5E6C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C5E6C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,348
   r4 = uint64_t(int64_t(348));
   // b 0x821c5eb8
@@ -12433,7 +12434,7 @@ loc_821C5E74:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C5E90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C5E90, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,347
   r4 = uint64_t(int64_t(347));
   // b 0x821c5eb8
@@ -12453,7 +12454,7 @@ loc_821C5E98:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C5EB4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C5EB4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,346
   r4 = uint64_t(int64_t(346));
 loc_821C5EB8:
@@ -12461,7 +12462,7 @@ loc_821C5EB8:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C5EC0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821C5EC0, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821C5EC0:
   // li r4,297
   r4 = uint64_t(int64_t(297));
@@ -12469,14 +12470,14 @@ loc_821C5EC0:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C5ECC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C5ECC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,298
   r4 = uint64_t(int64_t(298));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C5ED8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C5ED8, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi cr6,r30,3
   cr6 = lifted::Compare<int32_t>(int32_t(r30), 3, so);
   // beq cr6,0x821c5f24
@@ -12517,7 +12518,7 @@ loc_821C5F0C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C5F24)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821C5F24, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821C5F24:
   // li r11,1
   r11 = uint64_t(int64_t(1));
@@ -12686,7 +12687,7 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C625C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C625C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // lwz r29,0(r3)
@@ -12747,7 +12748,7 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r10) + -31596, uint32_t(r11));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C62D4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C62D4, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821c03d8
   // (left out: dead in C++)
   { const lifted::Result o = f821C03D8(base, r1, r13, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
@@ -12759,14 +12760,14 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r29;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C62E8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C62E8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,3
   r4 = uint64_t(int64_t(3));
   // mr r30,r3
   r30 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C62F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C62F4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r4,5
@@ -12777,7 +12778,7 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r11) + 80, uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C6308)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C6308, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r4,7
@@ -12788,7 +12789,7 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r11) + 80, uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C631C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C631C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r4,4
@@ -12799,7 +12800,7 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r11) + 80, uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C6330)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C6330, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // li r5,7
@@ -12808,7 +12809,7 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r29;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C6340)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C6340, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821c04e0
   // (left out: dead in C++)
   { const lifted::Result o = f821C04E0(base, r1, r13, f1); r3 = o.r3; f1 = o.f1; }
@@ -12846,7 +12847,7 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C6374)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C6374, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // lwz r29,0(r3)
@@ -12907,7 +12908,7 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r10) + -31596, uint32_t(r11));
   // bl 0x825a7410
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C63EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x825A7410, LIFTED_ARGS(0x821C63EC, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821c0640
   // (left out: dead in C++)
   { const lifted::Result o = f821C0640(base, r1, r13, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
@@ -12919,14 +12920,14 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r29;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C6400)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821C6400, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,3
   r4 = uint64_t(int64_t(3));
   // mr r30,r3
   r30 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C640C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C640C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r4,5
@@ -12937,7 +12938,7 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r11) + 80, uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C6420)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C6420, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r4,7
@@ -12948,7 +12949,7 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r11) + 80, uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C6434)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C6434, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r4,4
@@ -12959,7 +12960,7 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   REX_STORE_U32(uint32_t(r11) + 80, uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C6448)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821C6448, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r3
   r4 = r3;
   // li r5,7
@@ -12968,7 +12969,7 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = r29;
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C6458)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821C6458, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821c0750
   // (left out: dead in C++)
   { const lifted::Result o = f821C0750(base, r1, r13, f1); r3 = o.r3; f1 = o.f1; }
@@ -13010,7 +13011,7 @@ lifted::Result f821C7188(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r25));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C71B0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C71B0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r26)
   r11 = REX_LOAD_U32(uint32_t(r26) + 0);
   // lwz r31,0(r3)
@@ -13037,7 +13038,7 @@ lifted::Result f821C7188(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821C71E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821C71E4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // li r4,21
@@ -13052,7 +13053,7 @@ lifted::Result f821C7188(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r5 = uint64_t(int64_t(int64_t(r11) + 2));
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821C7200)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821C7200, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,2
@@ -13061,7 +13062,7 @@ lifted::Result f821C7188(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x8211c470
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C470, LIFTED_ARGS(0x821C7210)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C470, LIFTED_ARGS(0x821C7210, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31624(r27)
   r11 = REX_LOAD_U32(uint32_t(r27) + -31624);
   // mr r29,r30
@@ -13104,7 +13105,7 @@ lifted::Result f821C7188(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r29 = uint64_t(int64_t(23));
   // bl 0x821c6e50
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821C6E50, LIFTED_ARGS(0x821C7264)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821C6E50, LIFTED_ARGS(0x821C7264, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821c72f4
   goto loc_821C72F4;
 loc_821C7268:
@@ -13112,7 +13113,7 @@ loc_821C7268:
   r29 = uint64_t(int64_t(21));
   // bl 0x821c6d48
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821C6D48, LIFTED_ARGS(0x821C7270)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821C6D48, LIFTED_ARGS(0x821C7270, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821c72f4
   goto loc_821C72F4;
 loc_821C7274:
@@ -13135,7 +13136,7 @@ loc_821C728C:
   r29 = uint64_t(int64_t(24));
   // bl 0x821c57d0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821C57D0, LIFTED_ARGS(0x821C7294)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821C57D0, LIFTED_ARGS(0x821C7294, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821c72f4
   goto loc_821C72F4;
 loc_821C7298:
@@ -13158,7 +13159,7 @@ loc_821C72B0:
   r29 = uint64_t(int64_t(18));
   // bl 0x821c5580
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821C5580, LIFTED_ARGS(0x821C72B8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821C5580, LIFTED_ARGS(0x821C72B8, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821c72f4
   goto loc_821C72F4;
 loc_821C72BC:
@@ -13181,7 +13182,7 @@ loc_821C72D4:
   r29 = uint64_t(int64_t(16));
   // bl 0x821c51d0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821C51D0, LIFTED_ARGS(0x821C72DC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821C51D0, LIFTED_ARGS(0x821C72DC, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821c72f4
   goto loc_821C72F4;
 loc_821C72E0:
@@ -13189,7 +13190,7 @@ loc_821C72E0:
   r29 = uint64_t(int64_t(15));
   // bl 0x821c4fd0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821C4FD0, LIFTED_ARGS(0x821C72E8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821C4FD0, LIFTED_ARGS(0x821C72E8, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821c72f4
   goto loc_821C72F4;
 loc_821C72EC:
@@ -13197,7 +13198,7 @@ loc_821C72EC:
   r29 = uint64_t(int64_t(14));
   // bl 0x821c4db0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821C4DB0, LIFTED_ARGS(0x821C72F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821C4DB0, LIFTED_ARGS(0x821C72F4, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821C72F4:
   // li r9,0
   r9 = uint64_t(int64_t(0));
@@ -13215,7 +13216,7 @@ loc_821C72F4:
   r3 = r31;
   // bl 0x8211d978
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821C7314)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821C7314, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r24,0(r26)
   REX_STORE_U32(uint32_t(r26) + 0, uint32_t(r24));
 loc_821C7318:
@@ -13225,7 +13226,7 @@ loc_821C7318:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C7324)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C7324, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821c75d0
@@ -13641,7 +13642,7 @@ lifted::Result f821C79B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C79E8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C79E8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // lwz r31,0(r3)
@@ -13708,7 +13709,7 @@ loc_821C7A58:
 loc_821C7A5C:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C7A60)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C7A60, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821C7A60:
   // li r5,0
   r5 = uint64_t(int64_t(0));
@@ -13718,7 +13719,7 @@ loc_821C7A60:
   r3 = r31;
   // bl 0x8211c470
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C470, LIFTED_ARGS(0x821C7A70)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C470, LIFTED_ARGS(0x821C7A70, r31)); r3 = o.r3; f1 = o.f1; }
   // li r9,0
   r9 = uint64_t(int64_t(0));
   // li r8,0
@@ -13735,10 +13736,10 @@ loc_821C7A60:
   r3 = r31;
   // bl 0x8211d978
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821C7A90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821C7A90, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821c4be0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821C4BE0, LIFTED_ARGS(0x821C7A94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821C4BE0, LIFTED_ARGS(0x821C7A94, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r30)
@@ -13750,7 +13751,7 @@ loc_821C7A9C:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C7AA8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C7AA8, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821c7aec
@@ -13837,7 +13838,7 @@ lifted::Result f821C7BF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C7C20)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C7C20, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // lwz r31,0(r3)
@@ -13880,7 +13881,7 @@ loc_821C7C68:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C7C70)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C7C70, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,2
@@ -13889,7 +13890,7 @@ loc_821C7C68:
   r3 = r31;
   // bl 0x8211c470
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C470, LIFTED_ARGS(0x821C7C80)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C470, LIFTED_ARGS(0x821C7C80, r31)); r3 = o.r3; f1 = o.f1; }
   // li r9,0
   r9 = uint64_t(int64_t(0));
   // li r8,0
@@ -13906,10 +13907,10 @@ loc_821C7C68:
   r3 = r31;
   // bl 0x8211d978
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821C7CA0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821C7CA0, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821c4be0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821C4BE0, LIFTED_ARGS(0x821C7CA4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821C4BE0, LIFTED_ARGS(0x821C7CA4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r30)
@@ -13921,7 +13922,7 @@ loc_821C7CAC:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C7CB8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C7CB8, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821c7cfc
@@ -14008,7 +14009,7 @@ lifted::Result f821C7E00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C7E30)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821C7E30, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // lwz r31,0(r3)
@@ -14051,7 +14052,7 @@ loc_821C7E78:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C7E80)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821C7E80, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,2
@@ -14060,7 +14061,7 @@ loc_821C7E78:
   r3 = r31;
   // bl 0x8211c470
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C470, LIFTED_ARGS(0x821C7E90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C470, LIFTED_ARGS(0x821C7E90, r31)); r3 = o.r3; f1 = o.f1; }
   // li r9,0
   r9 = uint64_t(int64_t(0));
   // li r8,0
@@ -14077,10 +14078,10 @@ loc_821C7E78:
   r3 = r31;
   // bl 0x8211d978
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821C7EB0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821C7EB0, r31)); r3 = o.r3; f1 = o.f1; }
   // bl 0x821c4be0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821C4BE0, LIFTED_ARGS(0x821C7EB4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821C4BE0, LIFTED_ARGS(0x821C7EB4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r30)
@@ -14092,7 +14093,7 @@ loc_821C7EBC:
   r3 = r31;
   // bl 0x8211e1b8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C7EC8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211E1B8, LIFTED_ARGS(0x821C7EC8, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // bne 0x821c7f0c
@@ -14189,7 +14190,7 @@ lifted::Result f821D4540(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821D4580)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821D4580, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,10040(r30)
   r10 = REX_LOAD_U32(uint32_t(r30) + 10040);
   // lwz r31,0(r3)
@@ -14224,14 +14225,14 @@ lifted::Result f821D4540(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   if (cr6.eq) goto loc_821D4654;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D45C4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D45C4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,780
   r4 = uint64_t(int64_t(780));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D45D0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D45D0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,1
   r5 = uint64_t(int64_t(1));
   // li r4,32
@@ -14240,7 +14241,7 @@ lifted::Result f821D4540(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821D45E0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821D45E0, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r10,9663(r30)
   r10 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r11,r3
@@ -14274,7 +14275,7 @@ loc_821D4610:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4618)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4618, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -14283,7 +14284,7 @@ loc_821D4610:
   r4 = uint64_t(int64_t(int64_t(r11) + 734));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4628)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4628, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // li r8,0
@@ -14300,7 +14301,7 @@ loc_821D4610:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4648)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4648, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // addi r4,r11,734
@@ -14310,7 +14311,7 @@ loc_821D4610:
 loc_821D4654:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4658)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4658, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -14325,7 +14326,7 @@ loc_821D4654:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4674)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4674, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // addi r4,r11,735
@@ -14355,14 +14356,14 @@ loc_821D4680:
   if (cr6.eq) goto loc_821D4794;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D46AC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D46AC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,643
   r4 = uint64_t(int64_t(643));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D46B8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D46B8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,1
   r5 = uint64_t(int64_t(1));
   // li r4,30
@@ -14371,12 +14372,12 @@ loc_821D4680:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821D46C8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821D46C8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821D46D0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821D46D0, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r10,9663(r30)
   r10 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r11,r3
@@ -14408,7 +14409,7 @@ loc_821D4680:
   r4 = uint64_t(int64_t(int64_t(r11) + 631));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4708)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4708, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -14417,7 +14418,7 @@ loc_821D4680:
   r4 = uint64_t(int64_t(int64_t(r11) + 632));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4718)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4718, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // li r8,0
@@ -14434,7 +14435,7 @@ loc_821D4680:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4738)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4738, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -14443,7 +14444,7 @@ loc_821D4680:
   r4 = uint64_t(int64_t(int64_t(r11) + 632));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821D4748)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821D4748, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9679(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9679);
 loc_821D474C:
@@ -14454,7 +14455,7 @@ loc_821D4750:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4758)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4758, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -14463,7 +14464,7 @@ loc_821D4750:
   r4 = uint64_t(int64_t(int64_t(r11) + 571));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4768)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4768, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // li r8,0
@@ -14480,7 +14481,7 @@ loc_821D4750:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4788)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4788, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // addi r4,r11,571
@@ -14490,7 +14491,7 @@ loc_821D4750:
 loc_821D4794:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4798)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4798, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -14505,7 +14506,7 @@ loc_821D4794:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D47B4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D47B4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -14514,7 +14515,7 @@ loc_821D4794:
   r4 = uint64_t(int64_t(int64_t(r11) + 633));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D47C4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D47C4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -14523,7 +14524,7 @@ loc_821D4794:
   r4 = uint64_t(int64_t(int64_t(r11) + 632));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D47D4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D47D4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // li r8,0
@@ -14540,7 +14541,7 @@ loc_821D4794:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D47F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D47F4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -14549,7 +14550,7 @@ loc_821D4794:
   r4 = uint64_t(int64_t(int64_t(r11) + 632));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821D4804)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821D4804, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // addi r4,r11,572
@@ -14579,14 +14580,14 @@ loc_821D4810:
   if (cr6.eq) goto loc_821D4888;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D483C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D483C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,780
   r4 = uint64_t(int64_t(780));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4848)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4848, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,1
   r5 = uint64_t(int64_t(1));
   // li r4,32
@@ -14595,7 +14596,7 @@ loc_821D4810:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821D4858)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821D4858, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r10,9663(r30)
   r10 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r11,r3
@@ -14626,7 +14627,7 @@ loc_821D4810:
 loc_821D4888:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D488C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D488C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -14641,7 +14642,7 @@ loc_821D4888:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D48A8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D48A8, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // addi r4,r11,772
@@ -14677,14 +14678,14 @@ loc_821D48B4:
   r4 = uint64_t(int64_t(779));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D48EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D48EC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,780
   r4 = uint64_t(int64_t(780));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D48F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D48F8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,1
   r5 = uint64_t(int64_t(1));
   // li r4,32
@@ -14693,7 +14694,7 @@ loc_821D48B4:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821D4908)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821D4908, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r10,9663(r30)
   r10 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r11,r3
@@ -14726,7 +14727,7 @@ loc_821D4938:
   r4 = uint64_t(int64_t(780));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4940)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4940, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -14741,7 +14742,7 @@ loc_821D4938:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D495C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D495C, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // b 0x821d460c
@@ -14769,14 +14770,14 @@ loc_821D4964:
   r4 = uint64_t(int64_t(642));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4990)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4990, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,643
   r4 = uint64_t(int64_t(643));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D499C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D499C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,1
   r5 = uint64_t(int64_t(1));
   // li r4,30
@@ -14785,12 +14786,12 @@ loc_821D4964:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821D49AC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821D49AC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821D49B4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821D49B4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r10,9663(r30)
   r10 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r11,r3
@@ -14820,7 +14821,7 @@ loc_821D4964:
   REX_STORE_U32(uint32_t(r11) + 16, temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D49E8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D49E8, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -14829,7 +14830,7 @@ loc_821D4964:
   r4 = uint64_t(int64_t(int64_t(r11) + 632));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D49F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D49F8, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // li r8,0
@@ -14846,7 +14847,7 @@ loc_821D4964:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4A18)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4A18, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -14855,7 +14856,7 @@ loc_821D4964:
   r4 = uint64_t(int64_t(int64_t(r11) + 632));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821D4A28)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821D4A28, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,571
   r4 = uint64_t(int64_t(571));
   // b 0x821d4750
@@ -14865,7 +14866,7 @@ loc_821D4A30:
   r4 = uint64_t(int64_t(643));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4A38)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4A38, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -14880,7 +14881,7 @@ loc_821D4A30:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4A54)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4A54, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -14889,7 +14890,7 @@ loc_821D4A30:
   r4 = uint64_t(int64_t(int64_t(r11) + 631));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4A64)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4A64, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -14898,7 +14899,7 @@ loc_821D4A30:
   r4 = uint64_t(int64_t(int64_t(r11) + 632));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4A74)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4A74, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // li r8,0
@@ -14915,7 +14916,7 @@ loc_821D4A30:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4A94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4A94, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -14924,7 +14925,7 @@ loc_821D4A30:
   r4 = uint64_t(int64_t(int64_t(r11) + 632));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821D4AA4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821D4AA4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // b 0x821d474c
@@ -14952,14 +14953,14 @@ loc_821D4AAC:
   r4 = uint64_t(int64_t(779));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4AD8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4AD8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,780
   r4 = uint64_t(int64_t(780));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4AE4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4AE4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,1
   r5 = uint64_t(int64_t(1));
   // li r4,32
@@ -14968,7 +14969,7 @@ loc_821D4AAC:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821D4AF4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821D4AF4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r10,9663(r30)
   r10 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r11,r3
@@ -15001,7 +15002,7 @@ loc_821D4B24:
   r4 = uint64_t(int64_t(780));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4B2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4B2C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -15016,7 +15017,7 @@ loc_821D4B24:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4B48)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4B48, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
 loc_821D4B4C:
@@ -15027,7 +15028,7 @@ loc_821D4B50:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4B58)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4B58, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // mr r3,r31
@@ -15036,7 +15037,7 @@ loc_821D4B50:
   r4 = uint64_t(int64_t(int64_t(r11) + 771));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4B68)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4B68, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // li r8,0
@@ -15053,7 +15054,7 @@ loc_821D4B50:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4B88)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4B88, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9663);
   // addi r4,r11,771
@@ -15063,7 +15064,7 @@ loc_821D4B90:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821D4B98)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821D4B98, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821d501c
   goto loc_821D501C;
 loc_821D4B9C:
@@ -15085,7 +15086,7 @@ loc_821D4B9C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821D4BC0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821D4BC0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -15112,7 +15113,7 @@ loc_821D4BE4:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4BF0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4BF0, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,10
@@ -15143,14 +15144,14 @@ loc_821D4C1C:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4C28)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4C28, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4C34)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4C34, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r29,r29,-1
   ca = uint32_t(r29) > 0;
   r29 = uint64_t(int64_t(int64_t(r29) + -1));
@@ -15165,7 +15166,7 @@ loc_821D4C1C:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4C4C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4C4C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,643
   r4 = uint64_t(int64_t(643));
   // b 0x821d4c94
@@ -15190,7 +15191,7 @@ loc_821D4C6C:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4C78)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4C78, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,10
@@ -15204,7 +15205,7 @@ loc_821D4C84:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4C90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4C90, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,780
   r4 = uint64_t(int64_t(780));
 loc_821D4C94:
@@ -15212,7 +15213,7 @@ loc_821D4C94:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4C9C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4C9C, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821d501c
   goto loc_821D501C;
 loc_821D4CA0:
@@ -15234,7 +15235,7 @@ loc_821D4CA0:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821D4CC4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821D4CC4, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -15261,7 +15262,7 @@ loc_821D4CE8:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4CF4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4CF4, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r29,r29,1
   r29 = uint64_t(int64_t(int64_t(r29) + 1));
   // cmpwi cr6,r29,10
@@ -15274,14 +15275,14 @@ loc_821D4CE8:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4D0C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4D0C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,780
   r4 = uint64_t(int64_t(780));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4D18)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4D18, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9661(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9661);
   // mr r3,r31
@@ -15290,7 +15291,7 @@ loc_821D4CE8:
   r4 = uint64_t(int64_t(int64_t(r11) + 515));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4D28)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4D28, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9661(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9661);
   // li r8,0
@@ -15307,7 +15308,7 @@ loc_821D4CE8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4D48)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4D48, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9661(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9661);
   // mr r3,r31
@@ -15316,7 +15317,7 @@ loc_821D4CE8:
   r4 = uint64_t(int64_t(int64_t(r11) + 466));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4D58)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4D58, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9661(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9661);
   // li r8,0
@@ -15333,12 +15334,12 @@ loc_821D4CE8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4D78)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4D78, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r30
   r3 = r30;
   // bl 0x821cd868
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821CD868, LIFTED_ARGS(0x821D4D80)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821CD868, LIFTED_ARGS(0x821D4D80, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9661(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9661);
   // cmpw cr6,r3,r11
@@ -15351,7 +15352,7 @@ loc_821D4CE8:
   r4 = uint64_t(int64_t(int64_t(r11) + 476));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4D98)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4D98, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9661(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9661);
   // addi r4,r11,476
@@ -15363,7 +15364,7 @@ loc_821D4DA4:
   r4 = uint64_t(int64_t(486));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4DAC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4DAC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,486
   r4 = uint64_t(int64_t(486));
 loc_821D4DB0:
@@ -15379,14 +15380,14 @@ loc_821D4DB0:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4DC8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4DC8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,992
   r4 = uint64_t(int64_t(992));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4DD4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4DD4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,992
   r4 = uint64_t(int64_t(992));
   // b 0x821d5004
@@ -15413,14 +15414,14 @@ loc_821D4DF8:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4E04)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4E04, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r29
   r4 = r29;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4E10)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4E10, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r28,r28,-1
   ca = uint32_t(r28) > 0;
   r28 = uint64_t(int64_t(int64_t(r28) + -1));
@@ -15435,14 +15436,14 @@ loc_821D4DF8:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4E28)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4E28, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,643
   r4 = uint64_t(int64_t(643));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4E34)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4E34, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9662(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9662);
   // mr r3,r31
@@ -15451,7 +15452,7 @@ loc_821D4DF8:
   r4 = uint64_t(int64_t(int64_t(r11) + 515));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4E44)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4E44, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9662(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9662);
   // li r8,0
@@ -15468,7 +15469,7 @@ loc_821D4DF8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4E64)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4E64, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9662(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9662);
   // mr r3,r31
@@ -15477,7 +15478,7 @@ loc_821D4DF8:
   r4 = uint64_t(int64_t(int64_t(r11) + 466));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4E74)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4E74, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9662(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9662);
   // li r8,0
@@ -15494,7 +15495,7 @@ loc_821D4DF8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4E94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4E94, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r10,0
   r10 = uint64_t(int64_t(0));
   // lbz r11,9662(r30)
@@ -15513,7 +15514,7 @@ loc_821D4DF8:
   r4 = uint64_t(int64_t(int64_t(r11) + 476));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4EB8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4EB8, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9662(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9662);
   // addi r4,r11,476
@@ -15525,7 +15526,7 @@ loc_821D4EC4:
   r4 = uint64_t(int64_t(486));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4ECC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4ECC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,486
   r4 = uint64_t(int64_t(486));
 loc_821D4ED0:
@@ -15541,14 +15542,14 @@ loc_821D4ED0:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4EE8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4EE8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,996
   r4 = uint64_t(int64_t(996));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4EF4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4EF4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,996
   r4 = uint64_t(int64_t(996));
   // b 0x821d5004
@@ -15573,7 +15574,7 @@ loc_821D4F14:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4F20)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4F20, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r29,r29,1
   r29 = uint64_t(int64_t(int64_t(r29) + 1));
   // cmpwi cr6,r29,10
@@ -15586,14 +15587,14 @@ loc_821D4F14:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4F38)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4F38, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,780
   r4 = uint64_t(int64_t(780));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4F44)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4F44, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9662(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9662);
   // mr r3,r31
@@ -15602,7 +15603,7 @@ loc_821D4F14:
   r4 = uint64_t(int64_t(int64_t(r11) + 515));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4F54)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4F54, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9662(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9662);
   // li r8,0
@@ -15619,7 +15620,7 @@ loc_821D4F14:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4F74)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4F74, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9662(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9662);
   // mr r3,r31
@@ -15628,7 +15629,7 @@ loc_821D4F14:
   r4 = uint64_t(int64_t(int64_t(r11) + 466));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4F84)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4F84, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9662(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9662);
   // li r8,0
@@ -15645,12 +15646,12 @@ loc_821D4F14:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4FA4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4FA4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r30
   r3 = r30;
   // bl 0x821cd868
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821CD868, LIFTED_ARGS(0x821D4FAC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821CD868, LIFTED_ARGS(0x821D4FAC, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9662(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9662);
   // cmpw cr6,r3,r11
@@ -15663,7 +15664,7 @@ loc_821D4F14:
   r4 = uint64_t(int64_t(int64_t(r11) + 476));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4FC4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4FC4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9662(r30)
   r11 = REX_LOAD_U8(uint32_t(r30) + 9662);
   // addi r4,r11,476
@@ -15675,7 +15676,7 @@ loc_821D4FD0:
   r4 = uint64_t(int64_t(486));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4FD8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D4FD8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,486
   r4 = uint64_t(int64_t(486));
 loc_821D4FDC:
@@ -15691,14 +15692,14 @@ loc_821D4FDC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4FF4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D4FF4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1000
   r4 = uint64_t(int64_t(1000));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D5000)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821D5000, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1000
   r4 = uint64_t(int64_t(1000));
 loc_821D5004:
@@ -15714,7 +15715,7 @@ loc_821D5004:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D501C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821D501C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821D501C:
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
@@ -15767,7 +15768,7 @@ lifted::Result f821E9920(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821E9960)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821E9960, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 4);
   // lwz r31,0(r3)
@@ -15788,7 +15789,7 @@ lifted::Result f821E9920(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9988)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9988, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -15813,7 +15814,7 @@ loc_821E9990:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E99B4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E99B4, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -15838,7 +15839,7 @@ loc_821E99BC:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E99E0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E99E0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -15863,7 +15864,7 @@ loc_821E99E8:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9A0C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9A0C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -15888,7 +15889,7 @@ loc_821E9A14:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9A38)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9A38, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -15903,7 +15904,7 @@ loc_821E9A44:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9A50)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9A50, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,10
@@ -15916,14 +15917,14 @@ loc_821E9A44:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9A68)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9A68, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,898
   r4 = uint64_t(int64_t(898));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9A74)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9A74, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821e9c94
   goto loc_821E9C94;
 loc_821E9A78:
@@ -15945,7 +15946,7 @@ loc_821E9A78:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9A9C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9A9C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -15960,7 +15961,7 @@ loc_821E9AA8:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9AB4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9AB4, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,10
@@ -15973,21 +15974,21 @@ loc_821E9AA8:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9ACC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9ACC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,898
   r4 = uint64_t(int64_t(898));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9AD8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9AD8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,982
   r4 = uint64_t(int64_t(982));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9AE4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9AE4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -16002,14 +16003,14 @@ loc_821E9AA8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821E9B00)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821E9B00, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1010
   r4 = uint64_t(int64_t(1010));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9B0C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9B0C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -16024,7 +16025,7 @@ loc_821E9AA8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821E9B28)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821E9B28, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821e9c94
   goto loc_821E9C94;
 loc_821E9B2C:
@@ -16046,14 +16047,14 @@ loc_821E9B2C:
   r4 = uint64_t(int64_t(897));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9B50)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9B50, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,898
   r4 = uint64_t(int64_t(898));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9B5C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9B5C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,36
@@ -16062,7 +16063,7 @@ loc_821E9B2C:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821E9B6C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821E9B6C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,30492(r30)
   r10 = REX_LOAD_U32(uint32_t(r30) + 30492);
   // li r4,890
@@ -16094,7 +16095,7 @@ loc_821E9B98:
   r4 = uint64_t(int64_t(898));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9BA0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9BA0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -16109,7 +16110,7 @@ loc_821E9B98:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821E9BBC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821E9BBC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30492(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30492);
   // addi r4,r11,886
@@ -16135,14 +16136,14 @@ loc_821E9BC8:
   if (cr6.eq) goto loc_821E9C24;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9BEC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9BEC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,898
   r4 = uint64_t(int64_t(898));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9BF8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9BF8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,36
@@ -16151,7 +16152,7 @@ loc_821E9BC8:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821E9C08)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821E9C08, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,30492(r30)
   r10 = REX_LOAD_U32(uint32_t(r30) + 30492);
   // li r4,887
@@ -16170,7 +16171,7 @@ loc_821E9BC8:
 loc_821E9C24:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9C28)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9C28, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -16185,7 +16186,7 @@ loc_821E9C24:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821E9C44)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821E9C44, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30492(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30492);
   // addi r4,r11,888
@@ -16195,7 +16196,7 @@ loc_821E9C4C:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9C54)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9C54, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30492(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30492);
   // mr r3,r31
@@ -16204,7 +16205,7 @@ loc_821E9C4C:
   r4 = uint64_t(int64_t(int64_t(r11) + 887));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9C64)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9C64, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30492(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30492);
   // li r8,0
@@ -16221,7 +16222,7 @@ loc_821E9C4C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821E9C84)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821E9C84, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30492(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30492);
   // mr r3,r31
@@ -16230,7 +16231,7 @@ loc_821E9C4C:
   r4 = uint64_t(int64_t(int64_t(r11) + 887));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821E9C94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821E9C94, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821E9C94:
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
@@ -16283,7 +16284,7 @@ lifted::Result f821E9DD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821E9E18)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821E9E18, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 4);
   // lwz r31,0(r3)
@@ -16304,7 +16305,7 @@ lifted::Result f821E9DD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9E40)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9E40, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -16329,7 +16330,7 @@ loc_821E9E48:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9E6C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9E6C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -16354,7 +16355,7 @@ loc_821E9E74:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9E98)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9E98, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -16379,7 +16380,7 @@ loc_821E9EA0:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9EC4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9EC4, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -16404,7 +16405,7 @@ loc_821E9ECC:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9EF0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9EF0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -16419,7 +16420,7 @@ loc_821E9EFC:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F08)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F08, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,10
@@ -16432,14 +16433,14 @@ loc_821E9EFC:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F20)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F20, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,937
   r4 = uint64_t(int64_t(937));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F2C, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ea124
   goto loc_821EA124;
 loc_821E9F30:
@@ -16461,7 +16462,7 @@ loc_821E9F30:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9F54)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821E9F54, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -16476,7 +16477,7 @@ loc_821E9F60:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F6C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F6C, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,10
@@ -16489,21 +16490,21 @@ loc_821E9F60:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F84)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F84, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,937
   r4 = uint64_t(int64_t(937));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F90, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,984
   r4 = uint64_t(int64_t(984));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F9C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9F9C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -16518,7 +16519,7 @@ loc_821E9F60:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821E9FB8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821E9FB8, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ea124
   goto loc_821EA124;
 loc_821E9FBC:
@@ -16540,14 +16541,14 @@ loc_821E9FBC:
   r4 = uint64_t(int64_t(936));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9FE0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9FE0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,937
   r4 = uint64_t(int64_t(937));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9FEC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821E9FEC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,37
@@ -16556,7 +16557,7 @@ loc_821E9FBC:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821E9FFC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821E9FFC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,30500(r30)
   r10 = REX_LOAD_U32(uint32_t(r30) + 30500);
   // li r4,928
@@ -16588,7 +16589,7 @@ loc_821EA028:
   r4 = uint64_t(int64_t(937));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EA030)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EA030, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -16603,7 +16604,7 @@ loc_821EA028:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EA04C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EA04C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30500(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30500);
   // addi r4,r11,925
@@ -16629,14 +16630,14 @@ loc_821EA058:
   if (cr6.eq) goto loc_821EA0B4;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EA07C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EA07C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,937
   r4 = uint64_t(int64_t(937));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EA088)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EA088, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,37
@@ -16645,7 +16646,7 @@ loc_821EA058:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EA098)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EA098, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,30500(r30)
   r10 = REX_LOAD_U32(uint32_t(r30) + 30500);
   // li r4,926
@@ -16664,7 +16665,7 @@ loc_821EA058:
 loc_821EA0B4:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EA0B8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EA0B8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -16679,7 +16680,7 @@ loc_821EA0B4:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EA0D4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EA0D4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30500(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30500);
   // addi r4,r11,927
@@ -16689,7 +16690,7 @@ loc_821EA0DC:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EA0E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EA0E4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30500(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30500);
   // mr r3,r31
@@ -16698,7 +16699,7 @@ loc_821EA0DC:
   r4 = uint64_t(int64_t(int64_t(r11) + 926));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EA0F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EA0F4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30500(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30500);
   // li r8,0
@@ -16715,7 +16716,7 @@ loc_821EA0DC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EA114)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EA114, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30500(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30500);
   // mr r3,r31
@@ -16724,7 +16725,7 @@ loc_821EA0DC:
   r4 = uint64_t(int64_t(int64_t(r11) + 926));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EA124)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EA124, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EA124:
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
@@ -16782,7 +16783,7 @@ lifted::Result f821EA898(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821EA8E0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821EA8E0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 4);
   // lwz r31,0(r3)
@@ -16803,7 +16804,7 @@ lifted::Result f821EA898(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EA908)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EA908, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -16828,7 +16829,7 @@ loc_821EA910:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EA934)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EA934, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -16853,7 +16854,7 @@ loc_821EA93C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EA960)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EA960, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -16878,7 +16879,7 @@ loc_821EA968:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EA98C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EA98C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -16903,7 +16904,7 @@ loc_821EA994:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EA9B8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EA9B8, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -16928,7 +16929,7 @@ loc_821EA9C0:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EA9E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EA9E4, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -16950,7 +16951,7 @@ loc_821EA9FC:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAA08)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAA08, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r29,r29,1
   r29 = uint64_t(int64_t(int64_t(r29) + 1));
   // cmpwi cr6,r29,2
@@ -16968,12 +16969,12 @@ loc_821EAA18:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAA28)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAA28, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,6
   r4 = uint64_t(int64_t(6));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAA30)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAA30, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r5,3
@@ -17012,12 +17013,12 @@ loc_821EAA18:
   REX_STORE_U32(uint32_t(r11) + 12, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAA74)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAA74, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,6
   r4 = uint64_t(int64_t(6));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAA7C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAA7C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r5,4
@@ -17046,12 +17047,12 @@ loc_821EAA18:
   REX_STORE_U32(uint32_t(r11) + 12, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAAB0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAAB0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,6
   r4 = uint64_t(int64_t(6));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAAB8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAAB8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwa r11,30520(r30)
   r11 = uint64_t(int64_t(int32_t(REX_LOAD_U32(uint32_t(r30) + 30520))));
   // std r11,80(r1)
@@ -17114,7 +17115,7 @@ loc_821EAB20:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAB2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAB2C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30536(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30536);
   // addi r4,r11,294
@@ -17139,7 +17140,7 @@ loc_821EAB4C:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAB54)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAB54, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EAB54:
   // lwz r11,30508(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30508);
@@ -17167,12 +17168,12 @@ loc_821EAB54:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAB88)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAB88, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAB90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAB90, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -17192,17 +17193,17 @@ loc_821EAB54:
   REX_STORE_U32(uint32_t(r10) + 68, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EABB0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EABB0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,4
   r4 = uint64_t(int64_t(4));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EABB8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EABB8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EABC0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EABC0, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -17222,17 +17223,17 @@ loc_821EAB54:
   REX_STORE_U32(uint32_t(r10) + 68, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EABE0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EABE0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,4
   r4 = uint64_t(int64_t(4));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EABE8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EABE8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EABF0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EABF0, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r5,4
@@ -17247,17 +17248,17 @@ loc_821EAB54:
   REX_STORE_U32(uint32_t(r11) + 68, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAC08)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAC08, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,4
   r4 = uint64_t(int64_t(4));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAC10)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAC10, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAC18)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAC18, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r5,5
@@ -17272,19 +17273,19 @@ loc_821EAB54:
   REX_STORE_U32(uint32_t(r11) + 68, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAC30)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAC30, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,3
   r4 = uint64_t(int64_t(3));
   // mr r29,r3
   r29 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAC3C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAC3C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAC44)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAC44, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // mr r3,r29
@@ -17299,12 +17300,12 @@ loc_821EAB54:
   r4 = uint64_t(int64_t(int64_t(r11) + 4));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAC5C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAC5C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,3
   r4 = uint64_t(int64_t(3));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAC64)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAC64, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,10812(r11)
@@ -17322,7 +17323,7 @@ loc_821EAB54:
   r4 = uint64_t(int64_t(int64_t(r11) + 219));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAC80)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAC80, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30528(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30528);
   // li r8,0
@@ -17339,7 +17340,7 @@ loc_821EAB54:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EACA0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EACA0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30528(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30528);
   // addi r4,r11,219
@@ -17355,12 +17356,12 @@ loc_821EACAC:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EACBC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EACBC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EACC4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EACC4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -17378,7 +17379,7 @@ loc_821EACAC:
   REX_STORE_U32(uint32_t(r10) + 68, temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EACE0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EACE0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -17393,14 +17394,14 @@ loc_821EACAC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EACFC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EACFC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,307
   r4 = uint64_t(int64_t(307));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EAD08)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EAD08, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30524(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30524);
   // mr r3,r31
@@ -17409,7 +17410,7 @@ loc_821EACAC:
   r4 = uint64_t(int64_t(int64_t(r11) + 294));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAD18)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAD18, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30524(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30524);
   // li r8,0
@@ -17426,7 +17427,7 @@ loc_821EACAC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EAD38)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EAD38, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30524(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 30524);
   // addi r4,r11,294
@@ -17442,12 +17443,12 @@ loc_821EAD44:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAD54)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAD54, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAD5C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAD5C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -17465,7 +17466,7 @@ loc_821EAD44:
   REX_STORE_U32(uint32_t(r10) + 68, temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAD78)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAD78, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -17480,7 +17481,7 @@ loc_821EAD44:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EAD94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EAD94, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,306
   r4 = uint64_t(int64_t(306));
   // b 0x821eae48
@@ -17494,12 +17495,12 @@ loc_821EAD9C:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EADAC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EADAC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EADB4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EADB4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -17517,7 +17518,7 @@ loc_821EAD9C:
   REX_STORE_U32(uint32_t(r10) + 68, temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EADD0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EADD0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -17532,7 +17533,7 @@ loc_821EAD9C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EADEC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EADEC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,305
   r4 = uint64_t(int64_t(305));
   // b 0x821eae48
@@ -17546,12 +17547,12 @@ loc_821EADF4:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAE04)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EAE04, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAE0C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EAE0C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -17569,7 +17570,7 @@ loc_821EADF4:
   REX_STORE_U32(uint32_t(r10) + 68, temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAE28)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EAE28, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -17584,7 +17585,7 @@ loc_821EADF4:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EAE44)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EAE44, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,304
   r4 = uint64_t(int64_t(304));
 loc_821EAE48:
@@ -17592,13 +17593,13 @@ loc_821EAE48:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EAE50)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EAE50, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EAE50:
   // mr r3,r30
   r3 = r30;
   // bl 0x821ea130
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821EA130, LIFTED_ARGS(0x821EAE58)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821EA130, LIFTED_ARGS(0x821EAE58, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,144
   r1 = uint64_t(int64_t(int64_t(r1) + 144));
   // lfd f30,-48(r1)
@@ -17658,7 +17659,7 @@ lifted::Result f821EB2A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821EB2E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821EB2E4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 4);
   // lwz r31,0(r3)
@@ -17679,7 +17680,7 @@ lifted::Result f821EB2A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB30C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB30C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -17704,7 +17705,7 @@ loc_821EB314:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB338)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB338, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -17729,7 +17730,7 @@ loc_821EB340:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB364)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB364, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -17754,7 +17755,7 @@ loc_821EB36C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB390)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB390, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -17779,7 +17780,7 @@ loc_821EB398:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB3BC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB3BC, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -17804,7 +17805,7 @@ loc_821EB3C4:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB3E8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB3E8, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -17826,7 +17827,7 @@ loc_821EB400:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB40C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB40C, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,2
@@ -17844,12 +17845,12 @@ loc_821EB41C:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB42C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB42C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,6
   r4 = uint64_t(int64_t(6));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB434)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB434, r31)); r3 = o.r3; f1 = o.f1; }
   // lwa r11,30552(r29)
   r11 = uint64_t(int64_t(int32_t(REX_LOAD_U32(uint32_t(r29) + 30552))));
   // std r11,80(r1)
@@ -17892,7 +17893,7 @@ loc_821EB41C:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB480)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB480, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30548(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 30548);
   // mr r4,r3
@@ -17905,7 +17906,7 @@ loc_821EB41C:
   r6 = uint64_t(int64_t(int64_t(r11) + 1));
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821EB498)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821EB498, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,17
   r5 = uint64_t(int64_t(17));
   // li r4,24
@@ -17914,7 +17915,7 @@ loc_821EB41C:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB4A8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB4A8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30568(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 30568);
   // mr r4,r3
@@ -17927,7 +17928,7 @@ loc_821EB41C:
   r6 = uint64_t(int64_t(int64_t(r11) + 1));
   // bl 0x8211c7e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821EB4C0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211C7E8, LIFTED_ARGS(0x821EB4C0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 4);
   // cmpwi cr6,r11,1
@@ -17946,7 +17947,7 @@ loc_821EB41C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB4E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB4E4, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -17971,7 +17972,7 @@ loc_821EB4EC:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB510)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB510, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -17996,7 +17997,7 @@ loc_821EB518:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB53C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB53C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -18021,7 +18022,7 @@ loc_821EB544:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB568)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EB568, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -18034,7 +18035,7 @@ loc_821EB570:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB57C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB57C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,382
   r4 = uint64_t(int64_t(382));
   // b 0x821eb594
@@ -18046,7 +18047,7 @@ loc_821EB584:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB590)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB590, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,383
   r4 = uint64_t(int64_t(383));
 loc_821EB594:
@@ -18062,7 +18063,7 @@ loc_821EB594:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EB5AC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EB5AC, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EB5AC:
   // lwz r11,9708(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 9708);
@@ -18103,7 +18104,7 @@ loc_821EB5EC:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB5F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB5F8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30572(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 30572);
   // addi r4,r11,366
@@ -18123,7 +18124,7 @@ loc_821EB610:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB618)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB618, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EB618:
   // lwz r11,30544(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 30544);
@@ -18147,12 +18148,12 @@ loc_821EB618:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB644)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB644, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB64C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB64C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -18172,12 +18173,12 @@ loc_821EB618:
   REX_STORE_U32(uint32_t(r10) + 68, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB66C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB66C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB674)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB674, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -18197,7 +18198,7 @@ loc_821EB618:
   REX_STORE_U32(uint32_t(r10) + 68, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB694)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB694, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r5,18
@@ -18212,7 +18213,7 @@ loc_821EB618:
   REX_STORE_U32(uint32_t(r11) + 68, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB6AC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB6AC, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r5,5
@@ -18227,7 +18228,7 @@ loc_821EB618:
   REX_STORE_U32(uint32_t(r11) + 68, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB6C4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB6C4, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r5,3
@@ -18242,17 +18243,17 @@ loc_821EB618:
   REX_STORE_U32(uint32_t(r11) + 68, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB6DC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB6DC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,4
   r4 = uint64_t(int64_t(4));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB6E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB6E4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB6EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB6EC, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // li r5,4
@@ -18267,19 +18268,19 @@ loc_821EB618:
   REX_STORE_U32(uint32_t(r11) + 68, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB704)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB704, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,3
   r4 = uint64_t(int64_t(3));
   // mr r30,r3
   r30 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB710)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB710, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB718)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB718, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // mr r3,r30
@@ -18294,12 +18295,12 @@ loc_821EB618:
   r4 = uint64_t(int64_t(int64_t(r11) + 4));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB730)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB730, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,3
   r4 = uint64_t(int64_t(3));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB738)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB738, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -18319,7 +18320,7 @@ loc_821EB618:
   r4 = uint64_t(int64_t(int64_t(r11) + 309));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB758)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB758, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30560(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 30560);
   // li r8,0
@@ -18336,7 +18337,7 @@ loc_821EB618:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EB778)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EB778, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30560(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 30560);
   // addi r4,r11,309
@@ -18352,12 +18353,12 @@ loc_821EB784:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB794)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB794, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB79C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB79C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -18375,7 +18376,7 @@ loc_821EB784:
   REX_STORE_U32(uint32_t(r10) + 68, temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB7B8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB7B8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -18390,14 +18391,14 @@ loc_821EB784:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EB7D4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EB7D4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,386
   r4 = uint64_t(int64_t(386));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EB7E0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EB7E0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30556(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 30556);
   // mr r3,r31
@@ -18406,7 +18407,7 @@ loc_821EB784:
   r4 = uint64_t(int64_t(int64_t(r11) + 366));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB7F0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB7F0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30556(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 30556);
   // li r8,0
@@ -18423,7 +18424,7 @@ loc_821EB784:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EB810)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EB810, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30556(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 30556);
   // addi r4,r11,366
@@ -18439,12 +18440,12 @@ loc_821EB81C:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB82C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB82C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB834)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB834, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -18462,7 +18463,7 @@ loc_821EB81C:
   REX_STORE_U32(uint32_t(r10) + 68, temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB850)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB850, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -18477,7 +18478,7 @@ loc_821EB81C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EB86C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EB86C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,385
   r4 = uint64_t(int64_t(385));
   // b 0x821eb8c8
@@ -18491,12 +18492,12 @@ loc_821EB874:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB884)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EB884, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB88C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EB88C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -18514,7 +18515,7 @@ loc_821EB874:
   REX_STORE_U32(uint32_t(r10) + 68, temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB8A8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EB8A8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -18529,7 +18530,7 @@ loc_821EB874:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EB8C4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EB8C4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,384
   r4 = uint64_t(int64_t(384));
 loc_821EB8C8:
@@ -18537,13 +18538,13 @@ loc_821EB8C8:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EB8D0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EB8D0, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EB8D0:
   // mr r3,r29
   r3 = r29;
   // bl 0x821eae68
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821EAE68, LIFTED_ARGS(0x821EB8D8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821EAE68, LIFTED_ARGS(0x821EB8D8, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // lfd f31,-40(r1)
@@ -18598,7 +18599,7 @@ lifted::Result f821EBA00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821EBA40)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821EBA40, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 4);
   // lwz r31,0(r3)
@@ -18619,7 +18620,7 @@ lifted::Result f821EBA00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EBA68)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EBA68, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -18644,7 +18645,7 @@ loc_821EBA70:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EBA94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EBA94, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -18669,7 +18670,7 @@ loc_821EBA9C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EBAC0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EBAC0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -18694,7 +18695,7 @@ loc_821EBAC8:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EBAEC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EBAEC, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -18719,7 +18720,7 @@ loc_821EBAF4:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EBB18)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EBB18, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -18736,7 +18737,7 @@ loc_821EBB24:
   r3 = r31;
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBB34)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBB34, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,10
@@ -18751,7 +18752,7 @@ loc_821EBB24:
   r3 = r31;
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBB50)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBB50, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,13
   r5 = uint64_t(int64_t(13));
   // li r4,27
@@ -18760,7 +18761,7 @@ loc_821EBB24:
   r3 = r31;
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBB60)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBB60, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ebdbc
   goto loc_821EBDBC;
 loc_821EBB64:
@@ -18782,7 +18783,7 @@ loc_821EBB64:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EBB88)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EBB88, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -18799,7 +18800,7 @@ loc_821EBB94:
   r3 = r31;
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBBA4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBBA4, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,10
@@ -18814,7 +18815,7 @@ loc_821EBB94:
   r3 = r31;
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBBC0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBBC0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,13
   r5 = uint64_t(int64_t(13));
   // li r4,27
@@ -18823,14 +18824,14 @@ loc_821EBB94:
   r3 = r31;
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBBD0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBBD0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1004
   r4 = uint64_t(int64_t(1004));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EBBDC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EBBDC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -18845,7 +18846,7 @@ loc_821EBB94:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EBBF8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EBBF8, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ebdbc
   goto loc_821EBDBC;
 loc_821EBBFC:
@@ -18873,7 +18874,7 @@ loc_821EBBFC:
   r5 = uint64_t(int64_t(12));
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBC2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBC2C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,13
   r5 = uint64_t(int64_t(13));
   // li r4,27
@@ -18882,7 +18883,7 @@ loc_821EBBFC:
   r3 = r31;
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBC3C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBC3C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,27
@@ -18891,7 +18892,7 @@ loc_821EBBFC:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EBC4C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EBC4C, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // li r5,3
@@ -18927,7 +18928,7 @@ loc_821EBC80:
   r5 = uint64_t(int64_t(13));
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBC88)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBC88, r31)); r3 = o.r3; f1 = o.f1; }
   // li r9,0
   r9 = uint64_t(int64_t(0));
   // li r8,0
@@ -18944,7 +18945,7 @@ loc_821EBC80:
   r3 = r31;
   // bl 0x8211d978
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821EBCA8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821EBCA8, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // addi r30,r30,-31996
@@ -18980,7 +18981,7 @@ loc_821EBCBC:
   if (cr6.eq) goto loc_821EBD30;
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBCEC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBCEC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,13
   r5 = uint64_t(int64_t(13));
   // li r4,27
@@ -18989,7 +18990,7 @@ loc_821EBCBC:
   r3 = r31;
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBCFC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBCFC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,27
@@ -18998,7 +18999,7 @@ loc_821EBCBC:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EBD0C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EBD0C, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // li r5,2
@@ -19021,7 +19022,7 @@ loc_821EBCBC:
 loc_821EBD30:
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBD34)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBD34, r31)); r3 = o.r3; f1 = o.f1; }
   // li r9,0
   r9 = uint64_t(int64_t(0));
   // li r8,0
@@ -19038,7 +19039,7 @@ loc_821EBD30:
   r3 = r31;
   // bl 0x8211d978
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821EBD54)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821EBD54, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // addi r30,r30,-31996
@@ -19054,7 +19055,7 @@ loc_821EBD64:
   r3 = r31;
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBD70)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBD70, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r4,27
@@ -19065,7 +19066,7 @@ loc_821EBD64:
   r3 = r31;
   // bl 0x8211de38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBD84)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DE38, LIFTED_ARGS(0x821EBD84, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r9,0
@@ -19084,7 +19085,7 @@ loc_821EBD64:
   r3 = r31;
   // bl 0x8211d978
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821EBDA8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211D978, LIFTED_ARGS(0x821EBDA8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r4,27
@@ -19095,7 +19096,7 @@ loc_821EBD64:
   r3 = r31;
   // bl 0x8211ddd8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDD8, LIFTED_ARGS(0x821EBDBC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDD8, LIFTED_ARGS(0x821EBDBC, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EBDBC:
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
@@ -19148,7 +19149,7 @@ lifted::Result f821EC038(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821EC078)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821EC078, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 4);
   // lwz r31,0(r3)
@@ -19169,7 +19170,7 @@ lifted::Result f821EC038(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC0A0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC0A0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -19194,7 +19195,7 @@ loc_821EC0A8:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC0CC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC0CC, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -19219,7 +19220,7 @@ loc_821EC0D4:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC0F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC0F8, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -19244,7 +19245,7 @@ loc_821EC100:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC124)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC124, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -19269,7 +19270,7 @@ loc_821EC12C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC150)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC150, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -19286,14 +19287,14 @@ loc_821EC160:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC16C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC16C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC178)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC178, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r29,r29,-1
   ca = uint32_t(r29) > 0;
   r29 = uint64_t(int64_t(int64_t(r29) + -1));
@@ -19308,14 +19309,14 @@ loc_821EC160:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC190)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC190, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,500
   r4 = uint64_t(int64_t(500));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC19C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC19C, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r28,1
   r30 = uint64_t(int64_t(int64_t(r28) + 65536));
   // mr r3,r31
@@ -19332,7 +19333,7 @@ loc_821EC160:
   r4 = uint64_t(int64_t(503));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC1BC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC1BC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,503
   r4 = uint64_t(int64_t(503));
   // b 0x821ec1d4
@@ -19342,7 +19343,7 @@ loc_821EC1C4:
   r4 = uint64_t(int64_t(int64_t(r11) + 501));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC1CC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC1CC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // addi r4,r11,501
@@ -19360,7 +19361,7 @@ loc_821EC1D4:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC1EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC1EC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -19373,7 +19374,7 @@ loc_821EC1D4:
   r4 = uint64_t(int64_t(446));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC204)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC204, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,446
   r4 = uint64_t(int64_t(446));
   // b 0x821ec21c
@@ -19383,7 +19384,7 @@ loc_821EC20C:
   r4 = uint64_t(int64_t(int64_t(r11) + 444));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC214)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC214, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // addi r4,r11,444
@@ -19401,12 +19402,12 @@ loc_821EC21C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC234)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC234, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r28
   r3 = r28;
   // bl 0x821cd868
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821CD868, LIFTED_ARGS(0x821EC23C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821CD868, LIFTED_ARGS(0x821EC23C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // cmpw cr6,r3,r11
@@ -19423,7 +19424,7 @@ loc_821EC21C:
   r4 = uint64_t(int64_t(457));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC25C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC25C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,457
   r4 = uint64_t(int64_t(457));
   // b 0x821ec308
@@ -19433,7 +19434,7 @@ loc_821EC264:
   r4 = uint64_t(int64_t(int64_t(r11) + 455));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC26C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC26C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // addi r4,r11,455
@@ -19445,7 +19446,7 @@ loc_821EC278:
   r4 = uint64_t(int64_t(465));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC280)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC280, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,465
   r4 = uint64_t(int64_t(465));
   // b 0x821ec308
@@ -19469,7 +19470,7 @@ loc_821EC288:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC2AC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC2AC, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -19486,14 +19487,14 @@ loc_821EC2BC:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC2C8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC2C8, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC2D4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC2D4, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r29,r29,-1
   ca = uint32_t(r29) > 0;
   r29 = uint64_t(int64_t(int64_t(r29) + -1));
@@ -19508,21 +19509,21 @@ loc_821EC2BC:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC2EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC2EC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,500
   r4 = uint64_t(int64_t(500));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC2F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC2F8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1003
   r4 = uint64_t(int64_t(1003));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC304)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC304, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1003
   r4 = uint64_t(int64_t(1003));
 loc_821EC308:
@@ -19538,7 +19539,7 @@ loc_821EC308:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC320)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC320, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ec694
   goto loc_821EC694;
 loc_821EC324:
@@ -19564,14 +19565,14 @@ loc_821EC324:
   r4 = uint64_t(int64_t(499));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC350)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC350, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,500
   r4 = uint64_t(int64_t(500));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC35C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC35C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,1
   r5 = uint64_t(int64_t(1));
   // li r4,28
@@ -19580,12 +19581,12 @@ loc_821EC324:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EC36C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EC36C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EC374)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EC374, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r28,1
   r30 = uint64_t(int64_t(int64_t(r28) + 65536));
   // mr r11,r3
@@ -19616,7 +19617,7 @@ loc_821EC324:
   REX_STORE_U32(uint32_t(r11) + 16, temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC3AC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC3AC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -19625,7 +19626,7 @@ loc_821EC324:
   r4 = uint64_t(int64_t(int64_t(r11) + 489));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC3BC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC3BC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r8,0
@@ -19642,7 +19643,7 @@ loc_821EC324:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC3DC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC3DC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -19651,7 +19652,7 @@ loc_821EC324:
   r4 = uint64_t(int64_t(int64_t(r11) + 489));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EC3EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EC3EC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,430
   r4 = uint64_t(int64_t(430));
   // b 0x821ec64c
@@ -19671,7 +19672,7 @@ loc_821EC3F4:
   if (!cr6.eq) goto loc_821EC4A8;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC410)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC410, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -19686,21 +19687,21 @@ loc_821EC3F4:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC42C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC42C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,490
   r4 = uint64_t(int64_t(490));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC438)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC438, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,491
   r4 = uint64_t(int64_t(491));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC444)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC444, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -19715,14 +19716,14 @@ loc_821EC3F4:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC460)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC460, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,491
   r4 = uint64_t(int64_t(491));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EC46C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EC46C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,429
   r4 = uint64_t(int64_t(429));
 loc_821EC470:
@@ -19730,14 +19731,14 @@ loc_821EC470:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC478)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC478, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,430
   r4 = uint64_t(int64_t(430));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC484)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC484, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -19752,7 +19753,7 @@ loc_821EC470:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC4A0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC4A0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,430
   r4 = uint64_t(int64_t(430));
   // b 0x821ec68c
@@ -19760,7 +19761,7 @@ loc_821EC470:
 loc_821EC4A8:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC4AC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC4AC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -19775,7 +19776,7 @@ loc_821EC4A8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC4C8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC4C8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -19784,7 +19785,7 @@ loc_821EC4A8:
   r4 = uint64_t(int64_t(int64_t(r11) + 488));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC4D8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC4D8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -19793,7 +19794,7 @@ loc_821EC4A8:
   r4 = uint64_t(int64_t(int64_t(r11) + 489));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC4E8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC4E8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r8,0
@@ -19810,7 +19811,7 @@ loc_821EC4A8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC508)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC508, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -19819,7 +19820,7 @@ loc_821EC4A8:
   r4 = uint64_t(int64_t(int64_t(r11) + 489));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EC518)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EC518, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // addi r4,r11,427
@@ -19849,14 +19850,14 @@ loc_821EC524:
   if (cr6.eq) goto loc_821EC5CC;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC550)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC550, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,500
   r4 = uint64_t(int64_t(500));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC55C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC55C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,1
   r5 = uint64_t(int64_t(1));
   // li r4,28
@@ -19865,12 +19866,12 @@ loc_821EC524:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EC56C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EC56C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EC574)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EC574, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -19888,14 +19889,14 @@ loc_821EC524:
   REX_STORE_U32(uint32_t(r10) + 16, temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC590)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC590, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,491
   r4 = uint64_t(int64_t(491));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC59C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC59C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -19910,14 +19911,14 @@ loc_821EC524:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC5B8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC5B8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,491
   r4 = uint64_t(int64_t(491));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EC5C4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EC5C4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,428
   r4 = uint64_t(int64_t(428));
   // b 0x821ec470
@@ -19925,7 +19926,7 @@ loc_821EC524:
 loc_821EC5CC:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC5D0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC5D0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -19940,7 +19941,7 @@ loc_821EC5CC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC5EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC5EC, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r28,1
   r30 = uint64_t(int64_t(int64_t(r28) + 65536));
   // mr r3,r31
@@ -19953,7 +19954,7 @@ loc_821EC5CC:
   r4 = uint64_t(int64_t(int64_t(r11) + 490));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC604)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC604, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -19962,7 +19963,7 @@ loc_821EC5CC:
   r4 = uint64_t(int64_t(int64_t(r11) + 489));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC614)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC614, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r8,0
@@ -19979,7 +19980,7 @@ loc_821EC5CC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC634)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC634, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -19988,7 +19989,7 @@ loc_821EC5CC:
   r4 = uint64_t(int64_t(int64_t(r11) + 489));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EC644)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EC644, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // addi r4,r11,429
@@ -19998,7 +19999,7 @@ loc_821EC64C:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC654)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC654, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -20007,7 +20008,7 @@ loc_821EC64C:
   r4 = uint64_t(int64_t(int64_t(r11) + 428));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC664)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC664, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r8,0
@@ -20024,7 +20025,7 @@ loc_821EC64C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC684)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC684, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // addi r4,r11,428
@@ -20034,7 +20035,7 @@ loc_821EC68C:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EC694)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EC694, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EC694:
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
@@ -20087,7 +20088,7 @@ lifted::Result f821EC7E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821EC820)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821EC820, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 4);
   // lwz r31,0(r3)
@@ -20108,7 +20109,7 @@ lifted::Result f821EC7E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC848)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC848, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20133,7 +20134,7 @@ loc_821EC850:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC874)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC874, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20158,7 +20159,7 @@ loc_821EC87C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC8A0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC8A0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20183,7 +20184,7 @@ loc_821EC8A8:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC8CC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC8CC, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20208,7 +20209,7 @@ loc_821EC8D4:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC8F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC8F8, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20223,7 +20224,7 @@ loc_821EC904:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC910)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC910, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,10
@@ -20236,14 +20237,14 @@ loc_821EC904:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC928)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC928, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,780
   r4 = uint64_t(int64_t(780));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC934)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC934, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ecc5c
   goto loc_821ECC5C;
 loc_821EC938:
@@ -20265,7 +20266,7 @@ loc_821EC938:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC95C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EC95C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20280,7 +20281,7 @@ loc_821EC968:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC974)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC974, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,10
@@ -20293,14 +20294,14 @@ loc_821EC968:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC98C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC98C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,780
   r4 = uint64_t(int64_t(780));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC998)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC998, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // mr r3,r31
@@ -20317,7 +20318,7 @@ loc_821EC968:
   r4 = uint64_t(int64_t(517));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC9B8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC9B8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,517
   r4 = uint64_t(int64_t(517));
   // b 0x821ec9d0
@@ -20327,7 +20328,7 @@ loc_821EC9C0:
   r4 = uint64_t(int64_t(int64_t(r11) + 515));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC9C8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EC9C8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // addi r4,r11,515
@@ -20345,7 +20346,7 @@ loc_821EC9D0:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC9E8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EC9E8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -20358,7 +20359,7 @@ loc_821EC9D0:
   r4 = uint64_t(int64_t(468));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECA00)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECA00, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,468
   r4 = uint64_t(int64_t(468));
   // b 0x821eca18
@@ -20368,7 +20369,7 @@ loc_821ECA08:
   r4 = uint64_t(int64_t(int64_t(r11) + 466));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECA10)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECA10, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // addi r4,r11,466
@@ -20386,12 +20387,12 @@ loc_821ECA18:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ECA30)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ECA30, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r29
   r3 = r29;
   // bl 0x821cd868
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821CD868, LIFTED_ARGS(0x821ECA38)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821CD868, LIFTED_ARGS(0x821ECA38, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // cmpw cr6,r3,r11
@@ -20408,7 +20409,7 @@ loc_821ECA18:
   r4 = uint64_t(int64_t(478));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECA58)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECA58, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,478
   r4 = uint64_t(int64_t(478));
   // b 0x821eca80
@@ -20418,7 +20419,7 @@ loc_821ECA60:
   r4 = uint64_t(int64_t(int64_t(r11) + 476));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECA68)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECA68, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // addi r4,r11,476
@@ -20430,7 +20431,7 @@ loc_821ECA74:
   r4 = uint64_t(int64_t(486));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECA7C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECA7C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,486
   r4 = uint64_t(int64_t(486));
 loc_821ECA80:
@@ -20446,14 +20447,14 @@ loc_821ECA80:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ECA98)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ECA98, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1000
   r4 = uint64_t(int64_t(1000));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECAA4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECAA4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -20468,7 +20469,7 @@ loc_821ECA80:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ECAC0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ECAC0, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ecc5c
   goto loc_821ECC5C;
 loc_821ECAC4:
@@ -20494,14 +20495,14 @@ loc_821ECAC4:
   r4 = uint64_t(int64_t(779));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECAF0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECAF0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,780
   r4 = uint64_t(int64_t(780));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECAFC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECAFC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,1
   r5 = uint64_t(int64_t(1));
   // li r4,32
@@ -20510,7 +20511,7 @@ loc_821ECAC4:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821ECB0C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821ECB0C, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // li r4,776
@@ -20546,7 +20547,7 @@ loc_821ECB40:
   r4 = uint64_t(int64_t(780));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECB48)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECB48, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -20561,7 +20562,7 @@ loc_821ECB40:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ECB64)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ECB64, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // addi r30,r30,-31980
@@ -20595,14 +20596,14 @@ loc_821ECB78:
   if (cr6.eq) goto loc_821ECBE4;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECBA4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECBA4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,780
   r4 = uint64_t(int64_t(780));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECBB0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECBB0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,1
   r5 = uint64_t(int64_t(1));
   // li r4,32
@@ -20611,7 +20612,7 @@ loc_821ECB78:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821ECBC0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821ECBC0, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // li r4,771
@@ -20634,7 +20635,7 @@ loc_821ECB78:
 loc_821ECBE4:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECBE8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECBE8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -20649,7 +20650,7 @@ loc_821ECBE4:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ECC04)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ECC04, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // addi r30,r30,-31980
@@ -20663,7 +20664,7 @@ loc_821ECC14:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECC1C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECC1C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -20672,7 +20673,7 @@ loc_821ECC14:
   r4 = uint64_t(int64_t(int64_t(r11) + 771));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECC2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ECC2C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r8,0
@@ -20689,7 +20690,7 @@ loc_821ECC14:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ECC4C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ECC4C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -20698,7 +20699,7 @@ loc_821ECC14:
   r4 = uint64_t(int64_t(int64_t(r11) + 771));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821ECC5C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821ECC5C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821ECC5C:
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
@@ -20751,7 +20752,7 @@ lifted::Result f821ED108(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821ED148)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821ED148, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 4);
   // lwz r31,0(r3)
@@ -20772,7 +20773,7 @@ lifted::Result f821ED108(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED170)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED170, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20797,7 +20798,7 @@ loc_821ED178:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED19C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED19C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20822,7 +20823,7 @@ loc_821ED1A4:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED1C8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED1C8, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20847,7 +20848,7 @@ loc_821ED1D0:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED1F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED1F4, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20872,7 +20873,7 @@ loc_821ED1FC:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED220)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED220, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20897,7 +20898,7 @@ loc_821ED228:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED24C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED24C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20922,7 +20923,7 @@ loc_821ED254:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED278)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED278, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20947,7 +20948,7 @@ loc_821ED280:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED2A4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED2A4, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20972,7 +20973,7 @@ loc_821ED2AC:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED2D0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED2D0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -20987,7 +20988,7 @@ loc_821ED2DC:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED2E8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED2E8, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,10
@@ -21000,28 +21001,28 @@ loc_821ED2DC:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED300)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED300, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,84
   r4 = uint64_t(int64_t(84));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED30C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED30C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED318)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED318, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED324)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED324, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,0
   r11 = uint64_t(int64_t(0));
   // ori r11,r11,33572
@@ -21071,7 +21072,7 @@ loc_821ED374:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED37C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED37C, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821edb68
   goto loc_821EDB68;
 loc_821ED380:
@@ -21093,7 +21094,7 @@ loc_821ED380:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED3A4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821ED3A4, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -21108,7 +21109,7 @@ loc_821ED3B0:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED3BC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED3BC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r30,r30,1
   r30 = uint64_t(int64_t(int64_t(r30) + 1));
   // cmpwi cr6,r30,10
@@ -21121,28 +21122,28 @@ loc_821ED3B0:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED3D4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED3D4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,84
   r4 = uint64_t(int64_t(84));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED3E0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED3E0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED3EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED3EC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED3F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED3F8, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,0
   r11 = uint64_t(int64_t(0));
   // ori r11,r11,33572
@@ -21192,7 +21193,7 @@ loc_821ED448:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED450)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED450, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821ED450:
   // li r4,1006
   r4 = uint64_t(int64_t(1006));
@@ -21200,7 +21201,7 @@ loc_821ED450:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED45C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED45C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,1006
@@ -21230,7 +21231,7 @@ loc_821ED468:
   r4 = uint64_t(int64_t(150));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED494)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED494, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,150
   r4 = uint64_t(int64_t(150));
   // b 0x821ed4ac
@@ -21240,7 +21241,7 @@ loc_821ED49C:
   r4 = uint64_t(int64_t(int64_t(r11) + 145));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED4A4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED4A4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // addi r4,r11,145
@@ -21258,7 +21259,7 @@ loc_821ED4AC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED4C4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED4C4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // cmplwi cr6,r11,1
@@ -21284,14 +21285,14 @@ loc_821ED4EC:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED4F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED4F4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,136
   r4 = uint64_t(int64_t(136));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED500)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED500, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -21306,7 +21307,7 @@ loc_821ED4EC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED51C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED51C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,136
   r4 = uint64_t(int64_t(136));
   // b 0x821ed9ac
@@ -21319,14 +21320,14 @@ loc_821ED528:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED530)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED530, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,131
   r4 = uint64_t(int64_t(131));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED53C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED53C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -21341,7 +21342,7 @@ loc_821ED528:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED558)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED558, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,131
   r4 = uint64_t(int64_t(131));
   // b 0x821ed9ac
@@ -21354,14 +21355,14 @@ loc_821ED564:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED56C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED56C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,126
   r4 = uint64_t(int64_t(126));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED578)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED578, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -21376,7 +21377,7 @@ loc_821ED564:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED594)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED594, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,126
   r4 = uint64_t(int64_t(126));
   // b 0x821ed9ac
@@ -21389,14 +21390,14 @@ loc_821ED5A0:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED5A8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED5A8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,121
   r4 = uint64_t(int64_t(121));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED5B4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED5B4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -21411,7 +21412,7 @@ loc_821ED5A0:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED5D0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED5D0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,121
   r4 = uint64_t(int64_t(121));
   // b 0x821ed9ac
@@ -21424,14 +21425,14 @@ loc_821ED5DC:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED5E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED5E4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,116
   r4 = uint64_t(int64_t(116));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED5F0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED5F0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -21446,7 +21447,7 @@ loc_821ED5DC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED60C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED60C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,116
   r4 = uint64_t(int64_t(116));
   // b 0x821ed9ac
@@ -21474,7 +21475,7 @@ loc_821ED614:
   r4 = uint64_t(int64_t(151));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED640)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED640, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,151
   r4 = uint64_t(int64_t(151));
   // b 0x821ed658
@@ -21485,7 +21486,7 @@ loc_821ED648:
   r4 = static_cast<uint64_t>(155) - r11;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED650)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED650, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // subfic r4,r11,155
@@ -21504,7 +21505,7 @@ loc_821ED658:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED670)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED670, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // cmplwi cr6,r11,1
@@ -21570,28 +21571,28 @@ loc_821ED6BC:
   r4 = uint64_t(int64_t(84));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED6E8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED6E8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,84
   r4 = uint64_t(int64_t(84));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED6F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED6F4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED700)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED700, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED70C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED70C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,2
@@ -21600,12 +21601,12 @@ loc_821ED6BC:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821ED71C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821ED71C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821ED724)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821ED724, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -21623,14 +21624,14 @@ loc_821ED6BC:
   REX_STORE_U32(uint32_t(r10) + 16, temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED740)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED740, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,74
   r4 = uint64_t(int64_t(74));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED74C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED74C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -21645,14 +21646,14 @@ loc_821ED6BC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED768)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED768, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,74
   r4 = uint64_t(int64_t(74));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821ED774)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821ED774, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r27,r26,1
   r27 = uint64_t(int64_t(int64_t(r26) + 65536));
   // li r30,0
@@ -21668,14 +21669,14 @@ loc_821ED780:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821ED790)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821ED790, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,5
   r4 = uint64_t(int64_t(5));
   // mr r29,r3
   r29 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821ED79C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821ED79C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r28,r3
   r28 = r3;
   // mr r4,r30
@@ -21684,7 +21685,7 @@ loc_821ED780:
   r3 = r26;
   // bl 0x821cdc38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821CDC38, LIFTED_ARGS(0x821ED7AC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821CDC38, LIFTED_ARGS(0x821ED7AC, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // li r11,1
@@ -21702,7 +21703,7 @@ loc_821ED7BC:
   r3 = r29;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821ED7CC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821ED7CC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r27)
   r11 = REX_LOAD_U32(uint32_t(r27) + 0);
   // mulli r11,r11,5
@@ -21734,14 +21735,14 @@ loc_821ED7EC:
   if (!cr6.eq) goto loc_821ED894;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED808)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED808, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED814)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED814, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -21756,7 +21757,7 @@ loc_821ED7EC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED830)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED830, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -21771,21 +21772,21 @@ loc_821ED7EC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED84C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED84C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,77
   r4 = uint64_t(int64_t(77));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED858)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED858, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,79
   r4 = uint64_t(int64_t(79));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED864)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED864, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -21800,14 +21801,14 @@ loc_821ED7EC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED880)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED880, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,79
   r4 = uint64_t(int64_t(79));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821ED88C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821ED88C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,145
   r4 = uint64_t(int64_t(145));
   // b 0x821ed374
@@ -21815,7 +21816,7 @@ loc_821ED7EC:
 loc_821ED894:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED898)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED898, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -21830,7 +21831,7 @@ loc_821ED894:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED8B4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED8B4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -21839,7 +21840,7 @@ loc_821ED894:
   r4 = uint64_t(int64_t(int64_t(r11) + 73));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED8C4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED8C4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -21848,7 +21849,7 @@ loc_821ED894:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED8D4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED8D4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r8,0
@@ -21865,7 +21866,7 @@ loc_821ED894:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED8F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED8F4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // b 0x821edb34
@@ -21893,28 +21894,28 @@ loc_821ED8FC:
   if (cr6.eq) goto loc_821ED9B8;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED928)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED928, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,84
   r4 = uint64_t(int64_t(84));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED934)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED934, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED940)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED940, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED94C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED94C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,2
@@ -21923,12 +21924,12 @@ loc_821ED8FC:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821ED95C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821ED95C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821ED964)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821ED964, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // mr r10,r3
@@ -21946,14 +21947,14 @@ loc_821ED8FC:
   REX_STORE_U32(uint32_t(r10) + 16, temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED980)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED980, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,79
   r4 = uint64_t(int64_t(79));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED98C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED98C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -21968,7 +21969,7 @@ loc_821ED8FC:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED9A8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED9A8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,79
   r4 = uint64_t(int64_t(79));
 loc_821ED9AC:
@@ -21976,7 +21977,7 @@ loc_821ED9AC:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821ED9B4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821ED9B4, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821edb68
   goto loc_821EDB68;
 loc_821ED9B8:
@@ -21992,14 +21993,14 @@ loc_821ED9B8:
   if (!cr6.eq) goto loc_821EDAD0;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED9D0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED9D0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,84
   r4 = uint64_t(int64_t(84));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED9DC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821ED9DC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -22014,7 +22015,7 @@ loc_821ED9B8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED9F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821ED9F8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -22029,21 +22030,21 @@ loc_821ED9B8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDA14)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDA14, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,79
   r4 = uint64_t(int64_t(79));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDA20)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDA20, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,77
   r4 = uint64_t(int64_t(77));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDA2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDA2C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -22058,21 +22059,21 @@ loc_821ED9B8:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDA48)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDA48, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,77
   r4 = uint64_t(int64_t(77));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EDA54)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EDA54, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,145
   r4 = uint64_t(int64_t(145));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDA60)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDA60, r31)); r3 = o.r3; f1 = o.f1; }
   // li r30,0
   r30 = uint64_t(int64_t(0));
 loc_821EDA64:
@@ -22084,14 +22085,14 @@ loc_821EDA64:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EDA74)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EDA74, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,5
   r4 = uint64_t(int64_t(5));
   // mr r28,r3
   r28 = r3;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EDA80)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EDA80, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r27,r3
   r27 = r3;
   // mr r4,r30
@@ -22100,7 +22101,7 @@ loc_821EDA64:
   r3 = r26;
   // bl 0x821cdc38
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821CDC38, LIFTED_ARGS(0x821EDA90)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821CDC38, LIFTED_ARGS(0x821EDA90, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // li r11,1
@@ -22118,7 +22119,7 @@ loc_821EDAA0:
   r3 = r28;
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EDAB0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EDAB0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 0);
   // mulli r11,r11,5
@@ -22138,7 +22139,7 @@ loc_821EDAA0:
 loc_821EDAD0:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDAD4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDAD4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -22153,7 +22154,7 @@ loc_821EDAD0:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDAF0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDAF0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 0);
   // mr r3,r31
@@ -22162,7 +22163,7 @@ loc_821EDAD0:
   r4 = uint64_t(int64_t(int64_t(r11) + 75));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDB00)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDB00, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 0);
   // mr r3,r31
@@ -22171,7 +22172,7 @@ loc_821EDAD0:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDB10)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDB10, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 0);
   // li r8,0
@@ -22188,7 +22189,7 @@ loc_821EDAD0:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDB30)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDB30, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
   r11 = REX_LOAD_U32(uint32_t(r29) + 0);
 loc_821EDB34:
@@ -22198,14 +22199,14 @@ loc_821EDB34:
   r3 = r31;
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EDB40)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EDB40, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,145
   r4 = uint64_t(int64_t(145));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDB4C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDB4C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,145
   r4 = uint64_t(int64_t(145));
   // li r5,1
@@ -22221,7 +22222,7 @@ loc_821EDB54:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDB68)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDB68, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EDB68:
   // addi r1,r1,144
   r1 = uint64_t(int64_t(int64_t(r1) + 144));
@@ -22274,7 +22275,7 @@ lifted::Result f821EDCA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
   // bl 0x8211b3f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821EDCE8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211B3F0, LIFTED_ARGS(0x821EDCE8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 4);
   // lwz r31,0(r3)
@@ -22295,7 +22296,7 @@ lifted::Result f821EDCA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EDD10)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EDD10, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -22320,7 +22321,7 @@ loc_821EDD18:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EDD3C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EDD3C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -22345,7 +22346,7 @@ loc_821EDD44:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EDD68)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EDD68, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -22370,7 +22371,7 @@ loc_821EDD70:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EDD94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EDD94, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -22395,7 +22396,7 @@ loc_821EDD9C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EDDC0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EDDC0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -22411,7 +22412,7 @@ loc_821EDD9C:
   r4 = REX_LOAD_U32(uint32_t(r30) + 0);
   // bl 0x821ce188
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821CE188, LIFTED_ARGS(0x821EDDDC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821CE188, LIFTED_ARGS(0x821EDDDC, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // beq 0x821ee384
@@ -22437,14 +22438,14 @@ loc_821EDE00:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDE0C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDE0C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDE18)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDE18, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r29,r29,-1
   ca = uint32_t(r29) > 0;
   r29 = uint64_t(int64_t(int64_t(r29) + -1));
@@ -22479,14 +22480,14 @@ loc_821EDE48:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDE54)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDE54, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDE60)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDE60, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r29,r29,-1
   ca = uint32_t(r29) > 0;
   r29 = uint64_t(int64_t(int64_t(r29) + -1));
@@ -22501,14 +22502,14 @@ loc_821EDE48:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDE78)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDE78, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDE84)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDE84, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ee384
   goto loc_821EE384;
 loc_821EDE88:
@@ -22530,7 +22531,7 @@ loc_821EDE88:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EDEAC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EDEAC, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -22547,14 +22548,14 @@ loc_821EDEBC:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDEC8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDEC8, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDED4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDED4, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r29,r29,-1
   ca = uint32_t(r29) > 0;
   r29 = uint64_t(int64_t(int64_t(r29) + -1));
@@ -22570,21 +22571,21 @@ loc_821EDEE0:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDEEC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDEEC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDEF8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDEF8, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,144
   r4 = uint64_t(int64_t(144));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDF04)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDF04, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -22599,14 +22600,14 @@ loc_821EDEE0:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDF20)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDF20, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1011
   r4 = uint64_t(int64_t(1011));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDF2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDF2C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -22621,7 +22622,7 @@ loc_821EDEE0:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDF48)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EDF48, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ee384
   goto loc_821EE384;
 loc_821EDF4C:
@@ -22647,14 +22648,14 @@ loc_821EDF4C:
   r4 = uint64_t(int64_t(84));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDF78)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDF78, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDF84)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDF84, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,2
@@ -22663,12 +22664,12 @@ loc_821EDF4C:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EDF94)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EDF94, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EDF9C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EDF9C, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // mr r11,r3
@@ -22699,7 +22700,7 @@ loc_821EDF4C:
   r4 = REX_LOAD_U32(uint32_t(r30) + 0);
   // bl 0x821ce188
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821CE188, LIFTED_ARGS(0x821EDFD4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821CE188, LIFTED_ARGS(0x821EDFD4, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // li r4,78
@@ -22710,7 +22711,7 @@ loc_821EDF4C:
   if (cr0.eq) goto loc_821EE02C;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDFE8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDFE8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -22719,7 +22720,7 @@ loc_821EDF4C:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDFF8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EDFF8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r8,0
@@ -22736,7 +22737,7 @@ loc_821EDF4C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE018)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE018, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -22745,13 +22746,13 @@ loc_821EDF4C:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EE028)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EE028, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ee064
   goto loc_821EE064;
 loc_821EE02C:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE030)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE030, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -22760,7 +22761,7 @@ loc_821EE02C:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE040)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE040, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,2
@@ -22769,12 +22770,12 @@ loc_821EE02C:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EE050)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EE050, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,9
   r4 = uint64_t(int64_t(9));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EE058)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EE058, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,10812(r11)
@@ -22794,7 +22795,7 @@ loc_821EE06C:
   r4 = uint64_t(int64_t(85));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE074)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE074, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -22809,7 +22810,7 @@ loc_821EE06C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE090)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE090, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // mr r3,r29
@@ -22820,7 +22821,7 @@ loc_821EE06C:
   r4 = REX_LOAD_U32(uint32_t(r30) + 0);
   // bl 0x821ce188
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821CE188, LIFTED_ARGS(0x821EE0A4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821CE188, LIFTED_ARGS(0x821EE0A4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // cmpwi r3,0
@@ -22833,7 +22834,7 @@ loc_821EE06C:
   if (cr0.eq) goto loc_821EE100;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE0BC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE0BC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -22842,7 +22843,7 @@ loc_821EE06C:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE0CC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE0CC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r8,0
@@ -22859,7 +22860,7 @@ loc_821EE06C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE0EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE0EC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -22868,13 +22869,13 @@ loc_821EE06C:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EE0FC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EE0FC, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ee13c
   goto loc_821EE13C;
 loc_821EE100:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE104)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE104, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -22883,7 +22884,7 @@ loc_821EE100:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE114)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE114, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,2
@@ -22892,14 +22893,14 @@ loc_821EE100:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EE124)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EE124, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // addi r4,r11,4
   r4 = uint64_t(int64_t(int64_t(r11) + 4));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EE130)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EE130, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,10812(r11)
@@ -22939,14 +22940,14 @@ loc_821EE148:
   if (cr6.eq) goto loc_821EE268;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE174)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE174, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,85
   r4 = uint64_t(int64_t(85));
   // mr r3,r31
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE180)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE180, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,2
@@ -22955,12 +22956,12 @@ loc_821EE148:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EE190)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EE190, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EE198)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EE198, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // mr r11,r3
@@ -22991,7 +22992,7 @@ loc_821EE148:
   r4 = REX_LOAD_U32(uint32_t(r30) + 0);
   // bl 0x821ce188
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821CE188, LIFTED_ARGS(0x821EE1D0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821CE188, LIFTED_ARGS(0x821EE1D0, r31)); r3 = o.r3; f1 = o.f1; }
   // cmpwi r3,0
   cr0 = lifted::Compare<int32_t>(int32_t(r3), 0, so);
   // li r4,74
@@ -23002,7 +23003,7 @@ loc_821EE148:
   if (cr0.eq) goto loc_821EE228;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE1E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE1E4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -23011,7 +23012,7 @@ loc_821EE148:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE1F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE1F4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r8,0
@@ -23028,7 +23029,7 @@ loc_821EE148:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE214)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE214, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -23037,13 +23038,13 @@ loc_821EE148:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EE224)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EE224, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ee260
   goto loc_821EE260;
 loc_821EE228:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE22C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE22C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -23052,7 +23053,7 @@ loc_821EE228:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE23C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE23C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,2
@@ -23061,12 +23062,12 @@ loc_821EE228:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EE24C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EE24C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,5
   r4 = uint64_t(int64_t(5));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EE254)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EE254, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,10812(r11)
@@ -23084,7 +23085,7 @@ loc_821EE260:
 loc_821EE268:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE26C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE26C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -23099,7 +23100,7 @@ loc_821EE268:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE288)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE288, r31)); r3 = o.r3; f1 = o.f1; }
   // addis r30,r29,1
   r30 = uint64_t(int64_t(int64_t(r29) + 65536));
   // mr r3,r29
@@ -23110,7 +23111,7 @@ loc_821EE268:
   r4 = REX_LOAD_U32(uint32_t(r30) + 0);
   // bl 0x821ce188
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821CE188, LIFTED_ARGS(0x821EE29C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821CE188, LIFTED_ARGS(0x821EE29C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // cmpwi r3,0
@@ -23123,7 +23124,7 @@ loc_821EE268:
   if (cr0.eq) goto loc_821EE2F8;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE2B4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE2B4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -23132,7 +23133,7 @@ loc_821EE268:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE2C4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE2C4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r8,0
@@ -23149,7 +23150,7 @@ loc_821EE268:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE2E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE2E4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -23158,13 +23159,13 @@ loc_821EE268:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EE2F4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EE2F4, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821ee334
   goto loc_821EE334;
 loc_821EE2F8:
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE2FC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE2FC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -23173,7 +23174,7 @@ loc_821EE2F8:
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE30C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE30C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // li r4,2
@@ -23182,14 +23183,14 @@ loc_821EE2F8:
   r3 = r31;
   // bl 0x8211a578
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EE31C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211A578, LIFTED_ARGS(0x821EE31C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // addi r4,r11,6
   r4 = uint64_t(int64_t(int64_t(r11) + 6));
   // bl 0x8259d658
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EE328)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8259D658, LIFTED_ARGS(0x821EE328, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,10812(r11)
@@ -23209,7 +23210,7 @@ loc_821EE33C:
   r3 = r31;
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE344)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE344, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -23218,7 +23219,7 @@ loc_821EE33C:
   r4 = uint64_t(int64_t(int64_t(r11) + 111));
   // bl 0x8211df20
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE354)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DF20, LIFTED_ARGS(0x821EE354, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // li r8,0
@@ -23235,7 +23236,7 @@ loc_821EE33C:
   r3 = r31;
   // bl 0x8211dac8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE374)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DAC8, LIFTED_ARGS(0x821EE374, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
   r11 = REX_LOAD_U32(uint32_t(r30) + 0);
   // mr r3,r31
@@ -23244,7 +23245,7 @@ loc_821EE33C:
   r4 = uint64_t(int64_t(int64_t(r11) + 111));
   // bl 0x8211dde0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EE384)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x8211DDE0, LIFTED_ARGS(0x821EE384, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EE384:
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
@@ -23305,7 +23306,7 @@ lifted::Result f821EF320(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF374)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF374, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -23330,7 +23331,7 @@ loc_821EF37C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF3A0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF3A0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -23355,7 +23356,7 @@ loc_821EF3A8:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF3CC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF3CC, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -23380,7 +23381,7 @@ loc_821EF3D4:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF3F8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF3F8, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -23405,7 +23406,7 @@ loc_821EF400:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF424)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF424, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -23415,7 +23416,7 @@ loc_821EF400:
   r3 = uint64_t(int64_t(0));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF434)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF434, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // li r7,0
@@ -23498,7 +23499,7 @@ loc_821EF4B0:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF4D4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF4D4, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -23508,7 +23509,7 @@ loc_821EF4B0:
   r3 = uint64_t(int64_t(2));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF4E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF4E4, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // li r9,-1
@@ -23580,7 +23581,7 @@ loc_821EF564:
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF56C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF56C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,30492(r31)
   r10 = REX_LOAD_U32(uint32_t(r31) + 30492);
   // li r11,1
@@ -23607,7 +23608,7 @@ loc_821EF594:
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF59C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF59C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,30492(r31)
   r10 = REX_LOAD_U32(uint32_t(r31) + 30492);
   // li r11,1
@@ -23704,7 +23705,7 @@ lifted::Result f821EF5E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF63C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF63C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -23729,7 +23730,7 @@ loc_821EF644:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF668)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF668, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -23754,7 +23755,7 @@ loc_821EF670:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF694)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF694, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -23779,7 +23780,7 @@ loc_821EF69C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF6C0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF6C0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -23804,7 +23805,7 @@ loc_821EF6C8:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF6EC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF6EC, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -23814,7 +23815,7 @@ loc_821EF6C8:
   r3 = uint64_t(int64_t(0));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF6FC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF6FC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // li r10,20
@@ -24133,7 +24134,7 @@ loc_821EF940:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF964)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EF964, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -24143,7 +24144,7 @@ loc_821EF940:
   r3 = uint64_t(int64_t(2));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF974)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF974, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // li r10,-1
@@ -24215,7 +24216,7 @@ loc_821EF9F4:
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF9FC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EF9FC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,30500(r31)
   r10 = REX_LOAD_U32(uint32_t(r31) + 30500);
   // li r11,1
@@ -24242,7 +24243,7 @@ loc_821EFA24:
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EFA2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EFA2C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,30500(r31)
   r10 = REX_LOAD_U32(uint32_t(r31) + 30500);
   // li r11,1
@@ -24340,7 +24341,7 @@ lifted::Result f821EFA78(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFACC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFACC, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -24365,7 +24366,7 @@ loc_821EFAD4:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFAF8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFAF8, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -24390,7 +24391,7 @@ loc_821EFB00:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFB24)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFB24, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -24415,7 +24416,7 @@ loc_821EFB2C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFB50)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFB50, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -24440,7 +24441,7 @@ loc_821EFB58:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFB7C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFB7C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -24465,7 +24466,7 @@ loc_821EFB84:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFBA8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFBA8, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -24490,7 +24491,7 @@ loc_821EFBB0:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFBD4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFBD4, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -24515,7 +24516,7 @@ loc_821EFBDC:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFC00)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFC00, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -24540,7 +24541,7 @@ loc_821EFC08:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFC2C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFC2C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -24550,7 +24551,7 @@ loc_821EFC08:
   r3 = uint64_t(int64_t(0));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EFC3C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EFC3C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30508(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 30508);
   // cmpwi cr6,r11,4
@@ -24701,7 +24702,7 @@ loc_821EFD38:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFD5C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFD5C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -24711,7 +24712,7 @@ loc_821EFD38:
   r3 = uint64_t(int64_t(2));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EFD6C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821EFD6C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30508(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 30508);
   // cmpwi cr6,r11,4
@@ -24831,7 +24832,7 @@ loc_821EFE20:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFE4C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFE4C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11420(r11)
@@ -24868,7 +24869,7 @@ loc_821EFE68:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFE8C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFE8C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11284(r11)
@@ -24930,7 +24931,7 @@ loc_821EFECC:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFEF8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFEF8, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11420(r11)
@@ -24967,7 +24968,7 @@ loc_821EFF14:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFF38)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFF38, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11284(r11)
@@ -25029,7 +25030,7 @@ loc_821EFF78:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFFA4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFFA4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11420(r11)
@@ -25066,7 +25067,7 @@ loc_821EFFC0:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFFE4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821EFFE4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11284(r11)
@@ -25110,7 +25111,7 @@ loc_821F0024:
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F002C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F002C, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821f02f8
   goto loc_821F02F8;
 loc_821F0030:
@@ -25190,7 +25191,7 @@ loc_821F0090:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F00BC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F00BC, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11420(r11)
@@ -25227,7 +25228,7 @@ loc_821F00D8:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F00FC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F00FC, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11284(r11)
@@ -25286,7 +25287,7 @@ loc_821F0138:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F0164)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F0164, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11420(r11)
@@ -25323,7 +25324,7 @@ loc_821F0180:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F01A4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F01A4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11284(r11)
@@ -25382,7 +25383,7 @@ loc_821F01E0:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F020C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F020C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11420(r11)
@@ -25419,7 +25420,7 @@ loc_821F0228:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F024C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F024C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11284(r11)
@@ -25513,7 +25514,7 @@ loc_821F02E8:
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F02F0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F02F0, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9708(r31)
@@ -25591,7 +25592,7 @@ lifted::Result f821F0318(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F036C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F036C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -25616,7 +25617,7 @@ loc_821F0374:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F0398)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F0398, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -25641,7 +25642,7 @@ loc_821F03A0:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F03C4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F03C4, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -25666,7 +25667,7 @@ loc_821F03CC:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F03F0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F03F0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -25691,7 +25692,7 @@ loc_821F03F8:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F041C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F041C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -25716,7 +25717,7 @@ loc_821F0424:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F0448)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F0448, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -25741,7 +25742,7 @@ loc_821F0450:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F0474)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F0474, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -25766,7 +25767,7 @@ loc_821F047C:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F04A0)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F04A0, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -25791,7 +25792,7 @@ loc_821F04A8:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F04CC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F04CC, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -25801,7 +25802,7 @@ loc_821F04A8:
   r3 = uint64_t(int64_t(0));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F04DC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F04DC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30544(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 30544);
   // cmpwi cr6,r11,3
@@ -25952,7 +25953,7 @@ loc_821F05D8:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F05FC)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F05FC, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r3,24
   r11 = uint32_t(r3) & 0xFF;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -25962,7 +25963,7 @@ loc_821F05D8:
   r3 = uint64_t(int64_t(2));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F060C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F060C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30544(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 30544);
   // cmpwi cr6,r11,3
@@ -26078,7 +26079,7 @@ loc_821F06B8:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F06E4)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F06E4, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11420(r11)
@@ -26115,7 +26116,7 @@ loc_821F0700:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F0724)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F0724, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11284(r11)
@@ -26159,7 +26160,7 @@ loc_821F0764:
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F076C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F076C, r31)); r3 = o.r3; f1 = o.f1; }
   // b 0x821f0974
   goto loc_821F0974;
 loc_821F0770:
@@ -26167,7 +26168,7 @@ loc_821F0770:
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F0778)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F0778, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // lwz r10,30492(r31)
@@ -26276,7 +26277,7 @@ loc_821F0810:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F083C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F083C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11420(r11)
@@ -26313,7 +26314,7 @@ loc_821F0858:
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F087C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821F087C, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,11284(r11)
@@ -26358,7 +26359,7 @@ loc_821F08B8:
   REX_STORE_U32(uint32_t(r31) + 9708, uint32_t(r11));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F08C8)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F08C8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30492(r31)
   r11 = REX_LOAD_U32(uint32_t(r31) + 30492);
   // cmpwi cr6,r11,1
@@ -26448,7 +26449,7 @@ loc_821F0964:
   r3 = uint64_t(int64_t(4));
   // bl 0x821103f0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F096C)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::Call(base, 0x821103F0, LIFTED_ARGS(0x821F096C, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9708(r31)
