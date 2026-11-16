@@ -4,7 +4,7 @@
 #include "lifted/sdk.h"
 
 #include "base/log.h"
-#include "threads/native_imports.h"
+#include "imports/native_imports.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -169,7 +169,7 @@ Result Import(uint8_t* base, ImportFunction* function, const Args& args) {
   if (LoggingImports()) {
     NoteImport(function, args);
   }
-  if (const threads::NativeImport native = threads::FindNativeImport(function)) {
+  if (const imports::NativeImport native = imports::FindNativeImport(function)) {
     return native(base, args);
   }
   return Boundary(args, [&](PPCContext& ctx) { function(ctx, base); });

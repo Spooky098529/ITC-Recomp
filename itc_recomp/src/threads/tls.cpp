@@ -8,7 +8,8 @@
 // the SDK's process bitmap): only KeTlsAlloc hands them out, and all of
 // them come here.
 
-#include "threads/native_imports.h"
+#include "imports/native_imports.h"
+#include "threads/threads.h"
 
 #include "base/log.h"
 #include "guest.h"
@@ -83,14 +84,14 @@ lifted::Result TlsSetValue(uint8_t* base, const lifted::Args& args) {
   return {1, 0.0};
 }
 
-const NativeImportEntry kEntries[] = {
+const imports::NativeImportEntry kEntries[] = {
     {__imp__KeTlsAlloc, TlsAlloc},
     {__imp__KeTlsFree, TlsFree},
     {__imp__KeTlsGetValue, TlsGetValue},
     {__imp__KeTlsSetValue, TlsSetValue},
 };
 
-const bool kRegistered = RegisterNativeImports(kEntries, std::size(kEntries));
+const bool kRegistered = imports::RegisterNativeImports(kEntries, std::size(kEntries), Enabled);
 
 }  // namespace
 

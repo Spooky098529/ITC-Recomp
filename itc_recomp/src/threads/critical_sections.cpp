@@ -11,7 +11,8 @@
 // in host order; nothing in the game reads it). The SDK made contended
 // waits on the struct as a kernel event; ours wait on the host lock.
 
-#include "threads/native_imports.h"
+#include "imports/native_imports.h"
+#include "threads/threads.h"
 
 #include "base/log.h"
 #include "guest.h"
@@ -169,14 +170,14 @@ lifted::Result LeaveCriticalSection(uint8_t* base, const lifted::Args& args) {
   return {0, 0.0};
 }
 
-const NativeImportEntry kEntries[] = {
+const imports::NativeImportEntry kEntries[] = {
     {__imp__RtlInitializeCriticalSection, InitializeCriticalSection},
     {__imp__RtlEnterCriticalSection, EnterCriticalSection},
     {__imp__RtlTryEnterCriticalSection, TryEnterCriticalSection},
     {__imp__RtlLeaveCriticalSection, LeaveCriticalSection},
 };
 
-const bool kRegistered = RegisterNativeImports(kEntries, std::size(kEntries));
+const bool kRegistered = imports::RegisterNativeImports(kEntries, std::size(kEntries), Enabled);
 
 }  // namespace
 

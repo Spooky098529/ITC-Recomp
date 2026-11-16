@@ -9,7 +9,8 @@
 // answers only goes back to KfLowerIrql, so raising answers 0 and lowering
 // does nothing.
 
-#include "threads/native_imports.h"
+#include "imports/native_imports.h"
+#include "threads/threads.h"
 
 #include "base/log.h"
 
@@ -95,7 +96,7 @@ lifted::Result ReleaseSpinLock(uint8_t* base, const lifted::Args& args) {
   return {0, 0.0};
 }
 
-const NativeImportEntry kEntries[] = {
+const imports::NativeImportEntry kEntries[] = {
     {__imp__KeRaiseIrqlToDpcLevel, RaiseIrqlToDpcLevel},
     {__imp__KfLowerIrql, LowerIrql},
     {__imp__KeAcquireSpinLockAtRaisedIrql, AcquireSpinLockAtRaisedIrql},
@@ -105,7 +106,7 @@ const NativeImportEntry kEntries[] = {
     {__imp__KfReleaseSpinLock, ReleaseSpinLock},
 };
 
-const bool kRegistered = RegisterNativeImports(kEntries, std::size(kEntries));
+const bool kRegistered = imports::RegisterNativeImports(kEntries, std::size(kEntries), Enabled);
 
 }  // namespace
 

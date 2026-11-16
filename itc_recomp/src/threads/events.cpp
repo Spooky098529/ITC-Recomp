@@ -14,7 +14,8 @@
 // other objects (threads), on SDK handles, named events. Logged once each.
 
 #include "threads/handles.h"
-#include "threads/native_imports.h"
+#include "imports/native_imports.h"
+#include "threads/threads.h"
 
 #include "base/log.h"
 #include "guest.h"
@@ -388,7 +389,7 @@ lifted::Result DelayExecutionThread(uint8_t* base, const lifted::Args& args) {
   return {kStatusSuccess, 0.0};
 }
 
-const NativeImportEntry kEntries[] = {
+const imports::NativeImportEntry kEntries[] = {
     {__imp__KeSetEvent, SetEvent},
     {__imp__KeResetEvent, ResetEvent},
     {__imp__KeInitializeSemaphore, InitializeSemaphore},
@@ -403,7 +404,7 @@ const NativeImportEntry kEntries[] = {
     {__imp__KeDelayExecutionThread, DelayExecutionThread},
 };
 
-const bool kRegistered = RegisterNativeImports(kEntries, std::size(kEntries));
+const bool kRegistered = imports::RegisterNativeImports(kEntries, std::size(kEntries), Enabled);
 
 }  // namespace
 

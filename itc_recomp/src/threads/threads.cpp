@@ -17,10 +17,11 @@
 // creator whose TLS has per-thread data (__declspec(thread)), and calls on
 // threads that aren't ours (the main thread, the SDK's own).
 
-#include "threads/current_thread.h"
+#include "threads/threads.h"
 #include "threads/handles.h"
-#include "threads/native_imports.h"
+#include "imports/native_imports.h"
 
+#include "base/flags.h"
 #include "base/log.h"
 #include "guest.h"
 #include "memory/heap.h"
@@ -35,7 +36,15 @@
 #include <thread>
 #include <unordered_map>
 
+ITC_FLAG_BOOL(native_threads, true, "ITC",
+              "Answer the kernel's thread, sync and TLS imports with our own code (E1 in "
+              "docs/rexglue-removal.md: src/threads/) instead of the SDK's; read at start-up");
+
 namespace threads {
+
+bool Enabled() {
+  return ITC_FLAG(native_threads);
+}
 
 namespace {
 
@@ -350,7 +359,7 @@ lifted::Result DereferenceObject(uint8_t* base, const lifted::Args& args) {
   return {0, 0.0};
 }
 
-const NativeImportEntry kEntries[] = {
+const imports::NativeImportEntry kEntries[] = {
     {__imp__ExCreateThread, CreateThread},
     {__imp__NtResumeThread, NtResumeThread},
     {__imp__KeResumeThread, KeResumeThread},
@@ -360,7 +369,7 @@ const NativeImportEntry kEntries[] = {
     {__imp__ObDereferenceObject, DereferenceObject},
 };
 
-const bool kRegistered = RegisterNativeImports(kEntries, std::size(kEntries));
+const bool kRegistered = imports::RegisterNativeImports(kEntries, std::size(kEntries), Enabled);
 
 }  // namespace
 

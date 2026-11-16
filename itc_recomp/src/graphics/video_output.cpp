@@ -3,7 +3,7 @@
 
 #include "graphics/video_output.h"
 
-#include "threads/current_thread.h"
+#include "threads/threads.h"
 
 #include "guest.h"
 
