@@ -12,6 +12,7 @@
 #include "app/app.h"
 #include "threads/threads.h"
 #include "memory/kernel_variables.h"
+#include "app/image_load.h"
 
 #include "audio/native_audio.h"
 #include "base/flags.h"
@@ -55,6 +56,7 @@ ITC_FLAG_DECLARE(std::string, log_file);
 ITC_FLAG_DECLARE(std::string, log_level);
 ITC_FLAG_DECLARE(bool, log_verbose);
 ITC_FLAG_DECLARE(uint32_t, rexcrt_heap_size_mb);
+ITC_FLAG_DECLARE(bool, check_image_load);
 ITC_FLAG_DECLARE(std::string, video_driver);
 
 namespace app {
@@ -272,6 +274,15 @@ int main(int argc, char* argv[]) {
   // The game's main thread: one of our threads (E1, src/threads/) running
   // our start-up (src/app/start_up.cpp) with the module's stack size; with
   // --native_threads off, the kernel's, started at xstart's address.
+  if (ITC_FLAG(check_image_load)) {
+    app::Image image;
+    std::string error;
+    if (app::LoadImage(paths.game_data / "default.xex", image, error)) {
+      app::CheckImageAgainstGuest(image, app::g_runtime->memory()->virtual_membase());
+    } else {
+      ITC_LOG_ERROR("image load: {}", error);
+    }
+  }
   memory::BindKernelVariables(app::g_runtime->memory()->virtual_membase());
   if (threads::Enabled()) {
     uint8_t* base = app::g_runtime->memory()->virtual_membase();

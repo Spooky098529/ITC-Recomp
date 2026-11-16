@@ -3829,6 +3829,19 @@ guest address space stays until E5 makes the code real C++ (the old E2's
    `default.xex` is supported, checked by its hash; its header's few
    fields read for that file. The player's own file stays the source (the
    repo never ships game data).
+
+   Done (2026-11-16, `src/app/image_load.cpp`): this `default.xex` turned
+   out to use the XEX's **basic** compression (two blocks of data, each
+   followed by zeros: 6,750,208 bytes then 3,211,264 zeros, then 196,608
+   bytes), not LZX, so libmspack isn't needed after all; only AES-128 (the
+   image key at the security info's +0x150 decrypted with the retail key,
+   then CBC from a zero IV over the data). AES and SHA-1 come from
+   FFmpeg's libavutil, already built for the XMA decoder (`itc_avutil`):
+   no new library. The file is checked by its SHA-1 (`32932de0...`).
+   `--check_image_load` (off by default) loads it beside the SDK's loader
+   and compares: 10,158,080 bytes at `0x82000000`, differing only in the
+   ten variable import slots the SDK binds (9 ranges, 39 bytes). The
+   loader isn't used for the game yet: step 4 switches to it.
 4. **Our own mapping**: one reservation of the guest's 4 GB (and the
    physical range) by us: `memfd_create` and `mmap` on Linux,
    `CreateFileMapping` and `MapViewOfFile` on Windows (`docs/windows.md`),
