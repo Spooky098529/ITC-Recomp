@@ -21,7 +21,7 @@ void AchievementsCheckSteps(lifted::Regs& ctx, uint8_t* base);
 void AchievementsWriteSteps(PPCContext& ctx, uint8_t* base);
 void AchievementsWriteSteps(lifted::Regs& ctx, uint8_t* base);
 // XUserWriteAchievements sub_82294E58 (r3 the count, r4 the list, r5 the
-// overlapped): XAPI's wrapper natively, entered through lifted::Enter.
+// overlapped): plugged in (nothing recorded), entered through lifted::Enter.
 void WriteAchievementsSteps(PPCContext& ctx, uint8_t* base);
 void WriteAchievementsSteps(lifted::Regs& ctx, uint8_t* base);
 

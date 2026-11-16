@@ -18,10 +18,7 @@
 ITC_FLAG_BOOL(native_achievements, true, "ITC",
               "Run the achievements (docs/functions/achievements.md: Achievements::Check "
               "sub_82290788 with AllBeaten sub_82290698, BeatsCourseTime sub_82290710 and "
-              "Time::Less sub_820FF708; Achievements::Write sub_82290A30, which still calls "
-              "XUserWriteAchievements sub_82294E58 through the function table, so the SDK "
-              "records unlocks; and XUserWriteAchievements, XAPI's wrapper over "
-              "XMsgStartIORequest, inside its harness wrap) natively (no adapters but Time::Less's: native RaceStates::OnRaceEnd "
+              "Time::Less sub_820FF708; Achievements::Write sub_82290A30) natively (no adapters but Time::Less's: native RaceStates::OnRaceEnd "
               "calls Check and Write) instead of through the translated code (the same "
               "words; checked by --run_harnesses=achievements)");
 
@@ -75,8 +72,8 @@ ITC_REGS_STEP(AchievementsCheckSteps) {
 
 ITC_REGS_STEP(WriteAchievementsSteps) {
   lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
-    return {achievements::WriteAchievements(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0]),
-                                            uint32_t(a.r[1]), uint32_t(a.r[2])),
+    return {achievements::WriteAchievements(base, uint32_t(a.r[0]), uint32_t(a.r[1]),
+                                            uint32_t(a.r[2])),
             a.f[0]};
   });
 }
@@ -101,19 +98,9 @@ ITC_ACHIEVEMENTS(820FF708, TimeLessSteps)
 // (sub_82264B90, never seen in play, recompiled) runs the originals. Their
 // steps are the harness's.
 
-// XUserWriteAchievements (system-services.md) wrapped for the achievements
-// harness: while its recorder is set (hooks::g_start_up_recorder), the call
-// is handed to it, so a harness case never unlocks anything in the SDK;
-// otherwise XAPI's wrapper over the import (still the SDK's, the user's
-// call), natively with --native_achievements, else the original.
+// XUserWriteAchievements (system-services.md), plugged in whatever the flag
+// (the user's call, 2026-11-16): the game reads nothing back, so the SDK's
+// import isn't reached and no unlock is recorded.
 ITC_NATIVE_ENTRY_ALWAYS(82294E58) {
-  
-  if (hooks::StartUpRecorded(ctx, 0x82294E58)) {
-    return;
-  }
-  if (!ITC_FLAG(native_achievements)) {
-    lifted::original::c82294E58(ctx, base);
-    return;
-  }
   hooks::WriteAchievementsSteps(ctx, base);
 }
