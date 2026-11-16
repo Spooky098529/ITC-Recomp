@@ -7,9 +7,9 @@ translator, a static dependency (`itc_recomp/cmake/xenos_translator.cmake`,
 its logging and flags through `itc_recomp/src/translator_shims/`), and the
 third-party libraries are our own submodules in `itc_recomp/thirdparty/`
 (SDL, Vulkan-Headers, simde, glslang, fmt, FFmpeg, xxHash). Act as if the
-SDK were deleted (the user's call). `git status` showing `rexglue-sdk` as
-modified (`m`) is the old `patches/rexglue-sdk/` still applied in its
-worktree (no longer applied by the build, nor touching the translator).
+SDK were deleted (the user's call). Our patches to the SDK
+(`patches/rexglue-sdk/`) were removed in E4's step 7: the submodule stays
+clean at its pinned commit.
 `docs/functions/` is the reference for the game's functions: their
 table, split by subsystem into one file per area since 2026-10-20
 (`functions.md` holds the rows not yet moved, `system-services.md` B5's,
@@ -969,8 +969,8 @@ play time and the glow (bloom; `src/interpolation/glow.cpp`, v0.3.9) are all don
 on by default (marked experimental in `itc.toml`, which also turns logging
 off); `interpolate_draw_state = false` and `max_fps = 30` there give the
 original 30 fps.
-Our renderer always draws the glow (`--glow` only affects the emulated
-GPU); `--motion_blur=false` leaves out the motion blur (on by default;
+Our renderer always draws the glow (`--glow`, the emulated GPU's switch
+from SDK patch 0001, went with the patch in E4); `--motion_blur=false` leaves out the motion blur (on by default;
 defined in `src/native/renderer.cpp` since SDK patch 0002 was removed). Known issues are in
 `docs/known-issues.md`.
 

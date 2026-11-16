@@ -4302,6 +4302,15 @@ Each leaves the game working, smallest and most independent first.
    configure, build), the test zip runs from its own folder, an attract
    race, the pad replay, a drive by the user.
 
+   Done (2026-11-16, `e4-sdk-removal-16-11-26`, the user's go-ahead):
+   both patches checked to be exactly what the submodule's worktree held
+   (`git apply --reverse --check`), reversed there (the submodule clean at
+   its pinned commit) and `patches/rexglue-sdk/` deleted: 0001 (the
+   emulated GPU's glow switch, `--glow`, gone with it) and 0003 (the SDK's
+   Windows SDL as a DLL). CLAUDE.md, `docs/windows.md` and
+   `docs/frame-interpolation.md` say so; older mentions in the docs are
+   history.
+
 Checks at each step: the build, `timeout 120 attract_race.sh 40`, the
 pad replay (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`,
 ~127 s, no error lines, the race at the frame cap), a frame dump,
