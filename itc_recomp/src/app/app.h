@@ -6,6 +6,8 @@
 
 #include <functional>
 
+#include "lifted/lifted.h"
+
 namespace app {
 
 // Runs `function` on the main thread (the one pumping SDL's events), soon.
@@ -15,5 +17,9 @@ void RunOnMainThread(std::function<void()> function);
 // Ends the program as closing the window does: the title's threads
 // terminated, the log flushed, the process exited. Any thread.
 void RequestQuit();
+
+// Our start-up, run where the kernel would start the game's main thread
+// (xstart's address; src/app/start_up.cpp).
+lifted::Result StartUp(uint8_t* base, const lifted::Args& in);
 
 }  // namespace app

@@ -2,7 +2,8 @@
 """Writes src/lifted/imports.h, the image's kernel and XAM imports declared
 (the SDK defines them), and src/lifted/imports.cpp: a dispatch table entry for each of the
 image's import thunks (docs/rexglue-removal.md, "Before E1: the rewiring",
-stage 4), read from generated/default/itc_init.cpp's function mappings.
+stage 4), read from generated/default/itc_init.cpp's function mappings,
+and lifted::ImportName, each import's name for diagnostics (--log_imports).
 
 Native code that calls a kernel or XAM import by its thunk's address (the
 ports that call `kExCreateThread = 0x825DBBE4` and the like through their
@@ -58,6 +59,24 @@ def main():
         "const bool kRegistered = (Register(kImports, std::size(kImports), &kOn), true);",
         "",
         "}  // namespace",
+        "",
+        "const char* ImportName(ImportFunction* function) {",
+        "  static const struct {",
+        "    ImportFunction* function;",
+        "    const char* name;",
+        "  } kNames[] = {",
+    ]
+    for name in sorted({n for _, n in thunks}):
+        lines.append(f'      {{{name}, "{name[len("__imp__"):]}"}},')
+    lines += [
+        "  };",
+        "  for (const auto& entry : kNames) {",
+        "    if (entry.function == function) {",
+        "      return entry.name;",
+        "    }",
+        "  }",
+        '  return "(not an import: our code through lifted::Sdk)";',
+        "}",
         "",
         "}  // namespace lifted",
         "",

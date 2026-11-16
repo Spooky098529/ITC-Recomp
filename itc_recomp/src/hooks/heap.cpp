@@ -9,6 +9,7 @@
 // docs/native-memory.md.
 
 #include "hooks/heap.h"
+#include "hooks/last_error.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
 
@@ -173,7 +174,18 @@ std::optional<uint32_t> hooks::VirtualFree(uint32_t address, uint32_t size, uint
 }
 
 ITC_NATIVE_ENTRY_ALWAYS(82295330) {
-  
+  // VirtualFree(0, ...), plugged in (E2's first step, docs/rexglue-removal.md):
+  // the only frees in play outside the layer (the pad replay: 34, from
+  // 0x820E85BC and 0x820F864C). The original asks the kernel, which answers
+  // STATUS_MEMORY_NOT_ALLOCATED, sets the last error from it
+  // (ERROR_INVALID_ADDRESS) and returns 0; a release with a size fails
+  // before the kernel (the original's first branch, kept).
+  if (ctx.r3.u32 == 0 && !((ctx.r5.u32 & hooks::kMemRelease) && ctx.r4.u32 != 0)) {
+    constexpr uint32_t kErrorInvalidAddress = 487;
+    last_error::Set(base, ctx.r13.u32, kErrorInvalidAddress);
+    ctx.r3.u64 = 0;
+    return;
+  }
   auto r3 = hooks::VirtualFree(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr));
   if (!r3) {
     lifted::original::c82295330(ctx, base);

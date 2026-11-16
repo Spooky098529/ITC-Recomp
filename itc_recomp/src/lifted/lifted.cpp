@@ -4,9 +4,11 @@
 #include "lifted/sdk.h"
 
 #include "base/log.h"
+#include "imports/native_imports.h"
 
 #include <cstdlib>
 #include <cstring>
+#include <string_view>
 #include <mutex>
 #include <unordered_map>
 
@@ -164,8 +166,42 @@ Result Call(uint8_t* base, uint32_t address, const Args& args) {
   Unknown(address);
 }
 
+// An SDK import with no answer of ours: the SDK's runtime isn't made since
+// E2 (docs/rexglue-removal.md, "E2: the plan", step 5), so its imports have
+// no kernel to run on: logged by name, and the program stops (as a call to
+// an address with no entry). None is called in play (--log_imports).
+[[noreturn]] void NoAnswer(ImportFunction* function, uint32_t lr) {
+  ITC_LOG_ERROR("lifted: the import {} (called from {:08X}) has no answer of ours, and the "
+                "SDK's runtime isn't made",
+                ImportName(function), lr);
+  std::abort();
+}
+
+// Whether `function` is one of the SDK's imports (lifted::Sdk also runs our
+// own functions and lifted originals, which aren't).
+bool IsSdkImport(ImportFunction* function) {
+  return !std::string_view(ImportName(function)).starts_with("(not an import");
+}
+
 Result Import(uint8_t* base, ImportFunction* function, const Args& args) {
+  if (LoggingImports()) {
+    NoteImport(function, args);
+  }
+  if (const imports::NativeImport native = imports::FindNativeImport(function)) {
+    return native(base, args);
+  }
+  if (IsSdkImport(function)) {
+    NoAnswer(function, args.lr);
+  }
   return Boundary(args, [&](PPCContext& ctx) { function(ctx, base); });
+}
+
+void BindThreadContext(PPCContext* context) {
+  current = context;
+}
+
+Result ImportFromSdk(uint8_t*, ImportFunction* function, const Args& args) {
+  NoAnswer(function, args.lr);
 }
 
 void Enter(PPCContext& ctx, uint8_t* base, Entry entry) {

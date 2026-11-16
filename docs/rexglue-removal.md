@@ -3473,15 +3473,19 @@ no error lines); frame dumps on against off for the render path; and
 Only when no recompiled function is left (or none that touches what's
 being removed):
 
-E1. **Threads and sync** (291 boundary functions, plus every recompiled
-    function using the game's locks): host threads and locks in native
-    code. The graphics library's per-CPU workers read the CPU number from
-    the PCR (+268; "Interrupts are made at the library's level" in
+E1. **Threads and sync**: host threads and locks in native code. The
+    graphics library's per-CPU workers read the CPU number from the PCR
+    (+268; "Interrupts are made at the library's level" in
     `docs/native-renderer.md`), and timing has mattered before (the
-    deferred-kick race there).
+    deferred-kick race there). The plan as of 2026-11-16 is under "E1:
+    the plan" below; the count of 291 boundary functions written here
+    before the lift no longer applies (nothing recompiled runs).
 
 E2. **Memory**: native allocations once nothing uses guest addresses.
-    No guest mapping, no `/dev/shm` files.
+    No guest mapping, no `/dev/shm` files. Since the lift sweep, that end
+    comes only with E5 (the code reads and writes guest addresses
+    throughout); what E2 does before it, a guest address space of our own
+    with no SDK memory behind it, is under "E2: the plan" below.
 
 E3. **The image load**: the recompiled code reads strings, constants,
     vtables, tables and initialized globals from the image at
@@ -3522,6 +3526,426 @@ E5. **The native code made native** (the user's call, 2026-11-09):
     (`BuildScreen::BackToBuilds` `sub_821A1258`, the garage screen's
     `Transition11` `sub_82195F10` and `Transition15` `sub_82196030`)
     need deciding before E4: they keep the PowerPC context alive.
+
+## E1: the plan (2026-11-16)
+
+On `e1-threads-sync-16-11-26`, after the rewiring (agreed with the user,
+2026-11-16). Where things start: every function the game runs is ours
+(hand ports or lifted), and the game reaches the SDK only through its
+imports (`lifted::Import`, the import thunks' entries in
+`src/lifted/imports.cpp`) and the five kernel entries. Our code names 184
+imports; 43 are threads and sync: `ExCreateThread`, `ExTerminateThread`,
+`NtResumeThread`, `NtSuspendThread`, `KeResumeThread`,
+`KeSetBasePriorityThread`, `KeSetAffinityThread`; `NtCreateEvent`,
+`NtSetEvent`, `NtClearEvent`, `KeSetEvent`, `KeResetEvent`,
+`KeInitializeSemaphore`, `KeReleaseSemaphore`, `KeWaitForSingleObject`,
+`KeWaitForMultipleObjects`, `NtWaitForSingleObjectEx`;
+`RtlInitializeCriticalSection`, `RtlEnterCriticalSection`,
+`RtlTryEnterCriticalSection`, `RtlLeaveCriticalSection`, the spin locks
+and IRQL (`KfAcquireSpinLock`, `KfReleaseSpinLock`,
+`KeAcquireSpinLockAtRaisedIrql`, `KeReleaseSpinLockFromRaisedIrql`,
+`KeTryToAcquireSpinLockAtRaisedIrql`, `KeRaiseIrqlToDpcLevel`,
+`KfLowerIrql`, `KeEnterCriticalRegion`, `KeLeaveCriticalRegion`,
+`KeLockL2`); `KeTlsAlloc`, `KeTlsFree`, `KeTlsGetValue`,
+`KeTlsSetValue`; `NtCreateTimer`, `NtSetTimerEx`, `NtCancelTimer`,
+`KeDelayExecutionThread`; `NtClose`, `NtDuplicateObject`,
+`ObReferenceObjectByHandle`, `ObDereferenceObject`. Which of them run in
+play isn't known yet (lifted code names every import its original did).
+
+The constraint that orders the steps: the game's threads are kernel
+threads because the code reads the kernel's per-thread block through
+r13 (the PCR: the CPU number at +268, the TLS slots, the thread's
+kernel pointers) and because the SDK's import functions find the
+current `XThread` from the host thread they run on. A thread of ours
+can only start once nothing it reaches calls an import needing that.
+Guest stacks stay until E2 (frames are still in guest memory).
+
+1. **Measure.** A diagnostic flag (`--log_imports`) counting each
+   import's calls by name through `lifted::Import`, logged at exit and
+   now and then; run in attract races and the pad replay. The result
+   (which imports run in play, from which threads, how often) is
+   recorded here and picks the order below; imports never seen keep
+   running through the SDK until their step, and any we replace that
+   then turns up unseen logs once.
+
+   Done (2026-11-16): `--log_imports` (`src/lifted/import_log.cpp`;
+   names from `lifted::ImportName`, written into `imports.cpp` by
+   `tools/import_entries.py`). An attract race (`itc_5673`, 68 s) and the
+   pad replay (`itc_5674`, 127 s: the menus, a save, a race) call the same
+   **30 imports**, nothing else (no file, XAM, graphics or network import
+   runs in play). Calls in the pad replay, by import:
+
+   | Import | Calls | Kind |
+   | --- | --- | --- |
+   | `KeRaiseIrqlToDpcLevel` | 2,572,463 | IRQL |
+   | `KeAcquireSpinLockAtRaisedIrql`, `KeReleaseSpinLockFromRaisedIrql`, `KfLowerIrql` | 2,477,245 each | spin locks, IRQL |
+   | `RtlEnterCriticalSection`, `RtlLeaveCriticalSection` | 331,752 each | critical sections |
+   | `KeWaitForSingleObject` | 49,018 | waits |
+   | `KeSetEvent` | 45,022 | events |
+   | `KeReleaseSemaphore`, `KeWaitForMultipleObjects` | 22,511 each | semaphores, waits |
+   | `NtSetEvent`, `NtWaitForSingleObjectEx` | 20,960, 20,959 | events by handle, waits |
+   | `KeTlsGetValue` | 4,320 | TLS |
+   | `RtlInitializeCriticalSection` | 38 | critical sections |
+   | `NtFreeVirtualMemory`, `NtAllocateVirtualMemory` | 32, 2 | memory (E2) |
+   | `NtCreateEvent` | 15 | events by handle |
+   | `ObReferenceObjectByHandle`, `ObDereferenceObject` | 10 each | threads (their objects) |
+   | `ExCreateThread`, `KeSetBasePriorityThread` | 7 each | threads |
+   | `NtResumeThread`, `KeSetAffinityThread` | 4 each | threads |
+   | `KeGetCurrentProcessType` | 3 | system |
+   | `KeTlsAlloc`, `KeTlsSetValue`, `KeResumeThread` | 2 each | TLS, threads |
+   | `KeInitializeSemaphore`, `ExRegisterTitleTerminateNotification` | 1 each | semaphores, threads |
+
+   Nine guest threads call them (by r13; the main thread `3001F000`
+   makes the others). Some hand ports still run lifted originals or
+   stand-ins of ours through `lifted::Sdk`, which `Import` also sees
+   (logged as "not an import"). Everything else our code names stays
+   behind its import, never seen; step 2 starts with the spin locks and
+   IRQL (nearly all the calls), then the critical sections.
+2. **Sync objects as host primitives.** Events, semaphores, critical
+   sections, spin locks and the waits on them, the timers and
+   `KeDelayExecutionThread`. Some are kernel structures inside game
+   objects in guest memory (a `KEVENT`'s or `RTL_CRITICAL_SECTION`'s
+   words), others handles; each kind gets a host object (a table keyed
+   by the structure's guest address or by the handle), with the
+   structure's words the game itself reads (if any) kept as the kernel
+   leaves them. The locks the user's calls kept as the game's own
+   (XAudio's API lock and voice lists' spin lock, XACT's lock: "until
+   every user is native, then host recursive locks with a readable
+   depth", 2026-10-29) become host recursive locks here. Done kind by
+   kind, each checked before the next.
+
+   Done (2026-11-16): `src/threads/`, behind `--native_threads` (on;
+   read once at start-up), routed in `lifted::Import` by a table of
+   native imports (`threads/native_imports.h`), so every caller, lifted or
+   hand port, reaches ours; `lifted::ImportFromSdk` is the way back to the
+   SDK for objects ours don't handle.
+   - Spin locks and IRQL (`spin_locks.cpp`): the lock stays a
+     compare-and-swap of the owner's r13 (big-endian) on the game's word;
+     IRQL plugged in (no game code reads the PCR's IRQL byte, +0x18:
+     raising answers 0, lowering does nothing).
+   - Critical sections (`critical_sections.cpp`): a host lock each, by
+     guest address, made on first use; the struct's lock count, recursion
+     count and owner (`[r13 + 256]`) written as the SDK writes them (the
+     lock count big-endian, where the SDK wrote host order).
+   - Events, semaphores and waits (`events.cpp`): objects in guest memory
+     keep their state in their own dispatcher header (type +0, signal
+     state +4, a semaphore's limit +0x10), as the original kernel did;
+     events by handle (`NtCreateEvent`) are host records under handles of
+     ours (`0xE1000000` up, below the SDK's `0xF8000000`); one host mutex
+     and condition variable; timeouts relative, absolute or a poll.
+     Waits on other objects (threads), SDK handles and named events fall
+     back to the SDK, logged once: none did in play.
+     `KeDelayExecutionThread` a host sleep.
+   Checked by attract races, the pad replay (127 s, no error lines, the
+   race at the frame cap) and a frame dump.
+3. **The per-thread block and TLS as ours.** r13's block in guest
+   memory filled by our code (the fields the game reads, found by
+   reading the lifted code), `KeTls*` over our own slots.
+
+   TLS done (2026-11-16, `threads/tls.cpp`): each thread's slots are
+   where its thread object points (`[[r13 + 256] + 0x68]` + 4 × slot), as
+   the SDK sets them up; slot numbers from our own table (lowest free
+   first, 256). Checked as above. What game code reads of the per-thread
+   block, from `generated/`: the PCR's +256 (the thread object), +268 (the
+   CPU number, a byte) and +336 (0 for a normal thread: `SetLastError`'s
+   check, `sub_82296E88`); the thread object's +88, +300, +332 and +352
+   (the last error), +0x68 (TLS, through our code). Those are what a block
+   of ours must fill.
+4. **Threads as host threads.** `std::thread` (or SDL's) with a guest
+   stack from our memory layer and our per-thread block in r13, for the
+   four thread starts the kernel runs today, then the game's main thread
+   (`xstart`'s, made by `PrepareModuleLaunch`). Only once step 1's list
+   shows nothing these threads reach still needs the SDK's `XThread`;
+   what's left of that (memory imports, the file reads, the audio
+   output's) is checked first, and may move this step after part of E2.
+
+   Found (2026-11-16, `--log_imports`' callers): every import still
+   answered by the SDK is called only from the main thread
+   (`NtAllocateVirtualMemory` and `NtFreeVirtualMemory` from the
+   allocation wrappers `82299AE4`, `82299B34`, `82295384`;
+   `KeGetCurrentProcessType`; `ExRegisterTitleTerminateNotification`;
+   the thread calls: `ExCreateThread` from `CreateThread` `825BA3C8`,
+   `Device::CreateWorkers` `822B6ED4` and `XAudioEngine::Init`
+   `8245C3F8`, `NtResumeThread`, `KeResumeThread`,
+   `KeSetBasePriorityThread`, `KeSetAffinityThread`, and
+   `ObReferenceObjectByHandle`/`ObDereferenceObject` on thread handles).
+   The other threads (XAudio's master and workers, the tiling workers,
+   the frame driver's, native audio's) reach only our sync and TLS. So
+   next: `ExCreateThread` and the thread calls ours, those threads host
+   threads with a guest stack and a PCR and thread object of ours; the
+   main thread after E2's memory imports.
+
+   Done (2026-11-16, `threads/threads.cpp`): `ExCreateThread` makes a
+   `std::thread` and, in guest memory from our allocation layer, only what
+   game code still reads through r1 and r13 (a stack, the code's frames
+   being there; a per-thread block with +256, +268 and +336; a thread
+   object with +0x58, +0x68 our TLS slots, +0x14C the thread ID and +0x160
+   the last error), then runs the start routine (through the XAPI
+   start-up when given) through our dispatch table; its handle is ours
+   (`threads/handles.h`, `0xE2000000` up). `NtResumeThread`,
+   `KeResumeThread`, `KeSetBasePriorityThread` (plugged in: kept and
+   answered, not applied), `KeSetAffinityThread` (the CPU number at
+   +268), `ObReferenceObjectByHandle` and `ObDereferenceObject` answer
+   for ours; `Device::CreateWorkers` hands `KeSetBasePriorityThread` the
+   handle where a thread object is expected (the SDK read it as a
+   pointer), so ours take either. Native code with no r13 at hand finds
+   its thread through `threads/current_thread.h` (`CurrentThreadId`,
+   `sub_825B9A60`, no longer asks the SDK on our threads). All seven of
+   the game's threads are ours (the frame driver's four, the tiling
+   worker, XAudio's master and worker); the main thread and native
+   audio's stay the SDK's. Attract races, the pad replay (127 s) and a
+   frame dump clean.
+
+   The main thread too (2026-11-16): first its last imports, none left to
+   the SDK in play. E2's first step (`src/memory/memory_imports.cpp`,
+   `--native_memory_imports`): the process heap's reserve and commit
+   (`RtlCreateHeap` `sub_822997B0`, from `CreateHeap` at start-up)
+   answered from our allocation layer, and `VirtualFree(0)` (34 in the pad
+   replay, from `0x820E85BC` and `0x820F864C`) plugged in as the original
+   answers it (0, `ERROR_INVALID_ADDRESS`), so `NtFreeVirtualMemory` isn't
+   called; `KeGetCurrentProcessType` plugged in (1, a title's process,
+   what `RtlCreateHeap` and XAudio read) and
+   `ExRegisterTitleTerminateNotification` (nothing kept: the SDK never ran
+   them). The native import table moved to `src/imports/`, with a flag per
+   group. Then `main()` starts the main thread through
+   `threads::StartMainThread` (our blocks, the module's stack size, our
+   start-up `app::StartUp` on a `std::thread`) in place of the SDK's
+   `PrepareModuleLaunch`, which only made the thread
+   (`SetExecutableModule` had run at load). Each of our threads binds a
+   context struct of its own (`lifted::BindThreadContext`), a register
+   carrier for the hand ports that still run lifted originals and
+   stand-ins through `lifted::Sdk` (4,411 calls in an attract race; to go
+   with `PPCContext` in E4). Native audio's thread too: it was an SDK
+   `XHostThread`, made only for a guest stack and r13 for the mixer
+   callback; now `threads::StartThread` (our blocks, a host body) and the
+   callback through our dispatch table. Every thread that runs game code
+   is ours. Attract races, the pad replay (127 s) and a frame dump clean.
+
+Checks at each step: `attract_race.sh 40` as a smoke run, the pad replay
+(`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`, ~127 s, no
+error lines), frame dumps, a drive by the user before the merge, and
+`boundary_status.py` recorded in "The boundary over time" (its "live"
+count reads rows, not running code, since stage 5).
+
+## E2: the plan (2026-11-16, a draft for the user's review)
+
+After E1 (every import the game calls in play is ours, every thread
+running game code ours), the SDK's runtime still owns the memory the game
+lives in. E2 here is that memory made ours, guest addresses kept: the
+lifted and hand-ported code reads and writes the game's objects at guest
+addresses (big-endian, by offset), and keeps its stack frames there, so a
+guest address space stays until E5 makes the code real C++ (the old E2's
+"no guest mapping" moves there).
+
+### Where guest memory comes from today
+
+- **The mapping** (`rexglue-sdk` `src/system/xmemory.cpp`): a shared
+  memory file (`/dev/shm/xenia_memory_*` on Linux, a file mapping on
+  Windows) of 4 GB of guest virtual addresses plus 512 MB of physical
+  memory at +4 GB, mapped as views so the physical ranges `0xA0000000`
+  (64 KB pages), `0xC0000000` (16 MB pages) and `0xE0000000` (4 KB pages)
+  all alias the same physical memory. Heaps over it: `0x00000000` (4 KB
+  pages), `0x40000000` (64 KB), `0x80000000` and `0x90000000` (the XEX's),
+  and the physical ones.
+- **Our allocation layer** (`src/memory/heap.cpp`, `docs/native-memory.md`):
+  every allocation the game makes, but its virtual range (384 MB at
+  `0x10000`) is one reservation from the SDK's `0x00000000` heap, and each
+  physical block one allocation from the SDK's physical heaps (by page
+  size). Since E1 it also holds our threads' stacks and blocks.
+- **The image** (E3): `Runtime::LoadXexImage` decrypts and decompresses
+  `default.xex` into `0x82000000`, resolves its imports, and writes the
+  kernel's variable exports the image imports (the SDK's
+  `export_resolver`); code reads the image's data, vtables and globals
+  there.
+- **The SDK's own guest data**: the kernel's guest globals (the title
+  process block, the TLS bitmap), the export variables
+  (`XboxHardwareInfo`, `ExLoadedImageName`, `XexExecutableModuleHandle`
+  and the like; `graphics/predicated_tiling.cpp` and
+  `hooks/graphics_device.cpp` read some), the loader's module records.
+- **Readers of the mapping's layout** in our code: the renderer
+  (`native/state.h`: physical memory at the virtual base + 4 GB, the GPU's
+  physical addresses read from the command data), its guest memory
+  mirrors, `hooks/xma.cpp` and `debug/thread_cpu.cpp` (the SDK's memory
+  object), `app/main.cpp` (the base). The game turns virtual addresses
+  into GPU physical ones inline (about 270 sites masking with
+  `0x1FFFFFFF` in `generated/`).
+
+### The steps
+
+1. **Measure** (logging, no change in behavior): which of the SDK's guest
+   data the game reads in play (the export variables by name, the kernel
+   globals), whether any CPU access goes through a second alias of a
+   physical block (written at one of `0xA`, `0xC`, `0xE` and read at
+   another, or at its physical address), and every physical address the
+   renderer reads, by the block it falls in. Recorded here; it decides
+   steps 2 and 4.
+
+   Done (2026-11-16). **The kernel's variables**: the image imports 10
+   (the SDK binds each slot in the image's import table, logged at
+   `--log_level=debug`; slots found in the image's first pages under
+   gdb). Read by code that runs (the lifted functions found by scanning
+   `src/lifted/` for loads at `0x82000000` + the slot, checked against
+   `coverage/seen_in_play.txt`; our hand ports by their constants):
+
+   | Slot | Variable | Read by | What the SDK leaves there | To plug in |
+   | --- | --- | --- | --- | --- |
+   | `0x820007B0` | `VdGlobalDevice` | the graphics library's lifted functions, `Device::WorkerThread`, `hooks/graphics_device.cpp`, `graphics/predicated_tiling.cpp` | a word the game writes itself (the device, `0x001B6900`) | a word of ours |
+   | `0x820007B4` | `KeCertMonitorData` | `Device::BeginTiling` `825BED08`, `822B1E70` (seen in play) | zeros | a zeroed block |
+   | `0x820007F0` | `KeDebugMonitorData` | the same two, `CheckHeap`, XAudio (`xaudio/engine.h`), the C runtime (`c_runtime/core.h`) | zeros | a zeroed block |
+   | `0x820007EC` | `ExLoadedCommandLine` | `GetCommandLineA` `sub_822979D0` (`c_runtime/core.cpp`) | `"default.xex"` with its quotes | the same string |
+   | `0x820007FC` | `ExThreadObjectType` | `SetThreadPriority`, `XSetThreadProcessor`, XAudio: passed to `ObReferenceObjectByHandle`, which ours ignores | a zeroed type record, `Thrd` at +0x18 | the same |
+   | `0x8200088C` | `XboxKrnlVersion` | `sub_822AC918` (not seen in play) | 2, 0xFFFF, 0xFFFF, 0x8000 | the same |
+   | `0x82000734`, `0x82000744`, `0x820007DC`, `0x82000854` | `VdGpuClockInMHz`, `VdHSIOCalibrationLock`, `XexExecutableModuleHandle`, `KeTimeStampBundle` | nothing that runs (their readers aren't lifted, or our ports don't read them: `CreateHeap`'s size is fixed, `GetTickCount` is the host clock) | | left out |
+
+   **The physical aliases**: the renderer reads physical memory as one
+   flat 512 MB range (`native/state.h`'s `PhysicalHostAddress`: base +
+   4 GB + the physical address, from the GPU addresses the game computes;
+   the guest memory mirrors copy it as flat buffers; textures, index
+   ranges, shader microcode and the copy hashes read it there). Dropping
+   the aliases would mean a new memory model for the renderer, so the
+   views stay (step 4): one memory file of physical memory mapped at +4 GB
+   and at `0xA0000000`, `0xC0000000` and `0xE0000000` (the last at
+   physical + 0x1000, as the SDK maps it; `GpuPhysicalAddress` has the
+   same offset). The CPU-side alias check is then not needed.
+2. **The SDK's guest data plugged in**: the export variables the game
+   reads written by us as fixed data (plug in data), in our layer's
+   memory; the rest left out.
+
+   Done (2026-11-16, `src/memory/kernel_variables.cpp`,
+   `--native_kernel_variables`): after the image is loaded, the six read
+   slots point at blocks of ours holding step 1's data; the four nothing
+   reads are left as the loader bound them (step 3's loader leaves them
+   out). The import table's page is read-only after the load, so it's
+   made writable around the binding (through the SDK's heap until step 4).
+   A first try without that faulted, and the SDK's fault handler retried
+   the write for ever: a hang, not a crash. Attract race and pad replay
+   clean.
+3. **The image loaded by us** (E3 brought forward: our mapping must hold
+   it, and the SDK's loader writes into the SDK's): `default.xex` read,
+   decrypted (AES, the title key) and decompressed (LZX, through an
+   upstream library: libmspack's LZX decoder is the candidate, as FFmpeg
+   was for XMA) into `0x82000000`, its imports bound to our dispatch
+   table's thunk entries and plugged-in variables. Only the US release's
+   `default.xex` is supported, checked by its hash; its header's few
+   fields read for that file. The player's own file stays the source (the
+   repo never ships game data).
+
+   Done (2026-11-16, `src/app/image_load.cpp`): this `default.xex` turned
+   out to use the XEX's **basic** compression (two blocks of data, each
+   followed by zeros: 6,750,208 bytes then 3,211,264 zeros, then 196,608
+   bytes), not LZX, so libmspack isn't needed after all; only AES-128 (the
+   image key at the security info's +0x150 decrypted with the retail key,
+   then CBC from a zero IV over the data). AES and SHA-1 come from
+   FFmpeg's libavutil, already built for the XMA decoder (`itc_avutil`):
+   no new library. The file is checked by its SHA-1 (`32932de0...`).
+   `--check_image_load` (off by default) loads it beside the SDK's loader
+   and compares: 10,158,080 bytes at `0x82000000`, differing only in the
+   ten variable import slots the SDK binds (9 ranges, 39 bytes). The
+   loader isn't used for the game yet: step 4 switches to it.
+4. **Our own mapping**: one reservation of the guest's 4 GB (and the
+   physical range) by us: `memfd_create` and `mmap` on Linux,
+   `CreateFileMapping` and `MapViewOfFile` on Windows (`docs/windows.md`),
+   our allocation layer taking its ranges from it directly (its own
+   ranges for the 4 KB, 64 KB and physical pages) instead of from the
+   SDK's heaps. Whether the physical aliases are kept depends on step 1:
+   - if nothing reaches a block through a second alias, each physical
+     block lives once at its virtual address and the renderer maps a
+     GPU physical address to it through a table our layer keeps (no
+     aliased views: the "not emulating" rule's choice);
+   - if something does, the three views are mapped as the SDK maps them.
+   The renderer's `PhysicalHostAddress`, the mirrors, `xma.cpp` and
+   `thread_cpu.cpp` move to our layer's accessors.
+
+   Done (2026-11-16, `src/memory/mapping.cpp`, Linux only for now): one
+   `memfd_create` file (nothing in `/dev/shm`) of 4.5 GB plus a page, mapped
+   as the SDK's nine views (`map_info` in its `xmemory.cpp`) into one
+   reservation, so every alias the game or the renderer can reach is the
+   same as before: 4 KB and 64 KB virtual pages, `0x7F000000` (physical
+   0-16 MB: the tiling workers' L2 area and signals,
+   `graphics/predicated_tiling.h`), the image at `0x80000000` and its alias
+   at `0x90000000`, the three physical views (`0xE0000000` at physical +
+   4 KB) and the flat physical range at base + 4 GB. Page 0's 64 KB stay
+   unmapped (the SDK's `--protect_zero`), and nothing else is protected:
+   no page protection or access watches (nothing of ours used them: the
+   texture reloads come from our memcpy hook). The allocation layer
+   (`memory/heap.cpp`) takes its 384 MB at `0x10000` from it, and physical
+   memory from an allocator of its own over physical [0, 512 MB) (free
+   ranges by physical address, top down, the size and alignment rounded
+   to the page size, `[low, high]` clamped and rounded as the SDK's
+   `BaseHeap::AllocRange`), the address in the view for the page size;
+   the ranges the SDK kept for itself at start-up are kept out the same
+   way (0-16 MB, which `0x7F000000` shows; 3.25 MB below the top 64 KB;
+   the top 64 KB). `main()` maps it first, loads the image with our loader
+   (step 3) into `0x82000000`, binds the kernel variables (no page to
+   unprotect now) and starts the main thread with the header's stack size
+   (field `0x20200`: `0x40000`); native audio and `hooks/xma.cpp` allocate
+   from our layer instead of the SDK's system heap. `--native_threads=false`
+   (the SDK's `PrepareModuleLaunch`) no longer starts. While the SDK's
+   runtime is still made (until step 5) it maps its own memory at
+   `0x100000000` with `MAP_FIXED`, over anything there, so ours goes where
+   the kernel puts it; the first try had ours at `0x100000000`, the SDK's
+   views over it, and the image's copy faulting on the SDK's read-only
+   page. `--check_image_load` still matched (the 9 ranges of step 3).
+   Attract races, the pad replay (127 s, no error lines, the race at the
+   frame cap) and a frame dump clean.
+5. **The SDK's runtime not made**: with threads (E1), memory and the image
+   ours, `main()` stops making `rex::Runtime` (its kernel state, memory
+   and module loader); what's left of it for us (the flag parser, the log
+   forwarding, A4's) and the fallback paths into the SDK
+   (`lifted::ImportFromSdk`, the imports never seen in play, which then
+   log and stop like an address with no entry) are settled there, and
+   that is E4's start.
+
+   Done (2026-11-16): `main()` (`src/app/main.cpp`) no longer makes
+   `rex::Runtime`: no SDK memory, kernel state, module loader, VFS,
+   function table, audio system or C runtime heap. It parses the flags,
+   sets up the log and SDL (SDK library calls, until E4), maps guest
+   memory (now at `0x100000000`, the SDK's address, as nothing else maps
+   there), loads the image, binds the kernel variables, starts our audio
+   output and the main thread, and runs the event loop; closing flushes
+   the log and exits (no `TerminateTitle`: the game's threads are ours).
+   - Native audio (`src/audio/native_audio.cpp`) is a class of its own
+     started from `main()`, no longer an `AudioSystem` in the runtime's
+     config; `--native_audio=false` (the SDK's driver) is gone (the flag
+     stays accepted and is ignored with a warning, as scripts pass it).
+   - The guest timebase (`REX_QUERY_TIMEBASE`, nothing lifted reads it)
+     is our 50 MHz performance counter (`helpers/clock.h`), not the SDK's
+     guest clock, whose rate only the runtime set.
+   - `debug/thread_cpu.cpp` no longer labels threads with the SDK's
+     `XThread` starts (ours aren't `XThread`s); `CurrentThreadId` has no
+     SDK fallback (0, logged once, on a thread not ours).
+   - The fallbacks into the SDK (`lifted::ImportFromSdk`, and `Import` of
+     an SDK import with no answer of ours) log the import's name and the
+     caller and stop the program, as a call with no dispatch table entry
+     does; `lifted::Sdk` on our own functions and lifted originals still
+     runs them. Turning `--native_threads` or `--native_memory_imports`
+     off therefore stops at the first such import, and
+     `--check_image_load` is gone (no SDK loader to compare with).
+   - Left for E4: the SDK-facing entries nothing calls without the runtime
+     (`REX_FUNC(xstart)` in `app/start_up.cpp`, the `ITC_KERNEL_ENTRY`
+     functions, `app/image.cpp`'s `PPCImageConfig`), and the library
+     pieces that don't need the runtime (flags, logging, `rex::filesystem`
+     paths, `fpscr.h`, the shader translator, `xeRtlNtStatusToDosError`,
+     `global_critical_region`). The Windows build isn't kept working:
+     `memory/mapping.cpp` is Linux only (no Windows code until the user
+     asks).
+
+Checks at each step: attract races, the pad replay, frame dumps, a drive
+by the user, the Windows build under Wine for step 4, and saves loading
+(the Risks below).
+
+### Decisions for the user
+
+- **The physical aliases** (step 4): drop them if step 1 shows nothing
+  uses them, or keep the SDK's aliased views. After step 1: keep the views
+  (recommended now: the renderer reads physical memory as one flat range).
+- **The image load** (step 3): our own loader with an upstream LZX
+  library (recommended; only the US `default.xex`), or keep the SDK's
+  loader as a library writing into our mapping (less work now, but it
+  keeps the SDK's memory classes alive until it's replaced). **Decided
+  (the user, 2026-11-16): our own loader with libmspack**, not the SDK's.
+- **The order**: steps 2 and 3 before 4 (the image and the SDK's data
+  have to land somewhere before the SDK's memory goes), as above.
 
 ## Risks
 
@@ -6053,3 +6477,28 @@ boundary: overridden 128, Native (with Lifted) 204, Dropped 24, never
 called 20, live 73. Imports: 186 called, 30 with a live caller. B7
 (`b7_status.py`): ours 10,556, work left 32. Static map: unported 9 (the Xbox Live mode's two, `xstart`, six the lift can't
 translate, none seen in play).
+
+**2026-11-16, E1's threads and sync (branch `e1-threads-sync-16-11-26`):**
+every import the game calls in play is answered by our code (`src/threads/`,
+`src/memory/memory_imports.cpp`, `src/imports/`; `--log_imports`: 30 imports
+in play, none reaching the SDK), and every thread running game code is a host
+thread of ours (the main thread, the frame driver's four, the tiling worker,
+XAudio's two, native audio's). Attract races, the pad replay (127 s) and frame
+dumps clean. `boundary_status.py` reads the function rows, not the running
+code, so its figures don't move with E1: overridden 128, Native (with Lifted)
+204, Dropped 24, never called 20, live 73; imports: 186 called, 30 with a live
+caller.
+
+**2026-11-16, E2's steps 2 to 5 (branch `e1-threads-sync-16-11-26`):** the
+kernel variables the game reads plugged in, `default.xex` loaded by our
+own loader, guest memory mapped by us (`src/memory/mapping.cpp`: one
+memfd as the SDK's nine views, nothing in `/dev/shm`) with the allocation
+layer's ranges and its own physical allocator, and `rex::Runtime` no
+longer made: no SDK memory, kernel, loader or VFS; the SDK is a library
+(flags, log, paths) until E4. Attract races, the pad replay (127 s, no
+error lines, the race at the frame cap) and frame dumps clean;
+`--log_imports`: 28 imports in play, all ours (any other now stops the
+program). `boundary_status.py` reads the docs' function rows, not the
+running code, so its figures don't move with E2: overridden 128, Native
+(with Lifted) 204, Dropped 24, never called 20, live 73; imports: 186
+called, 30 with a live caller.

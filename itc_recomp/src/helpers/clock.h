@@ -1,9 +1,9 @@
 // The game's clocks as plain C++: the performance counter
 // (QueryPerformanceCounter) and its rate (KeQueryPerformanceFrequency), and
-// the millisecond tick count (GetTickCount). The counter is the timebase recompiled code reads with mftb
-// (REX_QUERY_TIMEBASE, the SDK's guest clock), whose rate the SDK's runtime
-// sets to the 360's 50 MHz (rexglue-sdk/src/system/runtime.cpp): the two have
-// to agree. See B6 in docs/rexglue-removal.md.
+// the millisecond tick count (GetTickCount). The counter is also the
+// timebase code reads with mftb (REX_QUERY_TIMEBASE in guest_code.h; the
+// SDK's guest clock at the same 50 MHz before E2). See B6 in
+// docs/rexglue-removal.md.
 
 #pragma once
 

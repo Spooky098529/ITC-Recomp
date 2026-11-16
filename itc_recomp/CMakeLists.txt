@@ -104,8 +104,18 @@ set(ITC_SOURCES
     src/hooks/memory_status.cpp
     src/hooks/heap.cpp
     src/memory/heap.cpp
+    src/memory/mapping.cpp
     src/hooks/c_runtime_heap.cpp
     src/memory/c_runtime_heap.cpp
+    src/memory/memory_imports.cpp
+    src/memory/kernel_variables.cpp
+    src/app/image_load.cpp
+    src/imports/native_imports.cpp
+    src/threads/spin_locks.cpp
+    src/threads/critical_sections.cpp
+    src/threads/events.cpp
+    src/threads/tls.cpp
+    src/threads/threads.cpp
     src/hooks/voice.cpp
     src/hooks/sprites.cpp
     src/sprites/sprites.cpp
@@ -1015,7 +1025,7 @@ function(itc_add_executable name)
     # include path can't stand in for them.
     target_include_directories(${name} PRIVATE thirdparty)
 
-    target_link_libraries(${name} PRIVATE itc_xma itc_movies itc_xenos_shaders)
+    target_link_libraries(${name} PRIVATE itc_xma itc_movies itc_xenos_shaders itc_avutil)
 
     # The native renderer (src/native/) uses SDL, which lives in librexruntime,
     # and loads Vulkan at runtime: it needs only the headers. Both are the SDK's
