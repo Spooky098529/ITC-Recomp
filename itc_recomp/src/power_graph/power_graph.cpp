@@ -3,6 +3,7 @@
 // floating point (CMakeLists.txt): each step is the translation's, in its
 // order, so results match it bit for bit.
 
+#include "base/float_mode.h"
 #include "power_graph/power_graph.h"
 
 #include "base/log.h"
@@ -329,7 +330,7 @@ constexpr uint32_t kSetupFromCar = 0x820C27E8;  // Vehicle::SetupFromCar
 constexpr uint32_t kSumScale = 0x820021E8;
 // Flush-to-zero off, as the car's plain C++ expects at entry.
 void FlushOff() {
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
 }
 uint32_t Fctiwz32(double value) {

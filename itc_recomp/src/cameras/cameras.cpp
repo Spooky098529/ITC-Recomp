@@ -13,7 +13,7 @@
 #include "matrix_math/matrix_math.h"
 #include "memory/heap.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/avx.h>
 #include <simde/x86/sse4.1.h>
 
@@ -25,7 +25,7 @@ namespace cameras {
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 constexpr uint32_t kOne = 0x82000A30;       // the game's float 1.0
 constexpr uint32_t kHalf = 0x82001BE4;      // 0.5
@@ -1414,7 +1414,7 @@ void ViewportInit(uint8_t* base, uint32_t viewport, double tangent, uint32_t fra
 std::optional<uint32_t> ViewportsInit(uint8_t* base, uint32_t frame, const ViewportCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820AB358 Viewports::Init");
   // tan (sub_825A8A50) as its adapter gives it with nearest rounding set.
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   double tangent;
   if ((Fpscr::getcsr() & Fpscr::RoundMaskVal) != 0 ||
       !c_runtime::Tan(std::bit_cast<double>(uint64_t(guest::LoadU32(base, 0x82002818)) << 32 |

@@ -2,6 +2,7 @@
 // (docs/functions/second-set.md), with the register steps the harness shares
 // (hooks/second_set.h).
 
+#include "base/float_mode.h"
 #include "hooks/second_set.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -468,7 +469,7 @@ namespace {
 // after, the mode as the original leaves it: `was_on` put back when it's
 // left unchanged.
 bool FlushOffForMorph(lifted::Regs& ctx) {
-  const bool was_on = (PPCFPSCRRegister::Platform::getcsr() & uint32_t(PPCFPSCRRegister::FlushMask)) != 0;
+  const bool was_on = (::base::FloatMode::getcsr() & uint32_t(::base::FloatMode::FlushMask)) != 0;
   ctx.fpscr.disableFlushMode();
   return was_on;
 }
@@ -572,7 +573,7 @@ ss::WheelCalls SecondSetWheelCalls(lifted::Regs& ctx, uint8_t* base) {
       ctx.r5.u64 = out1;
       ctx.r6.u64 = out2;
       lifted::original::c82594D10(ctx, base);
-      on = (PPCFPSCRRegister::Platform::getcsr() & uint32_t(PPCFPSCRRegister::FlushMask)) != 0;
+      on = (::base::FloatMode::getcsr() & uint32_t(::base::FloatMode::FlushMask)) != 0;
     });
     return on;
   };

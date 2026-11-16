@@ -2,7 +2,7 @@
 
 #include "guest.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
 
 #include <bit>
@@ -111,7 +111,7 @@ void StoreF(uint8_t* base, uint32_t address, float value) {
 
 uint32_t BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
                                 const SlotAllocator& slots) {
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   const int32_t alpha_mode = int32_t(guest::LoadU32(base, material + 0));
   uint32_t total = guest::LoadU32(base, material + 32);
   uint32_t type = 2;

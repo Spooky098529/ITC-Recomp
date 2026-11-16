@@ -22,7 +22,7 @@
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
 
 #include <cstring>
@@ -1059,7 +1059,7 @@ void VehicleTick(uint8_t* base, uint32_t vehicle, uint32_t racer, uint32_t car, 
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 constexpr uint32_t kLastRow = 0x826382D0;      // the matrix's fourth row
 constexpr uint32_t kRaise = 0x8200296C;        // 0.3

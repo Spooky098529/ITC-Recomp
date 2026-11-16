@@ -12,6 +12,7 @@
 // hasn't room for all its slots or a chunk is open, where the original
 // prints its messages: left to it.
 
+#include "base/float_mode.h"
 #include "post_effects/post_effects.h"
 
 #include "guest.h"
@@ -58,7 +59,7 @@ void StoreDoubleword(uint8_t* base, uint32_t address, uint32_t low) {
   Store(base, address + 4, low);
 }
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 // tan as the original's call gives it: nearest rounding (its _ctrlfp), or
 // false where c_runtime::Tan can't stand in.

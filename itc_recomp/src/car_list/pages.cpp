@@ -13,7 +13,7 @@
 #include "tuning_pages/tuning_pages.h"
 #include "type67_modes/type67_modes.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 
 #include <climits>
 #include <cmath>
@@ -564,7 +564,7 @@ uint64_t ShowStandCar(uint8_t* base, uint64_t b_r3, uint64_t color, uint32_t sp,
   race_setup::SetModel(base, car, id);
   StoreU32(base, car + 3888, LoadU32(base, car + 3888) | flag);
   // Flush-to-zero off, as Car::Refresh's plain C++ expects.
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
   uint32_t refreshed = 0;
   if (!car_specs::CarRefresh(base, car, &refreshed)) {
@@ -900,7 +900,7 @@ uint32_t Fctiwz(double value) {
 
 uint64_t SetUpColors(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8224B248 PanelSetBase::SetUpColors");
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   const auto flush_off = [] { Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask)); };
   flush_off();
   const uint32_t b = uint32_t(b_r3);

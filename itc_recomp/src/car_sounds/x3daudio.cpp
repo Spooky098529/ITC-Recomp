@@ -8,7 +8,7 @@
 #include "c_runtime/math.h"
 #include "guest.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 
 #include <bit>
 #include <cmath>
@@ -424,7 +424,7 @@ uint64_t Pan(uint8_t* base, uint64_t handle, uint32_t dsp, uint32_t channel, dou
   // with nearest rounding set (it leaves r3 = 0xF8: the restored word ^
   // 0xF8), or tan itself.
   const double x = (f13 * f7) / (f11 + f13);
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   TanResult t;
   if ((Fpscr::getcsr() & Fpscr::RoundMaskVal) != 0 || !c_runtime::Tan(x, &t.f1)) {
     t = tan.guest(tan.user, frame, x);

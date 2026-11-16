@@ -4,6 +4,7 @@
 // (--find_per_frame_state, --debug_hide) have their adapters there, in
 // src/debug/frame_state_diff.cpp, calling these steps.
 
+#include "base/float_mode.h"
 #include "hooks/load_poll.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -136,7 +137,7 @@ lp::Calls LoadPollCalls(lifted::Regs& ctx, uint8_t* base) {
     return;                               \
   }                                       \
   const bool was_on =                     \
-      (PPCFPSCRRegister::Platform::getcsr() & uint32_t(PPCFPSCRRegister::FlushMask)) != 0; \
+      (::base::FloatMode::getcsr() & uint32_t(::base::FloatMode::FlushMask)) != 0; \
   (void)was_on;                           \
   ctx.fpscr.disableFlushMode();
 

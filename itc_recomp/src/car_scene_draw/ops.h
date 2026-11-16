@@ -8,7 +8,7 @@
 
 #include "guest.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
 
 #include <bit>
@@ -17,7 +17,7 @@
 
 namespace car_scene_draw::ops {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 inline constexpr uint32_t kOne = 0x82000A30;   // the game's float 1.0
 inline constexpr uint32_t kZero = 0x82000A34;  // 0.0

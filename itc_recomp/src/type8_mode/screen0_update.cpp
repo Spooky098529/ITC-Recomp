@@ -12,6 +12,7 @@
 // Accepted and Cancelled, the stand's GarageStage calls and the sound
 // manager's slots as guest calls to their overrides.
 
+#include "base/float_mode.h"
 #include "type8_mode/type8_mode.h"
 
 #include "base/log.h"
@@ -102,7 +103,7 @@ void SavePage(uint8_t* base, uint32_t screen, uint32_t keep, bool when_nonzero) 
 
 // Flush-to-zero off, as the car's plain C++ expects at entry.
 void FlushOff() {
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
 }
 

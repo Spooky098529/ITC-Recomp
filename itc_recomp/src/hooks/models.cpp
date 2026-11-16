@@ -15,6 +15,7 @@
 // from Resource::Relocate and XPR::Create; Mesh::LoadShaders (sub_82594D20)
 // and Mesh::Parse (sub_825963F0), from Mesh::Parse and Model::Load.
 
+#include "base/float_mode.h"
 #include "guest.h"
 #include "hooks/native_entry.h"
 #include "lifted/originals.h"
@@ -319,13 +320,11 @@ ITC_NATIVE_ENTRY(82599AF0, ITC_FLAG(native_models)) {
 // Skeleton::LocalMatrices: r3 = the skeleton (r3 left: no caller reads
 // it). Flush-to-zero off when it did float work, as the original leaves it.
 ITC_NATIVE_ENTRY(82599C58, ITC_FLAG(native_models)) {
-  // The float mode is the host's (MXCSR): read and put back through the
-  // SDK's register type.
-  PPCFPSCRRegister fpscr;
-  const uint32_t mode = fpscr.getcsr();
+  // The float mode is the host's (MXCSR): read and put back through ours.
+  const uint32_t mode = ::base::FloatMode::getcsr();
   ctx.fpscr.disableFlushMode();
   if (!model_animation::SkeletonLocalMatrices(base, ctx.r3.u32, ctx.r1.u32)) {
-    fpscr.restoreGuestBits(mode);  // no float work: the mode as it came
+    ::base::FloatMode::restoreGuestBits(mode);  // no float work: the mode as it came
   }
 }
 

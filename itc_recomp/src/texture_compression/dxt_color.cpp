@@ -8,7 +8,7 @@
 #include "base/log.h"
 #include "texture_compression/steps.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse.h>
 
 #include <atomic>
@@ -323,7 +323,7 @@ void FitColorEndpoints(uint8_t* base, const float pixels[16][3], uint32_t colors
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 // EncodeBlock's constants: the alpha reference (in .data, read twice as the
 // original does), the color weights' inverses (0x82649B20, beside the

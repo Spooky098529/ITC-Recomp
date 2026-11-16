@@ -11,7 +11,7 @@
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
 
 namespace track_collision {
@@ -23,7 +23,7 @@ namespace va = vehicle_accessors;
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 constexpr uint32_t kHalf = 0x82001BE4;              // 0.5
 constexpr uint32_t kSliceOffsets = 0x8200680C;      // 4 words: the slices tried around one

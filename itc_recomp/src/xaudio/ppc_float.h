@@ -8,8 +8,8 @@
 
 #include "guest.h"
 
-#include <rex/platform/fpscr.h>
-#include <rex/ppc/intrinsics.h>
+#include "base/float_mode.h"
+#include "lifted/vector_helpers.h"
 #include <simde/x86/sse4.1.h>
 
 #include <cmath>
@@ -17,7 +17,7 @@
 
 namespace xaudio::ppc_float {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 using Vec = simde__m128i;
 
 // The host's flush to zero (and denormals as zero) as the translated code
@@ -56,19 +56,19 @@ inline double Fma(double a, double b, double c) { return double(float(std::fma(a
 inline Vec Lvx(uint8_t* base, uint32_t address) {
   return simde_mm_shuffle_epi8(
       simde_mm_load_si128(reinterpret_cast<const Vec*>(REX_RAW_ADDR(address & ~0xFu))),
-      simde_mm_load_si128(reinterpret_cast<const Vec*>(rex::ppc::VectorMaskL)));
+      simde_mm_load_si128(reinterpret_cast<const Vec*>(vector_helpers::VectorMaskL)));
 }
 inline Vec Lvlx(uint8_t* base, uint32_t address) {
   return simde_mm_shuffle_epi8(
       simde_mm_load_si128(reinterpret_cast<const Vec*>(REX_RAW_ADDR(address & ~0xFu))),
       simde_mm_load_si128(
-          reinterpret_cast<const Vec*>(&rex::ppc::VectorMaskL[(address & 0xF) * 16])));
+          reinterpret_cast<const Vec*>(&vector_helpers::VectorMaskL[(address & 0xF) * 16])));
 }
 inline void Stvx(uint8_t* base, uint32_t address, Vec value) {
   simde_mm_store_si128(
       reinterpret_cast<Vec*>(REX_RAW_ADDR(address & ~0xFu)),
       simde_mm_shuffle_epi8(value,
-                            simde_mm_load_si128(reinterpret_cast<const Vec*>(rex::ppc::VectorMaskL))));
+                            simde_mm_load_si128(reinterpret_cast<const Vec*>(vector_helpers::VectorMaskL))));
 }
 
 // Each value passed through an empty asm so nothing moves across the

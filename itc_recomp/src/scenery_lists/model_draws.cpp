@@ -16,7 +16,7 @@
 #include "models/model.h"
 #include "models/texture_provider.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
 
 #include <algorithm>
@@ -28,7 +28,7 @@ namespace scenery_lists {
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 // A call of the texture provider's slot `function` (args: the provider, the
 // slot, the index) from `frame` with `lr`: its plain C++ where it's the

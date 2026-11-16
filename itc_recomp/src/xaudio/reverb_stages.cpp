@@ -7,7 +7,7 @@
 #include "guest.h"
 #include "xaudio/ppc_float.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
 
 #include <climits>

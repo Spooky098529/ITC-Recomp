@@ -8,7 +8,7 @@
 #include "guest.h"
 #include "ui_movies/game.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 
 #include <climits>
 #include <cmath>
@@ -139,7 +139,7 @@ uint64_t OpenCar(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821847A0 CarDealer::OpenColors");
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
   const uint32_t frame = Frame(base, sp, 240);
   const uint32_t movie = FindMovie(base, 4, frame + 96);

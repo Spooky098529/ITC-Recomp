@@ -15,8 +15,8 @@
 #include "xaudio/resampler.h"
 #include "xaudio/reverb_core.h"
 
-#include <rex/platform/fpscr.h>
-#include <rex/ppc/intrinsics.h>
+#include "base/float_mode.h"
+#include "lifted/vector_helpers.h"
 #include <simde/x86/sse4.1.h>
 
 #include <bit>
@@ -29,7 +29,7 @@ namespace xaudio {
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 Regs Args(std::initializer_list<uint64_t> r) {
   Regs regs;
@@ -340,7 +340,7 @@ uint32_t XmaBlockSize(uint8_t* base, uint32_t address) {
   const simde__m128i line = simde_mm_load_si128(
       reinterpret_cast<const simde__m128i*>(REX_RAW_ADDR(address & ~0xFu)));
   const simde__m128i mask = simde_mm_load_si128(
-      reinterpret_cast<const simde__m128i*>(&rex::ppc::VectorMaskL[(address & 0xF) * 16]));
+      reinterpret_cast<const simde__m128i*>(&vector_helpers::VectorMaskL[(address & 0xF) * 16]));
   simde__m128 x = simde_mm_castsi128_ps(simde_mm_shuffle_epi8(line, mask));
   asm volatile("" : "+x"(x));
   simde__m128 n = simde_mm_round_ps(x, SIMDE_MM_FROUND_TO_NEG_INF | SIMDE_MM_FROUND_NO_EXC);
@@ -356,9 +356,9 @@ uint32_t XmaBlockSize(uint8_t* base, uint32_t address) {
   simde__m128 e = simde_mm_mul_ps(p, simde_mm_castsi128_ps(exp_bits));
   simde__m128 scaled = simde_mm_mul_ps(e, simde_mm_set1_ps(16));
   asm volatile("" : "+x"(scaled));
-  const simde__m128i fixed = rex::ppc::simde_mm_vctsxs(scaled);
+  const simde__m128i fixed = vector_helpers::simde_mm_vctsxs(scaled);
   Fpscr::setcsr(csr);
-  v0 = rex::ppc::simde_mm_adds_epu32(fixed, v0);
+  v0 = vector_helpers::simde_mm_adds_epu32(fixed, v0);
   v0 = simde_mm_srai_epi32(v0, 4);
   v0 = simde_mm_max_epi32(v0, v11);
   alignas(16) uint32_t lanes[4];
@@ -1082,19 +1082,19 @@ using Vec = simde__m128i;
 Vec LoadAligned(uint8_t* base, uint32_t address) {
   return simde_mm_shuffle_epi8(
       simde_mm_load_si128(reinterpret_cast<const Vec*>(REX_RAW_ADDR(address & ~0xFu))),
-      simde_mm_load_si128(reinterpret_cast<const Vec*>(rex::ppc::VectorMaskL)));
+      simde_mm_load_si128(reinterpret_cast<const Vec*>(vector_helpers::VectorMaskL)));
 }
 Vec LoadLeft(uint8_t* base, uint32_t address) {
   return simde_mm_shuffle_epi8(
       simde_mm_load_si128(reinterpret_cast<const Vec*>(REX_RAW_ADDR(address & ~0xFu))),
       simde_mm_load_si128(
-          reinterpret_cast<const Vec*>(&rex::ppc::VectorMaskL[(address & 0xF) * 16])));
+          reinterpret_cast<const Vec*>(&vector_helpers::VectorMaskL[(address & 0xF) * 16])));
 }
 void StoreAligned(uint8_t* base, uint32_t address, Vec value) {
   simde_mm_store_si128(
       reinterpret_cast<Vec*>(REX_RAW_ADDR(address & ~0xFu)),
       simde_mm_shuffle_epi8(value,
-                            simde_mm_load_si128(reinterpret_cast<const Vec*>(rex::ppc::VectorMaskL))));
+                            simde_mm_load_si128(reinterpret_cast<const Vec*>(vector_helpers::VectorMaskL))));
 }
 // vspltw of the first lane.
 Vec SplatFirst(Vec value) { return simde_mm_shuffle_epi32(value, 0xFF); }

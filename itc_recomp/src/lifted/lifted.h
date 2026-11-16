@@ -15,7 +15,7 @@
 // The SDK's helpers for vector instructions SSE has no single instruction
 // for (vperm, the shifts, the conversions) and their shuffle tables:
 // called as the generated code calls them.
-#include <rex/ppc/intrinsics.h>
+#include "lifted/vector_helpers.h"
 
 #include <bit>
 #include <cstddef>

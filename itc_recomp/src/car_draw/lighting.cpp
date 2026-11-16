@@ -12,7 +12,7 @@
 #include "guest.h"
 #include "hooks/lights.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
 
 #include <bit>
@@ -23,7 +23,7 @@ namespace car_draw {
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 constexpr uint32_t kScene = 0x826C2E44;
 constexpr uint32_t kOne = 0x82000A30;           // 1.0

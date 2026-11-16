@@ -4,7 +4,7 @@
 
 #include "command_list/command_list.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse.h>
 
 #include <bit>
@@ -66,7 +66,7 @@ int32_t TurnSide(const float a[4], const float b[4], float zero) {
   if (Equal4(a, b)) {
     return 0;
   }
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   const uint32_t csr = Fpscr::getcsr();
   Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
   const simde__m128 x_z = simde_mm_mul_ss(simde_mm_set_ss(a[0]), simde_mm_set_ss(b[2]));

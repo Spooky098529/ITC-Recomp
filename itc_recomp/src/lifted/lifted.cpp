@@ -1,5 +1,6 @@
 // The lift sweep's runtime: see lifted.h and sdk.h.
 
+#include "base/float_mode.h"
 #include "lifted/lifted.h"
 #include "lifted/sdk.h"
 
@@ -101,16 +102,16 @@ Result Boundary(const Args& args, Invoke invoke) {
 }  // namespace
 
 void ScalarFloatMode() {
-  const uint32_t csr = PPCFPSCRRegister::Platform::getcsr();
-  if ((csr & PPCFPSCRRegister::FlushMask) != 0) [[unlikely]] {
-    PPCFPSCRRegister::Platform::setcsr(csr & ~uint32_t(PPCFPSCRRegister::FlushMask));
+  const uint32_t csr = ::base::FloatMode::getcsr();
+  if ((csr & ::base::FloatMode::FlushMask) != 0) [[unlikely]] {
+    ::base::FloatMode::setcsr(csr & ~uint32_t(::base::FloatMode::FlushMask));
   }
 }
 
 void VectorFloatMode() {
-  const uint32_t csr = PPCFPSCRRegister::Platform::getcsr();
-  if ((csr & PPCFPSCRRegister::FlushMask) != PPCFPSCRRegister::FlushMask) [[unlikely]] {
-    PPCFPSCRRegister::Platform::setcsr(csr | uint32_t(PPCFPSCRRegister::FlushMask));
+  const uint32_t csr = ::base::FloatMode::getcsr();
+  if ((csr & ::base::FloatMode::FlushMask) != ::base::FloatMode::FlushMask) [[unlikely]] {
+    ::base::FloatMode::setcsr(csr | uint32_t(::base::FloatMode::FlushMask));
   }
 }
 

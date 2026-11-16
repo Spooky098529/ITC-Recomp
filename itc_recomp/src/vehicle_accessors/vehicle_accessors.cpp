@@ -9,7 +9,7 @@
 #include <bit>
 #include <cmath>
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
 
 namespace vehicle_accessors {
@@ -361,7 +361,7 @@ uint32_t VehicleSetObjectHalf114(uint8_t* base, uint32_t vehicle, uint32_t value
 
 void QuaternionToMatrix3(uint8_t* base, uint32_t out, uint32_t quaternion) {
   ITC_NATIVE_RUNNING("sub_820C0490 Quaternion::ToMatrix3");
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   // The squared length: vmsum4fp128 on the 16 bytes at the quaternion
   // rounded down to 16 (lvx128), with flush-to-zero on.
   const uint32_t aligned = quaternion & ~0xFu;

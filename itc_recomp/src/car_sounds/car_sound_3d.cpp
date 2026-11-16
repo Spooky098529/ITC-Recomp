@@ -10,7 +10,7 @@
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
 
 #include <bit>
@@ -20,7 +20,7 @@ namespace car_sounds {
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 // The globals and constants Update3D reads.
 constexpr uint32_t kRaceData = 0x826C5B2C;      // the race data: +0xA3AF0, +0xA3AF4

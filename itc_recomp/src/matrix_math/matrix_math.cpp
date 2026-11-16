@@ -8,7 +8,7 @@
 #include "interpolation/blend_state.h"
 #include "vehicle_accessors/vectors.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/avx.h>
 #include <simde/x86/sse4.1.h>
 
@@ -19,7 +19,7 @@ namespace matrix_math {
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 constexpr uint32_t kOne = 0x82000A30;       // the game's float 1.0
 constexpr uint32_t kZero = 0x82000A34;      // the game's float 0.0

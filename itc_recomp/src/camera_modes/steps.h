@@ -8,7 +8,7 @@
 
 #include "guest.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
 
 #include <bit>
@@ -18,7 +18,7 @@
 
 namespace camera_modes::steps {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 // lfs and stfs.
 inline double Lfs(uint8_t* base, uint32_t address) {

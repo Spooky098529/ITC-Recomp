@@ -13,7 +13,7 @@
 #include "type67_modes/type67_modes.h"
 #include "type67_screens/type67_screens.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 
 namespace car_list {
 
@@ -41,7 +41,7 @@ uint64_t SetDrawWord(uint8_t* base, uint32_t holder, uint32_t word, uint32_t fra
 // Car::Refresh on the frame's car: its plain C++ (flush-to-zero off, as it
 // expects), else its original.
 void Refresh(uint8_t* base, uint32_t car, uint32_t frame, uint32_t lr, const Calls& calls) {
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
   uint32_t refreshed = 0;
   if (!car_specs::CarRefresh(base, car, &refreshed)) {

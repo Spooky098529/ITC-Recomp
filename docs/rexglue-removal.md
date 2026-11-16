@@ -4092,6 +4092,24 @@ Each leaves the game working, smallest and most independent first.
    - `rex/version.h`: our version string from git (the window title);
      `rex/audio/flags.h`: `audio_mute`, `audio_maxqframes` as our flags.
    - Checks: the build, an attract race, the pad replay, a frame dump.
+
+   Done (2026-11-16, `e4-sdk-removal-16-11-26`): the status conversion
+   (`hooks/last_error.cpp`: the four failures ours can pass, the general
+   rules, any other logged once and answered 317 as the kernel does), the
+   global lock (`guest_code.h`, a `std::recursive_mutex` of ours),
+   the float mode (`base/float_mode.h`, `::base::FloatMode`: the guest
+   memory parameter is also named `base`; the rounding conversion
+   `_ctrlfp` uses too) and the vector helpers
+   (`lifted/vector_helpers.h`, generated from the SDK's header: the four
+   mask tables and the nine helpers used, `sllv_epi16` with them;
+   `lift.py` now writes `vector_helpers::`). Moved to later steps: the
+   tables' global names (the SDK's, the same bytes, until step 3 takes
+   `rex/ppc.h` out: both can't be declared), simde (still the SDK's copy
+   until step 6), the version string (the SDK's CMake makes it from
+   `git describe`: step 7) and `audio_mute` and `audio_maxqframes` (the
+   SDK's library still defines them: step 4). An attract race
+   (`itc_5720`), the pad replay (`itc_5721`, 127 s, no error lines, the
+   race at ~150 fps) and a frame dump clean.
 3. **`PPCContext` out** (mechanical, by script; a change to
    `guest_code.h` rebuilds every lifted file):
    - Imports keyed by our own numbers (an enum written by

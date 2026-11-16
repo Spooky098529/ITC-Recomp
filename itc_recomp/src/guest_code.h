@@ -1,6 +1,6 @@
 // What our code (the lifted functions, the hand ports' entries, the lift
 // runtime) takes from the SDK for guest code: the image's layout, guest
-// memory access, the function prologue's hint and the global lock. Our own
+// memory access, the function prologue's hint and the global lock (ours). Our own
 // copy of what generated/'s itc_pch.h gave (docs/rexglue-removal.md,
 // "Before E1: the rewiring", stage 5: generated/ isn't built), kept as it
 // was there.
@@ -10,12 +10,12 @@
 #include <rex/image_info.h>
 #include <rex/logging.h>
 #include <rex/ppc.h>
-#include <rex/thread/mutex.h>
 
 #include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
+#include <mutex>
 #include <string_view>
 
 #include "helpers/clock.h"
@@ -67,9 +67,15 @@ extern const rex::PPCImageInfo PPCImageConfig;
 // (helpers/clock.h), the SDK's guest clock's rate when its runtime set it.
 #define REX_QUERY_TIMEBASE() helpers::PerformanceCounter()
 
-// The SDK's stand-in for the 360 turning interrupts off: one lock, shared
-// with the SDK's kernel functions, and a count of how deep it's held
-// (lifted::EnterGlobalLock and the like).
+// The stand-in for the 360 turning interrupts off: one process-wide lock
+// (ours since E4's step 2; the SDK's kernel, which shared it, no longer
+// runs), and a count of how deep it's held (lifted::EnterGlobalLock and the
+// like).
+inline std::recursive_mutex& ppc_global_lock_() {
+  static std::recursive_mutex lock;
+  return lock;
+}
+
 inline std::atomic<i32>& ppc_global_lock_count_() {
   static std::atomic<i32> count{0};
   return count;
@@ -77,19 +83,19 @@ inline std::atomic<i32>& ppc_global_lock_count_() {
 
 #define REX_CHECK_GLOBAL_LOCK()                                        \
   ([&]() -> u64 {                                                      \
-    auto lock_ = rex::thread::global_critical_region::AcquireDirect(); \
+    std::lock_guard<std::recursive_mutex> lock_(ppc_global_lock_());   \
     return ppc_global_lock_count_().load() ? 0 : 0x8000;               \
   }())
 
-#define REX_ENTER_GLOBAL_LOCK()                          \
-  do {                                                   \
-    rex::thread::global_critical_region::mutex().lock(); \
-    ppc_global_lock_count_().fetch_add(1);               \
+#define REX_ENTER_GLOBAL_LOCK()             \
+  do {                                      \
+    ppc_global_lock_().lock();              \
+    ppc_global_lock_count_().fetch_add(1);  \
   } while (0)
 
 #define REX_LEAVE_GLOBAL_LOCK()                                                           \
   do {                                                                                    \
     auto old_count_ = ppc_global_lock_count_().fetch_sub(1);                              \
     assert(old_count_ >= 1 && "LeaveGlobalLock called without matching EnterGlobalLock"); \
-    rex::thread::global_critical_region::mutex().unlock();                                \
+    ppc_global_lock_().unlock();                                                          \
   } while (0)

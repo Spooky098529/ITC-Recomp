@@ -13,7 +13,7 @@
 #include "load_poll/load_poll.h"
 #include "second_set/objects.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 
 #include <cstring>
 
@@ -21,7 +21,7 @@ namespace car_draw {
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 constexpr uint32_t kScene = 0x826C2E44;
 constexpr uint32_t kCameraPasses = 0x826BAC00;

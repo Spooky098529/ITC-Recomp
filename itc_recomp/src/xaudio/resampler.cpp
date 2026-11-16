@@ -12,8 +12,8 @@
 #include "guest.h"
 #include "xaudio/ppc_float.h"
 
-#include <rex/platform/fpscr.h>
-#include <rex/ppc/intrinsics.h>
+#include "base/float_mode.h"
+#include "lifted/vector_helpers.h"
 #include <simde/x86/sse4.1.h>
 
 #include <bit>
@@ -50,8 +50,8 @@ Vec Srw(Vec a, Vec b) {
   }
   return simde_mm_load_si128(reinterpret_cast<const Vec*>(x));
 }
-Vec Vsr(Vec a, Vec b) { return rex::ppc::simde_mm_vsr(a, b); }
-Vec Perm(Vec a, Vec b, Vec c) { return rex::ppc::simde_mm_perm_epi8_(a, b, c); }
+Vec Vsr(Vec a, Vec b) { return vector_helpers::simde_mm_vsr(a, b); }
+Vec Perm(Vec a, Vec b, Vec c) { return vector_helpers::simde_mm_perm_epi8_(a, b, c); }
 // vupkhsh and vupklsh.
 Vec High16(Vec v) { return simde_mm_cvtepi16_epi32(simde_mm_unpackhi_epi64(v, v)); }
 Vec Low16(Vec v) { return simde_mm_cvtepi16_epi32(v); }
@@ -64,7 +64,7 @@ Vec SignedToFloat(Vec v, uint32_t scale) {
                            simde_mm_castsi128_ps(simde_mm_set1_epi32(int(scale)))));
 }
 Vec UnsignedToFloat(Vec v, uint32_t scale) {
-  return I(simde_mm_mul_ps(rex::ppc::simde_mm_cvtepu32_ps_(Pin(v)),
+  return I(simde_mm_mul_ps(vector_helpers::simde_mm_cvtepu32_ps_(Pin(v)),
                            simde_mm_castsi128_ps(simde_mm_set1_epi32(int(scale)))));
 }
 // The dot product the translated code makes of vmsum4fp: a's lane 3 replaced

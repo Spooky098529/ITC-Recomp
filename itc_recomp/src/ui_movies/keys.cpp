@@ -10,7 +10,7 @@
 #include "base/log.h"
 #include "c_runtime/math.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse2.h>
 
 #include <bit>
@@ -76,7 +76,7 @@ uint32_t FloatBits(double x) { return std::bit_cast<uint32_t>(float(x)); }
 // tan (sub_825A8A50) as its adapter gives it with nearest rounding set: the
 // result, or nullopt where the original must run.
 std::optional<double> Tan(double x) {
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   if ((Fpscr::getcsr() & Fpscr::RoundMaskVal) != 0) {
     return std::nullopt;
   }

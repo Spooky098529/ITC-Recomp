@@ -5,6 +5,7 @@
 // UiMovie::SetText (Strings::FormatV's guest calls through FormatCalls) and
 // the node setters through their plain C++.
 
+#include "base/float_mode.h"
 #include "type67_modes/type67_modes.h"
 
 #include "base/log.h"
@@ -134,7 +135,7 @@ constexpr uint32_t kMinusOne = 0xFFFFFFFF;
 
 // Flush-to-zero off, as the car's plain C++ expects at entry.
 void FlushOff() {
-  using Fpscr = rex::platform::FPSCRPlatform;
+  using Fpscr = ::base::FloatMode;
   Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
 }
 

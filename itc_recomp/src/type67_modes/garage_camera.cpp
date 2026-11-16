@@ -4,6 +4,7 @@
 // float steps (src/xaudio/ppc_float.h), so the results are the original's
 // bit for bit, and its frame's stores replayed.
 
+#include "base/float_mode.h"
 #include "type67_modes/type67_modes.h"
 
 #include "base/log.h"
@@ -238,7 +239,7 @@ void GarageCameraReset(uint8_t* base, uint32_t camera, uint32_t frame) {
   // sets it (put back after, as the original's second _ctrlfp does).
   double tangent = 0.0;
   {
-    using Fpscr = rex::platform::FPSCRPlatform;
+    using Fpscr = ::base::FloatMode;
     const uint32_t csr = Fpscr::getcsr();
     Fpscr::setcsr(csr & ~uint32_t(Fpscr::RoundMaskVal));
     if (!c_runtime::Tan(std::bit_cast<double>(LoadU64(base, 0x82009ED8)), &tangent)) {

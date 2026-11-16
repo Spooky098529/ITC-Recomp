@@ -13,7 +13,7 @@
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
-#include <rex/platform/fpscr.h>
+#include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
 
 #include <algorithm>
@@ -592,7 +592,7 @@ namespace race_overlays {
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
+using Fpscr = ::base::FloatMode;
 
 constexpr uint32_t kTrailTail = 64132;
 constexpr uint32_t kTrailLast = 64144;

@@ -671,6 +671,8 @@ def read_expr(name, view):
 
 def rewrite(text):
     """A statement's ctx reads as locals."""
+    # The SDK's vector helpers are ours (src/lifted/vector_helpers.h, E4).
+    text = text.replace("rex::ppc::", "vector_helpers::")
     def sub(m):
         name, field = m.group(1), m.group(2)
         if name in CRS:
