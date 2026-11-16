@@ -2,6 +2,7 @@
 // itc_recomp/tools/lift.py from generated/. Don't edit it by hand: run the
 // tool again.
 
+#include "lifted/entries.h"
 #include "lifted/functions.h"
 #include "lifted/sdk.h"
 
@@ -761,7 +762,7 @@ lifted::Result f825C09A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   r3 = r30;
   // bl 0x825b9a70
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825B9A70, LIFTED_ARGS(0x825C0AFC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825B9A70(base, LIFTED_ARGS(0x825C0AFC, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32153
   r11 = uint64_t(int64_t(-2107179008));
   // cmpwi cr6,r3,0
@@ -1013,7 +1014,7 @@ uint64_t f825D9C40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t lr) {
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // b 0x825a71d0
-  { const lifted::Result o = lifted::Call(base, 0x825A71D0, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825A71D0(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return r3;
 }
 

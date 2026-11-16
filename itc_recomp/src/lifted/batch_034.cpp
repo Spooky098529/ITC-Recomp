@@ -2,6 +2,7 @@
 // itc_recomp/tools/lift.py from generated/. Don't edit it by hand: run the
 // tool again.
 
+#include "lifted/entries.h"
 #include "lifted/functions.h"
 #include "lifted/sdk.h"
 
@@ -347,7 +348,7 @@ loc_82095CC8:
   r5 = REX_LOAD_U64(uint32_t(r26) + 0);
   // bl 0x82098e80
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82098E80, LIFTED_ARGS(0x82095CF0, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e82098E80(base, LIFTED_ARGS(0x82095CF0, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r28
   r3 = r28;
   // bl 0x8258e578
@@ -463,7 +464,7 @@ loc_82095D6C:
   r4 = REX_LOAD_U64(uint32_t(r11) + 0);
   // bl 0x82095958
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82095958, LIFTED_ARGS(0x82095DAC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e82095958(base, LIFTED_ARGS(0x82095DAC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r3,r31,104
   r3 = uint64_t(int64_t(int64_t(r31) + 104));
   // bl 0x8258dd78
@@ -615,7 +616,7 @@ loc_822BE478:
   r3 = uint64_t(int64_t(16));
   // bl 0x822976f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x822976F8, LIFTED_ARGS(0x822BE484, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e822976F8(base, LIFTED_ARGS(0x822BE484, r31)); r3 = o.r3; f1 = o.f1; }
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x822be4b4
@@ -733,7 +734,7 @@ lifted::Result f822BE2D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r30;
   // bl 0x822976f8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x822976F8, LIFTED_ARGS(0x822BE2F8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e822976F8(base, LIFTED_ARGS(0x822BE2F8, r31)); r3 = o.r3; f1 = o.f1; }
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // stw r3,12(r31)
@@ -802,7 +803,7 @@ lifted::Result f822BE3E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82297790, LIFTED_ARGS(0x822BE41C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x822BE41C, r31)); r3 = o.r3; f1 = o.f1; }
   // clrlwi. r11,r30,31
   r11 = uint32_t(r30) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -814,7 +815,7 @@ lifted::Result f822BE3E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = r31;
   // bl 0x82297790
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82297790, LIFTED_ARGS(0x822BE430, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e82297790(base, LIFTED_ARGS(0x822BE430, r31)); r3 = o.r3; f1 = o.f1; }
 loc_822BE430:
   // mr r3,r31
   r3 = r31;

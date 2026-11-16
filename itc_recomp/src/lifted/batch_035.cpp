@@ -2,6 +2,7 @@
 // itc_recomp/tools/lift.py from generated/. Don't edit it by hand: run the
 // tool again.
 
+#include "lifted/entries.h"
 #include "lifted/functions.h"
 #include "lifted/sdk.h"
 
@@ -400,7 +401,7 @@ loc_82297518:
   r3 = uint64_t(int64_t(122));
   // bl 0x82296fd0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x82296FD0, LIFTED_ARGS(0x82297530, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e82296FD0(base, LIFTED_ARGS(0x82297530, r31)); r3 = o.r3; f1 = o.f1; }
   // li r3,0
   r3 = uint64_t(int64_t(0));
 loc_82297534:
@@ -470,7 +471,7 @@ loc_822B07E0:
   f1 = double(float(f13 * f0));
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A8ED0, LIFTED_ARGS(0x822B0804, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825A8ED0(base, LIFTED_ARGS(0x822B0804, r31)); r3 = o.r3; f1 = o.f1; }
   // frsp f1,f1
   lifted::ScalarFloatMode();
   f1 = double(float(f1));
@@ -505,7 +506,7 @@ loc_822B082C:
   f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + 17248)));
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A8ED0, LIFTED_ARGS(0x822B0838, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825A8ED0(base, LIFTED_ARGS(0x822B0838, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // frsp f12,f1
@@ -591,7 +592,7 @@ loc_822B0890:
   f1 = double(float(f13 * f0));
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A8ED0, LIFTED_ARGS(0x822B08B4, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825A8ED0(base, LIFTED_ARGS(0x822B08B4, r31)); r3 = o.r3; f1 = o.f1; }
   // frsp f1,f1
   lifted::ScalarFloatMode();
   f1 = double(float(f1));
@@ -626,7 +627,7 @@ loc_822B08DC:
   f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + 17312)));
   // bl 0x825a8ed0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A8ED0, LIFTED_ARGS(0x822B08E8, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825A8ED0(base, LIFTED_ARGS(0x822B08E8, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // frsp f12,f1

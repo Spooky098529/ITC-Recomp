@@ -35,6 +35,7 @@ def main(argv):
         "// run the tool again.",
         "",
         '#include "lifted/originals.h"',
+        '#include "lifted/entries.h"',
         '#include "lifted/functions.h"',
         '#include "lifted/sdk.h"',
         "",

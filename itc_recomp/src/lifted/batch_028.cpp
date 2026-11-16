@@ -2,6 +2,7 @@
 // itc_recomp/tools/lift.py from generated/. Don't edit it by hand: run the
 // tool again.
 
+#include "lifted/entries.h"
 #include "lifted/functions.h"
 #include "lifted/sdk.h"
 
@@ -148,7 +149,7 @@ uint64_t f825DB2B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t lr) {
   // addi r3,r11,-17140
   r3 = uint64_t(int64_t(int64_t(r11) + -17140));
   // b 0x82106540
-  { const lifted::Result o = lifted::Call(base, 0x82106540, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e82106540(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return r3;
 }
 
@@ -175,7 +176,7 @@ uint64_t f825DB2D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t lr) {
   // addi r3,r11,-17096
   r3 = uint64_t(int64_t(int64_t(r11) + -17096));
   // b 0x82106540
-  { const lifted::Result o = lifted::Call(base, 0x82106540, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e82106540(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return r3;
 }
 
@@ -208,7 +209,7 @@ lifted::Result f825DB2E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   r3 = REX_LOAD_U32(uint32_t(r31) + 4);
   // bl 0x825a70e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A70E8, LIFTED_ARGS(0x825DB308, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x825DB308, r31)); r3 = o.r3; f1 = o.f1; }
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,4(r31)
@@ -257,7 +258,7 @@ lifted::Result f825DB328(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = REX_LOAD_U32(uint32_t(r31) + 4);
   // bl 0x825a70e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A70E8, LIFTED_ARGS(0x825DB354, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x825DB354, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825DB354:
   // li r11,15
   r11 = uint64_t(int64_t(15));
@@ -313,7 +314,7 @@ lifted::Result f825DB380(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r3 = REX_LOAD_U32(uint32_t(r31) + 4);
   // bl 0x825a70e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A70E8, LIFTED_ARGS(0x825DB3AC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x825DB3AC, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825DB3AC:
   // li r11,15
   r11 = uint64_t(int64_t(15));

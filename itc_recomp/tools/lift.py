@@ -9,6 +9,8 @@ usage:
                                     the static map lists, by reason
   lift.py emit <batch> sub_X ...    writes src/lifted/batch_<batch>.cpp with
                                     those functions, and functions.h
+  lift.py reemit                    writes every batch again (its functions
+                                    from its registration table, in order)
 
 How a function is translated (it reads generated/, never edits it):
   registers   one local each: r0-r31, ctr and the reservation as uint64_t,
@@ -22,8 +24,10 @@ How a function is translated (it reads generated/, never edits it):
               address or an import passes them all)
   return      r3 and f1 when the function writes them (a call writes what
               its callee returns); void, uint64_t, double or lifted::Result
-  calls       a lifted function directly; any other function through the
-              dispatch table (lifted::Call, by address); imports through
+  calls       a lifted function directly, typed; a hand port's entry
+              (lifted/entries.h) directly, with every argument register;
+              any other address through the dispatch table (lifted::Call,
+              which stops the program: none is reached); imports through
               lifted::Import; the register save and restore helpers left
               out (their stack bytes are dead)
   lr          return addresses are dead in C++ (a return is a return): the
@@ -819,6 +823,19 @@ def assign_result(info_callee, call):
     return f"{call};"
 
 
+_ENTRIES = None
+
+
+def entries():
+    """The hand ports' entries lifted/entries.h declares (tools/entry_list.py
+    writes it from a build), by address."""
+    global _ENTRIES
+    if _ENTRIES is None:
+        with open(os.path.join(OUT, "entries.h")) as f:
+            _ENTRIES = frozenset(re.findall(r"Result e(8[0-9A-F]{7})\(", f.read()))
+    return _ENTRIES
+
+
 def is_direct(st, infos, emitting):
     """Whether a call statement is a direct C++ call to a lifted function."""
     return (st.how == "direct" and st.target in infos and infos[st.target].lifted
@@ -871,7 +888,13 @@ def emit_function(info, infos, emitting):
                 call = f"{fname(st.target)}({', '.join(['base'] + callee.params + ([lr] if callee.needs_lr else []))})"
                 used.update(callee.params)
                 line = assign_result(callee, call)
+            elif st.how == "direct" and st.target[4:] in entries():
+                # A hand port's entry (lifted/entries.h): called directly.
+                line = assign_result(None, f"lifted::entry::e{st.target[4:]}(base, LIFTED_ARGS({lr}, r31))")
+                used.update(ALL_ARGS | {"r31"})
             elif st.how == "direct":
+                # No function of ours at the address (not seen in play):
+                # the dispatch table, which stops the program.
                 line = assign_result(None, f"lifted::Call(base, 0x{st.target[4:]}, LIFTED_ARGS({lr}, r31))")
                 used.update(ALL_ARGS | {"r31"})
             elif st.how == "import":
@@ -981,6 +1004,7 @@ def emit_batch(batch, names, infos, emitting):
         "// itc_recomp/tools/lift.py from generated/. Don't edit it by hand: run the",
         "// tool again.",
         "",
+        '#include "lifted/entries.h"',
         '#include "lifted/functions.h"',
         '#include "lifted/sdk.h"',
         "",
@@ -1120,6 +1144,28 @@ def main(argv):
         with open(os.path.join(OUT, "functions.h"), "w") as f:
             f.write(emit_header(signatures))
         print(f"wrote batch {batch}: {len(chosen)} functions")
+        return 0
+    if argv[1] == "reemit":
+        # Every batch written again from its own registration table (its
+        # functions, in their order), as `emit` wrote it, with today's tool.
+        batches = {}
+        for path in sorted(glob.glob(os.path.join(OUT, "batch_*.cpp"))):
+            batch = re.search(r"batch_(\w+)\.cpp$", path).group(1)
+            with open(path) as f:
+                batches[batch] = ["sub_" + a for a in re.findall(r"\{0x(8[0-9A-F]{7}), e8", f.read())]
+        everything = sorted({n for names in batches.values() for n in names})
+        infos = build(sorted(set(everything) | set(lifted_before)), bodies, skip - set(lifted_before))
+        bad = [n for n in everything if not infos[n].lifted]
+        if bad:
+            for n in bad:
+                print(f"{n}: refused: {infos[n].error}")
+            return 1
+        emitting = set(everything) | set(lifted_before)
+        mark_needs_lr(infos, emitting)
+        for batch, names in batches.items():
+            with open(os.path.join(OUT, f"batch_{batch}.cpp"), "w") as f:
+                f.write(emit_batch(batch, names, infos, emitting))
+        print(f"rewrote {len(batches)} batches: {len(everything)} functions")
         return 0
     print(__doc__)
     return 1

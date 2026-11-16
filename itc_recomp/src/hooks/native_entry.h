@@ -18,15 +18,22 @@
 #include "lifted/regs.h"
 #include "lifted/sdk.h"
 
+// The entry is `lifted::entry::e<address>` (declared for every entry in
+// lifted/entries.h, written by tools/entry_list.py), so code that knows its
+// callee calls it directly (docs/e5-native.md, step 0); it's also
+// registered under its address for calls through pointers and vtables.
 #define ITC_NATIVE_ENTRY_DEFINE(address, enabled)                                        \
+  namespace lifted::entry {                                                              \
+  lifted::Result e##address(uint8_t* base, const lifted::Args& args);                    \
+  }                                                                                      \
   static void itc_entry_body_##address(lifted::Regs& ctx, uint8_t* base);                \
-  static lifted::Result itc_entry_##address(uint8_t* base, const lifted::Args& args) {    \
+  lifted::Result lifted::entry::e##address(uint8_t* base, const lifted::Args& args) {    \
     lifted::Regs ctx(args);                                                              \
     itc_entry_body_##address(ctx, base);                                                 \
     return ctx.result();                                                                 \
   }                                                                                      \
   [[maybe_unused]] static const bool itc_entry_registered_##address =                    \
-      lifted::RegisterEntry(0x##address, itc_entry_##address, (enabled));
+      lifted::RegisterEntry(0x##address, lifted::entry::e##address, (enabled));
 
 #define ITC_NATIVE_ENTRY_BODY(address)                                                   \
   static void itc_entry_body_##address([[maybe_unused]] lifted::Regs& ctx,               \

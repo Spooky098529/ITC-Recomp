@@ -2,6 +2,7 @@
 // itc_recomp/tools/lift.py from generated/. Don't edit it by hand: run the
 // tool again.
 
+#include "lifted/entries.h"
 #include "lifted/functions.h"
 #include "lifted/sdk.h"
 
@@ -145,7 +146,7 @@ loc_825DAD60:
   r3 = r31;
   // bl 0x8224fb10
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x8224FB10, LIFTED_ARGS(0x825DAD6C, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e8224FB10(base, LIFTED_ARGS(0x825DAD6C, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r30,r30,-1
   ca = uint32_t(r30) > 0;
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
@@ -212,7 +213,7 @@ loc_825DADBC:
   REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r29));
   // bl 0x820900c0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x820900C0, LIFTED_ARGS(0x825DADDC, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e820900C0(base, LIFTED_ARGS(0x825DADDC, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r30,r30,-1
   ca = uint32_t(r30) > 0;
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
@@ -318,7 +319,7 @@ loc_825DAE4C:
   r3 = r31;
   // bl 0x820900c0
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x820900C0, LIFTED_ARGS(0x825DAE68, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e820900C0(base, LIFTED_ARGS(0x825DAE68, r31)); r3 = o.r3; f1 = o.f1; }
   // addic. r30,r30,-1
   ca = uint32_t(r30) > 0;
   r30 = uint64_t(int64_t(int64_t(r30) + -1));
@@ -475,7 +476,7 @@ lifted::Result f825DAF18(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lwz r3,23756(r11)
   r3 = REX_LOAD_U32(uint32_t(r11) + 23756);
   // b 0x825a71c0
-  { const lifted::Result o = lifted::Call(base, 0x825A71C0, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825A71C0(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
 }
 
@@ -767,7 +768,7 @@ lifted::Result f825DB050(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   if (cr6.eq) goto loc_825DB078;
   // bl 0x825a70e8
   // (left out: dead in C++)
-  { const lifted::Result o = lifted::Call(base, 0x825A70E8, LIFTED_ARGS(0x825DB078, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x825DB078, r31)); r3 = o.r3; f1 = o.f1; }
 loc_825DB078:
   // li r11,0
   r11 = uint64_t(int64_t(0));
@@ -1083,7 +1084,7 @@ uint64_t f825DB210(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t lr) {
   // addi r3,r11,-18128
   r3 = uint64_t(int64_t(int64_t(r11) + -18128));
   // b 0x82106540
-  { const lifted::Result o = lifted::Call(base, 0x82106540, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
+  { const lifted::Result o = lifted::entry::e82106540(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return r3;
 }
 
