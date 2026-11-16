@@ -20,6 +20,8 @@
 #include "threads/threads.h"
 #include "hooks/lifted_call.h"
 #include "hooks/native_entry.h"
+#include "memory/heap.h"
+#include "memory/mapping.h"
 #include "movies/player.h"
 
 #include "guest.h"
@@ -125,7 +127,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
     running_ = true;
     // One of our threads (E1, src/threads/): a guest stack and per-thread
     // block for the game's mixer callback, no SDK thread behind it.
-    thread_ = threads::StartThread(memory()->virtual_membase(), 128 * 1024, "native audio",
+    thread_ = threads::StartThread(memory::Base(), 128 * 1024, "native audio",
                                    [this](lifted::Args args) { ThreadMain(args); });
     g_system = this;
     ITC_LOG_INFO("native audio: started ({} frames queued at most)", queued_frames_limit_);
@@ -175,8 +177,8 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
     if (!OpenStream(index, &stream, &device_channels)) {
       return 0;
     }
-    uint32_t wrapped_arg = memory()->SystemHeapAlloc(4);
-    rex::memory::store_and_swap<uint32_t>(memory()->TranslateVirtual(wrapped_arg), callback_arg);
+    const uint32_t wrapped_arg = memory::Alloc(4, 0);
+    guest::StoreU32(memory::Base(), wrapped_arg, callback_arg);
     {
       std::lock_guard<std::mutex> lock(mutex_);
       client = {};
@@ -223,7 +225,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       client = {};
     }
     if (wrapped_arg) {
-      memory()->SystemHeapFree(wrapped_arg);
+      memory::Free(wrapped_arg);
     }
   }
 
@@ -233,7 +235,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       ITC_LOG_ERROR("native audio: frame for unknown driver handle {:08X}", handle);
       return;
     }
-    const float* input = memory()->TranslateVirtual<const float*>(samples);
+    const float* input = reinterpret_cast<const float*>(memory::Base() + samples);
     std::lock_guard<std::mutex> lock(mutex_);
     Client& client = clients_[index];
     if (!client.in_use) {
@@ -271,7 +273,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
     call.r13 = thread.r13;
     call.lr = 0xBCBCBCBC;
     call.r[0] = arg;
-    lifted::Call(memory()->virtual_membase(), callback, call);
+    lifted::Call(memory::Base(), callback, call);
   }
 
   // Runs each client's mixer while it has credits. The mixer submits its

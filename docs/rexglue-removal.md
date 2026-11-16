@@ -3855,6 +3855,39 @@ guest address space stays until E5 makes the code real C++ (the old E2's
    - if something does, the three views are mapped as the SDK maps them.
    The renderer's `PhysicalHostAddress`, the mirrors, `xma.cpp` and
    `thread_cpu.cpp` move to our layer's accessors.
+
+   Done (2026-11-16, `src/memory/mapping.cpp`, Linux only for now): one
+   `memfd_create` file (nothing in `/dev/shm`) of 4.5 GB plus a page, mapped
+   as the SDK's nine views (`map_info` in its `xmemory.cpp`) into one
+   reservation, so every alias the game or the renderer can reach is the
+   same as before: 4 KB and 64 KB virtual pages, `0x7F000000` (physical
+   0-16 MB: the tiling workers' L2 area and signals,
+   `graphics/predicated_tiling.h`), the image at `0x80000000` and its alias
+   at `0x90000000`, the three physical views (`0xE0000000` at physical +
+   4 KB) and the flat physical range at base + 4 GB. Page 0's 64 KB stay
+   unmapped (the SDK's `--protect_zero`), and nothing else is protected:
+   no page protection or access watches (nothing of ours used them: the
+   texture reloads come from our memcpy hook). The allocation layer
+   (`memory/heap.cpp`) takes its 384 MB at `0x10000` from it, and physical
+   memory from an allocator of its own over physical [0, 512 MB) (free
+   ranges by physical address, top down, the size and alignment rounded
+   to the page size, `[low, high]` clamped and rounded as the SDK's
+   `BaseHeap::AllocRange`), the address in the view for the page size;
+   the ranges the SDK kept for itself at start-up are kept out the same
+   way (0-16 MB, which `0x7F000000` shows; 3.25 MB below the top 64 KB;
+   the top 64 KB). `main()` maps it first, loads the image with our loader
+   (step 3) into `0x82000000`, binds the kernel variables (no page to
+   unprotect now) and starts the main thread with the header's stack size
+   (field `0x20200`: `0x40000`); native audio and `hooks/xma.cpp` allocate
+   from our layer instead of the SDK's system heap. `--native_threads=false`
+   (the SDK's `PrepareModuleLaunch`) no longer starts. While the SDK's
+   runtime is still made (until step 5) it maps its own memory at
+   `0x100000000` with `MAP_FIXED`, over anything there, so ours goes where
+   the kernel puts it; the first try had ours at `0x100000000`, the SDK's
+   views over it, and the image's copy faulting on the SDK's read-only
+   page. `--check_image_load` still matched (the 9 ranges of step 3).
+   Attract races, the pad replay (127 s, no error lines, the race at the
+   frame cap) and a frame dump clean.
 5. **The SDK's runtime not made**: with threads (E1), memory and the image
    ours, `main()` stops making `rex::Runtime` (its kernel state, memory
    and module loader); what's left of it for us (the flag parser, the log

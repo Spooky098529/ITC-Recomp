@@ -1,7 +1,8 @@
 // See image_load.h. The format, for this one file (its header read with
 // the offsets the XEX2 format has): the header's optional fields (+24, 15
 // of them) give the file format (0x3FF: AES-128 encryption, basic
-// compression: blocks of data then zeros) and the load address (0x10201);
+// compression: blocks of data then zeros), the load address (0x10201) and
+// the main thread's stack size (0x20200);
 // the security info (+16's offset) holds the image size (+4) and the
 // image's key (+0x150), itself encrypted with the retail key; the data
 // starts at +8's offset, encrypted with CBC from a zero IV across all the
@@ -45,6 +46,7 @@ constexpr std::array<uint8_t, 16> kRetailKey = {0x20, 0xB1, 0x85, 0xA5, 0x9D, 0x
 
 constexpr uint32_t kFileFormatKey = 0x3FF;
 constexpr uint32_t kLoadAddressKey = 0x10201;
+constexpr uint32_t kStackSizeKey = 0x20200;
 constexpr uint16_t kEncryptionNormal = 1;
 constexpr uint16_t kCompressionBasic = 1;
 constexpr uint32_t kSecurityImageSize = 4;
@@ -94,11 +96,14 @@ bool LoadImage(const std::filesystem::path& path, Image& image, std::string& err
       file_format = value;
     } else if (key == kLoadAddressKey) {
       image.load_address = value;
+    } else if (key == kStackSizeKey) {
+      image.stack_size = value;
     }
   }
   const uint32_t format_size = Be32(file, file_format);
   if (Be16(file, file_format + 4) != kEncryptionNormal ||
-      Be16(file, file_format + 6) != kCompressionBasic || image.load_address == 0) {
+      Be16(file, file_format + 6) != kCompressionBasic || image.load_address == 0 ||
+      image.stack_size == 0) {
     error = "unexpected file format";
     return false;
   }
@@ -130,8 +135,8 @@ bool LoadImage(const std::filesystem::path& path, Image& image, std::string& err
     from += bytes;
     to += bytes + zeros;
   }
-  ITC_LOG_INFO("image load: {} ({} bytes at {:08X})", path.filename().string(), image_size,
-               image.load_address);
+  ITC_LOG_INFO("image load: {} ({} bytes at {:08X}, stack {:#x})", path.filename().string(),
+               image_size, image.load_address, image.stack_size);
   return true;
 }
 

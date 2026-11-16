@@ -13,6 +13,7 @@
 #include "threads/threads.h"
 #include "memory/kernel_variables.h"
 #include "app/image_load.h"
+#include "memory/mapping.h"
 
 #include "audio/native_audio.h"
 #include "base/flags.h"
@@ -38,6 +39,7 @@
 #include <rex/system/xthread.h>
 
 #include <atomic>
+#include <cstring>
 #include <cstdlib>
 #include <deque>
 #include <filesystem>
@@ -264,6 +266,12 @@ int main(int argc, char* argv[]) {
   rex::InitLoggingEarly();
   const app::Paths paths = app::ResolvePaths();
   app::SetUpLogging(paths);
+  // Guest memory (ours: src/memory/mapping.h), before anything that
+  // allocates in it.
+  if (!memory::MapGuest()) {
+    app::Fail("Failed to map guest memory");
+    return EXIT_FAILURE;
+  }
   if (!app::SetUpSdl() || !app::SetUpRuntime(paths)) {
     return EXIT_FAILURE;
   }
@@ -271,41 +279,29 @@ int main(int argc, char* argv[]) {
   input::Gamepads_Start([](std::function<void()> function) {
     app::RunOnMainThread(std::move(function));
   });
-  // The game's main thread: one of our threads (E1, src/threads/) running
-  // our start-up (src/app/start_up.cpp) with the module's stack size; with
-  // --native_threads off, the kernel's, started at xstart's address.
-  if (ITC_FLAG(check_image_load)) {
-    app::Image image;
-    std::string error;
-    if (app::LoadImage(paths.game_data / "default.xex", image, error)) {
-      app::CheckImageAgainstGuest(image, app::g_runtime->memory()->virtual_membase());
-    } else {
-      ITC_LOG_ERROR("image load: {}", error);
-    }
-  }
-  memory::BindKernelVariables(app::g_runtime->memory()->virtual_membase());
-  if (threads::Enabled()) {
-    uint8_t* base = app::g_runtime->memory()->virtual_membase();
-    const uint32_t stack_size =
-        app::g_runtime->kernel_state()->GetExecutableModule()->stack_size();
-    std::thread main_thread = threads::StartMainThread(base, stack_size, app::StartUp);
-    std::thread waiter([thread = std::move(main_thread)]() mutable {
-      thread.join();
-      ITC_LOG_INFO("Execution complete");
-      app::RequestQuit();
-    });
-    waiter.detach();
-    app::RunLoop();
-    return EXIT_SUCCESS;
-  }
-  auto main_thread = app::g_runtime->PrepareModuleLaunch();
-  if (!main_thread) {
-    app::Fail("Failed to launch module");
+  // The image in guest memory (our own loader: src/app/image_load.cpp), the
+  // kernel variables bound.
+  uint8_t* base = memory::Base();
+  app::Image image;
+  std::string error;
+  if (!app::LoadImage(paths.game_data / "default.xex", image, error)) {
+    app::Fail("Failed to load default.xex: " + error);
     return EXIT_FAILURE;
   }
-  main_thread->Resume();
+  if (ITC_FLAG(check_image_load)) {
+    app::CheckImageAgainstGuest(image, app::g_runtime->memory()->virtual_membase());
+  }
+  std::memcpy(base + image.load_address, image.bytes.data(), image.bytes.size());
+  memory::BindKernelVariables(base);
+  // The game's main thread: one of our threads (E1, src/threads/) running
+  // our start-up (src/app/start_up.cpp) with the image's stack size.
+  if (!threads::Enabled()) {
+    app::Fail("--native_threads=false is no longer supported");
+    return EXIT_FAILURE;
+  }
+  std::thread main_thread = threads::StartMainThread(base, image.stack_size, app::StartUp);
   std::thread waiter([thread = std::move(main_thread)]() mutable {
-    thread->Wait(0, 0, 0, nullptr);
+    thread.join();
     ITC_LOG_INFO("Execution complete");
     app::RequestQuit();
   });

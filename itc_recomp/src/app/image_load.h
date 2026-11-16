@@ -13,6 +13,7 @@ namespace app {
 
 struct Image {
   uint32_t load_address = 0;
+  uint32_t stack_size = 0;     // the main thread's (the header's default stack size)
   std::vector<uint8_t> bytes;  // the image from load_address on
 };
 

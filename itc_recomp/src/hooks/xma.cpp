@@ -1,7 +1,7 @@
 // The audio library's XMA layer (B2 in docs/rexglue-removal.md; the functions
 // in docs/functions/audio.md) over our own decoding (audio/xma_stream.h):
 // no XMA contexts, registers or hardware. A source voice's XMA object (voice
-// +184) is an opaque handle (a small system heap block) for an Object here,
+// +184) is an opaque handle (a small block from our allocation layer) for an Object here,
 // and the voice reaches it only through these helpers. Each stream decodes
 // its sound into one flat buffer of big-endian 16-bit samples in guest
 // memory (the voice's recompiled update reads the samples there), and
@@ -20,8 +20,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
-#include <rex/system/kernel_state.h>
-#include <rex/system/xmemory.h>
+#include "memory/heap.h"
 
 #include <memory>
 #include <mutex>
@@ -43,7 +42,7 @@ struct StreamState {
   uint32_t input = 0;    // the sound's data (guest), 0 when none
   uint32_t pending = 0;  // a second sound given while one plays (not seen in play)
   uint32_t pending_size = 0;
-  uint32_t buffer = 0;  // the decoded samples (guest, system heap)
+  uint32_t buffer = 0;  // the decoded samples (guest, our allocation layer)
   uint32_t consumed = 0;
   audio::xma::Stream stream;
 };
@@ -57,8 +56,10 @@ struct Object {
 std::mutex g_objects_mutex;
 std::unordered_map<uint32_t, std::shared_ptr<Object>> g_objects;
 
-rex::memory::Memory* Memory() {
-  return rex::system::kernel_state()->memory();
+// The SDK's system heap before E2: our allocation layer, cleared as fresh
+// pages were.
+uint32_t SystemAlloc(uint32_t bytes) {
+  return memory::Alloc(bytes, memory::kHeapZeroMemory);
 }
 
 std::shared_ptr<Object> Find(uint32_t handle) {
@@ -70,7 +71,7 @@ std::shared_ptr<Object> Find(uint32_t handle) {
 void FreeBuffer(StreamState& s) {
   s.stream.End();
   if (s.buffer) {
-    Memory()->SystemHeapFree(s.buffer);
+    memory::Free(s.buffer);
     s.buffer = 0;
   }
   s.input = 0;
@@ -87,9 +88,9 @@ bool Start(uint8_t* base, StreamState& s, uint32_t data, uint32_t size) {
   const uint8_t* host = base + data;
   const uint32_t samples = audio::xma::Stream::BufferSamples(host, size);
   const uint32_t bytes = std::max(samples, 1u) * s.channels * 2;
-  s.buffer = Memory()->SystemHeapAlloc(bytes);
+  s.buffer = SystemAlloc(bytes);
   if (!s.buffer) {
-    ITC_LOG_ERROR("xma: no system heap for {} bytes ({} samples)", bytes, samples);
+    ITC_LOG_ERROR("xma: no memory for {} bytes ({} samples)", bytes, samples);
     return false;
   }
   if (!s.stream.Begin(host, size, s.channels, s.sample_rate, base + s.buffer)) {
@@ -166,7 +167,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8245C650) {
     s->channels = guest::LoadU8(base, d + 8);
     object->streams.push_back(std::move(s));
   }
-  const uint32_t handle = Memory()->SystemHeapAlloc(16);
+  const uint32_t handle = SystemAlloc(16);
   if (!handle) {
     ctx.r3.u64 = 0x8007000E;
     return;
@@ -197,7 +198,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8245C880) {
     for (auto& s : object->streams) {
       Reset(*s);
     }
-    Memory()->SystemHeapFree(handle);
+    memory::Free(handle);
   }
   ctx.r3.u64 = 0;
 }

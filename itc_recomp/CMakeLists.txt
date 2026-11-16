@@ -104,6 +104,7 @@ set(ITC_SOURCES
     src/hooks/memory_status.cpp
     src/hooks/heap.cpp
     src/memory/heap.cpp
+    src/memory/mapping.cpp
     src/hooks/c_runtime_heap.cpp
     src/memory/c_runtime_heap.cpp
     src/memory/memory_imports.cpp

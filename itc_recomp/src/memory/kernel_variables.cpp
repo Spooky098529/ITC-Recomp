@@ -15,9 +15,6 @@
 #include "guest.h"
 
 #include <cstring>
-
-#include <rex/system/kernel_state.h>
-#include <rex/system/xmemory.h>
 #include <string_view>
 
 ITC_FLAG_BOOL(native_kernel_variables, true, "ITC",
@@ -46,19 +43,8 @@ void BindKernelVariables(uint8_t* base) {
   if (!ITC_FLAG(native_kernel_variables)) {
     return;
   }
-  // The loader leaves the import table's page read-only: writable while
-  // the slots are bound, then as it was (through the SDK's heap until our
-  // own mapping, step 4).
-  constexpr uint32_t kPage = kVdGlobalDevice & ~0xFFFu;
-  constexpr uint32_t kPageBytes = 0x1000;
-  rex::memory::BaseHeap* heap = REX_KERNEL_MEMORY()->LookupHeap(kPage);
-  uint32_t protection = 0;
-  if (!heap || !heap->QueryProtect(kPage, &protection) ||
-      !heap->Protect(kPage, kPageBytes,
-                     rex::memory::kMemoryProtectRead | rex::memory::kMemoryProtectWrite)) {
-    ITC_LOG_ERROR("kernel variables: the import table's page can't be made writable");
-    return;
-  }
+  // The import table's page is writable in our mapping (memory/mapping.h:
+  // no page protection).
   // VdGlobalDevice: a word the game writes itself (the device).
   guest::StoreU32(base, kVdGlobalDevice, Block(16));
   // KeCertMonitorData and KeDebugMonitorData: no monitor, zeros (their
@@ -82,7 +68,6 @@ void BindKernelVariables(uint8_t* base) {
   guest::StoreU16(base, version + 4, 0xFFFF);
   guest::StoreU16(base, version + 6, 0x8000);
   guest::StoreU32(base, kXboxKrnlVersion, version);
-  heap->Protect(kPage, kPageBytes, protection);
   ITC_LOG_INFO("kernel variables: 6 bound to data of ours");
 }
 
