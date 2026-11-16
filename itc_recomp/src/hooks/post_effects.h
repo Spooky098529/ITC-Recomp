@@ -14,13 +14,11 @@ namespace hooks {
 // entry pointer): its plain C++, or the original where the frees aren't
 // the allocation layer's (--native_c_runtime_heap, --native_heap, or a
 // block not the layer's). r3 as the original leaves it.
-void PostEffectsReleaseTexture(PPCContext& ctx, uint8_t* base);
 void PostEffectsReleaseTexture(lifted::Regs& ctx, uint8_t* base);
 // PostEffect::ReleaseSurface (sub_82133C60; r3 = the address of an
 // effect's surface pointer): its plain C++ with the video output and
 // Resource::Release as guest calls from a 112-byte frame, or the original
 // without --native_video_output. r3 as the original leaves it.
-void PostEffectsReleaseSurface(PPCContext& ctx, uint8_t* base);
 void PostEffectsReleaseSurface(lifted::Regs& ctx, uint8_t* base);
 // The destructors' calls: the two above on a field's address.
 post_effects::DestroyCalls PostEffectsDestroyCalls(lifted::Regs& ctx, uint8_t* base);
@@ -31,13 +29,11 @@ post_effects::RecordCalls PostEffectsRecordCalls(lifted::Regs& ctx, uint8_t* bas
 // the glow; r3 as the render queue's call leaves it), or the original
 // (also where the plain C++ declines). Frame interpolation's wrap
 // (src/interpolation/glow.cpp) calls it around its own work.
-void PostEffectsGlowRecord(PPCContext& ctx, uint8_t* base);
 void PostEffectsGlowRecord(lifted::Regs& ctx, uint8_t* base);
 
 // PostEffects::InitBoot (sub_82138C38; r3 = the device or 0) natively with
 // --native_post_effects and the allocation layer, else the original; r3 as
 // the original leaves it. FramePasses::Boot's plain C++ calls it.
-void PostEffectsInitBoot(PPCContext& ctx, uint8_t* base);
 void PostEffectsInitBoot(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -4133,6 +4133,41 @@ Each leaves the game working, smallest and most independent first.
      uses buys nothing before E5.
    - Checks: as step 2, plus the link: no `__imp__` symbol and no
      `PPCContext` left (`nm`, `grep`).
+
+   Done (2026-11-16, `e4-sdk-removal-16-11-26`): no `PPCContext`,
+   `rex/ppc.h` or SDK function left in our code.
+   - Imports: `lifted::ImportFunction` is a record of ours with the
+     import's name (`lifted/imports.h`, by `tools/import_entries.py`);
+     `__imp__X` is a pointer to it, so every site reads as before.
+     `lifted::Import` runs our answer or logs and stops; `ImportFromSdk`
+     only logs and stops.
+   - `lifted::Sdk` takes an import or a function on a register view
+     (`RegsFunction`: the lifted originals' `cX` forms); `Boundary`,
+     `Enter(PPCContext&)`, `RegsScope`, `CallFromContext(PPCContext&)`,
+     `BindThreadContext` and the threads' carrier contexts are gone, and so
+     are the originals' context forms (`tools/lift_originals.py` no longer
+     writes them).
+   - The context forms: `ITC_REGS_STEP` makes only the register-view form;
+     the 44 files' `ITC_CONTEXT_FORM` blocks, the seven `__finally` forms
+     (no callers), the title load's and network machines' template forms,
+     `EnterR3`'s, `Gpr` and a dead `CallFrom` overload deleted; the 3,834
+     context declarations turned into (mostly duplicate, then merged)
+     register-view ones; the four "caller r24" wrappers take a view.
+   - The harnesses' hooks (`g_start_up_recorder`, the stand-ins: set only by
+     harnesses, which aren't built, so always null) are typed on the
+     register view and called directly. Removing them altogether is left
+     as a cleanup.
+   - `REX_FUNC(xstart)`, the kernel entries' `REX_FUNC`s
+     (`ITC_KERNEL_ENTRY` is `ITC_NATIVE_ENTRY`) and `app/image.cpp`
+     (`PPCImageConfig`) removed; `guest_code.h` defines the short integer
+     names (`u32` and the like) itself, and the vector helpers' global mask
+     tables are ours (step 2).
+   The link: 106 symbols from `librexruntime.so` (296 at the measure): no
+   import, no `PPCContext` (SDL 39, spdlog 23, `rex::` 30, the SDK's flags
+   12, fmt 2). An attract race (`itc_5723`), the pad replay
+   (`itc_5724`, 127 s, no error lines, the race at ~150 fps;
+   `--log_imports`: 28 imports, all ours) and a frame dump (the same
+   frame as step 2's) clean.
 4. **A4: the app shell** (the 2026-10-21 survey, with what A4 brought
    forward already did: our `main()`, our loop, no SDK window):
    - A `--log_flags` flag landed first on the old parser, logging every
@@ -6783,5 +6818,14 @@ error lines, the race at the frame cap) and frame dumps clean;
 `--log_imports`: 28 imports in play, all ours (any other now stops the
 program). `boundary_status.py` reads the docs' function rows, not the
 running code, so its figures don't move with E2: overridden 128, Native
+(with Lifted) 204, Dropped 24, never called 20, live 73; imports: 186
+called, 30 with a live caller.
+
+**2026-11-16, E4's steps 2 and 3 (branch `e4-sdk-removal-16-11-26`):** the
+status conversion, the global lock, the float mode and the vector helpers
+ours; no `PPCContext`, `rex/ppc.h` or SDK import left; 106 symbols linked
+from `librexruntime.so` (296 before). Attract races, the pad replay (127 s)
+and frame dumps clean. `boundary_status.py` reads the docs' function rows,
+not the running code, so its figures don't move: overridden 128, Native
 (with Lifted) 204, Dropped 24, never called 20, live 73; imports: 186
 called, 30 with a live caller.

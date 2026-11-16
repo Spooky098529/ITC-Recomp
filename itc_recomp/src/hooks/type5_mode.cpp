@@ -258,14 +258,3 @@ ITC_TYPE5_MODE(8222FC50, ModeSlot14Thunk)
 ITC_TYPE5_MODE(8222FED0, ModeType5Interrupt)
 ITC_TYPE5_MODE(8222FF60, ModeType5ForceExit)
 ITC_TYPE5_MODE(8222FC38, ModeType5Resume)
-
-// The forms on the SDK's context the header declares (a harness's), on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::ModeType5Resume)
-ITC_CONTEXT_FORM(hooks::Type5DialogOnInterrupt)
-#undef ITC_CONTEXT_FORM

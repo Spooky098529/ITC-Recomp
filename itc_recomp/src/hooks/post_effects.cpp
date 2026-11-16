@@ -499,14 +499,3 @@ ITC_POST_EFFECT_RECORD(821363F0, MotionBlurRecord)
 ITC_POST_EFFECT_DELETE(821389C8, EffectKind::kGlow)
 ITC_POST_EFFECT_DELETE(82138570, EffectKind::kColorFilter)
 ITC_POST_EFFECT_DELETE(821385C0, EffectKind::kMotionBlur)
-
-// The forms on the SDK's context the header declares (a harness's), on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::PostEffectsGlowRecord)
-ITC_CONTEXT_FORM(hooks::PostEffectsInitBoot)
-#undef ITC_CONTEXT_FORM

@@ -12,7 +12,6 @@ namespace hooks {
 
 // rand (sub_825A9BB8): no registers in; r3 the number. The per-thread data's
 // lookup through `ctx` (c_runtime::ThreadData). Shared with the harness.
-void CRuntimeRand(PPCContext& ctx, uint8_t* base);
 void CRuntimeRand(lifted::Regs& ctx, uint8_t* base);
 
 // Whether lock 8 (the exit lock) is the host mutex for this run

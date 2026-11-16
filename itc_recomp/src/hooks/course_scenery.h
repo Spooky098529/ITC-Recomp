@@ -14,14 +14,12 @@ namespace hooks {
 // Scenery::DrawSetLists (sub_820F52A8): r3 = the manager, r4 = the pass
 // description; r3 as the original leaves it. Its original runs with the
 // command list's diagnostics on (as the recorders').
-void CourseSceneryDrawSetLists(PPCContext& ctx, uint8_t* base);
 void CourseSceneryDrawSetLists(lifted::Regs& ctx, uint8_t* base);
 
 // Scenery::RecordHeadlightProjectors (sub_820F34C8): r4 = the pass
 // description; r3 as the original leaves it, lr put back. The original
 // with --native_cameras, --native_matrix_math or --native_vehicle_accessors
 // off or the command list's diagnostics on.
-void CourseSceneryRecordHeadlightProjectors(PPCContext& ctx, uint8_t* base);
 void CourseSceneryRecordHeadlightProjectors(lifted::Regs& ctx, uint8_t* base);
 
 // Scenery::DrawArea (sub_820F3B70): r3 = the manager, r4 = the pass
@@ -29,7 +27,6 @@ void CourseSceneryRecordHeadlightProjectors(lifted::Regs& ctx, uint8_t* base);
 // read it). CourseSceneryDrawAreaNative: whether its plain C++ may run (its
 // callees' flags, the command list's diagnostics off).
 bool CourseSceneryDrawAreaNative();
-void CourseSceneryDrawArea(PPCContext& ctx, uint8_t* base);
 void CourseSceneryDrawArea(lifted::Regs& ctx, uint8_t* base);
 
 // Scenery::Draw (sub_820F6068): r3 = the manager; lr and flush-to-zero
@@ -40,13 +37,11 @@ void CourseSceneryDrawArea(lifted::Regs& ctx, uint8_t* base);
 // per-frame wraps (src/frame_pacing/per_frame_logic.cpp), RecordClear
 // through its adapter's work.
 bool CourseSceneryDrawNative();
-void CourseSceneryDraw(PPCContext& ctx, uint8_t* base);
 void CourseSceneryDraw(lifted::Regs& ctx, uint8_t* base);
 
 // Scenery::Update (sub_820F4558): r3 = the manager; the original's register
 // saves made, then the plain C++ (its guest calls putting flush-to-zero back
 // off); r3 as the original leaves it, lr put back.
-void CourseSceneryUpdate(PPCContext& ctx, uint8_t* base);
 void CourseSceneryUpdate(lifted::Regs& ctx, uint8_t* base);
 
 // The calls the course scenery's plain C++ makes into code that takes the

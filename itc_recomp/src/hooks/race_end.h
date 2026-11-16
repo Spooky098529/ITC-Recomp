@@ -11,9 +11,7 @@
 
 namespace hooks {
 
-void RaceModeModeAfterRace(PPCContext& ctx, uint8_t* base);
 void RaceModeModeAfterRace(lifted::Regs& ctx, uint8_t* base);  // sub_82150E00
-void RaceModeNextMode(PPCContext& ctx, uint8_t* base);
 void RaceModeNextMode(lifted::Regs& ctx, uint8_t* base);       // sub_82151EF0
 
 }  // namespace hooks

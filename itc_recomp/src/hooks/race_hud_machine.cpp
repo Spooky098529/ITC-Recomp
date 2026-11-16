@@ -289,7 +289,7 @@ class Calls {
 // A handler: its plain C++ with the machine's register, or the original
 // where it answers nullopt.
 template <typename Handler>
-void Handle(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original,
+void Handle(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
             Handler handler) {
   ctx.fpscr.disableFlushMode();
   std::optional<uint64_t> r3;

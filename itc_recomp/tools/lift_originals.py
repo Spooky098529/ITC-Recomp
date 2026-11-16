@@ -60,8 +60,6 @@ def main(argv):
     for n in names:
         cpp.extend(lift.emit_entry(infos[n]))
         cpp.append("")
-    for n in names:
-        cpp.append(f"void c{n[4:]}(PPCContext& ctx, uint8_t* base) {{ Enter(ctx, base, {lift.ename(n)}); }}")
     cpp += ["", "}  // namespace lifted::original", ""]
     h = [
         "// The originals our C++ still called, lifted (lifted/originals.cpp):",
@@ -79,8 +77,7 @@ def main(argv):
     for n in names:
         h.append(f"// {n}'s original.")
         h.append(f"Result {lift.ename(n)}(uint8_t* base, const Args& a);")
-        h.append(f"// The same for code still holding a context (in place of __imp__{n}).")
-        h.append(f"void c{n[4:]}(PPCContext& ctx, uint8_t* base);")
+        h.append(f"// The same on a register view (in place of __imp__{n}).")
         h.append(f"inline void c{n[4:]}(Regs& regs, uint8_t* base) {{ regs.Apply({lift.ename(n)}(base, regs.ToArgs())); }}")
     h += ["", "}  // namespace lifted::original", ""]
     with open(os.path.join(lift.OUT, "originals.cpp"), "w") as f:

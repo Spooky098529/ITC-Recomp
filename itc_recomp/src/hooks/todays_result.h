@@ -17,128 +17,71 @@ bool TodaysResultNative();
 // The mode: its Init (r3 the mode), the delegate functions (r3 the answer,
 // r4 the mode), IsLoaded (r3 the mode + 32), FindShown (r3 the block), Kind
 // (no arguments) and the two machines' InitStates (r3 the machine).
-void ModeType9Init(PPCContext& ctx, uint8_t* base);
 void ModeType9Init(lifted::Regs& ctx, uint8_t* base);
-void ModeType9WaitForLoads(PPCContext& ctx, uint8_t* base);
 void ModeType9WaitForLoads(lifted::Regs& ctx, uint8_t* base);
-void ModeType9NextMode(PPCContext& ctx, uint8_t* base);
 void ModeType9NextMode(lifted::Regs& ctx, uint8_t* base);
-void ModeType9LeaveScreen(PPCContext& ctx, uint8_t* base);
 void ModeType9LeaveScreen(lifted::Regs& ctx, uint8_t* base);
-void ModeType9WaitForShown(PPCContext& ctx, uint8_t* base);
 void ModeType9WaitForShown(lifted::Regs& ctx, uint8_t* base);
-void ModeType9Leaving(PPCContext& ctx, uint8_t* base);
 void ModeType9Leaving(lifted::Regs& ctx, uint8_t* base);
-void ModeType9IsLoaded(PPCContext& ctx, uint8_t* base);
 void ModeType9IsLoaded(lifted::Regs& ctx, uint8_t* base);
-void ModeType9FindShown(PPCContext& ctx, uint8_t* base);
 void ModeType9FindShown(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventKind(PPCContext& ctx, uint8_t* base);
 void TodaysEventKind(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultInitStates(PPCContext& ctx, uint8_t* base);
 void TodaysResultInitStates(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventInitStates(PPCContext& ctx, uint8_t* base);
 void TodaysEventInitStates(lifted::Regs& ctx, uint8_t* base);
 // Today's result's handlers (r3 the machine, r4 the dispatcher where read),
 // its helpers (no arguments), pages (r3 the dispatcher) and transitions (r3
 // the started word's address).
-void TodaysResultCreate(PPCContext& ctx, uint8_t* base);
 void TodaysResultCreate(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultOpenMovie(PPCContext& ctx, uint8_t* base);
 void TodaysResultOpenMovie(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultWaitForMovie(PPCContext& ctx, uint8_t* base);
 void TodaysResultWaitForMovie(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultStart(PPCContext& ctx, uint8_t* base);
 void TodaysResultStart(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultReadDay(PPCContext& ctx, uint8_t* base);
 void TodaysResultReadDay(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultSetUpMovie(PPCContext& ctx, uint8_t* base);
 void TodaysResultSetUpMovie(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultSetTexts(PPCContext& ctx, uint8_t* base);
 void TodaysResultSetTexts(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultDraw(PPCContext& ctx, uint8_t* base);
 void TodaysResultDraw(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultUpdate(PPCContext& ctx, uint8_t* base);
 void TodaysResultUpdate(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultWaitPage(PPCContext& ctx, uint8_t* base);
 void TodaysResultWaitPage(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultLeavePage(PPCContext& ctx, uint8_t* base);
 void TodaysResultLeavePage(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultQueueMovie(PPCContext& ctx, uint8_t* base);
 void TodaysResultQueueMovie(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultIntro(PPCContext& ctx, uint8_t* base);
 void TodaysResultIntro(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultShowLoop(PPCContext& ctx, uint8_t* base);
 void TodaysResultShowLoop(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultFadeOut(PPCContext& ctx, uint8_t* base);
 void TodaysResultFadeOut(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultUnload(PPCContext& ctx, uint8_t* base);
 void TodaysResultUnload(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultUnloaded(PPCContext& ctx, uint8_t* base);
 void TodaysResultUnloaded(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultLeave(PPCContext& ctx, uint8_t* base);
 void TodaysResultLeave(lifted::Regs& ctx, uint8_t* base);
-void TodaysResultDestroy(PPCContext& ctx, uint8_t* base);
 void TodaysResultDestroy(lifted::Regs& ctx, uint8_t* base);
 // Today's event's handlers (r3 the machine, r4 the dispatcher where read)
 // and helpers (no arguments; LoadImagePair r3 the data and r4 an index;
 // ImagesLoadedA and B and FreeImages r3 the data).
-void TodaysEventCreate(PPCContext& ctx, uint8_t* base);
 void TodaysEventCreate(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventMarkImages(PPCContext& ctx, uint8_t* base);
 void TodaysEventMarkImages(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventOpenMovie(PPCContext& ctx, uint8_t* base);
 void TodaysEventOpenMovie(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventLoadImages(PPCContext& ctx, uint8_t* base);
 void TodaysEventLoadImages(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventLoadImagePair(PPCContext& ctx, uint8_t* base);
 void TodaysEventLoadImagePair(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventWaitForMovie(PPCContext& ctx, uint8_t* base);
 void TodaysEventWaitForMovie(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventImagesLoadedA(PPCContext& ctx, uint8_t* base);
 void TodaysEventImagesLoadedA(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventImagesLoadedB(PPCContext& ctx, uint8_t* base);
 void TodaysEventImagesLoadedB(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventStart(PPCContext& ctx, uint8_t* base);
 void TodaysEventStart(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventSetUpTexts(PPCContext& ctx, uint8_t* base);
 void TodaysEventSetUpTexts(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventNextUnlockEntry(PPCContext& ctx, uint8_t* base);
 void TodaysEventNextUnlockEntry(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventUnload(PPCContext& ctx, uint8_t* base);
 void TodaysEventUnload(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventUnloaded(PPCContext& ctx, uint8_t* base);
 void TodaysEventUnloaded(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventLeave(PPCContext& ctx, uint8_t* base);
 void TodaysEventLeave(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventDestroy(PPCContext& ctx, uint8_t* base);
 void TodaysEventDestroy(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventFreeImages(PPCContext& ctx, uint8_t* base);
 void TodaysEventFreeImages(lifted::Regs& ctx, uint8_t* base);
 // Today's event's Draw and Update, pages (r3 the dispatcher, EndPage r4 the
 // machine), transitions (r3 the started word) and helpers (no arguments;
 // ShowImages r3 an image index).
-void TodaysEventDraw(PPCContext& ctx, uint8_t* base);
 void TodaysEventDraw(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventUpdate(PPCContext& ctx, uint8_t* base);
 void TodaysEventUpdate(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventEventPage(PPCContext& ctx, uint8_t* base);
 void TodaysEventEventPage(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventEndPage(PPCContext& ctx, uint8_t* base);
 void TodaysEventEndPage(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventQueueEventMovies(PPCContext& ctx, uint8_t* base);
 void TodaysEventQueueEventMovies(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventIntro(PPCContext& ctx, uint8_t* base);
 void TodaysEventIntro(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventFadeOut(PPCContext& ctx, uint8_t* base);
 void TodaysEventFadeOut(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventNextUnlock(PPCContext& ctx, uint8_t* base);
 void TodaysEventNextUnlock(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventNextPage(PPCContext& ctx, uint8_t* base);
 void TodaysEventNextPage(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventShowUnlock(PPCContext& ctx, uint8_t* base);
 void TodaysEventShowUnlock(lifted::Regs& ctx, uint8_t* base);
-void TodaysEventShowImages(PPCContext& ctx, uint8_t* base);
 void TodaysEventShowImages(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

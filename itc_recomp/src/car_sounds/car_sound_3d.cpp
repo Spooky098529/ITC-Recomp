@@ -80,7 +80,7 @@ void StoreLanes(uint8_t* base, uint32_t address, simde__m128 v) {
   Store(base, a + 8, lanes[1]);
   Store(base, a + 12, lanes[0]);
 }
-// stvx of a register as PPCContext holds it (host byte order: guest byte j
+// stvx of a register as the SDK's context held it (host byte order: guest byte j
 // is host byte 15 - j).
 void StoreRegister(uint8_t* base, uint32_t address, const uint8_t (&v)[16]) {
   const uint32_t a = address & ~0xFu;

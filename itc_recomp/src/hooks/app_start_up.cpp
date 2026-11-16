@@ -52,19 +52,8 @@ namespace asu = app_start_up;
 
 hooks::StartUpRecorder hooks::g_start_up_recorder = nullptr;
 
-namespace {
-thread_local uint32_t t_recorder_address = 0;
-thread_local bool t_recorded = false;
-void RunRecorder(PPCContext& ctx, uint8_t*) {
-  t_recorded = hooks::g_start_up_recorder(ctx, t_recorder_address);
-}
-}  // namespace
-
 bool hooks::StartUpRecordedOnView(lifted::Regs& ctx, uint32_t address) {
-  t_recorder_address = address;
-  t_recorded = false;
-  lifted::Sdk(ctx, nullptr, RunRecorder);
-  return t_recorded;
+  return hooks::g_start_up_recorder(ctx, address);
 }
 
 // ReadError::SetApp (sub_8209AC50), sub_8209AC30, sub_8209F580,
@@ -969,24 +958,3 @@ bool hooks::RenderManagerSlotDirect(lifted::Regs& ctx, uint8_t* base, uint32_t f
   ctx.ctr.u64 = slot->target;
   return true;
 }
-
-// The forms taking the SDK's context (for the harnesses, which pass one; the
-// header declares both): each on a view of the context.
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::AppStartUpSteps)
-ITC_CONTEXT_FORM(hooks::MovieConstructSteps)
-ITC_CONTEXT_FORM(hooks::MovieWrapperSteps)
-ITC_CONTEXT_FORM(hooks::AudioManagerCreateSteps)
-ITC_CONTEXT_FORM(hooks::StartXAudioSteps)
-ITC_CONTEXT_FORM(hooks::AppCameraSteps)
-ITC_CONTEXT_FORM(hooks::AppCameraCameraConstructSteps)
-ITC_CONTEXT_FORM(hooks::AppCameraListConstructSteps)
-ITC_CONTEXT_FORM(hooks::AppConstructSteps)
-ITC_CONTEXT_FORM(hooks::AppCreateSteps)
-ITC_CONTEXT_FORM(hooks::TextInitSteps)
-ITC_CONTEXT_FORM(hooks::FontConstructSteps)
-#undef ITC_CONTEXT_FORM

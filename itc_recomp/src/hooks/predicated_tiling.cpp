@@ -167,15 +167,3 @@ void hooks::NativeWorkerThread(lifted::Regs& ctx, uint8_t* base) {
 ITC_KERNEL_ENTRY(822B69A8, ITC_FLAG(native_predicated_tiling)) {
   hooks::NativeWorkerThread(ctx, base);
 }
-
-// The forms on the SDK's context the header declares (a harness's), on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::EndTiledSegments)
-ITC_CONTEXT_FORM(hooks::NativeCreateWorkers)
-ITC_CONTEXT_FORM(hooks::NativeWorkerThread)
-#undef ITC_CONTEXT_FORM

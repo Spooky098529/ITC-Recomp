@@ -431,14 +431,3 @@ ITC_CAR_DEALER(82199B38, HelpLineSet)
 // seen in play, reach the original) (removed, B7 loop, 2026-11-08): their
 // callers in play are native, the flag switches those; their steps above are
 // the harness's.
-
-// The forms taking the SDK's context (for the harnesses, which pass one; the
-// header declares both): each on a view of the context.
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::CarDealerAfterDetail)
-ITC_CONTEXT_FORM(hooks::CarDealerCheckLimits)
-#undef ITC_CONTEXT_FORM

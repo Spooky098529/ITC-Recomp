@@ -272,30 +272,12 @@ void NetMachineDestroy(lifted::Regs& ctx, uint8_t* base) {
   }
   ctx.r3.u64 = r3;
 }
-// The forms on the SDK's context (the harness's), on a view of it.
-#define ITC_NET_MACHINE_CONTEXT_FORM(name)          \
-  template <uint32_t kIndex>                        \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name<kIndex>(scope.regs, base);                 \
-  }
-ITC_NET_MACHINE_CONTEXT_FORM(NetMachineCreate)
-ITC_NET_MACHINE_CONTEXT_FORM(NetMachineOpenMovie)
-ITC_NET_MACHINE_CONTEXT_FORM(NetMachineWaitForMovie)
-ITC_NET_MACHINE_CONTEXT_FORM(NetMachineLeave)
-ITC_NET_MACHINE_CONTEXT_FORM(NetMachineDestroy)
-#undef ITC_NET_MACHINE_CONTEXT_FORM
 #define ITC_NET_MACHINE(index)                                          \
   template void NetMachineCreate<index>(lifted::Regs&, uint8_t*);       \
   template void NetMachineOpenMovie<index>(lifted::Regs&, uint8_t*);    \
   template void NetMachineWaitForMovie<index>(lifted::Regs&, uint8_t*); \
   template void NetMachineLeave<index>(lifted::Regs&, uint8_t*);        \
-  template void NetMachineDestroy<index>(lifted::Regs&, uint8_t*);      \
-  template void NetMachineCreate<index>(PPCContext&, uint8_t*);         \
-  template void NetMachineOpenMovie<index>(PPCContext&, uint8_t*);      \
-  template void NetMachineWaitForMovie<index>(PPCContext&, uint8_t*);   \
-  template void NetMachineLeave<index>(PPCContext&, uint8_t*);          \
-  template void NetMachineDestroy<index>(PPCContext&, uint8_t*);
+  template void NetMachineDestroy<index>(lifted::Regs&, uint8_t*);
 ITC_NET_MACHINE(0)
 ITC_NET_MACHINE(1)
 ITC_NET_MACHINE(3)
@@ -514,17 +496,3 @@ ITC_NETWORK_MODE(8227BFB8, NetModeSelectOnYes)
 ITC_NETWORK_MODE(8227BFD8, NetModeSelectOnDialogClosed)
 ITC_NETWORK_MODE(8227C7A8, NetModeSelectUnload)
 ITC_NETWORK_MODE(8227C810, NetModeSelectUnloaded)
-
-// The forms on the SDK's context the header declares (a harness's), on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::ModeType12LeaveScreen)
-ITC_CONTEXT_FORM(hooks::ModeType12NextMode)
-ITC_CONTEXT_FORM(hooks::ModeType12Teardown)
-ITC_CONTEXT_FORM(hooks::ModeType12WaitForLoads)
-ITC_CONTEXT_FORM(hooks::ModeType12WaitForShown)
-#undef ITC_CONTEXT_FORM

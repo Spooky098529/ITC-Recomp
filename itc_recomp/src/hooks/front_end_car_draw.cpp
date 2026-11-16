@@ -204,10 +204,9 @@ ITC_REGS_STEP(FrontEndCarDrawClearLightKit) {
 
 // `caller_r24`, handed to Model::DrawShape's recorder's context (a
 // diagnostic word), isn't carried (the rewiring, stage 3): 0.
-void FrontEndCarDrawFloorDraw(PPCContext& ctx, uint8_t* base) {
-  lifted::RegsScope scope(ctx);
+void FrontEndCarDrawFloorDraw(lifted::Regs& ctx, uint8_t* base) {
   // (the caller's r24: diagnostic only, not carried)
-  FrontEndCarDrawFloorDraw(scope.regs, base, 0);
+  FrontEndCarDrawFloorDraw(ctx, base, 0);
 }
 void FrontEndCarDrawFloorDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   // Model::DrawShape's plain C++ only with its flag and without the command
@@ -264,10 +263,9 @@ fe::DrawCallees FrontEndCarDrawDrawCallees(uint32_t caller_r24) {
 
 // `caller_r24`, handed to Floor::Draw (a diagnostic word of its draws'
 // recorder's context), isn't carried (the rewiring, stage 3): 0.
-void FrontEndCarDrawDraw(PPCContext& ctx, uint8_t* base) {
-  lifted::RegsScope scope(ctx);
+void FrontEndCarDrawDraw(lifted::Regs& ctx, uint8_t* base) {
   // (the caller's r24: diagnostic only, not carried)
-  FrontEndCarDrawDraw(scope.regs, base, 0);
+  FrontEndCarDrawDraw(ctx, base, 0);
 }
 void FrontEndCarDrawDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   ITC_FRONT_END_ORIGINAL(8217FE60)

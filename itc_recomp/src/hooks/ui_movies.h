@@ -12,7 +12,6 @@ namespace ui_movies_hooks {
 // and f1 = the float at 0x82001C00, as a tail call. Natively or, with
 // --native_ui_movies off, the original. Its override (WATCH_MOVIE_CALL's,
 // src/debug/pause_movie_log.cpp) wraps this for --log_pause_movie.
-void ResetAfterMovie(PPCContext& ctx, uint8_t* base);
 void ResetAfterMovie(lifted::Regs& ctx, uint8_t* base);
 
 // UiMovie::RestorePose (sub_82119B80; r3 = the movie, r4 and r5 = the live
@@ -20,7 +19,6 @@ void ResetAfterMovie(lifted::Regs& ctx, uint8_t* base);
 // with --native_ui_movies off, the original. Its override
 // (src/debug/pause_movie_log.cpp) runs the original, watched, for
 // --log_pause_movie.
-void RestorePose(PPCContext& ctx, uint8_t* base);
 void RestorePose(lifted::Regs& ctx, uint8_t* base);
 
 // UiMovie::DrawPicture (sub_8259ED40) and UiMovie::DrawPrimitive
@@ -28,14 +26,10 @@ void RestorePose(lifted::Regs& ctx, uint8_t* base);
 // natively (the quad built by the plain C++, then handed to sub_8259EBE8's
 // adapter from a frame like the original's, with its return address) or,
 // with --native_ui_movies off, the original. r3 as sub_8259EBE8 leaves it.
-void DrawPicture(PPCContext& ctx, uint8_t* base);
 void DrawPicture(lifted::Regs& ctx, uint8_t* base);
-void DrawPrimitive(PPCContext& ctx, uint8_t* base);
 void DrawPrimitive(lifted::Regs& ctx, uint8_t* base);
 // The same natively, whatever the flag (for the harness).
-void RecordPicture(PPCContext& ctx, uint8_t* base);
 void RecordPicture(lifted::Regs& ctx, uint8_t* base);
-void RecordPrimitive(PPCContext& ctx, uint8_t* base);
 void RecordPrimitive(lifted::Regs& ctx, uint8_t* base);
 
 // UiMovie::Draw (sub_8259FA00; r3 = the draw context, r4 = the scene, r5
@@ -46,11 +40,9 @@ void RecordPrimitive(lifted::Regs& ctx, uint8_t* base);
 // the level's frame with the original's return address) or, with
 // --native_ui_movies off, the original. Its override (WATCH_MOVIE_CALL's,
 // src/debug/pause_movie_log.cpp) wraps this for --log_pause_movie.
-void Draw(PPCContext& ctx, uint8_t* base);
 void Draw(lifted::Regs& ctx, uint8_t* base);
 // UiMovie::DrawNode natively, whatever the flag (r3 = the draw context, r4
 // = the scene, r5 = the node, r6 = the layer; for the harness).
-void RecordDrawNode(PPCContext& ctx, uint8_t* base);
 void RecordDrawNode(lifted::Regs& ctx, uint8_t* base);
 
 // UiMovie::ApplyTrack (sub_825A0548; r3 = the node, r4 = the track, f1 = t,
@@ -58,16 +50,13 @@ void RecordDrawNode(lifted::Regs& ctx, uint8_t* base);
 // or, with --native_ui_movies off, the original. Its override
 // (src/frame_pacing/per_frame_logic.cpp) wraps this for
 // --per_tick_ui_movie_tracks and --log_pause_movie.
-void ApplyTrack(PPCContext& ctx, uint8_t* base);
 void ApplyTrack(lifted::Regs& ctx, uint8_t* base);
 // The same natively, whatever the flags (for the harness).
-void ApplyTrackNative(PPCContext& ctx, uint8_t* base);
 void ApplyTrackNative(lifted::Regs& ctx, uint8_t* base);
 
 // UiMovie::ApplyAnimation (sub_825A08E0; r3 = the node, r4 = the animation,
 // f1 = the time, r6 = loop) natively, whatever the flag (for the harness):
 // each track through sub_825A0548 (its override) from the level's frame.
-void ApplyAnimationNative(PPCContext& ctx, uint8_t* base);
 void ApplyAnimationNative(lifted::Regs& ctx, uint8_t* base);
 
 // UiMovie::Update (sub_8211D2F8; r3 = movie, r4 = 0 to advance a frame and
@@ -76,7 +65,6 @@ void ApplyAnimationNative(lifted::Regs& ctx, uint8_t* base);
 // original's, with its return addresses) or, with --native_ui_movies off,
 // the original. r3 1 while an animation plays or is queued, else 0. Its
 // override (src/frame_pacing/per_frame_logic.cpp) wraps this.
-void Update(PPCContext& ctx, uint8_t* base);
 void Update(lifted::Regs& ctx, uint8_t* base);
 
 // For harnesses: while set, this is asked first by the overrides of the
@@ -89,7 +77,7 @@ void Update(lifted::Regs& ctx, uint8_t* base);
 // The stand-in is on the SDK's context (the harnesses' functions); from a
 // view, it runs on the thread's context with the view's registers (as
 // lifted::Sdk), its r3 and f1 back in the view.
-using UpdateCalleeStandIn = bool (*)(uint32_t function, PPCContext& ctx, uint8_t* base);
+using UpdateCalleeStandIn = bool (*)(uint32_t function, lifted::Regs& ctx, uint8_t* base);
 extern UpdateCalleeStandIn g_update_callee_stand_in;
 bool UpdateCalleeStoodInOnView(uint32_t function, lifted::Regs& ctx, uint8_t* base);
 // Whether the stand-in is set and ran instead of `function`.

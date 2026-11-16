@@ -192,10 +192,8 @@ inline simde__m128i simde_mm_sllv_epi8(simde__m128i a, simde__m128i count) {
 
 }  // namespace vector_helpers
 
-// The mask tables at global scope, as the generated code named them: still
-// the SDK's (rex/ppc.h, through guest_code.h, declares the same names) until
-// step 3 of E4 takes rex/ppc.h out; then these:
-// using vector_helpers::VectorMaskL;
-// using vector_helpers::VectorMaskR;
-// using vector_helpers::VectorShiftTableL;
-// using vector_helpers::VectorShiftTableR;
+// The mask tables at global scope, as the generated code named them.
+using vector_helpers::VectorMaskL;
+using vector_helpers::VectorMaskR;
+using vector_helpers::VectorShiftTableL;
+using vector_helpers::VectorShiftTableR;

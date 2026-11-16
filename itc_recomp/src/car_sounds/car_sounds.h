@@ -111,7 +111,7 @@ struct Update3DSaves {
   uint32_t lr;
   uint64_t r22, r23, r24, r25, r26, r27, r28, r29, r30, r31;
   uint64_t f23, f24, f25, f26, f27, f28, f29, f30, f31;  // the bits
-  uint8_t v126[16], v127[16];                            // as PPCContext holds them
+  uint8_t v126[16], v127[16];                            // as the SDK's context held them
 };
 uint64_t Update3D(uint8_t* base, uint64_t sound, uint64_t r4, uint64_t vehicle, uint32_t sp,
                   const Update3DSaves& saves, const x3daudio::TanCall& tan);

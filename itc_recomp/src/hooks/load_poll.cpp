@@ -335,18 +335,3 @@ ITC_LOAD_POLL(820D8EC0, LoadPollWheelsSetRecord)
 ITC_LOAD_POLL(820E3938, LoadPollSceneInteriorSetGauges)
 ITC_LOAD_POLL(820E05E0, LoadPollScenePartsBuild)
 ITC_LOAD_POLL(820DA318, LoadPollSceneModelPollLoad)
-
-// The forms on the SDK's context the header declares (a harness's), on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::LoadPollSceneCockpitFinish)
-ITC_CONTEXT_FORM(hooks::LoadPollSceneModelPollLoad)
-ITC_CONTEXT_FORM(hooks::LoadPollScenePartsFinish)
-ITC_CONTEXT_FORM(hooks::LoadPollSceneWheelsFinish)
-ITC_CONTEXT_FORM(hooks::LoadPollWheelsApplyPalette)
-ITC_CONTEXT_FORM(hooks::LoadPollWheelsBindTextures)
-#undef ITC_CONTEXT_FORM

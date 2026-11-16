@@ -228,13 +228,3 @@ ITC_TYPE2_DIALOG(82186428, Type2DialogOnLeft)
 ITC_TYPE2_DIALOG(82188178, Type2DialogInit)
 // TakesInput (from the type 2 mode's sub_82197858, recompiled).
 ITC_TYPE2_DIALOG(821864A0, Type2DialogTakesInput)
-
-// The forms taking the SDK's context (for the harnesses, which pass one; the
-// header declares both): each on a view of the context.
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::Type2DialogShown)
-#undef ITC_CONTEXT_FORM

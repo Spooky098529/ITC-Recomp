@@ -402,7 +402,7 @@ ITC_REGS_STEP(ScenePoolsSetUp) {
 void SecondSetUp(lifted::Regs& ctx, uint8_t* base,
                  std::optional<uint32_t> (*setup)(uint8_t*, uint32_t, uint32_t, uint32_t,
                                                   const cm::SecondSetUps&),
-                 lifted::ImportFunction* original) {
+                 lifted::RegsFunction* original) {
   const uint64_t lr = ctx.lr;
   const uint64_t stack = ctx.r1.u64;
   const cm::GuestCall guest = [&ctx, base, stack](uint32_t function, uint32_t r3, uint32_t r4,

@@ -82,19 +82,15 @@ void CameraPassesInit(lifted::Regs& ctx, uint8_t* base, bool all);
 // natively, for their wrappers in src/debug/frame_state_diff.cpp: each
 // enabled pass recorded as above (the original RecordBegin or RecordEnd
 // where it must run), from frames like the originals'.
-void CameraPassesRecordBegins(PPCContext& ctx, uint8_t* base);
 void CameraPassesRecordBegins(lifted::Regs& ctx, uint8_t* base);
-void CameraPassesRecordEnds(PPCContext& ctx, uint8_t* base);
 void CameraPassesRecordEnds(lifted::Regs& ctx, uint8_t* base);
 
 // CameraPass::RecordViewport (sub_820A0978)'s adapter's work, without the
 // flag: r3 = the pass, r4 = the sort key (for the harness).
-void CameraPassRecordViewport(PPCContext& ctx, uint8_t* base);
 void CameraPassRecordViewport(lifted::Regs& ctx, uint8_t* base);
 
 // RecordClear (sub_8209FA38)'s adapter's work, without the flag: r4 = the
 // key, r5 = the flags, r6 = the color, r7 = the depth (for the harness).
-void RecordClear(PPCContext& ctx, uint8_t* base);
 void RecordClear(lifted::Regs& ctx, uint8_t* base);
 
 // Viewports::Init (sub_820AB358) natively, without the flag: from frames

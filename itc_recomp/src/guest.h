@@ -17,6 +17,12 @@
 #include <tmmintrin.h>
 #endif
 
+// Our register view (lifted/regs.h), declared here for the steps' and
+// helpers' declarations that take one.
+namespace lifted {
+struct Regs;
+}  // namespace lifted
+
 namespace guest {
 
 inline uint8_t LoadU8(uint8_t* base, uint32_t address) {
@@ -185,12 +191,7 @@ inline void StoreFloat(uint8_t* base, uint32_t address, float value) {
 
 // Reserves space on the guest stack for the lifetime of the object, for
 // guest functions that take pointers to locals. Mirrors a guest prologue.
-// A step named as a value, in its form on the SDK's context (a harness's
-// table or std::function; the step's other form is on our register view,
-// hooks/native_entry.h's ITC_REGS_FN).
-#define ITC_CONTEXT_FN(name) static_cast<void (*)(PPCContext&, uint8_t*)>(&name)
-
-// `Context` is the SDK's context or our register view (lifted::Regs).
+// `Context` is our register view (lifted::Regs).
 template <typename Context>
 class StackFrame {
  public:

@@ -128,7 +128,7 @@ namespace {
 
 void DeleteWith(lifted::Regs& ctx, uint8_t* base,
                 std::optional<uint32_t> (*destruct)(uint8_t*, uint32_t, uint32_t),
-                lifted::ImportFunction* original) {
+                lifted::RegsFunction* original) {
   const auto r3 = NativeHeapActive() ? destruct(base, ctx.r3.u32, ctx.r4.u32) : std::nullopt;
   if (!r3) {
     lifted::Sdk(ctx, base, original);

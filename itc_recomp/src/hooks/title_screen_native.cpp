@@ -390,21 +390,8 @@ template <uint32_t kWhich>
 void TitleLoadDebugStep(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = ts::LoadDebugStep(base, kWhich, ctx.r3.u32, ctx.r1.u32);
 }
-// Their forms on the SDK's context (a harness's), run on a view of it (the
-// rewiring, stage 3).
-template <uint32_t kWhich>
-void TitleLoadDebugPage(PPCContext& ctx, uint8_t* base) {
-  lifted::RegsScope scope(ctx);
-  TitleLoadDebugPage<kWhich>(scope.regs, base);
-}
-template <uint32_t kWhich>
-void TitleLoadDebugStep(PPCContext& ctx, uint8_t* base) {
-  lifted::RegsScope scope(ctx);
-  TitleLoadDebugStep<kWhich>(scope.regs, base);
-}
 #define ITC_TITLE_LOAD_DEBUG(name, index)                  \
-  template void name<index>(lifted::Regs&, uint8_t*);      \
-  template void name<index>(PPCContext&, uint8_t*);
+  template void name<index>(lifted::Regs&, uint8_t*);
 ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 0)
 ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 1)
 ITC_TITLE_LOAD_DEBUG(TitleLoadDebugPage, 2)
@@ -536,20 +523,3 @@ ITC_TITLE_SCREEN(82220960, TitleLoadDebugStep<8>)
 ITC_TITLE_SCREEN(822209F0, TitleLoadDebugStep<9>)
 ITC_TITLE_SCREEN(82220A80, TitleLoadDebugStep<10>)
 ITC_TITLE_SCREEN(82220B10, TitleLoadDebugStep<11>)
-
-// The forms on the SDK's context the header declares (a harness's), run on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::TitleScreenOnGameDataLoaded)
-ITC_CONTEXT_FORM(hooks::TitleScreenOnInterrupt)
-ITC_CONTEXT_FORM(hooks::TitleScreenOnResume)
-ITC_CONTEXT_FORM(hooks::ModeType4Restart)
-ITC_CONTEXT_FORM(hooks::ModeType4NextMode)
-ITC_CONTEXT_FORM(hooks::ModeType4LeaveScreen)
-ITC_CONTEXT_FORM(hooks::ModeType4WaitForLeave)
-ITC_CONTEXT_FORM(hooks::ModeType4Leaving)
-#undef ITC_CONTEXT_FORM

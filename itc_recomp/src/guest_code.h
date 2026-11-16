@@ -1,15 +1,11 @@
 // What our code (the lifted functions, the hand ports' entries, the lift
-// runtime) takes from the SDK for guest code: the image's layout, guest
-// memory access, the function prologue's hint and the global lock (ours). Our own
-// copy of what generated/'s itc_pch.h gave (docs/rexglue-removal.md,
-// "Before E1: the rewiring", stage 5: generated/ isn't built), kept as it
-// was there.
+// runtime) needs for guest code: the image's layout, guest memory access,
+// the function prologue's hint and the global lock. Our own copy of what
+// generated/'s itc_pch.h gave (docs/rexglue-removal.md, "Before E1: the
+// rewiring", stage 5: generated/ isn't built), kept as it was there; no
+// SDK header since E4 ("E4: the plan", step 3).
 
 #pragma once
-
-#include <rex/image_info.h>
-#include <rex/logging.h>
-#include <rex/ppc.h>
 
 #include <atomic>
 #include <cassert>
@@ -26,9 +22,17 @@
 #define REX_CODE_BASE 0x82090000ull
 #define REX_CODE_SIZE 0x56C1B8ull
 
-// The SDK's image description for its runtime (src/app/image.cpp): the
-// layout above and the functions the kernel calls by address.
-extern const rex::PPCImageInfo PPCImageConfig;
+// The short integer names the generated code (and so the lifted code) uses.
+using u8 = uint8_t;
+using u16 = uint16_t;
+using u32 = uint32_t;
+using u64 = uint64_t;
+using i8 = int8_t;
+using i16 = int16_t;
+using i32 = int32_t;
+using i64 = int64_t;
+using f32 = float;
+using f64 = double;
 
 // A function's prologue: `base` is 32-byte aligned (lets the compiler fold
 // guest addresses).
@@ -38,13 +42,11 @@ extern const rex::PPCImageInfo PPCImageConfig;
 #define REX_FUNC_PROLOGUE() ((void)0)
 #endif
 
-// Guest memory: big-endian, `base` + the 32-bit guest address (the physical
-// range above 0xE0000000 offset by a page where the host maps it so).
-#if REX_PLATFORM_WIN32 || (REX_PLATFORM_MAC && REX_ARCH_ARM64)
-#define REX_PHYS_HOST_OFFSET(addr) (((u32)(addr) >= 0xE0000000u) ? 0x1000u : 0u)
-#else
+// Guest memory: big-endian, `base` + the 32-bit guest address. The physical
+// range above 0xE0000000 is mapped at physical + 4 KB, which the views'
+// layout gives (src/memory/mapping.cpp, as the SDK mapped it on Linux): no
+// offset to add here.
 #define REX_PHYS_HOST_OFFSET(addr) 0u
-#endif
 
 #define REX_RAW_ADDR(x) (base + (u32)(x) + REX_PHYS_HOST_OFFSET(x))
 

@@ -22,17 +22,12 @@ namespace hooks {
 // when it answers true, the adapter returns (the recorder set r3), so the
 // harness sees what App::StartUp hands each without setting anything up
 // again.
-// The recorder is on the SDK's context (the harnesses' functions); from a
-// view, it runs on the thread's context with the view's registers (as
-// lifted::Sdk), its r3 and f1 back in the view.
-using StartUpRecorder = bool (*)(PPCContext& ctx, uint32_t address);
+// (Set only by the harnesses, which aren't built: always null.)
+using StartUpRecorder = bool (*)(lifted::Regs& ctx, uint32_t address);
 extern StartUpRecorder g_start_up_recorder;
 bool StartUpRecordedOnView(lifted::Regs& ctx, uint32_t address);
 inline bool StartUpRecorded(lifted::Regs& ctx, uint32_t address) {
   return g_start_up_recorder != nullptr && StartUpRecordedOnView(ctx, address);
-}
-inline bool StartUpRecorded(PPCContext& ctx, uint32_t address) {
-  return g_start_up_recorder != nullptr && g_start_up_recorder(ctx, address);
 }
 
 // The register steps without the flag (the adapters' and the harness's):
@@ -40,46 +35,34 @@ inline bool StartUpRecorded(PPCContext& ctx, uint32_t address) {
 // and Font::Font (sub_82109228: r3 the font; no adapter of its own), each
 // from frames like the originals'. Text::Init's and Font::Font's need the
 // device lock native and --native_heap (DeviceUsersNative).
-void AppStartUpSteps(PPCContext& ctx, uint8_t* base);
 void AppStartUpSteps(lifted::Regs& ctx, uint8_t* base);
 // Movie::Movie (sub_820AEA88: r3 the movie, r4 the block) and
 // MovieWrapper::MovieWrapper (sub_82593DC0: r3 the wrapper), each with the
 // original's prologue saves; need --native_heap (the adapters check).
-void MovieConstructSteps(PPCContext& ctx, uint8_t* base);
 void MovieConstructSteps(lifted::Regs& ctx, uint8_t* base);
-void MovieWrapperSteps(PPCContext& ctx, uint8_t* base);
 void MovieWrapperSteps(lifted::Regs& ctx, uint8_t* base);
 // AudioManager::Create (sub_82119B38: r3 the owner, r4 the name, r5 the
 // count's address) in frames like the original's, with its constructor and
 // StartXAudio; needs --native_heap (the adapter checks).
-void AudioManagerCreateSteps(PPCContext& ctx, uint8_t* base);
 void AudioManagerCreateSteps(lifted::Regs& ctx, uint8_t* base);
 // AudioEngine::StartXAudio (sub_8259CD50: r3 the engine, not read) alone,
 // for the harness (no adapter: only AudioManager's plain C++ calls it).
-void StartXAudioSteps(PPCContext& ctx, uint8_t* base);
 void StartXAudioSteps(lifted::Regs& ctx, uint8_t* base);
 // The second camera class (sub_820A8B88: r3 the object, r4 the block) in a
 // frame like the original's, and for the harness its camera's and list's
 // constructors alone (sub_820A9E28, sub_820A98C0: r3 the block; no
 // adapters); need --native_heap (the adapter checks).
-void AppCameraSteps(PPCContext& ctx, uint8_t* base);
 void AppCameraSteps(lifted::Regs& ctx, uint8_t* base);
-void AppCameraCameraConstructSteps(PPCContext& ctx, uint8_t* base);
 void AppCameraCameraConstructSteps(lifted::Regs& ctx, uint8_t* base);
-void AppCameraListConstructSteps(PPCContext& ctx, uint8_t* base);
 void AppCameraListConstructSteps(lifted::Regs& ctx, uint8_t* base);
 // App::App (sub_82094590: r3 the app, r4 the block) in a frame like the
 // original's, its saved registers set as it sets them; needs --native_heap
 // (the adapter checks).
-void AppConstructSteps(PPCContext& ctx, uint8_t* base);
 void AppConstructSteps(lifted::Regs& ctx, uint8_t* base);
 // App::Create (sub_82094AB8: r3 the block) in a frame like the original's,
 // App::App through its adapter; needs --native_heap (the adapter checks).
-void AppCreateSteps(PPCContext& ctx, uint8_t* base);
 void AppCreateSteps(lifted::Regs& ctx, uint8_t* base);
-void TextInitSteps(PPCContext& ctx, uint8_t* base);
 void TextInitSteps(lifted::Regs& ctx, uint8_t* base);
-void FontConstructSteps(PPCContext& ctx, uint8_t* base);
 void FontConstructSteps(lifted::Regs& ctx, uint8_t* base);
 // Whether Text::Init's and Font::Font's native steps can run.
 bool TextInitNative();

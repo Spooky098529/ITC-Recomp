@@ -12,20 +12,13 @@
 namespace hooks {
 
 // The machine's handlers (r3 the machine, r4 the mode where read).
-void CarSettingsCreate(PPCContext& ctx, uint8_t* base);
 void CarSettingsCreate(lifted::Regs& ctx, uint8_t* base);
-void CarSettingsOpenMovie(PPCContext& ctx, uint8_t* base);
 void CarSettingsOpenMovie(lifted::Regs& ctx, uint8_t* base);
-void CarSettingsWaitForMovie(PPCContext& ctx, uint8_t* base);
 void CarSettingsWaitForMovie(lifted::Regs& ctx, uint8_t* base);
-void CarSettingsClose(PPCContext& ctx, uint8_t* base);
 void CarSettingsClose(lifted::Regs& ctx, uint8_t* base);
-void CarSettingsDestroy(PPCContext& ctx, uint8_t* base);
 void CarSettingsDestroy(lifted::Regs& ctx, uint8_t* base);
 // The set-ups (r3 the machine).
-void CarSettingsInit(PPCContext& ctx, uint8_t* base);
 void CarSettingsInit(lifted::Regs& ctx, uint8_t* base);
-void CarSettingsInitType5(PPCContext& ctx, uint8_t* base);
 void CarSettingsInitType5(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

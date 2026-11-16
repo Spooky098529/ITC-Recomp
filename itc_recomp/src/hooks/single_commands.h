@@ -23,17 +23,12 @@ graphics::single_commands::GuestCall SingleCommandsCall(lifted::Regs& ctx, uint8
 graphics::render_queue::SingleCommand SingleCommands(lifted::Regs& ctx, uint8_t* base);
 
 // The adapters' native paths, without the flag: r3 as the original's.
-void NativeSingleInlineVertices(PPCContext& ctx, uint8_t* base);
 void NativeSingleInlineVertices(lifted::Regs& ctx, uint8_t* base);
-void NativeSingleSetUpDrawer(PPCContext& ctx, uint8_t* base);
 void NativeSingleSetUpDrawer(lifted::Regs& ctx, uint8_t* base);
-void NativeSingleSetShaderConstants(PPCContext& ctx, uint8_t* base);
 void NativeSingleSetShaderConstants(lifted::Regs& ctx, uint8_t* base);
 // Command 15 marked as command 15 (native::g_current_command) around it, as
 // its wrap in src/native/replay_hooks.cpp does.
-void NativeSingleDrawerDraw(PPCContext& ctx, uint8_t* base);
 void NativeSingleDrawerDraw(lifted::Regs& ctx, uint8_t* base);
-void NativeSingleCallback(PPCContext& ctx, uint8_t* base);
 void NativeSingleCallback(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

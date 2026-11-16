@@ -30,46 +30,29 @@ void MorphJobsConstruct(lifted::Regs& ctx, uint8_t* base, morph_jobs::Kind kind)
 // the +4 interface's sub_82090E38): the stores, then operator delete with
 // bit 0 of r4 (natively over the native heap, else the original); r3 the
 // object.
-void MorphJobsDestroy(PPCContext& ctx, uint8_t* base);
 void MorphJobsDestroy(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsDestroyBase(PPCContext& ctx, uint8_t* base);
 void MorphJobsDestroyBase(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsWorkItemDestroy(PPCContext& ctx, uint8_t* base);
 void MorphJobsWorkItemDestroy(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsWorkItemInterfaceDestroy(PPCContext& ctx, uint8_t* base);
 void MorphJobsWorkItemInterfaceDestroy(lifted::Regs& ctx, uint8_t* base);
 
 // The job's slots: the wait (Job::Wait on the item, through the function
 // table), the released byte, its set, the run (Morph::Blend's step with
 // --native_second_set, else its original; the skinning blend's original),
 // and the run thunk.
-void MorphJobsWait(PPCContext& ctx, uint8_t* base);
 void MorphJobsWait(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsIsReleased(PPCContext& ctx, uint8_t* base);
 void MorphJobsIsReleased(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsSetReleased(PPCContext& ctx, uint8_t* base);
 void MorphJobsSetReleased(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsRun(PPCContext& ctx, uint8_t* base);
 void MorphJobsRun(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsRunThunk(PPCContext& ctx, uint8_t* base);
 void MorphJobsRunThunk(lifted::Regs& ctx, uint8_t* base);
 
 // The work item's slots and the +4 interface's slot 1.
-void MorphJobsWorkItemPosted(PPCContext& ctx, uint8_t* base);
 void MorphJobsWorkItemPosted(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsWorkItemStarted(PPCContext& ctx, uint8_t* base);
 void MorphJobsWorkItemStarted(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsWorkItemFinished(PPCContext& ctx, uint8_t* base);
 void MorphJobsWorkItemFinished(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsWorkItemSkip(PPCContext& ctx, uint8_t* base);
 void MorphJobsWorkItemSkip(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsWorkItemIsSkipped(PPCContext& ctx, uint8_t* base);
 void MorphJobsWorkItemIsSkipped(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsWorkItemInterfaceIsSkipped(PPCContext& ctx, uint8_t* base);
 void MorphJobsWorkItemInterfaceIsSkipped(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsWorkItemRun(PPCContext& ctx, uint8_t* base);
 void MorphJobsWorkItemRun(lifted::Regs& ctx, uint8_t* base);
-void MorphJobsWorkItemCall(PPCContext& ctx, uint8_t* base);
 void MorphJobsWorkItemCall(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

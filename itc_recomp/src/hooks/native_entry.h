@@ -43,32 +43,18 @@
   ITC_NATIVE_ENTRY_DEFINE(address, &lifted::kAlwaysOn)                                   \
   ITC_NATIVE_ENTRY_BODY(address)
 
-// An entry the kernel itself calls by its address (a thread's start: the
-// list in "The kernel's entries"): also an override in the SDK's function
-// table, which unpacks the context into the entry (lifted::Enter).
-#define ITC_KERNEL_ENTRY(address, flag)                                                  \
-  ITC_NATIVE_ENTRY_DEFINE(address, &(flag))                                              \
-  extern "C" REX_FUNC(sub_##address) { lifted::Enter(ctx, base, itc_entry_##address); }  \
-  ITC_NATIVE_ENTRY_BODY(address)
+// An entry our threads start at (a thread's start routine: the list in
+// "The kernel's entries"; once also an override in the SDK's function
+// table, gone with the SDK's context in E4): an entry like any other.
+#define ITC_KERNEL_ENTRY(address, flag) ITC_NATIVE_ENTRY(address, flag)
+#define ITC_KERNEL_ENTRY_ALWAYS(address) ITC_NATIVE_ENTRY_ALWAYS(address)
 
-#define ITC_KERNEL_ENTRY_ALWAYS(address)                                                 \
-  ITC_NATIVE_ENTRY_DEFINE(address, &lifted::kAlwaysOn)                                   \
-  extern "C" REX_FUNC(sub_##address) { lifted::Enter(ctx, base, itc_entry_##address); }  \
-  ITC_NATIVE_ENTRY_BODY(address)
-
-// A step on our register view (an adapter's body split out, shared with a
-// harness): `name(lifted::Regs&, uint8_t*)`, with the form taking the SDK's
-// context for code still entered with it (a harness), which runs it on a
-// view of the context (lifted::RegsScope). Followed by the body.
-#define ITC_REGS_STEP(name)                                                              \
-  void name(lifted::Regs& ctx, uint8_t* base);                                           \
-  void name(PPCContext& ctx, uint8_t* base) {                                            \
-    lifted::RegsScope scope(ctx);                                                        \
-    name(scope.regs, base);                                                              \
-  }                                                                                      \
+// A step on our register view (an adapter's body split out):
+// `name(lifted::Regs&, uint8_t*)`. Followed by the body. (It once also
+// defined a form on the SDK's context for the harnesses: gone in E4.)
+#define ITC_REGS_STEP(name) \
   void name([[maybe_unused]] lifted::Regs& ctx, [[maybe_unused]] uint8_t* base)
 
 // A step or an original named as a value (a table, a ternary, a
-// std::function): its form on our register view, or on the SDK's context
-// (a harness's).
+// std::function): its form on our register view.
 #define ITC_REGS_FN(name) static_cast<void (*)(lifted::Regs&, uint8_t*)>(&name)

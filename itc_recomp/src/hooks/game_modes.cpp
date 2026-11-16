@@ -205,17 +205,3 @@ ITC_NATIVE_ENTRY_ALWAYS(821077A8) {
   }
   lifted::original::c821077A8(ctx, base);
 }
-
-// The forms on the SDK's context the header declares (a harness's), on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::GameModesAdd)
-ITC_CONTEXT_FORM(hooks::GameModesFind)
-ITC_CONTEXT_FORM(hooks::GameModesHandle)
-ITC_CONTEXT_FORM(hooks::GameModesRaceOverlaysMachineInit)
-ITC_CONTEXT_FORM(hooks::GameModesResetOverlays)
-#undef ITC_CONTEXT_FORM

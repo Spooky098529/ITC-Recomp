@@ -516,7 +516,7 @@ bool g_in_rival_cutscene = false;
 uint32_t g_rival_logo = 0;  // the entry the last logic pass drew, or 0
 }  // namespace
 
-void (*race_hud_hooks::g_rival_logo_draw_stand_in)(PPCContext&, uint8_t*) = nullptr;
+void (*race_hud_hooks::g_rival_logo_draw_stand_in)(lifted::Regs&, uint8_t*) = nullptr;
 
 ITC_NATIVE_ENTRY_ALWAYS(82211A28) {
   

@@ -307,7 +307,7 @@ archive::LoadCall hooks::NativeArchiveLoad(uint8_t* base) {
     // A harness's recorder takes the call first, as Archive::Load's adapter
     // hands it (so a harness running native callers never queues for real).
     if (hooks::g_start_up_recorder != nullptr) {
-      PPCContext t{};
+      lifted::Regs t{};
       t.r3.u64 = id;
       t.r4.u64 = destination;
       t.r5.u64 = callback;
@@ -321,13 +321,7 @@ archive::LoadCall hooks::NativeArchiveLoad(uint8_t* base) {
 }
 
 void hooks::SetArchiveSerial(lifted::Regs& ctx, int64_t serial) { SetSerial(ctx, serial); }
-void hooks::SetArchiveSerial(PPCContext& ctx, int64_t serial) {
-  if (serial < 0) {
-    ctx.r3.s64 = -1;
-  } else {
-    ctx.r3.u64 = uint64_t(serial);
-  }
-}
+
 
 // The set-up: r3 = the request; r3 read by no caller (the next request sets
 // its own).
@@ -479,17 +473,3 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
   file_layer::GameFileDestruct(base, file);
   ctx.r3.u64 = file;
 }
-
-// The forms taking the SDK's context (for the harnesses, which pass one; the
-// header declares both): each on a view of the context.
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::ArchiveSetUp)
-ITC_CONTEXT_FORM(hooks::ArchiveNextRequest)
-ITC_CONTEXT_FORM(hooks::ArchiveFinishRequest)
-ITC_CONTEXT_FORM(hooks::ArchiveInvokeFunctor)
-ITC_CONTEXT_FORM(hooks::ArchiveUclUnpack)
-#undef ITC_CONTEXT_FORM

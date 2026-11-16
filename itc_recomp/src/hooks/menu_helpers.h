@@ -11,10 +11,8 @@
 namespace hooks {
 
 // Menu::Step sub_82186568: r3 = the menu.
-void MenuStep(PPCContext& ctx, uint8_t* base);
 void MenuStep(lifted::Regs& ctx, uint8_t* base);
 // Menu::Pressed sub_821864C8: r3 = the menu, r4 = the action id.
-void MenuPressed(PPCContext& ctx, uint8_t* base);
 void MenuPressed(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

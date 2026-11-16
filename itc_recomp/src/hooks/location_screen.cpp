@@ -358,7 +358,7 @@ namespace {
 // The texts' functions: natively while the UI movies' text setters are, else
 // the original; r3 the plain C++'s.
 template <typename Step>
-void Texts(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original, Step step) {
+void Texts(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original, Step step) {
   if (!LocationScreenTextsNative(base)) {
     lifted::Sdk(ctx, base, original);
     return;
@@ -546,31 +546,3 @@ LOCATION_SCREEN_ADAPTER(8222F0B0, LocationScreenStart)
 LOCATION_SCREEN_ADAPTER(8222DEE0, LocationScreenTransition9)
 // State 2's handler (through the machine's table: its adapter stays).
 LOCATION_SCREEN_ADAPTER(82229238, LocationScreenPollLoad)
-
-// The forms on the SDK's context the header declares (a harness's), on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::LocationScreenKindText)
-ITC_CONTEXT_FORM(hooks::LocationScreenOnMessage14)
-ITC_CONTEXT_FORM(hooks::LocationScreenSceneryConfig)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition12)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition14)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition16)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition17)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition2)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition23)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition24)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition25)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition29)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition33)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition34)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition4)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition5)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition7)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition8)
-ITC_CONTEXT_FORM(hooks::LocationScreenTransition9)
-#undef ITC_CONTEXT_FORM

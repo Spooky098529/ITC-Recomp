@@ -493,20 +493,9 @@ ITC_NATIVE_ENTRY_ALWAYS(825A08E0) {
 
 ui_movies_hooks::UpdateCalleeStandIn ui_movies_hooks::g_update_callee_stand_in = nullptr;
 
-namespace {
-thread_local uint32_t t_stand_in_function = 0;
-thread_local bool t_stood_in = false;
-void RunUpdateCalleeStandIn(PPCContext& ctx, uint8_t* base) {
-  t_stood_in = ui_movies_hooks::g_update_callee_stand_in(t_stand_in_function, ctx, base);
-}
-}  // namespace
-
 bool ui_movies_hooks::UpdateCalleeStoodInOnView(uint32_t function, lifted::Regs& ctx,
                                                 uint8_t* base) {
-  t_stand_in_function = function;
-  t_stood_in = false;
-  lifted::Sdk(ctx, base, RunUpdateCalleeStandIn);
-  return t_stood_in;
+  return ui_movies_hooks::g_update_callee_stand_in(function, ctx, base);
 }
 
 // UiMovie::Update: its calls made as the original's (r1 its frame, lr the
@@ -679,14 +668,3 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
   ctx.lr = lr;
   ctx.r3.u64 = playing ? 1 : 0;
 }
-
-// The forms on the SDK's context the header declares (a harness's), on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(ui_movies_hooks::ApplyAnimationNative)
-ITC_CONTEXT_FORM(ui_movies_hooks::Update)
-#undef ITC_CONTEXT_FORM

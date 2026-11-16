@@ -34,16 +34,11 @@ struct ModelLoadGuest {
 // index, r6 = the group), the shared shaders (sub_825896D8, sub_82589700: r3
 // = the pair). (The vertex declaration's, sub_82589728, are the harness's:
 // its adapter is gone.)
-void ModelsMaterialCount(PPCContext& ctx, uint8_t* base);
 void ModelsMaterialCount(lifted::Regs& ctx, uint8_t* base);
-void ModelsMaterial(PPCContext& ctx, uint8_t* base);
 void ModelsMaterial(lifted::Regs& ctx, uint8_t* base);
-void ModelsSharedVertexShader(PPCContext& ctx, uint8_t* base);
 void ModelsSharedVertexShader(lifted::Regs& ctx, uint8_t* base);
-void ModelsSharedPixelShader(PPCContext& ctx, uint8_t* base);
 void ModelsSharedPixelShader(lifted::Regs& ctx, uint8_t* base);
 // sub_825896C0 (r3, r4 the tables; r3 left).
-void ModelsSetSharedShaders(PPCContext& ctx, uint8_t* base);
 void ModelsSetSharedShaders(lifted::Regs& ctx, uint8_t* base);
 
 // A guest call of `function` (r3 the provider, r4 the slot, r5 the index;

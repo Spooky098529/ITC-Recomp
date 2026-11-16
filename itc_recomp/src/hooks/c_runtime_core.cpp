@@ -444,20 +444,6 @@ void hooks::CoreLockFhandle(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::LockFhandle(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
 }
 
-// The __finally funclets: r12 the parent's frame end (r31 = its frame), and
-// the parent's registers they reload or keep, as the originals leave them.
-void hooks::CoreLockFhandleFinally(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
-  // (and reloads) its parent's registers, which the view doesn't carry; the
-  // rest on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
-  cc::LockFhandleFinally(CRuntimeCoreCalls(ctx, base));
-  sdk.r11.u64 = cc::kPioinfo;
-  ctx.r3.u64 = guest::LoadU32(base, sdk.r31.u32 + 148);
-  sdk.r29.u64 = guest::LoadU32(base, sdk.r31.u32 + 80);
-}
-
 void hooks::CoreFreeOsfhnd(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.s64 = int32_t(cc::FreeOsfhnd(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base)));
 }
@@ -475,35 +461,8 @@ void hooks::CoreGetOsfhandle(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = loaded ? uint64_t(result) : uint64_t(int64_t(int32_t(result)));
 }
 
-void hooks::CoreRaiseFinally(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
-  // (and reloads) its parent's registers, which the view doesn't carry; the
-  // rest on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
-  bool called = false;
-  const uint64_t r3 = cc::RaiseFinally(sdk.r28.u32, &called, CRuntimeCoreCalls(ctx, base));
-  if (called) {
-    ctx.r3.u64 = r3;
-  }
-}
-
 void hooks::CoreUnlockStreamsFinally(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::UnlockStreamsFinally(CRuntimeCoreCalls(ctx, base));
-}
-
-void hooks::CoreFlsallInnerFinally(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
-  // (and reloads) its parent's registers, which the view doesn't carry; the
-  // rest on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
-  const uint32_t index = sdk.r28.u32, piob_word = sdk.r29.u32;
-  ctx.r4.u64 = guest::LoadU32(base, guest::LoadU32(base, piob_word) + 4 * index);
-  ctx.r3.u64 = cc::FlsallInnerFinally(base, index, piob_word, CRuntimeCoreCalls(ctx, base));
-  sdk.r11.u64 = 0x82980000u;
-  ctx.r10.u64 = cc::kNstream;
-  sdk.r27.u64 = guest::LoadU32(base, sdk.r12.u32 + 20);
 }
 
 void hooks::CoreExp(lifted::Regs& ctx, uint8_t* base) {
@@ -558,48 +517,6 @@ void hooks::CoreLd12ToFloat(lifted::Regs& ctx, uint8_t* base) {
 
 void hooks::CoreFileno(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = cc::Fileno(base, ctx.r3.u32, CRuntimeCoreCalls(ctx, base));
-}
-
-// The __finally funclets over a file handle's lock: the handle in r30
-// (_close's, _write's) or r27 (_commit's).
-void hooks::CoreCloseFinally(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
-  // (and reloads) its parent's registers, which the view doesn't carry; the
-  // rest on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
-  ctx.r3.u64 = cc::UnlockFhandleFinally(base, sdk.r30.u32, CRuntimeCoreCalls(ctx, base));
-}
-
-void hooks::CoreCommitFinally(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
-  // (and reloads) its parent's registers, which the view doesn't carry; the
-  // rest on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
-  ctx.r3.u64 = cc::UnlockFhandleFinally(base, sdk.r27.u32, CRuntimeCoreCalls(ctx, base));
-}
-
-void hooks::CoreFcloseFinally(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
-  // (and reloads) its parent's registers, which the view doesn't carry; the
-  // rest on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
-  ctx.r3.u64 = cc::UnlockFileFinally(base, sdk.r30.u32, CRuntimeCoreCalls(ctx, base));
-}
-
-void hooks::CoreExitUnlockFinally(PPCContext& sdk, uint8_t* base) {
-  // On the SDK's context (the rewiring, stage 3): a __finally funclet reads
-  // (and reloads) its parent's registers, which the view doesn't carry; the
-  // rest on a view of it.
-  lifted::RegsScope scope(sdk);
-  lifted::Regs& ctx = scope.regs;
-  bool called = false;
-  const uint64_t r3 = cc::ExitUnlockFinally(sdk.r28.u32, &called, CRuntimeCoreCalls(ctx, base));
-  if (called) {
-    ctx.r3.u64 = r3;
-  }
 }
 
 void hooks::CoreTerminate(lifted::Regs& ctx, uint8_t* base) {
@@ -988,121 +905,3 @@ ITC_C_RUNTIME_CORE(825A71B0, CoreVsprintf)
 // (_fltout2, sub_825B6458, has no adapter of its own: c-runtime.md.)
 ITC_C_RUNTIME_CORE(825AE1A8, CoreCftoe)
 ITC_C_RUNTIME_CORE(825AE9D0, CoreCftog)
-
-// The forms taking the SDK's context (for the harnesses, which pass one; the
-// header declares both): each on a view of the context.
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::CoreCrtTlsAlloc)
-ITC_CONTEXT_FORM(hooks::CoreGetptdNoexit)
-ITC_CONTEXT_FORM(hooks::CoreFreeFls)
-ITC_CONTEXT_FORM(hooks::CoreMtTerm)
-ITC_CONTEXT_FORM(hooks::CoreSetFlsGetValue)
-ITC_CONTEXT_FORM(hooks::CoreMtDeleteLocks)
-ITC_CONTEXT_FORM(hooks::CoreErrno)
-ITC_CONTEXT_FORM(hooks::CoreDosErrno)
-ITC_CONTEXT_FORM(hooks::CoreGetErrnoFromOsErr)
-ITC_CONTEXT_FORM(hooks::CoreDosMapErr)
-ITC_CONTEXT_FORM(hooks::CoreFreePtd)
-ITC_CONTEXT_FORM(hooks::CoreCritSecNoSpinCount)
-ITC_CONTEXT_FORM(hooks::CoreInitCritSecAndSpinCount)
-ITC_CONTEXT_FORM(hooks::CoreRegisterThreadNotifyRoutine)
-ITC_CONTEXT_FORM(hooks::CoreCallThreadNotifyRoutines)
-ITC_CONTEXT_FORM(hooks::CoreMtInitLocks)
-ITC_CONTEXT_FORM(hooks::CoreThreadNotify)
-ITC_CONTEXT_FORM(hooks::CoreMtInit)
-ITC_CONTEXT_FORM(hooks::CoreAtol)
-ITC_CONTEXT_FORM(hooks::CoreStrtol)
-ITC_CONTEXT_FORM(hooks::CoreStrrchr)
-ITC_CONTEXT_FORM(hooks::CoreInitterm)
-ITC_CONTEXT_FORM(hooks::CoreSetAbortBehavior)
-ITC_CONTEXT_FORM(hooks::CoreGetSigabrt)
-ITC_CONTEXT_FORM(hooks::CoreCrtDebuggerHook)
-ITC_CONTEXT_FORM(hooks::CoreValidateExecute)
-ITC_CONTEXT_FORM(hooks::CoreSetUnhandledExceptionFilter)
-ITC_CONTEXT_FORM(hooks::CoreGetCommandLineA)
-ITC_CONTEXT_FORM(hooks::CorePositive)
-ITC_CONTEXT_FORM(hooks::CoreNmsgWrite)
-ITC_CONTEXT_FORM(hooks::CoreGetbuf)
-ITC_CONTEXT_FORM(hooks::CoreFreebuf)
-ITC_CONTEXT_FORM(hooks::CoreBugCheckStub)
-ITC_CONTEXT_FORM(hooks::CoreRaiseException)
-ITC_CONTEXT_FORM(hooks::CoreCxxThrowException)
-ITC_CONTEXT_FORM(hooks::CoreInvalidParameter)
-ITC_CONTEXT_FORM(hooks::CoreThreadStartup)
-ITC_CONTEXT_FORM(hooks::CoreAmsgExit)
-ITC_CONTEXT_FORM(hooks::CoreGetptd)
-ITC_CONTEXT_FORM(hooks::CoreFptrap)
-ITC_CONTEXT_FORM(hooks::CoreUnhandledExceptionFilter)
-ITC_CONTEXT_FORM(hooks::CoreDebugMonitorNotify)
-ITC_CONTEXT_FORM(hooks::CoreCxxRestoreUnhandledExceptionFilter)
-ITC_CONTEXT_FORM(hooks::CoreInvokeWatson)
-ITC_CONTEXT_FORM(hooks::CoreLockFhandle)
-ITC_CONTEXT_FORM(hooks::CoreFreeOsfhnd)
-ITC_CONTEXT_FORM(hooks::CoreGetOsfhandle)
-ITC_CONTEXT_FORM(hooks::CoreUnlockStreamsFinally)
-ITC_CONTEXT_FORM(hooks::CoreExp)
-ITC_CONTEXT_FORM(hooks::CoreForcdecpt)
-ITC_CONTEXT_FORM(hooks::CoreCropzeros)
-ITC_CONTEXT_FORM(hooks::CoreFassign)
-ITC_CONTEXT_FORM(hooks::CoreAtodbl)
-ITC_CONTEXT_FORM(hooks::CoreAtoflt)
-ITC_CONTEXT_FORM(hooks::CoreLd12ToFloat)
-ITC_CONTEXT_FORM(hooks::CoreCloseHandle)
-ITC_CONTEXT_FORM(hooks::CoreResetEvent)
-ITC_CONTEXT_FORM(hooks::CoreInittermE)
-ITC_CONTEXT_FORM(hooks::CoreIoInit)
-ITC_CONTEXT_FORM(hooks::CoreInitStdio)
-ITC_CONTEXT_FORM(hooks::CoreFfMsgBanner)
-ITC_CONTEXT_FORM(hooks::CoreLockFile)
-ITC_CONTEXT_FORM(hooks::CoreUnlockFile)
-ITC_CONTEXT_FORM(hooks::CoreLockFile2)
-ITC_CONTEXT_FORM(hooks::CoreUnlockFile2)
-ITC_CONTEXT_FORM(hooks::CoreUnlockFhandle)
-ITC_CONTEXT_FORM(hooks::CoreFileno)
-ITC_CONTEXT_FORM(hooks::CoreTerminate)
-ITC_CONTEXT_FORM(hooks::CoreCloseNolock)
-ITC_CONTEXT_FORM(hooks::CoreClose)
-ITC_CONTEXT_FORM(hooks::CoreFlushFileBuffers)
-ITC_CONTEXT_FORM(hooks::CoreCommit)
-ITC_CONTEXT_FORM(hooks::CoreSetFilePointer)
-ITC_CONTEXT_FORM(hooks::CoreLseekNolock)
-ITC_CONTEXT_FORM(hooks::CoreLseek)
-ITC_CONTEXT_FORM(hooks::CoreWriteFile)
-ITC_CONTEXT_FORM(hooks::CoreWriteNolock)
-ITC_CONTEXT_FORM(hooks::CoreWrite)
-ITC_CONTEXT_FORM(hooks::CoreFlush)
-ITC_CONTEXT_FORM(hooks::CoreCxxUnhandledExceptionFilter)
-ITC_CONTEXT_FORM(hooks::CoreFcloseNolock)
-ITC_CONTEXT_FORM(hooks::CoreFclose)
-ITC_CONTEXT_FORM(hooks::CoreFcloseall)
-ITC_CONTEXT_FORM(hooks::CoreFlsbuf)
-ITC_CONTEXT_FORM(hooks::CoreStbuf)
-ITC_CONTEXT_FORM(hooks::CoreFtbuf)
-ITC_CONTEXT_FORM(hooks::CoreBsearch)
-ITC_CONTEXT_FORM(hooks::CoreCftoe2)
-ITC_CONTEXT_FORM(hooks::CoreFassignNoLocale)
-ITC_CONTEXT_FORM(hooks::CoreForcdecptNoLocale)
-ITC_CONTEXT_FORM(hooks::CoreCropzerosNoLocale)
-ITC_CONTEXT_FORM(hooks::CoreCxxSetUnhandledExceptionFilter)
-ITC_CONTEXT_FORM(hooks::CoreFflushNolock)
-ITC_CONTEXT_FORM(hooks::CoreFlsall)
-ITC_CONTEXT_FORM(hooks::CoreFflush)
-ITC_CONTEXT_FORM(hooks::CoreFlushall)
-ITC_CONTEXT_FORM(hooks::CoreEndstdio)
-ITC_CONTEXT_FORM(hooks::CoreDoexit)
-ITC_CONTEXT_FORM(hooks::CoreExit)
-ITC_CONTEXT_FORM(hooks::CoreCexit)
-ITC_CONTEXT_FORM(hooks::CoreRaise)
-ITC_CONTEXT_FORM(hooks::CoreAbort)
-ITC_CONTEXT_FORM(hooks::CorePurecall)
-ITC_CONTEXT_FORM(hooks::CoreFwriteNolock)
-ITC_CONTEXT_FORM(hooks::CoreFputs)
-ITC_CONTEXT_FORM(hooks::CoreThrow)
-ITC_CONTEXT_FORM(hooks::CoreVsprintf)
-ITC_CONTEXT_FORM(hooks::CoreCftoe)
-ITC_CONTEXT_FORM(hooks::CoreCftog)
-#undef ITC_CONTEXT_FORM

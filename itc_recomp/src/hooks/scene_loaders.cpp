@@ -149,7 +149,7 @@ namespace {
 
 // The paint walks' callees' flag: the original when it's off.
 template <typename Walk>
-void PaintWalk(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original,
+void PaintWalk(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
                Walk walk) {
   if (!ITC_FLAG(native_material_passes)) {
     lifted::Sdk(ctx, base, original);

@@ -147,7 +147,7 @@ namespace {
 // A point group's reset or init: r3 = the group or record, r3 as the plain
 // C++ returns it; the original where memcpy isn't native.
 template <typename Step>
-void GroupStep(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original,
+void GroupStep(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
                Step step) {
   if (!native::Buffers_NativeMemcpy()) {
     lifted::Sdk(ctx, base, original);
@@ -255,7 +255,7 @@ using Construct = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t);
 // A release: natively where memcpy is native and ReleaseA's plain C++ runs
 // for `pool` (and with --native_material_passes for the parts'); r3 as the
 // plain C++ returns it, else the original.
-void ReleaseStep(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original,
+void ReleaseStep(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
                  uint32_t pool, Release release) {
   if (!native::Buffers_NativeMemcpy() || !SceneLoadersReleaseANative(pool) ||
       (pool == 1 && !ITC_FLAG(native_material_passes))) {
@@ -271,7 +271,7 @@ void ReleaseStep(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* origi
 }
 
 // A constructor: r3 = the object, r4 = its list; r3 = the object.
-void ConstructStep(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original,
+void ConstructStep(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
                    Construct construct) {
   if (!native::Buffers_NativeMemcpy()) {
     lifted::Sdk(ctx, base, original);
@@ -378,7 +378,7 @@ namespace {
 bool DestructNative(uint32_t pool) { return SecondSetReleaseNative(pool); }
 
 // A destructor: r3 = the object, left; the original where it declines.
-void DestructStep(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original,
+void DestructStep(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
                   uint32_t pool, bool (*destruct)(uint8_t*, uint32_t, uint32_t)) {
   if (DestructNative(pool)) {
     ctx.fpscr.disableFlushMode();
@@ -390,7 +390,7 @@ void DestructStep(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* orig
 }
 
 // A deleting destructor: r3 = the object (left), r4 = the flags.
-void DeletingStep(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original,
+void DeletingStep(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
                   uint32_t pool, bool (*destruct)(uint8_t*, uint32_t, uint32_t, uint32_t)) {
   if (DestructNative(pool)) {
     ctx.fpscr.disableFlushMode();
@@ -797,102 +797,3 @@ ITC_SECOND_SET(820DE030, SecondSetSceneLightsConstruct)
 ITC_SECOND_SET(820ECE40, SecondSetSceneWheelsConstruct)
 ITC_SECOND_SET(820E6E70, SecondSetSceneTrafficConstruct)
 ITC_SECOND_SET(820DB330, SecondSetSceneModelConstruct)
-
-// The forms on the SDK's context the header declares (a harness's), run on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetFrontBumper)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetRearBumper)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetRearSpoiler)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetBonnet)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetLeftDoor)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetDoors)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetHeadlights)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetTailLights)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetFenders)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetCabin)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetEngine)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetMufflers)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsResetShadows)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsInitCooling)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsInitSideSkirts)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsInitLeftMirror)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsInitRightMirror)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsInitMirror)
-ITC_CONTEXT_FORM(hooks::SecondSetCockpitInitBonnet)
-ITC_CONTEXT_FORM(hooks::SecondSetCockpitInitMirror)
-ITC_CONTEXT_FORM(hooks::SecondSetCockpitResetFenders)
-ITC_CONTEXT_FORM(hooks::SecondSetCockpitResetCabin)
-ITC_CONTEXT_FORM(hooks::SecondSetCockpitResetDoors)
-ITC_CONTEXT_FORM(hooks::SecondSetCockpitResetHeadlights)
-ITC_CONTEXT_FORM(hooks::SecondSetInteriorInitBody)
-ITC_CONTEXT_FORM(hooks::SecondSetInteriorResetDials)
-ITC_CONTEXT_FORM(hooks::SecondSetInteriorResetMeters)
-ITC_CONTEXT_FORM(hooks::SecondSetInteriorResetSteering)
-ITC_CONTEXT_FORM(hooks::SecondSetInteriorResetSeats)
-ITC_CONTEXT_FORM(hooks::SecondSetInteriorResetRollCage)
-ITC_CONTEXT_FORM(hooks::SecondSetLightsResetFront)
-ITC_CONTEXT_FORM(hooks::SecondSetLightsResetSides)
-ITC_CONTEXT_FORM(hooks::SecondSetLightsResetRear)
-ITC_CONTEXT_FORM(hooks::SecondSetTrafficResetBody)
-ITC_CONTEXT_FORM(hooks::SecondSetTrafficResetHeadlights)
-ITC_CONTEXT_FORM(hooks::SecondSetTrafficResetTailLights)
-ITC_CONTEXT_FORM(hooks::SecondSetCockpitPointsConstruct)
-ITC_CONTEXT_FORM(hooks::SecondSetCockpitPointsReset)
-ITC_CONTEXT_FORM(hooks::SecondSetInteriorPointsConstruct)
-ITC_CONTEXT_FORM(hooks::SecondSetInteriorPointsReset)
-ITC_CONTEXT_FORM(hooks::SecondSetLightPointsConstruct)
-ITC_CONTEXT_FORM(hooks::SecondSetLightPointsReset)
-ITC_CONTEXT_FORM(hooks::SecondSetTrafficPointsConstruct)
-ITC_CONTEXT_FORM(hooks::SecondSetTrafficPointsReset)
-ITC_CONTEXT_FORM(hooks::SecondSetWheelsResetTire)
-ITC_CONTEXT_FORM(hooks::SecondSetWheelsResetRimA)
-ITC_CONTEXT_FORM(hooks::SecondSetWheelsResetRimB)
-ITC_CONTEXT_FORM(hooks::SecondSetWheelsResetBrakes)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneCockpitReset)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneInteriorReset)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneLightsReset)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneTrafficReset)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneModelBlockReset)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneWheelsReset)
-ITC_CONTEXT_FORM(hooks::SecondSetWheelPointsReset)
-ITC_CONTEXT_FORM(hooks::SecondSetWheelPointsConstruct)
-ITC_CONTEXT_FORM(hooks::SecondSetWheelsInitTire)
-ITC_CONTEXT_FORM(hooks::SecondSetWheelsInitRimA)
-ITC_CONTEXT_FORM(hooks::SecondSetWheelsInitRimB)
-ITC_CONTEXT_FORM(hooks::SecondSetWheelsInitBrakes)
-ITC_CONTEXT_FORM(hooks::SecondSetScenePartsRelease)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneInteriorRelease)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneLightsRelease)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneWheelsRelease)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneTrafficRelease)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneCarModelConstruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneCockpitConstruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneInteriorConstruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneLightsConstruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneWheelsConstruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneTrafficConstruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneModelConstruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneCarModelDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetScenePartsDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneInteriorDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneLightsDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneWheelsDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneCarModelDeletingDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetScenePartsDeletingDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneInteriorDeletingDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneLightsDeletingDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneWheelsDeletingDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetSceneTrafficDeletingDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetPoolObjectDeletingDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetPartsPointsDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetCockpitPointsDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetInteriorPointsDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetLightPointsDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetWheelPointsDestruct)
-ITC_CONTEXT_FORM(hooks::SecondSetTrafficPointsDestruct)
-#undef ITC_CONTEXT_FORM

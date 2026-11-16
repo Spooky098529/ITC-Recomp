@@ -740,22 +740,3 @@ ITC_TYPE2_SCREENS(82198FB8, PlateTransition19)
 // their callers in play are native (the transitions never seen in play
 // reach the originals), the flag switches those; their steps above are the
 // harness's.
-
-// The forms taking the SDK's context (for the harnesses, which pass one; the
-// header declares both): each on a view of the context.
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::HubOnNo)
-ITC_CONTEXT_FORM(hooks::HubOnYes)
-ITC_CONTEXT_FORM(hooks::HubTransition0)
-ITC_CONTEXT_FORM(hooks::HubTransition1)
-ITC_CONTEXT_FORM(hooks::HubTransition2)
-ITC_CONTEXT_FORM(hooks::HubTransition3)
-ITC_CONTEXT_FORM(hooks::HubTransition5)
-ITC_CONTEXT_FORM(hooks::HubTransition6)
-ITC_CONTEXT_FORM(hooks::HubTransition7)
-ITC_CONTEXT_FORM(hooks::PlateOnMessage32)
-#undef ITC_CONTEXT_FORM

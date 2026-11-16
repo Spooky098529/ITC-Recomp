@@ -19,14 +19,12 @@ graphics::command_buffer::Kick CommandBufferKick(lifted::Regs& ctx, uint8_t* bas
 // --native_command_buffer (the original with it off, or with a recording
 // command buffer). For its Wrapped override in src/native/draw_packets.cpp,
 // which counts the calls.
-void EndCommandSegment(PPCContext& ctx, uint8_t* base);
 void EndCommandSegment(lifted::Regs& ctx, uint8_t* base);
 
 // The next segment (sub_8229EC00), r3 the device, r4 the words: the plain
 // C++ with --native_command_buffer (the original with it off, or with a
 // recording command buffer); r3 the segment. For Device::Swap's override
 // (src/hooks/graphics_device.cpp).
-void NextCommandSegment(PPCContext& ctx, uint8_t* base);
 void NextCommandSegment(lifted::Regs& ctx, uint8_t* base);
 
 }  // namespace hooks

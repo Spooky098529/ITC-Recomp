@@ -183,12 +183,6 @@ int64_t GetTimeZoneBias(lifted::Regs& ctx, uint8_t* base) {
   });
   return bias;
 }
-// The form taking the SDK's context (for the harness, which passes one): on
-// a view of the context.
-int64_t GetTimeZoneBias(PPCContext& ctx, uint8_t* base) {
-  lifted::RegsScope scope(ctx);
-  return GetTimeZoneBias(scope.regs, base);
-}
 
 }  // namespace time_hooks
 

@@ -447,7 +447,7 @@ bool InOwnFrame(lifted::Regs& ctx, uint8_t* base, uint32_t bytes, const as::AppC
 }
 
 void LayerConstructStep(lifted::Regs& ctx, uint8_t* base, bool with_state,
-                        lifted::ImportFunction* original) {
+                        lifted::RegsFunction* original) {
   const uint32_t layer = ctx.r3.u32, owner = ctx.r4.u32;
   const std::optional<uint32_t> state =
       with_state ? std::optional<uint32_t>(ctx.r5.u32) : std::nullopt;

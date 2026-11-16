@@ -265,15 +265,3 @@ ITC_NATIVE_ENTRY_ALWAYS(825D9518) {
   hooks::GuestAtexit guest{ctx, base};
   ctx.r3.s64 = SignInWatchStaticInit(base, guest.Call());
 }
-
-// The forms taking the SDK's context (for the harnesses, which pass one; the
-// header declares both): each on a view of the context.
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::ModesTickSteps)
-ITC_CONTEXT_FORM(hooks::ModeTickMusicPlay)
-ITC_CONTEXT_FORM(hooks::ModeTickScreenFadesUpdate)
-#undef ITC_CONTEXT_FORM

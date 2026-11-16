@@ -1085,21 +1085,6 @@ uint32_t CallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t bytes,
   });
   return ctx.r3.u32;
 }
-// The same for an SDK function (a recompiled original), run on the
-// thread's context with the view's registers.
-uint32_t CallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t sp, uint32_t bytes, uint32_t back,
-                  lifted::ImportFunction* function, uint32_t r3, uint32_t r4 = 0,
-                  uint32_t r5 = 0) {
-  AtStack(ctx, sp, [&] {
-    guest_call::InFrame(ctx, base, bytes, back, [&](uint32_t) {
-      ctx.r3.u64 = r3;
-      ctx.r4.u64 = r4;
-      ctx.r5.u64 = r5;
-      lifted::Sdk(ctx, base, function);
-    });
-  });
-  return ctx.r3.u32;
-}
 
 // sub_8211C168 on the movie table, natively where PairsSet can, else the
 // original from the caller's frame; r3 as it leaves it.

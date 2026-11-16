@@ -152,7 +152,7 @@ ITC_REGS_STEP(StandModelsSetDecalB) {
 // A setter that re-applies the record: `body` with the guest calls, lr put
 // back; the original without its callees' flags.
 template <typename Body>
-void Reapplying(lifted::Regs& ctx, uint8_t* base, lifted::ImportFunction* original,
+void Reapplying(lifted::Regs& ctx, uint8_t* base, lifted::RegsFunction* original,
                 Body body) {
   if (!ITC_FLAG(native_vehicle_accessors) || !ITC_FLAG(native_scene_models)) {
     lifted::Sdk(ctx, base, original);
@@ -569,15 +569,3 @@ ITC_REGS_STEP(StandModelsLightValue) {
 // SceneParts::LightValue sub_820DF1A0 has none: only SetLightsOn calls it,
 // and its plain C++ calls LightValue's (its register step above is the
 // harness's).
-
-// The forms on the SDK's context the header declares (a harness's), run on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::StandModelsSetInteriorClass)
-ITC_CONTEXT_FORM(hooks::StandModelsSetWord5016)
-ITC_CONTEXT_FORM(hooks::StandModelsSetWheelWord)
-#undef ITC_CONTEXT_FORM

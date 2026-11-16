@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Writes src/lifted/imports.h, the image's kernel and XAM imports declared
-(the SDK defines them), and src/lifted/imports.cpp: a dispatch table entry for each of the
+(each a record of ours with its name, the key our answers are found by:
+src/imports/native_imports.h), and src/lifted/imports.cpp: a dispatch table entry for each of the
 image's import thunks (docs/rexglue-removal.md, "Before E1: the rewiring",
 stage 4), read from generated/default/itc_init.cpp's function mappings,
-and lifted::ImportName, each import's name for diagnostics (--log_imports).
+whose names the records carry for diagnostics (--log_imports).
 
 Native code that calls a kernel or XAM import by its thunk's address (the
 ports that call `kExCreateThread = 0x825DBBE4` and the like through their
 `Calls`) reaches it through lifted::Call like any other function: the
-entry runs the import through lifted::Import, the lift code's boundary
-with the SDK. Without these, such calls went to the SDK's function table.
+entry runs the import through lifted::Import (our answer, or a log and a
+stop: E2 and E4 in docs/rexglue-removal.md).
 
 usage: import_entries.py
 """
@@ -33,8 +34,8 @@ def main():
         "// The import thunks' dispatch table entries (docs/rexglue-removal.md,",
         "// \"Before E1: the rewiring\", stage 4): written by",
         "// itc_recomp/tools/import_entries.py. Don't edit it by hand: run the tool",
-        "// again. A call to an import thunk's address runs the import through the",
-        "// SDK boundary (lifted::Import).",
+        "// again. A call to an import thunk's address runs the import through",
+        "// lifted::Import (our answer, or a log and a stop).",
         "",
         '#include "lifted/lifted.h"',
         '#include "lifted/sdk.h"',
@@ -60,41 +61,37 @@ def main():
         "",
         "}  // namespace",
         "",
-        "const char* ImportName(ImportFunction* function) {",
-        "  static const struct {",
-        "    ImportFunction* function;",
-        "    const char* name;",
-        "  } kNames[] = {",
-    ]
-    for name in sorted({n for _, n in thunks}):
-        lines.append(f'      {{{name}, "{name[len("__imp__"):]}"}},')
-    lines += [
-        "  };",
-        "  for (const auto& entry : kNames) {",
-        "    if (entry.function == function) {",
-        "      return entry.name;",
-        "    }",
-        "  }",
-        '  return "(not an import: our code through lifted::Sdk)";',
-        "}",
-        "",
         "}  // namespace lifted",
         "",
     ]
     with open(OUT, "w") as f:
         f.write("\n".join(lines))
     header = [
-        "// The image's kernel and XAM imports, which the SDK defines: written by",
+        "// The image's kernel and XAM imports: written by",
         "// itc_recomp/tools/import_entries.py. Don't edit it by hand: run the tool",
-        "// again.",
+        "// again. Each is a record of ours with the import's name, known by its",
+        "// address (`__imp__X`, the name the generated code gave the SDK's",
+        "// function): the key lifted::Import finds our answer by",
+        "// (docs/rexglue-removal.md, \"E4: the plan\", step 3).",
         "",
         "#pragma once",
         "",
-        "#include <rex/ppc/func.h>",
+        "namespace lifted {",
+        "",
+        "// An import: its name, for diagnostics.",
+        "struct ImportFunction {",
+        "  const char* name;",
+        "};",
+        "",
+        "namespace import_records {",
         "",
     ]
-    for name in sorted({n for _, n in thunks}):
-        header.append(f"REX_EXTERN({name});")
+    names = sorted({n for _, n in thunks})
+    for name in names:
+        header.append(f'inline ImportFunction {name[len("__imp__"):]}{{"{name[len("__imp__"):]}"}};')
+    header += ["", "}  // namespace import_records", "", "}  // namespace lifted", ""]
+    for name in names:
+        header.append(f"inline lifted::ImportFunction* const {name} = &lifted::import_records::{name[len('__imp__'):]};")
     header.append("")
     with open(HEADER, "w") as f:
         f.write("\n".join(header))

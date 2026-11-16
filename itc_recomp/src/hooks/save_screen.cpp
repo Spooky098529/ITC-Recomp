@@ -253,13 +253,3 @@ ITC_SAVE_SCREEN(821A3DE8, SaveScreenPage15)
 ITC_SAVE_SCREEN(821A4AC0, SaveScreenPage24)
 // No adapter for SaveScreen::StoreSettings sub_821A24B0: its only caller,
 // Page6, is native (the flag switches it); its step above is the harness's.
-
-// The forms taking the SDK's context (for the harnesses, which pass one; the
-// header declares both): each on a view of the context.
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::SaveScreenCancel)
-#undef ITC_CONTEXT_FORM

@@ -566,17 +566,3 @@ ITC_NATIVE_ENTRY_ALWAYS(820F1208) {
   ITC_SCENERY_CALLS;
   ctx.r3.u64 = SceneryModelDestruct(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
 }
-
-// The forms taking the SDK's context (for the harnesses, which pass one; the
-// header declares both): each on a view of the context.
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::CourseSceneryRecordHeadlightProjectors)
-ITC_CONTEXT_FORM(hooks::CourseSceneryUpdate)
-ITC_CONTEXT_FORM(hooks::CourseSceneryDrawSetLists)
-ITC_CONTEXT_FORM(hooks::CourseSceneryDrawArea)
-ITC_CONTEXT_FORM(hooks::CourseSceneryDraw)
-#undef ITC_CONTEXT_FORM

@@ -63,15 +63,7 @@ inline uint32_t PushFrame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 }
 
 // An adapter's step for plain C++ `function(base, sp, r13, r3)` returning
-// the original's r3: entered through lifted::Enter, f1 left as it was.
-template <uint64_t (*function)(uint8_t*, uint32_t, uint64_t, uint32_t)>
-void EnterR3(PPCContext& ctx, uint8_t* base) {
-  lifted::Enter(ctx, base, [](uint8_t* base, const lifted::Args& a) -> lifted::Result {
-    return {function(base, uint32_t(a.r1), a.r13, uint32_t(a.r[0])), a.f[0]};
-  });
-}
-
-// The same for an adapter body on our register view.
+// the original's r3, on our register view (f1 left as it was).
 template <uint64_t (*function)(uint8_t*, uint32_t, uint64_t, uint32_t)>
 void EnterR3(lifted::Regs& ctx, uint8_t* base) {
   ctx.r3.u64 = function(base, ctx.r1.u32, ctx.r13.u64, ctx.r3.u32);

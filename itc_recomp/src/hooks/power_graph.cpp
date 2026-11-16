@@ -246,16 +246,3 @@ ITC_NATIVE_ENTRY(82250670, ITC_FLAG(native_power_graph)) {
 ITC_NATIVE_ENTRY(82250700, ITC_FLAG(native_power_graph)) {
   hooks::CarListDrawCarPowerGraph(ctx, base);
 }
-
-// The forms on the SDK's context the header declares (a harness's), on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::CarListDrawCarPowerGraph)
-ITC_CONTEXT_FORM(hooks::CarListDrawEntryPowerGraph)
-ITC_CONTEXT_FORM(hooks::PowerGraphDraw)
-ITC_CONTEXT_FORM(hooks::TuningScreenDrawPowerGraph)
-#undef ITC_CONTEXT_FORM

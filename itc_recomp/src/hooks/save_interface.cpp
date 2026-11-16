@@ -70,8 +70,7 @@ namespace si = save_interface;
 
 namespace {
 
-// The registers from r4 up (PPCContext keeps r3 first, then r0 to r2, then
-// r4 on).
+// The registers from r4 up (our register view keeps r4 to r10 in order).
 uint32_t Reg(lifted::Regs& ctx, int n) { return (&ctx.r4)[n - 4].u32; }
 
 // A request's arguments from the register of the display name (r4 for the
@@ -790,13 +789,3 @@ ITC_SAVE_INTERFACE_ADAPTER(820A5A88, SlotCheckStepSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A5BE8, SlotSaveStepSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A5E68, SlotLoadStepSteps)
 ITC_SAVE_INTERFACE_ADAPTER(820A6010, SlotDeleteStepSteps)
-
-// The forms on the SDK's context the header declares (a harness's), run on a
-// view of it (the rewiring, stage 3).
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::SaveInterfaceContentSize)
-#undef ITC_CONTEXT_FORM

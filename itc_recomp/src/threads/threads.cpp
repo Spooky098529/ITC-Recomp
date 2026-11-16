@@ -186,9 +186,7 @@ Made Make(uint8_t* base, uint32_t stack_size, uint32_t flags) {
 }
 
 // The host thread: once resumed, `body` with r1 at the stack's top and r13
-// the per-thread block. A context struct of its own is bound for code that
-// runs a function through lifted::Sdk (a register carrier only; no SDK
-// thread behind it).
+// the per-thread block.
 std::thread Run(uint8_t* base, const Made& made, std::function<void(lifted::Args)> body) {
   return std::thread([base, made, body = std::move(body)] {
     {
@@ -198,10 +196,6 @@ std::thread Run(uint8_t* base, const Made& made, std::function<void(lifted::Args
     }
     t_pcr = made.thread->pcr;
     t_base = base;
-    auto context = std::make_unique<PPCContext>();
-    context->r1.u64 = made.stack_base;
-    context->r13.u64 = made.thread->pcr;
-    lifted::BindThreadContext(context.get());
     lifted::Args call;
     call.r1 = made.stack_base;
     call.r13 = made.thread->pcr;

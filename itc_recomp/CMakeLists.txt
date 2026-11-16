@@ -61,7 +61,6 @@ include(cmake/ffmpeg.cmake)
 # Sources
 set(ITC_SOURCES
     src/app/main.cpp
-    src/app/image.cpp
     src/app/start_up.cpp
     src/base/log.cpp
     src/base/log_sdk.cpp

@@ -238,7 +238,7 @@ uint32_t Thread(lifted::Regs& ctx, uint8_t* base) { return XAudioThreadOf(ctx, b
 // original's registers when `refuses`, else framed.
 template <typename Body>
 void FramedOr(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes, bool refuses,
-              lifted::ImportFunction* original, Body body) {
+              lifted::RegsFunction* original, Body body) {
   if (refuses) {
     lifted::Sdk(ctx, base, original);
     return;

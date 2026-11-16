@@ -218,10 +218,9 @@ bool MinimapDrawNative() {
          !hooks::SceneryListsSlotDiagnostics();
 }
 
-void MinimapDraw(PPCContext& ctx, uint8_t* base) {
-  lifted::RegsScope scope(ctx);
+void MinimapDraw(lifted::Regs& ctx, uint8_t* base) {
   // (the caller's r24: diagnostic only, not carried)
-  MinimapDraw(scope.regs, base, 0);
+  MinimapDraw(ctx, base, 0);
 }
 void MinimapDraw(lifted::Regs& ctx, uint8_t* base, uint32_t caller_r24) {
   ctx.fpscr.disableFlushMode();

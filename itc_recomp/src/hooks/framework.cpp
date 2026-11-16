@@ -642,22 +642,3 @@ ITC_NATIVE_ENTRY_ALWAYS(82090108) {
   ITC_FRAMEWORK_FALLBACK(82090108)
   hooks::Main(ctx, base);
 }
-
-// The forms taking the SDK's context (for the harnesses, which pass one; the
-// header declares both): each on a view of the context.
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(hooks::TickHandlerInvoke)
-ITC_CONTEXT_FORM(hooks::DelegateSlot1Thunk)
-ITC_CONTEXT_FORM(hooks::Main)
-ITC_CONTEXT_FORM(hooks::RunFrameworkAt)
-ITC_CONTEXT_FORM(hooks::RunFramework)
-ITC_CONTEXT_FORM(hooks::AppRun)
-ITC_CONTEXT_FORM(hooks::ForEachTickHandler)
-ITC_CONTEXT_FORM(hooks::ForEachRequest)
-ITC_CONTEXT_FORM(hooks::DebugTextLoadFontSteps)
-ITC_CONTEXT_FORM(hooks::DebugFontInitSteps)
-#undef ITC_CONTEXT_FORM

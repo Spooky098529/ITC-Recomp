@@ -309,16 +309,6 @@ ITC_REGS_STEP(RaceSoundsInit) {
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
-// The forms taking the SDK's context (for the harnesses, which pass one; the
-// header declares both): each on a view of the context.
-#define ITC_CONTEXT_FORM(name)                      \
-  void name(PPCContext& ctx, uint8_t* base) {       \
-    lifted::RegsScope scope(ctx);                   \
-    name(scope.regs, base);                         \
-  }
-ITC_CONTEXT_FORM(RaceSoundsOnEffectsBankLoaded)
-#undef ITC_CONTEXT_FORM
-
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
