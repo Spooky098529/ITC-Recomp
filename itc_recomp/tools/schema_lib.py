@@ -45,8 +45,12 @@ class Schema:
         self.by_measure = {}
         for path in sorted(glob.glob(os.path.join(SCHEMA, "*.toml"))):
             area = os.path.basename(path)[:-5]
-            with open(path, "rb") as f:
-                data = tomllib.load(f)
+            try:
+                with open(path, "rb") as f:
+                    data = tomllib.load(f)
+            except tomllib.TOMLDecodeError as e:
+                print(f"{area}: skipped (doesn't parse: {e})")
+                continue
             for name, t in data.items():
                 if name == "globals":
                     continue

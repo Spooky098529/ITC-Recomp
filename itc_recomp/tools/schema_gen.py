@@ -14,7 +14,9 @@ the game sees. For each field `name` at +offset:
 and `kSize`, the type's size. The `[globals]` table of an area becomes a
 struct `<Area>Globals` with the same accessors, static, taking `base`.
 
-usage: schema_gen.py      (writes every header; checks names and pointees)
+usage: schema_gen.py              (writes every header; checks names and pointees)
+       schema_gen.py --area <a>   (only <a>'s header; other files that don't
+                                   parse are skipped: agents side by side)
 """
 import glob
 import os
@@ -43,12 +45,19 @@ SCALARS = {
 IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
-def load():
+def load(tolerant=False):
+    """Every area's schema; with `tolerant`, a file that doesn't parse (an
+    agent mid-edit) is skipped with a warning."""
     areas = {}
     for path in sorted(glob.glob(os.path.join(SCHEMA, "*.toml"))):
         area = os.path.basename(path)[:-5]
-        with open(path, "rb") as f:
-            areas[area] = tomllib.load(f)
+        try:
+            with open(path, "rb") as f:
+                areas[area] = tomllib.load(f)
+        except tomllib.TOMLDecodeError as e:
+            if not tolerant:
+                raise
+            print(f"{area}: skipped (doesn't parse: {e})", file=sys.stderr)
     return areas
 
 
@@ -64,6 +73,16 @@ def check(areas):
             if name in types:
                 errors.append(f"{area}: type {name} also in {types[name]}")
             types[name] = area
+    claimed = {}
+    for area, data in areas.items():
+        for name, t in data.items():
+            if name == "globals":
+                continue
+            for m in ([t["measure"]] if t.get("measure") else []) + t.get("measures", []):
+                if m in claimed and claimed[m] != (area, name):
+                    errors.append(f"{area}: {name} claims the measure's {m!r}, "
+                                  f"also {claimed[m][1]}'s ({claimed[m][0]})")
+                claimed[m] = (area, name)
     for area, data in areas.items():
         for name, t in data.items():
             fields = (t.items() if name == "globals" else
@@ -157,6 +176,26 @@ def emit_area(area, data):
 
 
 def main(argv):
+    if len(argv) == 3 and argv[1] == "--area":
+        # One area's header only, from its file, checked against every file
+        # that parses: for agents working on areas side by side (the other
+        # headers and types.h are written by a full run).
+        area = argv[2].removesuffix(".toml").removesuffix(".md")
+        areas = load(tolerant=True)
+        if area not in areas:
+            print(f"{area}: no schema file (or it doesn't parse)", file=sys.stderr)
+            return 1
+        types, errors = check(areas)
+        errors = [e for e in errors if e.startswith(f"{area}:")]
+        if errors:
+            for e in errors:
+                print(e, file=sys.stderr)
+            return 1
+        os.makedirs(OUT, exist_ok=True)
+        with open(os.path.join(OUT, area.replace("-", "_") + ".h"), "w") as f:
+            f.write(emit_area(area, areas[area]))
+        print(f"schema: {area}: {sum(1 for k in areas[area] if k != 'globals')} types")
+        return 0
     areas = load()
     types, errors = check(areas)
     if errors:
