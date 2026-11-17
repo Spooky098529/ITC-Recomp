@@ -562,6 +562,10 @@ Decided (the user, 2026-11-16), on `e5-native-16-11-26`:
   (B7's rules carried over); steps 0, 1 and 6 to 9 done directly.
 - **The names**: rows' names taken even where marked "probably"; rows
   without a name keep `sub_X`.
+- **The Host status** (2026-11-17): added, as proposed: a function whose
+  objects are host structs (steps 3 to 5); in every file's status
+  definitions and in `tools/check_function_statuses.py` (checked as
+  Native).
 
 ## Risks
 

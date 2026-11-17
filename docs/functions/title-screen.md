@@ -229,6 +229,11 @@ Status:
   calls direct or through the dispatch table. While the SDK or code not
   native yet still reaches it, its entry for them is an override in
   `src/lifted/` (deleted when nothing reaches it that way).
+- **Host**: E5 (`docs/e5-native.md`, steps 3 to 5): our C++ whose objects
+  are host structs (host byte order, host pointers, made with `new` or
+  kept in containers), read and written as C++ members instead of by
+  offset in guest memory. A Native or Lifted function becomes Host when
+  its area's objects move to the host.
 
 | Address | Name | Status | Notes |
 | `sub_82224C70` | `ModeType4::Init` | Overridden | Slot 0 of vtable `0x82006BE0`, from `Modes::Tick` once the mode is made: r3 = the mode. A 112-byte frame (r30, r31 saved). `sub_8211AD00` (a screen's start); `Strings::Load([0x826C5C34], 3)`; `VirtualAlloc(0, 48220, MEM_COMMIT, PAGE_READWRITE)` into +848 (the block); `Type4Options::Init(block)`, `Type4ControllerOptions::Init(block + 9640)`, `TitleLoad::Init(block + 28920)`, `TitleScreen::Init(block + 38560)`, `Type4SaveScreen::Init(block + 19280)`; the dispatcher (+36: count +200, the handler pointers from +36) given block, +9640, +28920, +38560 and +19280 in that order; +9612 = 1 and +9616 = 0 on +28920, +38560 and +0, +9612 = 0 and +9616 = 1 on +9640, +9612 = 1 and +9616 = 0 on +19280; the delegate (+8, pointed to by +4) = vtable `0x82010FA0` (`ModeDelegate::Invoke`), the mode, `Mode::Slot8Thunk` `0x8223D4B0` (`Restart`), its last word from a frame word set to 0. Seen in play. Read in full. Ready (with both Inits in its group). Plain C++ in `itc_recomp/src/title_screen/mode.cpp` (`ModeInit`: the title load's and the title screen's Inits as plain C++; the screen start, `Strings::Load`, `VirtualAlloc`, `Type4Options::Init`, `Type4ControllerOptions::Init` and `Type4SaveScreen::Init` through their overrides) behind an adapter in `src/hooks/title_screen_native.cpp` (`--native_title_screen`); checked by the `title_screen` harness (B7 loop, 2026-11-11). |

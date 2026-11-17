@@ -7,7 +7,7 @@ Reports only; changes nothing.
 usage: check_function_statuses.py [repo root]   (default: this repo)
 
 For each table row, every sub_XXXXXXXX in its first column is checked:
-  error    Native or Merged, but an override (extern "C" REX_FUNC(sub_X),
+  error    Native, Merged or Host, but an override (extern "C" REX_FUNC(sub_X),
            or a macro defining one) exists:
            it should be Overridden or Wrapped
   error    Overridden or Wrapped, but no override exists
@@ -175,7 +175,7 @@ def main():
                     print(f"error  {where}: an override outside src/lifted/ exists in {override[0]}")
                     errors += 1
                 continue
-            if status in ("Native", "Merged") and override:
+            if status in ("Native", "Merged", "Host") and override:
                 print(f"error  {where}: an override exists in {override[0]}")
                 errors += 1
             elif status in ("Overridden", "Wrapped") and not override:
