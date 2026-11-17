@@ -273,10 +273,10 @@ named (by a class, a path, a parameter or a return), 311 allocations
 without a class; **4,468 private, 416 shared**. 180 constructors' vtables
 found.
 
-Typed accesses by their types' kind: **37.5% on types tagged file, GPU or
+Typed accesses by their types' kind: **36.5% on types tagged file, GPU or
 save** (touched by an area that reads `DATA/` in place, feeds the GPU, or
-saves: steps 5 and 7; the tags are by area, not proof), **36.1% private**
-(step 3), **26.5% shared** (step 4).
+saves: steps 5 and 7; the tags are by area, not proof), **36.2% private**
+(step 3), **27.4% shared** (step 4).
 
 What can't move by itself (the tags, by type): 831 touched by a file area,
 251 by a GPU area, 85 by a save area; 86 types are what an image word
@@ -309,13 +309,16 @@ The order it gives (to confirm with the user):
   physics (215), the tuning screen and the UI movies (171), and every
   front-end screen with the UI movies (130 to 135): those pairs move
   together, the UI movies' records last.
-- **Steps 5 and 7** are as big as step 3 by accesses (37.5%): the file
+- **Steps 5 and 7** are as big as step 3 by accesses (36.5%): the file
   loaders and the renderer's inputs aren't a tail.
 
-Three fixes found by step 2 (2026-11-17; the figures above are after
+Four fixes found by step 2 (2026-11-17; the figures above are after
 them): a function without an area no longer takes it from a callee called
-from more than 20 places (operator new and delete filed every deleting
-destructor under the heap); a function's second allocation of the same size is another
+from more than 20 places or in a library area (the C runtime, the heap,
+the math: operator new and delete filed every deleting destructor under
+the heap, `__ultod` and `log` 44 image filters under the C runtime); a
+name the rows give several functions carries the address in the measure's
+names (`memcpy_825A7410.r3`); a function's second allocation of the same size is another
 type (`new<68>@Type2Dialog::OnEnter#2`: the dialog's menu and data were
 one), and a constructor calling its base class's constructor on its own
 `this` (`ScreenMachine`'s `StateMachine`) no longer makes them one type.

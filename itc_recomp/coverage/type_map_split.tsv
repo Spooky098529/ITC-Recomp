@@ -10,8 +10,8 @@ archive.md	32	0	0	32
 audio.md	421	359	27	35
 boot-mode.md	121	75	22	24
 build-screen.md	119	1	118	0
-c-runtime-core.md	430	212	12	206
-c-runtime.md	902	841	45	16
+c-runtime-core.md	194	160	12	22
+c-runtime.md	215	154	45	16
 camera-modes.md	1791	1203	332	255
 cameras.md	789	336	95	358
 car-dealer.md	728	384	148	195
@@ -47,7 +47,7 @@ garage-screen.md	855	493	192	169
 graphics-resources.md	518	0	0	518
 heap.md	216	200	0	16
 input.md	115	73	36	6
-lifted.md	3376	2690	273	413
+lifted.md	4063	3377	273	413
 load-poll.md	499	6	114	379
 location-screen.md	659	428	130	100
 material-passes.md	259	0	0	259
@@ -128,7 +128,7 @@ ui-movies.md	619	0	0	619
 user-info.md	129	81	22	25
 vehicle-accessors.md	792	213	461	118
 vehicle.md	578	154	383	41
-video-output.md	491	0	0	491
+video-output.md	727	0	0	727
 xact.md	4	0	0	4
 xaudio-engine.md	336	240	46	50
 xaudio-objects.md	1802	1793	9	0

@@ -804,7 +804,7 @@ SceneInterior	17	85	27	11672	11680	1	820062E4	shared	5	second-set.md,scene-model
 SceneInterior.+11608	4	7	1	28		0		shared	2	load-poll.md,scene-models.md	no allocation seen	+24:4i
 SceneInterior.+11608.+24	2	2	1	36		0		private	1	load-poll.md	no allocation seen	+32:4i
 SceneInterior.+11632	2	6	1	456		0		shared	2	load-poll.md,scene-models.md	no allocation seen	+452:4i[ptr:SceneInterior.+11664;ptr:new<16>@sub_82228E88.+8.+0]
-SceneLights	70	4046	111	13164	13168	1	820056E0	shared	22	post-effects.md,scenery-lists.md,cameras.md,frame-passes.md,scene-target.md,second-set.md,car-draw.md,command-list.md,load-poll.md,minimap.md,mode-tick.md,sprites.md,ui-movies.md,c-runtime-core.md,models.md,accessories.md,car-scene-draw.md,course-scenery.md,movies.md,power-graph.md,screen-objects.md,strings-and-font.md	file,gpu	+0:2i/4f/4i/8i[image:82004F90;image:820056E0] +2:2i +4:2i/4f/4i[ptr:Device.+13432;ptr:Font.+36.+12] +6:2i +8:4f/4i/8i[ptr:PostEffect.+24;ptr:SceneryModel.+432] +12:1i/4f/4i[ptr:PostEffect.+28;ptr:ScreenObject.+20] +13:1i +16:4f/4i/8i +18:2i +20:4f/4i[ptr:sub_82595490.ret;ptr:sub_825960D0.ret] +24:4f/4i/8i[ptr:VideoOutput.+276;ptr:sub_82133F58.r5] +28:4f/4i +32:4f/4i/8i +34:2i +36:4f/4i[ptr:sub_820CECA0.ret;ptr:sub_82146BD0.ret] +40:4f/4i/8i +44:1i/4f +45:1i +46:1i +47:1i +48:4f/8i +52:4f/4i +56:4f/4i/8i +60:4f/4i[ptr:sub_82133F58.r7] +64:4f/4i/8i +68:4f +72:4f/8i +76:4f +80:4f/8i +84:4f +88:4f/8i +92:4f +96:4f/4i/8i[ptr:SceneLights] +100:4f +104:4f/8i +108:4f +112:4f/8i +116:4f +120:4f/8i +124:4f +128:4f/8i +132:4f +136:4f/8i +140:4f +144:4f/4i/8i[ptr:SceneLights] +148:4f +152:4f/8i +156:4f +160:4f/8i +164:4f +168:4f/8i +172:4f +176:4f/8i +180:4f +184:4f/8i +188:4f +192:4f/8i +196:4f +200:4f/8i +204:4f +208:4f/8i +212:4f +216:4f/8i +220:4f +224:4f/8i +228:4f +232:4f/8i +236:4f +240:4f/8i +244:4f +248:4f/8i +252:4f +256:4f/8i +260:4f +264:4f/8i +268:4f +272:4f +276:4f +280:4f +284:4f +288:4f/8i +292:4f +296:4f/8i +300:4f +304:4f/8i +308:4f +312:4f/8i +316:4f +320:4f/8i +324:4f +328:4f/8i +332:4f +336:4f/8i +340:4f +344:4f/8i +348:4f +352:4f/8i +356:4f +360:4f/8i +364:4f +368:8i +376:8i +384:8i +392:8i +400:8i +408:8i +4480:4i[ptr:SceneLights] +8816:4i[ptr:SceneLights] +13152:4i[ptr:Pool4Object] +13156:4i +13160:4i[ptr:CarScene]
+SceneLights	70	4046	111	13164	13168	1	820056E0	shared	22	post-effects.md,scenery-lists.md,cameras.md,frame-passes.md,scene-target.md,second-set.md,car-draw.md,command-list.md,load-poll.md,minimap.md,mode-tick.md,sprites.md,ui-movies.md,models.md,video-output.md,accessories.md,car-scene-draw.md,course-scenery.md,movies.md,power-graph.md,screen-objects.md,strings-and-font.md	file,gpu	+0:2i/4f/4i/8i[image:82004F90;image:820056E0] +2:2i +4:2i/4f/4i[ptr:Device.+13432;ptr:Font.+36.+12] +6:2i +8:4f/4i/8i[ptr:PostEffect.+24;ptr:SceneryModel.+432] +12:1i/4f/4i[ptr:PostEffect.+28;ptr:ScreenObject.+20] +13:1i +16:4f/4i/8i +18:2i +20:4f/4i[ptr:sub_82595490.ret;ptr:sub_825960D0.ret] +24:4f/4i/8i[ptr:VideoOutput.+276;ptr:sub_82133F58.r5] +28:4f/4i +32:4f/4i/8i +34:2i +36:4f/4i[ptr:sub_820CECA0.ret;ptr:sub_82146BD0.ret] +40:4f/4i/8i +44:1i/4f +45:1i +46:1i +47:1i +48:4f/8i +52:4f/4i +56:4f/4i/8i +60:4f/4i[ptr:sub_82133F58.r7] +64:4f/4i/8i +68:4f +72:4f/8i +76:4f +80:4f/8i +84:4f +88:4f/8i +92:4f +96:4f/4i/8i[ptr:SceneLights] +100:4f +104:4f/8i +108:4f +112:4f/8i +116:4f +120:4f/8i +124:4f +128:4f/8i +132:4f +136:4f/8i +140:4f +144:4f/4i/8i[ptr:SceneLights] +148:4f +152:4f/8i +156:4f +160:4f/8i +164:4f +168:4f/8i +172:4f +176:4f/8i +180:4f +184:4f/8i +188:4f +192:4f/8i +196:4f +200:4f/8i +204:4f +208:4f/8i +212:4f +216:4f/8i +220:4f +224:4f/8i +228:4f +232:4f/8i +236:4f +240:4f/8i +244:4f +248:4f/8i +252:4f +256:4f/8i +260:4f +264:4f/8i +268:4f +272:4f +276:4f +280:4f +284:4f +288:4f/8i +292:4f +296:4f/8i +300:4f +304:4f/8i +308:4f +312:4f/8i +316:4f +320:4f/8i +324:4f +328:4f/8i +332:4f +336:4f/8i +340:4f +344:4f/8i +348:4f +352:4f/8i +356:4f +360:4f/8i +364:4f +368:8i +376:8i +384:8i +392:8i +400:8i +408:8i +4480:4i[ptr:SceneLights] +8816:4i[ptr:SceneLights] +13152:4i[ptr:Pool4Object] +13156:4i +13160:4i[ptr:CarScene]
 SceneModel	25	401	68	5120	5120	1	82004F90	shared	10	scene-models.md,load-poll.md,car-scene-draw.md,car-draw.md,second-set.md,car-models.md,course-scenery.md,material-passes.md,scene-loaders.md,stand-models.md	file	+0:4f/4i/8i[image:82004F90] +4:4f +8:4f/8i +12:4f +16:4i +20:4i +32:4i +48:4i +64:8i +72:8i +80:8i +88:8i +96:8i +104:8i +112:8i +120:8i +128:8i +136:8i +140:4i +144:8i +152:8i +160:8i +168:8i +180:4i +3728:4i +3764:4i +3768:4i +3772:4i +3776:4i +3784:4i +3788:4i +3824:4i +3828:4i +3924:4i[ptr:SceneModel.+3924] +3928:4i[ptr:SceneModel.+3928] +3932:4i[ptr:SceneModel.+3932] +3936:4i[ptr:SceneModel.+3936] +3940:4i[ptr:SceneModel.+3940] +3944:4i[ptr:SceneModel.+3944] +4068:4i[ptr:SceneModel.+4068] +4072:4i +4296:4i +4300:4i +4916:4f +5024:4i +5028:4i +5032:4i +5036:4i +5040:4i +5044:4i[ptr:SceneModel.+5044] +5048:4i[ptr:sub_820C5B28.ret] +5052:4i +5056:4i +5060:4i[ptr:TrafficCar;ptr:sub_820C5B28.ret] +5064:4i +5068:4i[ptr:TrafficCar;ptr:sub_820C5B28.ret] +5072:4i +5076:4i[ptr:TrafficCar;ptr:sub_820C5B28.ret] +5080:4i +5084:4i[ptr:TrafficCar;ptr:sub_820C5B28.ret] +5088:4i +5092:4i[ptr:TrafficCar;ptr:sub_820C5B28.ret] +5096:4i +5100:4i[ptr:TrafficCar;ptr:sub_820C5B28.ret] +5104:4i +5108:4i[ptr:TrafficCar] +5112:4i +5116:4i[ptr:CarScene]
 SceneModel.+20	1	0	0	0		0		private	1	scene-models.md	no allocation seen	
 SceneModel.+5060.+104	1	1	1	120		0		private	1	scene-loaders.md	file,no allocation seen	+116:4i
@@ -1345,7 +1345,7 @@ ZoneRanges	1	3	2	70		0		private	1	track-zones.md	no allocation seen	+68:2i +[i]:
 [8296B910].+0	1	1	1	8		0		private	1	car-draw.md	no allocation seen	+4:4i
 [8296B914]	1	1	1	4		0		private	1	car-draw.md	no allocation seen	+0:4i
 [8296B914].+0	1	1	1	8		0		private	1	car-draw.md	no allocation seen	+4:4i
-[8296BCFC]	1	36	36	144		0		private	1	c-runtime-core.md	no allocation seen	+0:4f +4:4f +8:4f +12:4i +16:4f +20:4f +24:4f +28:4f +32:4f +36:4i +40:4f +44:4f +48:4f +52:4f +56:4f +60:4i +64:4f +68:4f +72:4f +76:4f +80:4f +84:4i +88:4f +92:4f +96:4f +100:4f +104:4f +108:4i +112:4f +116:4f +120:4f +124:4f +128:4f +132:4i +136:4f +140:4f
+[8296BCFC]	1	36	36	144		0		private	1	video-output.md	gpu,no allocation seen	+0:4f +4:4f +8:4f +12:4i +16:4f +20:4f +24:4f +28:4f +32:4f +36:4i +40:4f +44:4f +48:4f +52:4f +56:4f +60:4i +64:4f +68:4f +72:4f +76:4f +80:4f +84:4i +88:4f +92:4f +96:4f +100:4f +104:4f +108:4i +112:4f +116:4f +120:4f +124:4f +128:4f +132:4i +136:4f +140:4f
 [8296BD58]	1	1	1	4		0		private	1	shader-objects.md	file,no allocation seen	+0:4i
 [8296BD58].+0	1	8	3	12		0		private	1	shader-objects.md	file,no allocation seen	+0:4i +4:4i[ptr:[8296BD58].+0.+4] +8:4i
 [8296BD58].+0.+4	1	1	1	4		0		private	1	shader-objects.md	file,no allocation seen	+0:4i
@@ -1707,9 +1707,9 @@ sub_82090D68.ret	1	6	2	8		0		private	1	lifted.md	no allocation seen	+0:4i[image:
 DebugText::DebugText.r4	1	2	2	8		0		private	1	framework.md	no allocation seen	+0:4i +4:4i
 DebugText::DebugText.r4.+4	1	1	1	4		0		private	1	framework.md	no allocation seen	+0:4i
 DebugText::DebugText.r4.+4.+0	1	1	1	8		0		private	1	framework.md	no allocation seen	+4:4i
-sub_82090F88.r3	1	3	2	24		0		private	1	c-runtime-core.md	no allocation seen	+4:4i +20:4i
-sub_82090F88.r3.+4	1	2	1	4		0		private	1	c-runtime-core.md	no allocation seen	+0:4i
-sub_82090F88.r3.+4.+0	1	2	1	12		0		private	1	c-runtime-core.md	no allocation seen	+8:4i
+sub_82090F88.r3	1	3	2	24		0		private	1	video-output.md	gpu,no allocation seen	+4:4i +20:4i
+sub_82090F88.r3.+4	1	2	1	4		0		private	1	video-output.md	gpu,no allocation seen	+0:4i
+sub_82090F88.r3.+4.+0	1	2	1	12		0		private	1	video-output.md	gpu,no allocation seen	+8:4i
 DebugText::SetPosition.r4	1	1	1	4		0		private	1	framework.md	no allocation seen	+0:4i
 DebugText::SetPosition.r5	1	1	1	4		0		private	1	framework.md	no allocation seen	+0:4i
 sub_82091070.r3	1	14	5	52		0		private	1	models.md	file,no allocation seen	+0:4i[image:82000BC8;image:82000D48] +8:4i[image:82000EB8] +12:4i[image:82000AB4;image:82000BA8] +32:4i[image:82000ABC] +48:4i
@@ -3445,7 +3445,7 @@ PanelSetBase::Step3.r4	1	2	1	4		0		private	1	car-list.md	no allocation seen	+0:4
 PanelSetBase::Step11.r4	1	2	1	4		0		private	1	car-list.md	no allocation seen	+0:4i
 PanelSetBase::Step13.r4	1	2	1	4		0		private	1	car-list.md	no allocation seen	+0:4i
 PanelSetBase::Step26.r4	1	2	1	4		0		private	1	car-list.md	no allocation seen	+0:4i
-Color::HsvToRgb.r4	1	20	4	16		0		private	1	tuning-pages.md	no allocation seen	+0:4f +4:4f +8:4f +12:4f
+Color::HsvToRgb_8224AB50.r4	1	20	4	16		0		private	1	tuning-pages.md	no allocation seen	+0:4f +4:4f +8:4f +12:4f
 PanelSetBase::Step4.r4	1	2	1	4		0		private	1	car-list.md	no allocation seen	+0:4i
 PanelSetBase::Step5.r4	1	2	1	4		0		private	1	car-list.md	no allocation seen	+0:4i
 PanelSetBase::Step14.r4	1	2	1	4		0		private	1	car-list.md	no allocation seen	+0:4i
@@ -3760,11 +3760,11 @@ sub_822950C0.r7	1	1	1	8		0		private	1	system-services.md	no allocation seen	+4:4
 sub_822950C0.r8	1	2	1	4		0		private	1	system-services.md	no allocation seen	+0:4i
 VirtualFree.ret	1	3	1	52		0		private	1	scene.md	no allocation seen	+48:4i[ptr:sub_82295330.ret.+48]
 CreateFile.r3	1	1	1	0		0		private	1	files-and-saves.md	no allocation seen	+[i]:1i
-XMemCpy.r3	1	2	2	8		0		private	1	c-runtime.md	no allocation seen	+0:8i +[i]:1i
-XMemCpy.r4	1	2	2	8		0		private	1	c-runtime.md	no allocation seen	+0:8i +[i]:1i
+XMemCpy_82295890.r3	1	2	2	8		0		private	1	c-runtime.md	no allocation seen	+0:8i +[i]:1i
+XMemCpy_82295890.r4	1	2	2	8		0		private	1	c-runtime.md	no allocation seen	+0:8i +[i]:1i
 XGetOverlappedResult.r3	1	4	3	16		0		private	1	files-and-saves.md	no allocation seen	+0:4i +4:4i +12:4i
 WriteFile.r7	1	5	5	20		0		private	1	files-and-saves.md	no allocation seen	+0:4i +4:4i +8:4i +12:4i +16:4i
-GetLastError.ret	1	10	4	136		0		private	1	system-services.md	no allocation seen	+0:4i +124:4i +128:4i[ptr:sub_82295F18.ret.+128] +132:4i[ptr:sub_82295F18.ret.+124;ptr:sub_82295F18.ret.+132]
+GetLastError_82295F18.ret	1	10	4	136		0		private	1	system-services.md	no allocation seen	+0:4i +124:4i +128:4i[ptr:sub_82295F18.ret.+128] +132:4i[ptr:sub_82295F18.ret.+124;ptr:sub_82295F18.ret.+132]
 GetOverlappedResult.r4	1	4	3	20		0		private	1	files-and-saves.md	no allocation seen	+0:4i +4:4i +16:4i
 GetOverlappedResult.r5	1	2	1	4		0		private	1	files-and-saves.md	no allocation seen	+0:4i[ptr:sub_82295F20.r4.+4]
 lstrcmpA.r3	2	2	1	1		0		private	1	mode-tick.md	no allocation seen	+0:1i
@@ -4057,7 +4057,7 @@ XAudioVoice::OutputsSize.r4	1	1	1	4		0		private	1	xaudio.md	no allocation seen	+
 XAudioVoice::InitOutputs.r4	1	3	3	32		0		private	1	xaudio.md	no allocation seen	+24:1i +25:1i +28:4i
 XAudioVoice::SetOutputMatrices.r4	1	3	2	8		0		private	1	xaudio.md	no allocation seen	+0:1i +4:4i
 XAudioVoice::SetOutputMatrices.r4.+4	1	2	2	8		0		private	1	xaudio.md	no allocation seen	+0:1i +4:4i
-XAudioVoice::SetOutputVoices.r4	1	4	2	8		0		private	1	xaudio.md	no allocation seen	+0:1i +4:4i
+XAudioVoice::SetOutputVoices_82460BF0.r4	1	4	2	8		0		private	1	xaudio.md	no allocation seen	+0:1i +4:4i
 XAudioVoice::MixToOutputs.r4	1	1	1	4		0		private	1	xaudio.md	no allocation seen	+0:4i
 XAudioVoice::SetFormatWords.r4	1	2	2	8		0		private	1	xaudio.md	no allocation seen	+0:4i +4:4i
 XAudioVoice::BaseSize.r4	1	1	1	4		0		private	1	xaudio.md	no allocation seen	+0:4i
@@ -4180,8 +4180,8 @@ sub_82466D50.r5	1	1	1	1		0		private	1	lifted.md	no allocation seen	+0:1i
 sub_82466DB0.r3	1	1	1	100		0		private	1	lifted.md	no allocation seen	+96:4f
 sub_82466DB0.r4	1	1	1	4		0		private	1	lifted.md	no allocation seen	+0:4f
 sub_82466DC0.r3	1	1	1	100		0		private	1	lifted.md	no allocation seen	+96:4f
-sub_82466DD0.r3	1	1	1	104		0		private	1	c-runtime.md	no allocation seen	+100:4f
-sub_82466DD0.r4	1	1	1	4		0		private	1	c-runtime.md	no allocation seen	+0:4f
+sub_82466DD0.r3	1	1	1	104		0		private	1	lifted.md	no allocation seen	+100:4f
+sub_82466DD0.r4	1	1	1	4		0		private	1	lifted.md	no allocation seen	+0:4f
 sub_82466E18.r3	1	1	1	104		0		private	1	lifted.md	no allocation seen	+100:4f
 sub_82466E60.r3	1	1	1	104		0		private	1	lifted.md	no allocation seen	+100:4f
 sub_82466E60.r4	1	1	1	4		0		private	1	lifted.md	no allocation seen	+0:4f
@@ -4211,8 +4211,8 @@ XmaCodec::SubmitRegion.r4	1	2	2	12		0		private	1	xaudio-objects.md	no allocation
 XAudioCodec::GetState.r4	1	1	1	1		0		private	1	xaudio-objects.md	no allocation seen	+0:1i
 sub_8246A930.r3	1	1	1	116		0		private	1	lifted.md	no allocation seen	+112:4f
 sub_8246A930.r4	1	1	1	4		0		private	1	lifted.md	no allocation seen	+0:4f
-sub_8246A940.r3	1	1	1	120		0		private	1	c-runtime.md	no allocation seen	+116:4f
-sub_8246A940.r4	1	1	1	4		0		private	1	c-runtime.md	no allocation seen	+0:4f
+sub_8246A940.r3	1	1	1	120		0		private	1	lifted.md	no allocation seen	+116:4f
+sub_8246A940.r4	1	1	1	4		0		private	1	lifted.md	no allocation seen	+0:4f
 sub_8246A988.r3	1	1	1	120		0		private	1	lifted.md	no allocation seen	+116:4f
 sub_8246A988.r4	1	1	1	4		0		private	1	lifted.md	no allocation seen	+0:4f
 sub_8246A998.r3	1	1	1	20		0		private	1	lifted.md	no allocation seen	+16:4i
@@ -4268,56 +4268,56 @@ PacketLists::Alloc.r5	1	1	1	4		0		private	1	xaudio-objects.md	no allocation seen
 PacketLists::Alloc.r5.+0	1	1	1	24		0		private	1	xaudio-objects.md	no allocation seen	+20:4i
 sub_8246E208.r7	1	14	11	52		0		private	1	xaudio-objects.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246E208.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
 sub_8246E4C8.r7	1	14	11	52		0		private	1	xaudio-objects.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246E4C8.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_8246E7F8.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246E7F8.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_8246EC08.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246EC08.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_8246F300.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246F300.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_8246F540.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246F540.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_8246F7C0.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246F7C0.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_8246FAC0.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246FAC0.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_8246FE48.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246FE48.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_824701E0.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_824701E0.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_82470668.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_82470668.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_82470CA0.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_82470CA0.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_82471510.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_82471510.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_824717F8.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_824717F8.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_82471B40.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_82471B40.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
-sub_82471F68.r7	1	14	11	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_82471F68.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_8246E7F8.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246E7F8.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_8246EC08.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246EC08.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_8246F300.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246F300.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_8246F540.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246F540.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_8246F7C0.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246F7C0.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_8246FAC0.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246FAC0.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_8246FE48.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8246FE48.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_824701E0.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_824701E0.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_82470668.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_82470668.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_82470CA0.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_82470CA0.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_82471510.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_82471510.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_824717F8.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_824717F8.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_82471B40.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_82471B40.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
+sub_82471F68.r7	1	14	11	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_82471F68.r7.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f +44:4f +48:4f
 sub_824724B8.r3	1	24	14	68		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_824724B8.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f +[i]:4f
 sub_824724B8.r3.+0	1	3	1	0		0		private	1	lifted.md	no allocation seen	+[i]:4f
-sub_824728B0.r3	1	20	10	56		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_824728B0.r3.+24] +44:4f +48:4f +52:4f
-sub_82472BB8.r3	1	21	11	60		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82472BB8.r3.+24] +44:4f +48:4f +52:4f +56:4f
-sub_82472BB8.r3.+0	1	2	1	0		0		private	1	c-runtime.md	no allocation seen	+[i]:4f
-sub_82472F30.r3	1	23	13	68		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82472F30.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f
-sub_82472F30.r3.+0	1	4	1	0		0		private	1	c-runtime.md	no allocation seen	+[i]:4f
-sub_824733C0.r3	1	25	15	76		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_824733C0.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f +68:4f +72:4f
-sub_824733C0.r3.+0	1	6	1	0		0		private	1	c-runtime.md	no allocation seen	+[i]:4f
+sub_824728B0.r3	1	20	10	56		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_824728B0.r3.+24] +44:4f +48:4f +52:4f
+sub_82472BB8.r3	1	21	11	60		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82472BB8.r3.+24] +44:4f +48:4f +52:4f +56:4f
+sub_82472BB8.r3.+0	1	2	1	0		0		private	1	lifted.md	no allocation seen	+[i]:4f
+sub_82472F30.r3	1	23	13	68		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82472F30.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f
+sub_82472F30.r3.+0	1	4	1	0		0		private	1	lifted.md	no allocation seen	+[i]:4f
+sub_824733C0.r3	1	25	15	76		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_824733C0.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f +68:4f +72:4f
+sub_824733C0.r3.+0	1	6	1	0		0		private	1	lifted.md	no allocation seen	+[i]:4f
 sub_824739B0.r3	1	24	14	68		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_824739B0.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f +[i]:4f
 sub_824739B0.r3.+0	1	5	1	0		0		private	1	lifted.md	no allocation seen	+[i]:2i
 sub_82473E48.r3	1	20	10	56		0		private	1	xaudio-objects.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82473E48.r3.+24] +44:4f +48:4f +52:4f
 sub_82474188.r3	1	21	11	60		0		private	1	xaudio-objects.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82474188.r3.+24] +44:4f +48:4f +52:4f +56:4f
 sub_82474188.r3.+0	1	2	1	0		0		private	1	xaudio-objects.md	no allocation seen	+[i]:2i
-sub_82474578.r3	1	23	13	68		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82474578.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f
-sub_82474578.r3.+0	1	4	1	0		0		private	1	c-runtime.md	no allocation seen	+[i]:2i
-sub_82474AE8.r3	1	25	15	76		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82474AE8.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f +68:4f +72:4f
-sub_82474AE8.r3.+0	1	6	1	0		0		private	1	c-runtime.md	no allocation seen	+[i]:2i
+sub_82474578.r3	1	23	13	68		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82474578.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f
+sub_82474578.r3.+0	1	4	1	0		0		private	1	lifted.md	no allocation seen	+[i]:2i
+sub_82474AE8.r3	1	25	15	76		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82474AE8.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f +68:4f +72:4f
+sub_82474AE8.r3.+0	1	6	1	0		0		private	1	lifted.md	no allocation seen	+[i]:2i
 sub_82475200.r3	1	24	14	68		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82475200.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f +[i]:4f
 sub_82475200.r3.+0	1	4	1	0		0		private	1	lifted.md	no allocation seen	+[i]:1i
-sub_82475688.r3	1	20	10	56		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82475688.r3.+24] +44:4f +48:4f +52:4f
-sub_824759D8.r3	1	21	11	60		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_824759D8.r3.+24] +44:4f +48:4f +52:4f +56:4f
-sub_824759D8.r3.+0	1	2	1	0		0		private	1	c-runtime.md	no allocation seen	+[i]:1i
-sub_82475E20.r3	1	23	13	68		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82475E20.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f
-sub_82475E20.r3.+0	1	4	1	0		0		private	1	c-runtime.md	no allocation seen	+[i]:1i
-sub_82476418.r3	1	25	15	76		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82476418.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f +68:4f +72:4f
-sub_82476418.r3.+0	1	6	1	0		0		private	1	c-runtime.md	no allocation seen	+[i]:1i
+sub_82475688.r3	1	20	10	56		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82475688.r3.+24] +44:4f +48:4f +52:4f
+sub_824759D8.r3	1	21	11	60		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_824759D8.r3.+24] +44:4f +48:4f +52:4f +56:4f
+sub_824759D8.r3.+0	1	2	1	0		0		private	1	lifted.md	no allocation seen	+[i]:1i
+sub_82475E20.r3	1	23	13	68		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82475E20.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f
+sub_82475E20.r3.+0	1	4	1	0		0		private	1	lifted.md	no allocation seen	+[i]:1i
+sub_82476418.r3	1	25	15	76		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82476418.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f +68:4f +72:4f
+sub_82476418.r3.+0	1	6	1	0		0		private	1	lifted.md	no allocation seen	+[i]:1i
 sub_82476BF8.r3	1	17	10	56		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f +52:4f
 sub_82476BF8.r3.+0	1	1	1	0		0		private	1	lifted.md	no allocation seen	+[i]:2i
-sub_82476FF0.r3	1	20	10	56		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82476FF0.r3.+24] +44:4f +48:4f +52:4f
-sub_82477348.r3	1	21	11	60		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82477348.r3.+24] +44:4f +48:4f +52:4f +56:4f
-sub_82477348.r3.+0	1	2	1	0		0		private	1	c-runtime.md	no allocation seen	+[i]:2i
-sub_82477760.r3	1	23	13	68		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82477760.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f
-sub_82477760.r3.+0	1	4	1	0		0		private	1	c-runtime.md	no allocation seen	+[i]:2i
-sub_82477D20.r3	1	25	15	76		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82477D20.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f +68:4f +72:4f
-sub_82477D20.r3.+0	1	6	1	0		0		private	1	c-runtime.md	no allocation seen	+[i]:2i
+sub_82476FF0.r3	1	20	10	56		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82476FF0.r3.+24] +44:4f +48:4f +52:4f
+sub_82477348.r3	1	21	11	60		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82477348.r3.+24] +44:4f +48:4f +52:4f +56:4f
+sub_82477348.r3.+0	1	2	1	0		0		private	1	lifted.md	no allocation seen	+[i]:2i
+sub_82477760.r3	1	23	13	68		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82477760.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f
+sub_82477760.r3.+0	1	4	1	0		0		private	1	lifted.md	no allocation seen	+[i]:2i
+sub_82477D20.r3	1	25	15	76		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i[ptr:sub_82477D20.r3.+24] +44:4f +48:4f +52:4f +56:4f +60:4f +64:4f +68:4f +72:4f
+sub_82477D20.r3.+0	1	6	1	0		0		private	1	lifted.md	no allocation seen	+[i]:2i
 sub_824784D0.r3	1	18	9	44		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_824784D0.r3.+4] +13:1i +20:4i +24:4i +28:4i +36:4f +40:4f
 sub_824784D0.r3.+0	1	5	1	0		0		private	1	lifted.md	no allocation seen	+[i]:4f
 sub_824784D0.r3.+20	1	5	1	0		0		private	1	lifted.md	no allocation seen	+[i]:4f
@@ -4438,22 +4438,22 @@ sub_8247D7B8.r3.+20	1	8	1	0		0		private	1	lifted.md	no allocation seen	+[i]:4f
 sub_8247DAA8.r3	1	37	15	76		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i[ptr:sub_8247DAA8.r3.+4] +13:1i +20:4i +24:4i +28:4i[ptr:sub_8247DAA8.r3.+24] +36:4f +40:4f +52:2i/4f +56:4f +60:4f +64:4f +68:4f +72:4f
 sub_8247DAA8.r3.+0	1	6	1	0		0		private	1	lifted.md	no allocation seen	+[i]:2i
 sub_8247DAA8.r3.+20	1	12	1	0		0		private	1	lifted.md	no allocation seen	+[i]:4f
-sub_8247DE28.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247DF00.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247DFD8.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247E0B0.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247DE28.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247DF00.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247DFD8.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247E0B0.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
 sub_8247E188.r3	1	9	9	52		0		private	1	xaudio-objects.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
 sub_8247E260.r3	1	9	9	52		0		private	1	xaudio-objects.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247E338.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247E410.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247E4E8.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247E5C8.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247E6A8.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247E788.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247E868.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247E940.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247EA18.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
-sub_8247EAF0.r3	1	9	9	52		0		private	1	c-runtime.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247E338.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247E410.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247E4E8.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247E5C8.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247E6A8.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247E788.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247E868.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247E940.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247EA18.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
+sub_8247EAF0.r3	1	9	9	52		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i +44:4f +48:4f
 sub_8247EBC8.r3	1	7	7	32		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i
 sub_8247EDA8.r3	1	7	7	32		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i
 sub_8247EFD8.r3	1	7	7	32		0		private	1	lifted.md	no allocation seen	+0:4i +4:4i +8:4i +13:1i +20:4i +24:4i +28:4i
@@ -4559,9 +4559,9 @@ sub_8258B368.r3.+0	1	1	1	4		0		private	1	morph-jobs.md	no allocation seen	+0:4i
 sub_8258B368.r3.+12	1	1	1	48		0		private	1	morph-jobs.md	no allocation seen	+44:4f
 sub_8258B368.r3.+16	1	1	1	48		0		private	1	morph-jobs.md	no allocation seen	+44:4f
 sub_8258B368.r3.+8	1	2	2	8		0		private	1	morph-jobs.md	no allocation seen	+0:4i +4:4i
-sub_8258BFA0.r4	1	1	1	4		0		private	1	c-runtime-core.md	no allocation seen	+0:4i
-sub_8258BFA0.r4.+0	1	1	1	20		0		private	1	c-runtime-core.md	no allocation seen	+16:4i
-sub_8258C0B8.r5	1	7	6	6		0		private	1	c-runtime-core.md	no allocation seen	+0:1i +1:1i +2:1i +3:1i +4:1i +5:1i
+sub_8258BFA0.r4	1	1	1	4		0		private	1	video-output.md	gpu,no allocation seen	+0:4i
+sub_8258BFA0.r4.+0	1	1	1	20		0		private	1	video-output.md	gpu,no allocation seen	+16:4i
+sub_8258C0B8.r5	1	7	6	6		0		private	1	video-output.md	gpu,no allocation seen	+0:1i +1:1i +2:1i +3:1i +4:1i +5:1i
 sub_8258C5B0.r3	1	2	1	4		0		private	1	file-layer.md	file,no allocation seen	+0:4i[image:8206BFF8]
 File::Seek.r4	1	2	1	4		0		private	1	files-and-saves.md	no allocation seen	+0:4i
 File::Seek.r5	1	2	1	4		0		private	1	files-and-saves.md	no allocation seen	+0:4i
@@ -4641,8 +4641,8 @@ Recorder::RecordObject.ret	5	11	1	76		0		shared	3	scenery-lists.md,accessories.m
 Mesh::Parse.r4	1	17	11	76		0		private	1	models.md	file,no allocation seen	+0:4i +36:4i +40:4i +44:4i +48:4i +52:4i +56:4i +60:4i +64:4i +68:4i +72:4i
 XPR::Create.r4	1	1	1	4		0		private	1	models.md	file,no allocation seen	+0:4i
 Box::FromPoints.r4	1	1	1	8		0		private	1	car-scene-draw.md	no allocation seen	+4:4i
-Matrix::LookAt.r4	1	3	3	12		0		private	1	car-scene-draw.md	no allocation seen	+0:4f +4:4f +8:4f
-Matrix::LookAt.r5	1	3	3	12		0		private	1	car-scene-draw.md	no allocation seen	+0:4f +4:4f +8:4f
+Matrix::LookAt_82597378.r4	1	3	3	12		0		private	1	car-scene-draw.md	no allocation seen	+0:4f +4:4f +8:4f
+Matrix::LookAt_82597378.r5	1	3	3	12		0		private	1	car-scene-draw.md	no allocation seen	+0:4f +4:4f +8:4f
 Frustum::FromMatrix.r4	1	16	16	64		0		private	1	car-scene-draw.md	no allocation seen	+0:4f +4:4f +8:4f +12:4f +16:4f +20:4f +24:4f +28:4f +32:4f +36:4f +40:4f +44:4f +48:4f +52:4f +56:4f +60:4f
 Plane::SegmentCrossing.r4	1	4	4	16		0		private	1	car-scene-draw.md	no allocation seen	+0:4f +4:4f +8:4f +12:4f
 Plane::SegmentCrossing.r5	1	3	3	12		0		private	1	car-scene-draw.md	no allocation seen	+0:4f +4:4f +8:4f
@@ -4806,10 +4806,10 @@ sub_825A67A8.r3	1	7	3	12		0		private	1	heap.md	no allocation seen	+0:4i[image:82
 sub_825A67A8.r4	1	3	2	12		0		private	1	heap.md	no allocation seen	+4:4i +8:4i
 sub_825A67A8.r4.+4	1	1	1	1		0		private	1	heap.md	no allocation seen	+0:1i
 sub_825A71C0.ret	1	2	1	12		0		private	1	shader-objects.md	file,no allocation seen	+8:4i[ptr:[8296BD5C]]
-memcpy.r3	1	1	1	1		0		private	1	c-runtime.md	no allocation seen	+0:1i
-memcpy.r4	1	1	1	1		0		private	1	c-runtime.md	no allocation seen	+0:1i
-memcpy.ret	2	7	3	104956		0		shared	2	c-runtime.md,career.md	no allocation seen	+6100:4i +104954:2i +[i]:1i/4i
-memcpy.r4	1	7	7	10		0		private	1	c-runtime.md	no allocation seen	+0:1i +1:4i +5:1i +6:1i +7:1i +8:1i +9:1i
+memcpy_825A7410.r3	1	1	1	1		0		private	1	c-runtime.md	no allocation seen	+0:1i
+memcpy_825A7410.r4	1	1	1	1		0		private	1	c-runtime.md	no allocation seen	+0:1i
+memcpy_825A7410.ret	2	7	3	104956		0		shared	2	c-runtime.md,career.md	no allocation seen	+6100:4i +104954:2i +[i]:1i/4i
+memcpy_825A7830.r4	1	7	7	10		0		private	1	c-runtime.md	no allocation seen	+0:1i +1:4i +5:1i +6:1i +7:1i +8:1i +9:1i
 wcscmp.r3	1	1	1	4		0		private	1	c-runtime.md	no allocation seen	+2:2i
 wcscmp.r4	1	1	1	4		0		private	1	c-runtime.md	no allocation seen	+2:2i
 wcscat.r3	1	3	2	4		0		private	1	c-runtime.md	no allocation seen	+0:2i +2:2i
@@ -4825,7 +4825,7 @@ strtoxl.r5	1	6	1	4		0		private	1	c-runtime.md	no allocation seen	+0:4i[ptr:sub_8
 strrchr.r3	1	2	2	2		0		private	1	c-runtime-core.md	no allocation seen	+0:1i +1:1i
 strrchr.ret	1	8	2	8		0		private	1	c-runtime-core.md	no allocation seen	+0:1i/8i +3:1i
 _fclose_nolock.r3	2	11	5	32		0		private	1	c-runtime-core.md	no allocation seen	+0:4i +4:4i +8:4i +12:4i +28:4i
-fclose.r3	1	2	1	16		0		private	1	c-runtime-core.md	no allocation seen	+12:4i
+fclose_825A9580.r3	1	2	1	16		0		private	1	c-runtime-core.md	no allocation seen	+12:4i
 strstr.r4	1	3	2	2		0		private	1	c-runtime.md	no allocation seen	+0:1i +1:1i
 wcslen.r3	1	1	1	2		0		private	1	c-runtime.md	no allocation seen	+0:2i
 _stricmp.r3	1	1	1	1		0		private	1	c-runtime.md	no allocation seen	+0:1i
@@ -4839,8 +4839,8 @@ calloc.ret	1	6	4	96		0		private	1	c-runtime-core.md	no allocation seen	+0:4i[ptr
 _flush.r3	1	10	4	16		0		private	1	c-runtime-core.md	no allocation seen	+0:4i[ptr:sub_825ACC78.r3.+8] +4:4i +8:4i +12:4i
 _fflush_nolock.r3	1	1	1	16		0		private	1	c-runtime-core.md	no allocation seen	+12:4i
 _CxxThrowException.r4	1	1	1	4		0		private	1	c-runtime-core.md	no allocation seen	+0:4i
-fputs.r3	1	1	1	1		0		private	1	c-runtime-core.md	no allocation seen	+0:1i
-fputs.r4	1	1	1	16		0		private	1	c-runtime-core.md	no allocation seen	+12:4i
+fputs_825AD280.r3	1	1	1	1		0		private	1	c-runtime-core.md	no allocation seen	+0:1i
+fputs_825AD280.r4	1	1	1	16		0		private	1	c-runtime-core.md	no allocation seen	+12:4i
 _cftoe2_l.r3	1	14	4	3		0		private	1	c-runtime-core.md	no allocation seen	+0:1i +1:1i +2:1i +[i]:1i
 _cftoe2_l.r7	1	4	3	16		0		private	1	c-runtime-core.md	no allocation seen	+0:4i +4:4i +12:4i
 _cftoe2_l.r7.+12	1	1	1	1		0		private	1	c-runtime-core.md	no allocation seen	+0:1i

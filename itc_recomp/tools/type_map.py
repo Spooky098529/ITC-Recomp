@@ -86,6 +86,10 @@ GPU_AREAS = {
     "graphics-resources.md", "command-list.md", "single-commands.md", "predicated-tiling.md",
     "video-output.md", "post-effects.md", "scene-target.md", "frame-passes.md", "sprites.md",
 }
+# Areas whose functions are libraries every area calls (the C runtime, the
+# heap, the math): a callee there doesn't file its caller under it.
+LIBRARY_AREAS = {"c-runtime.md", "c-runtime-core.md", "heap.md", "matrix-math.md",
+                 "std-string.md", "vector-library.md"}
 SAVE_AREAS = {"save-data.md", "save-interface.md", "save-screen.md", "options-load-save.md"}
 
 GPR = re.compile(r"^r(\d+)$")
@@ -148,6 +152,7 @@ class Map:
         self.area = {r["function"]: r["file"] or "?" for r in self.rows}
         self.bodies = lift.load_bodies()
         self.names = {"sub_" + a: n for a, n in function_names.row_names().items() if n}
+        self.name_count = collections.Counter(self.names.values())
         # Parsed instructions per function: (mnemonic, operands); each one's
         # ordinal among the body's comments (lift.py's Stmt.insn).
         self.code = {}
@@ -181,8 +186,17 @@ class Map:
 
     def display(self, t):
         """A type's name with functions named by their rows."""
-        return re.sub(r"sub_([0-9A-F]{8})",
-                      lambda g: self.names.get(g.group(0)) or g.group(0), t)
+        return re.sub(r"sub_([0-9A-F]{8})", lambda g: self.display_name(g.group(0)), t)
+
+    def display_name(self, fn):
+        """A function's row name, with its address when several functions
+        share the name (the two memcpys)."""
+        name = self.names.get(fn)
+        if not name:
+            return fn
+        if self.name_count[name] > 1:
+            return f"{name}_{fn[4:]}"
+        return name
 
     def assign_areas(self):
         """Functions whose rows are in lifted.md (the lift sweep's catch-all)
@@ -208,7 +222,8 @@ class Map:
                     # (called from more than 20 places: operator new and
                     # delete would claim every deleting destructor).
                     votes = collections.Counter(self.area[c] for c in callees[f]
-                                                if self.area[c] not in loose and len(callers[c]) <= 20)
+                                                if self.area[c] not in loose and self.area[c] not in LIBRARY_AREAS
+                                                and len(callers[c]) <= 20)
                 if votes:
                     a = votes.most_common(1)[0][0]
                     if self.area[f] != a:
