@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/heap.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -4729,7 +4730,7 @@ lifted::Result f825788C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // beq cr6,0x825788fc
   if (cr6.eq) goto loc_825788FC;
   // lbz r10,0(r27)
-  r10 = guest::LoadU8(base, uint32_t(r27) + 0);
+  r10 = guest::LoadU8(base, schema::ByteCountedList(base, uint32_t(r27)).count_address());
   // cmplwi r10,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq 0x825788fc
@@ -4768,7 +4769,7 @@ loc_82578918:
   // beq cr6,0x8257896c
   if (cr6.eq) goto loc_8257896C;
   // lbz r7,0(r27)
-  r7 = guest::LoadU8(base, uint32_t(r27) + 0);
+  r7 = guest::LoadU8(base, schema::ByteCountedList(base, uint32_t(r27)).count_address());
   // cmplwi r7,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r7), 0, so);
   // beq 0x8257896c
@@ -4776,7 +4777,7 @@ loc_82578918:
   // mulli r9,r8,12
   r9 = uint64_t(int64_t(static_cast<int64_t>(r8 * static_cast<uint64_t>(12))));
   // lwz r10,4(r27)
-  r10 = guest::LoadU32(base, uint32_t(r27) + 4);
+  r10 = guest::LoadU32(base, schema::ByteCountedList(base, uint32_t(r27)).entries_address());
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // lbzx r9,r9,r5
@@ -4843,12 +4844,12 @@ loc_82578988:
   // beq cr6,0x825789b4
   if (cr6.eq) goto loc_825789B4;
   // lbz r11,0(r27)
-  r11 = guest::LoadU8(base, uint32_t(r27) + 0);
+  r11 = guest::LoadU8(base, schema::ByteCountedList(base, uint32_t(r27)).count_address());
   // stb r11,0(r29)
-  guest::StoreU8(base, uint32_t(r29) + 0, uint8_t(r11));
+  guest::StoreU8(base, schema::ByteCountedList(base, uint32_t(r29)).count_address(), uint8_t(r11));
 loc_825789B4:
   // lbz r11,0(r29)
-  r11 = guest::LoadU8(base, uint32_t(r29) + 0);
+  r11 = guest::LoadU8(base, schema::ByteCountedList(base, uint32_t(r29)).count_address());
   // clrlwi r10,r30,24
   r10 = uint32_t(r30) & 0xFF;
   // mr r4,r31
@@ -4862,12 +4863,12 @@ loc_825789B4:
   // mulli r3,r10,12
   r3 = uint64_t(int64_t(static_cast<int64_t>(r10 * static_cast<uint64_t>(12))));
   // stb r11,0(r29)
-  guest::StoreU8(base, uint32_t(r29) + 0, uint8_t(r11));
+  guest::StoreU8(base, schema::ByteCountedList(base, uint32_t(r29)).count_address(), uint8_t(r11));
   // bl 0x822976f8
   // (left out: dead in C++)
   { const lifted::Result o = game::XMemAlloc(base, LIFTED_ARGS(0x825789D8, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r3,4(r29)
-  guest::StoreU32(base, uint32_t(r29) + 4, uint32_t(r3));
+  guest::StoreU32(base, schema::ByteCountedList(base, uint32_t(r29)).entries_address(), uint32_t(r3));
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x82578ab4
@@ -4879,9 +4880,9 @@ loc_825789B4:
   // beq cr6,0x82578a10
   if (cr6.eq) goto loc_82578A10;
   // lbz r11,0(r27)
-  r11 = guest::LoadU8(base, uint32_t(r27) + 0);
+  r11 = guest::LoadU8(base, schema::ByteCountedList(base, uint32_t(r27)).count_address());
   // lwz r4,4(r27)
-  r4 = guest::LoadU32(base, uint32_t(r27) + 4);
+  r4 = guest::LoadU32(base, schema::ByteCountedList(base, uint32_t(r27)).entries_address());
   // mr r31,r11
   r31 = r11;
   // cmplwi r4,0
@@ -4914,7 +4915,7 @@ loc_82578A24:
   // beq cr6,0x82578a78
   if (cr6.eq) goto loc_82578A78;
   // lbz r8,0(r27)
-  r8 = guest::LoadU8(base, uint32_t(r27) + 0);
+  r8 = guest::LoadU8(base, schema::ByteCountedList(base, uint32_t(r27)).count_address());
   // cmplwi r8,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r8), 0, so);
   // beq 0x82578a78
@@ -4922,7 +4923,7 @@ loc_82578A24:
   // mulli r9,r30,12
   r9 = uint64_t(int64_t(static_cast<int64_t>(r30 * static_cast<uint64_t>(12))));
   // lwz r10,4(r27)
-  r10 = guest::LoadU32(base, uint32_t(r27) + 4);
+  r10 = guest::LoadU32(base, schema::ByteCountedList(base, uint32_t(r27)).entries_address());
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // lbzx r9,r9,r28
@@ -4955,7 +4956,7 @@ loc_82578A78:
   // mulli r11,r30,12
   r11 = uint64_t(int64_t(static_cast<int64_t>(r30 * static_cast<uint64_t>(12))));
   // lwz r10,4(r29)
-  r10 = guest::LoadU32(base, uint32_t(r29) + 4);
+  r10 = guest::LoadU32(base, schema::ByteCountedList(base, uint32_t(r29)).entries_address());
   // clrlwi r31,r31,24
   r31 = uint32_t(r31) & 0xFF;
   // add r4,r11,r28
@@ -4986,7 +4987,7 @@ loc_82578AA0:
   goto loc_82578AE0;
 loc_82578AB4:
   // lwz r3,4(r29)
-  r3 = guest::LoadU32(base, uint32_t(r29) + 4);
+  r3 = guest::LoadU32(base, schema::ByteCountedList(base, uint32_t(r29)).entries_address());
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x82578ad0
@@ -4999,7 +5000,7 @@ loc_82578AB4:
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,4(r29)
-  guest::StoreU32(base, uint32_t(r29) + 4, uint32_t(r11));
+  guest::StoreU32(base, schema::ByteCountedList(base, uint32_t(r29)).entries_address(), uint32_t(r11));
 loc_82578AD0:
   // mr r4,r31
   r4 = r31;
@@ -5038,11 +5039,11 @@ lifted::Result f82578AF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,0(r5)
-  r11 = guest::LoadU32(base, uint32_t(r5) + 0);
+  r11 = guest::LoadU32(base, schema::ByteCountedListArgs(base, uint32_t(r5)).unknown_0_address());
   // mr r30,r3
   r30 = r3;
   // lwz r3,4(r5)
-  r3 = guest::LoadU32(base, uint32_t(r5) + 4);
+  r3 = guest::LoadU32(base, schema::ByteCountedListArgs(base, uint32_t(r5)).list_address());
   // mr r31,r4
   r31 = r4;
   // mr r29,r6
@@ -5050,11 +5051,11 @@ lifted::Result f82578AF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r11,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r11));
   // lwz r11,4(r5)
-  r11 = guest::LoadU32(base, uint32_t(r5) + 4);
+  r11 = guest::LoadU32(base, schema::ByteCountedListArgs(base, uint32_t(r5)).list_address());
   // stw r11,84(r1)
   guest::StoreU32(base, uint32_t(r1) + 84, uint32_t(r11));
   // lwz r11,8(r5)
-  r11 = guest::LoadU32(base, uint32_t(r5) + 8);
+  r11 = guest::LoadU32(base, schema::ByteCountedListArgs(base, uint32_t(r5)).unknown_8_address());
   // stw r11,88(r1)
   guest::StoreU32(base, uint32_t(r1) + 88, uint32_t(r11));
   // bl 0x825788c0

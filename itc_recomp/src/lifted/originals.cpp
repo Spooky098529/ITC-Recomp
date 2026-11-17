@@ -7,6 +7,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/heap.h"
 
 #include "base/log.h"
 #include "helpers/clock.h"
@@ -342398,7 +342399,7 @@ lifted::Result f82298FF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r31,r5
   r31 = r5;
   // lwz r11,20(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 20);
+  r11 = guest::LoadU32(base, schema::ProcessHeap(base, uint32_t(r30)).flags_address());
   // rlwinm. r11,r11,0,13,13
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0x40000;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -342408,7 +342409,7 @@ lifted::Result f82298FF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Import(base, __imp__KeGetCurrentProcessType, LIFTED_ARGS(0x82299024, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,379(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 379);
+  r11 = guest::LoadU8(base, schema::ProcessHeap(base, uint32_t(r30)).process_type_address());
   // cmpw cr6,r11,r3
   cr6 = lifted::Compare<int32_t>(int32_t(r11), int32_t(r3), so);
   // beq cr6,0x82299048
@@ -342428,7 +342429,7 @@ lifted::Result f82298FF8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   { const lifted::Result o = lifted::Import(base, __imp__KeBugCheckEx, LIFTED_ARGS(0x82299048, r31)); r3 = o.r3; f1 = o.f1; }
 loc_82299048:
   // lbz r11,-11(r31)
-  r11 = guest::LoadU8(base, uint32_t(r31) + -11);
+  r11 = guest::LoadU8(base, schema::HeapBlock(base, uint32_t(r31)).flags_address());
   // clrlwi. r10,r11,31
   r10 = uint32_t(r11) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
@@ -342445,9 +342446,9 @@ loc_8229905C:
   // beq 0x82299078
   if (cr0.eq) goto loc_82299078;
   // lhz r11,-16(r31)
-  r11 = guest::LoadU16(base, uint32_t(r31) + -16);
+  r11 = guest::LoadU16(base, schema::HeapBlock(base, uint32_t(r31)).size_address());
   // lwz r10,-24(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + -24);
+  r10 = guest::LoadU32(base, schema::HeapBlock(base, uint32_t(r31)).large_commit_size_address());
   // subf r11,r11,r10
   r11 = r10 - r11;
   // addi r3,r11,-48
@@ -342456,9 +342457,9 @@ loc_8229905C:
   goto loc_82299088;
 loc_82299078:
   // lhz r11,-16(r31)
-  r11 = guest::LoadU16(base, uint32_t(r31) + -16);
+  r11 = guest::LoadU16(base, schema::HeapBlock(base, uint32_t(r31)).size_address());
   // lbz r10,-10(r31)
-  r10 = guest::LoadU8(base, uint32_t(r31) + -10);
+  r10 = guest::LoadU8(base, schema::HeapBlock(base, uint32_t(r31)).unused_bytes_address());
   // rotlwi r11,r11,4
   r11 = __builtin_rotateleft32(uint32_t(r11), 4);
   // subf r3,r10,r11
@@ -407827,7 +407828,7 @@ loc_825AC2D8:
   // li r11,12
   r11 = uint64_t(int64_t(12));
   // stw r11,0(r28)
-  guest::StoreU32(base, uint32_t(r28) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::CallocErrorOut(base, uint32_t(r28)).error_address(), uint32_t(r11));
   // b 0x825ac29c
   goto loc_825AC29C;
 loc_825AC308:
@@ -407838,7 +407839,7 @@ loc_825AC308:
   // li r11,12
   r11 = uint64_t(int64_t(12));
   // stw r11,0(r28)
-  guest::StoreU32(base, uint32_t(r28) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::CallocErrorOut(base, uint32_t(r28)).error_address(), uint32_t(r11));
 loc_825AC318:
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));

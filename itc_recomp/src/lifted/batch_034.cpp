@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/heap.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -633,13 +634,13 @@ loc_822BE478:
   // mr r31,r3
   r31 = r3;
   // stw r10,12(r3)
-  guest::StoreU32(base, uint32_t(r3) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::D3DXBuffer(base, uint32_t(r3)).data_address(), uint32_t(r10));
   // stw r11,0(r3)
-  guest::StoreU32(base, uint32_t(r3) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::D3DXBuffer(base, uint32_t(r3)).vtable_address(), uint32_t(r11));
   // stw r10,8(r3)
-  guest::StoreU32(base, uint32_t(r3) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::D3DXBuffer(base, uint32_t(r3)).size_address(), uint32_t(r10));
   // stw r9,4(r3)
-  guest::StoreU32(base, uint32_t(r3) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::D3DXBuffer(base, uint32_t(r3)).ref_count_address(), uint32_t(r9));
   // b 0x822be4b8
   goto loc_822BE4B8;
 loc_822BE4B4:
@@ -696,7 +697,7 @@ loc_822BE50C:
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // stw r31,0(r29)
-  guest::StoreU32(base, uint32_t(r29) + 0, uint32_t(r31));
+  guest::StoreU32(base, schema::D3DXBufferOut(base, uint32_t(r29)).buffer_address(), uint32_t(r31));
 loc_822BE514:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));

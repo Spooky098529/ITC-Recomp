@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/heap.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -3609,7 +3610,7 @@ lifted::Result f8210B0E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r4
   r30 = r4;
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // bl 0x8259c7f8
   // (left out: dead in C++)
   f8259C7F8(base, r3);

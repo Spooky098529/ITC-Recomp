@@ -1,0 +1,417 @@
+# The schema of docs/functions/heap.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# Two kinds of types here. The game's own heap: XAPI's process heap (NT's
+# RtlHeap, statically linked; its handle at 0x8297149C), its blocks and
+# list links, as HeapAlloc, HeapFree, HeapReAlloc and HeapSize read them
+# (routed to our allocation layer since 2026-10-22, src/hooks/heap.cpp, so
+# only their never-run originals touch these; the offsets match NT's HEAP
+# with a 16-byte HEAP_ENTRY, so 8 bytes past NT's from +16 on: the names
+# from NT are "probably"). And the measure's types whose only callee is
+# operator new or delete (the classes' deleting destructors and a few
+# makers, all lifted and never seen in play): other areas' classes, given
+# their names from the docs where the vtable is known; their own areas
+# extend or move them when described there.
+
+# The process heap (1,412 bytes seen; made at boot by sub_82297C08).
+[ProcessHeap]
+measure = "[8297149C]"
+size = 1412
+origin = "allocated"
+fields = [
+  { name = "flags", offset = 20, type = "u32", note = "the heap's flags; 0x40000: check the caller's process type (+379)" },
+  { name = "force_flags", offset = 24, type = "u32", note = "ORed into every call's flags (HeapReAlloc)" },
+  { name = "virtual_memory_threshold", offset = 28, type = "u32", note = "probably (NT's): sizes above it get their own virtual block" },
+  { name = "decommit_free_block_threshold", offset = 40, type = "u32", note = "probably (NT's), read by HeapFree" },
+  { name = "decommit_total_free_threshold", offset = 44, type = "u32", note = "probably (NT's), read by HeapFree" },
+  { name = "total_free_size", offset = 48, type = "u32", note = "probably (NT's): updated by every allocation and free" },
+  { name = "align_round", offset = 80, type = "u32", note = "added to a size before align_mask (HeapReAlloc)" },
+  { name = "align_mask", offset = 84, type = "u32" },
+  { name = "process_type", offset = 379, type = "u8", note = "compared with KeGetCurrentProcessType when flags has 0x40000" },
+  { name = "unknown_380", offset = 380, type = "u32", note = "read by HeapReAlloc: when 0 (and no other flag), the size isn't padded by 16" },
+  { name = "large_free_first", offset = 384, type = "ptr", to = "HeapListEntry", note = "free list 0's head (blocks of 128 units and more, by size)" },
+  { name = "large_free_last", offset = 388, type = "ptr", to = "HeapListEntry" },
+  { name = "free_lists", offset = 392, type = "bytes", count = 1016, note = "free lists 1 to 127 (8 bytes each, indexed by size)" },
+  { name = "lock", offset = 1408, type = "u32", note = "the heap's critical section (taken unless the flags have 0x1)" },
+]
+
+# A list link: a free block's (8 bytes into its header) or a large virtual
+# block's (48 bytes before the block).
+[HeapListEntry]
+measures = ["[8297149C].+384", "[8297149C].+384.+0", "[8297149C].+388",
+            "HeapFree.r5.+-44", "HeapFree.r5.+-48"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "free_size", offset = -8, type = "u16", note = "a free block's size in 16-byte units (its header's +0)" },
+  { name = "next", offset = 0, type = "ptr", to = "HeapListEntry" },
+  { name = "previous", offset = 4, type = "ptr", to = "HeapListEntry" },
+]
+
+# A block as the game holds it: its 16-byte header right before it (+0 the
+# size, +4 the segment, +5 the flags, +6 the unused bytes), a large block's
+# virtual entry 48 bytes before it.
+[HeapBlock]
+measures = ["HeapFree.r5", "HeapSize.r5", "new<?>@HeapReAlloc", "[8297149C].+384.+0.+4"]
+size = 0
+origin = "allocated"
+fields = [
+  { name = "large_next", offset = -48, type = "u32", note = "a large block's link in the heap's virtual blocks list" },
+  { name = "large_previous", offset = -44, type = "u32" },
+  { name = "unknown_m48", offset = -48, type = "u16", note = "HeapReAlloc's in-place resize: a header's size the measure puts 48 bytes before the block (probably another header than this block's)" },
+  { name = "unknown_m44", offset = -44, type = "u8", note = "the same header's segment index (probably)" },
+  { name = "unknown_m43", offset = -43, type = "u8", note = "the same header's flags (probably)" },
+  { name = "large_commit_size", offset = -24, type = "u32", note = "a large block's committed bytes (HeapSize: less the unused bytes and 48)" },
+  { name = "size", offset = -16, type = "u16", note = "in 16-byte units; a large block's unused bytes" },
+  { name = "flags", offset = -11, type = "u8", note = "0x1 busy, 0x2 with extra, 0x8 a large virtual block" },
+  { name = "unused_bytes", offset = -10, type = "u8" },
+  { name = "link_next", offset = 0, type = "u32", note = "the measure joins HeapReAlloc's block with a free link: the free lists' next written here" },
+]
+
+# _calloc_impl's r5: where the error goes (calloc's stack word).
+[CallocErrorOut]
+measure = "_calloc_impl.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "error", offset = 0, type = "u32", note = "12 (ENOMEM) on failure" },
+]
+
+# D3DX's buffer (D3DXCreateBuffer, functions.md; 16 bytes from XMemAlloc).
+[D3DXBuffer]
+measure = "new<16>@D3DXCreateBuffer"
+size = 16
+origin = "allocated"
+vtable = 0x82019DC0
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "ref_count", offset = 4, type = "u32" },
+  { name = "size", offset = 8, type = "u32" },
+  { name = "data", offset = 12, type = "u32", note = "the buffer's bytes (vtable slot 6's XMemAlloc)" },
+]
+
+# D3DXCreateBuffer's r4: where the buffer goes.
+[D3DXBufferOut]
+measure = "D3DXCreateBuffer.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "buffer", offset = 0, type = "ptr", to = "D3DXBuffer" },
+]
+
+# std::exception (std::bad_alloc's base), as its copy constructor
+# sub_825A67A8 reads the source (r4) and writes the copy (r3).
+[StdException]
+measures = ["sub_825A67A8.r3", "sub_825A67A8.r4"]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82000CC0 (std::exception's)" },
+  { name = "what", offset = 4, type = "ptr", to = "ExceptionMessage" },
+  { name = "owns_what", offset = 8, type = "u32", note = "probably: set when what was copied into a block of its own" },
+]
+
+# The message std::exception holds (a C string).
+[ExceptionMessage]
+measure = "sub_825A67A8.r4.+4"
+size = 1
+origin = "allocated"
+fields = [
+  { name = "first_char", offset = 0, type = "u8" },
+]
+
+# Objects seen only in their deleting destructors, which put back the base
+# class's vtable and call operator delete (bit 0 of r4): the vtables are
+# 0x82000A74, 0x82000AB4 (sub_82090268, sub_820AC950), 0x82000D84 (the
+# run loop's interface), 0x82000DA0, 0x82000DD0, 0x82000EB8, 0x82001EC0
+# (Camera), 0x82002148 (the save interface's base), 0x820024C8, 0x82002880
+# (the app states' base), 0x82007F18 and 0x820713C0 (ClientList),
+# 0x820085D8 (Overlay), 0x82008838 (the post effects' base), 0x82010B5C,
+# 0x8206CB30 and 0x82000ED4 (Thread), 0x8206CBE4, 0x8206CC00 (the input
+# processors' base), 0x82071380 (ClientNode).
+[VtableObject]
+measures = ["sub_820901D8.r3", "sub_82090268.r3", "sub_820926C8.r3", "sub_820927E8.r3",
+            "sub_82092830.r3", "sub_82094B68.r3", "sub_8209FB80.r3", "sub_820A44C0.r3",
+            "sub_820A70B0.r3", "sub_820AC950.r3", "sub_820ACCF0.r3", "sub_8210B0E8.r3",
+            "sub_8210B0E8.ret", "sub_82126818.r3", "sub_82133C18.r3", "sub_82589480.r3",
+            "sub_8258DEB8.r3", "sub_8258DEB8.ret", "sub_82591898.r3", "sub_825925A8.r3",
+            "sub_8259C8C8.r3", "sub_8259C910.r3"]
+size = 4
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+]
+
+# The framework (framework.md): sixteen vtables at +0 to +60, put back to
+# the base classes' by its destructor sub_820905E0.
+[Framework]
+measure = "sub_820908F8.ret"
+size = 64
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "vtable_4", offset = 4, type = "u32" },
+  { name = "vtable_8", offset = 8, type = "u32" },
+  { name = "vtable_12", offset = 12, type = "u32" },
+  { name = "vtable_16", offset = 16, type = "u32" },
+  { name = "vtable_20", offset = 20, type = "u32" },
+  { name = "vtable_24", offset = 24, type = "u32" },
+  { name = "vtable_28", offset = 28, type = "u32" },
+  { name = "vtable_32", offset = 32, type = "u32" },
+  { name = "vtable_36", offset = 36, type = "u32" },
+  { name = "vtable_40", offset = 40, type = "u32" },
+  { name = "vtable_44", offset = 44, type = "u32" },
+  { name = "vtable_48", offset = 48, type = "u32" },
+  { name = "vtable_52", offset = 52, type = "u32" },
+  { name = "vtable_56", offset = 56, type = "u32" },
+  { name = "vtable_60", offset = 60, type = "u32" },
+]
+
+# An 8-byte object with two vtables (0x82000EB8, then 0x82000BA8 and
+# 0x82000AB4 at +4), deleted by sub_82090D68; the same pair is embedded in
+# the debug text (+8) and the movie (+12).
+[DualVtableObject]
+measure = "sub_82090D68.ret"
+size = 8
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "vtable_4", offset = 4, type = "u32" },
+]
+
+# The debug text (52 bytes at framework + 92, framework.md; vtable
+# 0x82000BC8), as its deleting destructor sub_82091070 reads it.
+[DebugText]
+measure = "sub_82091070.r3"
+size = 52
+origin = "embedded"
+vtable = 0x82000BC8
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "vtable_8", offset = 8, type = "u32", note = "an embedded DualVtableObject's (0x82000EB8)" },
+  { name = "vtable_12", offset = 12, type = "u32" },
+  { name = "vtable_32", offset = 32, type = "u32", note = "the functors' base 0x82000ABC" },
+  { name = "unknown_48", offset = 48, type = "u32", note = "a block freed with operator delete[]" },
+]
+
+# One save slot (1,000 bytes, vtable 0x82002190, save-interface.md), as its
+# deleting destructors read it: sub_820A4508 one slot, sub_820A5660 the
+# operator new[] array of four.
+[SaveSlot]
+measures = ["sub_820A4508.r3", "sub_820A5660.r3"]
+size = 1000
+origin = "allocated"
+vtable = 0x82002190
+fields = [
+  { name = "array_count", offset = -8, type = "u32", note = "the operator new[] block's count, 8 bytes before the first slot" },
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "unknown_80", offset = 80, type = "u32", note = "a block the destructor frees" },
+  { name = "unknown_84", offset = 84, type = "u32", note = "a block the destructor frees" },
+]
+
+# An object holding a std::vector at +4 (begin, end, end of storage), freed
+# and cleared by sub_820A9010; sub_820A9208 (vtable 0x82002780) deletes one
+# at its +4.
+[VectorHolder]
+measure = "sub_820A9010.r3"
+size = 16
+origin = "allocated"
+fields = [
+  { name = "first", offset = 4, type = "u32" },
+  { name = "last", offset = 8, type = "u32" },
+  { name = "end", offset = 12, type = "u32" },
+]
+
+[VectorHolderOwner]
+measure = "sub_820A9208.r3"
+size = 8
+origin = "allocated"
+vtable = 0x82002780
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "holder", offset = 4, type = "ptr", to = "VectorHolder" },
+]
+
+# The movie class (movies.md, vtable 0x82002910), as its deleting
+# destructor sub_820AE9F8 reads it.
+[Movie]
+measure = "sub_820AE9F8.r3"
+size = 40
+origin = "allocated"
+vtable = 0x82002910
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "wrapper", offset = 8, type = "ptr", to = "MovieWrapper", note = "the 8-byte MovieWrapper, or 0" },
+  { name = "command_vtable", offset = 12, type = "u32", note = "the command at +12's vtables (0x82000EB8 put back)" },
+  { name = "command_vtable_16", offset = 16, type = "u32" },
+  { name = "delegate_vtable", offset = 36, type = "u32", note = "the delegate's vtable (0x82000ABC put back)" },
+]
+
+# The movie library's wrapper (vtable 0x8206CC90, movies.md).
+[MovieWrapper]
+measure = "sub_820AE9F8.r3.+8"
+size = 4
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "MovieWrapperVtable" },
+]
+
+[MovieWrapperVtable]
+measure = "sub_820AE9F8.r3.+8.+0"
+size = 32
+origin = "image"
+fields = [
+  { name = "slot_7", offset = 28, type = "fn", note = "called by the movie's destructor (probably the release)" },
+]
+
+# The graphics library's command list (command-list.md, vtable 0x8206C080),
+# as its deleting destructor sub_8258CE00 reads it.
+[CommandList]
+measure = "sub_8258CE00.r3"
+size = 32
+origin = "embedded"
+vtable = 0x8206C080
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32", note = "a block freed with operator delete[]" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+]
+
+# A texture provider (known-data.md; 20 bytes, vtable 0x8206CCB4), as its
+# deleting destructor sub_82594440 reads it.
+[TextureProvider]
+measure = "sub_82594440.r3"
+size = 20
+origin = "embedded"
+vtable = 0x8206CCB4
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "first", offset = 8, type = "u32", note = "the texture pointers' std::vector: first slot" },
+  { name = "last", offset = 12, type = "u32" },
+  { name = "end", offset = 16, type = "u32", note = "the end of its storage" },
+]
+
+# A skeleton (model-animation.md, vtable 0x8206CE50), as its deleting
+# destructor sub_82599BE0 reads it.
+[Skeleton]
+measure = "sub_82599BE0.r3"
+size = 180
+origin = "allocated"
+vtable = 0x8206CE50
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "node_vectors", offset = 176, type = "u32", note = "the per-node float4s (freed with operator delete[])" },
+]
+
+# The primitive drawer (model-animation.md, vtable 0x820721D4), as its
+# deleting destructor sub_825A13D8 reads it.
+[PrimitiveDrawer]
+measure = "sub_825A13D8.r3"
+size = 8
+origin = "allocated"
+vtable = 0x820721D4
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "a block the destructor frees" },
+]
+
+# The objects sub_820A81C0 makes (not read, never seen in play): items with
+# a vtable, +4 0, +8 their argument and +12 a value block of their own.
+[FloatPairItem]
+measure = "new<16>@sub_820A81C0#2"
+size = 16
+origin = "allocated"
+vtable = 0x82002518
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "0 when made" },
+  { name = "argument", offset = 8, type = "u32", note = "the maker's r4" },
+  { name = "value", offset = 12, type = "ptr", to = "FloatPair" },
+]
+
+[FloatPair]
+measure = "new<12>@sub_820A70F8"
+size = 12
+origin = "allocated"
+fields = [
+  { name = "flag", offset = 0, type = "u8", note = "1 when made" },
+  { name = "a", offset = 4, type = "f32", note = "both set to the float at 0x82000A34" },
+  { name = "b", offset = 8, type = "f32" },
+]
+
+[FloatTripleItem]
+measure = "new<16>@sub_820A81C0"
+size = 16
+origin = "allocated"
+vtable = 0x82002628
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "0 when made" },
+  { name = "argument", offset = 8, type = "u32", note = "the maker's r4" },
+  { name = "value", offset = 12, type = "ptr", to = "FloatTriple" },
+]
+
+[FloatTriple]
+measure = "new<20>@sub_820A7AF8"
+size = 20
+origin = "allocated"
+fields = [
+  { name = "flag", offset = 0, type = "u8", note = "1 when made" },
+  { name = "a", offset = 4, type = "f32", note = "a, b and c set to the float at 0x82000A34" },
+  { name = "b", offset = 8, type = "f32" },
+  { name = "flag_12", offset = 12, type = "u8", note = "0 when made" },
+  { name = "c", offset = 16, type = "f32" },
+]
+
+# The 64-byte item sub_820A81C0 makes (vtable 0x820025D8, set by sub_820A7688).
+[Item820025D8]
+measure = "new<64>@sub_820A81C0"
+size = 64
+origin = "allocated"
+vtable = 0x820025D8
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "argument", offset = 8, type = "u32", note = "the maker's r4" },
+  { name = "unknown_16", offset = 16, type = "u64" },
+  { name = "unknown_24", offset = 24, type = "u64" },
+  { name = "unknown_28", offset = 28, type = "f32" },
+  { name = "unknown_32", offset = 32, type = "u64" },
+  { name = "unknown_40", offset = 40, type = "u64" },
+  { name = "unknown_44", offset = 44, type = "f32" },
+  { name = "unknown_48", offset = 48, type = "f32" },
+  { name = "unknown_52", offset = 52, type = "f32" },
+]
+
+# A list of 12-byte entries with a byte count, as sub_825788C0 (not read,
+# never seen in play; XMemAlloc and XMemFree) reads and copies it.
+[ByteCountedList]
+measures = ["sub_825788C0.r3", "new<8>@sub_825788C0"]
+size = 8
+origin = "allocated"
+fields = [
+  { name = "count", offset = 0, type = "u8" },
+  { name = "entries", offset = 4, type = "u32", note = "count 12-byte entries, compared by their first byte" },
+]
+
+# sub_82578AF0's r5 (not read): +4 a ByteCountedList handed to sub_825788C0.
+[ByteCountedListArgs]
+measure = "sub_82578AF0.r5"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "list", offset = 4, type = "ptr", to = "ByteCountedList" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+]
+
+[globals]
+process_heap = { address = 0x8297149C, type = "ptr", to = "ProcessHeap", note = "GetProcessHeap's word, made at boot by sub_82297C08" }
+no_large_physical_pages = { address = 0x829537B0, type = "u32", note = "when not 0, XPhysicalAlloc and XPhysicalAllocEx clear X_MEM_LARGE_PAGES from the protection" }
+physical_protections = { address = 0x82638770, type = "u32", note = "XMemAlloc's protections for physical memory: four words, by (attributes >> 28) & 3" }
+new_handler = { address = 0x82971170, type = "fn", note = "the new handler _callnewh calls" }
+new_mode = { address = 0x8297119C, type = "u32", note = "probably _newmode: malloc retries through _callnewh when set" }

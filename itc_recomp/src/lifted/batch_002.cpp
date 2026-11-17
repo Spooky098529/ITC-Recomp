@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/heap.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -138,7 +139,7 @@ lifted::Result f82094B68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq 0x82094b94
   if (cr0.eq) goto loc_82094B94;
   // bl 0x825a70e8
@@ -5651,7 +5652,7 @@ lifted::Result f8209FB80(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq 0x8209fbac
   if (cr0.eq) goto loc_8209FBAC;
   // bl 0x825a70e8
@@ -5992,7 +5993,7 @@ lifted::Result f820A44C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq 0x820a44ec
   if (cr0.eq) goto loc_820A44EC;
   // bl 0x825a70e8
@@ -6038,11 +6039,11 @@ lifted::Result f820A4508(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r11,8592
   r11 = uint64_t(int64_t(int64_t(r11) + 8592));
   // lwz r3,80(r31)
-  r3 = guest::LoadU32(base, uint32_t(r31) + 80);
+  r3 = guest::LoadU32(base, schema::SaveSlot(base, uint32_t(r31)).unknown_80_address());
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::SaveSlot(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq 0x820a4538
   if (cr0.eq) goto loc_820A4538;
   // bl 0x825a70e8
@@ -6050,7 +6051,7 @@ lifted::Result f820A4508(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x820A4538, r31)); r3 = o.r3; f1 = o.f1; }
 loc_820A4538:
   // lwz r3,84(r31)
-  r3 = guest::LoadU32(base, uint32_t(r31) + 84);
+  r3 = guest::LoadU32(base, schema::SaveSlot(base, uint32_t(r31)).unknown_84_address());
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x820a4548
@@ -6240,7 +6241,7 @@ lifted::Result f820A5660(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r29,r30,-8
   r29 = uint64_t(int64_t(int64_t(r30) + -8));
   // lwz r11,0(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 0);
+  r11 = guest::LoadU32(base, schema::SaveSlot(base, uint32_t(r29) + 8).array_count_address());
   // mulli r10,r11,1000
   r10 = uint64_t(int64_t(static_cast<int64_t>(r11 * static_cast<uint64_t>(1000))));
   // addic. r31,r11,-1

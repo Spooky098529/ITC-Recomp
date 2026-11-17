@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/heap.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -58,12 +59,12 @@ lifted::Result f82594440(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r3,r31
   r3 = r31;
   // stw r11,0(r30)
-  guest::StoreU32(base, uint32_t(r30) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::TextureProvider(base, uint32_t(r30)).vtable_address(), uint32_t(r11));
   // bl 0x82590d68
   // (left out: dead in C++)
   { const lifted::Result o = game::TextureProvider::Clear(base, LIFTED_ARGS(0x8259446C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,4(r31)
-  r3 = guest::LoadU32(base, uint32_t(r31) + 4);
+  r3 = guest::LoadU32(base, schema::TextureProvider(base, uint32_t(r31) - 4).first_address());
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq cr6,0x8259447c
@@ -81,11 +82,11 @@ loc_8259447C:
   // cmplwi cr6,r10,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // stw r11,4(r31)
-  guest::StoreU32(base, uint32_t(r31) + 4, uint32_t(r11));
+  guest::StoreU32(base, schema::TextureProvider(base, uint32_t(r31) - 4).first_address(), uint32_t(r11));
   // stw r11,8(r31)
-  guest::StoreU32(base, uint32_t(r31) + 8, uint32_t(r11));
+  guest::StoreU32(base, schema::TextureProvider(base, uint32_t(r31) - 4).last_address(), uint32_t(r11));
   // stw r11,12(r31)
-  guest::StoreU32(base, uint32_t(r31) + 12, uint32_t(r11));
+  guest::StoreU32(base, schema::TextureProvider(base, uint32_t(r31) - 4).end_address(), uint32_t(r11));
   // beq cr6,0x825944a4
   if (cr6.eq) goto loc_825944A4;
   // bl 0x825a70e8
@@ -591,11 +592,11 @@ lifted::Result f82599BE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r11,-12720
   r11 = uint64_t(int64_t(int64_t(r11) + -12720));
   // lwz r3,176(r31)
-  r3 = guest::LoadU32(base, uint32_t(r31) + 176);
+  r3 = guest::LoadU32(base, schema::Skeleton(base, uint32_t(r31)).node_vectors_address());
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::Skeleton(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq cr6,0x82599c18
   if (cr6.eq) goto loc_82599C18;
   // bl 0x825a71c0
@@ -607,7 +608,7 @@ loc_82599C18:
   // mr r3,r31
   r3 = r31;
   // stw r11,176(r31)
-  guest::StoreU32(base, uint32_t(r31) + 176, uint32_t(r11));
+  guest::StoreU32(base, schema::Skeleton(base, uint32_t(r31)).node_vectors_address(), uint32_t(r11));
   // bl 0x8259a9d0
   // (left out: dead in C++)
   { const lifted::Result o = game::SkeletonBase::Dtor(base, LIFTED_ARGS(0x82599C28, r31)); r3 = o.r3; f1 = o.f1; }
@@ -1723,7 +1724,7 @@ void f8259C7F8(uint8_t* base, uint64_t r3) {
   // addi r11,r11,5056
   r11 = uint64_t(int64_t(int64_t(r11) + 5056));
   // stw r11,0(r3)
-  guest::StoreU32(base, uint32_t(r3) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r3)).vtable_address(), uint32_t(r11));
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,3092(r10)
@@ -1760,7 +1761,7 @@ lifted::Result f8259C8C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq 0x8259c8f4
   if (cr0.eq) goto loc_8259C8F4;
   // bl 0x825a70e8
@@ -1811,7 +1812,7 @@ lifted::Result f8259C910(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lis r10,-32105
   r10 = uint64_t(int64_t(-2104033280));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,3092(r10)
@@ -3141,9 +3142,9 @@ lifted::Result f825A13D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r4
   r30 = r4;
   // lwz r3,4(r31)
-  r3 = guest::LoadU32(base, uint32_t(r31) + 4);
+  r3 = guest::LoadU32(base, schema::PrimitiveDrawer(base, uint32_t(r31)).unknown_4_address());
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::PrimitiveDrawer(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // bl 0x825a70e8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x825A1408, r31)); r3 = o.r3; f1 = o.f1; }

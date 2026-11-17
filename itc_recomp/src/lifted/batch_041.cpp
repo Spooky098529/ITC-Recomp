@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/heap.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -8885,15 +8886,15 @@ lifted::Result f825A67A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r29,r4
   r29 = r4;
   // stw r11,0(r30)
-  guest::StoreU32(base, uint32_t(r30) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::StdException(base, uint32_t(r30)).vtable_address(), uint32_t(r11));
   // lwz r11,8(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 8);
+  r11 = guest::LoadU32(base, schema::StdException(base, uint32_t(r29)).owns_what_address());
   // cmpwi r11,0
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // stw r11,8(r30)
-  guest::StoreU32(base, uint32_t(r30) + 8, uint32_t(r11));
+  guest::StoreU32(base, schema::StdException(base, uint32_t(r30)).owns_what_address(), uint32_t(r11));
   // lwz r11,4(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 4);
+  r11 = guest::LoadU32(base, schema::StdException(base, uint32_t(r29)).what_address());
   // beq 0x825a6830
   if (cr0.eq) goto loc_825A6830;
   // cmplwi r11,0
@@ -8904,7 +8905,7 @@ lifted::Result f825A67A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = r11;
 loc_825A67E8:
   // lbz r9,0(r11)
-  r9 = guest::LoadU8(base, uint32_t(r11) + 0);
+  r9 = guest::LoadU8(base, schema::ExceptionMessage(base, uint32_t(r11)).first_char_address());
   // addi r11,r11,1
   r11 = uint64_t(int64_t(int64_t(r11) + 1));
   // cmplwi cr6,r9,0
@@ -8927,13 +8928,13 @@ loc_825A67E8:
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // stw r3,4(r30)
-  guest::StoreU32(base, uint32_t(r30) + 4, uint32_t(r3));
+  guest::StoreU32(base, schema::StdException(base, uint32_t(r30)).what_address(), uint32_t(r3));
   // beq 0x825a6834
   if (cr0.eq) goto loc_825A6834;
   // mr r4,r31
   r4 = r31;
   // lwz r5,4(r29)
-  r5 = guest::LoadU32(base, uint32_t(r29) + 4);
+  r5 = guest::LoadU32(base, schema::StdException(base, uint32_t(r29)).what_address());
   // bl 0x825a9dd8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x825A9DD8, LIFTED_ARGS(0x825A6828, r31)); r3 = o.r3; f1 = o.f1; }
@@ -8944,7 +8945,7 @@ loc_825A682C:
   r11 = uint64_t(int64_t(0));
 loc_825A6830:
   // stw r11,4(r30)
-  guest::StoreU32(base, uint32_t(r30) + 4, uint32_t(r11));
+  guest::StoreU32(base, schema::StdException(base, uint32_t(r30)).what_address(), uint32_t(r11));
 loc_825A6834:
   // mr r3,r30
   r3 = r30;

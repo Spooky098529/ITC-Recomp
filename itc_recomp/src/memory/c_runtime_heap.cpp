@@ -4,6 +4,7 @@
 
 #include "base/log.h"
 #include "memory/heap.h"
+#include "schema/heap.h"
 
 #include <cstring>
 
@@ -11,25 +12,18 @@ namespace memory::crt {
 
 namespace {
 
-// GetProcessHeap's word.
-constexpr uint32_t kProcessHeapHandle = 0x8297149C;
 // The largest size malloc, calloc and realloc take (-4096).
 constexpr uint32_t kMaxSize = 0xFFFFF000;
 // XMemAlloc's attributes.
 constexpr uint32_t kPhysical = 0x80000000;
 constexpr uint32_t kZero = 0x40000000;
-// XMemAlloc's protections for physical memory, by (attributes >> 28) & 3.
-constexpr uint32_t kProtectionTable = 0x82638770;
-// Read by XPhysicalAlloc (sub_822964C8): when not 0, it clears
-// X_MEM_LARGE_PAGES from the protection (as its adapter in hooks/heap.cpp).
-constexpr uint32_t kNoLargePhysicalPages = 0x829537B0;
 constexpr uint32_t kMemLargePages = 0x20000000;
 
 }  // namespace
 
 uint32_t GetProcessHeap(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8229B670 GetProcessHeap");
-  return guest::LoadU32(base, kProcessHeapHandle);
+  return schema::HeapGlobals::process_heap(base).address;
 }
 
 std::optional<uint32_t> Malloc(uint8_t* base, uint32_t size) {
@@ -119,9 +113,10 @@ uint32_t XMemAlloc(uint8_t* base, uint32_t size, uint32_t attributes) {
     attributes |= 0x0C000000;
   }
   const uint32_t alignment = 1u << ((attributes >> 24) & 0xF);
-  uint32_t protection = guest::LoadU32(base, kProtectionTable + ((attributes >> 28) & 3) * 4);
+  uint32_t protection = guest::LoadU32(
+      base, schema::HeapGlobals::physical_protections_address() + ((attributes >> 28) & 3) * 4);
   // XPhysicalAlloc (sub_822964C8) with any physical address.
-  if (guest::LoadU32(base, kNoLargePhysicalPages) != 0) {
+  if (schema::HeapGlobals::no_large_physical_pages(base) != 0) {
     protection &= ~kMemLargePages;
   }
   const uint32_t block = memory::AllocPhysical(size, 0, 0xFFFFFFFF, alignment, protection);
@@ -135,7 +130,7 @@ uint32_t XMemAlloc(uint8_t* base, uint32_t size, uint32_t attributes) {
 
 uint32_t XPhysicalAllocEx(uint8_t* base, uint32_t size, uint32_t low, uint32_t high,
                           uint32_t alignment, uint32_t protection) {
-  if (guest::LoadU32(base, kNoLargePhysicalPages) != 0) {
+  if (schema::HeapGlobals::no_large_physical_pages(base) != 0) {
     protection &= ~kMemLargePages;
   }
   return memory::AllocPhysical(size, low, high, alignment, protection);

@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/heap.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -154,7 +155,7 @@ lifted::Result f820901D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq 0x82090204
   if (cr0.eq) goto loc_82090204;
   // bl 0x825a70e8
@@ -252,7 +253,7 @@ lifted::Result f82090268(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq 0x82090294
   if (cr0.eq) goto loc_82090294;
   // bl 0x825a70e8
@@ -433,11 +434,11 @@ void f820905E0(uint8_t* base, uint64_t r3) {
   // lis r7,-32256
   r7 = uint64_t(int64_t(-2113929216));
   // stw r30,40(r3)
-  guest::StoreU32(base, uint32_t(r3) + 40, uint32_t(r30));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_40_address(), uint32_t(r30));
   // lis r6,-32256
   r6 = uint64_t(int64_t(-2113929216));
   // stw r11,4(r3)
-  guest::StoreU32(base, uint32_t(r3) + 4, uint32_t(r11));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_4_address(), uint32_t(r11));
   // lis r5,-32256
   r5 = uint64_t(int64_t(-2113929216));
   // lis r4,-32256
@@ -471,85 +472,85 @@ void f820905E0(uint8_t* base, uint64_t r3) {
   // addi r5,r5,2872
   r5 = uint64_t(int64_t(int64_t(r5) + 2872));
   // stw r10,8(r3)
-  guest::StoreU32(base, uint32_t(r3) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_8_address(), uint32_t(r10));
   // addi r4,r4,2856
   r4 = uint64_t(int64_t(int64_t(r4) + 2856));
   // stw r9,12(r3)
-  guest::StoreU32(base, uint32_t(r3) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_12_address(), uint32_t(r9));
   // addi r31,r31,2812
   r31 = uint64_t(int64_t(int64_t(r31) + 2812));
   // stw r8,16(r3)
-  guest::StoreU32(base, uint32_t(r3) + 16, uint32_t(r8));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_16_address(), uint32_t(r8));
   // addi r29,r29,2796
   r29 = uint64_t(int64_t(int64_t(r29) + 2796));
   // stw r7,20(r3)
-  guest::StoreU32(base, uint32_t(r3) + 20, uint32_t(r7));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_20_address(), uint32_t(r7));
   // addi r28,r28,2788
   r28 = uint64_t(int64_t(int64_t(r28) + 2788));
   // stw r6,24(r3)
-  guest::StoreU32(base, uint32_t(r3) + 24, uint32_t(r6));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_24_address(), uint32_t(r6));
   // addi r27,r27,2772
   r27 = uint64_t(int64_t(int64_t(r27) + 2772));
   // stw r5,28(r3)
-  guest::StoreU32(base, uint32_t(r3) + 28, uint32_t(r5));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_28_address(), uint32_t(r5));
   // addi r26,r26,2764
   r26 = uint64_t(int64_t(int64_t(r26) + 2764));
   // stw r4,32(r3)
-  guest::StoreU32(base, uint32_t(r3) + 32, uint32_t(r4));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_32_address(), uint32_t(r4));
   // addi r25,r25,2760
   r25 = uint64_t(int64_t(int64_t(r25) + 2760));
   // stw r31,36(r3)
-  guest::StoreU32(base, uint32_t(r3) + 36, uint32_t(r31));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_36_address(), uint32_t(r31));
   // lis r22,-32256
   r22 = uint64_t(int64_t(-2113929216));
   // stw r29,44(r3)
-  guest::StoreU32(base, uint32_t(r3) + 44, uint32_t(r29));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_44_address(), uint32_t(r29));
   // addi r24,r24,2908
   r24 = uint64_t(int64_t(int64_t(r24) + 2908));
   // stw r28,48(r3)
-  guest::StoreU32(base, uint32_t(r3) + 48, uint32_t(r28));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_48_address(), uint32_t(r28));
   // lis r21,-32256
   r21 = uint64_t(int64_t(-2113929216));
   // stw r27,52(r3)
-  guest::StoreU32(base, uint32_t(r3) + 52, uint32_t(r27));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_52_address(), uint32_t(r27));
   // addi r23,r23,2740
   r23 = uint64_t(int64_t(int64_t(r23) + 2740));
   // stw r26,56(r3)
-  guest::StoreU32(base, uint32_t(r3) + 56, uint32_t(r26));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_56_address(), uint32_t(r26));
   // lis r30,-32256
   r30 = uint64_t(int64_t(-2113929216));
   // stw r25,60(r3)
-  guest::StoreU32(base, uint32_t(r3) + 60, uint32_t(r25));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_60_address(), uint32_t(r25));
   // addi r22,r22,3400
   r22 = uint64_t(int64_t(int64_t(r22) + 3400));
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // stw r24,60(r3)
-  guest::StoreU32(base, uint32_t(r3) + 60, uint32_t(r24));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_60_address(), uint32_t(r24));
   // addi r21,r21,2740
   r21 = uint64_t(int64_t(int64_t(r21) + 2740));
   // addi r30,r30,2740
   r30 = uint64_t(int64_t(int64_t(r30) + 2740));
   // stw r23,56(r3)
-  guest::StoreU32(base, uint32_t(r3) + 56, uint32_t(r23));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_56_address(), uint32_t(r23));
   // addi r11,r11,2740
   r11 = uint64_t(int64_t(int64_t(r11) + 2740));
   // stw r22,52(r3)
-  guest::StoreU32(base, uint32_t(r3) + 52, uint32_t(r22));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_52_address(), uint32_t(r22));
   // lis r10,-32256
   r10 = uint64_t(int64_t(-2113929216));
   // lis r9,-32256
   r9 = uint64_t(int64_t(-2113929216));
   // stw r21,48(r3)
-  guest::StoreU32(base, uint32_t(r3) + 48, uint32_t(r21));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_48_address(), uint32_t(r21));
   // lis r8,-32256
   r8 = uint64_t(int64_t(-2113929216));
   // stw r30,44(r3)
-  guest::StoreU32(base, uint32_t(r3) + 44, uint32_t(r30));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_44_address(), uint32_t(r30));
   // lis r7,-32256
   r7 = uint64_t(int64_t(-2113929216));
   // stw r11,40(r3)
-  guest::StoreU32(base, uint32_t(r3) + 40, uint32_t(r11));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_40_address(), uint32_t(r11));
   // lis r6,-32256
   r6 = uint64_t(int64_t(-2113929216));
   // lis r11,-32255
@@ -579,29 +580,29 @@ void f820905E0(uint8_t* base, uint64_t r3) {
   // addi r31,r31,2908
   r31 = uint64_t(int64_t(int64_t(r31) + 2908));
   // stw r10,36(r3)
-  guest::StoreU32(base, uint32_t(r3) + 36, uint32_t(r10));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_36_address(), uint32_t(r10));
   // lis r30,-32256
   r30 = uint64_t(int64_t(-2113929216));
   // stw r9,32(r3)
-  guest::StoreU32(base, uint32_t(r3) + 32, uint32_t(r9));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_32_address(), uint32_t(r9));
   // stw r8,28(r3)
-  guest::StoreU32(base, uint32_t(r3) + 28, uint32_t(r8));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_28_address(), uint32_t(r8));
   // addi r30,r30,2616
   r30 = uint64_t(int64_t(int64_t(r30) + 2616));
   // stw r7,24(r3)
-  guest::StoreU32(base, uint32_t(r3) + 24, uint32_t(r7));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_24_address(), uint32_t(r7));
   // stw r6,20(r3)
-  guest::StoreU32(base, uint32_t(r3) + 20, uint32_t(r6));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_20_address(), uint32_t(r6));
   // stw r11,16(r3)
-  guest::StoreU32(base, uint32_t(r3) + 16, uint32_t(r11));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_16_address(), uint32_t(r11));
   // stw r5,12(r3)
-  guest::StoreU32(base, uint32_t(r3) + 12, uint32_t(r5));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_12_address(), uint32_t(r5));
   // stw r4,8(r3)
-  guest::StoreU32(base, uint32_t(r3) + 8, uint32_t(r4));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_8_address(), uint32_t(r4));
   // stw r31,4(r3)
-  guest::StoreU32(base, uint32_t(r3) + 4, uint32_t(r31));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_4_address(), uint32_t(r31));
   // stw r30,0(r3)
-  guest::StoreU32(base, uint32_t(r3) + 0, uint32_t(r30));
+  guest::StoreU32(base, schema::Framework(base, uint32_t(r3)).vtable_address(), uint32_t(r30));
   // b 0x825a6ebc
   // (left out: dead in C++)
   return;
@@ -1499,11 +1500,11 @@ lifted::Result f82090D68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r8 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r8), 0, so);
   // stw r11,4(r31)
-  guest::StoreU32(base, uint32_t(r31) + 4, uint32_t(r11));
+  guest::StoreU32(base, schema::DualVtableObject(base, uint32_t(r31)).vtable_4_address(), uint32_t(r11));
   // stw r10,4(r31)
-  guest::StoreU32(base, uint32_t(r31) + 4, uint32_t(r10));
+  guest::StoreU32(base, schema::DualVtableObject(base, uint32_t(r31)).vtable_4_address(), uint32_t(r10));
   // stw r9,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::DualVtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r9));
   // beq 0x82090dac
   if (cr0.eq) goto loc_82090DAC;
   // bl 0x825a70e8
@@ -1671,7 +1672,7 @@ lifted::Result f82091070(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r11,3016
   r11 = uint64_t(int64_t(int64_t(r11) + 3016));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::DebugText(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // bl 0x8258c060
   // (left out: dead in C++)
   { const lifted::Result o = f8258C060(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -1682,7 +1683,7 @@ lifted::Result f82091070(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r11,-12160(r10)
   guest::StoreU32(base, uint32_t(r10) + -12160, uint32_t(r11));
   // lwz r3,48(r31)
-  r3 = guest::LoadU32(base, uint32_t(r31) + 48);
+  r3 = guest::LoadU32(base, schema::DebugText(base, uint32_t(r31)).unknown_48_address());
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x820910b8
@@ -1693,7 +1694,7 @@ lifted::Result f82091070(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,48(r31)
-  guest::StoreU32(base, uint32_t(r31) + 48, uint32_t(r11));
+  guest::StoreU32(base, schema::DebugText(base, uint32_t(r31)).unknown_48_address(), uint32_t(r11));
 loc_820910B8:
   // lis r10,-32256
   r10 = uint64_t(int64_t(-2113929216));
@@ -1718,15 +1719,15 @@ loc_820910B8:
   // addi r6,r6,3400
   r6 = uint64_t(int64_t(int64_t(r6) + 3400));
   // stw r10,24(r11)
-  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r10));
+  guest::StoreU32(base, schema::DebugText(base, uint32_t(r11) - 8).vtable_32_address(), uint32_t(r10));
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::DebugText(base, uint32_t(r11) - 8).vtable_12_address(), uint32_t(r9));
   // stw r8,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::DebugText(base, uint32_t(r11) - 8).vtable_12_address(), uint32_t(r8));
   // stw r7,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r7));
+  guest::StoreU32(base, schema::DebugText(base, uint32_t(r11) - 8).vtable_8_address(), uint32_t(r7));
   // stw r6,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r6));
+  guest::StoreU32(base, schema::DebugText(base, uint32_t(r31)).vtable_address(), uint32_t(r6));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
@@ -3347,7 +3348,7 @@ lifted::Result f820926C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq 0x820926f4
   if (cr0.eq) goto loc_820926F4;
   // bl 0x825a70e8
@@ -3396,7 +3397,7 @@ lifted::Result f820927E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq 0x82092814
   if (cr0.eq) goto loc_82092814;
   // bl 0x825a70e8
@@ -3445,7 +3446,7 @@ lifted::Result f82092830(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::VtableObject(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq 0x8209285c
   if (cr0.eq) goto loc_8209285C;
   // bl 0x825a70e8

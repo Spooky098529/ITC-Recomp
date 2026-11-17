@@ -53,6 +53,16 @@ effects but a warning logged once). The harness found the map's reading
 of XMemAlloc's physical attributes off: the protection's index is bits
 28-29 and the default alignment field is 12 (4 KiB).
 
+The objects' layout (E5's step 2, 2026-11-17): `itc_recomp/schema/heap.toml`.
+The process heap is NT's RtlHeap with a 16-byte block header (so 8 bytes
+past NT's offsets from +16 on: +20 the flags, +24 the force flags, +384 free
+list 0, +1408 the lock), a block's header 16 bytes before it (+0 the size in
+16-byte units, +5 the flags, +6 the unused bytes) and a large block's
+virtual entry 48 bytes before it (+0 and +4 its list links, +24 its
+committed size). The file also holds the measure's types whose only callee
+is operator new or delete (other areas' deleting destructors), named from
+the docs where their vtables are known.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
