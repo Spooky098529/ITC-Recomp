@@ -8,8 +8,8 @@
 namespace schema {
 
 struct FrontEndMenu;
+struct PageObject;
 struct StateMachine;
 struct Type2DialogData;
-struct Type2DialogPages;
 
 }  // namespace schema

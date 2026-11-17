@@ -132,11 +132,17 @@ def overridden():
 
 # --- Statements ---
 
+# The ordinal of the comment the statement being parsed follows (counted as
+# type_map.py counts them: the measure's typed accesses are keyed by it).
+CURRENT_INSN = 0
+
+
 class Stmt:
     def __init__(self, kind, code, comment, **kw):
         self.kind = kind          # label goto if return trap call switch case end plain skip
         self.code = code
         self.comment = comment
+        self.insn = CURRENT_INSN
         self.__dict__.update(kw)
 
 
@@ -151,6 +157,8 @@ IF_GOTO_RE = re.compile(r"^if \((.*)\) goto (loc_[0-9A-F]+);$")
 
 
 def parse(name, lines):
+    global CURRENT_INSN
+    CURRENT_INSN = 0
     stmts = []
     comment = None
     braces = []
@@ -160,6 +168,8 @@ def parse(name, lines):
         s = raw.strip()
         if not s:
             continue
+        if s.startswith("//"):
+            CURRENT_INSN += 1
         if s.startswith("//") and not pending:
             comment = s[2:].strip()
             continue
@@ -947,6 +957,7 @@ def emit_function(info, infos, emitting):
             body.append("  " + st.code)
         else:
             body.append("  " + plain(st.code))
+            body[-1] = name_fields(info.name, st, body[-1])
         # A conditional return (a conditional branch to the link register)
         # returns what the function returns.
         if body[-1].endswith(" return;") and st.kind != "return":
@@ -1052,9 +1063,13 @@ def emit_batch(batch, names, infos, emitting):
         "namespace lifted {",
         "",
     ]
+    VIEW_HEADERS.clear()
     for name in names:
         lines.extend(emit_function(infos[name], infos, emitting))
         lines.append("")
+    # The schema's views the functions name (docs/e5-native.md, step 2).
+    at = lines.index('#include "lifted/sdk.h"') + 1
+    lines[at:at] = [f'#include "{h}"' for h in sorted(VIEW_HEADERS)]
     # The uniform entries (functions.h declares them: hand ports call a
     # lifted function by them, docs/e5-native.md, step 0).
     for name in names:
@@ -1080,6 +1095,58 @@ def emit_batch(batch, names, infos, emitting):
     # The functions with LIFTED_ARGS but without some of its registers as
     # locals or parameters would not build: every call adds them to `used`.
     return own_spelling("\n".join(lines))
+
+
+_VIEWS = None
+# The schema's headers the function being emitted names (emit_batch
+# includes them).
+VIEW_HEADERS = set()
+ADDRESS_RE = re.compile(r"\bREX_(LOAD|STORE)_U(8|16|32|64)\(uint32_t\((r\d+)\) \+ (-?\d+)\b")
+
+
+def views():
+    """The measure's typed accesses (tools/type_map.py) whose type the
+    schema describes and whose offset is one of its fields: (function, the
+    statement's comment ordinal) -> (the type, the field, the register's
+    offset into the object, the displacement)."""
+    global _VIEWS
+    if _VIEWS is None:
+        sys.path.insert(0, TOOLS)
+        import schema_lib
+        import type_map
+        schema = schema_lib.load()
+        _VIEWS = {}
+        if schema.types:
+            accesses, _ = type_map.typed_accesses()
+            for key, (t, off, disp, width, store) in accesses.items():
+                ty = schema.of_measure(t)
+                if ty is None or off is None:
+                    continue
+                f = ty.field_at(off + disp, width)
+                if f is not None:
+                    _VIEWS[key] = (ty, f, off, disp)
+    return _VIEWS
+
+
+def name_fields(fn, st, line):
+    """A load's or store's address named by the schema's view
+    (docs/e5-native.md, step 2): `REX_LOAD_U32(uint32_t(r31) + 24)` as
+    `REX_LOAD_U32(schema::T(base, uint32_t(r31)).field_address())` where the
+    measure knows r31 holds a T; the access itself is unchanged."""
+    v = views().get((fn, st.insn))
+    if v is None:
+        return line
+    ty, f, off, disp = v
+    m = ADDRESS_RE.search(line)
+    if m is None or int(m.group(4)) != disp:
+        return line
+    obj = f"uint32_t({m.group(3)})" + (f" - {off}" if off > 0 else f" + {-off}" if off < 0 else "")
+    address = f"schema::{ty.name}(base, {obj}).{f['name']}_address()"
+    inside = off + disp - f["offset"]
+    if inside:
+        address += f" + {inside}"
+    VIEW_HEADERS.add(ty.header())
+    return line[:m.start()] + f"REX_{m.group(1)}_U{m.group(2)}({address}" + line[m.end():]
 
 
 OWN_SPELLING = re.compile(r"\bREX_(LOAD|STORE)_U(8|16|32|64)\(|\bREX_RAW_ADDR\(")

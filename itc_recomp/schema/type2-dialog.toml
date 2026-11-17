@@ -11,21 +11,6 @@
 # The dialog's machine is a StateMachine (game-modes.toml) at the type 2
 # mode block's +0x1E4C8.
 
-# The page object (28 bytes, made by OnEnter).
-[Type2DialogPages]
-measure = "new<28>@Type2Dialog::OnEnter"
-size = 28
-origin = "allocated"
-fields = [
-  { name = "page", offset = 0, type = "u32", note = "the page Draw runs; -1 while a step runs" },
-  { name = "next_page", offset = 4, type = "u32", note = "the page after the step" },
-  { name = "previous_page", offset = 8, type = "u32" },
-  { name = "step", offset = 12, type = "u32", note = "the step Update runs; -1 none" },
-  { name = "queued_step", offset = 16, type = "u32", note = "the step after it" },
-  { name = "unknown_20", offset = 20, type = "u32" },
-  { name = "step_started", offset = 24, type = "u32", note = "the step's started word" },
-]
-
 # The data block (68 bytes, made by OnEnter).
 [Type2DialogData]
 measure = "new<68>@Type2Dialog::OnEnter"
@@ -38,7 +23,7 @@ fields = [
 ]
 
 [globals]
-pages = { address = 0x826D83F8, type = "ptr", to = "Type2DialogPages" }
+pages = { address = 0x826D83F8, type = "ptr", to = "PageObject" }
 menu = { address = 0x826D83FC, type = "ptr", to = "FrontEndMenu", note = "a front-end menu, items 0 to 1" }
 data = { address = 0x826D8400, type = "ptr", to = "Type2DialogData" }
 showing = { address = 0x82636200, type = "u32", note = "the dialog showing, 0 to 3" }

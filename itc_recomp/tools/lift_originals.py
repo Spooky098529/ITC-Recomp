@@ -9,15 +9,44 @@ through the dispatch table, as the originals' calls go through the
 function table, except to functions lift.py lifted.
 
 usage: lift_originals.py sub_X ...   (writes both files for exactly these)
+       lift_originals.py --all          (the originals there now, and every
+                                         address lifted code or a hand port
+                                         calls with no entry of its own)
 """
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import lift
 
 
+def calls_without_entry():
+    """Addresses lifted code or a hand port calls by constant with no entry
+    of its own (lifted/entries.h, functions.h): their originals are the
+    fallbacks."""
+    import glob
+    import re
+    src = os.path.join(lift.SRC)
+    entries = set(re.findall(r"Result e(8[0-9A-F]{7})\(", open(os.path.join(lift.OUT, "entries.h")).read()))
+    lifted = {n[4:] for n in lift.load_signatures()}
+    targets = set()
+    for path in glob.glob(os.path.join(src, "**", "*.cpp"), recursive=True) + \
+            glob.glob(os.path.join(src, "**", "*.h"), recursive=True):
+        if os.sep + "harnesses" + os.sep in path:
+            continue
+        text = open(path, errors="ignore").read()
+        targets |= {a.upper() for a in re.findall(r"lifted::Call\(base, 0x(8[0-9A-Fa-f]{7})", text)}
+        targets |= {a.upper() for a in re.findall(
+            r"CallFromContext\([^,()]+, [^,()]+, 0x(8[0-9A-Fa-f]{7})", text)}
+    return {"sub_" + a for a in targets - entries - lifted}
+
+
 def main(argv):
+    if argv[1:] == ["--all"]:
+        with open(os.path.join(lift.OUT, "originals.h")) as f:
+            current = set(re.findall(r"// (sub_8[0-9A-F]{7})'s original", f.read()))
+        argv = argv[:1] + sorted(current | calls_without_entry())
     wanted = sorted(set(argv[1:]))
     bodies = lift.load_bodies()
     skip = lift.overridden() - set(wanted)
@@ -56,12 +85,31 @@ def main(argv):
         "namespace lifted::original {",
         "",
     ]
+    lift.VIEW_HEADERS.clear()
+    emitted = []
     for n in names:
-        cpp.extend(lift.emit_function(infos[n], infos, emitting))
+        try:
+            body = lift.emit_function(infos[n], infos, emitting)
+        except lift.Refused as e:
+            print(f"{n}: refused at emission: {e}")
+            continue
+        cpp.extend(body)
         cpp.append("")
+        emitted.append(n)
+    names = emitted
+    # The schema's views the functions name (docs/e5-native.md, step 2).
+    at = cpp.index('#include "lifted/sdk.h"') + 1
+    cpp[at:at] = [f'#include "{h}"' for h in sorted(lift.VIEW_HEADERS)]
     for n in names:
         cpp.extend(lift.emit_entry(infos[n]))
         cpp.append("")
+    # Every original, the function an address with no entry runs
+    # (lifted::Call's fallback, docs/e5-native.md, step 0).
+    cpp += ["namespace {", "", "const Registration kFallbacks[] = {"]
+    cpp += [f"    {{0x{n[4:]}, {lift.ename(n)}}}," for n in names]
+    cpp += ["};", "",
+            "const bool kRegistered = (RegisterFallbacks(kFallbacks, std::size(kFallbacks)), true);",
+            "", "}  // namespace", ""]
     cpp += ["", "}  // namespace lifted::original", ""]
     h = [
         "// The originals our C++ still called, lifted (lifted/originals.cpp):",

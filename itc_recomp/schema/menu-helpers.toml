@@ -7,6 +7,7 @@
 # (sub_82186568) and read by Menu::Pressed (sub_821864C8); every front-end
 # screen keeps one or more.
 [FrontEndMenu]
+measures = ["new<68>@Type12Screen7::Create"]
 size = 68
 origin = "allocated"
 fields = [
@@ -24,4 +25,21 @@ fields = [
   { name = "unknown_48", offset = 48, type = "u32" },
   { name = "unknown_52", offset = 52, type = "u32" },
   { name = "player", offset = 64, type = "u32", note = "probably the player: the mapper entry's index" },
+]
+
+# The page object (28 bytes): a front-end screen's pages and steps, made by
+# its Create or OnEnter beside its menu (the type 2 dialog's at
+# [0x826D83F8], Type12Screen7's at [0x82816160]).
+[PageObject]
+measures = ["new<28>@Type2Dialog::OnEnter", "new<28>@Type12Screen7::Create"]
+size = 28
+origin = "allocated"
+fields = [
+  { name = "page", offset = 0, type = "u32", note = "the page Draw runs; -1 while a step runs" },
+  { name = "next_page", offset = 4, type = "u32", note = "the page after the step" },
+  { name = "previous_page", offset = 8, type = "u32" },
+  { name = "step", offset = 12, type = "u32", note = "the step Update runs; -1 none" },
+  { name = "queued_step", offset = 16, type = "u32", note = "the step after it" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "step_started", offset = 24, type = "u32", note = "the step's started word" },
 ]

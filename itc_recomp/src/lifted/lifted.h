@@ -165,12 +165,17 @@ struct Registration {
 };
 void Register(const Registration* entries, size_t count, const bool* enabled);
 
-// The entry registered at `address`, else null.
+// The entry registered at `address`, else its lifted original's (a
+// fallback), else null.
 Entry Find(uint32_t address);
 
+// Registers the lifted originals (lifted/originals.cpp) as the functions an
+// address with no entry of its own runs (Call and Find look there second).
+void RegisterFallbacks(const Registration* entries, size_t count);
+
 // Calls the function at `address`: its entry in the dispatch table (lifted,
-// a hand port's or an import thunk's). An address with none is logged and
-// stops the program.
+// a hand port's or an import thunk's), else its lifted original. An address
+// with neither is logged and stops the program.
 Result Call(uint8_t* base, uint32_t address, const Args& args);
 
 // A function's original asked for where it couldn't be lifted (a flag off,

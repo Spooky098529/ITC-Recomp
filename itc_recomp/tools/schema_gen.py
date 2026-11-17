@@ -129,8 +129,9 @@ def emit_area(area, data):
     for name, t in data.items():
         if name == "globals":
             continue
-        if t.get("measure") or t.get("origin"):
-            lines.append(f"// {t.get('origin', '?')}; measure: {t.get('measure', '-')}")
+        measures = ([t["measure"]] if t.get("measure") else []) + t.get("measures", [])
+        if measures or t.get("origin"):
+            lines.append(f"// {t.get('origin', '?')}; measure: {', '.join(measures) or '-'}")
         lines.append(f"struct {name} : View {{")
         lines.append("  using View::View;")
         lines.append(f"  static constexpr uint32_t kSize = {t.get('size', 0)};")

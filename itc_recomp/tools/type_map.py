@@ -148,14 +148,22 @@ class Map:
         self.area = {r["function"]: r["file"] or "?" for r in self.rows}
         self.bodies = lift.load_bodies()
         self.names = {"sub_" + a: n for a, n in function_names.row_names().items() if n}
-        # Parsed instructions per function: (mnemonic, operands).
+        # Parsed instructions per function: (mnemonic, operands); each one's
+        # ordinal among the body's comments (lift.py's Stmt.insn).
         self.code = {}
+        self.ordinals = {}
+        self.recording = None
         for r in self.rows:
             insns = []
+            ordinal = 0
             for line in self.bodies.get(r["function"], []):
+                if line.strip().startswith("//"):
+                    # Counted as lift.py counts its statements' comments.
+                    ordinal += 1
                 m = INSN.match(line)
                 if m:
                     insns.append((m.group(1), [o.strip() for o in (m.group(2) or "").split(",")]))
+                    self.ordinals[(r["function"], len(insns) - 1)] = ordinal
                 elif line.startswith("loc_"):
                     insns.append(("label", []))
                 elif HELPER.search(line) and insns and insns[-1][0] in ("bl", "b"):
@@ -267,7 +275,8 @@ class Map:
         for fn, insns in self.code.items():
             regs = {i: Ptr(f"{fn}.r{i}", 0) for i in range(3, 11)}
             ctor = self.is_ctor(fn)
-            for op, args in insns:
+            for index, (op, args) in enumerate(insns):
+                self._insn = (fn, index)
                 self.step(fn, op, args, regs, ctor, new_params, new_returns, new_fields)
         if record:
             return
@@ -324,6 +333,8 @@ class Map:
             t = self.find(b.type)
             off = b.off + disp
             self.stats["typed"] += 1
+            if self.recording is not None:
+                self.recording[(fn, self.ordinals[self._insn])] = (t, b.off, disp, width, store)
             self.touch[t].add(fn)
             f = self.fields[t][off]
             f[(width, kind)] += 1
@@ -483,6 +494,19 @@ class Map:
                 regs.pop(d, None)
         except (ValueError, IndexError, TypeError):
             regs.pop(d, None)
+
+
+def typed_accesses():
+    """The measure's typed accesses by instruction, for lift.py: (function,
+    its comment ordinal) -> (the type's display name, the register's offset
+    into the object, the displacement, the width, a store)."""
+    m = Map()
+    for _ in range(4):
+        m.run_pass(record=False)
+    m.recording = {}
+    m.run_pass(record=True)
+    return {k: (m.display(t), off, disp, width, store)
+            for k, (t, off, disp, width, store) in m.recording.items()}, m
 
 
 def main():

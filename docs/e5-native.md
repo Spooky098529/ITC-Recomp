@@ -172,6 +172,22 @@ The dispatch table is now reached by the 2,382 calls through pointers and
 vtable slots (`lifted::Call(base, ctr)`), the 2,918 to addresses with no
 function of ours, and the hand ports' calls by a computed address.
 
+Corrected (2026-11-17): the calls to an address with no entry *are* reached
+in play. An attract race (`itc_5753`) stopped at "a call to 825D55E0, which
+has no entry": the lifted `sub_825D1830` calls `XACTTrackInstance::CheckDone`
+by address, whose adapter was removed in B7 (only plain C++ called it then).
+The call predates E5 (in `rexglue-removal-project` before step 0; 1 of the
+last 40 logs). Fixed for all of them: `lift_originals.py --all` also lifts
+every address lifted code or a hand port calls with no entry (2,369
+originals, from 1,408), `originals.cpp` registers each as a fallback
+(`lifted::RegisterFallbacks`), and `lifted::Call` and `Find` run the
+fallback when an address has no entry, so the game's own code runs there,
+as it did when recompiled. Four can't be lifted (two read their caller's
+registers, two the float control register: `sub_825B32F0`, `sub_825B8778`,
+`sub_825B0BB0`, `sub_825B0BE4`) and still stop the program if reached.
+`save_interface.cpp`'s call to `0x822900E0` is covered too (its original
+is a fallback now). Two attract races and the pad replay clean.
+
 ### 1. The measure: types, owners, and what crosses
 
 Recorded here, as E1's and E2's measures were; it picks the order of steps

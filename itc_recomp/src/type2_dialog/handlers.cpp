@@ -122,7 +122,7 @@ uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   const uint32_t frame = Frame(base, sp, 128);
   const Machine m(base, machine);
   m.set_loaded(0);
-  const schema::Type2DialogPages pages(
+  const schema::PageObject pages(
       base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x821869E4, 0, 28, 0x1000, 4)));
   G::set_pages(base, pages);
   pages.set_next_page(0);

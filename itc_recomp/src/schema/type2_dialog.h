@@ -8,38 +8,6 @@
 
 namespace schema {
 
-// allocated; measure: new<28>@Type2Dialog::OnEnter
-struct Type2DialogPages : View {
-  using View::View;
-  static constexpr uint32_t kSize = 28;
-  // the page Draw runs; -1 while a step runs
-  uint32_t page() const { return guest::LoadU32(base, address + 0); }
-  void set_page(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t page_address() const { return address + 0; }
-  // the page after the step
-  uint32_t next_page() const { return guest::LoadU32(base, address + 4); }
-  void set_next_page(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t next_page_address() const { return address + 4; }
-  uint32_t previous_page() const { return guest::LoadU32(base, address + 8); }
-  void set_previous_page(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t previous_page_address() const { return address + 8; }
-  // the step Update runs; -1 none
-  uint32_t step() const { return guest::LoadU32(base, address + 12); }
-  void set_step(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t step_address() const { return address + 12; }
-  // the step after it
-  uint32_t queued_step() const { return guest::LoadU32(base, address + 16); }
-  void set_queued_step(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t queued_step_address() const { return address + 16; }
-  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
-  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t unknown_20_address() const { return address + 20; }
-  // the step's started word
-  uint32_t step_started() const { return guest::LoadU32(base, address + 24); }
-  void set_step_started(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
-  uint32_t step_started_address() const { return address + 24; }
-};
-
 // allocated; measure: new<68>@Type2Dialog::OnEnter
 struct Type2DialogData : View {
   using View::View;
@@ -58,7 +26,7 @@ struct Type2DialogData : View {
 
 // The image words docs/functions/type2-dialog.md's code uses.
 struct Type2DialogGlobals {
-  template <typename T = Type2DialogPages>
+  template <typename T = PageObject>
   static T pages(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D83F8u)); }
   static void set_pages(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D83F8u, v.address); }
   static void set_pages(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D83F8u, v); }
