@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/c_runtime.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -792,7 +793,7 @@ uint64_t f825A9958(uint8_t* base, uint64_t r3) {
   r11 = r3;
 loc_825A995C:
   // lhz r10,0(r11)
-  r10 = guest::LoadU16(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU16(base, schema::WideString(base, uint32_t(r11)).units_address());
   // addi r11,r11,2
   r11 = uint64_t(int64_t(int64_t(r11) + 2));
   // cmplwi r10,0

@@ -62,9 +62,9 @@ int32_t ToLowerStep(int32_t c);
 // The character type tables (docs/known-data.md): halfwords, 1 upper, 2
 // lower, 4 digit, 8 space, 0x100 alpha, 0x8000 a multibyte lead byte. Read
 // from guest memory on every call, as the originals do (the current
-// locale's pointer is the game's to change).
-constexpr uint32_t kCLocale = 0x8266BB48;       // the C locale's data
-constexpr uint32_t kCurrentLocale = 0x8266BC28;  // the current locale's pointer
+// locale's pointer is the game's to change): the Locale views'
+// ctype_table, the C locale's (CRuntimeGlobals::c_locale) or the current
+// one's (CRuntimeGlobals::current_locale).
 // isalpha, isdigit and isalnum (sub_825AB020, sub_825AB040, sub_825AB0A0):
 // the C locale's entry for c (c as an unsigned index: -1 reads the halfword
 // before the table) masked with 0x103, 4 or 0x107.
@@ -113,11 +113,11 @@ std::optional<uint32_t> MemmoveS(uint8_t* base, uint32_t destination, uint32_t s
 
 // XAPI's vectorized memset (sub_822962B0, probably XMemSet): `bytes` bytes
 // at `destination` set to `value`'s low byte. Its 16-byte store loops step
-// by the word at 0x8263830C (kXMemSetStride, 16 in the xex): with 16 the
-// bytes are a plain memset's (the 128-byte lines it clears with dcbzl lie
-// wholly inside the range); with any other step the same stores, line
-// clears and edge bytes as the translated code, in its order.
-constexpr uint32_t kXMemSetStride = 0x8263830C;
+// by the word at 0x8263830C (CRuntimeGlobals::xmemset_stride, 16 in the
+// xex): with 16 the bytes are a plain memset's (the 128-byte lines it
+// clears with dcbzl lie wholly inside the range); with any other step the
+// same stores, line clears and edge bytes as the translated code, in its
+// order.
 void XMemSet(uint8_t* base, uint32_t destination, uint32_t value, uint32_t bytes);
 
 // XAPI's vectorized copy (sub_82295890, probably XMemCpy, with its line
@@ -125,12 +125,12 @@ void XMemSet(uint8_t* base, uint32_t destination, uint32_t value, uint32_t bytes
 // `destination`, forward. The bytes are a plain copy's where the two ranges
 // don't share memory (its 128-byte line clears lie inside the destination
 // before they're written). Under 16 bytes, its last byte loop counts down by
-// the word at 0x82638308 (kXMemCpyStep, 1 in the xex, logged by the harness):
-// with another step, the bytes that loop copies before its count reaches 0.
-// False, with nothing copied, where the original must run: ranges that may
-// share memory (c_runtime::Memcpy refuses them), or a step whose count never
-// reaches 0 (0, or one that doesn't divide what's left).
-constexpr uint32_t kXMemCpyStep = 0x82638308;
+// the word at 0x82638308 (CRuntimeGlobals::xmemcpy_step, 1 in the xex,
+// logged by the harness): with another step, the bytes that loop copies
+// before its count reaches 0. False, with nothing copied, where the
+// original must run: ranges that may share memory (c_runtime::Memcpy
+// refuses them), or a step whose count never reaches 0 (0, or one that
+// doesn't divide what's left).
 bool XMemCpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t bytes);
 // The bytes XMemCpy copies: all of them, or under 16 with a step other than
 // 1, those its byte loop copies before its count is 0; nullopt when it never

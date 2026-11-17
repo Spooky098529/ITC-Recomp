@@ -200,6 +200,21 @@ crosses `0x80000000`, so within one view that's the address order.
 `memcpy_s` (`sub_825A7270`) calls `memcpy`'s override rather than copying
 itself, so the renderer's mirrors still see its copies.
 
+The objects' layout (E5's step 2, 2026-11-17):
+`itc_recomp/schema/c-runtime.toml`. A locale's data (+172 the longest
+multibyte character, +200 the character type table; the C locale's at
+`0x8266BB48`, the current one through `[0x8266BC28]`), `__lconv`
+(`[0x8266C024]`, +0 the decimal point's text), the multibyte info
+(`threadmbcinfo`'s layout: +4 the code page, +16 six halfwords, +28 the
+257 types, +285 the case map), the float conversion table (`_cfltcvt_tab`,
+MSVC's ten entries), a stream (`FILE`: +0 the pointer, +4 the room left, +8
+the buffer, +12 the flags), `_fltout2`'s result (`_strflt`), `$I10_OUTPUT`'s
+FOS, the 12-byte long double, a thread's data as `rand` reads it (+20 the
+seed), `atexit`'s table, and the strings and buffers the string functions
+walk (as byte runs). The C runtime's image words are its `[globals]`
+(`schema::CRuntimeGlobals`). Not there: the lock table and the TLS words,
+`c-runtime-core.md`'s.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the

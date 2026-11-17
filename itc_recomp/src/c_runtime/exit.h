@@ -1,6 +1,7 @@
 // The C runtime's exit table, natively: atexit (sub_825A7068) and _onexit
 // (sub_825A6F60) over the game's own table in guest memory (begin at
-// 0x82978334, end at 0x82978330: one word a registered function), grown
+// 0x82978334, end at 0x82978330: one word a registered function; the
+// CRuntimeGlobals exit_table_begin and exit_table_end), grown
 // with the native _msize and realloc (memory/c_runtime_heap.h), and the exit
 // lock (the C runtime's lock 8, _lockexit and _unlockexit) as a host mutex.
 // See docs/functions/c-runtime.md.
@@ -24,10 +25,8 @@
 
 namespace c_runtime {
 
-constexpr uint32_t kExitLock = 8;                 // the lock number
-constexpr uint32_t kLockTable = 0x8266BD40;       // the C runtime's locks
-constexpr uint32_t kExitTableBegin = 0x82978334;  // the table's first word
-constexpr uint32_t kExitTableEnd = 0x82978330;    // one past its last
+constexpr uint32_t kExitLock = 8;            // the lock number
+constexpr uint32_t kLockTable = 0x8266BD40;  // the C runtime's locks (c-runtime-core's)
 
 // The host mutex in place of lock 8's critical section.
 std::recursive_mutex& ExitMutex();

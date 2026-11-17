@@ -4,6 +4,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/c_runtime.h"
 
 namespace c_runtime {
 
@@ -53,8 +54,9 @@ uint64_t Rand(uint8_t* base, uint32_t sp, const ThreadDataCall& call) {
   ITC_NATIVE_RUNNING("sub_825A9BB8 rand");
   const uint32_t frame = Frame(base, sp, 96);
   const uint32_t data = ThreadData(base, frame, 0x825A9BC8, call);
-  const uint32_t seed = guest::LoadU32(base, data + 20) * 214013u + 2531011u;
-  guest::StoreU32(base, data + 20, seed);
+  const schema::ThreadData thread_data(base, data);
+  const uint32_t seed = thread_data.rand_seed() * 214013u + 2531011u;
+  thread_data.set_rand_seed(seed);
   return (seed >> 16) & 0x7FFF;
 }
 

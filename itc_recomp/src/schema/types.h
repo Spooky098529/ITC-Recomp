@@ -7,24 +7,40 @@
 
 namespace schema {
 
+struct ByteBuffer;
 struct ByteCountedList;
 struct ByteCountedListArgs;
+struct CString;
 struct CallocErrorOut;
 struct CommandList;
 struct D3DXBuffer;
 struct D3DXBufferOut;
 struct DebugText;
+struct DoubleValue;
 struct DualVtableObject;
+struct EndPointerOut;
 struct ExceptionMessage;
+struct ExitTable;
+struct ExponentOut;
+struct FloatConversionTable;
+struct FloatOutput;
 struct FloatPair;
 struct FloatPairItem;
+struct FloatStrings;
 struct FloatTriple;
 struct FloatTripleItem;
+struct FpControlWord;
+struct FpIeeeRecord;
+struct FpOperand;
 struct Framework;
 struct FrontEndMenu;
 struct HeapBlock;
 struct HeapListEntry;
 struct Item820025D8;
+struct Lconv;
+struct Ld12;
+struct Locale;
+struct MbcInfo;
 struct Movie;
 struct MovieWrapper;
 struct MovieWrapperVtable;
@@ -35,10 +51,13 @@ struct SaveSlot;
 struct Skeleton;
 struct StateMachine;
 struct StdException;
+struct Stream;
 struct TextureProvider;
+struct ThreadData;
 struct Type2DialogData;
 struct VectorHolder;
 struct VectorHolderOwner;
 struct VtableObject;
+struct WideString;
 
 }  // namespace schema

@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/c_runtime.h"
 #include "schema/heap.h"
 
 #include "base/flags.h"
@@ -9937,7 +9938,7 @@ lifted::Result f825B0068(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r29,r7
   r29 = r7;
   // stw r11,4(r3)
-  guest::StoreU32(base, uint32_t(r3) + 4, uint32_t(r11));
+  guest::StoreU32(base, schema::FpIeeeRecord(base, uint32_t(r3)).cause_address(), uint32_t(r11));
   // mr r26,r8
   r26 = r8;
   // lwz r10,180(r1)
@@ -10045,7 +10046,7 @@ loc_825B014C:
   // lwz r11,180(r1)
   r11 = guest::LoadU32(base, uint32_t(r1) + 180);
   // lwz r10,0(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r10 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // not r10,r10
   r10 = ~r10;
   // lwz r9,8(r11)
@@ -10057,7 +10058,7 @@ loc_825B014C:
   // lwz r11,180(r1)
   r11 = guest::LoadU32(base, uint32_t(r1) + 180);
   // lwz r10,0(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r10 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // not r10,r10
   r10 = ~r10;
   // lwz r9,8(r11)
@@ -10069,7 +10070,7 @@ loc_825B014C:
   // lwz r11,180(r1)
   r11 = guest::LoadU32(base, uint32_t(r1) + 180);
   // lwz r10,0(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r10 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // not r10,r10
   r10 = ~r10;
   // lwz r9,8(r11)
@@ -10081,7 +10082,7 @@ loc_825B014C:
   // lwz r11,180(r1)
   r11 = guest::LoadU32(base, uint32_t(r1) + 180);
   // lwz r10,0(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r10 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // not r10,r10
   r10 = ~r10;
   // lwz r9,8(r11)
@@ -10093,7 +10094,7 @@ loc_825B014C:
   // lwz r11,180(r1)
   r11 = guest::LoadU32(base, uint32_t(r1) + 180);
   // lwz r10,0(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r10 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // not r10,r10
   r10 = ~r10;
   // lwz r9,8(r11)
@@ -10176,7 +10177,7 @@ loc_825B0228:
   guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r10));
 loc_825B0240:
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // li r30,1
   r30 = uint64_t(int64_t(1));
   // clrlwi r11,r11,30
@@ -10268,7 +10269,7 @@ loc_825B02A4:
   guest::StoreU32(base, uint32_t(r11) + 32, uint32_t(r10));
   // lfs f0,0(r29)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r29) + 0);
+  temp.u32 = guest::LoadU32(base, schema::FpOperand(base, uint32_t(r29)).as_float_address());
   f0 = double(temp.f32);
   // lwz r11,180(r1)
   r11 = guest::LoadU32(base, uint32_t(r1) + 180);
@@ -10292,7 +10293,7 @@ loc_825B02A4:
   // stw r10,96(r11)
   guest::StoreU32(base, uint32_t(r11) + 96, uint32_t(r10));
   // lfs f0,0(r26)
-  temp.u32 = guest::LoadU32(base, uint32_t(r26) + 0);
+  temp.u32 = guest::LoadU32(base, schema::FpOperand(base, uint32_t(r26)).as_float_address());
   f0 = double(temp.f32);
   // lwz r11,180(r1)
   r11 = guest::LoadU32(base, uint32_t(r1) + 180);
@@ -10308,7 +10309,7 @@ loc_825B0328:
   guest::StoreU32(base, uint32_t(r11) + 32, uint32_t(r10));
   // lfd f0,0(r29)
   lifted::ScalarFloatMode();
-  f0 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r29) + 0)));
+  f0 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, schema::FpOperand(base, uint32_t(r29)).as_double_address())));
   // lwz r11,180(r1)
   r11 = guest::LoadU32(base, uint32_t(r1) + 180);
   // stfd f0,16(r11)
@@ -10330,7 +10331,7 @@ loc_825B0328:
   // stw r10,96(r11)
   guest::StoreU32(base, uint32_t(r11) + 96, uint32_t(r10));
   // lfd f0,0(r26)
-  f0 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r26) + 0)));
+  f0 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, schema::FpOperand(base, uint32_t(r26)).as_double_address())));
   // lwz r11,180(r1)
   r11 = guest::LoadU32(base, uint32_t(r1) + 180);
   // stfd f0,80(r11)
@@ -10360,11 +10361,11 @@ loc_825B0368:
   // beq 0x825b039c
   if (cr0.eq) goto loc_825B039C;
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // rlwinm r11,r11,0,25,23
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFFFFFFFF7F;
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address(), uint32_t(r11));
 loc_825B039C:
   // lwz r11,8(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 8);
@@ -10374,11 +10375,11 @@ loc_825B039C:
   // beq 0x825b03b4
   if (cr0.eq) goto loc_825B03B4;
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // rlwinm r11,r11,0,28,26
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFFFFFFFFEF;
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address(), uint32_t(r11));
 loc_825B03B4:
   // lwz r11,8(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 8);
@@ -10388,11 +10389,11 @@ loc_825B03B4:
   // beq 0x825b03cc
   if (cr0.eq) goto loc_825B03CC;
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // rlwinm r11,r11,0,26,24
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFFFFFFFFBF;
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address(), uint32_t(r11));
 loc_825B03CC:
   // lwz r11,8(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 8);
@@ -10402,11 +10403,11 @@ loc_825B03CC:
   // beq 0x825b03e4
   if (cr0.eq) goto loc_825B03E4;
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // rlwinm r11,r11,0,27,25
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFFFFFFFFDF;
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address(), uint32_t(r11));
 loc_825B03E4:
   // lwz r11,8(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 8);
@@ -10416,11 +10417,11 @@ loc_825B03E4:
   // beq 0x825b03fc
   if (cr0.eq) goto loc_825B03FC;
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // rlwinm r11,r11,0,29,27
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFFFFFFFFF7;
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address(), uint32_t(r11));
 loc_825B03FC:
   // lwz r11,0(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + 0);
@@ -10439,33 +10440,33 @@ loc_825B03FC:
   // bne cr6,0x825b044c
   if (!cr6.eq) goto loc_825B044C;
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // rlwimi r11,r30,0,30,31
   r11 = (__builtin_rotateleft64(uint32_t(r30) | (r30 << 32), 0) & 0x3) | (r11 & 0xFFFFFFFFFFFFFFFC);
   // b 0x825b0448
   goto loc_825B0448;
 loc_825B0428:
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // rlwimi r11,r30,1,30,31
   r11 = (__builtin_rotateleft64(uint32_t(r30) | (r30 << 32), 1) & 0x3) | (r11 & 0xFFFFFFFFFFFFFFFC);
   // b 0x825b0448
   goto loc_825B0448;
 loc_825B0434:
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // ori r11,r11,3
   r11 = r11 | 3;
   // b 0x825b0448
   goto loc_825B0448;
 loc_825B0440:
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address());
   // rlwinm r11,r11,0,0,29
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFC;
 loc_825B0448:
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::FpControlWord(base, uint32_t(r31)).value_address(), uint32_t(r11));
 loc_825B044C:
   // cmpwi cr6,r25,0
   cr6 = lifted::Compare<int32_t>(int32_t(r25), 0, so);
@@ -10477,7 +10478,7 @@ loc_825B044C:
   f0 = double(temp.f32);
   // stfs f0,0(r26)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r26) + 0, temp.u32);
+  guest::StoreU32(base, schema::FpOperand(base, uint32_t(r26)).as_float_address(), temp.u32);
   // b 0x825b0468
   goto loc_825B0468;
 loc_825B0460:
@@ -10485,7 +10486,7 @@ loc_825B0460:
   lifted::ScalarFloatMode();
   f0 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r10) + 80)));
   // stfd f0,0(r26)
-  guest::StoreU64(base, uint32_t(r26) + 0, std::bit_cast<uint64_t>(f0));
+  guest::StoreU64(base, schema::FpOperand(base, uint32_t(r26)).as_double_address(), std::bit_cast<uint64_t>(f0));
 loc_825B0468:
   // addi r1,r1,160
   r1 = uint64_t(int64_t(int64_t(r1) + 160));
@@ -10595,7 +10596,7 @@ loc_825B04D0:
   r11 = uint64_t(int64_t(-2113929216));
   // lfd f13,0(r30)
   lifted::ScalarFloatMode();
-  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r30) + 0)));
+  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, schema::DoubleValue(base, uint32_t(r30)).value_address())));
   // lfd f0,8792(r11)
   f0 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8792)));
   // fcmpu cr6,f13,f0
@@ -10613,7 +10614,7 @@ loc_825B0524:
   r11 = uint64_t(int64_t(-2113929216));
   // lfd f13,0(r30)
   lifted::ScalarFloatMode();
-  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r30) + 0)));
+  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, schema::DoubleValue(base, uint32_t(r30)).value_address())));
   // lfd f0,8792(r11)
   f0 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8792)));
   // fcmpu cr6,f13,f0
@@ -10631,7 +10632,7 @@ loc_825B0544:
   r11 = uint64_t(int64_t(-2113929216));
   // lfd f13,0(r30)
   lifted::ScalarFloatMode();
-  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r30) + 0)));
+  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, schema::DoubleValue(base, uint32_t(r30)).value_address())));
   // lfd f0,8792(r11)
   f0 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8792)));
   // lis r11,-32153
@@ -10649,7 +10650,7 @@ loc_825B0564:
   r11 = uint64_t(int64_t(-2113929216));
   // lfd f13,0(r30)
   lifted::ScalarFloatMode();
-  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r30) + 0)));
+  f13 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, schema::DoubleValue(base, uint32_t(r30)).value_address())));
   // lfd f0,8792(r11)
   f0 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8792)));
   // fcmpu cr6,f13,f0
@@ -10677,7 +10678,7 @@ loc_825B058C:
 loc_825B0590:
   // stfd f0,0(r30)
   lifted::ScalarFloatMode();
-  guest::StoreU64(base, uint32_t(r30) + 0, std::bit_cast<uint64_t>(f0));
+  guest::StoreU64(base, schema::DoubleValue(base, uint32_t(r30)).value_address(), std::bit_cast<uint64_t>(f0));
 loc_825B0594:
   // rlwinm r28,r28,0,0,30
   r28 = __builtin_rotateleft64(uint32_t(r28) | (r28 << 32), 0) & 0xFFFFFFFE;
@@ -10708,7 +10709,7 @@ loc_825B05BC:
   r11 = uint64_t(int64_t(-2113929216));
   // lfd f1,0(r30)
   lifted::ScalarFloatMode();
-  f1 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r30) + 0)));
+  f1 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, schema::DoubleValue(base, uint32_t(r30)).value_address())));
   // lfd f31,8792(r11)
   f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8792)));
   // fcmpu cr6,f1,f31
@@ -10815,7 +10816,7 @@ loc_825B0664:
 loc_825B0674:
   // stfd f0,0(r30)
   lifted::ScalarFloatMode();
-  guest::StoreU64(base, uint32_t(r30) + 0, std::bit_cast<uint64_t>(f0));
+  guest::StoreU64(base, schema::DoubleValue(base, uint32_t(r30)).value_address(), std::bit_cast<uint64_t>(f0));
   // b 0x825b0680
   goto loc_825B0680;
 loc_825B067C:

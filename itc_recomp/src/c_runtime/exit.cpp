@@ -7,6 +7,7 @@
 #include "memory/c_runtime_heap.h"
 
 #include "guest.h"
+#include "schema/c_runtime.h"
 
 #include <algorithm>
 
@@ -34,8 +35,8 @@ std::optional<uint32_t> OnExit(uint8_t* base, uint32_t function) {
   // _lockexit and _unlockexit (sub_825AA1A8, sub_825A7044 over sub_825AA1B0):
   // lock 8, the host mutex.
   std::lock_guard<std::recursive_mutex> lock(ExitMutex());
-  const uint32_t begin = guest::LoadU32(base, kExitTableBegin);
-  const uint32_t end = guest::LoadU32(base, kExitTableEnd);
+  const uint32_t begin = schema::CRuntimeGlobals::exit_table_begin(base).address;
+  const uint32_t end = schema::CRuntimeGlobals::exit_table_end(base);
   if (end < begin) {
     return 0u;
   }
@@ -73,13 +74,13 @@ std::optional<uint32_t> OnExit(uint8_t* base, uint32_t function) {
         return 0u;
       }
     }
-    guest::StoreU32(base, kExitTableBegin, table);
+    schema::CRuntimeGlobals::set_exit_table_begin(base, table);
     // srawi 2, then the word's offset: the used bytes with their low two
     // bits cleared.
     slot = table + (used & ~3u);
   }
   guest::StoreU32(base, slot, function);
-  guest::StoreU32(base, kExitTableEnd, slot + 4);
+  schema::CRuntimeGlobals::set_exit_table_end(base, slot + 4);
   return function;
 }
 
@@ -89,12 +90,12 @@ std::optional<uint32_t> InitExitTable(uint8_t* base) {
   if (!table) {
     return std::nullopt;
   }
-  guest::StoreU32(base, kExitTableBegin, *table);
-  guest::StoreU32(base, kExitTableEnd, *table);
+  schema::CRuntimeGlobals::set_exit_table_begin(base, *table);
+  schema::CRuntimeGlobals::set_exit_table_end(base, *table);
   if (*table == 0) {
     return 24u;
   }
-  guest::StoreU32(base, *table, 0);
+  schema::ExitTable(base, *table).set_first(0);
   return 0u;
 }
 

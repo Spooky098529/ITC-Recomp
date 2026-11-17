@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/c_runtime.h"
 #include "schema/heap.h"
 
 #include "base/flags.h"
@@ -14019,9 +14020,9 @@ loc_825AE4C8:
   // lwz r11,-16348(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -16348);
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r11 = guest::LoadU32(base, schema::Lconv(base, uint32_t(r11)).decimal_point_address());
   // lbz r11,0(r11)
-  r11 = guest::LoadU8(base, uint32_t(r11) + 0);
+  r11 = guest::LoadU8(base, schema::CString(base, uint32_t(r11)).chars_address());
   // stb r11,0(r4)
   guest::StoreU8(base, uint32_t(r4) + 0, uint8_t(r11));
 loc_825AE4DC:

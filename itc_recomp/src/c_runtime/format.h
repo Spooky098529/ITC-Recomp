@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "schema/c_runtime.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -182,6 +184,6 @@ bool Vsnprintf(uint8_t* base, uint32_t buffer, uint32_t size, uint32_t format, u
 
 // __iob_func (sub_825AD4C0): the C runtime's stream table (_iob: 32 bytes
 // a stream, stdin, stdout and stderr first).
-constexpr uint32_t kStreams = 0x8266B7D0;
+constexpr uint32_t kStreams = schema::CRuntimeGlobals::streams_address();
 
 }  // namespace c_runtime

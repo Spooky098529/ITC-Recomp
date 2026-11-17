@@ -21,6 +21,7 @@
 #include "c_runtime/random.h"
 #include "c_runtime/start_up.h"
 #include "c_runtime/strings.h"
+#include "schema/c_runtime.h"
 
 #include "base/flags.h"
 
@@ -346,7 +347,7 @@ bool StrToXl(uint8_t* base, uint32_t string, uint32_t end_out, int32_t radix, ui
     return false;
   }
   if (end_out != 0) {
-    guest::StoreU32(base, end_out, end);
+    schema::EndPointerOut(base, end_out).set_end(end);
   }
   return true;
 }
@@ -401,7 +402,8 @@ ITC_NATIVE_ENTRY_ALWAYS(825AB1C0) {
 // result and digits, is below the caller's stack pointer: not written.)
 namespace {
 ITC_REGS_STEP(CftofL) {
-  if (!c_runtime::Cftof(base, guest::LoadU64(base, ctx.r3.u32), ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
+  if (!c_runtime::Cftof(base, schema::DoubleValue(base, ctx.r3.u32).bits(), ctx.r4.u32, ctx.r5.u32,
+                        ctx.r6.s32)) {
     lifted::original::c825AE8E0(ctx, base);
     return;
   }

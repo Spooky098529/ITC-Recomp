@@ -5,6 +5,7 @@
 #include "base/log.h"
 
 #include "guest.h"
+#include "schema/c_runtime.h"
 
 #include <cstring>
 #include <iterator>
@@ -206,13 +207,13 @@ int32_t ToLowerStep(int32_t c) {
 }
 
 uint32_t CTypeC(uint8_t* base, uint32_t c, uint32_t mask) {
-  const uint32_t table = guest::LoadU32(base, kCLocale + 200);
+  const uint32_t table =
+      schema::Locale(base, schema::CRuntimeGlobals::c_locale_address()).ctype_table();
   return guest::LoadU16(base, table + 2 * c) & mask;
 }
 
 uint32_t IsLeadByte(uint8_t* base, uint32_t c) {
-  const uint32_t locale = guest::LoadU32(base, kCurrentLocale);
-  const uint32_t table = guest::LoadU32(base, locale + 200);
+  const uint32_t table = schema::CRuntimeGlobals::current_locale(base).ctype_table();
   return guest::LoadU16(base, table + 2 * (c & 0xFF)) & 0x8000;
 }
 
@@ -222,13 +223,13 @@ bool StrToXl(uint8_t* base, uint32_t string, int32_t radix, uint32_t flags, bool
   if (string == 0 || (radix != 0 && (radix < 2 || radix > 36))) {
     return false;
   }
-  const uint32_t locale = guest::LoadU32(base, kCurrentLocale);
-  const uint32_t table = guest::LoadU32(base, locale + 200);
+  const schema::Locale locale = schema::CRuntimeGlobals::current_locale(base);
+  const uint32_t table = locale.ctype_table();
   auto type = [&](uint8_t c) { return guest::LoadU16(base, table + 2 * uint32_t(c)); };
   uint32_t next = string + 1;  // the byte after `c`
   uint8_t c = guest::LoadU8(base, string);
   for (;;) {
-    if (int32_t(guest::LoadU32(base, locale + 172)) > 1) {
+    if (locale.mb_cur_max() > 1) {
       return false;  // multibyte: sub_825AFD98, never seen in play
     }
     if ((type(c) & 8) == 0) {
@@ -390,7 +391,7 @@ void XMemSet(uint8_t* base, uint32_t destination, uint32_t value, uint32_t bytes
     }
     return;
   }
-  const uint32_t stride = guest::LoadU32(base, kXMemSetStride);
+  const uint32_t stride = schema::CRuntimeGlobals::xmemset_stride(base);
   if (stride == 16) {
     guest::ForEachHostPart(base, destination, bytes, [&](uint8_t* host, uint32_t, uint32_t n) {
       std::memset(host, byte, n);
@@ -471,7 +472,7 @@ std::optional<uint32_t> XMemCpyBytes(uint8_t* base, uint32_t source, uint32_t by
     left &= 3;
   }
   if (left != 0) {
-    const uint32_t step = guest::LoadU32(base, kXMemCpyStep);
+    const uint32_t step = schema::CRuntimeGlobals::xmemcpy_step(base);
     if (step == 0 || left % step != 0) {
       return std::nullopt;
     }
