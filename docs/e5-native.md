@@ -186,7 +186,12 @@ as it did when recompiled. Four can't be lifted (two read their caller's
 registers, two the float control register: `sub_825B32F0`, `sub_825B8778`,
 `sub_825B0BB0`, `sub_825B0BE4`) and still stop the program if reached.
 `save_interface.cpp`'s call to `0x822900E0` is covered too (its original
-is a fallback now). Two attract races and the pad replay clean.
+is a fallback now). Two attract races and the pad replay clean. Only
+the first level: the originals' own calls aren't followed, since that
+closure runs through most of the game (tried: 2,369 originals grew past
+4,451 in ten rounds without settling); an original's call to an address
+with no entry still stops the program with its address in the log, to be
+lifted then (`lift_originals.py` with that function).
 
 ### 1. The measure: types, owners, and what crosses
 
@@ -244,7 +249,7 @@ not followed: a simplification). Types come from four sources:
   keeps a type of its own.
 
 The joins are made again each pass from the last pass's votes (four
-passes; the output is the same from run to run), and two classes the rows name differently are never merged (592
+passes; the output is the same from run to run), and two classes the rows name differently are never merged (463
 such joins refused: base and derived classes, generic helpers). The first
 runs without those rules merged half the game into one type (`Mesh` with
 `Car`, `CarScene`, `Skeleton`...); what's left may still hold such merges,
@@ -263,18 +268,18 @@ The figures (2026-11-17):
 | Other constant addresses, the thread block | 732 | 0.4% |
 
 Of the accesses not on the stack, **80.6% are attributed** (to a type or the
-image); the rest are listed per function by the tool. 4,821 types: 4,553
-named (by a class, a path, a parameter or a return), 268 allocations
-without a class; **4,404 private, 417 shared**. 175 constructors' vtables
+image); the rest are listed per function by the tool. 4,884 types: 4,573
+named (by a class, a path, a parameter or a return), 311 allocations
+without a class; **4,464 private, 420 shared**. 180 constructors' vtables
 found.
 
-Typed accesses by their types' kind: **37.9% on types tagged file, GPU or
+Typed accesses by their types' kind: **37.5% on types tagged file, GPU or
 save** (touched by an area that reads `DATA/` in place, feeds the GPU, or
-saves: steps 5 and 7; the tags are by area, not proof), **35.2% private**
-(step 3), **26.9% shared** (step 4).
+saves: steps 5 and 7; the tags are by area, not proof), **36.1% private**
+(step 3), **26.5% shared** (step 4).
 
-What can't move by itself (the tags, by type): 822 touched by a file area,
-249 by a GPU area, 82 by a save area; 86 types are what an image word
+What can't move by itself (the tags, by type): 831 touched by a file area,
+251 by a GPU area, 85 by a save area; 86 types are what an image word
 points to (the game's singletons and globals, `[826C5C80]`, the scene at
 `[826C2E44]`); 4,501 types have no allocation seen (embedded objects, file
 data, globals' contents, or allocations through a path the tool doesn't
@@ -304,8 +309,14 @@ The order it gives (to confirm with the user):
   physics (215), the tuning screen and the UI movies (171), and every
   front-end screen with the UI movies (130 to 135): those pairs move
   together, the UI movies' records last.
-- **Steps 5 and 7** are as big as step 3 by accesses (37.9%): the file
+- **Steps 5 and 7** are as big as step 3 by accesses (37.5%): the file
   loaders and the renderer's inputs aren't a tail.
+
+Two fixes found by step 2's check (2026-11-17; the figures above are
+after them): a function's second allocation of the same size is another
+type (`new<68>@Type2Dialog::OnEnter#2`: the dialog's menu and data were
+one), and a constructor calling its base class's constructor on its own
+`this` (`ScreenMachine`'s `StateMachine`) no longer makes them one type.
 
 The functions still filed in `lifted.md` (the lift sweep's catch-all) were
 given their callers' area; those with no caller in the code (reached by a

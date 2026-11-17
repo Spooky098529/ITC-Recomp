@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: new<68>@Type2Dialog::OnEnter
+// allocated; measure: new<68>@Type2Dialog::OnEnter#2
 struct Type2DialogData : View {
   using View::View;
   static constexpr uint32_t kSize = 68;

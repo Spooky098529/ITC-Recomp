@@ -21515,11 +21515,11 @@ loc_8226D6B8:
   // li r8,7
   r8 = uint64_t(int64_t(7));
   // stw r31,44(r11)
-  guest::StoreU32(base, uint32_t(r11) + 44, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).unknown_44_address(), uint32_t(r31));
   // stw r31,56(r11)
-  guest::StoreU32(base, uint32_t(r11) + 56, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).unknown_56_address(), uint32_t(r31));
   // stw r8,60(r11)
-  guest::StoreU32(base, uint32_t(r11) + 60, uint32_t(r8));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).unknown_60_address(), uint32_t(r8));
   // b 0x8226d720
   goto loc_8226D720;
 loc_8226D710:

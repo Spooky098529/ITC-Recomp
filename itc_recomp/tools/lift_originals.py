@@ -22,9 +22,9 @@ import lift
 
 
 def calls_without_entry():
-    """Addresses lifted code or a hand port calls by constant with no entry
-    of its own (lifted/entries.h, functions.h): their originals are the
-    fallbacks."""
+    """Addresses lifted code (the batches) or a hand port calls by constant
+    with no entry of its own (lifted/entries.h, functions.h): their
+    originals are the fallbacks."""
     import glob
     import re
     src = os.path.join(lift.SRC)
@@ -33,7 +33,11 @@ def calls_without_entry():
     targets = set()
     for path in glob.glob(os.path.join(src, "**", "*.cpp"), recursive=True) + \
             glob.glob(os.path.join(src, "**", "*.h"), recursive=True):
-        if os.sep + "harnesses" + os.sep in path:
+        if os.sep + "harnesses" + os.sep in path or path.endswith("originals.cpp"):
+            # The originals' own calls aren't followed: their closure runs
+            # through most of the game (every function with plain C++ but no
+            # adapter); a fallback's call to an address with no entry is
+            # logged when reached, and lifted then.
             continue
         text = open(path, errors="ignore").read()
         targets |= {a.upper() for a in re.findall(r"lifted::Call\(base, 0x(8[0-9A-Fa-f]{7})", text)}

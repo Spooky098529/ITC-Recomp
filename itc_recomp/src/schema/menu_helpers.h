@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: new<68>@Type12Screen7::Create
+// allocated; measure: new<68>@Type2Dialog::OnEnter, new<68>@Type12Screen7::Create
 struct FrontEndMenu : View {
   using View::View;
   static constexpr uint32_t kSize = 68;
@@ -49,12 +49,21 @@ struct FrontEndMenu : View {
   uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
   void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
   uint32_t unknown_40_address() const { return address + 40; }
+  uint32_t unknown_44() const { return guest::LoadU32(base, address + 44); }
+  void set_unknown_44(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
+  uint32_t unknown_44_address() const { return address + 44; }
   uint32_t unknown_48() const { return guest::LoadU32(base, address + 48); }
   void set_unknown_48(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
   uint32_t unknown_48_address() const { return address + 48; }
   uint32_t unknown_52() const { return guest::LoadU32(base, address + 52); }
   void set_unknown_52(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
   uint32_t unknown_52_address() const { return address + 52; }
+  uint32_t unknown_56() const { return guest::LoadU32(base, address + 56); }
+  void set_unknown_56(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
+  uint32_t unknown_56_address() const { return address + 56; }
+  uint32_t unknown_60() const { return guest::LoadU32(base, address + 60); }
+  void set_unknown_60(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
+  uint32_t unknown_60_address() const { return address + 60; }
   // probably the player: the mapper entry's index
   uint32_t player() const { return guest::LoadU32(base, address + 64); }
   void set_player(uint32_t v) const { guest::StoreU32(base, address + 64, v); }

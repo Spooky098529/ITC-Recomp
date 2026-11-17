@@ -275,6 +275,7 @@ class Map:
         for fn, insns in self.code.items():
             regs = {i: Ptr(f"{fn}.r{i}", 0) for i in range(3, 11)}
             ctor = self.is_ctor(fn)
+            self._alloc_seen = collections.Counter()
             for index, (op, args) in enumerate(insns):
                 self._insn = (fn, index)
                 self.step(fn, op, args, regs, ctor, new_params, new_returns, new_fields)
@@ -416,13 +417,21 @@ class Map:
                     new_params[target][i][self.find(v.type)] += 1
                     if i == 3 and self.is_ctor(target):
                         cls = self.class_of(target)
-                        if cls and v.off == 0:
+                        # A constructor calling its base class's on its own
+                        # `this` (ScreenMachine's StateMachine) makes no join.
+                        base_ctor = self.is_ctor(fn) and v.type == f"{fn}.r3"
+                        if cls and v.off == 0 and not base_ctor:
                             self.ctor_joins.append((cls, v.type))
             result = None
             size_reg = ALLOCATORS.get(target[4:])
             if size_reg is not None:
                 size = regs.get(size_reg)
                 key = "new<%s>@%s" % (size.value if isinstance(size, Const) else "?", fn)
+                # A function's second allocation of the same size is another
+                # object (the type 2 dialog's menu and data, both 68 bytes).
+                self._alloc_seen[key] += 1
+                if self._alloc_seen[key] > 1:
+                    key += "#%d" % self._alloc_seen[key]
                 self.allocs[self.find(key)].append((fn, size.value if isinstance(size, Const) else None))
                 result = Ptr(key, 0)
             elif target in self.code:

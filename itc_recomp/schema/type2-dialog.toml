@@ -13,7 +13,7 @@
 
 # The data block (68 bytes, made by OnEnter).
 [Type2DialogData]
-measure = "new<68>@Type2Dialog::OnEnter"
+measure = "new<68>@Type2Dialog::OnEnter#2"
 size = 68
 origin = "allocated"
 fields = [

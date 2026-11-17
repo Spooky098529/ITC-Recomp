@@ -7,7 +7,7 @@
 # (sub_82186568) and read by Menu::Pressed (sub_821864C8); every front-end
 # screen keeps one or more.
 [FrontEndMenu]
-measures = ["new<68>@Type12Screen7::Create"]
+measures = ["new<68>@Type2Dialog::OnEnter", "new<68>@Type12Screen7::Create"]
 size = 68
 origin = "allocated"
 fields = [
@@ -22,8 +22,11 @@ fields = [
   { name = "shoulders_step", offset = 32, type = "u32" },
   { name = "side", offset = 36, type = "s32", note = "-1 or 1 when left or right was asked" },
   { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
   { name = "unknown_48", offset = 48, type = "u32" },
   { name = "unknown_52", offset = 52, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
   { name = "player", offset = 64, type = "u32", note = "probably the player: the mapper entry's index" },
 ]
 
