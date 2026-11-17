@@ -270,7 +270,7 @@ The figures (2026-11-17):
 Of the accesses not on the stack, **80.6% are attributed** (to a type or the
 image); the rest are listed per function by the tool. 4,884 types: 4,573
 named (by a class, a path, a parameter or a return), 311 allocations
-without a class; **4,464 private, 420 shared**. 180 constructors' vtables
+without a class; **4,468 private, 416 shared**. 180 constructors' vtables
 found.
 
 Typed accesses by their types' kind: **37.5% on types tagged file, GPU or
@@ -312,8 +312,10 @@ The order it gives (to confirm with the user):
 - **Steps 5 and 7** are as big as step 3 by accesses (37.5%): the file
   loaders and the renderer's inputs aren't a tail.
 
-Two fixes found by step 2's check (2026-11-17; the figures above are
-after them): a function's second allocation of the same size is another
+Three fixes found by step 2 (2026-11-17; the figures above are after
+them): a function without an area no longer takes it from a callee called
+from more than 20 places (operator new and delete filed every deleting
+destructor under the heap); a function's second allocation of the same size is another
 type (`new<68>@Type2Dialog::OnEnter#2`: the dialog's menu and data were
 one), and a constructor calling its base class's constructor on its own
 `this` (`ScreenMachine`'s `StateMachine`) no longer makes them one type.

@@ -54,6 +54,11 @@ bytes at the same addresses, read and written in the same order.
    - field types: `u8 u16 u32 u64 s8 s16 s32 f32 f64`, `ptr` with `to`
      (a schema type), `fn`, `bytes` with `count`; `note` for what the
      docs say;
+   - a type of yours already in another area's file (`heap.toml` holds
+     classes whose deleting destructors the measure filed under the heap
+     before 2026-11-17: `VtableObject`'s 22, `Framework`, `Movie`,
+     `CommandList`, `Skeleton`, `SaveSlot` and others) is moved into
+     yours and completed there;
    - the area's image words in `[globals]` (name, address, type);
    - types with a C++ name of their own (`TuningScreen`, not
      `New9700_TuningScreen_Create`), unique across the schema.

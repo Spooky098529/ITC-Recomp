@@ -204,7 +204,11 @@ class Map:
             for f in sorted(self.loose):
                 votes = collections.Counter(self.area[c] for c in callers[f] if self.area[c] not in loose)
                 if not votes:
-                    votes = collections.Counter(self.area[c] for c in callees[f] if self.area[c] not in loose)
+                    # Callees vote only when they aren't general utilities
+                    # (called from more than 20 places: operator new and
+                    # delete would claim every deleting destructor).
+                    votes = collections.Counter(self.area[c] for c in callees[f]
+                                                if self.area[c] not in loose and len(callers[c]) <= 20)
                 if votes:
                     a = votes.most_common(1)[0][0]
                     if self.area[f] != a:
