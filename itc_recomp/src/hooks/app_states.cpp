@@ -89,9 +89,9 @@ ITC_REGS_STEP(AppMessagesErase) {
     lifted::original::c82092E70(ctx, base);
     return;
   }
-  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r5.u64);
-  REX_STORE_U64(ctx.r1.u32 + 40, ctx.r6.u64);
-  REX_STORE_U64(ctx.r3.u32, ctx.r5.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 32, ctx.r5.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 40, ctx.r6.u64);
+  guest::StoreU64(base, ctx.r3.u32, ctx.r5.u64);
 }
 
 ITC_REGS_STEP(AppMessagesClear) {
@@ -146,8 +146,8 @@ ITC_REGS_STEP(AppPtrListErase) {
     return;
   }
   const uint64_t result = (ctx.r5.u64 & 0xFFFFFFFF00000000ull) | *next;
-  REX_STORE_U64(ctx.r1.u32 + 32, result);
-  REX_STORE_U64(ctx.r3.u32, result);
+  guest::StoreU64(base, ctx.r1.u32 + 32, result);
+  guest::StoreU64(base, ctx.r3.u32, result);
 }
 
 ITC_REGS_STEP(AppDelegateClone) {
@@ -286,8 +286,8 @@ ITC_REGS_STEP(AppApplyRequest) {
     lifted::original::c82093BE0(ctx, base);
     return;
   }
-  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
-  REX_STORE_U64(ctx.r1.u32 + 40, ctx.r5.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 32, ctx.r4.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 40, ctx.r5.u64);
   if (*inserted) {
     ctx.r3.u64 = ctx.r1.u32 - 32;
   }
@@ -379,7 +379,7 @@ ITC_REGS_STEP(AppMessagesInsertN) {
     lifted::original::c820938C0(ctx, base);
     return;
   }
-  REX_STORE_U64(ctx.r1.u32 + 24, ctx.r4.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 24, ctx.r4.u64);
 }
 
 ITC_REGS_STEP(AppMessagesInsert) {
@@ -391,7 +391,7 @@ ITC_REGS_STEP(AppMessagesInsert) {
     lifted::original::c82094110(ctx, base);
     return;
   }
-  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r5.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 32, ctx.r5.u64);
   guest::StoreU32(base, ctx.r3.u32 + 0, ctx.r4.u32);
   guest::StoreU32(base, ctx.r3.u32 + 4, *where);
 }

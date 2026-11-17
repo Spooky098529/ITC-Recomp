@@ -83,7 +83,7 @@ def main(argv):
         h.append(f"inline void c{n[4:]}(Regs& regs, uint8_t* base) {{ regs.Apply({lift.ename(n)}(base, regs.ToArgs())); }}")
     h += ["", "}  // namespace lifted::original", ""]
     with open(os.path.join(lift.OUT, "originals.cpp"), "w") as f:
-        f.write("\n".join(cpp))
+        f.write(lift.own_spelling("\n".join(cpp)))
     with open(os.path.join(lift.OUT, "originals.h"), "w") as f:
         f.write("\n".join(h))
     print(f"originals: {len(names)} lifted, {len(refused)} refused")

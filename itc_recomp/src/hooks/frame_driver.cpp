@@ -97,8 +97,8 @@ ITC_REGS_STEP(FrameDriverApplyRequest) {
     lifted::original::c82091FF0(ctx, base);
     return;
   }
-  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
-  REX_STORE_U64(ctx.r1.u32 + 40, ctx.r5.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 32, ctx.r4.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 40, ctx.r5.u64);
   if (*inserted) {
     ctx.r3.u64 = ctx.r1.u32 - 32;
   }

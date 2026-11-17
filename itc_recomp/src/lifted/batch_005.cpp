@@ -39,14 +39,14 @@ lifted::Result f820F0E00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -71,13 +71,13 @@ loc_820F0E30:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -91,30 +91,30 @@ lifted::Result f820F1098(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // mr r31,r3
   r31 = r3;
   // lwz r30,21780(r11)
-  r30 = REX_LOAD_U32(uint32_t(r11) + 21780);
+  r30 = guest::LoadU32(base, uint32_t(r11) + 21780);
   // bl 0x820fb998
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820FB998, LIFTED_ARGS(0x820F10BC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,32(r30)
-  r10 = REX_LOAD_U32(uint32_t(r30) + 32);
+  r10 = guest::LoadU32(base, uint32_t(r30) + 32);
   // lis r11,-32240
   r11 = uint64_t(int64_t(-2112880640));
   // lwz r4,184(r30)
-  r4 = REX_LOAD_U32(uint32_t(r30) + 184);
+  r4 = guest::LoadU32(base, uint32_t(r30) + 184);
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -124,22 +124,22 @@ lifted::Result f820F1098(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r5,r11,-17984
   r5 = uint64_t(int64_t(int64_t(r11) + -17984));
   // lwz r3,0(r10)
-  r3 = REX_LOAD_U32(uint32_t(r10) + 0);
+  r3 = guest::LoadU32(base, uint32_t(r10) + 0);
   // stw r4,56(r31)
-  REX_STORE_U32(uint32_t(r31) + 56, uint32_t(r4));
+  guest::StoreU32(base, uint32_t(r31) + 56, uint32_t(r4));
   // bl 0x8209de48
   // (left out: dead in C++)
   { const lifted::Result o = game::Archive::Load(base, LIFTED_ARGS(0x820F10E4, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -153,12 +153,12 @@ uint64_t f820F1100(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -173,11 +173,11 @@ uint64_t f820F1100(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return r3;
 }
@@ -191,14 +191,14 @@ lifted::Result f820F77A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r30,r4
   r30 = r4;
@@ -235,7 +235,7 @@ lifted::Result f820F77A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r5,r11,27056
   r5 = uint64_t(int64_t(int64_t(r11) + 27056));
   // stw r4,4(r31)
-  REX_STORE_U32(uint32_t(r31) + 4, uint32_t(r4));
+  guest::StoreU32(base, uint32_t(r31) + 4, uint32_t(r4));
   // mr r3,r30
   r3 = r30;
   // bl 0x8209de48
@@ -244,13 +244,13 @@ lifted::Result f820F77A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -263,28 +263,28 @@ uint64_t f820F7D70(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5) {
   lifted::Cr cr6;
   lifted::Temp temp{};
   // lwz r11,4(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 4);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 4);
   // extsh r10,r5
   r10 = uint64_t(int64_t(int16_t(r5)));
   // lfs f13,0(r4)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r4) + 0);
+  temp.u32 = guest::LoadU32(base, uint32_t(r4) + 0);
   f13 = double(temp.f32);
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // lwz r11,4(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 4);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 4);
   // lwzx r11,r10,r11
-  r11 = REX_LOAD_U32(uint32_t(r10) + uint32_t(r11));
+  r11 = guest::LoadU32(base, uint32_t(r10) + uint32_t(r11));
   // lis r10,-32256
   r10 = uint64_t(int64_t(-2113929216));
   // lfs f12,48(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 48);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 48);
   f12 = double(temp.f32);
   // lfs f0,8152(r10)
-  temp.u32 = REX_LOAD_U32(uint32_t(r10) + 8152);
+  temp.u32 = guest::LoadU32(base, uint32_t(r10) + 8152);
   f0 = double(temp.f32);
   // fsubs f12,f12,f0
   f12 = double(float(f12 - f0));
@@ -299,7 +299,7 @@ uint64_t f820F7D70(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5) {
 loc_820F7DAC:
   // lfs f12,56(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 56);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 56);
   f12 = double(temp.f32);
   // fadds f12,f12,f0
   f12 = double(float(f12 + f0));
@@ -312,15 +312,15 @@ loc_820F7DAC:
 loc_820F7DC0:
   // lfs f13,44(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 44);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 44);
   f13 = double(temp.f32);
   // lfs f12,40(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 40);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 40);
   f12 = double(temp.f32);
   // fsubs f10,f13,f12
   f10 = double(float(f13 - f12));
   // lfs f11,4(r4)
-  temp.u32 = REX_LOAD_U32(uint32_t(r4) + 4);
+  temp.u32 = guest::LoadU32(base, uint32_t(r4) + 4);
   f11 = double(temp.f32);
   // fsubs f10,f10,f0
   f10 = double(float(f10 - f0));
@@ -347,12 +347,12 @@ loc_820F7DE4:
 loc_820F7DF8:
   // lfs f12,52(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 52);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 52);
   f12 = double(temp.f32);
   // fsubs f12,f12,f0
   f12 = double(float(f12 - f0));
   // lfs f13,8(r4)
-  temp.u32 = REX_LOAD_U32(uint32_t(r4) + 8);
+  temp.u32 = guest::LoadU32(base, uint32_t(r4) + 8);
   f13 = double(temp.f32);
   // fcmpu cr6,f13,f12
   cr6 = lifted::CompareFloat(f13, f12);
@@ -365,7 +365,7 @@ loc_820F7DF8:
 loc_820F7E14:
   // lfs f12,60(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 60);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 60);
   f12 = double(temp.f32);
   // fadds f0,f12,f0
   f0 = double(float(f12 + f0));
@@ -394,7 +394,7 @@ uint64_t f820F7EE8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // (left out: dead in C++)
   // stwu r1,-192(r1)
   ea = -192 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -422,20 +422,20 @@ uint64_t f820F7EE8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   ctr = r11;
 loc_820F7F24:
   // sth r9,0(r10)
-  REX_STORE_U16(uint32_t(r10) + 0, uint16_t(r9));
+  guest::StoreU16(base, uint32_t(r10) + 0, uint16_t(r9));
   // addi r10,r10,2
   r10 = uint64_t(int64_t(int64_t(r10) + 2));
   // bdnz 0x820f7f24
   --ctr;
   if (uint32_t(ctr) != 0) goto loc_820F7F24;
   // lha r11,0(r22)
-  r11 = uint64_t(int64_t(int16_t(REX_LOAD_U16(uint32_t(r22) + 0))));
+  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r22) + 0))));
   // cmpwi cr6,r11,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), -1, so);
   // beq cr6,0x820f7fe4
   if (cr6.eq) goto loc_820F7FE4;
   // lwz r10,4(r26)
-  r10 = REX_LOAD_U32(uint32_t(r26) + 4);
+  r10 = guest::LoadU32(base, uint32_t(r26) + 4);
   // rlwinm r11,r11,2,0,29
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 2) & 0xFFFFFFFC;
   // li r27,0
@@ -443,20 +443,20 @@ loc_820F7F24:
   // mr r28,r25
   r28 = r25;
   // lwz r10,4(r10)
-  r10 = REX_LOAD_U32(uint32_t(r10) + 4);
+  r10 = guest::LoadU32(base, uint32_t(r10) + 4);
   // lwzx r11,r10,r11
-  r11 = REX_LOAD_U32(uint32_t(r10) + uint32_t(r11));
+  r11 = guest::LoadU32(base, uint32_t(r10) + uint32_t(r11));
   // addi r30,r11,6
   r30 = uint64_t(int64_t(int64_t(r11) + 6));
 loc_820F7F58:
   // lhz r11,-2(r30)
-  r11 = REX_LOAD_U16(uint32_t(r30) + -2);
+  r11 = guest::LoadU16(base, uint32_t(r30) + -2);
   // cmplwi cr6,r11,65535
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 65535, so);
   // beq cr6,0x820f7fb4
   if (cr6.eq) goto loc_820F7FB4;
   // lha r31,0(r30)
-  r31 = uint64_t(int64_t(int16_t(REX_LOAD_U16(uint32_t(r30) + 0))));
+  r31 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r30) + 0))));
   // mr r4,r24
   r4 = r24;
   // mr r3,r26
@@ -473,7 +473,7 @@ loc_820F7F58:
   // bne 0x820f7fb4
   if (!cr0.eq) goto loc_820F7FB4;
   // lwz r11,4(r26)
-  r11 = REX_LOAD_U32(uint32_t(r26) + 4);
+  r11 = guest::LoadU32(base, uint32_t(r26) + 4);
   // rlwinm r10,r31,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r31) | (r31 << 32), 2) & 0xFFFFFFFC;
   // mr r5,r24
@@ -481,9 +481,9 @@ loc_820F7F58:
   // li r4,-1
   r4 = uint64_t(int64_t(-1));
   // lwz r11,4(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 4);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 4);
   // lwzx r3,r11,r10
-  r3 = REX_LOAD_U32(uint32_t(r11) + uint32_t(r10));
+  r3 = guest::LoadU32(base, uint32_t(r11) + uint32_t(r10));
   // bl 0x820f6be8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820F6BE8, LIFTED_ARGS(0x820F7FA0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -492,7 +492,7 @@ loc_820F7F58:
   // bne cr6,0x820f7fc8
   if (!cr6.eq) goto loc_820F7FC8;
   // sth r29,0(r28)
-  REX_STORE_U16(uint32_t(r28) + 0, uint16_t(r29));
+  guest::StoreU16(base, uint32_t(r28) + 0, uint16_t(r29));
   // addi r21,r21,1
   r21 = uint64_t(int64_t(int64_t(r21) + 1));
   // addi r28,r28,2
@@ -512,25 +512,25 @@ loc_820F7FC8:
   // li r20,1
   r20 = uint64_t(int64_t(1));
   // sth r3,2(r22)
-  REX_STORE_U16(uint32_t(r22) + 2, uint16_t(r3));
+  guest::StoreU16(base, uint32_t(r22) + 2, uint16_t(r3));
   // sth r31,0(r22)
-  REX_STORE_U16(uint32_t(r22) + 0, uint16_t(r31));
+  guest::StoreU16(base, uint32_t(r22) + 0, uint16_t(r31));
 loc_820F7FD4:
   // rlwinm r11,r21,1,0,30
   r11 = __builtin_rotateleft64(uint32_t(r21) | (r21 << 32), 1) & 0xFFFFFFFE;
   // cmpwi cr6,r20,0
   cr6 = lifted::Compare<int32_t>(int32_t(r20), 0, so);
   // sthx r23,r11,r25
-  REX_STORE_U16(uint32_t(r11) + uint32_t(r25), uint16_t(r23));
+  guest::StoreU16(base, uint32_t(r11) + uint32_t(r25), uint16_t(r23));
   // bne cr6,0x820f8080
   if (!cr6.eq) goto loc_820F8080;
 loc_820F7FE4:
   // lwz r30,4(r26)
-  r30 = REX_LOAD_U32(uint32_t(r26) + 4);
+  r30 = guest::LoadU32(base, uint32_t(r26) + 4);
   // li r31,0
   r31 = uint64_t(int64_t(0));
   // lwz r11,0(r30)
-  r11 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // ble cr6,0x820f8080
@@ -548,7 +548,7 @@ loc_820F7FFC:
   r11 = r25;
 loc_820F800C:
   // lha r9,0(r11)
-  r9 = uint64_t(int64_t(int16_t(REX_LOAD_U16(uint32_t(r11) + 0))));
+  r9 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r11) + 0))));
   // cmpw cr6,r9,r31
   cr6 = lifted::Compare<int32_t>(int32_t(r9), int32_t(r31), so);
   // beq cr6,0x820f805c
@@ -576,13 +576,13 @@ loc_820F8028:
   // bne 0x820f805c
   if (!cr0.eq) goto loc_820F805C;
   // lwz r11,4(r30)
-  r11 = REX_LOAD_U32(uint32_t(r30) + 4);
+  r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // mr r5,r24
   r5 = r24;
   // li r4,-1
   r4 = uint64_t(int64_t(-1));
   // lwzx r3,r11,r29
-  r3 = REX_LOAD_U32(uint32_t(r11) + uint32_t(r29));
+  r3 = guest::LoadU32(base, uint32_t(r11) + uint32_t(r29));
   // bl 0x820f6be8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820F6BE8, LIFTED_ARGS(0x820F8054, r31)); r3 = o.r3; f1 = o.f1; }
@@ -592,7 +592,7 @@ loc_820F8028:
   if (!cr6.eq) goto loc_820F8074;
 loc_820F805C:
   // lwz r11,0(r30)
-  r11 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // addi r29,r29,4
@@ -607,9 +607,9 @@ loc_820F8074:
   // li r20,1
   r20 = uint64_t(int64_t(1));
   // sth r3,2(r22)
-  REX_STORE_U16(uint32_t(r22) + 2, uint16_t(r3));
+  guest::StoreU16(base, uint32_t(r22) + 2, uint16_t(r3));
   // sth r31,0(r22)
-  REX_STORE_U16(uint32_t(r22) + 0, uint16_t(r31));
+  guest::StoreU16(base, uint32_t(r22) + 0, uint16_t(r31));
 loc_820F8080:
   // mr r3,r20
   r3 = r20;
@@ -629,14 +629,14 @@ lifted::Result f820F9DD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -648,28 +648,28 @@ lifted::Result f820F9DD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820AB498, LIFTED_ARGS(0x820F9DF4, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r3,80(r1)
-  REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r3));
+  guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r3));
   // mr r4,r30
   r4 = r30;
   // mr r3,r31
   r3 = r31;
   // lha r6,82(r1)
-  r6 = uint64_t(int64_t(int16_t(REX_LOAD_U16(uint32_t(r1) + 82))));
+  r6 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r1) + 82))));
   // lha r5,80(r1)
-  r5 = uint64_t(int64_t(int16_t(REX_LOAD_U16(uint32_t(r1) + 80))));
+  r5 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r1) + 80))));
   // bl 0x820f9768
   // (left out: dead in C++)
   { const lifted::Result o = game::TrackRoute::SlicePoint(base, LIFTED_ARGS(0x820F9E0C, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -683,14 +683,14 @@ lifted::Result f820F9E28(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r30,r4
   r30 = r4;
@@ -727,7 +727,7 @@ lifted::Result f820F9E28(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r5,r11,-28592
   r5 = uint64_t(int64_t(int64_t(r11) + -28592));
   // stw r4,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r4));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r4));
   // mr r3,r30
   r3 = r30;
   // bl 0x8209de48
@@ -738,13 +738,13 @@ lifted::Result f820F9E28(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -764,10 +764,10 @@ lifted::Result f820FA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   // stfd f31,-40(r1)
   lifted::ScalarFloatMode();
-  REX_STORE_U64(uint32_t(r1) + -40, std::bit_cast<uint64_t>(f31));
+  guest::StoreU64(base, uint32_t(r1) + -40, std::bit_cast<uint64_t>(f31));
   // stwu r1,-176(r1)
   ea = -176 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
@@ -778,29 +778,29 @@ lifted::Result f820FA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r29,r4
   r29 = r4;
   // lfs f0,2608(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // stfs f0,92(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 92, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 92, temp.u32);
   // addi r11,r11,23312
   r11 = uint64_t(int64_t(int64_t(r11) + 23312));
   // stfs f0,124(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 124, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 124, temp.u32);
   // stfs f0,108(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 108, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 108, temp.u32);
   // lwz r11,4(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 4);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 4);
   // addi r31,r11,-1
   r31 = uint64_t(int64_t(int64_t(r11) + -1));
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,8128(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 8128);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 8128);
   f0 = double(temp.f32);
   // b 0x820fa94c
   goto loc_820FA94C;
@@ -845,48 +845,48 @@ loc_820FA94C:
   f1 = f820F8FA0(base, r1, r3, r4, r5);
   // lfs f0,96(r1)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r1) + 96);
+  temp.u32 = guest::LoadU32(base, uint32_t(r1) + 96);
   f0 = double(temp.f32);
   // fmuls f0,f0,f31
   f0 = double(float(f0 * f31));
   // lfs f13,100(r1)
-  temp.u32 = REX_LOAD_U32(uint32_t(r1) + 100);
+  temp.u32 = guest::LoadU32(base, uint32_t(r1) + 100);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
   // lfs f12,104(r1)
-  temp.u32 = REX_LOAD_U32(uint32_t(r1) + 104);
+  temp.u32 = guest::LoadU32(base, uint32_t(r1) + 104);
   f12 = double(temp.f32);
   // fmuls f12,f12,f31
   f12 = double(float(f12 * f31));
   // lfs f11,80(r1)
-  temp.u32 = REX_LOAD_U32(uint32_t(r1) + 80);
+  temp.u32 = guest::LoadU32(base, uint32_t(r1) + 80);
   f11 = double(temp.f32);
   // fadds f0,f11,f0
   f0 = double(float(f11 + f0));
   // stfs f0,0(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 0, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 0, temp.u32);
   // lfs f0,84(r1)
-  temp.u32 = REX_LOAD_U32(uint32_t(r1) + 84);
+  temp.u32 = guest::LoadU32(base, uint32_t(r1) + 84);
   f0 = double(temp.f32);
   // fadds f0,f0,f13
   f0 = double(float(f0 + f13));
   // stfs f0,4(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 4, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 4, temp.u32);
   // lfs f0,88(r1)
-  temp.u32 = REX_LOAD_U32(uint32_t(r1) + 88);
+  temp.u32 = guest::LoadU32(base, uint32_t(r1) + 88);
   f0 = double(temp.f32);
   // fadds f0,f0,f12
   f0 = double(float(f0 + f12));
   // stfs f0,8(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 8, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 8, temp.u32);
   // addi r1,r1,176
   r1 = uint64_t(int64_t(int64_t(r1) + 176));
   // lfd f31,-40(r1)
-  f31 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r1) + -40)));
+  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r1) + -40)));
   // b 0x825a6edc
   // (left out: dead in C++)
   return {r3, f1};
@@ -897,7 +897,7 @@ void f820FB9C0(uint8_t* base, uint64_t r6) {
   ITC_NATIVE_RUNNING("sub_820FB9C0 (lifted)");
   uint64_t r10 = 0, r11 = 0;
   // lwz r10,32(r6)
-  r10 = REX_LOAD_U32(uint32_t(r6) + 32);
+  r10 = guest::LoadU32(base, uint32_t(r6) + 32);
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // rlwimi r10,r11,3,30,30
@@ -905,7 +905,7 @@ void f820FB9C0(uint8_t* base, uint64_t r6) {
   // rlwimi r10,r11,3,28,28
   r10 = (__builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 3) & 0x8) | (r10 & 0xFFFFFFFFFFFFFFF7);
   // stw r10,32(r6)
-  REX_STORE_U32(uint32_t(r6) + 32, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r6) + 32, uint32_t(r10));
   // blr
   return;
 }
@@ -919,14 +919,14 @@ lifted::Result f820FBB68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -942,11 +942,11 @@ lifted::Result f820FBB68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // addi r10,r3,63
   r10 = uint64_t(int64_t(int64_t(r3) + 63));
   // lwz r9,0(r30)
-  r9 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r9 = guest::LoadU32(base, uint32_t(r30) + 0);
   // addi r5,r11,-17984
   r5 = uint64_t(int64_t(int64_t(r11) + -17984));
   // lwz r11,8(r30)
-  r11 = REX_LOAD_U32(uint32_t(r30) + 8);
+  r11 = guest::LoadU32(base, uint32_t(r30) + 8);
   // rlwinm r10,r10,0,0,25
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 0) & 0xFFFFFFC0;
   // add r4,r9,r11
@@ -962,26 +962,26 @@ lifted::Result f820FBB68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // stw r11,8(r30)
-  REX_STORE_U32(uint32_t(r30) + 8, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r30) + 8, uint32_t(r11));
   // lwz r11,32(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 32);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 32);
   // rlwinm r11,r11,0,30,25
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFFFFFFFFC3;
   // stw r11,32(r31)
-  REX_STORE_U32(uint32_t(r31) + 32, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 32, uint32_t(r11));
   // bl 0x8209de48
   // (left out: dead in C++)
   { const lifted::Result o = game::Archive::Load(base, LIFTED_ARGS(0x820FBBD0, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -1001,7 +1001,7 @@ lifted::Result f820FF368(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // (left out: dead in C++)
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // li r3,4
   r3 = uint64_t(int64_t(4));
@@ -1015,7 +1015,7 @@ lifted::Result f820FF368(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,0(r3)
-  REX_STORE_U32(uint32_t(r3) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r3) + 0, uint32_t(r11));
   // b 0x820ff394
   goto loc_820FF394;
 loc_820FF390:
@@ -1027,22 +1027,22 @@ loc_820FF394:
   // addi r31,r11,23336
   r31 = uint64_t(int64_t(int64_t(r11) + 23336));
   // stw r3,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r3));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r3));
   // bl 0x820ff250
   // (left out: dead in C++)
   { const lifted::Result o = game::CollisionWorld::Setup(base, LIFTED_ARGS(0x820FF3A4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
   // li r10,4
   r10 = uint64_t(int64_t(4));
   // stw r10,0(r11)
-  REX_STORE_U32(uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // lwz r11,23340(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 23340);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 23340);
   // lwz r10,4(r11)
-  r10 = REX_LOAD_U32(uint32_t(r11) + 4);
+  r10 = guest::LoadU32(base, uint32_t(r11) + 4);
   // cmpwi cr6,r10,8
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 8, so);
   // beq cr6,0x820ff3e0
@@ -1056,7 +1056,7 @@ loc_820FF394:
   // beq cr6,0x820ff3e0
   if (cr6.eq) goto loc_820FF3E0;
   // lwz r4,32(r11)
-  r4 = REX_LOAD_U32(uint32_t(r11) + 32);
+  r4 = guest::LoadU32(base, uint32_t(r11) + 32);
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // b 0x820ff3e8
@@ -1111,16 +1111,16 @@ loc_820FF3E8:
   // addi r11,r11,4
   r11 = uint64_t(int64_t(int64_t(r11) + 4));
   // lwzx r31,r10,r11
-  r31 = REX_LOAD_U32(uint32_t(r10) + uint32_t(r11));
+  r31 = guest::LoadU32(base, uint32_t(r10) + uint32_t(r11));
   // lwz r4,0(r31)
-  r4 = REX_LOAD_U32(uint32_t(r31) + 0);
+  r4 = guest::LoadU32(base, uint32_t(r31) + 0);
   // bl 0x820f77a0
   // (left out: dead in C++)
   { const lifted::Result o = game::TrackMesh::Load(base, r1, r13, r3, r4, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
   // mr r3,r30
   r3 = r30;
   // lwz r4,4(r31)
-  r4 = REX_LOAD_U32(uint32_t(r31) + 4);
+  r4 = guest::LoadU32(base, uint32_t(r31) + 4);
   // bl 0x820f9e28
   // (left out: dead in C++)
   { const lifted::Result o = game::TrackRoute::Load(base, r1, r13, r3, r4, r8, r9, r10); r3 = o.r3; f1 = o.f1; }
@@ -1146,7 +1146,7 @@ uint64_t f820FF4D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // (left out: dead in C++)
   // stwu r1,-128(r1)
   ea = -128 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r29,r4
   r29 = r4;
@@ -1157,9 +1157,9 @@ uint64_t f820FF4D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // li r31,0
   r31 = uint64_t(int64_t(0));
   // lwz r11,60(r29)
-  r11 = REX_LOAD_U32(uint32_t(r29) + 60);
+  r11 = guest::LoadU32(base, uint32_t(r29) + 60);
   // stw r3,80(r1)
-  REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r3));
+  guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r3));
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x820ff540
@@ -1168,13 +1168,13 @@ uint64_t f820FF4D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   r30 = r29;
 loc_820FF500:
   // lwz r10,0(r30)
-  r10 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r30) + 0);
   // addi r11,r1,84
   r11 = uint64_t(int64_t(int64_t(r1) + 84));
   // stw r10,84(r1)
-  REX_STORE_U32(uint32_t(r1) + 84, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r1) + 84, uint32_t(r10));
   // lwz r3,0(r11)
-  r3 = REX_LOAD_U32(uint32_t(r11) + 0);
+  r3 = guest::LoadU32(base, uint32_t(r11) + 0);
   // bl 0x820ff790
   // (left out: dead in C++)
   r3 = game::Time::Clamp(base, r1, r13, r3);
@@ -1185,18 +1185,18 @@ loc_820FF500:
   // addi r3,r1,80
   r3 = uint64_t(int64_t(int64_t(r1) + 80));
   // stw r11,84(r1)
-  REX_STORE_U32(uint32_t(r1) + 84, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r1) + 84, uint32_t(r11));
   // bl 0x820ff458
   // (left out: dead in C++)
   { const lifted::Result o = game::Time::Add(base, LIFTED_ARGS(0x820FF528, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,60(r29)
-  r11 = REX_LOAD_U32(uint32_t(r29) + 60);
+  r11 = guest::LoadU32(base, uint32_t(r29) + 60);
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // addi r30,r30,4
   r30 = uint64_t(int64_t(int64_t(r30) + 4));
   // stw r3,80(r1)
-  REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r3));
+  guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r3));
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // blt cr6,0x820ff500
@@ -1210,7 +1210,7 @@ loc_820FF540:
   // mr r3,r28
   r3 = r28;
   // stw r11,0(r28)
-  REX_STORE_U32(uint32_t(r28) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r28) + 0, uint32_t(r11));
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6ed8
@@ -1229,12 +1229,12 @@ void f820FF5A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // li r5,64
   r5 = uint64_t(int64_t(64));
@@ -1250,16 +1250,16 @@ void f820FF5A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // li r11,15
   r11 = uint64_t(int64_t(15));
   // stw r10,60(r31)
-  REX_STORE_U32(uint32_t(r31) + 60, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 60, uint32_t(r10));
   // stw r10,64(r31)
-  REX_STORE_U32(uint32_t(r31) + 64, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 64, uint32_t(r10));
   // stw r10,72(r31)
-  REX_STORE_U32(uint32_t(r31) + 72, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 72, uint32_t(r10));
   // stw r10,68(r31)
-  REX_STORE_U32(uint32_t(r31) + 68, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 68, uint32_t(r10));
 loc_820FF5D8:
   // lwz r10,60(r31)
-  r10 = REX_LOAD_U32(uint32_t(r31) + 60);
+  r10 = guest::LoadU32(base, uint32_t(r31) + 60);
   // lis r9,10
   r9 = uint64_t(int64_t(655360));
   // addic. r11,r11,-1
@@ -1269,13 +1269,13 @@ loc_820FF5D8:
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // stwx r9,r10,r31
-  REX_STORE_U32(uint32_t(r10) + uint32_t(r31), uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r10) + uint32_t(r31), uint32_t(r9));
   // lwz r10,60(r31)
-  r10 = REX_LOAD_U32(uint32_t(r31) + 60);
+  r10 = guest::LoadU32(base, uint32_t(r31) + 60);
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // stw r10,60(r31)
-  REX_STORE_U32(uint32_t(r31) + 60, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 60, uint32_t(r10));
   // bne 0x820ff5d8
   if (!cr0.eq) goto loc_820FF5D8;
   // lis r11,-32759
@@ -1285,19 +1285,19 @@ loc_820FF5D8:
   // li r11,99
   r11 = uint64_t(int64_t(99));
   // stw r10,64(r31)
-  REX_STORE_U32(uint32_t(r31) + 64, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 64, uint32_t(r10));
   // stw r11,68(r31)
-  REX_STORE_U32(uint32_t(r31) + 68, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 68, uint32_t(r11));
   // stw r11,72(r31)
-  REX_STORE_U32(uint32_t(r31) + 72, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 72, uint32_t(r11));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return;
 }
@@ -1311,14 +1311,14 @@ uint64_t f820FF628(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -1342,17 +1342,17 @@ uint64_t f820FF628(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // mr r3,r31
   r3 = r31;
   // stw r11,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return r3;
 }
@@ -1365,9 +1365,9 @@ uint64_t f820FF680(uint8_t* base, uint64_t r3, uint64_t r4) {
   uint8_t ca = 0, so = 0;
   lifted::Temp temp{};
   // lwz r11,0(r4)
-  r11 = REX_LOAD_U32(uint32_t(r4) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r4) + 0);
   // lwz r10,0(r3)
-  r10 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r3) + 0);
   // rlwinm r9,r11,0,0,0
   r9 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0x80000000;
   // rlwinm r8,r11,16,17,31
@@ -1452,14 +1452,14 @@ uint64_t f820FF790(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
@@ -1472,7 +1472,7 @@ uint64_t f820FF790(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // mr r4,r31
   r4 = r31;
   // stw r30,132(r1)
-  REX_STORE_U32(uint32_t(r1) + 132, uint32_t(r30));
+  guest::StoreU32(base, uint32_t(r1) + 132, uint32_t(r30));
   // bl 0x820ff708
   // (left out: dead in C++)
   { const lifted::Result o = game::Time::Less(base, LIFTED_ARGS(0x820FF7C0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -1482,7 +1482,7 @@ uint64_t f820FF790(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   if (cr0.eq) goto loc_820FF7D0;
 loc_820FF7C8:
   // lwz r3,0(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 0);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 0);
   // b 0x820ff7f0
   goto loc_820FF7F0;
 loc_820FF7D0:
@@ -1507,13 +1507,13 @@ loc_820FF7F0:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return r3;
 }
@@ -1526,7 +1526,7 @@ lifted::Result f820FF908(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // lwz r3,23340(r11)
-  r3 = REX_LOAD_U32(uint32_t(r11) + 23340);
+  r3 = guest::LoadU32(base, uint32_t(r11) + 23340);
   // b 0x825a71c0
   { const lifted::Result o = lifted::entry::e825A71C0(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -1539,9 +1539,9 @@ uint64_t f820FF958(uint8_t* base) {
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // lwz r11,23340(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 23340);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 23340);
   // lwz r3,8(r11)
-  r3 = REX_LOAD_U32(uint32_t(r11) + 8);
+  r3 = guest::LoadU32(base, uint32_t(r11) + 8);
   // blr
   return r3;
 }
@@ -1557,7 +1557,7 @@ void f820FFA88(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5) {
   // bne cr6,0x820ffa9c
   if (!cr6.eq) goto loc_820FFA9C;
   // lwz r11,800(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 800);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 800);
   // mulli r11,r11,80
   r11 = uint64_t(int64_t(static_cast<int64_t>(r11 * static_cast<uint64_t>(80))));
   // b 0x820ffaa0
@@ -1569,7 +1569,7 @@ loc_820FFAA0:
   // add r11,r11,r3
   r11 = r11 + r3;
   // stw r4,4(r11)
-  REX_STORE_U32(uint32_t(r11) + 4, uint32_t(r4));
+  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r4));
   // blr
   return;
 }
@@ -1585,41 +1585,41 @@ uint64_t f820FFB60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r11,212(r1)
-  r11 = REX_LOAD_U32(uint32_t(r1) + 212);
+  r11 = guest::LoadU32(base, uint32_t(r1) + 212);
   // mr r31,r3
   r31 = r3;
   // std r4,128(r1)
-  REX_STORE_U64(uint32_t(r1) + 128, r4);
+  guest::StoreU64(base, uint32_t(r1) + 128, r4);
   // addi r4,r1,128
   r4 = uint64_t(int64_t(int64_t(r1) + 128));
   // std r5,136(r1)
-  REX_STORE_U64(uint32_t(r1) + 136, r5);
+  guest::StoreU64(base, uint32_t(r1) + 136, r5);
   // cmpwi cr6,r11,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), -1, so);
   // std r6,144(r1)
-  REX_STORE_U64(uint32_t(r1) + 144, r6);
+  guest::StoreU64(base, uint32_t(r1) + 144, r6);
   // li r5,80
   r5 = uint64_t(int64_t(80));
   // std r7,152(r1)
-  REX_STORE_U64(uint32_t(r1) + 152, r7);
+  guest::StoreU64(base, uint32_t(r1) + 152, r7);
   // std r8,160(r1)
-  REX_STORE_U64(uint32_t(r1) + 160, r8);
+  guest::StoreU64(base, uint32_t(r1) + 160, r8);
   // std r9,168(r1)
-  REX_STORE_U64(uint32_t(r1) + 168, r9);
+  guest::StoreU64(base, uint32_t(r1) + 168, r9);
   // std r10,176(r1)
-  REX_STORE_U64(uint32_t(r1) + 176, r10);
+  guest::StoreU64(base, uint32_t(r1) + 176, r10);
   // bne cr6,0x820ffbc4
   if (!cr6.eq) goto loc_820FFBC4;
   // lwz r11,800(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 800);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 800);
   // mulli r11,r11,80
   r11 = uint64_t(int64_t(static_cast<int64_t>(r11 * static_cast<uint64_t>(80))));
   // add r3,r11,r31
@@ -1628,11 +1628,11 @@ uint64_t f820FFB60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // (left out: dead in C++)
   { const lifted::Result o = game::memcpy_825A7410(base, LIFTED_ARGS(0x820FFBB4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,800(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 800);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 800);
   // addi r11,r11,1
   r11 = uint64_t(int64_t(int64_t(r11) + 1));
   // stw r11,800(r31)
-  REX_STORE_U32(uint32_t(r31) + 800, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 800, uint32_t(r11));
   // b 0x820ffbd0
   goto loc_820FFBD0;
 loc_820FFBC4:
@@ -1647,11 +1647,11 @@ loc_820FFBD0:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return r3;
 }
@@ -1667,19 +1667,19 @@ uint64_t f82101940(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r11,r3
   r11 = r3;
   // lwz r10,800(r11)
-  r10 = REX_LOAD_U32(uint32_t(r11) + 800);
+  r10 = guest::LoadU32(base, uint32_t(r11) + 800);
   // addi r9,r10,-1
   r9 = uint64_t(int64_t(int64_t(r10) + -1));
   // lwz r10,804(r11)
-  r10 = REX_LOAD_U32(uint32_t(r11) + 804);
+  r10 = guest::LoadU32(base, uint32_t(r11) + 804);
   // cmpw cr6,r10,r9
   cr6 = lifted::Compare<int32_t>(int32_t(r10), int32_t(r9), so);
   // bge cr6,0x82101974
@@ -1689,7 +1689,7 @@ uint64_t f82101940(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // stw r10,804(r11)
-  REX_STORE_U32(uint32_t(r11) + 804, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 804, uint32_t(r10));
   // b 0x82101980
   goto loc_82101980;
 loc_82101974:
@@ -1704,7 +1704,7 @@ loc_82101980:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -1722,14 +1722,14 @@ uint64_t f821022B0(uint8_t* base, uint64_t r1, uint64_t r13) {
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -1739,7 +1739,7 @@ uint64_t f821022B0(uint8_t* base, uint64_t r1, uint64_t r13) {
   r30 = uint64_t(int64_t(int64_t(r11) + 23344));
 loc_821022D0:
   // lwz r3,0(r30)
-  r3 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r3 = guest::LoadU32(base, uint32_t(r30) + 0);
   // bl 0x820c96e8
   // (left out: dead in C++)
   { const lifted::Result o = game::CarInput::Clear(base, LIFTED_ARGS(0x821022D8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -1754,13 +1754,13 @@ loc_821022D0:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return r3;
 }
@@ -1784,11 +1784,11 @@ uint64_t f82102A28(uint8_t* base, uint64_t r3, uint64_t r4) {
   // mullw r11,r4,r11
   r11 = uint64_t(int64_t(int64_t(int32_t(r4)) * int64_t(int32_t(r11))));
   // lwz r10,23372(r6)
-  r10 = REX_LOAD_U32(uint32_t(r6) + 23372);
+  r10 = guest::LoadU32(base, uint32_t(r6) + 23372);
   // add r9,r11,r10
   r9 = r11 + r10;
   // lwzx r9,r9,r7
-  r9 = REX_LOAD_U32(uint32_t(r9) + uint32_t(r7));
+  r9 = guest::LoadU32(base, uint32_t(r9) + uint32_t(r7));
   // cmplwi cr6,r9,54000
   cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 54000, so);
   // bge cr6,0x82102a9c
@@ -1805,18 +1805,18 @@ uint64_t f82102A28(uint8_t* base, uint64_t r3, uint64_t r4) {
   ctr = r9;
 loc_82102A68:
   // lwz r9,0(r10)
-  r9 = REX_LOAD_U32(uint32_t(r10) + 0);
+  r9 = guest::LoadU32(base, uint32_t(r10) + 0);
   // addi r10,r10,4
   r10 = uint64_t(int64_t(int64_t(r10) + 4));
   // stw r9,0(r3)
-  REX_STORE_U32(uint32_t(r3) + 0, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r3) + 0, uint32_t(r9));
   // addi r3,r3,4
   r3 = uint64_t(int64_t(int64_t(r3) + 4));
   // bdnz 0x82102a68
   --ctr;
   if (uint32_t(ctr) != 0) goto loc_82102A68;
   // lwz r10,23372(r6)
-  r10 = REX_LOAD_U32(uint32_t(r6) + 23372);
+  r10 = guest::LoadU32(base, uint32_t(r6) + 23372);
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // add r11,r11,r10
@@ -1824,11 +1824,11 @@ loc_82102A68:
   // add r11,r11,r7
   r11 = r11 + r7;
   // lwz r10,0(r11)
-  r10 = REX_LOAD_U32(uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // stw r10,0(r11)
-  REX_STORE_U32(uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
   // blr
   return r3;
 loc_82102A9C:
@@ -1849,14 +1849,14 @@ lifted::Result f82104630(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // addis r11,r3,1
   r11 = uint64_t(int64_t(int64_t(r3) + 65536));
@@ -1891,13 +1891,13 @@ loc_82104654:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -1913,14 +1913,14 @@ lifted::Result f82104CE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -1956,13 +1956,13 @@ loc_82104D24:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -1976,7 +1976,7 @@ lifted::Result f82104F00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // lwz r3,23372(r11)
-  r3 = REX_LOAD_U32(uint32_t(r11) + 23372);
+  r3 = guest::LoadU32(base, uint32_t(r11) + 23372);
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beqlr cr6
@@ -1999,17 +1999,17 @@ lifted::Result f82104F20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // lwz r31,23376(r11)
-  r31 = REX_LOAD_U32(uint32_t(r11) + 23376);
+  r31 = guest::LoadU32(base, uint32_t(r11) + 23376);
   // cmplwi cr6,r31,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), 0, so);
   // beq cr6,0x82104f54
@@ -2030,11 +2030,11 @@ loc_82104F54:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -2054,10 +2054,10 @@ lifted::Result f82105228(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   // (left out: dead in C++)
   // ld r12,-4096(r1)
-  r12 = REX_LOAD_U64(uint32_t(r1) + -4096);
+  r12 = guest::LoadU64(base, uint32_t(r1) + -4096);
   // stwu r1,-8048(r1)
   ea = -8048 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,2
   r11 = uint64_t(int64_t(131072));
@@ -2070,7 +2070,7 @@ lifted::Result f82105228(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r23,r5
   r23 = r5;
   // lwzx r11,r31,r11
-  r11 = REX_LOAD_U32(uint32_t(r31) + uint32_t(r11));
+  r11 = guest::LoadU32(base, uint32_t(r31) + uint32_t(r11));
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x82105260
@@ -2112,11 +2112,11 @@ loc_82105260:
   ctr = r11;
 loc_82105298:
   // lwz r11,0(r10)
-  r11 = REX_LOAD_U32(uint32_t(r10) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r10) + 0);
   // addi r10,r10,4
   r10 = uint64_t(int64_t(int64_t(r10) + 4));
   // stw r11,0(r9)
-  REX_STORE_U32(uint32_t(r9) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r9) + 0, uint32_t(r11));
   // addi r9,r9,4
   r9 = uint64_t(int64_t(int64_t(r9) + 4));
   // bdnz 0x82105298
@@ -2146,9 +2146,9 @@ loc_82105298:
   // li r26,93
   r26 = uint64_t(int64_t(93));
   // lwzx r11,r31,r11
-  r11 = REX_LOAD_U32(uint32_t(r31) + uint32_t(r11));
+  r11 = guest::LoadU32(base, uint32_t(r31) + uint32_t(r11));
   // stwx r11,r29,r10
-  REX_STORE_U32(uint32_t(r29) + uint32_t(r10), uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r29) + uint32_t(r10), uint32_t(r11));
 loc_821052E0:
   // addi r4,r30,8
   r4 = uint64_t(int64_t(int64_t(r30) + 8));
@@ -2160,15 +2160,15 @@ loc_821052E0:
   // (left out: dead in C++)
   { const lifted::Result o = game::memcpy_825A7410(base, LIFTED_ARGS(0x821052F0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
   // addi r3,r1,128
   r3 = uint64_t(int64_t(int64_t(r1) + 128));
   // stw r11,4016(r1)
-  REX_STORE_U32(uint32_t(r1) + 4016, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r1) + 4016, uint32_t(r11));
   // lwz r11,4(r30)
-  r11 = REX_LOAD_U32(uint32_t(r30) + 4);
+  r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // stw r11,4020(r1)
-  REX_STORE_U32(uint32_t(r1) + 4020, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r1) + 4020, uint32_t(r11));
   // bl 0x820c4998
   // (left out: dead in C++)
   { const lifted::Result o = game::Car::Refresh(base, LIFTED_ARGS(0x82105308, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2190,30 +2190,30 @@ loc_821052E0:
   r26 = uint64_t(int64_t(int64_t(r26) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r26), 0, so);
   // lhz r9,0(r11)
-  r9 = REX_LOAD_U16(uint32_t(r11) + 0);
+  r9 = guest::LoadU16(base, uint32_t(r11) + 0);
   // sth r9,0(r10)
-  REX_STORE_U16(uint32_t(r10) + 0, uint16_t(r9));
+  guest::StoreU16(base, uint32_t(r10) + 0, uint16_t(r9));
   // lhz r11,2(r11)
-  r11 = REX_LOAD_U16(uint32_t(r11) + 2);
+  r11 = guest::LoadU16(base, uint32_t(r11) + 2);
   // sth r11,2(r10)
-  REX_STORE_U16(uint32_t(r10) + 2, uint16_t(r11));
+  guest::StoreU16(base, uint32_t(r10) + 2, uint16_t(r11));
   // lfs f0,1896(r30)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r30) + 1896);
+  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 1896);
   f0 = double(temp.f32);
   // stfs f0,0(r28)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r28) + 0, temp.u32);
+  guest::StoreU32(base, uint32_t(r28) + 0, temp.u32);
   // lwz r11,1900(r30)
-  r11 = REX_LOAD_U32(uint32_t(r30) + 1900);
+  r11 = guest::LoadU32(base, uint32_t(r30) + 1900);
   // stw r11,4(r28)
-  REX_STORE_U32(uint32_t(r28) + 4, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r28) + 4, uint32_t(r11));
   // lfs f0,1904(r30)
-  temp.u32 = REX_LOAD_U32(uint32_t(r30) + 1904);
+  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 1904);
   f0 = double(temp.f32);
   // stfs f0,12(r28)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r28) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r28) + 12, temp.u32);
   // addi r30,r30,1908
   r30 = uint64_t(int64_t(int64_t(r30) + 1908));
   // addi r28,r28,3936
@@ -2223,7 +2223,7 @@ loc_821052E0:
   // lis r10,5
   r10 = uint64_t(int64_t(327680));
   // lwz r11,84(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 84);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 84);
   // lis r9,5
   r9 = uint64_t(int64_t(327680));
   // ori r10,r10,38368
@@ -2237,11 +2237,11 @@ loc_821052E0:
   // ori r8,r8,38380
   r8 = r8 | 38380;
   // stwx r11,r27,r10
-  REX_STORE_U32(uint32_t(r27) + uint32_t(r10), uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r27) + uint32_t(r10), uint32_t(r11));
   // li r11,-1
   r11 = uint64_t(int64_t(-1));
   // lwz r10,92(r31)
-  r10 = REX_LOAD_U32(uint32_t(r31) + 92);
+  r10 = guest::LoadU32(base, uint32_t(r31) + 92);
   // addis r30,r31,3
   r30 = uint64_t(int64_t(int64_t(r31) + 196608));
   // ori r7,r7,38372
@@ -2251,40 +2251,40 @@ loc_821052E0:
   // addi r3,r1,88
   r3 = uint64_t(int64_t(int64_t(r1) + 88));
   // stw r11,116(r1)
-  REX_STORE_U32(uint32_t(r1) + 116, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r1) + 116, uint32_t(r11));
   // li r5,24
   r5 = uint64_t(int64_t(24));
   // stwx r10,r27,r9
-  REX_STORE_U32(uint32_t(r27) + uint32_t(r9), uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r27) + uint32_t(r9), uint32_t(r10));
   // addi r4,r30,56
   r4 = uint64_t(int64_t(int64_t(r30) + 56));
   // lwz r11,96(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 96);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 96);
   // stwx r11,r27,r8
-  REX_STORE_U32(uint32_t(r27) + uint32_t(r8), uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r27) + uint32_t(r8), uint32_t(r11));
   // lwz r11,88(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 88);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 88);
   // stwx r11,r27,r7
-  REX_STORE_U32(uint32_t(r27) + uint32_t(r7), uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r27) + uint32_t(r7), uint32_t(r11));
   // bl 0x825a7410
   // (left out: dead in C++)
   { const lifted::Result o = game::memcpy_825A7410(base, LIFTED_ARGS(0x821053B8, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r3,r25
   r3 = r25;
   // ld r4,0(r30)
-  r4 = REX_LOAD_U64(uint32_t(r30) + 0);
+  r4 = guest::LoadU64(base, uint32_t(r30) + 0);
   // ld r5,8(r30)
-  r5 = REX_LOAD_U64(uint32_t(r30) + 8);
+  r5 = guest::LoadU64(base, uint32_t(r30) + 8);
   // ld r6,16(r30)
-  r6 = REX_LOAD_U64(uint32_t(r30) + 16);
+  r6 = guest::LoadU64(base, uint32_t(r30) + 16);
   // ld r7,24(r30)
-  r7 = REX_LOAD_U64(uint32_t(r30) + 24);
+  r7 = guest::LoadU64(base, uint32_t(r30) + 24);
   // ld r8,32(r30)
-  r8 = REX_LOAD_U64(uint32_t(r30) + 32);
+  r8 = guest::LoadU64(base, uint32_t(r30) + 32);
   // ld r9,40(r30)
-  r9 = REX_LOAD_U64(uint32_t(r30) + 40);
+  r9 = guest::LoadU64(base, uint32_t(r30) + 40);
   // ld r10,48(r30)
-  r10 = REX_LOAD_U64(uint32_t(r30) + 48);
+  r10 = guest::LoadU64(base, uint32_t(r30) + 48);
   // bl 0x820ffb60
   // (left out: dead in C++)
   r3 = f820FFB60(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10);
@@ -2296,7 +2296,7 @@ loc_821052E0:
   r11 = uint64_t(int64_t(int64_t(r1) + 4828));
   // lfs f0,2612(r9)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r9) + 2612);
+  temp.u32 = guest::LoadU32(base, uint32_t(r9) + 2612);
   f0 = double(temp.f32);
 loc_821053EC:
   // li r9,0
@@ -2304,13 +2304,13 @@ loc_821053EC:
   // stfs f0,0(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 0, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 0, temp.u32);
   // addic. r10,r10,-1
   ca = uint32_t(r10) > 0;
   r10 = uint64_t(int64_t(int64_t(r10) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r9,4(r11)
-  REX_STORE_U32(uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
   // addi r11,r11,972
   r11 = uint64_t(int64_t(int64_t(r11) + 972));
   // bge 0x821053ec
@@ -2335,7 +2335,7 @@ loc_821053EC:
   // ori r9,r9,46560
   r9 = r9 | 46560;
   // lwzx r11,r31,r11
-  r11 = REX_LOAD_U32(uint32_t(r31) + uint32_t(r11));
+  r11 = guest::LoadU32(base, uint32_t(r31) + uint32_t(r11));
   // ori r8,r8,46564
   r8 = r8 | 46564;
   // addi r4,r1,4032
@@ -2343,19 +2343,19 @@ loc_821053EC:
   // mr r3,r24
   r3 = r24;
   // stw r11,7948(r1)
-  REX_STORE_U32(uint32_t(r1) + 7948, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r1) + 7948, uint32_t(r11));
   // lwzx r11,r31,r10
-  r11 = REX_LOAD_U32(uint32_t(r31) + uint32_t(r10));
+  r11 = guest::LoadU32(base, uint32_t(r31) + uint32_t(r10));
   // stw r11,7952(r1)
-  REX_STORE_U32(uint32_t(r1) + 7952, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r1) + 7952, uint32_t(r11));
   // lwzx r11,r31,r9
-  r11 = REX_LOAD_U32(uint32_t(r31) + uint32_t(r9));
+  r11 = guest::LoadU32(base, uint32_t(r31) + uint32_t(r9));
   // stw r11,7956(r1)
-  REX_STORE_U32(uint32_t(r1) + 7956, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r1) + 7956, uint32_t(r11));
   // lwzx r11,r31,r8
-  r11 = REX_LOAD_U32(uint32_t(r31) + uint32_t(r8));
+  r11 = guest::LoadU32(base, uint32_t(r31) + uint32_t(r8));
   // stw r11,7960(r1)
-  REX_STORE_U32(uint32_t(r1) + 7960, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r1) + 7960, uint32_t(r11));
   // bl 0x820ffe08
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x820FFE08, LIFTED_ARGS(0x82105458, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2394,9 +2394,9 @@ loc_821053EC:
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // lwz r11,23340(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 23340);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 23340);
   // stwx r9,r11,r10
-  REX_STORE_U32(uint32_t(r11) + uint32_t(r10), uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r11) + uint32_t(r10), uint32_t(r9));
 loc_821054A0:
   // addi r1,r1,8048
   r1 = uint64_t(int64_t(int64_t(r1) + 8048));
@@ -2414,10 +2414,10 @@ lifted::Result f82105688(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // bl 0x82104f00
   // (left out: dead in C++)
@@ -2439,7 +2439,7 @@ lifted::Result f82105688(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -2455,10 +2455,10 @@ lifted::Result f82106678(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // bl 0x82106540
   // (left out: dead in C++)
@@ -2508,7 +2508,7 @@ lifted::Result f82106678(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -2525,15 +2525,15 @@ lifted::Result f821066D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // lwz r11,23436(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 23436);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 23436);
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x82106704
@@ -2560,7 +2560,7 @@ loc_82106704:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -2575,10 +2575,10 @@ lifted::Result f82106718(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // bl 0x821066d0
   // (left out: dead in C++)
@@ -2589,7 +2589,7 @@ lifted::Result f82106718(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -2607,14 +2607,14 @@ lifted::Result f82106B60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -2639,13 +2639,13 @@ loc_82106B90:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -2659,12 +2659,12 @@ lifted::Result f82107518(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
@@ -2681,9 +2681,9 @@ lifted::Result f82107518(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r3,r3,26480
   r3 = uint64_t(int64_t(int64_t(r3) + 26480));
   // stw r11,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
   // stw r10,32(r31)
-  REX_STORE_U32(uint32_t(r31) + 32, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 32, uint32_t(r10));
   // bl 0x8215e1d0
   // (left out: dead in C++)
   { const lifted::Result o = game::RaceOverlays::Destroy(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -2708,17 +2708,17 @@ lifted::Result f82107518(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r10,r10,27148
   r10 = uint64_t(int64_t(int64_t(r10) + 27148));
   // stw r11,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
   // stw r10,32(r31)
-  REX_STORE_U32(uint32_t(r31) + 32, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 32, uint32_t(r10));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -2734,14 +2734,14 @@ lifted::Result f82107590(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -2766,13 +2766,13 @@ loc_821075C0:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -2802,7 +2802,7 @@ loc_82107C38:
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // stw r11,23464(r10)
-  REX_STORE_U32(uint32_t(r10) + 23464, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r10) + 23464, uint32_t(r11));
   // blr
   return r3;
 }
@@ -2816,7 +2816,7 @@ void f82107C48(uint8_t* base) {
   // li r11,13
   r11 = uint64_t(int64_t(13));
   // stw r11,23464(r10)
-  REX_STORE_U32(uint32_t(r10) + 23464, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r10) + 23464, uint32_t(r11));
   // blr
   return;
 }
@@ -2836,9 +2836,9 @@ void f82107D80(uint8_t* base, uint64_t r3) {
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // lwz r10,600(r11)
-  r10 = REX_LOAD_U32(uint32_t(r11) + 600);
+  r10 = guest::LoadU32(base, uint32_t(r11) + 600);
   // lwz r6,604(r11)
-  r6 = REX_LOAD_U32(uint32_t(r11) + 604);
+  r6 = guest::LoadU32(base, uint32_t(r11) + 604);
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -2846,7 +2846,7 @@ void f82107D80(uint8_t* base, uint64_t r3) {
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  REX_STORE_U32(uint32_t(r11) + 600, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 600, uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -2858,11 +2858,11 @@ void f82107D80(uint8_t* base, uint64_t r3) {
   // add r11,r10,r11
   r11 = r10 + r11;
   // stw r9,0(r11)
-  REX_STORE_U32(uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
   // stw r8,4(r11)
-  REX_STORE_U32(uint32_t(r11) + 4, uint32_t(r8));
+  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r8));
   // stw r7,8(r11)
-  REX_STORE_U32(uint32_t(r11) + 8, uint32_t(r7));
+  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r7));
   // blr
   return;
 }
@@ -2877,24 +2877,24 @@ lifted::Result f82108A08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r30,r3
   r30 = r3;
   // lwz r3,16560(r30)
-  r3 = REX_LOAD_U32(uint32_t(r30) + 16560);
+  r3 = guest::LoadU32(base, uint32_t(r30) + 16560);
   // bl 0x822a67b0
   // (left out: dead in C++)
   { const lifted::Result o = game::Resource::Release(base, LIFTED_ARGS(0x82108A28, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,16564(r30)
-  r3 = REX_LOAD_U32(uint32_t(r30) + 16564);
+  r3 = guest::LoadU32(base, uint32_t(r30) + 16564);
   // bl 0x822a67b0
   // (left out: dead in C++)
   { const lifted::Result o = game::Resource::Release(base, LIFTED_ARGS(0x82108A30, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2906,7 +2906,7 @@ loc_82108A34:
   // rlwinm r11,r11,2,0,29
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 2) & 0xFFFFFFFC;
   // lwzx r3,r11,r30
-  r3 = REX_LOAD_U32(uint32_t(r11) + uint32_t(r30));
+  r3 = guest::LoadU32(base, uint32_t(r11) + uint32_t(r30));
   // bl 0x822a67b0
   // (left out: dead in C++)
   { const lifted::Result o = game::Resource::Release(base, LIFTED_ARGS(0x82108A44, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2921,13 +2921,13 @@ loc_82108A34:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -2947,10 +2947,10 @@ uint64_t f82108A70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64
   // (left out: dead in C++)
   // stwu r1,-128(r1)
   ea = -128 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lbz r11,0(r5)
-  r11 = REX_LOAD_U8(uint32_t(r5) + 0);
+  r11 = guest::LoadU8(base, uint32_t(r5) + 0);
   // mr r28,r4
   r28 = r4;
   // mr r31,r5
@@ -2965,7 +2965,7 @@ uint64_t f82108A70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, uint64
   r30 = r28;
 loc_82108A98:
   // lbz r11,0(r31)
-  r11 = REX_LOAD_U8(uint32_t(r31) + 0);
+  r11 = guest::LoadU8(base, uint32_t(r31) + 0);
   // mr r10,r11
   r10 = r11;
   // cmplwi cr6,r10,128
@@ -2988,13 +2988,13 @@ loc_82108AC0:
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // stb r11,80(r1)
-  REX_STORE_U8(uint32_t(r1) + 80, uint8_t(r11));
+  guest::StoreU8(base, uint32_t(r1) + 80, uint8_t(r11));
   // lbz r11,0(r31)
-  r11 = REX_LOAD_U8(uint32_t(r31) + 0);
+  r11 = guest::LoadU8(base, uint32_t(r31) + 0);
   // stb r11,81(r1)
-  REX_STORE_U8(uint32_t(r1) + 81, uint8_t(r11));
+  guest::StoreU8(base, uint32_t(r1) + 81, uint8_t(r11));
   // lhz r11,80(r1)
-  r11 = REX_LOAD_U16(uint32_t(r1) + 80);
+  r11 = guest::LoadU16(base, uint32_t(r1) + 80);
   // b 0x82108adc
   goto loc_82108ADC;
 loc_82108AD8:
@@ -3010,7 +3010,7 @@ loc_82108ADC:
   // li r11,10
   r11 = uint64_t(int64_t(10));
   // sth r11,0(r30)
-  REX_STORE_U16(uint32_t(r30) + 0, uint16_t(r11));
+  guest::StoreU16(base, uint32_t(r30) + 0, uint16_t(r11));
   // b 0x82108afc
   goto loc_82108AFC;
 loc_82108AF4:
@@ -3018,7 +3018,7 @@ loc_82108AF4:
   // (left out: dead in C++)
   r3 = f8259C6C0(base, r1, r13, r3);
   // sth r3,0(r30)
-  REX_STORE_U16(uint32_t(r30) + 0, uint16_t(r3));
+  guest::StoreU16(base, uint32_t(r30) + 0, uint16_t(r3));
 loc_82108AFC:
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
@@ -3027,7 +3027,7 @@ loc_82108AFC:
   // addi r30,r30,2
   r30 = uint64_t(int64_t(int64_t(r30) + 2));
   // lbz r11,0(r31)
-  r11 = REX_LOAD_U8(uint32_t(r31) + 0);
+  r11 = guest::LoadU8(base, uint32_t(r31) + 0);
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // bne cr6,0x82108a98
@@ -3040,7 +3040,7 @@ loc_82108B14:
   // mr r3,r28
   r3 = r28;
   // sthx r10,r11,r28
-  REX_STORE_U16(uint32_t(r11) + uint32_t(r28), uint16_t(r10));
+  guest::StoreU16(base, uint32_t(r11) + uint32_t(r28), uint16_t(r10));
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6ed8
@@ -3059,14 +3059,14 @@ lifted::Result f82109160(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-144(r1)
   ea = -144 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r30,r4
   r30 = r4;
@@ -3088,9 +3088,9 @@ lifted::Result f82109160(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r10,r11,4
   r10 = uint64_t(int64_t(int64_t(r11) + 4));
   // stw r11,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
   // stw r10,4(r31)
-  REX_STORE_U32(uint32_t(r31) + 4, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 4, uint32_t(r10));
   // bl 0x825a6880
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x821091A4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3112,7 +3112,7 @@ loc_821091BC:
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // stw r11,8(r31)
-  REX_STORE_U32(uint32_t(r31) + 8, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 8, uint32_t(r11));
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // mr r3,r30
@@ -3123,14 +3123,14 @@ loc_821091BC:
   // mr r4,r3
   r4 = r3;
   // lwz r3,8(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 8);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 8);
   // bl 0x82596f68
   // (left out: dead in C++)
   { const lifted::Result o = game::XPR::Create(base, LIFTED_ARGS(0x821091DC, r31)); r3 = o.r3; f1 = o.f1; }
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r3,8(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 8);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 8);
   // bl 0x82597118
   // (left out: dead in C++)
   { const lifted::Result o = game::XPR::GetTexture(base, LIFTED_ARGS(0x821091E8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3139,32 +3139,32 @@ loc_821091BC:
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // stw r3,12(r31)
-  REX_STORE_U32(uint32_t(r31) + 12, uint32_t(r3));
+  guest::StoreU32(base, uint32_t(r31) + 12, uint32_t(r3));
   // bl 0x822a5b78
   // (left out: dead in C++)
   { const lifted::Result o = game::Texture::GetLevelDesc(base, LIFTED_ARGS(0x821091F8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,104(r1)
-  r11 = REX_LOAD_U32(uint32_t(r1) + 104);
+  r11 = guest::LoadU32(base, uint32_t(r1) + 104);
   // lwz r10,108(r1)
-  r10 = REX_LOAD_U32(uint32_t(r1) + 108);
+  r10 = guest::LoadU32(base, uint32_t(r1) + 108);
   // li r9,1
   r9 = uint64_t(int64_t(1));
   // stw r11,16(r31)
-  REX_STORE_U32(uint32_t(r31) + 16, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 16, uint32_t(r11));
   // stw r10,20(r31)
-  REX_STORE_U32(uint32_t(r31) + 20, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 20, uint32_t(r10));
   // stw r9,24(r31)
-  REX_STORE_U32(uint32_t(r31) + 24, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r31) + 24, uint32_t(r9));
   // addi r1,r1,144
   r1 = uint64_t(int64_t(int64_t(r1) + 144));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -3183,7 +3183,7 @@ lifted::Result f82109400(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   // stwu r1,-128(r1)
   ea = -128 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -3195,7 +3195,7 @@ loc_82109414:
   // rlwinm r29,r11,2,0,29
   r29 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 2) & 0xFFFFFFFC;
   // lwzx r11,r29,r31
-  r11 = REX_LOAD_U32(uint32_t(r29) + uint32_t(r31));
+  r11 = guest::LoadU32(base, uint32_t(r29) + uint32_t(r31));
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x82109438
@@ -3206,7 +3206,7 @@ loc_82109414:
   // (left out: dead in C++)
   { const lifted::Result o = game::XPR::Release_82108860(base, LIFTED_ARGS(0x82109430, r31)); r3 = o.r3; f1 = o.f1; }
   // lwzx r3,r29,r31
-  r3 = REX_LOAD_U32(uint32_t(r29) + uint32_t(r31));
+  r3 = guest::LoadU32(base, uint32_t(r29) + uint32_t(r31));
   // bl 0x825a70e8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x82109438, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3216,7 +3216,7 @@ loc_82109438:
   // rlwinm r11,r11,2,0,29
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 2) & 0xFFFFFFFC;
   // lwzx r3,r11,r31
-  r3 = REX_LOAD_U32(uint32_t(r11) + uint32_t(r31));
+  r3 = guest::LoadU32(base, uint32_t(r11) + uint32_t(r31));
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x8210945c
@@ -3240,7 +3240,7 @@ loc_8210945C:
   // blt cr6,0x82109414
   if (cr6.lt) goto loc_82109414;
   // lwz r3,0(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 0);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 0);
   // bl 0x8258d8c8
   // (left out: dead in C++)
   { const lifted::Result o = game::VideoOutput::LockDevice(base, LIFTED_ARGS(0x82109474, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3249,14 +3249,14 @@ loc_8210945C:
   // mr r3,r31
   r3 = r31;
   // stw r4,80(r1)
-  REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r4));
+  guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r4));
   // bl 0x82108a08
   // (left out: dead in C++)
   { const lifted::Result o = f82108A08(base, r1, r13, r3, r5, r6, r7, r8, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13); r3 = o.r3; f1 = o.f1; }
   // addi r4,r1,80
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // lwz r3,0(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 0);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 0);
   // bl 0x8258d908
   // (left out: dead in C++)
   { const lifted::Result o = game::VideoOutput::UnlockDevice(base, LIFTED_ARGS(0x82109490, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3277,22 +3277,22 @@ lifted::Result f82109A40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r31,-32148
   r31 = uint64_t(int64_t(-2106851328));
   // lwz r3,23552(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 23552);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 23552);
   // bl 0x82109400
   // (left out: dead in C++)
   { const lifted::Result o = f82109400(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13); r3 = o.r3; f1 = o.f1; }
   // lwz r3,23552(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 23552);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 23552);
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq cr6,0x82109a84
@@ -3309,7 +3309,7 @@ lifted::Result f82109A40(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,23552(r31)
-  REX_STORE_U32(uint32_t(r31) + 23552, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 23552, uint32_t(r11));
   // b 0x82109a90
   goto loc_82109A90;
 loc_82109A84:
@@ -3324,11 +3324,11 @@ loc_82109A90:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -3343,12 +3343,12 @@ lifted::Result f8210A4D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // bl 0x82109a40
   // (left out: dead in C++)
@@ -3356,7 +3356,7 @@ lifted::Result f8210A4D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // lis r31,-32148
   r31 = uint64_t(int64_t(-2106851328));
   // lwz r3,23604(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 23604);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 23604);
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq cr6,0x8210a518
@@ -3373,7 +3373,7 @@ lifted::Result f8210A4D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,23604(r31)
-  REX_STORE_U32(uint32_t(r31) + 23604, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 23604, uint32_t(r11));
   // b 0x8210a524
   goto loc_8210A524;
 loc_8210A518:
@@ -3388,11 +3388,11 @@ loc_8210A524:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -3405,10 +3405,10 @@ lifted::Result f8210AE38(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // bl 0x82109a40
   // (left out: dead in C++)
@@ -3419,7 +3419,7 @@ lifted::Result f8210AE38(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -3436,7 +3436,7 @@ void f8210AEA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // addi r11,r11,32472
   r11 = uint64_t(int64_t(int64_t(r11) + 32472));
   // stw r11,0(r3)
-  REX_STORE_U32(uint32_t(r3) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r3) + 0, uint32_t(r11));
   // b 0x8259c6f0
   f8259C6F0(base, r3);
   return;
@@ -3453,14 +3453,14 @@ lifted::Result f8210AFA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // li r5,0
   r5 = uint64_t(int64_t(0));
@@ -3509,13 +3509,13 @@ loc_8210AFFC:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -3531,14 +3531,14 @@ lifted::Result f8210B090(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
@@ -3549,7 +3549,7 @@ lifted::Result f8210B090(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r4
   r30 = r4;
   // stw r11,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
   // bl 0x8259c6f0
   // (left out: dead in C++)
   f8259C6F0(base, r3);
@@ -3569,13 +3569,13 @@ loc_8210B0CC:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -3591,14 +3591,14 @@ lifted::Result f8210B0E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
@@ -3609,7 +3609,7 @@ lifted::Result f8210B0E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r4
   r30 = r4;
   // stw r11,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
   // bl 0x8259c7f8
   // (left out: dead in C++)
   f8259C7F8(base, r3);
@@ -3629,13 +3629,13 @@ loc_8210B124:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -3651,25 +3651,25 @@ lifted::Result f8210B388(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-128(r1)
   ea = -128 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
   // lbz r11,2884(r31)
-  r11 = REX_LOAD_U8(uint32_t(r31) + 2884);
+  r11 = guest::LoadU8(base, uint32_t(r31) + 2884);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x8210b420
   if (cr0.eq) goto loc_8210B420;
   // lwz r11,2888(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 2888);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 2888);
   // li r30,0
   r30 = uint64_t(int64_t(0));
   // cmplwi cr6,r11,1
@@ -3689,7 +3689,7 @@ lifted::Result f8210B388(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r4,r1,80
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // stw r11,80(r1)
-  REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r11));
   // b 0x8210b404
   goto loc_8210B404;
 loc_8210B3DC:
@@ -3698,7 +3698,7 @@ loc_8210B3DC:
   // addi r4,r1,84
   r4 = uint64_t(int64_t(int64_t(r1) + 84));
   // stw r11,84(r1)
-  REX_STORE_U32(uint32_t(r1) + 84, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r1) + 84, uint32_t(r11));
   // b 0x8210b404
   goto loc_8210B404;
 loc_8210B3EC:
@@ -3707,23 +3707,23 @@ loc_8210B3EC:
   // addi r4,r1,88
   r4 = uint64_t(int64_t(int64_t(r1) + 88));
   // stw r11,88(r1)
-  REX_STORE_U32(uint32_t(r1) + 88, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r1) + 88, uint32_t(r11));
   // b 0x8210b404
   goto loc_8210B404;
 loc_8210B3FC:
   // stw r30,92(r1)
-  REX_STORE_U32(uint32_t(r1) + 92, uint32_t(r30));
+  guest::StoreU32(base, uint32_t(r1) + 92, uint32_t(r30));
   // addi r4,r1,92
   r4 = uint64_t(int64_t(int64_t(r1) + 92));
 loc_8210B404:
   // lwz r3,2892(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 2892);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 2892);
   // addi r5,r31,2464
   r5 = uint64_t(int64_t(int64_t(r31) + 2464));
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,16(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 16);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 16);
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -3731,18 +3731,18 @@ loc_8210B404:
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x8210B41C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_8210B41C:
   // stb r30,2884(r31)
-  REX_STORE_U8(uint32_t(r31) + 2884, uint8_t(r30));
+  guest::StoreU8(base, uint32_t(r31) + 2884, uint8_t(r30));
 loc_8210B420:
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -3755,12 +3755,12 @@ lifted::Result f8210B650(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
@@ -3769,7 +3769,7 @@ lifted::Result f8210B650(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r11,32632
   r11 = uint64_t(int64_t(int64_t(r11) + 32632));
   // stw r11,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
   // bl 0x8210b388
   // (left out: dead in C++)
   { const lifted::Result o = f8210B388(base, r1, r13, r3, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -3786,11 +3786,11 @@ lifted::Result f8210B650(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -3806,10 +3806,10 @@ uint64_t f8210B6E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4) {
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // bl 0x8210b140
   // (left out: dead in C++)
@@ -3826,7 +3826,7 @@ loc_8210B708:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -3844,14 +3844,14 @@ lifted::Result f8210B908(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -3876,13 +3876,13 @@ loc_8210B938:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -3896,12 +3896,12 @@ lifted::Result f8210BDB8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // addi r31,r3,448
   r31 = uint64_t(int64_t(int64_t(r3) + 448));
@@ -3918,11 +3918,11 @@ lifted::Result f8210BDB8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -3938,12 +3938,12 @@ lifted::Result f8210CDE8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
@@ -3959,9 +3959,9 @@ lifted::Result f8210CDE8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r9 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r9), 0, so);
   // stw r11,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
   // stw r10,44(r31)
-  REX_STORE_U32(uint32_t(r31) + 44, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 44, uint32_t(r10));
   // beq 0x8210ce20
   if (cr0.eq) goto loc_8210CE20;
   // bl 0x825a70e8
@@ -3973,11 +3973,11 @@ loc_8210CE20:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -3991,12 +3991,12 @@ lifted::Result f82110388(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r31,-32148
   r31 = uint64_t(int64_t(-2106851328));
@@ -4005,13 +4005,13 @@ lifted::Result f82110388(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // addi r4,r1,80
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // lwz r3,23680(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 23680);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 23680);
   // stw r11,80(r1)
-  REX_STORE_U32(uint32_t(r1) + 80, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r11));
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,20(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 20);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -4020,29 +4020,29 @@ lifted::Result f82110388(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // lwz r3,23688(r11)
-  r3 = REX_LOAD_U32(uint32_t(r11) + 23688);
+  r3 = guest::LoadU32(base, uint32_t(r11) + 23688);
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,23680(r31)
-  REX_STORE_U32(uint32_t(r31) + 23680, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 23680, uint32_t(r11));
   // bl 0x8258e410
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x8258E410, LIFTED_ARGS(0x821103D0, r31)); r3 = o.r3; f1 = o.f1; }
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // lwz r3,23692(r11)
-  r3 = REX_LOAD_U32(uint32_t(r11) + 23692);
+  r3 = guest::LoadU32(base, uint32_t(r11) + 23692);
   // bl 0x8258e410
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x8258E410, LIFTED_ARGS(0x821103DC, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -4062,7 +4062,7 @@ uint64_t f821116E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // (left out: dead in C++)
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r30,r4
   r30 = r4;
@@ -4097,9 +4097,9 @@ uint64_t f821116E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // addi r11,r31,48
   r11 = uint64_t(int64_t(int64_t(r31) + 48));
   // lwz r9,6104(r31)
-  r9 = REX_LOAD_U32(uint32_t(r31) + 6104);
+  r9 = guest::LoadU32(base, uint32_t(r31) + 6104);
   // lha r10,20(r11)
-  r10 = uint64_t(int64_t(int16_t(REX_LOAD_U16(uint32_t(r11) + 20))));
+  r10 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r11) + 20))));
   // cmpwi cr6,r10,9999
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 9999, so);
   // bge cr6,0x82111740
@@ -4107,7 +4107,7 @@ uint64_t f821116E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // sth r10,20(r11)
-  REX_STORE_U16(uint32_t(r11) + 20, uint16_t(r10));
+  guest::StoreU16(base, uint32_t(r11) + 20, uint16_t(r10));
 loc_82111740:
   // addi r10,r9,414
   r10 = uint64_t(int64_t(int64_t(r9) + 414));
@@ -4116,7 +4116,7 @@ loc_82111740:
   // add r11,r10,r11
   r11 = r10 + r11;
   // lha r10,12(r11)
-  r10 = uint64_t(int64_t(int16_t(REX_LOAD_U16(uint32_t(r11) + 12))));
+  r10 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r11) + 12))));
   // cmpwi cr6,r10,9999
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 9999, so);
   // bge cr6,0x82111760
@@ -4124,10 +4124,10 @@ loc_82111740:
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // sth r10,12(r11)
-  REX_STORE_U16(uint32_t(r11) + 12, uint16_t(r10));
+  guest::StoreU16(base, uint32_t(r11) + 12, uint16_t(r10));
 loc_82111760:
   // lha r11,6(r30)
-  r11 = uint64_t(int64_t(int16_t(REX_LOAD_U16(uint32_t(r30) + 6))));
+  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r30) + 6))));
   // addi r11,r11,1
   r11 = uint64_t(int64_t(int64_t(r11) + 1));
   // cmpwi cr6,r11,999
@@ -4138,7 +4138,7 @@ loc_82111760:
   r11 = uint64_t(int64_t(999));
 loc_82111774:
   // sth r11,6(r30)
-  REX_STORE_U16(uint32_t(r30) + 6, uint16_t(r11));
+  guest::StoreU16(base, uint32_t(r30) + 6, uint16_t(r11));
 loc_82111778:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
@@ -4163,7 +4163,7 @@ void f82113400(uint8_t* base, uint64_t r3, uint64_t r4) {
   goto loc_82113430;
 loc_82113410:
   // lha r10,204(r3)
-  r10 = uint64_t(int64_t(int16_t(REX_LOAD_U16(uint32_t(r3) + 204))));
+  r10 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r3) + 204))));
   // addic. r11,r4,-1
   ca = uint32_t(r4) > 0;
   r11 = uint64_t(int64_t(int64_t(r4) + -1));
@@ -4172,7 +4172,7 @@ loc_82113410:
   goto loc_82113424;
 loc_8211341C:
   // lha r10,0(r9)
-  r10 = uint64_t(int64_t(int16_t(REX_LOAD_U16(uint32_t(r9) + 0))));
+  r10 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r9) + 0))));
   // addic. r11,r11,-1
   ca = uint32_t(r11) > 0;
   r11 = uint64_t(int64_t(int64_t(r11) + -1));
@@ -4186,31 +4186,31 @@ loc_82113424:
   if (!cr0.eq) goto loc_8211341C;
 loc_82113430:
   // lhz r10,0(r9)
-  r10 = REX_LOAD_U16(uint32_t(r9) + 0);
+  r10 = guest::LoadU16(base, uint32_t(r9) + 0);
   // extsh r11,r10
   r11 = uint64_t(int64_t(int16_t(r10)));
   // rlwinm r11,r11,2,0,29
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 2) & 0xFFFFFFFC;
   // lhzx r8,r11,r3
-  r8 = REX_LOAD_U16(uint32_t(r11) + uint32_t(r3));
+  r8 = guest::LoadU16(base, uint32_t(r11) + uint32_t(r3));
   // sthx r10,r11,r3
-  REX_STORE_U16(uint32_t(r11) + uint32_t(r3), uint16_t(r10));
+  guest::StoreU16(base, uint32_t(r11) + uint32_t(r3), uint16_t(r10));
   // sth r8,0(r9)
-  REX_STORE_U16(uint32_t(r9) + 0, uint16_t(r8));
+  guest::StoreU16(base, uint32_t(r9) + 0, uint16_t(r8));
   // lhzx r9,r11,r3
-  r9 = REX_LOAD_U16(uint32_t(r11) + uint32_t(r3));
+  r9 = guest::LoadU16(base, uint32_t(r11) + uint32_t(r3));
   // lhz r10,200(r3)
-  r10 = REX_LOAD_U16(uint32_t(r3) + 200);
+  r10 = guest::LoadU16(base, uint32_t(r3) + 200);
   // sth r9,200(r3)
-  REX_STORE_U16(uint32_t(r3) + 200, uint16_t(r9));
+  guest::StoreU16(base, uint32_t(r3) + 200, uint16_t(r9));
   // sthx r10,r11,r3
-  REX_STORE_U16(uint32_t(r11) + uint32_t(r3), uint16_t(r10));
+  guest::StoreU16(base, uint32_t(r11) + uint32_t(r3), uint16_t(r10));
   // lhz r11,208(r3)
-  r11 = REX_LOAD_U16(uint32_t(r3) + 208);
+  r11 = guest::LoadU16(base, uint32_t(r3) + 208);
   // addi r11,r11,-1
   r11 = uint64_t(int64_t(int64_t(r11) + -1));
   // sth r11,208(r3)
-  REX_STORE_U16(uint32_t(r3) + 208, uint16_t(r11));
+  guest::StoreU16(base, uint32_t(r3) + 208, uint16_t(r11));
   // blr
   return;
 }
@@ -4226,14 +4226,14 @@ uint64_t f82116BE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -4249,7 +4249,7 @@ uint64_t f82116BE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // addi r11,r11,-26336
   r11 = uint64_t(int64_t(int64_t(r11) + -26336));
   // lwz r10,0(r11)
-  r10 = REX_LOAD_U32(uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
   // cmpw cr6,r30,r10
   cr6 = lifted::Compare<int32_t>(int32_t(r30), int32_t(r10), so);
   // bge cr6,0x82116c20
@@ -4257,18 +4257,18 @@ uint64_t f82116BE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // addi r10,r10,-1
   r10 = uint64_t(int64_t(int64_t(r10) + -1));
   // stw r10,0(r11)
-  REX_STORE_U32(uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
 loc_82116C20:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return r3;
 }
@@ -4283,7 +4283,7 @@ uint64_t f82116D88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // addi r11,r3,48
   r11 = uint64_t(int64_t(int64_t(r3) + 48));
   // lha r10,6006(r11)
-  r10 = uint64_t(int64_t(int16_t(REX_LOAD_U16(uint32_t(r11) + 6006))));
+  r10 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r11) + 6006))));
   // cmpwi cr6,r10,9999
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 9999, so);
   // bge cr6,0x82116da0
@@ -4291,7 +4291,7 @@ uint64_t f82116D88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // sth r10,6006(r11)
-  REX_STORE_U16(uint32_t(r11) + 6006, uint16_t(r10));
+  guest::StoreU16(base, uint32_t(r11) + 6006, uint16_t(r10));
 loc_82116DA0:
   // b 0x82116be0
   r3 = game::Garage::Remove(base, r1, r13, r3, r4);
@@ -4307,35 +4307,35 @@ lifted::Result f82116FB0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r31,-32148
   r31 = uint64_t(int64_t(-2106851328));
   // lwz r11,23712(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 23712);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 23712);
   // lwz r3,12(r11)
-  r3 = REX_LOAD_U32(uint32_t(r11) + 12);
+  r3 = guest::LoadU32(base, uint32_t(r11) + 12);
   // bl 0x825a71c0
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A71C0(base, LIFTED_ARGS(0x82116FD0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,23712(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 23712);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 23712);
   // bl 0x825a70e8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x82116FD8, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -4355,7 +4355,7 @@ lifted::Result f82117348(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   // stwu r1,-128(r1)
   ea = -128 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -4366,7 +4366,7 @@ lifted::Result f82117348(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r28,r5
   r28 = r5;
   // stw r6,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r6));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r6));
   // bl 0x825a6880
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x8211736C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -4386,35 +4386,35 @@ loc_82117380:
   r3 = r30;
 loc_82117384:
   // stw r3,4(r31)
-  REX_STORE_U32(uint32_t(r31) + 4, uint32_t(r3));
+  guest::StoreU32(base, uint32_t(r31) + 4, uint32_t(r3));
   // mr r4,r29
   r4 = r29;
   // stb r30,8(r31)
-  REX_STORE_U8(uint32_t(r31) + 8, uint8_t(r30));
+  guest::StoreU8(base, uint32_t(r31) + 8, uint8_t(r30));
   // stb r30,9(r31)
-  REX_STORE_U8(uint32_t(r31) + 9, uint8_t(r30));
+  guest::StoreU8(base, uint32_t(r31) + 9, uint8_t(r30));
   // stb r30,10(r31)
-  REX_STORE_U8(uint32_t(r31) + 10, uint8_t(r30));
+  guest::StoreU8(base, uint32_t(r31) + 10, uint8_t(r30));
   // stb r30,11(r31)
-  REX_STORE_U8(uint32_t(r31) + 11, uint8_t(r30));
+  guest::StoreU8(base, uint32_t(r31) + 11, uint8_t(r30));
   // stw r30,12(r31)
-  REX_STORE_U32(uint32_t(r31) + 12, uint32_t(r30));
+  guest::StoreU32(base, uint32_t(r31) + 12, uint32_t(r30));
   // lwz r10,0(r29)
-  r10 = REX_LOAD_U32(uint32_t(r29) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r29) + 0);
   // lwz r11,0(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
   // mr r3,r11
   r3 = r11;
   // stw r10,16(r31)
-  REX_STORE_U32(uint32_t(r31) + 16, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 16, uint32_t(r10));
   // lwz r10,0(r28)
-  r10 = REX_LOAD_U32(uint32_t(r28) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r28) + 0);
   // stw r10,20(r31)
-  REX_STORE_U32(uint32_t(r31) + 20, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 20, uint32_t(r10));
   // lwz r11,0(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 0);
   // lwz r11,4(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 4);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 4);
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -4426,13 +4426,13 @@ loc_82117384:
   // beq 0x821173e4
   if (cr0.eq) goto loc_821173E4;
   // lwz r11,20(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 20);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 20);
   // addi r5,r1,80
   r5 = uint64_t(int64_t(int64_t(r1) + 80));
   // lwz r3,4(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 4);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 4);
   // sth r11,80(r1)
-  REX_STORE_U16(uint32_t(r1) + 80, uint16_t(r11));
+  guest::StoreU16(base, uint32_t(r1) + 80, uint16_t(r11));
   // bl 0x8259cb48
   // (left out: dead in C++)
   { const lifted::Result o = game::Emitter::Prepare(base, r1, r13, r3, r4, r5, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -4450,7 +4450,7 @@ loc_821173E4:
 lifted::Result f82117400(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64_t r5, uint64_t r6, uint64_t r7, uint64_t r8, uint64_t r9, uint64_t r10, double f1, uint64_t lr) {
   ITC_NATIVE_RUNNING("sub_82117400 (lifted)");
   // lwz r3,4(r3)
-  r3 = REX_LOAD_U32(uint32_t(r3) + 4);
+  r3 = guest::LoadU32(base, uint32_t(r3) + 4);
   // b 0x8259cc58
   { const lifted::Result o = game::Emitter::Stop(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1, lr); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -4464,13 +4464,13 @@ lifted::Result f82117408(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r3,4(r3)
-  r3 = REX_LOAD_U32(uint32_t(r3) + 4);
+  r3 = guest::LoadU32(base, uint32_t(r3) + 4);
   // bl 0x8259cca0
   // (left out: dead in C++)
   { const lifted::Result o = game::Emitter::IsNotStopped(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -4483,7 +4483,7 @@ lifted::Result f82117408(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -4505,20 +4505,20 @@ lifted::Result f82117438(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   // stwu r1,-128(r1)
   ea = -128 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
   // li r29,0
   r29 = uint64_t(int64_t(0));
   // lbz r11,11(r31)
-  r11 = REX_LOAD_U8(uint32_t(r31) + 11);
+  r11 = guest::LoadU8(base, uint32_t(r31) + 11);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x82117474
   if (cr0.eq) goto loc_82117474;
   // lwz r3,4(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 4);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 4);
   // bl 0x8259ccf8
   // (left out: dead in C++)
   { const lifted::Result o = game::Emitter::IsPrepared(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -4528,21 +4528,21 @@ lifted::Result f82117438(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // beq 0x82117474
   if (cr0.eq) goto loc_82117474;
   // lwz r3,4(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 4);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 4);
   // stb r29,11(r31)
-  REX_STORE_U8(uint32_t(r31) + 11, uint8_t(r29));
+  guest::StoreU8(base, uint32_t(r31) + 11, uint8_t(r29));
   // bl 0x8259cc38
   // (left out: dead in C++)
   { const lifted::Result o = game::Emitter::Play(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1, 0x82117474); r3 = o.r3; f1 = o.f1; }
 loc_82117474:
   // lbz r11,8(r31)
-  r11 = REX_LOAD_U8(uint32_t(r31) + 8);
+  r11 = guest::LoadU8(base, uint32_t(r31) + 8);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x821174cc
   if (cr0.eq) goto loc_821174CC;
   // lwz r3,4(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 4);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 4);
   // bl 0x8259cca0
   // (left out: dead in C++)
   { const lifted::Result o = game::Emitter::IsNotStopped(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -4552,26 +4552,26 @@ loc_82117474:
   // beq 0x821174cc
   if (cr0.eq) goto loc_821174CC;
   // lwz r3,0(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 0);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 0);
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,12(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 12);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 12);
   // mtctr r11
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821174A4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
   // mr r30,r3
   r30 = r3;
   // mr r3,r11
   r3 = r11;
   // lwz r10,0(r11)
-  r10 = REX_LOAD_U32(uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
   // lwz r11,8(r10)
-  r11 = REX_LOAD_U32(uint32_t(r10) + 8);
+  r11 = guest::LoadU32(base, uint32_t(r10) + 8);
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -4580,13 +4580,13 @@ loc_82117474:
   // mr r5,r30
   r5 = r30;
   // lwz r4,4(r31)
-  r4 = REX_LOAD_U32(uint32_t(r31) + 4);
+  r4 = guest::LoadU32(base, uint32_t(r31) + 4);
   // bl 0x8259d160
   // (left out: dead in C++)
   { const lifted::Result o = f8259D160(base, r1, r13, r3, r4, r5); r3 = o.r3; f1 = o.f1; }
 loc_821174CC:
   // lwz r3,4(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 4);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 4);
   // bl 0x8259cca0
   // (left out: dead in C++)
   { const lifted::Result o = game::Emitter::IsNotStopped(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -4598,35 +4598,35 @@ loc_821174CC:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stb r11,10(r31)
-  REX_STORE_U8(uint32_t(r31) + 10, uint8_t(r11));
+  guest::StoreU8(base, uint32_t(r31) + 10, uint8_t(r11));
   // b 0x82117548
   goto loc_82117548;
 loc_821174E8:
   // lbz r11,10(r31)
-  r11 = REX_LOAD_U8(uint32_t(r31) + 10);
+  r11 = guest::LoadU8(base, uint32_t(r31) + 10);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x82117544
   if (cr0.eq) goto loc_82117544;
   // lbz r11,9(r31)
-  r11 = REX_LOAD_U8(uint32_t(r31) + 9);
+  r11 = guest::LoadU8(base, uint32_t(r31) + 9);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x82117544
   if (cr0.eq) goto loc_82117544;
   // lwz r3,4(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 4);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 4);
   // bl 0x8259cbe8
   // (left out: dead in C++)
   { const lifted::Result o = game::Emitter::DestroyCue(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // lwz r3,0(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 0);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 0);
   // addi r4,r31,16
   r4 = uint64_t(int64_t(int64_t(r31) + 16));
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,4(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 4);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 4);
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -4638,24 +4638,24 @@ loc_821174E8:
   // beq 0x82117544
   if (cr0.eq) goto loc_82117544;
   // lwz r11,20(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 20);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 20);
   // addi r5,r1,80
   r5 = uint64_t(int64_t(int64_t(r1) + 80));
   // lwz r3,4(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 4);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 4);
   // sth r11,80(r1)
-  REX_STORE_U16(uint32_t(r1) + 80, uint16_t(r11));
+  guest::StoreU16(base, uint32_t(r1) + 80, uint16_t(r11));
   // bl 0x8259cb48
   // (left out: dead in C++)
   { const lifted::Result o = game::Emitter::Prepare(base, r1, r13, r3, r4, r5, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // lwz r3,4(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 4);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 4);
   // bl 0x8259cc38
   // (left out: dead in C++)
   { const lifted::Result o = game::Emitter::Play(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1, 0x82117544); r3 = o.r3; f1 = o.f1; }
 loc_82117544:
   // stb r29,10(r31)
-  REX_STORE_U8(uint32_t(r31) + 10, uint8_t(r29));
+  guest::StoreU8(base, uint32_t(r31) + 10, uint8_t(r29));
 loc_82117548:
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
@@ -4669,9 +4669,9 @@ void f82117550(uint8_t* base, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82117550 (lifted)");
   uint64_t r11 = 0;
   // lwz r11,0(r4)
-  r11 = REX_LOAD_U32(uint32_t(r4) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r4) + 0);
   // stw r11,12(r3)
-  REX_STORE_U32(uint32_t(r3) + 12, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r3) + 12, uint32_t(r11));
   // blr
   return;
 }
@@ -4681,9 +4681,9 @@ uint64_t f82117598(uint8_t* base, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82117598 (lifted)");
   uint64_t r10 = 0, r11 = 0;
   // lwz r11,12(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 12);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 12);
   // lwz r10,0(r4)
-  r10 = REX_LOAD_U32(uint32_t(r4) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r4) + 0);
   // subf r11,r11,r10
   r11 = r10 - r11;
   // cntlzw r11,r11
@@ -4707,19 +4707,19 @@ lifted::Result f821175D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r30,r3
   r30 = r3;
   // lwz r31,0(r30)
-  r31 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r31 = guest::LoadU32(base, uint32_t(r30) + 0);
   // cmplwi r31,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r31), 0, so);
   // beq 0x82117614
@@ -4737,18 +4737,18 @@ lifted::Result f821175D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,0(r30)
-  REX_STORE_U32(uint32_t(r30) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r30) + 0, uint32_t(r11));
 loc_82117614:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -4763,17 +4763,17 @@ lifted::Result f82117630(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // addi r31,r3,4
   r31 = uint64_t(int64_t(int64_t(r3) + 4));
   // lwz r3,0(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 0);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 0);
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x8211765c
@@ -4790,11 +4790,11 @@ loc_8211765C:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -4806,13 +4806,13 @@ uint64_t f82117698(uint8_t* base, uint64_t r3) {
   lifted::Cr cr6;
   uint8_t so = 0;
   // lbz r11,108(r3)
-  r11 = REX_LOAD_U8(uint32_t(r3) + 108);
+  r11 = guest::LoadU8(base, uint32_t(r3) + 108);
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // bne cr6,0x821176b4
   if (!cr6.eq) goto loc_821176B4;
   // lbz r11,109(r3)
-  r11 = REX_LOAD_U8(uint32_t(r3) + 109);
+  r11 = guest::LoadU8(base, uint32_t(r3) + 109);
   // li r3,1
   r3 = uint64_t(int64_t(1));
   // cmplwi cr6,r11,1
@@ -4834,13 +4834,13 @@ lifted::Result f821176C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r3,76(r3)
-  r3 = REX_LOAD_U32(uint32_t(r3) + 76);
+  r3 = guest::LoadU32(base, uint32_t(r3) + 76);
   // bl 0x8259d3f0
   // (left out: dead in C++)
   { const lifted::Result o = game::SoundBankHolder::GetCueIndex(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1, 0x821176D4); r3 = o.r3; f1 = o.f1; }
@@ -4849,7 +4849,7 @@ lifted::Result f821176C0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -4867,13 +4867,13 @@ lifted::Result f821176E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lbz r11,69(r3)
-  r11 = REX_LOAD_U8(uint32_t(r3) + 69);
+  r11 = guest::LoadU8(base, uint32_t(r3) + 69);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // bne 0x82117708
@@ -4885,27 +4885,27 @@ loc_82117700:
   goto loc_82117750;
 loc_82117708:
   // lwz r11,76(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 76);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 76);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x82117700
   if (cr0.eq) goto loc_82117700;
   // lwz r11,8(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 8);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 8);
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq cr6,0x82117700
   if (cr6.eq) goto loc_82117700;
   // lwz r11,76(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 76);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 76);
   // addi r4,r1,80
   r4 = uint64_t(int64_t(int64_t(r1) + 80));
   // lwz r3,8(r11)
-  r3 = REX_LOAD_U32(uint32_t(r11) + 8);
+  r3 = guest::LoadU32(base, uint32_t(r11) + 8);
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,20(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 20);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 20);
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -4916,7 +4916,7 @@ loc_82117708:
   // blt 0x82117700
   if (cr0.lt) goto loc_82117700;
   // lwz r11,80(r1)
-  r11 = REX_LOAD_U32(uint32_t(r1) + 80);
+  r11 = guest::LoadU32(base, uint32_t(r1) + 80);
   // not r11,r11
   r11 = ~r11;
   // clrlwi r3,r11,31
@@ -4925,7 +4925,7 @@ loc_82117750:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -4941,47 +4941,47 @@ lifted::Result f82117778(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r6
   r31 = r6;
   // lwz r3,36(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 36);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 36);
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,12(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 12);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 12);
   // mtctr r11
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821177A0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r6,92(r31)
-  r6 = REX_LOAD_U32(uint32_t(r31) + 92);
+  r6 = guest::LoadU32(base, uint32_t(r31) + 92);
   // lwz r5,100(r31)
-  r5 = REX_LOAD_U32(uint32_t(r31) + 100);
+  r5 = guest::LoadU32(base, uint32_t(r31) + 100);
   // lwz r4,72(r31)
-  r4 = REX_LOAD_U32(uint32_t(r31) + 72);
+  r4 = guest::LoadU32(base, uint32_t(r31) + 72);
   // bl 0x8259ce78
   // (left out: dead in C++)
   { const lifted::Result o = game::AudioEngine::CreateWaveBank(base, r1, r13, r3, r4, r5, r6, r9, r10); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stb r11,108(r31)
-  REX_STORE_U8(uint32_t(r31) + 108, uint8_t(r11));
+  guest::StoreU8(base, uint32_t(r31) + 108, uint8_t(r11));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -4995,47 +4995,47 @@ lifted::Result f821177D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r6
   r31 = r6;
   // lwz r3,36(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 36);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 36);
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,12(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 12);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 12);
   // mtctr r11
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821177F8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r6,96(r31)
-  r6 = REX_LOAD_U32(uint32_t(r31) + 96);
+  r6 = guest::LoadU32(base, uint32_t(r31) + 96);
   // lwz r5,104(r31)
-  r5 = REX_LOAD_U32(uint32_t(r31) + 104);
+  r5 = guest::LoadU32(base, uint32_t(r31) + 104);
   // lwz r4,76(r31)
-  r4 = REX_LOAD_U32(uint32_t(r31) + 76);
+  r4 = guest::LoadU32(base, uint32_t(r31) + 76);
   // bl 0x8259cf10
   // (left out: dead in C++)
   { const lifted::Result o = game::AudioEngine::CreateSoundBank(base, r1, r13, r3, r4, r5, r6, r9, r10); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stb r11,109(r31)
-  REX_STORE_U8(uint32_t(r31) + 109, uint8_t(r11));
+  guest::StoreU8(base, uint32_t(r31) + 109, uint8_t(r11));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -5049,45 +5049,45 @@ lifted::Result f82117828(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r6
   r31 = r6;
   // lwz r3,36(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 36);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 36);
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,12(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 12);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 12);
   // mtctr r11
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x82117850, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r5,92(r31)
-  r5 = REX_LOAD_U32(uint32_t(r31) + 92);
+  r5 = guest::LoadU32(base, uint32_t(r31) + 92);
   // lwz r4,72(r31)
-  r4 = REX_LOAD_U32(uint32_t(r31) + 72);
+  r4 = guest::LoadU32(base, uint32_t(r31) + 72);
   // bl 0x8259cfa8
   // (left out: dead in C++)
   { const lifted::Result o = f8259CFA8(base, r1, r13, r3, r4, r5, r9, r10); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stb r11,108(r31)
-  REX_STORE_U8(uint32_t(r31) + 108, uint8_t(r11));
+  guest::StoreU8(base, uint32_t(r31) + 108, uint8_t(r11));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -5101,45 +5101,45 @@ lifted::Result f82117878(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r6
   r31 = r6;
   // lwz r3,36(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 36);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 36);
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,12(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 12);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 12);
   // mtctr r11
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x821178A0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r5,96(r31)
-  r5 = REX_LOAD_U32(uint32_t(r31) + 96);
+  r5 = guest::LoadU32(base, uint32_t(r31) + 96);
   // lwz r4,76(r31)
-  r4 = REX_LOAD_U32(uint32_t(r31) + 76);
+  r4 = guest::LoadU32(base, uint32_t(r31) + 76);
   // bl 0x8259d038
   // (left out: dead in C++)
   { const lifted::Result o = f8259D038(base, r1, r13, r3, r4, r5, r9, r10); r3 = o.r3; f1 = o.f1; }
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stb r11,109(r31)
-  REX_STORE_U8(uint32_t(r31) + 109, uint8_t(r11));
+  guest::StoreU8(base, uint32_t(r31) + 109, uint8_t(r11));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -5155,14 +5155,14 @@ lifted::Result f821178C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-128(r1)
   ea = -128 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -5171,11 +5171,11 @@ lifted::Result f821178C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r3,28
   r3 = uint64_t(int64_t(28));
   // lwz r11,80(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 80);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 80);
   // stb r30,108(r31)
-  REX_STORE_U8(uint32_t(r31) + 108, uint8_t(r30));
+  guest::StoreU8(base, uint32_t(r31) + 108, uint8_t(r30));
   // stb r30,109(r31)
-  REX_STORE_U8(uint32_t(r31) + 109, uint8_t(r30));
+  guest::StoreU8(base, uint32_t(r31) + 109, uint8_t(r30));
   // cmpwi cr6,r11,2
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 2, so);
   // beq cr6,0x82117940
@@ -5201,7 +5201,7 @@ loc_82117918:
   // li r3,12
   r3 = uint64_t(int64_t(12));
   // stw r11,72(r31)
-  REX_STORE_U32(uint32_t(r31) + 72, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 72, uint32_t(r11));
   // bl 0x825a6880
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x82117924, r31)); r3 = o.r3; f1 = o.f1; }
@@ -5219,7 +5219,7 @@ loc_82117934:
   r3 = r30;
 loc_82117938:
   // stw r3,76(r31)
-  REX_STORE_U32(uint32_t(r31) + 76, uint32_t(r3));
+  guest::StoreU32(base, uint32_t(r31) + 76, uint32_t(r3));
   // b 0x821179a0
   goto loc_821179A0;
 loc_82117940:
@@ -5244,7 +5244,7 @@ loc_8211795C:
   // li r3,12
   r3 = uint64_t(int64_t(12));
   // stw r11,72(r31)
-  REX_STORE_U32(uint32_t(r31) + 72, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 72, uint32_t(r11));
   // bl 0x825a6880
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A6880(base, LIFTED_ARGS(0x82117968, r31)); r3 = o.r3; f1 = o.f1; }
@@ -5264,21 +5264,21 @@ loc_8211797C:
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // stw r3,76(r31)
-  REX_STORE_U32(uint32_t(r31) + 76, uint32_t(r3));
+  guest::StoreU32(base, uint32_t(r31) + 76, uint32_t(r3));
   // lwz r10,72(r31)
-  r10 = REX_LOAD_U32(uint32_t(r31) + 72);
+  r10 = guest::LoadU32(base, uint32_t(r31) + 72);
   // lwz r11,23688(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 23688);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 23688);
   // stw r11,0(r10)
-  REX_STORE_U32(uint32_t(r10) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r10) + 0, uint32_t(r11));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
   // lwz r10,76(r31)
-  r10 = REX_LOAD_U32(uint32_t(r31) + 76);
+  r10 = guest::LoadU32(base, uint32_t(r31) + 76);
   // lwz r11,23692(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 23692);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 23692);
   // stw r11,0(r10)
-  REX_STORE_U32(uint32_t(r10) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r10) + 0, uint32_t(r11));
 loc_821179A0:
   // addi r3,r1,80
   r3 = uint64_t(int64_t(int64_t(r1) + 80));
@@ -5286,28 +5286,28 @@ loc_821179A0:
   // (left out: dead in C++)
   { const lifted::Result o = game::GameFile::Ctor(base, LIFTED_ARGS(0x821179A8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,80(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 80);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 80);
   // cmpwi cr6,r11,2
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 2, so);
   // beq cr6,0x82117a4c
   if (cr6.eq) goto loc_82117A4C;
   // lbz r11,68(r31)
-  r11 = REX_LOAD_U8(uint32_t(r31) + 68);
+  r11 = guest::LoadU8(base, uint32_t(r31) + 68);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // bne 0x82117a14
   if (!cr0.eq) goto loc_82117A14;
   // lwz r3,84(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 84);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 84);
   // bl 0x820a0678
   // (left out: dead in C++)
   { const lifted::Result o = game::Archive::AssetSize(base, LIFTED_ARGS(0x821179C8, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // lwz r3,84(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 84);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 84);
   // stw r11,92(r31)
-  REX_STORE_U32(uint32_t(r31) + 92, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 92, uint32_t(r11));
   // bl 0x820a0678
   // (left out: dead in C++)
   { const lifted::Result o = game::Archive::AssetSize(base, LIFTED_ARGS(0x821179D8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -5329,7 +5329,7 @@ loc_821179A0:
   // lis r11,-32239
   r11 = uint64_t(int64_t(-2112815104));
   // lwz r3,84(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 84);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 84);
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -5339,22 +5339,22 @@ loc_821179A0:
   // addi r5,r11,30584
   r5 = uint64_t(int64_t(int64_t(r11) + 30584));
   // stw r4,100(r31)
-  REX_STORE_U32(uint32_t(r31) + 100, uint32_t(r4));
+  guest::StoreU32(base, uint32_t(r31) + 100, uint32_t(r4));
   // bl 0x8209de48
   // (left out: dead in C++)
   { const lifted::Result o = game::Archive::Load(base, LIFTED_ARGS(0x82117A14, r31)); r3 = o.r3; f1 = o.f1; }
 loc_82117A14:
   // lwz r3,88(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 88);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 88);
   // bl 0x820a0678
   // (left out: dead in C++)
   { const lifted::Result o = game::Archive::AssetSize(base, LIFTED_ARGS(0x82117A1C, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // lwz r3,88(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 88);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 88);
   // stw r11,96(r31)
-  REX_STORE_U32(uint32_t(r31) + 96, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 96, uint32_t(r11));
   // bl 0x820a0678
   // (left out: dead in C++)
   { const lifted::Result o = game::Archive::AssetSize(base, LIFTED_ARGS(0x82117A2C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -5372,23 +5372,23 @@ loc_82117A14:
   // addi r5,r11,30672
   r5 = uint64_t(int64_t(int64_t(r11) + 30672));
   // stw r4,104(r31)
-  REX_STORE_U32(uint32_t(r31) + 104, uint32_t(r4));
+  guest::StoreU32(base, uint32_t(r31) + 104, uint32_t(r4));
   // b 0x82117aa0
   goto loc_82117AA0;
 loc_82117A4C:
   // lwz r3,84(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 84);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 84);
   // bl 0x820a0678
   // (left out: dead in C++)
   { const lifted::Result o = game::Archive::AssetSize(base, LIFTED_ARGS(0x82117A54, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // lwz r9,72(r31)
-  r9 = REX_LOAD_U32(uint32_t(r31) + 72);
+  r9 = guest::LoadU32(base, uint32_t(r31) + 72);
   // lis r10,-32239
   r10 = uint64_t(int64_t(-2112815104));
   // lwz r3,84(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 84);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 84);
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -5398,34 +5398,34 @@ loc_82117A4C:
   // addi r5,r10,30760
   r5 = uint64_t(int64_t(int64_t(r10) + 30760));
   // stw r11,92(r31)
-  REX_STORE_U32(uint32_t(r31) + 92, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 92, uint32_t(r11));
   // lwz r4,0(r9)
-  r4 = REX_LOAD_U32(uint32_t(r9) + 0);
+  r4 = guest::LoadU32(base, uint32_t(r9) + 0);
   // bl 0x8209de48
   // (left out: dead in C++)
   { const lifted::Result o = game::Archive::Load(base, LIFTED_ARGS(0x82117A80, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r3,88(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 88);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 88);
   // bl 0x820a0678
   // (left out: dead in C++)
   { const lifted::Result o = game::Archive::AssetSize(base, LIFTED_ARGS(0x82117A88, r31)); r3 = o.r3; f1 = o.f1; }
   // mr r11,r3
   r11 = r3;
   // lwz r9,76(r31)
-  r9 = REX_LOAD_U32(uint32_t(r31) + 76);
+  r9 = guest::LoadU32(base, uint32_t(r31) + 76);
   // lis r10,-32239
   r10 = uint64_t(int64_t(-2112815104));
   // addi r5,r10,30840
   r5 = uint64_t(int64_t(int64_t(r10) + 30840));
   // stw r11,96(r31)
-  REX_STORE_U32(uint32_t(r31) + 96, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 96, uint32_t(r11));
   // lwz r4,0(r9)
-  r4 = REX_LOAD_U32(uint32_t(r9) + 0);
+  r4 = guest::LoadU32(base, uint32_t(r9) + 0);
 loc_82117AA0:
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // lwz r3,88(r31)
-  r3 = REX_LOAD_U32(uint32_t(r31) + 88);
+  r3 = guest::LoadU32(base, uint32_t(r31) + 88);
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // mr r6,r31
@@ -5441,13 +5441,13 @@ loc_82117AA0:
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -5467,14 +5467,14 @@ lifted::Result f82117B88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   // stwu r1,-128(r1)
   ea = -128 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
   // li r29,0
   r29 = uint64_t(int64_t(0));
   // lwz r11,80(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 80);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 80);
   // cmpwi cr6,r11,2
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 2, so);
   // beq cr6,0x82117c48
@@ -5482,9 +5482,9 @@ lifted::Result f82117B88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r27,r31,72
   r27 = uint64_t(int64_t(int64_t(r31) + 72));
   // lwz r11,0(r27)
-  r11 = REX_LOAD_U32(uint32_t(r27) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r27) + 0);
   // lwz r10,8(r11)
-  r10 = REX_LOAD_U32(uint32_t(r11) + 8);
+  r10 = guest::LoadU32(base, uint32_t(r11) + 8);
   // cmplwi cr6,r10,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq cr6,0x82117bd8
@@ -5492,23 +5492,23 @@ lifted::Result f82117B88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // rotlwi r3,r10,0
   r3 = __builtin_rotateleft32(uint32_t(r10), 0);
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,0(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 0);
   // mtctr r11
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x82117BD0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r27)
-  r11 = REX_LOAD_U32(uint32_t(r27) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r27) + 0);
   // stw r29,8(r11)
-  REX_STORE_U32(uint32_t(r11) + 8, uint32_t(r29));
+  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r29));
 loc_82117BD8:
   // lwz r11,0(r27)
-  r11 = REX_LOAD_U32(uint32_t(r27) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r27) + 0);
   // lwz r10,0(r11)
-  r10 = REX_LOAD_U32(uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
   // cmplwi cr6,r10,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq cr6,0x82117bf8
@@ -5519,16 +5519,16 @@ loc_82117BD8:
   // (left out: dead in C++)
   { const lifted::Result o = game::XPhysicalFree(base, LIFTED_ARGS(0x82117BF0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r27)
-  r11 = REX_LOAD_U32(uint32_t(r27) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r27) + 0);
   // stw r29,0(r11)
-  REX_STORE_U32(uint32_t(r11) + 0, uint32_t(r29));
+  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r29));
 loc_82117BF8:
   // addi r30,r31,76
   r30 = uint64_t(int64_t(int64_t(r31) + 76));
   // lwz r11,0(r30)
-  r11 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
   // lwz r10,8(r11)
-  r10 = REX_LOAD_U32(uint32_t(r11) + 8);
+  r10 = guest::LoadU32(base, uint32_t(r11) + 8);
   // cmplwi cr6,r10,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq cr6,0x82117c28
@@ -5536,23 +5536,23 @@ loc_82117BF8:
   // rotlwi r3,r10,0
   r3 = __builtin_rotateleft32(uint32_t(r10), 0);
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,16(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 16);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 16);
   // mtctr r11
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x82117C20, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
   // stw r29,8(r11)
-  REX_STORE_U32(uint32_t(r11) + 8, uint32_t(r29));
+  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r29));
 loc_82117C28:
   // lwz r28,0(r30)
-  r28 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r28 = guest::LoadU32(base, uint32_t(r30) + 0);
   // lwz r3,0(r28)
-  r3 = REX_LOAD_U32(uint32_t(r28) + 0);
+  r3 = guest::LoadU32(base, uint32_t(r28) + 0);
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x82117c40
@@ -5561,7 +5561,7 @@ loc_82117C28:
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x82117C3C, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r29,0(r28)
-  REX_STORE_U32(uint32_t(r28) + 0, uint32_t(r29));
+  guest::StoreU32(base, uint32_t(r28) + 0, uint32_t(r29));
 loc_82117C40:
   // mr r3,r27
   r3 = r27;
@@ -5571,9 +5571,9 @@ loc_82117C48:
   // addi r28,r31,72
   r28 = uint64_t(int64_t(int64_t(r31) + 72));
   // lwz r11,0(r28)
-  r11 = REX_LOAD_U32(uint32_t(r28) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r28) + 0);
   // lwz r10,8(r11)
-  r10 = REX_LOAD_U32(uint32_t(r11) + 8);
+  r10 = guest::LoadU32(base, uint32_t(r11) + 8);
   // cmplwi cr6,r10,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq cr6,0x82117c78
@@ -5581,25 +5581,25 @@ loc_82117C48:
   // rotlwi r3,r10,0
   r3 = __builtin_rotateleft32(uint32_t(r10), 0);
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,0(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 0);
   // mtctr r11
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x82117C70, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r28)
-  r11 = REX_LOAD_U32(uint32_t(r28) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r28) + 0);
   // stw r29,8(r11)
-  REX_STORE_U32(uint32_t(r11) + 8, uint32_t(r29));
+  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r29));
 loc_82117C78:
   // addi r30,r31,76
   r30 = uint64_t(int64_t(int64_t(r31) + 76));
   // lwz r11,0(r30)
-  r11 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
   // lwz r10,8(r11)
-  r10 = REX_LOAD_U32(uint32_t(r11) + 8);
+  r10 = guest::LoadU32(base, uint32_t(r11) + 8);
   // cmplwi cr6,r10,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq cr6,0x82117ca8
@@ -5607,18 +5607,18 @@ loc_82117C78:
   // rotlwi r3,r10,0
   r3 = __builtin_rotateleft32(uint32_t(r10), 0);
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,16(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 16);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 16);
   // mtctr r11
   ctr = r11;
   // bctrl
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, uint32_t(uint32_t(ctr)), LIFTED_ARGS(0x82117CA0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
   // stw r29,8(r11)
-  REX_STORE_U32(uint32_t(r11) + 8, uint32_t(r29));
+  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r29));
 loc_82117CA8:
   // mr r3,r28
   r3 = r28;
@@ -5657,13 +5657,13 @@ loc_82117CAC:
   // addi r8,r8,3768
   r8 = uint64_t(int64_t(int64_t(r8) + 3768));
   // stw r11,24(r31)
-  REX_STORE_U32(uint32_t(r31) + 24, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 24, uint32_t(r11));
   // stw r10,4(r31)
-  REX_STORE_U32(uint32_t(r31) + 4, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 4, uint32_t(r10));
   // stw r9,4(r31)
-  REX_STORE_U32(uint32_t(r31) + 4, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r31) + 4, uint32_t(r9));
   // stw r8,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r8));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r8));
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6ed4
@@ -5694,7 +5694,7 @@ lifted::Result f82117D08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   // stwu r1,-144(r1)
   ea = -144 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r26,r9
   r26 = r9;
@@ -5725,54 +5725,54 @@ lifted::Result f82117D08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r8,r8,10320
   r8 = uint64_t(int64_t(int64_t(r8) + 10320));
   // stw r11,4(r31)
-  REX_STORE_U32(uint32_t(r31) + 4, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 4, uint32_t(r11));
   // stw r30,8(r31)
-  REX_STORE_U32(uint32_t(r31) + 8, uint32_t(r30));
+  guest::StoreU32(base, uint32_t(r31) + 8, uint32_t(r30));
   // addi r3,r31,40
   r3 = uint64_t(int64_t(int64_t(r31) + 40));
   // stw r30,12(r31)
-  REX_STORE_U32(uint32_t(r31) + 12, uint32_t(r30));
+  guest::StoreU32(base, uint32_t(r31) + 12, uint32_t(r30));
   // mr r29,r5
   r29 = r5;
   // stb r30,16(r31)
-  REX_STORE_U8(uint32_t(r31) + 16, uint8_t(r30));
+  guest::StoreU8(base, uint32_t(r31) + 16, uint8_t(r30));
   // stb r7,17(r31)
-  REX_STORE_U8(uint32_t(r31) + 17, uint8_t(r7));
+  guest::StoreU8(base, uint32_t(r31) + 17, uint8_t(r7));
   // stb r30,18(r31)
-  REX_STORE_U8(uint32_t(r31) + 18, uint8_t(r30));
+  guest::StoreU8(base, uint32_t(r31) + 18, uint8_t(r30));
   // stw r10,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r10));
   // stw r9,4(r31)
-  REX_STORE_U32(uint32_t(r31) + 4, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r31) + 4, uint32_t(r9));
   // stw r8,24(r31)
-  REX_STORE_U32(uint32_t(r31) + 24, uint32_t(r8));
+  guest::StoreU32(base, uint32_t(r31) + 24, uint32_t(r8));
   // stw r30,28(r31)
-  REX_STORE_U32(uint32_t(r31) + 28, uint32_t(r30));
+  guest::StoreU32(base, uint32_t(r31) + 28, uint32_t(r30));
   // stw r30,32(r31)
-  REX_STORE_U32(uint32_t(r31) + 32, uint32_t(r30));
+  guest::StoreU32(base, uint32_t(r31) + 32, uint32_t(r30));
   // stw r6,36(r31)
-  REX_STORE_U32(uint32_t(r31) + 36, uint32_t(r6));
+  guest::StoreU32(base, uint32_t(r31) + 36, uint32_t(r6));
   // bl 0x825931d0
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825931D0(base, LIFTED_ARGS(0x82117D88, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,0(r29)
-  r11 = REX_LOAD_U8(uint32_t(r29) + 0);
+  r11 = guest::LoadU8(base, uint32_t(r29) + 0);
   // mr r3,r31
   r3 = r31;
   // stb r30,69(r31)
-  REX_STORE_U8(uint32_t(r31) + 69, uint8_t(r30));
+  guest::StoreU8(base, uint32_t(r31) + 69, uint8_t(r30));
   // stw r30,72(r31)
-  REX_STORE_U32(uint32_t(r31) + 72, uint32_t(r30));
+  guest::StoreU32(base, uint32_t(r31) + 72, uint32_t(r30));
   // stw r30,76(r31)
-  REX_STORE_U32(uint32_t(r31) + 76, uint32_t(r30));
+  guest::StoreU32(base, uint32_t(r31) + 76, uint32_t(r30));
   // stw r28,80(r31)
-  REX_STORE_U32(uint32_t(r31) + 80, uint32_t(r28));
+  guest::StoreU32(base, uint32_t(r31) + 80, uint32_t(r28));
   // stb r11,68(r31)
-  REX_STORE_U8(uint32_t(r31) + 68, uint8_t(r11));
+  guest::StoreU8(base, uint32_t(r31) + 68, uint8_t(r11));
   // stw r27,84(r31)
-  REX_STORE_U32(uint32_t(r31) + 84, uint32_t(r27));
+  guest::StoreU32(base, uint32_t(r31) + 84, uint32_t(r27));
   // stw r26,88(r31)
-  REX_STORE_U32(uint32_t(r31) + 88, uint32_t(r26));
+  guest::StoreU32(base, uint32_t(r31) + 88, uint32_t(r26));
   // bl 0x821178c8
   // (left out: dead in C++)
   { const lifted::Result o = game::BankPair::Load(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -5796,12 +5796,12 @@ lifted::Result f82117DC0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
@@ -5813,7 +5813,7 @@ lifted::Result f82117DC0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r10 = uint32_t(r4) & 0x1;
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,0(r31)
-  REX_STORE_U32(uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
   // beq 0x82117dec
   if (cr0.eq) goto loc_82117DEC;
   // bl 0x825a70e8
@@ -5825,11 +5825,11 @@ loc_82117DEC:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -5843,14 +5843,14 @@ uint64_t f82117E20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // addi r31,r3,1456
   r31 = uint64_t(int64_t(int64_t(r3) + 1456));
@@ -5871,13 +5871,13 @@ uint64_t f82117E20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return r3;
 }
@@ -5944,11 +5944,11 @@ lifted::Result f82117E90(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   uint64_t r11 = 0, r31 = 0, ctr = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // lwz r3,8(r3)
-  r3 = REX_LOAD_U32(uint32_t(r3) + 8);
+  r3 = guest::LoadU32(base, uint32_t(r3) + 8);
   // lwz r11,0(r3)
-  r11 = REX_LOAD_U32(uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
   // lwz r11,8(r11)
-  r11 = REX_LOAD_U32(uint32_t(r11) + 8);
+  r11 = guest::LoadU32(base, uint32_t(r11) + 8);
   // mtctr r11
   ctr = r11;
   // bctr
@@ -5980,7 +5980,7 @@ uint64_t f82117EB8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // (left out: dead in C++)
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -5990,13 +5990,13 @@ uint64_t f82117EB8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   r29 = uint64_t(int64_t(0));
 loc_82117ED0:
   // lwz r11,1516(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 1516);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 1516);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x82117f68
   if (cr0.eq) goto loc_82117F68;
   // lwz r10,1520(r31)
-  r10 = REX_LOAD_U32(uint32_t(r31) + 1520);
+  r10 = guest::LoadU32(base, uint32_t(r31) + 1520);
   // subf r11,r11,r10
   r11 = r10 - r11;
   // srawi r11,r11,2
@@ -6007,7 +6007,7 @@ loc_82117ED0:
   // bge cr6,0x82117f68
   if (!cr6.lt) goto loc_82117F68;
   // lwz r11,1516(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 1516);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 1516);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x82117f10
@@ -6028,19 +6028,19 @@ loc_82117F10:
   lifted::Trap(22);
 loc_82117F14:
   // lwzx r11,r29,r11
-  r11 = REX_LOAD_U32(uint32_t(r29) + uint32_t(r11));
+  r11 = guest::LoadU32(base, uint32_t(r29) + uint32_t(r11));
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq cr6,0x82117f54
   if (cr6.eq) goto loc_82117F54;
   // lwz r11,1516(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 1516);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 1516);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x82117f40
   if (cr0.eq) goto loc_82117F40;
   // lwz r10,1520(r31)
-  r10 = REX_LOAD_U32(uint32_t(r31) + 1520);
+  r10 = guest::LoadU32(base, uint32_t(r31) + 1520);
   // subf r10,r11,r10
   r10 = r10 - r11;
   // srawi r10,r10,2
@@ -6055,7 +6055,7 @@ loc_82117F40:
   lifted::Trap(22);
 loc_82117F44:
   // lwzx r3,r29,r11
-  r3 = REX_LOAD_U32(uint32_t(r29) + uint32_t(r11));
+  r3 = guest::LoadU32(base, uint32_t(r29) + uint32_t(r11));
   // bl 0x82117670
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x82117670, LIFTED_ARGS(0x82117F4C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -6094,18 +6094,18 @@ uint64_t f82117F78(uint8_t* base, uint64_t r3, uint64_t r4) {
   lifted::Cr cr0, cr6;
   uint8_t ca = 0, so = 0;
   // lwz r11,0(r4)
-  r11 = REX_LOAD_U32(uint32_t(r4) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r4) + 0);
   // rlwinm r8,r11,2,0,29
   r8 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 2) & 0xFFFFFFFC;
 loc_82117F80:
   // lwz r10,1516(r3)
-  r10 = REX_LOAD_U32(uint32_t(r3) + 1516);
+  r10 = guest::LoadU32(base, uint32_t(r3) + 1516);
   // cmplwi r10,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq 0x82117fe4
   if (cr0.eq) goto loc_82117FE4;
   // lwz r9,1520(r3)
-  r9 = REX_LOAD_U32(uint32_t(r3) + 1520);
+  r9 = guest::LoadU32(base, uint32_t(r3) + 1520);
   // subf r10,r10,r9
   r10 = r9 - r10;
   // srawi r10,r10,2
@@ -6116,7 +6116,7 @@ loc_82117F80:
   // bge cr6,0x82117fe4
   if (!cr6.lt) goto loc_82117FE4;
   // lwz r10,1516(r3)
-  r10 = REX_LOAD_U32(uint32_t(r3) + 1516);
+  r10 = guest::LoadU32(base, uint32_t(r3) + 1516);
   // cmplwi r10,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq 0x82117fc0
@@ -6137,7 +6137,7 @@ loc_82117FC0:
   lifted::Trap(22);
 loc_82117FC4:
   // lwzx r10,r8,r10
-  r10 = REX_LOAD_U32(uint32_t(r8) + uint32_t(r10));
+  r10 = guest::LoadU32(base, uint32_t(r8) + uint32_t(r10));
   // cmplwi cr6,r10,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq cr6,0x82117fdc
@@ -6174,7 +6174,7 @@ lifted::Result f82117FF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   // stwu r1,-128(r1)
   ea = -128 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -6186,13 +6186,13 @@ lifted::Result f82117FF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   r29 = uint64_t(int64_t(0));
 loc_8211800C:
   // lwz r11,1516(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 1516);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 1516);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x821180a8
   if (cr0.eq) goto loc_821180A8;
   // lwz r10,1520(r31)
-  r10 = REX_LOAD_U32(uint32_t(r31) + 1520);
+  r10 = guest::LoadU32(base, uint32_t(r31) + 1520);
   // subf r11,r11,r10
   r11 = r10 - r11;
   // srawi r11,r11,2
@@ -6203,7 +6203,7 @@ loc_8211800C:
   // bge cr6,0x821180a8
   if (!cr6.lt) goto loc_821180A8;
   // lwz r11,1516(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 1516);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 1516);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x8211804c
@@ -6224,19 +6224,19 @@ loc_8211804C:
   lifted::Trap(22);
 loc_82118050:
   // lwzx r11,r29,r11
-  r11 = REX_LOAD_U32(uint32_t(r29) + uint32_t(r11));
+  r11 = guest::LoadU32(base, uint32_t(r29) + uint32_t(r11));
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq cr6,0x82118094
   if (cr6.eq) goto loc_82118094;
   // lwz r11,1516(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 1516);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 1516);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x8211807c
   if (cr0.eq) goto loc_8211807C;
   // lwz r10,1520(r31)
-  r10 = REX_LOAD_U32(uint32_t(r31) + 1520);
+  r10 = guest::LoadU32(base, uint32_t(r31) + 1520);
   // subf r10,r11,r10
   r10 = r10 - r11;
   // srawi r10,r10,2
@@ -6253,7 +6253,7 @@ loc_82118080:
   // mr r4,r28
   r4 = r28;
   // lwzx r3,r29,r11
-  r3 = REX_LOAD_U32(uint32_t(r29) + uint32_t(r11));
+  r3 = guest::LoadU32(base, uint32_t(r29) + uint32_t(r11));
   // bl 0x82117d00
   // (left out: dead in C++)
   { const lifted::Result o = game::BankPair::HasName(base, r1, r13, r3, r4, r8, f1); r3 = o.r3; f1 = o.f1; }
@@ -6300,7 +6300,7 @@ lifted::Result f821180B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   // stwu r1,-144(r1)
   ea = -144 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -6313,17 +6313,17 @@ lifted::Result f821180B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r27,r7
   r27 = r7;
   // lwz r11,1516(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 1516);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 1516);
   // mr r26,r8
   r26 = r8;
   // lwz r10,0(r30)
-  r10 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r30) + 0);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x82118100
   if (cr0.eq) goto loc_82118100;
   // lwz r9,1520(r31)
-  r9 = REX_LOAD_U32(uint32_t(r31) + 1520);
+  r9 = guest::LoadU32(base, uint32_t(r31) + 1520);
   // subf r9,r11,r9
   r9 = r9 - r11;
   // srawi r9,r9,2
@@ -6340,7 +6340,7 @@ loc_82118104:
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // lwzx r11,r10,r11
-  r11 = REX_LOAD_U32(uint32_t(r10) + uint32_t(r11));
+  r11 = guest::LoadU32(base, uint32_t(r10) + uint32_t(r11));
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // bne cr6,0x82118184
@@ -6366,13 +6366,13 @@ loc_82118134:
   // mr r5,r28
   r5 = r28;
   // lwz r9,0(r26)
-  r9 = REX_LOAD_U32(uint32_t(r26) + 0);
+  r9 = guest::LoadU32(base, uint32_t(r26) + 0);
   // mr r4,r29
   r4 = r29;
   // lwz r8,0(r27)
-  r8 = REX_LOAD_U32(uint32_t(r27) + 0);
+  r8 = guest::LoadU32(base, uint32_t(r27) + 0);
   // lwz r7,0(r30)
-  r7 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r7 = guest::LoadU32(base, uint32_t(r30) + 0);
   // bl 0x82117d08
   // (left out: dead in C++)
   { const lifted::Result o = game::BankPair::Ctor(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
@@ -6383,15 +6383,15 @@ loc_82118150:
   r3 = uint64_t(int64_t(0));
 loc_82118154:
   // lwz r11,1516(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 1516);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 1516);
   // lwz r10,0(r30)
-  r10 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r30) + 0);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x82118178
   if (cr0.eq) goto loc_82118178;
   // lwz r9,1520(r31)
-  r9 = REX_LOAD_U32(uint32_t(r31) + 1520);
+  r9 = guest::LoadU32(base, uint32_t(r31) + 1520);
   // subf r9,r11,r9
   r9 = r9 - r11;
   // srawi r9,r9,2
@@ -6408,7 +6408,7 @@ loc_8211817C:
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // stwx r3,r10,r11
-  REX_STORE_U32(uint32_t(r10) + uint32_t(r11), uint32_t(r3));
+  guest::StoreU32(base, uint32_t(r10) + uint32_t(r11), uint32_t(r3));
 loc_82118184:
   // addi r1,r1,144
   r1 = uint64_t(int64_t(int64_t(r1) + 144));
@@ -6425,15 +6425,15 @@ uint64_t f82118270(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   lifted::Cr cr0, cr6;
   uint8_t ca = 0, so = 0;
   // lwz r10,1516(r3)
-  r10 = REX_LOAD_U32(uint32_t(r3) + 1516);
+  r10 = guest::LoadU32(base, uint32_t(r3) + 1516);
   // lwz r11,0(r4)
-  r11 = REX_LOAD_U32(uint32_t(r4) + 0);
+  r11 = guest::LoadU32(base, uint32_t(r4) + 0);
   // cmplwi r10,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq 0x82118294
   if (cr0.eq) goto loc_82118294;
   // lwz r9,1520(r3)
-  r9 = REX_LOAD_U32(uint32_t(r3) + 1520);
+  r9 = guest::LoadU32(base, uint32_t(r3) + 1520);
   // subf r9,r10,r9
   r9 = r9 - r10;
   // srawi r9,r9,2
@@ -6450,19 +6450,19 @@ loc_82118298:
   // rlwinm r9,r11,2,0,29
   r9 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 2) & 0xFFFFFFFC;
   // lwzx r10,r9,r10
-  r10 = REX_LOAD_U32(uint32_t(r9) + uint32_t(r10));
+  r10 = guest::LoadU32(base, uint32_t(r9) + uint32_t(r10));
   // cmplwi cr6,r10,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq cr6,0x821182d8
   if (cr6.eq) goto loc_821182D8;
   // lwz r10,1516(r3)
-  r10 = REX_LOAD_U32(uint32_t(r3) + 1516);
+  r10 = guest::LoadU32(base, uint32_t(r3) + 1516);
   // cmplwi r10,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // beq 0x821182c8
   if (cr0.eq) goto loc_821182C8;
   // lwz r9,1520(r3)
-  r9 = REX_LOAD_U32(uint32_t(r3) + 1520);
+  r9 = guest::LoadU32(base, uint32_t(r3) + 1520);
   // subf r9,r10,r9
   r9 = r9 - r10;
   // srawi r9,r9,2
@@ -6479,7 +6479,7 @@ loc_821182CC:
   // rlwinm r11,r11,2,0,29
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 2) & 0xFFFFFFFC;
   // lwzx r3,r11,r10
-  r3 = REX_LOAD_U32(uint32_t(r11) + uint32_t(r10));
+  r3 = guest::LoadU32(base, uint32_t(r11) + uint32_t(r10));
   // b 0x82117698
   r3 = game::BankPair::IsLoaded(base, r3);
   return r3;
@@ -6504,7 +6504,7 @@ lifted::Result f82118320(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   // stwu r1,-128(r1)
   ea = -128 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r31,r3
   r31 = r3;
@@ -6515,15 +6515,15 @@ lifted::Result f82118320(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r28,-1
   r28 = uint64_t(int64_t(-1));
   // lwz r11,1516(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 1516);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 1516);
   // lwz r10,0(r30)
-  r10 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r30) + 0);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x82118360
   if (cr0.eq) goto loc_82118360;
   // lwz r9,1520(r31)
-  r9 = REX_LOAD_U32(uint32_t(r31) + 1520);
+  r9 = guest::LoadU32(base, uint32_t(r31) + 1520);
   // subf r9,r11,r9
   r9 = r9 - r11;
   // srawi r9,r9,2
@@ -6540,19 +6540,19 @@ loc_82118364:
   // rlwinm r9,r10,2,0,29
   r9 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // lwzx r11,r9,r11
-  r11 = REX_LOAD_U32(uint32_t(r9) + uint32_t(r11));
+  r11 = guest::LoadU32(base, uint32_t(r9) + uint32_t(r11));
   // cmplwi cr6,r11,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq cr6,0x821183f0
   if (cr6.eq) goto loc_821183F0;
   // lwz r11,1516(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 1516);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 1516);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x82118394
   if (cr0.eq) goto loc_82118394;
   // lwz r9,1520(r31)
-  r9 = REX_LOAD_U32(uint32_t(r31) + 1520);
+  r9 = guest::LoadU32(base, uint32_t(r31) + 1520);
   // subf r9,r11,r9
   r9 = r9 - r11;
   // srawi r9,r9,2
@@ -6569,7 +6569,7 @@ loc_82118398:
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // lwzx r3,r10,r11
-  r3 = REX_LOAD_U32(uint32_t(r10) + uint32_t(r11));
+  r3 = guest::LoadU32(base, uint32_t(r10) + uint32_t(r11));
   // bl 0x821176e8
   // (left out: dead in C++)
   { const lifted::Result o = game::BankPair::CanFree(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -6579,15 +6579,15 @@ loc_82118398:
   // bne 0x821183f0
   if (!cr0.eq) goto loc_821183F0;
   // lwz r11,1516(r31)
-  r11 = REX_LOAD_U32(uint32_t(r31) + 1516);
+  r11 = guest::LoadU32(base, uint32_t(r31) + 1516);
   // lwz r10,0(r30)
-  r10 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r10 = guest::LoadU32(base, uint32_t(r30) + 0);
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x821183d0
   if (cr0.eq) goto loc_821183D0;
   // lwz r9,1520(r31)
-  r9 = REX_LOAD_U32(uint32_t(r31) + 1520);
+  r9 = guest::LoadU32(base, uint32_t(r31) + 1520);
   // subf r9,r11,r9
   r9 = r9 - r11;
   // srawi r9,r9,2
@@ -6606,7 +6606,7 @@ loc_821183D4:
   // mr r4,r29
   r4 = r29;
   // lwzx r3,r10,r11
-  r3 = REX_LOAD_U32(uint32_t(r10) + uint32_t(r11));
+  r3 = guest::LoadU32(base, uint32_t(r10) + uint32_t(r11));
   // bl 0x821176c0
   // (left out: dead in C++)
   { const lifted::Result o = game::BankPair::GetCueIndex(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -6637,19 +6637,19 @@ lifted::Result f82118438(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r30,r3
   r30 = r3;
   // lwz r31,0(r30)
-  r31 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r31 = guest::LoadU32(base, uint32_t(r30) + 0);
   // cmplwi r31,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r31), 0, so);
   // beq 0x82118474
@@ -6667,18 +6667,18 @@ lifted::Result f82118438(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,0(r30)
-  REX_STORE_U32(uint32_t(r30) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r30) + 0, uint32_t(r11));
 loc_82118474:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -6694,19 +6694,19 @@ lifted::Result f82118490(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r30,r3
   r30 = r3;
   // lwz r31,0(r30)
-  r31 = REX_LOAD_U32(uint32_t(r30) + 0);
+  r31 = guest::LoadU32(base, uint32_t(r30) + 0);
   // cmplwi r31,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r31), 0, so);
   // beq 0x821184cc
@@ -6724,18 +6724,18 @@ lifted::Result f82118490(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,0(r30)
-  REX_STORE_U32(uint32_t(r30) + 0, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r30) + 0, uint32_t(r11));
 loc_821184CC:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -6750,15 +6750,15 @@ lifted::Result f821185C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // mr r3,r4
   r3 = r4;
   // stw r4,124(r1)
-  REX_STORE_U32(uint32_t(r1) + 124, uint32_t(r4));
+  guest::StoreU32(base, uint32_t(r1) + 124, uint32_t(r4));
   // bl 0x82117408
   // (left out: dead in C++)
   { const lifted::Result o = game::Sound::IsStopped(base, r1, r13, r3, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
@@ -6783,7 +6783,7 @@ loc_821185FC:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -6798,22 +6798,22 @@ lifted::Result f82118610(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // addi r3,r1,124
   r3 = uint64_t(int64_t(int64_t(r1) + 124));
   // stw r4,124(r1)
-  REX_STORE_U32(uint32_t(r1) + 124, uint32_t(r4));
+  guest::StoreU32(base, uint32_t(r1) + 124, uint32_t(r4));
   // bl 0x82118490
   // (left out: dead in C++)
   { const lifted::Result o = f82118490(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr

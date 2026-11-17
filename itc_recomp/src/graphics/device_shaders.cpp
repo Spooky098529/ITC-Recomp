@@ -41,7 +41,7 @@ constexpr uint32_t kVertexPatches = 592;  // where the vertex shader's file head
 constexpr uint32_t kPixelPatches = 56;    // the pixel shader's
 
 void Or64(uint8_t* base, uint32_t address, uint64_t bits) {
-  REX_STORE_U64(address, REX_LOAD_U64(address) | bits);
+  guest::StoreU64(base, address, guest::LoadU64(base, address) | bits);
 }
 
 // The patches at p (header + its +12): the constant mask ORed into the
@@ -50,8 +50,8 @@ void Or64(uint8_t* base, uint32_t address, uint64_t bits) {
 // `at` is the memcpy call's return address in the original.
 void ApplyPatches(uint8_t* base, uint32_t device, uint32_t p, uint32_t mask, uint32_t at,
                   const ShaderCalls& calls, uint32_t& r3) {
-  Or64(base, device + mask, REX_LOAD_U64(p + 0));
-  if (REX_LOAD_U64(p + 8) != 0) {
+  Or64(base, device + mask, guest::LoadU64(base, p + 0));
+  if (guest::LoadU64(base, p + 8) != 0) {
     Or64(base, device + kRenderStateMask, 2);
   }
   uint32_t record = p + 24;

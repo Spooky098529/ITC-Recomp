@@ -172,7 +172,7 @@ std::optional<uint32_t> WaveGetStartPosition(uint8_t* base, uint32_t wave, uint3
 
 void WaveRequestNext(uint8_t* base, uint32_t wave, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_825D1C30 XACTWave::RequestNext");
-  auto* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(wave + 32));
+  auto* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, wave + 32));
   uint32_t seen = __atomic_load_n(word, __ATOMIC_SEQ_CST);
   while (!__atomic_compare_exchange_n(word, &seen, __builtin_bswap32(value), false,
                                       __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
@@ -445,7 +445,7 @@ void StoreSplit(uint8_t* base, uint32_t address, uint32_t value) {
 }
 // The engine's +20 exchanged atomically (the original's lwarx/stwcx. loop).
 void ExchangeWord(uint8_t* base, uint32_t address, uint32_t value) {
-  auto* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(address));
+  auto* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, address));
   uint32_t seen = __atomic_load_n(word, __ATOMIC_SEQ_CST);
   while (!__atomic_compare_exchange_n(word, &seen, __builtin_bswap32(value), false,
                                       __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
@@ -988,7 +988,7 @@ namespace {
 // A request word taken atomically (the original's lwarx/stwcx. loop): 1
 // becomes 0, anything else is written back as it was. Returns the word seen.
 uint32_t TakeRequest(uint8_t* base, uint32_t address) {
-  auto* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(address));
+  auto* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, address));
   uint32_t seen = __atomic_load_n(word, __ATOMIC_SEQ_CST);
   while (true) {
     const uint32_t value = __builtin_bswap32(seen);

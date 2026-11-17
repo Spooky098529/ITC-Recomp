@@ -164,18 +164,18 @@ void Barrier(uint8_t* base, uint32_t engine, uint32_t barrier, uint32_t processo
     all |= has << (56 - 8 * i);
   }
   // The original's spin (db16cyc in the loop, nothing in the translation):
-  // REX_LOAD_U64's volatile loads, as the recompiled processors read it.
-  uint64_t word = REX_LOAD_U64(barrier);
+  // guest::LoadU64's volatile loads, as the recompiled processors read it.
+  uint64_t word = guest::LoadU64(base, barrier);
   if (word == 0) {
     return;
   }
   while (word != all) {
-    word = REX_LOAD_U64(barrier);
+    word = guest::LoadU64(base, barrier);
     if (word == 0) {
       return;
     }
   }
-  REX_STORE_U64(barrier, uint64_t(0));
+  guest::StoreU64(base, barrier, uint64_t(0));
 }
 
 // --- The engine's making ---
@@ -380,8 +380,8 @@ uint32_t EngineSize(uint8_t* base, uint32_t params, uint32_t out, uint32_t frame
   // The output buffer's format (20 bytes at +112): type 0, max(+0, 6)
   // channels, 48,000 Hz.
   const uint32_t format = frame + 112;
-  REX_STORE_U64(format, uint64_t(0));
-  REX_STORE_U64(format + 8, uint64_t(0));
+  guest::StoreU64(base, format, uint64_t(0));
+  guest::StoreU64(base, format + 8, uint64_t(0));
   guest::StoreU32(base, format + 16, 0);
   guest::StoreU8(base, format, 0);
   guest::StoreU8(base, format + 4, 0);
@@ -424,9 +424,9 @@ namespace {
 // description's three words (when given) at +8, +16 and +20; +24 on as the
 // stack had them.
 void MasteringDescription(uint8_t* base, uint32_t at, uint32_t description) {
-  REX_STORE_U64(at, uint64_t(0));
-  REX_STORE_U64(at + 8, uint64_t(0));
-  REX_STORE_U64(at + 16, uint64_t(0));
+  guest::StoreU64(base, at, uint64_t(0));
+  guest::StoreU64(base, at + 8, uint64_t(0));
+  guest::StoreU64(base, at + 16, uint64_t(0));
   guest::StoreU8(base, at, 0);
   guest::StoreU8(base, at + 1, 6);
   guest::StoreU32(base, at + 4, kSampleRate);
@@ -484,7 +484,7 @@ uint32_t MasteringInit(uint8_t* base, uint32_t voice, uint32_t description, uint
   }
   // The driver's description: +0 the type (2), +4 the voice, +8 0.
   const uint32_t driver_description = frame + 80;
-  REX_STORE_U64(driver_description, uint64_t(0));
+  guest::StoreU64(base, driver_description, uint64_t(0));
   guest::StoreU32(base, driver_description + 8, 0);
   guest::StoreU32(base, driver_description + 4, voice);
   guest::StoreU8(base, driver_description, 2);

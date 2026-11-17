@@ -50,7 +50,7 @@ void Require(bool done, const char* what) {
 }
 
 std::string Message(uint8_t* base, uint32_t text) {
-  const char* host = reinterpret_cast<const char*>(REX_RAW_ADDR(text));
+  const char* host = reinterpret_cast<const char*>(guest::Pointer(base, text));
   std::string message(host, strnlen(host, 256));
   while (!message.empty() && (message.back() == '\n' || message.back() == '\r')) {
     message.pop_back();

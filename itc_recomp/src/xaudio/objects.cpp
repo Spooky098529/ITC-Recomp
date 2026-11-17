@@ -338,7 +338,7 @@ uint32_t XmaBlockSize(uint8_t* base, uint32_t address) {
   simde__m128i v0 = simde_mm_set1_epi32(int(0xF));
   const simde__m128i v11 = simde_mm_set1_epi32(int(0x1));
   const simde__m128i line = simde_mm_load_si128(
-      reinterpret_cast<const simde__m128i*>(REX_RAW_ADDR(address & ~0xFu)));
+      reinterpret_cast<const simde__m128i*>(guest::Pointer(base, address & ~0xFu)));
   const simde__m128i mask = simde_mm_load_si128(
       reinterpret_cast<const simde__m128i*>(&vector_helpers::VectorMaskL[(address & 0xF) * 16]));
   simde__m128 x = simde_mm_castsi128_ps(simde_mm_shuffle_epi8(line, mask));
@@ -672,7 +672,7 @@ void SetConverterRate(uint8_t* base, uint32_t converter, uint32_t frame, uint32_
 }
 
 double TwoToThe(uint8_t* base, double octaves) {
-  return c_runtime::Pow(std::bit_cast<double>(uint64_t(REX_LOAD_U64(0x820056D8))), octaves);
+  return c_runtime::Pow(std::bit_cast<double>(uint64_t(guest::LoadU64(base, 0x820056D8))), octaves);
 }
 
 }  // namespace
@@ -1081,18 +1081,18 @@ using Vec = simde__m128i;
 // translated code's order) and lvlx, as the translated code does them.
 Vec LoadAligned(uint8_t* base, uint32_t address) {
   return simde_mm_shuffle_epi8(
-      simde_mm_load_si128(reinterpret_cast<const Vec*>(REX_RAW_ADDR(address & ~0xFu))),
+      simde_mm_load_si128(reinterpret_cast<const Vec*>(guest::Pointer(base, address & ~0xFu))),
       simde_mm_load_si128(reinterpret_cast<const Vec*>(vector_helpers::VectorMaskL)));
 }
 Vec LoadLeft(uint8_t* base, uint32_t address) {
   return simde_mm_shuffle_epi8(
-      simde_mm_load_si128(reinterpret_cast<const Vec*>(REX_RAW_ADDR(address & ~0xFu))),
+      simde_mm_load_si128(reinterpret_cast<const Vec*>(guest::Pointer(base, address & ~0xFu))),
       simde_mm_load_si128(
           reinterpret_cast<const Vec*>(&vector_helpers::VectorMaskL[(address & 0xF) * 16])));
 }
 void StoreAligned(uint8_t* base, uint32_t address, Vec value) {
   simde_mm_store_si128(
-      reinterpret_cast<Vec*>(REX_RAW_ADDR(address & ~0xFu)),
+      reinterpret_cast<Vec*>(guest::Pointer(base, address & ~0xFu)),
       simde_mm_shuffle_epi8(value,
                             simde_mm_load_si128(reinterpret_cast<const Vec*>(vector_helpers::VectorMaskL))));
 }
@@ -1623,7 +1623,7 @@ void FilterCoefficient(uint8_t* base, uint32_t filter) {
   ITC_NATIVE_RUNNING("sub_824675B8 ReverbCore::FilterCoefficient");
   const auto single = [&](uint32_t address) { return LoadSingle(base, address); };
   const auto dbl = [&](uint32_t address) {
-    return std::bit_cast<double>(uint64_t(REX_LOAD_U64(address)));
+    return std::bit_cast<double>(uint64_t(guest::LoadU64(base, address)));
   };
   const auto f = [](double x) { return double(float(x)); };
   double f0 = single(filter + 12);
@@ -1750,7 +1750,7 @@ uint32_t ToWord(double value) {
 // else 8.
 uint32_t DecayStep(uint8_t* base, double log, uint32_t scale, uint32_t frame) {
   const double product =
-      double(float(log)) * std::bit_cast<double>(uint64_t(REX_LOAD_U64(scale)));
+      double(float(log)) * std::bit_cast<double>(uint64_t(guest::LoadU64(base, scale)));
   guest::StoreU32(base, frame + 80, ToWord(product));
   const int32_t step = int32_t(guest::LoadU32(base, frame + 80));
   return step < -8 ? 0u : step < 0 ? uint32_t(step + 8) : 8u;
@@ -1764,7 +1764,7 @@ double I3dl2ToNative(uint8_t* base, uint32_t in, uint32_t out, uint32_t frame) {
   // A word through the frame (std, lfd, fcfid) and frsp: `bits` the 64 bits
   // stored.
   const auto integer = [&](uint64_t bits) {
-    REX_STORE_U64(frame + 80, bits);
+    guest::StoreU64(base, frame + 80, bits);
     return f(double(int64_t(bits)));
   };
   const auto level = [&](uint32_t address) {
@@ -1876,8 +1876,8 @@ uint64_t ReverbConstruct(uint8_t* base, uint32_t reverb, uint32_t descriptor, ui
   const uint32_t offset = guest::LoadU32(base, guest::LoadU32(base, core) + 4);
   guest::StoreU32(base, offset + core, 0x8204AA88);
   ReverbDefaults(base, core + 52);
-  REX_STORE_U64(reverb + 0x4BAA0, 0);
-  REX_STORE_U64(reverb + 0x4BAA8, 0);
+  guest::StoreU64(base, reverb + 0x4BAA0, 0);
+  guest::StoreU64(base, reverb + 0x4BAA8, 0);
   return reverb;
 }
 
@@ -1987,16 +1987,16 @@ uint64_t ReverbProcess(uint8_t* base, uint32_t reverb, uint32_t input, uint32_t 
   guest::StoreU32(base, frame + 160, out + 5120);
   const auto counter = [&](uint32_t at) {
     const uint64_t count = helpers::PerformanceCounter();
-    REX_STORE_U64(at, count);
+    guest::StoreU64(base, at, count);
   };
   counter(frame + 88);
   ReverbRun(base, core, frame + 80, frame + 144, thread, Below(base, frame, 144), call);
   counter(frame + 96);
   const uint32_t sum = reverb + 0x4BAA0, count = reverb + 0x4BAA8;
-  const uint64_t total = uint64_t(REX_LOAD_U64(sum)) - uint64_t(REX_LOAD_U64(frame + 88));
-  const uint64_t runs = uint64_t(REX_LOAD_U64(count)) + 1;
-  REX_STORE_U64(count, runs);
-  REX_STORE_U64(sum, total + uint64_t(REX_LOAD_U64(frame + 96)));
+  const uint64_t total = uint64_t(guest::LoadU64(base, sum)) - uint64_t(guest::LoadU64(base, frame + 88));
+  const uint64_t runs = uint64_t(guest::LoadU64(base, count)) + 1;
+  guest::StoreU64(base, count, runs);
+  guest::StoreU64(base, sum, total + uint64_t(guest::LoadU64(base, frame + 96)));
   return 0;
 }
 

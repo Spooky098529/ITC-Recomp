@@ -44,7 +44,7 @@ std::optional<uint32_t> Allocator(uint8_t* base) {
   Store(base, allocator + kFree, kTiles);
   Store(base, allocator + kBitmapEnd, kSentinel);
   // The original's lwarx/stwcx: set the pointer if it's still 0.
-  uint32_t* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(kAllocator));
+  uint32_t* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, kAllocator));
   uint32_t expected = 0;
   if (!__atomic_compare_exchange_n(word, &expected, __builtin_bswap32(allocator), false,
                                    __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {

@@ -125,6 +125,53 @@ areas (as B7 did), not as one change.
   `guest::LoadU32`-style, one spelling for lifted and hand-ported code), so
   the later steps' tools see one form.
 
+Done (2026-11-16, on `e5-native-16-11-26`), in four commits, each built and
+checked:
+
+- **The calls.** The 16,856 were 8,990 in the lifted batches and 7,866 in
+  `originals.cpp` (the lifted originals hand ports fall back to with their
+  flag off). By target: 13,731 a hand port's entry, 215 a lifted function
+  (lifted in a later batch than its caller), 2,910 an address with no
+  function of ours (1,266 functions with plain C++ but no adapter, such as
+  `List16::Insert32` `sub_82154378`; their callers never run in play). Hand
+  ports' entries are now `lifted::entry::e<address>` (no longer `static` in
+  `ITC_NATIVE_ENTRY_DEFINE`), declared in `src/lifted/entries.h`, which
+  `tools/entry_list.py` writes from a build's symbols (3,543 entries; the
+  wrapper macros' forms don't read well from the sources); run it again
+  after adding or removing an entry. `lift.py` and `lift_originals.py` call
+  entries directly (the uniform `(base, Args)`: typed parameters come when
+  a port is converted) and lifted functions typed; the 2,910 stay
+  `lifted::Call`, which stops the program. The hand ports' own 235
+  `lifted::CallFromContext(ctx, base, 0x8...)`: 227 became
+  `lifted::Enter(ctx, base, <entry>)` (none reads `ctr` after; the lifted
+  functions' uniform entries are now `lifted::e<address>` in `functions.h`
+  for this), and 8 target no function of ours. Among those,
+  `save_interface.cpp`'s call to `0x822900E0` (a "rep" save's parse) has a
+  lifted original but no entry, so reaching it would stop the program: to
+  look at. `lift.py reemit` writes every batch again from its registration
+  table (checked first: today's output, but for one function's tail block
+  placed elsewhere).
+- **The names.** `tools/function_names.py` writes `src/lifted/names.h`:
+  4,423 of our functions under `game::A::B` (1,120 lifted, 3,303 entries),
+  each a reference to the function, from the rows' Name cells ("probably"
+  names taken; constructors `Ctor`, destructors `Dtor`, `std` as `Std`, a
+  keyword part with `_`, operators kept as `sub_X`; 40 names shared by
+  several functions, or also a namespace of others, get `_<address>`). The
+  lifted code calls by these names (15,851 sites), each definition's comment
+  names its function, and the hand ports' 175 `lifted::Enter` to an entry
+  use them. Run the tool and `lift.py reemit` again when rows are renamed.
+- **One spelling for guest memory.** `guest.h`'s `guest::Load{U8,U16,U32,U64}`,
+  `guest::Store*` and `guest::Pointer` (new: `LoadU64`, `StoreU64`,
+  `Pointer`), written as plain inline functions with the same volatile
+  accesses; `lift.py` emits them in place of `REX_LOAD_*`, `REX_STORE_*`
+  and `REX_RAW_ADDR` (`own_spelling`), the 27 hand-port files that used the
+  macros were rewritten the same way, and the macros are gone from
+  `guest_code.h`.
+
+The dispatch table is now reached by the 2,382 calls through pointers and
+vtable slots (`lifted::Call(base, ctr)`), the 2,918 to addresses with no
+function of ours, and the hand ports' calls by a computed address.
+
 ### 1. The measure: types, owners, and what crosses
 
 Recorded here, as E1's and E2's measures were; it picks the order of steps

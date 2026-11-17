@@ -401,7 +401,7 @@ ITC_NATIVE_ENTRY_ALWAYS(825AB1C0) {
 // result and digits, is below the caller's stack pointer: not written.)
 namespace {
 ITC_REGS_STEP(CftofL) {
-  if (!c_runtime::Cftof(base, REX_LOAD_U64(ctx.r3.u32), ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
+  if (!c_runtime::Cftof(base, guest::LoadU64(base, ctx.r3.u32), ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
     lifted::original::c825AE8E0(ctx, base);
     return;
   }

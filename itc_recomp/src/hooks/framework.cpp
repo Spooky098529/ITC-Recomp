@@ -210,8 +210,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8209A458) {
     lifted::original::c8209A458(ctx, base);
     return;
   }
-  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
-  REX_STORE_U64(ctx.r1.u32 + 40, ctx.r5.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 32, ctx.r4.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 40, ctx.r5.u64);
   if (*inserted) {
     ctx.r3.u64 = ctx.r1.u32 - 32;
   }
@@ -235,7 +235,7 @@ bool hooks::NativeFramework() { return ITC_FLAG(native_framework); }
 void hooks::TickHandlerInvoke(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t loop = ctx.r3.u32;
   const uint32_t delegate = ctx.r4.u32;
-  REX_STORE_U64(ctx.r1.u32 + 24, ctx.r4.u64);
+  guest::StoreU64(base, ctx.r1.u32 + 24, ctx.r4.u64);
   const uint32_t target = fw::TickHandlerTarget(base, delegate);
   guest_call::InFrame(ctx, base, 96, 0x82099AC4, [&](uint32_t) {
     ctx.r3.u64 = delegate;

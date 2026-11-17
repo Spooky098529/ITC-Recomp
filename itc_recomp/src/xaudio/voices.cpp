@@ -201,7 +201,7 @@ uint32_t AddStat(uint8_t* base, uint32_t index, uint32_t amount) {
   ITC_NATIVE_RUNNING("sub_8245F640 XAudio::AddStat");
   // The original's lwarx/stwcx. loop: a compare-and-swap on the big-endian
   // word, as the recompiled users of the same counters do.
-  auto* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(uint32_t(kStats + (index << 2))));
+  auto* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, uint32_t(kStats + (index << 2))));
   uint32_t seen = __atomic_load_n(word, __ATOMIC_SEQ_CST);
   while (!__atomic_compare_exchange_n(word, &seen,
                                       __builtin_bswap32(__builtin_bswap32(seen) + amount), false,

@@ -102,8 +102,8 @@ uint32_t Init(uint8_t* base, uint32_t queue, uint32_t device, uint32_t sp, const
 uint32_t PassListAdd(uint8_t* base, uint32_t list, uint64_t chunk_key, uint64_t sequence,
                      uint32_t bucket, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8258EB88 PassList::Add");
-  REX_STORE_U64(sp + 32, chunk_key);
-  REX_STORE_U64(sp + 40, sequence);
+  guest::StoreU64(base, sp + 32, chunk_key);
+  guest::StoreU64(base, sp + 40, sequence);
   if (bucket >= guest::LoadU32(base, list + 12)) {
     return 0;
   }
@@ -153,8 +153,8 @@ std::optional<uint32_t> Add(uint8_t* base, uint32_t queue, uint32_t chunk, uint3
   guest::StoreFloat(base, frame + 88, float(sequence));
   const uint32_t list = QueueSlot(base, queue, kRecordingSlot, kRecordingFunction, Recording,
                                   frame, 0x8258EE60, call);
-  const uint32_t r3 = PassListAdd(base, list, REX_LOAD_U64(frame + 80),
-                                  REX_LOAD_U64(frame + 88), bucket, frame);
+  const uint32_t r3 = PassListAdd(base, list, guest::LoadU64(base, frame + 80),
+                                  guest::LoadU64(base, frame + 88), bucket, frame);
   const uint32_t now = State(base, queue);
   const double before = guest::LoadFloat(base, now + 84);
   const double step = guest::LoadFloat(base, kSequenceStep);

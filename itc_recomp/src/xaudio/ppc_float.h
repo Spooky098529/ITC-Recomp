@@ -55,18 +55,18 @@ inline double Fma(double a, double b, double c) { return double(float(std::fma(a
 // translated code's order).
 inline Vec Lvx(uint8_t* base, uint32_t address) {
   return simde_mm_shuffle_epi8(
-      simde_mm_load_si128(reinterpret_cast<const Vec*>(REX_RAW_ADDR(address & ~0xFu))),
+      simde_mm_load_si128(reinterpret_cast<const Vec*>(guest::Pointer(base, address & ~0xFu))),
       simde_mm_load_si128(reinterpret_cast<const Vec*>(vector_helpers::VectorMaskL)));
 }
 inline Vec Lvlx(uint8_t* base, uint32_t address) {
   return simde_mm_shuffle_epi8(
-      simde_mm_load_si128(reinterpret_cast<const Vec*>(REX_RAW_ADDR(address & ~0xFu))),
+      simde_mm_load_si128(reinterpret_cast<const Vec*>(guest::Pointer(base, address & ~0xFu))),
       simde_mm_load_si128(
           reinterpret_cast<const Vec*>(&vector_helpers::VectorMaskL[(address & 0xF) * 16])));
 }
 inline void Stvx(uint8_t* base, uint32_t address, Vec value) {
   simde_mm_store_si128(
-      reinterpret_cast<Vec*>(REX_RAW_ADDR(address & ~0xFu)),
+      reinterpret_cast<Vec*>(guest::Pointer(base, address & ~0xFu)),
       simde_mm_shuffle_epi8(value,
                             simde_mm_load_si128(reinterpret_cast<const Vec*>(vector_helpers::VectorMaskL))));
 }

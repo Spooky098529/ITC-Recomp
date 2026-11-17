@@ -66,14 +66,14 @@ void f825D97C0(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,28252(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 28252);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 28252);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-31476(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -31476);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -31476);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -81,7 +81,7 @@ void f825D97C0(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23856(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 23856, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 23856, temp.u32);
   // blr
   return;
 }
@@ -96,14 +96,14 @@ void f825D97E8(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,28464(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 28464);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 28464);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-31464(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -31464);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -31464);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -111,7 +111,7 @@ void f825D97E8(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23888(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 23888, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 23888, temp.u32);
   // blr
   return;
 }
@@ -127,9 +127,9 @@ void f825D9810(uint8_t* base) {
   // addi r11,r11,28496
   r11 = uint64_t(int64_t(int64_t(r11) + 28496));
   // stw r10,164(r11)
-  REX_STORE_U32(uint32_t(r11) + 164, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 164, uint32_t(r10));
   // stw r10,168(r11)
-  REX_STORE_U32(uint32_t(r11) + 168, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 168, uint32_t(r10));
   // blr
   return;
 }
@@ -145,9 +145,9 @@ void f825D9828(uint8_t* base) {
   // addi r11,r11,28672
   r11 = uint64_t(int64_t(int64_t(r11) + 28672));
   // stw r10,164(r11)
-  REX_STORE_U32(uint32_t(r11) + 164, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 164, uint32_t(r10));
   // stw r10,168(r11)
-  REX_STORE_U32(uint32_t(r11) + 168, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 168, uint32_t(r10));
   // blr
   return;
 }
@@ -190,14 +190,14 @@ void f825D9860(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,28856(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 28856);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 28856);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-31412(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -31412);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -31412);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -205,7 +205,7 @@ void f825D9860(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23892(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 23892, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 23892, temp.u32);
   // blr
   return;
 }
@@ -220,14 +220,14 @@ void f825D9888(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,28940(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 28940);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 28940);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-31164(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -31164);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -31164);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -235,7 +235,7 @@ void f825D9888(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23896(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 23896, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 23896, temp.u32);
   // blr
   return;
 }
@@ -250,14 +250,14 @@ void f825D98B0(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,28960(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 28960);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 28960);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-31048(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -31048);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -31048);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -265,7 +265,7 @@ void f825D98B0(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23908(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 23908, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 23908, temp.u32);
   // blr
   return;
 }
@@ -280,14 +280,14 @@ void f825D98D8(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,29064(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 29064);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 29064);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-31004(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -31004);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -31004);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -295,7 +295,7 @@ void f825D98D8(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23912(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 23912, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 23912, temp.u32);
   // blr
   return;
 }
@@ -310,14 +310,14 @@ void f825D9900(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,29080(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 29080);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 29080);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-30952(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -30952);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -30952);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -325,7 +325,7 @@ void f825D9900(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23916(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 23916, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 23916, temp.u32);
   // blr
   return;
 }
@@ -340,14 +340,14 @@ void f825D9928(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,29096(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 29096);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 29096);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-30908(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -30908);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -30908);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -355,7 +355,7 @@ void f825D9928(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23920(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 23920, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 23920, temp.u32);
   // blr
   return;
 }
@@ -370,14 +370,14 @@ void f825D9950(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,29112(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 29112);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 29112);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-30860(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -30860);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -30860);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -385,7 +385,7 @@ void f825D9950(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23924(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 23924, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 23924, temp.u32);
   // blr
   return;
 }
@@ -400,14 +400,14 @@ void f825D9978(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107572224));
   // lfs f0,29128(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 29128);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 29128);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-30808(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -30808);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -30808);
   f0 = double(temp.f32);
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -415,7 +415,7 @@ void f825D9978(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,23928(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 23928, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 23928, temp.u32);
   // blr
   return;
 }
@@ -709,10 +709,10 @@ lifted::Result f825D9B50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -731,7 +731,7 @@ lifted::Result f825D9B50(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -761,10 +761,10 @@ lifted::Result f825D9B98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -783,7 +783,7 @@ lifted::Result f825D9B98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -801,14 +801,14 @@ lifted::Result f825D9BD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32148
   r11 = uint64_t(int64_t(-2106851328));
@@ -851,13 +851,13 @@ loc_825D9C04:
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -881,13 +881,13 @@ lifted::Result f825D9C58(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = r9;
 loc_825D9C6C:
   // stw r8,0(r11)
-  REX_STORE_U32(uint32_t(r11) + 0, uint32_t(r8));
+  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r8));
   // addic. r10,r10,-1
   ca = uint32_t(r10) > 0;
   r10 = uint64_t(int64_t(int64_t(r10) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r8,260(r11)
-  REX_STORE_U32(uint32_t(r11) + 260, uint32_t(r8));
+  guest::StoreU32(base, uint32_t(r11) + 260, uint32_t(r8));
   // addi r11,r11,264
   r11 = uint64_t(int64_t(int64_t(r11) + 264));
   // bge 0x825d9c6c
@@ -903,7 +903,7 @@ loc_825D9C6C:
   // addi r3,r10,-20240
   r3 = uint64_t(int64_t(int64_t(r10) + -20240));
   // stwx r11,r9,r8
-  REX_STORE_U32(uint32_t(r9) + uint32_t(r8), uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r9) + uint32_t(r8), uint32_t(r11));
   // b 0x825a7068
   { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -919,14 +919,14 @@ void f825D9CA0(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-29784(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -29784);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -29784);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-27976(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -27976);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27976);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -934,7 +934,7 @@ void f825D9CA0(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32324(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + -32324, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + -32324, temp.u32);
   // blr
   return;
 }
@@ -949,14 +949,14 @@ void f825D9CC8(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-29260(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -29260);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -29260);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-27916(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -27916);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27916);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -964,7 +964,7 @@ void f825D9CC8(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32048(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + -32048, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + -32048, temp.u32);
   // blr
   return;
 }
@@ -993,14 +993,14 @@ void f825D9D00(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27796(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -27796);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27796);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-27692(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -27692);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27692);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1008,7 +1008,7 @@ void f825D9D00(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32040(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + -32040, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + -32040, temp.u32);
   // blr
   return;
 }
@@ -1023,14 +1023,14 @@ void f825D9D28(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27780(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -27780);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27780);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26708(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -26708);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26708);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1038,7 +1038,7 @@ void f825D9D28(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32036(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + -32036, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + -32036, temp.u32);
   // blr
   return;
 }
@@ -1053,14 +1053,14 @@ void f825D9D50(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27764(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -27764);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27764);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26664(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -26664);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26664);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1068,7 +1068,7 @@ void f825D9D50(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32032(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + -32032, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + -32032, temp.u32);
   // blr
   return;
 }
@@ -1083,14 +1083,14 @@ void f825D9D78(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27748(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -27748);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27748);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26648(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -26648);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26648);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1098,7 +1098,7 @@ void f825D9D78(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32028(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + -32028, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + -32028, temp.u32);
   // blr
   return;
 }
@@ -1113,14 +1113,14 @@ void f825D9DA0(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27732(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -27732);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27732);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26632(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -26632);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26632);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1128,7 +1128,7 @@ void f825D9DA0(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32020(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + -32020, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + -32020, temp.u32);
   // blr
   return;
 }
@@ -1143,14 +1143,14 @@ void f825D9DC8(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27716(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -27716);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27716);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26340(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -26340);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26340);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1158,7 +1158,7 @@ void f825D9DC8(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32016(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + -32016, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + -32016, temp.u32);
   // blr
   return;
 }
@@ -1173,14 +1173,14 @@ void f825D9DF0(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27700(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -27700);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27700);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26268(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -26268);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26268);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1188,7 +1188,7 @@ void f825D9DF0(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-32008(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + -32008, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + -32008, temp.u32);
   // blr
   return;
 }
@@ -1203,14 +1203,14 @@ void f825D9E18(uint8_t* base) {
   r11 = uint64_t(int64_t(-2107506688));
   // lfs f0,-27628(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -27628);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -27628);
   f0 = double(temp.f32);
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // fmuls f13,f0,f0
   f13 = double(float(f0 * f0));
   // lfs f0,-26148(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + -26148);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + -26148);
   f0 = double(temp.f32);
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
@@ -1218,7 +1218,7 @@ void f825D9E18(uint8_t* base) {
   f0 = double(float(f13 * f0));
   // stfs f0,-31796(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + -31796, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + -31796, temp.u32);
   // blr
   return;
 }
@@ -1331,10 +1331,10 @@ uint64_t f825D9FC8(uint8_t* base, uint64_t r1, uint64_t r13) {
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-160(r1)
   ea = -160 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32107
   r11 = uint64_t(int64_t(-2104164352));
@@ -1352,68 +1352,68 @@ uint64_t f825D9FC8(uint8_t* base, uint64_t r1, uint64_t r13) {
   r4 = uint64_t(int64_t(int64_t(r1) + 128));
   // lfs f0,2612(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 2612);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2612);
   f0 = double(temp.f32);
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // stfs f0,80(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 80, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 80, temp.u32);
   // stfs f0,84(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 84, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 84, temp.u32);
   // stfs f0,88(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 88, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 88, temp.u32);
   // stfs f0,96(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 96, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 96, temp.u32);
   // lfs f13,2608(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
   f13 = double(temp.f32);
   // stfs f13,92(r1)
   temp.f32 = float(f13);
-  REX_STORE_U32(uint32_t(r1) + 92, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 92, temp.u32);
   // stfs f0,100(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 100, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 100, temp.u32);
   // stfs f13,104(r1)
   temp.f32 = float(f13);
-  REX_STORE_U32(uint32_t(r1) + 104, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 104, temp.u32);
   // stfs f0,108(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 108, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 108, temp.u32);
   // stfs f0,112(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 112, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 112, temp.u32);
   // stfs f13,116(r1)
   temp.f32 = float(f13);
-  REX_STORE_U32(uint32_t(r1) + 116, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 116, temp.u32);
   // stfs f0,120(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 120, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 120, temp.u32);
   // stfs f0,124(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 124, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 124, temp.u32);
   // stfs f13,128(r1)
   temp.f32 = float(f13);
-  REX_STORE_U32(uint32_t(r1) + 128, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 128, temp.u32);
   // stfs f0,132(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 132, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 132, temp.u32);
   // stfs f0,136(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 136, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 136, temp.u32);
   // stfs f0,140(r1)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r1) + 140, temp.u32);
+  guest::StoreU32(base, uint32_t(r1) + 140, temp.u32);
   // bl 0x820bfbb8
   // (left out: dead in C++)
   { const lifted::Result o = game::Matrix::FromRows(base, LIFTED_ARGS(0x825DA040, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,160
   r1 = uint64_t(int64_t(int64_t(r1) + 160));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -1429,12 +1429,12 @@ uint64_t f825DA050(uint8_t* base, uint64_t r1, uint64_t r13) {
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32156
   r11 = uint64_t(int64_t(-2107375616));
@@ -1448,15 +1448,15 @@ uint64_t f825DA050(uint8_t* base, uint64_t r1, uint64_t r13) {
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,112(r31)
-  REX_STORE_U32(uint32_t(r31) + 112, uint32_t(r11));
+  guest::StoreU32(base, uint32_t(r31) + 112, uint32_t(r11));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return r3;
 }
@@ -1486,10 +1486,10 @@ lifted::Result f825DA0B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32155
   r11 = uint64_t(int64_t(-2107310080));
@@ -1510,7 +1510,7 @@ lifted::Result f825DA0B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -1526,10 +1526,10 @@ lifted::Result f825DA0F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32155
   r11 = uint64_t(int64_t(-2107310080));
@@ -1550,7 +1550,7 @@ lifted::Result f825DA0F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -1584,10 +1584,10 @@ lifted::Result f825DA140(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32154
   r11 = uint64_t(int64_t(-2107244544));
@@ -1608,7 +1608,7 @@ lifted::Result f825DA140(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -1624,10 +1624,10 @@ lifted::Result f825DA178(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1646,7 +1646,7 @@ lifted::Result f825DA178(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -1751,7 +1751,7 @@ lifted::Result f825DA210(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19888));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1759,13 +1759,13 @@ lifted::Result f825DA210(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -18096));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
   // b 0x825a7068
   { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -1785,7 +1785,7 @@ lifted::Result f825DA238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19880));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1793,13 +1793,13 @@ lifted::Result f825DA238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -18048));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
   // b 0x825a7068
   { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -1819,7 +1819,7 @@ lifted::Result f825DA260(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19872));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1827,13 +1827,13 @@ lifted::Result f825DA260(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -18000));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
   // b 0x825a7068
   { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -1853,7 +1853,7 @@ lifted::Result f825DA288(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19864));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1861,28 +1861,28 @@ lifted::Result f825DA288(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -17952));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
   // stfs f0,60(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 60, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 60, temp.u32);
   // stfs f0,76(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 76, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 76, temp.u32);
   // stfs f0,92(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 92, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 92, temp.u32);
   // stfs f0,108(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 108, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 108, temp.u32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
   // b 0x825a7068
   { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -1902,7 +1902,7 @@ lifted::Result f825DA2C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19856));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1910,28 +1910,28 @@ lifted::Result f825DA2C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -17824));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
   // stfs f0,60(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 60, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 60, temp.u32);
   // stfs f0,76(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 76, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 76, temp.u32);
   // stfs f0,92(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 92, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 92, temp.u32);
   // stfs f0,108(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 108, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 108, temp.u32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
   // b 0x825a7068
   { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -1951,7 +1951,7 @@ lifted::Result f825DA308(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19848));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -1959,28 +1959,28 @@ lifted::Result f825DA308(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -17696));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
   // stfs f0,60(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 60, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 60, temp.u32);
   // stfs f0,76(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 76, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 76, temp.u32);
   // stfs f0,92(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 92, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 92, temp.u32);
   // stfs f0,108(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 108, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 108, temp.u32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
   // b 0x825a7068
   { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -2000,7 +2000,7 @@ lifted::Result f825DA348(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19840));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2008,28 +2008,28 @@ lifted::Result f825DA348(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -17568));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
   // stfs f0,60(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 60, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 60, temp.u32);
   // stfs f0,76(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 76, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 76, temp.u32);
   // stfs f0,92(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 92, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 92, temp.u32);
   // stfs f0,108(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 108, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 108, temp.u32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
   // b 0x825a7068
   { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -2049,7 +2049,7 @@ lifted::Result f825DA388(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19832));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2057,28 +2057,28 @@ lifted::Result f825DA388(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -17440));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
   // stfs f0,60(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 60, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 60, temp.u32);
   // stfs f0,76(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 76, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 76, temp.u32);
   // stfs f0,92(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 92, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 92, temp.u32);
   // stfs f0,108(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 108, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 108, temp.u32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
   // b 0x825a7068
   { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -2098,7 +2098,7 @@ lifted::Result f825DA3C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r3 = uint64_t(int64_t(int64_t(r10) + -19824));
   // lfs f0,2608(r11)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 2608);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 2608);
   f0 = double(temp.f32);
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2106,28 +2106,28 @@ lifted::Result f825DA3C8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   r11 = uint64_t(int64_t(int64_t(r11) + -17312));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
   // stfs f0,28(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 28, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 28, temp.u32);
   // stfs f0,44(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 44, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 44, temp.u32);
   // stfs f0,60(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 60, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 60, temp.u32);
   // stfs f0,76(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 76, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 76, temp.u32);
   // stfs f0,92(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 92, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 92, temp.u32);
   // stfs f0,108(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 108, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 108, temp.u32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
   // b 0x825a7068
   { const lifted::Result o = game::atexit(base, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -2184,10 +2184,10 @@ lifted::Result f825DA438(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2206,7 +2206,7 @@ lifted::Result f825DA438(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -2222,10 +2222,10 @@ lifted::Result f825DA470(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2244,7 +2244,7 @@ lifted::Result f825DA470(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -2260,10 +2260,10 @@ lifted::Result f825DA4A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2282,7 +2282,7 @@ lifted::Result f825DA4A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -2300,10 +2300,10 @@ lifted::Result f825DA4E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // li r3,12
   r3 = uint64_t(int64_t(12));
@@ -2315,7 +2315,7 @@ lifted::Result f825DA4E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // beq cr6,0x825da500
   if (cr6.eq) goto loc_825DA500;
   // stw r3,0(r3)
-  REX_STORE_U32(uint32_t(r3) + 0, uint32_t(r3));
+  guest::StoreU32(base, uint32_t(r3) + 0, uint32_t(r3));
 loc_825DA500:
   // addi r11,r3,4
   r11 = uint64_t(int64_t(int64_t(r3) + 4));
@@ -2324,7 +2324,7 @@ loc_825DA500:
   // beq cr6,0x825da510
   if (cr6.eq) goto loc_825DA510;
   // stw r3,0(r11)
-  REX_STORE_U32(uint32_t(r11) + 0, uint32_t(r3));
+  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r3));
 loc_825DA510:
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2333,20 +2333,20 @@ loc_825DA510:
   // addi r11,r11,-17068
   r11 = uint64_t(int64_t(int64_t(r11) + -17068));
   // stw r3,4(r11)
-  REX_STORE_U32(uint32_t(r11) + 4, uint32_t(r3));
+  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r3));
   // addi r3,r10,-19744
   r3 = uint64_t(int64_t(int64_t(r10) + -19744));
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,8(r11)
-  REX_STORE_U32(uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
   // bl 0x825a7068
   // (left out: dead in C++)
   { const lifted::Result o = game::atexit(base, LIFTED_ARGS(0x825DA530, r31)); r3 = o.r3; f1 = o.f1; }
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -2382,14 +2382,14 @@ void f825DA648(uint8_t* base) {
   // addi r11,r11,3908
   r11 = uint64_t(int64_t(int64_t(r11) + 3908));
   // lwz r9,-16(r8)
-  r9 = REX_LOAD_U32(uint32_t(r8) + -16);
+  r9 = guest::LoadU32(base, uint32_t(r8) + -16);
   // mr r7,r9
   r7 = r9;
   // stw r9,0(r11)
-  REX_STORE_U32(uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
 loc_825DA664:
   // lbz r10,0(r9)
-  r10 = REX_LOAD_U8(uint32_t(r9) + 0);
+  r10 = guest::LoadU8(base, uint32_t(r9) + 0);
   // addi r9,r9,1
   r9 = uint64_t(int64_t(int64_t(r9) + 1));
   // cmplwi cr6,r10,0
@@ -2399,22 +2399,22 @@ loc_825DA664:
   // subf r7,r7,r9
   r7 = r9 - r7;
   // lwz r10,-12(r8)
-  r10 = REX_LOAD_U32(uint32_t(r8) + -12);
+  r10 = guest::LoadU32(base, uint32_t(r8) + -12);
   // li r9,0
   r9 = uint64_t(int64_t(0));
   // stw r9,8(r11)
-  REX_STORE_U32(uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
   // addi r9,r7,-1
   r9 = uint64_t(int64_t(int64_t(r7) + -1));
   // stw r10,12(r11)
-  REX_STORE_U32(uint32_t(r11) + 12, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r10));
   // mr r7,r10
   r7 = r10;
   // stw r9,4(r11)
-  REX_STORE_U32(uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
 loc_825DA694:
   // lbz r9,0(r10)
-  r9 = REX_LOAD_U8(uint32_t(r10) + 0);
+  r9 = guest::LoadU8(base, uint32_t(r10) + 0);
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // cmplwi cr6,r9,0
@@ -2424,22 +2424,22 @@ loc_825DA694:
   // subf r7,r7,r10
   r7 = r10 - r7;
   // lwz r9,-8(r8)
-  r9 = REX_LOAD_U32(uint32_t(r8) + -8);
+  r9 = guest::LoadU32(base, uint32_t(r8) + -8);
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,20(r11)
-  REX_STORE_U32(uint32_t(r11) + 20, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 20, uint32_t(r10));
   // addi r10,r7,-1
   r10 = uint64_t(int64_t(int64_t(r7) + -1));
   // stw r9,24(r11)
-  REX_STORE_U32(uint32_t(r11) + 24, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r9));
   // mr r7,r9
   r7 = r9;
   // stw r10,16(r11)
-  REX_STORE_U32(uint32_t(r11) + 16, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r10));
 loc_825DA6C4:
   // lbz r10,0(r9)
-  r10 = REX_LOAD_U8(uint32_t(r9) + 0);
+  r10 = guest::LoadU8(base, uint32_t(r9) + 0);
   // addi r9,r9,1
   r9 = uint64_t(int64_t(int64_t(r9) + 1));
   // cmplwi cr6,r10,0
@@ -2449,22 +2449,22 @@ loc_825DA6C4:
   // subf r7,r7,r9
   r7 = r9 - r7;
   // lwz r10,-4(r8)
-  r10 = REX_LOAD_U32(uint32_t(r8) + -4);
+  r10 = guest::LoadU32(base, uint32_t(r8) + -4);
   // li r9,0
   r9 = uint64_t(int64_t(0));
   // stw r9,32(r11)
-  REX_STORE_U32(uint32_t(r11) + 32, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r11) + 32, uint32_t(r9));
   // addi r9,r7,-1
   r9 = uint64_t(int64_t(int64_t(r7) + -1));
   // stw r10,36(r11)
-  REX_STORE_U32(uint32_t(r11) + 36, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 36, uint32_t(r10));
   // mr r7,r10
   r7 = r10;
   // stw r9,28(r11)
-  REX_STORE_U32(uint32_t(r11) + 28, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r11) + 28, uint32_t(r9));
 loc_825DA6F4:
   // lbz r9,0(r10)
-  r9 = REX_LOAD_U8(uint32_t(r10) + 0);
+  r9 = guest::LoadU8(base, uint32_t(r10) + 0);
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // cmplwi cr6,r9,0
@@ -2472,24 +2472,24 @@ loc_825DA6F4:
   // bne cr6,0x825da6f4
   if (!cr6.eq) goto loc_825DA6F4;
   // lwz r9,0(r8)
-  r9 = REX_LOAD_U32(uint32_t(r8) + 0);
+  r9 = guest::LoadU32(base, uint32_t(r8) + 0);
   // subf r8,r7,r10
   r8 = r10 - r7;
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,44(r11)
-  REX_STORE_U32(uint32_t(r11) + 44, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 44, uint32_t(r10));
   // addi r10,r8,-1
   r10 = uint64_t(int64_t(int64_t(r8) + -1));
   // stw r9,48(r11)
-  REX_STORE_U32(uint32_t(r11) + 48, uint32_t(r9));
+  guest::StoreU32(base, uint32_t(r11) + 48, uint32_t(r9));
   // stw r10,40(r11)
-  REX_STORE_U32(uint32_t(r11) + 40, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 40, uint32_t(r10));
   // mr r10,r9
   r10 = r9;
 loc_825DA724:
   // lbz r8,0(r9)
-  r8 = REX_LOAD_U8(uint32_t(r9) + 0);
+  r8 = guest::LoadU8(base, uint32_t(r9) + 0);
   // addi r9,r9,1
   r9 = uint64_t(int64_t(int64_t(r9) + 1));
   // cmplwi cr6,r8,0
@@ -2501,11 +2501,11 @@ loc_825DA724:
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,56(r11)
-  REX_STORE_U32(uint32_t(r11) + 56, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 56, uint32_t(r10));
   // addi r10,r9,-1
   r10 = uint64_t(int64_t(int64_t(r9) + -1));
   // stw r10,52(r11)
-  REX_STORE_U32(uint32_t(r11) + 52, uint32_t(r10));
+  guest::StoreU32(base, uint32_t(r11) + 52, uint32_t(r10));
   // blr
   return;
 }
@@ -2520,26 +2520,26 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stfd f31,-32(r1)
   lifted::ScalarFloatMode();
-  REX_STORE_U64(uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
+  guest::StoreU64(base, uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfd f2,8792(r11)
-  f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + 8792)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8792)));
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfd f31,22232(r11)
-  f31 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + 22232)));
+  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 22232)));
   // fmr f1,f31
   f1 = f31;
   // bl 0x825a8ed0
@@ -2555,7 +2555,7 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,8784(r11)
-  f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + 8784)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8784)));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
   // addi r31,r11,3968
@@ -2563,13 +2563,13 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = REX_LOAD_U32(uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,0(r31)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r31) + 0, temp.u32);
+  guest::StoreU32(base, uint32_t(r31) + 0, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
   { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA7B0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2583,13 +2583,13 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = REX_LOAD_U32(uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,4(r31)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r31) + 4, temp.u32);
+  guest::StoreU32(base, uint32_t(r31) + 4, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
   { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA7D0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2601,17 +2601,17 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,-31160(r11)
-  f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + -31160)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + -31160)));
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = REX_LOAD_U32(uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,8(r31)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r31) + 8, temp.u32);
+  guest::StoreU32(base, uint32_t(r31) + 8, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
   { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA7F4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2623,17 +2623,17 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,-18120(r11)
-  f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + -18120)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + -18120)));
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = REX_LOAD_U32(uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,12(r31)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r31) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r31) + 12, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
   { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA818, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2645,17 +2645,17 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,-9632(r11)
-  f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + -9632)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + -9632)));
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = REX_LOAD_U32(uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,16(r31)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r31) + 16, temp.u32);
+  guest::StoreU32(base, uint32_t(r31) + 16, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
   { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA83C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2667,17 +2667,17 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,8840(r11)
-  f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + 8840)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8840)));
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = REX_LOAD_U32(uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,20(r31)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r31) + 20, temp.u32);
+  guest::StoreU32(base, uint32_t(r31) + 20, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
   { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA860, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2689,17 +2689,17 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,-9640(r11)
-  f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + -9640)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + -9640)));
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = REX_LOAD_U32(uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,24(r31)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r31) + 24, temp.u32);
+  guest::StoreU32(base, uint32_t(r31) + 24, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
   { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA884, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2711,17 +2711,17 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // fmr f1,f31
   f1 = f31;
   // lfd f2,12936(r11)
-  f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + 12936)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 12936)));
   // frsp f13,f0
   f13 = double(float(f0));
   // lfs f0,8796(r30)
-  temp.u32 = REX_LOAD_U32(uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,28(r31)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r31) + 28, temp.u32);
+  guest::StoreU32(base, uint32_t(r31) + 28, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
   { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA8A8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2733,17 +2733,17 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   // lis r11,-32249
   r11 = uint64_t(int64_t(-2113470464));
   // lfs f0,8796(r30)
-  temp.u32 = REX_LOAD_U32(uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmr f1,f31
   f1 = f31;
   // lfd f2,8832(r11)
-  f2 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r11) + 8832)));
+  f2 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r11) + 8832)));
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,32(r31)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r31) + 32, temp.u32);
+  guest::StoreU32(base, uint32_t(r31) + 32, temp.u32);
   // bl 0x825a8ed0
   // (left out: dead in C++)
   { const lifted::Result o = game::pow(base, LIFTED_ARGS(0x825DA8CC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2751,25 +2751,25 @@ lifted::Result f825DA750(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) 
   lifted::ScalarFloatMode();
   f13 = double(float(f1));
   // lfs f0,8796(r30)
-  temp.u32 = REX_LOAD_U32(uint32_t(r30) + 8796);
+  temp.u32 = guest::LoadU32(base, uint32_t(r30) + 8796);
   f0 = double(temp.f32);
   // fmuls f0,f13,f0
   f0 = double(float(f13 * f0));
   // stfs f0,36(r31)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r31) + 36, temp.u32);
+  guest::StoreU32(base, uint32_t(r31) + 36, temp.u32);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // lfd f31,-32(r1)
-  f31 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r1) + -32)));
+  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r1) + -32)));
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -2784,17 +2784,17 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stfd f31,-32(r1)
   lifted::ScalarFloatMode();
-  REX_STORE_U64(uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
+  guest::StoreU64(base, uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
   // stwu r1,-112(r1)
   ea = -112 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -2803,10 +2803,10 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lis r11,-32249
   r11 = uint64_t(int64_t(-2113470464));
   // lfs f0,0(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 0);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 0);
   f0 = double(temp.f32);
   // lfs f31,8848(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 8848);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 8848);
   f31 = double(temp.f32);
   // fmuls f1,f0,f31
   f1 = double(float(f0 * f31));
@@ -2819,7 +2819,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
   // lfs f13,4(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 4);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 4);
   f13 = double(temp.f32);
   // addi r30,r11,4008
   r30 = uint64_t(int64_t(int64_t(r11) + 4008));
@@ -2829,7 +2829,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,0(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 0, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 0, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
   { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA94C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2837,7 +2837,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,8(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 8);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 8);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2845,7 +2845,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,4(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 4, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 4, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
   { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA964, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2853,7 +2853,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,12(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 12);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 12);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2861,7 +2861,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,8(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 8, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 8, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
   { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA97C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2869,7 +2869,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,16(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 16);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 16);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2877,7 +2877,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,12(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 12, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
   { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA994, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2885,7 +2885,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,20(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 20);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 20);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2893,7 +2893,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,16(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 16, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 16, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
   { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA9AC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2901,7 +2901,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,24(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 24);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 24);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2909,7 +2909,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,20(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 20, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 20, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
   { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA9C4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2917,7 +2917,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,28(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 28);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 28);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2925,7 +2925,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,24(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 24, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 24, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
   { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA9DC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2933,7 +2933,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,32(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 32);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 32);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2941,7 +2941,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,28(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 28, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 28, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
   { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DA9F4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2949,7 +2949,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,36(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 36);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 36);
   f13 = double(temp.f32);
   // fmuls f1,f13,f31
   f1 = double(float(f13 * f31));
@@ -2957,7 +2957,7 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f0));
   // stfs f0,32(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 32, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 32, temp.u32);
   // bl 0x825a8a50
   // (left out: dead in C++)
   { const lifted::Result o = game::tan(base, LIFTED_ARGS(0x825DAA0C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2966,19 +2966,19 @@ lifted::Result f825DA8F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   f0 = double(float(f1));
   // stfs f0,36(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 36, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 36, temp.u32);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // lfd f31,-32(r1)
-  f31 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r1) + -32)));
+  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r1) + -32)));
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return {r3, f1};
 }
@@ -2993,19 +2993,19 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // std r30,-24(r1)
-  REX_STORE_U64(uint32_t(r1) + -24, r30);
+  guest::StoreU64(base, uint32_t(r1) + -24, r30);
   // std r31,-16(r1)
-  REX_STORE_U64(uint32_t(r1) + -16, r31);
+  guest::StoreU64(base, uint32_t(r1) + -16, r31);
   // stfd f30,-40(r1)
   lifted::ScalarFloatMode();
-  REX_STORE_U64(uint32_t(r1) + -40, std::bit_cast<uint64_t>(f30));
+  guest::StoreU64(base, uint32_t(r1) + -40, std::bit_cast<uint64_t>(f30));
   // stfd f31,-32(r1)
-  REX_STORE_U64(uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
+  guest::StoreU64(base, uint32_t(r1) + -32, std::bit_cast<uint64_t>(f31));
   // stwu r1,-128(r1)
   ea = -128 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -3014,17 +3014,17 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   // lis r11,-32256
   r11 = uint64_t(int64_t(-2113929216));
   // lfs f0,0(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 0);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 0);
   f0 = double(temp.f32);
   // lfs f31,8124(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 8124);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 8124);
   f31 = double(temp.f32);
   // lis r11,-32249
   r11 = uint64_t(int64_t(-2113470464));
   // fmuls f0,f0,f31
   f0 = double(float(f0 * f31));
   // lfs f30,8852(r11)
-  temp.u32 = REX_LOAD_U32(uint32_t(r11) + 8852);
+  temp.u32 = guest::LoadU32(base, uint32_t(r11) + 8852);
   f30 = double(temp.f32);
   // fmuls f1,f0,f30
   f1 = double(float(f0 * f30));
@@ -3035,7 +3035,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,4(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 4);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 4);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3051,7 +3051,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,0(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 0, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 0, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
   { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAA9C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3059,7 +3059,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,8(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 8);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 8);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3071,7 +3071,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,4(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 4, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 4, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
   { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAABC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3079,7 +3079,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,12(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 12);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 12);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3091,7 +3091,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,8(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 8, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 8, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
   { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAADC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3099,7 +3099,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,16(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 16);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 16);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3111,7 +3111,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,12(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 12, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 12, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
   { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAAFC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3119,7 +3119,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,20(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 20);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 20);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3131,7 +3131,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,16(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 16, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 16, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
   { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAB1C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3139,7 +3139,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,24(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 24);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 24);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3151,7 +3151,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,20(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 20, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 20, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
   { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAB3C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3159,7 +3159,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,28(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 28);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 28);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3171,7 +3171,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,24(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 24, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 24, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
   { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAB5C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3179,7 +3179,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   lifted::ScalarFloatMode();
   f0 = f1;
   // lfs f13,32(r31)
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 32);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 32);
   f13 = double(temp.f32);
   // fmuls f13,f13,f31
   f13 = double(float(f13 * f31));
@@ -3191,13 +3191,13 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,28(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 28, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 28, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
   { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAB7C, r31)); r3 = o.r3; f1 = o.f1; }
   // lfs f13,36(r31)
   lifted::ScalarFloatMode();
-  temp.u32 = REX_LOAD_U32(uint32_t(r31) + 36);
+  temp.u32 = guest::LoadU32(base, uint32_t(r31) + 36);
   f13 = double(temp.f32);
   // fmr f0,f1
   f0 = f1;
@@ -3211,7 +3211,7 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,32(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 32, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 32, temp.u32);
   // bl 0x825a8978
   // (left out: dead in C++)
   { const lifted::Result o = game::cos(base, LIFTED_ARGS(0x825DAB9C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3222,21 +3222,21 @@ double f825DAA30(uint8_t* base, uint64_t r1, uint64_t r13) {
   f0 = std::bit_cast<double>(uint64_t(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000));
   // stfs f0,36(r30)
   temp.f32 = float(f0);
-  REX_STORE_U32(uint32_t(r30) + 36, temp.u32);
+  guest::StoreU32(base, uint32_t(r30) + 36, temp.u32);
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // lfd f30,-40(r1)
-  f30 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r1) + -40)));
+  f30 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r1) + -40)));
   // lfd f31,-32(r1)
-  f31 = std::bit_cast<double>(uint64_t(REX_LOAD_U64(uint32_t(r1) + -32)));
+  f31 = std::bit_cast<double>(uint64_t(guest::LoadU64(base, uint32_t(r1) + -32)));
   // ld r30,-24(r1)
-  r30 = REX_LOAD_U64(uint32_t(r1) + -24);
+  r30 = guest::LoadU64(base, uint32_t(r1) + -24);
   // ld r31,-16(r1)
-  r31 = REX_LOAD_U64(uint32_t(r1) + -16);
+  r31 = guest::LoadU64(base, uint32_t(r1) + -16);
   // blr
   return f1;
 }
@@ -3250,10 +3250,10 @@ lifted::Result f825DABC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -3272,7 +3272,7 @@ lifted::Result f825DABC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr
@@ -3302,10 +3302,10 @@ lifted::Result f825DAC10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // mflr r12
   r12 = 0;
   // stw r12,-8(r1)
-  REX_STORE_U32(uint32_t(r1) + -8, uint32_t(r12));
+  guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r12));
   // stwu r1,-96(r1)
   ea = -96 + uint32_t(r1);
-  REX_STORE_U32(ea, uint32_t(r1));
+  guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lis r11,-32105
   r11 = uint64_t(int64_t(-2104033280));
@@ -3324,7 +3324,7 @@ lifted::Result f825DAC10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r4, 
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
-  r12 = REX_LOAD_U32(uint32_t(r1) + -8);
+  r12 = guest::LoadU32(base, uint32_t(r1) + -8);
   // mtlr r12
   // (left out: dead in C++)
   // blr

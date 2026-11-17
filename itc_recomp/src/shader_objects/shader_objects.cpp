@@ -92,7 +92,7 @@ std::string TrimmedMessage(const char* host) {
 }
 
 void DebugMessage(uint8_t* base, const char* where, uint32_t text) {
-  const char* host = reinterpret_cast<const char*>(REX_RAW_ADDR(text));
+  const char* host = reinterpret_cast<const char*>(guest::Pointer(base, text));
   ITC_LOG_WARN("{}: the game's debug message: {}", where, TrimmedMessage(host));
 }
 
@@ -149,7 +149,7 @@ bool VertexShaderInit(uint8_t* base, uint32_t object, uint32_t microcode) {
     const uint32_t from = microcode + 12 * (word & 0xFFF);
     const uint32_t to = object + 192 + 12 * i;
     if (to != from) {
-      std::memcpy(REX_RAW_ADDR(to), REX_RAW_ADDR(from), 12);
+      std::memcpy(guest::Pointer(base, to), guest::Pointer(base, from), 12);
     }
   }
   return true;

@@ -80,7 +80,7 @@ uint32_t LoadLittleEndianU32(uint8_t* base, uint32_t address) {
 
 __m128 LoadSwapped(uint8_t* base, uint32_t address) {
   return _mm_castsi128_ps(
-      guest::SwapVector(_mm_loadu_si128(reinterpret_cast<const __m128i*>(REX_RAW_ADDR(address)))));
+      guest::SwapVector(_mm_loadu_si128(reinterpret_cast<const __m128i*>(guest::Pointer(base, address)))));
 }
 
 // One light that passed both tests, as the original's loop at 0x820F42A8
@@ -90,7 +90,7 @@ __m128 LoadSwapped(uint8_t* base, uint32_t address) {
 void Keep(uint8_t* base, const Query& query, Search& search, uint32_t light, float x, float y,
           float z, float distance) {
   Kept& added = search.kept[search.count];
-  std::memcpy(added.bytes, REX_RAW_ADDR(light), sizeof(added.bytes));
+  std::memcpy(added.bytes, guest::Pointer(base, light), sizeof(added.bytes));
   added.x = x;
   added.y = y;
   added.z = z;
@@ -221,9 +221,9 @@ void FindNearest(uint8_t* base, uint32_t owner, const Query& query, Search& sear
 // kOutputW, then the light's bytes 16-31.
 void Write(uint8_t* base, const Search& search, uint32_t output) {
   uint8_t w[4];
-  std::memcpy(w, REX_RAW_ADDR(kOutputW), 4);
+  std::memcpy(w, guest::Pointer(base, kOutputW), 4);
   for (int32_t i = 0; i < search.count; i++) {
-    uint8_t* out = REX_RAW_ADDR(output + kOutputStride * i);
+    uint8_t* out = guest::Pointer(base, output + kOutputStride * i);
     std::memcpy(out, search.kept[i].bytes, 12);
     std::memcpy(out + 12, w, 4);
     std::memcpy(out + 16, search.kept[i].bytes + 16, 16);

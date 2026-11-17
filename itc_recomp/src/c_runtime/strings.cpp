@@ -377,7 +377,7 @@ bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size)
   if (to < from + size && from < to + size) {
     return false;  // overlapping: the original's loop order decides
   }
-  std::memcpy(REX_RAW_ADDR(destination), REX_RAW_ADDR(source), size);
+  std::memcpy(guest::Pointer(base, destination), guest::Pointer(base, source), size);
   return true;
 }
 
@@ -398,8 +398,8 @@ void XMemSet(uint8_t* base, uint32_t destination, uint32_t value, uint32_t bytes
     return;
   }
   // The translated code's steps (docs/functions/c-runtime.md).
-  auto store16 = [&](uint32_t at) { std::memset(REX_RAW_ADDR(at & ~15u), byte, 16); };
-  auto clear_line = [&](uint32_t at) { std::memset(REX_RAW_ADDR(at & ~127u), 0, 128); };
+  auto store16 = [&](uint32_t at) { std::memset(guest::Pointer(base, at & ~15u), byte, 16); };
+  auto clear_line = [&](uint32_t at) { std::memset(guest::Pointer(base, at & ~127u), 0, 128); };
   uint32_t p = destination;
   uint32_t left = bytes;
   const uint32_t head = (0u - destination) & 15;
@@ -506,10 +506,10 @@ bool MemmoveDown(uint8_t* base, uint32_t destination, uint32_t source, uint32_t 
     }
     // One view: the guest's order is the host's, and the original's backward
     // copy gives what memmove does.
-    std::memmove(REX_RAW_ADDR(destination), REX_RAW_ADDR(source), size);
+    std::memmove(guest::Pointer(base, destination), guest::Pointer(base, source), size);
     return true;
   }
-  std::memcpy(REX_RAW_ADDR(destination), REX_RAW_ADDR(source), size);
+  std::memcpy(guest::Pointer(base, destination), guest::Pointer(base, source), size);
   return true;
 }
 

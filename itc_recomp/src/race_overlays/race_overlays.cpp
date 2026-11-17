@@ -525,11 +525,11 @@ namespace race_overlays {
 namespace {
 
 uint64_t LoadU64(uint8_t* base, uint32_t address) {
-  return REX_LOAD_U64(address);
+  return guest::LoadU64(base, address);
 }
 
 void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
-  REX_STORE_U64(address, value);
+  guest::StoreU64(base, address, value);
 }
 
 // fsubs on two singles from guest memory: the difference of the two as

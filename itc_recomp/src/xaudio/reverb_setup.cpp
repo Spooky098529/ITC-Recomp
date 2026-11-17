@@ -34,14 +34,14 @@ using namespace ppc_float;
 
 uint64_t L8(uint8_t* base, uint32_t address) { return guest::LoadU8(base, address); }
 uint64_t L32(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-uint64_t L64(uint8_t* base, uint32_t address) { return REX_LOAD_U64(address); }
+uint64_t L64(uint8_t* base, uint32_t address) { return guest::LoadU64(base, address); }
 void S8(uint8_t* base, uint32_t address, uint64_t value) {
   guest::StoreU8(base, address, uint8_t(value));
 }
 void S32(uint8_t* base, uint32_t address, uint64_t value) {
   guest::StoreU32(base, address, uint32_t(value));
 }
-void S64(uint8_t* base, uint32_t address, uint64_t value) { REX_STORE_U64(address, value); }
+void S64(uint8_t* base, uint32_t address, uint64_t value) { guest::StoreU64(base, address, value); }
 // lfs: the word as a float, widened.
 double ToDouble(uint64_t word) { return double(std::bit_cast<float>(uint32_t(word))); }
 // stfs: rounded to a float.

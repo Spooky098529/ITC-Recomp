@@ -60,7 +60,7 @@ thread_local std::chrono::steady_clock::time_point g_last_log;
 
 // Adds `delta` to the big-endian count at `address`; returns the new count.
 uint32_t AddToCount(uint8_t* base, uint32_t address, int32_t delta) {
-  uint32_t* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(address));
+  uint32_t* word = reinterpret_cast<uint32_t*>(guest::Pointer(base, address));
   uint32_t old_raw = __atomic_load_n(word, __ATOMIC_RELAXED);
   uint32_t value;
   do {

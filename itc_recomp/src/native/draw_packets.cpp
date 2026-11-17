@@ -95,7 +95,7 @@ bool Checking() {
 }
 
 uint8_t* DevicePointer(uint8_t* base, uint32_t device) {
-  return REX_RAW_ADDR(device);
+  return guest::Pointer(base, device);
 }
 
 // Runs `call` and records which device words it changed (the command
@@ -208,7 +208,7 @@ void native::DrawPackets_IndexedDraw(lifted::Regs& ctx, uint8_t* base) {
   uint32_t device = ctx.r3.u32;
   bool predicated = guest::LoadU8(base, device + kDeviceTilingFlags) & 0x2;
   if (Checking()) {
-    bool shader_load = REX_LOAD_U64(device + kDeviceShaderStateDirty) & kShaderBits;
+    bool shader_load = guest::LoadU64(base, device + kDeviceShaderStateDirty) & kShaderBits;
     {
       std::lock_guard lock(g_mutex);
       g_check.draws++;
@@ -230,9 +230,9 @@ void native::DrawPackets_IndexedDraw(lifted::Regs& ctx, uint8_t* base) {
     lifted::original::c825BE708(ctx, base);
     return;
   }
-  REX_STORE_U64(device + kDeviceVertexConstantsDirty, 0);
-  REX_STORE_U64(device + kDevicePixelConstantsDirty, 0);
-  uint64_t shader_state = REX_LOAD_U64(device + kDeviceShaderStateDirty);
+  guest::StoreU64(base, device + kDeviceVertexConstantsDirty, 0);
+  guest::StoreU64(base, device + kDevicePixelConstantsDirty, 0);
+  uint64_t shader_state = guest::LoadU64(base, device + kDeviceShaderStateDirty);
   if (shader_state & kShaderBits) {
     // A shader's fence (+8) is the command position it was last loaded at;
     // the library patches a vertex shader in place only once the GPU has
@@ -252,12 +252,12 @@ void native::DrawPackets_IndexedDraw(lifted::Regs& ctx, uint8_t* base) {
     ctx = saved;
   }
   // What the library's draw would have flushed: read again.
-  MarkDeviceDirty(shader_state, REX_LOAD_U64(device + kDeviceRenderStateDirty),
-                  REX_LOAD_U64(device + kDeviceOtherStateDirty));
-  REX_STORE_U64(device + kDeviceShaderStateDirty, 0);
-  if (REX_LOAD_U64(device + kDeviceRenderStateDirty) & 0x2) {
-    REX_STORE_U64(device + kDeviceHizState, 0xFFFFFFFFFF000000ull);  // lis r11,-256; std
+  MarkDeviceDirty(shader_state, guest::LoadU64(base, device + kDeviceRenderStateDirty),
+                  guest::LoadU64(base, device + kDeviceOtherStateDirty));
+  guest::StoreU64(base, device + kDeviceShaderStateDirty, 0);
+  if (guest::LoadU64(base, device + kDeviceRenderStateDirty) & 0x2) {
+    guest::StoreU64(base, device + kDeviceHizState, 0xFFFFFFFFFF000000ull);  // lis r11,-256; std
   }
-  REX_STORE_U64(device + kDeviceRenderStateDirty, 0);
-  REX_STORE_U64(device + kDeviceOtherStateDirty, 0);
+  guest::StoreU64(base, device + kDeviceRenderStateDirty, 0);
+  guest::StoreU64(base, device + kDeviceOtherStateDirty, 0);
 }

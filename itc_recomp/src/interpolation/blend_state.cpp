@@ -202,7 +202,7 @@ bool OneHostRange(uint32_t address) {
 Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
   Matrix4 m;
   if (OneHostRange(address)) {
-    const uint8_t* p = REX_RAW_ADDR(address);
+    const uint8_t* p = guest::Pointer(base, address);
     for (int i = 0; i < 4; i++) {
       __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i*>(p + 16 * i));
       _mm_storeu_si128(reinterpret_cast<__m128i*>(&m[4 * i]), guest::SwapVector(v));
@@ -217,7 +217,7 @@ Matrix4 LoadMatrix(uint8_t* base, uint32_t address) {
 
 void StoreMatrix(uint8_t* base, uint32_t address, const Matrix4& m) {
   if (OneHostRange(address)) {
-    uint8_t* p = REX_RAW_ADDR(address);
+    uint8_t* p = guest::Pointer(base, address);
     for (int i = 0; i < 4; i++) {
       __m128i v = _mm_loadu_si128(reinterpret_cast<const __m128i*>(&m[4 * i]));
       _mm_storeu_si128(reinterpret_cast<__m128i*>(p + 16 * i), guest::SwapVector(v));

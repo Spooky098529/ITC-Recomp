@@ -130,7 +130,7 @@ std::string TrimmedMessage(const char* host) {
 }
 
 void DebugMessage(uint8_t* base, uint32_t text) {
-  const char* host = reinterpret_cast<const char*>(REX_RAW_ADDR(text));
+  const char* host = reinterpret_cast<const char*>(guest::Pointer(base, text));
   ITC_LOG_WARN("XPR::Create: the game's debug message: {}", TrimmedMessage(host));
 }
 

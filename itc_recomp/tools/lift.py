@@ -1079,7 +1079,22 @@ def emit_batch(batch, names, infos, emitting):
     # code calls them directly or through the dispatch table.
     # The functions with LIFTED_ARGS but without some of its registers as
     # locals or parameters would not build: every call adds them to `used`.
-    return "\n".join(lines)
+    return own_spelling("\n".join(lines))
+
+
+OWN_SPELLING = re.compile(r"\bREX_(LOAD|STORE)_U(8|16|32|64)\(|\bREX_RAW_ADDR\(")
+
+
+def own_spelling(text):
+    """Guest memory accesses in our own spelling (docs/e5-native.md, step
+    0): the generated code's REX_LOAD_U32(x), REX_STORE_U32(x, y) and
+    REX_RAW_ADDR(x) as guest::LoadU32(base, x), guest::StoreU32(base, x, y)
+    and guest::Pointer(base, x) (guest.h), as the hand ports write them."""
+    def rep(m):
+        if m.group(1):
+            return f"guest::{m.group(1).capitalize()}U{m.group(2)}(base, "
+        return "guest::Pointer(base, "
+    return OWN_SPELLING.sub(rep, text)
 
 
 def emit_header(signatures):

@@ -55,7 +55,7 @@ float LoadF(uint8_t* base, uint32_t address) { return guest::LoadFloat(base, add
 
 // A dirty mask ORed with `bits`.
 void Mark(uint8_t* base, uint32_t address, uint64_t bits) {
-  REX_STORE_U64(address, REX_LOAD_U64(address) | bits);
+  guest::StoreU64(base, address, guest::LoadU64(base, address) | bits);
 }
 
 // rlwimi: the word at `address` with `mask`'s bits from `value` rotated
@@ -345,13 +345,13 @@ void CopyConstants(uint8_t* base, uint32_t to, uint32_t data, uint32_t count) {
   auto load = [&](uint32_t from, uint8_t* out) {
     // lvlx and lvrx: the bytes up to the next 16-byte line, then the rest.
     const uint32_t first = 16 - (from & 0xF);
-    std::memcpy(out, REX_RAW_ADDR(from), first);
+    std::memcpy(out, guest::Pointer(base, from), first);
     if (first < 16) {
-      std::memcpy(out + first, REX_RAW_ADDR(from + first), 16 - first);
+      std::memcpy(out + first, guest::Pointer(base, from + first), 16 - first);
     }
   };
   auto store = [&](uint32_t at, const uint8_t* in) {
-    std::memcpy(REX_RAW_ADDR(at & ~0xFu), in, 16);
+    std::memcpy(guest::Pointer(base, at & ~0xFu), in, 16);
   };
   uint32_t left = count;
   if (count > 3) {
@@ -1515,8 +1515,8 @@ void SetDepthStencilSurface(uint8_t* base, uint32_t device, uint32_t surface) {
 
 namespace {
 
-uint64_t Load64(uint8_t* base, uint32_t address) { return REX_LOAD_U64(address); }
-void Store64(uint8_t* base, uint32_t address, uint64_t value) { REX_STORE_U64(address, value); }
+uint64_t Load64(uint8_t* base, uint32_t address) { return guest::LoadU64(base, address); }
+void Store64(uint8_t* base, uint32_t address, uint64_t value) { guest::StoreU64(base, address, value); }
 uint64_t Rotl64(uint64_t x, int n) { return std::rotl(x, n); }
 
 // A render state setter from the device's table, natively when it's one of

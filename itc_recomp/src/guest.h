@@ -25,28 +25,48 @@ struct Regs;
 
 namespace guest {
 
+// Guest memory's one spelling, for lifted code and hand ports alike
+// (docs/e5-native.md, step 0): `base` + the 32-bit guest address,
+// big-endian, through volatile accesses (as the generated code's macros
+// did: the compiler neither merges nor drops them). The physical range
+// above 0xE0000000 is mapped at physical + 4 KB by the views' layout
+// (src/memory/mapping.cpp): no offset to add here.
+
+// The host address of a guest address.
+inline uint8_t* Pointer(uint8_t* base, uint32_t address) {
+  return base + address;
+}
+
 inline uint8_t LoadU8(uint8_t* base, uint32_t address) {
-  return REX_LOAD_U8(address);
+  return *reinterpret_cast<volatile uint8_t*>(base + address);
 }
 
 inline void StoreU8(uint8_t* base, uint32_t address, uint8_t value) {
-  REX_STORE_U8(address, value);
+  *reinterpret_cast<volatile uint8_t*>(base + address) = value;
 }
 
 inline uint16_t LoadU16(uint8_t* base, uint32_t address) {
-  return REX_LOAD_U16(address);
+  return __builtin_bswap16(*reinterpret_cast<volatile uint16_t*>(base + address));
 }
 
 inline void StoreU16(uint8_t* base, uint32_t address, uint16_t value) {
-  REX_STORE_U16(address, value);
+  *reinterpret_cast<volatile uint16_t*>(base + address) = __builtin_bswap16(value);
 }
 
 inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
-  return REX_LOAD_U32(address);
+  return __builtin_bswap32(*reinterpret_cast<volatile uint32_t*>(base + address));
 }
 
 inline void StoreU32(uint8_t* base, uint32_t address, uint32_t value) {
-  REX_STORE_U32(address, value);
+  *reinterpret_cast<volatile uint32_t*>(base + address) = __builtin_bswap32(value);
+}
+
+inline uint64_t LoadU64(uint8_t* base, uint32_t address) {
+  return __builtin_bswap64(*reinterpret_cast<volatile uint64_t*>(base + address));
+}
+
+inline void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
+  *reinterpret_cast<volatile uint64_t*>(base + address) = __builtin_bswap64(value);
 }
 
 #if defined(__SSSE3__)
@@ -108,11 +128,11 @@ inline bool CopyU32s(uint8_t* base, uint32_t address, uint32_t* out, uint32_t co
   if (count && address < kOffsetChange &&
       uint64_t(address) + 4 * uint64_t(count - 1) >= kOffsetChange) {
     uint32_t below = (kOffsetChange - address + 3) / 4;
-    bool differ = SwapU32s(REX_RAW_ADDR(address), out, below);
+    bool differ = SwapU32s(guest::Pointer(base, address), out, below);
     uint32_t rest = address + 4 * below;
-    return SwapU32s(REX_RAW_ADDR(rest), out + below, count - below) || differ;
+    return SwapU32s(guest::Pointer(base, rest), out + below, count - below) || differ;
   }
-  return SwapU32s(REX_RAW_ADDR(address), out, count);
+  return SwapU32s(guest::Pointer(base, address), out, count);
 }
 
 // CopyU32s for floats (no comparison).
@@ -129,12 +149,12 @@ inline void CopyFloats(uint8_t* base, uint32_t address, float* out, uint32_t cou
   if (count && address < kOffsetChange &&
       uint64_t(address) + 4 * uint64_t(count - 1) >= kOffsetChange) {
     uint32_t below = (kOffsetChange - address + 3) / 4;
-    SwapFloats(REX_RAW_ADDR(address), out, below);
+    SwapFloats(guest::Pointer(base, address), out, below);
     uint32_t rest = address + 4 * below;
-    SwapFloats(REX_RAW_ADDR(rest), out + below, count - below);
+    SwapFloats(guest::Pointer(base, rest), out + below, count - below);
     return;
   }
-  SwapFloats(REX_RAW_ADDR(address), out, count);
+  SwapFloats(guest::Pointer(base, address), out, count);
 }
 
 // Byte-swaps count words from in into guest memory at out (host memory,
@@ -157,11 +177,11 @@ inline void ForEachHostPart(uint8_t* base, uint32_t address, uint32_t bytes, Par
   constexpr uint32_t kOffsetChange = 0xE0000000u;
   if (bytes && address < kOffsetChange && uint64_t(address) + bytes > kOffsetChange) {
     uint32_t below = kOffsetChange - address;
-    part(REX_RAW_ADDR(address), 0u, below);
-    part(REX_RAW_ADDR(kOffsetChange), below, bytes - below);
+    part(guest::Pointer(base, address), 0u, below);
+    part(guest::Pointer(base, kOffsetChange), below, bytes - below);
     return;
   }
-  part(REX_RAW_ADDR(address), 0u, bytes);
+  part(guest::Pointer(base, address), 0u, bytes);
 }
 
 // Stores count words (floats or integers, in host byte order) to guest
@@ -173,20 +193,20 @@ inline void StoreU32s(uint8_t* base, uint32_t address, const void* words, uint32
   if (count && address < kOffsetChange &&
       uint64_t(address) + 4 * uint64_t(count - 1) >= kOffsetChange) {
     uint32_t below = (kOffsetChange - address + 3) / 4;
-    SwapStoreU32s(REX_RAW_ADDR(address), in, below);
+    SwapStoreU32s(guest::Pointer(base, address), in, below);
     uint32_t rest = address + 4 * below;
-    SwapStoreU32s(REX_RAW_ADDR(rest), in + 4 * below, count - below);
+    SwapStoreU32s(guest::Pointer(base, rest), in + 4 * below, count - below);
     return;
   }
-  SwapStoreU32s(REX_RAW_ADDR(address), in, count);
+  SwapStoreU32s(guest::Pointer(base, address), in, count);
 }
 
 inline float LoadFloat(uint8_t* base, uint32_t address) {
-  return std::bit_cast<float>(REX_LOAD_U32(address));
+  return std::bit_cast<float>(guest::LoadU32(base, address));
 }
 
 inline void StoreFloat(uint8_t* base, uint32_t address, float value) {
-  REX_STORE_U32(address, std::bit_cast<uint32_t>(value));
+  guest::StoreU32(base, address, std::bit_cast<uint32_t>(value));
 }
 
 // Reserves space on the guest stack for the lifetime of the object, for
