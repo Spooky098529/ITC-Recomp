@@ -202,6 +202,99 @@ Done when the tables exist for every type the static map reaches, with the
 share of loads and stores the tool could attribute to a type (the rest
 listed, to read by hand).
 
+Measured (2026-11-17, on `e5-native-16-11-26`), for the user's review:
+`itc_recomp/tools/type_map.py` (it reads code, changes none; ~4 s) writes
+`itc_recomp/coverage/type_map.tsv` (a row a type: functions, accesses,
+fields with offset, width and int/float/pointee, allocation sizes and
+sites, vtables, owner, areas, tags), `type_map_areas.tsv` (the graph's
+nodes: an area's private and shared types, its shared weight, its heaviest
+neighbors) and `type_map_split.tsv` (an area's typed accesses by kind).
+
+How it reads the code: the original PowerPC instructions (the comments in
+`generated/`) of the 8,289 functions the static map reaches from `main`
+that are ours or unported (the replaced libraries left out), following
+pointers through registers in a straight read of each function (branches
+not followed: a simplification). Types come from four sources:
+- a row's class (`X::Y` takes an `X` in r3), joined only when the function
+  uses r3 as a pointer: a name like `Controls::ButtonIndex` is a free
+  function;
+- allocations: 573 sites (`operator new`, `new[]`, `malloc`, `XMemAlloc`,
+  `HeapAlloc`, the memory blocks', `VirtualAlloc`, the physical ones)
+  named by the constructor they're handed to, else `new<size>@caller`;
+- paths: what a field or an image word holds (`App.+24`, `[826C5C80]`),
+  joined with the type stored there when every store agrees;
+- parameters and returns (`sub_X.r4`, `Find.ret`), joined with what every
+  caller passes or every return gives. A generic function (lists, copies)
+  keeps a type of its own.
+
+The joins are made again each pass from the last pass's votes (four
+passes), and two classes the rows name differently are never merged (592
+such joins refused: base and derived classes, generic helpers). The first
+runs without those rules merged half the game into one type (`Mesh` with
+`Car`, `CarScene`, `Skeleton`...); what's left may still hold such merges,
+smaller, to read by hand.
+
+The figures (2026-11-17):
+
+| Loads and stores (192,480 in the 8,289 functions) | Count | Share |
+| --- | --- | --- |
+| Through a typed pointer (fields) | 80,800 | 42.0% |
+| On the stack (the frame and locals' addresses) | 68,266 | 35.5% |
+| At an image address (2,819 addresses; 2,131 used by one area) | 18,021 | 9.4% |
+| Untyped (a register the read lost: after an indirect call, a loop's join) | 10,933 | 5.7% |
+| Indexed by an untyped register | 7,311 | 3.8% |
+| An array inside a typed object (`[i]`), or indexed and typed | 6,417 | 3.3% |
+| Other constant addresses, the thread block | 732 | 0.4% |
+
+Of the accesses not on the stack, **80.6% are attributed** (to a type or the
+image); the rest are listed per function by the tool. 4,821 types: 4,553
+named (by a class, a path, a parameter or a return), 268 allocations
+without a class; **4,405 private, 416 shared**. 175 constructors' vtables
+found.
+
+Typed accesses by their types' kind: **37.9% on types tagged file, GPU or
+save** (touched by an area that reads `DATA/` in place, feeds the GPU, or
+saves: steps 5 and 7; the tags are by area, not proof), **35.3% private**
+(step 3), **26.8% shared** (step 4).
+
+What can't move by itself (the tags, by type): 826 touched by a file area,
+250 by a GPU area, 82 by a save area; 86 types are what an image word
+points to (the game's singletons and globals, `[826C5C80]`, the scene at
+`[826C2E44]`); 4,501 types have no allocation seen (embedded objects, file
+data, globals' contents, or allocations through a path the tool doesn't
+follow).
+
+The most shared types (areas, functions): the UI movie records
+(`UiMovies::Find`'s return: 39, 937; `UiMovie`: 27, 303;
+`UiMovie::Child`'s: 17, 167), the save data (`SaveData::Of`'s: 36, 165),
+`Racers` (38, 195), `SceneLights` (22, 69), the objects at `[826C5C80]`
+and `[826BABA0]` (15 and 14), the stand scene's 24-byte allocation (12,
+81). These are step 4's hubs, moved last or behind handles.
+
+The order it gives (to confirm with the user):
+- **Step 3 first**, the areas most on private types (share of their typed
+  accesses): XAudio's objects (99.5%), our heap (94.7%), the type 2 dialog
+  (90.6%), the C runtime (88.4%), the framework (87.0%), XAudio (86.4%),
+  the track zones (84.5%), the app states (81.2%), the race menu (80.3%),
+  the action mappers (79.5%), then the race world, collision, XAudio's
+  engine, the car sounds, the type 5 mode, the movies, the game modes,
+  today's result and the AI drivers (67% to 73%). That's the plan's guess
+  (the C runtime, XAudio, the action mappers, the menus' machines).
+- **The leaves** of the graph (fewest shared ties): `std::string`, XACT's
+  core, the morph jobs, the shader objects, the file layer, the archive,
+  the data tables, the framework.
+- **The heaviest ties** (functions on both sides of a shared type): the
+  tuning pages and the tuning screen (336), the AI drivers and the car
+  physics (215), the tuning screen and the UI movies (171), and every
+  front-end screen with the UI movies (130 to 135): those pairs move
+  together, the UI movies' records last.
+- **Steps 5 and 7** are as big as step 3 by accesses (37.9%): the file
+  loaders and the renderer's inputs aren't a tail.
+
+The functions still filed in `lifted.md` (the lift sweep's catch-all) were
+given their callers' area; those with no caller in the code (reached by a
+pointer) stay there as one area (2,573 typed accesses).
+
 ### 2. The schema and named fields (no change in memory)
 
 - **The schema** (`itc_recomp/schema/`, one file per area, in a form the
