@@ -39,6 +39,7 @@ usage: type_map.py   (writes itc_recomp/coverage/type_map.tsv and
 """
 import collections
 import csv
+import json
 import os
 import pickle
 import re
@@ -192,7 +193,7 @@ class Map:
         self.loose = {f for f, a in self.area.items() if a in loose}
         for _ in range(20):
             changed = False
-            for f in self.loose:
+            for f in sorted(self.loose):
                 votes = collections.Counter(self.area[c] for c in callers[f] if self.area[c] not in loose)
                 if not votes:
                     votes = collections.Counter(self.area[c] for c in callees[f] if self.area[c] not in loose)
@@ -288,15 +289,15 @@ class Map:
                     continue
                 kinds = {self.find(t) for t in c}
                 if len(kinds) == 1:
-                    pairs.append((f"{fn}.r{i}", kinds.pop()))
+                    pairs.append((f"{fn}.r{i}", min(kinds)))
         for field, c in new_fields.items():
             kinds = {self.find(t) for t in c}
             if len(kinds) == 1:
-                pairs.append((field, kinds.pop()))
+                pairs.append((field, min(kinds)))
         for fn, c in new_returns.items():
             kinds = {self.find(t) for t in c}
             if len(kinds) == 1:
-                pairs.append((f"{fn}.ret", kinds.pop()))
+                pairs.append((f"{fn}.ret", min(kinds)))
         self.parent = {}
         self.refused = 0
         for a, b in pairs:
@@ -529,9 +530,31 @@ def main():
             "alloc_sizes": ",".join(map(str, alloc_sizes)), "alloc_sites": len(m.allocs.get(t, [])),
             "vtables": ",".join(sorted(m.vtables.get(t, ()))),
             "owner": "private" if len(areas) == 1 else "shared", "areas": len(areas),
-            "area_list": ",".join(a for a, _ in areas.most_common()),
+            "area_list": ",".join(a for a, _ in sorted(areas.items(), key=lambda kv: (-kv[1], kv[0]))),
             "tags": ",".join(tags(t, areas)), "field_list": " ".join(fdesc)[:4000],
         })
+    # The full fields, for the schema's seed (tools/schema_seed.py): not
+    # committed (out/).
+    full = {}
+    for t in m.touch:
+        fields = {}
+        for off, c in m.fields.get(t, {}).items():
+            fields[str(off)] = {
+                "widths": sorted({f"{w}{k[0]}" for (w, k) in c if isinstance(w, int)}),
+                "pointee": sorted({m.display(k) for (w, k) in c if w == "ptr"}),
+                "fn": sorted({k for (w, k) in c if w == "fn"}),
+                "image": sorted({k for (w, k) in c if w == "image"}),
+                "count": sum(c.values()),
+            }
+        areas = areas_of[t]
+        full[m.display(t)] = {
+            "areas": dict(sorted(areas.items(), key=lambda kv: (-kv[1], kv[0]))), "functions": len(m.touch[t]),
+            "alloc_sizes": sorted({s_ for _, s_ in m.allocs.get(t, []) if s_ is not None}),
+            "vtables": sorted(m.vtables.get(t, ())), "tags": tags(t, areas), "fields": fields,
+        }
+    os.makedirs(os.path.join(ROOT, "itc_recomp", "out"), exist_ok=True)
+    with open(os.path.join(ROOT, "itc_recomp", "out", "type_map.json"), "w") as f:
+        json.dump(full, f, indent=0, sort_keys=True)
     with open(os.path.join(COVERAGE, "type_map.tsv"), "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]), delimiter="\t")
         w.writeheader()

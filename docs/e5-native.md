@@ -228,7 +228,7 @@ not followed: a simplification). Types come from four sources:
   keeps a type of its own.
 
 The joins are made again each pass from the last pass's votes (four
-passes), and two classes the rows name differently are never merged (592
+passes; the output is the same from run to run), and two classes the rows name differently are never merged (592
 such joins refused: base and derived classes, generic helpers). The first
 runs without those rules merged half the game into one type (`Mesh` with
 `Car`, `CarScene`, `Skeleton`...); what's left may still hold such merges,
@@ -240,7 +240,7 @@ The figures (2026-11-17):
 | --- | --- | --- |
 | Through a typed pointer (fields) | 80,800 | 42.0% |
 | On the stack (the frame and locals' addresses) | 68,266 | 35.5% |
-| At an image address (2,819 addresses; 2,131 used by one area) | 18,021 | 9.4% |
+| At an image address (2,819 addresses; 2,134 used by one area) | 18,021 | 9.4% |
 | Untyped (a register the read lost: after an indirect call, a loop's join) | 10,933 | 5.7% |
 | Indexed by an untyped register | 7,311 | 3.8% |
 | An array inside a typed object (`[i]`), or indexed and typed | 6,417 | 3.3% |
@@ -249,16 +249,16 @@ The figures (2026-11-17):
 Of the accesses not on the stack, **80.6% are attributed** (to a type or the
 image); the rest are listed per function by the tool. 4,821 types: 4,553
 named (by a class, a path, a parameter or a return), 268 allocations
-without a class; **4,405 private, 416 shared**. 175 constructors' vtables
+without a class; **4,404 private, 417 shared**. 175 constructors' vtables
 found.
 
 Typed accesses by their types' kind: **37.9% on types tagged file, GPU or
 save** (touched by an area that reads `DATA/` in place, feeds the GPU, or
-saves: steps 5 and 7; the tags are by area, not proof), **35.3% private**
-(step 3), **26.8% shared** (step 4).
+saves: steps 5 and 7; the tags are by area, not proof), **35.2% private**
+(step 3), **26.9% shared** (step 4).
 
-What can't move by itself (the tags, by type): 826 touched by a file area,
-250 by a GPU area, 82 by a save area; 86 types are what an image word
+What can't move by itself (the tags, by type): 822 touched by a file area,
+249 by a GPU area, 82 by a save area; 86 types are what an image word
 points to (the game's singletons and globals, `[826C5C80]`, the scene at
 `[826C2E44]`); 4,501 types have no allocation seen (embedded objects, file
 data, globals' contents, or allocations through a path the tool doesn't
