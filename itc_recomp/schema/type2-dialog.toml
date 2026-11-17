@@ -1,0 +1,45 @@
+# The schema of docs/functions/type2-dialog.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The type 2 mode's dialog: four dialogs over UI movies 16 to 19 (two yes/no
+# questions, two notices), run by a state machine at the type 2 mode block's
+# +0x1E4C8 with three blocks of its own (src/type2_dialog/).
+
+# The dialog's machine is a StateMachine (game-modes.toml) at the type 2
+# mode block's +0x1E4C8.
+
+# The page object (28 bytes, made by OnEnter).
+[Type2DialogPages]
+measure = "new<28>@Type2Dialog::OnEnter"
+size = 28
+origin = "allocated"
+fields = [
+  { name = "page", offset = 0, type = "u32", note = "the page Draw runs; -1 while a step runs" },
+  { name = "next_page", offset = 4, type = "u32", note = "the page after the step" },
+  { name = "previous_page", offset = 8, type = "u32" },
+  { name = "step", offset = 12, type = "u32", note = "the step Update runs; -1 none" },
+  { name = "queued_step", offset = 16, type = "u32", note = "the step after it" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "step_started", offset = 24, type = "u32", note = "the step's started word" },
+]
+
+# The data block (68 bytes, made by OnEnter).
+[Type2DialogData]
+measure = "new<68>@Type2Dialog::OnEnter"
+size = 68
+origin = "allocated"
+fields = [
+  { name = "movies_loaded", offset = 0, type = "u32" },
+  { name = "queued_state", offset = 4, type = "u32", note = "21 none" },
+  { name = "movie_shown", offset = 8, type = "u32" },
+]
+
+[globals]
+pages = { address = 0x826D83F8, type = "ptr", to = "Type2DialogPages" }
+menu = { address = 0x826D83FC, type = "ptr", to = "FrontEndMenu", note = "a front-end menu, items 0 to 1" }
+data = { address = 0x826D8400, type = "ptr", to = "Type2DialogData" }
+showing = { address = 0x82636200, type = "u32", note = "the dialog showing, 0 to 3" }
+status = { address = 0x82636204, type = "u32", note = "-1 loading, 3 idle, 5 an open asked, 0 just shown, 4 asked by TakesInput, 1 taking input, 2 cancelled" }

@@ -1,0 +1,17 @@
+# The schema of docs/functions/game-modes.md's objects (docs/e5-native.md, step 2).
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+
+# The game's state machine (StateMachine::StateMachine sub_82107108): 200
+# transitions of 48 bytes, then the words every mode's machine uses.
+[StateMachine]
+size = 9616
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (key, functor, next state)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32" },
+  { name = "loaded", offset = 9608, type = "u32", note = "set once a mode's movies are loaded (the modes' WaitForMovies)" },
+  { name = "reenter", offset = 9612, type = "u32" },
+]

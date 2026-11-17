@@ -1,0 +1,27 @@
+# The schema of docs/functions/menu-helpers.md's objects (docs/e5-native.md, step 2).
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+
+# The front-end menu (68 bytes, docs/known-data.md): stepped by Menu::Step
+# (sub_82186568) and read by Menu::Pressed (sub_821864C8); every front-end
+# screen keeps one or more.
+[FrontEndMenu]
+size = 68
+origin = "allocated"
+fields = [
+  { name = "cursor", offset = 0, type = "u32" },
+  { name = "previous", offset = 4, type = "u32" },
+  { name = "moved", offset = 8, type = "u32", note = "set when the last Menu::Step moved the cursor" },
+  { name = "first_item", offset = 12, type = "u32", note = "0 in every menu seen" },
+  { name = "last_item", offset = 16, type = "u32" },
+  { name = "wraps", offset = 20, type = "u32", note = "1 when the cursor wraps (probably)" },
+  { name = "up_down_locked", offset = 24, type = "u32" },
+  { name = "left_right_steps", offset = 28, type = "u32" },
+  { name = "shoulders_step", offset = 32, type = "u32" },
+  { name = "side", offset = 36, type = "s32", note = "-1 or 1 when left or right was asked" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "u32" },
+  { name = "player", offset = 64, type = "u32", note = "probably the player: the mapper entry's index" },
+]
