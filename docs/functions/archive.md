@@ -91,6 +91,13 @@ calls the native next request and takes the semaphores directly, as
 `Semaphore` class itself, the list's unseen clear and destructors, the
 functor's clone and the static clean-ups.
 
+The objects (E5 step 2, `itc_recomp/schema/archive.toml`, views in
+`src/schema/archive.h`): the request slot `ArchiveRequestSlot`, the queue's
+list `ArchiveList`, the list node `ArchiveListNode`, a TOC entry
+`ArchiveTocEntry`, a loose file's entry `ArchiveLooseFile`, the loader's
+`LoaderFunctor`, and the globals in `ArchiveGlobals`; `src/archive/` and the
+loose read in `src/hooks/archive.cpp` read them through the views.
+
 The harness: the cases that read or write the game's queue and slots take
 the game's queue lock (migration 1's, through `Semaphore::Wait` and
 `Signal`). The cases of the functions over the semaphores first wait for

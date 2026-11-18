@@ -8,6 +8,7 @@
 #include "data_tables/data_tables.h"
 #include "guest.h"
 #include "race_world/race_world.h"
+#include "schema/career.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
@@ -15,43 +16,49 @@
 
 namespace career {
 
+using schema::CareerCounter;
+using schema::CareerSave;
+using schema::CareerStats;
+
 void PlayTimeMark(uint8_t* base, uint32_t save) {
   ITC_NATIVE_RUNNING("sub_82111628 PlayTime::Mark");
-  guest::StoreU32(base, save + 6088, guest::LoadU32(base, kPlayTimeFrames));
+  CareerSave(base, save).set_play_time_mark(schema::CareerGlobals::play_time_frames(base));
 }
 
 uint32_t DayBlockWinStreak(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_82110580 DayBlock::WinStreak");
-  return guest::LoadU16(base, block + 4828);
+  return CareerCounter(base, block).day_win_streak();
 }
 
 uint32_t DayBlockBestStreak(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_82110588 DayBlock::BestStreak");
-  return guest::LoadU16(base, block + 4830);
+  return CareerCounter(base, block).day_best_streak();
 }
 
 void DayBlockAddWord4832(uint8_t* base, uint32_t block, uint64_t amount) {
   ITC_NATIVE_RUNNING("sub_82110590 DayBlock::AddWord4832");
-  guest::StoreU32(base, block + 4832, uint32_t(amount) + guest::LoadU32(base, block + 4832));
+  const CareerCounter day(base, block);
+  day.set_day_points(uint32_t(amount) + day.day_points());
 }
 
 uint32_t DayBlockWord4832(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_821105A0 DayBlock::Word4832");
-  return guest::LoadU32(base, block + 4832);
+  return CareerCounter(base, block).day_points();
 }
 
 uint32_t StatsWinStreak(uint8_t* base, uint32_t stats) {
   ITC_NATIVE_RUNNING("sub_82110B10 Stats::WinStreak");
-  return guest::LoadU16(base, stats + 5970);
+  return CareerStats(base, stats).win_streak();
 }
 
 void StatsAddPoints(uint8_t* base, uint32_t stats, uint64_t amount) {
   ITC_NATIVE_RUNNING("sub_82110B18 Stats::AddPoints");
-  int32_t sum = int32_t(uint32_t(amount) + guest::LoadU32(base, stats + 6024));
+  const CareerStats s(base, stats);
+  int32_t sum = int32_t(uint32_t(amount) + s.points());
   if (sum > 9999999) {
     sum = 9999999;
   }
-  guest::StoreU32(base, stats + 6024, uint32_t(sum));
+  s.set_points(uint32_t(sum));
 }
 
 void ItemFlagsSet(uint8_t* base, uint32_t save, uint32_t zero, uint32_t id) {
@@ -59,7 +66,8 @@ void ItemFlagsSet(uint8_t* base, uint32_t save, uint32_t zero, uint32_t id) {
   if (zero != 0 || int32_t(id) < 0) {
     return;
   }
-  const uint32_t word = save + kItemFlags + ((uint32_t(int32_t(id) >> 5) << 2));
+  const uint32_t word =
+      CareerSave(base, save).item_flags_address() + ((uint32_t(int32_t(id) >> 5) << 2));
   guest::StoreU32(base, word, guest::LoadU32(base, word) | (1u << (id & 31)));
 }
 
@@ -73,7 +81,7 @@ namespace {
 // The garage list's node `n` steps from its head (+204), as the original
 // walks it: 4-byte nodes from the list, +0 the next index (signed).
 uint32_t GarageNode(uint8_t* base, uint32_t garage, uint32_t n) {
-  uint32_t index = uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204))));
+  uint32_t index = uint32_t(int32_t(int16_t(schema::CareerGarageList(base, garage).head())));
   uint32_t node = garage + (index << 2);
   for (; n != 0; n--) {
     index = uint32_t(int32_t(int16_t(guest::LoadU16(base, node))));
@@ -91,21 +99,23 @@ uint32_t GarageCar(uint8_t* base, uint32_t garage, uint32_t node) {
 
 void PickFromCar(uint8_t* base, uint32_t save) {
   ITC_NATIVE_RUNNING("sub_82115CC0 Career::PickFromCar");
-  const uint32_t garage = save + kGarage;
-  const uint32_t selected = guest::LoadU32(base, save + kSelectedCar);
-  guest::StoreU32(base, save + 12, 4);
+  const CareerSave s(base, save);
+  const schema::CareerPick pick(base, s.pick_address());
+  const uint32_t garage = s.garage_address();
+  const uint32_t selected = s.selected_car();
+  pick.set_first_kind(4);
   const uint32_t first = GarageCar(base, garage, GarageNode(base, garage, selected));
   const int8_t kind = int8_t(guest::LoadU8(base, first + 1781));
-  guest::StoreU8(base, save + 18, 1);
-  guest::StoreU32(base, save + 20, 3);
-  guest::StoreU16(base, save + 16, uint16_t(int16_t(kind)));
+  pick.set_first_set(1);
+  pick.set_second_kind(3);
+  pick.set_first_value(uint16_t(int16_t(kind)));
   const uint32_t car = GarageCar(base, garage, GarageNode(base, garage, selected));
   const int32_t id = int32_t(guest::LoadU32(base, car + 224));
-  guest::StoreU8(base, save + 26, 1);
-  guest::StoreU8(base, save + 8, 0);
-  guest::StoreU16(base, save + 24, uint16_t(id % 4));
+  pick.set_second_set(1);
+  pick.set_level(0);
+  pick.set_second_value(uint16_t(id % 4));
   for (uint32_t i = 0; i < 20; i += 4) {
-    guest::StoreU32(base, save + 28 + i, guest::LoadU32(base, save + 8 + i));
+    guest::StoreU32(base, s.pick_kept_address() + i, guest::LoadU32(base, s.pick_address() + i));
   }
 }
 
@@ -152,8 +162,9 @@ uint32_t StageOf(uint8_t* base, uint32_t save) {
 uint32_t Entry56Allows(uint8_t* base, uint32_t entry, uint32_t mode, uint32_t location,
                        uint32_t stage, uint32_t test_location) {
   ITC_NATIVE_RUNNING("sub_82111BA8 Entry56::Allows");
+  const schema::CareerEntry56 e(base, entry);
   uint32_t result = 0;
-  if (int32_t(guest::LoadU32(base, entry + 0)) == 4) {
+  if (int32_t(e.kind()) == 4) {
     return 0;
   }
   if (test_location != 0) {
@@ -164,13 +175,13 @@ uint32_t Entry56Allows(uint8_t* base, uint32_t entry, uint32_t mode, uint32_t lo
       bit = 1u << (location - 14);
     }
     if (bit != 0) {
-      if ((guest::LoadU32(base, entry + 4) & bit) == 0) {
+      if ((e.mask() & bit) == 0) {
         return 0;
       }
       result = 1;
     }
   }
-  const uint32_t mask = guest::LoadU32(base, entry + 4);
+  const uint32_t mask = e.mask();
   if ((mask & 0x380) != 0 && int32_t(mode) != 3) {
     const uint32_t bit = mode < 1 ? 7 : mode == 1 ? 8 : 9;
     if ((mask & (1u << bit)) == 0) {
@@ -191,11 +202,13 @@ uint32_t Entry56Allows(uint8_t* base, uint32_t entry, uint32_t mode, uint32_t lo
 
 uint32_t AnyWonKind3Stage1(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82111780 Items::AnyWonKind3Stage1");
-  const uint32_t records = vehicle_accessors::SaveDataOf(base, 0) + kItemRecords;
+  const uint32_t records =
+      CareerSave(base, vehicle_accessors::SaveDataOf(base, 0)).item_records_address();
   for (uint32_t id = 0; id < 400; id++) {
     const uint32_t item = data_tables::Item(base, id);
     if (guest::LoadU16(base, item + 42) == 1 && guest::LoadU8(base, item + 36) == 0 &&
-        guest::LoadU8(base, item + 35) == 3 && guest::LoadU16(base, records + 12 * id + 2) != 0) {
+        guest::LoadU8(base, item + 35) == 3 &&
+        schema::CareerItemRecord(base, records + 12 * id).wins() != 0) {
       return 1;
     }
   }
@@ -212,7 +225,7 @@ uint64_t EventQuery(uint8_t* base, uint32_t flag, const race_event::Guest& guest
 
 void EventLocation(uint8_t* base, uint32_t save, const race_event::Guest& guest) {
   ITC_NATIVE_RUNNING("sub_82111650 Career::EventLocation");
-  const int32_t location = int32_t(guest::LoadU32(base, save + 6108));
+  const int32_t location = int32_t(CareerSave(base, save).location());
   const int32_t group = location >= 14 && location <= 19 ? location - 10 : 4;
   race_event::UpdateLocation(base, uint32_t(group), guest.Down(96));
 }

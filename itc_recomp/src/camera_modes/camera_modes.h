@@ -19,23 +19,17 @@
 
 #include "archive/archive.h"
 #include "c_runtime/exit.h"
+#include "schema/camera_modes.h"
 
 namespace camera_modes {
 
-// The globals read here.
-constexpr uint32_t kViewports = 0x826C2CE8;  // the two viewports (a pointer to two)
-constexpr uint32_t kRaceData = 0x826C5B2C;   // the race data (a pointer)
-// The camera animations' table: 264-byte entries (+0 the asset id, +4 up
-// to 64 object pointers, +260 their count) and its count.
-constexpr uint32_t kAnims = 0x826C79B8;
-constexpr uint32_t kAnimCount = 0x826D81B8;
-constexpr uint32_t kAnimBytes = 264;
-
-// The director's fields.
-constexpr uint32_t kView = 9628;      // the view shown (0-5)
-constexpr uint32_t kViewKept = 9632;  // the view kept for after views 3-5
-constexpr uint32_t kFollowed = 9636;  // the player the views follow
-constexpr uint32_t kFollowedInput = 0x12E60;  // +77408: the player whose input is read
+// The globals read here (schema/camera_modes.h's CameraModesGlobals).
+constexpr uint32_t kViewports = schema::CameraModesGlobals::viewports_address();
+constexpr uint32_t kRaceData = schema::CameraModesGlobals::race_data_address();
+// The camera animations' table: 264-byte entries (schema::CameraAnimEntry)
+// and its count.
+constexpr uint32_t kAnims = schema::CameraModesGlobals::anims_address();
+constexpr uint32_t kAnimCount = schema::CameraModesGlobals::anim_count_address();
 
 // --- The director's handlers (no direct callers: its state machine's functors) ---
 
@@ -228,7 +222,7 @@ uint32_t AnimsObjectMatrix(uint8_t* base, uint32_t out, uint32_t id, uint32_t ti
 // --- The camera paths (src/camera_modes/anims.cpp) ---
 
 // The camera paths' asset ids: [[0x82618D30 + 4 x index]].
-constexpr uint32_t kPathAssets = 0x82618D30;
+constexpr uint32_t kPathAssets = schema::CameraModesGlobals::path_assets_address();
 
 // sub_82152E08 CameraPath::Request: for `index` (not -1), with the path
 // buffer (a Buffer28) empty (+24 0) or loaded (3): its block freed and the
@@ -392,7 +386,6 @@ void DirectorRelease(uint8_t* base, uint32_t director, const std::function<void(
 
 // --- The director's state machine and views (src/camera_modes/director.cpp) ---
 
-constexpr uint32_t kMachine = 16;  // the director's state machine
 // sub_82159950 CameraDirector::InitStates: +9620 = 1, the state machine's
 // (+16) 34 transitions added as the original does (its stores and copies
 // replayed in `frame`, its 2,368 bytes: the words it never writes go into
@@ -401,8 +394,6 @@ constexpr uint32_t kMachine = 16;  // the director's state machine
 constexpr uint32_t kInitStatesFrame = 2368;
 uint32_t DirectorInitStates(uint8_t* base, uint32_t director, uint32_t frame, bool* replaced);
 
-constexpr uint32_t kCurrentCamera = 68528;   // the view's camera object
-constexpr uint32_t kCurrentCamera2 = 68532;  // player 1's in split screen
 // SetMode's constructor call: view `view`'s camera object made in place at
 // `object` (ChaseCamera::ChaseCamera, ViewCamera1, ViewCamera2,
 // IntroCamera, TvCamera, Cutscene for views 0-5) with the viewport and the

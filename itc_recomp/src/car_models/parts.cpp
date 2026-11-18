@@ -10,6 +10,7 @@
 #include "car_models/vinyl.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/car_models.h"
 #include "scene_models/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -25,72 +26,91 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
 
+using G = schema::CarModelsGlobals;
+// The car scene ([0x826C2E44]) and the first set of pools ([0x826C2E40]).
+uint32_t Scene(uint8_t* base) { return G::scene<schema::View>(base).address; }
+uint32_t FirstSet(uint8_t* base) { return G::first_set(base).address; }
+// A car model's block.
+uint32_t Block(uint8_t* base, uint32_t car_model) {
+  return schema::CarModel(base, car_model).block();
+}
+// The traffic car's index the word at `at` points to.
+uint32_t TrafficIndex(uint8_t* base, uint32_t at) {
+  return schema::CarModelsTrafficIndex(base, Load(base, at)).index();
+}
+
 // One end of the rims or brakes: `n` the wheel number, `block` the car's;
 // the part's id `part` for a block above 19, else 3 x block +
 // `part_block_base`, or 3n + `part_wheel_base` for a wheel.
 void WheelEnd(uint8_t* base, uint32_t xpr_at, uint32_t part_at, int32_t n, int32_t block,
               uint32_t part, uint32_t part_block_base, uint32_t part_wheel_base) {
+  const schema::LoadSlot xpr(base, xpr_at), slot(base, part_at);
   if (n == -1) {
     if (block > 19) {
-      Store(base, part_at, part);
-      Store(base, xpr_at, 695);
+      slot.set_id(part);
+      xpr.set_id(695);
       return;
     }
-    Store(base, xpr_at, 3 * uint32_t(block) + 587);
-    Store(base, part_at, 3 * uint32_t(block) + part_block_base);
+    xpr.set_id(3 * uint32_t(block) + 587);
+    slot.set_id(3 * uint32_t(block) + part_block_base);
     return;
   }
-  Store(base, xpr_at, 3 * uint32_t(n) + 695);
-  Store(base, part_at, 3 * uint32_t(n) + part_wheel_base);
+  xpr.set_id(3 * uint32_t(n) + 695);
+  slot.set_id(3 * uint32_t(n) + part_wheel_base);
 }
 
 }  // namespace
 
 void WheelsRims(uint8_t* base, uint32_t wheels) {
   ITC_NATIVE_RUNNING("sub_820D8BA8 Wheels::Rims");
-  const int32_t block = int32_t(Load(base, Load(base, wheels + 24) + 32));
-  WheelEnd(base, wheels + 2144, wheels + 1168, int32_t(Load(base, wheels + 44)), block, 696,
-           588, 696);
-  WheelEnd(base, wheels + 2168, wheels + 1192, int32_t(Load(base, wheels + 60)), block, 696,
-           588, 696);
+  const schema::CarWheels w(base, wheels);
+  const int32_t block = int32_t(w.car_model().block());
+  WheelEnd(base, w.front_xpr_id_address(), w.front_rim_id_address(), int32_t(w.front_wheel()),
+           block, 696, 588, 696);
+  WheelEnd(base, w.rear_xpr_id_address(), w.rear_rim_id_address(), int32_t(w.rear_wheel()),
+           block, 696, 588, 696);
 }
 
 void WheelsBrakes(uint8_t* base, uint32_t wheels) {
   ITC_NATIVE_RUNNING("sub_820D8C50 Wheels::Brakes");
-  if (Load(base, wheels + 28) == 3) {
-    const uint32_t x = 3 * (Load(base, Load(base, wheels + 3264)) + 20);
-    Store(base, wheels + 1168, x + 589);
-    Store(base, wheels + 2144, x + 587);
-    Store(base, wheels + 1192, x + 589);
-    Store(base, wheels + 2168, x + 587);
+  const schema::CarWheels w(base, wheels);
+  if (w.type() == 3) {
+    const uint32_t x = 3 * (w.traffic().index() + 20);
+    w.set_front_rim_id(x + 589);
+    w.set_front_xpr_id(x + 587);
+    w.set_rear_rim_id(x + 589);
+    w.set_rear_xpr_id(x + 587);
     return;
   }
-  const int32_t block = int32_t(Load(base, Load(base, wheels + 24) + 32));
-  WheelEnd(base, wheels + 2144, wheels + 1168, int32_t(Load(base, wheels + 44)), block, 697,
-           589, 697);
-  WheelEnd(base, wheels + 2168, wheels + 1192, int32_t(Load(base, wheels + 60)), block, 697,
-           589, 697);
+  const int32_t block = int32_t(w.car_model().block());
+  WheelEnd(base, w.front_xpr_id_address(), w.front_rim_id_address(), int32_t(w.front_wheel()),
+           block, 697, 589, 697);
+  WheelEnd(base, w.rear_xpr_id_address(), w.rear_rim_id_address(), int32_t(w.rear_wheel()),
+           block, 697, 589, 697);
 }
 
 std::optional<uint32_t> WheelsSetUp(uint8_t* base, uint32_t wheels, uint32_t setup,
                                     const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_820D9110 Wheels::SetUp");
-  if (!native::Buffers_Memcpy(base, wheels + 28, setup, 156, 0x820D912C)) {
+  const schema::CarWheels w(base, wheels);
+  if (!native::Buffers_Memcpy(base, w.setup_address(), setup, 156, 0x820D912C)) {
     return std::nullopt;
   }
-  if (Load(base, Load(base, wheels + 3268) + 8) == 0) {
+  if (w.first_set().model_set() == 0) {
     WheelsRims(base, wheels);
   } else {
     WheelsBrakes(base, wheels);
   }
   uint32_t r3 = 0;
   for (uint32_t i = 0; i < 2; i++) {
-    const uint32_t part = wheels + 1168 + 24 * i;
-    const uint32_t tire = Load(base, wheels + 144 + 4 * i) == 0 ? 582 : 584;
+    const uint32_t part = w.rim_slots_address() + 24 * i;
+    const uint32_t tire =
+        Load(base, w.front_tire_aftermarket_address() + 4 * i) == 0 ? 582 : 584;
     LoadSlotLoadShared(base, part - 976, tire, wheels, kOnWheelPartLoaded, load);
-    LoadSlotLoadShared(base, part, Load(base, part), wheels, kOnWheelPartLoaded, load);
-    LoadSlotLoadShared(base, part + 976, Load(base, part + 976), wheels, kOnWheelPartLoaded,
+    LoadSlotLoadShared(base, part, schema::LoadSlot(base, part).id(), wheels, kOnWheelPartLoaded,
                        load);
+    LoadSlotLoadShared(base, part + 976, schema::LoadSlot(base, part + 976).id(), wheels,
+                       kOnWheelPartLoaded, load);
     r3 = LoadSlotLoadShared(base, part + 1112, 887, wheels, kOnWheelPartLoaded, load);
   }
   return r3;
@@ -100,12 +120,14 @@ std::optional<uint32_t> CockpitLoadSetC(uint8_t* base, uint32_t object, uint32_t
                                         uint32_t stack, uint32_t pcr,
                                         const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_820D67E8 CarInterior::LoadSetCBody");
-  if (!native::Buffers_Memcpy(base, object + 28, setup, 144, 0x820D6808)) {
+  const schema::CarInterior cockpit(base, object);
+  if (!native::Buffers_Memcpy(base, cockpit.setup_address(), setup, 144, 0x820D6808)) {
     return std::nullopt;
   }
-  const uint32_t block = Load(base, Load(base, object + 24) + 32);
+  const uint32_t block = cockpit.car_model().block();
   const uint32_t n = block * 55;
-  if (LoadSlotLoad(base, object + 176, n + 19928, object, kOnCockpitPartLoaded, pcr, load) == 0) {
+  if (LoadSlotLoad(base, cockpit.cockpit_node_file_slot_address(), n + 19928, object,
+                   kOnCockpitPartLoaded, pcr, load) == 0) {
     // sprintf's call from the original's 1,152-byte frame: the block spilled
     // into the frame's parameter area as sprintf spills r5 (r6 to r10, which
     // the call doesn't set, as 0: only dead frame words differ), its own
@@ -120,24 +142,25 @@ std::optional<uint32_t> CockpitLoadSetC(uint8_t* base, uint32_t object, uint32_t
                        &written);
   }
   const uint32_t body = n + 19926;
-  const uint32_t buffer = Load(base, Load(base, kSceneSet) + kSharedBuffer);
-  Store(base, object + 400, body);
-  Store(base, object + 408, archive::AssetSize(base, body));
+  const uint32_t buffer = Load(base, Scene(base) + kSharedBuffer);
+  cockpit.set_cockpit_body_id(body);
+  cockpit.set_cockpit_body_size(archive::AssetSize(base, body));
   const int64_t serial = load(body, buffer, kOnCockpitPartLoaded, object);
-  Store(base, object + 404, uint32_t(serial));
-  Store(base, object + 420, 2);
+  cockpit.set_cockpit_body_request(uint32_t(serial));
+  cockpit.set_cockpit_body_state(2);
   uint32_t r3 = 0;
   for (uint32_t i = 0; i < 6; i++) {
     uint32_t id;
     switch (i) {
-      case 0: id = Load(base, object + 28) + body + 3; break;
-      case 1: id = Load(base, object + 32) + body + 16; break;
-      case 2: id = Load(base, object + 36) + body + 19; break;
-      case 3: id = Load(base, object + 40) + body + 31; break;
-      case 4: id = Load(base, object + 44) + body + 36; break;
+      case 0: id = cockpit.cockpit_bonnet() + body + 3; break;
+      case 1: id = cockpit.cockpit_door() + body + 16; break;
+      case 2: id = cockpit.cockpit_mirrors() + body + 19; break;
+      case 3: id = cockpit.cockpit_headlights() + body + 31; break;
+      case 4: id = cockpit.cockpit_fenders() + body + 36; break;
       default: id = body + 35; break;
     }
-    r3 = LoadSlotLoadShared(base, object + 536 + 24 * i, id, object, kOnCockpitPartLoaded, load);
+    r3 = LoadSlotLoadShared(base, cockpit.cockpit_part_slots_address() + 24 * i, id, object,
+                            kOnCockpitPartLoaded, load);
   }
   return r3;
 }
@@ -145,12 +168,13 @@ std::optional<uint32_t> CockpitLoadSetC(uint8_t* base, uint32_t object, uint32_t
 uint32_t InteriorLoadParts(uint8_t* base, uint32_t object, uint32_t first, uint32_t stride,
                            uint32_t offset, const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_820D7730 CarInterior::LoadParts");
-  const int32_t block = int32_t(Load(base, Load(base, object + 24) + 32));
+  const schema::CarInterior interior(base, object);
+  const int32_t block = int32_t(interior.car_model().block());
   const uint32_t id = uint32_t(int64_t(block) * int64_t(int32_t(stride))) + first + offset;
   uint32_t r3 = 0;
   for (uint32_t i = 0; i < 6; i++) {
-    r3 = LoadSlotLoadShared(base, object + 160 + 24 * i, id + i, object, kOnInteriorPartLoaded,
-                            load);
+    r3 = LoadSlotLoadShared(base, interior.part_slots_address() + 24 * i, id + i, object,
+                            kOnInteriorPartLoaded, load);
   }
   return r3;
 }
@@ -160,19 +184,20 @@ std::optional<uint32_t> InteriorLoad(uint8_t* base, uint32_t object, uint32_t se
                                      const AccessoryLoadCall& accessory_load) {
   ITC_NATIVE_RUNNING("sub_820D79B0 CarInterior::Load");
   const uint32_t accessories = scene_models::Accessories(base);
-  if (!native::Buffers_Memcpy(base, object + 28, setup, 120, 0x820D79E0)) {
+  const schema::CarInterior interior(base, object);
+  if (!native::Buffers_Memcpy(base, interior.setup_address(), setup, 120, 0x820D79E0)) {
     return std::nullopt;
   }
-  uint32_t r3 = object + 28;  // memcpy's answer
-  const uint32_t set = Load(base, Load(base, object + 3092) + 8);
-  const bool cockpit = Load(base, object + 3088) != 0;
+  uint32_t r3 = interior.setup_address();  // memcpy's answer
+  const uint32_t set = interior.first_set().model_set();
+  const bool cockpit = interior.cockpit() != 0;
   if (set == 1) {
     if (cockpit) {
       InteriorLoadParts(base, object, 19926, 55, 49, load);
     } else {
       InteriorLoadParts(base, object, 11061, 197, 190, load);
     }
-    r3 = accessory_load(accessories, Load(base, object + 140), Load(base, object + 144), 0);
+    r3 = accessory_load(accessories, interior.accessory(), interior.accessory_arg(), 0);
   } else if (set == 0) {
     if (cockpit) {
       InteriorLoadParts(base, object, 19926, 55, 49, load);
@@ -191,17 +216,17 @@ std::optional<uint32_t> InteriorLoad(uint8_t* base, uint32_t object, uint32_t se
 
 void CarPartsLoadSetA(uint8_t* base, uint32_t object, const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_820D7090 CarParts::LoadSetA");
-  uint32_t id = Load(base, Load(base, object + 24) + 32) * 226 + 894;
+  uint32_t id = Block(base, Load(base, object + 24)) * 226 + 894;
   uint32_t slot = object + 96;
   for (uint32_t i = 0; i < 216; i++, slot += 24, id++) {
-    Store(base, slot, id);
+    schema::LoadSlot(base, slot).set_id(id);
     LoadSlotLoadShared(base, slot, id, object, kOnPartsLoadedA, load);
   }
 }
 
 void CarPartsLoadSetB(uint8_t* base, uint32_t object, const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_820D70F0 CarParts::LoadSetB");
-  const uint32_t first = Load(base, Load(base, object + 24) + 32) * 197 + 11061;
+  const uint32_t first = Block(base, Load(base, object + 24)) * 197 + 11061;
   const auto field = [&](uint32_t offset) { return Load(base, object + offset); };
   for (uint32_t j = 0; j < 17; j++) {
     uint32_t id;
@@ -255,7 +280,7 @@ bool Pool4Load(uint8_t* base, uint32_t object, uint32_t record, const archive::L
   const uint32_t scene_set = Load(base, object + 576);
   const uint32_t car = Load(base, object + 24);
   const uint32_t set = Load(base, scene_set + 8);
-  const uint32_t block = Load(base, car + 32);
+  const uint32_t block = Block(base, car);
   const uint32_t id = set == 0 ? block * 226 + 1116 : block * 197 + 11257;
   LoadSlotLoadShared(base, object + 80, id, object, kOnPool4Loaded, load);
   return true;
@@ -269,7 +294,7 @@ bool TrafficCarLoad(uint8_t* base, uint32_t object, uint32_t record, uint32_t st
   }
   const uint32_t frame = stack - 1136;
   const uint32_t number = Load(base, object + 32);
-  Store(base, object + 7392, Load(base, 0x826C2E40));
+  Store(base, object + 7392, FirstSet(base));
   if (LoadSlotLoad(base, object + 3744, number + 22529, object, kOnTrafficLoaded, pcr, load) ==
       0) {
     // sprintf's call from the original's frame: the number spilled into the
@@ -366,7 +391,7 @@ uint32_t SetUpFirst(uint8_t* base, uint32_t pools, uint32_t pool, uint32_t index
 uint32_t ClaimLinkSetUp(uint8_t* base, uint32_t object, uint32_t pool, uint32_t at,
                         uint32_t copy, uint32_t frame, const SecondSetUps& setups) {
   namespace va = vehicle_accessors;
-  const uint32_t pools = Load(base, kFirstSet);
+  const uint32_t pools = FirstSet(base);
   const uint32_t index = uint32_t(va::ScenePoolsClaimA(base, pools, pool));
   const uint32_t first = va::ScenePoolsGetA(base, pools, pool, index);
   Store(base, object + at, first);
@@ -383,8 +408,8 @@ std::optional<uint32_t> SceneCarModelSetUp(uint8_t* base, uint32_t object, uint3
   ITC_NATIVE_RUNNING("sub_820DB818 SceneCarModel::SetUp");
   namespace va = vehicle_accessors;
   const uint32_t frame = stack - 112;
-  const uint32_t pools = Load(base, kFirstSet);
-  Store(base, object + 3728, Load(base, kSceneSet));
+  const uint32_t pools = FirstSet(base);
+  Store(base, object + 3728, Scene(base));
   if (!scene_models::CarRecordCopy(base, object + 32, record)) {
     return std::nullopt;
   }
@@ -421,8 +446,8 @@ std::optional<uint32_t> SceneInteriorSetUp(uint8_t* base, uint32_t object, uint3
                                            uint32_t stack, const SecondSetUps& setups) {
   ITC_NATIVE_RUNNING("sub_820E37F0 SceneInterior::SetUp");
   namespace va = vehicle_accessors;
-  const uint32_t pools = Load(base, kFirstSet);
-  Store(base, object + 11668, Load(base, kSceneSet));
+  const uint32_t pools = FirstSet(base);
+  Store(base, object + 11668, Scene(base));
   if (!native::Buffers_Memcpy(base, object + 40, record, 120, 0x820E3824)) {
     return std::nullopt;
   }
@@ -444,8 +469,8 @@ std::optional<uint32_t> SceneTrafficSetUp(uint8_t* base, uint32_t object, uint32
                                           uint32_t stack, const SecondSetUps& setups) {
   ITC_NATIVE_RUNNING("sub_820E5998 SceneTraffic::SetUp");
   namespace va = vehicle_accessors;
-  const uint32_t pools = Load(base, kFirstSet);
-  Store(base, object + 9796, Load(base, kSceneSet));
+  const uint32_t pools = FirstSet(base);
+  Store(base, object + 9796, Scene(base));
   if (!native::Buffers_Memcpy(base, object + 32, record, 3696, 0x820E59CC)) {
     return std::nullopt;
   }
@@ -461,7 +486,7 @@ std::optional<uint32_t> SceneWheelsSetUp(uint8_t* base, uint32_t object, uint32_
   ITC_NATIVE_RUNNING("sub_820E70C0 SceneWheels::SetUp");
   namespace va = vehicle_accessors;
   constexpr uint32_t kTable = 0x820044B0;
-  const uint32_t pools = Load(base, kFirstSet);
+  const uint32_t pools = FirstSet(base);
   const uint32_t copy = object + 32;
   if (!native::Buffers_Memcpy(base, copy, record, 156, 0x820E70EC)) {
     return std::nullopt;
@@ -474,9 +499,9 @@ std::optional<uint32_t> SceneWheelsSetUp(uint8_t* base, uint32_t object, uint32_
   const bool alternate = Load(base, object + 100) != 0;
   uint32_t index;
   if (!alternate && int32_t(Load(base, copy)) == 3) {
-    index = Load(base, Load(base, object + 16776)) + 45;
+    index = TrafficIndex(base, object + 16776) + 45;
   } else {
-    index = Load(base, Load(base, Load(base, object + 24) + 24) + 32);
+    index = schema::CarModelsSceneCarModel(base, Load(base, object + 24)).car_model().block();
   }
   const uint32_t entry = kTable + index * 44;
   Store(base, object + 112, Load(base, entry + 4));
@@ -501,7 +526,7 @@ std::optional<uint32_t> SceneWheelsSetUp(uint8_t* base, uint32_t object, uint32_
   if (int32_t(Load(base, front)) == -1 && int32_t(Load(base, rear)) == -1) {
     const uint32_t car = Load(base, object + 24);
     if (car != 0) {
-      const uint32_t block = Load(base, Load(base, car + 24) + 32);
+      const uint32_t block = schema::CarModelsSceneCarModel(base, car).car_model().block();
       if (int32_t(block) >= 18) {
         setups.guest(0x820D39D8, block, front, rear, frame, 0x820E727C);
       }
@@ -518,9 +543,10 @@ std::optional<uint32_t> SceneWheelsSetUp(uint8_t* base, uint32_t object, uint32_
   Store(base, object + 28, wheels);
   const uint32_t car = Load(base, object + 24);
   if (car != 0) {
-    Store(base, wheels + 24, Load(base, car + 24));
+    schema::CarWheels(base, wheels)
+        .set_car_model(schema::CarModelsSceneCarModel(base, car).car_model());
   } else {
-    Store(base, wheels + 3264, Load(base, object + 16776));
+    schema::CarWheels(base, wheels).set_traffic(Load(base, object + 16776));
   }
   return SetUpFirst(base, pools, 5, claimed, copy, frame, setups);
 }
@@ -563,8 +589,8 @@ std::optional<uint32_t> SceneCockpitSetUp(uint8_t* base, uint32_t object, uint32
                                           uint32_t stack, const SecondSetUps& setups) {
   ITC_NATIVE_RUNNING("sub_820DBE80 SceneCockpit::SetUp");
   namespace va = vehicle_accessors;
-  const uint32_t pools = Load(base, kFirstSet);
-  Store(base, object + 4316, Load(base, kSceneSet));
+  const uint32_t pools = FirstSet(base);
+  Store(base, object + 4316, Scene(base));
   if (!native::Buffers_Memcpy(base, object + 36, record, 144, 0x820DBEB4)) {
     return std::nullopt;
   }

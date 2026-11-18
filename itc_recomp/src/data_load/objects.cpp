@@ -9,8 +9,15 @@
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
 #include "race_setup/race_setup.h"
+#include "schema/data_load.h"
 
 namespace data_load {
+
+namespace {
+
+using G = schema::DataLoadGlobals;
+
+}  // namespace
 
 std::optional<uint32_t> RaceDataCreate(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82102208 RaceData::Create");
@@ -22,7 +29,7 @@ std::optional<uint32_t> RaceDataCreate(uint8_t* base) {
   if (data != 0) {
     data = race_setup::RaceDataConstruct(base, data);
   }
-  guest::StoreU32(base, kRaceDataSlot, data);
+  G::set_race_data(base, data);
   return data;
 }
 
@@ -46,7 +53,7 @@ std::optional<uint32_t> InputRecordingsCreate(uint8_t* base) {
   if (block != 0) {
     block = InputRecordingsConstruct(base, block);
   }
-  guest::StoreU32(base, kInputRecordingsSlot, block);
+  G::set_input_recordings(base, block);
   guest::StoreU32(base, block + 0x2225B0, 0);
   return block;
 }
@@ -64,7 +71,7 @@ std::optional<uint32_t> ReplayCreate(uint8_t* base) {
       r3 = Record5232Construct(base, block + 0x2BF10 + kRecordBytes * i);
     }
   }
-  guest::StoreU32(base, kReplaySlot, block);
+  G::set_replay(base, block);
   guest::StoreU32(base, block + 0x2B600, 1);
   return r3;
 }
@@ -83,12 +90,12 @@ int32_t StaticReplayInit(uint8_t* base, uint32_t object, uint32_t exit_function,
 
 int32_t StaticReplayAInit(uint8_t* base, const c_runtime::AtexitCall& call) {
   ITC_NATIVE_RUNNING("sub_825D9E60 Replay826D8520::StaticInit");
-  return StaticReplayInit(base, kStaticReplayA, kStaticReplayAExit, call);
+  return StaticReplayInit(base, G::static_replay_a_address(), kStaticReplayAExit, call);
 }
 
 int32_t StaticReplayBInit(uint8_t* base, const c_runtime::AtexitCall& call) {
   ITC_NATIVE_RUNNING("sub_825D9F68 Replay82816E50::StaticInit");
-  return StaticReplayInit(base, kStaticReplayB, kStaticReplayBExit, call);
+  return StaticReplayInit(base, G::static_replay_b_address(), kStaticReplayBExit, call);
 }
 
 }  // namespace data_load

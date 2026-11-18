@@ -11,25 +11,17 @@
 #include "memory/heap.h"
 #include "post_effects/post_effects.h"
 #include "scene_models/scene_models.h"
-
-#include <bit>
+#include "schema/race_scene.h"
 
 namespace race_scene {
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;  // 1.0 (as the image holds it)
+using G = schema::RaceSceneGlobals;
 
-// lfs and stfs: a float word through a double, as the translated code.
-double Lfs(uint8_t* base, uint32_t address) { return double(guest::LoadFloat(base, address)); }
+// stfs: a float word through a double, as the translated code.
 void Stfs(uint8_t* base, uint32_t address, double value) {
   guest::StoreFloat(base, address, float(value));
-}
-
-double Lfd(uint8_t* base, uint32_t address) {
-  const uint64_t bits = (uint64_t(guest::LoadU32(base, address)) << 32) |
-                        guest::LoadU32(base, address + 4);
-  return std::bit_cast<double>(bits);
 }
 
 // A 16-byte vector of four doubles stored as floats.
@@ -47,7 +39,7 @@ uint32_t SceneConstruct(uint8_t* base, uint32_t scene) {
   for (uint32_t i = 0; i < 7; i++) {
     scene_models::SceneModelRecordConstruct(base, scene + 48 + 4288 * i);
   }
-  const double one = Lfs(base, kOne);
+  const double one = double(G::one(base));
   for (uint32_t i = 0; i < 11; i++) {
     const uint32_t at = scene + 30080 + 44 + 96 * i;
     Stfs(base, at - 16, one);
@@ -60,13 +52,13 @@ uint32_t SceneConstruct(uint8_t* base, uint32_t scene) {
 }
 
 bool SceneCreate(uint8_t* base) {
-  guest::StoreU32(base, kScene, 0);
+  G::set_scene(base, 0);
   const auto block = memory::crt::OperatorNew(base, kSceneBytes);
   if (!block) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_8215D738 RaceScene::Create");
-  guest::StoreU32(base, kScene, *block != 0 ? SceneConstruct(base, *block) : 0);
+  G::set_scene(base, *block != 0 ? SceneConstruct(base, *block) : 0);
   return true;
 }
 
@@ -78,24 +70,25 @@ void LightsInitEntry(uint8_t* base, uint32_t entry, int32_t index) {
     return;
   }
   guest::StoreU32(base, entry + 0, 0);
-  const double c = Lfs(base, kOne);
-  const double z = Lfs(base, 0x82000A34);  // 0.0
+  const double c = double(G::one(base));
+  const double z = double(G::zero(base));
   if (index < 3) {
-    const double e = Lfs(base, 0x82001070);
+    const double e = double(G::light_kind1_value(base));
     guest::StoreU32(base, entry + 0, 1);
     Stfs4(base, entry + 32, e, e, e, c);
     Stfs4(base, entry + 48, c, c, c, c);
   } else {
     guest::StoreU32(base, entry + 0, 2);
-    Stfs4(base, entry + 32, Lfs(base, 0x82001BE4), z, z, c);
+    Stfs4(base, entry + 32, double(G::light_kind2_x(base)), z, z, c);
     Stfs4(base, entry + 48, c, c, c, c);
-    Stfs4(base, entry + 64, Lfs(base, 0x82002578), Lfs(base, 0x8200222C), c, c);
-    const double inner = c_runtime::Cos(Lfd(base, 0x82009790));
-    const double outer = c_runtime::Cos(Lfd(base, 0x82002FE0));
+    Stfs4(base, entry + 64, double(G::light_kind2_64_x(base)), double(G::light_kind2_64_y(base)),
+          c, c);
+    const double inner = c_runtime::Cos(G::light_cone_inner(base));
+    const double outer = c_runtime::Cos(G::light_cone_outer(base));
     Stfs4(base, entry + 80, double(float(outer)), double(float(inner)), z, c);
   }
-  const double p = Lfs(base, 0x82001FC0);
-  const double q = Lfs(base, 0x82009798);
+  const double p = double(G::light_color_p(base));
+  const double q = double(G::light_color_q(base));
   switch (index) {
     case 1:
       Stfs4(base, entry + 16, p, p, q, c);
@@ -142,14 +135,13 @@ void LightsSetUp(uint8_t* base, uint32_t set) {
   }
 }
 
-double LightsLastF1(uint8_t* base) { return c_runtime::Cos(Lfd(base, 0x82002FE0)); }
+double LightsLastF1(uint8_t* base) { return c_runtime::Cos(G::light_cone_outer(base)); }
 
 // --- The post effects' parameters ---
 
 namespace {
 
 constexpr uint32_t kGlowSetters = 0x82136EF8;  // slot 2; 8 bytes apart to slot 12
-constexpr uint32_t kGlowFirstOffset = 8436;
 constexpr uint32_t kFilterSet8120 = 0x82135148;  // slot 8
 
 bool GlowReady(uint8_t* base, uint32_t glow) {
@@ -169,17 +161,27 @@ bool FilterReady(uint8_t* base, uint32_t filter) {
   return filter != 0 && guest::LoadU32(base, guest::LoadU32(base, filter) + 32) == kFilterSet8120;
 }
 
-// The 11 setters' calls on one glow.
+// The 11 setters' calls on one glow (slots 2 to 12: the glow's +8436 to
+// +8476), each float loaded before its call.
 void GlowSetAll(uint8_t* base, uint32_t glow, uint32_t entry) {
-  for (uint32_t k = 0; k < 11; k++) {
-    post_effects::GlowSet(base, glow, kGlowFirstOffset + 4 * k, Lfs(base, entry + 4 * k));
-  }
+  const schema::RaceGlowParams p(base, entry);
+  post_effects::GlowSet(base, glow, 8436, double(p.c33_x_second()));
+  post_effects::GlowSet(base, glow, 8440, double(p.c33_x_first()));
+  post_effects::GlowSet(base, glow, 8444, double(p.c34_x()));
+  post_effects::GlowSet(base, glow, 8448, double(p.c34_y()));
+  post_effects::GlowSet(base, glow, 8452, double(p.strength()));
+  post_effects::GlowSet(base, glow, 8456, double(p.c33_z()));
+  post_effects::GlowSet(base, glow, 8460, double(p.history_weight()));
+  post_effects::GlowSet(base, glow, 8464, double(p.param_8464()));
+  post_effects::GlowSet(base, glow, 8468, double(p.star_step()));
+  post_effects::GlowSet(base, glow, 8472, double(p.star_attenuation()));
+  post_effects::GlowSet(base, glow, 8476, double(p.c33_w()));
 }
 
 }  // namespace
 
 bool SplitScreen(uint8_t* base) {
-  return guest::LoadU32(base, guest::LoadU32(base, 0x826C2CE8) + 8) != 0;
+  return guest::LoadU32(base, G::viewports(base).address + 8) != 0;
 }
 
 bool EffectParamsReady(uint8_t* base) {
@@ -217,9 +219,12 @@ uint32_t GlowsSetParams(uint8_t* base, uint32_t entry) {
 
 uint32_t SetEffectParams(uint8_t* base, uint32_t kind, uint32_t index, double* f1) {
   ITC_NATIVE_RUNNING("sub_8228F5C0 RaceScene::SetEffectParams");
-  const uint32_t entry = int32_t(kind) < 8 ? 0x82637CC0 + 44 * (3 * kind + index) : 0x82637C94;
+  const uint32_t entry =
+      int32_t(kind) < 8
+          ? G::glow_params_address() + schema::RaceGlowParams::kSize * (3 * kind + index)
+          : G::glow_params_other_address();
   GlowsSetParams(base, entry);
-  const double value = Lfs(base, 0x82002204);
+  const double value = double(G::filter_value(base));
   *f1 = value;
   if (SplitScreen(base)) {
     const uint32_t first = post_effects::Get(base, 6);
@@ -237,17 +242,19 @@ uint32_t SetEffectParams(uint8_t* base, uint32_t kind, uint32_t index, double* f
 
 uint32_t TogglePause(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_8215C750 RaceSceneMachine::TogglePause");
-  guest::StoreU32(base, machine + kPaused, guest::LoadU32(base, machine + kPaused) == 0 ? 1 : 0);
-  return post_effects::ToggleRaceEffects(base, guest::LoadU32(base, kScene));
+  const schema::RaceSceneMachine m(base, machine);
+  m.set_paused(m.paused() == 0 ? 1 : 0);
+  return post_effects::ToggleRaceEffects(base, G::scene(base).address);
 }
 
 std::optional<uint32_t> Resume(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_8215D0D8 RaceSceneMachine::Resume");
-  if (guest::LoadU32(base, machine + kPaused) == 0) {
+  const schema::RaceSceneMachine m(base, machine);
+  if (m.paused() == 0) {
     return std::nullopt;
   }
-  guest::StoreU32(base, machine + kPaused, 0);
-  return post_effects::ToggleRaceEffects(base, guest::LoadU32(base, kScene));
+  m.set_paused(0);
+  return post_effects::ToggleRaceEffects(base, G::scene(base).address);
 }
 
 // --- The scene's freeing ---
@@ -278,13 +285,13 @@ void DestroyCars(uint8_t* base, uint32_t cars) {
 }
 
 bool DestroyReady(uint8_t* base) {
-  const uint32_t scene = guest::LoadU32(base, kScene);
+  const uint32_t scene = G::scene(base).address;
   return scene == 0 || memory::IsHeapBlock(scene);
 }
 
 uint32_t Destroy(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8215D790 RaceScene::Destroy");
-  const uint32_t scene = guest::LoadU32(base, kScene);
+  const uint32_t scene = G::scene(base).address;
   if (scene != 0) {
     DestroyCars(base, scene + 16);
     memory::crt::OperatorDelete(scene);

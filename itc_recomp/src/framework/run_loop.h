@@ -29,30 +29,16 @@
 
 namespace framework {
 
+// The layouts are the schema's (schema/framework.h: RunLoop, HandlerMap,
+// HandlerMapNode, RequestVector, Request). The map head and a node's key and
+// delegate offsets stay for app_states/app.cpp.
 constexpr uint32_t kMapHead = 4;
-constexpr uint32_t kMapSize = 8;
-constexpr uint32_t kNodeLeft = 0;
-constexpr uint32_t kNodeParent = 4;
-constexpr uint32_t kNodeRight = 8;
 constexpr uint32_t kNodeKey = 12;
 constexpr uint32_t kNodeDelegate = 16;
-constexpr uint32_t kNodeColor = 20;
-constexpr uint32_t kNodeIsNil = 21;
-constexpr uint32_t kNodeBytes = 24;
 constexpr uint32_t kMapMaxSize = 0x1FFFFFFE;  // Insert's length_error from here
 
 constexpr uint32_t kRequestBytes = 12;
-constexpr uint32_t kVectorFirst = 4;
-constexpr uint32_t kVectorLast = 8;
-constexpr uint32_t kVectorEnd = 12;
 constexpr uint32_t kRequestsMaxSize = 0x15555555;
-
-// The run loop (RunLoop::RunLoop): its vtable, the tick handler map, the
-// listener map and the request vector.
-constexpr uint32_t kRunLoopVtable = 0x82000FE8;
-constexpr uint32_t kTickHandlers = 4;
-constexpr uint32_t kListeners = 16;
-constexpr uint32_t kRequests = 28;
 
 struct Iterator {
   uint32_t container;

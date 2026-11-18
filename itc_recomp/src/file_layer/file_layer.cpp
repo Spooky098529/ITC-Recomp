@@ -3,6 +3,7 @@
 #include "base/log.h"
 #include "c_runtime/format.h"
 #include "guest.h"
+#include "schema/file_layer.h"
 
 namespace file_layer {
 
@@ -27,41 +28,42 @@ void FileDestruct(uint8_t* base, uint32_t file) {
 void AsyncFileConstruct(uint8_t* base, uint32_t file) {
   ITC_NATIVE_RUNNING("sub_82593AC0 AsyncFile::AsyncFile");
   FileConstruct(base, file);
-  guest::StoreU32(base, file, kAsyncFileVtable);
+  schema::GameFile(base, file).set_vtable(kAsyncFileVtable);
 }
 
 void AsyncFileDestruct(uint8_t* base, uint32_t file) {
   ITC_NATIVE_RUNNING("sub_82593B00 AsyncFile::~AsyncFile");
-  guest::StoreU32(base, file, kAsyncFileVtable);
+  schema::GameFile(base, file).set_vtable(kAsyncFileVtable);
   FileDestruct(base, file);
 }
 
 void GameFileConstruct(uint8_t* base, uint32_t file) {
   ITC_NATIVE_RUNNING("sub_820A6A00 GameFile::GameFile");
   AsyncFileConstruct(base, file);
-  guest::StoreU32(base, file, kGameFileVtable);
+  schema::GameFile(base, file).set_vtable(kGameFileVtable);
 }
 
 void GameFileDestruct(uint8_t* base, uint32_t file) {
   ITC_NATIVE_RUNNING("sub_820A6A40 GameFile::~GameFile");
-  guest::StoreU32(base, file, kGameFileVtable);
+  schema::GameFile(base, file).set_vtable(kGameFileVtable);
   AsyncFileDestruct(base, file);
 }
 
 void PathConstruct(uint8_t* base, uint32_t path) {
   ITC_NATIVE_RUNNING("sub_82593C28 Path::Path");
-  guest::StoreU8(base, path + 4, 0);
-  guest::StoreU32(base, path, kPathVtable);
+  const schema::Path p(base, path);
+  p.set_text(0);
+  p.set_vtable(kPathVtable);
 }
 
 void PathDestruct(uint8_t* base, uint32_t path) {
   ITC_NATIVE_RUNNING("sub_82593C48 Path::~Path");
-  guest::StoreU32(base, path, kPathVtable);
+  schema::Path(base, path).set_vtable(kPathVtable);
 }
 
 void GamePathConstruct(uint8_t* base, uint32_t path) {
   ITC_NATIVE_RUNNING("sub_820A6BE0 GamePath::GamePath");
-  guest::StoreU32(base, path, kGamePathVtable);
+  schema::GamePath(base, path).set_vtable(kGamePathVtable);
 }
 
 namespace {
@@ -72,8 +74,9 @@ uint32_t StringText(uint8_t* base, uint32_t string) {
   return guest::LoadU32(base, string + 24) < 16 ? string + 4 : guest::LoadU32(base, string + 4);
 }
 
-constexpr uint32_t kFormats[3] = {0x8206CC48, 0x8206CC54, 0x8206CC60};
-constexpr uint32_t kPrefixString = 0x8265EE7C, kProjectString = 0x8265EE98;
+using Globals = schema::FileLayerGlobals;
+constexpr uint32_t kFormats[3] = {Globals::format_kind0_address(), Globals::format_kind1_address(),
+                                  Globals::format_kind2_address()};
 
 }  // namespace
 
@@ -92,8 +95,8 @@ bool PathBuild(uint8_t* base, uint32_t path, uint32_t kind, uint32_t name, uint3
     uint32_t args[3];
     uint32_t count = 0;
     if (kind == 2) {
-      args[count++] = StringText(base, kPrefixString);
-      args[count++] = StringText(base, kProjectString);
+      args[count++] = StringText(base, Globals::prefix_string_address());
+      args[count++] = StringText(base, Globals::project_string_address());
     }
     args[count++] = name;
     for (uint32_t i = 0; i < count; i++) {
@@ -101,13 +104,13 @@ bool PathBuild(uint8_t* base, uint32_t path, uint32_t kind, uint32_t name, uint3
       guest::StoreU32(base, frame + 36 + 8 * i, args[i]);
     }
     int32_t written;
-    if (!c_runtime::Sprintf(base, path + 4, kFormats[kind], frame + 32, frame - 144 - 1328,
+    if (!c_runtime::Sprintf(base, schema::Path(base, path).text_address(), kFormats[kind], frame + 32, frame - 144 - 1328,
                             &written)) {
       return false;
     }
   }
   ITC_NATIVE_RUNNING("sub_82593CA0 Path::Build");
-  *result = path + 4;
+  *result = schema::Path(base, path).text_address();
   return true;
 }
 
@@ -121,14 +124,14 @@ bool GamePathSetGame(uint8_t* base, uint32_t game_path, uint32_t name, uint32_t 
     return false;
   }
   ITC_NATIVE_RUNNING("sub_820A6BF0 GamePath::SetGame");
-  uint32_t out = game_path + 4;
+  uint32_t out = schema::GamePath(base, game_path).text_address();
   for (;;) {
     const uint8_t c = guest::LoadU8(base, text++);
     guest::StoreU8(base, out++, c);
     if (c == 0) break;
   }
   PathDestruct(base, path);
-  *result = game_path + 4;
+  *result = schema::GamePath(base, game_path).text_address();
   return true;
 }
 

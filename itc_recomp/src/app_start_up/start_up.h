@@ -11,15 +11,10 @@
 namespace app_start_up {
 
 // The globals the start-up keeps the app's interface (app + 16, vtable
-// 0x82000E38) in.
-constexpr uint32_t kReadErrorApp = 0x82600344;    // ReadError::SetApp (+4 of 0x82600340)
-constexpr uint32_t kAppInterface84 = 0x8266D084;  // sub_8209AC30
-constexpr uint32_t kRenderApp = 0x826BABA0;       // sub_8209F580
+// 0x82000E38) in, sub_8225FB70's two words, the scene target's and the
+// billboards' are schema::AppStartUpGlobals (schema/app_start_up.h).
 // Movies::Set's: the movie class (the app + 128).
 constexpr uint32_t kMovieClass = 0x826C1CDC;
-// sub_8225FB70's two words.
-constexpr uint32_t kWords8110 = 0x82816110;
-constexpr uint32_t kWords8114 = 0x82816114;
 
 // The interface's slot +44 (sub_82379350: its +112, the app + 128).
 constexpr uint32_t kInterfaceMovie = 0x82379350;
@@ -54,10 +49,6 @@ std::optional<uint32_t> CreateVertexDeclaration(uint8_t* base, uint32_t elements
                                                 const MemcpyCall& memcpy_call);
 
 // --- The scene target ---
-
-constexpr uint32_t kSceneTargetApp = 0x8266D088;  // the video output's way in
-constexpr uint32_t kSceneTarget = 0x8266D08C;
-constexpr uint32_t kDisplayTiling = 0x8260034C;  // the display's tiling block (a pointer)
 
 // The guest calls the device's users make: the video output ([0x8266D088]'s
 // vtable slot 7, then that object's slot 3; `at` 0 for the lock, 1 for the

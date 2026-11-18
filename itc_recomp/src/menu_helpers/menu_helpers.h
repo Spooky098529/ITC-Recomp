@@ -23,19 +23,7 @@ constexpr uint32_t kFiredOffset = 48;    // slot 12
 constexpr uint32_t kPressedSlot = 0x8210BF40;
 constexpr uint32_t kFiredSlot = 0x8210C010;
 
-// The menu's fields (docs/known-data.md's "front-end menu").
-constexpr uint32_t kCursor = 0;
-constexpr uint32_t kPrevious = 4;
-constexpr uint32_t kMoved = 8;
-constexpr uint32_t kFirst = 12;
-constexpr uint32_t kLast = 16;
-constexpr uint32_t kWraps = 20;
-constexpr uint32_t kUpDownLocked = 24;
-constexpr uint32_t kSidesStep = 28;
-constexpr uint32_t kShouldersStep = 32;
-constexpr uint32_t kSide = 36;
-constexpr uint32_t kWrapped = 40;
-constexpr uint32_t kPlayer = 64;
+// The menu's fields are schema::FrontEndMenu's (schema/menu_helpers.h).
 
 // A guest function called through the function table from the frame at
 // `r1`, with r3 and r4 given (the other registers left as they are: the

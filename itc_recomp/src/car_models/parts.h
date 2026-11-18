@@ -186,9 +186,6 @@ struct SecondSetUps {
   const GuestCall& guest;
 };
 
-// The first set's pools.
-constexpr uint32_t kFirstSet = 0x826C2E40;
-
 // SceneCarModel::SetUp (sub_820DB818): +3728 = the scene ([0x826C2E44]),
 // the car record copied to +32 (CarRecord::Copy), pool 0 claimed and set up
 // with +32; +24 = the set-up's object. 112-byte frame.

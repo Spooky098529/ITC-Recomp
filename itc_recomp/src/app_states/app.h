@@ -12,13 +12,7 @@
 
 namespace app_states {
 
-// The app's state stack (AppStates::, 12 bytes): +4 the app, +8 the root
-// layer.
-constexpr uint32_t kStatesRoot = 8;
-// The app's +20 interface: +96 the state stack (the app + 116), +56 the
-// message vector (the app + 76).
-constexpr uint32_t kInterfaceStates = 96;
-constexpr uint32_t kInterfaceMessages = 56;
+// The objects' fields: schema/app_states.h (itc_recomp/schema/app-states.toml).
 
 // The targets ours in play.
 constexpr uint32_t kAppStatesIsEmpty = 0x820AE1A0;
@@ -69,16 +63,6 @@ uint32_t AppIsRunning(uint8_t* base, uint32_t interface, const AppCalls& calls);
 // Insert, or nullopt where MessageVector::PushBack hands back.
 std::optional<bool> AppSendMessage(uint8_t* base, uint32_t interface, uint32_t message);
 
-// The app's handler maps: +28 (run while the toggle +112 is clear or a
-// step was asked), +40 (while it's set), +52 (every pass), +64 (the
-// listeners); the request vector at +96, the message vector at +76, the
-// message being delivered at +92.
-constexpr uint32_t kAppMaps[4] = {28, 40, 52, 64};
-constexpr uint32_t kAppRequests = 96;
-constexpr uint32_t kAppMessages = 76;
-constexpr uint32_t kAppMessage = 92;
-constexpr uint32_t kAppInterface = 20;
-constexpr uint32_t kInterfaceRequests = 76;  // the app + 96
 // The functors App::Update and DeliverMessage hand the walks.
 constexpr uint32_t kRunHandler = 0x82092968;
 constexpr uint32_t kRunListener = 0x820929B0;

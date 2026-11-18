@@ -27,11 +27,9 @@ namespace build_screen {
 // overrides.
 using Calls = race_hud_object::Calls;
 
-// The globals (pointers).
-constexpr uint32_t kMachine = 0x826D843C;  // the transition machine (+24 a word per transition)
-constexpr uint32_t kList = 0x826D8440;     // the level's menu list (72 bytes)
-constexpr uint32_t kGroupList = 0x826D8444;  // the groups, stepped on levels 1 and 2
-constexpr uint32_t kScreen = 0x826D8448;   // the screen data
+// The globals (the transition machine [0x826D843C], the menu lists
+// [0x826D8440] and [0x826D8444], the screen data [0x826D8448]):
+// schema::BuildScreenGlobals (schema/build_screen.h).
 
 // The screen data's fields.
 constexpr uint32_t kGroups = 36;            // 56 groups of 3,252 bytes

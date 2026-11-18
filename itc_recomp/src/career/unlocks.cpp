@@ -6,9 +6,13 @@
 #include "c_runtime/strings.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
+#include "schema/career.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace career {
+
+using schema::CareerItemRecord;
+using schema::CareerSave;
 
 namespace {
 
@@ -46,32 +50,30 @@ bool ConditionTestFits(uint8_t* base, uint32_t sp) {
 std::optional<uint32_t> ConditionTest(uint8_t* base, uint32_t condition, uint32_t location,
                                       uint32_t mask, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82112950 Condition::Test");
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  const CareerSave sv(base, vehicle_accessors::SaveDataOf(base, 0));
+  const schema::CareerCondition c(base, condition);
   const bool masked = (mask & 0x7C00) != 0;
-  const uint32_t kind = guest::LoadU32(base, condition + 0);
+  const uint32_t kind = c.kind();
   if (kind > 9) {
     return 0;
   }
-  const int32_t value = int32_t(guest::LoadU32(base, condition + 4));
+  const int32_t value = int32_t(c.value());
   if (value < 0) {
     return 0;
   }
-  const uint32_t records = save + kItemRecords;
+  const uint32_t records = sv.item_records_address();
   switch (kind) {
     case 0:
-      return int16_t(guest::LoadU16(base, records + 12 * uint32_t(value) + 2)) > 0 ? 1 : 0;
+      return int16_t(CareerItemRecord(base, records + 12 * uint32_t(value)).wins()) > 0 ? 1 : 0;
     case 1:
-      return guest::LoadU16(base, records + 12 * uint32_t(value) + 2) == 0 ? 1 : 0;
+      return CareerItemRecord(base, records + 12 * uint32_t(value)).wins() == 0 ? 1 : 0;
     case 2: {
-      const uint32_t record = records + 12 * uint32_t(value);
-      return guest::LoadU16(base, record + 2) == 0 && guest::LoadU16(base, record + 0) == 0 &&
-                     guest::LoadU16(base, record + 4) == 0
-                 ? 1
-                 : 0;
+      const CareerItemRecord record(base, records + 12 * uint32_t(value));
+      return record.wins() == 0 && record.losses() == 0 && record.outcome3() == 0 ? 1 : 0;
     }
     case 3:
     case 4: {
-      const int32_t weekday = int32_t(guest::LoadU32(base, save + 6100)) % 7;
+      const int32_t weekday = int32_t(sv.day()) % 7;
       return (kind == 3 ? weekday > value : weekday < value) ? 1 : 0;
     }
     case 5:
@@ -81,10 +83,11 @@ std::optional<uint32_t> ConditionTest(uint8_t* base, uint32_t condition, uint32_
       }
       bool done;
       if (location == 0) {
-        done = BitSet(base, save + 0x1CA7C, value);
+        done = BitSet(base, sv.table0_done_address(), value);
       } else {
-        const uint32_t table = kind == 5 ? 0x1BE78 : 0x1C178;
-        done = guest::LoadU32(base, save + table + 4 * uint32_t(value)) == 2;
+        // +0x1BE78 and +0x1C178: the table words' +0xF00 and +0x1200.
+        const uint32_t table = sv.table_words_address() + (kind == 5 ? 0xF00 : 0x1200);
+        done = guest::LoadU32(base, table + 4 * uint32_t(value)) == 2;
       }
       return (kind == 5 ? done : !done) ? 1 : 0;
     }
@@ -112,7 +115,7 @@ std::optional<uint32_t> ConditionTest(uint8_t* base, uint32_t condition, uint32_
         if (counted && masked && !KindAllowed(base, item, mask)) {
           counted = false;
         }
-        if (counted && guest::LoadU16(base, records + 12 * uint32_t(i) + 2) != 0) {
+        if (counted && CareerItemRecord(base, records + 12 * uint32_t(i)).wins() != 0) {
           count++;
         }
       }
@@ -135,12 +138,13 @@ constexpr int32_t kOneBit[42] = {
 };
 
 void AppendReward(uint8_t* base, uint32_t save, uint32_t index) {
-  const uint32_t list = save + 0x1CA84;
-  const uint32_t entry = list + 12 * guest::LoadU32(base, list + 2688);
+  const CareerSave sv(base, save);
+  const uint32_t list = sv.rewards_shown_address();
+  const uint32_t entry = list + 12 * sv.rewards_shown_count();
   guest::StoreU32(base, entry + 0, 0);
   guest::StoreU32(base, entry + 4, 8);
   guest::StoreU32(base, entry + 8, index);
-  guest::StoreU32(base, list + 2688, guest::LoadU32(base, list + 2688) + 1);
+  sv.set_rewards_shown_count(sv.rewards_shown_count() + 1);
 }
 
 }  // namespace
@@ -148,13 +152,14 @@ void AppendReward(uint8_t* base, uint32_t save, uint32_t index) {
 uint32_t RewardsGrant(uint8_t* base, uint32_t save, uint32_t index, uint32_t kind,
                       uint32_t value) {
   ITC_NATIVE_RUNNING("sub_82114C08 Rewards::Grant");
+  const CareerSave sv(base, save);
   if (int32_t(index) >= 0) {
-    SetBit(base, save + 0x1D508, int32_t(index));
+    SetBit(base, sv.rewards_granted_address(), int32_t(index));
   }
   if (kind > 41) {
     return save;
   }
-  const uint32_t unlocks = save + kUnlockSet;
+  const uint32_t unlocks = sv.unlock_set_address();
   bool fresh = false;
   // A bit tested (new when clear, or negative) and set (when not negative).
   const auto test_and_set = [&](uint32_t set, uint32_t offset) {
@@ -206,7 +211,7 @@ uint32_t RewardsGrant(uint8_t* base, uint32_t save, uint32_t index, uint32_t kin
       break;
     }
     case 38: {
-      const uint32_t set = save + 0x19924;
+      const uint32_t set = sv.reward_cars_address();
       const int32_t b = int32_t(value);
       if (b >= 0 && BitSet(base, set, b)) {
         return save;
@@ -221,10 +226,10 @@ uint32_t RewardsGrant(uint8_t* base, uint32_t save, uint32_t index, uint32_t kin
       AppendReward(base, save, index);
       return save;
     case 40:
-      test_and_set(save + 0x199A8, 0);
+      test_and_set(sv.reward_set_40_address(), 0);
       break;
     case 41:
-      test_and_set(save + 0x199C4, 0);
+      test_and_set(sv.reward_set_41_address(), 0);
       break;
     default:
       test_and_set(unlocks, uint32_t(kOneBit[kind]));

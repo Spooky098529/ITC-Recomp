@@ -13,6 +13,7 @@
 #include "guest.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "schema/app_start_up.h"
 #include "strings_and_font/strings_and_font.h"
 
 #include <cstddef>
@@ -128,7 +129,7 @@ namespace {
 // [0x8266D088]'s slot 7, then that object's slot 3: the video output, with
 // the original's return addresses.
 uint32_t VideoOutput(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
-  ctx.r3.u64 = guest::LoadU32(base, asu::kSceneTargetApp);
+  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app(base).address;
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
   const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
@@ -296,8 +297,9 @@ asu::FontCalls FontCallsFor(lifted::Regs& ctx, uint8_t* base, uint32_t text_fram
   };
   calls.render_object = [&ctx, base, font_frame](int which) {
     return At(ctx, font_frame, [&] {
-      const uint32_t object = VirtualCall(ctx, base, guest::LoadU32(base, asu::kRenderApp), 32,
-                                          which == 0 ? 0x82109284 : 0x821092AC);
+      const uint32_t object =
+          VirtualCall(ctx, base, schema::AppStartUpGlobals::render_app(base).address, 32,
+                      which == 0 ? 0x82109284 : 0x821092AC);
       return VirtualCall(ctx, base, object, which == 0 ? 4 : 8,
                          which == 0 ? 0x82109294 : 0x821092BC);
     });

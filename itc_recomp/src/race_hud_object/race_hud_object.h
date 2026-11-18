@@ -23,17 +23,12 @@ struct Calls;
 
 namespace race_hud_object {
 
-// The HUD's fields.
-constexpr uint32_t kHudPlayer = 16;     // the player's index
-constexpr uint32_t kHudVehicle = 440;   // Vehicle::Get(+16)
-constexpr uint32_t kHudDashboard = 608; // the dashboard movie (id 0)
-constexpr uint32_t kHudTimer = 624;     // the timer movie (id 13)
+// The HUD's fields, its racers' bars and curves, and the image words it
+// uses: schema/race_hud_object.h (itc_recomp/schema/race-hud-object.toml).
 
-// The two viewports (a pointer to two; +1860 the camera view).
-constexpr uint32_t kViewports = 0x826C2CE8;
-
-// The race data ([0x826C5B2C]: +4 the course, the racers' records 3,936
-// bytes each from +0, +0xA3AF4 the race mode) and the track zones' owner.
+// The race data ([0x826C5B2C], the schema's RaceHudObjectGlobals::race_data:
+// +4 the course, the racers' records 3,936 bytes each from +0, +0xA3AF4 the
+// race mode).
 constexpr uint32_t kRaceData = 0x826C5B2C;
 constexpr uint32_t kRecordBytes = 3936;
 constexpr uint32_t kRaceMode = 0xA3AF4;
@@ -77,8 +72,6 @@ constexpr uint32_t kMoviesOpen = 0x8211E808;
 constexpr uint32_t kNew = 0x825A6880;
 constexpr uint32_t kMemset = 0x825A71D0;
 constexpr uint32_t kMenuListInit = 0x8220BAC0;
-constexpr uint32_t kTrackZones = 0x828161EC;  // the zones' owner
-constexpr uint32_t kRaceProgress = 0x826D82E8;  // the race's progress (+7156 a float)
 
 // A guest function `function` called with r3 to r10 (0 where not given:
 // the varargs UiMovie::SetText's unset r7 to r10 pass 0, the user's call
@@ -443,8 +436,6 @@ uint64_t ScreensDestruct(uint8_t* base, uint32_t holder, uint32_t sp, const Call
 // destructor, OutputDebugStringA(0x8200D1C4) instead (discarded,
 // helpers::DebugOutput; r3 the text). VirtualFree's r3.
 uint64_t ScreensDestroy(uint8_t* base, uint32_t sp, const Calls& calls);
-// The in-race screens' holder ([0x826D84F0]).
-constexpr uint32_t kScreensHolder = 0x826D84F0;
 // RaceScreens::Create (sub_82211F40): the holder (VirtualAlloc(0, 1040,
 // MEM_COMMIT, read-write): the allocation layer's pages) at [0x826D84F0],
 // the eight screens' makers (race_screens::PauseMenuCreate and the rest,

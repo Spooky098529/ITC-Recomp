@@ -35,8 +35,6 @@ constexpr uint32_t kCodecBaseVtable = 0x8204B958;    // the codec base's own
 constexpr uint32_t kMatrixVtable = 0x8204AB30;
 constexpr uint32_t kMatrixInnerVtable = 0x8204AB14;
 constexpr uint32_t kMeterVtable = 0x8207229C;
-constexpr uint32_t kCodecInfoWord = 0x8204B950;      // the codecs' info half-word (10)
-constexpr uint32_t kSampleBytes = 0x8204BBC0;        // bytes a sample, by the format's type
 constexpr uint32_t kXmaRelease = 0x8246A758;         // the XMA object's release (audio.md)
 constexpr uint32_t kMemset = 0x825A71D0;
 

@@ -6,22 +6,23 @@
 #include "base/log.h"
 #include "guest.h"
 #include "models/model.h"
+#include "schema/models.h"
 
 namespace models {
 
 namespace {
 
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
-
 // The words after the base Model, in the originals' order.
 void Clear(uint8_t* base, uint32_t model) {
-  for (uint32_t offset : {444u, 448u, 452u, 456u, 460u, 432u}) {
-    Store(base, model + offset, 0);
-  }
-  Store(base, model + 436, 0xFFFFFFFFu);
-  Store(base, model + 440, 0);
+  const schema::Model m(base, model);
+  m.set_vinyl_sheet(0u);
+  m.set_vinyl_texture_b(0u);
+  m.set_category3_texture(0u);
+  m.set_override_texture(0u);
+  m.set_replacement_texture(0u);
+  m.set_use_override_texture(0u);
+  m.set_replaced_texture_index(0xFFFFFFFFu);
+  m.set_force_pair_1005(0u);
 }
 
 }  // namespace
@@ -33,8 +34,9 @@ void PartModelClear(uint8_t* base, uint32_t model) {
 
 void PartModelSetVinylTextures(uint8_t* base, uint32_t model, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_820CE9F8 Model::SetVinylTextures");
-  Store(base, model + 444, a);
-  Store(base, model + 448, b);
+  const schema::Model m(base, model);
+  m.set_vinyl_sheet(a);
+  m.set_vinyl_texture_b(b);
 }
 
 bool PartModelConstruct(uint8_t* base, uint32_t model) {
@@ -42,14 +44,14 @@ bool PartModelConstruct(uint8_t* base, uint32_t model) {
   if (!ModelConstruct(base, model)) {
     return false;
   }
-  Store(base, model, kPartModelVtable);
+  schema::Model(base, model).set_vtable(kPartModelVtable);
   Clear(base, model);
   return true;
 }
 
 std::optional<uint32_t> PartModelDestruct(uint8_t* base, uint32_t model) {
   ITC_NATIVE_RUNNING("sub_820CE990 PartModel::~PartModel");
-  Store(base, model, kPartModelVtable);
+  schema::Model(base, model).set_vtable(kPartModelVtable);
   Clear(base, model);
   return ModelDestruct(base, model);
 }

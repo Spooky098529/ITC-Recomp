@@ -49,6 +49,23 @@ writes), marked "Not read in detail". The fields are in
 "screen picture", `0x82636518`, `0x82602EA0`, and the save data's
 location records and unlock list under `0x826C5B58`).
 
+The objects' layout (E5's step 2, 2026-11-18):
+`itc_recomp/schema/location-screen.toml`, and the hand ports read them
+through its views (`schema/location_screen.h`): the screen
+(`LocationScreen`, 912 bytes), its view at +560 (`LocationScreenView`),
+the machine as the leaving pages get it (`LocationScreenMachine`), the
+mode's dispatcher (`LocationScreenDispatcher`), the type 5 mode and its
+block as `FrontEndMode::NextMode` gets them (`LocationScreenMode`,
+`LocationScreenModeBlock`), the pictures and their texture records
+(`LocationScreenPicture`, `LocationScreenPictureTexture`), the 20-byte
+entries the texts walk (`LocationScreenEntry20`), the locations' and the
+card table's rows (`LocationScreenLocation`, `LocationScreenCard`) and the
+image words (`LocationScreenGlobals`). The page object and the four menus
+are `menu-helpers.toml`'s `PageObject` and `FrontEndMenu`. The measure
+joins the screen with the machine the state handlers get, the type 5
+mode's block and the view (the screen's `machine_*` and `block_*` fields,
+noted as measure faults).
+
 Shared, with their rows where they are: `CourseView::Draw`
 (`sub_822282E8`, `camera-modes.md`: drawn by `LocationScreen::Update`),
 `StateMachine::Add` (`game-modes.md`), the camera animations

@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/movies.h"
 
 #include <atomic>
 #include <mutex>
@@ -53,7 +54,8 @@ uint32_t MovieWrapperLockLeave(uint8_t* base, uint32_t lock) {
 }
 
 std::optional<uint32_t> MovieWrapperConstruct(uint8_t* base, uint32_t wrapper) {
-  Store(base, wrapper + 0, kMovieWrapperVtable);
+  const schema::MovieWrapper w(base, wrapper);
+  w.set_vtable(kMovieWrapperVtable);
   const auto block = memory::crt::OperatorNew(base, kMovieWrapperBlockBytes);
   if (!block) {
     return std::nullopt;
@@ -65,28 +67,29 @@ std::optional<uint32_t> MovieWrapperConstruct(uint8_t* base, uint32_t wrapper) {
   if (*block != 0) {
     SetMovieWrapperLock(*block);
   }
-  Store(base, wrapper + 4, *block);
+  w.set_block(*block);
   // The player (+28) = 0; with no block the original stores at 28 too.
-  Store(base, *block + 28, 0);
+  schema::MovieWrapperBlock(base, *block).set_player(uint32_t{0});
   return wrapper;
 }
 
 std::optional<uint32_t> MovieConstruct(uint8_t* base, uint32_t movie, uint32_t block,
                                        uint32_t frame, const MovieCalls& calls) {
-  Store(base, movie + 0, kMovieVtable);
-  Store(base, movie + 4, Load(base, block + 4));
+  const schema::Movie m(base, movie);
+  m.set_vtable(kMovieVtable);
+  m.set_framework_interface(Load(base, block + 4));
   // The command at +12 (as the sound manager's at +1584).
-  Store(base, movie + 16, 0x82000AB4);
-  Store(base, movie + 20, 0);
-  Store(base, movie + 24, 0);
-  guest::StoreU8(base, movie + 28, 0);
-  guest::StoreU8(base, movie + 29, 1);
-  guest::StoreU8(base, movie + 30, 0);
-  Store(base, movie + 12, 0x820066DC);
-  Store(base, movie + 16, 0x82002908);
-  Store(base, movie + 36, kDelegateVtable);
-  Store(base, movie + 40, 0);
-  Store(base, movie + 44, 0);
+  m.set_command_vtable_4(0x82000AB4);
+  m.set_unknown_20(0);
+  m.set_command_status(0);
+  m.set_unknown_28(0);
+  m.set_unknown_29(1);
+  m.set_unknown_30(0);
+  m.set_command_vtable(0x820066DC);
+  m.set_command_vtable_4(0x82002908);
+  m.set_delegate_vtable(kDelegateVtable);
+  m.set_delegate_object(uint32_t{0});
+  m.set_delegate_function(0);
   const auto wrapper_block = memory::crt::OperatorNew(base, 8);
   if (!wrapper_block) {
     return std::nullopt;
@@ -96,7 +99,7 @@ std::optional<uint32_t> MovieConstruct(uint8_t* base, uint32_t movie, uint32_t b
   if (*wrapper_block != 0) {
     wrapper = calls.wrapper(*wrapper_block);
   }
-  Store(base, movie + 8, wrapper);
+  m.set_wrapper(wrapper);
   // The tick handler (key 1, Movie::OnTick 0x820AE808) and the listener
   // (key 1, 0x820AE818), each a 12-byte delegate on the frame.
   Store(base, frame + 92, movie);
@@ -110,7 +113,7 @@ std::optional<uint32_t> MovieConstruct(uint8_t* base, uint32_t movie, uint32_t b
   Store(base, frame + 104, kDelegateVtable);
   Store(base, frame + 112, 0x820AE818);
   calls.virtual_call(Load(base, block + 0), 4, frame + 80, frame + 104, 0x820AEBAC);
-  Store(base, movie + 308, 0);
+  m.set_state(0);
   return movie;
 }
 

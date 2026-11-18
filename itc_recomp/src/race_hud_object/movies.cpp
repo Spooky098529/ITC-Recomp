@@ -11,6 +11,8 @@
 #include "helpers/debug_output.h"
 #include "memory/heap.h"
 #include "race_screens/race_screens.h"
+#include "schema/car_physics.h"
+#include "schema/race_hud_object.h"
 #include "menu_sounds/menu_sounds.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -25,15 +27,17 @@ namespace {
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;  // a sub-scene index of -1
 
-// The HUD's other movies.
-constexpr uint32_t kHudRacers = 604;     // the racers' gauges (id 10)
-constexpr uint32_t kHudCountdown = 612;  // the start countdown (id 11)
-constexpr uint32_t kHudWarning = 616;    // the warning (id 3)
-constexpr uint32_t kHudMovie1 = 628;     // the movie of id 1
+using Hud = schema::RaceHud;
+using Racers = schema::RaceHudRacers;
+using G = schema::RaceHudObjectGlobals;
 
-uint32_t Movie(uint8_t* base, uint32_t hud, uint32_t field) {
-  return guest::LoadU32(base, hud + field);
-}
+// The HUD's movies (each pointer loaded at the call).
+uint32_t RacersMovie(uint8_t* base, uint32_t hud) { return Hud(base, hud).racers_movie().address; }
+uint32_t Dashboard(uint8_t* base, uint32_t hud) { return Hud(base, hud).dashboard().address; }
+uint32_t Countdown(uint8_t* base, uint32_t hud) { return Hud(base, hud).countdown().address; }
+uint32_t Warning(uint8_t* base, uint32_t hud) { return Hud(base, hud).warning().address; }
+uint32_t Timer(uint8_t* base, uint32_t hud) { return Hud(base, hud).timer().address; }
+uint32_t Movie1(uint8_t* base, uint32_t hud) { return Hud(base, hud).movie1().address; }
 
 // UiMovie::LoopNamed's or UiMovie::Loop's r3 (their adapters' MovedR3):
 // the slot moved to, else the copy in their 176-byte frame below `frame`
@@ -49,8 +53,8 @@ uint64_t MovedR3(const ui_movies::Moved& moved, uint32_t frame, uint32_t movie) 
 
 uint32_t StartCountdown(uint8_t* base, uint32_t hud) {
   ITC_NATIVE_RUNNING("sub_82212270 RaceHud::StartCountdown");
-  const uint32_t movie = Movie(base, hud, kHudCountdown);
-  guest::StoreU32(base, hud + 436, 1);
+  const uint32_t movie = Countdown(base, hud);
+  Hud(base, hud).set_countdown_running(1);
   return ui_movies::Play(base, movie, kNone, 0, 0, 0, 0, 0);
 }
 
@@ -58,37 +62,37 @@ uint64_t StartMovie1(uint8_t* base, uint32_t hud, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82212718 RaceHud::StartMovie1");
   const uint32_t frame = sp - 96;
   guest::StoreU32(base, frame, sp);
-  ui_movies::PlayNamed(base, Movie(base, hud, kHudMovie1), 0, 0, 0, 0, 0);
-  const uint32_t movie = Movie(base, hud, kHudMovie1);
+  ui_movies::PlayNamed(base, Movie1(base, hud), 0, 0, 0, 0, 0);
+  const uint32_t movie = Movie1(base, hud);
   return MovedR3(ui_movies::MoveNamedAnimation(base, movie, 0, true), frame, movie);
 }
 
 uint64_t FinishMovie1(uint8_t* base, uint32_t hud, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82212878 RaceHud::FinishMovie1");
-  return calls.Call(kFinishNamed, sp, lr, Movie(base, hud, kHudMovie1), 0);
+  return calls.Call(kFinishNamed, sp, lr, Movie1(base, hud), 0);
 }
 
 uint64_t DrawWarning(uint8_t* base, uint32_t hud, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82212AC8 RaceHud::DrawWarning");
-  if (guest::LoadU32(base, hud + 468) == 0) {
+  if (Hud(base, hud).warning_shown() == 0) {
     return hud;
   }
-  return calls.Call(kRun, sp, lr, Movie(base, hud, kHudWarning), 1);
+  return calls.Call(kRun, sp, lr, Warning(base, hud), 1);
 }
 
 uint64_t RunMovie1(uint8_t* base, uint32_t hud, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82212AF8 RaceHud::RunMovie1");
-  return calls.Call(kRun, sp, lr, Movie(base, hud, kHudMovie1), 0);
+  return calls.Call(kRun, sp, lr, Movie1(base, hud), 0);
 }
 
 uint64_t RunItem(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82212B08 RaceHud::RunItem");
   const uint32_t frame = sp - 96;
   guest::StoreU32(base, frame, sp);
-  if (int32_t(guest::LoadU32(base, hud + 460)) == -1) {
+  if (int32_t(Hud(base, hud).item_shown()) == -1) {
     return hud;
   }
-  calls.Call(kRun, frame, 0x82212B34, Movie(base, hud, kHudRacers), 0);
+  calls.Call(kRun, frame, 0x82212B34, RacersMovie(base, hud), 0);
   // sub_82106540(200, 500, 0, 0x8200F710, +460): empty (audio.md), so
   // nothing but its r3, the 200 it was handed.
   return 200;
@@ -98,11 +102,12 @@ uint64_t Draw(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822128A8 RaceHud::Draw");
   const uint32_t frame = sp - 96;
   guest::StoreU32(base, frame, sp);
-  uint64_t r3 = calls.Call(kRun, frame, 0x822128C8, Movie(base, hud, kHudDashboard), 0);
-  if (guest::LoadU32(base, hud + 472) == 0 || guest::LoadU32(base, hud + 12) == 0) {
+  uint64_t r3 = calls.Call(kRun, frame, 0x822128C8, Dashboard(base, hud), 0);
+  const Hud h(base, hud);
+  if (h.view_dashboard() == 0 || h.option_mirror() == 0) {
     return r3;
   }
-  const uint32_t mirror = ui_movies::FindNode(base, Movie(base, hud, kHudDashboard), kNone, 19);
+  const uint32_t mirror = ui_movies::FindNode(base, Dashboard(base, hud), kNone, 19);
   return calls.Call(kDrawMirror, frame, 0x822128F4, mirror);
 }
 
@@ -110,26 +115,27 @@ uint64_t UpdateWarning(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& ca
   ITC_NATIVE_RUNNING("sub_82212C50 RaceHud::UpdateWarning");
   const uint32_t frame = sp - 96;
   guest::StoreU32(base, frame, sp);
-  const uint32_t car = guest::LoadU32(base, hud + kHudVehicle);
+  const Hud h(base, hud);
+  const uint32_t car = h.vehicle().address;
   const uint32_t wrong_way = guest::LoadU32(base, car + 6168);
   if (wrong_way == 0) {
-    if (guest::LoadU32(base, hud + 468) == 0) {
+    if (h.warning_shown() == 0) {
       return hud;
     }
     const uint64_t r3 =
-        calls.Call(kFinish, frame, 0x82212C90, Movie(base, hud, kHudWarning), kNone, 0);
-    guest::StoreU32(base, hud + 468, 0);
+        calls.Call(kFinish, frame, 0x82212C90, Warning(base, hud), kNone, 0);
+    h.set_warning_shown(0);
     return r3;
   }
-  if (guest::LoadU32(base, hud + 468) != 0) {
+  if (h.warning_shown() != 0) {
     return hud;
   }
-  calls.Call(kFinish, frame, 0x82212CBC, Movie(base, hud, kHudWarning), kNone, 0);
-  ui_movies::Play(base, Movie(base, hud, kHudWarning), kNone, 0, 0, 0, 0, 0);
-  const uint32_t movie = Movie(base, hud, kHudWarning);
+  calls.Call(kFinish, frame, 0x82212CBC, Warning(base, hud), kNone, 0);
+  ui_movies::Play(base, Warning(base, hud), kNone, 0, 0, 0, 0, 0);
+  const uint32_t movie = Warning(base, hud);
   const uint64_t r3 =
       MovedR3(ui_movies::MoveAnimation(base, movie, kNone, 0, true), frame, movie);
-  guest::StoreU32(base, hud + 468, 1);
+  h.set_warning_shown(1);
   return r3;
 }
 
@@ -138,20 +144,21 @@ uint64_t UpdateRecordingFull(uint8_t* base, uint32_t hud, int32_t room, uint32_t
   ITC_NATIVE_RUNNING("sub_82212E60 RaceHud::UpdateRecordingFull");
   const uint32_t frame = sp - 96;
   guest::StoreU32(base, frame, sp);
+  const Hud h(base, hud);
   if (room == 0) {
-    if (guest::LoadU32(base, hud + 492) != 0) {
+    if (h.recording_full() != 0) {
       return hud;
     }
-    const uint32_t dashboard = Movie(base, hud, kHudDashboard);
-    guest::StoreU32(base, hud + 492, 1);
+    const uint32_t dashboard = Dashboard(base, hud);
+    h.set_recording_full(1);
     calls.Call(kFinishNamed, frame, 0x82212E9C, dashboard, 6);
-    return ui_movies::PlayNamed(base, Movie(base, hud, kHudDashboard), 6, 0, 0, 0, 0);
+    return ui_movies::PlayNamed(base, Dashboard(base, hud), 6, 0, 0, 0, 0);
   }
   if (room != 1) {
     return hud;
   }
-  const uint32_t dashboard = Movie(base, hud, kHudDashboard);
-  guest::StoreU32(base, hud + 492, 0);
+  const uint32_t dashboard = Dashboard(base, hud);
+  h.set_recording_full(0);
   const uint32_t node = ui_movies::FindNode(base, dashboard, kNone, 5);
   camera_modes::steps::Stfs(base, node + 68, camera_modes::steps::Lfs(base, kZero));
   return node;
@@ -165,7 +172,7 @@ uint64_t ShowItem(uint8_t* base, uint32_t hud, int32_t id, uint32_t sp, const Ca
   constexpr uint32_t kTagPic = 0x50494300;  // "PIC\0"
   constexpr uint32_t kTagTxt = 0x54585400;  // "TXT\0"
   const uint32_t shown = id == -1 ? 1 : 0;
-  uint32_t chunk = guest::LoadU32(base, Movie(base, hud, kHudRacers) + ui_movies::kMovieLive);
+  uint32_t chunk = guest::LoadU32(base, RacersMovie(base, hud) + ui_movies::kMovieLive);
   while (guest::LoadU32(base, chunk) != ui_movies::kTagTrm) {
     const uint32_t tag = guest::LoadU32(base, chunk);
     if (tag == kTagPrm || tag == kTagPic || tag == kTagTxt) {
@@ -176,15 +183,15 @@ uint64_t ShowItem(uint8_t* base, uint32_t hud, int32_t id, uint32_t sp, const Ca
   if (id == -1) {
     return hud;
   }
-  const uint32_t name = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, 19);
-  const uint32_t picture = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), 5, 0);
+  const uint32_t name = ui_movies::FindNode(base, RacersMovie(base, hud), kNone, 19);
+  const uint32_t picture = ui_movies::FindNode(base, RacersMovie(base, hud), 5, 0);
   guest::StoreU32(base, name + 80, 1);
-  const uint32_t panel = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, 5);
+  const uint32_t panel = ui_movies::FindNode(base, RacersMovie(base, hud), kNone, 5);
   guest::StoreU32(base, panel + 80, 1);
   guest::StoreU32(base, picture + 80, 1);
   // UiMovie::SetNodeText's r6 to r10 (varargs) passed 0: the original leaves
   // them unset (the user's call for the parking area, 2026-10-30).
-  calls.Call(kSetNodeText, frame, 0x82213724, Movie(base, hud, kHudRacers), name,
+  calls.Call(kSetNodeText, frame, 0x82213724, RacersMovie(base, hud), name,
              uint64_t(int64_t(id) + 4650));
   const uint32_t item = data_tables::Item(base, uint32_t(id));
   const int32_t kind = int8_t(guest::LoadU8(base, item + 34));
@@ -194,11 +201,12 @@ uint64_t ShowItem(uint8_t* base, uint32_t hud, int32_t id, uint32_t sp, const Ca
 
 uint64_t UpdateItem(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82214238 RaceHud::UpdateItem");
-  const uint32_t item = guest::LoadU32(base, guest::LoadU32(base, kRaceProgress) + 7240);
-  if (guest::LoadU32(base, hud + 460) == item) {
+  const Hud h(base, hud);
+  const uint32_t item = guest::LoadU32(base, G::race_progress(base).address + 7240);
+  if (h.item_shown() == item) {
     return hud;
   }
-  guest::StoreU32(base, hud + 460, item);
+  h.set_item_shown(item);
   return ShowItem(base, hud, int32_t(item), sp, calls);
 }
 
@@ -219,54 +227,54 @@ uint64_t SetUpTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls
   ITC_NATIVE_RUNNING("sub_822123C8 RaceHud::SetUpTimer");
   const uint32_t frame = sp - 144;
   guest::StoreU32(base, frame, sp);
-  const uint32_t racers = guest::LoadU32(base, hud + 444);
-  const uint32_t animation = guest::LoadU32(base, racers + 12);
-  const uint32_t count = guest::LoadU32(base, racers + 0);
-  guest::StoreU32(base, hud + 464, animation);
+  const Hud h(base, hud);
+  const Racers racers = h.racers();
+  const uint32_t animation = racers.timer_animation();
+  const uint32_t count = racers.count();
+  h.set_timer_animation(animation);
   if (int32_t(animation) >= 0) {
     for (uint32_t i = 0; i < 5; i++) {
-      calls.Call(kFinishNamed, frame, 0x82212408, Movie(base, hud, kHudTimer), i);
+      calls.Call(kFinishNamed, frame, 0x82212408, Timer(base, hud), i);
     }
-    const uint32_t node = ui_movies::FindNode(base, Movie(base, hud, kHudTimer), kNone, 0);
+    const uint32_t node = ui_movies::FindNode(base, Timer(base, hud), kNone, 0);
     guest::StoreU32(base, node + 80, 1);
-    ui_movies::PlayNamed(base, Movie(base, hud, kHudTimer), guest::LoadU32(base, hud + 464), 0,
-                         0, 0, 0);
-    ui_movies::MoveNamedAnimation(base, Movie(base, hud, kHudTimer),
-                                  guest::LoadU32(base, hud + 464), true);
+    ui_movies::PlayNamed(base, Timer(base, hud), h.timer_animation(), 0, 0, 0, 0);
+    ui_movies::MoveNamedAnimation(base, Timer(base, hud), h.timer_animation(), true);
   } else {
-    const uint32_t node = ui_movies::FindNode(base, Movie(base, hud, kHudTimer), kNone, 0);
+    const uint32_t node = ui_movies::FindNode(base, Timer(base, hud), kNone, 0);
     guest::StoreU32(base, node + 80, 0);
   }
-  const uint32_t group = ui_movies::FindNode(base, Movie(base, hud, kHudTimer), kNone, 3);
+  const uint32_t group = ui_movies::FindNode(base, Timer(base, hud), kNone, 3);
   for (int32_t k = 0; k < int32_t(guest::LoadU32(base, group + 104)); k++) {
-    const uint32_t node = ui_movies::FindNode(base, Movie(base, hud, kHudTimer), kNone,
+    const uint32_t node = ui_movies::FindNode(base, Timer(base, hud), kNone,
                                               guest::LoadU32(base, group + 100) + uint32_t(k));
     guest::StoreU32(base, node + 80, 0);
   }
-  const uint32_t last = guest::LoadU32(base, guest::LoadU32(base, hud + 444) + count * 972 - 964);
+  // Record count - 1's item (records 972 bytes from the racers' +0).
+  const uint32_t last = guest::LoadU32(base, h.racers().address + count * 972 - 964);
   if (int32_t(last) != -1) {
     const uint32_t child = guest::LoadU32(base, group + 100) + count - 2;
-    const uint32_t shown = ui_movies::FindNode(base, Movie(base, hud, kHudTimer), kNone, child);
+    const uint32_t shown = ui_movies::FindNode(base, Timer(base, hud), kNone, child);
     guest::StoreU32(base, shown + 80, 1);
-    const uint32_t picture = ui_movies::FindNode(base, Movie(base, hud, kHudTimer),
+    const uint32_t picture = ui_movies::FindNode(base, Timer(base, hud),
                                                  guest::LoadU32(base, group + 100) + count - 2, 0);
     guest::StoreU32(base, picture + 108, ItemPicture(base, last));
   }
   for (uint32_t i = 1; i < 4; i++) {
     if (int32_t(i) < int32_t(count + 1)) {
-      const uint32_t id = guest::LoadU32(base, guest::LoadU32(base, hud + 444) + 972 * i + 8);
+      const uint32_t id = guest::LoadU32(base, h.racers().item0_address() + 972 * i);
       if (int32_t(id) != -1) {
         // SetText's varargs (r7 to r10) passed 0: the original leaves them
         // unset (the user's call for the parking area, 2026-10-30).
-        calls.Call(kSetText, frame, 0x82212568, Movie(base, hud, kHudTimer), kAll, i + 26,
+        calls.Call(kSetText, frame, 0x82212568, Timer(base, hud), kAll, i + 26,
                    uint64_t(id) + 4650);
       }
     } else {
-      calls.Call(kClearText, frame, 0x8221257C, Movie(base, hud, kHudTimer), kAll, i + 26);
+      calls.Call(kClearText, frame, 0x8221257C, Timer(base, hud), kAll, i + 26);
     }
   }
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  return calls.Call(kSetChildNameText, frame, 0x822125AC, Movie(base, hud, kHudTimer), kAll, 26,
+  return calls.Call(kSetChildNameText, frame, 0x822125AC, Timer(base, hud), kAll, 26,
                     uint64_t(save) + 8);
 }
 
@@ -276,36 +284,37 @@ uint64_t SetUpRacers(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& call
   const uint32_t frame = sp - 176;
   guest::StoreU32(base, frame, sp);
   ShowItem(base, hud, -1, frame, calls);
-  const uint32_t count = guest::LoadU32(base, guest::LoadU32(base, hud + 444) + 0);
-  guest::StoreU32(base, hud + 452, count);
-  uint32_t group = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, 0);
+  const Hud h(base, hud);
+  const uint32_t count = h.racers().count();
+  h.set_racer_count(count);
+  uint32_t group = ui_movies::FindNode(base, RacersMovie(base, hud), kNone, 0);
   {
     uint32_t k = guest::LoadU32(base, group + 100);
     uint32_t end = guest::LoadU32(base, group + 104) + k;
     while (int32_t(k) < int32_t(end)) {
-      const uint32_t node = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, k);
+      const uint32_t node = ui_movies::FindNode(base, RacersMovie(base, hud), kNone, k);
       guest::StoreU32(base, node + 80, 0);
       k++;
       end = guest::LoadU32(base, group + 100) + guest::LoadU32(base, group + 104);
     }
   }
-  const uint32_t last = guest::LoadU32(
-      base, guest::LoadU32(base, hud + 444) + guest::LoadU32(base, hud + 452) * 972 - 964);
+  const uint32_t racers = h.racers().address;
+  const uint32_t last = guest::LoadU32(base, racers + h.racer_count() * 972 - 964);
   if (int32_t(last) != -1) {
-    const uint32_t shown = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone,
+    const uint32_t shown = ui_movies::FindNode(base, RacersMovie(base, hud), kNone,
                                                guest::LoadU32(base, group + 100) + count - 2);
     guest::StoreU32(base, shown + 80, 1);
-    const uint32_t picture = ui_movies::FindNode(base, Movie(base, hud, kHudRacers),
+    const uint32_t picture = ui_movies::FindNode(base, RacersMovie(base, hud),
                                                  guest::LoadU32(base, group + 100) + count - 2, 0);
     guest::StoreU32(base, picture + 108, ItemPicture(base, last));
   }
   for (uint32_t k = 1; k < 3; k++) {
-    const uint32_t node = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, k + 2);
+    const uint32_t node = ui_movies::FindNode(base, RacersMovie(base, hud), kNone, k + 2);
     guest::StoreU32(base, node + 80, 1);
   }
   if (int32_t(count - 1) < 3) {
     for (uint32_t k = count + 1; int32_t(k) < 5; k++) {
-      const uint32_t node = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, k);
+      const uint32_t node = ui_movies::FindNode(base, RacersMovie(base, hud), kNone, k);
       guest::StoreU32(base, node + 80, 0);
     }
   }
@@ -315,49 +324,49 @@ uint64_t SetUpRacers(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& call
     const double scale4 = Lfs(base, 0x82002A60);
     const double scale12 = Lfs(base, 0x8200F724);
     for (uint32_t i = 0; int32_t(i) < int32_t(count); i++) {
-      group = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, i + 1);
+      group = ui_movies::FindNode(base, RacersMovie(base, hud), kNone, i + 1);
       if (i == 0) {
         const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-        calls.Call(kSetChildNameText, frame, 0x822140D4, Movie(base, hud, kHudRacers), kAll,
+        calls.Call(kSetChildNameText, frame, 0x822140D4, RacersMovie(base, hud), kAll,
                    uint64_t(guest::LoadU32(base, group + 100)) + 5, uint64_t(save) + 8);
       } else {
-        const uint32_t id = guest::LoadU32(base, guest::LoadU32(base, hud + 444) + 972 * i + 8);
+        const uint32_t id = guest::LoadU32(base, h.racers().item0_address() + 972 * i);
         if (int32_t(id) != -1) {
           // SetText's varargs passed 0 (the user's call, 2026-10-30).
-          calls.Call(kSetText, frame, 0x82214108, Movie(base, hud, kHudRacers), kAll,
+          calls.Call(kSetText, frame, 0x82214108, RacersMovie(base, hud), kAll,
                      uint64_t(guest::LoadU32(base, group + 100)) + 5, uint64_t(id) + 4650);
         }
       }
-      const uint32_t record = guest::LoadU32(base, hud + 444) + 972 * i;
-      const uint32_t bar = hud + 40 * i + 244;
-      const int64_t target = int32_t(guest::LoadU32(base, record + 788));
-      Stfs(base, bar + 16, zero);
-      Stfs(base, bar + 0, zero);
-      guest::StoreU32(base, bar + 32, 0);
-      guest::StoreU32(base, bar + 36, 0);
+      const uint32_t record = h.racers().address + 972 * i;
+      const schema::RaceHudBar bar(base, h.bars_address() + 40 * i);
+      const int64_t target = int32_t(Racers(base, record).bar_max0());
+      bar.set_min(float(zero));
+      bar.set_value(float(zero));
+      bar.set_animation_played(0);
+      bar.set_touched(0);
       // std (the conversion's doubleword): the high word first.
       guest::StoreU32(base, frame + 80, uint32_t(uint64_t(target) >> 32));
       guest::StoreU32(base, frame + 84, uint32_t(target));
       const double value = Single(double(target));
-      Stfs(base, bar + 20, value);
-      Stfs(base, bar + 24, value);
-      Stfs(base, bar + 8, value);
-      Stfs(base, bar + 4, Fmuls(value, scale4));
-      Stfs(base, bar + 12, Fmuls(value, scale12));
+      bar.set_max(float(value));
+      bar.set_target(float(value));
+      bar.set_trail(float(value));
+      bar.set_value_step(float(Fmuls(value, scale4)));
+      bar.set_trail_step(float(Fmuls(value, scale12)));
     }
   }
   uint64_t r3 = 0;
   for (uint32_t i = 0; i < 4; i++) {
-    r3 = calls.Call(kFinish, frame, 0x8221417C, Movie(base, hud, kHudRacers), kAll, i);
+    r3 = calls.Call(kFinish, frame, 0x8221417C, RacersMovie(base, hud), kAll, i);
   }
-  guest::StoreU32(base, hud + 456, 0);
+  h.set_any_bar_low(0);
   return r3;
 }
 
 uint64_t SetMode(uint8_t* base, uint32_t hud, uint64_t mode, uint32_t sp, uint32_t lr,
                  const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822157A8 RaceHud::SetMode");
-  guest::StoreU32(base, hud + 448, uint32_t(mode));
+  Hud(base, hud).set_mode(uint32_t(mode));
   switch (uint32_t(mode)) {
     case 0:
       return SetUpRacers(base, hud, sp, calls);
@@ -386,10 +395,14 @@ uint32_t Init(uint8_t* base, uint32_t hud, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82215260 RaceHud::Init");
   const uint32_t frame = sp - 128;
   guest::StoreU32(base, frame, sp);
-  static constexpr struct {
+  const Hud h(base, hud);
+  const struct {
     uint32_t id, field;
-  } kMovies[9] = {{10, 604}, {0, 608},  {11, 612}, {3, 616}, {2, 620},
-                  {13, 624}, {1, 628}, {12, 632}, {19, 636}};
+  } kMovies[9] = {{10, h.racers_movie_address()}, {0, h.dashboard_address()},
+                  {11, h.countdown_address()},    {3, h.warning_address()},
+                  {2, h.movie2_address()},        {13, h.timer_address()},
+                  {1, h.movie1_address()},        {12, h.splits_address()},
+                  {19, h.movie19_address()}};
   const uint32_t key = frame + 80;
   uint32_t found = 0;
   for (uint32_t i = 0; i < 9; i++) {
@@ -397,9 +410,9 @@ uint32_t Init(uint8_t* base, uint32_t hud, uint32_t sp) {
     found = ui_movies::PairsFind(base, ui_movies::kMovieTable, key);
     const uint32_t movie = guest::LoadU32(base, found);
     if (i == 8) {
-      guest::StoreU32(base, hud + 588, 0);
+      h.set_swapped_texture(0);
     }
-    guest::StoreU32(base, hud + kMovies[i].field, movie);
+    guest::StoreU32(base, kMovies[i].field, movie);
   }
   return found;
 }
@@ -435,7 +448,7 @@ uint64_t ScreensInit(uint8_t* base, uint32_t holder, uint32_t kind, uint32_t sp,
   const uint32_t frame = sp - 128;
   guest::StoreU32(base, frame, sp);
   calls.Call(kMoviesStart, frame, 0x82211DB8, holder, kind);
-  calls.Call(kStringsLoad, frame, 0x82211DC8, guest::LoadU32(base, 0x826C5C34), 47);
+  calls.Call(kStringsLoad, frame, 0x82211DC8, G::strings(base).address, 47);
   const uint32_t mask = MovieMask(kind);
   for (uint32_t i = 0; i < 23; i++) {
     if ((mask >> i) & 1) {
@@ -464,7 +477,7 @@ uint64_t ScreensDestruct(uint8_t* base, uint32_t holder, uint32_t sp, const Call
   // The jump reads no argument; r3 as Strings::Release leaves it (DeleteAll
   // hands it back when the movie table is empty).
   const uint64_t r3 =
-      calls.Call(kStringsRelease, frame, 0x82211BCC, guest::LoadU32(base, 0x826C5C34), 47);
+      calls.Call(kStringsRelease, frame, 0x82211BCC, G::strings(base).address, 47);
   return calls.Call(kDeleteAllJump, frame, 0x82211BD0, r3);
 }
 
@@ -491,8 +504,8 @@ uint64_t ScreensDestroy(uint8_t* base, uint32_t sp, const Calls& calls) {
       calls.Call(teardown.original, frame, teardown.lr);
     }
   }
-  ScreensDestruct(base, guest::LoadU32(base, kScreensHolder), frame, calls);
-  const uint32_t holder = guest::LoadU32(base, kScreensHolder);
+  ScreensDestruct(base, G::screens_holder(base).address, frame, calls);
+  const uint32_t holder = G::screens_holder(base).address;
   if (holder == 0) {
     constexpr uint32_t kText = 0x8200D1C4;
     helpers::DebugOutput(nullptr);
@@ -504,7 +517,7 @@ uint64_t ScreensDestroy(uint8_t* base, uint32_t sp, const Calls& calls) {
   } else {
     r3 = calls.Call(0x82295330, frame, 0x82211D70, holder, 0, 0x8000);
   }
-  guest::StoreU32(base, kScreensHolder, 0);
+  G::set_screens_holder(base, 0u);
   return r3;
 }
 
@@ -514,7 +527,7 @@ uint64_t ScreensCreate(uint8_t* base, uint32_t kind, uint32_t sp, const Calls& c
   guest::StoreU32(base, frame, sp);
   // VirtualAlloc(0, 1040, MEM_COMMIT, PAGE_READWRITE) over the allocation
   // layer (the adapter runs this only there, hooks::NativeHeapActive).
-  guest::StoreU32(base, kScreensHolder, memory::AllocPages(1040, 4096));
+  G::set_screens_holder(base, memory::AllocPages(1040, 4096));
   race_screens::PauseMenuCreate(base, frame);
   race_screens::PauseMenu4Create(base, frame);
   race_screens::AfterRaceMenuCreate(base, frame);
@@ -523,7 +536,7 @@ uint64_t ScreensCreate(uint8_t* base, uint32_t kind, uint32_t sp, const Calls& c
   race_screens::SplitResultsCreate(base, frame);
   race_screens::RaceDialogCreate(base, frame);
   race_screens::Kind6MenuCreate(base, frame);
-  return ScreensInit(base, guest::LoadU32(base, kScreensHolder), kind, frame, calls);
+  return ScreensInit(base, G::screens_holder(base).address, kind, frame, calls);
 }
 
 uint64_t DrawPauseMenu(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& calls) {
@@ -541,9 +554,9 @@ uint64_t RunCountdown(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& cal
   ITC_NATIVE_RUNNING("sub_822129A8 RaceHud::RunCountdown");
   const uint32_t frame = sp - 112;
   guest::StoreU32(base, frame, sp);
-  const uint64_t run = calls.Call(kRun, frame, 0x822129C8, Movie(base, hud, kHudCountdown), 0);
-  const uint32_t movie = Movie(base, hud, kHudCountdown);
-  guest::StoreU32(base, hud + 436, uint32_t(run));
+  const uint64_t run = calls.Call(kRun, frame, 0x822129C8, Countdown(base, hud), 0);
+  const uint32_t movie = Countdown(base, hud);
+  Hud(base, hud).set_countdown_running(uint32_t(run));
   // UiMovie::AnimationTime leaves r3 (the movie) and its time in f1, set
   // before the sound's call as the original leaves it.
   const uint32_t time = ui_movies::AnimationTime(base, movie, kNone, 0);
@@ -567,7 +580,7 @@ uint64_t RunWarning(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls
   // The frame is made before the flag's test.
   const uint32_t frame = sp - 112;
   guest::StoreU32(base, frame, sp);
-  if (guest::LoadU32(base, hud + 468) == 0) {
+  if (Hud(base, hud).warning_shown() == 0) {
     return hud;
   }
   // Sound 10 unless the sound manager's slot 14 (AudioManager::IsCuePlaying:
@@ -580,7 +593,7 @@ uint64_t RunWarning(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls
   if ((r3 & 0xFF) == 0) {
     menu_sounds::PlayMenuSound(base, 10, frame, sounds);
   }
-  return calls.Call(kRun, frame, 0x82212AB4, Movie(base, hud, kHudWarning), 0);
+  return calls.Call(kRun, frame, 0x82212AB4, Warning(base, hud), 0);
 }
 
 uint64_t UpdateRacerBar(uint8_t* base, uint32_t hud, uint64_t index, uint64_t racer, uint32_t sp,
@@ -589,21 +602,22 @@ uint64_t UpdateRacerBar(uint8_t* base, uint32_t hud, uint64_t index, uint64_t ra
   using namespace camera_modes::steps;
   const uint32_t frame = sp - 176;
   guest::StoreU32(base, frame, sp);
-  const uint32_t bar = uint32_t(index * 40 + hud) + 244;
-  const uint32_t racers = guest::LoadU32(base, hud + 444);
-  const uint32_t target = guest::LoadU32(base, uint32_t(racer * 972) + racers + 788);
-  if (guest::LoadU32(base, bar + 36) == 0 && Touching(base, uint32_t(racer), frame) != 0) {
-    const double value = Lfs(base, bar + 0);
-    guest::StoreU32(base, bar + 36, 1);
-    Stfs(base, bar + 8, value);
+  const Hud h(base, hud);
+  const schema::RaceHudBar bar(base, uint32_t(index * 40) + h.bars_address());
+  const uint32_t racers = h.racers().address;
+  const uint32_t target = Racers(base, uint32_t(racer * 972) + racers).bar_max0();
+  if (bar.touched() == 0 && Touching(base, uint32_t(racer), frame) != 0) {
+    const double value = double(bar.value());
+    bar.set_touched(1);
+    bar.set_trail(float(value));
   }
-  BarStep(base, bar, int32_t(target), frame);
+  BarStep(base, bar.address, int32_t(target), frame);
   // The group (r4 + 1) and its children 1, 3, 2 and 4, in the original's
   // order.
-  const uint32_t group = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone,
+  const uint32_t group = ui_movies::FindNode(base, RacersMovie(base, hud), kNone,
                                              uint32_t(index + 1));
   auto child = [&](uint32_t k) {
-    return ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone,
+    return ui_movies::FindNode(base, RacersMovie(base, hud), kNone,
                                guest::LoadU32(base, group + 100) + k);
   };
   const uint32_t n1 = child(1);
@@ -612,28 +626,28 @@ uint64_t UpdateRacerBar(uint8_t* base, uint32_t hud, uint64_t index, uint64_t ra
   const uint32_t n4 = child(4);
   uint64_t r3 = n4;
   const bool first = int32_t(uint32_t(index)) == 0;
-  const double goal = Lfs(base, bar + 24);
-  if (!(goal > Lfs(base, bar + 16))) {
+  const double goal = double(bar.target());
+  if (!(goal > double(bar.min()))) {
     guest::StoreU32(base, n1 + 80, 0);
     guest::StoreU32(base, n3 + 80, 0);
     guest::StoreU32(base, n4 + 80, 0);
-    if (guest::LoadU32(base, bar + 32) != 0) {
-      r3 = calls.Call(kFinish, frame, 0x822148A8, Movie(base, hud, kHudRacers), ~0ull, index);
+    if (bar.animation_played() != 0) {
+      r3 = calls.Call(kFinish, frame, 0x822148A8, RacersMovie(base, hud), ~0ull, index);
     }
   } else {
     // The double at 0x8200F738 times the maximum (fmul, not rounded).
     const uint64_t bits =
         uint64_t(guest::LoadU32(base, 0x8200F738)) << 32 | guest::LoadU32(base, 0x8200F73C);
-    const double low = Lfs(base, bar + 20) * std::bit_cast<double>(bits);
+    const double low = double(bar.max()) * std::bit_cast<double>(bits);
     if (!(goal > low)) {
       guest::StoreU32(base, n1 + 80, 0);
       guest::StoreU32(base, n3 + 80, 0);
       guest::StoreU32(base, n4 + 80, 1);
-      guest::StoreU32(base, hud + 456, 1);
-      if (guest::LoadU32(base, bar + 32) == 0) {
-        guest::StoreU32(base, bar + 32, 1);
-        ui_movies::Play(base, Movie(base, hud, kHudRacers), kNone, uint32_t(index), 0, 0, 0, 0);
-        const uint32_t movie = Movie(base, hud, kHudRacers);
+      h.set_any_bar_low(1);
+      if (bar.animation_played() == 0) {
+        bar.set_animation_played(1);
+        ui_movies::Play(base, RacersMovie(base, hud), kNone, uint32_t(index), 0, 0, 0, 0);
+        const uint32_t movie = RacersMovie(base, hud);
         r3 = MovedR3(ui_movies::MoveAnimation(base, movie, kNone, uint32_t(index), true), frame,
                      movie);
       }
@@ -651,28 +665,28 @@ uint64_t UpdateRacerBar(uint8_t* base, uint32_t hud, uint64_t index, uint64_t ra
         }
       }
     } else {
-      guest::StoreU32(base, n1 + 80, guest::LoadU32(base, bar + 28) != 0 ? 0 : 1);
+      guest::StoreU32(base, n1 + 80, bar.rising() != 0 ? 0 : 1);
       guest::StoreU32(base, n3 + 80, 1);
       guest::StoreU32(base, n4 + 80, 0);
     }
   }
-  guest::StoreU32(base, n2 + 80, int32_t(guest::LoadU32(base, bar + 36)) == 1 ? 1 : 0);
+  guest::StoreU32(base, n2 + 80, int32_t(bar.touched()) == 1 ? 1 : 0);
   // The four nodes' x scales (+28): the value's fraction of the range (n3,
   // n1, n4) and the trail's lead over it (n2), each loaded again.
-  auto range = [&]() { return Fsubs(Lfs(base, bar + 20), Lfs(base, bar + 16)); };
-  Stfs(base, n3 + 28, Fdivs(Lfs(base, bar + 0), range()));
-  Stfs(base, n1 + 28, Fdivs(Lfs(base, bar + 0), range()));
+  auto range = [&]() { return Fsubs(double(bar.max()), double(bar.min())); };
+  Stfs(base, n3 + 28, Fdivs(double(bar.value()), range()));
+  Stfs(base, n1 + 28, Fdivs(double(bar.value()), range()));
   {
-    const double lead = Fsubs(Lfs(base, bar + 8), Lfs(base, bar + 0));
+    const double lead = Fsubs(double(bar.trail()), double(bar.value()));
     Stfs(base, n2 + 28, Fdivs(lead, range()));
   }
-  Stfs(base, n4 + 28, Fdivs(Lfs(base, bar + 0), range()));
+  Stfs(base, n4 + 28, Fdivs(double(bar.value()), range()));
   // Node 2's x (+12): after node 1 by the float at 0x8200F730 times its
   // scale (bar 0: 1.0 less the trail's fraction).
   const double width = Lfs(base, 0x8200F730);
   double x;
   if (first) {
-    const double scale = Fsubs(Lfs(base, 0x82000A30), Fdivs(Lfs(base, bar + 8), range()));
+    const double scale = Fsubs(Lfs(base, 0x82000A30), Fdivs(double(bar.trail()), range()));
     x = Fmadds(scale, width, Lfs(base, n1 + 12));
   } else {
     x = Fmadds(Lfs(base, n1 + 28), width, Lfs(base, n1 + 12));

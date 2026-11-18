@@ -9,12 +9,17 @@
 #include "course_scenery/course_scenery.h"
 #include "data_tables/data_tables.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/race_loading.h"
 #include "scene/scene.h"
 #include "strings_and_font/strings_and_font.h"
 
 namespace race_loading {
 
 namespace {
+
+using G = schema::RaceLoadingGlobals;
+using Machine = schema::CourseSetup;
+using Chunk = schema::UiMovieSceneChunk;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -68,11 +73,11 @@ uint64_t WaitCourse(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32
                     const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821514A0 CourseSetup::WaitCourse");
   const uint32_t frame = Frame(base, sp, 112);
-  if (SceneryLoaded(base, frame, calls) != 0 && int32_t(Load(base, kCollisionState)) == 2 &&
-      int32_t(Load(base, kRouteState)) == 2 && strings_and_font::TextIsLoaded(base) != 0 &&
+  if (SceneryLoaded(base, frame, calls) != 0 && int32_t(G::collision_state(base)) == 2 &&
+      int32_t(G::route_state(base)) == 2 && strings_and_font::TextIsLoaded(base) != 0 &&
       data_tables::IsLoading(base) == 0) {
     Post(base, dispatcher, 3);
-    Store(base, machine + kDrawStep, 0);
+    Machine(base, machine).set_draw_step(0);
     return 0;
   }
   // "CRS SETUP WAITING." to the empty sub_82106540 (r3 = 500, r4 = 100, r5
@@ -84,7 +89,8 @@ uint64_t EndTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t 
                  const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821516F0 CourseSetup::EndTick");
   const uint32_t frame = Frame(base, sp, 112);
-  Store(base, machine + kEndTicks, Load(base, machine + kEndTicks) + 1);
+  const Machine m(base, machine);
+  m.set_end_ticks(m.end_ticks() + 1);
   uint64_t r3 = SceneryLoaded(base, frame, calls);
   if (r3 != 0) {
     r3 = scene::LoadsDone(
@@ -95,8 +101,8 @@ uint64_t EndTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t 
     if (r3 == 1) {
       r3 = calls.native_queue ? archive::QueueLength(base)
                               : uint32_t(calls.Call(kQueueLength, frame, 0x82151744, 0));
-      if (r3 == 0 && Load(base, machine + kEndTicks) > 2 &&
-          (Load(base, kLayer0FadeOut) | Load(base, kLayer0FadeIn)) == 0) {
+      if (r3 == 0 && m.end_ticks() > 2 &&
+          (G::layer0_fade_out(base) | G::layer0_fade_in(base)) == 0) {
         Post(base, dispatcher, 50);
         return 0;
       }
@@ -109,42 +115,46 @@ uint64_t Start(uint8_t* base, uint32_t dispatcher, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82151408 CourseSetup::Start");
   Frame(base, sp, 112);
   Post(base, dispatcher, 2);
-  const uint32_t passes = Load(base, kFadeInPasses);
+  const uint32_t passes = G::fade_in_passes(base);
   mode_tick::ScreenFadesFadeIn(base, passes, 0, 0, 0, 0);
   return passes;
 }
 
 void Begin(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_82150DE0 CourseSetup::Begin");
-  for (const uint32_t field : {9616u, 9620u, 9608u, 9632u, 9636u, 9628u}) {
-    Store(base, machine + field, 0);
-  }
+  const Machine m(base, machine);
+  m.set_unknown_9616(0);
+  m.set_unknown_9620(0);
+  m.set_unknown_9608(0);
+  m.set_unknown_9632(0);
+  m.set_unknown_9636(0);
+  m.set_unknown_9628(0);
 }
 
 void OnCourseReady(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_82150DD0 CourseSetup::OnCourseReady");
-  Store(base, machine + kReady, 0);
+  Machine(base, machine).set_unknown_9640(0);
 }
 
 uint64_t WaitDraw(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                   const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821515A0 CourseSetup::WaitDraw");
-  const uint32_t machine = uint32_t(r3);
+  const Machine m(base, uint32_t(r3));
   const uint32_t frame = Frame(base, sp, 96);
-  if (Load(base, machine + kDrawStep) == 0) {
+  if (m.draw_step() == 0) {
     const uint32_t queued = calls.native_queue
                                 ? archive::QueueLength(base)
                                 : uint32_t(calls.Call(kQueueLength, frame, 0x821515C4, 0));
     if (queued == 0) {
-      if (int32_t(Load(base, kLayer0Alpha)) != 255) {
-        mode_tick::ScreenFadesFadeOut(base, Load(base, kFadeOutPasses), 0, 0, 0, 0);
+      if (int32_t(G::layer0_alpha(base)) != 255) {
+        mode_tick::ScreenFadesFadeOut(base, G::fade_out_passes(base), 0, 0, 0, 0);
       }
-      Store(base, machine + kDrawStep, 1);
+      m.set_draw_step(1);
     }
-  } else if (int32_t(Load(base, kLayer0Alpha)) == 255) {
+  } else if (int32_t(G::layer0_alpha(base)) == 255) {
     Post(base, dispatcher, 4);
-    Store(base, machine + kCleared, 0);
-    Store(base, machine + kDrawStep, 0);
+    m.set_unknown_9608(0);
+    m.set_draw_step(0);
     return r3;
   }
   // "DRAW SETUP WAITING." to the empty sub_82106540 (r3 = 500, r4 = 100, r5
@@ -157,13 +167,13 @@ void SetFrames(uint8_t* base, uint32_t movie, uint32_t other, uint32_t text) {
   constexpr uint32_t kTrm = 0x54524D00, kTxt = 0x54585400, kPrm = 0x50524D00,
                      kPic = 0x50494300;
   uint32_t chunk = Load(base, movie + 16);
-  for (uint32_t tag = Load(base, chunk); tag != kTrm; tag = Load(base, chunk)) {
+  for (uint32_t tag = Chunk(base, chunk).tag(); tag != kTrm; tag = Chunk(base, chunk).tag()) {
     if (tag == kTxt) {
-      Store(base, chunk + 72, text);
+      Chunk(base, chunk).set_frame(text);
     } else if (tag == kPrm || tag == kPic) {
-      Store(base, chunk + 72, other);
+      Chunk(base, chunk).set_frame(other);
     }
-    chunk += Load(base, chunk + 4);
+    chunk += Chunk(base, chunk).size();
   }
 }
 
@@ -175,16 +185,16 @@ uint64_t Show(uint8_t* base, uint64_t tip, uint32_t which, uint32_t frames, uint
     return tip;
   }
   constexpr uint64_t kNone = ~0ull;  // li -1
-  const uint32_t movie = Load(base, kLoadingMovies + 4 * which);
-  Store(base, kLoadingCurrent, which);
+  const uint32_t movie = Load(base, G::loading_movies_address() + 4 * which);
+  G::set_loading_current(base, which);
   calls.Call(kResetPose, frame, 0x8224790C, 1, movie);
   if (int32_t(frames) != -1) {
     SetFrames(base, movie, frames, frames);
   }
-  uint32_t current = Load(base, kLoadingCurrent);
+  uint32_t current = G::loading_current(base);
   if (current == 0 || current == 2) {
     calls.Call(kSetText, frame, 0x8224795C, 8, movie, kNone, current == 0 ? 3 : 2, 1200);
-    current = Load(base, kLoadingCurrent);
+    current = G::loading_current(base);
   }
   if (current == 0) {
     if (int32_t(tip) != 0) {
@@ -199,15 +209,15 @@ uint64_t Show(uint8_t* base, uint64_t tip, uint32_t which, uint32_t frames, uint
       calls.Call(kHideNode, frame, 0x822479F0, 3, movie, kNone, 9);
       calls.Call(kHideNode, frame, 0x82247A00, 3, movie, kNone, 10);
     }
-    current = Load(base, kLoadingCurrent);
+    current = G::loading_current(base);
   }
   calls.Call(kFinishNamed, frame, 0x82247A1C, 2, movie,
-             Load(base, kLoadingAnimations + (current << 2)));
-  current = Load(base, kLoadingCurrent);
+             Load(base, G::loading_animations_address() + (current << 2)));
+  current = G::loading_current(base);
   calls.Call(kPlayNamed, frame, 0x82247A40, 6, movie,
-             Load(base, kLoadingAnimations + (current << 2)), 0, 0, 0, 0);
+             Load(base, G::loading_animations_address() + (current << 2)), 0, 0, 0, 0);
   const uint64_t r3 = calls.Call(kLoopLast, frame, 0x82247A48, 1, movie);
-  Store(base, kLoadingShown, 1);
+  G::set_loading_shown(base, 1);
   return r3;
 }
 
@@ -220,7 +230,7 @@ bool Which(uint8_t* base, uint64_t r3, uint32_t* which) {
   if (index >= 3) {
     return false;
   }
-  *which = index == -1 ? Load(base, kLoadingCurrent) : uint32_t(index);
+  *which = index == -1 ? G::loading_current(base) : uint32_t(index);
   return true;
 }
 
@@ -232,7 +242,7 @@ uint64_t Run(uint8_t* base, uint64_t which, uint32_t sp, uint32_t lr, const Call
   if (!Which(base, which, &index)) {
     return which;
   }
-  return calls.Call(kRun, sp, lr, 2, Load(base, kLoadingMovies + (index << 2)), 0);
+  return calls.Call(kRun, sp, lr, 2, Load(base, G::loading_movies_address() + (index << 2)), 0);
 }
 
 uint64_t Finish(uint8_t* base, uint64_t which, uint32_t sp, uint32_t lr, const Calls& calls) {
@@ -241,21 +251,21 @@ uint64_t Finish(uint8_t* base, uint64_t which, uint32_t sp, uint32_t lr, const C
   if (!Which(base, which, &index)) {
     return which;
   }
-  return calls.Call(kFinishNamed, sp, lr, 2, Load(base, kLoadingMovies + (index << 2)),
-                    Load(base, kLoadingAnimations + (index << 2)));
+  return calls.Call(kFinishNamed, sp, lr, 2, Load(base, G::loading_movies_address() + (index << 2)),
+                    Load(base, G::loading_animations_address() + (index << 2)));
 }
 
 uint64_t CheckSystemRequest(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82293460 CheckSystemRequest");
   const uint32_t frame = Frame(base, sp, 96);
-  const uint32_t request = Load(base, kSystemRequest);
+  const uint32_t request = G::system_request(base);
   if (request == 0) {
     return 0;
   }
   if (int32_t(uint32_t(calls.Call(kSystemRequestCheck, frame, 0x8229348C, 1, request))) == 0) {
     return 0;
   }
-  calls.Call(kSystemRequestRun, frame, 0x8229349C, 1, Load(base, kSystemRequest));
+  calls.Call(kSystemRequestRun, frame, 0x8229349C, 1, G::system_request(base));
   return 1;
 }
 

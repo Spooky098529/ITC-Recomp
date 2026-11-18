@@ -1,0 +1,333 @@
+# The schema of docs/functions/action-mappers.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# Arrays are named by their first element (index i at `<field>_address() +
+# stride × i`). Actions are indexed 0-29 (id - 151).
+#
+# A measure fault: the measure files the originals that take the mapper's
+# input state (r3 = mapper + 448: ResetStages, InitRepeats, ResetWords,
+# Rebuild, Hysteresis, Words) and its analog stage (r3 = mapper + 1072:
+# InitCurves, ResetAnalog, Analog, CurveUnsigned, CurveCentered) as the
+# mapper itself, so their accesses land on the mapper's own offsets; here
+# they're ActionMapperState and ActionMapperAnalog, embedded in the mapper.
+# The mapper keeps fault_* fields at those offsets so the check passes; code
+# uses the embedded types.
+
+# One player's action mapper (2,896 bytes, docs/known-data.md, "action
+# mapper"; the update's fields in docs/pause-menu-fix.md): a client node of
+# type 2 in the input client list, turning a logical pad's values and its
+# listener's held buttons into 30 actions.
+[ActionMapper]
+measure = "ActionMapper"
+size = 2896
+origin = "allocated"
+vtable = 0x82007F78
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82007F78" },
+  { name = "client_type", offset = 4, type = "u32", note = "the client node's type: 2" },
+  { name = "next_client", offset = 8, type = "ptr", to = "InputClientNode", note = "the next node of the client list" },
+  { name = "kinds", offset = 12, type = "u32", note = "30 words: each action's kind (1, digital)" },
+  { name = "analog_kinds", offset = 132, type = "u32", note = "30 words: each action's analog kind (2 for actions 24-29, else 1)" },
+  { name = "links", offset = 252, type = "u32", note = "30 words: each action's linked action (probably each direction's opposite; 30 none)" },
+  { name = "config", offset = 372, type = "u32", note = "an ActionMapperConfig (the kinds and links pointers), then at +380 the analog stage's" },
+  { name = "config_links", offset = 376, type = "u32", note = "the config's links pointer (mapper + 252)" },
+  { name = "analog_config", offset = 380, type = "u32", note = "the analog stage's ActionMapperConfig: its kinds pointer (mapper + 132)" },
+  { name = "analog_config_links", offset = 384, type = "u32", note = "its links pointer (mapper + 252)" },
+  { name = "raw", offset = 388, type = "u16", note = "30 u16s: this tick's raw value per action; [0] Back (151)" },
+  { name = "raw_start", offset = 390, type = "u16", note = "action 1 (152)" },
+  { name = "raw_dpad_up", offset = 392, type = "u16", note = "action 2 (153)" },
+  { name = "raw_dpad_down", offset = 394, type = "u16", note = "action 3 (154)" },
+  { name = "raw_dpad_left", offset = 396, type = "u16", note = "action 4 (155)" },
+  { name = "raw_dpad_right", offset = 398, type = "u16", note = "action 5 (156)" },
+  { name = "raw_y", offset = 400, type = "u16", note = "action 6 (157)" },
+  { name = "raw_b", offset = 402, type = "u16", note = "action 7 (158)" },
+  { name = "raw_a", offset = 404, type = "u16", note = "action 8 (159)" },
+  { name = "raw_x", offset = 406, type = "u16", note = "action 9 (160)" },
+  { name = "raw_left_shoulder", offset = 408, type = "u16", note = "action 10 (161)" },
+  { name = "raw_right_shoulder", offset = 410, type = "u16", note = "action 11 (162)" },
+  { name = "raw_left_trigger", offset = 412, type = "u16", note = "action 12" },
+  { name = "raw_right_trigger", offset = 414, type = "u16", note = "action 13" },
+  { name = "raw_left_stick_click", offset = 416, type = "u16", note = "action 14 (165)" },
+  { name = "raw_right_stick_click", offset = 418, type = "u16", note = "action 15 (166)" },
+  { name = "raw_left_y_plus", offset = 420, type = "u16", note = "action 16: the left stick's y above 0" },
+  { name = "raw_left_y_minus", offset = 422, type = "u16", note = "action 17" },
+  { name = "raw_left_x_minus", offset = 424, type = "u16", note = "action 18" },
+  { name = "raw_left_x_plus", offset = 426, type = "u16", note = "action 19" },
+  { name = "raw_right_y_plus", offset = 428, type = "u16", note = "action 20" },
+  { name = "raw_right_y_minus", offset = 430, type = "u16", note = "action 21" },
+  { name = "raw_right_x_minus", offset = 432, type = "u16", note = "action 22" },
+  { name = "raw_right_x_plus", offset = 434, type = "u16", note = "action 23" },
+  { name = "raw_dpad_x", offset = 436, type = "u16", note = "action 24: the d-pad's axis from actions 4 and 5" },
+  { name = "raw_dpad_y", offset = 438, type = "u16", note = "action 25: from actions 2 and 3" },
+  { name = "raw_left_x", offset = 440, type = "u16", note = "action 26: the left stick's axis from actions 18 and 19" },
+  { name = "raw_left_y", offset = 442, type = "u16", note = "action 27: from actions 16 and 17" },
+  { name = "raw_right_x", offset = 444, type = "u16", note = "action 28: from actions 22 and 23" },
+  { name = "raw_right_y", offset = 446, type = "u16", note = "action 29: from actions 20 and 21" },
+  { name = "held", offset = 448, type = "u32", note = "the input state (an ActionMapperState) starts here: bit i, action i held" },
+  { name = "held_before", offset = 452, type = "u32" },
+  { name = "pressed", offset = 456, type = "u32" },
+  { name = "released", offset = 460, type = "u32" },
+  { name = "fired", offset = 464, type = "u32", note = "pressed or repeating" },
+  { name = "pending", offset = 468, type = "u32", note = "ORed into the next update's held before and pressed" },
+  { name = "repeat_pointers", offset = 472, type = "ptr", to = "ActionRepeat", note = "30 pointers to the repeat objects" },
+  { name = "repeats", offset = 592, type = "u32", note = "30 ActionRepeats (16 bytes): the first's vtable" },
+  { name = "analog_raw", offset = 1072, type = "u16", note = "the analog stage (an ActionMapperAnalog) starts here: 30 u16s" },
+  { name = "analog_values", offset = 1132, type = "f32", note = "30 floats: the analog values through each action's curve" },
+  { name = "curve_pointers", offset = 1252, type = "ptr", to = "ActionCurve", note = "30 pointers to the curve objects" },
+  { name = "curves", offset = 1372, type = "u32", note = "30 ActionCurves (16 bytes): the first's vtable" },
+  { name = "thresholds", offset = 1852, type = "f32", note = "30 ActionThresholds (20 bytes): the first's on" },
+  { name = "unknown_2452", offset = 2452, type = "bytes", count = 12 },
+  { name = "listener", offset = 2464, type = "bytes", count = 416, note = "the listener: an input processor (vtable 0x8206C0C4, input.md)" },
+  { name = "fault_analog_raw", offset = 0, type = "u16", note = "measure fault: the analog stage's raw[0] (ActionMapperAnalog +0, mapper + 1072)" },
+  { name = "fault_state_fired", offset = 16, type = "u32", note = "measure fault: ActionMapperState's fired (mapper + 464)" },
+  { name = "fault_state_pending", offset = 20, type = "u32", note = "measure fault: ActionMapperState's pending (mapper + 468)" },
+  { name = "fault_state_repeat_pointers", offset = 24, type = "u32", note = "measure fault: ActionMapperState's repeat pointers (mapper + 472)" },
+  { name = "fault_analog_values", offset = 60, type = "f32", note = "measure fault: the analog stage's values (mapper + 1132)" },
+  { name = "fault_state_repeats", offset = 144, type = "u32", note = "measure fault: ActionMapperState's first repeat's vtable (mapper + 592)" },
+  { name = "fault_state_repeat_delay", offset = 152, type = "u32", note = "measure fault: the first repeat's delay (mapper + 600)" },
+  { name = "fault_state_repeat_period", offset = 156, type = "u32", note = "measure fault: the first repeat's period (mapper + 604)" },
+  { name = "fault_analog_curve_pointers", offset = 180, type = "u32", note = "measure fault: the analog stage's curve pointers (mapper + 1252)" },
+  { name = "fault_analog_curves", offset = 300, type = "u32", note = "measure fault: the analog stage's first curve's vtable (mapper + 1372)" },
+  { name = "fault_analog_curve_center", offset = 304, type = "f32", note = "measure fault: the first curve's center (mapper + 1376)" },
+  { name = "fault_analog_curve_dead_zone", offset = 308, type = "f32", note = "measure fault: the first curve's dead zone (mapper + 1380)" },
+  { name = "fault_analog_curve_maximum", offset = 312, type = "f32", note = "measure fault: the first curve's maximum (mapper + 1384)" },
+  { name = "fault_state_analog_values", offset = 684, type = "f32", note = "measure fault: ActionMapperState +684, the analog stage's values (mapper + 1132)" },
+  { name = "fault_threshold_on", offset = 1404, type = "f32", note = "measure fault: ActionMapperState +1404, the first threshold's on (mapper + 1852)" },
+  { name = "fault_threshold_off", offset = 1408, type = "f32", note = "measure fault: the first threshold's off (mapper + 1856)" },
+  { name = "fault_threshold_suppress_ticks", offset = 1412, type = "u32", note = "measure fault: the first threshold's suppress ticks (mapper + 1860)" },
+  { name = "fault_threshold_counter", offset = 1416, type = "u32", note = "measure fault: the first threshold's counter (mapper + 1864)" },
+  { name = "fault_threshold_state", offset = 1420, type = "u8", note = "measure fault: the first threshold's state (mapper + 1868)" },
+  { name = "pad_values", offset = 2880, type = "ptr", to = "ActionPadValues", note = "the logical pad's 40 values (input manager + 44 + 196 × player)" },
+  { name = "bound", offset = 2884, type = "u8" },
+  { name = "player", offset = 2888, type = "u32", note = "0-3" },
+  { name = "input_manager", offset = 2892, type = "ptr", to = "ActionMapperInputManager", note = "the input object it's bound to" },
+]
+
+# The mapper's input state (mapper + 448): what ResetStages, InitRepeats,
+# ResetWords, Rebuild, Hysteresis and Words take as r3.
+[ActionMapperState]
+size = 2004
+origin = "embedded"
+fields = [
+  { name = "held", offset = 0, type = "u32", note = "bit i, action i held" },
+  { name = "held_before", offset = 4, type = "u32" },
+  { name = "pressed", offset = 8, type = "u32" },
+  { name = "released", offset = 12, type = "u32" },
+  { name = "fired", offset = 16, type = "u32", note = "pressed or repeating" },
+  { name = "pending", offset = 20, type = "u32", note = "ORed into the next update's held before and pressed" },
+  { name = "repeat_pointers", offset = 24, type = "ptr", to = "ActionRepeat", note = "30 pointers" },
+  { name = "repeats", offset = 144, type = "u32", note = "30 ActionRepeats (16 bytes): the first's vtable" },
+  { name = "analog", offset = 624, type = "u16", note = "the analog stage (an ActionMapperAnalog, mapper + 1072): its first raw value" },
+  { name = "analog_values", offset = 684, type = "f32", note = "the analog stage's 30 floats (its +60)" },
+  { name = "thresholds", offset = 1404, type = "f32", note = "30 ActionThresholds (20 bytes): the first's on" },
+]
+
+# The mapper's analog stage (mapper + 1072): what InitCurves, ResetAnalog,
+# Analog, CurveUnsigned and CurveCentered take as r3.
+[ActionMapperAnalog]
+size = 780
+origin = "embedded"
+fields = [
+  { name = "raw", offset = 0, type = "u16", note = "30 u16s: the raw values the stage took" },
+  { name = "values", offset = 60, type = "f32", note = "30 floats: through each action's curve" },
+  { name = "curve_pointers", offset = 180, type = "ptr", to = "ActionCurve", note = "30 pointers" },
+  { name = "curves", offset = 300, type = "u32", note = "30 ActionCurves (16 bytes): the first's vtable" },
+]
+
+# A threshold entry (20 bytes, 30 at mapper + 1852).
+[ActionThreshold]
+size = 20
+origin = "embedded"
+fields = [
+  { name = "on", offset = 0, type = "f32" },
+  { name = "off", offset = 4, type = "f32" },
+  { name = "suppress_ticks", offset = 8, type = "u32", note = "set into a linked action's counter when this one turns on" },
+  { name = "counter", offset = 12, type = "u32", note = "while nonzero, counts down and holds the state at 0" },
+  { name = "state", offset = 16, type = "u8" },
+]
+
+# The two config blocks (mapper + 372 and + 380): pointers to 30-word
+# tables in the mapper.
+[ActionMapperConfig]
+measure = "ActionMapper::Hysteresis.r6"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "kinds", offset = 0, type = "u32", note = "the address of 30 kinds" },
+  { name = "links", offset = 4, type = "u32", note = "the address of 30 links (30 none)" },
+]
+
+# A repeat object (16 bytes, vtable 0x82007F68; 30 at mapper + 592).
+[ActionRepeat]
+measure = "ActionRepeat"
+size = 16
+origin = "embedded"
+vtable = 0x82007F68
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "ActionObjectVtable" },
+  { name = "count", offset = 4, type = "u32", note = "ticks held" },
+  { name = "delay", offset = 8, type = "u32" },
+  { name = "period", offset = 12, type = "u32" },
+]
+
+# A curve object (16 bytes, vtable 0x82007F70; 30 at mapper + 1372).
+[ActionCurve]
+measure = "ActionCurve"
+size = 16
+origin = "embedded"
+vtable = 0x82007F70
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "ActionObjectVtable" },
+  { name = "center", offset = 4, type = "f32" },
+  { name = "dead_zone", offset = 8, type = "f32" },
+  { name = "maximum", offset = 12, type = "f32" },
+]
+
+# The repeat and curve objects' vtables (0x82007F68, 0x82007F70), met
+# through their pointers.
+[ActionObjectVtable]
+measures = ["ActionMapper.+0", "ActionMapper.+144", "ActionMapper.+300"]
+size = 8
+origin = "image"
+fields = [
+  { name = "reset", offset = 0, type = "fn", note = "slot 0: sub_8243DC88 (repeats: the count 0) or sub_82106540 (curves: nothing)" },
+  { name = "update", offset = 4, type = "fn", note = "slot 1: ActionRepeat::Update sub_8210B568 or ActionCurve::Apply sub_8210B5B8" },
+]
+
+# The logical pad's values the mapper reads (logical pad + 36; 40 floats,
+# docs/pause-menu-fix.md): values 0-7 the sticks and triggers.
+[ActionPadValues]
+measure = "ActionMapper.+2880"
+size = 160
+origin = "embedded"
+fields = [
+  { name = "left_x", offset = 0, type = "f32" },
+  { name = "left_y", offset = 4, type = "f32" },
+  { name = "left_trigger", offset = 8, type = "f32" },
+  { name = "unknown_12", offset = 12, type = "f32", note = "0" },
+  { name = "right_x", offset = 16, type = "f32" },
+  { name = "right_y", offset = 20, type = "f32" },
+  { name = "right_trigger", offset = 24, type = "f32" },
+]
+
+# The input object a mapper is bound to (ActionMapper::Bind's r4, kept at
+# +2892): the input manager (input.md's, vtable 0x82000F48; the measure
+# didn't join it with InputManager).
+[ActionMapperInputManager]
+measures = ["ActionMapper.+2892", "ActionMapper::Bind.r4"]
+size = 3984
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "ActionMapperInputManagerVtable" },
+]
+
+[ActionMapperInputManagerVtable]
+measures = ["ActionMapper.+2892.+0", "ActionMapper::Bind.r4.+0"]
+size = 16
+origin = "image"
+fields = [
+  { name = "get_logical_pad", offset = 8, type = "fn", note = "slot 2: InputManager::GetLogicalPad 0x82098CD0" },
+  { name = "add_listener", offset = 12, type = "fn", note = "slot 3: InputManager::AddListener 0x82099430" },
+]
+
+# The input client list (52 bytes; the base ClientList, vtable
+# 0x820713C0, then InputClientList's 0x82007F18): one, at [0x82970C14]
+# and [0x826BAB7C].
+[InputClientList]
+measures = ["ClientList", "InputClientList"]
+size = 52
+origin = "allocated"
+vtable = 0x82007F18
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x820713C0, then 0x82007F18" },
+  { name = "first", offset = 4, type = "ptr", to = "InputClientNode" },
+  { name = "last", offset = 8, type = "ptr", to = "InputClientNode" },
+  { name = "added_counts", offset = 12, type = "u32", note = "3 words: the nodes added of types 0-2" },
+  { name = "added_count_1", offset = 16, type = "u32" },
+  { name = "added_count_2", offset = 20, type = "u32", note = "the mappers" },
+  { name = "bound_counts", offset = 24, type = "u32", note = "3 words: those bound, types 0-2" },
+  { name = "bound_count_1", offset = 28, type = "u32" },
+  { name = "bound_count_2", offset = 32, type = "u32", note = "the mappers bound" },
+  { name = "manager", offset = 36, type = "ptr", to = "ActionMappersOwner", note = "the object ActionMappers::Init was given" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+]
+
+# A client node (ClientNode, vtable 0x82071380; InputClient's 0x82007ED8):
+# the base of the action mapper.
+[InputClientNode]
+measures = ["ClientNode", "InputClient"]
+size = 12
+origin = "embedded"
+vtable = 0x82007ED8
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82071380, then 0x82007ED8, then the derived class's" },
+  { name = "type", offset = 4, type = "u32", note = "2 for an action mapper" },
+  { name = "next", offset = 8, type = "ptr", to = "InputClientNode" },
+]
+
+# The object ActionMappers::Init is given (probably the app object of
+# sub_82106548: its vtable slot +36 gives the input manager).
+[ActionMappersOwner]
+measure = "InputClientList.+36"
+size = 4
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "ActionMappersOwnerVtable" },
+]
+
+[ActionMappersOwnerVtable]
+measure = "InputClientList.+36.+0"
+size = 40
+origin = "image"
+fields = [
+  { name = "get_input_manager", offset = 36, type = "fn", note = "probably: what InputClientList::BindAll binds the mappers to" },
+]
+
+# A button mask the input processors' held tests read (r4 of
+# InputProcessor::TestHeld and AllHeld: a pointer to the mask).
+[ActionButtonMask]
+measures = ["InputProcessor::AllHeld.r4", "InputProcessor::TestHeld.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "mask", offset = 0, type = "u32" },
+]
+
+# One entry of the action mappers' settings table (32 bytes, 0x82600B88).
+[ActionSettings]
+size = 32
+origin = "image"
+fields = [
+  { name = "on", offset = 0, type = "f32" },
+  { name = "off", offset = 4, type = "f32" },
+  { name = "suppress_ticks", offset = 8, type = "u32" },
+  { name = "repeat_delay", offset = 12, type = "u32" },
+  { name = "repeat_period", offset = 16, type = "u32" },
+  { name = "curve_center", offset = 20, type = "f32" },
+  { name = "curve_dead_zone", offset = 24, type = "f32" },
+  { name = "curve_maximum", offset = 28, type = "f32" },
+]
+
+[globals]
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "probably 0.0" }
+minus_one = { address = 0x82001BE0, type = "f32", note = "probably -1.0" }
+half = { address = 0x82001BE4, type = "f32", note = "probably 0.5" }
+threshold_off = { address = 0x8200296C, type = "f32", note = "a new mapper's threshold off" }
+threshold_on = { address = 0x82002A10, type = "f32", note = "a new mapper's threshold on" }
+unsigned_scale = { address = 0x82002BD4, type = "f32", note = "probably 1/32767: CurveUnsigned's raw value to the curve" }
+pad_scale = { address = 0x82007F58, type = "f32", note = "a pad value to a raw u16 (probably 32767)" }
+axis_scale = { address = 0x82007F5C, type = "f32", note = "the axes' factor on the direction pairs" }
+centered_scale = { address = 0x82007F60, type = "f32", note = "CurveCentered's factor" }
+centered_offset = { address = 0x82007F64, type = "f32", note = "CurveCentered's center, taken from the raw value" }
+owner = { address = 0x826BAB78, type = "ptr", to = "ActionMappersOwner", note = "the object ActionMappers::Init was given" }
+client_list = { address = 0x826BAB7C, type = "ptr", to = "InputClientList" }
+mappers = { address = 0x826BAB80, type = "ptr", to = "ActionMapper", note = "4 entries of 8 bytes: +0 a mapper (players 0-3), +4 a word the menus test" }
+settings_index = { address = 0x82600B84, type = "u32", note = "1 at boot" }
+settings = { address = 0x82600B88, type = "bytes", count = 32, note = "ActionSettings entries of 32 bytes, picked by the index" }
+the_client_list = { address = 0x82970C14, type = "ptr", to = "InputClientList", note = "ClientList's one list (the lookups read it here)" }

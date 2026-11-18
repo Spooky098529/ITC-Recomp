@@ -9,6 +9,8 @@
 #include "guest.h"
 #include "hooks/vehicle.h"
 #include "racer_controllers/racer_controllers.h"
+#include "schema/car_physics.h"
+#include "schema/race_hud_object.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -21,6 +23,10 @@ namespace {
 using namespace camera_modes::steps;
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;  // a sub-scene index of -1
+
+using Hud = schema::RaceHud;
+using Racers = schema::RaceHudRacers;
+using G = schema::RaceHudObjectGlobals;
 
 double LoadDouble(uint8_t* base, uint32_t address) {
   return std::bit_cast<double>(uint64_t(guest::LoadU32(base, address)) << 32 |
@@ -37,7 +43,8 @@ uint64_t Tick(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, const Cal
   ITC_NATIVE_RUNNING("sub_822153A0 RaceHud::Tick");
   const uint32_t frame = sp - 128;
   guest::StoreU32(base, frame, sp);
-  const uint32_t car = guest::LoadU32(base, hud + kHudVehicle);
+  const Hud h(base, hud);
+  const uint32_t car = h.vehicle().address;
   double f1 = double(Vehicle_GetSpeedKmh(base, car));
   const double speed = Single(f1 * LoadDouble(base, kFactor));
   guest::StoreU32(base, frame + 80, uint32_t(Fctiwz(speed)));
@@ -56,7 +63,7 @@ uint64_t Tick(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, const Cal
   SetBoost(base, hud, Lfs(base, car + 2944), frame);
   const uint32_t extra = guest::LoadU32(base, guest::LoadU32(base, car + 5712) + 3892);
   const uint32_t node =
-      ui_movies::FindNode(base, guest::LoadU32(base, hud + kHudDashboard), kNone, 13);
+      ui_movies::FindNode(base, h.dashboard().address, kNone, 13);
   guest::StoreU32(base, node + 80, extra);
   return UpdateSigns(base, hud, flag, frame, calls, zone_calls);
 }
@@ -65,19 +72,19 @@ uint64_t TickTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls)
   ITC_NATIVE_RUNNING("sub_82214D78 RaceHud::TickTimer");
   const uint32_t frame = sp - 128;
   guest::StoreU32(base, frame, sp);
-  const uint32_t racers = guest::LoadU32(base, hud + 444);
-  guest::StoreU32(base, frame + 80,
-                  ai_drivers::TimeFromTicks(guest::LoadU32(base, racers + 3932)));
+  const Hud h(base, hud);
+  const Racers racers = h.racers();
+  guest::StoreU32(base, frame + 80, ai_drivers::TimeFromTicks(racers.ticks()));
   SetTime(base, hud, frame + 80, frame);
-  const uint32_t racers2 = guest::LoadU32(base, hud + 444);
-  const uint32_t progress = guest::LoadU32(base, kRaceProgress);
-  const double start = Lfs(base, racers2 + 828);
+  const Racers racers2 = h.racers();
+  const uint32_t progress = G::race_progress(base).address;
+  const double start = double(racers2.start_distance());
   double distance = Fsubs(Lfs(base, progress + 7156), start);
   distance = Fmuls(distance, Lfs(base, 0x820029D8));
   double f1 = Single(distance * LoadDouble(base, kFactor));
   SetDistance(base, hud, frame, &f1);
-  const int32_t animation = int32_t(guest::LoadU32(base, guest::LoadU32(base, hud + 444) + 12));
-  const uint32_t timer = guest::LoadU32(base, hud + kHudTimer);
+  const int32_t animation = int32_t(h.racers().timer_animation());
+  const uint32_t timer = h.timer().address;
   if (animation < 0) {
     const uint32_t node = ui_movies::FindNode(base, timer, kNone, 0);
     guest::StoreU32(base, node + 80, 0);
@@ -85,22 +92,21 @@ uint64_t TickTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls)
   }
   const uint32_t node = ui_movies::FindNode(base, timer, kNone, 0);
   guest::StoreU32(base, node + 80, 1);
-  if (int32_t(guest::LoadU32(base, hud + 464)) == animation) {
+  if (int32_t(h.timer_animation()) == animation) {
     return node;
   }
   for (uint32_t i = 0; i < 5; i++) {
-    calls.Call(kFinishNamed, frame, 0x82214E28, guest::LoadU32(base, hud + kHudTimer), i);
+    calls.Call(kFinishNamed, frame, 0x82214E28, h.timer().address, i);
   }
-  ui_movies::PlayNamed(base, guest::LoadU32(base, hud + kHudTimer), uint32_t(animation), 0, 0, 0,
-                       0);
+  ui_movies::PlayNamed(base, h.timer().address, uint32_t(animation), 0, 0, 0, 0);
   // UiMovie::LoopNamed's r3: the slot moved to, else (from its 176-byte
   // frame below this one) the copy's place when the list had slots, or the
   // movie.
-  const uint32_t movie = guest::LoadU32(base, hud + kHudTimer);
+  const uint32_t movie = h.timer().address;
   const ui_movies::Moved moved =
       ui_movies::MoveNamedAnimation(base, movie, uint32_t(animation), true);
   const uint64_t r3 = moved.slot ? *moved.slot : moved.looked ? frame - 176 + 80 : movie;
-  guest::StoreU32(base, hud + 464, uint32_t(animation));
+  h.set_timer_animation(uint32_t(animation));
   return r3;
 }
 
@@ -110,14 +116,15 @@ uint64_t TickRacers(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls
   const uint32_t frame = sp - 112;
   guest::StoreU32(base, frame, sp);
   uint64_t r3 = hud;
-  const int32_t count = int32_t(guest::LoadU32(base, hud + 452));
-  guest::StoreU32(base, hud + 456, 0);
+  const Hud h(base, hud);
+  const int32_t count = int32_t(h.racer_count());
+  h.set_any_bar_low(0);
   if (count > 0) {
     int64_t i = 0;
     do {
       r3 = UpdateRacerBar(base, hud, uint64_t(i), uint64_t(i), frame, calls, sounds);
       i++;
-    } while (int32_t(i) < int32_t(guest::LoadU32(base, hud + 452)));
+    } while (int32_t(i) < int32_t(h.racer_count()));
   }
   return r3;
 }
@@ -127,7 +134,7 @@ uint64_t TickPanel(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
   ITC_NATIVE_RUNNING("sub_82215488 RaceHud::TickPanel");
   const uint32_t frame = sp - 96;
   guest::StoreU32(base, frame, sp);
-  const uint32_t mode = guest::LoadU32(base, hud + 448);
+  const uint32_t mode = Hud(base, hud).mode();
   // Modes 2 to 4 never ran in play: the originals, through `calls` (mode
   // 4's r3 the HUD as well, which the original doesn't set again).
   switch (mode) {

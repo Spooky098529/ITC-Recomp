@@ -9,6 +9,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/build_screen.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -28,7 +29,9 @@ uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, add
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
-uint32_t Screen(uint8_t* base) { return Load(base, kScreen); }
+using G = schema::BuildScreenGlobals;
+
+uint32_t Screen(uint8_t* base) { return G::screen(base).address; }
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   Store(base, sp - bytes, sp);
@@ -239,7 +242,7 @@ uint64_t DrawGroupRow(uint8_t* base, uint32_t sp, uint32_t row, uint32_t index,
 uint64_t DrawGroupRows(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219FA28 BuildScreen::DrawGroupRows");
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t scroll = Load(base, Load(base, kList) + 4);
+  const uint32_t scroll = Load(base, G::list(base).address + 4);
   uint64_t r3 = 0;
   for (uint32_t r = 0; r < 11; r++) {
     r3 = DrawGroupRow(base, frame, r, r + scroll, calls);

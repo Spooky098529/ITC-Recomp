@@ -7,6 +7,7 @@
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
 #include "native/buffers.h"
+#include "schema/menu_helpers.h"
 #include "ui_movies/game.h"
 
 namespace options_screen {
@@ -68,14 +69,18 @@ uint64_t Step(uint8_t* base, uint32_t step, uint32_t sp, uint32_t bytes, uint32_
   return 1;
 }
 
-uint32_t Settings(uint8_t* base) { return LoadU32(base, kSettings); }
+using G = schema::OptionsScreenGlobals;
+using S = schema::OptionsSettings;
+
+S Settings(uint8_t* base) { return G::settings(base); }
+schema::FrontEndMenu Menu(uint8_t* base) { return G::menu(base); }
 
 constexpr uint32_t kMinusOne = 0xFFFFFFFFu;
 // -1 as the originals' `li` leaves it in a 64-bit register.
 constexpr uint64_t kMinusOne64 = ~uint64_t(0);
 // The menu's cursor (+0) as the originals load it (zero-extended), for the
 // indexes they add to it.
-uint64_t Cursor(uint8_t* base) { return LoadU32(base, LoadU32(base, kMenu) + 0); }
+uint64_t Cursor(uint8_t* base) { return Menu(base).cursor(); }
 
 }  // namespace
 
@@ -84,7 +89,7 @@ uint64_t OpenCategories(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
   return Step(base, step, sp, 128, 0x821BD578, calls, [&](const Movie& m, uint32_t) {
     m.Play(0x821BD4C0, 23, 1);
     m.Loop(0x821BD4D0, 23, 1);
-    const uint32_t context = LoadU32(base, Settings(base) + 4);
+    const uint32_t context = Settings(base).context();
     if (context == 1) {
       m.Play(0x821BD5A4, 16, 0);
       m.Loop(0x821BD520, 16, 0);
@@ -115,7 +120,7 @@ uint64_t EnterHud(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls)
     if (int32_t(cursor) < 4) {
       index = cursor + 4;
       m.Play(0x821BD798, 5, index);
-    } else if (int32_t(LoadU32(base, Settings(base) + 660)) == 1) {
+    } else if (int32_t(Settings(base).ok_default()) == 1) {
       index = 2;
       m.Play(0x821BD7BC, 5, index);
     } else {
@@ -132,7 +137,7 @@ uint64_t ChangeHudValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
     if (int32_t(Cursor(base)) != 4) {
       return;
     }
-    if (int32_t(LoadU32(base, Settings(base) + 660)) == 1) {
+    if (int32_t(Settings(base).ok_default()) == 1) {
       m.Finish(0x821BD878, 5, 2);
       m.Play(0x821BD898, 5, 1);
       m.Loop(0x821BD8D8, 5, 1);
@@ -172,7 +177,7 @@ uint64_t EnterButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
     m.PlayNamed(0x821BDBAC, 407);
     m.LoopNamed(0x821BDBB8, 407);
     const uint32_t picture =
-        LoadU32(base, frame + 96 + (LoadU32(base, Settings(base) + 284) << 2));
+        LoadU32(base, frame + 96 + (Settings(base).edit_button_0() << 2));
     m.PlayNamed(0x821BDBEC, picture);
     m.LoopNamed(0x821BDBF8, picture);
   });
@@ -189,7 +194,7 @@ uint64_t EnterAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   return Step(base, step, sp, 176, 0x821BDF9C, calls, [&](const Movie& m, uint32_t frame) {
     m.PlayNamed(0x821BDF34, 658);
     m.LoopNamed(0x821BDF40, 658);
-    const uint32_t index = AnalogPicture(LoadU32(base, Settings(base) + 380));
+    const uint32_t index = AnalogPicture(Settings(base).edit_analog_0());
     const uint32_t picture = LoadU32(base, frame + 96 + (index << 2));
     m.PlayNamed(0x821BDF7C, picture);
     m.LoopNamed(0x821BDF88, picture);
@@ -198,18 +203,18 @@ uint64_t EnterAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
 
 namespace {
 
-// The dialogs' menu (the second front-end menu, [0x826D8484]).
-uint32_t DialogMenu(uint8_t* base) { return LoadU32(base, 0x826D8484); }
+// The dialogs' menu (the second front-end menu).
+schema::FrontEndMenu DialogMenu(uint8_t* base) { return G::dialog_menu(base); }
 
-// Steps 45 and 48: the dialog menu's cursor before (+4) finished, the new
-// one (+0) played, then looped (step 45) or finished (step 48). A 128-byte
+// Steps 45 and 48: the dialog menu's cursor before finished, the new
+// one played, then looped (step 45) or finished (step 48). A 128-byte
 // frame.
 uint64_t MoveDialogCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls,
                           uint32_t first, const uint32_t lr[3], bool loop, uint32_t run_lr) {
   return Step(base, step, sp, 128, run_lr, calls, [&](const Movie& m, uint32_t) {
-    const uint32_t menu = DialogMenu(base);
-    const uint64_t before = uint64_t(LoadU32(base, menu + 4)) + first;
-    const uint64_t now = uint64_t(LoadU32(base, menu + 0)) + first;
+    const schema::FrontEndMenu menu = DialogMenu(base);
+    const uint64_t before = uint64_t(menu.previous()) + first;
+    const uint64_t now = uint64_t(menu.cursor()) + first;
     m.FinishNamed(lr[0], before);
     m.PlayNamed(lr[1], now);
     if (loop) {
@@ -221,10 +226,13 @@ uint64_t MoveDialogCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls
 }
 
 // Steps 44 and 47: on the first pass MenuSound::Play(5) and the dialog's
-// animations by its shown state (`state`, the settings' +620 or +640); then
-// UiMovie::Run, and once it answers 0 the state = the next (+4) and 1.
+// animations by its shown state (`state`, the settings' load_dialog_state
+// or save_dialog_state); then UiMovie::Run, and once it answers 0 the state
+// = the next and 1.
 struct DialogAnimations {
-  uint32_t state;      // the settings' word
+  uint32_t (S::*state)() const;            // the settings' word
+  void (S::*set_state)(uint32_t) const;
+  uint32_t (S::*next)() const;             // the state next
   uint32_t first;      // the cursor's first animation
   uint32_t open;       // state 0's
   uint32_t shown;      // states 1 and 2's
@@ -240,9 +248,9 @@ uint64_t ChangeDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
   const Movie m{calls, frame, FindMovie(base, frame)};
   if (LoadU32(base, step) == 0) {
     calls.Call(kMenuSoundPlay, frame, a.lr[0], 5);
-    switch (LoadU32(base, Settings(base) + a.state)) {
+    switch ((Settings(base).*a.state)()) {
       case 0:
-        m.FinishNamed(a.lr[1], uint64_t(LoadU32(base, DialogMenu(base) + 0)) + a.first);
+        m.FinishNamed(a.lr[1], uint64_t(DialogMenu(base).cursor()) + a.first);
         m.PlayNamed(a.lr[2], a.open);
         break;
       case 1: m.PlayNamed(a.lr[2], a.shown); break;
@@ -257,8 +265,8 @@ uint64_t ChangeDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
   if (uint32_t(m.Run(run_lr)) != 0) {
     return 0;
   }
-  const uint32_t o = Settings(base);
-  StoreU32(base, o + a.state, LoadU32(base, o + a.state + 4));
+  const S o = Settings(base);
+  (o.*a.set_state)((o.*a.next)());
   return 1;
 }
 
@@ -280,35 +288,37 @@ uint64_t MoveCategory6DialogCursor(uint8_t* base, uint32_t step, uint32_t sp,
 uint64_t ChangeSaveDialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821C08B0 Options::ChangeSaveDialog");
   static constexpr DialogAnimations kAnimations = {
-      620, 843, 855, 856, 841, {0x821C08F4, 0x821C095C, 0x821C0978, 0x821C092C, 0x821C0938}};
+      &S::load_dialog_state, &S::set_load_dialog_state, &S::load_dialog_next, 843, 855, 856, 841,
+      {0x821C08F4, 0x821C095C, 0x821C0978, 0x821C092C, 0x821C0938}};
   return ChangeDialog(base, step, sp, calls, kAnimations, 0x821C098C);
 }
 
 uint64_t ChangeCategory6Dialog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821C0A50 Options::ChangeCategory6Dialog");
   static constexpr DialogAnimations kAnimations = {
-      640, 859, 871, 872, 857, {0x821C0A94, 0x821C0AFC, 0x821C0B18, 0x821C0ACC, 0x821C0AD8}};
+      &S::save_dialog_state, &S::set_save_dialog_state, &S::save_dialog_next, 859, 871, 872, 857,
+      {0x821C0A94, 0x821C0AFC, 0x821C0B18, 0x821C0ACC, 0x821C0AD8}};
   return ChangeDialog(base, step, sp, calls, kAnimations, 0x821C0B2C);
 }
 
 namespace {
 
-// The options' menu's cursor (+0), the cursor before (+4) and the direction
-// (+8), as the steps load them.
+// The options' menu's cursor, the cursor before and the direction (its
+// moved word), as the steps load them.
 struct Cursor2 {
   uint32_t now, before;
 };
 Cursor2 Cursors(uint8_t* base) {
-  const uint32_t menu = LoadU32(base, kMenu);
-  return {LoadU32(base, menu + 0), LoadU32(base, menu + 4)};
+  const schema::FrontEndMenu menu = Menu(base);
+  return {menu.cursor(), menu.previous()};
 }
-int32_t Direction(uint8_t* base) { return int32_t(LoadU32(base, LoadU32(base, kMenu) + 8)); }
+int32_t Direction(uint8_t* base) { return int32_t(Menu(base).moved()); }
 
 // The category table (0x8200A578, 7 words a context) at the context `o` +4
 // and the menu's cursor, both loaded again for each read as the original.
 uint32_t Category(uint8_t* base) {
-  const uint32_t index = LoadU32(base, Settings(base) + 4) * 7 + LoadU32(base, LoadU32(base, kMenu));
-  return LoadU32(base, 0x8200A578 + (index << 2));
+  const uint32_t index = Settings(base).context() * 7 + Menu(base).cursor();
+  return LoadU32(base, G::categories_address() + (index << 2));
 }
 
 }  // namespace
@@ -323,13 +333,12 @@ uint64_t MoveCategoryCursor(uint8_t* base, uint32_t step, uint32_t sp, const Cal
     StoreU32(base, title2 + 108, Category(base));
     m.Finish(0x821C2CB4, kMinusOne64, 2);
     m.Play(0x821C2CD4, kMinusOne64, 2, 1);
-    const uint32_t menu = LoadU32(base, kMenu);
-    m.Finish(0x821C2CEC, 21, uint64_t(LoadU32(base, menu + 4)) + 2);
-    m.Play(0x821C2D14, 21, uint64_t(LoadU32(base, LoadU32(base, kMenu) + 0)) + 2, 1);
-    m.Loop(0x821C2D2C, 21, uint64_t(LoadU32(base, LoadU32(base, kMenu) + 0)) + 2);
+    m.Finish(0x821C2CEC, 21, uint64_t(Menu(base).previous()) + 2);
+    m.Play(0x821C2D14, 21, uint64_t(Menu(base).cursor()) + 2, 1);
+    m.Loop(0x821C2D2C, 21, uint64_t(Menu(base).cursor()) + 2);
     m.Finish(0x821C2D3C, 21, 12);
     m.Finish(0x821C2D4C, 21, 13);
-    const int32_t last = int32_t(LoadU32(base, LoadU32(base, kMenu) + 16));
+    const int32_t last = int32_t(Menu(base).last_item());
     const int32_t now = int32_t(c.now), before = int32_t(c.before);
     if ((now == 0 && before == last) || (now == last && before == 0)) {
       SetCategoryArrow(base, uint64_t(c.now) * 40, frame);
@@ -351,7 +360,7 @@ uint64_t MoveHudCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& c
   return Step(base, step, sp, 160, 0x821C2FF8, calls, [&](const Movie& m, uint32_t frame) {
     const Cursor2 c = Cursors(base);
     const int32_t now = int32_t(c.now), before = int32_t(c.before);
-    const auto ok = [&]() { return int32_t(LoadU32(base, Settings(base) + 660)) == 1; };
+    const auto ok = [&]() { return int32_t(Settings(base).ok_default()) == 1; };
     if (before < 4) {
       m.Finish(0x821C2E90, 5, uint64_t(c.before) + 4);
     } else {
@@ -362,7 +371,7 @@ uint64_t MoveHudCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls& c
       } else if (now == 3) {
         calls.Call(kSetHudArrow, frame, 0x821C2ED0, 120);
       }
-      StoreU32(base, Settings(base) + 660, 1);
+      Settings(base).set_ok_default(1);
     }
     uint64_t index;
     if (now < 4) {
@@ -400,7 +409,7 @@ uint64_t MoveSoundCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls&
   return Step(base, step, sp, 144, 0x821C326C, calls, [&](const Movie& m, uint32_t frame) {
     const Cursor2 c = Cursors(base);
     const auto ok_or_default = [&]() -> uint64_t {
-      return int32_t(LoadU32(base, Settings(base) + 660)) == 1 ? 4 : 3;
+      return int32_t(Settings(base).ok_default()) == 1 ? 4 : 3;
     };
     // Options::SetSoundArrow sub_821BE7A8 (never seen in play: the original).
     switch (c.before) {
@@ -413,7 +422,7 @@ uint64_t MoveSoundCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls&
         } else if (c.now == 1) {
           calls.Call(kSetSoundArrow, frame, 0x821C30D4, 40);
         }
-        StoreU32(base, Settings(base) + 660, 0);
+        Settings(base).set_ok_default(0);
         break;
       case 3:
         m.Finish(0x821C307C, 6, 5);
@@ -452,8 +461,8 @@ uint64_t MoveSoundCursor(uint8_t* base, uint32_t step, uint32_t sp, const Calls&
 uint64_t ChangeSoundValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821C3278 Options::ChangeSoundValue");
   return Step(base, step, sp, 128, 0x821C3388, calls, [&](const Movie& m, uint32_t frame) {
-    if (int32_t(LoadU32(base, LoadU32(base, kMenu) + 0)) == 2) {
-      if (int32_t(LoadU32(base, Settings(base) + 660)) == 1) {
+    if (int32_t(Menu(base).cursor()) == 2) {
+      if (int32_t(Settings(base).ok_default()) == 1) {
         m.Finish(0x821C32E8, 6, 3);
         m.Play(0x821C3318, 6, 4);
       } else {
@@ -465,9 +474,9 @@ uint64_t ChangeSoundValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls
     }
     const uint32_t music = ui_movies::FindNode(base, m.m, 6, 6);
     const uint32_t effects = ui_movies::FindNode(base, m.m, 6, 7);
-    ShowVolumeNumber(base, music, LoadU32(base, Settings(base) + 252), frame, calls);
-    ShowVolumeNumber(base, effects, LoadU32(base, Settings(base) + 256), frame, calls);
-    ShowMusicName(base, LoadU32(base, Settings(base) + 688), frame, calls);
+    ShowVolumeNumber(base, music, Settings(base).edit_music_volume(), frame, calls);
+    ShowVolumeNumber(base, effects, Settings(base).edit_effects_volume(), frame, calls);
+    ShowMusicName(base, Settings(base).music_track(), frame, calls);
   });
 }
 
@@ -476,7 +485,7 @@ uint64_t MoveSlidersCursor(uint8_t* base, uint32_t step, uint32_t sp, const Call
   return Step(base, step, sp, 144, 0x821C35E4, calls, [&](const Movie& m, uint32_t frame) {
     const Cursor2 c = Cursors(base);
     const auto last_row = [&]() -> uint64_t {
-      return LoadU32(base, Settings(base) + 660) == 0 ? 229 : 230;
+      return Settings(base).ok_default() == 0 ? 229 : 230;
     };
     // Options::SetSlidersArrow sub_821BEDC8 (never seen in play: the
     // original).
@@ -484,7 +493,7 @@ uint64_t MoveSlidersCursor(uint8_t* base, uint32_t step, uint32_t sp, const Call
       m.FinishNamed(0x821C3468, 226 + c.before);
     } else if (c.before == 3) {
       m.FinishNamed(0x821C341C, last_row());
-      StoreU32(base, Settings(base) + 660, 0);
+      Settings(base).set_ok_default(0);
       if (c.now == 0) {
         calls.Call(kSetSlidersArrow, frame, 0x821C3448, 0);
       } else if (c.now == 2) {
@@ -525,11 +534,11 @@ uint64_t MoveSlidersCursor(uint8_t* base, uint32_t step, uint32_t sp, const Call
 uint64_t ChangeSlidersValue(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821C35F0 Options::ChangeSlidersValue");
   return Step(base, step, sp, 112, 0x821C36D4, calls, [&](const Movie& m, uint32_t frame) {
-    if (int32_t(LoadU32(base, LoadU32(base, kMenu) + 0)) != 3) {
+    if (int32_t(Menu(base).cursor()) != 3) {
       ShowSliderNumbers(base, frame, calls);
       return;
     }
-    if (LoadU32(base, Settings(base) + 660) == 0) {
+    if (Settings(base).ok_default() == 0) {
       m.FinishNamed(0x821C3664, 230);
       m.PlayNamed(0x821C3680, 229);
       m.LoopNamed(0x821C36B8, 229);
@@ -548,7 +557,7 @@ namespace {
 // the pictures' two animations at `first` and `second`.
 struct LeaveStep {
   uint32_t bytes;          // the frame
-  uint32_t edits[12];      // the edits' offsets in menu order
+  const SettingsWord* edits;  // the edits in menu order
   uint32_t count;          // the items
   uint32_t first, second;  // the pictures' tables' offsets in the frame
   const uint32_t* first_table;
@@ -556,7 +565,10 @@ struct LeaveStep {
   uint32_t pictures;       // the tables' words
   uint32_t row;            // the cursor's first animation (407 or 658)
   uint32_t ok, back;       // the last row's (OK/Default 0, else)
-  uint32_t copy_to, copy_from, copy_bytes;  // the edits put back
+  // The edits put back: the edits' and the current settings' first words.
+  uint32_t (S::*copy_to)() const;
+  uint32_t (S::*copy_from)() const;
+  uint32_t copy_bytes;
   uint32_t lr[8];  // FinishNamed (the row, the picture's two), the last row's
                    // FinishNamed, memcpy, UiMovie::Run (two unused)
 };
@@ -566,20 +578,20 @@ uint64_t RunLeave(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls,
   const uint32_t frame = sp - l.bytes;
   StoreU32(base, frame, sp);
   const Movie m{calls, frame, FindMovie(base, frame)};
-  const uint32_t o = Settings(base);
+  const S o = Settings(base);
   for (uint32_t i = 0; i < l.count; i++) {
-    StoreU32(base, frame + 96 + 4 * i, LoadU32(base, o + l.edits[i]));
+    StoreU32(base, frame + 96 + 4 * i, (o.*l.edits[i])());
   }
   for (uint32_t i = 0; i < l.pictures; i++) {
     StoreU32(base, frame + l.first + 4 * i, l.first_table[i]);
     StoreU32(base, frame + l.second + 4 * i, l.second_table[i]);
   }
   if (LoadU32(base, step) == 0) {
-    StoreU32(base, o + 684, 0);
-    const uint32_t menu = LoadU32(base, kMenu);
-    const uint32_t cursor = LoadU32(base, menu + 0);
+    o.set_wait_counter(0);
+    const schema::FrontEndMenu menu = Menu(base);
+    const uint32_t cursor = menu.cursor();
     if (cursor != l.count) {
-      m.FinishNamed(l.lr[0], uint64_t(cursor) - uint64_t(LoadU32(base, menu + 48)) + l.row);
+      m.FinishNamed(l.lr[0], uint64_t(cursor) - uint64_t(menu.visible_row()) + l.row);
       uint32_t picture = LoadU32(base, frame + 96 + (cursor << 2));
       if (analog) {
         picture = AnalogPicture(picture);
@@ -593,10 +605,10 @@ uint64_t RunLeave(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls,
         ShowButtonPicture(base, kMinusOne, frame);
       }
     } else {
-      m.FinishNamed(l.lr[3], LoadU32(base, Settings(base) + 660) != 0 ? l.back : l.ok);
+      m.FinishNamed(l.lr[3], Settings(base).ok_default() != 0 ? l.back : l.ok);
     }
-    const uint32_t settings = Settings(base);
-    const uint32_t to = settings + l.copy_to, from = settings + l.copy_from;
+    const S settings = Settings(base);
+    const uint32_t to = (settings.*l.copy_to)(), from = (settings.*l.copy_from)();
     if (!native::Buffers_Memcpy(base, to, from, l.copy_bytes, l.lr[4])) {
       calls.Call(kMemcpy, frame, l.lr[4], to, from, l.copy_bytes);
     }
@@ -610,9 +622,9 @@ uint64_t RunLeave(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls,
     StoreU32(base, step, 1);
   }
   m.Run(l.lr[5]);
-  const uint32_t settings = Settings(base);
-  StoreU32(base, settings + 684, LoadU32(base, settings + 684) + 1);
-  return int32_t(LoadU32(base, Settings(base) + 684)) >= 10 ? 1 : 0;
+  const S settings = Settings(base);
+  settings.set_wait_counter(settings.wait_counter() + 1);
+  return int32_t(Settings(base).wait_counter()) >= 10 ? 1 : 0;
 }
 
 }  // namespace
@@ -624,8 +636,8 @@ uint64_t LeaveButtons(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
   static constexpr uint32_t kSecond[17] = {423, 425, 427, 429, 431, 433, 435, 437, 439,
                                            441, 443, 445, 447, 449, 451, 453, 455};
   static constexpr LeaveStep kLeave = {
-      336, {284, 288, 292, 296, 300, 304, 320, 312, 316, 308, 324, 328},
-      12, 144, 224, kFirst, kSecond, 17, 407, 353, 354, 284, 92, 48,
+      336, kButtonEdits, 12, 144, 224, kFirst, kSecond, 17, 407, 353, 354,
+      &S::edit_button_0_address, &S::current_button_0_address, 48,
       {0x821C2958, 0x821C2978, 0x821C2988, 0x821C29B0, 0x821C29C4, 0x821C29E0, 0, 0}};
   return RunLeave(base, step, sp, calls, kLeave, false);
 }
@@ -637,8 +649,8 @@ uint64_t LeaveAnalog(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   static constexpr uint32_t kFirst[7] = {673, 675, 677, 679, 681, 683, 693};
   static constexpr uint32_t kSecond[7] = {674, 676, 678, 680, 682, 684, 694};
   static constexpr LeaveStep kLeave = {
-      240, {380, 384, 388, 396, 392, 400}, 6, 128, 160, kFirst, kSecond, 7, 658, 604, 605,
-      380, 188, 24,
+      240, kAnalogEdits, 6, 128, 160, kFirst, kSecond, 7, 658, 604, 605,
+      &S::edit_analog_0_address, &S::current_analog_0_address, 24,
       {0x821C2B20, 0x821C2B48, 0x821C2B58, 0x821C2B80, 0x821C2B94, 0x821C2BB0, 0, 0}};
   return RunLeave(base, step, sp, calls, kLeave, true);
 }
@@ -665,16 +677,16 @@ uint64_t Close(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls,
     StoreU32(base, step, 1);
   }
   if (int32_t(m.Run(lr[2])) == 0) {
-    const uint32_t p = LoadU32(base, kPage);
-    const uint32_t page = LoadU32(base, p + 0);
+    const schema::PageObject p = G::pages(base);
+    const uint32_t page = p.page();
     if (page != 0) {
-      StoreU32(base, p + 8, page);
+      p.set_previous_page(page);
     }
-    StoreU32(base, p + 16, kMinusOne);
-    StoreU32(base, p + 4, 0);
-    StoreU32(base, p + 12, 5);
-    StoreU32(base, p + 0, kMinusOne);
-    StoreU32(base, LoadU32(base, kPage) + 24, 0);
+    p.set_queued_step(kMinusOne);
+    p.set_next_page(0);
+    p.set_step(5);
+    p.set_page(kMinusOne);
+    G::pages(base).set_step_started(0);
   }
   return 0;
 }
@@ -691,7 +703,7 @@ uint64_t FadeIn(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
     m.Play(0x821C7100, kMinusOne64, 0);
     m.Loop(0x821C7110, kMinusOne64, 0);
     // ScreenFades::FadeIn([0x82001BEC], black, layer 0).
-    mode_tick::ScreenFadesFadeIn(base, LoadU32(base, 0x82001BEC), 0, 0, 0, 0);
+    mode_tick::ScreenFadesFadeIn(base, G::screen_fades(base), 0, 0, 0, 0);
     SetUpCategoryPage(base, frame, calls);
     StoreU32(base, step, 1);
   }
@@ -710,7 +722,7 @@ uint64_t CloseHud(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls)
     if (int32_t(cursor) < 4) {
       index = cursor + 4;
     } else {
-      index = LoadU32(base, Settings(base) + 660) != 0 ? 1 : 2;
+      index = Settings(base).ok_default() != 0 ? 1 : 2;
     }
     m.Finish(0x821C7664, 5, index);
   });
@@ -724,7 +736,7 @@ uint64_t CloseSound(uint8_t* base, uint32_t step, uint32_t sp, const Calls& call
       case 0: m.Finish(0x821C77C0, 6, 1); break;
       case 1: m.Finish(0x821C77C0, 6, 2); break;
       case 2:
-        m.Finish(0x821C77C0, 6, int32_t(LoadU32(base, Settings(base) + 660)) == 1 ? 4 : 3);
+        m.Finish(0x821C77C0, 6, int32_t(Settings(base).ok_default()) == 1 ? 4 : 3);
         break;
       case 3: m.Finish(0x821C77C0, 6, 5); break;
       default: break;
@@ -740,7 +752,7 @@ uint64_t CloseSliders(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
     if (cursor < 3) {
       m.FinishNamed(0x821C7910, 226 + cursor);
     } else if (cursor == 3) {
-      m.FinishNamed(0x821C7910, LoadU32(base, Settings(base) + 660) == 0 ? 229 : 230);
+      m.FinishNamed(0x821C7910, Settings(base).ok_default() == 0 ? 229 : 230);
     }
   });
 }

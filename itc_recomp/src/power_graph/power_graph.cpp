@@ -18,6 +18,7 @@
 #include "c_runtime/strings.h"
 #include "car_specs/car_specs.h"
 #include "race_setup/race_setup.h"
+#include "schema/power_graph.h"
 #include "strings_and_font/steps.h"
 #include "ui_movies/game.h"
 #include "vehicle/vehicle.h"
@@ -43,8 +44,6 @@ constexpr uint32_t kPowerScale = 0x82009EBC;   // 0.32
 constexpr uint32_t kCountScale = 0x82002CE8;   // 0.0025
 // The empty destructor the sprites' arrays are destroyed with.
 constexpr uint32_t kEmptyDestructor = 0x82106540;
-// Primitive::RecordTransform's list.
-constexpr uint32_t kTransformList = 0x826D83D4;
 // A line's slots: the header, the transform's five, [13], the vertices'
 // header and three, [15].
 constexpr uint32_t kLineSlots = 12;
@@ -66,6 +65,8 @@ double ToSingle(int32_t value) {
 }
 
 using strings_and_font::steps::Fctiwz;
+using G = schema::PowerGraphGlobals;
+using Sprite = schema::LineSprite;
 
 }  // namespace
 
@@ -73,10 +74,10 @@ bool LineRecordFlat(uint8_t* base, uint32_t sprite, uint32_t pass, uint32_t key,
                     const LineCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8217B508 Line::RecordFlat");
   const auto [list, queue] = calls.list_and_queue(frame);
-  guest::StoreU32(base, kLineLists + 0, queue);
-  guest::StoreU32(base, kLineLists + 4, list);
+  G::set_line_queue(base, queue);
+  G::set_line_list(base, list);
   const uint32_t used = guest::LoadU32(base, list + 12);
-  if (guest::LoadU32(base, kTransformList) != list || guest::LoadU8(base, list + 52) != 0 ||
+  if (G::transform_list(base) != list || guest::LoadU8(base, list + 52) != 0 ||
       guest::LoadU32(base, command_list::kOpenChunks) != 0 || used + kLineSlots < used ||
       used + kLineSlots >= guest::LoadU32(base, list + 8)) {
     return false;
@@ -90,18 +91,20 @@ bool LineRecordFlat(uint8_t* base, uint32_t sprite, uint32_t pass, uint32_t key,
   guest::StoreU32(base, slot + 12, 0);
   guest::StoreU32(base, slot + 4, 2);
   uint32_t vertex = command_list::AllocateVertices(base, list, 2, true);
-  for (uint32_t i = 0; i < 2; i++) {
-    const uint32_t from = sprite + 80 + 16 * i;
-    Stfs(base, vertex + 0, Lfs(base, from + 0));
-    Stfs(base, vertex + 4, Lfs(base, from + 4));
-    Stfs(base, vertex + 8, Lfs(base, from + 8));
-    const uint32_t color = (guest::LoadU32(base, from + 44) << 24) |
-                           (uint32_t(guest::LoadU8(base, from + 35)) << 16) |
-                           (uint32_t(guest::LoadU8(base, from + 39)) << 8) |
-                           guest::LoadU8(base, from + 43);
-    guest::StoreU32(base, vertex + 12, color);
-    vertex += 24;
-  }
+  const Sprite s(base, sprite);
+  Stfs(base, vertex + 0, double(s.end0_x()));
+  Stfs(base, vertex + 4, double(s.end0_y()));
+  Stfs(base, vertex + 8, double(s.end0_z()));
+  const uint32_t color0 = (s.end0_alpha() << 24) | (uint32_t(s.end0_red_byte()) << 16) |
+                          (uint32_t(s.end0_green_byte()) << 8) | s.end0_blue_byte();
+  guest::StoreU32(base, vertex + 12, color0);
+  vertex += 24;
+  Stfs(base, vertex + 0, double(s.end1_x()));
+  Stfs(base, vertex + 4, double(s.end1_y()));
+  Stfs(base, vertex + 8, double(s.end1_z()));
+  const uint32_t color1 = (s.end1_alpha() << 24) | (uint32_t(s.end1_red_byte()) << 16) |
+                          (uint32_t(s.end1_green_byte()) << 8) | s.end1_blue_byte();
+  guest::StoreU32(base, vertex + 12, color1);
   guest::StoreU32(base, command_list::AllocateSlots(base, list, 1), 15);
   command_list::CloseChunk(base, list);
   const int32_t slots = command_list::ChunkSlots(base, list);
@@ -110,7 +113,7 @@ bool LineRecordFlat(uint8_t* base, uint32_t sprite, uint32_t pass, uint32_t key,
   guest::StoreU32(base, header + 4, 0);
   guest::StoreU32(base, header + 12, 0);
   guest::StoreU32(base, header + 8, uint32_t(slots - 1));
-  calls.add(frame, guest::LoadU32(base, kLineLists), header, key);
+  calls.add(frame, G::line_queue(base), header, key);
   return true;
 }
 
@@ -128,35 +131,39 @@ void Draw(uint8_t* base, uint32_t frame, double x, double y, uint32_t car,
   ITC_NATIVE_RUNNING("sub_8217C708 PowerGraph::Draw");
   const uint32_t torque_set = frame + kTorqueSprites;
   const uint32_t power_set = frame + kPowerSprites;
+  // Sprite i of a set.
+  auto at = [&](uint32_t set, uint32_t i) { return Sprite(base, set + Sprite::kSize * i); };
   for (uint32_t i = 0; i < 32; i++) {
-    race_overlays::SpriteResetStyle2(base, torque_set + kSpriteBytes * i);
+    race_overlays::SpriteResetStyle2(base, at(torque_set, i).address);
   }
   for (uint32_t i = 0; i < 32; i++) {
-    race_overlays::SpriteResetStyle2(base, power_set + kSpriteBytes * i);
+    race_overlays::SpriteResetStyle2(base, at(power_set, i).address);
   }
 
   // The segments' x, y and z (sprites 0 to 30).
   const double zero = Lfs(base, kZero);
   const double step = Lfs(base, kStep);
   for (int32_t i = 0; i < 31; i++) {
-    const uint32_t a = torque_set + kSpriteBytes * uint32_t(i);
-    const uint32_t b = power_set + kSpriteBytes * uint32_t(i);
+    const Sprite a = at(torque_set, uint32_t(i));
+    const Sprite b = at(power_set, uint32_t(i));
     StoreS64(base, frame + 80, i);
     StoreS64(base, frame + 88, i + 1);
     double left = ToSingle(i);
     left = double(float(left * step));
-    Stfs(base, a + 80, double(float(left + x)));
-    Stfs(base, b + 80, double(float(left + x)));
+    a.set_end0_x(float(double(float(left + x))));
+    b.set_end0_x(float(double(float(left + x))));
     double right = ToSingle(i + 1);
     right = double(float(right * step));
-    Stfs(base, a + 96, double(float(right + x)));
-    Stfs(base, b + 96, double(float(right + x)));
-    for (uint32_t corner = 0; corner < 32; corner += 16) {
-      Stfs(base, a + 84 + corner, y);
-      Stfs(base, b + 84 + corner, y);
-      Stfs(base, a + 88 + corner, zero);
-      Stfs(base, b + 88 + corner, zero);
-    }
+    a.set_end1_x(float(double(float(right + x))));
+    b.set_end1_x(float(double(float(right + x))));
+    a.set_end0_y(float(y));
+    b.set_end0_y(float(y));
+    a.set_end0_z(float(zero));
+    b.set_end0_z(float(zero));
+    a.set_end1_y(float(y));
+    b.set_end1_y(float(y));
+    a.set_end1_z(float(zero));
+    b.set_end1_z(float(zero));
   }
 
   // The 32 points: torque (kgf·m) at +112, power (PS) at +240.
@@ -188,32 +195,39 @@ void Draw(uint8_t* base, uint32_t frame, double x, double y, uint32_t car,
   const double torque_scale = Lfs(base, kTorqueScale);
   const double power_scale = Lfs(base, kPowerScale);
   for (uint32_t i = 0; i < 26; i++) {
-    const uint32_t a = torque_set + kSpriteBytes * i;
-    const uint32_t b = power_set + kSpriteBytes * i;
+    const Sprite a = at(torque_set, i);
+    const Sprite b = at(power_set, i);
     const double torque = double(float(Lfs(base, frame + 112 + 4 * i) * torque_scale));
     const double power = double(float(Lfs(base, frame + 240 + 4 * i) * power_scale));
-    Stfs(base, a + 100, double(float(y - torque)));
-    Stfs(base, a + kSpriteBytes + 84, double(float(y - torque)));
-    Stfs(base, b + 100, double(float(y - power)));
-    Stfs(base, b + kSpriteBytes + 84, double(float(y - power)));
-    for (uint32_t corner = 0; corner < 32; corner += 16) {
-      guest::StoreU32(base, b + 112 + corner, 44);
-      guest::StoreU32(base, b + 116 + corner, 242);
-      guest::StoreU32(base, b + 120 + corner, 242);
-      guest::StoreU32(base, b + 124 + corner, 255);
-      guest::StoreU32(base, a + 124 + corner, 255);
-      guest::StoreU32(base, a + 112 + corner, 198);
-      guest::StoreU32(base, a + 116 + corner, 66);
-      guest::StoreU32(base, a + 120 + corner, 14);
-    }
+    a.set_end1_y(float(double(float(y - torque))));
+    at(torque_set, i + 1).set_end0_y(float(double(float(y - torque))));
+    b.set_end1_y(float(double(float(y - power))));
+    at(power_set, i + 1).set_end0_y(float(double(float(y - power))));
+    // Power cyan, torque orange: end 0's colors, then end 1's.
+    b.set_end0_red(44);
+    b.set_end0_green(242);
+    b.set_end0_blue(242);
+    b.set_end0_alpha(255);
+    a.set_end0_alpha(255);
+    a.set_end0_red(198);
+    a.set_end0_green(66);
+    a.set_end0_blue(14);
+    b.set_end1_red(44);
+    b.set_end1_green(242);
+    b.set_end1_blue(242);
+    b.set_end1_alpha(255);
+    a.set_end1_alpha(255);
+    a.set_end1_red(198);
+    a.set_end1_green(66);
+    a.set_end1_blue(14);
   }
 
   // The count, and segments 1 to n - 1.
   const int32_t count = SegmentCount(base, car);
   guest::StoreU32(base, frame + 80, uint32_t(count));
   for (int32_t i = 1; i < count; i++) {
-    const uint32_t a = torque_set + kSpriteBytes * uint32_t(i);
-    const uint32_t b = power_set + kSpriteBytes * uint32_t(i);
+    const uint32_t a = at(torque_set, uint32_t(i)).address;
+    const uint32_t b = at(power_set, uint32_t(i)).address;
     if (!LineRecordFlat(base, a, kPass, kKey, frame - kLineFrame, calls)) {
       calls.original(a, kTorqueLineReturn);
     }
@@ -225,16 +239,17 @@ void Draw(uint8_t* base, uint32_t frame, double x, double y, uint32_t car,
   // The sprites' destructors: the power set, then the torque set, 31 to 0.
   for (const uint32_t set : {power_set, torque_set}) {
     for (int32_t i = 31; i >= 0; i--) {
-      const uint32_t sprite = set + kSpriteBytes * uint32_t(i);
-      c_runtime::VectorDestruct(base, sprite + 112, 16, 2, kEmptyDestructor, nullptr, nullptr);
-      c_runtime::VectorDestruct(base, sprite + 80, 16, 2, kEmptyDestructor, nullptr, nullptr);
+      const Sprite sprite = at(set, uint32_t(i));
+      c_runtime::VectorDestruct(base, sprite.end0_red_address(), 16, 2, kEmptyDestructor, nullptr,
+                                nullptr);
+      c_runtime::VectorDestruct(base, sprite.end0_x_address(), 16, 2, kEmptyDestructor, nullptr,
+                                nullptr);
     }
   }
 }
 
 namespace {
 constexpr uint32_t kMovieTable = 0x826C5CCC;
-constexpr uint32_t kFrontEndCars = 0x826D83E0;
 constexpr uint32_t kShownAfter = 0x8200829C;  // 22.0
 constexpr uint32_t kNoTime = 0x82001BE0;      // AnimationTime's answer for none
 constexpr uint32_t kTuningX = 0x8200AD98;     // 1042.0
@@ -270,7 +285,7 @@ bool TuningScreenShowsGraph(uint8_t* base, uint32_t screen, uint32_t frame, uint
 
 TuningDraw TuningScreenDraw(uint8_t* base, uint32_t screen) {
   TuningDraw draw;
-  draw.r3 = guest::LoadU32(base, guest::LoadU32(base, kFrontEndCars));
+  draw.r3 = guest::LoadU32(base, G::stand_holder(base));
   draw.x = Lfs(base, kTuningX);
   draw.y = Lfs(base, kTuningY);
   draw.car = screen + 18912;
@@ -287,7 +302,7 @@ constexpr uint32_t kCarDataFrame = 96;
 bool CarListEntrySetUp(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t entry,
                        uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82250670 CarList::DrawEntryPowerGraph");
-  if (guest::LoadU32(base, kEntryShown) == 0) {
+  if (G::graph_shown(base) == 0) {
     return false;
   }
   const uint32_t car = frame + kEntryCar;
@@ -302,7 +317,7 @@ bool CarListEntrySetUp(uint8_t* base, const front_end_car_draw::Calls& calls, ui
 
 TuningDraw CarListEntryDraw(uint8_t* base, uint32_t frame) {
   TuningDraw draw;
-  draw.r3 = guest::LoadU32(base, guest::LoadU32(base, kFrontEndCars));
+  draw.r3 = guest::LoadU32(base, G::stand_holder(base));
   draw.x = Lfs(base, kEntryX);
   draw.y = Lfs(base, kEntryY);
   draw.car = frame + kEntryCarData;
@@ -312,7 +327,7 @@ TuningDraw CarListEntryDraw(uint8_t* base, uint32_t frame) {
 bool CarListCarSetUp(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t car,
                      uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82250700 CarList::DrawCarPowerGraph");
-  if (guest::LoadU32(base, kEntryShown) == 0) {
+  if (G::graph_shown(base) == 0) {
     return false;
   }
   const uint32_t data = frame + kEntryCarData;

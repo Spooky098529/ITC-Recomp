@@ -23,6 +23,7 @@
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
+#include "schema/minimap.h"
 #include "scenery_lists/scenery_lists.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -33,24 +34,15 @@ namespace minimap {
 namespace {
 
 using namespace car_scene_draw::ops;
+using G = schema::MinimapGlobals;
+using List = schema::MinimapList80;
+using Entry = schema::MinimapRacerEntry;
+using Color = schema::MinimapColor;
 
 constexpr uint32_t kFrame = 28336;
 constexpr uint32_t kCameraPasses = 0x826BAC00;
-constexpr uint32_t kViewCopy = 0x8265ECA0;
-constexpr uint32_t kDrawKeyA = 0x8296B90C;
-constexpr uint32_t kDrawKeyB = 0x8296B900;
-constexpr uint32_t kRangeNear = 0x82002814;
-constexpr uint32_t kRangeFar = 0x82006804;
-constexpr uint32_t kLowest = 0x82006808;      // -1000.0: points below aren't drawn
-constexpr uint32_t kMarkerScale = 0x82002A0C;  // the markers' x and z scale
-constexpr uint32_t kQuarterTurn = 0x82001FB4;  // pi / 2
 constexpr uint32_t kRaceMode = 0xA3AF0;        // the race data's mode
 constexpr uint32_t kStages = 0x59620;          // the race data's stages
-constexpr uint32_t kHumanFlag = 0x826C7824;
-constexpr uint32_t kBlinkFrames = 0x826C5AA4;
-constexpr uint32_t kBlinkPhase = 0x826C5AA8;
-constexpr uint32_t kColors = 0x826C5AB0;      // the five types' colors
-constexpr uint32_t kColorsGuard = 0x826C5B00;
 constexpr uint32_t kColorsCleanUp = 0x825DAEF0;
 constexpr uint32_t kSetWsToOne = 0x8209B038;
 constexpr uint32_t kEmptyDestructor = 0x82106540;
@@ -117,8 +109,8 @@ void Drawer::Run(uint32_t manager, uint32_t description) {
   const uint32_t f = f_;
   const uint32_t set = Load(base_, manager + 112);  // r26
   const uint32_t pass = Load(base_, description + 20) * 592u + kCameraPasses;  // r14
-  one_ = Lfs(base_, kOne);    // f31
-  zero_ = Lfs(base_, kZero);  // f30
+  one_ = double(G::one(base_));    // f31
+  zero_ = double(G::zero(base_));  // f30
   // The compiler's dead stores (overwritten before they're read).
   for (uint32_t at = 364; at <= 476; at += 16) {
     Stfs(base_, f + at, one_);
@@ -138,10 +130,10 @@ void Drawer::Run(uint32_t manager, uint32_t description) {
   FlushOff();
   const uint32_t key_b = Load(base_, description + 28);
   const uint32_t key_a = Load(base_, description + 24);
-  Store(base_, kDrawKeyA, key_a);
-  Store(base_, kDrawKeyB, key_b);
-  matrix_math::Copy(base_, kViewCopy, pass + 16);
-  interpolation::BlendState_OnCopy(base_, kViewCopy, pass + 16, 0x820F5848);
+  G::set_draw_key_a(base_, key_a);
+  G::set_draw_key_b(base_, key_b);
+  matrix_math::Copy(base_, G::view_copy_address(), pass + 16);
+  interpolation::BlendState_OnCopy(base_, G::view_copy_address(), pass + 16, 0x820F5848);
   FlushOff();
   Map(set);
   Points(set, pass);
@@ -153,7 +145,7 @@ void Drawer::Map(uint32_t set) {
   const uint32_t f = f_;
   const uint32_t list = set + 1064;
   int32_t count = int32_t(Load(base_, list));  // r27
-  const uint32_t race = Load(base_, kRaceData);
+  const uint32_t race = G::race_data(base_);
   if (race != 0 && int32_t(Load(base_, race + kRaceMode)) == 1) {
     const uint32_t flags = Load(base_, race + 20);
     if (flags & 0x20) {
@@ -164,8 +156,8 @@ void Drawer::Map(uint32_t set) {
       count = (flags & 0x10) ? 2 : 1;
     }
   }
-  const double far_range = Lfs(base_, kRangeFar);    // f28
-  const double near_range = Lfs(base_, kRangeNear);  // f29
+  const double far_range = double(G::range_far(base_));    // f28
+  const double near_range = double(G::range_near(base_));  // f29
   const uint32_t nodes = list + 4;  // r29
   for (int32_t i = 0; i < count; i++) {
     auto node_at = [&](uint32_t at) {
@@ -206,10 +198,10 @@ void Drawer::Points(uint32_t set, uint32_t pass) {
   if (int32_t(Load(base_, list + 620)) <= 0) {
     return;
   }
-  const double lowest = Lfs(base_, kLowest);  // f29
+  const double lowest = double(G::lowest(base_));  // f29
   // The scale vector (s, 1.0, s, 1.0) at `scale`.
   auto scale_vector = [&](uint32_t scale) {
-    const double s = Lfs(base_, kMarkerScale);
+    const double s = double(G::marker_scale(base_));
     Stfs(base_, scale + 0, s);
     Stfs(base_, scale + 4, one_);
     Stfs(base_, scale + 8, s);
@@ -262,13 +254,13 @@ void Drawer::Points(uint32_t set, uint32_t pass) {
 // sorted by type and the blink phase, drawn pool by pool; the blink clock.
 void Drawer::CarMarkers(uint32_t pass) {
   const uint32_t f = f_;
-  const uint32_t guard = Load(base_, kColorsGuard);
+  const uint32_t guard = G::type_colors_guard(base_);
   if ((guard & 1) == 0) {
-    Store(base_, kColorsGuard, guard | 1);
+    G::set_type_colors_guard(base_, guard | 1);
     static constexpr uint32_t kTable[20] = {255, 241, 0,   255, 255, 66,  23,  255, 0,  255,
                                             255, 255, 255, 80,  255, 255, 34,  172, 54, 255};
     for (uint32_t i = 0; i < 20; i++) {
-      Store(base_, kColors + 4 * i, kTable[i]);
+      Store(base_, G::type_colors_address() + 4 * i, kTable[i]);
     }
     c_runtime::AtexitFrom(base_, kColorsCleanUp, calls_.atexit);
     FlushOff();
@@ -284,37 +276,38 @@ void Drawer::CarMarkers(uint32_t pass) {
     Store(base_, at - 4, 0);
     Store(base_, at + 0, 0);
     Store(base_, at + 4, 1);
-    const uint32_t nodes = at + 8;
+    const List l(base_, at + 8);  // the pool's list
+    const uint32_t nodes = l.nodes_address();
     for (uint32_t n = 0; n < 80; n++) {
       guest::StoreU16(base_, nodes + 4 * n + 2, uint16_t(n));
       guest::StoreU16(base_, nodes + 4 * n + 0, uint16_t(n + 1));
     }
-    guest::StoreU16(base_, nodes + 316, 0xFFFF);
-    guest::StoreU16(base_, nodes + 324, 0xFFFF);
-    guest::StoreU16(base_, nodes + 326, 0xFFFF);
-    guest::StoreU16(base_, nodes + 320, 0);
-    guest::StoreU16(base_, nodes + 322, 0xFFFF);
-    guest::StoreU16(base_, nodes + 328, 0);
+    guest::StoreU16(base_, nodes + 316, 0xFFFF);  // node 79's next
+    l.set_head(0xFFFF);
+    l.set_unknown_326(0xFFFF);
+    l.set_free_head(0);
+    l.set_unknown_322(0xFFFF);
+    l.set_count(0);
   }
 
   if (vehicle_accessors::VehicleGet(base_, 0) != 0) {
-    uint32_t manager = Load(base_, kRaceManager);
+    uint32_t manager = G::racers_manager(base_);
     // The player's branch number: byte +3 of its section.
     const uint32_t player = RaceFindPlayerEntry(base_, manager, 1);
-    Store(base_, f + 80, Load(base_, player + 8));
+    Store(base_, f + 80, Entry(base_, player).position());
     const uint32_t section = uint32_t(guest::LoadU16(base_, f + 80)) << 2;
-    const uint32_t sections = Load(base_, Load(base_, kRoute) + 12);
+    const uint32_t sections = Load(base_, G::route(base_) + 12);
     const int32_t branch = guest::LoadU8(base_, Load(base_, section + sections) + 3);  // r20
-    const double quarter = Lfs(base_, kQuarterTurn);  // f29
+    const double quarter = double(G::quarter_turn(base_));  // f29
     for (uint32_t i = 0; int32_t(i) < int32_t(Load(base_, manager + 2368)); i++) {
       const uint32_t entry = manager + 28 * i + 4;  // r27
-      const uint32_t flags = Load(base_, entry);
+      const uint32_t flags = Entry(base_, entry).flags();
       uint32_t vehicle = 0;  // r28
       int32_t type = 0;      // r30
       if (flags & 0xC) {
         const bool human = (flags & 0x4) == 0;  // the 0x8 entries'
         vehicle = RaceRacerVehicle(base_, i);
-        const uint32_t race = Load(base_, kRaceData);
+        const uint32_t race = G::race_data(base_);
         if (int32_t(Load(base_, race + kRaceMode)) == 6) {
           const uint32_t stage = f + 544;
           if (!debug::IsHidden(kStagesCopy)) {
@@ -329,7 +322,7 @@ void Drawer::CarMarkers(uint32_t pass) {
             }
           }
           if (int32_t(Load(base_, stage)) != 1) {
-            const uint32_t humans = Load(base_, kHumanFlag);
+            const uint32_t humans = G::human_flag(base_);
             if (human ? humans != 0 : humans == 0) {
               type = 1;
             }
@@ -341,22 +334,24 @@ void Drawer::CarMarkers(uint32_t pass) {
                            : int32_t(Call(kRacerMarkerType, {entry, uint64_t(int64_t(branch))},
                                           0x820F5DA4));
         if (type == -1) {
-          manager = Load(base_, kRaceManager);
+          manager = G::racers_manager(base_);
           continue;
         }
       } else {
         continue;
       }
       // Its pool by the type and the blink phase.
-      const int32_t sum = type + int32_t(Load(base_, kBlinkPhase));
+      const int32_t sum = type + int32_t(G::blink_phase(base_));
       const int32_t index = sum - (sum / 5) * 5;
       const uint32_t pool = f + kPools + kPoolBytes * uint32_t(index);
       if (int32_t(Load(base_, pool)) == -1) {
         Store(base_, pool, uint32_t(type));
-        const uint32_t color = (uint32_t(type) << 4) + kColors;
-        for (uint32_t w = 0; w < 16; w += 4) {
-          Store(base_, pool + 16 + w, Load(base_, color + w));
-        }
+        const Color from(base_, (uint32_t(type) << 4) + G::type_colors_address());
+        const Color to(base_, pool + 16);
+        to.set_red(from.red());
+        to.set_green(from.green());
+        to.set_blue(from.blue());
+        to.set_alpha(from.alpha());
       }
       // The marker's matrix at +112.
       for (uint32_t at : {124u, 140u, 156u, 172u}) {
@@ -368,7 +363,7 @@ void Drawer::CarMarkers(uint32_t pass) {
           calls_.calls->memcpy(f + 480, vehicle + 3312, 64, f, 0x820F5E6C);
         }
         FlushOff();
-        const double s = Lfs(base_, kMarkerScale);
+        const double s = double(G::marker_scale(base_));
         Stfs(base_, f + 532, zero_);
         Stfs(base_, f + 272, s);
         Stfs(base_, f + 276, one_);
@@ -382,15 +377,15 @@ void Drawer::CarMarkers(uint32_t pass) {
         interpolation::BlendState_OnMultiply(base_, f + 112, f + 112, f + 480, 0x820F5EB4);
         FlushOff();
       } else {
-        const uint32_t sections_now = Load(base_, Load(base_, kRoute) + 12);
-        const uint32_t at_section = uint32_t(guest::LoadU16(base_, entry + 8)) << 2;
-        const int32_t at_slice = int16_t(guest::LoadU16(base_, entry + 10));
+        const uint32_t sections_now = Load(base_, G::route(base_) + 12);
+        const uint32_t at_section = uint32_t(Entry(base_, entry).section()) << 2;
+        const int32_t at_slice = int16_t(Entry(base_, entry).slice());
         const uint32_t slice = Load(base_, at_section + sections_now) + uint32_t(at_slice) * 84u;
         const double angle = c_runtime::Atan2(Lfs(base_, slice + 168), Lfs(base_, slice + 172));
         FlushOff();
         Stfs(base_, f + 96, Lfs(base_, slice + 124));
         Stfs(base_, f + 104, Lfs(base_, slice + 132));
-        const double s = Lfs(base_, kMarkerScale);
+        const double s = double(G::marker_scale(base_));
         Stfs(base_, f + 208, s);
         Stfs(base_, f + 216, s);
         Stfs(base_, f + 108, one_);
@@ -403,12 +398,12 @@ void Drawer::CarMarkers(uint32_t pass) {
         FlushOff();
         Translate(f + 112, f + 96);
       }
-      if (guest::LoadU16(base_, pool + 360) < 80) {
+      if (List(base_, pool + 32).count() < 80) {
         const uint32_t list = pool + 32;
-        List80Insert(base_, list, f + 112, uint32_t(int32_t(int16_t(guest::LoadU16(base_, list + 328)))));
+        List80Insert(base_, list, f + 112, uint32_t(int32_t(int16_t(List(base_, list).count()))));
         FlushOff();
       }
-      manager = Load(base_, kRaceManager);
+      manager = G::racers_manager(base_);
     }
   }
 
@@ -418,7 +413,7 @@ void Drawer::CarMarkers(uint32_t pass) {
     if (int32_t(Load(base_, list - 32)) == -1) {
       continue;
     }
-    for (uint32_t j = 0; j < uint32_t(int32_t(int16_t(guest::LoadU16(base_, list + 328)))); j++) {
+    for (uint32_t j = 0; j < uint32_t(int32_t(int16_t(List(base_, list).count()))); j++) {
       if (!List80Copy(base_, f + 624, list, j)) {
         Call(kList80Copy, {f + 624, list, j}, 0x820F5FBC);
       }
@@ -431,14 +426,14 @@ void Drawer::CarMarkers(uint32_t pass) {
   }
 
   // The blink clock.
-  const uint32_t frames = Load(base_, kBlinkFrames) + 1;
-  Store(base_, kBlinkFrames, frames);
+  const uint32_t frames = G::blink_frames(base_) + 1;
+  G::set_blink_frames(base_, frames);
   if (frames > 4) {
-    const uint32_t phase = Load(base_, kBlinkPhase) + 1;
-    Store(base_, kBlinkFrames, 0);
-    Store(base_, kBlinkPhase, phase);
+    const uint32_t phase = G::blink_phase(base_) + 1;
+    G::set_blink_frames(base_, 0);
+    G::set_blink_phase(base_, phase);
     if (int32_t(phase) > 5) {
-      Store(base_, kBlinkPhase, 0);
+      G::set_blink_phase(base_, 0);
     }
   }
   // The pools' destructor iterator: the empty destructor, nothing.

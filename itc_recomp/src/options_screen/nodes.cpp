@@ -17,6 +17,8 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::OptionsScreenGlobals;
+using S = schema::OptionsSettings;
 
 // A helper's frame (`bytes` below `sp`, its back chain) and `m`.
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
@@ -160,24 +162,23 @@ uint64_t ShowVolumeNumbers(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t m = FindMovie(base, frame);
   const uint32_t music = ui_movies::FindNode(base, m, 6, 6);
-  ShowVolumeNumber(base, music, LoadU32(base, LoadU32(base, kSettings) + 252), frame, calls);
+  ShowVolumeNumber(base, music, G::settings(base).edit_music_volume(), frame, calls);
   const uint32_t effects = ui_movies::FindNode(base, m, 6, 7);
-  return ShowVolumeNumber(base, effects, LoadU32(base, LoadU32(base, kSettings) + 256), frame,
-                          calls);
+  return ShowVolumeNumber(base, effects, G::settings(base).edit_effects_volume(), frame, calls);
 }
 
 namespace {
 
-// The three slider edits (o +260 to +268) copied to the frame's +88, node
+// The three slider edits (edit_slider_0 to 2) copied to the frame's +88, node
 // (7, 0), and `show` on its children 4 to 6 with each value. A 144-byte
 // frame. `show`'s last answer.
 template <typename Show>
 uint64_t ShowSliders(uint8_t* base, uint32_t sp, Show show) {
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t m = FindMovie(base, frame);
-  const uint32_t o = LoadU32(base, kSettings);
+  const S o = G::settings(base);
   for (uint32_t i = 0; i < 3; i++) {
-    StoreU32(base, frame + 88 + 4 * i, LoadU32(base, o + 260 + 4 * i));
+    StoreU32(base, frame + 88 + 4 * i, LoadU32(base, o.edit_slider_0_address() + 4 * i));
   }
   const uint32_t node = ui_movies::FindNode(base, m, 7, 0);
   uint64_t r3 = 0;
@@ -208,11 +209,11 @@ uint64_t ShowHudValues(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BE290 Options::ShowHudValues");
   const uint32_t frame = Frame(base, sp, 208);
   const uint32_t m = FindMovie(base, frame);
-  const uint32_t o = LoadU32(base, kSettings);
+  const S o = G::settings(base);
   for (uint32_t i = 0; i < 4; i++) {
-    StoreU32(base, frame + 96 + 4 * i, LoadU32(base, o + 236 + 4 * i));
+    StoreU32(base, frame + 96 + 4 * i, LoadU32(base, o.edit_hud_0_address() + 4 * i));
   }
-  StoreU32(base, frame + 112, LoadU32(base, o + 660));
+  StoreU32(base, frame + 112, o.ok_default());
   const uint32_t group = ui_movies::FindNode(base, m, 5, 2);
   uint64_t r3 = group;
   for (int32_t i = 0; i < int32_t(LoadU32(base, group + 104)); i++) {
@@ -288,11 +289,9 @@ uint32_t ShowButtonList(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 208);
   const uint32_t m = FindMovie(base, frame);
   // The twelve edits in menu order at the frame's +96.
-  static constexpr uint32_t kEdits[12] = {284, 288, 292, 296, 300, 304,
-                                          320, 312, 316, 308, 324, 328};
-  const uint32_t o = LoadU32(base, kSettings);
+  const S o = G::settings(base);
   for (uint32_t i = 0; i < 12; i++) {
-    StoreU32(base, frame + 96 + 4 * i, LoadU32(base, o + kEdits[i]));
+    StoreU32(base, frame + 96 + 4 * i, (o.*kButtonEdits[i])());
   }
   static constexpr uint32_t kNames[12] = {348, 349, 350, 351, 352, 353,
                                           354, 355, 356, 357, 358, 359};
@@ -304,11 +303,10 @@ uint32_t ShowAnalogList(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 208);
   const uint32_t m = FindMovie(base, frame);
   // The six edits in menu order at the frame's +128, the names at +96.
-  static constexpr uint32_t kEdits[6] = {380, 384, 388, 396, 392, 400};
   static constexpr uint32_t kNames[6] = {351, 352, 353, 354, 355, 359};
-  const uint32_t o = LoadU32(base, kSettings);
+  const S o = G::settings(base);
   for (uint32_t i = 0; i < 6; i++) {
-    StoreU32(base, frame + 128 + 4 * i, LoadU32(base, o + kEdits[i]));
+    StoreU32(base, frame + 128 + 4 * i, (o.*kAnalogEdits[i])());
     StoreU32(base, frame + 96 + 4 * i, kNames[i]);
   }
   return ShowList(base, frame, m, 11, kNames, 128, 6, 0x821BF5FC, calls);

@@ -25,11 +25,9 @@ struct DrawCalls;
 
 namespace minimap {
 
-// The race's manager (28-byte entries from +4, count +2368; the racers'
-// pointers from +2308), the race data, the route.
-constexpr uint32_t kRaceManager = 0x826D82F4;
-constexpr uint32_t kRaceData = 0x826C5B2C;
-constexpr uint32_t kRoute = 0x826C5B10;
+// The race's manager (its 28-byte entries, schema::MinimapRacerEntry, from
+// +4, count +2368; the racers' pointers from +2308), the race data and the
+// route are schema::MinimapGlobals' (schema/minimap.h).
 
 // --- The race manager's lookups ---
 
@@ -87,9 +85,8 @@ bool List80Copy(uint8_t* base, uint32_t out, uint32_t list, uint32_t position);
 
 // --- Recording ---
 
-// The command list Primitive::RecordTransform records on.
-constexpr uint32_t kTransformList = 0x826D83D4;
-// Where Primitive::RecordTransform's product goes: the original's frame
+// Primitive::RecordTransform records on the command list at
+// schema::MinimapGlobals::triangle_list. Where Primitive::RecordTransform's product goes: the original's frame
 // (r1 - 160 + 80, so r1 - 80), where the interpolation notes it.
 constexpr uint32_t kTransformProduct = 80;
 
@@ -109,8 +106,8 @@ std::optional<uint32_t> RecordTransform(uint8_t* base, uint32_t pass, uint32_t p
 enum class TriangleRecording { kFlat, kOther, kNone };
 TriangleRecording TriangleRecord(uint8_t* base, uint32_t triangle);
 
-// The render queue (+0) and the command list (+4) the triangles go to.
-constexpr uint32_t kTriangleLists = 0x826D83D0;
+// The render queue and the command list the triangles go to are
+// schema::MinimapGlobals' triangle_queue and triangle_list.
 // Triangle::RecordFlat's frame (its r1 less this): Primitive::
 // RecordTransform's product is made below it, as the original's call does.
 constexpr uint32_t kRecordFlatFrame = 128;

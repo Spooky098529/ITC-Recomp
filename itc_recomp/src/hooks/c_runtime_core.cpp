@@ -20,6 +20,7 @@
 #include "hooks/last_error.h"
 #include "memory/c_runtime_heap.h"
 #include "lifted/sdk.h"
+#include "schema/c_runtime_core.h"
 
 ITC_FLAG_BOOL(native_c_runtime_core, true, "ITC",
               "Run the C runtime's core natively instead of through the translated code "
@@ -454,12 +455,14 @@ void hooks::CoreGetOsfhandle(lifted::Regs& ctx, uint8_t* base) {
   const uint32_t handle = ctx.r3.u32;
   const uint32_t result = cc::GetOsfhandle(base, handle, CRuntimeCoreCalls(ctx, base));
   // The OS handle as loaded (lwz, zero-extended); -1 as `li` (sign-extended).
-  const bool loaded = int32_t(handle) >= 0 && handle != 0xFFFFFFFEu &&
-                      handle < guest::LoadU32(base, cc::kNhandle) &&
-                      (guest::LoadU8(base, guest::LoadU32(base, cc::kPioinfo +
-                                                                   4 * uint32_t(int32_t(handle) >> 5)) +
-                                               44 * (handle & 31) + 4) &
-                       1) != 0;
+  using G = schema::CRuntimeCoreGlobals;
+  const bool loaded =
+      int32_t(handle) >= 0 && handle != 0xFFFFFFFEu && handle < G::handle_count(base) &&
+      (schema::CrtIoInfo(base, guest::LoadU32(base, G::io_info_blocks_address() +
+                                                        4 * uint32_t(int32_t(handle) >> 5)) +
+                                   44 * (handle & 31))
+           .osfile() &
+       1) != 0;
   ctx.r3.u64 = loaded ? uint64_t(result) : uint64_t(int64_t(int32_t(result)));
 }
 

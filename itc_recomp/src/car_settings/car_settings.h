@@ -30,23 +30,13 @@ namespace car_settings {
 
 using Calls = race_hud_object::Calls;
 
-// The blocks (globals, VirtualAlloc'ed by Create, freed by Destroy): the page
-// object (28 bytes), the menu (68: a front-end menu) and the screen's data
-// (764).
-constexpr uint32_t kPages = 0x826D8458;
-constexpr uint32_t kMenu = 0x826D845C;
-constexpr uint32_t kData = 0x826D8460;
-constexpr uint32_t kPagesBytes = 28;
-constexpr uint32_t kMenuBytes = 68;
-constexpr uint32_t kDataBytes = 764;
+// The blocks (globals, VirtualAlloc'ed by Create, freed by Destroy), the
+// machine and the mode's ring are views of itc_recomp/schema/car-settings.toml
+// (src/schema/car_settings.h: CarSettingsGlobals' page object, menu and
+// data; CarSettings; CarSettingsMode).
 
 constexpr uint32_t kMovie = 3;
 constexpr uint32_t kAsset = 22554;
-
-// The machine's words.
-constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineReenter = 9612;
 
 // The current mode's type (2 or 5 post Close's message).
 constexpr uint32_t kModeType = 0x826032DC;

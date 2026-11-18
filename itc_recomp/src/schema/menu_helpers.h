@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: new<68>@Type2Dialog::OnEnter, new<68>@Type12Screen7::Create
+// allocated; measure: Menu, new<68>@Type2Dialog::OnEnter, new<68>@Type12Screen7::Create
 struct FrontEndMenu : View {
   using View::View;
   static constexpr uint32_t kSize = 68;
@@ -46,25 +46,31 @@ struct FrontEndMenu : View {
   int32_t side() const { return int32_t(guest::LoadU32(base, address + 36)); }
   void set_side(int32_t v) const { guest::StoreU32(base, address + 36, uint32_t(v)); }
   uint32_t side_address() const { return address + 36; }
-  uint32_t unknown_40() const { return guest::LoadU32(base, address + 40); }
-  void set_unknown_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
-  uint32_t unknown_40_address() const { return address + 40; }
-  uint32_t unknown_44() const { return guest::LoadU32(base, address + 44); }
-  void set_unknown_44(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
-  uint32_t unknown_44_address() const { return address + 44; }
-  uint32_t unknown_48() const { return guest::LoadU32(base, address + 48); }
-  void set_unknown_48(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
-  uint32_t unknown_48_address() const { return address + 48; }
-  uint32_t unknown_52() const { return guest::LoadU32(base, address + 52); }
-  void set_unknown_52(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
-  uint32_t unknown_52_address() const { return address + 52; }
-  uint32_t unknown_56() const { return guest::LoadU32(base, address + 56); }
-  void set_unknown_56(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
-  uint32_t unknown_56_address() const { return address + 56; }
-  uint32_t unknown_60() const { return guest::LoadU32(base, address + 60); }
-  void set_unknown_60(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
-  uint32_t unknown_60_address() const { return address + 60; }
-  // probably the player: the mapper entry's index
+  // 1 when the last Menu::Step wrapped
+  uint32_t wrapped() const { return guest::LoadU32(base, address + 40); }
+  void set_wrapped(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t wrapped_address() const { return address + 40; }
+  // 1 when the last Menu::StepList wrapped (probably; tuning-pages.md)
+  uint32_t list_wrapped() const { return guest::LoadU32(base, address + 44); }
+  void set_list_wrapped(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
+  uint32_t list_wrapped_address() const { return address + 44; }
+  // the visible row, kept within first_row to rows_shown - 1 (probably)
+  uint32_t visible_row() const { return guest::LoadU32(base, address + 48); }
+  void set_visible_row(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
+  uint32_t visible_row_address() const { return address + 48; }
+  // the row before the last up or down step (probably)
+  uint32_t previous_row() const { return guest::LoadU32(base, address + 52); }
+  void set_previous_row(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
+  uint32_t previous_row_address() const { return address + 52; }
+  // probably
+  uint32_t first_row() const { return guest::LoadU32(base, address + 56); }
+  void set_first_row(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
+  uint32_t first_row_address() const { return address + 56; }
+  // 8 where seen (probably)
+  uint32_t rows_shown() const { return guest::LoadU32(base, address + 60); }
+  void set_rows_shown(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
+  uint32_t rows_shown_address() const { return address + 60; }
+  // the player: an index into [0x826BABA4], then the mapper entry at 0x826BAB80
   uint32_t player() const { return guest::LoadU32(base, address + 64); }
   void set_player(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
   uint32_t player_address() const { return address + 64; }

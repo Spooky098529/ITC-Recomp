@@ -35,10 +35,10 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
   // object's +24; a nonzero answer (or none below -1) starts the queued one
   // or, with none, the page becomes +4.
   uint64_t r3 = movie;
-  uint32_t pages = Load(base, kPages);
-  const uint32_t running = Load(base, pages + 12);
+  PageObject pages = PagesOf(base);
+  const uint32_t running = pages.step();
   if (running == kNone) {
-    if (Load(base, pages + 0) != 4) {
+    if (pages.page() != 4) {
       r3 = calls.Call(kRun, frame, 0x821963F4, movie, 0);
     }
   } else {
@@ -51,57 +51,58 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
       // (Transition11 and Transition15, or a word past the table) through the
       // guest.
       const uint32_t target = Load(base, frame + 96 + (running << 2));
-      if (!RunTransition(base, target, pages + 24, frame, calls, &r3)) {
+      if (!RunTransition(base, target, pages.step_started_address(), frame, calls, &r3)) {
         r3 = calls.CallArgs(target, frame, 0x82196380,
-                            {pages + 24, kTransitions[11], kTransitions[12], kTransitions[13],
-                             kTransitions[14], kTransitions[15], frame + 96, running << 2});
+                            {pages.step_started_address(), kTransitions[11], kTransitions[12],
+                             kTransitions[13], kTransitions[14], kTransitions[15], frame + 96,
+                             running << 2});
       }
-      pages = Load(base, kPages);
+      pages = PagesOf(base);
       finished = uint32_t(r3) != 0;
     }
     if (finished) {
-      const uint32_t queued = Load(base, pages + 16);
+      const uint32_t queued = pages.queued_step();
       if (queued == kNone) {
-        Store(base, pages + 0, Load(base, pages + 4));
-        Store(base, pages + 12, kNone);
+        pages.set_page(pages.next_page());
+        pages.set_step(kNone);
       } else {
-        Store(base, pages + 16, kNone);
-        Store(base, pages + 20, 0);
-        Store(base, pages + 12, queued);
+        pages.set_queued_step(kNone);
+        pages.set_unknown_20(0);
+        pages.set_step(queued);
       }
-      Store(base, pages + 24, 0);
+      pages.set_step_started(0);
     }
   }
   // The stand.
-  if (Load(base, Data(base) + 72) == 0) {
-    if (Load(base, Data(base) + 84) != 0) {
+  if (Data(base).stand_shown() == 0) {
+    if (Data(base).busy_shown() != 0) {
       r3 = HideBusyNow(base, frame, calls);
-      Store(base, Data(base) + 84, 0);
+      Data(base).set_busy_shown(0);
     }
     return r3;
   }
   r3 = calls.Call(kIsBusy, frame, 0x82196418, Holder(base));
   if (uint32_t(r3) != 0) {
-    if (Load(base, Data(base) + 84) == 0) {
+    if (Data(base).busy_shown() == 0) {
       r3 = ShowBusy(base, frame, calls);
-      Store(base, Data(base) + 84, 1);
+      Data(base).set_busy_shown(1);
     }
-  } else if (Load(base, Data(base) + 84) != 0) {
+  } else if (Data(base).busy_shown() != 0) {
     r3 = HideBusy(base, frame, calls);
-    Store(base, Data(base) + 84, 0);
+    Data(base).set_busy_shown(0);
   }
-  const uint32_t data = Data(base);
-  if (Load(base, data + 76) != 0) {
+  const ScreenData data = Data(base);
+  if (data.stand_model() != 0) {
     return calls.Call(kStageDraw, frame, 0x821964FC, Holder(base), 0, 0);
   }
   // The selected garage car's model (the data's +44 + +48 in the save's
   // garage, its id at the car's +12).
   const uint32_t record =
-      GarageRecord(base, Load(base, data + 36), Load(base, data + 48) + Load(base, data + 44));
+      GarageRecord(base, data.save(), data.scroll() + data.selection());
   const uint64_t block = calls.Call(kBlockOf, frame, 0x821964A8, Load(base, record + 224));
   r3 = calls.Call(kReloadModel, frame, 0x821964B8, Holder(base), block);
-  Store(base, Data(base) + 76, uint32_t(r3));
-  if (Load(base, Data(base) + 76) == 0) {
+  Data(base).set_stand_model(uint32_t(r3));
+  if (Data(base).stand_model() == 0) {
     return r3;
   }
   PutCarOnStand(base, frame, calls);

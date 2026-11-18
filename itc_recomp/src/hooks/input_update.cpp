@@ -26,14 +26,15 @@
 
 #include "base/log.h"
 #include "lifted/sdk.h"
+#include "schema/input.h"
 
 namespace input_hooks {
 namespace {
 
-constexpr uint32_t kLogicalPads = 8, kLogicalPadBytes = 196;
-constexpr uint32_t kPhysicalPads = 988, kPhysicalPadBytes = 212;
-constexpr uint32_t kProcessors = 1840, kProcessorBytes = 416;
-constexpr uint32_t kListenerSlots = 3924, kListenerSlotBytes = 12;
+// The physical pads (model-animation.toml's PhysicalPad) and the listener
+// lists (app-states.toml's PtrList) by offset until those types are switched.
+constexpr uint32_t kPhysicalPadBytes = 212;
+constexpr uint32_t kListenerSlotBytes = 12;
 
 // The devices' vtable slot 1 (their values' address) for the two kinds bound
 // in every race (see "Step 0 results" in docs/pause-menu-fix.md), done here;
@@ -96,12 +97,13 @@ void ReadPhysicalPad(uint8_t* base, uint32_t address, uint32_t user) {
 
 // A device's values' address: its vtable slot 1 (r3 = device).
 uint32_t DeviceValues(lifted::Regs& ctx, uint8_t* base, uint32_t device) {
-  uint32_t function = guest::LoadU32(base, guest::LoadU32(base, device) + 4);
+  // Its vtable: its first word (a logical or a physical pad's).
+  uint32_t function = schema::InputDeviceVtable(base, guest::LoadU32(base, device)).values();
   if (function == kPhysicalPadValues) {
     return device + 8;
   }
   if (function == kLogicalPadValues) {
-    return device + 36;
+    return schema::LogicalPad(base, device).values_address();
   }
   ctx.r3.u64 = device;
   ctx.lr = kReturnFromDeviceValues;
@@ -112,10 +114,12 @@ uint32_t DeviceValues(lifted::Regs& ctx, uint8_t* base, uint32_t device) {
 // A logical pad (196 bytes): four bindings {u8 enabled at +4 + 8k, device at
 // +8 + 8k}, values at +36.
 void BuildLogicalPad(lifted::Regs& ctx, uint8_t* base, uint32_t pad) {
+  const schema::LogicalPad logical(base, pad);
   float values[input::kPadValues] = {};
   for (uint32_t k = 0; k < 4; k++) {
-    uint32_t device = guest::LoadU32(base, pad + 8 + 8 * k);
-    if (!guest::LoadU8(base, pad + 4 + 8 * k) || !device) {
+    const schema::InputPadBinding binding(base, logical.bindings_address() + 8 * k);
+    uint32_t device = binding.device();
+    if (!binding.enabled() || !device) {
       continue;
     }
     float device_values[input::kPadValues];
@@ -124,19 +128,20 @@ void BuildLogicalPad(lifted::Regs& ctx, uint8_t* base, uint32_t pad) {
   }
   input::LogicalPad_Clamp(values);
   for (int i = 0; i < input::kPadValues; i++) {
-    guest::StoreFloat(base, pad + 36 + 4 * i, values[i]);
+    guest::StoreFloat(base, logical.values_address() + 4 * i, values[i]);
   }
 }
 
 // A processor (416 bytes): the fields InputProcessor_Update reads, in, and
 // those it writes, out.
 void LoadProcessor(uint8_t* base, uint32_t object, input::InputProcessor& p) {
-  guest::CopyFloats(base, object + 16, p.dead_zone, 4);
-  p.held = guest::LoadU32(base, object + 272);
-  p.repeat_delay = int32_t(guest::LoadU32(base, object + 276));
-  p.repeat_period = int32_t(guest::LoadU32(base, object + 280));
+  const schema::InputProcessor o(base, object);
+  guest::CopyFloats(base, o.dead_zone_x_address(), p.dead_zone, 4);
+  p.held = o.held();
+  p.repeat_delay = o.repeat_delay();
+  p.repeat_period = o.repeat_period();
   for (int i = 0; i < 32; i++) {
-    p.held_ticks[i] = int32_t(guest::LoadU32(base, object + 284 + 4 * i));
+    p.held_ticks[i] = int32_t(guest::LoadU32(base, o.held_ticks_address() + 4 * i));
   }
 }
 
@@ -147,17 +152,18 @@ void StoreFloats(uint8_t* base, uint32_t address, const float* values, int count
 }
 
 void StoreProcessor(uint8_t* base, uint32_t object, const input::InputProcessor& p) {
-  StoreFloats(base, object + 32, p.raw, 8);
-  StoreFloats(base, object + 64, p.adjusted, 8);
-  StoreFloats(base, object + 96, p.direction[0], 4);
-  StoreFloats(base, object + 112, p.direction[1], 4);
-  StoreFloats(base, object + 128, p.length, 2);
-  StoreFloats(base, object + 136, p.buttons, 32);
-  guest::StoreU32(base, object + 264, p.pressed);
-  guest::StoreU32(base, object + 268, p.released);
-  guest::StoreU32(base, object + 272, p.held);
+  const schema::InputProcessor o(base, object);
+  StoreFloats(base, o.raw_lx_address(), p.raw, 8);
+  StoreFloats(base, o.adjusted_lx_address(), p.adjusted, 8);
+  StoreFloats(base, o.left_direction_x_address(), p.direction[0], 4);
+  StoreFloats(base, o.right_direction_x_address(), p.direction[1], 4);
+  StoreFloats(base, o.left_length_address(), p.length, 2);
+  StoreFloats(base, o.buttons_address(), p.buttons, 32);
+  o.set_pressed(p.pressed);
+  o.set_released(p.released);
+  o.set_held(p.held);
   for (int i = 0; i < 32; i++) {
-    guest::StoreU32(base, object + 284 + 4 * i, uint32_t(p.held_ticks[i]));
+    guest::StoreU32(base, o.held_ticks_address() + 4 * i, uint32_t(p.held_ticks[i]));
   }
 }
 
@@ -183,7 +189,7 @@ bool UpdateProcessor(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t
 // Calls `object`'s vtable slot 1 with r4 = its logical pad.
 void UpdateWithPad(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t pad,
                    uint32_t return_address) {
-  uint32_t function = guest::LoadU32(base, guest::LoadU32(base, object) + 4);
+  uint32_t function = schema::InputProcessor(base, object).vtable().update();
   uint32_t values_address;
   if (function == kProcessorUpdate && UpdateProcessor(ctx, base, object, pad, &values_address)) {
     return;
@@ -203,31 +209,34 @@ ITC_REGS_STEP(InputUpdate_Run) {
   // stack as it did.
   guest::StackFrame frame(ctx, 144);
 
+  const schema::InputManager m(base, manager);
   for (uint32_t i = 0; i < 4; i++) {
-    ReadPhysicalPad(base, manager + kPhysicalPads + kPhysicalPadBytes * i, i);
+    ReadPhysicalPad(base, m.physical_pads_address() + kPhysicalPadBytes * i, i);
   }
   for (uint32_t j = 0; j < 5; j++) {
-    BuildLogicalPad(ctx, base, manager + kLogicalPads + kLogicalPadBytes * j);
+    BuildLogicalPad(ctx, base, m.logical_pads_address() + schema::LogicalPad::kSize * j);
   }
   for (uint32_t j = 0; j < 5; j++) {
-    UpdateWithPad(ctx, base, manager + kProcessors + kProcessorBytes * j,
-                  manager + kLogicalPads + kLogicalPadBytes * j, kReturnFromProcessor);
+    UpdateWithPad(ctx, base, m.processors_address() + schema::InputProcessor::kSize * j,
+                  m.logical_pads_address() + schema::LogicalPad::kSize * j, kReturnFromProcessor);
   }
   for (uint32_t j = 0; j < 5; j++) {
-    // A list {head, count}; only the first node's object is updated.
-    uint32_t slot = manager + kListenerSlots + kListenerSlotBytes * j;
-    if (!guest::LoadU32(base, slot + 4)) {
+    // A PtrList {+4 head, +8 size} (app-states.toml's, by offset until
+    // switched); only the head's previous node's object is updated (the
+    // last listener, the only one in play).
+    uint32_t list = m.listener_lists_address() + kListenerSlotBytes * j;
+    if (!guest::LoadU32(base, list + 8)) {
       continue;
     }
-    uint32_t head = guest::LoadU32(base, slot);
-    uint32_t node = guest::LoadU32(base, head + 4);
-    if (node == head) {
+    const schema::PtrListNode head(base, guest::LoadU32(base, list + 4));
+    const schema::PtrListNode node = head.previous();
+    if (node.address == head.address) {
       // An empty list with a count; the game traps here (twi 31).
       ITC_LOG_ERROR("Input::Update: listener slot {} has a count but no node", j);
       continue;
     }
-    UpdateWithPad(ctx, base, guest::LoadU32(base, node + 8),
-                  manager + kLogicalPads + kLogicalPadBytes * j, kReturnFromListener);
+    UpdateWithPad(ctx, base, node.value(),
+                  m.logical_pads_address() + schema::LogicalPad::kSize * j, kReturnFromListener);
   }
   ctx.lr = saved_lr;
 }

@@ -8,6 +8,7 @@
 
 #include "base/log.h"
 #include "collision/collision.h"
+#include "schema/collision_world.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -25,29 +26,21 @@ namespace {
 
 using Fpscr = ::base::FloatMode;
 
-constexpr uint32_t kHalf = 0x82001BE4;              // 0.5
-constexpr uint32_t kSliceOffsets = 0x8200680C;      // 4 words: the slices tried around one
-constexpr uint32_t kInsideEpsilon = 0x820029D8;     // an edge's cross product at most this
-constexpr uint32_t kKindHeightOffset = 0x82002A08;  // added to the height (kinds 4 and 20)
-constexpr uint32_t kNoOtherLowering = 0x82002FB0;   // kinds 4 and 20 with no other triangle
-constexpr uint32_t kCatchDistance = 0x82002A0C;     // the ground within this of the point
-constexpr uint32_t kColorScale = 0x82006820;
-constexpr uint32_t kColorNumerator = 0x82001BE0;
-constexpr uint32_t kUp = 0x82640000u - 32128;  // 0x82638280: the up vector
-constexpr uint32_t kEpsilon = 0x8200222C;       // collision.md's small epsilon
-
-uint32_t S16(uint8_t* base, uint32_t address) {
-  return uint32_t(int32_t(int16_t(guest::LoadU16(base, address))));
-}
+using G = schema::CollisionWorldGlobals;
+using Point = schema::TrackQueryPoint;
+using Section = schema::TrackMeshSection;
+using Triangle = schema::TrackMeshTriangle;
+using Position = schema::TrackPosition;
+using Result = schema::TrackGroundResult;
 
 // Section `index` of the mesh's file (the table at [[mesh + 4] + 4]).
-uint32_t Section(uint8_t* base, uint32_t mesh, uint32_t index) {
-  return guest::LoadU32(base, index * 4 + guest::LoadU32(base, guest::LoadU32(base, mesh + 4) + 4));
+uint32_t SectionOf(uint8_t* base, uint32_t mesh, uint32_t index) {
+  return guest::LoadU32(base, index * 4 + schema::TrackMesh(base, mesh).file().sections());
 }
 
 // Vertex `index` of the section (12 bytes each from its +64).
 uint32_t Vertex(uint8_t* base, uint32_t section, uint32_t index) {
-  return index * 12 + guest::LoadU32(base, section + 64) + section;
+  return index * 12 + Section(base, section).vertices() + section;
 }
 
 }  // namespace
@@ -107,18 +100,20 @@ double Blue(uint32_t c) {
 uint32_t TrackMeshTriangleInSlice(uint8_t* base, uint32_t section, uint32_t slice, uint32_t point,
                                   uint32_t skip_kinds) {
   ITC_NATIVE_RUNNING("sub_820F72F8 TrackMesh::TriangleInSlice");
-  const uint32_t slice_at = guest::LoadU32(base, section + 72) + slice * 28 + section;
-  const uint32_t vertices = guest::LoadU32(base, section + 64) + section;
-  const uint32_t first = guest::LoadU16(base, slice_at + 2);
-  const int32_t count = int32_t(guest::LoadU16(base, slice_at + 0));
-  uint32_t triangle = first * 12 + guest::LoadU32(base, section + 76) + section;
+  const Section sec(base, section);
+  const schema::TrackMeshSlice slice_at(base, sec.slices() + slice * 28 + section);
+  const uint32_t vertices = sec.vertices() + section;
+  const uint32_t first = slice_at.first_triangle();
+  const int32_t count = int32_t(slice_at.triangle_count());
+  uint32_t triangle = first * 12 + sec.triangles() + section;
   if (count <= 0) {
     return uint32_t(-1);
   }
-  const double epsilon = Lfs(base, kInsideEpsilon);
+  const double epsilon = double(G::inside_epsilon(base));
   for (int32_t i = 0; i < count; i++, triangle += 12) {
+    const Triangle t(base, triangle);
     if (int32_t(skip_kinds) == 1) {
-      int32_t kind = guest::LoadU8(base, triangle + 9);
+      int32_t kind = t.surface_kind();
       if (kind >= 9) {
         if (kind == 20) {
           continue;
@@ -129,31 +124,31 @@ uint32_t TrackMeshTriangleInSlice(uint8_t* base, uint32_t section, uint32_t slic
         continue;
       }
     }
-    const uint32_t v0 = guest::LoadU16(base, triangle + 0) * 12 + vertices;
-    const double pz = Lfs(base, point + 8);
-    const uint32_t v1 = guest::LoadU16(base, triangle + 2) * 12 + vertices;
-    const double px = Lfs(base, point + 0);
-    const double f7 = Fsubs(Lfs(base, v0 + 0), px);
-    const double f8 = Fsubs(Lfs(base, v1 + 8), pz);
-    const double f6 = Fsubs(Lfs(base, v0 + 8), pz);
-    const double f9 = Fsubs(Lfs(base, v1 + 0), px);
+    const uint32_t v0 = t.vertex_0() * 12 + vertices;
+    const double pz = double(Point(base, point).z());
+    const uint32_t v1 = t.vertex_1() * 12 + vertices;
+    const double px = double(Point(base, point).x());
+    const double f7 = Fsubs(double(Point(base, v0).x()), px);
+    const double f8 = Fsubs(double(Point(base, v1).z()), pz);
+    const double f6 = Fsubs(double(Point(base, v0).z()), pz);
+    const double f9 = Fsubs(double(Point(base, v1).x()), px);
     if (Fmsubs(f9, f6, Fmuls(f8, f7)) > epsilon) {
       continue;
     }
-    const uint32_t v2 = guest::LoadU16(base, triangle + 4) * 12 + vertices;
-    const double pz2 = Lfs(base, point + 8);
-    const double f11 = Fsubs(Lfs(base, v2 + 8), pz2);
-    const double f12 = Fsubs(Lfs(base, v2 + 0), px);
+    const uint32_t v2 = t.vertex_2() * 12 + vertices;
+    const double pz2 = double(Point(base, point).z());
+    const double f11 = Fsubs(double(Point(base, v2).z()), pz2);
+    const double f12 = Fsubs(double(Point(base, v2).x()), px);
     if (Fmsubs(f12, f8, Fmuls(f11, f9)) > epsilon) {
       continue;
     }
     double last;
-    if (guest::LoadU16(base, triangle + 6) == 0xFFFF) {
+    if (t.vertex_3() == 0xFFFF) {
       last = Fmsubs(f11, f7, Fmuls(f12, f6));
     } else {
-      const uint32_t v3 = guest::LoadU16(base, triangle + 6) * 12 + vertices;
-      const double f10 = Fsubs(Lfs(base, v3 + 8), pz2);
-      const double f0 = Fsubs(Lfs(base, v3 + 0), px);
+      const uint32_t v3 = t.vertex_3() * 12 + vertices;
+      const double f10 = Fsubs(double(Point(base, v3).z()), pz2);
+      const double f0 = Fsubs(double(Point(base, v3).x()), px);
       if (Fmsubs(f0, f11, Fmuls(f10, f12)) > epsilon) {
         continue;
       }
@@ -171,64 +166,66 @@ void TrackMeshTriangleNormal(uint8_t* base, uint32_t out, uint32_t section, uint
   ITC_NATIVE_RUNNING("sub_820F7468 TrackMesh::TriangleNormal");
   const double one = Lfs(base, kOne);
   // The original's names: A the vertex `b`, B `a`, C `c`.
-  const uint32_t va = Vertex(base, section, guest::LoadU16(base, triangle + 2 * b));
-  const uint32_t vb = Vertex(base, section, guest::LoadU16(base, triangle + 2 * a));
-  const uint32_t vc = Vertex(base, section, guest::LoadU16(base, triangle + 2 * c));
+  const uint32_t vertex_0 = Triangle(base, triangle).vertex_0_address();
+  const uint32_t va = Vertex(base, section, guest::LoadU16(base, vertex_0 + 2 * b));
+  const uint32_t vb = Vertex(base, section, guest::LoadU16(base, vertex_0 + 2 * a));
+  const uint32_t vc = Vertex(base, section, guest::LoadU16(base, vertex_0 + 2 * c));
   {
-    const double ay = Lfs(base, va + 4), az = Lfs(base, va + 8);
-    const double t = Fsubs(ay, Lfs(base, vb + 4));
-    const double u = Fsubs(Lfs(base, vc + 8), az);
-    const double cy = Fsubs(Lfs(base, vc + 4), ay);
-    const double d = Fsubs(az, Lfs(base, vb + 8));
-    Stfs(base, out + 0, Fmsubs(cy, d, Fmuls(t, u)));
+    const double ay = double(Point(base, va).y()), az = double(Point(base, va).z());
+    const double t = Fsubs(ay, double(Point(base, vb).y()));
+    const double u = Fsubs(double(Point(base, vc).z()), az);
+    const double cy = Fsubs(double(Point(base, vc).y()), ay);
+    const double d = Fsubs(az, double(Point(base, vb).z()));
+    Point(base, out).set_x(float(Fmsubs(cy, d, Fmuls(t, u))));
   }
   {
-    const double ax = Lfs(base, va + 0), az = Lfs(base, va + 8);
-    const double t = Fsubs(Lfs(base, vc + 0), ax);
-    const double u = Fsubs(az, Lfs(base, vb + 8));
-    const double cz = Fsubs(Lfs(base, vc + 8), az);
-    const double d = Fsubs(ax, Lfs(base, vb + 0));
-    Stfs(base, out + 4, Fmsubs(cz, d, Fmuls(t, u)));
+    const double ax = double(Point(base, va).x()), az = double(Point(base, va).z());
+    const double t = Fsubs(double(Point(base, vc).x()), ax);
+    const double u = Fsubs(az, double(Point(base, vb).z()));
+    const double cz = Fsubs(double(Point(base, vc).z()), az);
+    const double d = Fsubs(ax, double(Point(base, vb).x()));
+    Point(base, out).set_y(float(Fmsubs(cz, d, Fmuls(t, u))));
   }
   {
-    const double ay = Lfs(base, va + 4), ax = Lfs(base, va + 0);
-    const double t = Fsubs(Lfs(base, vc + 4), ay);
-    const double u = Fsubs(ax, Lfs(base, vb + 0));
-    const double cx = Fsubs(Lfs(base, vc + 0), ax);
-    const double d = Fsubs(ay, Lfs(base, vb + 4));
-    Stfs(base, out + 8, Fmsubs(cx, d, Fmuls(t, u)));
+    const double ay = double(Point(base, va).y()), ax = double(Point(base, va).x());
+    const double t = Fsubs(double(Point(base, vc).y()), ay);
+    const double u = Fsubs(ax, double(Point(base, vb).x()));
+    const double cx = Fsubs(double(Point(base, vc).x()), ax);
+    const double d = Fsubs(ay, double(Point(base, vb).y()));
+    Point(base, out).set_z(float(Fmsubs(cx, d, Fmuls(t, u))));
   }
-  Stfs(base, out + 12, one);
+  Point(base, out).set_w(float(one));
   NormalizeVector(base, out, out);
-  Stfs(base, out + 12, one);
+  Point(base, out).set_w(float(one));
 }
 
 double TrackMeshQuadHeight(uint8_t* base, uint32_t out, uint32_t section, uint32_t quad,
                            uint32_t point, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820F7590 TrackMesh::QuadHeight");
   const uint32_t f = frame;
-  const double pz = Lfs(base, point + 8);
-  const double px = Lfs(base, point + 0);
+  const double pz = double(Point(base, point).z());
+  const double px = double(Point(base, point).x());
   const double one = Lfs(base, kOne);
   Stfs(base, f + 92, one);
   Stfs(base, f + 108, one);
-  const uint32_t v0 = Vertex(base, section, guest::LoadU16(base, quad + 0));
-  const uint32_t v2 = Vertex(base, section, guest::LoadU16(base, quad + 4));
-  const uint32_t v1 = Vertex(base, section, guest::LoadU16(base, quad + 2));
-  const uint32_t v3 = Vertex(base, section, guest::LoadU16(base, quad + 6));
-  const double d0z = Fsubs(Lfs(base, v0 + 8), pz);
-  const double d0x = Fsubs(Lfs(base, v0 + 0), px);
-  const double d2z = Fsubs(Lfs(base, v2 + 8), pz);
-  const double d2x = Fsubs(Lfs(base, v2 + 0), px);
+  const Triangle q(base, quad);
+  const uint32_t v0 = Vertex(base, section, q.vertex_0());
+  const uint32_t v2 = Vertex(base, section, q.vertex_2());
+  const uint32_t v1 = Vertex(base, section, q.vertex_1());
+  const uint32_t v3 = Vertex(base, section, q.vertex_3());
+  const double d0z = Fsubs(double(Point(base, v0).z()), pz);
+  const double d0x = Fsubs(double(Point(base, v0).x()), px);
+  const double d2z = Fsubs(double(Point(base, v2).z()), pz);
+  const double d2x = Fsubs(double(Point(base, v2).x()), px);
   Stfs(base, f + 148, d2z);
   Stfs(base, f + 112, d0x);
   Stfs(base, f + 116, d0z);
   Stfs(base, f + 144, d2x);
   const double side = Fmsubs(d2x, d0z, Fmuls(d2z, d0x));
-  const double d1x = Fsubs(Lfs(base, v1 + 0), px);
-  const double d3x = Fsubs(Lfs(base, v3 + 0), px);
-  const double d3z = Fsubs(Lfs(base, v3 + 8), pz);
-  const double d1z = Fsubs(Lfs(base, v1 + 8), pz);
+  const double d1x = Fsubs(double(Point(base, v1).x()), px);
+  const double d3x = Fsubs(double(Point(base, v3).x()), px);
+  const double d3z = Fsubs(double(Point(base, v3).z()), pz);
+  const double d1z = Fsubs(double(Point(base, v1).z()), pz);
   Stfs(base, f + 128, d1x);
   Stfs(base, f + 132, d1z);
   Stfs(base, f + 160, d3x);
@@ -243,17 +240,18 @@ double TrackMeshQuadHeight(uint8_t* base, uint32_t out, uint32_t section, uint32
   const double t = Fmuls(Lfs(base, f + 80), d0x);
   const double u = Fmuls(d3z, d1x);
   const double first_height =
-      Fadds(Fdivs(Fmadds(Lfs(base, f + 88), d0z, t), Lfs(base, f + 84)), Lfs(base, v0 + 4));
+      Fadds(Fdivs(Fmadds(Lfs(base, f + 88), d0z, t), Lfs(base, f + 84)),
+            double(Point(base, v0).y()));
   const double other_side = Fmsubs(d3x, d1z, u);
   double other_y;
   uint32_t other;
   if (other_side > zero) {
     TrackMeshTriangleNormal(base, f + 96, section, quad, 1, 2, 3);
-    other_y = Lfs(base, v1 + 4);
+    other_y = double(Point(base, v1).y());
     other = f + 128;
   } else {
     TrackMeshTriangleNormal(base, f + 96, section, quad, 0, 1, 3);
-    other_y = Lfs(base, v0 + 4);
+    other_y = double(Point(base, v0).y());
     other = f + 112;
   }
   const double n2x = Lfs(base, f + 96);
@@ -264,11 +262,11 @@ double TrackMeshQuadHeight(uint8_t* base, uint32_t out, uint32_t section, uint32
   const double t2 = Fmuls(Lfs(base, other + 0), n2x);
   const double other_z = Lfs(base, other + 4);
   const double sum_z = Fadds(n2z, Lfs(base, f + 88));
-  const double half = Lfs(base, kHalf);
-  Stfs(base, out + 0, Fmuls(sum_x, half));
-  Stfs(base, out + 4, Fmuls(sum_y, half));
+  const double half = double(G::half(base));
+  Point(base, out).set_x(float(Fmuls(sum_x, half)));
+  Point(base, out).set_y(float(Fmuls(sum_y, half)));
   const double plane = Fmadds(other_z, n2z, t2);
-  Stfs(base, out + 8, Fmuls(sum_z, half));
+  Point(base, out).set_z(float(Fmuls(sum_z, half)));
   const double second_height = Fadds(Fdivs(plane, n2y), other_y);
   const double result = Fmuls(Fadds(second_height, first_height), half);
   NormalizeVector(base, out, out);
@@ -278,18 +276,20 @@ double TrackMeshQuadHeight(uint8_t* base, uint32_t out, uint32_t section, uint32
 uint32_t TrackMeshFindTriangle(uint8_t* base, uint32_t mesh, uint32_t section_out,
                                uint32_t triangle_out, uint32_t point, uint32_t position) {
   ITC_NATIVE_RUNNING("sub_820F7818 TrackMesh::FindTriangle");
-  uint32_t slice_found = guest::LoadU16(base, position + 2);
-  const uint32_t section_index = S16(base, position + 0);
-  if (int32_t(section_index) == -1 || int32_t(S16(base, position + 2)) == -1) {
+  const Position pos(base, position);
+  const schema::TrackFoundSection out_section(base, section_out);
+  uint32_t slice_found = pos.slice();
+  const uint32_t section_index = uint32_t(int32_t(int16_t(pos.section())));
+  if (int32_t(section_index) == -1 || int32_t(int16_t(pos.slice())) == -1) {
     return uint32_t(-1);
   }
-  guest::StoreU32(base, section_out, Section(base, mesh, section_index));
-  const uint32_t slice = S16(base, position + 2);
-  uint32_t found = TrackMeshTriangleInSlice(base, guest::LoadU32(base, section_out), slice, point, 0);
+  out_section.set_section(SectionOf(base, mesh, section_index));
+  const uint32_t slice = uint32_t(int32_t(int16_t(pos.slice())));
+  uint32_t found = TrackMeshTriangleInSlice(base, out_section.section().address, slice, point, 0);
   auto done = [&](uint32_t triangle) {
-    const uint32_t section = guest::LoadU32(base, section_out);
-    guest::StoreU32(base, triangle_out,
-                    triangle * 12 + guest::LoadU32(base, section + 76) + section);
+    const Section section = out_section.section();
+    schema::TrackFoundTriangle(base, triangle_out)
+        .set_triangle(triangle * 12 + section.triangles() + section.address);
     return slice_found;
   };
   if (int32_t(found) != -1) {
@@ -297,36 +297,37 @@ uint32_t TrackMeshFindTriangle(uint8_t* base, uint32_t mesh, uint32_t section_ou
   }
   // The slices offset from it in its section.
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t s = uint32_t(int32_t(int16_t(guest::LoadU32(base, kSliceOffsets + 4 * i) + slice)));
-    if (int32_t(s) < 0 ||
-        int32_t(s) >= int32_t(S16(base, guest::LoadU32(base, section_out) + 0))) {
+    const uint32_t offsets = G::slice_offsets_address() + 4 * i;
+    const uint32_t s =
+        uint32_t(int32_t(int16_t(guest::LoadU32(base, offsets) + slice)));
+    if (int32_t(s) < 0 || int32_t(s) >= int32_t(int16_t(out_section.section().slice_count()))) {
       continue;
     }
-    const uint32_t section = Section(base, mesh, S16(base, position + 0));
+    const uint32_t section = SectionOf(base, mesh, uint32_t(int32_t(int16_t(pos.section()))));
     found = TrackMeshTriangleInSlice(base, section, s, point, 0);
     if (int32_t(found) != -1) {
       slice_found = s;
-      guest::StoreU32(base, section_out, section);
+      out_section.set_section(section);
       return done(found);
     }
   }
   // The cells the section's links lead to from this slice.
   {
-    const uint32_t links = guest::LoadU32(base, section_out) + 8;
+    const uint32_t links = out_section.section().links_address();
     for (uint32_t i = 0; i < 6; i++) {
-      const uint32_t link = links + 6 * i;
-      const int32_t from = int32_t(S16(base, link - 4));
-      if (from == -1 || from != int32_t(S16(base, position + 2))) {
+      const schema::TrackMeshLink link(base, links + 6 * i);
+      const int32_t from = int32_t(int16_t(link.from_slice()));
+      if (from == -1 || from != int32_t(int16_t(pos.slice()))) {
         continue;
       }
-      const uint32_t target_index = S16(base, link - 2);
-      const uint32_t target_slice = guest::LoadU16(base, link + 0);
-      const uint32_t section = Section(base, mesh, target_index);
+      const uint32_t target_index = uint32_t(int32_t(int16_t(link.section())));
+      const uint32_t target_slice = link.slice();
+      const uint32_t section = SectionOf(base, mesh, target_index);
       found = TrackMeshTriangleInSlice(base, section, uint32_t(int32_t(int16_t(target_slice))),
                                        point, 0);
       if (int32_t(found) != -1) {
         slice_found = target_slice;
-        guest::StoreU32(base, section_out, section);
+        out_section.set_section(section);
         return done(found);
       }
     }
@@ -334,42 +335,42 @@ uint32_t TrackMeshFindTriangle(uint8_t* base, uint32_t mesh, uint32_t section_ou
   // The links leaving from within 2 slices of it: their cell and the
   // slices offset from it.
   for (uint32_t offset = 0; offset < 36; offset += 6) {
-    const uint32_t link = guest::LoadU32(base, section_out) + offset;
-    const int32_t from = int32_t(S16(base, link + 4));
+    const schema::TrackMeshLink link(base, out_section.section().links_address() + offset);
+    const int32_t from = int32_t(int16_t(link.from_slice()));
     if (from == -1) {
       continue;
     }
-    const int32_t here = int32_t(S16(base, position + 2));
+    const int32_t here = int32_t(int16_t(pos.slice()));
     if (from < here - 2 || from > here + 2) {
       continue;
     }
-    const int32_t target_index = int32_t(S16(base, link + 6));
+    const int32_t target_index = int32_t(int16_t(link.section()));
     if (target_index < 0) {
       continue;
     }
     const uint32_t target_slice =
-        guest::LoadU16(base, guest::LoadU32(base, section_out) + offset + 8);
-    const uint32_t section = Section(base, mesh, uint32_t(target_index));
+        schema::TrackMeshLink(base, out_section.section().links_address() + offset).slice();
+    const uint32_t section = SectionOf(base, mesh, uint32_t(target_index));
     if (from != here) {
       found = TrackMeshTriangleInSlice(base, section, uint32_t(int32_t(int16_t(target_slice))),
                                        point, 0);
       if (int32_t(found) != -1) {
         slice_found = target_slice;
-        guest::StoreU32(base, section_out, section);
+        out_section.set_section(section);
         return done(found);
       }
     }
     const uint32_t around = uint32_t(int32_t(int16_t(target_slice)));
     for (uint32_t i = 0; i < 4; i++) {
-      const uint32_t s =
-          uint32_t(int32_t(int16_t(guest::LoadU32(base, kSliceOffsets + 4 * i) + around)));
-      if (int32_t(s) < 0 || int32_t(s) >= int32_t(S16(base, section + 0))) {
+      const uint32_t offsets = G::slice_offsets_address() + 4 * i;
+      const uint32_t s = uint32_t(int32_t(int16_t(guest::LoadU32(base, offsets) + around)));
+      if (int32_t(s) < 0 || int32_t(s) >= int32_t(int16_t(Section(base, section).slice_count()))) {
         continue;
       }
       found = TrackMeshTriangleInSlice(base, section, s, point, 0);
       if (int32_t(found) != -1) {
         slice_found = s;
-        guest::StoreU32(base, section_out, section);
+        out_section.set_section(section);
         return done(found);
       }
     }
@@ -383,37 +384,38 @@ void TrackMeshColorAt(uint8_t* base, uint32_t out, uint32_t point, uint32_t tria
   // The three vertices A, B, C (the original's order) and their colors.
   uint32_t a, b, c;
   bool first_half = true;
-  if (guest::LoadU16(base, triangle + 6) != 0xFFFF) {
-    const uint32_t v2 = guest::LoadU16(base, triangle + 4) * 12 + vertices;
-    const double pz = Lfs(base, point + 8);
-    const uint32_t v0 = guest::LoadU16(base, triangle + 0) * 12 + vertices;
-    const double px = Lfs(base, point + 0);
-    const double v2z = Lfs(base, v2 + 8), v2x = Lfs(base, v2 + 0);
+  const Triangle t(base, triangle);
+  if (t.vertex_3() != 0xFFFF) {
+    const uint32_t v2 = t.vertex_2() * 12 + vertices;
+    const double pz = double(Point(base, point).z());
+    const uint32_t v0 = t.vertex_0() * 12 + vertices;
+    const double px = double(Point(base, point).x());
+    const double v2z = double(Point(base, v2).z()), v2x = double(Point(base, v2).x());
     const double dz = Fsubs(pz, v2z);
     const double dx = Fsubs(px, v2x);
-    const double ez = Fsubs(Lfs(base, v0 + 8), v2z);
-    const double ex = Fsubs(Lfs(base, v0 + 0), v2x);
+    const double ez = Fsubs(double(Point(base, v0).z()), v2z);
+    const double ex = Fsubs(double(Point(base, v0).x()), v2x);
     const double side = Fmsubs(ex, dz, Fmuls(ez, dx));
     first_half = !(side < Lfs(base, kZero));
   }
   if (first_half) {
-    a = guest::LoadU16(base, triangle + 0);
-    b = guest::LoadU16(base, triangle + 2);
-    c = guest::LoadU16(base, triangle + 4);
+    a = t.vertex_0();
+    b = t.vertex_1();
+    c = t.vertex_2();
   } else {
-    a = guest::LoadU16(base, triangle + 4);
-    b = guest::LoadU16(base, triangle + 6);
-    c = guest::LoadU16(base, triangle + 0);
+    a = t.vertex_2();
+    b = t.vertex_3();
+    c = t.vertex_0();
   }
   const uint32_t ca = guest::LoadU16(base, colors + 2 * a);
   const uint32_t cb = guest::LoadU16(base, colors + 2 * b);
   const uint32_t cc = guest::LoadU16(base, colors + 2 * c);
   const uint32_t va = a * 12 + vertices, vb = b * 12 + vertices, vc = c * 12 + vertices;
-  const double ax = Lfs(base, va + 0), az = Lfs(base, va + 8);
-  const double bx = Lfs(base, vb + 0), bz = Lfs(base, vb + 8);
-  const double cx = Lfs(base, vc + 0), cz = Lfs(base, vc + 8);
-  const double pz = Lfs(base, point + 8);
-  const double px = Lfs(base, point + 0);
+  const double ax = double(Point(base, va).x()), az = double(Point(base, va).z());
+  const double bx = double(Point(base, vb).x()), bz = double(Point(base, vb).z());
+  const double cx = double(Point(base, vc).x()), cz = double(Point(base, vc).z());
+  const double pz = double(Point(base, point).z());
+  const double px = double(Point(base, point).x());
   const double ra = Red(ca), ga = Green(ca), ba = Blue(ca);
   const double rb = Red(cb), gb = Green(cb), bb = Blue(cb);
   const double rc = Red(cc), gc = Green(cc), bc = Blue(cc);
@@ -425,7 +427,7 @@ void TrackMeshColorAt(uint8_t* base, uint32_t out, uint32_t point, uint32_t tria
   const double abz = Fsubs(az, bz);
   const double pcx = Fsubs(px, cx);
   const double dr_ac = Fsubs(ra, rc);
-  const double numerator = Lfs(base, kColorNumerator);
+  const double numerator = double(G::minus_one(base));
   const double db_ac = Fsubs(ba, bc);
   const double dg_ac = Fsubs(ga, gc);
   const double dg_ab = Fsubs(ga, gb);
@@ -440,10 +442,10 @@ void TrackMeshColorAt(uint8_t* base, uint32_t out, uint32_t point, uint32_t tria
   const double red = Fsubs(Fsubs(Fmuls(dr_ab, s), Fmuls(dr_ac, r)), rc);
   const double green = Fsubs(Fsubs(Fmuls(dg_ab, s), Fmuls(dg_ac, r)), gc);
   const double blue = Fsubs(Fsubs(Fmuls(db_ab, s), Fmuls(db_ac, r)), bc);
-  const double k = Lfs(base, kColorScale);
-  Stfs(base, out + 0, Fmuls(red, k));
-  Stfs(base, out + 4, Fmuls(green, k));
-  Stfs(base, out + 8, Fmuls(blue, k));
+  const double k = double(G::color_scale(base));
+  Point(base, out).set_x(float(Fmuls(red, k)));
+  Point(base, out).set_y(float(Fmuls(green, k)));
+  Point(base, out).set_z(float(Fmuls(blue, k)));
 }
 
 uint32_t TrackMeshGroundHeight(uint8_t* base, uint32_t mesh, uint32_t point, uint32_t position,
@@ -457,17 +459,17 @@ uint32_t TrackMeshGroundHeight(uint8_t* base, uint32_t mesh, uint32_t point, uin
   bool other_found = true;
   const double zero = Lfs(base, kZero);
   if (color != 0) {
-    Stfs(base, color + 0, zero);
-    Stfs(base, color + 4, zero);
-    Stfs(base, color + 8, zero);
-    Stfs(base, color + 12, one);
+    Point(base, color).set_x(float(zero));
+    Point(base, color).set_y(float(zero));
+    Point(base, color).set_z(float(zero));
+    Point(base, color).set_w(float(one));
   }
   if (normal != 0) {
-    Stfs(base, normal + 0, zero);
-    Stfs(base, normal + 8, zero);
-    Stfs(base, normal + 12, one);
-    Stfs(base, normal + 4, zero);
-    Stfs(base, normal + 4, one);
+    Point(base, normal).set_x(float(zero));
+    Point(base, normal).set_z(float(zero));
+    Point(base, normal).set_w(float(one));
+    Point(base, normal).set_y(float(zero));
+    Point(base, normal).set_y(float(one));
   }
   const uint32_t slice =
       uint32_t(int32_t(int16_t(TrackMeshFindTriangle(base, mesh, f + 80, f + 84, point, position))));
@@ -476,9 +478,10 @@ uint32_t TrackMeshGroundHeight(uint8_t* base, uint32_t mesh, uint32_t point, uin
   }
   uint32_t triangle = guest::LoadU32(base, f + 84);
   const uint32_t section = guest::LoadU32(base, f + 80);
-  const uint32_t vertex_offset = guest::LoadU32(base, section + 64);
-  uint32_t v0 = guest::LoadU16(base, triangle + 0) * 12 + vertex_offset + section;
-  uint32_t kind = guest::LoadU8(base, triangle + 9);
+  const Section sec(base, section);
+  const uint32_t vertex_offset = sec.vertices();
+  uint32_t v0 = Triangle(base, triangle).vertex_0() * 12 + vertex_offset + section;
+  uint32_t kind = Triangle(base, triangle).surface_kind();
   if (int32_t(kind) >= 9) {
     kind = kind == 20 ? 4 : 0;
   }
@@ -487,47 +490,47 @@ uint32_t TrackMeshGroundHeight(uint8_t* base, uint32_t mesh, uint32_t point, uin
     // from it.
     uint32_t other = TrackMeshTriangleInSlice(base, section, slice, point, 1);
     for (uint32_t i = 0; int32_t(other) == -1 && i < 4; i++) {
-      const uint32_t s = slice + guest::LoadU32(base, kSliceOffsets + 4 * i);
-      if (int32_t(s) < 0 || int32_t(s) >= int32_t(S16(base, section + 0))) {
+      const uint32_t s = slice + guest::LoadU32(base, G::slice_offsets_address() + 4 * i);
+      if (int32_t(s) < 0 || int32_t(s) >= int32_t(int16_t(sec.slice_count()))) {
         continue;
       }
       other = TrackMeshTriangleInSlice(base, section, s, point, 1);
     }
     if (int32_t(other) != -1) {
-      triangle = other * 12 + guest::LoadU32(base, section + 76) + section;
-      v0 = guest::LoadU16(base, triangle + 0) * 12 + vertex_offset + section;
+      triangle = other * 12 + sec.triangles() + section;
+      v0 = Triangle(base, triangle).vertex_0() * 12 + vertex_offset + section;
     } else {
       other_found = false;
     }
   }
   double height;
-  if (guest::LoadU16(base, triangle + 6) != 0xFFFF &&
-      (guest::LoadU16(base, triangle + 10) & 0x1) != 0) {
+  if (Triangle(base, triangle).vertex_3() != 0xFFFF &&
+      (Triangle(base, triangle).flags() & 0x1) != 0) {
     height = TrackMeshQuadHeight(base, f + 96, section, triangle, point, f - 208);
   } else {
     TrackMeshTriangleNormal(base, f + 96, section, triangle, 0, 1, 2);
     const double inverse = Fdivs(one, Lfs(base, f + 100));
-    const double dx = Fsubs(Lfs(base, v0 + 0), Lfs(base, point + 0));
+    const double dx = Fsubs(double(Point(base, v0).x()), double(Point(base, point).x()));
     const double nx = Lfs(base, f + 96);
-    const double dz = Fsubs(Lfs(base, v0 + 8), Lfs(base, point + 8));
+    const double dz = Fsubs(double(Point(base, v0).z()), double(Point(base, point).z()));
     const double nz = Lfs(base, f + 104);
-    const double y = Lfs(base, v0 + 4);
+    const double y = double(Point(base, v0).y());
     const double sx = Fmuls(inverse, nx);
     const double sz = Fmuls(inverse, nz);
     height = Fadds(Fmadds(dz, sz, Fmuls(sx, dx)), y);
   }
-  height = Fadds(height, Lfs(base, kKindHeightOffset));
+  height = Fadds(height, double(G::height_offset(base)));
   if (!other_found) {
-    height = Fsubs(height, Lfs(base, kNoOtherLowering));
+    height = Fsubs(height, double(G::no_other_lowering(base)));
   }
-  const double off = Fabs(Fsubs(Lfs(base, point + 4), height));
-  if (!(off < Lfs(base, kCatchDistance))) {
+  const double off = Fabs(Fsubs(double(Point(base, point).y()), height));
+  if (!(off < double(G::catch_distance(base)))) {
     return uint32_t(-2);
   }
-  Stfs(base, point + 4, height);
+  Point(base, point).set_y(float(height));
   if (color != 0) {
-    TrackMeshColorAt(base, color, point, triangle, guest::LoadU32(base, section + 64) + section,
-                     guest::LoadU32(base, section + 68) + section);
+    TrackMeshColorAt(base, color, point, triangle, sec.vertices() + section,
+                     sec.colors() + section);
   }
   if (normal != 0) {
     Stfs(base, f + 108, one);
@@ -540,52 +543,55 @@ uint32_t TrackCollisionGround(uint8_t* base, uint32_t result, uint32_t point, ui
                               uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820FE8F8 TrackCollision::Ground");
   const uint32_t f = frame;
+  const Result res(base, result);
+  const Point pt(base, point);
+  const Position pos(base, position);
   if (position == 0) {
-    guest::StoreU32(base, result + 52, 0);
-    vl::Vec4Copy(base, result + 16, kUp);
-    vl::Vec4Copy(base, result + 32, kUp);
-    CopyWord(base, point + 4, result + 0);
-    guest::StoreU32(base, result + 48, 0x04000000);
+    res.set_position(0);
+    vl::Vec4Copy(base, res.normal_x_address(), G::up_address());
+    vl::Vec4Copy(base, res.normal_copy_x_address(), G::up_address());
+    CopyWord(base, pt.y_address(), res.depth_address());
+    res.set_surface(0x04000000);
     return 1;
   }
   // The point copied to the frame, 0.5 higher.
   for (uint32_t i = 0; i < 16; i += 4) {
     guest::StoreU32(base, f + 80 + i, guest::LoadU32(base, point + i));
   }
-  const bool same_x = Lfs(base, position + 16) == Lfs(base, point + 0);
-  Stfs(base, f + 84, Fadds(Lfs(base, f + 84), Lfs(base, kHalf)));
+  const bool same_x = double(pos.point_x()) == double(pt.x());
+  Stfs(base, f + 84, Fadds(Lfs(base, f + 84), double(G::half(base))));
   uint32_t kind;
-  if (same_x && Lfs(base, position + 24) == Lfs(base, point + 8)) {
-    CopyWord(base, position + 20, f + 84);
-    kind = S16(base, position + 80);
+  if (same_x && double(pos.point_z()) == double(pt.z())) {
+    CopyWord(base, pos.point_y_address(), f + 84);
+    kind = uint32_t(int32_t(int16_t(pos.surface_kind())));
   } else {
-    kind = TrackMeshGroundHeight(base, kMesh, f + 80, position, 0, position + 48, f - 240);
-    CopyWord(base, f + 80, position + 16);
-    CopyWord(base, f + 84, position + 20);
-    CopyWord(base, f + 88, position + 24);
+    kind = TrackMeshGroundHeight(base, kMesh, f + 80, position, 0, pos.normal_x_address(), f - 240);
+    CopyWord(base, f + 80, pos.point_x_address());
+    CopyWord(base, f + 84, pos.point_y_address());
+    CopyWord(base, f + 88, pos.point_z_address());
   }
   if (int32_t(kind) > -1) {
-    guest::StoreU16(base, position + 80, uint16_t(kind));
-    guest::StoreU32(base, result + 52, position);
-    CopyWord(base, position + 48, result + 16);
-    CopyWord(base, position + 52, result + 20);
-    CopyWord(base, position + 56, result + 24);
-    vl::Vec4Copy(base, result + 32, result + 16);
-    guest::StoreU32(base, result + 48, kind);
+    pos.set_surface_kind(uint16_t(kind));
+    res.set_position(position);
+    CopyWord(base, pos.normal_x_address(), res.normal_x_address());
+    CopyWord(base, pos.normal_y_address(), res.normal_y_address());
+    CopyWord(base, pos.normal_z_address(), res.normal_z_address());
+    vl::Vec4Copy(base, res.normal_copy_x_address(), res.normal_x_address());
+    res.set_surface(kind);
     double height = Lfs(base, f + 84);
     if (int32_t(kind) == 4 || int32_t(kind) == 20) {
-      height = Fadds(height, Lfs(base, kKindHeightOffset));
+      height = Fadds(height, double(G::height_offset(base)));
     }
-    Stfs(base, result + 0, Fsubs(Lfs(base, point + 4), height));
+    res.set_depth(float(Fsubs(double(pt.y()), height)));
   } else {
-    guest::StoreU32(base, result + 52, position);
-    vl::Vec4Copy(base, result + 16, kUp);
-    vl::Vec4Copy(base, result + 32, kUp);
-    CopyWord(base, kZero, result + 0);
-    guest::StoreU32(base, result + 48, 0x04000000);
-    CopyWord(base, point + 0, position + 16);
-    CopyWord(base, point + 4, position + 20);
-    CopyWord(base, point + 8, position + 24);
+    res.set_position(position);
+    vl::Vec4Copy(base, res.normal_x_address(), G::up_address());
+    vl::Vec4Copy(base, res.normal_copy_x_address(), G::up_address());
+    CopyWord(base, kZero, res.depth_address());
+    res.set_surface(0x04000000);
+    CopyWord(base, pt.x_address(), pos.point_x_address());
+    CopyWord(base, pt.y_address(), pos.point_y_address());
+    CopyWord(base, pt.z_address(), pos.point_z_address());
   }
   return 1;
 }
@@ -594,7 +600,8 @@ uint32_t TrackCollisionGroundCallback(uint8_t* base, uint32_t result, uint32_t p
                                       uint32_t position, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820FEAB0 TrackCollision::GroundCallback");
   TrackCollisionGround(base, result, point, position, frame - 144);
-  guest::StoreU32(base, result + 48, guest::LoadU32(base, result + 48) & 0x80FFFFFF);
+  const Result res(base, result);
+  res.set_surface(res.surface() & 0x80FFFFFF);
   return 1;
 }
 
@@ -621,12 +628,13 @@ bool TrackCollisionGroundHits(uint8_t* base, uint32_t hits, uint32_t box, uint32
   {
     const uint32_t corner = co::BoxLowerCorner(base, box, 0);
     const uint32_t position = co::BoxCacheWord(base, box, 0);
-    below = Fsubs(Lfs(base, corner + 4), Lfs(base, position + 20));
+    below = Fsubs(double(Point(base, corner).y()), double(Position(base, position).point_y()));
   }
   for (uint32_t k = 1; k < 4; k++) {
     const uint32_t corner = co::BoxLowerCorner(base, box, guest::LoadU32(base, f + 80 + 4 * k));
     const uint32_t position = co::BoxCacheWord(base, box, k);
-    const double d = Fsubs(Lfs(base, corner + 4), Lfs(base, position + 20));
+    const double d =
+        Fsubs(double(Point(base, corner).y()), double(Position(base, position).point_y()));
     if (below > d) {
       below = d;
       lowest = k;
@@ -649,7 +657,7 @@ bool TrackCollisionGroundHits(uint8_t* base, uint32_t hits, uint32_t box, uint32
   guest::StoreU32(base, hits + 60, 0);
   vl::Vec4Copy(base, hits + 16, f + 240);
   vl::Vec4Copy(base, hits + 32, f + 256);
-  Stfs(base, hits + 48, Fsubs(Lfs(base, kEpsilon), Lfs(base, f + 224)));
+  Stfs(base, hits + 48, Fsubs(double(G::small_epsilon(base)), Lfs(base, f + 224)));
   vl::Vec4Copy(base, hits + 0, corner);
   guest::StoreU32(base, hits + 56, guest::LoadU32(base, f + 272));
   if (room > 0) {

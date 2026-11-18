@@ -16,6 +16,7 @@
 #include "material_passes/material_passes.h"
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
+#include "schema/car_draw.h"
 
 #include <cmath>
 #include <initializer_list>
@@ -47,8 +48,7 @@ void CopyDoublewords(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes) 
 
 namespace {
 
-constexpr uint32_t kScene = 0x826C2E44;
-constexpr uint32_t kCullFlip = 0x826C5104;
+using G = schema::CarDrawGlobals;
 constexpr uint32_t kOne = 0x82000A30;    // 1.0
 constexpr uint32_t kZero = 0x82000A34;   // 0.0
 constexpr uint32_t kHalf = 0x82001BE4;   // 0.5
@@ -77,13 +77,13 @@ uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
 
 // The block's flag bits (the low word of its +0 doubleword, ld'd each time).
 uint32_t Bits(uint8_t* base, uint32_t block) {
-  return Load(base, block + 4);
+  return schema::CarDrawBlock(base, block).flags();
 }
 
 // [0x826C5104] = !x (cntlzw and the shift): Model::RecordMaterials' cull
 // swap flipped around the lamps' glows.
 void Flip(uint8_t* base) {
-  Store(base, kCullFlip, Load(base, kCullFlip) == 0 ? 1 : 0);
+  G::set_lights_flip(base, G::lights_flip(base) == 0 ? 1 : 0);
 }
 
 // 1.0 (lfs'd once) into each of the frame's words at `offsets`.
@@ -138,9 +138,10 @@ void Memcpy(uint8_t* base, const Calls& calls, uint32_t to, uint32_t from, uint3
 // PartModel::SetPair1002Alpha(the record's model, its shape, the block's
 // +636) from `frame`.
 Left CoverAlpha(uint8_t* base, uint32_t record, uint32_t block, uint32_t frame) {
-  const double f1 = Lfs(base, block + 636);
-  const uint32_t shape = Load(base, record + 228);
-  const uint32_t model = Load(base, record + 4);
+  const double f1 = double(schema::CarDrawBlock(base, block).lights_alpha());
+  const schema::CarPart part(base, record);
+  const uint32_t shape = part.shape();
+  const uint32_t model = part.model();
   return Left{false, material_passes::SetPair1002Alpha(base, model, shape, f1, frame)};
 }
 
@@ -326,19 +327,20 @@ Left TailGlows(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group
   }
 
   // The glows: the scene's glow model in red at the four tl**_0k_ef nodes.
-  const uint32_t model = Load(base, kScene) + 480;
+  const schema::CarScene scene = G::scene(base);
+  const uint32_t model = scene.glow_model_address();
   left = GlowColor(base, calls, frame, model, 176, sites.color_memcpy, sites.color);
-  const int32_t shapes = int32_t(Load(base, model + 412));
+  const int32_t shapes = int32_t(scene.glow_model_shapes());
   const double two = Lfs(base, kTwo);
   const double half = Lfs(base, kHalf);
   for (uint32_t node = 0; node < 4; node++) {
-    const uint32_t record = group + 240 * node;
-    if (Load(base, record + 4) == 0) {
+    const schema::CarPart record(base, group + 240 * node);
+    if (record.model() == 0) {
       continue;
     }
     // The node's position through the block's world, at +384 and +448.
     FreshIdentity(base, frame + 336, frame + 208);
-    const uint64_t p0 = Load64(base, record + 144), p1 = Load64(base, record + 152);
+    const uint64_t p0 = record.position_lo(), p1 = record.position_hi();
     Stfs(base, frame + 732, one);
     Stfs(base, frame + 748, one);
     Stfs(base, frame + 764, one);
@@ -461,12 +463,13 @@ Left PartsDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint
   const uint32_t frame = Frame(base, stack, kPartsHeadlightsFrame);
   Left left;
   left.r3 = group;
-  if (Load(base, group + 4) == 0) {
+  const schema::PartsPoints points(base, group);
+  if (points.record0_model() == 0) {
     return left;
   }
   // The lamps with the pop-up's matrix (+3120): low, high, the winkers; the
   // cover. r28 is the pass here.
-  const uint32_t vp = pass + 144, popup = group + 3120;
+  const uint32_t vp = pass + 144, popup = points.headlights_popup_matrix_address();
   auto lamp = [&](uint32_t record, uint32_t lr) {
     return PartsDrawRecord(base, calls, frame, group + record, vp, popup, 0, caller_r24, pass,
                            lr);
@@ -522,21 +525,22 @@ Left PartsDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint
   // The glows: the low beams' nodes (records 1 to 4), with the high beams
   // also 5 and 6, each facing the camera; the glows follow the block's
   // world, not the pop-up.
-  const uint32_t model = Load(base, kScene) + 480;
+  const schema::CarScene scene = G::scene(base);
+  const uint32_t model = scene.glow_model_address();
   left = GlowColor(base, calls, frame, model, 160, 0x820E18F0, 0x820E1914);
-  const int32_t shapes = int32_t(Load(base, model + 412));
+  const int32_t shapes = int32_t(scene.glow_model_shapes());
   const double zero = Lfs(base, kZero);
   const uint32_t world = block + 16;
   for (uint32_t node = 1; node < 7; node++) {
-    const uint32_t record = group + 240 * node;
-    if (Load(base, record + 4) == 0) {
+    const schema::CarPart record(base, group + 240 * node);
+    if (record.model() == 0) {
       continue;
     }
     if (node >= 5 && (Bits(base, block) & 0x40) == 0) {
       continue;
     }
     FreshIdentity(base, frame + 336, frame + 192);
-    const uint64_t p0 = Load64(base, record + 144), p1 = Load64(base, record + 152);
+    const uint64_t p0 = record.position_lo(), p1 = record.position_hi();
     Stfs(base, frame + 732, one);
     Stfs(base, frame + 748, one);
     Stfs(base, frame + 764, one);
@@ -639,17 +643,18 @@ Left TrafficDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, ui
 
   // The glows: the scene's glow model in white at nodes 0 to 3, each facing
   // the camera, with the block's world.
-  const uint32_t model = Load(base, kScene) + 480;
+  const schema::CarScene scene = G::scene(base);
+  const uint32_t model = scene.glow_model_address();
   left = GlowColor(base, calls, frame, model, 176, 0x820E63A8, 0x820E63CC);
-  const int32_t shapes = int32_t(Load(base, model + 412));
+  const int32_t shapes = int32_t(scene.glow_model_shapes());
   const double zero = Lfs(base, kZero);
   for (uint32_t node = 0; node < 4; node++) {
-    const uint32_t record = group + 240 * node;
-    if (Load(base, record + 4) == 0) {
+    const schema::CarPart record(base, group + 240 * node);
+    if (record.model() == 0) {
       continue;
     }
     FreshIdentity(base, frame + 336, frame + 208);
-    const uint64_t p0 = Load64(base, record + 144), p1 = Load64(base, record + 152);
+    const uint64_t p0 = record.position_lo(), p1 = record.position_hi();
     Stfs(base, frame + 732, one);
     Stfs(base, frame + 748, one);
     Stfs(base, frame + 764, one);

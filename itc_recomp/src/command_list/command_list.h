@@ -6,39 +6,35 @@
 // Adapters: src/hooks/command_list.cpp (and AllocateSlots's in
 // src/interpolation/blend_state.cpp).
 //
-// The list's fields (`list` is its guest address):
-//   +0 vtable, +4 the buffer being recorded (0 or 1), +8 each buffer's
-//   capacity in slots, +12 the slots used this tick, +16 the slots the last
-//   tick used, +20 the allocation, +24 and +28 the two buffers, +32 where
-//   the next chunk starts, +36 and +40 the last chunk's start and end, +44
-//   the write pointer, +48 the open chunk's start again, byte +52 whether a
-//   chunk is open.
+// The list's fields (`list` is its guest address) are schema::CommandList's
+// (itc_recomp/schema/command-list.toml).
 
 #pragma once
 
 #include "guest.h"
+#include "schema/command_list.h"
 
 #include <cstdint>
 
 namespace command_list {
 
-// The count of chunks open (all lists), a guest global.
-constexpr uint32_t kOpenChunks = 0x8296BD28;
-// CommandList's vtable.
-constexpr uint32_t kVtable = 0x8206C080;
+// The count of chunks open (all lists), a guest global (other areas' ports
+// still read it through this name).
+constexpr uint32_t kOpenChunks = schema::CommandListGlobals::open_chunks_address();
 
 // CommandList::AllocateSlots (sub_8258CAA0): `count` 16-byte slots at the
 // write pointer; the first, or 0 with nothing changed when the list would be
 // full (used + count not below the capacity, 32-bit), where the original
 // prints a message (sub_825A1318) and returns 0.
 inline uint32_t AllocateSlots(uint8_t* base, uint32_t list, uint32_t count) {
-  const uint32_t used = guest::LoadU32(base, list + 12) + count;
-  if (used >= guest::LoadU32(base, list + 8)) {
+  const schema::CommandList l(base, list);
+  const uint32_t used = l.used() + count;
+  if (used >= l.capacity()) {
     return 0;
   }
-  const uint32_t first = guest::LoadU32(base, list + 44);
-  guest::StoreU32(base, list + 12, used);
-  guest::StoreU32(base, list + 44, first + (count << 4));
+  const uint32_t first = l.write();
+  l.set_used(used);
+  l.set_write(first + (count << 4));
   return first;
 }
 

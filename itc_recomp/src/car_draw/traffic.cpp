@@ -9,12 +9,12 @@
 #include "base/log.h"
 #include "guest.h"
 #include "material_passes/material_passes.h"
+#include "schema/car_draw.h"
 
 namespace car_draw {
 
 namespace {
 
-constexpr uint32_t kScene = 0x826C2E44;
 constexpr uint32_t kCameraPasses = 0x826BAC00;
 
 uint32_t Load(uint8_t* base, uint32_t address) {
@@ -47,15 +47,17 @@ Left TrafficDrawBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
     }
     // The plates: their texture (+456) and the override (+432) on around
     // the draw, off after it (the model word read again each time).
-    const uint32_t record = records + 240 * k;
-    if (Load(base, record + 4) == 0) {
+    const schema::CarPart record(base, records + 240 * k);
+    if (record.model() == 0) {
       continue;
     }
-    const uint32_t texture = Load(base, records + (k == 2 ? 1440 : 1444));
-    Store(base, Load(base, record + 4) + 456, texture);
-    Store(base, Load(base, record + 4) + 432, 1);
-    left = PartsDrawRecord(base, calls, frame, record, vp, world, 0, caller_r24, pass, 0x820E5628);
-    Store(base, Load(base, record + 4) + 432, 0);
+    const schema::TrafficPoints body(base, records);
+    const uint32_t texture = k == 2 ? body.front_plate_texture() : body.rear_plate_texture();
+    Store(base, record.model() + 456, texture);
+    Store(base, record.model() + 432, 1);
+    left = PartsDrawRecord(base, calls, frame, record.address, vp, world, 0, caller_r24, pass,
+                           0x820E5628);
+    Store(base, record.model() + 432, 0);
   }
   return left;
 }
@@ -65,9 +67,10 @@ Left TrafficDrawWindow(uint8_t* base, const Calls& calls, uint32_t stack, uint32
   ITC_NATIVE_RUNNING("sub_820E5668 TrafficPoints::DrawWindow");
   const uint32_t frame = Frame(base, stack, kTrafficWindowFrame);
   // window01's alpha (record 5's model and shape, the block's +632).
-  const uint32_t shape = Load(base, records + 1428);
-  const double alpha = double(guest::LoadFloat(base, block + 632));
-  const uint32_t model = Load(base, records + 1204);
+  const schema::TrafficPoints body(base, records);
+  const uint32_t shape = body.record5_shape();
+  const double alpha = double(schema::CarDrawBlock(base, block).window_alpha_01());
+  const uint32_t model = body.record5_model();
   material_passes::SetPair1002Alpha(base, model, shape, alpha, frame);
   const uint32_t vp = pass + 144, world = block + 16;
   Left left;
@@ -84,7 +87,7 @@ Left TrafficPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32
   const uint32_t frame = Frame(base, stack, kTrafficPointsFrame);
   // The scene's current camera pass (0 when its address's low word is 0 or
   // it isn't enabled).
-  uint32_t pass = kCameraPasses + Load(base, Load(base, kScene) + 5072) * 592;
+  uint32_t pass = kCameraPasses + schema::CarDrawGlobals::scene(base).pass_camera() * 592;
   if (pass == 0 || int32_t(Load(base, pass + 588)) == 0) {
     pass = 0;
   }

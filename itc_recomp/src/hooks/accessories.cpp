@@ -16,6 +16,7 @@
 #include "hooks/models.h"
 #include "memory/heap.h"
 #include "native/buffers.h"
+#include "schema/accessories.h"
 
 #include <functional>
 #include "lifted/sdk.h"
@@ -62,7 +63,7 @@ void GuestCall(lifted::Regs& ctx, uint8_t* base, uint32_t function, uint32_t r1,
 std::function<void(uint32_t, uint32_t)> AccessoriesSetDestructor(lifted::Regs& ctx,
                                                                  uint8_t* base) {
   return [&ctx, base](uint32_t set, uint32_t frame) {
-    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, set));
+    const uint32_t function = schema::Accessories(base, set).vtable().destroy();
     GuestCall(ctx, base, function, frame, 0x820F0FC4, set, 0);
   };
 }
@@ -156,7 +157,7 @@ ITC_REGS_STEP(AccessoriesRelease) {
   if (index != 3) {
     const uint32_t entry =
         guest::LoadU32(base, set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu));
-    if (entry != 0 && guest::LoadU32(base, entry) - 1 == 0) {
+    if (entry != 0 && schema::AccessoryEntry(base, entry).count() - 1 == 0) {
       ctx.fpscr.disableFlushMode();  // as AccessoryEntry::Destroy's register step
     }
   }
@@ -187,7 +188,9 @@ ITC_REGS_STEP(AccessoriesDestruct) {
 std::function<uint64_t(uint32_t, uint32_t)> AccessoryTextureSet(lifted::Regs& ctx,
                                                                 uint8_t* base) {
   return [&ctx, base](uint32_t provider, uint32_t frame) -> uint64_t {
-    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, provider) + 12);
+    // The provider is embedded at the accessory's +80 (Accessory::textures_vtable).
+    const uint32_t function =
+        schema::AccessoryTexturesVtable(base, guest::LoadU32(base, provider)).texture_set();
     GuestCall(ctx, base, function, frame, 0x820EF5A8, provider, 0);
     return ctx.r3.u64;
   };

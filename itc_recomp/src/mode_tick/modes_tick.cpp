@@ -6,6 +6,8 @@
 
 #include "base/log.h"
 #include "hooks/lifted_call.h"
+#include "schema/game_modes.h"
+#include "schema/mode_tick.h"
 
 #include <initializer_list>
 
@@ -13,17 +15,9 @@ namespace mode_tick {
 
 namespace {
 
-constexpr uint32_t kPlayTimeFrames = 0x826C5B90;
-constexpr uint32_t kMusicStarted = 0x826C5B94;  // the menu music asked for once
-constexpr uint32_t kMenuMode = 0x826C5B98;      // whether the type is a front-end one
-constexpr uint32_t kLayerAnswers = 0x826C5B60;  // the layer's slot 1, asked twice
-constexpr uint32_t kSignInWatch = 0x826C5B9C;
-constexpr uint32_t kModeType = 0x826032DC;
-constexpr uint32_t kOldModeType = 0x826032E0;
-constexpr uint32_t kMapperClients = 0x826BAB7C;
-constexpr uint32_t kNetworkCounter = 0x8260185C;
-constexpr uint32_t kMusicPlayer = 0x826C5C80;
-constexpr uint32_t kMenuMusic = 0x82006A18;  // "BGM_SYSTEM"
+using G = schema::ModeTickGlobals;
+constexpr uint32_t kMenuMusic = G::music_names_address();  // "BGM_SYSTEM"
+constexpr uint32_t kSignInWatch = G::sign_in_watch_address();
 
 constexpr uint32_t kGlobalMemoryStatus = 0x82294DA0;
 constexpr uint32_t kModeCreate = 0x821077A8;
@@ -52,39 +46,39 @@ uint64_t ModesTick(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t holder, ui
     return lifted_call::Call(base, function, frame, r13, args).r3;
   };
   uint64_t r3 = 0;
-  guest::StoreU32(base, kPlayTimeFrames, guest::LoadU32(base, kPlayTimeFrames) + 1);
-  if (guest::LoadU32(base, holder + 4) == 0) {
+  const schema::ModeHolder modes(base, holder);
+  G::set_play_time_frames(base, G::play_time_frames(base) + 1);
+  if (modes.mode<schema::View>().address == 0) {
     // The first mode: made by type, its settings, then its set-up (slot 0);
     // the layer's slot 1 asked twice.
     call(kGlobalMemoryStatus, {frame + 112});
-    r3 = call(kModeCreate, {holder, guest::LoadU32(base, kModeType)});
-    guest::StoreU32(base, holder + 4, uint32_t(r3));
-    call(kSetChecks, {holder, guest::LoadU32(base, kModeType)});
-    call(kSetSceneTargetMode, {holder, guest::LoadU32(base, kModeType)});
-    r3 = call(kPresenceSetForMode, {guest::LoadU32(base, kModeType)});
-    const uint32_t mode = guest::LoadU32(base, holder + 4);
+    r3 = call(kModeCreate, {holder, G::mode_type(base)});
+    modes.set_mode(uint32_t(r3));
+    call(kSetChecks, {holder, G::mode_type(base)});
+    call(kSetSceneTargetMode, {holder, G::mode_type(base)});
+    r3 = call(kPresenceSetForMode, {G::mode_type(base)});
+    const uint32_t mode = modes.mode<schema::View>().address;
     call(Slot(base, mode, 0), {mode});
     r3 = call(Slot(base, layer, 4), {layer});
-    guest::StoreU32(base, kLayerAnswers, uint32_t(r3));
+    G::set_layer_answer_0(base, uint32_t(r3));
     r3 = call(Slot(base, layer, 4), {layer});
-    guest::StoreU32(base, kLayerAnswers + 4, uint32_t(r3));
+    G::set_layer_answer_1(base, uint32_t(r3));
   }
   // The menu music, once, on the first front-end pass.
-  if (int32_t(guest::LoadU32(base, kMusicStarted)) == 0 &&
-      int32_t(guest::LoadU32(base, kMenuMode)) == 1) {
+  if (int32_t(G::music_started(base)) == 0 && int32_t(G::menu_mode(base)) == 1) {
     guest::StoreU8(base, frame + 80, 0);
     guest::StoreU32(base, frame + 88, 1);
     call(kMusicPlay, {frame + 88, kMenuMusic, frame + 80});
-    guest::StoreU32(base, kMusicStarted, 1);
+    G::set_music_started(base, 1);
   }
-  call(kActionMappersUpdate, {guest::LoadU32(base, kMapperClients)});
-  guest::StoreU32(base, kNetworkCounter, guest::LoadU32(base, kNetworkCounter) - 1);
-  call(kNetworkUpdate, {guest::LoadU32(base, kModeType)});
-  call(kSignInWatchUpdate, {kSignInWatch, guest::LoadU32(base, holder + 4)});
+  call(kActionMappersUpdate, {G::mapper_clients(base)});
+  G::set_network_counter(base, G::network_counter(base) - 1);
+  call(kNetworkUpdate, {G::mode_type(base)});
+  call(kSignInWatchUpdate, {kSignInWatch, modes.mode<schema::View>().address});
   call(kFlipRing, {});
   // The mode's delegate (+4, slot 0): an 8-byte answer, a byte (change the
   // mode) and the new type.
-  const uint32_t delegate = guest::LoadU32(base, guest::LoadU32(base, holder + 4) + 4);
+  const uint32_t delegate = guest::LoadU32(base, modes.mode<schema::View>().address + 4);
   call(Slot(base, delegate, 0), {frame + 104, delegate});
   guest::StoreU32(base, frame + 88, guest::LoadU32(base, frame + 104));
   guest::StoreU32(base, frame + 92, guest::LoadU32(base, frame + 108));
@@ -92,30 +86,30 @@ uint64_t ModesTick(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t holder, ui
   if (guest::LoadU8(base, frame + 88) != 0) {
     // The mode changes: the old one's slot 1 and slot 7 (deleted), the
     // next pass makes the new one.
-    guest::StoreU32(base, kOldModeType, guest::LoadU32(base, kModeType));
-    guest::StoreU32(base, kModeType, guest::LoadU32(base, frame + 92));
-    uint32_t mode = guest::LoadU32(base, holder + 4);
+    G::set_old_mode_type(base, G::mode_type(base));
+    G::set_mode_type(base, guest::LoadU32(base, frame + 92));
+    uint32_t mode = modes.mode<schema::View>().address;
     r3 = call(Slot(base, mode, 4), {mode});
-    mode = guest::LoadU32(base, holder + 4);
+    mode = modes.mode<schema::View>().address;
     r3 = mode;
     if (mode != 0) {
       r3 = call(Slot(base, mode, 28), {mode, 1});
     }
-    guest::StoreU32(base, holder + 4, 0);
+    modes.set_mode(0u);
     call(kOnModeChange, {kSignInWatch});
     call(kSetBlocked, {0});
     r3 = call(kGlobalMemoryStatus, {frame + 112});
   }
   // Whether the type is a front-end one (2, 4 to 10, 12); when that turns
   // off after the music started, the music player's slot 5 with 1.
-  const int32_t type = int32_t(guest::LoadU32(base, kModeType));
+  const int32_t type = int32_t(G::mode_type(base));
   const uint32_t menu = (type == 2 || (type >= 4 && type <= 10) || type == 12) ? 1 : 0;
-  guest::StoreU32(base, kMenuMode, menu);
-  if (int32_t(guest::LoadU32(base, kMusicStarted)) == 1 && menu == 0) {
+  G::set_menu_mode(base, menu);
+  if (int32_t(G::music_started(base)) == 1 && menu == 0) {
     guest::StoreU32(base, frame + 96, 1);
-    const uint32_t player = guest::LoadU32(base, kMusicPlayer);
+    const uint32_t player = G::music_player(base);
     r3 = call(Slot(base, player, 20), {player, frame + 96});
-    guest::StoreU32(base, kMusicStarted, 0);
+    G::set_music_started(base, 0);
   }
   return r3;
 }

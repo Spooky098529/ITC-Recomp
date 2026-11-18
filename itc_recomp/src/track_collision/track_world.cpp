@@ -7,12 +7,14 @@
 #include "car_physics/float_ops.h"
 
 #include "base/log.h"
+#include "schema/collision_world.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace track_collision {
 
 using namespace car_physics::ops;
 namespace cp = car_physics;
+using G = schema::CollisionWorldGlobals;
 
 uint32_t TimesThreePlus(uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_8228F090 TimesThreePlus");
@@ -42,8 +44,8 @@ void TrackCollisionTick(uint8_t* base, uint32_t frame, const cp::CollisionGuestC
   ITC_NATIVE_RUNNING("sub_820FF050 TrackCollision::Tick");
   namespace va = vehicle_accessors;
   const uint32_t records = guest::LoadU32(base, 0x826C5B2C) + 48;
-  double dt = Lfs(base, 0x8260327C);
-  if (guest::LoadU32(base, kMesh + 8) != 2 || guest::LoadU32(base, kRoute + 8) != 2) {
+  double dt = double(G::tick_step(base));
+  if (schema::TrackMesh(base, kMesh).state() != 2 || guest::LoadU32(base, kRoute + 8) != 2) {
     return;
   }
   const uint32_t collide = RacersCarsCollide(base, records);
@@ -93,8 +95,8 @@ uint32_t TrackCollisionResetWorld(uint8_t* base) {
   cp::CollisionSurfaceSetD(base, kBit24, one);
   cp::CollisionSurfaceSetD(base, kBit26, one);
   cp::CollisionSurfaceSetA(base, kBit25, zero);
-  cp::CollisionSurfaceSetA(base, kBit24, Lfs(base, 0x82001BE4));
-  cp::CollisionSurfaceSetA(base, kBit26, Lfs(base, 0x82002968));
+  cp::CollisionSurfaceSetA(base, kBit24, double(G::half(base)));
+  cp::CollisionSurfaceSetA(base, kBit26, double(G::quarter(base)));
   cp::CollisionSurfaceSetB(base, kBit25, zero);
   cp::CollisionSurfaceSetB(base, kBit24, zero);
   cp::CollisionSurfaceSetB(base, kBit26, zero);

@@ -19,14 +19,8 @@
 
 namespace racer_controllers {
 
-// The race data ([0x826C5B2C]), the cars' input records (seven pointers),
-// the input recordings ([0x826C5B4C]) and the race ([0x826D82F4]: +2308 the
-// racers' records, +2364 their count).
-constexpr uint32_t kRaceData = 0x826C5B2C;
-constexpr uint32_t kInputs = 0x826C5B30;
-constexpr uint32_t kRecordings = 0x826C5B4C;
-constexpr uint32_t kRace = 0x826D82F4;
-// The race data's stage list, flags, mode and finish count.
+// The race data ([0x826C5B2C], the cars' input records, the input
+// recordings and the race: schema::RacerControllersGlobals). The race data's stage list, flags, mode and finish count.
 constexpr uint32_t kStages = 0x59620;
 constexpr uint32_t kFlags = 0x59AE4;
 constexpr uint32_t kMode = 0xA3AF0;
@@ -131,13 +125,8 @@ uint32_t OnState16(uint8_t* base, uint32_t sp, const Calls& calls);
 
 // --- The player's controls ---
 
-// The action mappers' table (0x826BAB80, 8 bytes an entry: the mapper, a
-// word +4: 1 when it isn't read), each player's entry index (0x826BABA4)
-// and the input manager (0x826BAB78).
-constexpr uint32_t kMapperEntries = 0x826BAB80;
-constexpr uint32_t kPlayerEntries = 0x826BABA4;
-constexpr uint32_t kInputManager = 0x826BAB78;
-// The player's mapper entry.
+// The player's mapper entry (schema::PlayerMapperEntry: 0x826BAB80 + 8 x
+// [0x826BABA4 + 4 x player]).
 uint32_t MapperEntry(uint8_t* base, uint32_t player);
 
 // PlayerInput::Read (sub_82102350): action `id` of the player's mapper

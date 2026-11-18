@@ -23,11 +23,6 @@ namespace car_models {
 
 constexpr uint32_t kDrawDecalsFrameBytes = 368;
 constexpr uint32_t kOnDecalLoadedFrameBytes = 144;
-constexpr uint32_t kLayerSlots = 4092, kStickerSlots = 4380;
-constexpr uint32_t kSheetHeader = 6684, kSheetData = 6688;
-// The floats DrawDecals reads (0.0 and 1.0).
-constexpr uint32_t kDecalsZero = 0x82000A34;
-constexpr uint32_t kDecalsOne = 0x82000A30;
 
 // sub_820D3C80 Vinyl::ClearCorner: the sheet's bottom left corner
 // ([0x82602578] pixels wide, [0x8260257C] rows, the sheet's size at

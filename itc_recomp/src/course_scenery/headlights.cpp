@@ -23,6 +23,7 @@
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
+#include "schema/course_scenery.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <initializer_list>
@@ -46,8 +47,6 @@ constexpr uint32_t kSlotsDirection = 0x8296BBE0;
 constexpr uint32_t kSlotsBeam = 0x8296BC60;
 constexpr uint32_t kSceneLight = 0x8265ED00;  // the scene's +5328
 constexpr uint32_t kEyeCopy = 0x8265ECE0;     // the pass's eye
-constexpr uint32_t kQueueKeyA = 0x8296B90C;
-constexpr uint32_t kQueueKeyB = 0x8296B900;
 constexpr uint32_t kNear = 0x82001FBC;
 constexpr uint32_t kFar = 0x82002FA8;
 
@@ -161,10 +160,10 @@ uint64_t Recorder::Run(uint32_t description) {
   const uint32_t f = f_;
   // The camera pass from the viewport, then CameraPass::Update from
   // FromViewport's frame (as its adapter).
-  const uint32_t pass = Load(base_, description + 20) * 592u + kCameraPasses;
-  Store(base_, description + 8, pass);
-  cameras::FromViewport(base_, pass, Load(base_, description + 12),
-                        Load(base_, description + 16));
+  const schema::SceneryPassDesc desc(base_, description);
+  const uint32_t pass = desc.camera_pass() * 592u + kCameraPasses;
+  desc.set_camera_pass_object(pass);
+  cameras::FromViewport(base_, pass, desc.player(), desc.viewport_entry());
   {
     const uint32_t from_viewport = f - 112;
     Store(base_, from_viewport, f);
@@ -176,8 +175,8 @@ uint64_t Recorder::Run(uint32_t description) {
   if (r3 != 0) {
     const uint32_t scene0 = Load(base_, kScene);
     const uint32_t lights = scene0 + 5248;  // the original's r31
-    const double zero = Lfs(base_, kZero);  // f30
-    const double one = Lfs(base_, kOne);    // f31
+    const double zero = double(schema::CourseSceneryGlobals::zero(base_));  // f30
+    const double one = double(schema::CourseSceneryGlobals::one(base_));    // f31
     for (uint32_t at : {96u, 100u, 104u, 108u, 80u, 84u, 88u, 92u}) {
       Stfs(base_, f + at, zero);
     }
@@ -219,7 +218,7 @@ uint64_t Recorder::Run(uint32_t description) {
       if (slot >= 8) {
         break;
       }
-      if (Load(base_, description + 20) == 2) {
+      if (desc.camera_pass() == 2) {
         if (slot == 0) {
           slot = 1;
         } else if (slot == 1) {
@@ -331,7 +330,7 @@ uint64_t Recorder::Run(uint32_t description) {
         Store(base_, command + 0, 36);
       }
       command_list::CloseChunk(base_, Get(1, 0x820F3A80));
-      const bool second = Load(base_, description + 20) == 2;
+      const bool second = desc.camera_pass() == 2;
       const uint32_t x = second ? 0x820F3AB4 : 0x820F3AD0;
       const uint32_t object = Scene(x);
       const uint32_t queue = uint32_t(VtableCall(object, 2, x + 16));
@@ -339,9 +338,9 @@ uint64_t Recorder::Run(uint32_t description) {
     }
     Copy16Interleaved(base_, kSceneLight, lights + 80);
   }
-  Store(base_, kQueueKeyA, Load(base_, description + 24));
-  Store(base_, kQueueKeyB, Load(base_, description + 28));
-  Copy16Interleaved(base_, kEyeCopy, Load(base_, description + 8) + 400);
+  schema::CourseSceneryGlobals::set_key_a(base_, desc.key_a());
+  schema::CourseSceneryGlobals::set_key_b(base_, desc.key_b());
+  Copy16Interleaved(base_, kEyeCopy, desc.camera_pass_object() + 400);
   return r3;
 }
 

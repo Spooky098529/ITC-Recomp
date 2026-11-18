@@ -15,6 +15,7 @@
 #include "race_setup/race_setup.h"
 #include "scene_models/apply.h"
 #include "scene_models/scene_models.h"
+#include "schema/car_makers.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -27,8 +28,9 @@ namespace {
 
 using namespace car_scene_draw::ops;
 
+using G = schema::CarMakersGlobals;
+
 constexpr uint32_t kScene = 0x826C2E44;
-constexpr uint32_t kDegree = 0x82002948;  // π/180
 constexpr uint32_t kSetupFromCar = 0x820C27E8;
 constexpr uint32_t kRecordCopy = 0x820DB290;
 constexpr uint32_t kPlayNamed = 0x8211DAC8;
@@ -38,7 +40,6 @@ constexpr uint32_t kStandMovie = 6;
 constexpr uint32_t kApplyPaint = 0x820D9B68;
 constexpr uint32_t kApplyWheelPaint = 0x820D9C50;
 constexpr uint32_t kApplyRecord = 0x820DA758;
-constexpr uint32_t kStandHolder = 0x826D83E0;  // a pointer to the holder's word
 constexpr uint32_t kCarList = 0x826D83F4;      // the stand's car list (+1136, +48, +52)
 constexpr uint32_t kRefresh = 0x820C4998;
 
@@ -122,7 +123,7 @@ uint64_t GarageStageFitCar(uint8_t* base, const front_end_car_draw::Calls& calls
   CopyFloat(base, frame + 896, stage() + 6116);
   CopyFloat(base, frame + 628, stage() + 6120);
   CopyFloat(base, frame + 900, stage() + 6124);
-  const double degree = Lfs(base, kDegree);
+  const double degree = double(G::radians_per_degree(base));
   double angle = Frsp(c_runtime::Sin(Fmuls(Lfs(base, frame + 624), degree)));
   s = stage();
   Stfs(base, s + 6128, Fmuls(angle, Lfs(base, frame + 468)));
@@ -221,7 +222,8 @@ uint64_t GarageStageSetCarClass(uint8_t* base, const front_end_car_draw::Calls& 
   // The original's compares of r5's low word: 1, 2 and 4 give 1; 3, 5 and
   // the rest 0.
   const int32_t which = int32_t(uint32_t(pick));
-  Store(base, record + 3768, which == 1 || which == 2 || which == 4 ? 1u : 0u);
+  schema::SceneModelRecord(base, record)
+      .set_parts_class(which == 1 || which == 2 || which == 4 ? 1u : 0u);
   GarageStageCopyRecord(base, calls, holder, record, frame);
   FlushOff();
   const uint64_t r3 = GarageStageReapplyRecord(base, calls, apply, holder, frame, false);
@@ -239,7 +241,7 @@ uint64_t GarageStageShowCarById(uint8_t* base, const front_end_car_draw::Calls& 
   }
   const uint32_t frame = Frame(base, stack, 4016);
   // The stage's scene model (its answer not used).
-  const uint32_t stage = Load(base, Load(base, Load(base, kStandHolder)));
+  const uint32_t stage = Load(base, Load(base, G::stand_holder(base).address));
   vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7, Load(base, stage + 8));
   const uint32_t list = Load(base, kCarList);
   const uint32_t index = (Load(base, list + 52) + Load(base, list + 48)) << 2;
@@ -247,7 +249,8 @@ uint64_t GarageStageShowCarById(uint8_t* base, const front_end_car_draw::Calls& 
   const uint32_t car = frame + 80;
   race_setup::CarInit(base, car);
   race_setup::SetModel(base, car, id);
-  Store(base, car + 3888, Load(base, car + 3888) | 1);
+  const schema::CarMakersCar c(base, car);
+  c.set_flags(c.flags() | 1);
   uint32_t refreshed = 0;
   if (!car_specs::CarRefresh(base, car, &refreshed)) {
     const uint64_t regs[1] = {car};
@@ -255,7 +258,7 @@ uint64_t GarageStageShowCarById(uint8_t* base, const front_end_car_draw::Calls& 
                nullptr);
   }
   FlushOff();
-  const uint32_t holder = Load(base, Load(base, kStandHolder));
+  const uint32_t holder = Load(base, G::stand_holder(base).address);
   if (with_class) {
     return GarageStageSetCarClass(base, calls, apply, holder, car, pick, frame);
   }
@@ -287,7 +290,6 @@ uint64_t HideBusyMarker(uint8_t* base, const front_end_car_draw::Calls& calls, u
 uint64_t GarageStageReloadModel(uint8_t* base, const front_end_car_draw::Calls& calls,
                                 uint32_t holder, uint32_t block, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8217F880 GarageStage::ReloadModel");
-  constexpr uint32_t kReloads = 0x826D83E4;
   constexpr uint32_t kPollLoad = 0x820DA318, kReleaseB = 0x820C5C88;
   constexpr uint32_t kCarSceneUpdate = 0x820C9608, kSetUpB = 0x820C5B28;
   const uint32_t frame = Frame(base, stack, 4400);
@@ -301,19 +303,19 @@ uint64_t GarageStageReloadModel(uint8_t* base, const front_end_car_draw::Calls& 
     FlushOff();
     return r3;
   };
-  const uint32_t count = Load(base, kReloads) + 1;
+  const uint32_t count = G::reload_count(base) + 1;
   Store(base, model + 4296, 0);
-  Store(base, kReloads, count);
+  G::set_reload_count(base, count);
   if (int32_t(block) != -1) {
     Store(base, Load(base, holder) + 4, block);
   }
   if (count < 4 || int32_t(call(kPollLoad, {model}, 0x8217F8F4)) == 0) {
     call(kCarSceneUpdate, {}, 0x8217F900);
   }
-  if (Load(base, kReloads) < 4) {
+  if (G::reload_count(base) < 4) {
     return 0;
   }
-  Store(base, kReloads, 4);
+  G::set_reload_count(base, 4);
   if (int32_t(call(kPollLoad, {model}, 0x8217F924)) == 0) {
     return 0;
   }
@@ -325,11 +327,11 @@ uint64_t GarageStageReloadModel(uint8_t* base, const front_end_car_draw::Calls& 
   const uint32_t record = frame + 80;
   scene_models::SceneModelRecordConstruct(base, record);
   scene_models::SceneModelRecordReset(base, record);
-  Store(base, frame + 96, Load(base, Load(base, holder) + 4));
+  schema::SceneModelRecord(base, record).set_block(Load(base, Load(base, holder) + 4));
   Store(base, Load(base, holder) + 8, uint32_t(vehicle_accessors::ScenePoolsClaimB(base, scene, 7)));
   call(kSetUpB, {scene, 7, Load(base, Load(base, holder) + 8), record}, 0x8217F9A8);
   Store(base, model + 4296, 1);
-  Store(base, kReloads, 0);
+  G::set_reload_count(base, 0);
   Store(base, Load(base, holder) + 6056, 1);
   Store(base, Load(base, holder) + 16, 1);
   Store(base, Load(base, holder) + 4, 0xFFFFFFFFu);

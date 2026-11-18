@@ -19,10 +19,15 @@
 #include "base/log.h"
 #include "game_modes/game_modes.h"
 #include "guest.h"
+#include "schema/game_modes.h"
+#include "schema/race_flow.h"
 
 namespace race_flow {
 
 namespace {
+
+using G = schema::RaceFlowGlobals;
+using Machine = schema::StateMachine;
 
 // A value: a constant, or an offset from the machine or the frame.
 struct Value {
@@ -614,9 +619,9 @@ constexpr Step kSteps[] = {
 
 uint32_t Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82160AE0 RaceFlow::Init");
-  guest::StoreU32(base, machine + kState, 1);
+  Machine(base, machine).set_state(1);
   guest::StoreU32(base, machine + kFlags, 0);
-  const uint32_t race = guest::LoadU32(base, kRaceData);
+  const uint32_t race = G::race_data(base);
   if (guest::LoadU32(base, race + kRaceKind) == 6) {
     guest::StoreU32(base, machine + kPlayers, 0);
     guest::StoreU32(base, machine + kPlayers + 4, 0);

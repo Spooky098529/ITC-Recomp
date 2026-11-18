@@ -1,0 +1,30 @@
+# The schema of docs/functions/build-screen.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The screen data [0x826D8448] (the measure's "BuildList", with the build
+# lists it holds) is type2-screens.md's (it touches it most); the menu
+# lists [0x826D8440] and [0x826D8444] are the shared "menu list"; the
+# transition machine [0x826D843C] is a PageObject (menu-helpers.toml).
+
+# BuildList::Insert's (sub_8219C230) r4: the word the new node's slot
+# takes, passed by address (a word of the caller's frame: CopyBuilds'
+# frame + 80, the screen's fill sub_821A0228's).
+[BuildScreenInsertValue]
+measure = "BuildList::Insert.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "build", offset = 0, type = "u32", note = "a build's address (the slot's pointer)" },
+]
+
+[globals]
+machine = { address = 0x826D843C, type = "ptr", to = "PageObject", note = "the transition machine: pages 0 to 3 the levels (groups, builds, the stand, the details), 4 leaving; 21 transitions" }
+list = { address = 0x826D8440, type = "ptr", note = "the level's menu list (72 bytes, a \"menu list\")" }
+group_list = { address = 0x826D8444, type = "ptr", note = "the groups' menu list, stepped by left and right on levels 1 and 2" }
+screen = { address = 0x826D8448, type = "ptr", note = "the screen data (type2-screens.md's type)" }
+stand_holder = { address = 0x826D83E0, type = "ptr", note = "the stand scene's holder: three 4-byte blocks, each holding a garage stage at +0" }
+fade_out_counts = { address = 0x826A50E4, type = "u32", note = "the screen fades' fade-out counts word" }
+fade_in_counts = { address = 0x826A50DC, type = "u32", note = "the screen fades' fade-in counts word" }

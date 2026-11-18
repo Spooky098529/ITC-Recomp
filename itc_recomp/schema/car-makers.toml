@@ -1,0 +1,346 @@
+# The schema of docs/functions/car-makers.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The front end's makers of car objects (src/car_makers/): the garage cars,
+# the car objects they become, and the scene model record a car object is
+# turned into for the stand (SceneModelRecord::FromCar). The garage stage
+# and the stand's holder are front-end-car-draw's and stand-models' types;
+# the car data is car-physics'.
+
+# A scene model's set-up (4,244 bytes; scene-models.md's constructor, Reset
+# and Copy), filled from a car object by SceneModelRecord::FromCar.
+[SceneModelRecord]
+measure = "SceneModelRecord"
+size = 4244
+origin = "embedded"
+fields = [
+  { name = "kind", offset = 0, type = "u32", note = "1 by default; from a car: 2 the players' cars (flags 0x81), 1 the rivals (0x2), 3 traffic" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "block", offset = 16, type = "u32", note = "the car record's +0 (the car record, 3,696 bytes, is embedded at +16): the model block, CarModels::BlockOf of the car id" },
+  { name = "paint0_hue", offset = 32, type = "f32", note = "a hue, saturation, value triple (SetPaint)" },
+  { name = "paint0_saturation", offset = 36, type = "f32" },
+  { name = "paint0_value", offset = 40, type = "f32" },
+  { name = "paint1_hue", offset = 48, type = "f32" },
+  { name = "paint1_saturation", offset = 52, type = "f32" },
+  { name = "paint1_value", offset = 56, type = "f32" },
+  { name = "paint2_hue", offset = 64, type = "f32" },
+  { name = "paint2_saturation", offset = 68, type = "f32" },
+  { name = "paint2_value", offset = 72, type = "f32" },
+  { name = "front_wheel_paint0_hue", offset = 80, type = "f32", note = "the front wheels' colors (SetPaint, GarageStage::SetWheel)" },
+  { name = "front_wheel_paint0_saturation", offset = 84, type = "f32" },
+  { name = "front_wheel_paint0_value", offset = 88, type = "f32" },
+  { name = "front_wheel_paint1_hue", offset = 96, type = "f32" },
+  { name = "front_wheel_paint1_saturation", offset = 100, type = "f32" },
+  { name = "front_wheel_paint1_value", offset = 104, type = "f32" },
+  { name = "front_wheel_paint2_hue", offset = 112, type = "f32" },
+  { name = "front_wheel_paint2_saturation", offset = 116, type = "f32" },
+  { name = "front_wheel_paint2_value", offset = 120, type = "f32" },
+  { name = "rear_wheel_paint0_hue", offset = 128, type = "f32", note = "the rear wheels' colors (SetPaint, GarageStage::SetWheel)" },
+  { name = "rear_wheel_paint0_saturation", offset = 132, type = "f32" },
+  { name = "rear_wheel_paint0_value", offset = 136, type = "f32" },
+  { name = "rear_wheel_paint1_hue", offset = 144, type = "f32" },
+  { name = "rear_wheel_paint1_saturation", offset = 148, type = "f32" },
+  { name = "rear_wheel_paint1_value", offset = 152, type = "f32" },
+  { name = "rear_wheel_paint2_hue", offset = 160, type = "f32" },
+  { name = "rear_wheel_paint2_saturation", offset = 164, type = "f32" },
+  { name = "rear_wheel_paint2_value", offset = 168, type = "f32" },
+  { name = "traffic_paint", offset = 176, type = "u32", note = "traffic (kind 3): the paint pick" },
+  { name = "decals", offset = 192, type = "bytes", count = 3456, note = "64-byte entries (CarMakersRecordDecal): +192 three and +384 three (the car's six at +96), then eight groups of six slots from +576, five used (the car's forty at +288)" },
+  { name = "car_record_bytes", offset = 3648, type = "bytes", count = 48, note = "the car record's +3632: twelve words (CarRecord::ResetBytes, SetBytes from the car's bytes +1568)" },
+  { name = "interior_item3", offset = 3696, type = "u32", note = "the car's +1812 (kind 2)" },
+  { name = "exterior_item1", offset = 3704, type = "u32", note = "the car's +1792" },
+  { name = "bonnet_painted", offset = 3708, type = "u32", note = "1 when the car's bonnet color kind (+1764) is 1" },
+  { name = "parts_aero0", offset = 3712, type = "u32", note = "the parts' 60 bytes start here: the car's +1744, or the aero kit's entry +0" },
+  { name = "parts_power", offset = 3716, type = "u32", note = "the car's +1664" },
+  { name = "parts_aero2", offset = 3720, type = "u32", note = "the car's +1752, or the kit's +4" },
+  { name = "parts_aero1", offset = 3724, type = "u32", note = "the car's +1748, or the kit's +8" },
+  { name = "parts_aero3", offset = 3728, type = "u32", note = "the car's +1756 (-1 gives 13), or the kit's +20" },
+  { name = "parts_bonnet", offset = 3732, type = "u32", note = "the car's +1760, or the kit's +16" },
+  { name = "parts_aero_kit", offset = 3736, type = "u32", note = "the car's aero kit (+1784) when the kit's flag 0x8, else 0" },
+  { name = "parts_aero6", offset = 3740, type = "u32", note = "the car's +1768" },
+  { name = "parts_aero7", offset = 3744, type = "u32", note = "the car's +1772" },
+  { name = "parts_aero8", offset = 3748, type = "u32", note = "the car's +1776" },
+  { name = "parts_aero9", offset = 3752, type = "u32", note = "the car's +1780, or the kit's +12" },
+  { name = "parts_engine_stage", offset = 3756, type = "u32", note = "the car's +1656; picks the sound assets' index (SceneModel::SetUp)" },
+  { name = "parts_cooling", offset = 3760, type = "u32", note = "the car's +1668" },
+  { name = "parts_class", offset = 3768, type = "u32", note = "1 when the car's halfword +4 (or the stand's class) is 1, 2 or 4" },
+  { name = "interior_engine_grade", offset = 3776, type = "u32", note = "the interior's 120 bytes start at +3772: 0, 1 or 2 by the engine stage (3 and 7 the steps)" },
+  { name = "interior_choices", offset = 3780, type = "bytes", count = 84, note = "seven 12-byte choices (CarMakersRecordChoice, SetChoice): +3780, +3792 or +3804, +3816 from the car's +1860, +1872; +3828, +3840, +3852 from +1848, +1836, +1824" },
+  { name = "interior_item2", offset = 3864, type = "u32", note = "the car's +1808" },
+  { name = "interior_item1", offset = 3868, type = "u32", note = "the car's +1804" },
+  { name = "interior_item0", offset = 3872, type = "u32", note = "the car's +1800: a scene part model's index (SceneInterior::Apply)" },
+  { name = "interior_seats", offset = 3876, type = "u32", note = "0 to 2, by the car's body level (+1708) and block 2's +232" },
+  { name = "interior_has_seats", offset = 3880, type = "u32" },
+  { name = "accessory", offset = 3884, type = "u32", note = "the car's +1816 unless 3 (none)" },
+  { name = "accessory_variant", offset = 3888, type = "u32", note = "the car's +1820, with the accessory" },
+  { name = "cockpit_bonnet", offset = 3892, type = "u32", note = "the cockpit's 144 bytes start here (its interior part at +24): the car's +1760" },
+  { name = "cockpit_bonnet_again", offset = 3896, type = "u32", note = "the car's +1760 again" },
+  { name = "cockpit_aero6", offset = 3900, type = "u32", note = "the car's +1768" },
+  { name = "cockpit_aero7", offset = 3904, type = "u32", note = "the car's +1772" },
+  { name = "cockpit_aero9", offset = 3908, type = "u32", note = "the car's +1780" },
+  { name = "wheels_painted", offset = 4040, type = "u32", note = "the wheels' 156 bytes start at +4036; 1 after SetPaint" },
+  { name = "front_tire_grade", offset = 4048, type = "u32", note = "0 to 2, from the car's front tire grade (+1716) through {0, 1, 1, 2, 2}" },
+  { name = "front_wheel", offset = 4052, type = "u32", note = "the car's front wheel number - 1 (-1 stock)" },
+  { name = "front_wheel_f28", offset = 4056, type = "f32", note = "the car's front wheel copy's +28 (+3296)" },
+  { name = "front_wheel_f16", offset = 4060, type = "f32", note = "the car's front wheel copy's +16 (+3284)" },
+  { name = "rear_tire_grade", offset = 4064, type = "u32", note = "as front_tire_grade, from +1724" },
+  { name = "rear_wheel", offset = 4068, type = "u32", note = "the car's rear wheel number - 1" },
+  { name = "rear_wheel_f28", offset = 4072, type = "f32", note = "the car's +3344" },
+  { name = "rear_wheel_f16", offset = 4076, type = "f32", note = "the car's +3332" },
+  { name = "front_size", offset = 4080, type = "u32", note = "the front tire copy's +80, truncated (probably a size)" },
+  { name = "front_size_a", offset = 4084, type = "f32", note = "the front tire copy's +48 x [0x82001BDC]" },
+  { name = "front_size_b", offset = 4088, type = "f32", note = "the front tire copy's +84 x 100" },
+  { name = "rear_size", offset = 4092, type = "u32", note = "as front_size, from the rear tire copy" },
+  { name = "rear_size_a", offset = 4096, type = "f32" },
+  { name = "rear_size_b", offset = 4100, type = "f32" },
+  { name = "wheel_extra", offset = 4104, type = "u32", note = "the car's +1696 (GarageStage::SetWheelExtras)" },
+  { name = "caliper_texture", offset = 4124, type = "u32", note = "the car's +1692, or block 2's +236 when set (probably the calipers' texture)" },
+  { name = "layer0_b", offset = 4192, type = "u32", note = "pool 4's 52 bytes start here: the car's +1592" },
+  { name = "layer0_a", offset = 4196, type = "u32", note = "the car's +1588" },
+  { name = "layer0_f8", offset = 4200, type = "f32", note = "the car's +1596" },
+  { name = "layer0_f12", offset = 4204, type = "f32" },
+  { name = "layer0_f16", offset = 4208, type = "f32" },
+  { name = "layer1_a", offset = 4212, type = "u32", note = "the car's +1608" },
+  { name = "layer1_f8", offset = 4216, type = "f32", note = "the car's +1616" },
+  { name = "layer1_f12", offset = 4220, type = "f32" },
+  { name = "layer1_f16", offset = 4224, type = "f32" },
+  { name = "layer2_a", offset = 4228, type = "u32", note = "the car's +1628" },
+  { name = "layer2_f8", offset = 4232, type = "f32", note = "the car's +1636" },
+  { name = "layer2_f12", offset = 4236, type = "f32" },
+  { name = "layer2_f16", offset = 4240, type = "f32" },
+]
+
+# One of the record's decals (+192, 64 bytes), from a car's 32-byte decal.
+[CarMakersRecordDecal]
+size = 64
+origin = "embedded"
+fields = [
+  { name = "image", offset = 0, type = "u32", note = "the car decal's +24 (an image id or car model, -1 none)" },
+  { name = "mirrored", offset = 4, type = "u32", note = "the car decal's +28" },
+  { name = "x", offset = 16, type = "f32", note = "the car decal's +8" },
+  { name = "y", offset = 20, type = "f32", note = "the car decal's +12" },
+  { name = "angle", offset = 32, type = "f32", note = "the car decal's +16" },
+  { name = "flag_scale", offset = 48, type = "f32", note = "the car decal's +0" },
+  { name = "scale", offset = 52, type = "f32", note = "the car decal's +4" },
+]
+
+# One of the record's interior choices (12 bytes, SceneModelRecord::SetChoice).
+[CarMakersRecordChoice]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "set", offset = 0, type = "u32", note = "0 none, else 1" },
+  { name = "index", offset = 4, type = "u32", note = "the value's c - 1" },
+  { name = "variant", offset = 8, type = "u32", note = "3a - 3 + k" },
+]
+
+# A car object as the makers read it (race-setup.md's car object, known-data's
+# "car object": the measure splits it by the functions taking it). The
+# fields SceneModelRecord::FromCar, SetPaint and SetWheels read.
+[CarMakersCar]
+measures = ["SceneModelRecord::FromCar.r4", "SceneModelRecord::SetPaint.r4"]
+size = 3896
+origin = "embedded"
+fields = [
+  { name = "head", offset = 0, type = "bytes", count = 12, note = "the paint (the fields below); the measure also files SetPaint's indexed reads of the paint copy (+3376 + 20 x pick) here" },
+  { name = "paint_pick", offset = 0, type = "u16", note = "the paint pick SetPaint takes for -1 (-2: the car's own paint below)" },
+  { name = "unknown_2", offset = 2, type = "u16" },
+  { name = "body_class", offset = 4, type = "u16", note = "-1 after the reset; 1, 2 or 4 set the record's +3768" },
+  { name = "paint_kind", offset = 6, type = "u16", note = "0 or 1: how SetPaint fills the third triple" },
+  { name = "paint_hue", offset = 8, type = "u16" },
+  { name = "paint_saturation", offset = 10, type = "u8" },
+  { name = "paint_value", offset = 11, type = "u8" },
+  { name = "car_id", offset = 12, type = "u32" },
+  { name = "decals", offset = 96, type = "bytes", count = 1472, note = "six then forty 32-byte decals (CarMakersCarDecal): +0 and +4 scales, +8, +12, +16 floats, +24 an image or -1, +28 mirrored" },
+  { name = "setting_bytes", offset = 1568, type = "bytes", count = 20, note = "20 bytes (CarRecord::SetBytes reads +0 to +11; +0 exterior item 2)" },
+  { name = "layer0_a", offset = 1588, type = "u32", note = "three 20-byte entries from +1588 (probably the vinyl layers): two words, three floats" },
+  { name = "layer0_b", offset = 1592, type = "u32" },
+  { name = "layer0_f8", offset = 1596, type = "f32" },
+  { name = "layer0_f12", offset = 1600, type = "f32" },
+  { name = "layer0_f16", offset = 1604, type = "f32" },
+  { name = "layer1_a", offset = 1608, type = "u32" },
+  { name = "layer1_f8", offset = 1616, type = "f32" },
+  { name = "layer1_f12", offset = 1620, type = "f32" },
+  { name = "layer1_f16", offset = 1624, type = "f32" },
+  { name = "layer2_a", offset = 1628, type = "u32" },
+  { name = "layer2_f8", offset = 1636, type = "f32" },
+  { name = "layer2_f12", offset = 1640, type = "f32" },
+  { name = "layer2_f16", offset = 1644, type = "f32" },
+  { name = "engine_stage", offset = 1656, type = "u32" },
+  { name = "power_part", offset = 1664, type = "u32" },
+  { name = "cooling", offset = 1668, type = "u32", note = "the cooling module's type" },
+  { name = "power_train3", offset = 1692, type = "u32", note = "a power train level (probably the gear count); the record's caliper_texture" },
+  { name = "power_train4", offset = 1696, type = "u32", note = "the record's wheel_extra" },
+  { name = "body_level", offset = 1708, type = "u32", note = "picks the record's seats (1 to 2, 3 to 5, 6)" },
+  { name = "front_tire_grade", offset = 1716, type = "u32" },
+  { name = "rear_tire_grade", offset = 1724, type = "u32" },
+  { name = "aero_item0", offset = 1744, type = "u32", note = "the aero items from +1744 to +1784" },
+  { name = "aero_item1", offset = 1748, type = "u32" },
+  { name = "aero_item2", offset = 1752, type = "u32" },
+  { name = "aero_item3", offset = 1756, type = "u32" },
+  { name = "bonnet", offset = 1760, type = "u32", note = "the aero items' bonnet" },
+  { name = "bonnet_color_kind", offset = 1764, type = "u32", note = "0 to 2" },
+  { name = "aero_item6", offset = 1768, type = "u32" },
+  { name = "aero_item7", offset = 1772, type = "u32" },
+  { name = "aero_item8", offset = 1776, type = "u32" },
+  { name = "aero_item9", offset = 1780, type = "u32" },
+  { name = "aero_kit", offset = 1784, type = "u32", note = "0 none, else the kit (entry block x 2 + kit - 1 of [0x820093E0])" },
+  { name = "exterior_item1", offset = 1792, type = "u32" },
+  { name = "interior_item0", offset = 1800, type = "u32" },
+  { name = "interior_item1", offset = 1804, type = "u32" },
+  { name = "interior_item2", offset = 1808, type = "u32" },
+  { name = "interior_item3", offset = 1812, type = "u32" },
+  { name = "accessory", offset = 1816, type = "u32", note = "the accessory (3 none)" },
+  { name = "accessory_variant", offset = 1820, type = "u32", note = "the accessory's variant" },
+  { name = "choice0", offset = 1824, type = "u64", note = "five 12-byte values {a, b, c} (SetChoice's r4:r5), read as a doubleword and a word" },
+  { name = "choice0_a", offset = 1824, type = "u32" },
+  { name = "choice0_b", offset = 1828, type = "u32" },
+  { name = "choice0_c", offset = 1832, type = "u32" },
+  { name = "choice1", offset = 1836, type = "u64" },
+  { name = "choice1_a", offset = 1836, type = "u32" },
+  { name = "choice1_b", offset = 1840, type = "u32" },
+  { name = "choice1_c", offset = 1844, type = "u32" },
+  { name = "choice2", offset = 1848, type = "u64" },
+  { name = "choice2_a", offset = 1848, type = "u32" },
+  { name = "choice2_b", offset = 1852, type = "u32" },
+  { name = "choice2_c", offset = 1856, type = "u32" },
+  { name = "choice3", offset = 1860, type = "u64" },
+  { name = "choice3_a", offset = 1860, type = "u32" },
+  { name = "choice3_b", offset = 1864, type = "u32" },
+  { name = "choice3_c", offset = 1868, type = "u32" },
+  { name = "choice4", offset = 1872, type = "u64" },
+  { name = "choice4_a", offset = 1872, type = "u32" },
+  { name = "choice4_b", offset = 1876, type = "u32" },
+  { name = "choice4_c", offset = 1880, type = "u32" },
+  { name = "front_tire_48", offset = 3132, type = "f32", note = "the front tire copy (+3084, inched up)'s +48" },
+  { name = "front_tire_80", offset = 3164, type = "f32" },
+  { name = "front_tire_84", offset = 3168, type = "f32" },
+  { name = "rear_tire_48", offset = 3224, type = "f32", note = "the rear tire copy (+3176, inched up)'s +48" },
+  { name = "rear_tire_80", offset = 3256, type = "f32" },
+  { name = "rear_tire_84", offset = 3260, type = "f32" },
+  { name = "front_wheel_color0_hue", offset = 3276, type = "u16", note = "the front wheel copy (+3268): three colors, a hue halfword, saturation and value bytes" },
+  { name = "front_wheel_color0_saturation", offset = 3278, type = "u8" },
+  { name = "front_wheel_color0_value", offset = 3279, type = "u8" },
+  { name = "front_wheel_color1_hue", offset = 3288, type = "u16" },
+  { name = "front_wheel_color1_saturation", offset = 3290, type = "u8" },
+  { name = "front_wheel_color1_value", offset = 3291, type = "u8" },
+  { name = "front_wheel_color2_hue", offset = 3292, type = "u16" },
+  { name = "front_wheel_color2_saturation", offset = 3294, type = "u8" },
+  { name = "front_wheel_color2_value", offset = 3295, type = "u8" },
+  { name = "front_wheel_f16", offset = 3284, type = "f32" },
+  { name = "front_wheel_f28", offset = 3296, type = "f32" },
+  { name = "front_wheel_number", offset = 3308, type = "u32", note = "1 + the wheel's number (0 stock)" },
+  { name = "rear_wheel_color0_hue", offset = 3324, type = "u16", note = "the rear wheel copy (+3316): three colors, a hue halfword, saturation and value bytes" },
+  { name = "rear_wheel_color0_saturation", offset = 3326, type = "u8" },
+  { name = "rear_wheel_color0_value", offset = 3327, type = "u8" },
+  { name = "rear_wheel_color1_hue", offset = 3336, type = "u16" },
+  { name = "rear_wheel_color1_saturation", offset = 3338, type = "u8" },
+  { name = "rear_wheel_color1_value", offset = 3339, type = "u8" },
+  { name = "rear_wheel_color2_hue", offset = 3340, type = "u16" },
+  { name = "rear_wheel_color2_saturation", offset = 3342, type = "u8" },
+  { name = "rear_wheel_color2_value", offset = 3343, type = "u8" },
+  { name = "rear_wheel_f16", offset = 3332, type = "f32" },
+  { name = "rear_wheel_f28", offset = 3344, type = "f32" },
+  { name = "rear_wheel_number", offset = 3356, type = "u32", note = "1 + the wheel's number (0 stock)" },
+  { name = "paint_copy", offset = 3364, type = "bytes", count = 272, note = "the paint's copy: 20-byte entries from +3376 (three colors each, a hue halfword and two bytes), picked by SetPaint" },
+  { name = "paint_copy0_hue0", offset = 3376, type = "u16", note = "the copy's first entry (SetPaint's -2)" },
+  { name = "paint_copy0_saturation0", offset = 3378, type = "u8" },
+  { name = "paint_copy0_value0", offset = 3379, type = "u8" },
+  { name = "paint_copy0_hue1", offset = 3380, type = "u16" },
+  { name = "paint_copy0_saturation1", offset = 3382, type = "u8" },
+  { name = "paint_copy0_value1", offset = 3383, type = "u8" },
+  { name = "paint_copy0_hue2", offset = 3384, type = "u16" },
+  { name = "paint_copy0_saturation2", offset = 3386, type = "u8" },
+  { name = "paint_copy0_value2", offset = 3387, type = "u8" },
+  { name = "flags", offset = 3888, type = "u32", note = "0x1 and 0x80 the players' cars, 0x2 the rivals, 0x4 traffic" },
+  { name = "unknown_3892", offset = 3892, type = "u32", note = "1 after Car::Init" },
+]
+
+# One of a car object's 32-byte decals (+96).
+[CarMakersCarDecal]
+size = 32
+origin = "embedded"
+fields = [
+  { name = "flag_scale", offset = 0, type = "f32", note = "negative: mirrored" },
+  { name = "scale", offset = 4, type = "f32" },
+  { name = "x", offset = 8, type = "f32" },
+  { name = "y", offset = 12, type = "f32" },
+  { name = "angle", offset = 16, type = "f32" },
+  { name = "packed", offset = 20, type = "u32", note = "packed from a halfword and two bytes" },
+  { name = "image", offset = 24, type = "u32", note = "an image id or car model, -1 none" },
+  { name = "mirrored", offset = 28, type = "u32" },
+]
+
+# One of a car object's five 12-byte choices (+1824), the value
+# SceneModelRecord::SetChoice takes in r4:r5.
+[CarMakersCarChoice]
+size = 12
+origin = "embedded"
+fields = [
+  { name = "ab", offset = 0, type = "u64", note = "a and b, read as one doubleword (r4)" },
+  { name = "a", offset = 0, type = "u32" },
+  { name = "b", offset = 4, type = "u32" },
+  { name = "c", offset = 8, type = "u32", note = "0 none" },
+]
+
+# A garage car (1,968 bytes): the head of a car object and its own words
+# (known-data's "garage car"; a save data's garage holds them at +6332).
+[GarageCar]
+measure = "GarageCar"
+size = 1968
+origin = "embedded"
+fields = [
+  { name = "car_head", offset = 0, type = "bytes", count = 1884, note = "a car object's first 1,884 bytes (CarMakersCar)" },
+  { name = "spec_748", offset = 1884, type = "u32", note = "3, or the spec's +748 (Car::SetModelAndClass)" },
+  { name = "unknown_1888", offset = 1888, type = "f32", note = "0.0 at the reset" },
+  { name = "racer_float", offset = 1892, type = "f32", note = "0.0 at the reset; Racers::Add's f1 (the racer record's +3920)" },
+  { name = "unknown_1896", offset = 1896, type = "u32" },
+  { name = "spec_744", offset = 1900, type = "u32", note = "the spec's +744 (Car::SetModelAndClass)" },
+  { name = "owned_parts", offset = 1904, type = "bytes", count = 60, note = "a bitset of the owned parts: 0x826C3044's 60 bytes at the reset" },
+  { name = "unknown_1964", offset = 1964, type = "u32", note = "1 at the reset" },
+]
+
+# One of the two 1,972-byte entries at 0x82814EB8 (GarageCars::StaticInit).
+[GarageCarSlot]
+size = 1972
+origin = "embedded"
+fields = [
+  { name = "car", offset = 0, type = "bytes", count = 1968, note = "a GarageCar" },
+  { name = "unknown_1968", offset = 1968, type = "u32", note = "0 at the static init" },
+]
+
+# One of the Xbox Live mode's machines (network-mode.md: a StateMachine, then
+# words of its own), met by sub_82267CD0 (Type12Screen6's (4, 1) handler,
+# not seen in play), filed here because it calls CarModels::BlockOf.
+[CarMakersNetMachine]
+measure = "sub_82267CD0.r3"
+size = 9660
+origin = "embedded"
+fields = [
+  { name = "machine", offset = 0, type = "bytes", count = 9616, note = "a StateMachine (game-modes.toml)" },
+  { name = "back", offset = 9624, type = "u32", note = "1: back (Destroy goes to state 14)" },
+  { name = "unknown_9628", offset = 9628, type = "u32" },
+  { name = "leave", offset = 9632, type = "u32", note = "1: Destroy goes to state 15" },
+  { name = "shown", offset = 9636, type = "u32", note = "set by ModeType12::Interrupt on the shown machine" },
+  { name = "unknown_9640", offset = 9640, type = "u32" },
+  { name = "unknown_9648", offset = 9648, type = "u32" },
+  { name = "unknown_9652", offset = 9652, type = "u32" },
+  { name = "unknown_9656", offset = 9656, type = "u32" },
+]
+
+[globals]
+stand_holder = { address = 0x826D83E0, type = "ptr", note = "the stand scene's holder: three 4-byte blocks, each holding a garage stage at +0" }
+reload_count = { address = 0x826D83E4, type = "u32", note = "GarageStage::ReloadModel's calls since its last remake (the remake waits for 4)" }
+garage_cars = { address = 0x82814EB8, type = "bytes", count = 3944, note = "two GarageCarSlot (1,972 bytes each)" }
+aero_kits = { address = 0x820093E0, type = "bytes", count = 24, note = "the aero kits' 24-byte entries, two a model block (block x 2 + kit - 1): +0, +4, +8 the record's +3712, +3720, +3724, +12 its +3752, +16 its +3732, +20 its +3728; how many not known" }
+byte_scale = { address = 0x82002200, type = "f32", note = "1/255 (SetPaint)" }
+hue_scale = { address = 0x82002A14, type = "f32", note = "SetPaint's paint kind 1 hue factor (value not read)" }
+value72 = { address = 0x82009788, type = "f32", note = "SetPaint's third value for paint kind 0 (not read)" }
+value72_kind1 = { address = 0x82001070, type = "f32", note = "SetPaint's third value for paint kind 1 (0.8)" }
+tire_scale = { address = 0x82001BDC, type = "f32", note = "SetWheels' tire factor (not read)" }
+hundred = { address = 0x82002A0C, type = "f32", note = "100.0" }
+radians_per_degree = { address = 0x82002948, type = "f32", note = "pi / 180 (GarageStage::FitCar)" }

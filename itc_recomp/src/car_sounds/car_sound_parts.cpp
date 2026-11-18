@@ -14,6 +14,7 @@
 #include "c_runtime/math.h"
 #include "guest.h"
 #include "hooks/vehicle.h"
+#include "schema/car_sounds.h"
 #include "vehicle/vehicle.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -28,6 +29,9 @@ namespace {
 
 namespace xa = xaudio;
 namespace va = vehicle_accessors;
+
+using Holder = schema::CarSoundVoiceHolder;
+using G = schema::CarSoundsGlobals;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -101,7 +105,7 @@ void SetF1(const GuestCall& call, double f1) { SetRegs(call, ArgsF1({}, f1)); }
 
 // The voice in `slot` (the original's (slot + 1) x 4 from the holder).
 uint32_t VoiceAt(uint8_t* base, uint32_t holder, uint32_t slot) {
-  return Load(base, holder + ((slot + 1) << 2));
+  return Load(base, Holder(base, holder).voices_address() + (slot << 2));
 }
 
 // The frames (their originals' sizes).
@@ -129,7 +133,7 @@ constexpr uint32_t kCounterScale = 0x82008000;
 // volume, f2 the pitch) in a frame below `frame`.
 uint32_t Play(uint8_t* base, uint32_t holder, uint32_t wave, uint32_t loop, double volume,
               double pitch, const Voices& voices, uint32_t frame, const GuestCall& call) {
-  const uint32_t view = Load(base, holder + 40);
+  const uint32_t view = schema::CarSoundPart(base, holder).view().address;
   SetRegs(call, ArgsF1({holder, view, wave}, volume));
   return PlayOnce(base, holder, view, wave, loop, volume, pitch, voices,
                   xa::FrameBelow(base, frame, kPlayOnceFrame), call);
@@ -164,10 +168,11 @@ uint32_t StopVoice(uint8_t* base, uint32_t voice, uint32_t frame, const GuestCal
 // (the fctidz word): +48 the level + 1 (as a 64-bit word at the frame's +80,
 // back through fcfid) times [0x82008000].
 void HitCounters(uint8_t* base, uint32_t part, uint32_t level, uint32_t frame) {
+  const schema::CarSoundHits p(base, part);
   const uint64_t next = uint64_t(level) + 1;
   Store64(base, frame + 80, next & 0xFFFFFFFFu);
   const double count = Single(double(int64_t(next & 0xFFFFFFFFu)));
-  Store(base, part + 48, FctidzWord(Single(count * LoadF(base, kCounterScale))));
+  p.set_wait_ticks(FctidzWord(Single(count * LoadF(base, kCounterScale))));
 }
 
 }  // namespace
@@ -175,6 +180,7 @@ void HitCounters(uint8_t* base, uint32_t part, uint32_t level, uint32_t frame) {
 uint32_t HitImpact(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices& voices,
                    uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210E778 HitSounds::Impact");
+  const schema::CarSoundHits p(base, part);
   if ((Load(base, vehicle + 6152) & 1) == 0) {
     return part;
   }
@@ -212,15 +218,15 @@ uint32_t HitImpact(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices&
     const double volume = Single(f0 * LoadF(base, kVolume));
     r3 = Play(base, part, uint32_t(wave), 0, volume, LoadF(base, kPitch), voices, frame, call);
     HitCounters(base, part, level, frame);
-    Store(base, part + 60, FctiwzWord(strength));
-    Store(base, part + 64, 0);
+    p.set_strength(FctiwzWord(strength));
+    p.set_since_impact(0);
   };
-  if (strength > high && int32_t(Load(base, part + 64)) == -1) {
+  if (strength > high && int32_t(p.since_impact()) == -1) {
     play();
-  } else if (strength > LoadF(base, kHitLow) && int32_t(Load(base, part + 64)) >= 0) {
+  } else if (strength > LoadF(base, kHitLow) && int32_t(p.since_impact()) >= 0) {
     play();
   } else if (strength > high) {
-    Store(base, part + 64, 0);
+    p.set_since_impact(0);
   }
   return r3;
 }
@@ -228,21 +234,22 @@ uint32_t HitImpact(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices&
 uint32_t HitScrape(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices& voices,
                    uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210E938 HitSounds::Scrape");
+  const schema::CarSoundHits p(base, part);
   const uint32_t flags = Load(base, vehicle + 6152);
   if ((flags & 1) != 0 || (flags & 2) == 0) {
     // Out of contact: the looping voice (+56) stopped once it has played
     // more than two ticks since (+52).
-    uint32_t r3 = Playing(base, part, Load(base, part + 56), frame, call);
+    uint32_t r3 = Playing(base, part, p.scrape_slot(), frame, call);
     if (r3 == 0) {
       return r3;
     }
-    const uint32_t ticks = Load(base, part + 52) + 1;
-    Store(base, part + 52, ticks);
+    const uint32_t ticks = p.scrape_ticks() + 1;
+    p.set_scrape_ticks(ticks);
     if (ticks <= 2) {
       return r3;
     }
-    r3 = StopVoice(base, VoiceAt(base, part, Load(base, part + 56)), frame, call);
-    Store(base, part + 56, 0xFFFFFFFFu);
+    r3 = StopVoice(base, VoiceAt(base, part, p.scrape_slot()), frame, call);
+    p.set_scrape_slot(0xFFFFFFFFu);
     return r3;
   }
   double amount = LoadF(base, kZero);  // f27
@@ -270,18 +277,18 @@ uint32_t HitScrape(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices&
   const double clamped = scaled > one ? one : scaled;
   double volume = Single(Fmadds(clamped, slope, vbase) * LoadF(base, kVolumeScale));  // f31
   if (amount > LoadF(base, 0x82001FD8) && amount < low) {
-    if (Playing(base, part, Load(base, part + 56), frame, call) != 0) {
+    if (Playing(base, part, p.scrape_slot(), frame, call) != 0) {
       const double f0 = Single((scaled > one ? one : scaled) * level_max);
-      const uint32_t voice = VoiceAt(base, part, Load(base, part + 56));
+      const uint32_t voice = VoiceAt(base, part, p.scrape_slot());
       volume = Single(Fmadds(f0, slope, vbase) * LoadF(base, 0x82008058));
       r3 = SetVolume(base, voice, Single(volume * LoadF(base, kVolume)), frame, call);
     } else {
       r3 = Play(base, part, 10, 1, Single(volume * LoadF(base, kVolume)), pitch, voices, frame,
                 call);
-      Store(base, part + 56, r3);
+      p.set_scrape_slot(r3);
     }
-    Store(base, part + 48, 4);
-    Store(base, part + 52, 0);
+    p.set_wait_ticks(4);
+    p.set_scrape_ticks(0);
   }
   if (amount > low) {
     double f0 = Single(amount * LoadF(base, kLevelScale));
@@ -300,19 +307,21 @@ uint32_t HitScrape(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices&
 uint32_t HitWave9(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices& voices,
                   uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210EB90 HitSounds::Wave9");
+  const schema::CarSoundHits p(base, part);
   if ((Load(base, vehicle + 6152) & 4) == 0) {
     return part;
   }
   const uint32_t r3 =
       Play(base, part, 9, 0, LoadF(base, kVolume), LoadF(base, kPitch), voices, frame, call);
-  Store(base, part + 48, 32);
+  p.set_wait_ticks(32);
   return r3;
 }
 
 uint32_t HitSoundsUpdate(uint8_t* base, uint32_t part, uint64_t vehicle, uint64_t output,
                          const Voices& voices, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210FD78 HitSounds::Update");
-  const uint32_t ticks = Load(base, part + 48);
+  const schema::CarSoundHits p(base, part);
+  const uint32_t ticks = p.wait_ticks();
   if (ticks == 0) {
     const uint32_t v = uint32_t(vehicle);
     SetRegs(call, Args({part, vehicle, output}));
@@ -322,15 +331,15 @@ uint32_t HitSoundsUpdate(uint8_t* base, uint32_t part, uint64_t vehicle, uint64_
     SetRegs(call, Args({part, vehicle}));
     HitWave9(base, part, v, voices, xa::FrameBelow(base, frame, 96), call);
   } else {
-    Store(base, part + 48, ticks - 1);
+    p.set_wait_ticks(ticks - 1);
   }
-  int32_t since = int32_t(Load(base, part + 64));
+  int32_t since = int32_t(p.since_impact());
   if (since >= 0) {
-    Store(base, part + 64, uint32_t(since + 1));
+    p.set_since_impact(uint32_t(since + 1));
   }
-  since = int32_t(Load(base, part + 64));
+  since = int32_t(p.since_impact());
   if (since > 32) {
-    Store(base, part + 64, 0xFFFFFFFFu);
+    p.set_since_impact(0xFFFFFFFFu);
   }
   return Update(base, part, output, frame, call);
 }
@@ -338,6 +347,7 @@ uint32_t HitSoundsUpdate(uint8_t* base, uint32_t part, uint64_t vehicle, uint64_
 uint32_t Part736Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
                        const Voices& voices, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210EBF0 CarSound::Part736Update");
+  const schema::CarSoundGear p(base, part);
   if (Load(base, vehicle + 2252) == 0) {
     return part;
   }
@@ -356,17 +366,17 @@ uint32_t Part736Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t 
         scale = LoadF(base, 0x82007FC8);
       }
     }
-    if (Load(base, part + 48) == 0) {
+    if (p.wait_ticks() == 0) {
       const double f13 = Single(LoadF(base, vehicle + 2952) * scale);
       const uint32_t slot = Play(base, part, 4, 0, Single(f13 * LoadF(base, 0x82002C50)),
                                  LoadF(base, kPitch), voices, frame, call);
-      Store(base, part + 52, slot);
-      Store(base, part + 48, 32);
+      p.set_slot(slot);
+      p.set_wait_ticks(32);
     }
   } else {
-    const uint32_t ticks = Load(base, part + 48);
+    const uint32_t ticks = p.wait_ticks();
     if (ticks != 0) {
-      Store(base, part + 48, ticks - 1);
+      p.set_wait_ticks(ticks - 1);
     }
   }
   return Update(base, part, output, frame, call);
@@ -375,18 +385,19 @@ uint32_t Part736Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t 
 uint32_t Part840Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
                        const Voices& voices, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210ECF0 CarSound::Part840Update");
+  const schema::CarSoundEvents p(base, part);
   const double pitch = LoadF(base, kPitch);
   if (guest::LoadU8(base, vehicle + 2504) != 0) {
     Play(base, part, 6, 0, LoadF(base, kVolume), pitch, voices, frame, call);
   }
-  if (guest::LoadU8(base, vehicle + 2960) != 0 && guest::LoadU8(base, part + 45) == 0) {
+  if (guest::LoadU8(base, vehicle + 2960) != 0 && p.wave18_wait() == 0) {
     Play(base, part, 18, 0, LoadF(base, kVolume), pitch, voices, frame, call);
-    guest::StoreU8(base, part + 45, 2);
+    p.set_wave18_wait(2);
   }
-  const uint8_t left = uint8_t(guest::LoadU8(base, part + 45) - 1);
-  guest::StoreU8(base, part + 45, left);
+  const uint8_t left = uint8_t(p.wave18_wait() - 1);
+  p.set_wave18_wait(left);
   if (int8_t(left) < 0) {
-    guest::StoreU8(base, part + 45, 0);
+    p.set_wave18_wait(0);
   }
   return Update(base, part, output, frame, call);
 }
@@ -394,47 +405,48 @@ uint32_t Part840Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t 
 uint32_t Part888Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
                        const Voices& voices, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210EEE0 CarSound::Part888Update");
+  const schema::CarSoundFade p(base, part);
   const double full = LoadF(base, 0x82002C50);  // f31
   const double zero = LoadF(base, kZero);       // f30
   const double rest = LoadF(base, 0x82001BE0);  // f28
   const double step = LoadF(base, kOne);        // f29
-  if (int32_t(Load(base, part + 48)) == 0) {
+  if (int32_t(p.playing()) == 0) {
     if (guest::LoadU8(base, vehicle + 2424) != 0) {
-      if (LoadF(base, part + 60) == rest) {
-        StoreF(base, part + 60, LoadF(base, 0x82007FB8));
+      if (double(p.fade_in()) == rest) {
+        p.set_fade_in(float(LoadF(base, 0x82007FB8)));
       }
       const uint32_t slot = Play(base, part, 17, 1, full, LoadF(base, kPitch), voices, frame, call);
-      StoreF(base, part + 56, rest);
-      Store(base, part + 52, slot);
-      Store(base, part + 48, 1);
+      p.set_fade_out(float(rest));
+      p.set_slot(slot);
+      p.set_playing(1);
     }
   } else {
-    double f0 = Single(LoadF(base, part + 60) - step);
-    StoreF(base, part + 60, f0);
+    double f0 = Single(double(p.fade_in()) - step);
+    p.set_fade_in(float(f0));
     if (f0 < zero) {
-      StoreF(base, part + 60, zero);
+      p.set_fade_in(float(zero));
     }
-    const double f13 = Single(LoadF(base, part + 60) * LoadF(base, 0x820029EC));
-    const uint32_t voice = VoiceAt(base, part, Load(base, part + 52));
+    const double f13 = Single(double(p.fade_in()) * LoadF(base, 0x820029EC));
+    const uint32_t voice = VoiceAt(base, part, p.slot());
     SetVolume(base, voice, Fmadds(f13, LoadF(base, 0x82007FD8), full), frame, call);
-    if (guest::LoadU8(base, vehicle + 2424) == 0 && LoadF(base, part + 56) == rest) {
-      StoreF(base, part + 56, LoadF(base, 0x820029D0));
+    if (guest::LoadU8(base, vehicle + 2424) == 0 && double(p.fade_out()) == rest) {
+      p.set_fade_out(float(LoadF(base, 0x820029D0)));
     }
   }
-  double f0 = LoadF(base, part + 56);
+  double f0 = double(p.fade_out());
   if (!(f0 == rest)) {
     f0 = Single(f0 - step);
-    StoreF(base, part + 56, f0);
+    p.set_fade_out(float(f0));
     const double f13 = Single(f0 * LoadF(base, 0x82008060));
-    const uint32_t voice = VoiceAt(base, part, Load(base, part + 52));
+    const uint32_t voice = VoiceAt(base, part, p.slot());
     SetVolume(base, voice, Single(f13 * full), frame, call);
-    if (LoadF(base, part + 56) == zero) {
-      if (Playing(base, part, Load(base, part + 52), frame, call) != 0) {
-        StopVoice(base, VoiceAt(base, part, Load(base, part + 52)), frame, call);
+    if (double(p.fade_out()) == zero) {
+      if (Playing(base, part, p.slot(), frame, call) != 0) {
+        StopVoice(base, VoiceAt(base, part, p.slot()), frame, call);
       }
-      StoreF(base, part + 56, rest);
-      StoreF(base, part + 60, rest);
-      Store(base, part + 48, 0);
+      p.set_fade_out(float(rest));
+      p.set_fade_in(float(rest));
+      p.set_playing(0);
     }
   }
   return Update(base, part, output, frame, call);
@@ -443,6 +455,7 @@ uint32_t Part888Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t 
 uint32_t WindSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
                          const Voices& voices, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210EDB0 WindSound::Update");
+  const schema::CarSoundWind p(base, part);
   // The four halfwords at the vehicle's +5410 (96 bytes apart), bit 0.
   bool any = false;
   for (uint32_t i = 0; i < 4; i++) {
@@ -452,7 +465,7 @@ uint32_t WindSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
     }
   }
   if (any) {
-    if (int32_t(Load(base, part + 48)) == 0) {
+    if (int32_t(p.played()) == 0) {
       SetRegs(call, Args({vehicle}));
       const double first = double(Vehicle_GetSpeedKmh(base, vehicle));
       SetF1(call, first);
@@ -473,11 +486,11 @@ uint32_t WindSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
         const double f13 = Single(scale * f0);
         Play(base, part, 5, 0, Single(f13 * LoadF(base, 0x82001FBC)), LoadF(base, kPitch), voices,
              frame, call);
-        Store(base, part + 48, 1);
+        p.set_played(1);
       }
     }
-  } else if (int32_t(Load(base, part + 48)) == 1) {
-    Store(base, part + 48, 0);
+  } else if (int32_t(p.played()) == 1) {
+    p.set_played(0);
   }
   return Update(base, part, output, frame, call);
 }
@@ -520,8 +533,10 @@ uint32_t EngineLayerUpdate(uint8_t* base, uint32_t layer, double speed, double v
                            double pitch, double gain, uint64_t output, const Voices& voices,
                            uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210D478 EngineLayer::Update");
-  const uint32_t table = Load(base, layer + 4);  // r25
-  uint32_t out = layer + 20;                     // r22
+  const schema::CarSoundEngineLayer l(base, layer);
+  using Entry = schema::CarSoundEngineEntry;
+  const uint32_t table = l.table().address;  // r25
+  uint32_t out = l.amounts_address();        // r22
   if (table == 0) {
     return 0;
   }
@@ -531,24 +546,24 @@ uint32_t EngineLayerUpdate(uint8_t* base, uint32_t layer, double speed, double v
       speed = cap;
     }
   }
-  uint32_t entry = table + 4;  // r29
-  if (!(int32_t(Load(base, entry)) > -1)) {
+  uint32_t entry = schema::CarSoundEngineTable(base, table).entries_address();  // r29
+  if (!(int32_t(Entry(base, entry).id()) > -1)) {
     return 0;
   }
-  const uint32_t holder = layer + 44;          // r26
-  uint32_t slot_at = layer + 48;               // r30
+  const uint32_t holder = l.holder_address();                // r26
+  uint32_t slot_at = Holder(base, holder).voices_address();  // r30
   const double scale = LoadF(base, kLayerVolume);  // f26
   const double end = LoadF(base, kCurveEnd);       // f29
   const double zero = LoadF(base, kZero);          // f27
   uint32_t slot = 0;                               // r28
   do {
-    const uint32_t second = entry + 72;  // r31
+    const uint32_t second = Entry(base, entry).pitch_curve_address();  // r31
     double amount = zero;                // f31
     double rate = zero;                  // f30
     // The first curve (entry + 8): the volume's amount at the speed, stored
     // at the layer's next float.
     {
-      uint32_t r11 = second - 64, r10 = r11;
+      uint32_t r11 = Entry(base, entry).volume_curve_address(), r10 = r11;
       bool found = false;
       for (;;) {
         const double x = LoadF(base, r11);
@@ -625,7 +640,7 @@ uint32_t EngineLayerUpdate(uint8_t* base, uint32_t layer, double speed, double v
     }
     // The volume: the table's word (as fcfid gives it, through the frame's
     // +88) times the scale, the amount, f2, f5 and the gain.
-    const uint32_t word = Load(base, table);
+    const uint32_t word = schema::CarSoundEngineTable(base, table).volume_scale();
     voice = Load(base, slot_at);
     Store64(base, frame + 88, word);
     double level = Single(double(int64_t(uint64_t(word))));
@@ -637,7 +652,7 @@ uint32_t EngineLayerUpdate(uint8_t* base, uint32_t layer, double speed, double v
     // The pitch (SetPitchScaled: r7 0, r9 the entry's +4, f3 `pitch`; the
     // original's f2, [0x8200295C], isn't read by it).
     SetRegs(call, ArgsF1({holder, slot}, rate));
-    SetPitchScaled(base, holder, slot, rate, pitch, 0, Load(base, entry + 4),
+    SetPitchScaled(base, holder, slot, rate, pitch, 0, Entry(base, entry).pitch_scale(),
                    xa::FrameBelow(base, frame, kSetPitchScaledFrame), call);
     // The output map: the whole r7 at the frame's +96.
     voice = Load(base, slot_at);
@@ -645,10 +660,10 @@ uint32_t EngineLayerUpdate(uint8_t* base, uint32_t layer, double speed, double v
     SetRegs(call, Args({voice, frame + 96}));
     xa::FrameBelow(base, frame, kApiFrame);
     xa::ApiSetOutputMatrix(base, voice, frame + 96, 0, 0, 0, call);
-    entry += 136;
+    entry += Entry::kSize;
     slot++;
     slot_at += 4;
-  } while (int32_t(Load(base, entry)) > -1);
+  } while (int32_t(Entry(base, entry).id()) > -1);
   return 0;
 }
 
@@ -678,7 +693,7 @@ uint32_t EngineLayerUpdatePitched(uint8_t* base, uint32_t engine, double speed, 
   const double scaled = Single(f0 * LoadF(base, 0x8200802C));
   const double mix = Fmadds(f2, LoadF(base, 0x82002A3C), LoadF(base, k + 20));
   const double volume = Single(scaled * mix);
-  const uint32_t layer = engine + 84;
+  const uint32_t layer = schema::CarSoundEngine(base, engine).pitched_layer_address();
   SetRegs(call, ArgsF1({layer}, speed));
   return EngineLayerUpdate(base, layer, speed, volume, f3, f4, output, voices,
                            xa::FrameBelow(base, frame, kLayerUpdateFrame), call);
@@ -688,6 +703,7 @@ uint32_t EngineSoundUpdate(uint8_t* base, uint32_t engine, uint32_t vehicle, uin
                            double f1, double f2, const Voices& voices, uint32_t frame,
                            const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210E470 EngineSound::Update");
+  const schema::CarSoundEngine e(base, engine);
   constexpr uint32_t k = 0x82007FC8;  // r29
   double speed;                       // f30
   if (vehicle != 0) {
@@ -697,12 +713,12 @@ uint32_t EngineSoundUpdate(uint8_t* base, uint32_t engine, uint32_t vehicle, uin
     SetF1(call, value);
     speed = Single(Single(value / top) * LoadF(base, k - 4));
   } else {
-    const double rise = Single(LoadF(base, engine + 172) + LoadF(base, 0x82001FD8));
-    StoreF(base, engine + 172, rise);
+    const double rise = Single(double(e.idle_speed()) + LoadF(base, 0x82001FD8));
+    e.set_idle_speed(float(rise));
     if (rise > LoadF(base, 0x82008048)) {
-      StoreF(base, engine + 172, LoadF(base, kEngineRest));
+      e.set_idle_speed(float(LoadF(base, kEngineRest)));
     }
-    speed = LoadF(base, engine + 172);
+    speed = double(e.idle_speed());
   }
   const double one = LoadF(base, k);       // f10
   const double zero = LoadF(base, kZero);  // f11
@@ -718,18 +734,18 @@ uint32_t EngineSoundUpdate(uint8_t* base, uint32_t engine, uint32_t vehicle, uin
     } else {
       target = LoadF(base, vehicle + 284);
     }
-    const double last = LoadF(base, engine + 168);
+    const double last = double(e.load());
     load = Fmadds(Single(target - last), LoadF(base, 0x82002968), last);
   } else {
     load = one;
   }
   SetRegs(call, ArgsF1({engine}, speed));
-  EngineLayerUpdate(base, engine, speed, Fmadds(load, zero, one), f1, f2, output, voices,
+  EngineLayerUpdate(base, e.layer_address(), speed, Fmadds(load, zero, one), f1, f2, output, voices,
                     xa::FrameBelow(base, frame, kLayerUpdateFrame), call);
   SetRegs(call, ArgsF1({engine}, speed));
   const uint32_t r3 = EngineLayerUpdatePitched(base, engine, speed, load, f1, f2, output, voices,
                                                xa::FrameBelow(base, frame, kPitchedFrame), call);
-  StoreF(base, engine + 168, load);
+  e.set_load(float(load));
   return r3;
 }
 
@@ -763,53 +779,55 @@ uint32_t TireLayerUpdate(uint8_t* base, uint32_t part, uint32_t layer, uint32_t 
                          uint64_t output, double scale, const Voices& voices, uint32_t frame,
                          const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210D890 TireLayer::Update");
-  const uint32_t holder = part + 24;
+  const schema::CarSoundTires p(base, part);
+  const schema::CarSoundTires l(base, layer);
+  const uint32_t holder = p.holder_address();
   uint32_t r3;
   if (active != 0) {  // r26
     // Playing (started first if not): the volume +80 x f1, the pitch from
     // the half-word +76, the output; +9 = 0, +8 up by one.
-    const uint32_t playing = Playing(base, holder, Load(base, layer), frame, call);
-    uint32_t voice = VoiceAt(base, holder, Load(base, layer));
+    const uint32_t playing = Playing(base, holder, l.slot(), frame, call);
+    uint32_t voice = VoiceAt(base, holder, l.slot());
     if (playing == 0) {
       SetRegs(call, Args({voice, 0}));
       xa::FrameBelow(base, frame, kApiFrame);
       xa::ApiStart(base, voice, 0, voices.thread, call);
-      voice = VoiceAt(base, holder, Load(base, layer));
+      voice = VoiceAt(base, holder, l.slot());
     }
     SetVolume(base, voice,
-              Single(Single(LoadF(base, part + 80) * scale) * LoadF(base, kTireVolume)), frame,
+              Single(Single(double(p.volume()) * scale) * LoadF(base, kTireVolume)), frame,
               call);
-    const int64_t word = int16_t(guest::LoadU16(base, part + 76));
+    const int64_t word = int16_t(p.pitch());
     const double pitch = PitchOfWord(base, frame + 80, word, kTirePitch);
-    const uint32_t slot = Load(base, layer);
+    const uint32_t slot = l.slot();
     SetRegs(call, ArgsF1({holder, slot}, pitch));
     SetPitch(base, holder, slot, pitch, 0, frame, call);
-    voice = VoiceAt(base, holder, Load(base, layer));
+    voice = VoiceAt(base, holder, l.slot());
     Store64(base, frame + 80, output);
     SetRegs(call, Args({voice, frame + 80}));
     xa::FrameBelow(base, frame, kApiFrame);
     r3 = xa::ApiSetOutputMatrix(base, voice, frame + 80, 0, 0, 0, call);
-    guest::StoreU8(base, layer + 9, 0);
-    guest::StoreU8(base, layer + 8, uint8_t(guest::LoadU8(base, layer + 8) + 1));
-    Store(base, layer + 4, active);
+    l.set_ramp_step(0);
+    l.set_slip_ticks(uint8_t(l.slip_ticks() + 1));
+    l.set_was_active(active);
     return r3;
   }
-  r3 = Playing(base, holder, Load(base, layer), frame, call);
+  r3 = Playing(base, holder, l.slot(), frame, call);
   if (r3 == 0) {
-    Store(base, layer + 4, active);
+    l.set_was_active(active);
     return r3;
   }
-  if (Load(base, layer + 4) != 0) {
+  if (l.was_active() != 0) {
     // Just stopped slipping: the ramp's length +10 from the ticks it played
     // (+8 x 10 x [0x820029EC], fctidz's low byte; under 10, [0x82001FD8];
     // else that byte as a float, at most [0x82008034], fctidz's low byte).
-    const int64_t ticks = int32_t(uint32_t(guest::LoadU8(base, layer + 8)) * 10);
+    const int64_t ticks = int32_t(uint32_t(l.slip_ticks()) * 10);
     Store64(base, frame + 80, uint64_t(ticks));
     double f0 = Single(Single(double(ticks)) * LoadF(base, kTireRampScale));
     uint64_t word = Fctidz64(f0);
     Store64(base, frame + 80, word);
     const uint8_t length = uint8_t(word);
-    guest::StoreU8(base, layer + 10, length);
+    l.set_ramp_length(length);
     if (length < 10) {
       f0 = LoadF(base, kTireRampShort);
     } else {
@@ -822,45 +840,46 @@ uint32_t TireLayerUpdate(uint8_t* base, uint32_t part, uint32_t layer, uint32_t 
     }
     word = Fctidz64(f0);
     Store64(base, frame + 80, word);
-    guest::StoreU8(base, layer + 10, uint8_t(word));
+    l.set_ramp_length(uint8_t(word));
   }
   // The ramp: the pitch half-way from +76 toward +9 x 128 (at most 16383),
   // while +9 is below +10; then stopped, +8 and +9 cleared. +9 up by one.
-  const uint32_t step = guest::LoadU8(base, layer + 9);
+  const uint32_t step = l.ramp_step();
   int32_t target = int32_t(step << 7);
   if (target > 16383) {
     target = 16383;
   }
-  const uint32_t length = guest::LoadU8(base, layer + 10);
-  const uint16_t now = guest::LoadU16(base, part + 76);
+  const uint32_t length = l.ramp_length();
+  const uint16_t now = p.pitch();
   const int32_t diff = int32_t(uint32_t(int64_t(int16_t(target)) - int64_t(int16_t(now))));
   const int64_t mid = int16_t(uint16_t(uint32_t(diff / 2) + now));
   if (step < length) {
-    uint32_t voice = VoiceAt(base, holder, Load(base, layer));
-    SetVolume(base, voice, Single(LoadF(base, part + 80) * LoadF(base, kTireVolume)), frame,
+    uint32_t voice = VoiceAt(base, holder, l.slot());
+    SetVolume(base, voice, Single(double(p.volume()) * LoadF(base, kTireVolume)), frame,
               call);
-    const uint32_t slot = Load(base, layer);
+    const uint32_t slot = l.slot();
     const double pitch = PitchOfWord(base, frame + 80, mid, kTirePitch);
     SetRegs(call, ArgsF1({holder, slot}, pitch));
     SetPitch(base, holder, slot, pitch, 0, frame, call);
-    voice = VoiceAt(base, holder, Load(base, layer));
+    voice = VoiceAt(base, holder, l.slot());
     Store64(base, frame + 80, output);
     SetRegs(call, Args({voice, frame + 80}));
     xa::FrameBelow(base, frame, kApiFrame);
     r3 = xa::ApiSetOutputMatrix(base, voice, frame + 80, 0, 0, 0, call);
   } else {
-    r3 = StopVoice(base, VoiceAt(base, holder, Load(base, layer)), frame, call);
-    guest::StoreU8(base, layer + 8, 0);
-    guest::StoreU8(base, layer + 9, 0);
+    r3 = StopVoice(base, VoiceAt(base, holder, l.slot()), frame, call);
+    l.set_slip_ticks(0);
+    l.set_ramp_step(0);
   }
-  guest::StoreU8(base, layer + 9, uint8_t(guest::LoadU8(base, layer + 9) + 1));
-  Store(base, layer + 4, active);
+  l.set_ramp_step(uint8_t(l.ramp_step() + 1));
+  l.set_was_active(active);
   return r3;
 }
 
 uint32_t TireSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
                          const Voices& voices, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210E5C0 TireSound::Update");
+  const schema::CarSoundTires p(base, part);
   const double speed = LoadF(base, kSlipSpeed);
   SetRegs(call, ArgsF1({vehicle}, speed));
   const double slip = vehicle::VehicleSlipWheelValue(
@@ -885,15 +904,15 @@ uint32_t TireSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
       active = 1;
       SetRegs(call, ArgsF1({part, vehicle}, slip));
       TireSoundAmount(base, part, slip);
-      guest::StoreU16(base, part + 70, uint16_t(guest::LoadU16(base, part + 70) + 1));
-      StoreF(base, part + 72, Single(LoadF(base, part + 72) + one));
+      p.set_slip_steps(uint16_t(p.slip_steps() + 1));
+      p.set_slip_time(float(Single(double(p.slip_time()) + one)));
       slipping = true;
     }
   } else {
     // No wheel down: both voices (+28, +32) stopped when playing (their
     // states at the frame's +80 and +81).
     for (uint32_t i = 0; i < 2; i++) {
-      const uint32_t voice = Load(base, part + 28 + 4 * i);
+      const uint32_t voice = Load(base, Holder(base, p.holder_address()).voices_address() + 4 * i);
       if (voice == 0) {
         continue;
       }
@@ -901,19 +920,20 @@ uint32_t TireSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
       xa::FrameBelow(base, frame, kApiFrame);
       xa::ApiGetState(base, voice, frame + 80 + i, 0, 0, 0, call);
       if ((guest::LoadU8(base, frame + 80 + i) & 1) != 0) {
-        StopVoice(base, Load(base, part + 28 + 4 * i), frame, call);
+        StopVoice(base, Load(base, Holder(base, p.holder_address()).voices_address() + 4 * i),
+                  frame, call);
       }
     }
   }
   if (!slipping) {
     // Neither slot (+0, +12) playing: +80, +72 = 0.0, +70, +76 = 0.
-    const uint32_t holder = part + 24;
-    if (Playing(base, holder, Load(base, part + 0), frame, call) == 0 &&
-        Playing(base, holder, Load(base, part + 12), frame, call) == 0) {
-      StoreF(base, part + 80, zero);
-      guest::StoreU16(base, part + 70, uint16_t(active));
-      StoreF(base, part + 72, zero);
-      guest::StoreU16(base, part + 76, uint16_t(active));
+    const uint32_t holder = p.holder_address();
+    if (Playing(base, holder, p.slot(), frame, call) == 0 &&
+        Playing(base, holder, p.slot_2(), frame, call) == 0) {
+      p.set_volume(float(zero));
+      p.set_slip_steps(uint16_t(active));
+      p.set_slip_time(float(zero));
+      p.set_pitch(uint16_t(active));
     }
   }
   SetRegs(call, ArgsF1({part, part, active}, one));
@@ -924,6 +944,8 @@ uint32_t TireSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
 uint32_t RollSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
                          const Voices& voices, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210DB60 RollSound::Update");
+  // Its one voice: the holder's slot 0.
+  const uint32_t voice_word = Holder(base, schema::CarSoundRoll(base, part).holder_address()).voices_address();
   SetRegs(call, Args({vehicle}));
   const double speed = double(Vehicle_GetSpeedKmh(base, vehicle));
   SetF1(call, speed);
@@ -935,7 +957,7 @@ uint32_t RollSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
   const double volume = Single(f0 * LoadF(base, kTireVolume));  // f31
   Store(base, frame + 88, FctiwzWord(Single(volume * LoadF(base, kRollPitchScale))));
   const double zero = LoadF(base, kZero);
-  uint32_t voice = Load(base, part + 4);
+  uint32_t voice = Load(base, voice_word);
   uint32_t r3 = voice;
   bool playing = false;  // r29
   if (voice != 0) {
@@ -946,13 +968,13 @@ uint32_t RollSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
   }
   if (playing) {
     if (volume == zero) {
-      return StopVoice(base, Load(base, part + 4), frame, call);
+      return StopVoice(base, Load(base, voice_word), frame, call);
     }
   } else {
     if (volume == zero) {
       return r3;
     }
-    voice = Load(base, part + 4);
+    voice = Load(base, voice_word);
     SetRegs(call, Args({voice, 0}));
     xa::FrameBelow(base, frame, kApiFrame);
     xa::ApiStart(base, voice, 0, voices.thread, call);
@@ -963,9 +985,9 @@ uint32_t RollSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
   const double pitch = PitchOfWord(base, frame + 88, word, kRollPitch);
   SetRegs(call, ArgsF1({part, 0}, pitch));
   SetPitch(base, part, 0, pitch, 0, frame, call);
-  voice = Load(base, part + 4);
+  voice = Load(base, voice_word);
   SetVolume(base, voice, Single(volume * LoadF(base, kTireVolume)), frame, call);
-  voice = Load(base, part + 4);
+  voice = Load(base, voice_word);
   Store64(base, frame + 88, output);
   SetRegs(call, Args({voice, frame + 88}));
   xa::FrameBelow(base, frame, kApiFrame);
@@ -978,9 +1000,7 @@ namespace {
 
 constexpr uint32_t kRaceData = 0x826C5B2C;     // the race data: its +0xA3AF4 the race mode
 constexpr uint32_t kRaceMode = 0xA3AF4;
-constexpr uint32_t kCarInputs = 0x826C5B30;    // the racers' 20-byte input records' pointers
 constexpr uint32_t kSideWord = 0x826C7824;     // 0 picks input record 1 in mode 8
-constexpr uint32_t kOtherInput = 0x826C62CC;   // the other 20-byte input record (mode 8)
 constexpr uint32_t kHornButton = 0x20000;      // the input word's bit (probably the horn)
 constexpr uint32_t kHornVolume = 0x82007FD8;
 constexpr uint32_t kHornPitchScale = 1600;     // SetPitchScaled's r9
@@ -1008,33 +1028,35 @@ uint64_t Fctiwz64(double value) {
 
 // One horn: the 20-byte input record at `record` copied to the frame's +80;
 // with its first word's button bit, the looping wave 11 + `horn` played
-// (slot at +`slot_at`, +`flag_at` = 1) or kept pitched; without it, the
-// voice stopped when +`flag_at` is 1 and it plays (+`flag_at` = 0).
+// (its slot into the word at `slot_at`, the word at `flag_at` = 1) or kept
+// pitched; without it, the voice stopped when the flag is 1 and it plays
+// (the flag 0). `flag_at` and `slot_at` are the horn part's words (+56 and
+// +48, or +60 and +52).
 void HornUpdate(uint8_t* base, uint32_t part, uint32_t record, uint32_t horn, uint32_t flag_at,
                 uint32_t slot_at, double volume, double pitch, double f3, const Voices& voices,
                 uint32_t frame, const GuestCall& call) {
-  for (uint32_t i = 0; i < 20; i += 4) {
-    Store(base, frame + 80 + i, Load(base, record + i));
+  for (uint32_t i = 0; i < schema::CarInputRecord::kSize; i += 4) {
+    Store(base, frame + 80 + i, Load(base, schema::CarInputRecord(base, record).address + i));
   }
-  const uint32_t flag = Load(base, part + flag_at);
+  const uint32_t flag = Load(base, flag_at);
   if ((Load(base, frame + 80) & kHornButton) != 0) {
     uint32_t slot;
     if (flag == 0) {
       slot = Play(base, part, horn + 11, 1, volume, pitch, voices, frame, call);
-      Store(base, part + slot_at, slot);
+      Store(base, slot_at, slot);
     } else {
-      slot = Load(base, part + slot_at);
+      slot = Load(base, slot_at);
     }
     SetRegs(call, ArgsF1({part, slot}, pitch));
     SetPitchScaled(base, part, slot, pitch, f3, 0, kHornPitchScale,
                    xa::FrameBelow(base, frame, kSetPitchScaledFrame), call);
     if (flag == 0) {
-      Store(base, part + flag_at, 1);
+      Store(base, flag_at, 1);
     }
   } else if (flag == 1) {
-    if (Playing(base, part, Load(base, part + slot_at), frame, call) != 0) {
-      StopVoice(base, VoiceAt(base, part, Load(base, part + slot_at)), frame, call);
-      Store(base, part + flag_at, 0);
+    if (Playing(base, part, Load(base, slot_at), frame, call) != 0) {
+      StopVoice(base, VoiceAt(base, part, Load(base, slot_at)), frame, call);
+      Store(base, flag_at, 0);
     }
   }
 }
@@ -1044,6 +1066,7 @@ void HornUpdate(uint8_t* base, uint32_t part, uint32_t record, uint32_t horn, ui
 uint32_t HornSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
                          double f1, const Voices& voices, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210F118 HornSound::Update");
+  const schema::CarSoundHorn h(base, part);
   if (vehicle == 0) {
     return part;
   }
@@ -1056,15 +1079,17 @@ uint32_t HornSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
     const uint32_t flags = Load(base, vehicle + 6148);
     const bool first = (flags & 1) != 0, second = (flags & 0x80) != 0;
     if (side == 0 ? first : second) {
-      HornUpdate(base, part, Load(base, kCarInputs + 4 * side), horn, 56, 48, volume, pitch, f1,
-                 voices, frame, call);
+      HornUpdate(base, part, Load(base, G::input_records_address() + 4 * side), horn,
+                 h.playing_address(), h.slot_address(), volume, pitch, f1, voices, frame, call);
     }
     if (side == 0 ? second : first) {
-      HornUpdate(base, part, kOtherInput, horn, 60, 52, volume, pitch, f1, voices, frame, call);
+      HornUpdate(base, part, G::horn_record_address(), horn, h.playing_2_address(),
+                 h.slot_2_address(), volume, pitch, f1, voices, frame, call);
     }
   } else {
-    HornUpdate(base, part, Load(base, kCarInputs), horn, 56, 48, LoadF(base, kHornVolume),
-               LoadF(base, kPitch), f1, voices, frame, call);
+    HornUpdate(base, part, Load(base, G::input_records_address()), horn, h.playing_address(),
+               h.slot_address(), LoadF(base, kHornVolume), LoadF(base, kPitch), f1, voices, frame,
+               call);
   }
   return Update(base, part, output, frame, call);
 }
@@ -1072,51 +1097,52 @@ uint32_t HornSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
 uint32_t TurboSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
                           const Voices& voices, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210F4E8 TurboSound::Update");
+  const schema::CarSoundTurbo p(base, part);
   const double boost = LoadF(base, vehicle + 2944);  // f30
   // The volume +60 up by +59 x [0x82008068], at most [0x82008064] (the
   // byte through the frame's +80).
   {
-    const uint32_t ramp = guest::LoadU8(base, part + 59);
+    const uint32_t ramp = p.volume_steps();
     Store64(base, frame + 80, ramp);
     double f0 = Fmadds(Single(double(int64_t(ramp))), LoadF(base, kTurboStep),
-                       LoadF(base, part + 60));
+                       double(p.volume()));
     const double max = LoadF(base, kTurboVolumeMax);
     if (f0 > max) {
       f0 = max;
     }
-    StoreF(base, part + 60, f0);
+    p.set_volume(float(f0));
   }
   const double one = LoadF(base, kOne);    // f29
   const double zero = LoadF(base, kZero);  // f31
-  const uint8_t wait = guest::LoadU8(base, part + 58);
+  const uint8_t wait = p.wait_ticks();
   const auto word_pitch = [&](int64_t word) {
     Store64(base, frame + 80, uint64_t(word));
     return Single(double(word));
   };
   if (wait != 0) {
-    guest::StoreU8(base, part + 58, uint8_t(wait + 255));
-  } else if (Playing(base, part, Load(base, part + 48), frame, call) == 0 && boost > one &&
-             boost > LoadF(base, part + 52)) {
+    p.set_wait_ticks(uint8_t(wait + 255));
+  } else if (Playing(base, part, p.slot(), frame, call) == 0 && boost > one &&
+             boost > double(p.last_boost())) {
     // Spooling up: the looping wave 3 at the volume +60, its pitch from +56.
-    const double pitch = word_pitch(int64_t(int16_t(guest::LoadU16(base, part + 56))) + 8192);
+    const double pitch = word_pitch(int64_t(int16_t(p.pitch())) + 8192);
     const uint32_t slot =
-        Play(base, part, 3, 1, LoadF(base, part + 60), pitch, voices, frame, call);
-    StoreF(base, part + 60, zero);
-    Store(base, part + 48, slot);
-    guest::StoreU8(base, part + 59, 0);
-    guest::StoreU8(base, part + 58, 16);
+        Play(base, part, 3, 1, double(p.volume()), pitch, voices, frame, call);
+    p.set_volume(float(zero));
+    p.set_slot(slot);
+    p.set_volume_steps(0);
+    p.set_wait_ticks(16);
   } else if (boost < LoadF(base, kTurboOff)) {
-    if (Playing(base, part, Load(base, part + 48), frame, call) != 0) {
-      StopVoice(base, VoiceAt(base, part, Load(base, part + 48)), frame, call);
-      StoreF(base, part + 60, zero);
-      guest::StoreU8(base, part + 59, 0);
+    if (Playing(base, part, p.slot(), frame, call) != 0) {
+      StopVoice(base, VoiceAt(base, part, p.slot()), frame, call);
+      p.set_volume(float(zero));
+      p.set_volume_steps(0);
     }
   }
-  const uint32_t playing = Playing(base, part, Load(base, part + 48), frame, call);
-  const int32_t word = int16_t(guest::LoadU16(base, part + 56));
+  const uint32_t playing = Playing(base, part, p.slot(), frame, call);
+  const int32_t word = int16_t(p.pitch());
   if (playing != 0) {
     if (word < 3072) {
-      const double rise = Single(boost - LoadF(base, part + 52));
+      const double rise = Single(boost - double(p.last_boost()));
       if (!(rise < zero)) {
         // +56 up by the rise x [0x820021EC] (+ [0x820029CC], fctiwz's low
         // half-word through the frame's +80), at most 3072.
@@ -1126,23 +1152,23 @@ uint32_t TurboSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64
         const uint64_t bits = Fctiwz64(f0);
         Store64(base, frame + 80, bits);
         const uint16_t next = uint16_t(bits);
-        guest::StoreU16(base, part + 56, int16_t(next) > 3072 ? 3072 : next);
+        p.set_pitch(int16_t(next) > 3072 ? 3072 : next);
       }
     }
-    const uint32_t slot = Load(base, part + 48);
+    const uint32_t slot = p.slot();
     const double pitch =
-        word_pitch(int64_t(int16_t(guest::LoadU16(base, part + 56))) + 8192);
+        word_pitch(int64_t(int16_t(p.pitch())) + 8192);
     SetRegs(call, ArgsF1({part, slot}, pitch));
     SetPitch(base, part, slot, pitch, 0, frame, call);
-    SetVolume(base, VoiceAt(base, part, Load(base, part + 48)), LoadF(base, part + 60), frame,
+    SetVolume(base, VoiceAt(base, part, p.slot()), double(p.volume()), frame,
               call);
-    guest::StoreU8(base, part + 59, uint8_t(guest::LoadU8(base, part + 59) + 1));
+    p.set_volume_steps(uint8_t(p.volume_steps() + 1));
   } else {
     // Not playing: the pitch word +56 back down by 255 a tick, to 0.
     const int32_t down = word - 255;
-    guest::StoreU16(base, part + 56, down >= 0 ? uint16_t(down) : 0);
+    p.set_pitch(down >= 0 ? uint16_t(down) : 0);
   }
-  StoreF(base, part + 52, boost);
+  p.set_last_boost(float(boost));
   return Update(base, part, output, frame, call);
 }
 
@@ -1152,18 +1178,12 @@ namespace {
 
 constexpr uint32_t kDopplerMax = 0x820029D4;  // +204 at most
 constexpr uint32_t kDopplerMin = 0x82001070;  // +204 at least
-// The submix's effect parameters (48 bytes each): outside, and inside (its
-// +192; probably a tunnel's reverb).
-constexpr uint32_t kReverbOff = 0x82616638;
-constexpr uint32_t kReverbOn = kReverbOff + 192;
+// The submix's effect parameters (48 bytes each): outside, and inside
+// (probably a tunnel's reverb).
 constexpr uint32_t kReverbBytes = 48;
 constexpr uint32_t kSetEffectFrame = 144;
 constexpr uint32_t kUpdate3DReturn = 0x82110080;
 constexpr uint32_t kCarSoundFrame = 128;
-
-uint64_t Load64(uint8_t* base, uint32_t address) {
-  return (uint64_t(Load(base, address)) << 32) | Load(base, address + 4);
-}
 
 // The submix voice's SetEffectParameters (r4 0, r5 1, r6 3, r7 the frame's
 // +`at`: the block's address, then its size).
@@ -1172,7 +1192,7 @@ uint32_t SetReverb(uint8_t* base, uint32_t block, uint32_t at, uint32_t frame,
   Store(base, frame + at + 4, 0);
   Store(base, frame + at, block);
   Store(base, frame + at + 4, kReverbBytes);
-  const uint32_t submix = Load(base, kSubmix);
+  const uint32_t submix = G::submix(base);
   SetRegs(call, Args({submix, 0, 1, 3, frame + at}));
   xa::FrameBelow(base, frame, kSetEffectFrame);
   return xa::ApiSetEffectParameters(base, submix, 0, 1, 3, frame + at, call);
@@ -1185,6 +1205,8 @@ uint64_t CarSoundUpdate(uint8_t* base, uint64_t sound64, const Update3DSaves& s,
                         const x3daudio::TanCall& tan) {
   ITC_NATIVE_RUNNING("sub_82110048 CarSound::Update");
   const uint32_t sound = uint32_t(sound64);
+  const schema::CarSound cs(base, sound);
+  const schema::X3DAudioDspSettings dsp(base, cs.dsp_address());
   // The prologue: __savegprlr_29 (r29 to r31 at sp - 32 to - 16, lr at
   // - 8), the back chain of the 128-byte frame.
   const uint32_t sp = frame + kCarSoundFrame;
@@ -1193,7 +1215,7 @@ uint64_t CarSoundUpdate(uint8_t* base, uint64_t sound64, const Update3DSaves& s,
   Store64(base, sp - 16, s.r31);
   Store(base, sp - 8, s.lr);
   Store(base, frame, sp);
-  const uint32_t vehicle = Load(base, sound + 400);
+  const uint32_t vehicle = cs.vehicle<schema::View>().address;
   if (vehicle == 0) {
     return sound64;
   }
@@ -1209,70 +1231,70 @@ uint64_t CarSoundUpdate(uint8_t* base, uint64_t sound64, const Update3DSaves& s,
 
   // The Doppler factor (+204) clamped (each bound's word stored as is).
   const double max = LoadF(base, kDopplerMax);
-  if (LoadF(base, sound + 204) > max) {
-    StoreF(base, sound + 204, max);
+  if (double(dsp.doppler_factor()) > max) {
+    dsp.set_doppler_factor(float(max));
   }
   const double min = LoadF(base, kDopplerMin);
-  if (LoadF(base, sound + 204) < min) {
-    StoreF(base, sound + 204, min);
+  if (double(dsp.doppler_factor()) < min) {
+    dsp.set_doppler_factor(float(min));
   }
 
   // For the players' cars, the submix's effect switched with the vehicle's
   // half-word +5314 bit 1 (+0 the state: 1 inside, 0 outside).
   if (players != 0) {
-    const uint32_t state = Load(base, sound + 0);
-    const bool inside = (guest::LoadU16(base, Load(base, sound + 400) + 5314) & 2) != 0;
+    const uint32_t state = cs.tunnel_reverb();
+    const bool inside = (guest::LoadU16(base, cs.vehicle<schema::View>().address + 5314) & 2) != 0;
     if (state == 0) {
       if (inside) {
-        r3 = SetReverb(base, kReverbOn, 80, frame, call);
-        Store(base, sound + 0, 1);
+        r3 = SetReverb(base, G::reverb_tunnel_address(), 80, frame, call);
+        cs.set_tunnel_reverb(1);
       }
     } else if (state == 1 && !inside) {
-      r3 = SetReverb(base, kReverbOff, 88, frame, call);
-      Store(base, sound + 0, 0);
+      r3 = SetReverb(base, G::reverb_off_address(), 88, frame, call);
+      cs.set_tunnel_reverb(0);
     }
   }
-  if (Load(base, sound + 1248) == 0) {
+  if (cs.live() == 0) {
     return r3;
   }
 
   // The parts, each with r4 the vehicle (+400) and r5 the DSP output (+352,
   // 8 bytes), read again for each.
-  const auto car = [&] { return Load(base, sound + 400); };
-  const auto output = [&] { return Load64(base, sound + 352); };
+  const auto car = [&] { return cs.vehicle<schema::View>().address; };
+  const auto output = [&] { return cs.output(); };
   const auto below = [&](uint32_t bytes) { return xa::FrameBelow(base, frame, bytes); };
   {
-    const double f2 = LoadF(base, sound + 1252);
-    const double f1 = LoadF(base, sound + 204);
+    const double f2 = double(cs.engine_gain());
+    const double f1 = double(dsp.doppler_factor());
     const uint32_t v = car();
     const uint64_t out = output();
-    SetRegs(call, ArgsF1({sound64 + 408, v, out}, f1));
-    r3 = EngineSoundUpdate(base, sound + 408, v, out, f1, f2, voices, below(160), call);
+    SetRegs(call, ArgsF1({sound64 + (cs.engine_address() - sound), v, out}, f1));
+    r3 = EngineSoundUpdate(base, cs.engine_address(), v, out, f1, f2, voices, below(160), call);
   }
   {
     const uint64_t out = output();
     const uint32_t v = car();
-    SetRegs(call, Args({sound64 + 652, v, out}));
-    r3 = TireSoundUpdate(base, sound + 652, v, out, voices, below(160), call);
+    SetRegs(call, Args({sound64 + (cs.tires_address() - sound), v, out}));
+    r3 = TireSoundUpdate(base, cs.tires_address(), v, out, voices, below(160), call);
   }
   {
     const uint64_t out = output();
     const uint32_t v = car();
-    SetRegs(call, Args({sound64 + 584, v, out}));
-    r3 = HitSoundsUpdate(base, sound + 584, v, out, voices, below(112), call);
+    SetRegs(call, Args({sound64 + (cs.hits_address() - sound), v, out}));
+    r3 = HitSoundsUpdate(base, cs.hits_address(), v, out, voices, below(112), call);
   }
   {
-    const uint32_t passed = Load(base, sound + 1260);
+    const uint32_t passed = cs.passed_close();
     const uint64_t out = output();
     const uint32_t v = car();
-    SetRegs(call, Args({sound64 + 1136, v, out, passed}));
-    r3 = PassBySoundUpdate(base, sound + 1136, v, out, passed, voices, below(112), call);
+    SetRegs(call, Args({sound64 + (cs.pass_by_address() - sound), v, out, passed}));
+    r3 = PassBySoundUpdate(base, cs.pass_by_address(), v, out, passed, voices, below(112), call);
   }
   {
     const uint64_t out = output();
     const uint32_t v = car();
-    SetRegs(call, Args({sound64 + 952, v, out}));
-    r3 = TurboSoundUpdate(base, sound + 952, v, out, voices, below(144), call);
+    SetRegs(call, Args({sound64 + (cs.turbo_address() - sound), v, out}));
+    r3 = TurboSoundUpdate(base, cs.turbo_address(), v, out, voices, below(144), call);
   }
   if (players == 0) {
     return r3;
@@ -1284,20 +1306,20 @@ uint64_t CarSoundUpdate(uint8_t* base, uint64_t sound64, const Update3DSaves& s,
     uint32_t at;
     PartFn fn;
     uint32_t frame_bytes;
-  } parts[] = {{736, Part736Update, 112},  {840, Part840Update, 128},
-               {888, Part888Update, 144},  {792, RollSoundUpdate, 144},
-               {1016, WindSoundUpdate, 128}};
+  } parts[] = {{cs.gear_address(), Part736Update, 112},  {cs.events_address(), Part840Update, 128},
+               {cs.fade_address(), Part888Update, 144},  {cs.roll_address(), RollSoundUpdate, 144},
+               {cs.wind_address(), WindSoundUpdate, 128}};
   for (const auto& p : parts) {
     const uint64_t out = output();
     const uint32_t v = car();
-    SetRegs(call, Args({sound64 + p.at, v, out}));
-    r3 = p.fn(base, sound + p.at, v, out, voices, below(p.frame_bytes), call);
+    SetRegs(call, Args({sound64 + (p.at - sound), v, out}));
+    r3 = p.fn(base, p.at, v, out, voices, below(p.frame_bytes), call);
   }
-  const double f1 = LoadF(base, sound + 204);
+  const double f1 = double(dsp.doppler_factor());
   const uint64_t out = output();
   const uint32_t v = car();
-  SetRegs(call, ArgsF1({sound64 + 1072, v, out}, f1));
-  return HornSoundUpdate(base, sound + 1072, v, out, f1, voices, below(192), call);
+  SetRegs(call, ArgsF1({sound64 + (cs.horn_address() - sound), v, out}, f1));
+  return HornSoundUpdate(base, cs.horn_address(), v, out, f1, voices, below(192), call);
 }
 
 }  // namespace car_sounds

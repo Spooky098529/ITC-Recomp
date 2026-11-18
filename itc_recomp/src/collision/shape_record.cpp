@@ -9,12 +9,15 @@
 #include "guest.h"
 #include "matrix_math/matrix_math.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/collision.h"
 #include "vehicle_accessors/vectors.h"
 
 namespace collision {
 
 using namespace car_physics::ops;
 namespace vl = vector_library;
+
+using Record = schema::CollisionShape;
 
 namespace {
 
@@ -28,57 +31,60 @@ void NegateWord(uint8_t* base, uint32_t from, uint32_t to) {
 // to minus the current center, plus the current center (w 1.0); through
 // `frame` + 80 to + 159.
 void MotionRow(uint8_t* base, uint32_t record, uint32_t frame) {
-  const uint32_t previous = guest::LoadU32(base, record + 4);
-  const uint32_t current = guest::LoadU32(base, record + 8);
-  vl::Vec3Difference(base, frame + 144, current + 48, previous + 48);
+  const Record r(base, record);
+  const auto previous = r.previous();
+  const auto current = r.current();
+  vl::Vec3Difference(base, frame + 144, current.center_x_address(), previous.center_x_address());
   CopyWord(base, frame + 144 + 0, frame + 80);
   CopyWord(base, frame + 144 + 8, frame + 88);
   CopyWord(base, frame + 144 + 4, frame + 84);
   CopyWord(base, kOne, frame + 92);
-  vl::Vec4Copy(base, record + 96, frame + 80);
-  const uint32_t center = guest::LoadU32(base, record + 8) + 48;
+  vl::Vec4Copy(base, r.motion_translation_x_address(), frame + 80);
+  const uint32_t center = r.current().center_x_address();
   NegateWord(base, center + 0, frame + 96);
   NegateWord(base, center + 8, frame + 104);
   NegateWord(base, center + 4, frame + 100);
   CopyWord(base, kZero, frame + 108);
-  vl::MatrixTransformPoint(base, frame + 128, record + 48, frame + 96);
-  vl::Vec3Sum(base, frame + 144, frame + 128, guest::LoadU32(base, record + 8) + 48);
+  vl::MatrixTransformPoint(base, frame + 128, r.motion_row0_x_address(), frame + 96);
+  vl::Vec3Sum(base, frame + 144, frame + 128, r.current().center_x_address());
   CopyWord(base, frame + 144 + 0, frame + 112);
   CopyWord(base, kOne, frame + 124);
   CopyWord(base, frame + 144 + 8, frame + 120);
   CopyWord(base, frame + 144 + 4, frame + 116);
-  vl::Vec4Copy(base, record + 96, frame + 112);
+  vl::Vec4Copy(base, r.motion_translation_x_address(), frame + 112);
 }
 
 }  // namespace
 
 void CollisionShapeUpdateBounds(uint8_t* base, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820BAC00 CollisionShape::UpdateBounds");
-  const uint32_t previous = guest::LoadU32(base, record + 4) + 48;
-  const uint32_t current = guest::LoadU32(base, record + 8) + 48;
-  const double radius = Lfs(base, guest::LoadU32(base, record + 0) + 32);
+  const Record r(base, record);
+  const uint32_t previous = r.previous().center_x_address();
+  const uint32_t current = r.current().center_x_address();
+  const double radius = double(r.template_shape().radius());
   for (uint32_t axis = 0; axis < 12; axis += 4) {
     const double a = Lfs(base, previous + axis);
     const double b = Lfs(base, current + axis);
     double high;
     if (a < b) {
-      Stfs(base, record + 16 + axis, Fsubs(a, radius));
+      Stfs(base, r.bounds_min_x_address() + axis, Fsubs(a, radius));
       high = Lfs(base, current + axis);
     } else {
-      Stfs(base, record + 16 + axis, Fsubs(b, radius));
+      Stfs(base, r.bounds_min_x_address() + axis, Fsubs(b, radius));
       high = Lfs(base, previous + axis);
     }
-    Stfs(base, record + 32 + axis, Fadds(high, radius));
+    Stfs(base, r.bounds_max_x_address() + axis, Fadds(high, radius));
   }
 }
 
 void CollisionShapeUpdateMotion(uint8_t* base, uint32_t record, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820BAE78 CollisionShape::UpdateMotion");
-  const uint32_t previous = guest::LoadU32(base, record + 4) + 64;
-  const uint32_t current = guest::LoadU32(base, record + 8) + 64;
+  const Record r(base, record);
+  const uint32_t previous = r.previous().axis0_x_address();
+  const uint32_t current = r.current().axis0_x_address();
   for (uint32_t row = 0; row < 3; row++) {
     for (uint32_t column = 0; column < 3; column++) {
-      Stfs(base, record + 48 + 16 * row + 4 * column,
+      Stfs(base, r.motion_row0_x_address() + 16 * row + 4 * column,
            double(vl::Vec3DotOf(base, current + 16 * row, previous + 16 * column)));
     }
   }
@@ -87,9 +93,10 @@ void CollisionShapeUpdateMotion(uint8_t* base, uint32_t record, uint32_t frame) 
 
 bool CollisionShapePlace(uint8_t* base, uint32_t record, uint32_t matrix, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820BB758 CollisionShape::Place");
-  const uint32_t previous = guest::LoadU32(base, record + 4);
-  const uint32_t current = guest::LoadU32(base, record + 8);
-  const uint32_t source = guest::LoadU32(base, record + 0);
+  const Record r(base, record);
+  const uint32_t previous = r.previous().address;
+  const uint32_t current = r.current().address;
+  const uint32_t source = r.template_shape().address;
   // The copy to place (the previous one) answers 2 to its type when it's a
   // box; with +112 not 0.0 (fcmpu: NaN isn't equal) the template is copied
   // onto the stack (+80) and lowered.
@@ -97,23 +104,27 @@ bool CollisionShapePlace(uint8_t* base, uint32_t record, uint32_t matrix, uint32
   if (!IsBox(base, previous) || !IsBox(base, source)) {
     return false;
   }
-  const bool lowered = Lfs(base, record + 112) != Lfs(base, kZero);
+  const bool lowered = double(r.bottom_lowering()) != Lfs(base, kZero);
   if (lowered && !BoxCopyFits(copy, source)) {
     return false;
   }
-  guest::StoreU32(base, record + 4, current);
-  guest::StoreU32(base, record + 8, previous);
+  r.set_previous(current);
+  r.set_current(previous);
   if (lowered) {
-    BoxCopyConstruct(base, copy, guest::LoadU32(base, record + 0));
-    Stfs(base, frame + 372, Fsubs(Lfs(base, frame + 372), Lfs(base, record + 112)));
-    BoxSetCorners(base, copy, frame + 368, frame + 256, frame - 224);
-    BoxPlace(base, guest::LoadU32(base, record + 8), matrix, copy, frame - 288);
-    guest::StoreU32(base, copy, kShapeVtable);
+    // The stack copy (a box at `copy`): its min corner (corner 7)'s y
+    // lowered, then its corners set again from the min and the max.
+    const schema::BoxShape stack_copy(base, copy);
+    BoxCopyConstruct(base, copy, r.template_shape().address);
+    const uint32_t min_corner = stack_copy.corner_x_address() + 7 * 16;
+    Stfs(base, min_corner + 4,
+         Fsubs(Lfs(base, min_corner + 4), double(r.bottom_lowering())));
+    BoxSetCorners(base, copy, min_corner, stack_copy.corner_x_address(), frame - 224);
+    BoxPlace(base, r.current().address, matrix, copy, frame - 288);
+    stack_copy.set_vtable(kShapeVtable);
   } else {
-    BoxPlace(base, guest::LoadU32(base, record + 8), matrix, guest::LoadU32(base, record + 0),
-             frame - 288);
+    BoxPlace(base, r.current().address, matrix, r.template_shape().address, frame - 288);
   }
-  BoxCopyCache(base, guest::LoadU32(base, record + 8), guest::LoadU32(base, record + 4));
+  BoxCopyCache(base, r.current().address, r.previous().address);
   CollisionShapeUpdateMotion(base, record, frame - 240);
   CollisionShapeUpdateBounds(base, record);
   return true;
@@ -121,10 +132,11 @@ bool CollisionShapePlace(uint8_t* base, uint32_t record, uint32_t matrix, uint32
 
 bool CollisionShapeTranslate(uint8_t* base, uint32_t record, uint32_t offset, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820BACD0 CollisionShape::Translate");
-  if (!IsBox(base, guest::LoadU32(base, record + 8))) {
+  const Record r(base, record);
+  if (!IsBox(base, r.current().address)) {
     return false;
   }
-  BoxTranslate(base, guest::LoadU32(base, record + 8), offset);
+  BoxTranslate(base, r.current().address, offset);
   MotionRow(base, record, frame);
   CollisionShapeUpdateBounds(base, record);
   return true;
@@ -136,8 +148,9 @@ namespace {
 // through their slot 0: each 0, or a box (slot 0 Shape::DeletingDestructor)
 // the layer gave, the two not the same block.
 bool CopiesDeletable(uint8_t* base, uint32_t record) {
-  const uint32_t previous = guest::LoadU32(base, record + 4);
-  const uint32_t current = guest::LoadU32(base, record + 8);
+  const Record r(base, record);
+  const uint32_t previous = r.previous().address;
+  const uint32_t current = r.current().address;
   for (uint32_t copy : {previous, current}) {
     if (copy != 0 && (!IsBox(base, copy) || !Deletable(copy))) {
       return false;
@@ -149,11 +162,12 @@ bool CopiesDeletable(uint8_t* base, uint32_t record) {
 // The copies deleted through slot 0 (r4 = 1) and zeroed, as the destructor
 // and SetUp do.
 void DeleteCopies(uint8_t* base, uint32_t record) {
-  for (uint32_t at : {4u, 8u}) {
-    const uint32_t copy = guest::LoadU32(base, record + at);
+  const Record r(base, record);
+  for (uint32_t at : {r.previous_address(), r.current_address()}) {
+    const uint32_t copy = guest::LoadU32(base, at);
     if (copy != 0) {
       ShapeDeletingDestructor(base, copy, 1);
-      guest::StoreU32(base, record + at, 0);
+      guest::StoreU32(base, at, 0);
     }
   }
 }
@@ -170,7 +184,7 @@ bool CollisionShapeDestroy(uint8_t* base, uint32_t record, uint32_t* r3) {
     return false;
   }
   // r3: the last copy loaded (+8), or what its slot 0 returned (the same).
-  *r3 = guest::LoadU32(base, record + 8);
+  *r3 = Record(base, record).current().address;
   DeleteCopies(base, record);
   return true;
 }
@@ -190,16 +204,17 @@ bool CollisionShapeSetUp(uint8_t* base, uint32_t record, uint32_t shape, uint32_
   DeleteCopies(base, record);
   uint32_t copy = 0;
   BoxClone(base, shape, memory, f - 96, &copy);
-  guest::StoreU32(base, record + 4, copy);
+  const Record r(base, record);
+  r.set_previous(copy);
   BoxClone(base, shape, memory, f - 96, &copy);
-  guest::StoreU32(base, record + 8, copy);
+  r.set_current(copy);
   // Each placed by the matrix through its slot 9: a clone is a box (or 0,
   // which the original would call through too: not with a process heap).
-  BoxPlace(base, guest::LoadU32(base, record + 4), matrix, shape, f - 288);
-  BoxPlace(base, guest::LoadU32(base, record + 8), matrix, shape, f - 288);
-  guest::StoreU32(base, record + 0, shape);
-  matrix_math::SetIdentity(base, record + 48);
-  CopyWord(base, kZero, record + 112);
+  BoxPlace(base, r.previous().address, matrix, shape, f - 288);
+  BoxPlace(base, r.current().address, matrix, shape, f - 288);
+  r.set_template_shape(shape);
+  matrix_math::SetIdentity(base, r.motion_row0_x_address());
+  CopyWord(base, kZero, r.bottom_lowering_address());
   CollisionShapeUpdateBounds(base, record);
   return true;
 }

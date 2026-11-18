@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "framework/framework.h"
 #include "framework/run_loop.h"
+#include "schema/framework.h"
 
 namespace framework {
 
@@ -23,6 +24,12 @@ uint64_t Load64(uint8_t* base, uint32_t address) {
 void Store64(uint8_t* base, uint32_t address, uint64_t value) {
   Store(base, address, uint32_t(value >> 32));
   Store(base, address + 4, uint32_t(value));
+}
+// The functor std::for_each returns, stored at `result` a word at a time.
+void StoreFunctor(uint8_t* base, uint32_t result, uint64_t functor) {
+  const schema::FrameworkMemberFunctor stored(base, result);
+  stored.set_function(uint32_t(functor >> 32));
+  stored.set_object(uint32_t(functor));
 }
 
 // The original's tw 22 (a failed check), which the recompiled code logs and
@@ -57,11 +64,12 @@ uint32_t ForEachTickHandler(uint8_t* base, uint32_t result, uint64_t first, uint
     if (map == 0) {
       Trap("sub_82099D50");
     }
-    if (node == Load(base, map + kMapHead)) {
+    if (node == schema::HandlerMap(base, map).head().address) {
       Trap("sub_82099D50");
     }
-    const uint32_t key = Load(base, node + kNodeKey);
-    const uint32_t delegate = Load(base, node + kNodeDelegate);
+    const schema::HandlerMapNode handler(base, node);
+    const uint32_t key = handler.key();
+    const uint32_t delegate = handler.delegate().address;
     Store(base, frame + 88, key);
     Store(base, frame + 92, delegate);
     calls.call(Load(base, frame + 168), Load(base, frame + 172), Load64(base, frame + 88),
@@ -73,7 +81,7 @@ uint32_t ForEachTickHandler(uint8_t* base, uint32_t result, uint64_t first, uint
       calls.increment(frame + 80);
     }
   }
-  Store64(base, result, functor);
+  StoreFunctor(base, result, functor);
   return result;
 }
 
@@ -89,11 +97,12 @@ uint32_t ForEachRequest(uint8_t* base, uint32_t result, uint64_t first, uint64_t
   calls.set_register(30, end);
   for (uint32_t at = Load(base, frame + 156); at != end; at += kRequestBytes) {
     calls.set_register(31, at);
-    const uint64_t delegate = uint64_t(Load(base, at + 8)) << 32;
-    calls.call(Load(base, frame + 168), Load(base, frame + 172), Load64(base, at), delegate,
-               0x82099F30);
+    const schema::Request request(base, at);
+    const uint64_t delegate = uint64_t(request.delegate().address) << 32;
+    calls.call(Load(base, frame + 168), Load(base, frame + 172),
+               (uint64_t(request.type()) << 32) | request.key(), delegate, 0x82099F30);
   }
-  Store64(base, result, functor);
+  StoreFunctor(base, result, functor);
   return result;
 }
 
@@ -101,23 +110,27 @@ uint32_t AppRun(uint8_t* base, uint32_t loop, uint32_t framework, uint32_t frame
                 const MainLoopCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8209A760 App::Run");
   // The framework's slots (its vtable read for each call).
-  const auto slot = [&](uint32_t offset, std::optional<uint64_t> r4, uint32_t return_address) {
-    return calls.call(VirtualTarget(base, framework, offset), framework, r4, std::nullopt,
-                      return_address);
+  using Slot = uint32_t (schema::FrameworkVtable::*)() const;
+  const auto slot = [&](Slot target, std::optional<uint64_t> r4, uint32_t return_address) {
+    const schema::FrameworkVtable vtable = schema::Framework(base, framework).vtable();
+    return calls.call((vtable.*target)(), framework, r4, std::nullopt, return_address);
   };
   // The run loop's slot 7 (an event: the word at frame + 80).
+  const schema::RunLoop run_loop(base, loop);
   const auto event = [&](uint32_t value, uint32_t return_address) {
     Store(base, frame + 80, value);
-    calls.call(VirtualTarget(base, loop, 28), loop, frame + 80, std::nullopt, return_address);
+    calls.call(run_loop.vtable().send_event(), loop, frame + 80, std::nullopt, return_address);
   };
   calls.set_register(30, framework);
   calls.set_register(31, loop);
-  if ((slot(4, loop, 0x8209A78C) & 0xFF) == 0) {
+  if ((slot(&schema::FrameworkVtable::init, loop, 0x8209A78C) & 0xFF) == 0) {
     return 0;
   }
-  slot(8, loop, 0x8209A7AC);
-  const uint32_t map = loop + kTickHandlers;
-  const uint32_t vector = loop + kRequests;
+  slot(&schema::FrameworkVtable::start, loop, 0x8209A7AC);
+  const uint32_t map = run_loop.tick_handlers_address();
+  const uint32_t vector = run_loop.requests_address();
+  const schema::HandlerMap handlers(base, map);
+  const schema::RequestVector requests(base, vector);
   Store(base, frame + 100, loop);
   Store(base, frame + 92, loop);
   Store(base, frame + 112, map);
@@ -129,10 +142,10 @@ uint32_t AppRun(uint8_t* base, uint32_t loop, uint32_t framework, uint32_t frame
   calls.set_register(29, vector);
   do {
     // The tick handlers: begin (the head's left) to end (the head).
-    const uint32_t head = Load(base, map + kMapHead);
+    const uint32_t head = handlers.head().address;
     Store(base, frame + 104, map);
     Store(base, frame + 108, head);
-    Store(base, frame + 116, Load(base, head + kNodeLeft));
+    Store(base, frame + 116, schema::HandlerMapNode(base, head).left().address);
     {
       const uint64_t functor = Load64(base, frame + 96);
       const uint64_t last = Load64(base, frame + 104);
@@ -142,13 +155,13 @@ uint32_t AppRun(uint8_t* base, uint32_t loop, uint32_t framework, uint32_t frame
       });
     }
     // The requests: their checked iterators (first past last traps).
-    if (Load(base, vector + kVectorFirst) > Load(base, vector + kVectorLast)) {
+    if (requests.first().address > requests.last().address) {
       Trap("sub_8209A760");
     }
-    Store(base, frame + 124, Load(base, vector + kVectorLast));
-    const uint32_t first_request = Load(base, vector + kVectorFirst);
+    Store(base, frame + 124, requests.last().address);
+    const uint32_t first_request = requests.first().address;
     Store(base, frame + 120, vector);
-    if (first_request > Load(base, vector + kVectorLast)) {
+    if (first_request > requests.last().address) {
       Trap("sub_8209A760");
     }
     Store(base, frame + 132, first_request);
@@ -164,14 +177,15 @@ uint32_t AppRun(uint8_t* base, uint32_t loop, uint32_t framework, uint32_t frame
     if (!RequestsClear(base, vector)) {
       calls.clear(vector);
     }
-    if ((slot(20, std::nullopt, 0x8209A884) & 0xFF) != 0) {
+    if ((slot(&schema::FrameworkVtable::app_finished, std::nullopt, 0x8209A884) & 0xFF) != 0) {
       event(1, 0x8209A8FC);
-    } else if ((slot(16, std::nullopt, 0x8209A8BC) & 0xFF) != 0) {
+    } else if ((slot(&schema::FrameworkVtable::restart_requested, std::nullopt, 0x8209A8BC) &
+                0xFF) != 0) {
       event(0, 0x8209A8E4);
-      slot(8, loop, 0x8209A8FC);
+      slot(&schema::FrameworkVtable::start, loop, 0x8209A8FC);
     }
-  } while (Load(base, loop + kTickHandlers + kMapSize) != 0);
-  slot(12, loop, 0x8209A920);
+  } while (handlers.size() != 0);
+  slot(&schema::FrameworkVtable::release, loop, 0x8209A920);
   return 0;
 }
 
@@ -190,7 +204,7 @@ uint32_t RunFramework(uint8_t* base, uint32_t framework, uint32_t frame,
 
 uint32_t RunFrameworkAt(uint8_t* base, uint32_t holder, const MainLoopCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82090378 RunFrameworkAt");
-  const uint32_t framework = Load(base, holder);
+  const uint32_t framework = schema::FrameworkHolder(base, holder).framework().address;
   uint32_t answer = 0;
   calls.in_frame(160, [&](uint32_t frame) { answer = RunFramework(base, framework, frame, calls); });
   return answer;

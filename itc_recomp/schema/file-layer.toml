@@ -1,0 +1,67 @@
+# The schema of docs/functions/file-layer.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The file layer: the file objects the game makes on the stack around a
+# whole-file load (GameFile over AsyncFile over File over a base stream) and
+# the path objects (Path, the game's GamePath) that turn a name into a full
+# path with sprintf (src/file_layer/).
+
+# The file object (16 bytes, on its users' stacks) seen through its derived
+# classes: GameFile (vtable 0x82002270) over AsyncFile (0x8206CC0C). The
+# same object as files-and-saves.toml's File (vtable 0x8206C05C; the base
+# stream's 0x8206BFF8, written by the destructors and the stream's deleting
+# destructor sub_8258C5B0), whose fields these repeat.
+[GameFile]
+measures = ["GameFile", "GameFile.r3", "AsyncFile", "AsyncFile.r3", "sub_8258C5B0.r3"]
+size = 16
+origin = "file"
+vtable = 0x82002270
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82002270 GameFile, 0x8206CC0C AsyncFile, 0x8206C05C File, 0x8206BFF8 the base stream" },
+  { name = "handle", offset = 4, type = "u32", note = "-1 when closed (AsyncFile::Detach returns it and sets -1)" },
+  { name = "position", offset = 8, type = "u32" },
+  { name = "size", offset = 12, type = "u32" },
+]
+
+# The path object (Path::, vtable 0x8206CC3C, on its users' stacks: r1 + 80
+# in the opens by name's and GamePath::SetGame's frames).
+[Path]
+measures = ["Path", "Path.r3"]
+size = 516
+origin = "file"
+vtable = 0x8206CC3C
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "text", offset = 4, type = "u8", note = "the full path's first character (probably a 512-byte buffer; Path::Build's sprintf writes it)" },
+]
+
+# Path::Build's result: the Path's text (+4).
+[PathText]
+measure = "Path::Build.ret"
+size = 1
+origin = "file"
+fields = [
+  { name = "first_char", offset = 0, type = "u8" },
+]
+
+# The game's path buffer (GamePath::, vtable 0x820022A0, on Movie::Open's
+# stack): a built path copied out of a Path.
+[GamePath]
+measures = ["GamePath", "GamePath.r3"]
+size = 5
+origin = "file"
+vtable = 0x820022A0
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "text", offset = 4, type = "u8", note = "the path's first character (its size not known)" },
+]
+
+[globals]
+format_kind0 = { address = 0x8206CC48, type = "bytes", count = 9, note = "Path::Build's kind 0 format, \"game:\\%s\"" }
+format_kind1 = { address = 0x8206CC54, type = "bytes", count = 1, note = "Path::Build's kind 1 format (not read)" }
+format_kind2 = { address = 0x8206CC60, type = "bytes", count = 1, note = "Path::Build's kind 2 format (not read; with the two strings below and the name)" }
+prefix_string = { address = 0x8265EE7C, type = "bytes", count = 28, note = "a std::string (std-string.md), Path::Build's kind 2's first argument" }
+project_string = { address = 0x8265EE98, type = "bytes", count = 28, note = "a std::string, XENON_PRJ\\TSP (probably a development path), kind 2's second argument" }

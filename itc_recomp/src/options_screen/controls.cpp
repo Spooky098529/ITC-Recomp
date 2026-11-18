@@ -5,6 +5,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/options_screen.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -17,16 +19,17 @@ namespace {
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
 
-uint32_t Settings(uint8_t* base) { return guest::LoadU32(base, kSettings); }
+using G = schema::OptionsScreenGlobals;
+using S = schema::OptionsSettings;
+using Word = SettingsWord;
 
 // The edits copied below `sp` from `at`, then 1 when an item
 // other than `item` holds item `item`'s word (read from `at + 4 * item`, the
 // 32-bit wrap of the original's address, on every try).
-uint32_t Taken(uint8_t* base, uint32_t item, uint32_t at, const uint32_t* offsets,
-               uint32_t count) {
-  const uint32_t o = Settings(base);
+uint32_t Taken(uint8_t* base, uint32_t item, uint32_t at, const Word* words, uint32_t count) {
+  const S o = G::settings(base);
   for (uint32_t i = 0; i < count; i++) {
-    guest::StoreU32(base, at + 4 * i, guest::LoadU32(base, o + offsets[i]));
+    guest::StoreU32(base, at + 4 * i, (o.*words[i])());
   }
   for (uint32_t i = 0; i < count; i++) {
     if (int32_t(i) == int32_t(item)) {
@@ -41,26 +44,26 @@ uint32_t Taken(uint8_t* base, uint32_t item, uint32_t at, const uint32_t* offset
   return 0;
 }
 
-// StepButtons and StepAnalog: `side_word` the settings' word, `last` the
-// last item (OK/Default).
-uint32_t Step(uint8_t* base, uint32_t side_word, int32_t last) {
-  const uint32_t menu = guest::LoadU32(base, kMenu);
-  const int32_t side = int32_t(guest::LoadU32(base, menu + 36));
-  const int32_t cursor = int32_t(guest::LoadU32(base, menu + 0));
-  guest::StoreU32(base, Settings(base) + side_word, 0);
+// StepButtons and StepAnalog: `set_side` the settings' side word's store,
+// `last` the last item (OK/Default).
+uint32_t Step(uint8_t* base, void (S::*set_side)(uint32_t) const, int32_t last) {
+  const schema::FrontEndMenu menu = G::menu(base);
+  const int32_t side = menu.side();
+  const int32_t cursor = int32_t(menu.cursor());
+  (G::settings(base).*set_side)(0);
   if (side != -1 && side != 1) {
     return 0;
   }
-  guest::StoreU32(base, Settings(base) + side_word, uint32_t(side));
+  (G::settings(base).*set_side)(uint32_t(side));
   if (cursor != last) {
     return 1;
   }
-  const uint32_t o = Settings(base);
-  const int32_t choice = int32_t(guest::LoadU32(base, o + 660));
+  const S o = G::settings(base);
+  const int32_t choice = int32_t(o.ok_default());
   if (side == -1 ? choice != 1 : choice != 0) {
     return 0;
   }
-  guest::StoreU32(base, o + 660, side == -1 ? 0 : 1);
+  o.set_ok_default(side == -1 ? 0 : 1);
   return 1;
 }
 
@@ -116,15 +119,12 @@ uint32_t AnalogPicture(uint32_t index) {
 
 uint32_t IsButtonTaken(uint8_t* base, uint32_t item, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BA7E0 Options::IsButtonTaken");
-  static constexpr uint32_t kEdits[12] = {284, 288, 292, 296, 300, 304,
-                                          320, 312, 316, 308, 324, 328};
-  return Taken(base, item, sp - 48, kEdits, 12);
+  return Taken(base, item, sp - 48, kButtonEdits, 12);
 }
 
 uint32_t IsAnalogTaken(uint8_t* base, uint32_t item, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BAB58 Options::IsAnalogTaken");
-  static constexpr uint32_t kEdits[6] = {380, 384, 388, 396, 392, 400};
-  return Taken(base, item, sp - 32, kEdits, 6);  // sp - 8 and - 4 not written
+  return Taken(base, item, sp - 32, kAnalogEdits, 6);  // sp - 8 and - 4 not written
 }
 
 namespace {
@@ -132,10 +132,10 @@ namespace {
 // HasButtonClash and HasAnalogClash: the edits copied below `sp` in menu
 // order (as the taken checks copy them), then 1 at the first pair of items
 // holding the same word, else 0.
-uint32_t Clash(uint8_t* base, uint32_t at, const uint32_t* offsets, uint32_t count) {
-  const uint32_t o = Settings(base);
+uint32_t Clash(uint8_t* base, uint32_t at, const Word* words, uint32_t count) {
+  const S o = G::settings(base);
   for (uint32_t i = 0; i < count; i++) {
-    guest::StoreU32(base, at + 4 * i, guest::LoadU32(base, o + offsets[i]));
+    guest::StoreU32(base, at + 4 * i, (o.*words[i])());
   }
   for (uint32_t i = 0; i + 1 < count; i++) {
     const uint32_t mine = guest::LoadU32(base, at + 4 * i);
@@ -152,64 +152,61 @@ uint32_t Clash(uint8_t* base, uint32_t at, const uint32_t* offsets, uint32_t cou
 
 uint32_t HasButtonClash(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BA890 Options::HasButtonClash");
-  static constexpr uint32_t kEdits[12] = {284, 288, 292, 296, 300, 304,
-                                          320, 312, 316, 308, 324, 328};
-  return Clash(base, sp - 48, kEdits, 12);
+  return Clash(base, sp - 48, kButtonEdits, 12);
 }
 
 uint32_t HasAnalogClash(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821BAC78 Options::HasAnalogClash");
-  static constexpr uint32_t kEdits[6] = {380, 384, 388, 396, 392, 400};
-  return Clash(base, sp - 32, kEdits, 6);
+  return Clash(base, sp - 32, kAnalogEdits, 6);
 }
 
 uint32_t StepButtons(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821BA550 Options::StepButtons");
-  return Step(base, 668, 12);
+  return Step(base, &S::set_buttons_side, 12);
 }
 
 uint32_t StepAnalog(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821BABD8 Options::StepAnalog");
-  return Step(base, 676, 6);
+  return Step(base, &S::set_analog_side, 6);
 }
 
 uint32_t StepSound(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821BE5F8 Options::StepSound");
-  const uint32_t menu = guest::LoadU32(base, kMenu);
-  const int32_t side = int32_t(guest::LoadU32(base, menu + 36));
-  const uint32_t cursor = guest::LoadU32(base, menu + 0);
+  const schema::FrontEndMenu menu = G::menu(base);
+  const int32_t side = menu.side();
+  const uint32_t cursor = menu.cursor();
   if (side != -1 && side != 1) {
     return 0;
   }
-  const uint32_t o = Settings(base);
+  const S o = G::settings(base);
   // The volumes (0 to 15): a step past a bound stores the bound and answers 0.
-  const auto volume = [&](uint32_t field) -> uint32_t {
-    const int32_t value = int32_t(guest::LoadU32(base, o + field)) + side;
-    guest::StoreU32(base, o + field, uint32_t(value));
+  const auto volume = [&](uint32_t (S::*get)() const, void (S::*set)(uint32_t) const) -> uint32_t {
+    const int32_t value = int32_t((o.*get)()) + side;
+    (o.*set)(uint32_t(value));
     if (side == -1 ? value >= 0 : value <= 15) {
       return 1;
     }
-    guest::StoreU32(base, o + field, side == -1 ? 0 : 15);
+    (o.*set)(side == -1 ? 0 : 15);
     return 0;
   };
   switch (cursor) {
-    case 0: return volume(252);
-    case 1: return volume(256);
+    case 0: return volume(&S::edit_music_volume, &S::set_edit_music_volume);
+    case 1: return volume(&S::edit_effects_volume, &S::set_edit_effects_volume);
     case 2:
       // OK/Default: left on a 1, right on a 0.
-      if (int32_t(guest::LoadU32(base, o + 660)) != (side == -1 ? 1 : 0)) {
+      if (int32_t(o.ok_default()) != (side == -1 ? 1 : 0)) {
         return 0;
       }
-      guest::StoreU32(base, o + 660, side == -1 ? 0 : 1);
+      o.set_ok_default(side == -1 ? 0 : 1);
       return 1;
     case 3: {
       // The track, wrapping within 0 to 16.
-      const int32_t value = int32_t(guest::LoadU32(base, o + 688)) + side;
-      guest::StoreU32(base, o + 688, uint32_t(value));
+      const int32_t value = int32_t(o.music_track()) + side;
+      o.set_music_track(uint32_t(value));
       if (value < 0) {
-        guest::StoreU32(base, o + 688, 16);
+        o.set_music_track(16);
       } else if (value > 16) {
-        guest::StoreU32(base, o + 688, 0);
+        o.set_music_track(0);
       }
       return 1;
     }
@@ -226,59 +223,60 @@ uint32_t StepSliders(uint8_t* base, uint32_t sp) {
   for (uint32_t i = 4; i <= 6; i++) {
     ui_movies::Child(base, node, i);
   }
-  const uint32_t menu = guest::LoadU32(base, kMenu);
-  const int32_t side = int32_t(guest::LoadU32(base, menu + 36));
-  const uint32_t cursor = guest::LoadU32(base, menu + 0);
+  const schema::FrontEndMenu menu = G::menu(base);
+  const int32_t side = menu.side();
+  const uint32_t cursor = menu.cursor();
   if (side != -1 && side != 1) {
     return 0;
   }
-  const uint32_t o = Settings(base);
+  const S o = G::settings(base);
   if (cursor < 3) {
     // The sliders (-10 to 10): no change at a bound.
-    const uint32_t field = 260 + 4 * cursor;
-    const int32_t value = int32_t(guest::LoadU32(base, o + field));
+    const uint32_t field = o.edit_slider_0_address() + 4 * cursor;
+    const int32_t value = int32_t(guest::LoadU32(base, field));
     if (side == -1 ? value <= -10 : value >= 10) {
       return 0;
     }
-    guest::StoreU32(base, o + field, uint32_t(value + side));
+    guest::StoreU32(base, field, uint32_t(value + side));
     return 1;
   }
-  if (cursor != 3 || int32_t(guest::LoadU32(base, o + 660)) != (side == -1 ? 1 : 0)) {
+  if (cursor != 3 || int32_t(o.ok_default()) != (side == -1 ? 1 : 0)) {
     return 0;
   }
-  guest::StoreU32(base, o + 660, side == -1 ? 0 : 1);
+  o.set_ok_default(side == -1 ? 0 : 1);
   return 1;
 }
 
 uint32_t SettingsReset(uint8_t* base, uint32_t settings, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821B9DB8 Settings::Reset");
   guest::StoreU32(base, sp - 112, sp);
-  guest::StoreU32(base, settings + 0, 0);
-  // memset (sub_825A71D0) with 0: the same bytes.
-  for (const auto& [offset, bytes] : {std::pair<uint32_t, uint32_t>{44, 192},
-                                      {236, 192},
-                                      {428, 192},
-                                      {12, 32}}) {
-    guest::ForEachHostPart(base, settings + offset, bytes,
+  const S o(base, settings);
+  o.set_set_up(0);
+  // memset (sub_825A71D0) with 0: the same bytes (+12: the name to the day).
+  for (const auto& [at, bytes] : {std::pair<uint32_t, uint32_t>{o.current_block_address(), 192},
+                                  {o.edit_block_address(), 192},
+                                  {o.default_block_address(), 192},
+                                  {o.name_0_address(), 32}}) {
+    guest::ForEachHostPart(base, at, bytes,
                            [](uint8_t* host, uint32_t, uint32_t size) {
                              std::memset(host, 0, size);
                            });
   }
-  for (const uint32_t field : {664u, 660u, 684u}) {
-    guest::StoreU32(base, settings + field, 0);
-  }
-  guest::StoreU32(base, settings + 712, 1);
-  for (const uint32_t field : {620u, 624u, 628u}) {
-    guest::StoreU32(base, settings + field, kNone);
-  }
-  guest::StoreU32(base, settings + 632, 0);
-  guest::StoreU32(base, settings + 636, 0);
-  for (const uint32_t field : {640u, 644u, 648u}) {
-    guest::StoreU32(base, settings + field, kNone);
-  }
-  guest::StoreU32(base, settings + 652, 0);
-  guest::StoreU32(base, settings + 656, 0);
-  return settings + 12;
+  o.set_category_cursor(0);
+  o.set_ok_default(0);
+  o.set_wait_counter(0);
+  o.set_save_page_closed(1);
+  o.set_load_dialog_state(kNone);
+  o.set_load_dialog_next(kNone);
+  o.set_load_dialog_kind(kNone);
+  o.set_load_dialog_passes(0);
+  o.set_load_dialog_default(0);
+  o.set_save_dialog_state(kNone);
+  o.set_save_dialog_next(kNone);
+  o.set_save_dialog_kind(kNone);
+  o.set_save_dialog_passes(0);
+  o.set_save_dialog_default(0);
+  return o.name_0_address();
 }
 
 }  // namespace options_screen

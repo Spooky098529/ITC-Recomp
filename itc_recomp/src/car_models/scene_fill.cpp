@@ -7,6 +7,7 @@
 #include "guest.h"
 #include "material_passes/material_passes.h"
 #include "memory/heap.h"
+#include "schema/car_models.h"
 #include "scene/scene.h"
 #include "second_set/objects.h"
 
@@ -19,9 +20,7 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
 }
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 
-// The archive's shared load buffer and its size.
-constexpr uint32_t kArchiveBuffer = 0x826A5134;
-constexpr uint32_t kArchiveBufferSize = 0x826A5130;
+using G = schema::CarModelsGlobals;
 
 }  // namespace
 
@@ -31,24 +30,24 @@ uint32_t SceneSetUp(uint8_t* base, uint32_t scene, uint32_t record, uint32_t r5,
   ITC_NATIVE_RUNNING("sub_820C8DE8 CarScene::SetUp");
   const uint32_t frame = sp - kSceneSetUpFrame;
   Store(base, frame, sp);
-  auto rec = [&](uint32_t offset) { return Load(base, record + offset); };
+  const schema::CarSceneSetUpRecord rec(base, record);
   Store(base, scene + 5044, r5);
   Store(base, scene + 0, 3);
-  Store(base, scene + 4, rec(0));
-  Store(base, scene + 8, rec(4));
-  Store(base, scene + 12, rec(8));
-  Store(base, scene + 16, rec(12) + rec(16) + rec(32));
-  Store(base, scene + 20, rec(16));
-  Store(base, scene + 24, rec(20));
-  Store(base, scene + 28, rec(24) + rec(32) + rec(28));
-  Store(base, scene + 32, rec(32) + rec(28));
-  Store(base, scene + 36, rec(32));
-  Store(base, scene + 40, rec(36));
-  Store(base, scene + 44, rec(40));
+  Store(base, scene + 4, rec.model_set());
+  Store(base, scene + 8, rec.car_models());
+  Store(base, scene + 12, rec.parts());
+  Store(base, scene + 16, rec.interiors() + rec.cockpits() + rec.traffic());
+  Store(base, scene + 20, rec.cockpits());
+  Store(base, scene + 24, rec.pool4_objects());
+  Store(base, scene + 28, rec.wheels() + rec.traffic() + rec.models());
+  Store(base, scene + 32, rec.traffic() + rec.models());
+  Store(base, scene + 36, rec.traffic());
+  Store(base, scene + 40, rec.load_buffer());
+  Store(base, scene + 44, rec.load_buffer_size());
   material_passes::PaintPaletteInit(base, frame);
-  if (rec(36) == 0) {
-    Store(base, scene + 5056, Load(base, kArchiveBuffer));
-    Store(base, scene + 5060, Load(base, kArchiveBufferSize));
+  if (rec.load_buffer() == 0) {
+    Store(base, scene + 5056, G::archive_buffer(base));
+    Store(base, scene + 5060, G::archive_buffer_size(base));
   } else {
     const uint32_t buffer = Load(base, scene + 40), size = Load(base, scene + 44);
     Store(base, scene + 5056, buffer);

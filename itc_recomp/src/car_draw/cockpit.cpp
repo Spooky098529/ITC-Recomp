@@ -12,6 +12,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "material_passes/material_passes.h"
+#include "schema/car_draw.h"
 
 namespace car_draw {
 
@@ -48,15 +49,16 @@ Left Part(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t part, uint
 // around the record's draw.
 Left Window(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t record, uint32_t block,
             uint32_t pass, uint32_t r24, uint32_t lr) {
-  const uint32_t model = Load(base, record + 4);
+  const schema::CarPart part(base, record);
+  const uint32_t model = part.model();
   if (model == 0) {
     return Left{false, 0};
   }
-  const double alpha = double(guest::LoadFloat(base, block + 628));
-  material_passes::SetPair1002Alpha(base, model, Load(base, record + 228), alpha, frame);
-  Store(base, Load(base, record + 4) + 440, 1);
+  const double alpha = double(schema::CarDrawBlock(base, block).window_alpha_02());
+  material_passes::SetPair1002Alpha(base, model, part.shape(), alpha, frame);
+  Store(base, part.model() + 440, 1);
   const Left left = Part(base, calls, frame, record, block, pass, r24, lr);
-  Store(base, Load(base, record + 4) + 440, 0);
+  Store(base, part.model() + 440, 0);
   return left;
 }
 
@@ -91,10 +93,11 @@ Left CockpitDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, ui
   const uint32_t frame = Frame(base, stack, kCockpitSmallFrame);
   // The doubleword at the block's +0: bit 0 and bit 6 of its low word (+4),
   // each read again after the draw before it.
-  if (Load(base, block + 4) & 0x1) {
+  const schema::CarDrawBlock flags(base, block);
+  if (flags.flags() & 0x1) {
     Part(base, calls, frame, group + 1200, block, pass, caller_r24, 0x820DBBC8);
   }
-  if (Load(base, block + 4) & 0x40) {
+  if (flags.flags() & 0x40) {
     Part(base, calls, frame, group + 1440, block, pass, caller_r24, 0x820DBBF0);
   }
   return Part(base, calls, frame, group + 1680, block, pass, caller_r24, 0x820DBC08);
@@ -121,7 +124,7 @@ Left SceneCockpitDrawBody(uint8_t* base, const Calls& calls, uint32_t stack, uin
                           uint32_t block, uint32_t caller_r24, uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820DC350 SceneCockpit::DrawBody");
   const uint32_t frame = Frame(base, stack, kCockpitBodyFrame);
-  if (int32_t(Load(base, Load(base, cockpit + 4316) + 4)) == 1) {
+  if (int32_t(schema::CarScene(base, Load(base, cockpit + 4316)).model_set()) == 1) {
     // The record's ten matrices' w words 1.0 (from the frame's +128 + 64i),
     // stored as the original's stfs of the loaded float.
     const float one = guest::LoadFloat(base, kOne);
@@ -142,8 +145,8 @@ Left SceneCockpitDrawBody(uint8_t* base, const Calls& calls, uint32_t stack, uin
 Left SceneCockpitDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t cockpit,
                       uint32_t block, uint32_t caller_r24, uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820DC498 SceneCockpit::Draw");
-  const uint32_t scene = Load(base, uint32_t(cockpit) + 4316);
-  if (Load(base, scene + 4) >= 2) {
+  const schema::CarScene scene(base, Load(base, uint32_t(cockpit) + 4316));
+  if (scene.model_set() >= 2) {
     return Left{false, cockpit};
   }
   // A tail call: the body's frame below `stack`.

@@ -4,6 +4,7 @@
 #include "graphics/render_queue.h"
 
 #include "guest.h"
+#include "schema/device_shaders.h"
 
 #include "base/log.h"
 #include "graphics/device_shaders.h"
@@ -17,15 +18,23 @@ namespace graphics::render_queue {
 
 namespace {
 
-constexpr uint32_t kZero = 0x82000A34;          // 0.0
-constexpr uint32_t kKeyMax = 0x82002814;        // 10,000.0
-constexpr uint32_t kKeyMin = 0x82001C00;        // -10,000.0
-constexpr uint32_t kSequenceStep = 0x82001FBC;  // 0.1
+using G = schema::DeviceShadersGlobals;
+using schema::ChunkCommand;
+using schema::ChunkItem;
+using schema::PassList;
+using schema::PassListBucket;
+using schema::PassListItem;
+using schema::PtrVector;
+using schema::PtrVectorSlot;
+using schema::RenderQueueEntry;
+using schema::RenderQueueState;
 
 constexpr uint32_t kRecordingSlot = 28;  // slot 7
 constexpr uint32_t kRecordingFunction = 0x8258E5F8;
 
-uint32_t State(uint8_t* base, uint32_t queue) { return guest::LoadU32(base, queue + 4); }
+RenderQueueState State(uint8_t* base, uint32_t queue) {
+  return schema::RenderQueue(base, queue).state();
+}
 
 // A frame of `bytes` below `sp`, with its back chain.
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
@@ -39,7 +48,8 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 uint32_t QueueSlot(uint8_t* base, uint32_t queue, uint32_t slot, uint32_t function,
                    uint32_t (*own)(uint8_t*, uint32_t), uint32_t frame, uint32_t return_address,
                    const GuestCall& call) {
-  const uint32_t target = guest::LoadU32(base, guest::LoadU32(base, queue) + slot);
+  const uint32_t target =
+      guest::LoadU32(base, schema::RenderQueue(base, queue).vtable().address + slot);
   if (target == function) {
     return own(base, queue);
   }
@@ -50,25 +60,27 @@ uint32_t QueueSlot(uint8_t* base, uint32_t queue, uint32_t slot, uint32_t functi
 
 void Flip(uint8_t* base, uint32_t queue) {
   ITC_NATIVE_RUNNING("sub_8258E5E0 RenderQueue::Flip");
-  const uint32_t state = State(base, queue);
-  guest::StoreU32(base, state, guest::LoadU32(base, state) == 0 ? 1 : 0);
+  const RenderQueueState state = State(base, queue);
+  state.set_replay_index(state.replay_index() == 0 ? 1 : 0);
 }
 
 uint32_t Recording(uint8_t* base, uint32_t queue) {
   ITC_NATIVE_RUNNING("sub_8258E5F8 RenderQueue::Recording");
-  const uint32_t index = guest::LoadU32(base, State(base, queue)) == 0 ? 1 : 0;
-  return guest::LoadU32(base, queue + ((index + 2) << 2));
+  const uint32_t index = State(base, queue).replay_index() == 0 ? 1 : 0;
+  const schema::RenderQueue q(base, queue);
+  return (index != 0 ? q.list_0() : q.list_1()).address;
 }
 
 uint32_t Replaying(uint8_t* base, uint32_t queue) {
   ITC_NATIVE_RUNNING("sub_8258E618 RenderQueue::Replaying");
-  const uint32_t index = guest::LoadU32(base, State(base, queue));
-  return guest::LoadU32(base, queue + ((index + 2) << 2));
+  const uint32_t index = State(base, queue).replay_index();
+  const schema::RenderQueue q(base, queue);
+  return (index != 0 ? q.list_0() : q.list_1()).address;
 }
 
 float Sequence(uint8_t* base, uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_8258E5C0 QueueEntry::Sequence");
-  return guest::LoadFloat(base, entry + 8);
+  return RenderQueueEntry(base, entry).sequence();
 }
 
 uint32_t ClearRecording(uint8_t* base, uint32_t queue, uint32_t sp, const GuestCall& call) {
@@ -78,24 +90,24 @@ uint32_t ClearRecording(uint8_t* base, uint32_t queue, uint32_t sp, const GuestC
                                   frame, 0x8258ED9C, call);
   device_shaders::PassListClear(base, list);
   // lfs, then stfs: the float through a double, as the original.
-  const double zero = guest::LoadFloat(base, kZero);
-  guest::StoreFloat(base, State(base, queue) + 84, float(zero));
+  const double zero = G::zero(base);
+  State(base, queue).set_sequence(float(zero));
   return list;
 }
 
 uint32_t Init(uint8_t* base, uint32_t queue, uint32_t device, uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258ED00 RenderQueue::Init");
   const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t drawer = State(base, queue) + 4;
+  const uint32_t drawer = State(base, queue).drawer_address();
   call(guest::LoadU32(base, guest::LoadU32(base, drawer)), frame, 0x8258ED2C, 2, drawer, device,
        0);
-  for (uint32_t i = 0, offset = 48; offset < 64; i++, offset += 4) {
-    const uint32_t at = offset + State(base, queue);
+  for (uint32_t i = 0, offset = 0; offset < 16; i++, offset += 4) {
+    const uint32_t at = offset + State(base, queue).render_target_0_address();
     guest::StoreU32(base, at, GetRenderTarget(base, device, i));
   }
-  const uint32_t state = State(base, queue);
+  const RenderQueueState state = State(base, queue);
   const uint32_t depth = GetDepthStencilSurface(base, device);
-  guest::StoreU32(base, state + 64, depth);
+  state.set_depth_surface(depth);
   return depth;
 }
 
@@ -104,41 +116,41 @@ uint32_t PassListAdd(uint8_t* base, uint32_t list, uint64_t chunk_key, uint64_t 
   ITC_NATIVE_RUNNING("sub_8258EB88 PassList::Add");
   guest::StoreU64(base, sp + 32, chunk_key);
   guest::StoreU64(base, sp + 40, sequence);
-  if (bucket >= guest::LoadU32(base, list + 12)) {
+  const PassList l(base, list);
+  if (bucket >= l.bucket_count()) {
     return 0;
   }
-  const uint32_t items = guest::LoadU32(base, list + 8);
-  const uint32_t used = guest::LoadU32(base, list + 16);
+  const uint32_t items = l.item_count();
+  const uint32_t used = l.items_used();
   if (used >= items) {
     return 0;
   }
-  const uint32_t buckets = guest::LoadU32(base, list + 24);
-  const uint32_t item_block = guest::LoadU32(base, list + 20);
+  const uint32_t buckets = l.buckets().address;
+  const uint32_t item_block = l.items().address;
   // lfs, then stfs: each float through a double, as the original.
   const double key = guest::LoadFloat(base, sp + 36);
   const double seq = guest::LoadFloat(base, sp + 40);
-  const uint32_t at = (bucket << 4) + buckets;
-  const uint32_t item = ((used + (used << 2)) << 2) + item_block;
+  const PassListBucket at(base, (bucket << 4) + buckets);
+  const PassListItem item(base, ((used + (used << 2)) << 2) + item_block);
   const uint32_t chunk = guest::LoadU32(base, sp + 32);
-  guest::StoreU32(base, item + 0, 0);
-  guest::StoreFloat(base, item + 8, float(key));
-  guest::StoreFloat(base, item + 12, float(seq));
-  guest::StoreU32(base, item + 4, chunk);
-  if (guest::LoadU32(base, at + 0) == 0) {
-    guest::StoreU32(base, at + 0, item);
+  item.set_next(0);
+  item.set_key(float(key));
+  item.set_sequence(float(seq));
+  item.set_chunk(chunk);
+  if (!at.first()) {
+    at.set_first(item);
   } else {
-    guest::StoreU32(base, guest::LoadU32(base, at + 4), item);
+    at.last().set_next(item);
   }
-  guest::StoreU32(base, at + 4, item);
-  guest::StoreU32(base, at + 12, guest::LoadU32(base, at + 12) + 1);
-  guest::StoreU32(base, list + 16, guest::LoadU32(base, list + 16) + 1);
+  at.set_last(item);
+  at.set_count(at.count() + 1);
+  l.set_items_used(l.items_used() + 1);
   return 1;
 }
 
 std::optional<uint32_t> Add(uint8_t* base, uint32_t queue, uint32_t chunk, uint32_t bucket,
                             double key, uint32_t sp, const GuestCall& call) {
-  if (bucket > 2056 || key > double(guest::LoadFloat(base, kKeyMax)) ||
-      key < double(guest::LoadFloat(base, kKeyMin))) {
+  if (bucket > 2056 || key > double(G::key_max(base)) || key < double(G::key_min(base))) {
     return std::nullopt;  // the warning (DebugPrintf), never seen in play
   }
   ITC_NATIVE_RUNNING("sub_8258EDC8 RenderQueue::Add");
@@ -146,19 +158,19 @@ std::optional<uint32_t> Add(uint8_t* base, uint32_t queue, uint32_t chunk, uint3
     return queue;
   }
   const uint32_t frame = Frame(base, sp, 144);
-  const uint32_t state = State(base, queue);
+  const RenderQueueState state = State(base, queue);
   guest::StoreFloat(base, frame + 84, float(key));
   guest::StoreU32(base, frame + 80, chunk);
-  const double sequence = guest::LoadFloat(base, state + 84);
+  const double sequence = state.sequence();
   guest::StoreFloat(base, frame + 88, float(sequence));
   const uint32_t list = QueueSlot(base, queue, kRecordingSlot, kRecordingFunction, Recording,
                                   frame, 0x8258EE60, call);
   const uint32_t r3 = PassListAdd(base, list, guest::LoadU64(base, frame + 80),
                                   guest::LoadU64(base, frame + 88), bucket, frame);
-  const uint32_t now = State(base, queue);
-  const double before = guest::LoadFloat(base, now + 84);
-  const double step = guest::LoadFloat(base, kSequenceStep);
-  guest::StoreFloat(base, now + 84, float(double(float(before + step))));
+  const RenderQueueState now = State(base, queue);
+  const double before = now.sequence();
+  const double step = G::sequence_step(base);
+  now.set_sequence(float(double(float(before + step))));
   return r3;
 }
 
@@ -172,35 +184,37 @@ uint32_t Count(uint32_t from, uint32_t to) { return uint32_t(int32_t(to - from) 
 
 std::optional<uint32_t> PtrVectorInsert(uint8_t* base, uint32_t answer, uint32_t vector,
                                         uint32_t where, uint32_t value) {
-  const uint32_t first = guest::LoadU32(base, vector + 4);
+  const PtrVector v(base, vector);
+  const uint32_t first = v.first().address;
   uint32_t index = 0;
-  if (first != 0 && Count(first, guest::LoadU32(base, vector + 8)) != 0) {
+  if (first != 0 && Count(first, v.last().address) != 0) {
     index = Count(first, where);
   }
-  if (!models::PointersInsertN(base, vector, where, 1, guest::LoadU32(base, value))) {
+  if (!models::PointersInsertN(base, vector, where, 1, PtrVectorSlot(base, value).value())) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_825911C8 PtrVector::Insert");
-  guest::StoreU32(base, answer, (index << 2) + guest::LoadU32(base, vector + 4));
+  guest::StoreU32(base, answer, (index << 2) + v.first().address);
   return answer;
 }
 
 std::optional<uint32_t> PushBack(uint8_t* base, uint32_t vector, uint32_t value, uint32_t sp,
                                  bool may_allocate) {
-  const uint32_t first = guest::LoadU32(base, vector + 4);
-  const uint32_t size = first == 0 ? 0 : Count(first, guest::LoadU32(base, vector + 8));
-  if (first != 0 && size < Count(first, guest::LoadU32(base, vector + 12))) {
+  const PtrVector v(base, vector);
+  const uint32_t first = v.first().address;
+  const uint32_t size = first == 0 ? 0 : Count(first, v.last().address);
+  if (first != 0 && size < Count(first, v.end().address)) {
     ITC_NATIVE_RUNNING("sub_82591540 PtrVector::PushBack");
-    const uint32_t last = guest::LoadU32(base, vector + 8);
-    guest::StoreU32(base, last, guest::LoadU32(base, value));
-    guest::StoreU32(base, vector + 8, last + 4);
+    const PtrVectorSlot last = v.last();
+    last.set_value(PtrVectorSlot(base, value).value());
+    v.set_last(last.address + 4);
     return vector;
   }
   if (!may_allocate) {
     return std::nullopt;
   }
   const uint32_t frame = Frame(base, sp, 96);
-  const uint32_t last = guest::LoadU32(base, vector + 8);
+  const uint32_t last = v.last().address;
   guest::StoreU32(base, frame + 80, last);
   const auto r3 = PtrVectorInsert(base, frame + 80, vector, last, value);
   if (r3) {
@@ -217,16 +231,11 @@ constexpr uint32_t kReplayingFunction = 0x8258E618;
 constexpr uint32_t kMassGetter = 0x820B6708;      // RigidBody::Mass: the float at +4
 constexpr uint32_t kSequenceGetter = 0x8258E5C0;  // QueueEntry::Sequence: at +8
 
-constexpr uint32_t kSingleCommands = 0x8265ED48;
-constexpr uint32_t kCommands = 0x8265EDE0;
+constexpr uint32_t kSingleCommands = G::single_commands_address();
+constexpr uint32_t kCommands = G::commands_address();
 constexpr uint32_t kEndCommand = 36;
 
-constexpr uint32_t kReleaseList = 0x8296BD8C;
-constexpr uint32_t kDevice = 0x8296BD90;
-constexpr uint32_t kEntries = 0x8296BD98;  // room for 5,000 before the next
-constexpr uint32_t kDrawer = 0x82970BB8;
-constexpr uint32_t kState12 = 0x82970BBC;
-constexpr uint32_t kRenderTargets = 0x82970BC0;
+constexpr uint32_t kEntries = G::replay_entries_address();  // room for 5,000 before the next
 
 // A sort key: the getter's f1.
 double Key(uint8_t* base, uint32_t getter, uint32_t element, uint32_t frame,
@@ -247,14 +256,15 @@ uint32_t Element(uint8_t* base, uint32_t array, int32_t index) {
 // The commands from `command` through the table 0x8265EDE0, until id 36.
 void RunCommands(uint8_t* base, uint32_t command, uint32_t frame, uint32_t return_address,
                  const GuestCall& call) {
-  uint32_t id = guest::LoadU32(base, command);
+  uint32_t id = ChunkCommand(base, command).id();
   while (int32_t(id) != int32_t(kEndCommand)) {
-    const uint32_t r5 = guest::LoadU32(base, command + 8);
-    const uint32_t r4 = guest::LoadU32(base, command + 4);
+    const ChunkCommand c(base, command);
+    const uint32_t r5 = c.arg1();
+    const uint32_t r4 = c.arg0();
     const uint32_t handler = guest::LoadU32(base, (id << 2) + kCommands);
     const uint64_t r3 = call(handler, frame, return_address, 3, command + 16, r4, r5).r3;
     command += uint32_t(r3 + 1) << 4;
-    id = guest::LoadU32(base, command);
+    id = ChunkCommand(base, command).id();
   }
 }
 
@@ -263,13 +273,13 @@ uint32_t RunSingles(uint8_t* base, uint32_t item, uint32_t sp, const GuestCall& 
                     const SingleCommand& single) {
   ITC_NATIVE_RUNNING("sub_8258E630 ChunkChain::RunSingles");
   const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t count = guest::LoadU32(base, item + 8);
+  const uint32_t count = ChunkItem(base, item).single_count();
   if (count != 0) {
     uint32_t i = 0;
     do {
       const uint32_t slot = ((i + 1) << 4) + item;
       const uint32_t handler =
-          guest::LoadU32(base, (guest::LoadU32(base, slot) << 2) + kSingleCommands);
+          guest::LoadU32(base, (ChunkCommand(base, slot).id() << 2) + kSingleCommands);
       const std::optional<uint32_t> native = single(handler, slot, frame);
       const uint64_t r3 = native ? *native : call(handler, frame, 0x8258E678, 1, slot, 0, 0).r3;
       i = uint32_t(r3 + i) + 1;
@@ -281,21 +291,22 @@ uint32_t RunSingles(uint8_t* base, uint32_t item, uint32_t sp, const GuestCall& 
 // ChunkChain::RunOutOfLine (sub_8258E780, kind 3), in its 112-byte frame.
 uint32_t RunOutOfLine(uint8_t* base, uint32_t item, uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258E780 ChunkChain::RunOutOfLine");
-  RunCommands(base, guest::LoadU32(base, item + 4), Frame(base, sp, 112), 0x8258E7C4, call);
+  RunCommands(base, ChunkItem(base, item).link(), Frame(base, sp, 112), 0x8258E7C4, call);
   return item + 16;
 }
 
 // ChunkChain::RunOutOfLineLast (sub_8258E7E8, kind 4).
 uint32_t RunOutOfLineLast(uint8_t* base, uint32_t item, uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258E7E8 ChunkChain::RunOutOfLineLast");
-  RunCommands(base, guest::LoadU32(base, item + 4), Frame(base, sp, 112), 0x8258E830, call);
+  RunCommands(base, ChunkItem(base, item).link(), Frame(base, sp, 112), 0x8258E830, call);
   return 0;
 }
 
 // ChunkChain::RunInlineLast (sub_8258E868, kind 5).
 uint32_t RunInlineLast(uint8_t* base, uint32_t item, uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258E868 ChunkChain::RunInlineLast");
-  RunCommands(base, item + 16, Frame(base, sp, 112), 0x8258E8B0, call);
+  RunCommands(base, ChunkItem(base, item).command_id_address(), Frame(base, sp, 112), 0x8258E8B0,
+              call);
   return 0;
 }
 
@@ -353,7 +364,7 @@ void ChunkChainRun(uint8_t* base, uint32_t queue, uint32_t item, uint32_t sp,
   ITC_NATIVE_RUNNING("sub_8258EE98 ChunkChain::Run");
   const uint32_t frame = Frame(base, sp, 96);
   while (item != 0) {
-    const uint32_t kind = uint32_t(int32_t(int16_t(guest::LoadU32(base, item) & 0xFFFF)));
+    const uint32_t kind = uint32_t(int32_t(int16_t(ChunkItem(base, item).kind() & 0xFFFF)));
     switch (kind) {
       case 0:
         item = RunSingles(base, item, frame, call, single);
@@ -385,45 +396,46 @@ void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_outpu
             const GuestCall& call, const SingleCommand& single) {
   ITC_NATIVE_RUNNING("sub_82591238 RenderQueue::Replay");
   const uint32_t frame = Frame(base, sp, 192);
-  guest::StoreU32(base, kDevice, device);
-  guest::StoreU32(base, State(base, queue) + 44, video_output);
-  for (uint32_t field : {24u, 28u, 32u, 36u}) {
-    guest::StoreU32(base, State(base, queue) + field, 0);
-  }
-  const uint32_t state = State(base, queue);
-  guest::StoreU32(base, kDrawer, state + 4);
-  guest::StoreU32(base, kReleaseList, state + 68);
-  guest::StoreU32(base, kState12, state + 12);
-  guest::StoreU32(base, kRenderTargets, state + 48);
-  models::PointersClear(base, state + 68);
-  const uint32_t list = QueueSlot(base, queue, kReplayingSlot, kReplayingFunction, Replaying,
-                                  frame, 0x825912BC, call);
-  uint32_t buckets_left = guest::LoadU32(base, list + 12);
+  G::set_replay_device(base, device);
+  State(base, queue).set_video_output(video_output);
+  State(base, queue).set_cleared_24(0);
+  State(base, queue).set_cleared_28(0);
+  State(base, queue).set_cleared_32(0);
+  State(base, queue).set_cleared_36(0);
+  const RenderQueueState state = State(base, queue);
+  G::set_replay_drawer(base, state.drawer_address());
+  G::set_release_list(base, state.release_list_address());
+  G::set_replay_drawer_state(base, state.drawer_state_address());
+  G::set_replay_render_targets(base, state.render_target_0_address());
+  models::PointersClear(base, state.release_list_address());
+  const PassList list(base, QueueSlot(base, queue, kReplayingSlot, kReplayingFunction, Replaying,
+                                       frame, 0x825912BC, call));
+  uint32_t buckets_left = list.bucket_count();
   if (buckets_left != 0) {
-    uint32_t bucket = guest::LoadU32(base, list + 24);
+    uint32_t bucket = list.buckets().address;
     do {
-      const uint32_t first = guest::LoadU32(base, bucket + 0);
+      const uint32_t first = PassListBucket(base, bucket).first().address;
       uint32_t n = 0;
-      guest::StoreU32(base, list + 28, 0);
-      guest::StoreU32(base, list + 32, 0);
-      guest::StoreU8(base, list + 4, 1);
+      list.set_cleared_28(0);
+      list.set_current_item(0);
+      list.set_bucket_done(1);
       if (first != 0) {
-        guest::StoreU32(base, list + 32, first);
-        guest::StoreU8(base, list + 4, 0);
+        list.set_current_item(first);
+        list.set_bucket_done(0);
       }
-      if (guest::LoadU8(base, list + 4) == 0) {
-        uint32_t item = guest::LoadU32(base, list + 32);
+      if (list.bucket_done() == 0) {
+        uint32_t item = list.current_item().address;
         uint32_t at = kEntries;
         do {
-          guest::StoreU32(base, at, item + 4);
+          guest::StoreU32(base, at, PassListItem(base, item).chunk_address());
           n++;
           at += 4;
-          item = guest::LoadU32(base, item + 0);
-          guest::StoreU32(base, list + 32, item);
+          item = PassListItem(base, item).next().address;
+          list.set_current_item(item);
           if (item == 0) {
-            guest::StoreU8(base, list + 4, 1);
+            list.set_bucket_done(1);
           }
-        } while (guest::LoadU8(base, list + 4) == 0);
+        } while (list.bucket_done() == 0);
         if (n != 0) {
           const int32_t last = int32_t(n - 1);
           if (last > 0) {
@@ -436,12 +448,12 @@ void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_outpu
           uint32_t start = 0;
           do {
             const uint32_t run = (start << 2) + kEntries;
-            const double key = guest::LoadFloat(base, guest::LoadU32(base, run) + 4);
+            const double key = RenderQueueEntry(base, guest::LoadU32(base, run)).key();
             uint32_t equal = 0;
             if (start < n) {
               uint32_t k = start, at_k = run;
               do {
-                const double other = guest::LoadFloat(base, guest::LoadU32(base, at_k) + 4);
+                const double other = RenderQueueEntry(base, guest::LoadU32(base, at_k)).key();
                 if (!(key == other)) break;
                 k++;
                 equal++;
@@ -458,8 +470,8 @@ void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_outpu
           } while (start < n);
           uint32_t left = n, at_entry = kEntries;
           do {
-            const uint32_t entry = guest::LoadU32(base, at_entry);
-            ChunkChainRun(base, queue, guest::LoadU32(base, entry + 0), frame, call, single);
+            const RenderQueueEntry entry(base, guest::LoadU32(base, at_entry));
+            ChunkChainRun(base, queue, entry.chunk().address, frame, call, single);
             left--;
             at_entry += 4;
           } while (left != 0);
@@ -470,26 +482,29 @@ void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_outpu
     } while (buckets_left != 0);
   }
   // The release list: each object's slot 0 with r4 = 1, the element then 0.
-  uint32_t vector = guest::LoadU32(base, kReleaseList);
-  const uint32_t first = guest::LoadU32(base, vector + 4);
-  const uint32_t size = first == 0 ? 0 : Count(first, guest::LoadU32(base, vector + 8));
+  PtrVector vector = G::release_list(base);
+  const uint32_t first = vector.first().address;
+  const uint32_t size = first == 0 ? 0 : Count(first, vector.last().address);
   for (uint32_t i = 0, offset = 0; i < size; i++, offset += 4) {
-    const uint32_t first_at = vector + 4;
-    const uint32_t now = guest::LoadU32(base, first_at);
-    if (now == 0 || !(Count(now, guest::LoadU32(base, vector + 8)) > i)) {
+    // The original keeps the address of the first word it read: `vector`
+    // read again below isn't used for it.
+    const PtrVector at_first = vector;
+    const uint32_t now = at_first.first().address;
+    if (now == 0 || !(Count(now, at_first.last().address) > i)) {
       call(0x825944B0, frame, 0x825914EC, 0, 0, 0, 0);  // std::_Xran, never seen in play
-      vector = guest::LoadU32(base, kReleaseList);
+      vector = G::release_list(base);
     }
-    const uint32_t elements = guest::LoadU32(base, first_at);
-    const uint32_t object = guest::LoadU32(base, offset + elements);
+    const uint32_t elements = at_first.first().address;
+    const PtrVectorSlot element(base, offset + elements);
+    const uint32_t object = element.value();
     if (object != 0) {
       call(guest::LoadU32(base, guest::LoadU32(base, object)), frame, 0x82591514, 2, object, 1,
            0);
-      vector = guest::LoadU32(base, kReleaseList);
-      guest::StoreU32(base, offset + elements, 0);
+      vector = G::release_list(base);
+      element.set_value(0);
     }
   }
-  guest::StoreU32(base, kDevice, 0);
+  G::set_replay_device(base, 0);
 }
 
 }  // namespace graphics::render_queue

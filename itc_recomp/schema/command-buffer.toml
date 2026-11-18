@@ -1,0 +1,152 @@
+# The schema of docs/functions/command-buffer.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The graphics library's command buffer: the segments its packet writers
+# fill, the data space beside them, the progress block the segments' tails
+# write, predicated tiling's chains of 4 KB blocks (src/graphics/
+# command_buffer.cpp). The device itself (its fields +40 to +20440 named in
+# src/graphics/command_buffer.h) is device-state.md's.
+
+# A chain of 4 KB blocks embedded in the device (+12976 the tiled draws,
+# +12996 a third list, +13016 the segments, +13036 the segment chain saved
+# at the tiling's start). Made by CommandChain::Init (sub_8229ED60), grown
+# by CommandChain::NewBlock (sub_8229EB10), closed by sub_8229DFB8.
+[CommandChain]
+measure = "CommandChain"
+size = 20
+origin = "gpu"
+fields = [
+  { name = "first", offset = 0, type = "ptr", to = "CommandChainBlock", note = "the first block" },
+  { name = "block", offset = 4, type = "ptr", to = "CommandChainBlock", note = "the current block's first word" },
+  { name = "cursor", offset = 8, type = "u32", note = "the write cursor (the block + 4 at its start)" },
+  { name = "end", offset = 12, type = "u32", note = "the block's end (block + 4,220); 0 when closed" },
+  { name = "device", offset = 16, type = "u32", note = "the device (device-state.md's Device)" },
+]
+
+# A chain's block (4,224 bytes from the command buffer's data space); only
+# its first word is a field: where the block's content ends, 0xC0000000 + the
+# physical address (its own start + 4 while open). The cursor and end point
+# into its words.
+[CommandChainBlock]
+measure = "CommandChain.+0"
+size = 4
+origin = "gpu"
+fields = [
+  { name = "content_end", offset = 0, type = "u32", note = "0xC0000000 + the physical address where the content ends; the cursor's word gets the end marker 0xC0000000 or the next block's link" },
+]
+
+# The device as a chain's +16 reaches it (a measure split: it's device-state.md's
+# Device; only its dummy segment's word is used through this path, by
+# CommandChain::NewBlock when out of space).
+[CommandChainDevice]
+measure = "CommandChain.+16"
+size = 15180
+origin = "gpu"
+fields = [
+  { name = "dummy_segment", offset = 15176, type = "u32", note = "the 4,800-byte segment writers get when out of space (device +15176)" },
+]
+
+# The progress block (device +10768, 96 bytes allocated by Device::SetUpRing):
+# what each segment's tail (sub_8229E768, two EVENT_WRITE_SHD) writes and
+# our kick applies (src/native/gpu_link.cpp); read by the waits.
+[CommandProgressBlock]
+measure = "new<96>@Device::SetUpRing"
+size = 96
+origin = "allocated"
+fields = [
+  { name = "fence_done", offset = 0, type = "u32", note = "the last fence the GPU passed (against device +10780)" },
+  { name = "read_position", offset = 4, type = "u32", note = "the last kicked segment's end | its generation & 3" },
+  { name = "ring_read_position", offset = 60, type = "u32", note = "the primary ring's read pointer (sub_8229DCC0)" },
+]
+
+# A recording command buffer (device +13160; never in play): the packet
+# writers' space comes from its buffer or its callback instead of the ring
+# (sub_822AD690, sub_822AD8F8, sub_822AD790, sub_822AD740, sub_8229EC00,
+# sub_8229EDA8).
+[CommandRecorder]
+measures = ["Device.+13160", "sub_822AD8F8.r3", "sub_8229E100.ret"]
+size = 176
+origin = "gpu"
+fields = [
+  { name = "first_block_link", offset = 112, type = "u32", note = "probably: 0xC0000000 + the physical address of the first block sub_822AD790 reserves" },
+  { name = "buffer", offset = 152, type = "u32", note = "its own buffer's start (0: space from the callback +172)" },
+  { name = "buffer_size", offset = 156, type = "u32", note = "its buffer's size in bytes" },
+  { name = "callback_context", offset = 164, type = "u32", note = "the callback's r3" },
+  { name = "max_size", offset = 168, type = "u32", note = "the most a callback call gives (the size asked is clamped to it)" },
+  { name = "callback", offset = 172, type = "fn", note = "gives space (context, kind, &size, alignment), under the device's lock +13576" },
+]
+
+# The size word handed by address to the space functions (sub_8229E100's r5,
+# the recorder's sub_822AD690 and sub_822AD8F8): bytes asked, written back
+# with the size given. A word on the caller's stack.
+[CommandSpaceSize]
+measures = ["sub_8229E100.r5", "sub_822AD690.r5", "sub_822AD8F8.r5"]
+size = 4
+origin = "gpu"
+fields = [
+  { name = "size", offset = 0, type = "u32" },
+]
+
+# A tap on the device (+19980; never set in play): an object whose methods
+# get packets written outside the segments (probably a capture tool's, as
+# PIX's). Device::WriteBinSelect (sub_822B6370) and sub_822B1CB0 call it.
+[CommandTap]
+measure = "Device.+19980"
+size = 4
+origin = "gpu"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "CommandTapVtable" },
+]
+
+[CommandTapVtable]
+measure = "Device.+19980.+0"
+size = 32
+origin = "gpu"
+fields = [
+  { name = "before_packets", offset = 24, type = "fn", note = "(tap, words, count, 0) before the words are written" },
+  { name = "after_packets", offset = 28, type = "fn", note = "after them" },
+]
+
+# Device::Kick's (sub_8229E3F0) r4: (size in words, address) pairs, two in
+# the frame of its caller.
+[CommandKickPairs]
+measure = "Device::Kick.r4"
+size = 16
+origin = "gpu"
+fields = [
+  { name = "words_0", offset = 0, type = "u32" },
+  { name = "address_0", offset = 4, type = "u32" },
+  { name = "words_1", offset = 8, type = "u32" },
+  { name = "address_1", offset = 12, type = "u32" },
+]
+
+# Device::WriteCallback's (sub_8229E9D0) r4: the write position
+# (pre-increment); +4 is the first word it writes.
+[CommandWritePosition]
+measure = "Device::WriteCallback.r4"
+size = 8
+origin = "gpu"
+fields = [
+  { name = "first_word", offset = 4, type = "u32" },
+]
+
+# Device::WriteFlushPackets' (sub_8229E5D0) out words: r4 the block's
+# physical address, r5 its word count (0: nothing to flush).
+[CommandFlushAddress]
+measure = "Device::WriteFlushPackets.r4"
+size = 4
+origin = "gpu"
+fields = [
+  { name = "address", offset = 0, type = "u32" },
+]
+
+[CommandFlushWords]
+measure = "Device::WriteFlushPackets.r5"
+size = 4
+origin = "gpu"
+fields = [
+  { name = "words", offset = 0, type = "u32" },
+]

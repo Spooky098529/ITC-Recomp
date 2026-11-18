@@ -18,6 +18,7 @@
 #include "hooks/native_entry.h"
 
 #include "game_data/game_data.h"
+#include "schema/files_and_saves.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -28,6 +29,8 @@
 ITC_FLAG_DECLARE(bool, log_file_opens);
 
 namespace {
+
+using schema::MovieSource;
 
 constexpr uint32_t kClosed = 0xFFFFFFFF;
 constexpr uint32_t kFileNotFound = 0x80070002;  // HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)
@@ -55,17 +58,18 @@ std::string GuestString(uint8_t* base, uint32_t address, uint32_t max = 260) {
 }
 
 bool Ours(uint8_t* base, uint32_t source) {
-  return game_data::IsHandle(guest::LoadU32(base, source + 44));
+  return game_data::IsHandle(MovieSource(base, source).handle());
 }
 
 // The source's Reset (sub_82487BF8, its vtable +112): closed, at the end,
 // every other field 0.
-void Reset(uint8_t* base, uint32_t source) {
-  for (uint32_t offset = 48; offset < 136; offset += 4) {
-    guest::StoreU32(base, source + offset, 0);
+void Reset(uint8_t* base, uint32_t address) {
+  const MovieSource source(base, address);
+  for (uint32_t at = source.at_end_address(); at < address + MovieSource::kSize; at += 4) {
+    guest::StoreU32(base, at, 0);
   }
-  guest::StoreU32(base, source + 44, kClosed);
-  guest::StoreU32(base, source + 48, 1);
+  source.set_handle(kClosed);
+  source.set_at_end(1);
 }
 
 // Read and the looping Read: r3 = source, r4 = destination, r5 = size, r6 =
@@ -74,16 +78,16 @@ void Reset(uint8_t* base, uint32_t source) {
 // the end). 0, or an error when the file can't be read. The looping Read
 // differs only in reading ahead past the end from the start.
 ITC_REGS_STEP(Read) {
-  const uint32_t source = ctx.r3.u32, destination = ctx.r4.u32, size = ctx.r5.u32,
-                 read_out = ctx.r6.u32;
-  const uint32_t handle = guest::LoadU32(base, source + 44);
-  guest::StoreU32(base, source + 48, 0);
+  const MovieSource source(base, ctx.r3.u32);
+  const uint32_t destination = ctx.r4.u32, size = ctx.r5.u32, read_out = ctx.r6.u32;
+  const uint32_t handle = source.handle();
+  source.set_at_end(0);
   guest::StoreU32(base, read_out, 0);
-  const uint64_t position = LoadU64(base, source + 88);
-  const uint64_t end = LoadU64(base, source + 56) + LoadU64(base, source + 64);
+  const uint64_t position = LoadU64(base, source.position_address());
+  const uint64_t end = LoadU64(base, source.start_address()) + LoadU64(base, source.size_address());
   ctx.r3.u64 = 0;
   if (position >= end) {
-    guest::StoreU32(base, source + 48, 1);
+    source.set_at_end(1);
     return;
   }
   const uint32_t want = end - position < size ? uint32_t(end - position) : size;
@@ -98,13 +102,14 @@ ITC_REGS_STEP(Read) {
     failed = !read || *read != bytes;
     total += read.value_or(0);
   });
-  StoreU64(base, source + 88, position + total);
+  StoreU64(base, source.position_address(), position + total);
   guest::StoreU32(base, read_out, total);
   if (total < size) {
-    guest::StoreU32(base, source + 48, 1);
+    source.set_at_end(1);
   }
   if (failed) {
-    ITC_LOG_WARN("movie source {:08X}: read of {} bytes at {} failed", source, want, position);
+    ITC_LOG_WARN("movie source {:08X}: read of {} bytes at {} failed", source.address, want,
+                 position);
     ctx.r3.u64 = kReadFault;
   }
 }
@@ -118,10 +123,10 @@ ITC_REGS_STEP(Read) {
 // failure gave through the source's +32), +44 = -1.
 ITC_NATIVE_ENTRY_ALWAYS(82487C48) {
   
-  const uint32_t source = ctx.r3.u32;
+  const MovieSource source(base, ctx.r3.u32);
   const std::string path = GuestString(base, ctx.r4.u32);
   if (ITC_FLAG(log_file_opens)) {
-    ITC_LOG_INFO("movie open: source {:08X} \"{}\" from {:08X}", source, path, ctx.lr);
+    ITC_LOG_INFO("movie open: source {:08X} \"{}\" from {:08X}", source.address, path, ctx.lr);
   }
   auto relative = game_data::RelativePath(path);
   if (!relative) {
@@ -138,13 +143,13 @@ ITC_NATIVE_ENTRY_ALWAYS(82487C48) {
   auto handle = game_data::Open(*relative);
   if (!handle) {
     ITC_LOG_WARN("movie source: no file \"{}\"", path);
-    guest::StoreU32(base, source + 44, kClosed);
+    source.set_handle(kClosed);
     ctx.r3.u64 = kFileNotFound;
     return;
   }
-  guest::StoreU32(base, source + 44, *handle);
-  StoreU64(base, source + 64, game_data::Size(*handle).value_or(0));
-  ctx.r3.u64 = source;
+  source.set_handle(*handle);
+  StoreU64(base, source.size_address(), game_data::Size(*handle).value_or(0));
+  ctx.r3.u64 = source.address;
   ctx.r4.u64 = blocks;
   ctx.r5.u64 = block_size;
   ctx.r6.u64 = count;
@@ -160,14 +165,14 @@ ITC_NATIVE_ENTRY_ALWAYS(82487C48) {
 // ahead (1 for 0); no blocks (+108, +124 and +132 stay 0). 0.
 ITC_NATIVE_ENTRY_ALWAYS(82487F68) {
   
-  const uint32_t source = ctx.r3.u32;
-  if (!Ours(base, source)) {
+  const MovieSource source(base, ctx.r3.u32);
+  if (!Ours(base, source.address)) {
     lifted::original::c82487F68(ctx, base);
     return;
   }
-  guest::StoreU32(base, source + 48, 0);
-  guest::StoreU32(base, source + 104, ctx.r5.u32);
-  guest::StoreU32(base, source + 116, ctx.r7.u32 ? ctx.r7.u32 : 1);
+  source.set_at_end(0);
+  source.set_block_size(ctx.r5.u32);
+  source.set_blocks_ahead(ctx.r7.u32 ? ctx.r7.u32 : 1);
   ctx.r3.u64 = 0;
 }
 
@@ -177,18 +182,17 @@ ITC_NATIVE_ENTRY_ALWAYS(82487F68) {
 // the recompiled one does; one on another handle, or with blocks, goes to it.
 ITC_NATIVE_ENTRY_ALWAYS(824880D8) {
   
-  const uint32_t source = ctx.r3.u32;
-  const uint32_t handle = guest::LoadU32(base, source + 44);
-  const bool no_blocks =
-      !guest::LoadU32(base, source + 124) && !guest::LoadU32(base, source + 132);
+  const MovieSource source(base, ctx.r3.u32);
+  const uint32_t handle = source.handle();
+  const bool no_blocks = !source.blocks_memory() && !source.block_list();
   if (!(game_data::IsHandle(handle) || handle == kClosed) || !no_blocks) {
     lifted::original::c824880D8(ctx, base);
     return;
   }
-  if (handle != kClosed && !(guest::LoadU32(base, source + 120) & 4)) {
+  if (handle != kClosed && !(source.flags() & 4)) {
     game_data::Close(handle);
   }
-  Reset(base, source);
+  Reset(base, source.address);
   ctx.r3.u64 = 0;
 }
 

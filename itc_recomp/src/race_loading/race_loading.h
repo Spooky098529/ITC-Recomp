@@ -15,12 +15,7 @@
 
 namespace race_loading {
 
-// The machine's words.
-constexpr uint32_t kState = 9604;     // the state (1 at set-up)
-constexpr uint32_t kCleared = 9608;   // cleared by Begin and WaitDraw
-constexpr uint32_t kReady = 9640;     // cleared by OnCourseReady
-constexpr uint32_t kEndTicks = 9644;  // the end's tick count (0 at set-up)
-constexpr uint32_t kDrawStep = 9648;  // WaitDraw's step
+// The machine's words: schema::CourseSetup (itc_recomp/schema/race-loading.toml).
 
 // The dispatcher's ring (from the dispatcher, the handlers' r4): 50
 // messages of 12 bytes from +204, the count at +804 and the start at +808.
@@ -30,10 +25,8 @@ constexpr uint32_t kRingStart = 604;  // from the ring
 constexpr uint32_t kRingSlots = 50;
 constexpr uint32_t kRingMessageBytes = 12;
 
-// The fades' passes (words in the image: 5 and 15) and layer 0's alpha.
-constexpr uint32_t kFadeInPasses = 0x82001BEC;
-constexpr uint32_t kFadeOutPasses = 0x82001BF0;
-constexpr uint32_t kLayer0Alpha = 0x826A50D4;
+// The fades' passes (words in the image: 5 and 15) and layer 0's alpha:
+// schema::RaceLoadingGlobals.
 
 // The guest functions called.
 constexpr uint32_t kQueueLength = 0x8209D7B0;  // Archive::QueueLength
@@ -55,14 +48,9 @@ constexpr uint32_t kGetLocalTime = 0x822968B8;
 constexpr uint32_t kSystemRequestCheck = 0x82293358;
 constexpr uint32_t kSystemRequestRun = 0x82292828;
 
-// The loading screen's globals: shown (1 once Show ran), the current movie,
-// the three movies; the animation each plays (a word each, 0, 13 and 0 in
-// the image); the system request sub_82293460 tests.
-constexpr uint32_t kLoadingShown = 0x82815E60;
-constexpr uint32_t kLoadingCurrent = 0x82815E64;
-constexpr uint32_t kLoadingMovies = 0x82815E68;
-constexpr uint32_t kLoadingAnimations = 0x8263799C;
-constexpr uint32_t kSystemRequest = 0x82816E3C;
+// The loading screen's globals (shown, the current movie, the three movies,
+// the animation each plays) and the system request sub_82293460 tests:
+// schema::RaceLoadingGlobals.
 
 // A guest function called from the frame at `r1`, with r3 to r10 (the first
 // `set` of them; the others left as they are) and the link register `lr`
@@ -116,14 +104,10 @@ uint64_t WaitDraw(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                   const Calls& calls);
 
 // The globals the course's wait and end read: the course scenery's manager
-// (Scenery::IsLoaded's), the collision mesh's and the route's load states
-// (2 once loaded; the words +8 into 0x826C5B1C and 0x826C5B10), layer 0's
-// fade counts (out and in), and the guest functions they call.
+// (Scenery::IsLoaded's; course-scenery's), the collision mesh's and the
+// route's load states and layer 0's fade counts (schema::RaceLoadingGlobals),
+// and the guest functions they call.
 constexpr uint32_t kSceneryManager = 0x826C5514;
-constexpr uint32_t kCollisionState = 0x826C5B24;
-constexpr uint32_t kRouteState = 0x826C5B18;
-constexpr uint32_t kLayer0FadeOut = 0x826A50E4;
-constexpr uint32_t kLayer0FadeIn = 0x826A50DC;
 constexpr uint32_t kCarSceneUpdate = 0x820C9608;  // CarScene::Update, through its adapter
 
 // sub_821514A0 CourseSetup::WaitCourse ((3, 0); 112-byte frame): when

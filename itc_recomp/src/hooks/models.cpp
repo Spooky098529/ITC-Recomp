@@ -35,6 +35,7 @@
 #include "models/part_model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
+#include "schema/models.h"
 #include "model_animation/model_animation.h"
 #include "shader_objects/shader_objects.h"
 #include "lifted/sdk.h"
@@ -199,8 +200,8 @@ void SetR3(lifted::Regs& ctx, const models::R3& r3) {
 ITC_NATIVE_ENTRY_ALWAYS(82590EF0) {
   
   if (NativeLifetime()) {
-    if (const auto r3 = models::PointersInsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                guest::LoadU32(base, ctx.r6.u32))) {
+    const uint32_t value = schema::TextureSlot(base, ctx.r6.u32).texture();
+    if (const auto r3 = models::PointersInsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, value)) {
       SetR3(ctx, *r3);
       return;
     }
@@ -480,7 +481,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82596920) {
     const bool done = models::ModelLoad(base, model, file, xpr, guest.Calls());
     ctx.lr = lr;
     if (done) {
-      ctx.r3.u64 = guest::LoadU32(base, model + 412);
+      ctx.r3.u64 = schema::Model(base, model).shape_count();
       return;
     }
     ctx.r3.u64 = model;

@@ -9,6 +9,7 @@
 #include "base/log.h"
 #include "game_modes/game_modes.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/app_states.h"
 #include "std_list/ptr_list.h"
 
 namespace app_states {
@@ -44,20 +45,20 @@ void LayerConstruct(uint8_t* base, uint32_t layer, uint32_t owner, std::optional
   if (state) {
     calls.set_register(30, *state);
   }
-  Store(base, layer + 4, kStateBaseVtable);
-  Store(base, layer + 0, kLayerVtable);
-  Store(base, layer + 4, kLayerStateVtable);
-  Store(base, layer + kLayerOwner, owner);
-  if (!std_list::Construct(base, layer + kLayerChildren)) {
-    calls.call(kPtrListConstruct, layer + kLayerChildren, std::nullopt, std::nullopt,
+  const schema::StateLayer l(base, layer);
+  l.set_state_vtable(kStateBaseVtable);
+  l.set_vtable(kLayerVtable);
+  l.set_state_vtable(kLayerStateVtable);
+  l.set_owner(owner);
+  if (!std_list::Construct(base, l.children_address())) {
+    calls.call(kPtrListConstruct, l.children_address(), std::nullopt, std::nullopt,
                children_return);
   }
-  if (!std_list::Construct(base, layer + kLayerStates)) {
-    calls.call(kPtrListConstruct, layer + kLayerStates, std::nullopt, std::nullopt,
-               states_return);
+  if (!std_list::Construct(base, l.states_address())) {
+    calls.call(kPtrListConstruct, l.states_address(), std::nullopt, std::nullopt, states_return);
   }
-  if (!OpConstruct(base, layer + kLayerOps)) {
-    calls.call(kOpListConstruct, layer + kLayerOps, std::nullopt, std::nullopt, ops_return);
+  if (!OpConstruct(base, l.ops_address())) {
+    calls.call(kOpListConstruct, l.ops_address(), std::nullopt, std::nullopt, ops_return);
   }
   if (state && !LayerPush(base, layer, *state)) {
     calls.call(kLayerPush, layer, uint64_t(*state), std::nullopt, 0x820ADC40);
@@ -70,11 +71,11 @@ void LayerAddChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t frame
   calls.set_register(31, layer);
   const uint32_t value = frame + 112 + 28;  // the caller's r1 + 28
   Store(base, value, child);
-  const uint32_t child_state = child + 4;
+  const uint32_t child_state = schema::StateLayer(base, child).state_vtable_address();
   calls.call(VirtualTarget(base, child_state, 4), child_state, uint64_t(layer), std::nullopt,
              0x820ADA38);
-  const uint32_t list = layer + kLayerChildren;
-  const uint32_t head = Load(base, list + std_list::kHead);
+  const uint32_t list = schema::StateLayer(base, layer).children_address();
+  const uint32_t head = schema::PtrList(base, list).head().address;
   Store(base, frame + 80, list);
   Store(base, frame + 84, head);
   if (!std_list::Insert(base, list, head, Load(base, value))) {
@@ -85,17 +86,18 @@ void LayerAddChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t frame
 bool StatesAddLayer(uint8_t* base, uint32_t states, uint32_t state, uint32_t frame,
                     const AppCalls& calls) {
   (void)frame;
-  const auto layer = memory::crt::OperatorNew(base, kLayerBytes);
+  const auto layer = memory::crt::OperatorNew(base, schema::StateLayer::kSize);
   if (!layer) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_820AE130 AppStates::AddLayer");
+  const schema::AppStates s(base, states);
   calls.set_register(30, states);
   calls.set_register(29, state);
   calls.set_register(31, *layer);
   uint32_t child = 0;
   if (*layer != 0) {
-    const uint32_t app = Load(base, states + 4);
+    const uint32_t app = s.app().address;
     const uint32_t owner =
         calls.call(VirtualTarget(base, app, 8), app, std::nullopt, std::nullopt, 0x820AE168);
     calls.in_frame(112, 0x820AE178, [&](uint32_t inner) {
@@ -104,25 +106,26 @@ bool StatesAddLayer(uint8_t* base, uint32_t states, uint32_t state, uint32_t fra
     child = *layer;
   }
   calls.in_frame(112, 0x820AE18C, [&](uint32_t inner) {
-    LayerAddChild(base, Load(base, states + kStatesRoot), child, inner, calls);
+    LayerAddChild(base, s.root().address, child, inner, calls);
   });
   return true;
 }
 
 bool StatesConstruct(uint8_t* base, uint32_t states, uint32_t setup, uint32_t frame,
                      const AppCalls& calls) {
-  const auto layer = memory::crt::OperatorNew(base, kLayerBytes);
+  const auto layer = memory::crt::OperatorNew(base, schema::StateLayer::kSize);
   if (!layer) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_820AE348 AppStates::AppStates");
   calls.set_register(31, states);
-  Store(base, states + 0, kStatesVtable);
-  Store(base, states + 4, Load(base, setup + 0));
+  const schema::AppStates s(base, states);
+  s.set_vtable(kStatesVtable);
+  s.set_app(schema::AppStatesSetup(base, setup).app());
   calls.set_register(30, *layer);
   uint32_t root = 0;
   if (*layer != 0) {
-    const uint32_t app = Load(base, states + 4);
+    const uint32_t app = s.app().address;
     const uint32_t owner =
         calls.call(VirtualTarget(base, app, 8), app, std::nullopt, std::nullopt, 0x820AE390);
     calls.in_frame(96, 0x820AE39C, [&](uint32_t inner) {
@@ -130,8 +133,8 @@ bool StatesConstruct(uint8_t* base, uint32_t states, uint32_t setup, uint32_t fr
     });
     root = *layer;
   }
-  const uint32_t app = Load(base, states + 4);
-  Store(base, states + kStatesRoot, root);
+  const uint32_t app = s.app().address;
+  s.set_root(root);
   const uint32_t interface =
       calls.call(VirtualTarget(base, app, 4), app, std::nullopt, std::nullopt, 0x820AE3C0);
   calls.set_register(30, interface);
@@ -167,7 +170,7 @@ bool StatesConstruct(uint8_t* base, uint32_t states, uint32_t setup, uint32_t fr
 std::optional<uint32_t> StatesCreate(uint8_t* base, uint32_t setup, uint32_t frame,
                                      const AppCalls& calls) {
   (void)frame;
-  const auto block = memory::crt::OperatorNew(base, kStatesBytes);
+  const auto block = memory::crt::OperatorNew(base, schema::AppStates::kSize);
   if (!block) {
     return std::nullopt;
   }
@@ -207,7 +210,7 @@ std::optional<uint32_t> AppStart(uint8_t* base, uint32_t interface, uint32_t fra
     game_modes::ModesConstruct(base, *holder, 3);
     state = *holder;
   }
-  const uint32_t states = Load(base, interface + kInterfaceStates);
+  const uint32_t states = schema::AppInterface(base, interface).states().address;
   const uint32_t target = VirtualTarget(base, states, 4);
   bool ours = false;
   if (target == kAddLayer) {
@@ -218,7 +221,7 @@ std::optional<uint32_t> AppStart(uint8_t* base, uint32_t interface, uint32_t fra
   // r3 as the slot leaves it (AddLayer's: AddChild's, the root's children).
   uint32_t r3 = 0;
   if (ours) {
-    r3 = Load(base, states + kStatesRoot) + kLayerChildren;
+    r3 = schema::AppStates(base, states).root().children_address();
   } else {
     r3 = calls.call(target, states, uint64_t(state), std::nullopt, 0x82092908);
   }
@@ -268,7 +271,7 @@ void ListForEach(uint8_t* base, uint32_t result, uint64_t first, uint64_t last, 
         calls.call(function, object, op, std::nullopt, return_address);
       }
     } else {
-      const uint32_t value = Load(base, node + 8);
+      const uint32_t value = schema::StateListNode(base, node).value();
       if (function == kUpdateChild || function == kUpdateChildToggled) {
         calls.in_frame(112, return_address, [&](uint32_t inner) {
           UpdateChild(base, object, value, function == kUpdateChildToggled, inner, calls);
@@ -281,7 +284,7 @@ void ListForEach(uint8_t* base, uint32_t result, uint64_t first, uint64_t last, 
         calls.call(function, object, uint64_t(value), std::nullopt, return_address);
       }
     }
-    node = Load(base, node + 0);
+    node = schema::StateListNode(base, node).next().address;  // an operation's node too
     calls.set_register(31, node);
   }
   const uint64_t a = Load64(base, caller + 48), b = Load64(base, caller + 56);
@@ -297,7 +300,7 @@ uint32_t UpdateChild(uint8_t* base, uint32_t layer, uint32_t child, bool toggled
   } else {
     ITC_NATIVE_RUNNING("sub_820ACD80 StateLayer::Update's functor");
   }
-  const uint32_t state = child + 4;
+  const uint32_t state = schema::StateLayer(base, child).state_vtable_address();
   calls.set_register(31, state);
   calls.set_register(30, layer);
   const uint32_t target = VirtualTarget(base, state, toggled ? 36 : 32);
@@ -317,7 +320,7 @@ uint32_t UpdateChild(uint8_t* base, uint32_t layer, uint32_t child, bool toggled
 uint32_t ToggleOffChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t return_address,
                         const AppCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820ACD60 StateLayer::OnToggleOff's functor");
-  const uint32_t state = child + 4;
+  const uint32_t state = schema::StateLayer(base, child).state_vtable_address();
   calls.set_register(11, state);
   const uint32_t target = VirtualTarget(base, state, 20);
   if (target == kLayerStateToggleOff) {
@@ -328,20 +331,20 @@ uint32_t ToggleOffChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t 
 
 uint32_t LayerApplyOps(uint8_t* base, uint32_t layer, uint32_t frame, const AppCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820ADE68 StateLayer::ApplyOps");
-  const uint32_t list = layer + kLayerOps;
+  const uint32_t list = schema::StateLayer(base, layer).ops_address();
   calls.set_register(31, list);
   Store(base, frame + 104, layer);
   Store(base, frame + 80, kApplyOp);
   Store(base, frame + 84, 0);
   const uint64_t function = Load64(base, frame + 80);
-  const uint32_t head = Load(base, list + 4);
+  const auto head = schema::OpList(base, list).head();
   Store(base, frame + 80, list);
   Store64(base, frame + 96, function);
   const uint64_t functor = Load64(base, frame + 96);
   const uint64_t adjust = Load64(base, frame + 104);  // its low word as the stack holds it
   Store(base, frame + 96, list);
-  Store(base, frame + 84, head);
-  Store(base, frame + 100, Load(base, head + 0));
+  Store(base, frame + 84, head.address);
+  Store(base, frame + 100, head.next().address);
   const uint64_t last = Load64(base, frame + 80);
   const uint64_t first = Load64(base, frame + 96);
   calls.in_frame(112, 0x820ADEE0, [&](uint32_t inner) {
@@ -358,35 +361,36 @@ uint32_t LayerUpdate(uint8_t* base, uint32_t layer, bool toggled, uint32_t frame
     ITC_NATIVE_RUNNING("sub_820ADF00 StateLayer::Update");
   }
   calls.set_register(31, layer);
-  if (Load(base, layer + 32) != 0) {
-    const uint32_t states = layer + kLayerStates;
+  const schema::StateLayer l(base, layer);
+  if (l.states_size() != 0) {
+    const uint32_t states = l.states_address();
     calls.set_register(30, states);
     const uint32_t returns[2][2] = {{0x820ADF5C, 0x820ADF8C}, {0x820AE06C, 0x820AE09C}};
     const uint32_t slots[2] = {toggled ? 36u : 32u, 40u};
     for (int i = 0; i < 2; i++) {
-      const uint32_t head = Load(base, states + std_list::kHead);
-      const uint32_t top = Load(base, head + std_list::kNext);
-      if (top == head) {
+      const auto head = schema::PtrList(base, states).head();
+      const auto top = head.next();
+      if (top.address == head.address) {
         ITC_LOG_WARN("{}: tw/td trap hit (type 22)", toggled ? "sub_820AE010" : "sub_820ADF00");
       }
-      const uint32_t state = Load(base, top + std_list::kValue);
+      const uint32_t state = top.value();
       calls.call(VirtualTarget(base, state, slots[i]), state, uint64_t(layer), std::nullopt,
                  returns[toggled][i]);
     }
   }
-  const uint32_t list = layer + kLayerChildren;
+  const uint32_t list = l.children_address();
   Store(base, frame + 104, layer);
   Store(base, frame + 84, 0);
   Store(base, frame + 80, toggled ? kUpdateChildToggled : kUpdateChild);
   const uint64_t function = Load64(base, frame + 80);
   Store(base, frame + 80, list);
   Store64(base, frame + 96, function);
-  const uint32_t head = Load(base, list + std_list::kHead);
+  const auto head = schema::PtrList(base, list).head();
   const uint64_t functor = Load64(base, frame + 96);
   const uint64_t adjust = Load64(base, frame + 104);  // its low word as the stack holds it
   Store(base, frame + 96, list);
-  const uint32_t first_node = Load(base, head + std_list::kNext);
-  Store(base, frame + 84, head);
+  const uint32_t first_node = head.next().address;
+  Store(base, frame + 84, head.address);
   const uint64_t last = Load64(base, frame + 80);
   Store(base, frame + 100, first_node);
   const uint64_t first = Load64(base, frame + 96);
@@ -420,7 +424,7 @@ uint32_t StatesOnUpdate(uint8_t* base, uint32_t states, bool toggled, uint32_t f
   } else {
     ITC_NATIVE_RUNNING("sub_820AE1B8 AppStates::OnUpdate");
   }
-  return LayerUpdate(base, Load(base, states + kStatesRoot), toggled, frame, calls);
+  return LayerUpdate(base, schema::AppStates(base, states).root().address, toggled, frame, calls);
 }
 
 std::optional<uint32_t> LayerApplyOp(uint8_t* base, uint32_t layer, uint64_t op, uint32_t frame,
@@ -432,7 +436,7 @@ std::optional<uint32_t> LayerApplyOp(uint8_t* base, uint32_t layer, uint64_t op,
   }
   const uint32_t caller = frame + 128;
   if (type == 0) {
-    const auto added = memory::crt::OperatorNew(base, kLayerBytes);
+    const auto added = memory::crt::OperatorNew(base, schema::StateLayer::kSize);
     if (!added) {
       return std::nullopt;
     }
@@ -441,7 +445,7 @@ std::optional<uint32_t> LayerApplyOp(uint8_t* base, uint32_t layer, uint64_t op,
     calls.set_register(30, layer);
     uint32_t child = 0;
     if (*added != 0) {
-      const uint32_t owner = Load(base, layer + kLayerOwner);
+      const uint32_t owner = schema::StateLayer(base, layer).owner();
       calls.in_frame(112, 0x820ADE48, [&](uint32_t inner) {
         LayerConstruct(base, *added, owner, state, inner, calls);
       });
@@ -449,7 +453,7 @@ std::optional<uint32_t> LayerApplyOp(uint8_t* base, uint32_t layer, uint64_t op,
     }
     calls.in_frame(112, 0x820ADE5C,
                    [&](uint32_t inner) { LayerAddChild(base, layer, child, inner, calls); });
-    return layer + kLayerChildren;
+    return schema::StateLayer(base, layer).children_address();
   }
   ITC_NATIVE_RUNNING("sub_820ADC60 StateLayer::ApplyOp");
   Store64(base, caller + 24, op);
@@ -457,20 +461,21 @@ std::optional<uint32_t> LayerApplyOp(uint8_t* base, uint32_t layer, uint64_t op,
   if (type != 2) {
     return layer;
   }
-  const uint32_t list = layer + kLayerStates;
-  if (Load(base, layer + 32) != 0) {
-    const uint32_t head = Load(base, list + std_list::kHead);
-    const uint32_t top = Load(base, head + std_list::kNext);
-    if (top == head) {
+  const schema::StateLayer l(base, layer);
+  const uint32_t list = l.states_address();
+  if (l.states_size() != 0) {
+    const auto head = schema::PtrList(base, list).head();
+    const auto top = head.next();
+    if (top.address == head.address) {
       ITC_LOG_WARN("sub_820ADC60: tw/td trap hit (type 22)");
     }
-    const uint32_t covered = Load(base, top + std_list::kValue);
+    const uint32_t covered = top.value();
     calls.call(VirtualTarget(base, covered, 24), covered, uint64_t(layer), std::nullopt,
                0x820ADD70);
   }
-  const uint32_t head = Load(base, list + std_list::kHead);
+  const auto head = schema::PtrList(base, list).head();
   Store(base, frame + 88, list);
-  const uint32_t first = Load(base, head + std_list::kNext);
+  const uint32_t first = head.next().address;
   Store(base, frame + 92, first);
   if (!std_list::Insert(base, list, first, Load(base, caller + 28))) {
     calls.call(kPtrListInsert, list, (uint64_t(list) << 32) | first, uint64_t(caller + 28),
@@ -489,30 +494,30 @@ uint32_t LayerToggle(uint8_t* base, uint32_t layer, bool off, uint32_t frame,
     ITC_NATIVE_RUNNING("sub_820AD4E0 StateLayer::OnToggleOn");
   }
   calls.set_register(31, layer);
-  if (Load(base, layer + 32) != 0) {
-    const uint32_t states = layer + kLayerStates;
-    const uint32_t head = Load(base, states + std_list::kHead);
-    const uint32_t top = Load(base, head + std_list::kNext);
-    if (top == head) {
+  const schema::StateLayer l(base, layer);
+  if (l.states_size() != 0) {
+    const auto head = schema::PtrList(base, l.states_address()).head();
+    const auto top = head.next();
+    if (top.address == head.address) {
       ITC_LOG_WARN("{}: tw/td trap hit (type 22)", off ? "sub_820AD680" : "sub_820AD4E0");
     }
-    const uint32_t state = Load(base, top + std_list::kValue);
+    const uint32_t state = top.value();
     calls.call(VirtualTarget(base, state, off ? 20 : 12), state, uint64_t(layer), std::nullopt,
                off ? 0x820AD6D8 : 0x820AD538);
   }
-  const uint32_t list = layer + kLayerChildren;
+  const uint32_t list = l.children_address();
   Store(base, frame + 104, layer);
   Store(base, frame + 84, 0);
   Store(base, frame + 80, off ? kToggleOffChild : kToggleOnChild);
   const uint64_t function = Load64(base, frame + 80);
   Store(base, frame + 80, list);
   Store64(base, frame + 96, function);
-  const uint32_t head = Load(base, list + std_list::kHead);
+  const auto head = schema::PtrList(base, list).head();
   const uint64_t functor = Load64(base, frame + 96);
   const uint64_t adjust = Load64(base, frame + 104);  // its low word as the stack holds it
   Store(base, frame + 96, list);
-  const uint32_t first_node = Load(base, head + std_list::kNext);
-  Store(base, frame + 84, head);
+  const uint32_t first_node = head.next().address;
+  Store(base, frame + 84, head.address);
   const uint64_t last = Load64(base, frame + 80);
   Store(base, frame + 100, first_node);
   const uint64_t first = Load64(base, frame + 96);
@@ -543,7 +548,7 @@ uint32_t LayerStateToggleOff(uint8_t* base, uint32_t state, uint32_t return_addr
 std::optional<uint32_t> StatesOnMessage(uint8_t* base, uint32_t states, uint32_t message,
                                         uint32_t frame, const AppCalls& calls) {
   (void)frame;
-  const uint32_t which = Load(base, message);
+  const uint32_t which = schema::AppMessageWord(base, message).value();
   if (which == 1 || which == 5 || which == 6) {
     return std::nullopt;
   }
@@ -551,7 +556,7 @@ std::optional<uint32_t> StatesOnMessage(uint8_t* base, uint32_t states, uint32_t
   if (which != 0 && which != 2) {
     return states;
   }
-  const uint32_t root = Load(base, states + kStatesRoot);
+  const uint32_t root = schema::AppStates(base, states).root().address;
   uint32_t answer = 0;
   calls.in_frame(128, which == 0 ? 0x820AE29C : 0x820AE284, [&](uint32_t inner) {
     answer = LayerToggle(base, root, which == 2, inner, calls);

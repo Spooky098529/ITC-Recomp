@@ -69,7 +69,7 @@ uint64_t ShowSpecTexts(uint8_t* base, uint32_t record, uint32_t sp, const Calls&
     // double at 0x82009F00 in single precision, truncated into +80 (stfiwx;
     // r10 the word's address).
     const double f13 = IntToFloat(base, frame + 80, Load(base, record + 8));
-    const double f0 = double(float(f13 * Lfd(base, 0x82009F00)));
+    const double f0 = double(float(f13 * G::weight_scale(base)));
     Store(base, frame + 80, Fctiwz(f0));
   }
   SetText(calls, frame, 0x8219385C, movie, 18, 8, 8, Load(base, frame + 80), frame + 80);
@@ -77,7 +77,7 @@ uint64_t ShowSpecTexts(uint8_t* base, uint32_t record, uint32_t sp, const Calls&
   {
     // A float scaled by the double at 0x82009F08, passed as a double in f1
     // and in r7 (its bits through the frame's +48).
-    const double f1 = double(float(Lfs(base, record + 20) * Lfd(base, 0x82009F08)));
+    const double f1 = double(float(Lfs(base, record + 20) * G::spec_scale(base)));
     const uint64_t bits = std::bit_cast<uint64_t>(f1);
     Store64(base, frame + 48, bits);
     const uint64_t args[8] = {movie, 18, 12, 436, bits, 0, 0, 0};

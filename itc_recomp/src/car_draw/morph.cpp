@@ -9,6 +9,7 @@
 #include "command_list/command_list.h"
 #include "guest.h"
 #include "models/xpr.h"
+#include "schema/car_draw.h"
 #include "scenery_lists/scenery_lists.h"
 #include "second_set/morph.h"
 
@@ -32,7 +33,6 @@ constexpr uint32_t kHeadersPerBuffer = 1280;
 
 constexpr uint32_t kRecordList = 0x8296B918;
 constexpr uint32_t kReleaseBucket = 0x8296B904;
-constexpr uint32_t kPoolMaker = 0x8296B914;
 constexpr uint32_t kMakeMorphJob = 0x820AC7F0;  // the second pool maker's slot 1
 constexpr uint32_t kZero = 0x82000A34;  // 0.0
 
@@ -181,7 +181,7 @@ std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t 
     if (bytes1 != 0 && !Fits(base, bytes1, UsedAfter(used, bytes0), headers + 1)) {
       return std::nullopt;
     }
-    if (Load(base, kPoolMaker) != 0 &&
+    if (schema::CarDrawGlobals::pool_maker(base) != 0 &&
         !sl::CommandListHasRoom(base, Load(base, kRecordList), 4)) {
       return std::nullopt;
     }
@@ -204,7 +204,7 @@ std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t 
   }
   Store(base, morph + 8, Load(base, shape + 416));
   Store(base, morph + 12, Load(base, shape + 424));
-  const uint32_t maker = Load(base, kPoolMaker);
+  const uint32_t maker = schema::CarDrawGlobals::pool_maker(base);
   Left left;
   if (maker != 0) {
     // The maker's slot 1 (sub_820AC7F0 in play: a job blending on a worker

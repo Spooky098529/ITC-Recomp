@@ -13,10 +13,9 @@
 
 namespace race_scene {
 
-constexpr uint32_t kScene = 0x826D82D4;  // the race scene
+// The race scene's pointer is schema::RaceSceneGlobals::scene ([0x826D82D4];
+// "[scene]" below), the machine schema::RaceSceneMachine.
 constexpr uint32_t kSceneBytes = 31168;
-// The machine's toggle (probably the pause): +9608.
-constexpr uint32_t kPaused = 9608;
 // RaceSceneMachine::Init's frame (its r1 less this).
 constexpr uint32_t kInitFrame = 864;
 
@@ -25,16 +24,16 @@ constexpr uint32_t kInitFrame = 864;
 // 11 light entries' five vectors (+30080 + 96 i, +28 to +92) = the float at
 // 0x82000A30. Returns the object.
 uint32_t SceneConstruct(uint8_t* base, uint32_t scene);
-// sub_8215D738 RaceScene::Create: [kScene] = 0, operator new(31,168) and,
-// when made, RaceScene::RaceScene on it into [kScene] (else 0). False, with
-// only [kScene] = 0 written, where operator new's plain C++ refuses (the
+// sub_8215D738 RaceScene::Create: [scene] = 0, operator new(31,168) and,
+// when made, RaceScene::RaceScene on it into [scene] (else 0). False, with
+// only [scene] = 0 written, where operator new's plain C++ refuses (the
 // original then runs).
 bool SceneCreate(uint8_t* base);
 // sub_8215D808 RaceSceneMachine::Init: RaceScene::Create, the state = 1 and
 // the 11 transitions added (StateMachine::Add), built in the original's
 // stack frame at `frame` (its r1 less kInitFrame: see race_scene_init.cpp).
 // Returns the last StateMachine::Add's answer (`replaced` as its), or
-// nothing, with only [kScene] = 0 written, where RaceScene::Create refuses.
+// nothing, with only [scene] = 0 written, where RaceScene::Create refuses.
 std::optional<uint32_t> MachineInit(uint8_t* base, uint32_t machine, uint32_t frame,
                                     bool* replaced);
 
@@ -80,11 +79,11 @@ uint32_t SetEffectParams(uint8_t* base, uint32_t kind, uint32_t index, double* f
 // --- The machine's toggle ---
 
 // sub_8215C750 RaceSceneMachine::TogglePause (probably): +9608 = (+9608 ==
-// 0), then Race::ToggleEffects([kScene]) (post-effects.md). Returns r3 as
+// 0), then Race::ToggleEffects([scene]) (post-effects.md). Returns r3 as
 // that leaves it.
 uint32_t TogglePause(uint8_t* base, uint32_t machine);
 // sub_8215D0D8 RaceSceneMachine::Resume (probably; not seen in play): when
-// +9608 is set, +9608 = 0 and Race::ToggleEffects([kScene]), returning its
+// +9608 is set, +9608 = 0 and Race::ToggleEffects([scene]), returning its
 // r3; else nothing (r3 left).
 std::optional<uint32_t> Resume(uint8_t* base, uint32_t machine);
 
@@ -97,7 +96,7 @@ void DestroyCars(uint8_t* base, uint32_t cars);
 // Whether RaceScene::Destroy's operator delete is the plain C++'s: no scene,
 // or a block of the allocation layer's.
 bool DestroyReady(uint8_t* base);
-// sub_8215D790 RaceScene::Destroy: when [kScene] is set, DestroyCars(+16)
+// sub_8215D790 RaceScene::Destroy: when [scene] is set, DestroyCars(+16)
 // and operator delete of it (the pointer left). Returns the scene (0: r3
 // left as it was). Only where DestroyReady.
 uint32_t Destroy(uint8_t* base);

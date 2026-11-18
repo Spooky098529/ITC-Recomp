@@ -11,6 +11,7 @@
 #include "debug/frame_state_diff.h"
 #include "guest.h"
 #include "load_poll/load_poll.h"
+#include "schema/car_draw.h"
 #include "second_set/objects.h"
 
 #include "base/float_mode.h"
@@ -23,14 +24,13 @@ namespace {
 
 using Fpscr = ::base::FloatMode;
 
-constexpr uint32_t kScene = 0x826C2E44;
+using G = schema::CarDrawGlobals;
+using Scene = schema::CarScene;
+
 constexpr uint32_t kCameraPasses = 0x826BAC00;
 constexpr uint32_t kOne = 0x82000A30;    // 1.0
 constexpr uint32_t kZero = 0x82000A34;   // 0.0
 constexpr uint32_t kBehind = 0x82002A24;  // the cull's least w
-// The render queue's sort keys the light kit draws under.
-constexpr uint32_t kKeyA = 0x8296B90C;
-constexpr uint32_t kKeyB = 0x8296B900;
 // The scene lights' per-object slots (2 to 5 cleared before the wheels).
 constexpr uint32_t kSlotsAmbient = 0x8296BA60;
 constexpr uint32_t kSlotsColorsA = 0x8296BAE0;
@@ -122,8 +122,9 @@ Left CarDrawUpdate(uint8_t* base, const Calls& calls, load_poll::Calls& poll,
 
   // In a race: the model's position through the current camera pass's
   // view-projection; behind the camera, nothing more; then the height cull.
-  if (LoadS(base, Load(base, model + 5116) + 4) != 0) {
-    const uint32_t d = Load(base, kScene) + 5072;  // the pass description
+  if (int32_t(Scene(base, Load(base, model + 5116)).model_set()) != 0) {
+    const Scene scene = G::scene(base);
+    const uint32_t d = scene.pass_camera_address();  // the pass description
     const uint32_t position = frame + 80, projected = frame + 160;
     guest::StoreFloat(base, frame + 80, zero);
     guest::StoreFloat(base, frame + 84, zero);
@@ -131,7 +132,7 @@ Left CarDrawUpdate(uint8_t* base, const Calls& calls, load_poll::Calls& poll,
     guest::StoreFloat(base, frame + 92, float(one));
     guest::StoreFloat(base, frame + 172, float(one));
     debug::Vec4Transform(base, position, model + 4304, position);
-    const uint32_t pass = EnabledPass(base, Load(base, d));
+    const uint32_t pass = EnabledPass(base, scene.pass_camera());
     debug::Vec4Transform(base, projected, pass + 144, position);
     left = Left{false, projected};
     FlushOff();
@@ -143,7 +144,7 @@ Left CarDrawUpdate(uint8_t* base, const Calls& calls, load_poll::Calls& poll,
       return SceneModelIsNearPlayerHeight(base, calls, frame, d, position);
     });
     if (int32_t(left.r3) == 0) {
-      Store(base, d + 60, Load(base, d + 60) & 0xFFFFFF07u);
+      scene.set_pass_mask(scene.pass_mask() & 0xFFFFFF07u);
     }
   }
 
@@ -228,7 +229,7 @@ Left CarDrawUpdate(uint8_t* base, const Calls& calls, load_poll::Calls& poll,
            [&](uint32_t o) { return load_poll::SceneLightsFinish(base, o, frame, poll); });
     finish(5104, 5100, 0x820E7328,
            [&](uint32_t o) { return load_poll::SceneWheelsFinish(base, o, frame, poll); });
-    const bool race = LoadS(base, Load(base, model + 5116) + 4) != 0;
+    const bool race = int32_t(Scene(base, Load(base, model + 5116)).model_set()) != 0;
     auto set = [&](uint32_t at) { return LoadS(base, model + at) != 0; };
     if (set(5052) && set(5064) && set(5072) && set(5056) && (!race || set(5080)) &&
         set(5104) && set(5088)) {
@@ -325,22 +326,22 @@ Left CarDrawUpdate(uint8_t* base, const Calls& calls, load_poll::Calls& poll,
   // The light kit under the scene's key (+5124) when its camera pass is
   // enabled, the render queue's two keys saved in the scene and put back.
   {
-    const uint32_t scene = Load(base, kScene);
-    if (EnabledPass(base, Load(base, scene + 5084)) != 0) {
-      const uint32_t key = Load(base, scene + 5124);
-      Store(base, scene + 5136, Load(base, kKeyA));
-      Store(base, scene + 5140, Load(base, kKeyB));
-      Store(base, kKeyA, key);
-      Store(base, kKeyB, key);
+    const Scene scene = G::scene(base);
+    if (EnabledPass(base, scene.pass_light_kit_camera()) != 0) {
+      const uint32_t key = scene.pass_light_kit_key();
+      scene.set_pass_saved_key_group0(G::key_group0(base));
+      scene.set_pass_saved_key_group1(G::key_group1(base));
+      G::set_key_group0(base, key);
+      G::set_key_group1(base, key);
       const uint32_t kit = Load(base, model + 5084);
       left = Wrapped(base, 0x820DDE58, kit, [&] {
         return SceneLightsDraw(base, calls, frame, kit, block, advance_blink,
                                uint32_t(caller_r24), kDrawsR28);
       });
-      const uint32_t now = Load(base, kScene);
-      const uint32_t b = Load(base, now + 5140), a = Load(base, now + 5136);
-      Store(base, kKeyB, b);
-      Store(base, kKeyA, a);
+      const Scene now = G::scene(base);
+      const uint32_t b = now.pass_saved_key_group1(), a = now.pass_saved_key_group0();
+      G::set_key_group1(base, b);
+      G::set_key_group0(base, a);
     }
   }
   const uint32_t parts = Load(base, model + 5060);
@@ -352,7 +353,7 @@ Left CarDrawUpdate(uint8_t* base, const Calls& calls, load_poll::Calls& poll,
   // (0, 0, 1, 0), the +240 block's the scene's lighting +176, through the
   // frame's +96 to +159.
   {
-    const uint32_t lighting = Load(base, kScene) + 5248;
+    const Scene lighting = G::scene(base);
     for (uint32_t at = 96; at < 152; at += 4) {
       guest::StoreFloat(base, frame + at, zero);
     }
@@ -365,8 +366,8 @@ Left CarDrawUpdate(uint8_t* base, const Calls& calls, load_poll::Calls& poll,
       CopyDoubleword(base, kSlotsColorsB + i + 8, frame + 120);
       CopyDoubleword(base, kSlotsDirections + i + 8, frame + 136);
       CopyDoubleword(base, kSlotsColorsA + i + 8, frame + 104);
-      CopyDoubleword(base, kSlots240 + i, lighting + 176);
-      CopyDoubleword(base, kSlots240 + i + 8, lighting + 184);
+      CopyDoubleword(base, kSlots240 + i, lighting.light_slot_vector_lo_address());
+      CopyDoubleword(base, kSlots240 + i + 8, lighting.light_slot_vector_hi_address());
       CopyDoubleword(base, kSlotsAmbient + i, frame + 144);
       CopyDoubleword(base, kSlotsAmbient + i + 8, frame + 152);
     }

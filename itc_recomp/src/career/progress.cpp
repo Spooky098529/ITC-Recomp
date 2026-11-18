@@ -8,15 +8,21 @@
 #include "guest.h"
 #include "race_setup/race_setup.h"
 #include "race_world/race_world.h"
+#include "schema/career.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <climits>
 
 namespace career {
 
-namespace {
+using schema::CareerCondition;
+using schema::CareerEntry40;
+using schema::CareerEntry56;
+using schema::CareerGlobals;
+using schema::CareerSave;
+using schema::CareerStats;
 
-constexpr uint32_t kRaceDataSlot = 0x826C5B2C;
+namespace {
 
 bool BitSet(uint8_t* base, uint32_t set, int32_t b) {
   return (guest::LoadU32(base, set + (uint32_t(b >> 5) << 2)) & (1u << (b & 31))) != 0;
@@ -31,13 +37,14 @@ void SetBit(uint8_t* base, uint32_t set, int32_t b) {
 // one (`any`) or, with !any, whether none that `want`s lacks a win.
 template <typename Want>
 uint32_t ItemsWon(uint8_t* base, bool any, Want want) {
-  const uint32_t records = vehicle_accessors::SaveDataOf(base, 0) + kItemRecords;
+  const uint32_t records =
+      CareerSave(base, vehicle_accessors::SaveDataOf(base, 0)).item_records_address();
   for (uint32_t id = 0; id < 400; id++) {
     const uint32_t item = data_tables::Item(base, id);
     if (!want(item)) {
       continue;
     }
-    const bool won = guest::LoadU16(base, records + 12 * id + 2) != 0;
+    const bool won = schema::CareerItemRecord(base, records + 12 * id).wins() != 0;
     if (any && won) {
       return 1;
     }
@@ -55,7 +62,7 @@ uint64_t LoadU64(uint8_t* base, uint32_t address) {
 // RunningMean::Add of an integer (converted through frame +88, as the
 // original) on the frame's {0.0, 0} at +80, merged into `into`.
 void MergeInt(uint8_t* base, uint32_t frame, uint32_t into, int32_t value) {
-  guest::StoreFloat(base, frame + 80, guest::LoadFloat(base, kZeroFloat));
+  guest::StoreFloat(base, frame + 80, CareerGlobals::zero(base));
   guest::StoreU32(base, frame + 84, 0);
   guest::StoreU32(base, frame + 88, uint32_t(uint64_t(int64_t(value)) >> 32));
   guest::StoreU32(base, frame + 92, uint32_t(value));
@@ -67,24 +74,24 @@ void MergeInt(uint8_t* base, uint32_t frame, uint32_t into, int32_t value) {
 // granted (Rewards::Grant), as Progress::AfterRace and CheckUnlocks run them;
 // Condition::Test from `frame` (the caller's).
 void RewardsPass(uint8_t* base, uint32_t save, uint32_t frame) {
+  const CareerSave sv(base, save);
   for (int32_t i = 0;; i++) {
-    const uint32_t entry = data_tables::Entry40(base, uint32_t(i));
-    if (int32_t(guest::LoadU32(base, entry + 16)) == -1) {
+    const CareerEntry40 e(base, data_tables::Entry40(base, uint32_t(i)));
+    if (int32_t(CareerCondition(base, e.conditions_address()).kind()) == -1) {
       break;
     }
-    if (i >= 0 && BitSet(base, save + 0x1D508, i)) {
+    if (i >= 0 && BitSet(base, sv.rewards_granted_address(), i)) {
       continue;
     }
     bool grant = false;
-    const bool all = guest::LoadU32(base, entry + 12) != 0;
+    const bool all = e.all_conditions() != 0;
     for (int32_t k = 0; k < 3; k++) {
-      const uint32_t condition = entry + 16 + 8 * uint32_t(k);
-      if (int32_t(guest::LoadU32(base, condition + 0)) == -1 ||
-          int32_t(guest::LoadU32(base, condition + 4)) == -1) {
+      const uint32_t condition = e.conditions_address() + 8 * uint32_t(k);
+      const CareerCondition c(base, condition);
+      if (int32_t(c.kind()) == -1 || int32_t(c.value()) == -1) {
         break;
       }
-      const uint32_t pass =
-          ConditionTest(base, condition, 0, guest::LoadU32(base, entry + 0), frame).value_or(0);
+      const uint32_t pass = ConditionTest(base, condition, 0, e.kind_mask(), frame).value_or(0);
       if (!all) {
         if (pass != 0) {
           grant = true;
@@ -99,8 +106,7 @@ void RewardsPass(uint8_t* base, uint32_t save, uint32_t frame) {
       }
     }
     if (grant) {
-      RewardsGrant(base, save, uint32_t(i), guest::LoadU32(base, entry + 4),
-                   guest::LoadU32(base, entry + 8));
+      RewardsGrant(base, save, uint32_t(i), e.reward_kind(), e.reward_value());
     }
   }
 }
@@ -145,14 +151,14 @@ uint32_t AllWonKind5(uint8_t* base) {
 void LocationsUnlock(uint8_t* base, uint32_t save, uint32_t bit) {
   ITC_NATIVE_RUNNING("sub_82111D20 Locations::Unlock");
   if (int32_t(bit) >= 0) {
-    SetBit(base, save + 0x199E0, int32_t(bit));
+    SetBit(base, CareerSave(base, save).locations_address(), int32_t(bit));
   }
 }
 
 void LocationsUnlock2(uint8_t* base, uint32_t save, uint32_t bit) {
   ITC_NATIVE_RUNNING("sub_82111D98 Locations::Unlock2");
   if (int32_t(bit) >= 0) {
-    SetBit(base, save + 0x199E8, int32_t(bit));
+    SetBit(base, CareerSave(base, save).locations_2_address(), int32_t(bit));
   }
 }
 
@@ -163,45 +169,42 @@ bool AfterRaceNative(uint8_t* base, uint32_t sp) {
 uint32_t ProgressAfterRace(uint8_t* base, uint32_t save, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82116588 Progress::AfterRace");
   const uint32_t frame = sp - kAfterRaceFrame;
-  const uint32_t stats = save + kStats;
-  const uint32_t totals = guest::LoadU32(base, kRaceDataSlot) + 0xA3AD0;
-  guest::StoreU32(base, stats + 5952,
-                  guest::LoadU32(base, totals + 4) + guest::LoadU32(base, stats + 5952));
-  guest::StoreU32(base, stats + 5956,
-                  guest::LoadU32(base, totals + 0) + guest::LoadU32(base, stats + 5956));
-  guest::StoreU32(base, stats + 5960,
-                  guest::LoadU32(base, totals + 8) + guest::LoadU32(base, stats + 5960));
-  guest::StoreU32(base, stats + 5964,
-                  uint32_t(int32_t(guest::LoadU32(base, totals + 12)) / 50) +
-                      guest::LoadU32(base, stats + 5964));
+  const CareerSave sv(base, save);
+  const CareerStats stats(base, sv.stats_address());
+  const uint32_t totals = CareerGlobals::race_data(base).address + 0xA3AD0;
+  stats.set_day_total_4(guest::LoadU32(base, totals + 4) + stats.day_total_4());
+  stats.set_day_total_0(guest::LoadU32(base, totals + 0) + stats.day_total_0());
+  stats.set_day_total_8(guest::LoadU32(base, totals + 8) + stats.day_total_8());
+  stats.set_day_total_12(uint32_t(int32_t(guest::LoadU32(base, totals + 12)) / 50) +
+                         stats.day_total_12());
   // The location: +6112 unless 48; else +6108 for a rival race (the race
   // data's flags +0x59AE4, 0x10), else 48.
-  uint32_t location = guest::LoadU32(base, save + 6112);
+  uint32_t location = sv.next_location();
   if (int32_t(location) == 48) {
     const uint32_t flags =
-        guest::LoadU32(base, guest::LoadU32(base, kRaceDataSlot) + 0x59AE4);
-    location = (flags & 0x10) != 0 ? guest::LoadU32(base, save + 6108) : 48;
+        guest::LoadU32(base, CareerGlobals::race_data(base).address + 0x59AE4);
+    location = (flags & 0x10) != 0 ? sv.location() : 48;
   }
   // The table-0 unlocks.
   for (int32_t i = 0;; i++) {
     const uint32_t entry = data_tables::Entry56(base, 0, uint32_t(i));
-    const int32_t kind = int32_t(guest::LoadU32(base, entry + 0));
+    const CareerEntry56 e(base, entry);
+    const int32_t kind = int32_t(e.kind());
     if (kind == -1) {
       break;
     }
-    if (kind == 4 || (i >= 0 && BitSet(base, save + 0x1CA7C, i))) {
+    if (kind == 4 || (i >= 0 && BitSet(base, sv.table0_done_address(), i))) {
       continue;
     }
-    if (Entry56Allows(base, entry, guest::LoadU32(base, save + 6104), location,
-                      StageOf(base, save), 1) == 0) {
+    if (Entry56Allows(base, entry, sv.mode(), location, StageOf(base, save), 1) == 0) {
       continue;
     }
     bool grant = false;
-    const bool all = guest::LoadU32(base, entry + 20) != 0;
+    const bool all = e.all_conditions() != 0;
     for (int32_t k = 0; k < 3; k++) {
-      const uint32_t condition = entry + 24 + 8 * uint32_t(k);
-      if (int32_t(guest::LoadU32(base, condition + 0)) == -1 ||
-          int32_t(guest::LoadU32(base, condition + 4)) == -1) {
+      const uint32_t condition = e.conditions_address() + 8 * uint32_t(k);
+      const CareerCondition c(base, condition);
+      if (int32_t(c.kind()) == -1 || int32_t(c.value()) == -1) {
         if (k == 0) {
           grant = true;
         }
@@ -225,21 +228,21 @@ uint32_t ProgressAfterRace(uint8_t* base, uint32_t save, uint32_t sp) {
       continue;
     }
     if (i >= 0) {
-      SetBit(base, save + 0x1CA7C, i);
+      SetBit(base, sv.table0_done_address(), i);
     }
-    const uint32_t list = save + 0x1C778;
-    const uint32_t at = list + 12 * guest::LoadU32(base, list + 768);
+    const uint32_t list = sv.unlocks_shown_address();
+    const uint32_t at = list + 12 * sv.unlocks_shown_count();
     guest::StoreU32(base, at + 0, 0);
     guest::StoreU32(base, at + 4, 0);
     guest::StoreU32(base, at + 8, uint32_t(i));
-    guest::StoreU32(base, list + 768, guest::LoadU32(base, list + 768) + 1);
+    sv.set_unlocks_shown_count(sv.unlocks_shown_count() + 1);
   }
   // The 40-byte rewards.
   RewardsPass(base, save, frame);
   // The stage reached.
   uint32_t reached = 0xFFFFFFFFu;
   const auto stage_bit = [&](uint32_t bit) {
-    guest::StoreU32(base, save + 6092, guest::LoadU32(base, save + 6092) | bit);
+    sv.set_stages(sv.stages() | bit);
   };
   switch (race_world::FirstUnsetFlag(base, save)) {
     case 0:
@@ -299,10 +302,10 @@ uint32_t ProgressAfterRace(uint8_t* base, uint32_t save, uint32_t sp) {
     default:
       break;
   }
-  const uint32_t next = guest::LoadU32(base, save + 6112);
+  const uint32_t next = sv.next_location();
   if (int32_t(next) != 48) {
-    guest::StoreU32(base, save + 6108, next);
-    guest::StoreU32(base, save + 6112, 48);
+    sv.set_location(next);
+    sv.set_next_location(48);
   }
   return reached;
 }
@@ -314,18 +317,20 @@ bool CheckUnlocksNative(uint8_t* base, uint32_t sp) {
 uint32_t ProgressCheckUnlocks(uint8_t* base, uint32_t save, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821162B0 Progress::CheckUnlocks");
   const uint32_t frame = sp - kCheckUnlocksFrame;
+  const CareerSave sv(base, save);
   // The table-0 unlocks: the entry's flags (+4) instead of Entry56::Allows.
   for (int32_t i = 0;; i++) {
     const uint32_t entry = data_tables::Entry56(base, 0, uint32_t(i));
-    const int32_t kind = int32_t(guest::LoadU32(base, entry + 0));
+    const CareerEntry56 e(base, entry);
+    const int32_t kind = int32_t(e.kind());
     if (kind == -1) {
       break;
     }
-    if (kind == 4 || (i >= 0 && BitSet(base, save + 0x1CA7C, i))) {
+    if (kind == 4 || (i >= 0 && BitSet(base, sv.table0_done_address(), i))) {
       continue;
     }
     const uint32_t stage = StageOf(base, save);
-    const uint32_t flags = guest::LoadU32(base, entry + 4);
+    const uint32_t flags = e.mask();
     if ((flags & 0x40) == 0) {
       continue;
     }
@@ -344,11 +349,11 @@ uint32_t ProgressCheckUnlocks(uint8_t* base, uint32_t save, uint32_t sp) {
       }
     }
     bool grant = false;
-    const bool all = guest::LoadU32(base, entry + 20) != 0;
+    const bool all = e.all_conditions() != 0;
     for (int32_t k = 0; k < 3; k++) {
-      const uint32_t condition = entry + 24 + 8 * uint32_t(k);
-      if (int32_t(guest::LoadU32(base, condition + 0)) == -1 ||
-          int32_t(guest::LoadU32(base, condition + 4)) == -1) {
+      const uint32_t condition = e.conditions_address() + 8 * uint32_t(k);
+      const CareerCondition c(base, condition);
+      if (int32_t(c.kind()) == -1 || int32_t(c.value()) == -1) {
         if (k == 0) {
           grant = true;
         }
@@ -372,14 +377,14 @@ uint32_t ProgressCheckUnlocks(uint8_t* base, uint32_t save, uint32_t sp) {
       continue;
     }
     if (i >= 0) {
-      SetBit(base, save + 0x1CA7C, i);
+      SetBit(base, sv.table0_done_address(), i);
     }
-    const uint32_t list = save + 0x1C778;
-    const uint32_t at = list + 12 * guest::LoadU32(base, list + 768);
+    const uint32_t list = sv.unlocks_shown_address();
+    const uint32_t at = list + 12 * sv.unlocks_shown_count();
     guest::StoreU32(base, at + 0, 0);
     guest::StoreU32(base, at + 4, 0);
     guest::StoreU32(base, at + 8, uint32_t(i));
-    guest::StoreU32(base, list + 768, guest::LoadU32(base, list + 768) + 1);
+    sv.set_unlocks_shown_count(sv.unlocks_shown_count() + 1);
   }
   RewardsPass(base, save, frame);
   return 0;
@@ -388,14 +393,15 @@ uint32_t ProgressCheckUnlocks(uint8_t* base, uint32_t save, uint32_t sp) {
 uint32_t StatsCloseDay(uint8_t* base, uint32_t stats, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82113898 Stats::CloseDay");
   const uint32_t frame = sp - kCloseDayFrame;
-  const int32_t days = int16_t(guest::LoadU16(base, stats + 6028));
+  const CareerStats s(base, stats);
+  const int32_t days = int16_t(s.days());
   if (days < 9999) {
-    guest::StoreU16(base, stats + 6028, uint16_t(days + 1));
+    s.set_days(uint16_t(days + 1));
   }
-  MergeInt(base, frame, stats + 5936, int32_t(guest::LoadU32(base, stats + 5960)));
-  MergeInt(base, frame, stats + 5944, int32_t(guest::LoadU32(base, stats + 5964)));
-  const int32_t numerator = int32_t(guest::LoadU32(base, stats + 5952) * 100u);
-  const int32_t divisor = int32_t(guest::LoadU32(base, stats + 5956));
+  MergeInt(base, frame, s.mean_day_total_8_address(), int32_t(s.day_total_8()));
+  MergeInt(base, frame, s.mean_day_total_12_address(), int32_t(s.day_total_12()));
+  const int32_t numerator = int32_t(s.day_total_4() * 100u);
+  const int32_t divisor = int32_t(s.day_total_0());
   int32_t quotient = 0;
   if (divisor == 0 || (numerator == INT_MIN && divisor == -1)) {
     // The original's tw traps; the translated code logs them and runs on.
@@ -404,33 +410,34 @@ uint32_t StatsCloseDay(uint8_t* base, uint32_t stats, uint32_t sp) {
   } else {
     quotient = numerator / divisor;
   }
-  MergeInt(base, frame, stats + 5928, quotient);
-  return stats + 5928;
+  MergeInt(base, frame, s.mean_day_ratio_address(), quotient);
+  return s.mean_day_ratio_address();
 }
 
 uint32_t CareerNextDay(uint8_t* base, uint32_t save, uint32_t sp, PickNextCall pick_next,
                        void* user) {
   ITC_NATIVE_RUNNING("sub_82116AF0 Career::NextDay");
   const uint32_t frame = sp - kNextDayFrame;
-  guest::StoreU32(base, save + 6100, guest::LoadU32(base, save + 6100) + 1);
-  const uint32_t garage = save + kGarage;
-  for (uint32_t i = 0; i < uint32_t(int32_t(int16_t(guest::LoadU16(base, save + 6328)))); i++) {
-    uint32_t node =
-        (uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204)))) << 2) + garage;
+  const CareerSave sv(base, save);
+  sv.set_day(sv.day() + 1);
+  const uint32_t garage = sv.garage_address();
+  const schema::CareerGarageList gl(base, garage);
+  for (uint32_t i = 0; i < uint32_t(int32_t(int16_t(sv.garage_count()))); i++) {
+    uint32_t node = (uint32_t(int32_t(int16_t(gl.head()))) << 2) + garage;
     for (uint32_t n = i; n != 0; n--) {
       node = (uint32_t(int32_t(int16_t(guest::LoadU16(base, node)))) << 2) + garage;
     }
     const uint32_t car =
-        uint32_t(int32_t(int16_t(guest::LoadU16(base, node + 2)))) * 1968 + garage + 212;
+        uint32_t(int32_t(int16_t(guest::LoadU16(base, node + 2)))) * 1968 + gl.cars_address();
     guest::StoreU32(base, car + 1896, guest::LoadU32(base, car + 1896) + 1);
   }
-  guest::StoreU32(base, save + 0x1ACE0, 0);
-  const uint32_t stats = save + kStats;
+  sv.set_unknown_109792(0);
+  const uint32_t stats = sv.stats_address();
   StatsCloseDay(base, stats, frame);
   if (!PickNextSkips(base, save)) {
     pick_next(user, save);
   }
-  const int32_t day = int32_t(guest::LoadU32(base, save + 6100));
+  const int32_t day = int32_t(sv.day());
   return StatsStartDay(base, stats, uint32_t(day % 7));
 }
 

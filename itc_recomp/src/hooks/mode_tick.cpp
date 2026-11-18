@@ -18,6 +18,7 @@
 #include "mode_tick/mode_tick.h"
 #include "mode_tick/modes_tick.h"
 #include "lifted/sdk.h"
+#include "schema/mode_tick.h"
 
 ITC_FLAG_BOOL(native_modes_tick, true, "ITC",
               "Run the mode manager's tick itself (Modes::Tick sub_82107910, "
@@ -108,7 +109,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209EEC8) {
     lifted::original::c8209EEC8(ctx, base);
     return;
   }
-  ctx.r3.s64 = int32_t(kLastName);
+  ctx.r3.s64 = int32_t(schema::ModeTickGlobals::last_name_address());
 }
 
 // --- ScreenFades::Update and its recording ---
@@ -120,8 +121,6 @@ ITC_FLAG_DECLARE(bool, log_slot_callers);
 ITC_FLAG_DECLARE(bool, log_recording_by_pass);
 
 namespace {
-
-constexpr uint32_t kScene = 0x826BABA0;
 
 // A call through slot `slot` of r3's vtable, returning to `return_address`.
 // (The render manager's slot 8 by its plain C++ where it's the game's,
@@ -155,11 +154,11 @@ void Submit(lifted::Regs& ctx, uint8_t* base, uint32_t queue, uint32_t chunk, ui
 void RecordScissor(lifted::Regs& ctx, uint8_t* base, uint32_t key) {
   bool fit = false;
   guest_call::InFrame(ctx, base, 160, 0x8209CE90, [&](uint32_t) {
-    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    ctx.r3.u64 = schema::ModeTickGlobals::app_interface(base);
     VtableCall(ctx, base, 8, 0x8209CE90);
     VtableCall(ctx, base, 1, 0x8209CEA0);
     const uint32_t list = ctx.r3.u32;
-    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    ctx.r3.u64 = schema::ModeTickGlobals::app_interface(base);
     VtableCall(ctx, base, 8, 0x8209CEBC);
     VtableCall(ctx, base, 2, 0x8209CECC);
     const uint32_t queue = ctx.r3.u32;
@@ -167,15 +166,15 @@ void RecordScissor(lifted::Regs& ctx, uint8_t* base, uint32_t key) {
       return;
     }
     fit = true;
-    Submit(ctx, base, queue, mode_tick::RecordScissorChunk(base, list), key, 0x82001C00,
-           0x8209CF90);
-    Submit(ctx, base, queue, mode_tick::RecordScissorEndChunk(base, list), key, 0x82001BFC,
-           0x8209D030);
+    Submit(ctx, base, queue, mode_tick::RecordScissorChunk(base, list), key,
+           schema::ModeTickGlobals::scissor_depth_0_address(), 0x8209CF90);
+    Submit(ctx, base, queue, mode_tick::RecordScissorEndChunk(base, list), key,
+           schema::ModeTickGlobals::scissor_depth_1_address(), 0x8209D030);
   });
   if (!fit) {
     ctx.r3.u64 = key;
     ctx.fpscr.disableFlushMode();
-    ctx.f1.f64 = double(guest::LoadFloat(base, 0x82001C00));
+    ctx.f1.f64 = double(schema::ModeTickGlobals::scissor_depth_0(base));
     ctx.lr = 0x8209D348;
     lifted::original::c8209CE68(ctx, base);
   }
@@ -189,14 +188,15 @@ void RecordColorRect(lifted::Regs& ctx, uint8_t* base, uint32_t rect, uint32_t k
   const auto chunk = mode_tick::ColorRectRecordFlat(base, rect);
   if (!chunk) {
     ctx.r3.u64 = rect;
-    ctx.r4.u64 = mode_tick::kFadeCameraPass;
+    ctx.r4.u64 = schema::ModeTickGlobals::fade_camera_pass_address();
     ctx.r5.u64 = key;
     ctx.lr = 0x8209D35C;
     lifted::original::c8217A370(ctx, base);
     return;
   }
   guest_call::InFrame(ctx, base, 368, 0x8217A74C, [&](uint32_t) {
-    Submit(ctx, base, guest::LoadU32(base, mode_tick::kColorRectLists), *chunk, key, 0x82000A34,
+    Submit(ctx, base, schema::ModeTickGlobals::color_rect_queue(base), *chunk, key,
+           schema::ModeTickGlobals::float_zero_address(),
            0x8217A74C);
   });
 }
@@ -241,7 +241,7 @@ void hooks::ModeTickMusicPlay(lifted::Regs& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, kMusicPlayFrame, 0x82106538, [&](uint32_t frame) {
     const MusicIds ids = MusicPlay(base, ctx.r13.u32, frame, name);
-    ctx.r3.u64 = guest::LoadU32(base, kMusicPlayer);
+    ctx.r3.u64 = schema::ModeTickGlobals::music_player(base);
     ctx.r4.u64 = a;
     ctx.r5.u64 = name64;
     ctx.r6.u64 = b;

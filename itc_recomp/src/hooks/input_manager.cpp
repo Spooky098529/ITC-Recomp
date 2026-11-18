@@ -16,6 +16,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "input/input_manager.h"
+#include "schema/input.h"
 #include "std_list/ptr_list.h"
 #include "lifted/sdk.h"
 
@@ -73,7 +74,7 @@ ITC_NATIVE_ENTRY_ALWAYS(820AD058) {
 ITC_NATIVE_ENTRY_ALWAYS(82095958) {
   
   if (!NativeLifetime() || !std_list::Insert(base, ctx.r3.u32, ctx.r4.u32,
-                                             guest::LoadU32(base, ctx.r5.u32))) {
+                                             schema::PtrListInsertValue(base, ctx.r5.u32).value())) {
     lifted::original::c82095958(ctx, base);
   }
 }
@@ -97,15 +98,15 @@ ITC_NATIVE_ENTRY_ALWAYS(82095958) {
 // The manager's slots 1, 2 and 5: r3 = the manager, r4 = the index's address.
 ITC_NATIVE_ENTRY_ALWAYS(82098CB8) {
   ITC_INPUT_FALLBACK(82098CB8)
-  ctx.r3.u64 = input::ManagerProcessor(ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32));
+  ctx.r3.u64 = input::ManagerProcessor(ctx.r3.u32, schema::InputIndex(base, ctx.r4.u32).index());
 }
 ITC_NATIVE_ENTRY_ALWAYS(82098CD0) {
   ITC_INPUT_FALLBACK(82098CD0)
-  ctx.r3.u64 = input::ManagerLogicalPad(ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32));
+  ctx.r3.u64 = input::ManagerLogicalPad(ctx.r3.u32, schema::InputIndex(base, ctx.r4.u32).index());
 }
 ITC_NATIVE_ENTRY_ALWAYS(82098FE0) {
   ITC_INPUT_FALLBACK(82098FE0)
-  ctx.r3.u64 = input::ManagerPhysicalPad(ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32));
+  ctx.r3.u64 = input::ManagerPhysicalPad(ctx.r3.u32, schema::InputIndex(base, ctx.r4.u32).index());
 }
 
 #undef ITC_INPUT_FALLBACK
@@ -138,7 +139,7 @@ void NoteRead(uint32_t function, uint32_t caller, uint32_t object, uint32_t mask
     \
     const uint32_t caller = uint32_t(ctx.lr);                                  \
     const uint32_t processor = ctx.r3.u32;                                     \
-    const uint32_t mask = guest::LoadU32(base, ctx.r4.u32);                    \
+    const uint32_t mask = schema::InputButtonMask(base, ctx.r4.u32).mask();     \
     if (ITC_FLAG(native_input)) {                                              \
       ctx.r3.u64 = function(base, processor, ctx.r4.u32);                      \
     } else {                                                                   \
@@ -194,23 +195,24 @@ bool ConstructManager(lifted::Regs& ctx, uint8_t* base) {
     guest::StoreU32(base, frame + 88, kFunctorVtable);
     guest::StoreU32(base, frame + 96, kUpdateHandler);
     guest::StoreU32(base, frame + 80, 5);
-    uint32_t dispatcher = guest::LoadU32(base, block);
-    ctx.r3.u64 = dispatcher;
+    const schema::InputManagerArgs args(base, block);
+    schema::InputDispatcher dispatcher = args.dispatcher();
+    ctx.r3.u64 = dispatcher.address;
     ctx.r4.u64 = frame + 80;
     ctx.r5.u64 = frame + 88;
-    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, dispatcher) + 8));
+    lifted::CallFromContext(ctx, base, dispatcher.vtable().register_5());
     // Message 7 through its slot +4.
-    dispatcher = guest::LoadU32(base, block);
+    dispatcher = args.dispatcher();
     guest::StoreU32(base, frame + 108, manager);
     guest::StoreU32(base, frame + 88, kFunctorDone);
     guest::StoreU32(base, frame + 104, kFunctorVtable);
     guest::StoreU32(base, frame + 112, kMessage7Handler);
     guest::StoreU32(base, frame + 80, 7);
-    ctx.r3.u64 = dispatcher;
+    ctx.r3.u64 = dispatcher.address;
     ctx.r4.u64 = frame + 80;
     ctx.r5.u64 = frame + 104;
     ctx.lr = 0x8209930C;
-    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, dispatcher) + 4));
+    lifted::CallFromContext(ctx, base, dispatcher.vtable().register_7());
     guest::StoreU32(base, frame + 104, kFunctorDone);
   });
   input::ManagerBindPads(base, manager);
@@ -260,7 +262,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82099430) {
   
   const uint32_t listener = ctx.r5.u32;
   if (!NativeLifetime() || !input::ManagerAddListener(base, ctx.r3.u32,
-                                                      guest::LoadU32(base, ctx.r4.u32),
+                                                      schema::InputIndex(base, ctx.r4.u32).index(),
                                                       listener)) {
     lifted::original::c82099430(ctx, base);
     return;

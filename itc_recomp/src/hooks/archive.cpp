@@ -21,6 +21,8 @@
 #include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "schema/archive.h"
+#include "schema/c_runtime.h"
 
 #include "base/log.h"
 #include "file_layer/file_layer.h"
@@ -372,7 +374,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
     return;
   }
   ITC_NATIVE_RUNNING("sub_8209DFA8 Archive::ReadLoose");
-  const uint32_t request = ctx.r3.u32;
+  const schema::ArchiveRequestSlot request(base, ctx.r3.u32);
   const uint32_t frame = ctx.r1.u32 - 240;
   const uint32_t file = frame + 96, path = frame + 112, name = frame + 144, fixed = frame + 176;
   auto call = [&](uint32_t return_address, auto&& body) {
@@ -412,7 +414,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
   };
   file_layer::GameFileConstruct(base, file);
   std_string::Construct(base, path);
-  from_text(name, guest::LoadU32(base, request + 20), frame + 82, 0x8209DFE4);
+  from_text(name, request.loose_path().address, frame + 82, 0x8209DFE4);
   assign(name, 0x8209DFFC);
   release(name, 0x8209E00C);
   // The wildcard replace of "/" (0x82001DE8) by "\\" (0x82001DEC): the text.
@@ -440,7 +442,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
     lifted::Enter(ctx, base, lifted::entry::e820A6AB8);
   });
   if ((ctx.r3.u32 & 0xFF) != 0) {
-    guest::StoreU32(base, frame + 84, guest::LoadU32(base, request + 64));
+    guest::StoreU32(base, frame + 84, request.read_r7());
     guest::StoreU32(base, frame + 88, 0);
     call(0x8209E0AC, [&] {
       ctx.r3.u64 = file;
@@ -450,8 +452,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8209DFA8) {
     });
     call(0x8209E0BC, [&] {
       ctx.r3.u64 = file;
-      ctx.r4.u64 = guest::LoadU32(base, request + 76);
-      ctx.r5.u64 = request + 68;
+      ctx.r4.u64 = request.data();
+      ctx.r5.u64 = request.read_stored_size_address();
       lifted::Enter(ctx, base, game::File::Read);
     });
     if (ctx.r3.u32 == 0) {

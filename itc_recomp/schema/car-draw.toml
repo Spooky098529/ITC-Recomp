@@ -1,0 +1,519 @@
+# The schema of docs/functions/car-draw.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The car scene's per-pass draw of one scene model (src/car_draw/): the car
+# scene [0x826C2E44] itself, the second set's point blocks the draws walk
+# (the parts', the light kit's, the interior's dials and meters, the
+# traffic body's), their records and the light kit's and interior's
+# records. The measure meets the point blocks through each group's draw
+# (r3 the group), so a point block type holds both the block's own words
+# (from its finds and resets) and the words its groups hold at the same
+# offsets from their own start (the 240-byte point records at +16 + 240k
+# or +240k, and the words after a group's records). The scene model's
+# 736-byte block every draw gets in r4 is CarDrawBlock below (the same
+# object as second-set.toml's SceneModelBlock, to merge).
+
+# The car scene (5,536 bytes, `CarScene::Create`, [0x826C2E44];
+# docs/functions/scene.md's layout, docs/known-data.md's "scene pass
+# description" and "car scene (the draw's reads)").
+[CarScene]
+measures = ["CarScene", "Car.+5116"]
+size = 5536
+origin = "allocated"
+fields = [
+  { name = "state", offset = 0, type = "u32", note = "0 made, 3 set up (CarScene::SetUp), 4 tearing down" },
+  { name = "model_set", offset = 4, type = "u32", note = "the set-up record's +0: 0 the front end (set a), 1 the race and parking area (set b)" },
+  { name = "car_model_count", offset = 8, type = "u32", note = "pool 0's count (the set-up record's +4)" },
+  { name = "parts_count", offset = 12, type = "u32", note = "pool 1's count" },
+  { name = "interior_count", offset = 16, type = "u32", note = "pool 3's count (record +12 + +16 + +32)" },
+  { name = "cockpit_count", offset = 20, type = "u32", note = "pool 2's count" },
+  { name = "light_kit_count", offset = 24, type = "u32", note = "pool 4's count" },
+  { name = "wheels_count", offset = 28, type = "u32", note = "pool 5's count (record +24 + +32 + +28)" },
+  { name = "scene_model_count", offset = 32, type = "u32", note = "pool 7's count" },
+  { name = "traffic_count", offset = 36, type = "u32", note = "pool 6's count" },
+  { name = "own_load_buffer", offset = 40, type = "u32", note = "the scene's own load buffer, 0 for the archive's shared one" },
+  { name = "own_load_buffer_size", offset = 44, type = "u32" },
+  { name = "teardown_count", offset = 48, type = "u32", note = "2 updates" },
+  { name = "asset141_state", offset = 84, type = "u32", note = "the shared assets' slot +0 (asset 141): its +20, 2 loading, 3 done" },
+  { name = "asset586_state", offset = 132, type = "u32", note = "the shared assets' slot +48 (asset 586)" },
+  { name = "asset_slot72_state", offset = 156, type = "u32", note = "the shared assets' slot +72" },
+  { name = "asset888_state", offset = 268, type = "u32", note = "the shared assets' slot +184 (asset 888)" },
+  { name = "texture_provider_145", offset = 432, type = "u32", note = "the texture provider of the slot at the assets' +320 (asset 145)" },
+  { name = "glow_part_file_state", offset = 472, type = "u32", note = "the slot at the assets' +388 (asset 142, the glow model's part file)" },
+  { name = "glow_model", offset = 480, type = "bytes", count = 464, note = "the shared glow model (a part model, the assets' +416)" },
+  { name = "glow_model_shapes", offset = 892, type = "u32", note = "the glow model's +412: its shape count" },
+  { name = "glow_textures_state", offset = 964, type = "u32", note = "the slot at the assets' +880 (asset 143, the glow model's textures)" },
+  { name = "tga_header", offset = 992, type = "bytes", count = 20, note = "the TGA image's header (assets +928)" },
+  { name = "tga_pixels", offset = 1012, type = "u32", note = "the TGA image's pixels (assets +948, CarScene::GetTga)" },
+  { name = "asset109_state", offset = 4156, type = "u32", note = "the slot at the assets' +4072 (asset 109, set a only)" },
+  { name = "plate_xpr", offset = 4648, type = "bytes", count = 24, note = "asset 105's XPR (assets +4584): the number plates' blank texture" },
+  { name = "bundle3_state", offset = 4764, type = "u32", note = "the fourth bundle's slot (assets +4680)" },
+  { name = "car_models_first", offset = 4944, type = "u32", note = "the second set's lists, 12 bytes a pool: +0 the first node, +8 the count" },
+  { name = "car_models_count", offset = 4952, type = "u32" },
+  { name = "parts_first", offset = 4956, type = "u32" },
+  { name = "parts_list_count", offset = 4964, type = "u32" },
+  { name = "cockpits_first", offset = 4968, type = "u32" },
+  { name = "cockpits_count", offset = 4976, type = "u32" },
+  { name = "interiors_first", offset = 4980, type = "u32" },
+  { name = "interiors_count", offset = 4988, type = "u32" },
+  { name = "light_kits_first", offset = 4992, type = "u32" },
+  { name = "light_kits_count", offset = 5000, type = "u32" },
+  { name = "wheels_first", offset = 5004, type = "u32" },
+  { name = "wheels_list_count", offset = 5012, type = "u32" },
+  { name = "traffic_first", offset = 5016, type = "u32" },
+  { name = "traffic_list_count", offset = 5024, type = "u32" },
+  { name = "scene_models_first", offset = 5028, type = "u32" },
+  { name = "scene_models_count", offset = 5036, type = "u32" },
+  { name = "first_set", offset = 5040, type = "u32", note = "the first set ([0x826C2E40], ScenePools::MakeA's)" },
+  { name = "set_up_r5", offset = 5044, type = "u32", note = "CarScene::SetUp's r5; set: asset 141 loaded in set b too, [0x8296B8F0] from its XPR in the race path" },
+  { name = "blink_timers_held", offset = 5048, type = "u32", note = "0: the light kits' blink timers advance (Race::ToggleEffects)" },
+  { name = "lighting_fixed", offset = 5052, type = "u32", note = "0: CarLighting::Gather writes the light slots; 1 in the parking area (LocationScreen::Update)" },
+  { name = "load_buffer", offset = 5056, type = "u32", note = "the load buffer the scene uses (its own or the archive's shared one)" },
+  { name = "load_buffer_size", offset = 5060, type = "u32" },
+  { name = "pass_camera", offset = 5072, type = "u32", note = "the pass description (+5072 to +5199, set by the scene's draw before each Car::DrawUpdate): +0 the camera pass index (0x826BAC00 + 592 x it)" },
+  { name = "pass_shadow_camera_a", offset = 5076, type = "u32", note = "+4: the plain shadows' and the tires' depth camera pass" },
+  { name = "pass_shadow_camera_b", offset = 5080, type = "u32", note = "+8: the second shadow set's camera pass" },
+  { name = "pass_light_kit_camera", offset = 5084, type = "u32", note = "+12: the light kit's camera pass" },
+  { name = "pass_parts_shadow_camera", offset = 5088, type = "u32", note = "+16: the parts' second depth draw's camera pass (probably)" },
+  { name = "pass_key_group0", offset = 5092, type = "u32", note = "+20: copied to 0x8296B90C (Model::Draw's group 0 bucket)" },
+  { name = "pass_key_group1", offset = 5096, type = "u32", note = "+24: copied to 0x8296B900" },
+  { name = "pass_key_depth", offset = 5100, type = "u32", note = "+28: copied to 0x8296B908" },
+  { name = "pass_shadow_key_a", offset = 5104, type = "u32", note = "+32: the plain shadows' (and the tires' depth) key" },
+  { name = "pass_shadow_key_b", offset = 5108, type = "u32", note = "+36: the second shadow set's key" },
+  { name = "pass_light0_shadow_key", offset = 5112, type = "u32", note = "+40 + 4i: the planar shadows' keys, lights 0 to 2" },
+  { name = "pass_light1_shadow_key", offset = 5116, type = "u32" },
+  { name = "pass_light2_shadow_key", offset = 5120, type = "u32" },
+  { name = "pass_light_kit_key", offset = 5124, type = "u32", note = "+52" },
+  { name = "pass_parts_shadow_key", offset = 5128, type = "u32", note = "+56" },
+  { name = "pass_mask", offset = 5132, type = "u32", note = "+60: 0x2 the interior's body r6, 0x4 and 0x10 the plain shadow sets and the tires' depth pass, 0x8 the light kit, 0x20 << i the planar shadows from light i, 0x100 the parts' second depth draw; 0xF8 cleared for a car far in height from the player's" },
+  { name = "pass_saved_key_group0", offset = 5136, type = "u32", note = "+64: [0x8296B90C] while a car draws" },
+  { name = "pass_saved_key_group1", offset = 5140, type = "u32", note = "+68: [0x8296B900]" },
+  { name = "pass_saved_key_depth", offset = 5144, type = "u32", note = "+72: [0x8296B908]" },
+  { name = "pass_saved_depth_key", offset = 5148, type = "u32", note = "+76: [0x8296B8FC] around a depth draw" },
+  { name = "pass_saved_other_key", offset = 5152, type = "u32", note = "+80: [0x8296B8F8] around a depth draw" },
+  { name = "pass_light_direction", offset = 5168, type = "bytes", count = 16, note = "+96: the planar shadow's light direction, normalized (probably)" },
+  { name = "pass_light_direction_w", offset = 5180, type = "f32", note = "1.0 when made" },
+  { name = "pass_light_matrix", offset = 5184, type = "bytes", count = 64, note = "+112: the planar shadow's projection (probably)" },
+  { name = "pass_light_matrix_w0", offset = 5196, type = "f32", note = "its rows' w's, 1.0 when made" },
+  { name = "pass_light_matrix_w1", offset = 5212, type = "f32" },
+  { name = "pass_light_matrix_w2", offset = 5228, type = "f32" },
+  { name = "pass_light_matrix_w3", offset = 5244, type = "f32" },
+  { name = "car_light_factor_a", offset = 5248, type = "bytes", count = 12, note = "the lighting block (+5248 to +5520, CarScene::InitLighting): the other cars' lights' first color factor" },
+  { name = "car_light_factor_a_w", offset = 5260, type = "f32" },
+  { name = "car_light_factor_b", offset = 5264, type = "bytes", count = 12, note = "their second color factor" },
+  { name = "light_vector_lo", offset = 5280, type = "u64", note = "a vector copied to 0x8265ED00 by the scene's draw (two doublewords)" },
+  { name = "light_vector_hi", offset = 5288, type = "u64" },
+  { name = "projector_a_x", offset = 5296, type = "f32", note = "read by Scenery::RecordHeadlightProjectors" },
+  { name = "projector_a_y", offset = 5300, type = "f32" },
+  { name = "projector_a_z", offset = 5304, type = "f32" },
+  { name = "projector_b_x", offset = 5312, type = "f32" },
+  { name = "projector_b_y", offset = 5316, type = "f32" },
+  { name = "projector_b_z", offset = 5320, type = "f32" },
+  { name = "projector_c_lo", offset = 5328, type = "u64" },
+  { name = "projector_c_hi", offset = 5336, type = "u64" },
+  { name = "gather_vector_a_lo", offset = 5344, type = "u64", note = "CarLighting::Gather's lighting vectors" },
+  { name = "gather_vector_a_hi", offset = 5352, type = "u64" },
+  { name = "gather_vector_b_lo", offset = 5360, type = "u64" },
+  { name = "gather_vector_b_hi", offset = 5368, type = "u64" },
+  { name = "headlight_position_lo", offset = 5376, type = "u64", note = "the headlight's position in the model's space" },
+  { name = "headlight_position_hi", offset = 5384, type = "u64" },
+  { name = "headlight_position_w", offset = 5388, type = "f32" },
+  { name = "low_beam_direction", offset = 5392, type = "bytes", count = 12, note = "the beam's direction, low beams (SceneModel::Beam)" },
+  { name = "low_beam_direction_w", offset = 5404, type = "f32" },
+  { name = "high_beam_direction_lo", offset = 5408, type = "u64", note = "the beam's direction, high beams" },
+  { name = "high_beam_direction_hi", offset = 5416, type = "u64" },
+  { name = "high_beam_direction_w", offset = 5420, type = "f32" },
+  { name = "light_slot_vector_lo", offset = 5424, type = "u64", note = "the vector Car::DrawUpdate puts in the light slots 2 to 5" },
+  { name = "light_slot_vector_hi", offset = 5432, type = "u64" },
+  { name = "projector_fov", offset = 5436, type = "f32", note = "the headlight projector's field of view (also the light slot vector's w)" },
+  { name = "light_slot_sixth", offset = 5440, type = "bytes", count = 12, note = "the light slots' sixth vector" },
+  { name = "light_slot_sixth_w", offset = 5452, type = "f32" },
+  { name = "low_beam_third", offset = 5456, type = "bytes", count = 12, note = "the beam's third vector, low beams (SceneModel::BeamShape)" },
+  { name = "low_beam_third_w", offset = 5468, type = "f32" },
+  { name = "high_beam_third_lo", offset = 5472, type = "u64", note = "the beam's third vector, high beams" },
+  { name = "high_beam_third_hi", offset = 5480, type = "u64" },
+  { name = "high_beam_third_w", offset = 5484, type = "f32" },
+  { name = "cone_a_lo", offset = 5488, type = "u64", note = "CarLighting::Gather's cones" },
+  { name = "cone_a_hi", offset = 5496, type = "u64" },
+  { name = "cone_angle", offset = 5500, type = "f32", note = "a light cone's angle (CarLighting::Gather)" },
+  { name = "cone_b_lo", offset = 5504, type = "u64" },
+  { name = "cone_b_hi", offset = 5512, type = "u64" },
+  { name = "cone_b_w", offset = 5516, type = "f32" },
+  { name = "lighting_end", offset = 5520, type = "f32", note = "InitLighting's last float (0x8200256C), read by CarLighting::Gather" },
+]
+
+# A 240-byte point record (PointRecord, second-set.md): one part's point of
+# a model, drawn by CarPart::Draw.
+[CarPart]
+measure = "CarPart"
+size = 240
+origin = "embedded"
+fields = [
+  { name = "node", offset = 0, type = "u32", note = "its node record ([+0] + 136: the skeleton's entries)" },
+  { name = "model", offset = 4, type = "u32", note = "the part model (0 when not found)" },
+  { name = "matrix", offset = 16, type = "bytes", count = 64 },
+  { name = "inverse", offset = 80, type = "bytes", count = 64 },
+  { name = "position_lo", offset = 144, type = "u64", note = "the glows' node position, two doublewords" },
+  { name = "position_hi", offset = 152, type = "u64" },
+  { name = "node_index", offset = 224, type = "u32" },
+  { name = "shape", offset = 228, type = "u32", note = "the shape's index in the model" },
+]
+
+# The parts' point block (SceneParts +176) or one of its groups: +0 front
+# bumper, +2656 cooling, +2896 rear bumper, +4592 side skirts, +4832 rear
+# spoiler, +5552 bonnet, +6032 and +12128 the left and right doors, +18224
+# set b's doors, +23760 to +24240 the mirrors, +24480 headlights, +27680
+# tail lights, +31280 fenders, +32960 cabin, +34160 engine, +34640
+# mufflers, +36096 shadows. A group's records are at +240k.
+[PartsPoints]
+measure = "PartsPoints"
+size = 37108
+origin = "embedded"
+fields = [
+  { name = "record0_node", offset = 0, type = "u32" },
+  { name = "record0_model", offset = 4, type = "u32" },
+  { name = "mufflers_row0_w", offset = 12, type = "f32", note = "the mufflers' group: four matrices at +0, their rows' w's 1.0 (InitMufflers)" },
+  { name = "mufflers_row1_w", offset = 28, type = "f32" },
+  { name = "mufflers_row2_w", offset = 44, type = "f32" },
+  { name = "mufflers_row3_w", offset = 60, type = "f32" },
+  { name = "record0_position_lo", offset = 144, type = "u64", note = "record 0's position, two doublewords (the glows)" },
+  { name = "record0_position_hi", offset = 152, type = "u64" },
+  { name = "record0_node_index", offset = 224, type = "u32" },
+  { name = "record0_shape", offset = 228, type = "u32" },
+  { name = "record1_model", offset = 244, type = "u32" },
+  { name = "record1_position_lo", offset = 384, type = "u64", note = "record 1's position (the headlights' glows)" },
+  { name = "record1_position_hi", offset = 392, type = "u64" },
+  { name = "record1_shape", offset = 468, type = "u32" },
+  { name = "record2_model", offset = 484, type = "u32" },
+  { name = "record2_shape", offset = 708, type = "u32" },
+  { name = "record3_model", offset = 724, type = "u32" },
+  { name = "record3_shape", offset = 948, type = "u32" },
+  { name = "shadows_word_960", offset = 960, type = "u32", note = "the shadows' group: 0 (ResetShadows), after its four records" },
+  { name = "record4_model", offset = 964, type = "u32" },
+  { name = "record4_shape", offset = 1188, type = "u32" },
+  { name = "record5_model", offset = 1204, type = "u32" },
+  { name = "record5_shape", offset = 1428, type = "u32" },
+  { name = "record6_model", offset = 1444, type = "u32", note = "the rear bumper's: the number plate's model" },
+  { name = "record6_shape", offset = 1668, type = "u32" },
+  { name = "rear_plate_set", offset = 1680, type = "u32", note = "the rear bumper's group: 1 when made (the plate's texture set)" },
+  { name = "record7_model", offset = 1684, type = "u32" },
+  { name = "rear_plate_texture", offset = 1684, type = "u32", note = "the rear bumper's group (after its seven records): the plate's texture" },
+  { name = "record7_shape", offset = 1908, type = "u32" },
+  { name = "record8_model", offset = 1924, type = "u32", note = "the front bumper's: the number plate's model" },
+  { name = "record8_shape", offset = 2148, type = "u32" },
+  { name = "record9_model", offset = 2164, type = "u32" },
+  { name = "record9_shape", offset = 2388, type = "u32" },
+  { name = "record10_model", offset = 2404, type = "u32" },
+  { name = "record10_shape", offset = 2628, type = "u32" },
+  { name = "front_plate_set", offset = 2640, type = "u32", note = "the front bumper's group (after its eleven records): the plate's texture set" },
+  { name = "record11_model", offset = 2644, type = "u32" },
+  { name = "front_plate_texture", offset = 2644, type = "u32", note = "the front bumper's group: the plate's texture (the car model's loading object's +6700)" },
+  { name = "front_car_record", offset = 2648, type = "u32", note = "the front bumper's group: the car record (+3684 the plate's record index)" },
+  { name = "record11_shape", offset = 2868, type = "u32" },
+  { name = "headlights_popup_matrix", offset = 3120, type = "bytes", count = 64, note = "the headlights' group: the pop-up's matrix (DrawHeadlightBody, for DrawHeadlights)" },
+  { name = "record13_model", offset = 3124, type = "u32" },
+  { name = "headlights_popup_max", offset = 3184, type = "f32", note = "the headlights' group: the pop-up's largest angle (FindHeadlights)" },
+  { name = "record13_shape", offset = 3348, type = "u32" },
+  { name = "block_rear_plate_texture", offset = 4580, type = "u32", note = "the block's: the rear bumper's plate texture (+2896 + 1684)" },
+  { name = "doors_parts_record", offset = 5520, type = "ptr", to = "PartsRecord", note = "set b's doors' group: the parts record (+12 the body's kind, +28 the windows')" },
+  { name = "door_skeleton", offset = 6000, type = "u32", note = "a door's group: the first-set car model's skeleton (PartsPoints::Find)" },
+  { name = "door_matrix", offset = 6016, type = "bytes", count = 64, note = "a door's group: the door's matrix (DrawLeftDoor, DrawRightDoor)" },
+  { name = "door_car_record", offset = 6080, type = "u32", note = "a door's group: the car record (+3688 scissor doors)" },
+  { name = "door_parts_record", offset = 6084, type = "ptr", to = "PartsRecord", note = "a door's group: the parts record (+12, +28)" },
+  { name = "block_left_door_skeleton", offset = 12032, type = "u32", note = "the block's: the left door's group's +6000" },
+  { name = "block_left_door_car_record", offset = 12112, type = "u32" },
+  { name = "block_left_door_parts_record", offset = 12116, type = "u32" },
+  { name = "block_right_door_skeleton", offset = 18128, type = "u32" },
+  { name = "block_right_door_car_record", offset = 18208, type = "u32" },
+  { name = "block_right_door_parts_record", offset = 18212, type = "u32" },
+  { name = "block_doors_parts_record", offset = 23744, type = "u32", note = "the block's: set b's doors' group's +5520" },
+  { name = "scene_model_record", offset = 37072, type = "u32" },
+  { name = "car_record", offset = 37076, type = "u32", note = "the first-set car model's car record (+0 the headlights' color index, +3688 scissor doors)" },
+  { name = "parts_record", offset = 37080, type = "ptr", to = "PartsRecord", note = "the parts object's 60-byte record (+108)" },
+  { name = "car_model", offset = 37084, type = "u32", note = "the first-set car model (the parts object's +24)" },
+  { name = "scene", offset = 37088, type = "ptr", to = "CarScene" },
+  { name = "skeleton", offset = 37092, type = "u32", note = "the first-set car model's skeleton" },
+]
+
+# The parts object's 60-byte record (SceneParts +108).
+[PartsRecord]
+measures = ["PartsPoints.+37080", "PartsPoints.+5520", "PartsPoints.+6084"]
+size = 60
+origin = "embedded"
+fields = [
+  { name = "doors_body_kind", offset = 12, type = "u32", note = "the doors' body record (12 + it, drawn when below 11, signed)" },
+  { name = "door_panel_kind", offset = 28, type = "u32", note = "the door panels' and windows' record (7 + it, 3 + it)" },
+  { name = "headlight_color", offset = 32, type = "u32", note = "the headlights' color table sub-index" },
+  { name = "unknown_56", offset = 56, type = "u32", note = "handed to the front end's and race's draws as r24's word (not read in detail)" },
+]
+
+# The light kit's point block (SceneLights +96) or one of its three groups
+# (+48 the front bumper's, +4384 the side skirts', +8720 the rear
+# bumper's): +0 the record either way; a group's 18 records at +16 + 240k
+# (the neon, 11 LEDs, 6 spots).
+[LightPoints]
+measures = ["LightPoints", "BlinkTimers"]
+size = 13056
+origin = "embedded"
+fields = [
+  { name = "record", offset = 0, type = "ptr", to = "LightKitRecord", note = "the light kit's 52-byte record (a group's: 0 when reset)" },
+  { name = "blink_counter", offset = 8, type = "u64", note = "the block's: BlinkTimers::Advance's counters, frames" },
+  { name = "front_counter", offset = 16, type = "u64" },
+  { name = "neon_model", offset = 20, type = "u32", note = "a group's record 0 (the neon): its model" },
+  { name = "sides_counter", offset = 24, type = "u64" },
+  { name = "rear_counter", offset = 32, type = "u64" },
+  { name = "neon_shape", offset = 244, type = "u32" },
+  { name = "led1_model", offset = 260, type = "u32", note = "the LEDs' records (not seen in play)" },
+  { name = "led1_shape", offset = 484, type = "u32" },
+  { name = "led2_model", offset = 500, type = "u32" },
+  { name = "led2_shape", offset = 724, type = "u32" },
+  { name = "unknown_760", offset = 760, type = "u32", note = "read by the LEDs' draws (not read in detail)" },
+  { name = "unknown_984", offset = 984, type = "u32", note = "read by the LEDs' draws (not read in detail)" },
+  { name = "spot_model", offset = 2900, type = "u32", note = "record 12 (the first spot; not seen in play)" },
+  { name = "spot_shape", offset = 3124, type = "u32" },
+]
+
+# The light kit's 52-byte record (pool 4's, the scene model's record +4224).
+[LightKitRecord]
+measures = ["LightPoints.+0", "BlinkTimers.+0"]
+size = 52
+origin = "embedded"
+fields = [
+  { name = "texture", offset = 0, type = "u32", note = "PartModel::SetTexture's texture (SceneLights::Finish)" },
+  { name = "front_mode", offset = 4, type = "u32", note = "0 none, 1 neon, 2 to 6 LEDs, 7 to 9 spots (blinking from 2)" },
+  { name = "front_on", offset = 8, type = "f32", note = "the on fraction" },
+  { name = "front_fade", offset = 12, type = "f32" },
+  { name = "front_rate", offset = 16, type = "f32" },
+  { name = "sides_mode", offset = 20, type = "u32", note = "spots up to 11" },
+  { name = "sides_on", offset = 24, type = "f32" },
+  { name = "sides_fade", offset = 28, type = "f32" },
+  { name = "sides_rate", offset = 32, type = "f32" },
+  { name = "rear_mode", offset = 36, type = "u32" },
+  { name = "rear_on", offset = 40, type = "f32" },
+  { name = "rear_fade", offset = 44, type = "f32" },
+  { name = "rear_rate", offset = 48, type = "f32" },
+]
+
+# The traffic body's point block (SceneTraffic +3728) or one of its groups
+# (+16 the body's records, +1472 the headlights, +3152 the tail lights),
+# records at +240k.
+[TrafficPoints]
+measure = "TrafficPoints"
+size = 6032
+origin = "embedded"
+fields = [
+  { name = "word_0", offset = 0, type = "u32", note = "the block's: 0 (TrafficPoints::Reset; not read in detail)" },
+  { name = "record0_model", offset = 4, type = "u32" },
+  { name = "record0_position_lo", offset = 144, type = "u64" },
+  { name = "record0_position_hi", offset = 152, type = "u64" },
+  { name = "record2_model", offset = 484, type = "u32", note = "the body's: the front plate" },
+  { name = "record3_model", offset = 724, type = "u32", note = "the body's: the rear plate" },
+  { name = "record5_model", offset = 1204, type = "u32", note = "the body's: the window (or the headlights' add-on)" },
+  { name = "record5_shape", offset = 1428, type = "u32" },
+  { name = "front_plate_texture", offset = 1440, type = "u32", note = "the body's records' +1440 (the body's +7040)" },
+  { name = "rear_plate_texture", offset = 1444, type = "u32", note = "the body's records' +1444 (the body's +7048)" },
+  { name = "record6_model", offset = 1444, type = "u32", note = "the headlights' cover" },
+  { name = "record6_shape", offset = 1668, type = "u32" },
+  { name = "record9_model", offset = 2164, type = "u32" },
+  { name = "record9_shape", offset = 2388, type = "u32" },
+  { name = "record10_model", offset = 2404, type = "u32" },
+  { name = "record10_shape", offset = 2628, type = "u32" },
+]
+
+# The interior's 120-byte record (SceneInterior +40; the point block's
+# groups' +0).
+[InteriorRecord]
+measures = ["InteriorDials.+0", "InteriorPoints.+0", "InteriorPoints.+10464", "Dash.+0"]
+size = 120
+origin = "embedded"
+fields = [
+  { name = "speedometer", offset = 0, type = "u32", note = "0 face record 4, else 5" },
+  { name = "tachometer", offset = 4, type = "u32", note = "0, 1, 2 face records 6, 7, 8, else none" },
+  { name = "gauge0_present", offset = 8, type = "u32", note = "the seven gauges, 12 bytes each: +8 present, +12 its kind" },
+  { name = "gauge0_kind", offset = 12, type = "u32" },
+  { name = "gauge1_present", offset = 20, type = "u32" },
+  { name = "gauge1_kind", offset = 24, type = "u32" },
+  { name = "gauge2_present", offset = 32, type = "u32" },
+  { name = "gauge2_kind", offset = 36, type = "u32" },
+  { name = "gauge3_present", offset = 44, type = "u32" },
+  { name = "gauge3_kind", offset = 48, type = "u32" },
+  { name = "gauge4_present", offset = 56, type = "u32" },
+  { name = "gauge4_kind", offset = 60, type = "u32" },
+  { name = "gauge5_present", offset = 68, type = "u32" },
+  { name = "gauge5_kind", offset = 72, type = "u32" },
+  { name = "gauge6_present", offset = 80, type = "u32" },
+  { name = "gauge6_kind", offset = 84, type = "u32" },
+  { name = "steering_wheel", offset = 92, type = "u32", note = "the steering wheel's record (+8512 + 16 + 240 x it)" },
+  { name = "seat_texture", offset = 96, type = "u32" },
+  { name = "seat_model", offset = 100, type = "u32", note = "0 the stock seats, else the aftermarket seat model (the scene's +784 + 464 x it)" },
+  { name = "roll_cage", offset = 104, type = "u32", note = "1 record 0, 2 record 1, else none" },
+  { name = "strut_bar", offset = 108, type = "u32", note = "0 record 2, else 3 (probably the strut tower bar)" },
+]
+
+# The interior's dials (its point block +240; SceneInterior +400): records at
+# +16 + 240k.
+[InteriorDials]
+measure = "InteriorDials"
+size = 2912
+origin = "embedded"
+fields = [
+  { name = "record", offset = 0, type = "ptr", to = "InteriorRecord" },
+  { name = "car_block", offset = 4, type = "u32", note = "the car's block (InteriorDials::SetBlock)" },
+  { name = "digit_provider", offset = 8, type = "u32", note = "the digits' texture provider (the scene's +1132 in set b, +1064 in set a)" },
+  { name = "tachometer_model", offset = 20, type = "u32", note = "record 0's model: Dash::PoseTachometer runs when set" },
+  { name = "digits_model", offset = 2180, type = "u32", note = "record 9's model: DrawDigitalSpeed runs when set" },
+  { name = "ones_shape", offset = 2404, type = "u32", note = "record 9's shape" },
+  { name = "tens_shape", offset = 2644, type = "u32", note = "record 10's shape" },
+  { name = "hundreds_shape", offset = 2884, type = "u32", note = "record 11's shape" },
+  { name = "gauge_record", offset = 2896, type = "u32", note = "a 48-byte record of the table at 0x82003680 (sub_820D3728 of the block)" },
+]
+
+# The dash: the interior's meters (its point block +3152; InteriorMeters,
+# load-poll's measure, to merge), with Dash::PoseTachometer's reads of the
+# dials (+0, +2896). Records at +16 + 240k.
+[Dash]
+measure = "Dash"
+size = 5356
+origin = "embedded"
+fields = [
+  { name = "record", offset = 0, type = "ptr", to = "InteriorRecord" },
+  { name = "mode", offset = 4, type = "u32", note = "5: gauge 1 is the turbo gauge (Dash::PoseDials; SceneInterior::Finish writes the block here)" },
+  { name = "needle0_model", offset = 1700, type = "u32", note = "the seven needles' models" },
+  { name = "needle1_model", offset = 1940, type = "u32" },
+  { name = "needle2_model", offset = 2660, type = "u32" },
+  { name = "dials_gauge_record", offset = 2896, type = "u32", note = "the dials' +2896 (PoseTachometer)" },
+  { name = "needle3_model", offset = 2900, type = "u32" },
+  { name = "needle4_model", offset = 3620, type = "u32" },
+  { name = "needle5_model", offset = 3860, type = "u32" },
+  { name = "needle6_model", offset = 4100, type = "u32" },
+  { name = "gauge0_provider", offset = 5296, type = "u32", note = "the gauges' texture providers, stored into the model's +48" },
+  { name = "gauge1_provider", offset = 5300, type = "u32" },
+  { name = "gauge2_provider", offset = 5304, type = "u32" },
+  { name = "gauge3_provider", offset = 5308, type = "u32" },
+  { name = "gauge4_provider", offset = 5312, type = "u32" },
+  { name = "gauge5_provider", offset = 5316, type = "u32" },
+  { name = "gauge6_provider", offset = 5320, type = "u32" },
+  { name = "turbo_provider", offset = 5324, type = "u32", note = "gauge 1's in mode 5" },
+  { name = "gauge0_angle", offset = 5328, type = "u32", note = "the needles' angle words (sub_820D3688's first argument)" },
+  { name = "gauge1_angle", offset = 5332, type = "u32" },
+  { name = "gauge2_angle", offset = 5336, type = "u32" },
+  { name = "gauge3_angle", offset = 5340, type = "u32" },
+  { name = "gauge4_angle", offset = 5344, type = "u32" },
+  { name = "gauge5_angle", offset = 5348, type = "u32" },
+  { name = "gauge6_angle", offset = 5352, type = "u32" },
+]
+
+# The scene model's 736-byte block (the scene model's +4288) as every draw
+# gets it in r4 (or r5): the same object as second-set.toml's
+# SceneModelBlock (to merge, the measures with it).
+[CarDrawBlock]
+measures = [
+  "CockpitPoints::DrawCabinWindow.r4",
+  "InteriorDials::DrawDigitalSpeed.r4",
+  "InteriorPoints::DrawRace.r4",
+  "PartsPoints::DrawBonnet.r4",
+  "PartsPoints::DrawCabinWindow01.r4",
+  "PartsPoints::DrawCabinWindow02.r4",
+  "PartsPoints::DrawFenderLights.r4",
+  "PartsPoints::DrawFrontBumperLights.r4",
+  "PartsPoints::DrawFrontEnd.r4",
+  "PartsPoints::DrawHeadlightBody.r4",
+  "PartsPoints::DrawHeadlights.r4",
+  "PartsPoints::DrawLeftDoorPanel.r4",
+  "PartsPoints::DrawRace.r4",
+  "PartsPoints::DrawRearBumperLights.r4",
+  "PartsPoints::DrawTailLights.r4",
+  "TrafficPoints::DrawHeadlights.r4",
+  "WheelPoints::DrawRimAMorphed.r5",
+  "WheelPoints::DrawRimB.r5",
+]
+size = 736
+origin = "embedded"
+fields = [
+  { name = "head", offset = 0, type = "u64", note = "+0 to +7 read as a doubleword (the flags in its low word)" },
+  { name = "flags", offset = 4, type = "u32", note = "0x1 headlights on, 0x2 and 0x4 the left and right sides, 0x8, 0x10, 0x20 no glows, 0x40" },
+  { name = "drawn", offset = 8, type = "u32", note = "the scene model's +4296: 0 draws nothing" },
+  { name = "cockpit_only", offset = 12, type = "u32", note = "the scene model's +4300 (the interior's body r6)" },
+  { name = "world", offset = 16, type = "bytes", count = 64, note = "the scene model's matrix (+4304)" },
+  { name = "wheel_r0", offset = 80, type = "bytes", count = 64, note = "the wheels' turns R_0 to R_3 and spins S_0 to S_3, 64 bytes each" },
+  { name = "wheel_r1", offset = 144, type = "bytes", count = 64 },
+  { name = "wheel_r2", offset = 208, type = "bytes", count = 64 },
+  { name = "wheel_r3", offset = 272, type = "bytes", count = 64 },
+  { name = "wheel_s0", offset = 336, type = "bytes", count = 64 },
+  { name = "wheel_s1", offset = 400, type = "bytes", count = 64 },
+  { name = "wheel_s2", offset = 464, type = "bytes", count = 64 },
+  { name = "wheel_s3", offset = 528, type = "bytes", count = 64 },
+  { name = "rear_second_matrix", offset = 592, type = "u32", note = "set: the rear tires and rims drawn a second time, shifted" },
+  { name = "front_rim_look_a", offset = 596, type = "u32", note = "set b's rims: 1 record 2, 2 record 4, else record 0" },
+  { name = "front_rim_look_b", offset = 600, type = "u32" },
+  { name = "rear_rim_look_a", offset = 604, type = "u32" },
+  { name = "rear_rim_look_b", offset = 608, type = "u32" },
+  { name = "front_brake_alpha_a", offset = 612, type = "f32", note = "record 10's alpha on the brakes" },
+  { name = "front_brake_alpha_b", offset = 616, type = "f32" },
+  { name = "rear_brake_alpha_a", offset = 620, type = "f32" },
+  { name = "rear_brake_alpha_b", offset = 624, type = "f32" },
+  { name = "window_alpha_02", offset = 628, type = "f32", note = "the door windows 02, the cabin's window 02 and the cockpit's windows" },
+  { name = "window_alpha_01", offset = 632, type = "f32" },
+  { name = "lights_alpha", offset = 636, type = "f32", note = "the lamps' covers" },
+  { name = "bonnet_angle", offset = 640, type = "f32", note = "clamped to [0.0, pi]" },
+  { name = "left_door_theta", offset = 660, type = "f32" },
+  { name = "left_door_phi", offset = 664, type = "f32" },
+  { name = "right_door_theta", offset = 676, type = "f32" },
+  { name = "right_door_phi", offset = 680, type = "f32" },
+  { name = "popup_set", offset = 688, type = "u32", note = "set: the pop-up's angle from +692" },
+  { name = "popup_angle", offset = 692, type = "f32" },
+  { name = "speed", offset = 696, type = "f32", note = "the digital speedometer's value" },
+  { name = "boost", offset = 704, type = "f32", note = "the scene model's +4992, lowered by 1.0 a draw (the turbo gauge)" },
+  { name = "identity_world", offset = 724, type = "u32", note = "set: the light kit's world the identity in the front end" },
+  { name = "word_728", offset = 728, type = "u32", note = "0: the front end's parts take one path (not read in detail)" },
+  { name = "no_side_offset", offset = 732, type = "u32", note = "set: the wheels' sides not moved by the group's side float4s" },
+]
+
+# CarLighting::Gather's out record (r3): ten words, then ten matrices.
+[CarLightingRecord]
+measure = "CarLighting"
+size = 688
+origin = "embedded"
+fields = [
+  { name = "light0", offset = 0, type = "u32", note = "the gathered lights' words, +4i (set: light i casts a planar shadow)" },
+  { name = "light1", offset = 4, type = "u32" },
+  { name = "light2", offset = 8, type = "u32" },
+  { name = "shadow_matrices", offset = 48, type = "bytes", count = 640, note = "+48 + 64i: light i's shadow matrix (their w's 1.0 first)" },
+]
+
+# Matrix::Shadow's vectors: r4 the light (a 4-vector), r5 a point on the
+# plane.
+[ShadowVector]
+measures = ["Matrix::Shadow.r4", "Matrix::Shadow.r5"]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "w", offset = 12, type = "f32", note = "the light's (the point has none)" },
+]
+
+# SceneModel::IsNearPlayerHeight's r4: the scene model's position.
+[NearHeightPosition]
+measure = "SceneModel::IsNearPlayerHeight.r4"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32", note = "compared with the player's car's" },
+]
+
+[globals]
+scene = { address = 0x826C2E44, type = "ptr", to = "CarScene", note = "the car scene" }
+lights_flip = { address = 0x826C5104, type = "u32", note = "flipped around the light kit's and the glows' draws" }
+plate_blank = { address = 0x82816E3C, type = "u32", note = "set: the number plates drawn blank" }
+key_group1 = { address = 0x8296B900, type = "u32", note = "the render queue's sort keys: Model::Draw's group 1 bucket" }
+key_depth = { address = 0x8296B908, type = "u32", note = "Model::Draw's depth bucket" }
+key_group0 = { address = 0x8296B90C, type = "u32", note = "Model::Draw's group 0 bucket" }
+depth_key = { address = 0x8296B8FC, type = "u32", note = "the depth draws' key" }
+other_key = { address = 0x8296B8F8, type = "u32", note = "the depth draws' second key" }
+pool_maker = { address = 0x8296B914, type = "u32", note = "the second pool maker (its slot 1 makes the morph's job)" }

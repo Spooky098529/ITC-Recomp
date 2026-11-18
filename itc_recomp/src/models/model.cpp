@@ -10,6 +10,7 @@
 #include "models/memory_blocks.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
+#include "schema/models.h"
 
 #include <cstdlib>
 
@@ -17,15 +18,26 @@ namespace models {
 
 namespace {
 
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
 }
 
-// The five track sets, in the constructor's order.
-constexpr uint32_t kTrackSets[] = {304, 324, 344, 364, 384};
+using G = schema::ModelsGlobals;
+
+// A shader pair's word `word` (0 to 3: the vertex and pixel shaders, their
+// microcode).
+uint32_t PairWord(const schema::ModelShaderPair& pair, uint32_t word) {
+  switch (word) {
+    case 0:
+      return pair.vertex_shader();
+    case 1:
+      return pair.pixel_shader();
+    case 2:
+      return pair.vertex_microcode();
+    default:
+      return pair.pixel_microcode();
+  }
+}
 
 // A callee whose checks the caller made: aborts when it refuses anyway.
 void Require(bool done, const char* what) {
@@ -38,15 +50,17 @@ void Require(bool done, const char* what) {
 // The blocks Model::Release puts off, at most (each one not null; those
 // without their header's tag are skipped), and XPR::Release's two.
 uint32_t ReleaseNodes(uint8_t* base, uint32_t model) {
+  const schema::Model m(base, model);
   uint32_t nodes = 2;
-  for (uint32_t offset : {16u, 20u, kModelShaderPairs}) {
-    nodes += Load(base, model + offset) != 0;
-  }
-  const uint32_t pairs = Load(base, model + kModelShaderPairs);
-  const uint32_t count = Load(base, model + kModelShaderPairCount);
+  nodes += m.header_block().address != 0;
+  nodes += m.vertex_data() != 0;
+  nodes += m.shader_pairs().address != 0;
+  const uint32_t pairs = m.shader_pairs().address;
+  const uint32_t count = m.shader_pair_count();
   for (uint32_t i = 0; i < count && nodes < 0x10000000u; i++) {
+    const schema::ModelShaderPair pair(base, pairs + schema::ModelShaderPair::kSize * i);
     for (uint32_t word = 0; word < 4; word++) {
-      nodes += Load(base, pairs + 16 * i + 4 * word) != 0;
+      nodes += PairWord(pair, word) != 0;
     }
   }
   return nodes;
@@ -61,19 +75,29 @@ void FreeIfAny(uint8_t* base, uint32_t block) {
 
 // Model::Release's work, its checks made.
 uint32_t Release(uint8_t* base, uint32_t model) {
-  FreeIfAny(base, Load(base, model + 16));
-  FreeIfAny(base, Load(base, model + 20));
-  for (uint32_t i = 0; i < Load(base, model + kModelShaderPairCount); i++) {
-    const uint32_t pair = Load(base, model + kModelShaderPairs) + 16 * i;
+  const schema::Model m(base, model);
+  FreeIfAny(base, m.header_block().address);
+  FreeIfAny(base, m.vertex_data());
+  for (uint32_t i = 0; i < m.shader_pair_count(); i++) {
+    const schema::ModelShaderPair pair(
+        base, m.shader_pairs().address + schema::ModelShaderPair::kSize * i);
     for (uint32_t word = 0; word < 4; word++) {
-      FreeIfAny(base, Load(base, pair + 4 * word));
+      FreeIfAny(base, PairWord(pair, word));
     }
   }
-  FreeIfAny(base, Load(base, model + kModelShaderPairs));
-  for (uint32_t offset : {16u, 20u, 24u, 420u, 28u, 40u, 48u, 404u, 412u, 408u, 416u}) {
-    Store(base, model + offset, 0);
-  }
-  const auto r3 = XprRelease(base, model + kModelXpr);
+  FreeIfAny(base, m.shader_pairs().address);
+  m.set_header_block(0u);
+  m.set_vertex_data(0u);
+  m.set_shader_pairs(0u);
+  m.set_shader_pair_count(0u);
+  m.set_header(0u);
+  m.set_shapes(0u);
+  m.set_texture_provider(0u);
+  m.set_file_04(0u);
+  m.set_shape_count(0u);
+  m.set_file_08(0u);
+  m.set_file_10(0u);
+  const auto r3 = XprRelease(base, m.xpr_address());
   Require(r3.has_value(), "XPR::Release");
   return *r3;
 }
@@ -85,17 +109,29 @@ bool ModelConstruct(uint8_t* base, uint32_t model) {
   if (!CanAllocatePointers(base, kTextureProviderSlots)) {
     return false;
   }
-  Store(base, model, kModelVtable);
-  XprConstruct(base, model + kModelXpr);
-  Require(TextureProviderConstruct(base, model + kModelTextures, -1).has_value(),
+  const schema::Model m(base, model);
+  m.set_vtable(kModelVtable);
+  XprConstruct(base, m.xpr_address());
+  Require(TextureProviderConstruct(base, m.textures_address(), -1).has_value(),
           "TextureProvider::TextureProvider");
-  model_animation::SkeletonConstruct(base, model + kModelSkeleton);
-  for (uint32_t offset : kTrackSets) {
-    model_animation::TrackSetConstruct(base, model + offset);
+  model_animation::SkeletonConstruct(base, m.skeleton_address());
+  // The five track sets, in the constructor's order.
+  for (uint32_t set : {m.track_set_float4_address(), m.track_set_float_a_address(),
+                       m.track_set_float_b_address(), m.track_set_material_address(),
+                       m.track_set_208_address()}) {
+    model_animation::TrackSetConstruct(base, set);
   }
-  for (uint32_t offset : {16u, 20u, 28u, 40u, 24u, 48u, 404u, 412u, 408u, 416u, 420u}) {
-    Store(base, model + offset, 0);
-  }
+  m.set_header_block(0u);
+  m.set_vertex_data(0u);
+  m.set_header(0u);
+  m.set_shapes(0u);
+  m.set_shader_pairs(0u);
+  m.set_texture_provider(0u);
+  m.set_file_04(0u);
+  m.set_shape_count(0u);
+  m.set_file_08(0u);
+  m.set_file_10(0u);
+  m.set_shader_pair_count(0u);
   return true;
 }
 
@@ -112,14 +148,15 @@ uint32_t ModelReleaseNodes(uint8_t* base, uint32_t model) {
 }
 
 bool ModelMembersDestructible(uint8_t* base, uint32_t model) {
-  const uint32_t storage = Load(base, model + kModelTextures + kTextureProviderVector +
-                                          kVectorFirst);
-  return model_animation::TrackSetReleasable(base, model + 384, true) &&
-         model_animation::TrackSetReleasable(base, model + 364, true) &&
-         model_animation::TrackSetReleasable(base, model + 344, false) &&
-         model_animation::TrackSetReleasable(base, model + 324, false) &&
-         model_animation::TrackSetReleasable(base, model + 304, true) &&
-         model_animation::SkeletonDestructible(base, model + kModelSkeleton) &&
+  const schema::Model m(base, model);
+  const uint32_t storage =
+      schema::TextureProvider(base, m.textures_address()).first().address;
+  return model_animation::TrackSetReleasable(base, m.track_set_208_address(), true) &&
+         model_animation::TrackSetReleasable(base, m.track_set_material_address(), true) &&
+         model_animation::TrackSetReleasable(base, m.track_set_float_b_address(), false) &&
+         model_animation::TrackSetReleasable(base, m.track_set_float_a_address(), false) &&
+         model_animation::TrackSetReleasable(base, m.track_set_float4_address(), true) &&
+         model_animation::SkeletonDestructible(base, m.skeleton_address()) &&
          (storage == 0 || memory::IsHeapBlock(storage));
 }
 
@@ -132,59 +169,71 @@ std::optional<uint32_t> ModelDestruct(uint8_t* base, uint32_t model) {
       !ModelMembersDestructible(base, model)) {
     return std::nullopt;
   }
-  Store(base, model, kModelVtable);
+  const schema::Model m(base, model);
+  m.set_vtable(kModelVtable);
   Release(base, model);
-  Require(model_animation::TrackSetReleaseArray(base, model + 384), "TrackSet::ReleaseArray");
-  Require(model_animation::TrackSetReleaseArray(base, model + 364), "TrackSet::ReleaseArray");
-  Require(model_animation::TrackSetRelease(base, model + 344), "TrackSet::Release");
-  Require(model_animation::TrackSetRelease(base, model + 324), "TrackSet::Release");
-  Require(model_animation::TrackSetReleaseArray(base, model + 304), "TrackSet::ReleaseArray");
-  Require(model_animation::SkeletonDestruct(base, model + kModelSkeleton),
+  Require(model_animation::TrackSetReleaseArray(base, m.track_set_208_address()),
+          "TrackSet::ReleaseArray");
+  Require(model_animation::TrackSetReleaseArray(base, m.track_set_material_address()),
+          "TrackSet::ReleaseArray");
+  Require(model_animation::TrackSetRelease(base, m.track_set_float_b_address()),
+          "TrackSet::Release");
+  Require(model_animation::TrackSetRelease(base, m.track_set_float_a_address()),
+          "TrackSet::Release");
+  Require(model_animation::TrackSetReleaseArray(base, m.track_set_float4_address()),
+          "TrackSet::ReleaseArray");
+  Require(model_animation::SkeletonDestruct(base, m.skeleton_address()),
           "Skeleton::~Skeleton");
-  Require(TextureProviderDestruct(base, model + kModelTextures).has_value(),
+  Require(TextureProviderDestruct(base, m.textures_address()).has_value(),
           "TextureProvider::~TextureProvider");
-  const auto r3 = XprDestruct(base, model + kModelXpr);
+  const auto r3 = XprDestruct(base, m.xpr_address());
   Require(r3.has_value(), "XPR::~XPR");
   return *r3;
 }
 
 uint32_t MaterialCount(uint8_t* base, uint32_t model, uint32_t shape, int32_t group) {
   ITC_NATIVE_RUNNING("sub_82594AD8 Model::MaterialCount");
-  const uint32_t block = Load(base, shape * 544 + Load(base, model + 40) + 396);
-  return Load(base, block + (group == 0 ? 8 : 12));
+  const schema::MaterialBlock block =
+      schema::ModelShape(base, shape * schema::ModelShape::kSize +
+                                   schema::Model(base, model).shapes().address)
+          .materials();
+  return group == 0 ? block.group0_count() : block.group1_count();
 }
 
 uint32_t Material(uint8_t* base, uint32_t model, uint32_t shape, uint32_t index, int32_t group) {
   ITC_NATIVE_RUNNING("sub_82594B20 Model::Material");
-  const uint32_t block = Load(base, shape * 544 + Load(base, model + 40) + 396);
+  const schema::MaterialBlock block =
+      schema::ModelShape(base, shape * schema::ModelShape::kSize +
+                                   schema::Model(base, model).shapes().address)
+          .materials();
   if (group == 0) {
-    return (index << 9) + block + 16;
+    return (index << 9) + block.records_address();
   }
-  return ((Load(base, block + 8) + index) << 9) + block + 16;
+  return ((block.group0_count() + index) << 9) + block.records_address();
 }
 
 uint32_t SharedVertexShader(uint8_t* base, uint32_t pair) {
   ITC_NATIVE_RUNNING("sub_825896D8 SharedVertexShader");
-  const uint32_t table = Load(base, 0x8296B7B4);
+  const uint32_t table = G::shared_vertex_shaders(base);
   return table == 0 ? 0 : Load(base, (pair << 2) + table);
 }
 
 void SetSharedShaders(uint8_t* base, uint32_t vertex, uint32_t pixel) {
   ITC_NATIVE_RUNNING("sub_825896C0 SetSharedShaders");
-  Store(base, 0x8296B7B4, vertex);
-  Store(base, 0x8296B7B8, pixel);
+  G::set_shared_vertex_shaders(base, vertex);
+  G::set_shared_pixel_shaders(base, pixel);
 }
 
 uint32_t SharedPixelShader(uint8_t* base, uint32_t pair) {
   ITC_NATIVE_RUNNING("sub_82589700 SharedPixelShader");
-  const uint32_t table = Load(base, 0x8296B7B8);
+  const uint32_t table = G::shared_pixel_shaders(base);
   return table == 0 ? 0 : Load(base, (pair << 2) + table);
 }
 
 std::optional<uint32_t> VertexDeclaration(uint8_t* base, uint32_t a, int32_t b, uint32_t c) {
   ITC_NATIVE_RUNNING("sub_82589728 VertexDeclaration");
-  constexpr uint32_t kKinds = 0x8265EC00;
-  constexpr uint32_t kTable = 0x8296B7F4;
+  constexpr uint32_t kKinds = G::stream_kinds_address();
+  constexpr uint32_t kTable = G::vertex_declarations_address();
   const uint32_t index = Load(base, (a << 2) + kKinds) << 2;
   const int32_t kind = int32_t(Load(base, (c << 2) + kKinds + 72));
   int32_t offset;

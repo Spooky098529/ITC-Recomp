@@ -21,6 +21,7 @@
 #include "matrix_math/matrix_math.h"
 #include "model_animation/model_animation.h"
 #include "scenery_lists/scenery_lists.h"
+#include "schema/course_scenery.h"
 #include "sprites/billboards.h"
 
 #include <initializer_list>
@@ -35,8 +36,6 @@ using namespace car_scene_draw::ops;
 constexpr uint32_t kFrame = 640;
 constexpr uint32_t kCameraPasses = 0x826BAC00;
 constexpr uint32_t kViewCopy = 0x8265ECA0;  // also the original's r24 throughout
-constexpr uint32_t kDrawKeyA = 0x8296B90C;  // the description's +24
-constexpr uint32_t kDrawKeyB = 0x8296B900;  // its +28
 constexpr uint32_t kViewports = 0x826C2CE8;
 // The pass table: 20 entries of six words (the player, the viewport entry,
 // the camera pass, the two keys, the mask): 0 to 2 the course set's model,
@@ -57,6 +56,10 @@ void FlushOff() { Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask)); 
 
 bool ShadowPass(int32_t type) { return type == 10 || type == 13 || type == 16; }
 
+using Manager = schema::Scenery;
+using VisibleArea = schema::SceneryVisibleArea;
+using G = schema::CourseSceneryGlobals;
+
 }  // namespace
 
 void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
@@ -66,10 +69,15 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   const uint32_t f = stack - kFrame;
   Store(base, f, stack);  // the back chain, as stwu
   const uint32_t description = f + 80;
-  const uint32_t provider = manager + 228;  // r27
-  const uint32_t areas = manager + 216;     // r16
-  const uint32_t set = Load(base, manager + 112);  // r15
-  const uint32_t textures = set + 64;              // r18
+  const Manager m(base, manager);
+  const uint32_t provider = m.texture_provider_address();  // r27
+  const schema::CourseSet s = m.course_set();              // r15
+  const uint32_t set = s.address;
+  const uint32_t textures = s.xpr_address();  // r18
+  // The visible areas (the manager's +216, r16): area `a`.
+  auto area_at = [&](uint32_t a) {
+    return VisibleArea(base, m.visible_areas().address + VisibleArea::kSize * a);
+  };
 
   auto guest_call = [&](uint32_t function, std::initializer_list<uint32_t> args, uint32_t lr) {
     draws.call(draws.user, function, args.begin(), int(args.size()), f, lr);
@@ -78,7 +86,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   // The texture provider's slots 2 and 4 (its plain C++ where they are the
   // game's, else guest calls); the vtable read again for each.
   auto provider_clear = [&](uint32_t lr) {
-    const uint32_t function = Load(base, Load(base, provider) + 8);
+    const uint32_t function = m.texture_provider().clear_all();
     if (function == kProviderClearAll) {
       scenery_lists::TextureProviderClearAll(base, provider);
     } else {
@@ -86,7 +94,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
     }
   };
   auto provider_set = [&](uint32_t slot, uint32_t lr) {
-    const uint32_t function = Load(base, Load(base, provider) + 16);
+    const uint32_t function = m.texture_provider().set();
     if (function != kProviderSet ||
         !scenery_lists::TextureProviderSet(base, provider, slot, textures)) {
       guest_call(function, {provider, slot, textures}, lr);
@@ -128,16 +136,17 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   // animations advanced (inside their per-frame wrap) and every visible
   // area's models animated.
   provider_clear(0x820F60A0);
-  if ((~Load(base, manager + 196) & 0x4000) != 0) {
+  if ((~m.mask() & 0x4000) != 0) {
     steps.advance(f, set);
     FlushOff();
-    for (uint32_t a = 0; a < Load(base, areas); a++) {
-      const uint32_t area = Load(base, areas + 8) + 272 * a;
-      if (Load(base, area + 4) == 0) {
+    for (uint32_t a = 0; a < m.visible_count(); a++) {
+      const VisibleArea area = area_at(a);
+      if (area.model_count() == 0) {
         continue;
       }
-      for (uint32_t n = 0; n < Load(base, area + 4); n++) {
-        const uint32_t model = Load(base, Load(base, area + 16 + 4 * n) + 56);
+      for (uint32_t n = 0; n < area.model_count(); n++) {
+        const uint32_t model =
+            schema::AreaModel(base, Load(base, area.models_address() + 4 * n)).model().address;
         if (steps.native_model_animation) {
           model_animation::ModelAnimate(base, model);
         } else {
@@ -149,10 +158,10 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   }
   provider_set(0, 0x820F613C);
 
-  const double one = Lfs(base, kOne);  // f31
+  const double one = double(G::one(base));  // f31
   // The course set's model (+96) with the eye's translation, +196's 0x10.
-  if ((Load(base, manager + 196) & 0x10) != 0) {
-    const double zero = Lfs(base, kZero);     // f30
+  if ((m.mask() & 0x10) != 0) {
+    const double zero = double(G::zero(base));  // f30
     const double range_y = Lfs(base, kRangeY);  // f28
     const double range_x = Lfs(base, kRangeX);  // f29
     for (uint32_t entry = 0; entry < 3; entry++) {
@@ -163,7 +172,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       for (uint32_t at : {220u, 236u, 252u, 268u, 348u, 364u, 380u, 396u}) {
         Stfs(base, f + at, one);
       }
-      const uint32_t model = set + 96;  // r29
+      const uint32_t model = s.model_address();  // r29
       if (model == 0) {
         break;  // the original's addic. test (the set at -96)
       }
@@ -176,8 +185,8 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       Stfs(base, f + 264, Lfs(base, pass + 408));
       copy(view_projection, pass + 144, 0x820F628C);
       provider_set(1, 0x820F62A8);
-      Store(base, kDrawKeyA, Load(base, f + 104));
-      Store(base, kDrawKeyB, Load(base, f + 108));
+      G::set_key_a(base, Load(base, f + 104));
+      G::set_key_b(base, Load(base, f + 108));
       copy(kViewCopy, pass + 16, 0x820F62C4);
       Store(base, model + 48, provider);
       for (uint32_t i = 0; int32_t(i) < int32_t(Load(base, model + 412)); i++) {
@@ -204,7 +213,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
 
   // The course set's list at +528, +196's 0x20: each model nearer than the
   // viewport entry's far distance (+72) drawn with the identity.
-  if ((Load(base, manager + 196) & 0x20) != 0) {
+  if ((m.mask() & 0x20) != 0) {
     for (uint32_t entry = 3; entry < 6; entry++) {
       if (!enabled(entry)) {
         continue;
@@ -213,7 +222,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       for (uint32_t at : {284u, 300u, 316u, 332u, 412u, 428u, 444u, 460u}) {
         Stfs(base, f + at, one);
       }
-      const uint32_t list = set + 528;  // r26
+      const uint32_t list = s.list_a_address();  // r26
       if (list == 0) {
         break;  // the original's addic. test (the set at -528)
       }
@@ -223,8 +232,8 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       identity(world);
       copy(view_projection, pass + 144, 0x820F6424);
       provider_set(1, 0x820F6440);
-      Store(base, kDrawKeyA, Load(base, f + 104));
-      Store(base, kDrawKeyB, Load(base, f + 108));
+      G::set_key_a(base, Load(base, f + 104));
+      G::set_key_b(base, Load(base, f + 108));
       copy(kViewCopy, pass + 16, 0x820F645C);
       const uint32_t row = kPassTable + 24 * entry;
       for (uint32_t i = 0; int32_t(i) < int32_t(Load(base, list)); i++) {
@@ -253,9 +262,9 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   // Each visible area for entries 6 to 15, then 16 to 18 (the original's
   // r28, the area's offset, its depth draws' context).
   for (const auto& [first, count] : {std::pair{6u, 10u}, std::pair{16u, 3u}}) {
-    for (uint32_t a = 0; a < Load(base, areas); a++) {
-      const uint32_t area = Load(base, areas + 8) + 272 * a;
-      if (Load(base, area + 4) == 0) {
+    for (uint32_t a = 0; a < m.visible_count(); a++) {
+      const uint32_t area = area_at(a).address;
+      if (VisibleArea(base, area).model_count() == 0) {
         continue;
       }
       for (uint32_t entry = first; entry < first + count; entry++) {
@@ -264,7 +273,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
         }
         describe(entry);
         steps.set_r24(Load(base, description + 20) * 592u + kCameraPasses);
-        DrawArea(base, draws, calls, f, manager, description, area, 272 * a);
+        DrawArea(base, draws, calls, f, manager, description, area, VisibleArea::kSize * a);
         steps.set_r24(kViewCopy);
         FlushOff();
       }
@@ -285,21 +294,22 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
 
   // The set's light groups (+1592) for entries 16 to 18 outside the shadow
   // passes, +196's 0x400.
-  if ((Load(base, manager + 196) & 0x400) != 0) {
+  if ((m.mask() & 0x400) != 0) {
     for (uint32_t entry = 16; entry < 19; entry++) {
       const uint32_t pass = pass_of(Load(base, kPassTable + 24 * entry + 8));
       if (Load(base, pass + 588) == 0 || ShadowPass(int32_t(Load(base, pass + 584)))) {
         continue;
       }
-      const uint32_t lights = Load(base, set + 1592);  // r31
+      const uint32_t lights = s.light_groups().address;  // r31
       if (lights == 0) {
         continue;
       }
       describe(entry);
       headlights();
       scenery_lists::SetBillboardPass(base, description, Load(base, f + 88), Load(base, f + 108));
-      for (uint32_t i = 0; i < __builtin_bswap32(Load(base, lights)); i++) {
-        const uint32_t animations = Load(base, set + 1060);
+      for (uint32_t i = 0; i < __builtin_bswap32(schema::SceneryDataFile(base, lights).count());
+           i++) {
+        const uint32_t animations = s.texture_animations().address;
         const uint32_t groups = game_data::GetEntry(base, lights, i, false);
         sprites::DrawLightGroups(base, calls, f, description, groups, textures, animations);
         FlushOff();

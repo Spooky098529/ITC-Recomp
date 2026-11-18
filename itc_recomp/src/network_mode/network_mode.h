@@ -26,21 +26,9 @@ namespace network_mode {
 
 using Calls = race_hud_object::Calls;
 
-// The mode's fields: the delegate's holder (+4) and the delegate (+8), the
-// dispatcher (+36: the handlers, the count +200), the type 12 block (+848).
-constexpr uint32_t kDispatcher = 36;
-constexpr uint32_t kBlock = 848;
-// The block's words: the first screen's index (+0x2100C the shown one,
-// +0x21010 the first), +0x21024 (set when the session was made here).
-constexpr uint32_t kShown = 0x2100C;
-constexpr uint32_t kFirstShown = 0x21010;
-constexpr uint32_t kSessionMade = 0x21024;
-
-// The globals the Init reads: the mode before, the session and the
-// network's state (docs/known-data.md).
-constexpr uint32_t kModeBefore = 0x826032E0;
-constexpr uint32_t kSession = 0x82816E3C;
-constexpr uint32_t kNetworkState = 0x8281611C;
+// The mode (schema::ModeType12), its block (schema::NetModeBlock), the
+// machines (schema::NetMachine), the session and the globals
+// (schema::NetworkModeGlobals) are itc_recomp/schema/network-mode.toml's.
 
 // The guest functions the Init calls.
 constexpr uint32_t kScreenStart = 0x8211AD00;
@@ -50,15 +38,12 @@ constexpr uint32_t kStandSceneCreate = 0x82180B00;
 constexpr uint32_t kVirtualAlloc = 0x82295398;
 constexpr uint32_t kFadeIn = 0x8209D038;
 constexpr uint32_t kLoadingShow = 0x822478D0;
-constexpr uint32_t kStringTable = 0x826C5C34;
 constexpr uint32_t kStringFile = 59;
-constexpr uint32_t kFadesPasses = 0x82001BEC;
 constexpr uint32_t kDelegateVtable = 0x82010FA0;
 constexpr uint32_t kSlot8Thunk = 0x8223D4B0;
 
 // The type 12 block's machines (ModeType12::Init's VirtualAlloc, 135,208
 // bytes at the mode's +848), by the index ModeType12::Machine numbers them.
-constexpr uint32_t kBlockBytes = 135208;
 constexpr uint32_t kModeSelectAt = 0;      // 0, NetModeSelect
 constexpr uint32_t kScreen1At = 9640;      // 1
 constexpr uint32_t kScreen3At = 19280;     // 3
@@ -153,35 +138,9 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
 
 // --- The mode's delegate functions and block helpers (mode.cpp) ---
 
-// The machines' words: the state, the movie loaded, back (to the title),
-// the mode again, held.
-constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineBack = 9624;
-constexpr uint32_t kMachineAgain = 9632;
-// The mode's message ring (+240; the +32 object's +208) and the block's
-// next-mode answer (8 bytes, NextMode's, handed over by Teardown).
-constexpr uint32_t kRing = 240;
-constexpr uint32_t kNextAnswer = 0x21014;
-// The globals: the sound manager, the sign-in watch's "not on Live" check
-// (0x826BAB40 + 16), the title's flag NextMode sets, the session's buffer
-// Session::Release frees, the race data and the time attack's set-up (the
-// course route, whether +0x82816684 picks the race data's +0x59618, that
-// word, the car's 1,884 bytes and its +3892, the word for the session's
-// +216).
-constexpr uint32_t kSoundManager = 0x826C5C80;
-constexpr uint32_t kSignInWatch = 0x826BAB40;
-constexpr uint32_t kTitleFlag = 0x826364EC;
-constexpr uint32_t kSessionBuffer = 0x826C6AD4;
-constexpr uint32_t kSessionRows = 0x13CD34;  // the session's +1,297,716
-constexpr uint32_t kRaceData = 0x826C5B2C;
-constexpr uint32_t kTaRoute = 0x82816660;
-constexpr uint32_t kTaHasKind = 0x82816680;
-constexpr uint32_t kTaKind = 0x82816684;
-constexpr uint32_t kTaCar = 0x82816688;
+// The time attack's car (the global ta_car) copied into the race's: its
+// bytes.
 constexpr uint32_t kTaCarBytes = 1884;
-constexpr uint32_t kTaCarWord = 0x82816E38;
-constexpr uint32_t kTaSessionWord = 0x82816694;
 
 // sub_82277E10 ModeType12::Machine (with its case 0's entry sub_82277E44):
 // the machine of index `index` in the block (2 and above 14: 0).
@@ -217,11 +176,6 @@ uint32_t Resume(uint8_t* base, uint32_t object, uint32_t sp);
 // frames. r3 as the original leaves it.
 uint64_t SessionFree(uint8_t* base, uint32_t sp, const Calls& calls);
 
-// The session's pages (sub_822926B8's VirtualAlloc) and the session state
-// word Session::Init clears (0x826C6AA8, system-services.md's
-// Session::IsActive reads it).
-constexpr uint32_t kSessionBytes = 0x13CD50;
-constexpr uint32_t kSessionState = 0x826C6AA8;
 // sub_822926B8 Session::Make (the mode select's menu page, the time
 // attack): with no session ([0x82816E3C]), its pages VirtualAlloc'ed (a
 // guest call through the override) into the global and set up by
@@ -271,24 +225,12 @@ uint64_t Screen1ResetData(uint8_t* base, uint32_t data, uint32_t sp, const Calls
 // (36 bytes: +0 set up, +4 and +8 back to the title, +12 the sign-in UI
 // shown, +16 the privilege dialog, +20 the page and +24 the transition the
 // dialog's close goes to, +28 the sign-in pages' count, +32 the time
-// attack's way). Movie 35.
-constexpr uint32_t kSelectPages = 0x82816190;
-constexpr uint32_t kSelectMenu = 0x82816194;
-constexpr uint32_t kSelectData = 0x82816198;
+// attack's way): the globals select_pages, select_menu and select_data
+// (schema::NetModeSelectData). Movie 35. The Live sign-in data the pages
+// read are plain guest reads, as the original's (the globals live_mask,
+// written 0 once by B5's Network::Update stub, src/hooks/network.cpp: no
+// user on Live; player_controller; system_ui0 and system_ui1).
 constexpr uint32_t kSelectMovie = 35;
-// Screen 1's data (its +8 = 1 when an item is picked), dialog 13's reason
-// (7: not signed in to Live) and dialog 12's (10: no privilege).
-constexpr uint32_t kScreen1Data = 0x82816180;
-constexpr uint32_t kDialog13Reason = 0x828161A4;
-constexpr uint32_t kDialog12Reason = 0x828161B0;
-// The Live sign-in data the pages read (plain guest reads, as the
-// original): the Live users' mask (written 0 once by B5's Network::Update
-// stub, src/hooks/network.cpp: no user on Live), player 1's controller
-// (0 to 3) and the system UI's two words.
-constexpr uint32_t kLiveMask = 0x826C795C;
-constexpr uint32_t kPlayerController = 0x826BABA4;
-constexpr uint32_t kSystemUi0 = 0x826C7960;
-constexpr uint32_t kSystemUi1 = 0x826C7964;
 // sub_8214F620(user, 254)'s answer, plugged in (the user's call,
 // 2026-11-12): its XUserCheckPrivilege wrapper sub_82295030 asks
 // XamGetSystemVersion (the SDK's 0, below 0x20096B00), so a user signed in

@@ -7,12 +7,15 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/data_load.h"
 
 #include <cstddef>
 
 namespace data_load {
 
 namespace {
+
+using G = schema::DataLoadGlobals;
 
 struct Range {
   uint32_t first;
@@ -71,45 +74,49 @@ constexpr uint32_t kOred[5] = {17, 35, 38, 41, 47};
 
 void Bits224Fill(uint8_t* base, uint32_t set) {
   ITC_NATIVE_RUNNING("sub_820CCD10 Bits224::Fill");
-  Clear(base, set, 7);
-  SetBits(base, set, 0, 199);
+  const uint32_t words = schema::Bits224(base, set).words_address();
+  Clear(base, words, 7);
+  SetBits(base, words, 0, 199);
 }
 
 void Bits480Fill(uint8_t* base, uint32_t set) {
   ITC_NATIVE_RUNNING("sub_820CCD68 Bits480::Fill");
-  Clear(base, set, 15);
-  SetBits(base, set, 0, 454);
+  const uint32_t words = schema::Bits480(base, set).words_address();
+  Clear(base, words, 15);
+  SetBits(base, words, 0, 454);
 }
 
 uint32_t DefaultsInit(uint8_t* base, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820CCDC0 Defaults::Init");
-  Clear(base, kTable3044, 15);
-  SetRanges(base, kTable3044, kBits3044);
-  Clear(base, kTable3C24, 7);
-  SetBits(base, kTable3C24, 0, 61);
-  Bits224Fill(base, kTable50E4);
-  Clear(base, kTable50A8, 15);
-  SetRanges(base, kTable50A8, kBits50A8);
+  const uint32_t table3044 = G::defaults_3044_address();
+  Clear(base, table3044, 15);
+  SetRanges(base, table3044, kBits3044);
+  Clear(base, G::defaults_3c24_address(), 7);
+  SetBits(base, G::defaults_3c24_address(), 0, 61);
+  Bits224Fill(base, G::defaults_50e4_address());
+  Clear(base, G::defaults_50a8_address(), 15);
+  SetRanges(base, G::defaults_50a8_address(), kBits50A8);
   for (uint32_t i = 0; i < 48; i++) {
-    const uint32_t set = kSets3080 + 60 * i;
+    const uint32_t set = schema::Bits480(base, G::defaults_sets_address() + schema::Bits480::kSize * i).words_address();
     Clear(base, set, 15);
     SetBits(base, set, kSetRanges[i].first, kSetRanges[i].end);
   }
   for (uint32_t i = 0; i < 5; i++) {
     guest::StoreU32(base, frame + 80 + 4 * i, kOred[i]);
   }
-  Clear(base, kDefaultsBase, 15);
+  const uint32_t defaults = G::defaults_4064_address();
+  Clear(base, defaults, 15);
   for (const uint32_t index : kOred) {
-    const uint32_t set = kSets3080 + 60 * index;
+    const uint32_t set = G::defaults_sets_address() + schema::Bits480::kSize * index;
     for (uint32_t w = 0; w < 15; w++) {
-      const uint32_t word = kDefaultsBase + 4 * w;
+      const uint32_t word = defaults + 4 * w;
       guest::StoreU32(base, word, guest::LoadU32(base, word) | guest::LoadU32(base, set + 4 * w));
     }
   }
-  Bits480Fill(base, kDefaultsBase);
+  Bits480Fill(base, defaults);
   // andc of each word with itself.
-  Clear(base, kDefaultsBase, 15);
-  return kDefaultsBase;
+  Clear(base, defaults, 15);
+  return defaults;
 }
 
 }  // namespace data_load

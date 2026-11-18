@@ -16,6 +16,7 @@
 #include "base/log.h"
 #include "camera_modes/steps.h"
 #include "guest.h"
+#include "schema/material_passes.h"
 
 namespace material_passes {
 
@@ -23,53 +24,54 @@ using namespace camera_modes::steps;
 
 namespace {
 
+using G = schema::MaterialPassesGlobals;
+
 constexpr uint32_t kScene = 0x826C2E44;    // the scene's pointer
-constexpr uint32_t kPalette = 0x826C5110;  // 16 entries of 64 bytes
 constexpr uint32_t kFrameBytes = 1184;
 
 // The float constants in .rdata the palette is built from, named by value.
-constexpr uint32_t k0 = 0x82000A34;             // 0.0
-constexpr uint32_t k0_0166669991 = 0x820035C8;  // 0.016667
-constexpr uint32_t k0_0166699998 = 0x820035DC;  // 0.01667
-constexpr uint32_t k0_0509800017 = 0x820035C0;  // 0.05098
-constexpr uint32_t k0_09375 = 0x82003598;       // 0.09375
-constexpr uint32_t k0_100000001 = 0x82001FBC;   // 0.1
-constexpr uint32_t k0_125 = 0x82002A88;         // 0.125
-constexpr uint32_t k0_159999996 = 0x820035D4;   // 0.16
-constexpr uint32_t k0_160133004 = 0x820035D0;   // 0.160133
-constexpr uint32_t k0_199986994 = 0x820035A4;   // 0.199987
-constexpr uint32_t k0_200000003 = 0x82002208;   // 0.2
-constexpr uint32_t k0_25 = 0x82002968;          // 0.25
-constexpr uint32_t k0_300000012 = 0x8200296C;   // 0.3
-constexpr uint32_t k0_375 = 0x820035B4;         // 0.375
-constexpr uint32_t k0_495579988 = 0x820035C4;   // 0.49558
-constexpr uint32_t k0_496679991 = 0x820035E8;   // 0.49668
-constexpr uint32_t k0_5 = 0x82001BE4;           // 0.5
-constexpr uint32_t k0_503125012 = 0x820035D8;   // 0.503125
-constexpr uint32_t k0_546875 = 0x820035BC;      // 0.546875
-constexpr uint32_t k0_578125 = 0x820035E0;      // 0.578125
-constexpr uint32_t k0_600000024 = 0x82002A14;   // 0.6
-constexpr uint32_t k0_640625 = 0x820035E4;      // 0.640625
-constexpr uint32_t k0_671875 = 0x8200359C;      // 0.671875
-constexpr uint32_t k0_703125 = 0x820035EC;      // 0.703125
-constexpr uint32_t k0_800000012 = 0x82001070;   // 0.8
-constexpr uint32_t k0_828125 = 0x820035B8;      // 0.828125
-constexpr uint32_t k0_90625 = 0x820035CC;       // 0.90625
-constexpr uint32_t k0_921875 = 0x820035F0;      // 0.921875
-constexpr uint32_t k1 = 0x82000A30;             // 1.0
-constexpr uint32_t k1_20000005 = 0x820029D4;    // 1.2
-constexpr uint32_t k2 = 0x820021E8;             // 2.0
-constexpr uint32_t k3 = 0x820021E4;             // 3.0
-constexpr uint32_t k7 = 0x820035B0;             // 7.0
-constexpr uint32_t k10 = 0x82001FD8;            // 10.0
-constexpr uint32_t k18 = 0x820035A8;            // 18.0
-constexpr uint32_t k20 = 0x82002568;            // 20.0
-constexpr uint32_t k22_2999992 = 0x820035AC;    // 22.3
-constexpr uint32_t k24 = 0x82002228;            // 24.0
-constexpr uint32_t k54 = 0x82003590;            // 54.0
-constexpr uint32_t k100 = 0x82002A0C;           // 100.0
-constexpr uint32_t k105_000038 = 0x82003594;    // 105.00004
-constexpr uint32_t k115 = 0x820035A0;           // 115.0
+constexpr uint32_t k0 = G::zero_address();             // 0.0
+constexpr uint32_t k0_0166669991 = G::value_0_016667_address();  // 0.016667
+constexpr uint32_t k0_0166699998 = G::value_0_01667_address();  // 0.01667
+constexpr uint32_t k0_0509800017 = G::value_0_05098_address();  // 0.05098
+constexpr uint32_t k0_09375 = G::value_0_09375_address();       // 0.09375
+constexpr uint32_t k0_100000001 = G::value_0_1_address();   // 0.1
+constexpr uint32_t k0_125 = G::value_0_125_address();         // 0.125
+constexpr uint32_t k0_159999996 = G::value_0_16_address();   // 0.16
+constexpr uint32_t k0_160133004 = G::value_0_160133_address();   // 0.160133
+constexpr uint32_t k0_199986994 = G::value_0_199987_address();   // 0.199987
+constexpr uint32_t k0_200000003 = G::value_0_2_address();   // 0.2
+constexpr uint32_t k0_25 = G::value_0_25_address();          // 0.25
+constexpr uint32_t k0_300000012 = G::value_0_3_address();   // 0.3
+constexpr uint32_t k0_375 = G::value_0_375_address();         // 0.375
+constexpr uint32_t k0_495579988 = G::value_0_49558_address();   // 0.49558
+constexpr uint32_t k0_496679991 = G::value_0_49668_address();   // 0.49668
+constexpr uint32_t k0_5 = G::half_address();           // 0.5
+constexpr uint32_t k0_503125012 = G::value_0_503125_address();   // 0.503125
+constexpr uint32_t k0_546875 = G::value_0_546875_address();      // 0.546875
+constexpr uint32_t k0_578125 = G::value_0_578125_address();      // 0.578125
+constexpr uint32_t k0_600000024 = G::value_0_6_address();   // 0.6
+constexpr uint32_t k0_640625 = G::value_0_640625_address();      // 0.640625
+constexpr uint32_t k0_671875 = G::value_0_671875_address();      // 0.671875
+constexpr uint32_t k0_703125 = G::value_0_703125_address();      // 0.703125
+constexpr uint32_t k0_800000012 = G::value_0_8_address();   // 0.8
+constexpr uint32_t k0_828125 = G::value_0_828125_address();      // 0.828125
+constexpr uint32_t k0_90625 = G::value_0_90625_address();       // 0.90625
+constexpr uint32_t k0_921875 = G::value_0_921875_address();      // 0.921875
+constexpr uint32_t k1 = G::one_address();             // 1.0
+constexpr uint32_t k1_20000005 = G::value_1_2_address();    // 1.2
+constexpr uint32_t k2 = G::value_2_address();             // 2.0
+constexpr uint32_t k3 = G::value_3_address();             // 3.0
+constexpr uint32_t k7 = G::value_7_address();             // 7.0
+constexpr uint32_t k10 = G::value_10_address();            // 10.0
+constexpr uint32_t k18 = G::value_18_address();            // 18.0
+constexpr uint32_t k20 = G::value_20_address();            // 20.0
+constexpr uint32_t k22_2999992 = G::value_22_3_address();    // 22.3
+constexpr uint32_t k24 = G::value_24_address();            // 24.0
+constexpr uint32_t k54 = G::value_54_address();            // 54.0
+constexpr uint32_t k100 = G::value_100_address();           // 100.0
+constexpr uint32_t k105_000038 = G::value_105_address();    // 105.00004
+constexpr uint32_t k115 = G::value_115_address();           // 115.0
 
 struct Entry {
   uint32_t colors[3][4];  // +0, +16, +32: (hue, saturation, value, 1.0)
@@ -148,7 +150,7 @@ std::optional<uint64_t> PaintPaletteInit(uint8_t* base, uint32_t sp) {
   const bool set = int32_t(guest::LoadU32(base, scene + 4)) != 0;
   for (uint32_t e = 0; e < 16; e++) {
     const Entry& entry = kEntries[e];
-    const uint32_t at = kPalette + 64 * e;
+    const schema::PaintPaletteEntry at(base, G::paint_palette_address() + 64 * e);
     for (uint32_t c = 0; c < 3; c++) {
       const uint32_t built = frame + entry.built[c];
       for (uint32_t i = 0; i < 4; i++) {
@@ -156,7 +158,8 @@ std::optional<uint64_t> PaintPaletteInit(uint8_t* base, uint32_t sp) {
       }
       // Copied into the entry by doublewords (ld, std): the same bits.
       for (uint32_t i = 0; i < 4; i++) {
-        guest::StoreU32(base, at + 16 * c + 4 * i, guest::LoadU32(base, built + 4 * i));
+        guest::StoreU32(base, at.color_a_address() + 16 * c + 4 * i,
+                        guest::LoadU32(base, built + 4 * i));
       }
     }
     for (uint32_t i = 0; i < 3; i++) {
@@ -166,7 +169,7 @@ std::optional<uint64_t> PaintPaletteInit(uint8_t* base, uint32_t sp) {
           constant = s.constant;
         }
       }
-      Move(base, at + 48 + 4 * i, constant);
+      Move(base, at.float_0_address() + 4 * i, constant);
     }
   }
   guest::StoreU32(base, frame + 40, 16);  // the loop's index, as it ends

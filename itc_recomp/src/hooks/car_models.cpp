@@ -26,6 +26,7 @@
 #include "hooks/scene_loaders.h"
 #include "hooks/texture_compression.h"
 #include "native/buffers.h"
+#include "schema/car_models.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_car_models, true, "ITC",
@@ -107,7 +108,8 @@ ITC_REGS_STEP(CarModelsLoadExterior) {
 }
 
 ITC_REGS_STEP(CarModelsReloadDecals) {
-  if (!hooks::NativeHeapActive() || int32_t(guest::LoadU32(base, ctx.r3.u32 + 3724)) == 1) {
+  if (!hooks::NativeHeapActive() ||
+      int32_t(schema::CarModel(base, ctx.r3.u32).extra_image()) == 1) {
     lifted::original::c820D5D20(ctx, base);
     return;
   }

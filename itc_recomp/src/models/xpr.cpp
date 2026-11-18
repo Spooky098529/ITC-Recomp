@@ -7,6 +7,7 @@
 #include "graphics/resources.h"
 #include "models/memory_blocks.h"
 #include "native/buffers.h"
+#include "schema/models.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -35,9 +36,13 @@ void Require(bool done, const char* what) {
 
 void XprConstruct(uint8_t* base, uint32_t xpr) {
   ITC_NATIVE_RUNNING("sub_82596E68 XPR::XPR");
-  for (uint32_t offset = 0; offset < kXprBytes; offset += 4) {
-    Store(base, xpr + offset, 0);
-  }
+  const schema::XPR x(base, xpr);
+  x.set_header_block(0u);
+  x.set_header_size(0u);
+  x.set_data_block(0u);
+  x.set_data_size(0u);
+  x.set_records(0u);
+  x.set_record_count(0u);
 }
 
 std::optional<uint32_t> XprRelease(uint8_t* base, uint32_t xpr) {
@@ -46,31 +51,34 @@ std::optional<uint32_t> XprRelease(uint8_t* base, uint32_t xpr) {
   if (!PendingFreesHaveRoom(base, 2)) {
     return std::nullopt;
   }
-  const uint32_t header = Load(base, xpr + kXprHeader);
+  const schema::XPR x(base, xpr);
+  const uint32_t header = x.header_block();
   if (header != 0) {
     Require(FreeLater(base, header), "Memory::FreeLater");
   }
-  const uint32_t data = Load(base, xpr + kXprData);
-  Store(base, xpr + 0, 0);
-  Store(base, xpr + 4, 0);
+  const uint32_t data = x.data_block();
+  x.set_header_block(0u);
+  x.set_header_size(0u);
   uint32_t r3 = data;
   if (data != 0) {
     Require(FreePhysicalLater(base, data, kXprDataAttributes), "Memory::FreePhysicalLater");
     r3 = kMemoryBlocksLock;
   }
-  for (uint32_t offset = 8; offset < kXprBytes; offset += 4) {
-    Store(base, xpr + offset, 0);
-  }
+  x.set_data_block(0u);
+  x.set_data_size(0u);
+  x.set_records(0u);
+  x.set_record_count(0u);
   return r3;
 }
 
 uint64_t XprGetTexture(uint8_t* base, uint32_t xpr, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82597118 XPR::GetTexture");
-  if (index >= Load(base, xpr + 20)) {
+  const schema::XPR x(base, xpr);
+  if (index >= x.record_count()) {
     index = 0;
   }
-  const uint32_t record = Load(base, xpr + 16) + (index << 4);
-  return uint64_t(Load(base, record + 4)) + Load(base, xpr + kXprHeader);
+  const schema::XprRecord record(base, x.records().address + (index << 4));
+  return uint64_t(record.header_offset()) + x.header_block();
 }
 
 std::optional<uint32_t> XprDestruct(uint8_t* base, uint32_t xpr) {
@@ -141,37 +149,40 @@ std::optional<uint32_t> XprCreate(uint8_t* base, uint32_t xpr, uint32_t file) {
   if (!native::Buffers_NativeMemcpy()) {
     return std::nullopt;
   }
-  if (Load(base, file) != kXpr2) {
+  const schema::XPR x(base, xpr);
+  const schema::Xpr2File f(base, file);
+  if (f.magic() != kXpr2) {
     DebugMessage(base, 0x8206CE20);
     return kNotXpr2;
   }
-  const uint32_t contents = file + 12;
-  Store(base, xpr + 4, Load(base, file + 4));
-  const uint32_t data_bytes = Load(base, file + 8);
-  const uint32_t header_bytes = Load(base, xpr + 4);
-  Store(base, xpr + 12, data_bytes);
-  Store(base, xpr + 0, AllocVirtual(base, header_bytes));
-  const uint32_t data = AllocPhysical(base, Load(base, xpr + 12), kXprDataAllocation);
-  Store(base, xpr + 8, data);
+  const uint32_t contents = file + schema::Xpr2File::kSize;
+  x.set_header_size(f.header_size());
+  const uint32_t data_bytes = f.data_size();
+  const uint32_t header_bytes = x.header_size();
+  x.set_data_size(data_bytes);
+  x.set_header_block(AllocVirtual(base, header_bytes));
+  const uint32_t data = AllocPhysical(base, x.data_size(), kXprDataAllocation);
+  x.set_data_block(data);
   if (data == 0) {
     DebugMessage(base, 0x8206CDFC);
   }
-  Require(native::Buffers_Memcpy(base, Load(base, xpr + 0), contents, Load(base, xpr + 4),
-                                 0x82597000),
+  Require(native::Buffers_Memcpy(base, x.header_block(), contents, x.header_size(), 0x82597000),
           "memcpy");
-  Require(native::Buffers_Memcpy(base, Load(base, xpr + 8), Load(base, xpr + 4) + contents,
-                                 Load(base, xpr + 12), 0x82597014),
+  Require(native::Buffers_Memcpy(base, x.data_block(), x.header_size() + contents,
+                                 x.data_size(), 0x82597014),
           "memcpy");
-  const uint32_t header = Load(base, xpr + 0);
-  Store(base, xpr + 20, Load(base, header));
-  Store(base, xpr + 16, header + 4);
-  for (uint32_t i = 0; i < Load(base, xpr + 20); i++) {
-    uint32_t record = Load(base, xpr + 16) + 16 * i;
-    Store(base, record + 12, Load(base, record + 12) + Load(base, xpr + 0));
-    record = Load(base, xpr + 16) + 16 * i;
-    if ((Load(base, record) & 0xFFFF0000u) == kTextureTag) {
-      const uint32_t to = Load(base, xpr + 8);
-      RelocateTexture(base, Load(base, record + 4) + Load(base, xpr + 0), to, to);
+  const uint32_t header = x.header_block();
+  // The header block's +0: the record count (an XprRecord's +0 in the schema,
+  // which joins the block with its records).
+  x.set_record_count(schema::XprRecord(base, header).type());
+  x.set_records(header + 4);
+  for (uint32_t i = 0; i < x.record_count(); i++) {
+    schema::XprRecord record(base, x.records().address + schema::XprRecord::kSize * i);
+    record.set_name(record.name() + x.header_block());
+    record = schema::XprRecord(base, x.records().address + schema::XprRecord::kSize * i);
+    if ((record.type() & 0xFFFF0000u) == kTextureTag) {
+      const uint32_t to = x.data_block();
+      RelocateTexture(base, record.header_offset() + x.header_block(), to, to);
     }
   }
   return 0;

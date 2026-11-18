@@ -1,0 +1,487 @@
+# The schema of docs/functions/car-models.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The car models: the car model (scene pool 0 of the first set) with its
+# load slots, skeleton, XPR2s and vinyl sheet; the decals' TGA reader and the
+# software rasterizer under Vinyl::DrawDecal; the car scene's set-up record.
+# Arrays (the vinyl layers, the stickers, the slots, the nodes' matrices and
+# positions) are `bytes`: an element is a view at `<field>_address() + n x
+# its size` (CarModelDecalRecord, LoadSlot).
+
+# The car model (docs/known-data.md, "car model"; 7,264 bytes, vtable
+# 0x82004F94, CarModel::CarModel in scene-loaders.md). The measure meets it
+# under several names: Vinyl:: and the load callbacks' r6, the interior's,
+# the wheels' and the scene wheels' +24 (their car model), and the second
+# set's objects (CarModel.+24: their +24 is the first set's car model).
+[CarModel]
+measures = [
+  "CarModel",
+  "CarModel.+24",
+  "Vinyl",
+  "CarModel::OnDecalLoaded.r6",
+  "CarModel::OnFileLoaded.r6",
+  "CarModel::OnFileLoadedB.r6",
+  "CarInterior.+24",
+  "Wheels.+24",
+  "SceneWheels.+192.+24",
+]
+size = 7264
+origin = "allocated"
+vtable = 0x82004F94
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82004F94 (also where the measure's Vinyl puts Vinyl::DecalCorner's out point, Vinyl::Compress's sheet word and TGA::CreateImage's buffer word: joined)" },
+  { name = "unknown_4", offset = 4, type = "f32", note = "only Vinyl::DecalCorner's out point's y, joined with the car model by the measure's Vinyl; the car model's own +4 isn't known" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool" },
+  { name = "linked_car_model", offset = 24, type = "ptr", to = "CarModel", note = "the car's object (known-data.md); the measure's loads here are the second set's objects' +24 (their first set's car model: SceneModel::, SceneParts::, CarModel::SetVinylTextures' r3), joined" },
+  { name = "record", offset = 32, type = "bytes", count = 3696, note = "a copy of the car's 3,696-byte set-up (the car record)" },
+  { name = "block", offset = 32, type = "u32", note = "the record's +0: the block index 0-44" },
+  { name = "unknown_196", offset = 196, type = "u32", note = "the record's +164: handed to the team emblem's lookup (sub_820D3CF8) as r5, not read there" },
+  { name = "vinyl_layers", offset = 208, type = "bytes", count = 384, note = "six 64-byte vinyl layer records (CarModelDecalRecord)" },
+  { name = "layer0_region", offset = 216, type = "u32", note = "layer 0's +8: the region layers 0 to 2 are drawn into" },
+  { name = "unknown_556", offset = 556, type = "u32", note = "read by sub_820D5FC8 (a walk from +556, not read)" },
+  { name = "sticker_groups", offset = 592, type = "bytes", count = 3072, note = "eight groups of six 64-byte sticker records (CarModelDecalRecord), groups 0 to 7 at +1360, +976, +1744, +2128, +3280, +2896, +2512, +592" },
+  { name = "emblem_sticker", offset = 592, type = "u32", note = "group 7's first sticker's index: the team emblem's asset id for blocks 18 and up" },
+  { name = "emblem_sticker_region", offset = 600, type = "u32", note = "its +8: 9 for the emblem (the id itself, not + 383)" },
+  { name = "plate", offset = 3664, type = "bytes", count = 48, note = "the record's 48-byte plate struct MakePlate takes by value (W0 to W11: W1 a number, W2 to W11 the cells)" },
+  { name = "plate_w0_w1", offset = 3664, type = "u64" },
+  { name = "plate_w2_w3", offset = 3672, type = "u64" },
+  { name = "plate_w4_w5", offset = 3680, type = "u64" },
+  { name = "plate_w6_w7", offset = 3688, type = "u64" },
+  { name = "plate_w8_w11", offset = 3696, type = "bytes", count = 16, note = "its last 16 bytes (memcpy'd into the callback's frame)" },
+  { name = "selected_texture", offset = 3712, type = "u32", note = "the record's +3680: which of +7232's indices CarModel::SelectedTexture (sub_820D4588) picks" },
+  { name = "extra_image", offset = 3724, type = "u32", note = "1: an image drawn into the sheet's region 8 (sub_820C4E68, the original's)" },
+  { name = "node_file_slot", offset = 3728, type = "bytes", count = 24, note = "the node file's LoadSlot" },
+  { name = "node_file_id", offset = 3728, type = "u32", note = "set a: 893 + 226 x block; set b: 11063 + 197 x block" },
+  { name = "node_file_request", offset = 3732, type = "u32" },
+  { name = "node_file_size", offset = 3736, type = "u32" },
+  { name = "node_file_buffer", offset = 3744, type = "u32", note = "its pages" },
+  { name = "node_file_state", offset = 3748, type = "u32", note = "2 loading, 3 loaded" },
+  { name = "skeleton", offset = 3760, type = "bytes", count = 180, note = "the skeleton (model-animation.md) the node file is bound to" },
+  { name = "skeleton_nodes", offset = 3844, type = "ptr", to = "AccessoryNodeRecord", note = "the skeleton's +84: the node records (160 bytes, the name at +0)" },
+  { name = "skeleton_node_matrices", offset = 3908, type = "ptr", to = "AccessoryMatrix", note = "the skeleton's +148: the nodes' 64-byte matrices" },
+  { name = "xpr_slots", offset = 3952, type = "bytes", count = 48, note = "the two texture sets' XPR2 LoadSlots (24 bytes each)" },
+  { name = "body_xpr_id", offset = 3952, type = "u32", note = "set a: 891 + 226 x block; set b: 11061 + 197 x block" },
+  { name = "body_xpr_request", offset = 3956, type = "u32" },
+  { name = "body_xpr_size", offset = 3960, type = "u32" },
+  { name = "body_xpr_buffer", offset = 3968, type = "u32", note = "its pages (set a)" },
+  { name = "body_xpr_state", offset = 3972, type = "u32", note = "1 empty, 2 loading, 3 made" },
+  { name = "xpr_objects", offset = 4000, type = "bytes", count = 48, note = "the two XPR objects (24 bytes each)" },
+  { name = "texture_providers", offset = 4048, type = "bytes", count = 40, note = "two TextureProviders (20 bytes each)" },
+  { name = "decals_state", offset = 4088, type = "u32", note = "0 reset, 2 loading, 3 done" },
+  { name = "layer_slots", offset = 4092, type = "bytes", count = 288, note = "six 48-byte decal slots, each two LoadSlots (the first's +20 the state: 0 empty, 1 none asked, 2 loading, 3 arrived)" },
+  { name = "sticker_slots", offset = 4380, type = "bytes", count = 2304, note = "48 decal slots as the layers'" },
+  { name = "vinyl_sheet", offset = 6684, type = "u32", note = "the vinyl sheet's texture header (A8R8G8B8, then DXT5 once compressed)" },
+  { name = "vinyl_sheet_data", offset = 6688, type = "u32", note = "its pixels" },
+  { name = "unknown_6692", offset = 6692, type = "u32", note = "handed with the sheet to the part models (Model::SetVinylTextures) and to DeferRelease" },
+  { name = "unknown_6696", offset = 6696, type = "u32", note = "handed to Vinyl::DrawDecal (its caller's frame +140) and to DeferRelease" },
+  { name = "plate_texture_a", offset = 6700, type = "u32", note = "MakePlate's first texture's header" },
+  { name = "plate_texture_a_data", offset = 6704, type = "u32" },
+  { name = "plate_texture_b", offset = 6708, type = "u32" },
+  { name = "plate_texture_b_data", offset = 6712, type = "u32" },
+  { name = "tire_matrices", offset = 6720, type = "bytes", count = 256, note = "tire_fl, tire_fr, tire_rl, tire_rr's 64-byte matrices" },
+  { name = "tire_positions", offset = 6976, type = "bytes", count = 64, note = "their positions (16 bytes each), scaled by 0.1 and turned a quarter about y" },
+  { name = "seat_matrices", offset = 7040, type = "bytes", count = 128, note = "seat_L, seat_R's matrices" },
+  { name = "seat_positions", offset = 7168, type = "bytes", count = 32 },
+  { name = "accessory_matrix", offset = 7200, type = "ptr", to = "AccessoryMatrix", note = "the acce_null node's matrix (in the skeleton's)" },
+  { name = "accessory_position", offset = 7216, type = "bytes", count = 16, note = "+7228 1.0 from the constructor" },
+  { name = "xpr_indices", offset = 7232, type = "bytes", count = 24, note = "six indices into the body XPR (-1 none)" },
+  { name = "first_set", offset = 7256, type = "ptr", to = "CarModelsFirstSet", note = "the first set of scene pools ([0x826C2E40], scene-loaders.md): its +8 the model set (0 a, 1 b)" },
+]
+
+# A vinyl layer or sticker record (64 bytes; docs/known-data.md "vinyl
+# layer", "sticker"): in the car model's +208 and +592 arrays.
+[CarModelDecalRecord]
+size = 64
+origin = "embedded"
+fields = [
+  { name = "index", offset = 0, type = "u32", note = "the asset index, negative none (layers + 163 or + 189; stickers + 383, or the id itself with region 9)" },
+  { name = "mirrored", offset = 4, type = "u32", note = "stickers only" },
+  { name = "region", offset = 8, type = "u32", note = "the sheet's region (9 the whole sheet, the team emblem's)" },
+  { name = "offset_xy", offset = 16, type = "u64", note = "the offset from the region's center (pixels), x and y" },
+  { name = "offset_zw", offset = 24, type = "u64" },
+  { name = "rotation", offset = 32, type = "f32", note = "radians, probably" },
+  { name = "scale", offset = 48, type = "bytes", count = 16, note = "x and y the scale" },
+]
+
+# A 24-byte load slot (LoadSlot::, load_slots.h).
+[LoadSlot]
+measure = "LoadSlot"
+size = 24
+origin = "embedded"
+fields = [
+  { name = "id", offset = 0, type = "u32", note = "the asset id" },
+  { name = "request", offset = 4, type = "u32", note = "Archive::Load's serial; -1 when reset" },
+  { name = "size", offset = 8, type = "u32", note = "the asset's size" },
+  { name = "shared", offset = 12, type = "u32", note = "1: the buffer is the shared load buffer (not freed)" },
+  { name = "buffer", offset = 16, type = "u32" },
+  { name = "state", offset = 20, type = "u32", note = "0 empty, 1 nothing loaded, 2 loading, 3 arrived" },
+]
+
+# The interior (scene pool 3, CarInterior::Load and LoadParts) and the
+# cockpit body (scene pool 2, CarInterior::LoadSetCBody): two objects the
+# measure joins under CarInterior (scene-loaders.md's Interior and Cockpit).
+[CarInterior]
+measure = "CarInterior"
+size = 3104
+origin = "allocated"
+fields = [
+  { name = "car_model", offset = 24, type = "ptr", to = "CarModel", note = "both" },
+  { name = "setup", offset = 28, type = "bytes", count = 144, note = "a copy of the set-up record: the interior's 120 bytes, the cockpit's 144" },
+  { name = "cockpit_bonnet", offset = 28, type = "u32", note = "the cockpit's record +0: the bonnet's part (body + 3 + it)" },
+  { name = "cockpit_door", offset = 32, type = "u32", note = "body + 16 + it" },
+  { name = "cockpit_mirrors", offset = 36, type = "u32", note = "body + 19 + it" },
+  { name = "cockpit_headlights", offset = 40, type = "u32", note = "body + 31 + it" },
+  { name = "cockpit_fenders", offset = 44, type = "u32", note = "body + 36 + it" },
+  { name = "accessory", offset = 140, type = "u32", note = "the interior's record +112: the accessory picked (set b)" },
+  { name = "accessory_arg", offset = 144, type = "u32", note = "the interior's record +116: the accessory load's r5 (set b)" },
+  { name = "part_slots", offset = 160, type = "bytes", count = 144, note = "the interior's six parts' LoadSlots (CarInterior::LoadParts)" },
+  { name = "cockpit_node_file_slot", offset = 176, type = "bytes", count = 24, note = "the cockpit's node file's LoadSlot (19928 + 55 x block)" },
+  { name = "cockpit_body_id", offset = 400, type = "u32", note = "the cockpit's body XPR2 slot: 19926 + 55 x block" },
+  { name = "cockpit_body_request", offset = 404, type = "u32" },
+  { name = "cockpit_body_size", offset = 408, type = "u32" },
+  { name = "cockpit_body_state", offset = 420, type = "u32", note = "2 loading" },
+  { name = "cockpit_part_slots", offset = 536, type = "bytes", count = 144, note = "the cockpit's six parts' LoadSlots" },
+  { name = "cockpit", offset = 3088, type = "u32", note = "the interior's: nonzero the cockpit set (c)" },
+  { name = "first_set", offset = 3092, type = "ptr", to = "CarModelsFirstSet", note = "the interior's" },
+]
+
+# The first set of scene pools ([0x826C2E40]; scene-loaders.md's ScenePools)
+# as the interior, the car model and the wheels read it.
+[CarModelsFirstSet]
+measure = "CarInterior.+3092"
+size = 12
+origin = "allocated"
+fields = [
+  { name = "model_set", offset = 8, type = "u32", note = "0 set a, 1 set b" },
+]
+
+# A second set car model (SceneCarModel, second-set.md) as the measure puts
+# it at SceneWheels::SetUp's +192 (the scene wheels' +24 in the code).
+[CarModelsSceneCarModel]
+measure = "SceneWheels.+192"
+size = 28
+origin = "allocated"
+fields = [
+  { name = "car_model", offset = 24, type = "ptr", to = "CarModel", note = "the first set's car model" },
+]
+
+# The traffic car's index word (the wheels' +3264, the scene wheels' +16776).
+[CarModelsTrafficIndex]
+measures = ["Wheels.+3264", "SceneWheels.+196"]
+size = 4
+origin = "allocated"
+fields = [
+  { name = "index", offset = 0, type = "u32", note = "the traffic car's wheel is 20 + it; its wheel table entry 45 + it" },
+]
+
+# A word where an address is or goes (the callers' out and in pointers:
+# Texture::Create's header and data, Texture::Free's, TGA::ToARGB's pixels,
+# PlateImage's pixels, FreePagesAt's buffer, MakePlate's data words).
+[CarModelsAddressWord]
+measures = [
+  "Texture::Create.r6",
+  "Texture::Create.r7",
+  "Texture::Free.r4",
+  "TGA::ToARGB.r4",
+  "PlateImage.r7",
+  "FreePagesAt.r4",
+  "CarModel::MakePlate.r4",
+  "CarModel::MakePlate.r6",
+]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "the address" },
+]
+
+# The TGA reader (76 bytes, in TGA::CreateImage's frame; tga.h). The
+# measure joins the header with it (TGA::Decode's and ToARGB's +2, +14, +16,
+# +18: the header's image type, width, height and depth), inside `text`.
+[TgaReader]
+measure = "TgaReader"
+size = 76
+origin = "embedded"
+fields = [
+  { name = "text", offset = 0, type = "bytes", count = 28, note = "a std::string" },
+  { name = "file_size", offset = 28, type = "u32" },
+  { name = "file", offset = 32, type = "ptr", to = "TgaFile", note = "the file's buffer, 0 when not loading" },
+  { name = "header", offset = 36, type = "bytes", count = 20, note = "a TgaHeader" },
+  { name = "image", offset = 56, type = "bytes", count = 24, note = "a TgaImage (+0 never written)" },
+]
+
+# A TGA file's 18-byte header (the u16s little-endian).
+[TgaFile]
+measure = "TgaReader.+32"
+size = 18
+origin = "file"
+fields = [
+  { name = "id_length", offset = 0, type = "u8" },
+  { name = "color_map_type", offset = 1, type = "u8" },
+  { name = "image_type", offset = 2, type = "u8", note = "2 uncompressed true color, 10 RLE" },
+  { name = "color_map_first_lo", offset = 3, type = "u8" },
+  { name = "color_map_first_hi", offset = 4, type = "u8" },
+  { name = "color_map_length_lo", offset = 5, type = "u8" },
+  { name = "color_map_length_hi", offset = 6, type = "u8" },
+  { name = "color_map_depth", offset = 7, type = "u8" },
+  { name = "x_origin_lo", offset = 8, type = "u8" },
+  { name = "x_origin_hi", offset = 9, type = "u8" },
+  { name = "y_origin_lo", offset = 10, type = "u8" },
+  { name = "y_origin_hi", offset = 11, type = "u8" },
+  { name = "width_lo", offset = 12, type = "u8" },
+  { name = "width_hi", offset = 13, type = "u8" },
+  { name = "height_lo", offset = 14, type = "u8" },
+  { name = "height_hi", offset = 15, type = "u8" },
+  { name = "bits_per_pixel", offset = 16, type = "u8" },
+  { name = "descriptor", offset = 17, type = "u8" },
+]
+
+# The TGA header as the reader keeps it (20 bytes; +3 and +9 never written).
+[TgaHeader]
+measure = "TgaHeader"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "id_length", offset = 0, type = "u8" },
+  { name = "color_map_type", offset = 1, type = "u8" },
+  { name = "image_type", offset = 2, type = "u8" },
+  { name = "color_map_first", offset = 4, type = "u16" },
+  { name = "color_map_length", offset = 6, type = "u16" },
+  { name = "color_map_depth", offset = 8, type = "u8" },
+  { name = "x_origin", offset = 10, type = "u16" },
+  { name = "y_origin", offset = 12, type = "u16" },
+  { name = "width", offset = 14, type = "u16" },
+  { name = "height", offset = 16, type = "u16" },
+  { name = "bits_per_pixel", offset = 18, type = "u8" },
+  { name = "descriptor", offset = 19, type = "u8" },
+]
+
+# The decoded TGA image (24 bytes from +4, the reader's +56).
+[TgaImage]
+measure = "TgaImage"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "file", offset = 4, type = "u32", note = "the file's buffer" },
+  { name = "header", offset = 8, type = "ptr", to = "TgaHeader" },
+  { name = "pixels", offset = 12, type = "u32", note = "the file's pixels copied (VirtualAlloc)" },
+  { name = "size", offset = 16, type = "u32", note = "their size in bytes" },
+  { name = "width", offset = 20, type = "u32" },
+  { name = "height", offset = 24, type = "u32" },
+]
+
+# The measure's TGA: the r3 of TGA::ParseHeader (a TgaHeader, its u16s
+# written byte by byte) joined with TGA::Decode's and ToARGB's (a TgaImage).
+# The hand ports use TgaHeader and TgaImage.
+[TgaHeaderOrImage]
+measure = "TGA"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "id_length", offset = 0, type = "u8" },
+  { name = "color_map_type", offset = 1, type = "u8" },
+  { name = "image_type", offset = 2, type = "u8" },
+  { name = "color_map_first", offset = 4, type = "u16" },
+  { name = "color_map_first_hi", offset = 4, type = "u8" },
+  { name = "color_map_first_lo", offset = 5, type = "u8" },
+  { name = "color_map_length", offset = 6, type = "u16" },
+  { name = "color_map_length_hi", offset = 6, type = "u8" },
+  { name = "color_map_length_lo", offset = 7, type = "u8" },
+  { name = "color_map_depth", offset = 8, type = "u8" },
+  { name = "x_origin", offset = 10, type = "u16" },
+  { name = "x_origin_hi", offset = 10, type = "u8" },
+  { name = "x_origin_lo", offset = 11, type = "u8" },
+  { name = "y_origin", offset = 12, type = "u16" },
+  { name = "y_origin_hi", offset = 12, type = "u8" },
+  { name = "y_origin_lo", offset = 13, type = "u8" },
+  { name = "width", offset = 14, type = "u16" },
+  { name = "width_hi", offset = 14, type = "u8" },
+  { name = "width_lo", offset = 15, type = "u8" },
+  { name = "height", offset = 16, type = "u16" },
+  { name = "height_hi", offset = 16, type = "u8" },
+  { name = "height_lo", offset = 17, type = "u8" },
+  { name = "bits_per_pixel", offset = 18, type = "u8" },
+  { name = "descriptor", offset = 19, type = "u8" },
+  { name = "image_file", offset = 4, type = "u32", note = "the image's" },
+  { name = "image_header", offset = 8, type = "u32" },
+  { name = "image_pixels", offset = 12, type = "u32" },
+  { name = "image_size", offset = 16, type = "u32" },
+  { name = "image_width", offset = 20, type = "u32" },
+  { name = "image_height", offset = 24, type = "u32" },
+]
+
+# A decal image the rasterizer samples (16 bytes, raster.h).
+[DecalImage]
+measure = "SoftRaster"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "pixels", offset = 0, type = "u32", note = "ARGB words" },
+  { name = "width", offset = 4, type = "u32" },
+  { name = "height", offset = 8, type = "u32" },
+  { name = "pitch", offset = 12, type = "u32", note = "bytes" },
+]
+
+# The region the rasterizer draws into (12 bytes).
+[DecalRegion]
+measure = "SoftRaster::DrawSpan.r4"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "width", offset = 0, type = "u32" },
+  { name = "height", offset = 4, type = "u32" },
+  { name = "pitch", offset = 8, type = "u32", note = "the sheet's, bytes" },
+]
+
+# The canvas word: the address of the region's first pixel.
+[DecalCanvas]
+measure = "SoftRaster::BlendPixel.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "first_pixel", offset = 0, type = "u32" },
+]
+
+# A vertex's position or texel (two floats in 16 bytes; the other 8 carried
+# along), or a 2D point of Vinyl::DecalCorner's.
+[DecalVertex]
+measures = [
+  "SoftRaster::DrawSpan.r8",
+  "SoftRaster::DrawSpan.r9",
+  "SoftRaster::BlendPixel.r8",
+  "Vinyl::DecalCorner.r4",
+  "Vinyl::DecalCorner.r5",
+  "Vinyl::DecalCorner.r6",
+  "Vinyl::DecalCorner.r8",
+]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "xy", offset = 0, type = "u64" },
+  { name = "zw", offset = 8, type = "u64" },
+]
+
+# A triangle's three positions (16 bytes apart: DecalVertex).
+[DecalTriangle]
+measure = "SoftRaster::DrawTriangle.r5"
+size = 48
+origin = "embedded"
+fields = [
+  { name = "y0", offset = 4, type = "f32" },
+  { name = "y1", offset = 20, type = "f32" },
+  { name = "y2", offset = 36, type = "f32" },
+]
+
+# CarScene::SetUp's 48-byte record: the model set, the second set's pools'
+# counts (pool n's count in the scene's +8, +12, +20, +16, +24, +28, +36,
+# +32) and the load buffer.
+[CarSceneSetUpRecord]
+measure = "CarScene::SetUp.r4"
+size = 48
+origin = "embedded"
+fields = [
+  { name = "model_set", offset = 0, type = "u32", note = "the scene's +4" },
+  { name = "car_models", offset = 4, type = "u32", note = "pool 0's count" },
+  { name = "parts", offset = 8, type = "u32", note = "pool 1's" },
+  { name = "interiors", offset = 12, type = "u32", note = "pool 3's is this + cockpits + traffic" },
+  { name = "cockpits", offset = 16, type = "u32", note = "pool 2's" },
+  { name = "pool4_objects", offset = 20, type = "u32", note = "pool 4's" },
+  { name = "wheels", offset = 24, type = "u32", note = "pool 5's is this + traffic + models" },
+  { name = "models", offset = 28, type = "u32", note = "pool 7's is this + traffic (probably the scene models besides traffic's)" },
+  { name = "traffic", offset = 32, type = "u32", note = "pool 6's" },
+  { name = "load_buffer", offset = 36, type = "u32", note = "0: the archive's shared load buffer" },
+  { name = "load_buffer_size", offset = 40, type = "u32" },
+]
+
+# The first set's wheels (scene pool 5, Wheels::SetUp; docs/known-data.md
+# "car wheels"): 3,280 bytes, vtable 0x82005100 (Wheels::Wheels in
+# scene-loaders.md). The six part models (464 bytes each) are `bytes`; their
+# +48 (the texture provider Wheels::BindTextures sets) named here.
+[CarWheels]
+measure = "Wheels"
+size = 3280
+origin = "allocated"
+vtable = 0x82005100
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82005100 (the pool node's 0x82004F90 while it's built or torn down)" },
+  { name = "state", offset = 16, type = "u32", note = "the pool object's: 3 in use" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool" },
+  { name = "car_model", offset = 24, type = "ptr", to = "CarModel" },
+  { name = "setup", offset = 28, type = "bytes", count = 156, note = "a copy of the 156-byte set-up record" },
+  { name = "type", offset = 28, type = "u32", note = "the record's +0: 3 traffic" },
+  { name = "front_tire_texture", offset = 40, type = "u32", note = "the record's +12: probably the front tire's texture (Wheels::BindTextures)" },
+  { name = "front_wheel", offset = 44, type = "u32", note = "the record's +16: -1 stock, else aftermarket wheel 36 + n" },
+  { name = "unknown_48", offset = 48, type = "f32", note = "the record's +20" },
+  { name = "unknown_52", offset = 52, type = "f32", note = "the record's +24" },
+  { name = "rear_tire_texture", offset = 56, type = "u32", note = "the record's +28" },
+  { name = "rear_wheel", offset = 60, type = "u32", note = "the record's +32" },
+  { name = "unknown_64", offset = 64, type = "f32", note = "the record's +36" },
+  { name = "unknown_68", offset = 68, type = "f32", note = "the record's +40" },
+  { name = "caliper_texture", offset = 116, type = "u32", note = "the record's +88: the calipers' texture (Wheels::SetCaliperTexture)" },
+  { name = "front_tire_aftermarket", offset = 144, type = "u32", note = "the record's +116: 0 tire asset 582, else 584" },
+  { name = "rear_tire_aftermarket", offset = 148, type = "u32" },
+  { name = "tire_slots", offset = 192, type = "bytes", count = 48, note = "the tires' LoadSlots (+192, +216)" },
+  { name = "front_tire_model", offset = 240, type = "bytes", count = 464 },
+  { name = "front_tire_model_provider", offset = 288, type = "u32", note = "the model's +48: the scene + 208" },
+  { name = "rear_tire_model", offset = 704, type = "bytes", count = 464 },
+  { name = "rear_tire_model_provider", offset = 752, type = "u32" },
+  { name = "rim_slots", offset = 1168, type = "bytes", count = 48, note = "the rims' or brakes' LoadSlots" },
+  { name = "front_rim_id", offset = 1168, type = "u32" },
+  { name = "rear_rim_id", offset = 1192, type = "u32" },
+  { name = "front_rim_model", offset = 1216, type = "bytes", count = 464 },
+  { name = "front_rim_model_provider", offset = 1264, type = "u32", note = "the wheels' own provider +2240" },
+  { name = "rear_rim_model", offset = 1680, type = "bytes", count = 464 },
+  { name = "rear_rim_model_provider", offset = 1728, type = "u32", note = "+2260" },
+  { name = "xpr_slots", offset = 2144, type = "bytes", count = 48, note = "the wheels' XPR2 LoadSlots" },
+  { name = "front_xpr_id", offset = 2144, type = "u32", note = "587 + 3 x block, or 695 + 3n" },
+  { name = "rear_xpr_id", offset = 2168, type = "u32" },
+  { name = "xpr_objects", offset = 2192, type = "bytes", count = 48 },
+  { name = "texture_providers", offset = 2240, type = "bytes", count = 40, note = "two TextureProviders (20 bytes each)" },
+  { name = "caliper_slots", offset = 2280, type = "bytes", count = 48, note = "the calipers' LoadSlots (asset 887)" },
+  { name = "rear_caliper_state", offset = 2324, type = "u32", note = "the second slot's state: 2 loading" },
+  { name = "front_caliper_model", offset = 2336, type = "bytes", count = 464 },
+  { name = "front_caliper_model_provider", offset = 2384, type = "u32", note = "the scene + 296" },
+  { name = "rear_caliper_model", offset = 2800, type = "bytes", count = 464 },
+  { name = "rear_caliper_model_provider", offset = 2848, type = "u32" },
+  { name = "traffic", offset = 3264, type = "ptr", to = "CarModelsTrafficIndex", note = "the traffic record (+0 its index)" },
+  { name = "first_set", offset = 3268, type = "ptr", to = "CarModelsFirstSet", note = "the first set of scene pools ([0x826C2E40]): its +8 picks rims (0) or brakes" },
+]
+
+# A deferred release record (20 bytes; DeferRelease): the first set's +52
+# array, 4 x (+40 + +12) of them (ScenePools::CreateA, scene-loaders.md).
+[CarModelsDeferredRelease]
+measure = "ScenePools.+52"
+size = 20
+origin = "allocated"
+fields = [
+  { name = "first", offset = 0, type = "u32", note = "a texture's header (the car model's +6684 the sheet, or +6700 the plate's first)" },
+  { name = "first_data", offset = 4, type = "u32", note = "its pixels" },
+  { name = "second", offset = 8, type = "u32", note = "the car model's +6692 or +6708 (the plate's second texture's header)" },
+  { name = "second_data", offset = 12, type = "u32", note = "+6696 or +6712" },
+  { name = "state", offset = 16, type = "u32", note = "0 free, 2 queued" },
+]
+
+[globals]
+first_set = { address = 0x826C2E40, type = "ptr", note = "the first set of scene pools (ScenePools, scene-loaders.md)" }
+scene = { address = 0x826C2E44, type = "ptr", to = "CarScene", note = "the car scene (its second set): +5056 the shared load buffer, +5060 its size" }
+car_names = { address = 0x826018C8, type = "bytes", count = 180, note = "the cars' names' addresses, by block" }
+vinyl_sheet_width = { address = 0x82602570, type = "u32", note = "1024" }
+vinyl_sheet_height = { address = 0x82602574, type = "u32", note = "1024" }
+vinyl_corner_width = { address = 0x82602578, type = "u32", note = "16: the corner Vinyl::ClearCorner clears" }
+vinyl_corner_rows = { address = 0x8260257C, type = "u32", note = "16" }
+vinyl_regions = { address = 0x82602A50, type = "bytes", count = 160, note = "the sheet's ten regions (16 bytes each: left, top, right, bottom)" }
+plate_slots = { address = 0x82602AF0, type = "bytes", count = 192, note = "MakePlate's slots' rectangles (16 bytes each)" }
+wheel_table = { address = 0x820044B0, type = "bytes", count = 2024, note = "the scene wheels' 44-byte entries, by block (45 + the traffic index for traffic)" }
+archive_buffer_size = { address = 0x826A5130, type = "u32", note = "the archive's shared load buffer's size" }
+archive_buffer = { address = 0x826A5134, type = "u32", note = "the archive's shared load buffer" }
+float_one = { address = 0x82000A30, type = "f32", note = "1.0" }
+float_zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+float_half = { address = 0x82001BE4, type = "f32", note = "0.5" }
+texel_scale = { address = 0x82001FAC, type = "f32", note = "the texel weights' scale" }
+float_tenth = { address = 0x82001FBC, type = "f32", note = "0.1" }
+quarter_turn = { address = 0x82002A50, type = "f32", note = "-pi / 2" }

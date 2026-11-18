@@ -25,26 +25,14 @@ namespace race_menu {
 
 using Calls = race_hud_object::Calls;
 
-// The blocks (globals, VirtualAlloc'ed by Create): the page object (28
-// bytes: +0 the page Draw runs, -1 while a transition runs; +4 the page
-// after it; +8 the page before; +12 the transition Update runs, -1 none;
-// +16 the one queued after it; +20; +24 the transition's set-up done), a
-// second page object (28; Draw runs Back when its +0 is 7) and the menu (68:
-// a front-end menu).
-constexpr uint32_t kPages = 0x826D8404;
-constexpr uint32_t kPages2 = 0x826D8408;
-constexpr uint32_t kMenu = 0x826D840C;
+// The blocks (globals, VirtualAlloc'ed by Create; RaceMenuGlobals in
+// schema/race_menu.h): the page object (a PageObject), a second page object
+// (Draw runs Back when its page is 7) and the menu (a FrontEndMenu).
 
 constexpr uint32_t kMovie = 1;
 constexpr uint32_t kAsset = 22546;
 
-// The machine's words.
-constexpr uint32_t kMachineState = 9604;
-constexpr uint32_t kMachineLoaded = 9608;
-constexpr uint32_t kMachineReenter = 9612;
-constexpr uint32_t kMachineDelete = 9616;
-constexpr uint32_t kPage = 9640;
-
+// The machine's words: schema::RaceMenu (schema/race-menu.toml).
 // The callees by address.
 constexpr uint32_t kVirtualAlloc = 0x82295398;
 constexpr uint32_t kVirtualFree = 0x82295330;
@@ -61,8 +49,6 @@ constexpr uint32_t kSetText = 0x8211C1F8;
 constexpr uint32_t kSetNumberText = 0x8211C740;
 constexpr uint32_t kSetChildNameText = 0x8211D930;
 constexpr uint32_t kScrollText = 0x8211C570;
-// The boot movies' list (boot-mode.md).
-constexpr uint32_t kBootList = 0x826C5BAC;
 
 // --- The machine's handlers (handlers.cpp) ---
 //

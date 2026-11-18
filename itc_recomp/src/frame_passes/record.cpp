@@ -8,6 +8,7 @@
 
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "schema/frame_passes.h"
 
 namespace frame_passes {
 
@@ -88,23 +89,25 @@ constexpr Add kAdds[] = {
 
 bool Record(uint8_t* base, uint32_t passes, uint32_t frame, const RecordCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82096418 FramePasses::Record");
-  const uint32_t scene = calls.vcall(guest::LoadU32(base, passes + 4), 12, 0x82096440);
+  const schema::FramePasses p(base, passes);
+  const uint32_t scene = calls.vcall(p.services().address, 12, 0x82096440);
   const uint32_t list = calls.vcall(scene, 4, 0x82096454);
   const uint32_t queue = calls.vcall(scene, 8, 0x8209646C);
   // Declined (the original then) where a chunk is open, the list hasn't
   // room for every slot, or this's slots 5 and 6 aren't the recorders.
-  const uint32_t vtable = guest::LoadU32(base, passes);
+  const auto vtable = p.vtable();
   if (guest::LoadU8(base, list + 52) != 0 ||
       guest::LoadU32(base, command_list::kOpenChunks) != 0 ||
       uint64_t(guest::LoadU32(base, list + 12)) + record::kSlots >= guest::LoadU32(base, list + 8) ||
-      guest::LoadU32(base, vtable + 20) != kRecordConstants ||
-      guest::LoadU32(base, vtable + 24) != kRecordSamplers) {
+      vtable.slot_5_record_constants() != kRecordConstants ||
+      vtable.slot_6_record_samplers() != kRecordSamplers) {
     return false;
   }
   // The render queue's sort keys.
-  guest::StoreU32(base, 0x8296B90C, 168);
-  guest::StoreU32(base, 0x8296B900, 270);
-  guest::StoreU32(base, 0x8296B908, 163);
+  using G = schema::FramePassesGlobals;
+  G::set_sort_key_group0(base, 168);
+  G::set_sort_key_group1(base, 270);
+  G::set_sort_key_depth(base, 163);
   command_list::OpenChunk(base, list);
   record::Recorder r{base, list, passes, frame, {}};
   r.heads.reserve(18);

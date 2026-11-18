@@ -3,11 +3,12 @@
 # (a function's address), bytes (with `count`). `measure` is the type's
 # name in tools/type_map.py's tables.
 
-# The front-end menu (68 bytes, docs/known-data.md): stepped by Menu::Step
+# The front-end menu (68 bytes, docs/known-data.md; the measure's "Menu" is
+# every menu Menu::Step, Menu::Pressed and Menu::StepList are given): stepped by Menu::Step
 # (sub_82186568) and read by Menu::Pressed (sub_821864C8); every front-end
 # screen keeps one or more.
 [FrontEndMenu]
-measures = ["new<68>@Type2Dialog::OnEnter", "new<68>@Type12Screen7::Create"]
+measures = ["Menu", "new<68>@Type2Dialog::OnEnter", "new<68>@Type12Screen7::Create"]
 size = 68
 origin = "allocated"
 fields = [
@@ -21,13 +22,13 @@ fields = [
   { name = "left_right_steps", offset = 28, type = "u32" },
   { name = "shoulders_step", offset = 32, type = "u32" },
   { name = "side", offset = 36, type = "s32", note = "-1 or 1 when left or right was asked" },
-  { name = "unknown_40", offset = 40, type = "u32" },
-  { name = "unknown_44", offset = 44, type = "u32" },
-  { name = "unknown_48", offset = 48, type = "u32" },
-  { name = "unknown_52", offset = 52, type = "u32" },
-  { name = "unknown_56", offset = 56, type = "u32" },
-  { name = "unknown_60", offset = 60, type = "u32" },
-  { name = "player", offset = 64, type = "u32", note = "probably the player: the mapper entry's index" },
+  { name = "wrapped", offset = 40, type = "u32", note = "1 when the last Menu::Step wrapped" },
+  { name = "list_wrapped", offset = 44, type = "u32", note = "1 when the last Menu::StepList wrapped (probably; tuning-pages.md)" },
+  { name = "visible_row", offset = 48, type = "u32", note = "the visible row, kept within first_row to rows_shown - 1 (probably)" },
+  { name = "previous_row", offset = 52, type = "u32", note = "the row before the last up or down step (probably)" },
+  { name = "first_row", offset = 56, type = "u32", note = "probably" },
+  { name = "rows_shown", offset = 60, type = "u32", note = "8 where seen (probably)" },
+  { name = "player", offset = 64, type = "u32", note = "the player: an index into [0x826BABA4], then the mapper entry at 0x826BAB80" },
 ]
 
 # The page object (28 bytes): a front-end screen's pages and steps, made by

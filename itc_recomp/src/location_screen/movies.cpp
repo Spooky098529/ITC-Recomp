@@ -6,11 +6,15 @@
 #include "base/log.h"
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/location_screen.h"
+#include "schema/menu_helpers.h"
 #include "ui_movies/game.h"
 
 namespace location_screen {
 
 namespace {
+
+using G = schema::LocationScreenGlobals;
 
 // The movie with id `id`: the id stored at the frame's +80, then
 // UiMovies::Find over the movie table, as the original.
@@ -82,7 +86,7 @@ uint32_t SetCarColor(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8222AC18 LocationScreen::SetCarColor");
   const uint32_t movie = FindMovie(base, sp - 96, kMenusMovie);
   const uint32_t color =
-      int32_t(guest::LoadU32(base, guest::LoadU32(base, kScreen) + 892)) == 1 ? 2 : 0;
+      int32_t(G::screen(base).special_car()) == 1 ? 2 : 0;
   const uint32_t node = ui_movies::FindNode(base, movie, 9, 7);
   ui_movies::SetColor(base, node, color);
   return node;
@@ -101,13 +105,13 @@ uint32_t ListNode(uint8_t* base, uint32_t sp, uint32_t value) {
 uint32_t ShowArrows(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8222C0C8 LocationScreen::ShowArrows");
   const uint32_t movie = FindMovie(base, sp - 112, kMenusMovie);
-  const uint32_t screen = guest::LoadU32(base, kScreen);
-  const int32_t count = int32_t(guest::LoadU32(base, screen + 808));
+  const schema::LocationScreen screen = G::screen(base);
+  const int32_t count = int32_t(screen.opponent_count());
   if (count == 1) {
     HideNode(base, movie, 0xFFFFFFFFu, 17);
     return HideNode(base, movie, 0xFFFFFFFFu, 18);
   }
-  const int32_t picked = int32_t(guest::LoadU32(base, screen + 800));
+  const int32_t picked = int32_t(screen.picked_opponent());
   if (picked == 0) {
     ShowNode(base, movie, 0xFFFFFFFFu, 18);
     return HideNode(base, movie, 0xFFFFFFFFu, 17);
@@ -152,7 +156,7 @@ uint32_t Transition18(uint8_t* base, uint32_t sp, uint32_t step, const RunCall& 
   if (uint32_t(run.run(run.user, card, 0, 128, 0x8222BEF4)) != 0) {
     return 0;
   }
-  guest::StoreU32(base, guest::LoadU32(base, kConfirmMenu) + 24, 0);
+  G::confirm_menu(base).set_up_down_locked(0);
   return 1;
 }
 

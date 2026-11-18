@@ -12,21 +12,7 @@
 
 namespace data_load {
 
-// .rdata's floats the constructors load with lfs and store with stfs.
-constexpr uint32_t kOneFloat = 0x82000A30;   // 1.0
-constexpr uint32_t kZeroFloat = 0x82000A34;  // 0.0
-
-// --- The save defaults' bit sets ---
-
-constexpr uint32_t kDefaultsBase = 0x826C4064;  // the last set, and Defaults::Init's r3
-constexpr uint32_t kTable3044 = 0x826C3044;     // 15 words
-constexpr uint32_t kSets3080 = 0x826C3080;      // 48 sets of 15 words, 60 bytes apart
-constexpr uint32_t kTable3C24 = 0x826C3C24;     // 7 words
-constexpr uint32_t kTable50A8 = 0x826C50A8;     // 15 words
-constexpr uint32_t kTable50E4 = 0x826C50E4;     // 7 words
-// Everything Defaults::Init writes: 0x826C3044 to 0x826C5100.
-constexpr uint32_t kDefaultsFirst = kTable3044;
-constexpr uint32_t kDefaultsBytes = kTable50E4 + 28 - kTable3044;
+// --- The save defaults' bit sets (schema/data_load.h's globals) ---
 
 // sub_820CCD10 Bits224::Fill: the 7 words at `set` cleared, then bits 0-198
 // set.
@@ -64,7 +50,6 @@ uint32_t Record5232Construct(uint8_t* base, uint32_t record);
 // --- The session's objects ---
 
 constexpr uint32_t kRaceDataBytes = 0xA3B00;
-constexpr uint32_t kRaceDataSlot = 0x826C5B2C;
 
 // sub_82102208 RaceData::Create: 0xA3B00 bytes (operator new's plain C++)
 // and, when not null, RaceData::RaceData (race_setup's plain C++); the block,
@@ -74,9 +59,7 @@ constexpr uint32_t kRaceDataSlot = 0x826C5B2C;
 std::optional<uint32_t> RaceDataCreate(uint8_t* base);
 
 constexpr uint32_t kInputRecordingsBytes = 0x2225C0;
-constexpr uint32_t kInputRecordingsSlot = 0x826C5B4C;
 constexpr uint32_t kReplayBytes = 0x13C8F0;
-constexpr uint32_t kReplaySlot = 0x826C5B50;
 
 // sub_821054A8 InputRecordings::InputRecordings: Record5232 on seven records
 // from +0x20FE90 and seven from +0x2196A0. Returns `block`.
@@ -97,8 +80,6 @@ std::optional<uint32_t> ReplayCreate(uint8_t* base);
 
 // The two static objects with Replay::Create's layout (C runtime static
 // set-ups, no direct callers: _cinit's initializer tables, once at boot).
-constexpr uint32_t kStaticReplayA = 0x826D8520;  // its records from +0x2BF10
-constexpr uint32_t kStaticReplayB = 0x82816E50;
 constexpr uint32_t kStaticReplayAExit = 0x825DB170;  // their clean-ups
 constexpr uint32_t kStaticReplayBExit = 0x825DB1B0;
 // sub_825D9E60 Replay826D8520::StaticInit (0x826D8520, clean-up 0x825DB170)
@@ -113,14 +94,6 @@ int32_t StaticReplayBInit(uint8_t* base, const c_runtime::AtexitCall& call);
 // --- The two UI movie sets (the loading screen's and another) ---
 
 constexpr uint32_t kMovieBytes = 40976;
-constexpr uint32_t kLoadingMovies = 0x82815E68;  // the list; its count at +64
-constexpr uint32_t kLoadingShown = 0x82815E60;
-constexpr uint32_t kOtherMovies = 0x82816610;    // the list; its count at +64
-constexpr uint32_t kOtherMovieIds = 0x82638134;  // three asset ids
-constexpr uint32_t kOtherWords = 0x828165D0;     // nine words
-constexpr uint32_t kOtherWord8600 = 0x82816600;
-constexpr uint32_t kOtherWord8130 = 0x82638130;
-constexpr uint32_t kRenderApp = 0x826BABA0;
 
 // What the movie sets call: UiMovie::UiMovie (its plain C++, the original
 // where it hands back; r3 the movie), Archive::Load, and the renderer's
@@ -155,8 +128,6 @@ uint32_t OtherMoviesLoad(uint8_t* base, const MovieAdd& add,
                          const std::function<uint32_t(int which)>& render_object);
 
 // --- The load ---
-
-constexpr uint32_t kLoaded = 0x826C5B8C;  // BootData::Load's once flag
 
 // A callee through its adapter (a guest call from the original's frame with
 // its return address; r3 when given): its r3.

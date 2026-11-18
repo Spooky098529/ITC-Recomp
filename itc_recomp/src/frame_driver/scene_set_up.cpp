@@ -9,6 +9,7 @@
 #include "command_list/command_list.h"
 #include "frame_driver/frame_driver.h"
 #include "graphics/video_output.h"
+#include "schema/frame_driver.h"
 
 #include <bit>
 
@@ -95,9 +96,7 @@ constexpr Float4Of kDefaults[] = {
     {0x8296BCD0, {kOne, kOne, kOne, kOne}},
 };
 
-constexpr uint32_t kWorkMem = 0x8296B780;
-constexpr uint32_t kDeclarationElements = 0x8265EBE4;  // the original's r29
-constexpr uint32_t kDeclarations = 0x8296B780;         // the original's r31
+using G = schema::FrameDriverGlobals;
 
 }  // namespace
 
@@ -140,8 +139,8 @@ uint32_t CommandListInit(uint8_t* base, uint32_t list, uint32_t slots,
 
 void ColorRectSetTargets(uint8_t* base, uint32_t queue, uint32_t list) {
   ITC_NATIVE_RUNNING("sub_82178B28 ColorRect::SetTargets");
-  Store(base, 0x826D83D0, queue);
-  Store(base, 0x826D83D4, list);
+  G::set_color_rect_queue(base, queue);
+  G::set_color_rect_list(base, list);
 }
 
 void DrawGlobalsInit(uint8_t* base, uint32_t capacity, uint32_t count,
@@ -153,7 +152,7 @@ void DrawGlobalsInit(uint8_t* base, uint32_t capacity, uint32_t count,
     // The identity matrix.
     for (uint32_t row = 0; row < 4; row++) {
       for (uint32_t lane = 0; lane < 4; lane++) {
-        Store(base, 0x8265ECA0 + 16 * row + 4 * lane, row == lane ? 0x3F800000u : 0);
+        Store(base, G::identity_matrix_address() + 16 * row + 4 * lane, row == lane ? 0x3F800000u : 0);
       }
     }
     for (const Float4Of& f : kDefaults) {
@@ -165,15 +164,16 @@ void DrawGlobalsInit(uint8_t* base, uint32_t capacity, uint32_t count,
       }
     }
     // The declarations: table k's element pointers at 0x8265EBE4 - 280 +
-    // 28k, its declarations at 0x8296B780 + 340 - 28k, seven each.
+    // 28k, its declarations at 0x8296B780 + 340 - 28k (0x8296B7BC + 28 x
+    // (10 - k)), seven each.
     static constexpr uint32_t kReturns[11] = {0x82589FAC, 0x82589FC4, 0x82589FDC, 0x82589FF4,
                                               0x8258A00C, 0x8258A024, 0x8258A03C, 0x8258A054,
                                               0x8258A06C, 0x8258A080, 0x8258A094};
     for (uint32_t i = 0; i < 28; i += 4) {
       calls.set_register(30, i);
       for (uint32_t k = 0; k < 11; k++) {
-        const uint32_t elements = Load(base, kDeclarationElements - 280 + 28 * k + i);
-        Store(base, kDeclarations + 340 - 28 * k + i,
+        const uint32_t elements = Load(base, G::declaration_elements_address() + 28 * k + i);
+        Store(base, G::declarations_address() + 28 * (10 - k) + i,
               calls.create_declaration(elements, kReturns[k]));
       }
     }
@@ -186,39 +186,41 @@ void DrawGlobalsInit(uint8_t* base, uint32_t capacity, uint32_t count,
       }
     }
     // The work memory.
-    Store(base, kWorkMem + 48, capacity);
-    Store(base, kWorkMem + 40, calls.alloc_physical(capacity, 0x8258A8FC));
-    Store(base, kWorkMem + 44, calls.alloc_physical(Load(base, kWorkMem + 48), 0x8258A918));
-    Store(base, kWorkMem + 20, count);
-    Store(base, kWorkMem + 32, 0);
-    Store(base, kWorkMem + 24, 0);
-    Store(base, kWorkMem + 36, 0);
-    Store(base, kWorkMem + 28, 0);
+    G::set_work_capacity(base, capacity);
+    Store(base, G::work_start_address() + 0, calls.alloc_physical(capacity, 0x8258A8FC));
+    Store(base, G::work_start_address() + 4,
+          calls.alloc_physical(G::work_capacity(base), 0x8258A918));
+    G::set_work_count(base, count);
+    Store(base, G::work_bytes_used_address() + 0, 0);
+    Store(base, G::work_headers_used_address() + 0, 0);
+    Store(base, G::work_bytes_used_address() + 4, 0);
+    Store(base, G::work_headers_used_address() + 4, 0);
     if (count != 0) {
-      Store(base, kWorkMem + 12, calls.alloc_virtual(count << 6, 0x8258A944));
-      Store(base, kWorkMem + 16, calls.alloc_virtual(Load(base, kWorkMem + 20) << 6, 0x8258A954));
+      G::set_work_virtual0(base, calls.alloc_virtual(count << 6, 0x8258A944));
+      G::set_work_virtual1(base, calls.alloc_virtual(G::work_count(base) << 6, 0x8258A954));
     }
-    Store(base, kWorkMem + 4, 0);
-    Store(base, kWorkMem + 8, 0);
-    StoreFloatOf(base, 0x8265ED20, 0x82001FCC);
-    StoreFloatOf(base, 0x8265ED24, 0x82002814);
-    Store(base, kWorkMem + 0, 0);
-    StoreFloatOf(base, 0x8265ED28, 0x82002CC4);
-    StoreFloatOf(base, 0x8265ED2C, kOne);
-    Store(base, 0x8296B90C, 0);
-    Store(base, 0x8296B900, 1);
-    StoreFloatOf(base, 0x8265ED30, kZero);
-    StoreFloatOf(base, 0x8265ED34, kZero);
-    StoreFloatOf(base, 0x8265ED38, kZero);
-    StoreFloatOf(base, 0x8265ED3C, kC01BE4);
+    Store(base, G::work_cleared_address() + 0, 0);
+    Store(base, G::work_cleared_address() + 4, 0);
+    const uint32_t defaults = G::draw_defaults_address();
+    StoreFloatOf(base, defaults + 0, 0x82001FCC);
+    StoreFloatOf(base, defaults + 4, 0x82002814);
+    G::set_work_buffer(base, 0);
+    StoreFloatOf(base, defaults + 8, 0x82002CC4);
+    StoreFloatOf(base, defaults + 12, kOne);
+    G::set_sort_key_a(base, 0);
+    G::set_sort_key_b(base, 1);
+    StoreFloatOf(base, defaults + 16, kZero);
+    StoreFloatOf(base, defaults + 20, kZero);
+    StoreFloatOf(base, defaults + 24, kZero);
+    StoreFloatOf(base, defaults + 28, kC01BE4);
   });
 }
 
 uint32_t PrimitiveDeclInit(uint8_t* base, const SceneSetUpCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82591858 PrimitiveDecl::Init");
   calls.in_frame(96, 0x82591870, [&](uint32_t) {
-    Store(base, 0x82970BC8, calls.create_declaration(0x8206CBB4, 0x82591870));
-    Store(base, 0x82970BDC, 1);
+    G::set_primitive_declaration(base, calls.create_declaration(0x8206CBB4, 0x82591870));
+    G::set_primitive_declaration_ready(base, 1);
   });
   return 1;
 }
@@ -229,19 +231,22 @@ uint32_t SceneConstruct(uint8_t* base, uint32_t scene, uint32_t block, uint32_t 
   namespace vo = graphics::video_output;
   constexpr uint32_t kDelegateVtable = 0x82002850;
   constexpr uint32_t kFunctorBase = 0x82000ABC;
-  const uint32_t list = scene + kSceneCommandList;
-  const uint32_t queue = scene + kSceneRenderQueue;
+  const schema::AppScene s(base, scene);
+  const schema::AppSceneInitBlock init(base, block);
+  const uint32_t list = s.command_list_address();
+  const uint32_t queue = s.render_queue_address();
   calls.set_register(31, scene);
   calls.set_register(29, list);
   calls.set_register(28, block);
-  Store(base, scene + 0, 0x82000F3C);
+  s.set_vtable(schema::AppScene::kVtable);
   command_list::Construct(base, list);
   calls.set_register(30, queue);
   calls.render_queue_construct(queue);
-  const uint32_t interface = Load(base, block + 4);
-  Store(base, scene + 4, interface);
+  const uint32_t interface = init.framework_interface().address;
+  s.set_framework_interface(interface);
   const uint32_t driver = calls.vcall(interface, 4, 0, 0, 0x82098AE8);
-  const uint32_t getter = Load(base, Load(base, driver) + 12);
+  const uint32_t getter =
+      schema::FrameDriverInterface(base, driver).vtable().get_video_output();
   const uint32_t video_output = getter == kGetVideoOutput
                                     ? GetVideoOutput(driver)
                                     : calls.vcall(driver, 12, 0, 0, 0x82098AF8);
@@ -251,18 +256,19 @@ uint32_t SceneConstruct(uint8_t* base, uint32_t scene, uint32_t block, uint32_t 
   calls.vcall(queue, 0, Load(base, frame + 80), 0, 0x82098B2C);
   ColorRectSetTargets(base, queue, list);
   DrawGlobalsInit(base, 0x200000, 16384, calls);
-  Store(base, 0x8296B918, list);
-  Store(base, 0x8296B91C, queue);
+  G::set_scene_list(base, list);
+  G::set_scene_queue(base, queue);
   PrimitiveDeclInit(base, calls);
-  Store(base, 0x82970BD8, list);
-  Store(base, 0x82970BD4, queue);
+  G::set_scene_list_2(base, list);
+  G::set_scene_queue_2(base, queue);
   vo::UnlockDevice(base, video_output, frame + 80);
   // Scene::Draw as the frame driver's listener 1.
   Store(base, frame + 92, scene);
   Store(base, frame + 88, kDelegateVtable);
   Store(base, frame + 96, 0x82098940);
   Store(base, frame + 84, 1);
-  const uint32_t listener_driver = calls.vcall(Load(base, scene + 4), 4, 0, 0, 0x82098BB4);
+  const uint32_t listener_driver =
+      calls.vcall(s.framework_interface().address, 4, 0, 0, 0x82098BB4);
   calls.vcall(listener_driver, 4, frame + 84, frame + 88, 0x82098BCC);
   // Scene::Update as tick handler 18; the first delegate destroyed.
   Store(base, frame + 88, kFunctorBase);
@@ -270,14 +276,14 @@ uint32_t SceneConstruct(uint8_t* base, uint32_t scene, uint32_t block, uint32_t 
   Store(base, frame + 108, scene);
   Store(base, frame + 112, 0x820988C8);
   Store(base, frame + 84, 18);
-  calls.vcall(Load(base, block + 0), 8, frame + 84, frame + 104, 0x82098C18);
+  calls.vcall(init.run_loop().address, 8, frame + 84, frame + 104, 0x82098C18);
   // Scene::OnEvent5 as the listener for event 5; the second destroyed.
   Store(base, frame + 124, scene);
   Store(base, frame + 104, kFunctorBase);
   Store(base, frame + 120, kDelegateVtable);
   Store(base, frame + 128, 0x820989A8);
   Store(base, frame + 84, 5);
-  calls.vcall(Load(base, block + 0), 4, frame + 84, frame + 120, 0x82098C64);
+  calls.vcall(init.run_loop().address, 4, frame + 84, frame + 120, 0x82098C64);
   return scene;
 }
 

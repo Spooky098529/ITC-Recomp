@@ -1,0 +1,59 @@
+# The schema of docs/functions/options-load-save.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The options screen's load page (category 5, page 9) and save page
+# (category 6, page 10): each runs a sub-page from a block of its own,
+# VirtualAlloced by Options::OnEnter (sub_821BB9A8), laid out as the
+# options' page block (the front-end screens' PageObject, menu-helpers.toml).
+# The settings block [0x826D8478] (the dialogs' words +620 to +712), the
+# options' page block [0x826D8470] and the dialog's menu [0x826D8484] are
+# options-screen.md's.
+#
+# Measure fault (tools/type_map.py), not claimed: "new<68>@Options::OnEnter#2.+4"
+# is the global 0x826D8484 read as -31612 off a register holding 0x826E0000
+# (lis), taken for the dialog menu's +4.
+
+# A save page's sub-page block (28 bytes): [0x826D847C] page 9's (the load,
+# 7 sub-pages), [0x826D8488] page 10's (the save, 6).
+[OptionsSubPageBlock]
+measures = ["new<28>@Options::OnEnter#2", "new<28>@Options::OnEnter#4"]
+size = 28
+origin = "allocated"
+# 7 functions; areas: front-end-screen-helpers.md, options-load-save.md, options-screen.md
+fields = [
+  { name = "page", offset = 0, type = "u32", note = "the sub-page: 0 the device check, 1 the question, 2 a note, 3 the wait, 4 the close, 5 the cancel's, 6 the device's answer (load only)" },
+  { name = "next_page", offset = 4, type = "u32", note = "the page after the step (the options' page block layout)" },
+  { name = "previous_page", offset = 8, type = "u32", note = "the sub-page before, set unless the same" },
+  { name = "step", offset = 12, type = "u32", note = "-1 here" },
+  { name = "queued_step", offset = 16, type = "u32", note = "-1 here" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "step_started", offset = 24, type = "u32", note = "the step's started word" },
+]
+
+# The step's started word LoadPage::Leave and SavePage::Leave are given (r3):
+# the options' page block's +24.
+[OptionsLeaveStarted]
+measures = ["LoadPage", "SavePage"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "started", offset = 0, type = "u32", note = "0 on the leave step's first pass, then 1" },
+]
+
+# The game data's buffer SaveBuffers::Create allocates (the save buffers'
+# header [0x828161F0] +0), the save data's layout (career.toml's CareerSave):
+# a good load is copied into player 0's save data (0x1F978 bytes).
+[OptionsLoadedGameData]
+measure = "new<129400>@SaveBuffers::Create"
+size = 129400
+origin = "allocated"
+fields = [
+  { name = "garage_count", offset = 6328, type = "u16", note = "the garage list's count; 0 is kind 12's note (probably not the game's data)" },
+]
+
+[globals]
+load_pages = { address = 0x826D847C, type = "ptr", to = "OptionsSubPageBlock", note = "page 9's (the load's) sub-page block" }
+save_pages = { address = 0x826D8488, type = "ptr", to = "OptionsSubPageBlock", note = "page 10's (the save's) sub-page block" }

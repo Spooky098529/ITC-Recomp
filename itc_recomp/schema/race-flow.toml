@@ -1,0 +1,17 @@
+# The schema of docs/functions/race-flow.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The race flow (RaceFlow::Init, src/race_flow/): no object of its own. The
+# race flow itself (the race mode's +97548, the measure's RaceFlow: a
+# StateMachine, game-modes.toml, with +9608 the flags and +9612, +9616 the
+# human cars' players) is touched most by the racer controllers' handlers,
+# so it is racer-controllers.toml's to describe. Init's transitions are
+# built in its own stack frame (not an object) and added by
+# StateMachine::Add. It reads the race data's kind ([0x826C5B2C] +0xA3AF0,
+# the measure's Racers, described by the area owning it).
+
+[globals]
+race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (a pointer): +0xA3AF0 the kind of race (6: both human cars' players 0)" }

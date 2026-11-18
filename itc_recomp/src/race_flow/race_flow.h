@@ -11,12 +11,13 @@
 
 namespace race_flow {
 
-// The machine's words.
-constexpr uint32_t kState = 9604;    // the state (1 at set-up)
+// The machine's words past StateMachine's (the state, +9604, is
+// schema::StateMachine's; these are the racer controllers' RaceFlow type's
+// to name, racer-controllers.toml).
 constexpr uint32_t kFlags = 9608;    // 0 at set-up; bit 0x1 set by OnSetUp
 constexpr uint32_t kPlayers = 9612;  // the human cars' players (+9612, +9616)
-// The race data's pointer and its kind.
-constexpr uint32_t kRaceData = 0x826C5B2C;
+// The race data's kind (the race data, [0x826C5B2C], is
+// schema::RaceFlowGlobals::race_data; its type is another area's).
 constexpr uint32_t kRaceKind = 0xA3AF0;
 
 // RaceFlow::Init's frame (its r1 less this).

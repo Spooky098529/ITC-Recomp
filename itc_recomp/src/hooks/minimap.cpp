@@ -18,6 +18,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/scenery_lists.h"
 #include "minimap/minimap.h"
+#include "schema/minimap.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_minimap, true, "ITC",
@@ -132,13 +133,13 @@ ITC_REGS_STEP(MinimapTriangleRecordFlat) {
   const uint64_t lr = ctx.lr;
   guest_call::InFrame(ctx, base, minimap::kRecordFlatFrame, 0x8217C4B8, [&](uint32_t) {
     // The render queue's slot 4 (sub_8258EDC8 in play): r4 = the chunk, r5 =
-    // the key, f1 = 0.0 (0x82000A34).
-    const uint32_t queue = guest::LoadU32(base, minimap::kTriangleLists);
+    // the key, f1 = 0.0.
+    const uint32_t queue = schema::MinimapGlobals::triangle_queue(base);
     ctx.r3.u64 = queue;
     ctx.r4.u64 = *chunk;
     ctx.r5.u64 = key;
     ctx.fpscr.disableFlushMode();
-    ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
+    ctx.f1.f64 = double(schema::MinimapGlobals::zero(base));
     lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
   });
   ctx.lr = lr;

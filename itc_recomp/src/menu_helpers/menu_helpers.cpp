@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "debug/pause_menu_log.h"
 #include "guest.h"
+#include "schema/menu_helpers.h"
 
 namespace menu_helpers {
 
@@ -14,13 +15,7 @@ namespace {
 
 int32_t S(uint32_t value) { return int32_t(value); }
 
-uint32_t Word(uint8_t* base, uint32_t menu, uint32_t field) {
-  return guest::LoadU32(base, menu + field);
-}
-
-void SetWord(uint8_t* base, uint32_t menu, uint32_t field, uint32_t value) {
-  guest::StoreU32(base, menu + field, value);
-}
+using Menu = schema::FrontEndMenu;
 
 // The mapper's read slot at `offset` in its vtable on `action`, as the
 // original's bctrl from `frame` returning to `lr`: ActionMapper::Pressed's
@@ -54,7 +49,8 @@ bool Try(uint8_t* base, uint32_t entry, uint32_t offset, uint64_t action, uint32
 
 // The cursor moved by `delta` (read again, as the original's lwz, addi, stw).
 void MoveCursor(uint8_t* base, uint32_t menu, int32_t delta) {
-  SetWord(base, menu, kCursor, Word(base, menu, kCursor) + uint32_t(delta));
+  const Menu m(base, menu);
+  m.set_cursor(m.cursor() + uint32_t(delta));
 }
 
 struct Read {
@@ -67,16 +63,17 @@ struct Read {
 
 uint32_t Step(uint8_t* base, uint32_t menu, uint32_t sp, bool native_slots, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82186568 Menu::Step");
+  const Menu m(base, menu);
   const uint32_t frame = sp - 128;
   guest::StoreU32(base, frame, sp);
   // The original's order: the player, the cursor and +24 loaded, the
   // player's entry index, then +4 and +36 stored.
-  const uint32_t player = Word(base, menu, kPlayer);
-  const uint32_t cursor = Word(base, menu, kCursor);
-  const uint32_t locked = Word(base, menu, kUpDownLocked);
+  const uint32_t player = m.player();
+  const uint32_t cursor = m.cursor();
+  const uint32_t locked = m.up_down_locked();
   const uint32_t index = guest::LoadU32(base, player * 4 + kControllerEntries);
-  SetWord(base, menu, kPrevious, cursor);
-  SetWord(base, menu, kSide, 0);
+  m.set_previous(cursor);
+  m.set_side(0);
   const uint32_t entry = index * 8 + kMapperEntries;
 
   // (1) Up and down (and the side asked), the first fired wins.
@@ -95,9 +92,9 @@ uint32_t Step(uint8_t* base, uint32_t menu, uint32_t sp, bool native_slots, cons
       if (Try(base, entry, move.read.offset, move.read.action, frame, move.read.lr, native_slots,
               calls)) {
         if (move.kind == 2) {
-          SetWord(base, menu, kSide, uint32_t(-1));
+          m.set_side(-1);
         } else if (move.kind == 3) {
-          SetWord(base, menu, kSide, 1);
+          m.set_side(1);
         } else {
           MoveCursor(base, menu, move.kind);
         }
@@ -109,18 +106,18 @@ uint32_t Step(uint8_t* base, uint32_t menu, uint32_t sp, bool native_slots, cons
   // (2) Left and right step the cursor; (3) the shoulder buttons, pressed
   // or fired.
   struct Steps {
-    uint32_t field;
+    uint32_t (Menu::*field)() const;  // the word that turns the steps on
     Read reads[4];
     int deltas[4];
   };
   static constexpr Steps kSteps[] = {
-      {kSidesStep,
+      {&Menu::left_right_steps,
        {{kFiredOffset, 155, 0x82186778},
         {kFiredOffset, 169, 0x821867A4},
         {kFiredOffset, 156, 0x821867D0},
         {kFiredOffset, 170, 0x821867FC}},
        {-1, -1, 1, 1}},
-      {kShouldersStep,
+      {&Menu::shoulders_step,
        {{kPressedOffset, 161, 0x8218684C},
         {kFiredOffset, 161, 0x82186878},
         {kPressedOffset, 162, 0x821868A4},
@@ -128,7 +125,7 @@ uint32_t Step(uint8_t* base, uint32_t menu, uint32_t sp, bool native_slots, cons
        {-1, -1, 1, 1}},
   };
   for (const Steps& steps : kSteps) {
-    if (Word(base, menu, steps.field) == 0) {
+    if ((m.*steps.field)() == 0) {
       continue;
     }
     for (int k = 0; k < 4; k++) {
@@ -141,55 +138,56 @@ uint32_t Step(uint8_t* base, uint32_t menu, uint32_t sp, bool native_slots, cons
   }
 
   // Wrapped or clamped between the first and the last item.
-  if (Word(base, menu, kWraps) != 0) {
-    const int32_t now = S(Word(base, menu, kCursor));
-    const int32_t first = S(Word(base, menu, kFirst));
+  if (m.wraps() != 0) {
+    const int32_t now = S(m.cursor());
+    const int32_t first = S(m.first_item());
     uint32_t wrapped;
     if (now < first) {
       wrapped = 1;
     } else {
-      wrapped = now > S(Word(base, menu, kLast)) ? 1 : 0;
+      wrapped = now > S(m.last_item()) ? 1 : 0;
     }
-    SetWord(base, menu, kWrapped, wrapped);
+    m.set_wrapped(wrapped);
     int32_t result = now;
     if (now < first) {
-      result = S(Word(base, menu, kLast));
-    } else if (now > S(Word(base, menu, kLast))) {
+      result = S(m.last_item());
+    } else if (now > S(m.last_item())) {
       result = first;
     }
-    SetWord(base, menu, kCursor, uint32_t(result));
+    m.set_cursor(uint32_t(result));
   } else {
-    const int32_t now = S(Word(base, menu, kCursor));
-    const int32_t first = S(Word(base, menu, kFirst));
-    SetWord(base, menu, kWrapped, 0);
+    const int32_t now = S(m.cursor());
+    const int32_t first = S(m.first_item());
+    m.set_wrapped(0);
     int32_t result = now;
     if (now < first) {
       result = first;
     } else {
-      const int32_t last = S(Word(base, menu, kLast));
+      const int32_t last = S(m.last_item());
       if (now > last) {
         result = last;
       }
     }
-    SetWord(base, menu, kCursor, uint32_t(result));
+    m.set_cursor(uint32_t(result));
   }
 
   // Which way it moved since the start.
-  const int32_t now = S(Word(base, menu, kCursor));
-  const int32_t before = S(Word(base, menu, kPrevious));
-  SetWord(base, menu, kMoved, now > before ? 1u : now < before ? uint32_t(-1) : 0u);
-  return Word(base, menu, kMoved);
+  const int32_t now = S(m.cursor());
+  const int32_t before = S(m.previous());
+  m.set_moved(now > before ? 1u : now < before ? uint32_t(-1) : 0u);
+  return m.moved();
 }
 
 uint32_t Pressed(uint8_t* base, uint32_t menu, uint64_t action, uint32_t sp, bool native_slots,
                  const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821864C8 Menu::Pressed");
+  const Menu m(base, menu);
   const uint32_t frame = sp - 96;
   guest::StoreU32(base, frame, sp);
-  if (Word(base, menu, kMoved) != 0 || Word(base, menu, kSide) != 0) {
+  if (m.moved() != 0 || m.side() != 0) {
     return 0;
   }
-  const uint32_t player = Word(base, menu, kPlayer);
+  const uint32_t player = m.player();
   const uint32_t index = guest::LoadU32(base, player * 4 + kControllerEntries);
   const uint32_t entry = index * 8 + kMapperEntries;
   return Try(base, entry, kPressedOffset, action, frame, 0x82186540, native_slots, calls) ? 1 : 0;

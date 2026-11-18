@@ -5,6 +5,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/achievements.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace achievements {
@@ -45,9 +46,11 @@ uint32_t BeatsCourseTime(uint8_t* base, uint32_t route, uint32_t time, uint32_t 
   guest::StoreU32(base, sp - 96, sp);
   const int32_t wanted = int32_t(guest::LoadU32(base, route));
   for (uint32_t i = 0; i < kCourseTargetCount; i++) {
-    const uint32_t pair = kCourseTargets + 8 * i;
-    if (int32_t(guest::LoadU32(base, pair)) == wanted) {
-      return TimeLess(guest::LoadU32(base, time), guest::LoadU32(base, pair + 4));
+    const schema::AchievementCourseTarget target(
+        base, schema::AchievementsGlobals::course_targets_address() +
+                  schema::AchievementCourseTarget::kSize * i);
+    if (target.route() == wanted) {
+      return TimeLess(schema::AchievementsPackedTime(base, time).packed(), target.time());
     }
   }
   return 0;
@@ -63,13 +66,14 @@ uint32_t Check(uint8_t* base, uint32_t kind, uint32_t out, uint32_t sp) {
                                             391, 396, 392, 0,   397, 398, 399};
   uint32_t any = 0;
   for (int i = 0; i < kCount; i++) {
-    const uint32_t word = out + 4 * i;
-    guest::StoreU32(base, word, 0);
-    const uint32_t pair = kTable + 8 * i;
-    if (int32_t(guest::LoadU32(base, pair)) != int32_t(kind)) {
+    const schema::AchievementFlag word(base, out + schema::AchievementFlag::kSize * i);
+    word.set_earned(0);
+    const schema::AchievementPair pair(
+        base, schema::AchievementsGlobals::table_address() + schema::AchievementPair::kSize * i);
+    if (pair.kind() != int32_t(kind)) {
       continue;
     }
-    const uint32_t index = guest::LoadU32(base, pair + 4) - 2;
+    const uint32_t index = pair.id() - 2;
     if (index <= 14) {
       uint32_t list, count;
       if (index == 7) {  // id 9: items 383 to 391
@@ -89,25 +93,26 @@ uint32_t Check(uint8_t* base, uint32_t kind, uint32_t out, uint32_t sp) {
         list = frame + 80;
         count = 1;
       }
-      guest::StoreU32(base, word, AllBeaten(base, list, count, frame));
+      word.set_earned(AllBeaten(base, list, count, frame));
     } else if (index <= 22) {  // ids 17 to 24: route id - 17
-      const uint32_t progress = guest::LoadU32(base, kProgress);
+      const uint32_t progress = schema::AchievementsGlobals::progress(base).address;
       if (int32_t(guest::LoadU32(base, progress + kProgressRoute)) == int32_t(index - 15)) {
-        guest::StoreU32(base, word,
-                        BeatsCourseTime(base, progress + kProgressRoute,
+        word.set_earned(BeatsCourseTime(base, progress + kProgressRoute,
                                         progress + kProgressTime, frame));
       }
     } else if (index <= 26) {  // ids 25 to 28: a count of the player's
       const int32_t slot = mode_tick::PlayersSignedInSlot(base, 0);
       if (slot >= 0) {
-        const uint32_t threshold = guest::LoadU32(base, kThresholds + 4 * i);
-        const uint32_t value = guest::LoadU32(base, kUserCounts + 4 * uint32_t(slot)) + 1;
+        const uint32_t threshold =
+            guest::LoadU32(base, schema::AchievementsGlobals::thresholds_address() + 4 * i);
+        const uint32_t value = guest::LoadU32(
+            base, schema::AchievementsGlobals::user_counts_address() + 4 * uint32_t(slot)) + 1;
         if (value >= threshold) {
-          guest::StoreU32(base, word, 1);
+          word.set_earned(1);
         }
       }
     }
-    if (int32_t(guest::LoadU32(base, word)) == 1) {
+    if (int32_t(word.earned()) == 1) {
       any = 1;
     }
   }
@@ -120,16 +125,21 @@ uint64_t Write(uint8_t* base, uint64_t words, uint32_t sp, const Calls& calls) {
   guest::StoreU32(base, frame, sp);
   uint64_t r3 = words;
   for (uint32_t i = 0; i < uint32_t(kCount); i++) {
-    if (guest::LoadU32(base, uint32_t(words) + 4 * i) == 0) {
+    if (schema::AchievementFlag(base, uint32_t(words) + schema::AchievementFlag::kSize * i)
+            .earned() == 0) {
       continue;
     }
-    const uint32_t entry = kEntries + 8 * i;
-    guest::StoreU32(base, entry, guest::LoadU32(base, kPlayerUser));
-    guest::StoreU32(base, entry + 4, guest::LoadU32(base, kTable + 4 + 8 * i));
+    const schema::AchievementEntry entry(
+        base, schema::AchievementsGlobals::entries_address() + schema::AchievementEntry::kSize * i);
+    entry.set_user(schema::AchievementsGlobals::player_user(base));
+    entry.set_id(schema::AchievementPair(base, schema::AchievementsGlobals::table_address() +
+                                                   schema::AchievementPair::kSize * i)
+                     .id());
     // The XAM wrapper through the guest, as the original (the user's call,
     // 2026-11-13): the SDK records the unlock.
-    r3 = calls.Call(kWriteAchievements, frame, kWriteReturn, 1, entry,
-                    kOverlappeds + kOverlappedBytes * i);
+    r3 = calls.Call(kWriteAchievements, frame, kWriteReturn, 1, entry.address,
+                    schema::AchievementsGlobals::overlappeds_address() +
+                        schema::AchievementOverlapped::kSize * i);
   }
   return r3;
 }
@@ -143,7 +153,7 @@ uint32_t WriteAchievements(uint8_t* base, uint32_t count, uint32_t list,
   // ids are only logged.
   for (uint32_t i = 0; i < count; i++) {
     ITC_LOG_INFO("achievement {} earned (not recorded)",
-                 guest::LoadU32(base, list + 8 * i + 4));
+                 schema::AchievementEntry(base, list + schema::AchievementEntry::kSize * i).id());
   }
   constexpr uint32_t kIoPending = 997;
   return overlapped != 0 ? kIoPending : 0;

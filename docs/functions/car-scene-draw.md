@@ -61,7 +61,10 @@ Never seen in play, without rows (as in `models.md`): `std::vector`'s
 `_Xlen` (`sub_825981C8`) and `bad_alloc`'s copy (`sub_82091200`,
 `std-string.md`). Fields: `../known-data.md` ("scene pass description",
 "car scene draw tables", "frustum", the scene's and the scene model's
-rows).
+rows). The objects' layout (E5's step 2, 2026-11-17):
+`itc_recomp/schema/car-scene-draw.toml` (the points, the std::vector of
+them, the box, the planes, the frustum, the scene pass description, the
+records at `0x82002D40` and the image words the draw reads).
 
 What wraps or reads these functions, kept around native bodies by the
 migration (the precedent of the car draw and `XPR::GetTexture`): the

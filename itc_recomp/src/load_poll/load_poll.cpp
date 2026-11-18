@@ -10,6 +10,7 @@
 #include "models/part_model.h"
 #include "car_models/car_model.h"
 #include "native/buffers.h"
+#include "schema/load_poll.h"
 #include "scene_loaders/file_loaded.h"
 #include "scene_loaders/pools.h"
 #include "second_set/blocks.h"
@@ -22,7 +23,14 @@ namespace mp = material_passes;
 namespace sl = scene_loaders;
 namespace ss = second_set;
 
-constexpr uint32_t kScene = 0x826C2E44;  // [kScene] the scene
+using schema::InteriorMeters;
+using schema::LoadPollGlobals;
+using schema::SceneParts;
+
+// [0x826C2E44] the scene's address.
+uint32_t Scene(uint8_t* base) {
+  return LoadPollGlobals::scene(base).address;
+}
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -137,11 +145,11 @@ uint64_t InteriorDialsSetBlock(uint8_t* base, uint32_t dials, uint64_t block) {
   Store(base, dials + 4, uint32_t(block));
   Store(base, dials + 2896, uint32_t(mp::RecordAt(block)));
   if (mp::IsBlockSetB(LoadS(base, dials + 4)) != 0) {
-    Store(base, dials + 8, Load(base, kScene) + 1132);
+    Store(base, dials + 8, Scene(base) + 1132);
     return 1;
   }
   if (mp::IsBlockSetA(LoadS(base, dials + 4)) != 0) {
-    Store(base, dials + 8, Load(base, kScene) + 1064);
+    Store(base, dials + 8, Scene(base) + 1064);
     return 1;
   }
   return 0;
@@ -151,26 +159,38 @@ uint64_t InteriorMetersSetGauge(uint8_t* base, uint32_t meters, uint64_t gauge, 
                                 uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E32E8 InteriorMeters::SetGauge");
   const uint32_t sp = Frame(base, stack, 112);
-  Store(base, uint32_t(uint32_t(gauge + 1324) << 2) + meters, uint32_t(entry));
+  const InteriorMeters m(base, meters);
+  Store(base, m.gauge0_provider_address() + (uint32_t(gauge) << 2), uint32_t(entry));
   // The gauge's point record: its part model and shape.
-  static constexpr uint32_t kRecords[7] = {1700, 1940, 2660, 2900, 3620, 3860, 4100};
+  using Word = uint32_t (InteriorMeters::*)() const;
+  static constexpr Word kModels[7] = {
+      &InteriorMeters::needle0_model, &InteriorMeters::needle1_model,
+      &InteriorMeters::needle2_model, &InteriorMeters::needle3_model,
+      &InteriorMeters::needle4_model, &InteriorMeters::needle5_model,
+      &InteriorMeters::needle6_model};
+  static constexpr Word kShapes[7] = {
+      &InteriorMeters::needle0_shape, &InteriorMeters::needle1_shape,
+      &InteriorMeters::needle2_shape, &InteriorMeters::needle3_shape,
+      &InteriorMeters::needle4_shape, &InteriorMeters::needle5_shape,
+      &InteriorMeters::needle6_shape};
   uint32_t model = 0;
   uint32_t shape = 0;
   if (uint32_t(gauge) < 7) {
-    model = Load(base, meters + kRecords[uint32_t(gauge)]);
-    shape = Load(base, meters + kRecords[uint32_t(gauge)] + 224);
+    model = (m.*kModels[uint32_t(gauge)])();
+    shape = (m.*kShapes[uint32_t(gauge)])();
   }
   const uint64_t offset = gauge * 12;
-  const int32_t scene_flag = LoadS(base, Load(base, kScene) + 4);
-  int32_t index = LoadS(base, uint32_t(offset + Load(base, meters)) + 16);
+  const int32_t scene_flag = LoadS(base, Scene(base) + 4);
+  // The record's gauge entries (+8 + 12i): +12 the kind, +16 the texture index.
+  int32_t index = LoadS(base, uint32_t(offset + m.record().address) + 16);
   if (scene_flag != 0 && index > 2) {
     index = 3;
   }
   mp::SetTexture(base, model, uint32_t(index), int32_t(shape), sp);
-  const uint32_t at = uint32_t(offset + Load(base, meters));
+  const uint32_t at = uint32_t(offset + m.record().address);
   const int32_t value = LoadS(base, at + 16);
   const uint64_t r3 = GaugeTableEntry(Load(base, at + 12), value);
-  Store(base, uint32_t(uint32_t(gauge + 1332) << 2) + meters, uint32_t(r3));
+  Store(base, m.gauge0_angle_address() + (uint32_t(gauge) << 2), uint32_t(r3));
   return r3;
 }
 
@@ -278,7 +298,7 @@ uint64_t SceneTrafficFinish(uint8_t* base, uint32_t body, uint32_t stack, Calls&
 uint64_t ScenePartsApplyPaint(uint8_t* base, uint32_t parts, const uint64_t regs[6],
                               uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E0908 SceneParts::ApplyPaint");
-  const uint32_t first = Load(base, parts + 104);
+  const uint32_t first = SceneParts(base, parts).first_set_parts();
   return sl::PartsSetPaint(base, first, first, regs, stack);
 }
 
@@ -481,12 +501,14 @@ uint64_t ScenePartsSetSelectedTexture(uint8_t* base, uint32_t parts, uint64_t r3
                                       uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DF250 SceneParts::SetSelectedTexture");
   Frame(base, stack, 112);
+  const SceneParts p(base, parts);
   for (uint32_t k = 0; k < 17; k++) {
-    if (Load(base, parts + 32 + 4 * k) == 0) {
+    const uint32_t slot = p.part_model_0_address() + 4 * k;
+    if (Load(base, slot) == 0) {
       continue;
     }
-    r3 = sl::CarModelSelectedTexture(base, Load(base, Load(base, parts + 24) + 24));
-    Store(base, Load(base, parts + 32 + 4 * k) + 452, uint32_t(r3));
+    r3 = sl::CarModelSelectedTexture(base, Load(base, p.scene_car_model().address + 24));
+    Store(base, Load(base, slot) + 452, uint32_t(r3));
   }
   return r3;
 }
@@ -494,36 +516,52 @@ uint64_t ScenePartsSetSelectedTexture(uint8_t* base, uint32_t parts, uint64_t r3
 uint64_t ScenePartsBuild(uint8_t* base, uint32_t parts, uint32_t stack, Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820E05E0 SceneParts::Build");
   const uint32_t sp = Frame(base, stack, 112);
-  // Each kind's record words (r5, r6): an offset into the parts object, or
-  // 0 for the constant 0.
+  const SceneParts p(base, parts);
+  // Each kind's record words (r5, r6): a word of the record, or none for
+  // the constant 0.
+  using Word = uint32_t (SceneParts::*)() const;
   struct Words {
-    uint32_t a, b;
+    Word a, b;
   };
   static constexpr Words kWords[17] = {
-      {108, 0},   {112, 108}, {116, 0},   {120, 0}, {124, 0},   {128, 0},
-      {132, 0},   {132, 0},   {136, 132}, {136, 132}, {140, 0}, {144, 0},
-      {148, 0},   {0, 0},     {152, 0},   {156, 0}, {0, 0}};
+      {&SceneParts::choice_0, nullptr},
+      {&SceneParts::choice_1, &SceneParts::choice_0},
+      {&SceneParts::choice_2, nullptr},
+      {&SceneParts::choice_3, nullptr},
+      {&SceneParts::choice_4, nullptr},
+      {&SceneParts::choice_5, nullptr},
+      {&SceneParts::choice_6, nullptr},
+      {&SceneParts::choice_6, nullptr},
+      {&SceneParts::choice_8, &SceneParts::choice_6},
+      {&SceneParts::choice_8, &SceneParts::choice_6},
+      {&SceneParts::choice_10, nullptr},
+      {&SceneParts::choice_11, nullptr},
+      {&SceneParts::choice_12, nullptr},
+      {nullptr, nullptr},
+      {&SceneParts::choice_14, nullptr},
+      {&SceneParts::choice_15, nullptr},
+      {nullptr, nullptr}};
   for (uint32_t k = 0; k < 17; k++) {
-    const uint32_t a = kWords[k].a == 0 ? 0 : Load(base, parts + kWords[k].a);
-    const uint32_t b = kWords[k].b == 0 ? 0 : Load(base, parts + kWords[k].b);
+    const uint32_t a = kWords[k].a == nullptr ? 0 : (p.*kWords[k].a)();
+    const uint32_t b = kWords[k].b == nullptr ? 0 : (p.*kWords[k].b)();
     if (k == 4 && int32_t(a) == 13) {
-      Store(base, parts + 48, 0);
+      p.set_part_model_4(0);
       continue;
     }
-    const uint32_t model = sl::PartsPart(base, Load(base, parts + 104), int32_t(k), a, b);
-    Store(base, parts + 32 + 4 * k, model);
+    const uint32_t model = sl::PartsPart(base, p.first_set_parts(), int32_t(k), a, b);
+    Store(base, p.part_model_0_address() + 4 * k, model);
   }
-  const uint32_t points = parts + 176;
+  const uint32_t points = p.points_address();
   ss::PartsPointsReset(base, points, sp);
-  const uint32_t scene_model = Load(base, parts + 24);
-  Store(base, parts + 37260, scene_model);
+  const uint32_t scene_model = p.scene_car_model().address;
+  p.set_points_scene_car_model(scene_model);
   const uint32_t car = Load(base, scene_model + 24);
-  Store(base, parts + 37256, parts + 108);
-  Store(base, parts + 37252, car + 32);
-  Store(base, parts + 37268, Load(base, scene_model + 24) + 3760);
-  ss::PartsFind(base, points, parts + 32, sp, calls.find);
+  p.set_points_record(p.record_address());
+  p.set_points_car_record(car + 32);
+  p.set_points_skeleton(Load(base, scene_model + 24) + 3760);
+  ss::PartsFind(base, points, p.part_model_0_address(), sp, calls.find);
   AfterFind(calls);
-  sl::PartsWalkMaterials(base, Load(base, parts + 104));
+  sl::PartsWalkMaterials(base, p.first_set_parts());
   return ScenePartsSetSelectedTexture(base, parts, parts, sp);
 }
 
@@ -531,8 +569,8 @@ uint64_t ScenePartsBuild(uint8_t* base, uint32_t parts, uint32_t stack, Calls& c
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;   // 1.0
-constexpr uint32_t kZero = 0x82000A34;  // 0.0
+constexpr uint32_t kOne = LoadPollGlobals::one_address();    // 1.0
+constexpr uint32_t kZero = LoadPollGlobals::zero_address();  // 0.0
 
 // A float word copied with lfs and stfs, as the original does.
 void CopyFloat(uint8_t* base, uint32_t to, uint32_t from) {
@@ -580,13 +618,13 @@ uint64_t WheelsBindTextures(uint8_t* base, uint32_t wheels, uint32_t stack, Call
     return 0;
   }
   const uint32_t texture = Load(base, wheels + 40);
-  Store(base, wheels + 288, Load(base, kScene) + 208);
-  const uint32_t scene = Load(base, kScene);
+  Store(base, wheels + 288, Scene(base) + 208);
+  const uint32_t scene = Scene(base);
   Store(base, wheels + 1264, wheels + 2240);
   Store(base, wheels + 1728, wheels + 2260);
   Store(base, wheels + 752, scene + 208);
-  Store(base, wheels + 2384, Load(base, kScene) + 296);
-  Store(base, wheels + 2848, Load(base, kScene) + 296);
+  Store(base, wheels + 2384, Scene(base) + 296);
+  Store(base, wheels + 2848, Scene(base) + 296);
   mp::SetTexture(base, wheels + 240, texture, -1, sp);
   mp::SetTexture(base, wheels + 704, Load(base, wheels + 56), -1, sp);
   CopyFloat(base, sp + 204, kOne);
@@ -667,15 +705,16 @@ uint64_t WheelsApplyPalette(uint8_t* base, uint32_t wheels, uint32_t stack, Call
 uint64_t ScenePartsFinish(uint8_t* base, uint32_t parts, uint32_t stack, Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820E2E68 SceneParts::Finish");
   const uint32_t sp = Frame(base, stack, 112);
-  if (LoadS(base, parts + 100) != 0) {
+  const SceneParts p(base, parts);
+  if (int32_t(p.loaded()) != 0) {
     return 1;
   }
-  const uint64_t loaded = sl::PartsIsLoaded(base, Load(base, parts + 104));
-  Store(base, parts + 100, uint32_t(loaded));
+  const uint64_t loaded = sl::PartsIsLoaded(base, p.first_set_parts());
+  p.set_loaded(uint32_t(loaded));
   if (int32_t(loaded) == 0) {
     return loaded;
   }
-  const uint32_t set = Load(base, Load(base, parts + 37284) + 4);
+  const uint32_t set = Load(base, p.scene().address + 4);
   if (set <= 1) {
     ScenePartsBuild(base, parts, sp, calls);
   }
@@ -727,7 +766,7 @@ uint64_t SceneModelApplyPalettes(uint8_t* base, uint32_t model, uint64_t r3, uin
     }
   } else {
     if (const uint32_t parts = Load(base, model + 5060); parts != 0) {
-      const uint32_t first = Load(base, parts + 104);
+      const uint32_t first = SceneParts(base, parts).first_set_parts();
       r3 = sl::PartsApplyPalette(base, first, first, sp);
     }
     if (const uint32_t interior = Load(base, model + 5068); interior != 0) {
@@ -826,7 +865,7 @@ uint64_t SceneModelPollLoad(uint8_t* base, uint32_t model, uint32_t stack, Calls
     }
   }
   if (const uint32_t parts = Load(base, model + 5060); parts != 0) {
-    const uint32_t first = Load(base, parts + 104);
+    const uint32_t first = SceneParts(base, parts).first_set_parts();
     CarPartsSetVinylTextures(base, first, first, sp);
   }
   SceneModelApplyPaint(base, model, model, sp);

@@ -18,6 +18,7 @@
 #include "memory/heap.h"
 #include "models/xpr.h"
 #include "ui_movies/game.h"
+#include "schema/camera_modes.h"
 
 namespace camera_modes {
 
@@ -25,21 +26,18 @@ using namespace steps;
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;   // 1.0
-constexpr uint32_t kZero = 0x82000A34;  // 0.0
-constexpr uint32_t kHalf = 0x82001BE4;  // 0.5
-constexpr uint32_t kTwo = 0x820021E8;   // 2.0
-constexpr uint32_t kRadiansPerDegree = 0x82002948;
-constexpr uint32_t kFilmScale = 0x82002D0C;   // EvalCamera's length scale
-constexpr uint32_t kZoomScale = 0x82002C30;   // EvalCamera's zoom numerator
-constexpr uint32_t kFirstTurn = 0x82001FB4;   // CameraAnim::Matrix's first RotateY
+using G = schema::CameraModesGlobals;
+
+constexpr uint32_t kOne = G::one_address();    // 1.0
+constexpr uint32_t kZero = G::zero_address();  // 0.0
+constexpr uint32_t kHalf = G::half_address();  // 0.5
+constexpr uint32_t kTwo = G::two_address();    // 2.0
+constexpr uint32_t kRadiansPerDegree = G::radians_per_degree_address();
+constexpr uint32_t kFilmScale = G::film_scale_address();  // EvalCamera's length scale
+constexpr uint32_t kZoomScale = G::zoom_scale_address();  // EvalCamera's zoom numerator
+constexpr uint32_t kFirstTurn = G::first_turn_address();  // CameraAnim::Matrix's first RotateY
 
 constexpr uint32_t kEndKind = 14;
-constexpr uint32_t kObjectBytes = 340;
-constexpr uint32_t kBlockBytes = 64;
-constexpr uint32_t kBlocks = 80;       // an object's blocks
-constexpr uint32_t kBlockCount = 336;  // their count
-constexpr uint32_t kBlockData = 60;    // a block's data
 
 // VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE): the layer's pages.
 uint32_t VirtualAlloc(uint32_t size) { return memory::AllocPages(size, 4096); }
@@ -55,7 +53,8 @@ void Copy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
 // A block's value at frame `time`: the float [+60][time] (the index
 // shifted as rlwinm's, 32 bits).
 double Value(uint8_t* base, uint32_t block, uint32_t time) {
-  return Lfs(base, guest::LoadU32(base, block + kBlockData) + (time << 2));
+  const schema::CameraAnimBlock b(base, block);
+  return Lfs(base, b.data() + (time << 2));
 }
 
 // A (kind, value) pair: kind 2 made kind 1 with value x 24 + `curves`.
@@ -69,19 +68,20 @@ void FixPair(uint8_t* base, uint32_t pair, uint32_t curves) {
 }
 
 bool ObjectFreeable(uint8_t* base, uint32_t object) {
+  const schema::CameraAnim anim(base, object);
   if (!memory::IsPages(object)) {
     return false;
   }
-  const uint32_t count = guest::LoadU32(base, object + kBlockCount);
+  const uint32_t count = anim.blocks_used();
   if (count > 64) {
     return false;
   }
   for (uint32_t i = 0; i < count; i++) {
-    const uint32_t block = guest::LoadU32(base, object + kBlocks + 4 * i);
+    const uint32_t block = guest::LoadU32(base, anim.blocks_address() + 4 * i);
     if (!memory::IsPages(block)) {
       return false;
     }
-    const uint32_t data = guest::LoadU32(base, block + kBlockData);
+    const uint32_t data = schema::CameraAnimBlock(base, block).data();
     if (data != 0 && !memory::IsPages(data)) {
       return false;
     }
@@ -112,36 +112,40 @@ void FixGroup(uint8_t* base, uint32_t group, uint32_t curves) {
 
 void FixKey(uint8_t* base, uint32_t key, uint32_t curves) {
   ITC_NATIVE_RUNNING("sub_820ABF80 CameraPath::FixKey");
-  FixPair(base, key + 8, curves);
-  FixPair(base, key + 16, curves);
-  FixGroup(base, key + 24, curves);
-  FixGroup(base, key + 120, curves);
+  const schema::CameraPathKey k(base, key);
+  FixPair(base, k.fov_kind_address(), curves);
+  FixPair(base, k.zoom_kind_address(), curves);
+  FixGroup(base, k.eye_position_x_kind_address(), curves);
+  FixGroup(base, k.target_position_x_kind_address(), curves);
 }
 
 void FixKeys(uint8_t* base, uint32_t path, uint32_t keys, uint32_t curves) {
   ITC_NATIVE_RUNNING("sub_820AC000 CameraPath::FixKeys");
-  const uint32_t first = guest::LoadU32(base, path + 16) * 216 + keys;
-  guest::StoreU32(base, path + 16, first);
-  for (uint32_t i = 0, at = 0; i < guest::LoadU32(base, path + 8); i++, at += 216) {
-    FixKey(base, guest::LoadU32(base, path + 16) + at, curves);
+  const schema::CameraPathRecord p(base, path);
+  const uint32_t first = p.keys() * 216 + keys;
+  p.set_keys(first);
+  for (uint32_t i = 0, at = 0; i < p.key_count(); i++, at += 216) {
+    FixKey(base, p.keys() + at, curves);
   }
 }
 
 void BlockFree(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_8214FFF0 CameraAnimBlock::Free");
-  const uint32_t data = guest::LoadU32(base, block + kBlockData);
+  const schema::CameraAnimBlock b(base, block);
+  const uint32_t data = b.data();
   if (data != 0) {
     memory::FreePages(data);
   }
-  guest::StoreU32(base, block + kBlockData, 0);
+  b.set_data(0);
 }
 
 void AnimFree(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82150098 CameraAnim::Free");
-  while (guest::LoadU32(base, object + kBlockCount) != 0) {
-    const uint32_t count = guest::LoadU32(base, object + kBlockCount) - 1;
-    guest::StoreU32(base, object + kBlockCount, count);
-    const uint32_t block = guest::LoadU32(base, object + kBlocks + (count << 2));
+  const schema::CameraAnim anim(base, object);
+  while (anim.blocks_used() != 0) {
+    const uint32_t count = anim.blocks_used() - 1;
+    anim.set_blocks_used(count);
+    const uint32_t block = guest::LoadU32(base, anim.blocks_address() + (count << 2));
     BlockFree(base, block);
     memory::FreePages(block);
   }
@@ -154,69 +158,72 @@ int64_t AnimsLoad(uint8_t* base, uint32_t id, const archive::LoadCall& load) {
   const uint32_t size = archive::AssetSize(base, id);
   const uint32_t record = VirtualAlloc(4);
   const uint32_t buffer = VirtualAlloc(size);
-  guest::StoreU32(base, record, id);
+  schema::CameraAnimLoad(base, record).set_id(id);
   return load(id, buffer, kAnimsOnLoaded, record);
 }
 
 uint32_t AnimParseObject(uint8_t* base, uint32_t object, const GuestCopy& xmemcpy) {
   ITC_NATIVE_RUNNING("sub_82150100 CameraAnim::ParseObject");
-  const uint32_t copy = VirtualAlloc(kObjectBytes);
+  const schema::CameraAnimFileObject file(base, object);
+  const uint32_t copy = VirtualAlloc(schema::CameraAnim::kSize);
   const double zero = Lfs(base, kZero);
-  guest::StoreU32(base, copy + 0, 0);
-  guest::StoreU32(base, copy + 4, 0);
-  guest::StoreU32(base, copy + 8, 0);
-  guest::StoreU32(base, copy + 12, 0);
+  schema::CameraAnim(base, copy).set_kind(0);
+  schema::CameraAnim(base, copy).set_header_size(0);
+  schema::CameraAnim(base, copy).set_unknown_8(0);
+  schema::CameraAnim(base, copy).set_block_count(0);
   for (const uint32_t at : {20u, 20u, 16u, 32u, 32u, 28u, 40u, 44u}) {
     Stfs(base, copy + at, zero);
   }
   for (uint32_t i = 0; i < 8; i++) {
-    guest::StoreU32(base, copy + 48 + 4 * i, 0);
+    guest::StoreU32(base, schema::CameraAnim(base, copy).unknown_48_address() + 4 * i, 0);
   }
-  guest::StoreU32(base, copy + kBlockCount, 0);
+  schema::CameraAnim(base, copy).set_blocks_used(0);
   for (uint32_t at = 0; at < 40; at += 4) {
     guest::StoreU32(base, copy + at, guest::LoadU32(base, object + at));
   }
-  Stfs(base, copy + 40, Lfs(base, object + 40));
-  Stfs(base, copy + 44, Lfs(base, object + 44));
-  uint32_t from = object + guest::LoadU32(base, object + 4);
-  if (guest::LoadU32(base, copy + 12) == 0) {
+  schema::CameraAnim(base, copy).set_unknown_40(float(Lfs(base, object + 40)));
+  schema::CameraAnim(base, copy).set_unknown_44(float(Lfs(base, object + 44)));
+  uint32_t from = object + file.header_size();
+  if (schema::CameraAnim(base, copy).block_count() == 0) {
     return copy;
   }
   uint32_t n = 0;
   do {
-    const uint32_t block = VirtualAlloc(kBlockBytes);
-    Stfs(base, block + 12, zero);
-    guest::StoreU32(base, block + 0, 0);
-    Stfs(base, block + 16, zero);
-    guest::StoreU32(base, block + 4, 0);
-    guest::StoreU32(base, block + 8, 0);
-    guest::StoreU32(base, block + kBlockData, 0);
+    const uint32_t block = VirtualAlloc(schema::CameraAnimBlock::kSize);
+    schema::CameraAnimBlock(base, block).set_unknown_12(float(zero));
+    schema::CameraAnimBlock(base, block).set_channel(0);
+    schema::CameraAnimBlock(base, block).set_duration(float(zero));
+    schema::CameraAnimBlock(base, block).set_header_size(0);
+    schema::CameraAnimBlock(base, block).set_data_size(0);
+    schema::CameraAnimBlock(base, block).set_data(0);
     for (uint32_t i = 0; i < 10; i++) {
-      guest::StoreU32(base, block + 20 + 4 * i, 0);
+      guest::StoreU32(base, schema::CameraAnimBlock(base, block).unknown_20_address() + 4 * i, 0);
     }
-    guest::StoreU32(base, block + 0, guest::LoadU32(base, from + 0));
-    guest::StoreU32(base, block + 4, guest::LoadU32(base, from + 4));
-    const uint32_t bytes = guest::LoadU32(base, from + 8);
-    guest::StoreU32(base, block + 8, bytes);
-    Stfs(base, block + 12, Lfs(base, from + 12));
-    Stfs(base, block + 16, Lfs(base, from + 16));
-    guest::StoreU32(base, block + kBlockData, VirtualAlloc(bytes));
-    c_runtime::XMemSet(base, guest::LoadU32(base, block + kBlockData), 0,
-                       guest::LoadU32(base, block + 8));
+    const schema::CameraAnimFileBlock source_block(base, from);
+    schema::CameraAnimBlock(base, block).set_channel(source_block.channel());
+    schema::CameraAnimBlock(base, block).set_header_size(source_block.header_size());
+    const uint32_t bytes = source_block.data_size();
+    schema::CameraAnimBlock(base, block).set_data_size(bytes);
+    schema::CameraAnimBlock(base, block).set_unknown_12(source_block.unknown_12());
+    schema::CameraAnimBlock(base, block).set_duration(source_block.duration());
+    schema::CameraAnimBlock(base, block).set_data(VirtualAlloc(bytes));
+    c_runtime::XMemSet(base, schema::CameraAnimBlock(base, block).data(), 0,
+                       schema::CameraAnimBlock(base, block).data_size());
     {
-      const uint32_t to = guest::LoadU32(base, block + kBlockData);
-      const uint32_t source = guest::LoadU32(base, from + 4) + from;
-      const uint32_t size = guest::LoadU32(base, block + 8);
+      const uint32_t to = schema::CameraAnimBlock(base, block).data();
+      const uint32_t source = schema::CameraAnimFileBlock(base, from).header_size() + from;
+      const uint32_t size = schema::CameraAnimBlock(base, block).data_size();
       if (!c_runtime::XMemCpy(base, to, source, size)) {
         xmemcpy(to, source, size);
       }
     }
-    const uint32_t count = guest::LoadU32(base, copy + kBlockCount);
-    guest::StoreU32(base, copy + kBlockCount, count + 1);
-    guest::StoreU32(base, copy + kBlocks + (count << 2), block);
-    from = guest::LoadU32(base, from + 4) + from + guest::LoadU32(base, from + 8);
+    const uint32_t count = schema::CameraAnim(base, copy).blocks_used();
+    schema::CameraAnim(base, copy).set_blocks_used(count + 1);
+    guest::StoreU32(base, schema::CameraAnim(base, copy).blocks_address() + (count << 2), block);
+    from = schema::CameraAnimFileBlock(base, from).header_size() + from +
+           schema::CameraAnimFileBlock(base, from).data_size();
     n++;
-  } while (n < guest::LoadU32(base, copy + 12));
+  } while (n < schema::CameraAnim(base, copy).block_count());
   return copy;
 }
 
@@ -228,7 +235,7 @@ bool AnimsOnLoaded(uint8_t* base, uint32_t data, uint32_t record, uint32_t frame
   ITC_NATIVE_RUNNING("sub_82150878 CameraAnims::OnLoaded");
   guest::StoreU32(base, frame, frame + 672);
   guest::StoreU32(base, frame + 80, 0);
-  const uint32_t id = guest::LoadU32(base, record);
+  const uint32_t id = schema::CameraAnimLoad(base, record).id();
   guest::StoreU32(base, frame + 340, 0);
   uint32_t object = data;
   uint32_t count = 0;
@@ -236,35 +243,39 @@ bool AnimsOnLoaded(uint8_t* base, uint32_t data, uint32_t record, uint32_t frame
     const uint32_t parsed = AnimParseObject(base, object, xmemcpy);
     guest::StoreU32(base, frame + 608, count + 1);
     guest::StoreU32(base, frame + 352 + (count << 2), parsed);
-    if (int32_t(guest::LoadU32(base, object)) == int32_t(kEndKind)) {
+    if (int32_t(schema::CameraAnimFileObject(base, object).kind()) == int32_t(kEndKind)) {
       break;
     }
     count = guest::LoadU32(base, frame + 608);
-    object = guest::LoadU32(base, object + 8) + guest::LoadU32(base, object + 4) + object;
+    object = schema::CameraAnimFileObject(base, object).data_size() +
+             schema::CameraAnimFileObject(base, object).header_size() + object;
   }
   guest::StoreU32(base, frame + 80, id);
   Copy(base, frame + 84, frame + 352, 260, memcpy);
-  const uint32_t n = guest::LoadU32(base, kAnimCount);
-  guest::StoreU32(base, kAnimCount, n + 1);
-  Copy(base, n * kAnimBytes + kAnims, frame + 80, kAnimBytes, memcpy);
+  const uint32_t n = G::anim_count(base);
+  G::set_anim_count(base, n + 1);
+  Copy(base, n * schema::CameraAnimEntry::kSize + G::anims_address(), frame + 80,
+       schema::CameraAnimEntry::kSize, memcpy);
   memory::FreePages(record);
   memory::FreePages(data);
   return true;
 }
 
 bool AnimsFreeable(uint8_t* base) {
-  const uint32_t entries = guest::LoadU32(base, kAnimCount);
+  const uint32_t entries = G::anim_count(base);
   if (entries > 64) {
     return false;
   }
   for (uint32_t e = 0; e < entries; e++) {
-    const uint32_t entry = kAnims + kAnimBytes * e;
-    const uint32_t count = guest::LoadU32(base, entry + 260);
+    const uint32_t entry = G::anims_address() + schema::CameraAnimEntry::kSize * e;
+    const uint32_t count = schema::CameraAnimEntry(base, entry).count();
     if (count > 64) {
       return false;
     }
     for (uint32_t i = 0; i < count; i++) {
-      if (!ObjectFreeable(base, guest::LoadU32(base, entry + 4 + 4 * i))) {
+      if (!ObjectFreeable(
+              base, guest::LoadU32(
+                        base, schema::CameraAnimEntry(base, entry).objects_address() + 4 * i))) {
         return false;
       }
     }
@@ -277,16 +288,16 @@ std::optional<uint32_t> AnimsFreeAll(uint8_t* base, uint32_t memcpy_r3) {
   std::optional<uint32_t> r3;
   // The original copies each entry to its stack (memcpy) and counts the
   // copy's objects down; the entry itself isn't written.
-  for (uint32_t e = guest::LoadU32(base, kAnimCount); e != 0;
-       e = guest::LoadU32(base, kAnimCount)) {
+  for (uint32_t e = G::anim_count(base); e != 0; e = G::anim_count(base)) {
     e--;
-    guest::StoreU32(base, kAnimCount, e);
-    const uint32_t entry = e * kAnimBytes + kAnims;
-    uint32_t count = guest::LoadU32(base, entry + 260);
+    G::set_anim_count(base, e);
+    const uint32_t entry = e * schema::CameraAnimEntry::kSize + G::anims_address();
+    uint32_t count = schema::CameraAnimEntry(base, entry).count();
     r3 = memcpy_r3;
     while (count != 0) {
       count--;
-      const uint32_t object = guest::LoadU32(base, entry + 4 + (count << 2));
+      const uint32_t object = guest::LoadU32(
+          base, schema::CameraAnimEntry(base, entry).objects_address() + (count << 2));
       AnimFree(base, object);
       memory::FreePages(object);
       r3 = 1;
@@ -297,12 +308,14 @@ std::optional<uint32_t> AnimsFreeAll(uint8_t* base, uint32_t memcpy_r3) {
 
 std::optional<double> AnimEvalCamera(uint8_t* base, uint32_t object, uint32_t out,
                                      uint32_t time) {
+  const schema::CameraAnim anim(base, object);
+  const schema::CameraAnimOut to(base, out);
   const double zero = Lfs(base, kZero);
   double x = zero, y = zero, z = zero, roll = zero, height = zero, length = zero;
-  const uint32_t count = guest::LoadU32(base, object + kBlockCount);
+  const uint32_t count = anim.blocks_used();
   for (uint32_t i = 0; i < count; i++) {
-    const uint32_t block = guest::LoadU32(base, object + kBlocks + 4 * i);
-    switch (guest::LoadU32(base, block)) {
+    const uint32_t block = guest::LoadU32(base, anim.blocks_address() + 4 * i);
+    switch (schema::CameraAnimBlock(base, block).channel()) {
       case 0: x = Value(base, block, time); break;
       case 1: y = Value(base, block, time); break;
       case 2: z = Fneg(Value(base, block, time)); break;
@@ -324,38 +337,42 @@ std::optional<double> AnimEvalCamera(uint8_t* base, uint32_t object, uint32_t ou
   }
   ITC_NATIVE_RUNNING("sub_82150350 CameraAnim::EvalCamera");
   const double tangent = Single(t);
-  Stfs(base, out + 32, roll);
-  Stfs(base, out + 36, Fdivs(Lfs(base, kZoomScale), tangent));
-  Stfs(base, out + 16, x);
-  Stfs(base, out + 20, y);
-  Stfs(base, out + 24, z);
-  Stfs(base, out + 28, Lfs(base, kOne));
+  to.set_roll(float(roll));
+  to.set_zoom(float(Fdivs(Lfs(base, kZoomScale), tangent)));
+  to.set_x(float(x));
+  to.set_y(float(y));
+  to.set_z(float(z));
+  to.set_w(float(Lfs(base, kOne)));
   return t;
 }
 
 void AnimEvalTarget(uint8_t* base, uint32_t object, uint32_t out, uint32_t time) {
   ITC_NATIVE_RUNNING("sub_821504E0 CameraAnim::EvalTarget");
+  const schema::CameraAnim anim(base, object);
+  const schema::CameraVec4 to(base, out);
   const double zero = Lfs(base, kZero);
   double x = zero, y = zero, z = zero;
-  const uint32_t count = guest::LoadU32(base, object + kBlockCount);
+  const uint32_t count = anim.blocks_used();
   for (uint32_t i = 0; i < count; i++) {
-    const uint32_t block = guest::LoadU32(base, object + kBlocks + 4 * i);
-    switch (guest::LoadU32(base, block)) {
+    const uint32_t block = guest::LoadU32(base, anim.blocks_address() + 4 * i);
+    switch (schema::CameraAnimBlock(base, block).channel()) {
       case 0: x = Value(base, block, time); break;
       case 1: y = Value(base, block, time); break;
       case 2: z = Fneg(Value(base, block, time)); break;
       default: break;
     }
   }
-  Stfs(base, out + 0, x);
-  Stfs(base, out + 4, y);
-  Stfs(base, out + 8, z);
-  Stfs(base, out + 12, Lfs(base, kOne));
+  to.set_x(float(x));
+  to.set_y(float(y));
+  to.set_z(float(z));
+  to.set_w(float(Lfs(base, kOne)));
 }
 
 void AnimMatrix(uint8_t* base, uint32_t object, uint32_t out, uint32_t time, uint32_t frame,
                 const GuestCopy& memcpy) {
   ITC_NATIVE_RUNNING("sub_82150590 CameraAnim::Matrix");
+  const schema::CameraAnim anim(base, object);
+  const schema::CameraMatrix to(base, out);
   auto identity = [&](uint32_t at) {
     for (uint32_t row = 0; row < 4; row++) {
       for (uint32_t column = 0; column < 4; column++) {
@@ -367,10 +384,10 @@ void AnimMatrix(uint8_t* base, uint32_t object, uint32_t out, uint32_t time, uin
   Copy(base, out, frame + 96, 64, memcpy);
   const double zero = Lfs(base, kZero);
   double x = zero, y = zero, z = zero, turn_x = zero, turn_y = zero, turn_z = zero;
-  const uint32_t count = guest::LoadU32(base, object + kBlockCount);
+  const uint32_t count = anim.blocks_used();
   for (uint32_t i = 0; i < count; i++) {
-    const uint32_t block = guest::LoadU32(base, object + kBlocks + 4 * i);
-    switch (guest::LoadU32(base, block)) {
+    const uint32_t block = guest::LoadU32(base, anim.blocks_address() + 4 * i);
+    switch (schema::CameraAnimBlock(base, block).channel()) {
       case 0: x = Value(base, block, time); break;
       case 1: y = Value(base, block, time); break;
       case 2: z = Fneg(Value(base, block, time)); break;
@@ -396,9 +413,9 @@ void AnimMatrix(uint8_t* base, uint32_t object, uint32_t out, uint32_t time, uin
   matrix_math::RotateZ(base, m, m, angle, turn);
   matrix_math::Multiply(base, out, out, m);
   interpolation::BlendState_OnMultiply(base, out, out, m, 0x821507B0);
-  Stfs(base, out + 48, x);
-  Stfs(base, out + 52, y);
-  Stfs(base, out + 56, z);
+  to.set_m30(float(x));
+  to.set_m31(float(y));
+  to.set_m32(float(z));
 }
 
 uint32_t AnimsEvaluate(uint8_t* base, uint32_t out, uint32_t id, uint32_t time,
@@ -409,9 +426,9 @@ uint32_t AnimsEvaluate(uint8_t* base, uint32_t out, uint32_t id, uint32_t time,
   if (objects == 0) {
     return 0;
   }
-  for (uint32_t i = 0; i < guest::LoadU32(base, objects + 256); i++) {
+  for (uint32_t i = 0; i < schema::CameraAnimObjects(base, objects).count(); i++) {
     const uint32_t object = guest::LoadU32(base, objects + 4 * i);
-    const int32_t kind = int32_t(guest::LoadU32(base, object));
+    const int32_t kind = int32_t(schema::CameraAnim(base, object).kind());
     if (kind == int32_t(kEndKind)) {
       break;
     }
@@ -423,7 +440,7 @@ uint32_t AnimsEvaluate(uint8_t* base, uint32_t out, uint32_t id, uint32_t time,
         *f1 = std::nullopt;
       }
     }
-    if (int32_t(guest::LoadU32(base, object)) == 7) {
+    if (int32_t(schema::CameraAnim(base, object).kind()) == 7) {
       AnimEvalTarget(base, object, out, time);
     }
   }
@@ -433,16 +450,16 @@ uint32_t AnimsEvaluate(uint8_t* base, uint32_t out, uint32_t id, uint32_t time,
 double AnimsDuration(uint8_t* base, uint32_t id, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_82150A98 CameraAnims::Duration");
   uint32_t slot = AnimsFind(base, id);
-  const uint32_t count = guest::LoadU32(base, slot + 256);
+  const uint32_t count = schema::CameraAnimObjects(base, slot).count();
   for (uint32_t i = 0; i < count; i++, slot += 4) {
     const uint32_t object = guest::LoadU32(base, slot);
-    const int32_t kind = int32_t(guest::LoadU32(base, object));
+    const int32_t kind = int32_t(schema::CameraAnim(base, object).kind());
     if (kind == int32_t(kEndKind)) {
       break;
     }
     if (kind == 1 || kind == 6) {
       *r3 = slot;
-      return Lfs(base, guest::LoadU32(base, object + kBlocks) + 16);
+      return Lfs(base, schema::CameraAnim(base, object).first_block().duration_address());
     }
   }
   *r3 = slot;
@@ -456,10 +473,10 @@ uint32_t AnimsObjectMatrix(uint8_t* base, uint32_t out, uint32_t id, uint32_t ti
   if (objects == 0) {
     return 0;
   }
-  const uint32_t count = guest::LoadU32(base, objects + 256);
+  const uint32_t count = schema::CameraAnimObjects(base, objects).count();
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t object = guest::LoadU32(base, objects + 4 * i);
-    const int32_t kind = int32_t(guest::LoadU32(base, object));
+    const int32_t kind = int32_t(schema::CameraAnim(base, object).kind());
     if (kind == int32_t(kEndKind)) {
       break;
     }
@@ -499,14 +516,15 @@ std::optional<int64_t> PathRequest(uint8_t* base, uint32_t buffer, uint32_t inde
 
 void PathOnLoaded(uint8_t* base, uint32_t data, uint32_t buffer) {
   ITC_NATIVE_RUNNING("sub_82152078 CameraPath::OnLoaded");
-  const uint32_t paths = data + 16;
-  const uint32_t keys = guest::LoadU32(base, data + 0) * 20 + paths;
-  const uint32_t curves = guest::LoadU32(base, data + 4) * 216 + keys;
-  for (uint32_t i = 0, path = paths; i < guest::LoadU32(base, data + 0); i++, path += 20) {
+  const schema::CameraPathFile file(base, data);
+  const uint32_t paths = data + schema::CameraPathFile::kSize;
+  const uint32_t keys = file.path_count() * schema::CameraPathRecord::kSize + paths;
+  const uint32_t curves = file.key_count() * schema::CameraPathKey::kSize + keys;
+  for (uint32_t i = 0, path = paths; i < file.path_count(); i++, path += schema::CameraPathRecord::kSize) {
     FixKeys(base, path, keys, curves);
   }
   guest::StoreU32(base, buffer + 4, paths);
-  const uint32_t count = guest::LoadU32(base, data + 0);
+  const uint32_t count = file.path_count();
   guest::StoreU32(base, buffer + 24, 3);
   guest::StoreU32(base, buffer + 8, count * 20 + paths - 20);
 }
@@ -515,49 +533,51 @@ void PathOnLoaded(uint8_t* base, uint32_t data, uint32_t buffer) {
 
 void RivalLogoConstruct(uint8_t* base, uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_82211848 RivalLogo::RivalLogo");
-  guest::StoreU32(base, entry + 8, 0);
-  guest::StoreU32(base, entry + 0, 0xFFFFFFFFu);
-  guest::StoreU32(base, entry + 4, 2);
-  guest::StoreU32(base, entry + 12, 0);
-  guest::StoreU32(base, entry + 16, 0);
+  const schema::RivalLogo r(base, entry);
+  r.set_movie(0);
+  r.set_logo(0xFFFFFFFFu);
+  r.set_flags(2);
+  r.set_anim(0);
+  r.set_asset(0);
   ITC_NATIVE_RUNNING("sub_82211708 RivalLogo::InitXpr");
-  const uint32_t holder = entry + 20;
-  guest::StoreU32(base, holder + 0, 0xFFFFFFFFu);
-  if (holder + 4 != 0) {
-    models::XprConstruct(base, holder + 4);
+  // The holder (+20): its +0, its XPR (+4), +28, +56 to +68.
+  r.set_holder(0xFFFFFFFFu);
+  if (r.xpr_address() != 0) {
+    models::XprConstruct(base, r.xpr_address());
   }
-  guest::StoreU32(base, holder + 28, 2);
-  guest::StoreU32(base, holder + 56, 0);
-  guest::StoreU32(base, holder + 60, 0);
-  guest::StoreU32(base, holder + 64, 3);
-  guest::StoreU32(base, holder + 68, 4);
+  r.set_xpr_flags(2);
+  r.set_old_texture0(0);
+  r.set_old_texture1(0);
+  r.set_texture_name0(3);
+  r.set_texture_name1(4);
 }
 
 uint32_t RivalLogoPlay(uint8_t* base, uint32_t entry, uint32_t key_slot) {
   ITC_NATIVE_RUNNING("sub_82211AB0 RivalLogo::Play");
-  if ((guest::LoadU32(base, entry + 4) & 0x4) == 0) {
+  const schema::RivalLogo r(base, entry);
+  if ((r.flags() & 0x4) == 0) {
     return entry;
   }
-  const uint32_t loaded = ui_movies::IsLoaded(base, guest::LoadU32(base, entry + 8));
-  const uint32_t logo = guest::LoadU32(base, entry + 0);
-  if (logo != 0 ? loaded == 0 : (guest::LoadU32(base, entry + 48) & 0x10) == 0) {
+  const uint32_t loaded = ui_movies::IsLoaded(base, r.movie());
+  const uint32_t logo = r.logo();
+  if (logo != 0 ? loaded == 0 : (r.xpr_flags() & 0x10) == 0) {
     return loaded;
   }
-  guest::StoreU32(base, key_slot, guest::LoadU32(base, entry + 8));
+  guest::StoreU32(base, key_slot, r.movie());
   const uint32_t movie =
       guest::LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, key_slot));
   if (logo == 0) {
     for (uint32_t i = 0; i < 2; i++) {
       const uint32_t old = ui_movies::SwapTexture(
-          base, movie, guest::LoadU32(base, entry + 84 + 4 * i), entry + 52 + 12 * i);
-      guest::StoreU32(base, entry + 76 + 4 * i, old);
+          base, movie, guest::LoadU32(base, r.texture_name0_address() + 4 * i),
+          r.textures_address() + 12 * i);
+      guest::StoreU32(base, r.old_texture0_address() + 4 * i, old);
     }
   }
-  const uint32_t r3 =
-      ui_movies::PlayNamed(base, movie, guest::LoadU32(base, entry + 12), 0, 0, 0, 0);
-  const uint32_t flags = guest::LoadU32(base, entry + 4) & ~0x4u;
-  guest::StoreU32(base, entry + 4, flags);
-  guest::StoreU32(base, entry + 4, flags | 0x8);
+  const uint32_t r3 = ui_movies::PlayNamed(base, movie, r.anim(), 0, 0, 0, 0);
+  const uint32_t flags = r.flags() & ~0x4u;
+  r.set_flags(flags);
+  r.set_flags(flags | 0x8);
   return r3;
 }
 
@@ -565,24 +585,25 @@ uint32_t RivalLogoOpen(uint8_t* base, uint32_t entry, uint32_t logo, uint32_t te
                        const std::function<uint32_t(uint32_t, uint32_t)>& open,
                        const std::function<uint32_t(uint32_t, uint32_t)>& load_xpr) {
   ITC_NATIVE_RUNNING("sub_822118E0 RivalLogo::Open");
+  const schema::RivalLogo r(base, entry);
   if (int32_t(logo) == -1) {
-    guest::StoreU32(base, entry + 4, 1);
+    r.set_flags(1);
     return entry;
   }
-  if ((guest::LoadU32(base, entry + 4) & 0x2) == 0) {
+  if ((r.flags() & 0x2) == 0) {
     return entry;
   }
   constexpr uint32_t kTextures = 0x8200CEA0;
   const uint32_t record = kTextures - 304 + logo * 12;
-  guest::StoreU32(base, entry + 0, logo);
-  guest::StoreU32(base, entry + 4, guest::LoadU32(base, entry + 4) | 4);
-  guest::StoreU32(base, entry + 8, guest::LoadU32(base, record + 0));
-  guest::StoreU32(base, entry + 12, guest::LoadU32(base, record + 4));
+  r.set_logo(logo);
+  r.set_flags(r.flags() | 4);
+  r.set_movie(guest::LoadU32(base, record + 0));
+  r.set_anim(guest::LoadU32(base, record + 4));
   const uint32_t asset = guest::LoadU32(base, record + 8);
-  guest::StoreU32(base, entry + 16, asset);
-  uint32_t r3 = open(guest::LoadU32(base, entry + 8), asset);
-  if (guest::LoadU32(base, entry + 0) == 0) {
-    r3 = load_xpr(entry + 20, guest::LoadU32(base, kTextures + (texture << 2)));
+  r.set_asset(asset);
+  uint32_t r3 = open(r.movie(), asset);
+  if (r.logo() == 0) {
+    r3 = load_xpr(r.holder_address(), guest::LoadU32(base, kTextures + (texture << 2)));
   }
   return r3;
 }
@@ -590,25 +611,26 @@ uint32_t RivalLogoOpen(uint8_t* base, uint32_t entry, uint32_t logo, uint32_t te
 uint32_t RivalLogoClose(uint8_t* base, uint32_t entry, uint32_t frame,
                         const RivalLogoCloseCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82211980 RivalLogo::Close");
-  guest::StoreU32(base, frame + 80, guest::LoadU32(base, entry + 8));
+  const schema::RivalLogo r(base, entry);
+  guest::StoreU32(base, frame + 80, r.movie());
   uint32_t r3 = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
   const uint32_t movie = guest::LoadU32(base, r3);
-  if ((guest::LoadU32(base, entry + 4) & 0x8) != 0) {
+  if ((r.flags() & 0x8) != 0) {
     calls.finish_all(movie);
-    if (guest::LoadU32(base, entry + 0) == 0) {
+    if (r.logo() == 0) {
       for (uint32_t i = 0; i < 2; i++) {
-        ui_movies::SwapTexture(base, movie, guest::LoadU32(base, entry + 84 + 4 * i),
-                               guest::LoadU32(base, entry + 76 + 4 * i));
+        ui_movies::SwapTexture(base, movie, guest::LoadU32(base, r.texture_name0_address() + 4 * i),
+                               guest::LoadU32(base, r.old_texture0_address() + 4 * i));
       }
-      calls.release_xpr(entry + 20);
+      calls.release_xpr(r.holder_address());
     }
-    r3 = calls.remove(guest::LoadU32(base, entry + 8));
+    r3 = calls.remove(r.movie());
   }
-  guest::StoreU32(base, entry + 8, 0);
-  guest::StoreU32(base, entry + 0, 0xFFFFFFFFu);
-  guest::StoreU32(base, entry + 4, 1);
-  guest::StoreU32(base, entry + 12, 0);
-  guest::StoreU32(base, entry + 16, 0);
+  r.set_movie(0);
+  r.set_logo(0xFFFFFFFFu);
+  r.set_flags(1);
+  r.set_anim(0);
+  r.set_asset(0);
   return r3;
 }
 

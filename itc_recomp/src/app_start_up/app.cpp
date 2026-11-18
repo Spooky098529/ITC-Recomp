@@ -8,6 +8,7 @@
 #include "framework/framework.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/app_start_up.h"
 
 ITC_FLAG_DECLARE(bool, native_app_start_up);
 ITC_FLAG_DECLARE(bool, native_framework);
@@ -67,8 +68,9 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
   guest::StoreU8(base, app + 112, 0);
   guest::StoreU8(base, app + 114, 0);
   guest::StoreU8(base, app + 113, 0);
-  Store(base, app + 24, Load(base, block + 4));
-  calls.virtual_call(Load(base, block + 0), 8, frame + 80, frame + 112, 0x820946D8);
+  const schema::AppSetUpBlock set_up(base, block);
+  Store(base, app + 24, set_up.framework_interface().address);
+  calls.virtual_call(set_up.run_loop().address, 8, frame + 80, frame + 112, 0x820946D8);
   // The run-loop listener (key 9, App::OnRunLoopEvent) on its slot 1.
   Store(base, frame + 84, 0);
   Store(base, frame + 132, app);
@@ -78,7 +80,7 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
   Store(base, frame + 136, 0x82092DE0);
   Store(base, frame + 140, 0);
   Store(base, frame + 80, 9);
-  calls.virtual_call(Load(base, block + 0), 4, frame + 80, frame + 128, 0x82094730);
+  calls.virtual_call(set_up.run_loop().address, 4, frame + 80, frame + 128, 0x82094730);
   // The state stack, from {the app} on the frame.
   Store(base, frame + 88, app);
   Store(base, frame + 128, 0x82000ABC);
@@ -138,7 +140,8 @@ std::optional<DirectSlot> RenderManagerCall(uint8_t* base, uint32_t function, ui
 }
 
 std::optional<uint32_t> RenderManagerScene(uint8_t* base, uint32_t manager) {
-  const auto slot = RenderManagerCall(base, Load(base, Load(base, manager) + 32), manager);
+  const auto slot = RenderManagerCall(
+      base, Load(base, schema::AppInterface16(base, manager).vtable() + 32), manager);
   if (!slot) {
     return std::nullopt;
   }
@@ -146,7 +149,8 @@ std::optional<uint32_t> RenderManagerScene(uint8_t* base, uint32_t manager) {
 }
 
 std::optional<uint32_t> RenderManagerFrameDriver(uint8_t* base, uint32_t manager) {
-  const auto slot = RenderManagerCall(base, Load(base, Load(base, manager) + 28), manager);
+  const auto slot = RenderManagerCall(
+      base, Load(base, schema::AppInterface16(base, manager).vtable() + 28), manager);
   if (!slot) {
     return std::nullopt;
   }
@@ -171,18 +175,18 @@ std::optional<uint32_t> AppCreate(uint8_t* base, uint32_t block,
 
 uint32_t InterfaceWord108(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82379338 (the word at +108)");
-  return Load(base, object + 108);
+  return schema::AppInterface16(base, object).sound_manager();
 }
 
 uint32_t InterfaceWord112(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82379350 (the word at +112)");
-  return Load(base, object + 112);
+  return schema::AppInterface16(base, object).movie();
 }
 
 SlotCall AppPoolSlot(uint8_t* base, uint32_t interface8) {
   ITC_NATIVE_RUNNING("sub_82094368 (the framework interface's slot 4)");
-  const uint32_t object = Load(base, interface8 + 16);
-  return {object, Load(base, Load(base, object) + 16)};
+  const auto object = schema::AppInterface8(base, interface8).framework_interface();
+  return {object.address, object.vtable().slot_4_worker_pool()};
 }
 
 SlotCall AppPoolSlotFromInterface16(uint8_t* base, uint32_t interface16) {
@@ -192,8 +196,8 @@ SlotCall AppPoolSlotFromInterface16(uint8_t* base, uint32_t interface16) {
 
 SlotCall SceneSlot(uint8_t* base, uint32_t interface8) {
   ITC_NATIVE_RUNNING("sub_82094338 App::SceneFromInterface8");
-  const uint32_t object = Load(base, interface8 + 16);
-  return {object, Load(base, Load(base, object) + 12)};
+  const auto object = schema::AppInterface8(base, interface8).framework_interface();
+  return {object.address, object.vtable().slot_3_scene()};
 }
 
 SlotCall SceneSlotFromInterface16(uint8_t* base, uint32_t interface16) {
@@ -203,8 +207,8 @@ SlotCall SceneSlotFromInterface16(uint8_t* base, uint32_t interface16) {
 
 SlotCall FrameDriverSlot(uint8_t* base, uint32_t interface4) {
   ITC_NATIVE_RUNNING("sub_82094320 App::FrameDriver");
-  const uint32_t object = Load(base, interface4 + 20);
-  return {object, Load(base, Load(base, object) + 8)};
+  const uint32_t object = Load(base, interface4 + 20);  // app + 24 (the App's, app-states)
+  return {object, schema::AppFrameworkInterface(base, object).vtable().slot_2_frame_driver()};
 }
 
 SlotCall FrameDriverSlotFromInterface16(uint8_t* base, uint32_t interface16) {

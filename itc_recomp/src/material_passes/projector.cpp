@@ -16,6 +16,7 @@
 #include "guest.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
+#include "schema/material_passes.h"
 
 namespace material_passes {
 
@@ -24,10 +25,7 @@ using namespace camera_modes::steps;
 namespace {
 
 constexpr uint32_t kOneBits = 0x3F800000;
-constexpr uint32_t kOne = 0x82000A30;       // 1.0
-constexpr uint32_t kZero = 0x82000A34;      // 0.0
-constexpr uint32_t kMinusOne = 0x82001BE0;  // probably -1.0
-constexpr uint32_t kHalf = 0x82001BE4;      // probably 0.5
+using G = schema::MaterialPassesGlobals;
 
 simde__m128 Lvx(uint8_t* base, uint32_t address) {
   const uint32_t at = address & ~0xFu;
@@ -127,14 +125,14 @@ std::optional<uint32_t> ProjectorMatrices(uint8_t* base, const ProjectorArgs& a,
   ITC_NATIVE_RUNNING("sub_820D1EB8 Projector::Matrices");
   const uint32_t f = sp - 544;
   guest::StoreU32(base, f, sp);  // the back chain, as stwu
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   Stfs(base, f + 84, zero);
   Stfs(base, f + 88, zero);
-  const double one = Lfs(base, kOne);
+  const double one = double(G::one(base));
   for (uint32_t at : {92u, 124u, 140u, 156u}) {
     Stfs(base, f + at, one);
   }
-  const double minus_one = Lfs(base, kMinusOne);
+  const double minus_one = double(G::minus_one(base));
   Stfs(base, f + 172, one);
   Stfs(base, f + 236, one);
   Stfs(base, f + 80, a.side != 0 ? minus_one : one);
@@ -165,23 +163,23 @@ std::optional<uint32_t> ProjectorMatrices(uint8_t* base, const ProjectorArgs& a,
   double size;
   {
     const bool side = a.side != 0;
-    double s = Fmadds(z, Lfs(base, side ? 0x82001FD8 : 0x82001FC0), Lfs(base, 0x82001FCC));
-    s = Fmuls(s, Lfs(base, 0x82002CC4));
-    s = Single(s * std::bit_cast<double>(
-                        (uint64_t(guest::LoadU32(base, 0x82003588)) << 32) |
-                        guest::LoadU32(base, 0x8200358C)));
-    size = Fmuls(s, Lfs(base, side ? 0x82002A14 : 0x82002A10));
+    const double depth_scale =
+        double(side ? G::value_10(base) : G::projector_depth_scale(base));
+    double s = Fmadds(z, depth_scale, double(G::projector_depth_bias(base)));
+    s = Fmuls(s, double(G::projector_size_scale(base)));
+    s = Single(s * G::projector_size_double(base));
+    size = Fmuls(s, double(side ? G::value_0_6(base) : G::projector_size_factor(base)));
   }
   {
-    const double small = Lfs(base, 0x82001070);
+    const double small = double(G::value_0_8(base));
     if (std::fabs(size) < small) {
       size = Fmuls(size, small);
     }
-    const double low = Lfs(base, 0x82002828);
+    const double low = double(G::projector_size_min(base));
     if (size < low) {
       size = low;
     } else {
-      const double high = Lfs(base, 0x820027A8);
+      const double high = double(G::projector_size_max(base));
       if (size > high) {
         size = high;
       }
@@ -195,7 +193,7 @@ std::optional<uint32_t> ProjectorMatrices(uint8_t* base, const ProjectorArgs& a,
     Stvx(base, f + 80, Normalized(p, dot));
   }
   {
-    const double half = Lfs(base, kHalf);
+    const double half = double(G::half(base));
     const double ux = Fmuls(Lfs(base, f + 80), half);
     const double uy = Fmuls(Lfs(base, f + 84), half);
     const double uz = Fmuls(Lfs(base, f + 88), half);
@@ -222,9 +220,10 @@ std::optional<uint32_t> ProjectorMatrices(uint8_t* base, const ProjectorArgs& a,
     return std::nullopt;
   }
   const double scaled = Fmuls(size, facing);
-  Stfs(base, a.scale + 40, facing);
-  Stfs(base, a.scale + 0, scaled);
-  Stfs(base, a.scale + 20, scaled);
+  const schema::MaterialPassesMatrix scale(base, a.scale);
+  scale.set_m22(float(facing));
+  scale.set_m00(float(scaled));
+  scale.set_m11(float(scaled));
   return 1;
 }
 

@@ -1,0 +1,557 @@
+# The schema of docs/functions/car-list.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The car list the type 6 and 7 panel screens show (the car pick): PanelSet
+# (at the panel screens' +9752) and its base at +4 (PanelSetBase, `b` in the
+# docs), the four panels the screens build (F the tabs, E the car rows, D
+# the colors, C the car's info), the two-player confirm panel and the
+# two-player variant PanelSetPair (src/car_list/; docs/known-data.md, "car
+# list").
+#
+# Measure faults left unclaimed (no type here takes them):
+# - "PanelSetBase.+512" (+24236, PanelSetBase::TabsPage): the two-player
+#   word 0x82815EAC read through a register the measure took for b + 512.
+# - "new<32>@PanelSetBase::SetUpColors" is CarListColor (tuning-pages owns
+#   it by the tie: Color::HsvToRgb's reads at +0 and +8, 8 bytes wide, are
+#   of the HSV at the record's +16, which SetUpColors passes).
+
+# PanelSetBase: the car list's base (the set's +4, `b`), vtable 0x820110C4
+# (one slot, sub_8224B888). Built by PanelSetBase::PanelSetBase
+# (screen-constructors.md).
+[PanelSetBase]
+measure = "PanelSetBase"
+size = 1972
+origin = "embedded"
+vtable = 0x820110C4
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "built", offset = 4, type = "u32", note = "the lists built (Build: nothing again while it and the two-player word share a bit)" },
+  { name = "picked", offset = 8, type = "u32", note = "a car picked (slot 8)" },
+  { name = "done", offset = 12, type = "u32", note = "the list done (picked or backed out)" },
+  { name = "power_graph_asked", offset = 16, type = "u32", note = "the power graph asked (slot 10)" },
+  { name = "show_stand_car", offset = 20, type = "u32", note = "show the stand's car" },
+  { name = "stand_model_loaded", offset = 24, type = "u32", note = "its model loaded (GarageStage::ReloadModel answered 1)" },
+  { name = "busy_playing", offset = 28, type = "u32", note = "group B's busy animation playing" },
+  { name = "page", offset = 32, type = "u32", note = "0 tabs, 1 rows, 2 the car's actions, 3 colors, 4 the two players' confirm, 5 picked, 6 the power graph, 7 and 8 back; -1 while a step runs" },
+  { name = "next_page", offset = 36, type = "u32", note = "the page after the step" },
+  { name = "previous_page", offset = 40, type = "u32", note = "the page before" },
+  { name = "step", offset = 44, type = "u32", note = "0 to 26, -1 none" },
+  { name = "queued_step", offset = 48, type = "u32" },
+  { name = "step_cleared", offset = 52, type = "u32", note = "cleared on each step" },
+  { name = "first_pass", offset = 56, type = "u32", note = "the step's first-pass word (each step's r4 points here)" },
+  { name = "page_menu", offset = 60, type = "bytes", count = 72, note = "the page's menu (a MenuList)" },
+  { name = "page_menu_count", offset = 60, type = "u32", note = "the page menu's +0, the item count" },
+  { name = "page_menu_scroll", offset = 64, type = "u32", note = "the page menu's +4" },
+  { name = "page_menu_scroll_before", offset = 68, type = "u32", note = "the page menu's +8" },
+  { name = "page_menu_last_move", offset = 84, type = "u32", note = "the page menu's +24 (1, -1, 0)" },
+  { name = "page_menu_wrapped", offset = 92, type = "u32", note = "the page menu's +32" },
+  { name = "page_menu_player", offset = 120, type = "u32", note = "the page menu's +60" },
+  { name = "page_menu_items", offset = 128, type = "u32", note = "the page menu's +68 (a word an item)" },
+  { name = "rows_menu", offset = 132, type = "bytes", count = 72, note = "the rows' menu (a MenuList)" },
+  { name = "rows_menu_scroll", offset = 136, type = "u32", note = "the rows menu's +4" },
+  { name = "rows_menu_scroll_before", offset = 140, type = "u32", note = "the rows menu's +8" },
+  { name = "rows_menu_last_move", offset = 156, type = "u32", note = "the rows menu's +24" },
+  { name = "rows_menu_player", offset = 192, type = "u32", note = "the rows menu's +60" },
+  { name = "rows_menu_items", offset = 200, type = "u32", note = "the rows menu's +68" },
+  { name = "answer_record", offset = 204, type = "u32", note = "the record slot 18 answers starts here (its +28 to +36 are tab, row and scroll); 0 in the constructor" },
+  { name = "unknown_208", offset = 208, type = "u32", note = "set by Build (20); not read" },
+  { name = "unknown_212", offset = 212, type = "u32", note = "0 in the constructor" },
+  { name = "unknown_216", offset = 216, type = "u32", note = "0 in the constructor" },
+  { name = "unknown_220", offset = 220, type = "u32", note = "0 in the constructor" },
+  { name = "unknown_224", offset = 224, type = "u32", note = "-1 in the constructor" },
+  { name = "tab_shown", offset = 228, type = "u32" },
+  { name = "tab", offset = 232, type = "u32", note = "0 and 1 the unlocked cars by their spec's byte +771, 2 the garage" },
+  { name = "row", offset = 236, type = "u32" },
+  { name = "scroll", offset = 240, type = "u32" },
+  { name = "color", offset = 244, type = "u32" },
+  { name = "color_scroll", offset = 248, type = "u32" },
+  { name = "unknown_252", offset = 252, type = "u32", note = "set by Build (0, then 6,000); not read" },
+  { name = "unknown_256", offset = 256, type = "u32", note = "set by Build (1); not read" },
+  { name = "unknown_260", offset = 260, type = "u32", note = "set by Build (20); not read" },
+  { name = "unknown_264", offset = 264, type = "u32", note = "set by Build (10); not read" },
+  { name = "unknown_268", offset = 268, type = "u32", note = "set by Build; not read" },
+  { name = "list0", offset = 272, type = "bytes", count = 516, note = "a CarListList: the unlocked cars whose spec byte +771 is 0" },
+  { name = "list0_count", offset = 784, type = "u32" },
+  { name = "list1", offset = 788, type = "bytes", count = 516, note = "a CarListList: the unlocked cars whose spec byte +771 is 1" },
+  { name = "list1_count", offset = 1300, type = "u32" },
+  { name = "list2", offset = 1304, type = "bytes", count = 516, note = "a CarListList: the garage's cars" },
+  { name = "list2_count", offset = 1816, type = "u32" },
+  { name = "current_list", offset = 1820, type = "ptr", to = "CarListList", note = "list0, list1 or list2" },
+  { name = "colors", offset = 1824, type = "bytes", count = 56, note = "a CarListColorList (up to 13 CarListColor records, count at +1876)" },
+  { name = "color_count", offset = 1876, type = "u32" },
+  { name = "previous_tab", offset = 1880, type = "u32", note = "the tab picked before (slot 15)" },
+  { name = "previous_entry", offset = 1884, type = "u32", note = "the entry picked before (slot 16)" },
+  { name = "previous_color", offset = 1888, type = "u32", note = "its color (slot 17)" },
+  { name = "back_object", offset = 1892, type = "ptr", to = "CarListBackObject", note = "0 in both constructors, no writer seen; when set, pages 7 and 8 update it and backing out of the rows goes through step 26" },
+  { name = "tabs", offset = 1896, type = "ptr", to = "TabPanel", note = "F" },
+  { name = "rows", offset = 1900, type = "ptr", to = "RowPanel", note = "E" },
+  { name = "color_panel", offset = 1904, type = "ptr", to = "ColorPanel", note = "D" },
+  { name = "car_panel", offset = 1908, type = "ptr", to = "CarPanel", note = "C" },
+  { name = "confirm_panel", offset = 1912, type = "ptr", to = "ConfirmPanel", note = "the two players' confirm panel" },
+  { name = "rows_shown", offset = 1916, type = "u32" },
+  { name = "unknown_1920", offset = 1920, type = "u32", note = "1 in the constructor" },
+  { name = "colors_shown", offset = 1924, type = "u32" },
+  { name = "open_kind", offset = 1928, type = "u32", note = "slot 13: 1 opens on the tabs at the list picked before, else on list 0's rows" },
+  { name = "page_drawn", offset = 1932, type = "u32", note = "the page HandleInput ran last" },
+  { name = "page_changed", offset = 1936, type = "u32" },
+  { name = "may_leave", offset = 1940, type = "u32", note = "may leave on cancel" },
+  { name = "cancelled", offset = 1944, type = "u32", note = "cancelled this frame" },
+  { name = "fade_with_steps", offset = 1948, type = "u32" },
+  { name = "player", offset = 1952, type = "u32", note = "-1, or 0 and 1 in PanelSetPair" },
+  { name = "group_b", offset = 1956, type = "ptr", note = "the screen's panel group B" },
+  { name = "busy_anim_a", offset = 1960, type = "u32", note = "group B's busy animations (-1 none): looped" },
+  { name = "busy_anim_b", offset = 1964, type = "u32", note = "looped" },
+  { name = "busy_anim_done", offset = 1968, type = "u32", note = "played once not busy" },
+]
+
+# PanelSet: the car list (the panel screens' +9752, their +9644 points to
+# it), vtable 0x820110C8 (19 slots), its base PanelSetBase at +4: each
+# field here is the base's of the same name (at its offset + 4), as the
+# set's own slots reach them.
+[PanelSet]
+measure = "PanelSet"
+size = 1976
+origin = "embedded"
+vtable = 0x820110C8
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "base_vtable", offset = 4, type = "u32", note = "the base's (PanelSetBase at +4)" },
+  { name = "picked", offset = 12, type = "u32" },
+  { name = "done", offset = 16, type = "u32" },
+  { name = "power_graph_asked", offset = 20, type = "u32" },
+  { name = "show_stand_car", offset = 24, type = "u32" },
+  { name = "stand_model_loaded", offset = 28, type = "u32" },
+  { name = "page", offset = 36, type = "u32" },
+  { name = "next_page", offset = 40, type = "u32" },
+  { name = "previous_page", offset = 44, type = "u32" },
+  { name = "step", offset = 48, type = "u32" },
+  { name = "step_cleared", offset = 56, type = "u32" },
+  { name = "first_pass", offset = 60, type = "u32" },
+  { name = "tab_shown", offset = 232, type = "u32" },
+  { name = "tab", offset = 236, type = "u32" },
+  { name = "row", offset = 240, type = "u32" },
+  { name = "scroll", offset = 244, type = "u32" },
+  { name = "color", offset = 248, type = "u32" },
+  { name = "color_scroll", offset = 252, type = "u32" },
+  { name = "current_list", offset = 1824, type = "ptr", to = "CarListList" },
+  { name = "previous_tab", offset = 1884, type = "u32" },
+  { name = "previous_entry", offset = 1888, type = "u32" },
+  { name = "previous_color", offset = 1892, type = "u32" },
+  { name = "tabs", offset = 1900, type = "ptr", to = "TabPanel" },
+  { name = "rows", offset = 1904, type = "ptr", to = "RowPanel" },
+  { name = "color_panel", offset = 1908, type = "ptr", to = "ColorPanel" },
+  { name = "car_panel", offset = 1912, type = "ptr", to = "CarPanel" },
+  { name = "open_kind", offset = 1932, type = "u32" },
+  { name = "may_leave", offset = 1944, type = "u32" },
+  { name = "cancelled", offset = 1948, type = "u32" },
+  { name = "fade_with_steps", offset = 1952, type = "u32" },
+  { name = "player", offset = 1956, type = "u32" },
+  { name = "group_b", offset = 1960, type = "ptr" },
+]
+
+# PanelSetPair: the two-player variant (vtable 0x82011118, built by
+# sub_8224B750 from the type 8 mode's panel screen, not seen in play): two
+# bases, `first_` at +4 and `second_` at +1976, each a PanelSetBase.
+[PanelSetPair]
+measure = "PanelSetPair"
+size = 3948
+origin = "embedded"
+vtable = 0x82011118
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "first_base", offset = 4, type = "u32", note = "the first base's vtable (PanelSetBase at +4)" },
+  { name = "first_picked", offset = 12, type = "u32" },
+  { name = "first_done", offset = 16, type = "u32" },
+  { name = "first_power_graph_asked", offset = 20, type = "u32" },
+  { name = "first_show_stand_car", offset = 24, type = "u32" },
+  { name = "first_stand_model_loaded", offset = 28, type = "u32" },
+  { name = "first_page", offset = 36, type = "u32" },
+  { name = "first_next_page", offset = 40, type = "u32" },
+  { name = "first_previous_page", offset = 44, type = "u32" },
+  { name = "first_step", offset = 48, type = "u32" },
+  { name = "first_step_cleared", offset = 56, type = "u32" },
+  { name = "first_first_pass", offset = 60, type = "u32" },
+  { name = "first_tab_shown", offset = 232, type = "u32" },
+  { name = "first_tab", offset = 236, type = "u32" },
+  { name = "first_row", offset = 240, type = "u32" },
+  { name = "first_scroll", offset = 244, type = "u32" },
+  { name = "first_color", offset = 248, type = "u32" },
+  { name = "first_color_scroll", offset = 252, type = "u32" },
+  { name = "first_current_list", offset = 1824, type = "ptr", to = "CarListList" },
+  { name = "first_tabs", offset = 1900, type = "ptr", to = "TabPanel" },
+  { name = "first_rows", offset = 1904, type = "ptr", to = "RowPanel" },
+  { name = "first_color_panel", offset = 1908, type = "ptr", to = "ColorPanel" },
+  { name = "first_car_panel", offset = 1912, type = "ptr", to = "CarPanel" },
+  { name = "first_confirm_panel", offset = 1916, type = "ptr", to = "ConfirmPanel" },
+  { name = "first_may_leave", offset = 1944, type = "u32" },
+  { name = "first_cancelled", offset = 1948, type = "u32" },
+  { name = "first_fade_with_steps", offset = 1952, type = "u32" },
+  { name = "first_player", offset = 1956, type = "u32" },
+  { name = "first_group_b", offset = 1960, type = "ptr" },
+  { name = "second_base", offset = 1976, type = "u32", note = "the second base's vtable (PanelSetBase at +1976)" },
+  { name = "second_picked", offset = 1984, type = "u32" },
+  { name = "second_done", offset = 1988, type = "u32" },
+  { name = "second_tabs", offset = 3872, type = "ptr", to = "TabPanel" },
+  { name = "second_rows", offset = 3876, type = "ptr", to = "RowPanel" },
+  { name = "second_color_panel", offset = 3880, type = "ptr", to = "ColorPanel" },
+  { name = "second_car_panel", offset = 3884, type = "ptr", to = "CarPanel" },
+  { name = "second_confirm_panel", offset = 3888, type = "ptr", to = "ConfirmPanel" },
+  { name = "second_may_leave", offset = 3916, type = "u32" },
+  { name = "second_cancelled", offset = 3920, type = "u32" },
+  { name = "second_fade_with_steps", offset = 3924, type = "u32" },
+  { name = "second_player", offset = 3928, type = "u32" },
+  { name = "second_group_b", offset = 3932, type = "ptr" },
+]
+
+# The interface PanelSet's and PanelSetPair's destructors leave (vtable
+# 0x82011018).
+[PanelSetInterface]
+measure = "PanelSetInterface"
+size = 4
+origin = "embedded"
+vtable = 0x82011018
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+]
+
+# A list of cars (PanelSetBase's +272, +788, +1304; +1820 points to one):
+# an embedded part of the base the measure doesn't split off (it files
+# current_list's pointee as the base itself, so its count is the base's
+# +512 there).
+[CarListList]
+size = 516
+origin = "embedded"
+fields = [
+  { name = "entries", offset = 0, type = "bytes", count = 512, note = "128 pointers to CarListEntry" },
+  { name = "count", offset = 512, type = "u32" },
+]
+
+# A car in a list (8,448 bytes, VirtualAlloc by PanelSetBase::Build): a
+# copy of the car's spec (Params::GetCarSpec, 8,432 bytes; car-specs.md),
+# the car's id and its color. The car dealer's entries are the same
+# (CarDealerEntry, car-dealer.toml).
+[CarListEntry]
+measures = ["new<8448>@PanelSetBase::Build", "new<8448>@PanelSetBase::Build#2", "CarPanel::SetName.r4", "CarPanel::ShowStats.r4", "RowPanel::SetRow.r5"]
+size = 8448
+origin = "allocated"
+fields = [
+  { name = "displacement", offset = 648, type = "u32", note = "the spec's block 2 +8 (cc)" },
+  { name = "unknown_652", offset = 652, type = "f32", note = "one of power, torque and their rpm (block 2 +12 to +24)" },
+  { name = "unknown_656", offset = 656, type = "f32", note = "one of power, torque and their rpm" },
+  { name = "unknown_660", offset = 660, type = "f32", note = "one of power, torque and their rpm" },
+  { name = "unknown_664", offset = 664, type = "f32", note = "one of power, torque and their rpm" },
+  { name = "unknown_708", offset = 708, type = "u8", note = "block 2 +68, the engine type (PowerGraph::SetEntry's class switch)" },
+  { name = "turbo", offset = 709, type = "u8", note = "block 2 +69: 1 for turbo" },
+  { name = "unknown_712", offset = 712, type = "u32", note = "shown by CarPanel::SetStats (scaled); the power graph record's +4" },
+  { name = "unknown_716", offset = 716, type = "u32", note = "the power graph record's +8 (the dealer: at most 4700)" },
+  { name = "unknown_720", offset = 720, type = "u32", note = "the power graph record's +16 (the dealer: at most 2000)" },
+  { name = "unknown_724", offset = 724, type = "u32", note = "the power graph record's +12 (the dealer: at most 1700)" },
+  { name = "price", offset = 744, type = "u32" },
+  { name = "maker", offset = 769, type = "u8", note = "string 1934 + it (the maker's name)" },
+  { name = "unknown_770", offset = 770, type = "u8", note = "the stats record's +0 (string 421 + it)" },
+  { name = "list_kind", offset = 771, type = "u8", note = "0 list 0, 1 list 1, others not listed" },
+  { name = "color_records", offset = 8116, type = "bytes", count = 260, note = "13 records of 20 bytes: +0 raised (u16), +4 the hue (u16), +6 the saturation, +7 the value (bytes)" },
+  { name = "color_count", offset = 8376, type = "u32" },
+  { name = "car_id", offset = 8432, type = "u32" },
+  { name = "color", offset = 8436, type = "u32" },
+]
+
+# The colors' list (PanelSetBase's +1824): up to 13 pointers to
+# CarListColor and the count.
+[CarListColorList]
+measure = "ColorPanel::SetSwatches.r4"
+size = 56
+origin = "embedded"
+fields = [
+  { name = "records", offset = 0, type = "bytes", count = 52, note = "13 pointers to CarListColor" },
+  { name = "count", offset = 52, type = "u32" },
+]
+
+# A color (32 bytes, VirtualAlloc by PanelSetBase::SetUpColors): the RGB
+# from the entry's HSV.
+[CarListColor]
+measure = "ColorPanel::SetSwatch.r5"
+size = 32
+origin = "allocated"
+fields = [
+  { name = "red", offset = 0, type = "u32" },
+  { name = "green", offset = 4, type = "u32" },
+  { name = "blue", offset = 8, type = "u32" },
+  { name = "hue", offset = 16, type = "f32" },
+  { name = "saturation", offset = 20, type = "f32", note = "0 to 1" },
+  { name = "value", offset = 24, type = "f32", note = "0 to 1" },
+]
+
+# The object PanelSetBase's +1892 points to (16 bytes; no writer of the
+# pointer seen): pages 7 and 8 copy its +8 or +12 into its +4.
+[CarListBackObject]
+measure = "PanelSetBase.+1892"
+size = 16
+origin = "embedded"
+fields = [
+  { name = "value", offset = 4, type = "u32" },
+  { name = "page7_value", offset = 8, type = "u32", note = "copied to +4 by BackPage7" },
+  { name = "page8_value", offset = 12, type = "u32", note = "copied to +4 by BackPage8" },
+]
+
+# The stats record CarPanel::ShowStats builds on its frame (+80) from an
+# entry's spec, passed to the C panels' slot 1 (SetStats).
+[CarListStats]
+measures = ["CarPanel::SetStats.r4", "Panel6C::SetStats.r4"]
+size = 32
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "the spec's +770 (string 421 + it)" },
+  { name = "turbo", offset = 4, type = "u32", note = "the spec's +709 set (string 426 + it)" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "the spec's +712, shown scaled" },
+  { name = "displacement", offset = 12, type = "u32", note = "the spec's +648" },
+  { name = "unknown_16", offset = 16, type = "u32", note = "the spec's +652 as an integer" },
+  { name = "unknown_20", offset = 20, type = "u32", note = "the spec's +656 as an integer" },
+  { name = "unknown_24", offset = 24, type = "f32", note = "the spec's +660, shown scaled" },
+  { name = "unknown_28", offset = 28, type = "u32", note = "the spec's +664 as an integer" },
+]
+
+# The panel groups' and the D, E, F panels' base (vtable 0x82010974; built
+# on NodeBase).
+[PanelGroupBase]
+measure = "PanelGroupBase"
+size = 36
+origin = "embedded"
+vtable = 0x82010974
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "node_word", offset = 4, type = "u32", note = "NodeBase's (0); a panel group's movie (PanelGroup::PanelGroup: 4)" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "-1 in the constructor" },
+  { name = "text_node_set", offset = 12, type = "u32", note = "the caption's node set (PanelGroup::SetCaption)" },
+  { name = "unknown_16", offset = 16, type = "u32", note = "-1 in the constructor" },
+  { name = "unknown_20", offset = 20, type = "u32", note = "-1 in the constructor" },
+  { name = "unknown_24", offset = 24, type = "u32", note = "-1 in the constructor" },
+  { name = "unknown_28", offset = 28, type = "u32", note = "-1 in the constructor" },
+  { name = "caption_node", offset = 32, type = "u32", note = "the caption's node (-1 none)" },
+]
+
+# A D or F panel seen through PanelPart::FinishAll.
+[PanelPart]
+measure = "PanelPart"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "group", offset = 4, type = "ptr" },
+]
+
+# F, the tabs (144 bytes; Panel6F / Panel7F). Named animations are ids of
+# the group's UI movie; nodes are node sets and child indices.
+[TabPanel]
+measure = "TabPanel"
+size = 144
+origin = "embedded"
+fields = [
+  { name = "group", offset = 4, type = "ptr", note = "its panel group" },
+  { name = "tab", offset = 8, type = "u32" },
+  { name = "tab0_enabled", offset = 12, type = "u32", note = "1 the tab's animation plays; set by step 0 from the lists' counts" },
+  { name = "tab1_enabled", offset = 16, type = "u32" },
+  { name = "tab2_enabled", offset = 20, type = "u32" },
+  { name = "node_set", offset = 24, type = "u32" },
+  { name = "texts_node", offset = 28, type = "u32" },
+  { name = "tabs_node", offset = 32, type = "u32" },
+  { name = "buttons_node", offset = 36, type = "u32" },
+  { name = "cursor", offset = 40, type = "u32", note = "the cursor's child of (node_set, texts_node)" },
+  { name = "tab0_text", offset = 44, type = "u32", note = "the tabs' text children" },
+  { name = "tab1_text", offset = 48, type = "u32" },
+  { name = "tab2_text", offset = 52, type = "u32" },
+  { name = "buttons", offset = 84, type = "u32", note = "the first of six button children" },
+  { name = "tab_word_a", offset = 88, type = "u32", note = "a child of tabs_node whose +108 is the tab" },
+  { name = "tab_word_b", offset = 92, type = "u32", note = "another" },
+  { name = "tab_anims", offset = 96, type = "u32", note = "the first tab's animation (+ the tab)" },
+  { name = "scroll_down", offset = 100, type = "u32", note = "played for a move of -1" },
+  { name = "scroll_up", offset = 104, type = "u32", note = "played for a move of 1" },
+  { name = "unknown_108", offset = 108, type = "u32", note = "played and finished by Move for a tab not enabled" },
+  { name = "unknown_112", offset = 112, type = "u32", note = "played reversed and finished by Move for a tab not enabled" },
+  { name = "show_anim", offset = 116, type = "u32" },
+  { name = "move_anim", offset = 120, type = "u32" },
+  { name = "loop_a", offset = 124, type = "u32", note = "looped by Show" },
+  { name = "loop_b", offset = 128, type = "u32", note = "looped by Select" },
+  { name = "loop_c", offset = 132, type = "u32", note = "looped by Show and Select" },
+  { name = "loop_d", offset = 136, type = "u32", note = "looped by Show" },
+  { name = "two_players", offset = 140, type = "u32", note = "the two-player word: no caption" },
+]
+
+# E, the car rows (160 bytes, PanelE).
+[RowPanel]
+measures = ["RowPanel", "MenuList.+1900"]
+size = 160
+origin = "embedded"
+fields = [
+  { name = "group", offset = 0, type = "ptr", note = "its panel group" },
+  { name = "row_count", offset = 4, type = "u32", note = "the rows shown" },
+  { name = "row", offset = 8, type = "u32", note = "the highlighted row (-1 none)" },
+  { name = "node_set", offset = 12, type = "u32" },
+  { name = "node", offset = 16, type = "u32" },
+  { name = "row_nodes", offset = 20, type = "bytes", count = 40, note = "the rows' child indices" },
+  { name = "spare_row_node", offset = 60, type = "u32", note = "the row SetRow fills for row -1 (scrolled in)" },
+  { name = "show_anim", offset = 76, type = "u32" },
+  { name = "show_anim_alt", offset = 80, type = "u32", note = "played instead with show_alt" },
+  { name = "show_first_anim", offset = 84, type = "u32" },
+  { name = "hide_anim", offset = 88, type = "u32" },
+  { name = "row_anims", offset = 92, type = "u32", note = "the first row's animation (+ the row)" },
+  { name = "scroll_up", offset = 96, type = "u32" },
+  { name = "scroll_down", offset = 100, type = "u32" },
+  { name = "arrow_up", offset = 104, type = "u32" },
+  { name = "arrow_down", offset = 108, type = "u32" },
+  { name = "loop_a", offset = 112, type = "u32" },
+  { name = "loop_b", offset = 116, type = "u32" },
+  { name = "logo", offset = 120, type = "u32", note = "a row's logo child (its +108 the frame)" },
+  { name = "text_maker", offset = 124, type = "u32", note = "a row's text child: string 1934 + the maker" },
+  { name = "text_name", offset = 128, type = "u32", note = "string 1646 + the car's id" },
+  { name = "text_third", offset = 132, type = "u32", note = "string 1718 + the car's id" },
+  { name = "cursor", offset = 144, type = "u32", note = "the more-rows marker child" },
+  { name = "arrows", offset = 148, type = "u32", note = "the up arrow's child, the down's after it" },
+  { name = "show_alt", offset = 152, type = "u32", note = "show with show_anim_alt (ToTabs and PanelSet::Open set it)" },
+  { name = "two_players", offset = 156, type = "u32", note = "the two-player word: no caption" },
+]
+
+# D, the colors (92 bytes; Panel6D / Panel7D).
+[ColorPanel]
+measure = "ColorPanel"
+size = 92
+origin = "embedded"
+fields = [
+  { name = "group", offset = 4, type = "ptr", note = "its panel group" },
+  { name = "node_set", offset = 8, type = "u32" },
+  { name = "node", offset = 12, type = "u32" },
+  { name = "show_anim", offset = 16, type = "u32" },
+  { name = "hide_anim", offset = 20, type = "u32" },
+  { name = "item_anims", offset = 24, type = "u32", note = "the first item's animation (+ the item)" },
+  { name = "scroll_back", offset = 28, type = "u32", note = "played for a step below 0" },
+  { name = "scroll_on", offset = 32, type = "u32", note = "played for a step above 0" },
+  { name = "swatches_on", offset = 36, type = "u32", note = "played for moves above 0" },
+  { name = "swatches_back", offset = 40, type = "u32", note = "played for moves below 0" },
+  { name = "unknown_44", offset = 44, type = "u32", note = "finished by Move" },
+  { name = "unknown_48", offset = 48, type = "u32", note = "finished by Move" },
+  { name = "arrow_a", offset = 52, type = "u32" },
+  { name = "arrow_b", offset = 56, type = "u32" },
+  { name = "arrows_node", offset = 60, type = "u32" },
+  { name = "cursor", offset = 64, type = "u32" },
+  { name = "swatches", offset = 68, type = "u32", note = "the swatches' child (its +100 the first swatch, +104 their count)" },
+  { name = "arrow_up_node", offset = 72, type = "u32" },
+  { name = "arrow_down_node", offset = 76, type = "u32" },
+  { name = "swatch_color", offset = 80, type = "u32", note = "a swatch's color child (+56 to +64 the RGB)" },
+  { name = "two_players", offset = 88, type = "u32", note = "the two-player word: no caption" },
+]
+
+# C, the car's info, stats and button prompts (320 bytes): CarPanelBase
+# (vtable 0x820111C0) and its classes Panel6C (0x82010980), Panel7C
+# (0x82010EE4) and Panel8C (type8-screens.md).
+[CarPanel]
+measures = ["CarPanel", "CarPanelBase", "Panel6C", "Panel7C"]
+size = 320
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "CarPanelVtable" },
+  { name = "shows_price", offset = 4, type = "u32", note = "ShowStats calls SetPrice" },
+  { name = "action", offset = 8, type = "u32", note = "the highlighted action (-1 none)" },
+  { name = "group", offset = 12, type = "ptr", note = "its panel group" },
+  { name = "node_set", offset = 16, type = "u32" },
+  { name = "node", offset = 20, type = "u32" },
+  { name = "stats_node", offset = 24, type = "u32" },
+  { name = "price_node", offset = 28, type = "u32" },
+  { name = "buttons_node", offset = 32, type = "u32" },
+  { name = "name_node", offset = 36, type = "u32", note = "CarPanelBase::SetCarName's node" },
+  { name = "show_anim_a", offset = 40, type = "u32" },
+  { name = "show_anim_b", offset = 44, type = "u32" },
+  { name = "hide_anim_a", offset = 48, type = "u32" },
+  { name = "hide_anim_b", offset = 52, type = "u32" },
+  { name = "show_again_anim", offset = 56, type = "u32" },
+  { name = "arrow_a", offset = 60, type = "u32" },
+  { name = "arrow_b", offset = 64, type = "u32" },
+  { name = "action_anims", offset = 68, type = "bytes", count = 40, note = "ten animations, one an action" },
+  { name = "scroll_back", offset = 108, type = "u32", note = "played for a move of -1" },
+  { name = "scroll_on", offset = 112, type = "u32", note = "played for a move of 1" },
+  { name = "stats_in", offset = 116, type = "u32" },
+  { name = "stats_out", offset = 120, type = "u32" },
+  { name = "loop_a", offset = 124, type = "u32" },
+  { name = "loop_b", offset = 128, type = "u32" },
+  { name = "text_maker", offset = 132, type = "u32", note = "string 1934 + the maker" },
+  { name = "text_name", offset = 136, type = "u32", note = "string 1646 + the car's id" },
+  { name = "text_third", offset = 140, type = "u32", note = "string 1718 + the car's id" },
+  { name = "texts", offset = 144, type = "u32", note = "two text children (SetTexts)" },
+  { name = "cursor", offset = 152, type = "u32" },
+  { name = "stats_children", offset = 160, type = "bytes", count = 88, note = "22 child indices of the stats node: CarPanel::SetStats uses +160 to +180 and +216 to +228, Panel6C::SetStats +160 to +244" },
+  { name = "price_child", offset = 260, type = "u32" },
+  { name = "price_text_a", offset = 264, type = "u32", note = "text 527 with the price" },
+  { name = "price_text_b", offset = 268, type = "u32", note = "text 435" },
+  { name = "buttons", offset = 272, type = "u32", note = "the first of six button children" },
+  { name = "text_a", offset = 276, type = "u32", note = "SetTexts' first string" },
+  { name = "text_b", offset = 280, type = "u32", note = "SetTexts' second string" },
+  { name = "two_players", offset = 316, type = "u32", note = "the two-player word: no caption" },
+]
+
+# The C panels' vtable as their callers read it.
+[CarPanelVtable]
+measure = "CarPanel.+0"
+size = 16
+origin = "image"
+fields = [
+  { name = "deleting_destructor", offset = 0, type = "fn" },
+  { name = "set_stats", offset = 4, type = "fn", note = "slot 1 (CarPanel::SetStats, Panel6C::SetStats)" },
+  { name = "set_car_name", offset = 8, type = "fn", note = "slot 2" },
+  { name = "show_arrows", offset = 12, type = "fn", note = "slot 3" },
+]
+
+# The two players' confirm panel (40 bytes, vtable 0x82010B5C; not seen in
+# play).
+[ConfirmPanel]
+measure = "ConfirmPanel"
+size = 40
+origin = "embedded"
+vtable = 0x82010B5C
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "group", offset = 4, type = "ptr", note = "0 in the constructor" },
+  { name = "kind", offset = 8, type = "u32", note = "2 in the constructor; picks the node ShowNode shows" },
+  { name = "unknown_12", offset = 12, type = "u32", note = "-1 in the constructor" },
+  { name = "node_a", offset = 16, type = "u32" },
+  { name = "node_b", offset = 20, type = "u32" },
+  { name = "node_c", offset = 24, type = "u32" },
+  { name = "show_anim", offset = 28, type = "u32" },
+  { name = "loop_anim", offset = 32, type = "u32" },
+  { name = "hide_anim", offset = 36, type = "u32" },
+]
+
+# The first-pass word each step is given (PanelSetBase's +56).
+[CarListStepWord]
+measures = [
+  "PanelSetBase::Step0.r4", "PanelSetBase::Step1.r4", "PanelSetBase::Step2.r4",
+  "PanelSetBase::Step3.r4", "PanelSetBase::Step4.r4", "PanelSetBase::Step5.r4",
+  "PanelSetBase::Step6.r4", "PanelSetBase::Step7.r4", "PanelSetBase::Step8.r4",
+  "PanelSetBase::Step9.r4", "PanelSetBase::Step10.r4", "PanelSetBase::Step11.r4",
+  "PanelSetBase::Step12.r4", "PanelSetBase::Step13.r4", "PanelSetBase::Step14.r4",
+  "PanelSetBase::Step15.r4", "PanelSetBase::Step16.r4", "PanelSetBase::Step17.r4",
+  "PanelSetBase::Step18.r4", "PanelSetBase::Step19.r4", "PanelSetBase::Step20.r4",
+  "PanelSetBase::Step21.r4", "PanelSetBase::Step22.r4", "PanelSetBase::Step23.r4",
+  "PanelSetBase::Step24.r4", "PanelSetBase::Step25.r4", "PanelSetBase::Step26.r4",
+]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "first_pass", offset = 0, type = "u32", note = "0 on a step's first call" },
+]
+
+[globals]
+two_players = { address = 0x82815EAC, type = "u32", note = "0 in PanelSet, 1 in PanelSetPair" }
+fade_wait = { address = 0x82815EB0, type = "u32", note = "set with each fade, cleared by GroupPair::WaitForFade; a step doesn't move on while set" }
+power_graph = { address = 0x82815EBC, type = "ptr", note = "the power graph screen's record block (its record at +8)" }
+pair_save_data = { address = 0x826C5B5C, type = "ptr", note = "the players' save data (sub_82105678's), 120,108 bytes each" }
+stand_holders = { address = 0x826D83E0, type = "ptr", note = "the stand's holders: three slots, by the player" }
+stand_wait = { address = 0x826379B8, type = "u32", note = "the two-player stand's wait word" }
+fade_in_passes = { address = 0x82001BEC, type = "u32", note = "ScreenFades::FadeIn's pass count (5)" }
+fade_out_passes = { address = 0x82001BF0, type = "u32", note = "ScreenFades::FadeOut's (15)" }
+stats_scale_a = { address = 0x82009F00, type = "f64", note = "the stats record's +8 scaled by it" }
+stats_scale_b = { address = 0x82009F08, type = "f64", note = "the stats record's +24 scaled by it" }
+color_scale = { address = 0x82000C44, type = "f32", note = "the RGB scale (255)" }
+color_unit = { address = 0x82002200, type = "f32", note = "the saturation's and value's unit" }
+color_value_add_raised = { address = 0x82002FF4, type = "u32", note = "added to a color record's value byte when its +0 is set" }
+color_value_add = { address = 0x82002FF8, type = "u32", note = "added to a color record's value byte when its +0 is 0" }

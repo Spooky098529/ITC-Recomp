@@ -15,6 +15,7 @@
 #include "graphics/command_buffer.h"
 #include "hooks/guest_call.h"
 #include "lifted/sdk.h"
+#include "schema/command_buffer.h"
 
 ITC_FLAG_BOOL(native_command_buffer, true, "ITC",
               "Run the graphics library's command buffer (docs/functions/command-buffer.md: "
@@ -59,8 +60,7 @@ ITC_COMMAND_BUFFER(8229E308, {
 // The chains: a recording command buffer (+13160, never in play) makes
 // Reserve the original's, so they run the original whole.
 ITC_COMMAND_BUFFER(8229EB10, {
-  if (guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32 + cb::kChainDevice) + cb::kRecorder) !=
-      0) {
+  if (guest::LoadU32(base, schema::CommandChain(base, ctx.r3.u32).device() + cb::kRecorder) != 0) {
     lifted::original::c8229EB10(ctx, base);
     return;
   }
@@ -152,7 +152,7 @@ ITC_COMMAND_BUFFER(822AF978,
 // range it took (sub_8229DE48) has had no writer in play since
 // Resource::Lock is native.
 ITC_NATIVE_ENTRY(8229E5D0, ITC_FLAG(native_command_buffer)) {
-  guest::StoreU32(base, ctx.r5.u32, 0);
+  schema::CommandFlushWords(base, ctx.r5.u32).set_words(0);
 }
 
 // The data cache flush (sub_822AC470): Dropped (no data cache to flush on

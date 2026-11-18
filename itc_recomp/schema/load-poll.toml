@@ -1,0 +1,128 @@
+# The schema of docs/functions/load-poll.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The scene models' load poll (src/load_poll/): the parts' finishers and the
+# record's apply steps over the second set's objects (known-data.md's
+# "second set objects" and "scene model"). The second set's other objects
+# (the scene model, the interior, the cockpit, the light kit, the traffic
+# body, the wheels) are other areas'; the measure gives this area the parts
+# object (pool 1) and the interior's meters.
+#
+# Left to other files (the measure's names to add there, not copied here):
+# "InteriorMeters.+0" is car-draw.toml's InteriorRecord (the interior's
+# 120-byte record; the meters also read +16 + 12i, gauge i's texture index);
+# "CarParts.+106000" is the first set of scene pools (car-models.toml's
+# CarModelsFirstSet: +8 the model set); "SceneInterior.+11608" is a second
+# set car model (car-models.toml's CarModelsSceneCarModel: +24 the first
+# set's car model) and "SceneInterior.+11608.+24" that car model
+# (car-models.toml's CarModel: +32 the block); "SceneParts.+92" is a part
+# model (PartModel, material-passes.md: +452 the selected texture).
+
+# Pool 1 of the second set: a car's parts (37,296 bytes, SceneParts::SceneParts
+# sub_820E2F18, second-set.md), a PoolNode at +0.
+[SceneParts]
+measure = "SceneParts"
+size = 37296
+origin = "allocated"
+vtable = 0x82006024
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82006024" },
+  { name = "list", offset = 4, type = "u32", note = "the PoolNode's list" },
+  { name = "link_8", offset = 8, type = "u32", note = "the PoolNode's links" },
+  { name = "link_12", offset = 12, type = "u32" },
+  { name = "state", offset = 16, type = "u32", note = "3 in use" },
+  { name = "index", offset = 20, type = "u32", note = "its index in the pool (-1 from the constructor)" },
+  { name = "scene_car_model", offset = 24, type = "ptr", to = "CarModelsSceneCarModel", note = "the second set's car model (pool 0; SceneParts::Link): its +24 the first set's car model" },
+  { name = "skeleton", offset = 28, type = "u32", note = "the car model's loading object's +3760, the node file's skeleton (SceneParts::Link)" },
+  { name = "part_model_0", offset = 32, type = "u32", note = "the 17 part models by kind (+32 + 4k; CarParts::Part, SceneParts::Build; cleared by Reset): PartModel, material-passes.md" },
+  { name = "part_model_1", offset = 36, type = "u32" },
+  { name = "part_model_2", offset = 40, type = "u32" },
+  { name = "part_model_3", offset = 44, type = "u32" },
+  { name = "part_model_4", offset = 48, type = "u32", note = "0 without the call when the record's +124 is 13" },
+  { name = "part_model_5", offset = 52, type = "u32" },
+  { name = "part_model_6", offset = 56, type = "u32" },
+  { name = "part_model_7", offset = 60, type = "u32" },
+  { name = "part_model_8", offset = 64, type = "u32" },
+  { name = "part_model_9", offset = 68, type = "u32" },
+  { name = "part_model_10", offset = 72, type = "u32" },
+  { name = "part_model_11", offset = 76, type = "u32" },
+  { name = "part_model_12", offset = 80, type = "u32" },
+  { name = "part_model_13", offset = 84, type = "u32" },
+  { name = "part_model_14", offset = 88, type = "u32" },
+  { name = "part_model_15", offset = 92, type = "u32", note = "the measure's SceneParts.+92 (its +452 the selected texture)" },
+  { name = "part_model_16", offset = 96, type = "u32" },
+  { name = "loaded", offset = 100, type = "u32", note = "CarParts::IsLoaded's answer (SceneParts::Finish); 1 once loaded" },
+  { name = "first_set_parts", offset = 104, type = "u32", note = "the first set's parts (CarParts, scene-loaders.md; pool 1 of [0x826C2E40])" },
+  { name = "record", offset = 108, type = "bytes", count = 60, note = "the 60-byte parts record (SceneParts::SetUp, Apply); its words pick each kind's part" },
+  { name = "choice_0", offset = 108, type = "u32", note = "kind 0's CarParts::Part r5 (and kind 1's r6)" },
+  { name = "choice_1", offset = 112, type = "u32", note = "kind 1's r5" },
+  { name = "choice_2", offset = 116, type = "u32", note = "kind 2's" },
+  { name = "choice_3", offset = 120, type = "u32", note = "kind 3's" },
+  { name = "choice_4", offset = 124, type = "u32", note = "kind 4's; 13: no part" },
+  { name = "choice_5", offset = 128, type = "u32", note = "kind 5's" },
+  { name = "choice_6", offset = 132, type = "u32", note = "kinds 6 and 7's r5, 8 and 9's r6" },
+  { name = "choice_8", offset = 136, type = "u32", note = "kinds 8 and 9's r5" },
+  { name = "choice_10", offset = 140, type = "u32", note = "kind 10's" },
+  { name = "choice_11", offset = 144, type = "u32", note = "kind 11's" },
+  { name = "choice_12", offset = 148, type = "u32", note = "kind 12's" },
+  { name = "choice_14", offset = 152, type = "u32", note = "kind 14's" },
+  { name = "choice_15", offset = 156, type = "u32", note = "kind 15's" },
+  { name = "points", offset = 176, type = "bytes", count = 37108, note = "the point block (PartsPoints, second-set.md; groups by part in known-data.md)" },
+  { name = "light_value", offset = 27664, type = "f32", note = "the point block's +27488, in the headlights' group (SceneParts::LightValue)" },
+  { name = "points_car_record", offset = 37252, type = "u32", note = "the point block's +37076: the first set's car model's car record (its +32; SceneParts::Build)" },
+  { name = "points_record", offset = 37256, type = "u32", note = "the point block's +37080: the record (+108)" },
+  { name = "points_scene_car_model", offset = 37260, type = "u32", note = "the point block's +37084: the second set's car model (+24)" },
+  { name = "points_skeleton", offset = 37268, type = "u32", note = "the point block's +37092: the first set's car model's skeleton (its +3760)" },
+  { name = "unknown_37280", offset = 37280, type = "u32", note = "0 from SceneParts::Reset" },
+  { name = "scene", offset = 37284, type = "ptr", to = "CarScene", note = "the car scene ([0x826C2E44]); its +4 the model set" },
+]
+
+# The interior's meters (the interior's point block +3152, SceneInterior
+# +3312; up to the steering wheel's group at the block's +8512): car-draw.toml's
+# Dash (measure "Dash") is the same object, by its names here, to merge.
+# Gauge records at +16 + 240k: the needles' models at their +4, shapes at +228.
+[InteriorMeters]
+measure = "InteriorMeters"
+size = 5360
+origin = "embedded"
+fields = [
+  { name = "record", offset = 0, type = "ptr", to = "InteriorRecord", note = "the interior's 120-byte record (SceneInterior +40): gauge i's entry at +8 + 12i (present, kind, texture index)" },
+  { name = "car_block", offset = 4, type = "u32", note = "the car's block (SceneInterior::Finish); 5: gauge 1 is the turbo gauge" },
+  { name = "needle0_model", offset = 1700, type = "u32", note = "gauge i's needle model (its point record's +4; InteriorMeters::SetGauge's PartModel::SetTexture)" },
+  { name = "needle0_shape", offset = 1924, type = "u32", note = "its shape (the record's +228)" },
+  { name = "needle1_model", offset = 1940, type = "u32" },
+  { name = "needle1_shape", offset = 2164, type = "u32" },
+  { name = "needle2_model", offset = 2660, type = "u32" },
+  { name = "needle2_shape", offset = 2884, type = "u32" },
+  { name = "needle3_model", offset = 2900, type = "u32" },
+  { name = "needle3_shape", offset = 3124, type = "u32" },
+  { name = "needle4_model", offset = 3620, type = "u32" },
+  { name = "needle4_shape", offset = 3844, type = "u32" },
+  { name = "needle5_model", offset = 3860, type = "u32" },
+  { name = "needle5_shape", offset = 4084, type = "u32" },
+  { name = "needle6_model", offset = 4100, type = "u32" },
+  { name = "needle6_shape", offset = 4324, type = "u32" },
+  { name = "gauge0_provider", offset = 5296, type = "u32", note = "the gauges' scene entries (the scene + 4864 + 20 x the record's kind; InteriorMeters::SetGauge): their texture providers" },
+  { name = "gauge1_provider", offset = 5300, type = "u32" },
+  { name = "gauge2_provider", offset = 5304, type = "u32" },
+  { name = "gauge3_provider", offset = 5308, type = "u32" },
+  { name = "gauge4_provider", offset = 5312, type = "u32" },
+  { name = "gauge5_provider", offset = 5316, type = "u32" },
+  { name = "gauge6_provider", offset = 5320, type = "u32" },
+  { name = "turbo_provider", offset = 5324, type = "u32", note = "gauge 1's in mode 5 (SceneInterior +8636: the interior's texture provider, SceneInterior::Finish)" },
+  { name = "gauge0_angle", offset = 5328, type = "u32", note = "the needles' angle words (sub_820D3658: 0x82003600 + 16 x (2 x kind + (texture index >= 3)))" },
+  { name = "gauge1_angle", offset = 5332, type = "u32" },
+  { name = "gauge2_angle", offset = 5336, type = "u32" },
+  { name = "gauge3_angle", offset = 5340, type = "u32" },
+  { name = "gauge4_angle", offset = 5344, type = "u32" },
+  { name = "gauge5_angle", offset = 5348, type = "u32" },
+  { name = "gauge6_angle", offset = 5352, type = "u32" },
+]
+
+[globals]
+scene = { address = 0x826C2E44, type = "ptr", to = "CarScene", note = "the car scene: +4 the model set (0 front end, 1 race), +208 and +296 the tires' and calipers' texture providers, +1064 and +1132 the digits'" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }

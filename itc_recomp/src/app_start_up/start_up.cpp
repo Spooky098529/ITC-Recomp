@@ -6,6 +6,7 @@
 #include "c_runtime/strings.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/app_start_up.h"
 
 #include <algorithm>
 
@@ -25,25 +26,27 @@ constexpr uint32_t kDeclarationAttributes = 0x24800000;
 
 }  // namespace
 
+using Globals = schema::AppStartUpGlobals;
+
 void ReadErrorSetApp(uint8_t* base, uint32_t interface) {
   ITC_NATIVE_RUNNING("sub_8209AC50 ReadError::SetApp");
-  Store(base, kReadErrorApp, interface);
+  Globals::set_read_error_app(base, interface);
 }
 
 void SetAppInterface84(uint8_t* base, uint32_t interface) {
   ITC_NATIVE_RUNNING("sub_8209AC30 SetAppInterface84");
-  Store(base, kAppInterface84, interface);
+  Globals::set_app_interface_84(base, interface);
 }
 
 void SetRenderApp(uint8_t* base, uint32_t interface) {
   ITC_NATIVE_RUNNING("sub_8209F580 SetRenderApp");
-  Store(base, kRenderApp, interface);
+  Globals::set_render_app(base, interface);
 }
 
 void ClearWords8110(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8225FB70 ClearWords8110");
-  Store(base, kWords8110, 0);
-  Store(base, kWords8114, 0);
+  Globals::set_word_82816110(base, 0);
+  Globals::set_word_82816114(base, 0);
 }
 
 std::optional<uint32_t> MoviesSet(uint8_t* base, uint32_t interface) {
@@ -51,7 +54,7 @@ std::optional<uint32_t> MoviesSet(uint8_t* base, uint32_t interface) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A4360 Movies::Set");
-  const uint32_t movie = Load(base, interface + 112);
+  const uint32_t movie = schema::AppInterface16(base, interface).movie();
   Store(base, kMovieClass, movie);
   return movie;
 }
@@ -62,7 +65,7 @@ std::optional<uint32_t> CreateVertexDeclaration(uint8_t* base, uint32_t elements
   uint32_t highest = 0;
   uint8_t map[16] = {};
   for (uint32_t element = elements;; element += 12) {
-    const uint32_t stream = guest::LoadU16(base, element);
+    const uint32_t stream = schema::VertexElement(base, element).stream();
     if (stream == 255) {
       break;
     }
@@ -82,14 +85,15 @@ std::optional<uint32_t> CreateVertexDeclaration(uint8_t* base, uint32_t elements
   for (uint32_t i = 0; i < 56; i++) {
     guest::StoreU8(base, declaration + i, 0);
   }
-  Store(base, declaration + 24, count);
-  Store(base, declaration + 28, highest);
-  Store(base, declaration + 48, 0);
-  Store(base, declaration + 4, 1);
-  Store(base, declaration + 0, 0x00100005);
-  Store(base, declaration + 20, 0xFFFF0000);
+  const schema::VertexDeclaration made(base, declaration);
+  made.set_element_count(count);
+  made.set_highest_stream(highest);
+  made.set_unknown_48(0);
+  made.set_reference_count(1);
+  made.set_common(0x00100005);
+  made.set_unknown_20(0xFFFF0000);
   for (uint32_t i = 0; i < 16; i++) {
-    guest::StoreU8(base, declaration + 32 + i, map[i]);
+    guest::StoreU8(base, made.stream_map_address() + i, map[i]);
   }
   if (!c_runtime::Memcpy(base, declaration + 52, elements, bytes)) {
     memcpy_call(declaration + 52, elements, bytes);

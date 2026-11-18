@@ -7,6 +7,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/collision.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -19,24 +20,16 @@ namespace vl = vector_library;
 
 namespace {
 
-constexpr uint32_t kMinusOne = 0x82001BE0;  // the game's float -1.0
-constexpr uint32_t kTwo = 0x820021E8;       // 2.0
-// The impact time's limit (read from guest memory; probably 1.0).
-constexpr uint32_t kImpactLimit = 0x82002B90;
-// The impact tests by the shapes' types (A's x 3 + B's), and the box-box
-// entry's function.
-constexpr uint32_t kImpactTests = 0x82600EB4;
+using G = schema::CollisionGlobals;
+using Box = schema::BoxShape;
+using Block = schema::CollisionBlock;
+using Query = schema::CollisionQuery;
+using Record = schema::CollisionShape;
+using Contact = schema::QueryContact;
+// The impact and push-out tests' box-box entries' functions (the tables'
+// entry 8, G::impact_tests and G::push_out_tests).
 constexpr uint32_t kBoxBoxFindImpact = 0x820BF038;
-// The push-out tests by the shapes' types, and the box-box entry's.
-constexpr uint32_t kPushOutTests = 0x82600E90;
 constexpr uint32_t kBoxBoxFindPushOut = 0x820BFB28;
-constexpr uint32_t kHalf = 0x82001BE4;  // 0.5
-// PushOutCorners' starting distance (read from guest memory).
-constexpr uint32_t kCornerStart = 0x82002A90;
-// PushOutEdges' depth limit (a single) and the separation's floor (a
-// double, lfd).
-constexpr uint32_t kEdgeDepthLimit = 0x82002B94;
-constexpr uint32_t kEdgeSeparationFloor = 0x82002B98;
 
 void SwapWords(uint8_t* base, uint32_t a, uint32_t b) {
   const uint32_t at_b = guest::LoadU32(base, b);
@@ -47,10 +40,11 @@ void SwapWords(uint8_t* base, uint32_t a, uint32_t b) {
 
 // Both records' templates and current copies are boxes.
 bool CurrentBoxes(uint8_t* base, uint32_t query) {
-  for (uint32_t at : {0u, 4u}) {
-    const uint32_t record = guest::LoadU32(base, query + at);
-    if (!IsBox(base, guest::LoadU32(base, record)) ||
-        !IsBox(base, guest::LoadU32(base, record + 8))) {
+  const Query q(base, query);
+  for (uint32_t at : {q.shape_a_address(), q.shape_b_address()}) {
+    const Record record(base, guest::LoadU32(base, at));
+    if (!IsBox(base, record.template_shape().address) ||
+        !IsBox(base, record.current().address)) {
       return false;
     }
   }
@@ -94,20 +88,22 @@ bool CrossesFace(uint8_t* base, uint32_t p, uint32_t c, uint32_t axis, uint32_t 
 
 uint32_t BoxBoxSwapForImpact(uint8_t* base, uint32_t query) {
   ITC_NATIVE_RUNNING("sub_820BE490 BoxBox::SwapForImpact");
-  ContactFlip(base, query + 32);
-  SwapWords(base, query + 0, query + 4);
-  SwapWords(base, query + 12, query + 20);
-  SwapWords(base, query + 8, query + 16);
-  return query + 64;
+  const Query q(base, query);
+  ContactFlip(base, q.contact_point_x_address());
+  SwapWords(base, q.shape_a_address(), q.shape_b_address());
+  SwapWords(base, q.b_in_a_current_address(), q.a_in_b_current_address());
+  SwapWords(base, q.b_in_a_previous_address(), q.a_in_b_previous_address());
+  return q.contact_push_x_address();
 }
 
 uint32_t BoxBoxSwapForPushOut(uint8_t* base, uint32_t query) {
   ITC_NATIVE_RUNNING("sub_820BEBF0 BoxBox::SwapForPushOut");
-  vl::Vec4ScaleBy(base, query + 96, Lfs(base, kMinusOne));
-  ContactFlip(base, query + 32);
-  SwapWords(base, query + 0, query + 4);
-  SwapWords(base, query + 12, query + 20);
-  return query + 64;
+  const Query q(base, query);
+  vl::Vec4ScaleBy(base, q.direction_x_address(), double(G::minus_one(base)));
+  ContactFlip(base, q.contact_point_x_address());
+  SwapWords(base, q.shape_a_address(), q.shape_b_address());
+  SwapWords(base, q.b_in_a_current_address(), q.a_in_b_current_address());
+  return q.contact_push_x_address();
 }
 
 bool BoxBoxCornerImpacts(uint8_t* base, uint32_t query, uint32_t* r3) {
@@ -115,15 +111,16 @@ bool BoxBoxCornerImpacts(uint8_t* base, uint32_t query, uint32_t* r3) {
   if (!CurrentBoxes(base, query)) {
     return false;
   }
+  const Query q(base, query);
   *r3 = query;
-  double best = Lfs(base, query + 84);
+  double best = double(q.contact_time());
   const double one = Lfs(base, kOne);
   for (uint32_t k = 0; k < 8; k++) {
     // A's corner k in B's unit box, at the previous and current placements.
-    const uint32_t previous = guest::LoadU32(base, query + 16) + 32 * k;
-    const uint32_t current = guest::LoadU32(base, query + 20) + 32 * k;
-    const uint32_t previous_code = guest::LoadU32(base, previous + 96);
-    const uint32_t current_code = guest::LoadU32(base, current + 96);
+    const Block previous = q.a_in_b_previous();
+    const Block current = q.a_in_b_current();
+    const uint32_t previous_code = guest::LoadU32(base, previous.corner_outcode_address() + 32 * k);
+    const uint32_t current_code = guest::LoadU32(base, current.corner_outcode_address() + 32 * k);
     if ((previous_code & current_code) != 0) {
       continue;
     }
@@ -131,7 +128,8 @@ bool BoxBoxCornerImpacts(uint8_t* base, uint32_t query, uint32_t* r3) {
     if (left == 0) {
       continue;
     }
-    const uint32_t p = previous + 80, c = current + 80;
+    const uint32_t p = previous.corner_x_address() + 32 * k;
+    const uint32_t c = current.corner_x_address() + 32 * k;
     uint32_t face = 0;
     if (left & 1) {
       CrossesFace(base, p, c, 0, 4, 8, true, one, &best);
@@ -158,19 +156,20 @@ bool BoxBoxCornerImpacts(uint8_t* base, uint32_t query, uint32_t* r3) {
         face = 5;
       }
     }
-    if (!(best < Lfs(base, query + 84))) {
+    if (!(best < double(q.contact_time()))) {
       continue;
     }
     // The contact: A's current corner, B's face's normal, the depth the
     // corner is in by, the time.
-    const uint32_t copy_a = guest::LoadU32(base, guest::LoadU32(base, query + 0) + 8);
-    const uint32_t copy_b = guest::LoadU32(base, guest::LoadU32(base, query + 4) + 8);
+    const uint32_t copy_a = q.shape_a().current().address;
+    const uint32_t copy_b = q.shape_b().current().address;
     uint32_t normal = 0;
     const double distance =
         BoxFaceDistance(base, copy_b, face, BoxCorner(copy_a, k), &normal);
     const uint32_t face_at = BoxFace(copy_b, face);
-    ContactSet(base, query + 32, BoxCorner(copy_a, k), face_at + 16, Fneg(distance), best);
-    *r3 = query + 64;
+    ContactSet(base, q.contact_point_x_address(), BoxCorner(copy_a, k),
+               schema::BoxShapeFace(base, face_at).normal_x_address(), Fneg(distance), best);
+    *r3 = q.contact_push_x_address();
   }
   return true;
 }
@@ -192,14 +191,15 @@ bool QueryFindImpact(uint8_t* base, uint32_t query, uint32_t* result) {
   ITC_NATIVE_RUNNING("sub_820BCE80 Query::FindImpact");
   // Both boxes (type 2): entry 8 of the table.
   if (!CurrentBoxes(base, query) ||
-      guest::LoadU32(base, kImpactTests + 4 * (2 * 3 + 2)) != kBoxBoxFindImpact) {
+      guest::LoadU32(base, G::impact_tests_address() + 4 * (2 * 3 + 2)) != kBoxBoxFindImpact) {
     return false;
   }
-  CopyWord(base, kZero, query + 80);
-  CopyWord(base, kTwo, query + 84);
-  CopyWord(base, kTwo, query + 88);
+  const Query q(base, query);
+  CopyWord(base, kZero, q.contact_depth_address());
+  CopyWord(base, G::two_address(), q.contact_time_address());
+  CopyWord(base, G::two_address(), q.unknown_88_address());
   BoxBoxFindImpact(base, query);
-  *result = Lfs(base, query + 84) < Lfs(base, kImpactLimit) ? 1 : 0;
+  *result = double(q.contact_time()) < double(G::impact_time_limit(base)) ? 1 : 0;
   return true;
 }
 
@@ -237,8 +237,8 @@ void AxisExit(uint8_t* base, uint32_t best, uint32_t face, double direction, dou
   guest::StoreU32(base, face, plus);
 }
 
-// The crossing test of one of the 12 edges' ends (the corners at +80 and
-// +88's coordinates `u`, `v`, `w` of each, a corner 32 bytes): the edge
+// The crossing test of one of the 12 edges' ends (the corners `from` and
+// `to`, their coordinates at `u`, `v`, `w`, a corner 32 bytes): the edge
 // crosses the unit box's face where its coordinate `u` reaches `limit`
 // (fsubs u - 1.0, or fadds u + 1.0), with the other two within 1.0.
 bool CrossesFace(uint8_t* base, uint32_t from, uint32_t to, uint32_t u, uint32_t v,
@@ -263,10 +263,15 @@ uint32_t BoxBoxEdgesCrossing(uint8_t* base, uint32_t out, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_820BF080 BoxBox::EdgesCrossing");
   uint32_t any = 0;
   for (uint32_t edge = 0; edge < 12; edge++, out += 4) {
-    const uint32_t from = (BoxEdgesStart(base, edge) << 5) + block;
-    const uint32_t to = (BoxEdgesEnd(base, edge) << 5) + block;
+    // The edge's ends: two of the block's corners (32 bytes a corner).
+    const Block corners(base, block);
+    const uint32_t start = BoxEdgesStart(base, edge) << 5;
+    const uint32_t end = BoxEdgesEnd(base, edge) << 5;
+    const uint32_t from = corners.corner_x_address() + start;
+    const uint32_t to = corners.corner_x_address() + end;
     guest::StoreU32(base, out, 0);
-    const uint32_t a = guest::LoadU32(base, from + 96), b = guest::LoadU32(base, to + 96);
+    const uint32_t a = guest::LoadU32(base, corners.corner_outcode_address() + start);
+    const uint32_t b = guest::LoadU32(base, corners.corner_outcode_address() + end);
     if ((a & b) != 0 || (a | b) == 0) {
       continue;
     }
@@ -275,13 +280,13 @@ uint32_t BoxBoxEdgesCrossing(uint8_t* base, uint32_t out, uint32_t block) {
       continue;
     }
     guest::StoreU32(base, out, 1);
-    // x, y, z at +80, +84, +88 of the corner (from the block: +80 + 32k).
-    if (((bits & 1) != 0 && CrossesFace(base, from, to, 80, 84, 88, true)) ||
-        ((bits & 2) != 0 && CrossesFace(base, from, to, 80, 84, 88, false)) ||
-        ((bits & 4) != 0 && CrossesFace(base, from, to, 84, 80, 88, true)) ||
-        ((bits & 8) != 0 && CrossesFace(base, from, to, 84, 80, 88, false)) ||
-        ((bits & 16) != 0 && CrossesFace(base, from, to, 88, 84, 80, true)) ||
-        ((bits & 32) != 0 && CrossesFace(base, from, to, 88, 84, 80, false))) {
+    // x, y, z at +0, +4, +8 of the corner.
+    if (((bits & 1) != 0 && CrossesFace(base, from, to, 0, 4, 8, true)) ||
+        ((bits & 2) != 0 && CrossesFace(base, from, to, 0, 4, 8, false)) ||
+        ((bits & 4) != 0 && CrossesFace(base, from, to, 4, 0, 8, true)) ||
+        ((bits & 8) != 0 && CrossesFace(base, from, to, 4, 0, 8, false)) ||
+        ((bits & 16) != 0 && CrossesFace(base, from, to, 8, 4, 0, true)) ||
+        ((bits & 32) != 0 && CrossesFace(base, from, to, 8, 4, 0, false))) {
       any = 1;
       continue;
     }
@@ -295,29 +300,30 @@ bool BoxBoxPushOutEdges(uint8_t* base, uint32_t query, uint32_t frame, uint32_t*
   if (!CurrentBoxes(base, query)) {
     return false;
   }
+  const Query q(base, query);
   const uint32_t f = frame;
   uint32_t a = 0, b = 0;
-  CollisionShapeCurrent(base, guest::LoadU32(base, query + 0), &a);
-  CollisionShapeCurrent(base, guest::LoadU32(base, query + 4), &b);
+  CollisionShapeCurrent(base, q.shape_a().address, &a);
+  CollisionShapeCurrent(base, q.shape_b().address, &b);
   // A's edges crossing B's unit box (block +20), B's crossing A's (+12).
   *r3 = 0;
-  if (BoxBoxEdgesCrossing(base, f + 272, guest::LoadU32(base, query + 20)) == 0) {
+  if (BoxBoxEdgesCrossing(base, f + 272, q.a_in_b_current().address) == 0) {
     return true;
   }
-  if (BoxBoxEdgesCrossing(base, f + 320, guest::LoadU32(base, query + 12)) == 0) {
+  if (BoxBoxEdgesCrossing(base, f + 320, q.b_in_a_current().address) == 0) {
     return true;
   }
   *r3 = 1;
-  const double limit = Lfs(base, kEdgeDepthLimit);
-  const double half = Lfs(base, kHalf);
+  const double limit = double(G::edge_depth_limit(base));
+  const double half = double(G::half(base));
   double best = limit;
   const double floor = std::bit_cast<double>(
-      uint64_t(guest::LoadU32(base, kEdgeSeparationFloor)) << 32 |
-      guest::LoadU32(base, kEdgeSeparationFloor + 4));
+      uint64_t(guest::LoadU32(base, G::edge_separation_floor_address())) << 32 |
+      guest::LoadU32(base, G::edge_separation_floor_address() + 4));
   const double zero = Lfs(base, kZero);
   CopyWord(base, kZero, f + 156);
   CopyWord(base, kZero, f + 172);
-  const double minus_one = Lfs(base, kMinusOne);
+  const double minus_one = double(G::minus_one(base));
   for (uint32_t i = 0; i < 12; i++) {
     if (guest::LoadU32(base, f + 272 + 4 * i) == 0) {
       continue;
@@ -370,8 +376,8 @@ bool BoxBoxPushOutEdges(uint8_t* base, uint32_t query, uint32_t frame, uint32_t*
         }
       }
       // Along the push direction, and shallower than the best so far.
-      *r3 = query + 96;
-      if (!(double(vl::Vec3DotOf(base, query + 96, f + 80)) > zero)) {
+      *r3 = q.direction_x_address();
+      if (!(double(vl::Vec3DotOf(base, q.direction_x_address(), f + 80)) > zero)) {
         continue;
       }
       if (!(depth < best)) {
@@ -384,11 +390,11 @@ bool BoxBoxPushOutEdges(uint8_t* base, uint32_t query, uint32_t frame, uint32_t*
       *r3 = f + 160;
     }
   }
-  if (!(best < limit) || !(best > Lfs(base, query + 80))) {
+  if (!(best < limit) || !(best > double(q.contact_depth()))) {
     return true;
   }
-  ContactSet(base, query + 32, f + 160, f + 144, best, zero);
-  *r3 = query + 64;
+  ContactSet(base, q.contact_point_x_address(), f + 160, f + 144, best, zero);
+  *r3 = q.contact_push_x_address();
   return true;
 }
 
@@ -397,34 +403,36 @@ bool BoxBoxPushOutCorners(uint8_t* base, uint32_t query, uint32_t frame, uint32_
   if (!CurrentBoxes(base, query)) {
     return false;
   }
+  const Query q(base, query);
   const uint32_t f = frame;
   uint32_t a = 0, b = 0;
-  CollisionShapeCurrent(base, guest::LoadU32(base, query + 0), &a);
-  CollisionShapeCurrent(base, guest::LoadU32(base, query + 4), &b);
+  CollisionShapeCurrent(base, q.shape_a().address, &a);
+  CollisionShapeCurrent(base, q.shape_b().address, &b);
   const double zero = Lfs(base, kZero);
   CopyWord(base, kZero, f + 108);
-  const uint32_t direction = query + 96;
+  const uint32_t direction = q.direction_x_address();
   // The direction in B's unit box: per face normal, its dot product x B's
   // inverse half extent.
   for (uint32_t i = 0; i < 3; i++) {
-    const double d = double(vl::Vec3DotOf(base, BoxFace(b, i) + 16, direction));
-    const uint32_t inverse = vehicle_accessors::RigidBodyField144(b);
-    Stfs(base, f + 96 + 4 * i, Fmuls(Lfs(base, inverse + 4 * i), d));
+    const double d = double(vl::Vec3DotOf(
+        base, schema::BoxShapeFace(base, BoxFace(b, i)).normal_x_address(), direction));
+    const schema::CollisionVector inverse(base, vehicle_accessors::RigidBodyField144(b));
+    Stfs(base, f + 96 + 4 * i, Fmuls(Lfs(base, inverse.x_address() + 4 * i), d));
   }
   *r3 = f + 96;
   if (double(vl::Vec3Dot(base, f + 96, f + 96)) == zero) {
     return true;
   }
   // A's corners inside B (outcode 0 in block +20): the farthest way out.
-  const uint32_t block = guest::LoadU32(base, query + 20);
+  const Block block = q.a_in_b_current();
   double best = zero;
   uint32_t best_face = 0xFFFFFFFFu, best_corner = 0xFFFFFFFFu;
   for (uint32_t k = 0; k < 8; k++) {
-    const uint32_t corner = block + 80 + 32 * k;
-    if (guest::LoadU32(base, corner + 16) != 0) {
+    const uint32_t corner = block.corner_x_address() + 32 * k;
+    if (guest::LoadU32(base, block.corner_outcode_address() + 32 * k) != 0) {
       continue;
     }
-    CopyWord(base, kCornerStart, f + 80);
+    CopyWord(base, G::corner_start_address(), f + 80);
     guest::StoreU32(base, f + 84, 0xFFFFFFFFu);
     for (uint32_t axis = 0; axis < 3; axis++) {
       AxisExit(base, f + 80, f + 84, Lfs(base, f + 96 + 4 * axis),
@@ -444,33 +452,33 @@ bool BoxBoxPushOutCorners(uint8_t* base, uint32_t query, uint32_t frame, uint32_
   }
   // Its length back in world units, along B's normals by B's half extents.
   vl::Vec4Scaled(base, f + 112, f + 96, best);
-  const uint32_t extents_z = vehicle_accessors::RigidBodyTorque(b);
-  vl::Vec4Scaled(base, f + 144, BoxFace(b, 2) + 16,
-                 Fmuls(Lfs(base, extents_z + 8), Lfs(base, f + 120)));
-  const uint32_t extents_y = vehicle_accessors::RigidBodyTorque(b);
-  vl::Vec4Scaled(base, f + 160, BoxFace(b, 1) + 16,
-                 Fmuls(Lfs(base, extents_y + 4), Lfs(base, f + 116)));
-  const uint32_t extents_x = vehicle_accessors::RigidBodyTorque(b);
-  vl::Vec4Scaled(base, f + 176, BoxFace(b, 0) + 16,
-                 Fmuls(Lfs(base, extents_x + 0), Lfs(base, f + 112)));
+  const schema::CollisionVector extents_z(base, vehicle_accessors::RigidBodyTorque(b));
+  vl::Vec4Scaled(base, f + 144, schema::BoxShapeFace(base, BoxFace(b, 2)).normal_x_address(),
+                 Fmuls(double(extents_z.z()), Lfs(base, f + 120)));
+  const schema::CollisionVector extents_y(base, vehicle_accessors::RigidBodyTorque(b));
+  vl::Vec4Scaled(base, f + 160, schema::BoxShapeFace(base, BoxFace(b, 1)).normal_x_address(),
+                 Fmuls(double(extents_y.y()), Lfs(base, f + 116)));
+  const schema::CollisionVector extents_x(base, vehicle_accessors::RigidBodyTorque(b));
+  vl::Vec4Scaled(base, f + 176, schema::BoxShapeFace(base, BoxFace(b, 0)).normal_x_address(),
+                 Fmuls(double(extents_x.x()), Lfs(base, f + 112)));
   vl::Vec3Sum(base, f + 192, f + 176, f + 160);
   vl::Vec3Sum(base, f + 128, f + 192, f + 144);
   const double depth = double(vl::Vec3Length(base, f + 128));
   *r3 = f + 128;
-  if (!(depth > Lfs(base, query + 80))) {
+  if (!(depth > double(q.contact_depth()))) {
     return true;
   }
   // sub_820BC8A8 (never ran in play; done here): the contact = A's corner,
   // B's face's normal, the push direction, the depth and time 0.0.
-  const uint32_t face = BoxFace(b, best_face);
+  const schema::BoxShapeFace face(base, BoxFace(b, best_face));
   const uint32_t point = BoxCorner(a, best_corner);
-  const uint32_t contact = query + 32;
-  vl::Vec4Copy(base, contact + 0, point);
-  vl::Vec4Copy(base, contact + 16, face + 16);
-  vl::Vec4Copy(base, contact + 32, direction);
-  Stfs(base, contact + 48, depth);
-  Stfs(base, contact + 52, zero);
-  *r3 = contact + 32;
+  const Contact contact(base, q.contact_point_x_address());
+  vl::Vec4Copy(base, contact.point_x_address(), point);
+  vl::Vec4Copy(base, contact.normal_x_address(), face.normal_x_address());
+  vl::Vec4Copy(base, contact.push_x_address(), direction);
+  contact.set_depth(float(depth));
+  contact.set_time(float(zero));
+  *r3 = contact.push_x_address();
   return true;
 }
 
@@ -479,16 +487,16 @@ bool BoxBoxFindPushOut(uint8_t* base, uint32_t query, uint32_t frame, uint32_t* 
   if (!CurrentBoxes(base, query)) {
     return false;
   }
+  const Query q(base, query);
   *r3 = query;
-  if (guest::LoadU32(base, guest::LoadU32(base, query + 12) + 64) != 0 ||
-      guest::LoadU32(base, guest::LoadU32(base, query + 20) + 64) != 0) {
+  if (q.b_in_a_current().outcode() != 0 || q.a_in_b_current().outcode() != 0) {
     return true;
   }
   BoxBoxPushOutCorners(base, query, frame - 304, r3);
   BoxBoxSwapForPushOut(base, query);
   BoxBoxPushOutCorners(base, query, frame - 304, r3);
   *r3 = BoxBoxSwapForPushOut(base, query);
-  if (Lfs(base, query + 80) > Lfs(base, kZero)) {
+  if (double(q.contact_depth()) > Lfs(base, kZero)) {
     return true;
   }
   BoxBoxPushOutEdges(base, query, frame - 544, r3);
@@ -500,16 +508,18 @@ bool QueryFindPushOut(uint8_t* base, uint32_t query, uint32_t direction, uint32_
   ITC_NATIVE_RUNNING("sub_820BCDD0 Query::FindPushOut");
   // Both boxes (type 2): entry 8 of the table.
   if (!CurrentBoxes(base, query) ||
-      guest::LoadU32(base, kPushOutTests + 4 * (2 * 3 + 2)) != kBoxBoxFindPushOut) {
+      guest::LoadU32(base, G::push_out_tests_address() + 4 * (2 * 3 + 2)) !=
+          kBoxBoxFindPushOut) {
     return false;
   }
-  vl::Vec4Copy(base, query + 96, direction);
-  CopyWord(base, kZero, query + 80);
-  CopyWord(base, kTwo, query + 84);
-  CopyWord(base, kTwo, query + 88);
+  const Query q(base, query);
+  vl::Vec4Copy(base, q.direction_x_address(), direction);
+  CopyWord(base, kZero, q.contact_depth_address());
+  CopyWord(base, G::two_address(), q.contact_time_address());
+  CopyWord(base, G::two_address(), q.unknown_88_address());
   uint32_t r3 = 0;
   BoxBoxFindPushOut(base, query, frame - 96, &r3);
-  *result = Lfs(base, query + 80) > Lfs(base, kZero) ? 1 : 0;
+  *result = double(q.contact_depth()) > Lfs(base, kZero) ? 1 : 0;
   return true;
 }
 

@@ -14,13 +14,8 @@
 
 namespace location_screen {
 
-// The screen's globals (pointers).
-constexpr uint32_t kPages = 0x82814E48;    // the page object (28 bytes)
-constexpr uint32_t kMenu = 0x82814E4C;     // the location's menu (68 bytes)
-constexpr uint32_t kScreen = 0x82814E50;   // the screen (912 bytes)
-constexpr uint32_t kListMenu = 0x82814E54;      // the location's list
-constexpr uint32_t kOpponentMenu = 0x82814E58;  // the opponents
-constexpr uint32_t kConfirmMenu = 0x82814E5C;   // race, the card, back
+// The screen's globals (its page object, menus and the screen itself) are
+// schema::LocationScreenGlobals' (schema/location_screen.h).
 // The race data (a pointer) and its racer records' offset.
 constexpr uint32_t kRaceData = 0x826C5B2C;
 constexpr uint32_t kRacerRecords = 0x59AE8;

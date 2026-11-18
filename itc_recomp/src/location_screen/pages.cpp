@@ -5,6 +5,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/location_screen.h"
+#include "schema/menu_helpers.h"
 
 #include <array>
 #include <bit>
@@ -13,7 +15,9 @@ namespace location_screen {
 
 namespace {
 
-uint32_t Screen(uint8_t* base) { return guest::LoadU32(base, kScreen); }
+using G = schema::LocationScreenGlobals;
+
+schema::LocationScreen Screen(uint8_t* base) { return G::screen(base); }
 
 // A float word through a float register and back (lfs, stfs).
 uint32_t ThroughFloat(uint8_t* base, uint32_t address) {
@@ -35,14 +39,12 @@ constexpr std::array<uint32_t, 16> kPageHandlers = {
     0x82229A48, 0x82229B38, 0x82228068, 0x822280D8, 0x82106540, 0x82228138,
     0x82229CF0, 0x82229E98, 0x82228E18, 0x82229B98};
 
-// UpdatePage's copy of the screen's +592 (its view's position, probably).
-constexpr uint32_t kViewCopy = 0x8265ECE0;
-
 }  // namespace
 
 void Reenter(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_822895E0 ScreenMachine::Reenter");
-  guest::StoreU32(base, machine + 9604, guest::LoadU32(base, machine + 9608) != 0 ? 4 : 1);
+  const schema::LocationScreenMachine m(base, machine);
+  m.set_state(m.loaded() != 0 ? 4 : 1);
 }
 
 bool ResetNative(uint32_t screen) {
@@ -51,73 +53,86 @@ bool ResetNative(uint32_t screen) {
 
 void ResetView(uint8_t* base, uint32_t view) {
   ITC_NATIVE_RUNNING("sub_82227818 LocationScreen::ResetView");
+  const schema::LocationScreenView v(base, view);
   const uint32_t zero = ThroughFloat(base, 0x82000A34);
   const uint32_t one = ThroughFloat(base, 0x82000A30);
-  guest::StoreU32(base, view + 0, 0);
-  guest::StoreU32(base, view + 4, 0);
-  guest::StoreU32(base, view + 12, 0);
-  guest::StoreU32(base, view + 16, 1);
-  guest::StoreU32(base, view + 8, 1);
-  for (uint32_t v = 0; v < 4; v++) {
-    const uint32_t at = view + 32 + 16 * v;
+  v.set_unknown_0(0);
+  v.set_unknown_4(0);
+  v.set_unknown_12(0);
+  v.set_unknown_16(1);
+  v.set_unknown_8(1);
+  // The four vectors (camera_vector_1, camera_vector_0, vector_64, vector_80).
+  for (uint32_t at : {v.camera_vector_1_address(), v.camera_vector_0_address(),
+                      v.vector_64_address(), v.vector_80_address()}) {
     guest::StoreU32(base, at + 0, zero);
     guest::StoreU32(base, at + 4, zero);
     guest::StoreU32(base, at + 8, zero);
     guest::StoreU32(base, at + 12, one);
   }
-  for (uint32_t k = 0; k < 4; k++) {
-    guest::StoreU32(base, view + 96 + 4 * k, zero);
+  // The floats' bits as lfs and stfs leave them.
+  for (uint32_t at : {v.unknown_96_address(), v.unknown_100_address(),
+                      v.camera_float_0_address(), v.camera_float_1_address()}) {
+    guest::StoreU32(base, at, zero);
   }
-  StoreIdentity(base, view + 112);
-  StoreIdentity(base, view + 176);
+  StoreIdentity(base, v.matrix0_address());
+  StoreIdentity(base, v.matrix1_address());
 }
 
 void Reset(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_822279A8 LocationScreen::Reset");
-  for (uint32_t offset : {0u, 552u, 800u, 856u, 860u}) {
-    guest::StoreU32(base, screen + offset, 0);
-  }
-  guest::StoreU32(base, screen + 864, 14);
-  ResetView(base, screen + 560);
-  for (uint32_t offset : {136u, 404u, 544u, 548u, 808u}) {
-    guest::StoreU32(base, screen + offset, 0);
-  }
-  guest::StoreU32(base, screen + 804, 4);
-  for (uint32_t offset : {852u, 868u, 872u, 876u, 812u}) {
-    guest::StoreU32(base, screen + offset, 0);
-  }
-  guest::StoreU32(base, screen + 880, 0xFFFFFFFFu);
-  guest::StoreU32(base, screen + 884, 0xFFFFFFFFu);
-  for (uint32_t offset : {816u, 820u, 888u, 892u, 900u}) {
-    guest::StoreU32(base, screen + offset, 0);
-  }
+  const schema::LocationScreen s(base, screen);
+  s.set_unknown_0(0);
+  s.set_scenery(0u);
+  s.set_picked_opponent(0);
+  s.set_teardown_started(0);
+  s.set_teardown_countdown(0);
+  s.set_location(14);
+  ResetView(base, s.view_address());
+  s.set_picture_count_a(0);
+  s.set_picture_count_b(0);
+  s.set_default_texture_a(0);
+  s.set_default_texture_b(0);
+  s.set_opponent_count(0);
+  s.set_group_kind(4);
+  s.set_location_index(0);
+  s.set_unlock_position(0);
+  s.set_entry_offset(0);
+  s.set_entry_table(0);
+  s.set_list_count(0);
+  s.set_queued_page(0xFFFFFFFFu);
+  s.set_queued_transition(0xFFFFFFFFu);
+  s.set_item2_taken(0);
+  s.set_won_card_item(0);
+  s.set_more_opponent_text(0);
+  s.set_special_car(0);
+  s.set_restart(0);
 }
 
 std::optional<uint32_t> ApplyQueuedPage(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8222C9B0 LocationScreen::ApplyQueuedPage");
   std::optional<uint32_t> r3;
-  if (guest::LoadU32(base, Screen(base) + 880) == 0) {
+  if (Screen(base).queued_page() == 0) {
     r3 = HidePictures(base, sp - 96);
   }
-  const uint32_t screen = Screen(base);
-  const uint32_t page = guest::LoadU32(base, screen + 880);
-  const uint32_t transition = guest::LoadU32(base, screen + 884);
-  const uint32_t pages = guest::LoadU32(base, kPages);
-  const uint32_t current = guest::LoadU32(base, pages + 0);
+  const schema::LocationScreen screen = Screen(base);
+  const uint32_t page = screen.queued_page();
+  const uint32_t transition = screen.queued_transition();
+  const schema::PageObject pages = G::pages(base);
+  const uint32_t current = pages.page();
   if (page != current) {
-    guest::StoreU32(base, pages + 8, current);
+    pages.set_previous_page(current);
   }
-  guest::StoreU32(base, pages + 16, 0xFFFFFFFFu);
+  pages.set_queued_step(0xFFFFFFFFu);
   if (transition == 0xFFFFFFFFu) {
-    guest::StoreU32(base, pages + 0, page);
-    guest::StoreU32(base, pages + 12, 0xFFFFFFFFu);
+    pages.set_page(page);
+    pages.set_step(0xFFFFFFFFu);
   } else {
-    guest::StoreU32(base, pages + 12, transition);
-    guest::StoreU32(base, pages + 4, page);
-    guest::StoreU32(base, pages + 0, 0xFFFFFFFFu);
+    pages.set_step(transition);
+    pages.set_next_page(page);
+    pages.set_page(0xFFFFFFFFu);
   }
-  guest::StoreU32(base, Screen(base) + 880, 0xFFFFFFFFu);
-  guest::StoreU32(base, Screen(base) + 884, 0xFFFFFFFFu);
+  Screen(base).set_queued_page(0xFFFFFFFFu);
+  Screen(base).set_queued_transition(0xFFFFFFFFu);
   return r3;
 }
 
@@ -125,7 +140,7 @@ void UpdatePage(uint8_t* base, uint32_t sp, uint32_t machine, uint32_t dispatche
                 const PageCall& call) {
   ITC_NATIVE_RUNNING("sub_8222EC08 LocationScreen::UpdatePage");
   const uint32_t frame = sp - 240;
-  const uint32_t start = guest::LoadU32(base, guest::LoadU32(base, kPages));
+  const uint32_t start = G::pages(base).page();
   for (uint32_t i = 0; i < 16; i++) {
     guest::StoreU32(base, frame + 80 + 4 * i, kPageHandlers[i]);
   }
@@ -133,33 +148,36 @@ void UpdatePage(uint8_t* base, uint32_t sp, uint32_t machine, uint32_t dispatche
     const uint32_t handler = guest::LoadU32(base, frame + 80 + (start << 2));
     call.call(call.user, handler, dispatcher, machine, 240, 0x8222ED08);
   }
-  const uint32_t screen = Screen(base);
+  const schema::LocationScreen screen = Screen(base);
+  const schema::LocationScreenView view(base, screen.view_address());
+  // The view's camera_vector_1 (its position, probably) copied.
   for (uint32_t k = 0; k < 16; k += 4) {
-    guest::StoreU32(base, kViewCopy + k, guest::LoadU32(base, screen + 592 + k));
+    guest::StoreU32(base, G::view_copy_address() + k,
+                    guest::LoadU32(base, view.camera_vector_1_address() + k));
   }
-  if (guest::LoadU32(base, screen + 900) == 0) {
+  if (screen.restart() == 0) {
     return;
   }
-  guest::StoreU32(base, screen + 900, 0);
-  const uint32_t pages = guest::LoadU32(base, kPages);
-  const uint32_t transition = guest::LoadU32(base, pages + 12);
-  const uint32_t page = guest::LoadU32(base, pages + 0);
+  screen.set_restart(0);
+  const schema::PageObject pages = G::pages(base);
+  const uint32_t transition = pages.step();
+  const uint32_t page = pages.page();
   if (transition != 0xFFFFFFFFu) {
-    const uint32_t next = guest::LoadU32(base, pages + 4);
+    const uint32_t next = pages.next_page();
     if (next != page) {
-      guest::StoreU32(base, pages + 8, page);
+      pages.set_previous_page(page);
     }
-    guest::StoreU32(base, pages + 12, transition);
-    guest::StoreU32(base, pages + 4, next);
-    guest::StoreU32(base, pages + 0, 0xFFFFFFFFu);
+    pages.set_step(transition);
+    pages.set_next_page(next);
+    pages.set_page(0xFFFFFFFFu);
   } else {
     if (start != page) {
-      guest::StoreU32(base, pages + 8, page);
+      pages.set_previous_page(page);
     }
-    guest::StoreU32(base, pages + 0, start);
-    guest::StoreU32(base, pages + 12, 0xFFFFFFFFu);
+    pages.set_page(start);
+    pages.set_step(0xFFFFFFFFu);
   }
-  guest::StoreU32(base, pages + 16, 0xFFFFFFFFu);
+  pages.set_queued_step(0xFFFFFFFFu);
 }
 
 }  // namespace location_screen

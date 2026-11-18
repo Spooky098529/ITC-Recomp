@@ -22,11 +22,8 @@
 
 namespace car_specs {
 
-// The parameter object's pointer (a 468-byte object: +0 the loads pending,
-// +8 table 73, +12 table 72, +16 to +48 tables 74-82, +52 table 83, +56 the
-// spec count, +60 the wheel count, +64 + 4 × model the first record of each
-// wheel model, +464 the last model + 1).
-constexpr uint32_t kParams = 0x826C2E48;
+// The parameter object at [0x826C2E48] is schema::CarParams
+// (itc_recomp/schema/car-specs.toml).
 constexpr uint32_t kSpecBytes = 8432;
 constexpr uint32_t kWheelBytes = 48;
 

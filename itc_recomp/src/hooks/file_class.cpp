@@ -12,6 +12,7 @@
 #include "lifted/originals.h"
 #include "hooks/native_entry.h"
 #include "guest_call.h"
+#include "schema/files_and_saves.h"
 
 #include "game_data/game_data.h"
 
@@ -21,6 +22,7 @@
 #include "lifted/sdk.h"
 
 using guest_call::InFrame;
+using schema::File;
 
 namespace {
 
@@ -51,7 +53,7 @@ void ReportError(lifted::Regs& ctx, uint8_t* base, uint32_t return_address) {
 // (the low word, as GetFileSize gave), 1.
 ITC_NATIVE_ENTRY_ALWAYS(8258C688) {
   
-  const uint32_t file = ctx.r3.u32;
+  const File file(base, ctx.r3.u32);
   const std::string path = GuestString(base, ctx.r4.u32);
   auto relative = game_data::RelativePath(path);
   if (!relative) {
@@ -60,7 +62,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C688) {
     lifted::original::c8258C688(ctx, base);
     return;
   }
-  if (guest::LoadU32(base, file + 4) != kClosed) {
+  if (file.handle() != kClosed) {
     ReportError(ctx, base, 0x8258C700);
     ctx.r3.u64 = 0;
     return;
@@ -68,13 +70,13 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C688) {
   auto handle = game_data::Open(*relative);
   if (!handle) {
     ITC_LOG_WARN("file class: no file \"{}\"", path);
-    guest::StoreU32(base, file + 4, kClosed);
+    file.set_handle(kClosed);
     ReportError(ctx, base, 0x8258C700);
     ctx.r3.u64 = 0;
     return;
   }
-  guest::StoreU32(base, file + 4, *handle);
-  guest::StoreU32(base, file + 12, uint32_t(game_data::Size(*handle).value_or(0)));
+  file.set_handle(*handle);
+  file.set_size(uint32_t(game_data::Size(*handle).value_or(0)));
   ctx.r3.u64 = 1;
 }
 
@@ -83,13 +85,14 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C688) {
 // report and 0 when the read fails.
 ITC_NATIVE_ENTRY_ALWAYS(8258C820) {
   
-  const uint32_t file = ctx.r3.u32, buffer = ctx.r4.u32;
-  const uint32_t handle = guest::LoadU32(base, file + 4);
+  const File file(base, ctx.r3.u32);
+  const uint32_t buffer = ctx.r4.u32;
+  const uint32_t handle = file.handle();
   if (!game_data::IsHandle(handle)) {
     lifted::original::c8258C820(ctx, base);
     return;
   }
-  const uint32_t size = guest::LoadU32(base, ctx.r5.u32);
+  const uint32_t size = schema::FileSizeArg(base, ctx.r5.u32).size();
   uint32_t total = 0;
   bool failed = false;
   guest::ForEachHostPart(base, buffer, size, [&](uint8_t* host, uint32_t, uint32_t bytes) {
@@ -105,7 +108,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C820) {
     ctx.r3.u64 = 0;
     return;
   }
-  guest::StoreU32(base, file + 8, guest::LoadU32(base, file + 8) + total);
+  file.set_position(file.position() + total);
   ctx.r3.u64 = total;
 }
 
@@ -115,23 +118,23 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C820) {
 // and 2, as the recompiled one does. The error report and 0 when it fails.
 ITC_NATIVE_ENTRY_ALWAYS(8258C768) {
   
-  const uint32_t file = ctx.r3.u32;
-  const uint32_t handle = guest::LoadU32(base, file + 4);
+  const File file(base, ctx.r3.u32);
+  const uint32_t handle = file.handle();
   if (!game_data::IsHandle(handle)) {
     lifted::original::c8258C768(ctx, base);
     return;
   }
-  const int32_t offset = int32_t(guest::LoadU32(base, ctx.r4.u32));
-  const uint32_t method = guest::LoadU32(base, ctx.r5.u32);
+  const int32_t offset = schema::FileSeekOffsetArg(base, ctx.r4.u32).offset();
+  const uint32_t method = schema::FileSeekMethodArg(base, ctx.r5.u32).method();
   if (!game_data::Seek(handle, offset, method > 2 ? 0 : method)) {
     ReportError(ctx, base, 0x8258C810);
     ctx.r3.u64 = 0;
     return;
   }
   if (method == 0) {
-    guest::StoreU32(base, file + 8, uint32_t(offset));
+    file.set_position(uint32_t(offset));
   } else if (method < 3) {
-    guest::StoreU32(base, file + 8, guest::LoadU32(base, file + 8) + uint32_t(offset));
+    file.set_position(file.position() + uint32_t(offset));
   }
   ctx.r3.u64 = 1;
 }
@@ -139,14 +142,14 @@ ITC_NATIVE_ENTRY_ALWAYS(8258C768) {
 // File::Close: r3 = file. Closes the handle (+4 = -1) and clears +8 and +12.
 ITC_NATIVE_ENTRY_ALWAYS(8258C718) {
   
-  const uint32_t file = ctx.r3.u32;
-  const uint32_t handle = guest::LoadU32(base, file + 4);
+  const File file(base, ctx.r3.u32);
+  const uint32_t handle = file.handle();
   if (!game_data::IsHandle(handle)) {
     lifted::original::c8258C718(ctx, base);
     return;
   }
   game_data::Close(handle);
-  guest::StoreU32(base, file + 4, kClosed);
-  guest::StoreU32(base, file + 8, 0);
-  guest::StoreU32(base, file + 12, 0);
+  file.set_handle(kClosed);
+  file.set_position(0);
+  file.set_size(0);
 }

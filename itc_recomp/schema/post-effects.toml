@@ -1,0 +1,511 @@
+# The schema of docs/functions/post-effects.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The post effects: up to 15 screen-space effects (0x826C5D80), one object
+# each, made from a table at 0x826174A8 (src/post_effects/). Every kind
+# starts with PostEffect's fields (the base class, 8,064 bytes); the kinds
+# repeat them under the same names. The measure's SceneLights (filed here)
+# joins the command list's slots with the second set's light kit: left out
+# (a measure fault, reported).
+
+# The base class, as PostEffects:: meets every kind (the array's words).
+[PostEffect]
+measures = ["PostEffect", "[826C5D80]", "sub_82136DC8.r3"]
+size = 8064
+origin = "allocated"
+vtable = 0x82008838
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PostEffectVtable", note = "the kind's vtable (base 0x82008838 between the constructor's steps and after the destructor)" },
+  { name = "kind", offset = 4, type = "u32", note = "+4 to +39: the table entry (PostEffectTableEntry) copied in; 0 glow, 1, 2 color filter, 3 motion blur, 4, 5 target filter" },
+  { name = "sort_key", offset = 8, type = "u32", note = "the render queue's key of its main chunk" },
+  { name = "second_sort_key", offset = 12, type = "u32", note = "the motion blur's velocity chunks' key (it - 2 for the upload and the blur's chunk)" },
+  { name = "width", offset = 16, type = "u32" },
+  { name = "height", offset = 20, type = "u32" },
+  { name = "x", offset = 24, type = "u32", note = "the view's position (by-view resolves and quads)" },
+  { name = "y", offset = 28, type = "u32" },
+  { name = "flags", offset = 32, type = "u32", note = "bit 2 kept past the race (PostEffects::DestroyRace); bits 0-1 the target filter's target (render target 4 or 3)" },
+  { name = "camera_pass", offset = 36, type = "u32", note = "its camera pass (0x826BAC00 + 592 x it)" },
+  { name = "reset", offset = 40, type = "u32", note = "1 at set-up, cleared after each record" },
+  { name = "no_history", offset = 44, type = "u32", note = "PostEffects::ToggleNoHistory" },
+  { name = "updated", offset = 48, type = "u32", note = "set on logic passes (PostEffects::MarkUpdated)" },
+  { name = "skipped", offset = 52, type = "u32", note = "skipped when set (PostEffects::RecordAll)" },
+  { name = "vertices", offset = 56, type = "bytes", count = 8000, note = "two buffers of 100 40-byte vertices (PostEffectQuad's)" },
+  { name = "vertex_count", offset = 8056, type = "u32", note = "vertices used in the buffer in use" },
+  { name = "vertex_buffer", offset = 8060, type = "u32", note = "the buffer in use (0 or 1)" },
+]
+
+# The effects' vtables: slot 0 records, slot 1 the deleting destructor; the
+# glow's (0x820088B0) has its setters at slots 2 to 12 and 24.
+[PostEffectVtable]
+measures = ["[826C5D80].+0", "Glow.+0"]
+size = 100
+origin = "image"
+fields = [
+  { name = "record", offset = 0, type = "fn", note = "Glow::Record, ColorFilter::Record, MotionBlur::Record, TargetFilter::Record" },
+  { name = "destroy", offset = 4, type = "fn", note = "the deleting destructor (r4 = 1 deletes)" },
+  { name = "c33_x_second_setter", offset = 8, type = "fn", note = "glow only: Glow::Set8436 (+8436)" },
+  { name = "c33_x_first_setter", offset = 12, type = "fn", note = "glow only: Glow::Set8440 (+8440)" },
+  { name = "c34_x_setter", offset = 16, type = "fn", note = "glow only: Glow::Set8444 (+8444)" },
+  { name = "c34_y_setter", offset = 20, type = "fn", note = "glow only: Glow::Set8448 (+8448)" },
+  { name = "strength_setter", offset = 24, type = "fn", note = "glow only: Glow::Set8452 (+8452)" },
+  { name = "c33_z_setter", offset = 28, type = "fn", note = "glow only: Glow::Set8456 (+8456)" },
+  { name = "history_weight_setter", offset = 32, type = "fn", note = "glow only: Glow::Set8460 (+8460)" },
+  { name = "param_8464_setter", offset = 36, type = "fn", note = "glow only: Glow::Set8464 (+8464)" },
+  { name = "star_step_setter", offset = 40, type = "fn", note = "glow only: Glow::Set8468 (+8468)" },
+  { name = "star_attenuation_setter", offset = 44, type = "fn", note = "glow only: Glow::Set8472 (+8472)" },
+  { name = "c33_w_setter", offset = 48, type = "fn", note = "glow only: Glow::Set8476 (+8476)" },
+  { name = "from_speed_setter", offset = 96, type = "fn", note = "glow only: Glow::SetFromSpeed (slot 24)" },
+]
+
+# Kind 0, the glow (8,480 bytes; the bloom and the star streaks).
+[Glow]
+measure = "Glow"
+size = 8480
+origin = "allocated"
+vtable = 0x820088B0
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PostEffectVtable", note = "the kind's vtable (base 0x82008838 between the constructor's steps and after the destructor)" },
+  { name = "kind", offset = 4, type = "u32", note = "+4 to +39: the table entry (PostEffectTableEntry) copied in; 0 glow, 1, 2 color filter, 3 motion blur, 4, 5 target filter" },
+  { name = "sort_key", offset = 8, type = "u32", note = "the render queue's key of its main chunk" },
+  { name = "second_sort_key", offset = 12, type = "u32", note = "the motion blur's velocity chunks' key (it - 2 for the upload and the blur's chunk)" },
+  { name = "width", offset = 16, type = "u32" },
+  { name = "height", offset = 20, type = "u32" },
+  { name = "x", offset = 24, type = "u32", note = "the view's position (by-view resolves and quads)" },
+  { name = "y", offset = 28, type = "u32" },
+  { name = "flags", offset = 32, type = "u32", note = "bit 2 kept past the race (PostEffects::DestroyRace); bits 0-1 the target filter's target (render target 4 or 3)" },
+  { name = "camera_pass", offset = 36, type = "u32", note = "its camera pass (0x826BAC00 + 592 x it)" },
+  { name = "reset", offset = 40, type = "u32", note = "1 at set-up, cleared after each record" },
+  { name = "no_history", offset = 44, type = "u32", note = "PostEffects::ToggleNoHistory" },
+  { name = "updated", offset = 48, type = "u32", note = "set on logic passes (PostEffects::MarkUpdated)" },
+  { name = "skipped", offset = 52, type = "u32", note = "skipped when set (PostEffects::RecordAll)" },
+  { name = "vertices", offset = 56, type = "bytes", count = 8000, note = "two buffers of 100 40-byte vertices (PostEffectQuad's)" },
+  { name = "vertex_count", offset = 8056, type = "u32", note = "vertices used in the buffer in use" },
+  { name = "vertex_buffer", offset = 8060, type = "u32", note = "the buffer in use (0 or 1)" },
+  { name = "glare", offset = 8064, type = "bytes", count = 288, note = "the glare definition (GlareDef), its star definition at +48 (+8112)" },
+  { name = "glare_star_inclination", offset = 8084, type = "f32", note = "the glare's +20: added to the lines' turn" },
+  { name = "glare_chromatic_aberration", offset = 8088, type = "f32", note = "the glare's +24: the colors scaled about the constant at 0x82008918" },
+  { name = "star_line_count", offset = 8112, type = "u32", note = "the star's lines (4 in the game)" },
+  { name = "star_lines", offset = 8116, type = "bytes", count = 96, note = "the star's lines (StarLine, 16 bytes each)" },
+  { name = "star_inclination", offset = 8212, type = "f32", note = "the star's +100" },
+  { name = "star_rotation", offset = 8216, type = "u32", note = "the star's +104" },
+  { name = "star_colors", offset = 8224, type = "bytes", count = 128, note = "the star's eight colors (16 bytes each)" },
+  { name = "frame_texture", offset = 8352, type = "ptr", to = "RenderTexture", note = "id 1: the frame resolved, full size" },
+  { name = "eighth_texture", offset = 8356, type = "ptr", to = "RenderTexture", note = "id 6: an eighth of the size" },
+  { name = "line_texture_0", offset = 8360, type = "ptr", to = "RenderTexture", note = "id 7: a quarter of the size; the star's line 0's" },
+  { name = "line_texture_1", offset = 8364, type = "ptr", to = "RenderTexture", note = "id 8: a quarter of the size; the star's line 1's" },
+  { name = "line_texture_2", offset = 8368, type = "ptr", to = "RenderTexture", note = "id 9: a quarter of the size; the star's line 2's" },
+  { name = "line_texture_3", offset = 8372, type = "ptr", to = "RenderTexture", note = "id 10: a quarter of the size; the star's line 3's" },
+  { name = "line_texture_4", offset = 8376, type = "ptr", to = "RenderTexture", note = "id 11: a quarter of the size; the star's line 4's" },
+  { name = "line_texture_5", offset = 8380, type = "ptr", to = "RenderTexture", note = "id 12: a quarter of the size; the star's line 5's" },
+  { name = "star_texture", offset = 8384, type = "ptr", to = "RenderTexture", note = "id 13: the lines merged, a quarter of the size" },
+  { name = "texture_64", offset = 8388, type = "ptr", to = "RenderTexture", note = "id 14: 64 x 64" },
+  { name = "texture_16", offset = 8392, type = "ptr", to = "RenderTexture", note = "id 15: 16 x 16" },
+  { name = "texture_4", offset = 8396, type = "ptr", to = "RenderTexture", note = "id 16: 4 x 4" },
+  { name = "texture_1", offset = 8400, type = "ptr", to = "RenderTexture", note = "id 17: 1 x 1" },
+  { name = "final_texture_1", offset = 8404, type = "ptr", to = "RenderTexture", note = "id 18: 1 x 1, sampler 1 of the final pass (pair 21)" },
+  { name = "history", offset = 8408, type = "ptr", to = "RenderTexture", note = "id 20 (its own): the glow's history, a quarter of the size" },
+  { name = "quarter_surface", offset = 8412, type = "ptr", to = "SurfaceHeader", note = "a quarter of the size: the bright pass drawn into it" },
+  { name = "eighth_surface", offset = 8416, type = "ptr", to = "SurfaceHeader" },
+  { name = "surface_64", offset = 8420, type = "ptr", to = "SurfaceHeader" },
+  { name = "surface_16", offset = 8424, type = "ptr", to = "SurfaceHeader" },
+  { name = "surface_4", offset = 8428, type = "ptr", to = "SurfaceHeader" },
+  { name = "surface_1", offset = 8432, type = "ptr", to = "SurfaceHeader" },
+  { name = "c33_x_second", offset = 8436, type = "f32", note = "c33.x of shader pair 10's second draw (Glow::Set8436, slot 2)" },
+  { name = "c33_x_first", offset = 8440, type = "f32", note = "c33.x of shader pair 10's first draw (slot 3)" },
+  { name = "c34_x", offset = 8444, type = "f32", note = "the bright pass's c34.x (slot 4)" },
+  { name = "c34_y", offset = 8448, type = "f32", note = "the bright pass's c34.y (slot 5)" },
+  { name = "strength", offset = 8452, type = "f32", note = "c33.y (Glow::SetStrength, slot 6; blended by frame interpolation)" },
+  { name = "c33_z", offset = 8456, type = "f32", note = "slot 7" },
+  { name = "history_weight", offset = 8460, type = "f32", note = "the history quad's alpha (Glow::SetHistoryWeight, slot 8; blended by frame interpolation)" },
+  { name = "param_8464", offset = 8464, type = "f32", note = "Glow::Set8464 (slot 9); the records don't read it" },
+  { name = "star_step", offset = 8468, type = "f32", note = "the star's step per sample (slot 10)" },
+  { name = "star_attenuation", offset = 8472, type = "f32", note = "the star passes' attenuation (slot 11)" },
+  { name = "c33_w", offset = 8476, type = "f32", note = "slot 12" },
+]
+
+# Kind 2, probably a color filter (8,128 bytes).
+[ColorFilter]
+measure = "ColorFilter"
+size = 8128
+origin = "allocated"
+vtable = 0x82008860
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PostEffectVtable", note = "the kind's vtable (base 0x82008838 between the constructor's steps and after the destructor)" },
+  { name = "kind", offset = 4, type = "u32", note = "+4 to +39: the table entry (PostEffectTableEntry) copied in; 0 glow, 1, 2 color filter, 3 motion blur, 4, 5 target filter" },
+  { name = "sort_key", offset = 8, type = "u32", note = "the render queue's key of its main chunk" },
+  { name = "second_sort_key", offset = 12, type = "u32", note = "the motion blur's velocity chunks' key (it - 2 for the upload and the blur's chunk)" },
+  { name = "width", offset = 16, type = "u32" },
+  { name = "height", offset = 20, type = "u32" },
+  { name = "x", offset = 24, type = "u32", note = "the view's position (by-view resolves and quads)" },
+  { name = "y", offset = 28, type = "u32" },
+  { name = "flags", offset = 32, type = "u32", note = "bit 2 kept past the race (PostEffects::DestroyRace); bits 0-1 the target filter's target (render target 4 or 3)" },
+  { name = "camera_pass", offset = 36, type = "u32", note = "its camera pass (0x826BAC00 + 592 x it)" },
+  { name = "reset", offset = 40, type = "u32", note = "1 at set-up, cleared after each record" },
+  { name = "no_history", offset = 44, type = "u32", note = "PostEffects::ToggleNoHistory" },
+  { name = "updated", offset = 48, type = "u32", note = "set on logic passes (PostEffects::MarkUpdated)" },
+  { name = "skipped", offset = 52, type = "u32", note = "skipped when set (PostEffects::RecordAll)" },
+  { name = "vertices", offset = 56, type = "bytes", count = 8000, note = "two buffers of 100 40-byte vertices (PostEffectQuad's)" },
+  { name = "vertex_count", offset = 8056, type = "u32", note = "vertices used in the buffer in use" },
+  { name = "vertex_buffer", offset = 8060, type = "u32", note = "the buffer in use (0 or 1)" },
+  { name = "frame_texture", offset = 8064, type = "ptr", to = "RenderTexture", note = "id 1: the frame resolved by the view" },
+  { name = "bool_0", offset = 8068, type = "u32", note = "pixel bool b0 (1 at set-up)" },
+  { name = "bool_1", offset = 8072, type = "u32", note = "pixel bool b1" },
+  { name = "color0_r", offset = 8080, type = "f32", note = "c37 = its inverses (ColorFilter::SetColor0)" },
+  { name = "color0_g", offset = 8084, type = "f32" },
+  { name = "color0_b", offset = 8088, type = "f32" },
+  { name = "color0_a", offset = 8092, type = "f32" },
+  { name = "color1_r", offset = 8096, type = "f32", note = "c39" },
+  { name = "color1_g", offset = 8100, type = "f32" },
+  { name = "color1_b", offset = 8104, type = "f32" },
+  { name = "color1_a", offset = 8108, type = "f32" },
+  { name = "strength", offset = 8112, type = "f32", note = "clamped, (it + 1) x tan(...) is c38.y (ColorFilter::Set8112)" },
+  { name = "c38_z", offset = 8116, type = "f32", note = "ColorFilter::Set8116" },
+  { name = "c38_x", offset = 8120, type = "f32", note = "ColorFilter::Set8120" },
+]
+
+# Kind 3, the motion blur (8,224 bytes).
+[MotionBlur]
+measure = "MotionBlur"
+size = 8224
+origin = "allocated"
+vtable = 0x820088A4
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PostEffectVtable", note = "the kind's vtable (base 0x82008838 between the constructor's steps and after the destructor)" },
+  { name = "kind", offset = 4, type = "u32", note = "+4 to +39: the table entry (PostEffectTableEntry) copied in; 0 glow, 1, 2 color filter, 3 motion blur, 4, 5 target filter" },
+  { name = "sort_key", offset = 8, type = "u32", note = "the render queue's key of its main chunk" },
+  { name = "second_sort_key", offset = 12, type = "u32", note = "the motion blur's velocity chunks' key (it - 2 for the upload and the blur's chunk)" },
+  { name = "width", offset = 16, type = "u32" },
+  { name = "height", offset = 20, type = "u32" },
+  { name = "x", offset = 24, type = "u32", note = "the view's position (by-view resolves and quads)" },
+  { name = "y", offset = 28, type = "u32" },
+  { name = "flags", offset = 32, type = "u32", note = "bit 2 kept past the race (PostEffects::DestroyRace); bits 0-1 the target filter's target (render target 4 or 3)" },
+  { name = "camera_pass", offset = 36, type = "u32", note = "its camera pass (0x826BAC00 + 592 x it)" },
+  { name = "reset", offset = 40, type = "u32", note = "1 at set-up, cleared after each record" },
+  { name = "no_history", offset = 44, type = "u32", note = "PostEffects::ToggleNoHistory" },
+  { name = "updated", offset = 48, type = "u32", note = "set on logic passes (PostEffects::MarkUpdated)" },
+  { name = "skipped", offset = 52, type = "u32", note = "skipped when set (PostEffects::RecordAll)" },
+  { name = "vertices", offset = 56, type = "bytes", count = 8000, note = "two buffers of 100 40-byte vertices (PostEffectQuad's)" },
+  { name = "vertex_count", offset = 8056, type = "u32", note = "vertices used in the buffer in use" },
+  { name = "vertex_buffer", offset = 8060, type = "u32", note = "the buffer in use (0 or 1)" },
+  { name = "velocity_texture", offset = 8064, type = "ptr", to = "RenderTexture", note = "id 20 (its own), half size: the velocities resolved" },
+  { name = "frame_texture", offset = 8068, type = "ptr", to = "RenderTexture", note = "id 1: the frame resolved by the view" },
+  { name = "velocity_surface", offset = 8072, type = "ptr", to = "SurfaceHeader", note = "half size: the velocities drawn into it" },
+  { name = "depth_surface", offset = 8076, type = "ptr", to = "SurfaceHeader", note = "half size, on the EDRAM base" },
+  { name = "view_projection", offset = 8080, type = "bytes", count = 64, note = "this tick's view-projection (the camera pass's +144, moved on on logic passes)" },
+  { name = "previous_view_projection", offset = 8144, type = "bytes", count = 64, note = "the previous tick's (vertex c100 x4)" },
+  { name = "c40_x", offset = 8208, type = "f32" },
+  { name = "c40_y", offset = 8212, type = "f32" },
+  { name = "c40_z", offset = 8216, type = "f32" },
+  { name = "scale", offset = 8220, type = "f32", note = "c41.x = (1 / width)^2 x it x it" },
+]
+
+# Kind 5, a two-pass filter over a camera pass's render target (8,068 bytes).
+[TargetFilter]
+measure = "TargetFilter"
+size = 8068
+origin = "allocated"
+vtable = 0x8200889C
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PostEffectVtable", note = "the kind's vtable (base 0x82008838 between the constructor's steps and after the destructor)" },
+  { name = "kind", offset = 4, type = "u32", note = "+4 to +39: the table entry (PostEffectTableEntry) copied in; 0 glow, 1, 2 color filter, 3 motion blur, 4, 5 target filter" },
+  { name = "sort_key", offset = 8, type = "u32", note = "the render queue's key of its main chunk" },
+  { name = "second_sort_key", offset = 12, type = "u32", note = "the motion blur's velocity chunks' key (it - 2 for the upload and the blur's chunk)" },
+  { name = "width", offset = 16, type = "u32" },
+  { name = "height", offset = 20, type = "u32" },
+  { name = "x", offset = 24, type = "u32", note = "the view's position (by-view resolves and quads)" },
+  { name = "y", offset = 28, type = "u32" },
+  { name = "flags", offset = 32, type = "u32", note = "bit 2 kept past the race (PostEffects::DestroyRace); bits 0-1 the target filter's target (render target 4 or 3)" },
+  { name = "camera_pass", offset = 36, type = "u32", note = "its camera pass (0x826BAC00 + 592 x it)" },
+  { name = "reset", offset = 40, type = "u32", note = "1 at set-up, cleared after each record" },
+  { name = "no_history", offset = 44, type = "u32", note = "PostEffects::ToggleNoHistory" },
+  { name = "updated", offset = 48, type = "u32", note = "set on logic passes (PostEffects::MarkUpdated)" },
+  { name = "skipped", offset = 52, type = "u32", note = "skipped when set (PostEffects::RecordAll)" },
+  { name = "vertices", offset = 56, type = "bytes", count = 8000, note = "two buffers of 100 40-byte vertices (PostEffectQuad's)" },
+  { name = "vertex_count", offset = 8056, type = "u32", note = "vertices used in the buffer in use" },
+  { name = "vertex_buffer", offset = 8060, type = "u32", note = "the buffer in use (0 or 1)" },
+  { name = "surface", offset = 8064, type = "ptr", to = "SurfaceHeader", note = "drawn into, then resolved into the target" },
+]
+
+# Kind 1 (8,112 bytes, never made in play; its constructor sub_82134410 not read in detail).
+[PostEffectKind1]
+measure = "new<8112>@PostEffects::Create"
+size = 8112
+origin = "allocated"
+vtable = 0x82008850
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PostEffectVtable", note = "the kind's vtable (base 0x82008838 between the constructor's steps and after the destructor)" },
+  { name = "kind", offset = 4, type = "u32", note = "+4 to +39: the table entry (PostEffectTableEntry) copied in; 0 glow, 1, 2 color filter, 3 motion blur, 4, 5 target filter" },
+  { name = "sort_key", offset = 8, type = "u32", note = "the render queue's key of its main chunk" },
+  { name = "second_sort_key", offset = 12, type = "u32", note = "the motion blur's velocity chunks' key (it - 2 for the upload and the blur's chunk)" },
+  { name = "width", offset = 16, type = "u32" },
+  { name = "height", offset = 20, type = "u32" },
+  { name = "x", offset = 24, type = "u32", note = "the view's position (by-view resolves and quads)" },
+  { name = "y", offset = 28, type = "u32" },
+  { name = "flags", offset = 32, type = "u32", note = "bit 2 kept past the race (PostEffects::DestroyRace); bits 0-1 the target filter's target (render target 4 or 3)" },
+  { name = "camera_pass", offset = 36, type = "u32", note = "its camera pass (0x826BAC00 + 592 x it)" },
+  { name = "reset", offset = 40, type = "u32", note = "1 at set-up, cleared after each record" },
+  { name = "no_history", offset = 44, type = "u32", note = "PostEffects::ToggleNoHistory" },
+  { name = "updated", offset = 48, type = "u32", note = "set on logic passes (PostEffects::MarkUpdated)" },
+  { name = "skipped", offset = 52, type = "u32", note = "skipped when set (PostEffects::RecordAll)" },
+  { name = "vertices", offset = 56, type = "bytes", count = 8000, note = "two buffers of 100 40-byte vertices (PostEffectQuad's)" },
+  { name = "vertex_count", offset = 8056, type = "u32", note = "vertices used in the buffer in use" },
+  { name = "vertex_buffer", offset = 8060, type = "u32", note = "the buffer in use (0 or 1)" },
+  { name = "texture_0", offset = 8064, type = "ptr", to = "RenderTexture" },
+  { name = "texture_1", offset = 8068, type = "ptr", to = "RenderTexture" },
+  { name = "texture_2", offset = 8072, type = "ptr", to = "RenderTexture" },
+  { name = "texture_3", offset = 8076, type = "ptr", to = "RenderTexture" },
+  { name = "texture_4", offset = 8080, type = "ptr", to = "RenderTexture" },
+  { name = "surface_0", offset = 8084, type = "ptr", to = "SurfaceHeader" },
+  { name = "surface_1", offset = 8088, type = "ptr", to = "SurfaceHeader" },
+  { name = "surface_2", offset = 8092, type = "ptr", to = "SurfaceHeader" },
+  { name = "unknown_8096", offset = 8096, type = "f32" },
+  { name = "unknown_8100", offset = 8100, type = "f32" },
+  { name = "unknown_8104", offset = 8104, type = "f32" },
+  { name = "unknown_8108", offset = 8108, type = "f32" },
+]
+
+# Kind 4 (8,068 bytes, never made in play; its constructor sub_82133B10 not read in detail).
+[PostEffectKind4]
+measure = "new<8068>@PostEffects::Create#2"
+size = 8068
+origin = "allocated"
+vtable = 0x82008848
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PostEffectVtable", note = "the kind's vtable (base 0x82008838 between the constructor's steps and after the destructor)" },
+  { name = "kind", offset = 4, type = "u32", note = "+4 to +39: the table entry (PostEffectTableEntry) copied in; 0 glow, 1, 2 color filter, 3 motion blur, 4, 5 target filter" },
+  { name = "sort_key", offset = 8, type = "u32", note = "the render queue's key of its main chunk" },
+  { name = "second_sort_key", offset = 12, type = "u32", note = "the motion blur's velocity chunks' key (it - 2 for the upload and the blur's chunk)" },
+  { name = "width", offset = 16, type = "u32" },
+  { name = "height", offset = 20, type = "u32" },
+  { name = "x", offset = 24, type = "u32", note = "the view's position (by-view resolves and quads)" },
+  { name = "y", offset = 28, type = "u32" },
+  { name = "flags", offset = 32, type = "u32", note = "bit 2 kept past the race (PostEffects::DestroyRace); bits 0-1 the target filter's target (render target 4 or 3)" },
+  { name = "camera_pass", offset = 36, type = "u32", note = "its camera pass (0x826BAC00 + 592 x it)" },
+  { name = "reset", offset = 40, type = "u32", note = "1 at set-up, cleared after each record" },
+  { name = "no_history", offset = 44, type = "u32", note = "PostEffects::ToggleNoHistory" },
+  { name = "updated", offset = 48, type = "u32", note = "set on logic passes (PostEffects::MarkUpdated)" },
+  { name = "skipped", offset = 52, type = "u32", note = "skipped when set (PostEffects::RecordAll)" },
+  { name = "vertices", offset = 56, type = "bytes", count = 8000, note = "two buffers of 100 40-byte vertices (PostEffectQuad's)" },
+  { name = "vertex_count", offset = 8056, type = "u32", note = "vertices used in the buffer in use" },
+  { name = "vertex_buffer", offset = 8060, type = "u32", note = "the buffer in use (0 or 1)" },
+  { name = "texture", offset = 8064, type = "ptr", to = "RenderTexture" },
+]
+
+# A post effects' table entry (0x826174A8, 15 of 36 bytes; copied into the effect at +4).
+[PostEffectTableEntry]
+size = 36
+origin = "image"
+fields = [
+  { name = "kind", offset = 0, type = "u32" },
+  { name = "sort_key", offset = 4, type = "u32" },
+  { name = "second_sort_key", offset = 8, type = "u32" },
+  { name = "width", offset = 12, type = "u32" },
+  { name = "height", offset = 16, type = "u32" },
+  { name = "x", offset = 20, type = "u32" },
+  { name = "y", offset = 24, type = "u32" },
+  { name = "flags", offset = 28, type = "u32" },
+  { name = "camera_pass", offset = 32, type = "u32" },
+]
+
+# A render texture: an entry of the pool at 0x826C5DC8 (20 of 36 bytes, by id), or
+# one of its own (id 20, operator new).
+[RenderTexture]
+measures = ["RenderTexture", "new<36>@RenderTextures::Acquire", "Glow.+8364", "Glow.+8368", "Glow.+8372", "Glow.+8404"]
+size = 36
+origin = "allocated"
+fields = [
+  { name = "format", offset = 0, type = "u32" },
+  { name = "width", offset = 4, type = "u32" },
+  { name = "height", offset = 8, type = "u32" },
+  { name = "key0", offset = 12, type = "u32", note = "two more words of the key (the view's x and y for id 1, else 0)" },
+  { name = "key1", offset = 16, type = "u32" },
+  { name = "users", offset = 20, type = "u32" },
+  { name = "header", offset = 24, type = "ptr", to = "TextureHeader", note = "52 bytes (operator new), set by XGSetTextureHeader" },
+  { name = "memory", offset = 28, type = "u32", note = "its physical memory (XPhysicalAlloc)" },
+  { name = "id", offset = 32, type = "u32", note = "20: its own entry, not the pool's" },
+]
+
+# An effect's render texture field, by address (RenderTextures::Release's r3).
+[RenderTextureRef]
+measure = "RenderTextures"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "entry", offset = 0, type = "ptr", to = "RenderTexture" },
+]
+
+# The glare definition (the glow's +8064; probably the DirectX SDK HDR sample's GLAREDEF).
+[GlareDef]
+measure = "GlareDef"
+size = 288
+origin = "embedded"
+fields = [
+  { name = "glare_luminance", offset = 0, type = "f32" },
+  { name = "bloom_luminance", offset = 4, type = "f32" },
+  { name = "ghost_luminance", offset = 8, type = "f32" },
+  { name = "ghost_distortion", offset = 12, type = "f32" },
+  { name = "star_luminance", offset = 16, type = "f32" },
+  { name = "star_inclination", offset = 20, type = "f32", note = "the table's +24 (its +20, the star type, left out)" },
+  { name = "chromatic_aberration_luminance", offset = 24, type = "f32" },
+  { name = "afterimage_sensitivity", offset = 28, type = "f32" },
+  { name = "afterimage_ratio", offset = 32, type = "f32" },
+  { name = "afterimage_luminance", offset = 36, type = "f32" },
+  { name = "star", offset = 48, type = "bytes", count = 240, note = "the star definition (StarDef)" },
+  { name = "star_line_count", offset = 48, type = "u32" },
+  { name = "star_def_inclination", offset = 148, type = "f32" },
+  { name = "star_rotation", offset = 152, type = "u32" },
+  { name = "star_colors", offset = 160, type = "bytes", count = 128 },
+]
+
+# The star definition (the glare's +48; probably the HDR sample's STARDEF).
+[StarDef]
+measure = "StarDef"
+size = 240
+origin = "embedded"
+fields = [
+  { name = "line_count", offset = 0, type = "u32" },
+  { name = "lines", offset = 4, type = "bytes", count = 96, note = "StarLine, 16 bytes each" },
+  { name = "inclination", offset = 100, type = "f32" },
+  { name = "rotation", offset = 104, type = "u32", note = "probably a bool (the HDR sample's bRotation)" },
+  { name = "colors", offset = 112, type = "bytes", count = 128, note = "eight colors (r, g, b, a) of 16 bytes" },
+]
+
+# A star line (StarDef + 4 + 16 i).
+[StarLine]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "passes", offset = 0, type = "u32" },
+  { name = "sample_length", offset = 4, type = "f32" },
+  { name = "attenuation", offset = 8, type = "f32" },
+  { name = "angle", offset = 12, type = "f32" },
+]
+
+# A star sample's color (Glow::RecordStarPass's r8, 16 bytes each, in Glow::RecordStar's frame).
+[GlowStarColor]
+measure = "Glow::RecordStarPass.r8"
+size = 16
+origin = "stack"
+fields = [
+  { name = "r", offset = 0, type = "f32" },
+  { name = "g", offset = 4, type = "f32" },
+  { name = "b", offset = 8, type = "f32" },
+  { name = "a", offset = 12, type = "f32" },
+]
+
+# The glare table's entry (0x82617280, eight of 44 bytes).
+[GlareTableEntry]
+size = 44
+origin = "image"
+fields = [
+  { name = "glare_luminance", offset = 0, type = "f32" },
+  { name = "bloom_luminance", offset = 4, type = "f32" },
+  { name = "ghost_luminance", offset = 8, type = "f32" },
+  { name = "ghost_distortion", offset = 12, type = "f32" },
+  { name = "star_luminance", offset = 16, type = "f32" },
+  { name = "star_type", offset = 20, type = "u32", note = "the star table's entry" },
+  { name = "star_inclination", offset = 24, type = "f32" },
+  { name = "chromatic_aberration_luminance", offset = 28, type = "f32" },
+  { name = "afterimage_sensitivity", offset = 32, type = "f32" },
+  { name = "afterimage_ratio", offset = 36, type = "f32" },
+  { name = "afterimage_luminance", offset = 40, type = "f32" },
+]
+
+# The star table's entry (0x826171D8, six of 28 bytes).
+[StarTableEntry]
+size = 28
+origin = "image"
+fields = [
+  { name = "line_count", offset = 0, type = "u32" },
+  { name = "passes", offset = 4, type = "u32" },
+  { name = "sample_length", offset = 8, type = "f32" },
+  { name = "attenuation", offset = 12, type = "f32" },
+  { name = "unknown_16", offset = 16, type = "f32" },
+  { name = "inclination", offset = 20, type = "f32" },
+  { name = "rotation", offset = 24, type = "u32" },
+]
+
+# PostEffect::AddQuad's three 40-byte vertices (in the effect's vertex buffers).
+[PostEffectQuad]
+measure = "PostEffect::AddQuad.ret"
+size = 120
+origin = "embedded"
+fields = [
+  { name = "v0_x", offset = 0, type = "f32" },
+  { name = "v0_y", offset = 4, type = "f32" },
+  { name = "v0_z", offset = 8, type = "f32" },
+  { name = "v0_w", offset = 12, type = "f32" },
+  { name = "v0_r", offset = 16, type = "f32" },
+  { name = "v0_g", offset = 20, type = "f32" },
+  { name = "v0_b", offset = 24, type = "f32" },
+  { name = "v0_a", offset = 28, type = "f32" },
+  { name = "v0_u", offset = 32, type = "f32" },
+  { name = "v0_v", offset = 36, type = "f32" },
+  { name = "v1_x", offset = 40, type = "f32" },
+  { name = "v1_y", offset = 44, type = "f32" },
+  { name = "v1_z", offset = 48, type = "f32" },
+  { name = "v1_w", offset = 52, type = "f32" },
+  { name = "v1_r", offset = 56, type = "f32" },
+  { name = "v1_g", offset = 60, type = "f32" },
+  { name = "v1_b", offset = 64, type = "f32" },
+  { name = "v1_a", offset = 68, type = "f32" },
+  { name = "v1_u", offset = 72, type = "f32" },
+  { name = "v1_v", offset = 76, type = "f32" },
+  { name = "v2_x", offset = 80, type = "f32" },
+  { name = "v2_y", offset = 84, type = "f32" },
+  { name = "v2_z", offset = 88, type = "f32" },
+  { name = "v2_w", offset = 92, type = "f32" },
+  { name = "v2_r", offset = 96, type = "f32" },
+  { name = "v2_g", offset = 100, type = "f32" },
+  { name = "v2_b", offset = 104, type = "f32" },
+  { name = "v2_a", offset = 108, type = "f32" },
+  { name = "v2_u", offset = 112, type = "f32" },
+  { name = "v2_v", offset = 116, type = "f32" },
+]
+
+# PostEffect::RecordPixelConstants' source: one 16-byte register's value.
+[PostEffectConstant]
+measure = "PostEffect::RecordPixelConstants.r5"
+size = 16
+origin = "stack"
+fields = [
+  { name = "xy", offset = 0, type = "u64" },
+  { name = "zw", offset = 8, type = "u64" },
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "w", offset = 12, type = "f32" },
+]
+
+# Command 26's 280-byte item (CommandList::AllocateBytes, no header), a clear,
+# probably D3D's Clear(count, rects, flags, color, z, stencil); the measure
+# names it by AllocateBytes' return, which other items share.
+[ClearItem]
+measure = "CommandList::AllocateBytes.ret"
+size = 280
+origin = "gpu"
+fields = [
+  { name = "rect_count", offset = 0, type = "u32", note = "probably; 0" },
+  { name = "rects", offset = 4, type = "u32", note = "probably; 0" },
+  { name = "flags", offset = 8, type = "u32", note = "49 color and depth, 1 color, 48 (cameras.md)" },
+  { name = "color", offset = 268, type = "u32" },
+  { name = "depth", offset = 272, type = "f32" },
+  { name = "stencil", offset = 276, type = "u32", note = "probably; 0" },
+]
+
+[globals]
+effects = { address = 0x826C5D80, type = "bytes", count = 60, note = "15 PostEffect pointers, one a table entry" }
+vertex_declaration = { address = 0x826C5DBC, type = "ptr", to = "VertexDeclaration", note = "the effects' 40-byte vertices (PostEffects::InitBoot)" }
+edram_base = { address = 0x826C5DC0, type = "u32", note = "the EDRAM base the effects' surfaces are given (PostEffects::InitEdramBase: 936)" }
+render_textures = { address = 0x826C5DC8, type = "bytes", count = 720, note = "the render texture pool: 20 RenderTexture entries by id" }
+effect_table = { address = 0x826174A8, type = "bytes", count = 540, note = "15 PostEffectTableEntry" }
+vertex_elements = { address = 0x826176C4, type = "bytes", count = 4, note = "the effects' vertex elements (CreateVertexDeclaration's input; its length not read here)" }
+glare_table = { address = 0x82617280, type = "bytes", count = 352, note = "eight GlareTableEntry" }
+star_table = { address = 0x826171D8, type = "bytes", count = 168, note = "six StarTableEntry" }
+render_manager = { address = 0x826BABA0, type = "ptr", note = "the render manager (app-start-up.md): slot 8, then 1 the scene's command list, 2 its render queue" }
+camera_passes = { address = 0x826BAC00, type = "bytes", count = 12432, note = "the 21 camera passes (CameraPass, 592 bytes each)" }
+scenery = { address = 0x826C551C, type = "ptr", to = "Scenery", note = "the course scenery (Race::ToggleEffects flips its +196 bit 0x4000)" }
+scene = { address = 0x826C2E44, type = "ptr", to = "CarScene", note = "the car scene (Race::ToggleEffects toggles its +5048)" }

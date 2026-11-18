@@ -102,19 +102,19 @@ uint64_t SetSpecTexts(uint8_t* base, uint32_t record, uint32_t sp, const Calls& 
 uint64_t ShowCarInfo(uint8_t* base, uint64_t index, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82182620 CarDealer::ShowCarInfo");
   const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t list = Load(base, Load(base, kData) + 1136);
-  const uint32_t entry = Load(base, (uint32_t(index) << 2) + list);
-  Store(base, frame + 80, guest::LoadU8(base, entry + 770));
-  Store(base, frame + 88, Load(base, entry + 712));
-  Store(base, frame + 84, guest::LoadU8(base, entry + 709) != 0 ? 1 : 0);
-  Store(base, frame + 92, Load(base, entry + 648));
-  Store(base, frame + 96, Fctiwz(double(std::bit_cast<float>(Load(base, entry + 652)))));
+  const uint32_t list = G::data(base).shown_list().address;
+  const Entry entry(base, Load(base, (uint32_t(index) << 2) + list));
+  Store(base, frame + 80, entry.unknown_770());
+  Store(base, frame + 88, entry.weight());
+  Store(base, frame + 84, entry.unknown_709() != 0 ? 1 : 0);
+  Store(base, frame + 92, entry.unknown_648());
+  Store(base, frame + 96, Fctiwz(double(entry.unknown_652())));
   // lfs then frsp: the translated code leaves the word as it was (a
   // signaling NaN too).
-  Store(base, frame + 100, Load(base, entry + 660));
+  Store(base, frame + 100, entry.unknown_660());
   SetSpecTexts(base, frame + 80, frame, calls);
-  SetNameTexts(base, Load(base, entry + 8432), guest::LoadU8(base, entry + 769), frame, calls);
-  return SetPriceTexts(base, Load(base, entry + 744), frame, calls);
+  SetNameTexts(base, entry.car_id(), entry.maker(), frame, calls);
+  return SetPriceTexts(base, entry.price(), frame, calls);
 }
 
 uint64_t SetSwatchColor(uint8_t* base, uint32_t node, uint32_t record, uint32_t sp) {
@@ -133,13 +133,14 @@ uint64_t ShowSwatches(uint8_t* base, uint32_t sp) {
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   const uint32_t row = ui_movies::FindNode(base, movie, 26, 1);
   uint64_t r3 = row;
-  const int32_t count = int32_t(Load(base, Load(base, kData) + 1192));
-  const uint32_t scroll = Load(base, Load(base, kListMenu) + 4);
+  const int32_t count = int32_t(Colors(base, G::data(base).colors_address()).count());
+  const uint32_t scroll = Load(base, G::list_menu(base).address + 4);
   const int32_t shown = count < 9 ? count : 9;
-  uint32_t at = (scroll + 285) << 2;
+  // The colors' records from the scroll on.
+  uint32_t at = scroll << 2;
   for (int32_t i = 0; i < shown; i++) {
     const uint32_t node = ui_movies::FindNode(base, movie, 26, Load(base, row + 100) + uint32_t(i));
-    const uint32_t record = Load(base, at + Load(base, kData));
+    const uint32_t record = Load(base, at + G::data(base).colors_address());
     r3 = SetSwatchColor(base, node, record, frame);
     at += 4;
   }
@@ -151,21 +152,21 @@ uint64_t FillStatus(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   calls.Call(kResetPose, frame, 0x82183B00, movie);
-  uint32_t data = Load(base, kData);
-  if (Load(base, data + 4) == 0) {
-    calls.Call(kSetChildNameText, frame, 0x82183B28, movie, 15, 6, data + 64);
-    data = Load(base, kData);
+  Data data = G::data(base);
+  if (data.first_car() == 0) {
+    calls.Call(kSetChildNameText, frame, 0x82183B28, movie, 15, 6, data.pick_address());
+    data = G::data(base);
   }
-  calls.Call(kSetNumberText, frame, 0x82183B40, movie, 15, 9, Load(base, data + 84));
-  SetText(calls, frame, 0x82183B5C, movie, 15, 13, 8, Load(base, Load(base, kData) + 92));
+  calls.Call(kSetNumberText, frame, 0x82183B40, movie, 15, 9, data.money());
+  SetText(calls, frame, 0x82183B5C, movie, 15, 13, 8, G::data(base).day());
   const uint32_t day = ui_movies::FindNode(base, movie, 15, 11);
-  Store(base, day + 108, Load(base, Load(base, kData) + 88));
+  Store(base, day + 108, G::data(base).weekday());
   const uint32_t prompts[6] = {0, 0, 1, 1, 0xFFFFFFFFu, 0xFFFFFFFFu};
   const uint64_t r3 = SetPrompts(base, prompts, frame);
-  Store(base, Load(base, kData) + 8, 0);
-  Store(base, Load(base, kData) + 28, 0);
-  Store(base, Load(base, kData) + 0, 1);
-  Store(base, Load(base, kData) + 32, 0);
+  G::data(base).set_leaving_bought(0);
+  G::data(base).set_car_shown(0);
+  G::data(base).set_started(1);
+  G::data(base).set_stand_model(0);
   return r3;
 }
 

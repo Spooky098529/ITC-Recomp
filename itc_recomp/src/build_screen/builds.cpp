@@ -10,6 +10,7 @@
 #include "car_makers/car_makers.h"
 #include "guest.h"
 #include "race_screens/race_screens.h"
+#include "schema/build_screen.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -29,7 +30,9 @@ uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, add
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
-uint32_t Screen(uint8_t* base) { return Load(base, kScreen); }
+using G = schema::BuildScreenGlobals;
+
+uint32_t Screen(uint8_t* base) { return G::screen(base).address; }
 int64_t Half(uint8_t* base, uint32_t address) { return int16_t(guest::LoadU16(base, address)); }
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
@@ -114,7 +117,8 @@ uint64_t InitBuildList(uint8_t* base, uint32_t sp, const Calls& calls) {
   const int64_t shown = int32_t(n) > 6 ? 6 : n;
   Store(base, frame + 92, 158);
   Store(base, frame + 84, 159);
-  const uint64_t args[8] = {Load(base, kList), uint64_t(n), uint64_t(shown), 1, 154, 153, 155, 156};
+  const uint64_t args[8] = {G::list(base).address, uint64_t(n), uint64_t(shown), 1,
+                            154, 153, 155, 156};
   calls.CallArgs(kMenuListInit, frame, int32_t(n) > 6 ? 0x8219C060 : 0x8219C044, args);
   return RestoreBuildList(base, frame);
 }
@@ -191,7 +195,7 @@ uint64_t DrawStandRow(uint8_t* base, uint32_t sp, uint32_t row, uint32_t positio
 uint64_t DrawBuildRows(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8219D3E8 BuildScreen::DrawBuildRows");
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t scroll = Load(base, Load(base, kList) + 4);
+  const uint32_t scroll = Load(base, G::list(base).address + 4);
   uint64_t r3 = 0;
   for (uint32_t r = 0; r < 6; r++) {
     r3 = DrawBuildRow(base, frame, r, r + scroll, calls);
@@ -238,14 +242,14 @@ uint64_t SetUpBuilds(uint8_t* base, uint32_t sp, const Calls& calls) {
   ListBuilds(base, frame, Load(base, group + 0), calls);
   InitBuildList(base, frame, calls);
   DrawBuildRows(base, frame, calls);
-  const uint32_t selection = race_screens::ListSelection(base, Load(base, kList));
-  const uint32_t scroll = Load(base, Load(base, kList) + 4);
+  const uint32_t selection = race_screens::ListSelection(base, G::list(base).address);
+  const uint32_t scroll = Load(base, G::list(base).address + 4);
   screen = Screen(base);
   ShowBuildMark(base, frame, BuildAt(base, screen + kBuilds, scroll + selection));
-  race_screens::ListSetSelection(base, Load(base, kGroupList),
+  race_screens::ListSetSelection(base, G::group_list(base).address,
                                  Load(base, Screen(base) + kGroupSelection));
-  Store(base, Load(base, kGroupList) + 4, Load(base, Screen(base) + kGroupScroll));
-  race_screens::ListFit(base, Load(base, kGroupList), 1);
+  Store(base, G::group_list(base).address + 4, Load(base, Screen(base) + kGroupScroll));
+  race_screens::ListFit(base, G::group_list(base).address, 1);
   static constexpr uint32_t kPrompts[6] = {0, 0, 1, 1, 0xFFFFFFFFu, 0xFFFFFFFFu};
   SetPrompts(base, frame, kPrompts);
   SetHelp(base, frame, 565, calls);
@@ -262,14 +266,14 @@ uint64_t SetUpGroups(uint8_t* base, uint32_t sp, const Calls& calls) {
   FilterGroups(base, frame);
   InitGroupLists(base, frame, calls);
   DrawGroupRows(base, frame, calls);
-  const uint32_t selection = race_screens::ListSelection(base, Load(base, kList));
-  const uint32_t shown = Load(base, Load(base, kList) + 4) + selection;
+  const uint32_t selection = race_screens::ListSelection(base, G::list(base).address);
+  const uint32_t shown = Load(base, G::list(base).address + 4) + selection;
   ShowGroup(base, frame, Load(base, Screen(base) + ((shown + 0x10000 - 14799) << 2)), calls);
   ShowNumber(base, frame, Load(base, Screen(base) + kNumber));
   static constexpr uint32_t kPrompts[6] = {0, 0, 1, 1, 0xFFFFFFFFu, 0xFFFFFFFFu};
   SetPrompts(base, frame, kPrompts);
   SetHelp(base, frame, 564, calls);
-  const uint32_t scroll = Load(base, Load(base, kList) + 4);
+  const uint32_t scroll = Load(base, G::list(base).address + 4);
   return GroupArrows(base, frame, scroll, Load(base, Screen(base) + kShownCount));
 }
 
@@ -278,7 +282,7 @@ uint64_t RestoreStand(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 96);
   InitStandList(base, frame, calls);
   RestoreStandList(base, frame);
-  DrawStandRow(base, frame, 0, Load(base, Load(base, kList) + 4), calls);
+  DrawStandRow(base, frame, 0, Load(base, G::list(base).address + 4), calls);
   static constexpr uint32_t kPrompts[6] = {0, 5, 1, 1, 0xFFFFFFFFu, 0xFFFFFFFFu};
   SetPrompts(base, frame, kPrompts);
   SetHelp(base, frame, 566, calls);
@@ -347,7 +351,7 @@ uint64_t SetUpDetails(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint64_t n = int32_t(uint32_t(lines)) > 4 ? lines - 3 : 1;
   Store(base, frame + 92, 158);
   Store(base, frame + 84, 159);
-  const uint64_t args[8] = {Load(base, kList), n, n, 0, 154, 153, 155, 156};
+  const uint64_t args[8] = {G::list(base).address, n, n, 0, 154, 153, 155, 156};
   calls.CallArgs(kMenuListInit, frame, 0x8219F9D4, args);
   static constexpr uint32_t kPrompts[6] = {1, 4, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu,
                                            0xFFFFFFFFu};
@@ -369,9 +373,9 @@ uint32_t PutOnStand(uint8_t* base, uint32_t sp, uint32_t index, uint32_t flag,
   const uint32_t id = Load(base, car_build + 2788);
   Store(base, screen + kStandMade, 0);
   const uint32_t block = car_makers::BlockOf(id);
-  reload(Load(base, Load(base, kStandHolder)), block, frame, 0x8219D778);
+  reload(Load(base, G::stand_holder(base).address), block, frame, 0x8219D778);
   const uint32_t dark = flag == 0 ? 1 : 0;
-  SetDark(base, frame, Load(base, Load(base, kStandHolder)), dark);
+  SetDark(base, frame, Load(base, G::stand_holder(base).address), dark);
   const uint32_t node = Node(base, movie, 0xFFFFFFFFu, 11);
   Store(base, node + 80, dark);
   return node;
@@ -383,13 +387,13 @@ uint64_t SetUpStand(uint8_t* base, uint32_t sp, const Calls& calls, const Reload
   KeepBuildList(base, frame);
   InitStandList(base, frame, calls);
   RestoreBuildList(base, frame);
-  DrawStandRow(base, frame, 0, Load(base, Load(base, kList) + 4), calls);
+  DrawStandRow(base, frame, 0, Load(base, G::list(base).address + 4), calls);
   static constexpr uint32_t kPrompts[6] = {0, 5, 1, 1, 0xFFFFFFFFu, 0xFFFFFFFFu};
   SetPrompts(base, frame, kPrompts);
   SetHelp(base, frame, 566, calls);
   StandArrows(base, frame);
   Store(base, Screen(base) + kCarShown, 1);
-  const uint32_t list = Load(base, kList);
+  const uint32_t list = G::list(base).address;
   const uint32_t scroll = Load(base, list + 4);
   const uint32_t position = race_screens::ListSelection(base, list) + scroll;
   const uint32_t build = BuildAt(base, Screen(base) + kBuilds, position);

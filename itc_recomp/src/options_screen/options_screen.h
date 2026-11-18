@@ -14,6 +14,8 @@
 #pragma once
 
 #include "race_hud_object/race_hud_object.h"
+#include "schema/menu_helpers.h"
+#include "schema/options_screen.h"
 
 #include <cstdint>
 
@@ -72,17 +74,31 @@ constexpr uint32_t kSetNumberText = 0x8211C740;
 constexpr uint32_t kClearText = 0x8211C470;
 constexpr uint32_t kResetTextScroll = 0x8211C5F8;
 constexpr uint32_t kScrollText = 0x8211C570;  // UiMovie::ScrollText
-// The category table (5 contexts of 7 words, -1 past the last).
-constexpr uint32_t kCategories = 0x8200A578;
 constexpr uint32_t kSetHudArrow = 0x821BE4A0;
 constexpr uint32_t kSetSoundArrow = 0x821BE7A8;
 constexpr uint32_t kSetSlidersArrow = 0x821BEDC8;
 
 // The screen's blocks (docs/known-data.md): the page block (28 bytes), the
-// front-end menu (68), the settings `o` (716).
+// front-end menu (68), the settings `o` (716): schema::OptionsScreenGlobals
+// (the constants left for load_save.cpp).
 constexpr uint32_t kPage = 0x826D8470;
 constexpr uint32_t kMenu = 0x826D8474;
 constexpr uint32_t kSettings = 0x826D8478;
+
+// A settings word's accessor (its load), and the button and analog edits in
+// menu order, as the pages copy them.
+using SettingsWord = uint32_t (schema::OptionsSettings::*)() const;
+inline constexpr SettingsWord kButtonEdits[12] = {
+    &schema::OptionsSettings::edit_button_0, &schema::OptionsSettings::edit_button_1,
+    &schema::OptionsSettings::edit_button_2, &schema::OptionsSettings::edit_button_3,
+    &schema::OptionsSettings::edit_button_4, &schema::OptionsSettings::edit_button_5,
+    &schema::OptionsSettings::edit_button_9, &schema::OptionsSettings::edit_button_7,
+    &schema::OptionsSettings::edit_button_8, &schema::OptionsSettings::edit_button_6,
+    &schema::OptionsSettings::edit_button_10, &schema::OptionsSettings::edit_button_11};
+inline constexpr SettingsWord kAnalogEdits[6] = {
+    &schema::OptionsSettings::edit_analog_0, &schema::OptionsSettings::edit_analog_1,
+    &schema::OptionsSettings::edit_analog_2, &schema::OptionsSettings::edit_analog_4,
+    &schema::OptionsSettings::edit_analog_3, &schema::OptionsSettings::edit_analog_5};
 
 // --- The controls' tables and the settings' leaves (controls.cpp) ---
 

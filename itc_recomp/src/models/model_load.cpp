@@ -12,6 +12,7 @@
 #include "models/model.h"
 #include "models/xpr.h"
 #include "native/buffers.h"
+#include "schema/models.h"
 #include "scenery_lists/scenery_lists.h"
 #include "shader_objects/shader_objects.h"
 #include "strings_and_font/steps.h"
@@ -26,6 +27,7 @@ namespace {
 
 using namespace car_physics::ops;
 namespace ma = model_animation;
+using G = schema::ModelsGlobals;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -33,7 +35,7 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
 }
 
 constexpr uint32_t kVersion = 0x00150000;
-constexpr uint32_t kShapeBytes = 544;
+constexpr uint32_t kShapeBytes = schema::ModelShape::kSize;
 constexpr uint32_t kMaterialBytes = 512;
 // The bits the parse sets in each buffer header's +28 (fetch constant, 1 in
 // bits 28-29).
@@ -66,24 +68,26 @@ bool LoadFits(uint8_t* base, uint32_t file) {
   if (!native::Buffers_NativeMemcpy()) {
     return false;
   }
-  const uint32_t section = Load(base, file + 72) + file;
-  const uint32_t count = Load(base, section);
-  uint32_t pair = section + 32;
+  const uint32_t section = schema::PartFile(base, file).shader_section() + file;
+  const uint32_t count = schema::ShaderSection(base, section).pair_count();
+  uint32_t pair = schema::ShaderSection(base, section).first_entry_address();
   for (uint32_t i = 0; i < count; i++) {
-    const uint32_t vertex = pair + 32;
-    const uint32_t pixel = Load(base, pair + 4) + vertex;
-    if (!c_runtime::XMemCpyBytes(base, vertex, Load(base, vertex + 4)) ||
-        !c_runtime::XMemCpyBytes(base, pixel, Load(base, pixel + 4))) {
+    const uint32_t vertex = pair + schema::ShaderPairEntry::kSize;
+    const uint32_t pixel = schema::ShaderPairEntry(base, pair).vertex_size() + vertex;
+    if (!c_runtime::XMemCpyBytes(base, vertex, schema::ShaderFile(base, vertex).header_size()) ||
+        !c_runtime::XMemCpyBytes(base, pixel, schema::ShaderFile(base, pixel).header_size())) {
       return false;
     }
-    pair = Load(base, pair + 8) + pixel;
+    pair = schema::ShaderPairEntry(base, pair).pixel_size() + pixel;
   }
   return true;
 }
 
 void MeshParse(uint8_t* base, uint32_t model, uint32_t file, const LoadCalls& calls) {
   ITC_NATIVE_RUNNING("sub_825963F0 Mesh::Parse");
-  const uint32_t version = Load(base, file);
+  const schema::Model m(base, model);
+  const schema::PartFile f(base, file);
+  const uint32_t version = f.version();
   if (version != kVersion) {
     // The game's debug print (sub_825ABFE8, its format at 0x8206CDE8).
     ITC_LOG_WARN("Mesh::Parse: version {:#x}, not {:#x} (the game's debug print)", version,
@@ -92,153 +96,172 @@ void MeshParse(uint8_t* base, uint32_t model, uint32_t file, const LoadCalls& ca
   shader_objects::CreateCalls shader_calls;
   shader_calls.init = calls.init;
   shader_calls.user = calls.user;
-  Require(shader_objects::LoadShaders(base, model, Load(base, file + 72) + file, shader_calls),
+  Require(shader_objects::LoadShaders(base, model, f.shader_section() + file, shader_calls),
           "Mesh::LoadShaders");
   // The header block: the file's bytes before the vertex data.
-  Store(base, model + 16, AllocVirtual(base, Load(base, file + 64)));
-  Require(native::Buffers_Memcpy(base, Load(base, model + 16), file, Load(base, file + 64),
+  m.set_header_block(AllocVirtual(base, f.vertex_data_offset()));
+  Require(native::Buffers_Memcpy(base, m.header_block().address, file, f.vertex_data_offset(),
                                  0x82596448),
           "memcpy");
-  const uint32_t header = Load(base, model + 16);
-  Store(base, model + 28, header);
-  Store(base, model + 32, Load(base, header + 20) + header);
-  Store(base, model + 36, Load(base, header + 24) + header);
-  Store(base, model + 40, Load(base, header + 28) + header);
-  Store(base, model + 44, Load(base, header + 32) + header);
-  Store(base, model + 404, Load(base, header + 4));
-  Store(base, model + 408, Load(base, header + 8));
-  const uint32_t shapes = Load(base, header + 12);
-  Store(base, model + 412, shapes);
-  Store(base, model + 416, Load(base, header + 16));
+  const uint32_t header = m.header_block().address;
+  const schema::PartFile h(base, header);
+  m.set_header(header);
+  m.set_table_14(h.table_14() + header);
+  m.set_table_18(h.table_18() + header);
+  m.set_shapes(h.shapes() + header);
+  m.set_table_20(h.table_20() + header);
+  m.set_file_04(h.file_04());
+  m.set_file_08(h.file_08());
+  const uint32_t shapes = h.shape_count();
+  m.set_shape_count(shapes);
+  m.set_file_10(h.file_10());
   // The shapes' pointers made pointers into the header block.
   if (int32_t(shapes) > 0) {
-    for (int32_t i = 0; i < int32_t(Load(base, model + 412)); i++) {
+    for (int32_t i = 0; i < int32_t(m.shape_count()); i++) {
       const uint32_t offset = kShapeBytes * uint32_t(i);
-      for (const uint32_t field : {396u, 408u, 400u, 404u}) {
-        const uint32_t shape = Load(base, model + 40) + offset;
-        Store(base, shape + field, Load(base, shape + field) + Load(base, model + 16));
+      auto shape_at = [&] { return schema::ModelShape(base, m.shapes().address + offset); };
+      {
+        const auto shape = shape_at();
+        shape.set_materials(shape.materials().address + m.header_block().address);
       }
-      const uint32_t shape = Load(base, model + 40) + offset;
-      const uint32_t weights = Load(base, shape + 408);
-      const uint32_t w8 = Load(base, weights + 8);
-      const uint32_t w12 = Load(base, weights + 12);
-      const uint32_t w16 = Load(base, weights + 16);
-      Store(base, weights + 8, Load(base, model + 16) + w8);
-      Store(base, weights + 12, Load(base, model + 16) + w12);
-      Store(base, weights + 16, Load(base, model + 16) + w16);
-      const uint32_t f316 = Load(base, shape + 316);
-      const uint32_t f348 = Load(base, shape + 348);
-      const uint32_t f380 = Load(base, shape + 380);
-      const uint32_t skinned = Load(base, shape + 428);
-      Store(base, shape + 316, WithFetchBits(f316));
-      Store(base, shape + 348, WithFetchBits(f348));
-      Store(base, shape + 380, WithFetchBits(f380));
+      {
+        const auto shape = shape_at();
+        shape.set_skin(shape.skin().address + m.header_block().address);
+      }
+      {
+        const auto shape = shape_at();
+        shape.set_skin_array_a(shape.skin_array_a() + m.header_block().address);
+      }
+      {
+        const auto shape = shape_at();
+        shape.set_skin_array_b(shape.skin_array_b() + m.header_block().address);
+      }
+      const auto shape = shape_at();
+      const schema::SkinBlock weights = shape.skin();
+      const uint32_t w8 = weights.influence_counts().address;
+      const uint32_t w12 = weights.weights().address;
+      const uint32_t w16 = weights.bone_indices();
+      weights.set_influence_counts(m.header_block().address + w8);
+      weights.set_weights(m.header_block().address + w12);
+      weights.set_bone_indices(m.header_block().address + w16);
+      const uint32_t f316 = shape.vertex_buffer0_fetch();
+      const uint32_t f348 = shape.vertex_buffer1_fetch();
+      const uint32_t f380 = shape.vertex_buffer2_fetch();
+      const uint32_t skinned = shape.skinned();
+      shape.set_vertex_buffer0_fetch(WithFetchBits(f316));
+      shape.set_vertex_buffer1_fetch(WithFetchBits(f348));
+      shape.set_vertex_buffer2_fetch(WithFetchBits(f380));
       if (skinned == 1) {
-        Store(base, shape + 348, WithFetchBits(Load(base, shape + 348)));
-        Store(base, shape + 380, WithFetchBits(Load(base, shape + 380)));
+        shape.set_vertex_buffer1_fetch(WithFetchBits(shape.vertex_buffer1_fetch()));
+        shape.set_vertex_buffer2_fetch(WithFetchBits(shape.vertex_buffer2_fetch()));
       }
     }
   }
-  // The materials' pointers.
-  if (int32_t(Load(base, model + 412)) > 0) {
-    for (int32_t i = 0; i < int32_t(Load(base, model + 412)); i++) {
+  // The materials' pointers (each record's +384, a material record's:
+  // material-passes.md's type).
+  if (int32_t(m.shape_count()) > 0) {
+    for (int32_t i = 0; i < int32_t(m.shape_count()); i++) {
       const uint32_t offset = kShapeBytes * uint32_t(i);
-      const uint32_t materials = Load(base, Load(base, model + 40) + offset + 396);
-      if (int32_t(Load(base, materials)) <= 0) {
+      auto shape_at = [&] { return schema::ModelShape(base, m.shapes().address + offset); };
+      const schema::MaterialBlock materials = shape_at().materials();
+      if (int32_t(materials.record_count()) <= 0) {
         continue;
       }
       for (int32_t j = 0;;) {
         const uint32_t entry =
-            Load(base, Load(base, model + 40) + offset + 396) + kMaterialBytes * uint32_t(j) + 16;
+            shape_at().materials().records_address() + kMaterialBytes * uint32_t(j);
         j++;
-        Store(base, entry + 384, Load(base, model + 16) + Load(base, entry + 384));
-        const uint32_t again = Load(base, Load(base, model + 40) + offset + 396);
-        if (!(j < int32_t(Load(base, again)))) {
+        Store(base, entry + 384, m.header_block().address + Load(base, entry + 384));
+        const schema::MaterialBlock again = shape_at().materials();
+        if (!(j < int32_t(again.record_count()))) {
           break;
         }
       }
     }
   }
   // The skeleton and the track sets, with the header block's sections.
-  auto section = [&](uint32_t field) { return Load(base, file + field); };
   auto call = [&](uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5, uint32_t lr) {
     calls.call(calls.user, function, r3, r4, r5, lr);
   };
-  if (Load(base, Load(base, model + 28) + 76) != 0) {
-    if (section(36) != 0) {
-      const uint32_t at = section(36) + Load(base, model + 16);
-      if (!ma::SkeletonBind(base, model + 112, at, 0)) {
-        call(0x82599A20, model + 112, at, 0, 0x82596674);
+  if (m.header().has_sections() != 0) {
+    if (f.node_file() != 0) {
+      const uint32_t at = f.node_file() + m.header_block().address;
+      if (!ma::SkeletonBind(base, m.skeleton_address(), at, 0)) {
+        call(0x82599A20, m.skeleton_address(), at, 0, 0x82596674);
       }
     }
-    if (section(40) != 0) {
-      ma::SkeletonLoadNodeValues(base, model + 112, Load(base, model + 16) + section(40));
+    if (f.node_values_section() != 0) {
+      ma::SkeletonLoadNodeValues(base, m.skeleton_address(),
+                                 m.header_block().address + f.node_values_section());
     }
-    if (section(48) != 0) {
-      const uint32_t at = section(48) + Load(base, model + 16);
-      if (!ma::TrackSetSetupFloat(base, model + 324, at)) {
-        call(0x825A1BE8, model + 324, at, 0, 0x825966AC);
+    if (f.float_section_a() != 0) {
+      const uint32_t at = f.float_section_a() + m.header_block().address;
+      if (!ma::TrackSetSetupFloat(base, m.track_set_float_a_address(), at)) {
+        call(0x825A1BE8, m.track_set_float_a_address(), at, 0, 0x825966AC);
       }
     }
-    if (section(52) != 0) {
-      const uint32_t at = Load(base, model + 16) + section(52);
-      if (!ma::TrackSetSetupFloat(base, model + 344, at)) {
-        call(0x825A1BE8, model + 344, at, 0, 0x825966C8);
+    if (f.float_section_b() != 0) {
+      const uint32_t at = m.header_block().address + f.float_section_b();
+      if (!ma::TrackSetSetupFloat(base, m.track_set_float_b_address(), at)) {
+        call(0x825A1BE8, m.track_set_float_b_address(), at, 0, 0x825966C8);
       }
     }
-    if (section(56) != 0) {
-      const uint32_t at = Load(base, model + 16) + section(56);
-      if (!ma::TrackSetSetup32(base, model + 364, at)) {
-        call(0x825A1218, model + 364, at, 0, 0x825966E4);
+    if (f.material_section() != 0) {
+      const uint32_t at = m.header_block().address + f.material_section();
+      if (!ma::TrackSetSetup32(base, m.track_set_material_address(), at)) {
+        call(0x825A1218, m.track_set_material_address(), at, 0, 0x825966E4);
       }
     }
-    if (section(60) != 0) {
-      const uint32_t at = Load(base, model + 16) + section(60);
-      if (!ma::TrackSetSetup208(base, model + 384, at)) {
-        call(0x825A1A38, model + 384, at, 0, 0x82596700);
+    if (f.section_208() != 0) {
+      const uint32_t at = m.header_block().address + f.section_208();
+      if (!ma::TrackSetSetup208(base, m.track_set_208_address(), at)) {
+        call(0x825A1A38, m.track_set_208_address(), at, 0, 0x82596700);
       }
     }
   }
   {
-    const uint32_t at = section(44) + Load(base, model + 16);
-    if (!ma::TrackSetSetupFloat4(base, model + 304, at)) {
-      call(0x825A1E08, model + 304, at, 0, 0x82596714);
+    const uint32_t at = f.float4_section() + m.header_block().address;
+    if (!ma::TrackSetSetupFloat4(base, m.track_set_float4_address(), at)) {
+      call(0x825A1E08, m.track_set_float4_address(), at, 0, 0x82596714);
     }
   }
-  if (Load(base, model + 412) == 0) {
+  if (m.shape_count() == 0) {
     return;
   }
   // The vertex data in physical memory, the shapes' buffers relocated to it.
-  const uint32_t vertices = file + section(64);
-  const uint32_t data = AllocPhysicalEx(base, section(68), 0, 0xFFFFFFFFu, 4, 0x404);
-  Store(base, model + 20, data);
+  const uint32_t vertices = file + f.vertex_data_offset();
+  const uint32_t data = AllocPhysicalEx(base, f.vertex_data_size(), 0, 0xFFFFFFFFu, 4, 0x404);
+  m.set_vertex_data(data);
   if (data == 0) {
     ITC_LOG_WARN("Mesh::Parse: the game's debug message: {}", Message(base, 0x8206CDC8));
   }
-  Require(native::Buffers_Memcpy(base, Load(base, model + 20), vertices, section(68), 0x8259676C),
+  Require(native::Buffers_Memcpy(base, m.vertex_data(), vertices, f.vertex_data_size(),
+                                 0x8259676C),
           "memcpy");
-  if (int32_t(Load(base, model + 412)) <= 0) {
+  if (int32_t(m.shape_count()) <= 0) {
     return;
   }
-  for (int32_t i = 0; i < int32_t(Load(base, model + 412)); i++) {
+  for (int32_t i = 0; i < int32_t(m.shape_count()); i++) {
     const uint32_t offset = kShapeBytes * uint32_t(i);
-    auto shape = [&] { return Load(base, model + 40) + offset; };
-    auto rebase = [&](uint32_t field) {
-      Store(base, shape() + field, Load(base, shape() + field) - section(64));
-      Store(base, shape() + field, Load(base, shape() + field) + Load(base, model + 20));
-    };
-    rebase(384);
-    RelocateResource(base, shape() + 288, Load(base, model + 20));
-    if (Load(base, shape() + 428) != 1) {
-      rebase(388);
-      RelocateResource(base, shape() + 320, Load(base, model + 20));
-      rebase(392);
-      RelocateResource(base, shape() + 352, Load(base, model + 20));
+    auto shape = [&] { return schema::ModelShape(base, m.shapes().address + offset); };
+    shape().set_stream0_offset(shape().stream0_offset() - f.vertex_data_offset());
+    shape().set_stream0_offset(shape().stream0_offset() + m.vertex_data());
+    RelocateResource(base, shape().vertex_buffer0_address(), m.vertex_data());
+    if (shape().skinned() != 1) {
+      shape().set_stream1_offset(shape().stream1_offset() - f.vertex_data_offset());
+      shape().set_stream1_offset(shape().stream1_offset() + m.vertex_data());
+      RelocateResource(base, shape().vertex_buffer1_address(), m.vertex_data());
+      shape().set_stream2_offset(shape().stream2_offset() - f.vertex_data_offset());
+      shape().set_stream2_offset(shape().stream2_offset() + m.vertex_data());
+      RelocateResource(base, shape().vertex_buffer2_address(), m.vertex_data());
     }
-    if (int32_t(Load(base, Load(base, shape() + 396))) > 0) {
-      for (int32_t j = 0; j < int32_t(Load(base, Load(base, shape() + 396))); j++) {
-        RelocateResource(base, Load(base, shape() + 396) + kMaterialBytes * uint32_t(j) + 368,
-                         Load(base, model + 20));
+    if (int32_t(shape().materials().record_count()) > 0) {
+      for (int32_t j = 0; j < int32_t(shape().materials().record_count()); j++) {
+        // A material record's index buffer header (its +0x160).
+        RelocateResource(base,
+                         shape().materials().records_address() + kMaterialBytes * uint32_t(j) +
+                             352,
+                         m.vertex_data());
       }
     }
   }
@@ -251,23 +274,24 @@ bool ModelLoad(uint8_t* base, uint32_t model, uint32_t file, uint32_t xpr,
     return false;
   }
   MeshParse(base, model, file, calls);
+  const schema::Model m(base, model);
   if (xpr != 0) {
-    Require(XprCreate(base, model + kModelXpr, xpr).has_value(), "XPR::Create");
-    const uint32_t provider = model + kModelTextures;
-    const uint32_t set = Load(base, Load(base, provider) + 16);
+    Require(XprCreate(base, m.xpr_address(), xpr).has_value(), "XPR::Create");
+    const uint32_t provider = m.textures_address();
+    const uint32_t set = schema::TextureProvider(base, provider).vtable().set();
     if (set != kTextureProviderSet ||
-        !scenery_lists::TextureProviderSet(base, provider, 0, model + kModelXpr)) {
-      calls.call(calls.user, set, provider, 0, model + kModelXpr, 0x82596980);
+        !scenery_lists::TextureProviderSet(base, provider, 0, m.xpr_address())) {
+      calls.call(calls.user, set, provider, 0, m.xpr_address(), 0x82596980);
     }
-    Store(base, model + 48, provider);
+    m.set_texture_provider(provider);
   }
-  if (Load(base, model + 412) == 0) {
+  if (m.shape_count() == 0) {
     return true;
   }
   const double one = Lfs(base, kOne);
-  const double scale = Lfs(base, 0x820029D8);
-  const double add = Lfs(base, 0x82001BE4);
-  const double multiply = Lfs(base, 0x82001BDC);
+  const double scale = Lfs(base, G::weight_scale_address());
+  const double add = Lfs(base, G::weight_add_address());
+  const double multiply = Lfs(base, G::weight_multiply_address());
   const double zero = Lfs(base, kZero);
   // A weight quantized: fmadds, fctidz, its low word reloaded (lwz, so
   // unsigned) and converted back (fcfid, frsp), then scaled.
@@ -276,43 +300,45 @@ bool ModelLoad(uint8_t* base, uint32_t model, uint32_t file, uint32_t xpr,
     const uint32_t low = uint32_t(strings_and_font::steps::Fctidz(fused));
     return Fmuls(double(float(double(int64_t(low)))), scale);
   };
-  for (uint32_t i = 0; i < Load(base, model + 412); i++) {
-    const uint32_t shape = Load(base, model + 40) + kShapeBytes * i;
-    if (Load(base, shape + 428) != 1) {
+  for (uint32_t i = 0; i < m.shape_count(); i++) {
+    const schema::ModelShape shape(base, m.shapes().address + kShapeBytes * i);
+    if (shape.skinned() != 1) {
       continue;
     }
-    const uint32_t weights = Load(base, shape + 408);
-    uint32_t counts = Load(base, weights + 8);
-    uint32_t at = Load(base, weights + 12);
-    if (Load(base, weights + 0) == 0) {
+    const schema::SkinBlock weights = shape.skin();
+    uint32_t counts = weights.influence_counts().address;
+    uint32_t at = weights.weights().address;
+    if (weights.vertex_count() == 0) {
       continue;
     }
-    for (uint32_t v = 0; v < Load(base, weights + 0); v++) {
+    for (uint32_t v = 0; v < weights.vertex_count(); v++) {
       double sum0 = zero, sum1 = zero, sum2 = zero;
-      if (Load(base, counts) - 1 != 0) {
+      if (schema::SkinInfluenceCount(base, counts).count() - 1 != 0) {
         uint32_t k = 0;
         do {
-          const double a = Lfs(base, at + 0);
-          const double c = Lfs(base, at + 8);
-          const double b = Lfs(base, at + 4);
+          const schema::SkinWeight w(base, at);
+          const double a = Lfs(base, w.x_address());
+          const double c = Lfs(base, w.z_address());
+          const double b = Lfs(base, w.y_address());
           const double q0 = quantize(a);
-          Stfs(base, at + 0, q0);
+          Stfs(base, w.x_address(), q0);
           sum0 = Fadds(q0, sum0);
           const double q1 = quantize(b);
-          Stfs(base, at + 4, q1);
+          Stfs(base, w.y_address(), q1);
           sum1 = Fadds(q1, sum1);
           const double q2 = quantize(c);
-          Stfs(base, at + 8, q2);
-          at += 16;
+          Stfs(base, w.z_address(), q2);
+          at += schema::SkinWeight::kSize;
           k++;
           sum2 = Fadds(q2, sum2);
-        } while (k < Load(base, counts) - 1);
+        } while (k < schema::SkinInfluenceCount(base, counts).count() - 1);
       }
-      Stfs(base, at + 0, Fsubs(one, sum0));
-      Stfs(base, at + 4, Fsubs(one, sum1));
-      Stfs(base, at + 8, Fsubs(one, sum2));
-      at += 16;
-      counts += 4;
+      const schema::SkinWeight last(base, at);
+      Stfs(base, last.x_address(), Fsubs(one, sum0));
+      Stfs(base, last.y_address(), Fsubs(one, sum1));
+      Stfs(base, last.z_address(), Fsubs(one, sum2));
+      at += schema::SkinWeight::kSize;
+      counts += schema::SkinInfluenceCount::kSize;
     }
   }
   return true;

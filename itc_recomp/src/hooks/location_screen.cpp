@@ -18,6 +18,7 @@
 #include "hooks/strings_and_font.h"
 #include "location_screen/location_screen.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/location_screen.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_ui_movies_game);
@@ -204,7 +205,9 @@ ITC_REGS_STEP(LocationScreenReset) {
   }
   ctx.fpscr.disableFlushMode();
   ls::Reset(base, screen);
-  ctx.r3.u64 = screen + 560 + 176;
+  // r3 the view's second matrix (memcpy's).
+  ctx.r3.u64 = schema::LocationScreenView(base, schema::LocationScreen(base, screen).view_address())
+                   .matrix1_address();
 }
 
 ITC_REGS_STEP(LocationScreenResetView) {
@@ -215,7 +218,7 @@ ITC_REGS_STEP(LocationScreenResetView) {
   }
   ctx.fpscr.disableFlushMode();
   ls::ResetView(base, view);
-  ctx.r3.u64 = view + 176;
+  ctx.r3.u64 = schema::LocationScreenView(base, view).matrix1_address();
 }
 
 ITC_REGS_STEP(LocationScreenApplyQueuedPage) {

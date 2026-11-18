@@ -19,12 +19,9 @@
 
 namespace frame_driver {
 
-// The frame driver (400 bytes; `FrameDriver::Create` keeps driver + 20).
-constexpr uint32_t kDriverInterface = 20;  // vtable 0x82000D6C
-constexpr uint32_t kDriverListeners = 28;  // a HandlerMap
-constexpr uint32_t kDriverRequests = 40;   // the request vector (interface + 20)
-constexpr uint32_t kDriverVideoOutput = 64;
-constexpr uint32_t kDriverDevice = 384;    // the device while a frame is drawn
+// The frame driver (400 bytes; `FrameDriver::Create` keeps driver + 20) and
+// the app's scene: their fields are schema::FrameDriver's and
+// schema::AppScene's (itc_recomp/schema/frame-driver.toml).
 // The functor FrameDriver::DrawFrame hands HandlerMap::ForEach.
 constexpr uint32_t kCallListener = 0x82091A98;
 
@@ -68,13 +65,6 @@ uint32_t CallListener(uint8_t* base, uint32_t driver, uint64_t entry, uint32_t f
 void DrawFrame(uint8_t* base, uint32_t driver, uint32_t frame,
                const app_states::AppCalls& calls);
 
-// The app's scene (80 bytes, vtable 0x82000F3C).
-constexpr uint32_t kSceneCommandList = 8;
-constexpr uint32_t kSceneRenderQueue = 64;
-// The word sub_82591838 flips once a tick.
-constexpr uint32_t kPrimitiveFlip = 0x82970BC4;
-// The vblank count VideoOutput::BeginFrame clears.
-constexpr uint32_t kVblankCount = 0x8296BD30;
 constexpr uint32_t kGetVideoOutput = 0x824960E0;
 
 // Device::SetShaderGprAllocation on a device (its plain C++ or original, in

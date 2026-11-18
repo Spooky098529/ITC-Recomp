@@ -1,0 +1,582 @@
+# The schema of docs/functions/models.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The graphics library's models: the model class (Model::Model, Load,
+# Release), the part file it parses (its shapes, materials and skin
+# weights), its shader pairs, its texture set (the XPR, from an XPR2 file)
+# and texture provider (a std::vector of texture pointers), the skeleton's
+# node file and node records as Skeleton::LocalMatrices and
+# UpdateNodeMatrices read them, the memory blocks with their 4 KiB XLMM
+# header and the pending frees (a std::list), and the boot's shader pair
+# loads. Names from docs/known-data.md ("model", "part file", "shape
+# record", "material block", "texture provider", "XPR object", "XPR2 file",
+# "memory block", the pending frees) and the hand port's constants and
+# comments (src/models/*.h).
+#
+# Left to other areas' files (the same objects): the skeleton itself
+# (model-animation.toml's Skeleton: also SkeletonBase::SetUp's and
+# Skeleton::Bind's r3, sub_8259A9E0.r3 and sub_82599A20.r3), the car part
+# model (material-passes.toml's PartModel: also sub_820CEC20.r3), a
+# texture's header and a resource (graphics-resources.toml's TextureHeader
+# and its resource: the measure's TextureHeader and sub_8235A9F8.r3), the
+# debug text (framework.toml's DebugText, sub_82091070.r3).
+
+# A model (432 bytes; vtable 0x8206CD18; Model::Model sub_825948C0, Model::Load
+# sub_82596920, Mesh::Parse sub_825963F0 as "Mesh"). The car part model
+# (PartModel, vtable 0x8200338C, 464 bytes) adds +432 to +460, which the
+# measure files here too.
+[Model]
+measures = ["Model", "Mesh"]
+size = 432
+origin = "allocated"
+vtable = 0x8206CD18
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "ModelVtable", note = "0x8206CD18 (a part model's 0x8200338C)" },
+  { name = "header_block", offset = 16, type = "ptr", to = "PartFile", note = "the part file's bytes before its vertex data, copied into a memory block (Memory::AllocVirtual)" },
+  { name = "vertex_data", offset = 20, type = "u32", note = "the vertex data in physical memory (Memory::AllocPhysicalEx)" },
+  { name = "shader_pairs", offset = 24, type = "ptr", to = "ModelShaderPair", note = "16 bytes a pair (Memory::AllocVirtual)" },
+  { name = "header", offset = 28, type = "ptr", to = "PartFile", note = "the header block again (+16): its +76 says whether the sections are read" },
+  { name = "table_14", offset = 32, type = "u32", note = "the part file's +0x14 made a pointer (not read here)" },
+  { name = "table_18", offset = 36, type = "u32", note = "the part file's +0x18 made a pointer (not read here)" },
+  { name = "shapes", offset = 40, type = "ptr", to = "ModelShape", note = "the part file's +0x1C made a pointer: 544 bytes a shape" },
+  { name = "table_20", offset = 44, type = "u32", note = "the part file's +0x20 made a pointer (not read here)" },
+  { name = "texture_provider", offset = 48, type = "ptr", to = "TextureProvider", note = "+80 once Model::Load has a texture set, else 0" },
+  { name = "xpr", offset = 56, type = "bytes", count = 24, note = "its own texture set (an XPR)" },
+  { name = "textures", offset = 80, type = "bytes", count = 20, note = "its TextureProvider (64 slots); Model::Load reads its vtable here" },
+  { name = "skeleton", offset = 112, type = "bytes", count = 180, note = "the skeleton (model-animation.toml's Skeleton), for the node file" },
+  { name = "track_set_float4", offset = 304, type = "bytes", count = 20, note = "the TrackSet for the part file's +0x2C section (a float4 a track)" },
+  { name = "float4_values", offset = 320, type = "u32", note = "the +304 set's values (its +16): the float4 table a material's +0xD0 indexes (vertex c9 + i)" },
+  { name = "track_set_float_a", offset = 324, type = "bytes", count = 20, note = "the TrackSet for the +0x30 section (a float a track)" },
+  { name = "track_set_float_b", offset = 344, type = "bytes", count = 20, note = "the TrackSet for the +0x34 section (a float a track)" },
+  { name = "track_set_material", offset = 364, type = "bytes", count = 20, note = "the TrackSet for the +0x38 section, the material animation (32 bytes a track)" },
+  { name = "track_set_208", offset = 384, type = "bytes", count = 20, note = "the TrackSet for the +0x3C section (208 bytes a track)" },
+  { name = "file_04", offset = 404, type = "u32", note = "the part file's +4" },
+  { name = "file_08", offset = 408, type = "u32", note = "the part file's +8" },
+  { name = "shape_count", offset = 412, type = "u32", note = "the part file's +0xC" },
+  { name = "file_10", offset = 416, type = "u32", note = "the part file's +0x10" },
+  { name = "shader_pair_count", offset = 420, type = "u32", note = "the shader section's +0" },
+  { name = "use_override_texture", offset = 432, type = "u32", note = "a part model's (PartModel): with +456, Model::RecordMaterials' textures from +456" },
+  { name = "replaced_texture_index", offset = 436, type = "u32", note = "a part model's: a texture index replaced by +460 (-1 at Clear)" },
+  { name = "force_pair_1005", offset = 440, type = "u32", note = "a part model's: forces shared pair 1005" },
+  { name = "vinyl_sheet", offset = 444, type = "u32", note = "a part model's: the vinyl sheet (SetVinylTextures' a)" },
+  { name = "vinyl_texture_b", offset = 448, type = "u32", note = "a part model's: SetVinylTextures' b" },
+  { name = "category3_texture", offset = 452, type = "u32", note = "a part model's: category 3's texture" },
+  { name = "override_texture", offset = 456, type = "u32", note = "a part model's: an override texture (with +432)" },
+  { name = "replacement_texture", offset = 460, type = "u32", note = "a part model's: the texture that replaces +436's index" },
+]
+
+# The model's vtable (0x8206CD18), as Model::RecordShape and RecordMaterials
+# read it. The measure types the model's +48 (its texture provider) as a
+# model, so the provider's vtable slots 5 and 6 are filed here too.
+[ModelVtable]
+measure = "Model.+0"
+size = 28
+origin = "image"
+fields = [
+  { name = "draw_hook", offset = 4, type = "fn", note = "slot 1: a per-draw hook (r6 the c13 color, r7 the blend index's address)" },
+  { name = "provider_xpr_texture", offset = 20, type = "fn", note = "the texture provider's slot 5 (through +48): a texture by XPR2 and index" },
+  { name = "provider_environment_texture", offset = 24, type = "fn", note = "the texture provider's slot 6 (through +48): the environment texture" },
+]
+
+# A shader pair (16 bytes, model +24): the two shader objects and their
+# microcode, each a memory block (Mesh::LoadShaders).
+[ModelShaderPair]
+measures = ["Model.+24", "new<?>@Mesh::LoadShaders"]
+size = 16
+origin = "allocated"
+fields = [
+  { name = "vertex_shader", offset = 0, type = "u32", note = "the vertex shader object (Memory::AllocVirtual)" },
+  { name = "pixel_shader", offset = 4, type = "u32", note = "the pixel shader object" },
+  { name = "vertex_microcode", offset = 8, type = "u32", note = "physical memory (Memory::AllocPhysicalEx)" },
+  { name = "pixel_microcode", offset = 12, type = "u32" },
+]
+
+# A part file (`00 15 00 00`, big-endian; Mesh::Parse's r4), and the header
+# block the model copies its bytes before the vertex data into (+16).
+[PartFile]
+measures = ["Mesh::Parse.r4", "new<?>@Mesh::Parse"]
+size = 80
+origin = "file"
+fields = [
+  { name = "version", offset = 0, type = "u32", note = "0x00150000, else a debug print" },
+  { name = "file_04", offset = 4, type = "u32", note = "kept at model +404" },
+  { name = "file_08", offset = 8, type = "u32", note = "kept at model +408" },
+  { name = "shape_count", offset = 12, type = "u32", note = "kept at model +412" },
+  { name = "file_10", offset = 16, type = "u32", note = "kept at model +416" },
+  { name = "table_14", offset = 20, type = "u32", note = "an offset, made a pointer at model +32" },
+  { name = "table_18", offset = 24, type = "u32", note = "an offset, made a pointer at model +36" },
+  { name = "shapes", offset = 28, type = "u32", note = "the shapes' offset (544 bytes each), made a pointer at model +40" },
+  { name = "table_20", offset = 32, type = "u32", note = "an offset, made a pointer at model +44" },
+  { name = "node_file", offset = 36, type = "u32", note = "the node file's offset (Skeleton::Bind), 0 none" },
+  { name = "node_values_section", offset = 40, type = "u32", note = "the +0x28 section (Skeleton::LoadNodeValues), 0 none" },
+  { name = "float4_section", offset = 44, type = "u32", note = "the +0x2C section, always read (TrackSet::SetupFloat4, model +304)" },
+  { name = "float_section_a", offset = 48, type = "u32", note = "the +0x30 section (TrackSet::SetupFloat, model +324), 0 none" },
+  { name = "float_section_b", offset = 52, type = "u32", note = "the +0x34 section (TrackSet::SetupFloat, model +344), 0 none" },
+  { name = "material_section", offset = 56, type = "u32", note = "the +0x38 section, the material animation (TrackSet::Setup32, model +364), 0 none" },
+  { name = "section_208", offset = 60, type = "u32", note = "the +0x3C section (TrackSet::Setup208, model +384), 0 none" },
+  { name = "vertex_data_offset", offset = 64, type = "u32", note = "the bytes before it are the header block" },
+  { name = "vertex_data_size", offset = 68, type = "u32" },
+  { name = "shader_section", offset = 72, type = "u32", note = "the shader section's offset (a ShaderSection)" },
+  { name = "has_sections", offset = 76, type = "u32", note = "the node file and the +0x28, +0x30 to +0x3C sections are read only when it isn't 0 (read in the header block)" },
+]
+
+# A part file's shader section (Mesh::LoadShaders' r4): the pair count, then
+# from +32 a pair after another (a 32-byte entry, +4 the vertex shader's
+# size, +8 the pixel shader's; the vertex shader file at +32, the pixel
+# shader file after it, the next entry after that).
+[ShaderSection]
+measure = "Mesh::LoadShaders.r4"
+size = 64
+origin = "file"
+fields = [
+  { name = "pair_count", offset = 0, type = "u32" },
+  { name = "first_entry", offset = 32, type = "bytes", count = 32, note = "the first pair's entry" },
+  { name = "first_vertex_size", offset = 36, type = "u32", note = "the first entry's +4" },
+  { name = "first_pixel_size", offset = 40, type = "u32", note = "the first entry's +8" },
+]
+
+# A shader section's pair entry (32 bytes, the section's +32 on; the vertex
+# shader file right after it, the pixel shader file after that). The
+# measure doesn't type it (the walk adds the files' sizes).
+[ShaderPairEntry]
+size = 32
+origin = "file"
+fields = [
+  { name = "vertex_size", offset = 4, type = "u32", note = "the vertex shader file's size" },
+  { name = "pixel_size", offset = 8, type = "u32", note = "the pixel shader file's size" },
+]
+
+# A shape record (544 bytes, the model's +40 on). The measure joins it with
+# the work memory's blocks ("WorkMem": WorkMem::AllocVertexBuffer's store
+# at +0, and the index reads of car-draw.md's, second-set.md's and others'
+# code) since Model::Load reads a shape's +408 and +428 through them.
+[ModelShape]
+measures = ["Mesh.+40", "WorkMem"]
+size = 544
+origin = "file"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "WorkMem::AllocVertexBuffer's store (a work memory block's, which the measure files here)" },
+  { name = "stream0", offset = 240, type = "bytes", count = 16, note = "a stream descriptor: +0 the vertex count, +4 the type, +8 the stride" },
+  { name = "stream1", offset = 256, type = "bytes", count = 16, note = "a stream descriptor (9 or 10 here, or 6 in stream 2, binds two streams)" },
+  { name = "stream2", offset = 272, type = "bytes", count = 16, note = "a stream descriptor" },
+  { name = "vertex_buffer0", offset = 288, type = "bytes", count = 32, note = "a vertex buffer header (Resource::Relocate'd to the vertex data)" },
+  { name = "vertex_buffer0_fetch", offset = 316, type = "u32", note = "its fetch constant word: bits 28-29 set to 1 at load" },
+  { name = "vertex_buffer1", offset = 320, type = "bytes", count = 32, note = "a vertex buffer header (relocated when not skinned)" },
+  { name = "vertex_buffer1_fetch", offset = 348, type = "u32", note = "as vertex_buffer0_fetch" },
+  { name = "vertex_buffer2", offset = 352, type = "bytes", count = 32, note = "a vertex buffer header (relocated when not skinned)" },
+  { name = "vertex_buffer2_fetch", offset = 380, type = "u32", note = "as vertex_buffer0_fetch" },
+  { name = "stream0_offset", offset = 384, type = "u32", note = "the stream's file offset, moved to the vertex data at load" },
+  { name = "stream1_offset", offset = 388, type = "u32", note = "moved only when not skinned" },
+  { name = "stream2_offset", offset = 392, type = "u32", note = "moved only when not skinned" },
+  { name = "materials", offset = 396, type = "ptr", to = "MaterialBlock", note = "made a pointer into the header block at load" },
+  { name = "skin_array_a", offset = 400, type = "u32", note = "a skin array, made a pointer at load" },
+  { name = "skin_array_b", offset = 404, type = "u32", note = "a skin array, made a pointer at load" },
+  { name = "skin", offset = 408, type = "ptr", to = "SkinBlock", note = "made a pointer at load" },
+  { name = "skinned_stream1", offset = 412, type = "u32", note = "a skinned shape's stream 1 (probably set at run time)" },
+  { name = "skinned_stream2", offset = 420, type = "u32", note = "a skinned shape's stream 2 (probably set at run time)" },
+  { name = "skinned", offset = 428, type = "u32", note = "1 when skinned (only stream 0 in the vertex data; weights normalized at load)" },
+  { name = "sampler_state_28", offset = 432, type = "bytes", count = 16, note = "sampler state 28 of samplers 0 to 3" },
+]
+
+# A shape's material block (the shape's +396): the counts, then 512-byte
+# material records (Model::Material.ret, material-passes.toml) from +16,
+# group 1 after group 0.
+[MaterialBlock]
+measure = "Mesh.+40.+396"
+size = 528
+origin = "file"
+fields = [
+  { name = "record_count", offset = 0, type = "u32" },
+  { name = "group0_count", offset = 8, type = "u32" },
+  { name = "group1_count", offset = 12, type = "u32", note = "probably the blended draws" },
+  { name = "records", offset = 16, type = "bytes", count = 512, note = "the first record (each one's +384, +0x180, made a pointer into the header block at load)" },
+]
+
+# A shape's skin block (the shape's +408).
+[SkinBlock]
+measures = ["Mesh.+40.+408", "WorkMem.+408"]
+size = 24
+origin = "file"
+fields = [
+  { name = "vertex_count", offset = 0, type = "u32" },
+  { name = "influence_counts", offset = 8, type = "ptr", to = "SkinInfluenceCount", note = "a u32 a vertex; made a pointer at load" },
+  { name = "weights", offset = 12, type = "ptr", to = "SkinWeight", note = "16 bytes an influence; made a pointer at load" },
+  { name = "bone_indices", offset = 16, type = "u32", note = "made a pointer at load" },
+  { name = "object", offset = 20, type = "u32", note = "an object recorded as command 22" },
+]
+
+# A vertex's influence count (the skin block's +8, a word a vertex).
+[SkinInfluenceCount]
+measure = "WorkMem.+408.+8"
+size = 4
+origin = "file"
+fields = [
+  { name = "count", offset = 0, type = "u32" },
+]
+
+# An influence's weight (16 bytes; the skin block's +12): x, y, z quantized
+# at load, the last of a vertex's 1 minus the others' sums.
+[SkinWeight]
+measure = "WorkMem.+408.+12"
+size = 16
+origin = "file"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "next", offset = 16, type = "bytes", count = 16, note = "the next weight (Model::Load walks them)" },
+]
+
+# A texture provider (20 bytes, vtable 0x8206CCB4; model +80, the course
+# scenery manager's +228; TextureProvider::TextureProvider sub_82594850):
+# a std::vector of texture pointers at +4. The vector's own functions
+# (Reserve, InsertN, Assign, At, Clear) take the vector (the provider + 4)
+# as r3, and the measure files their reads at the vector's offsets: their
+# first, last and end land on +4, +8 and +12 here (TexturePointerVector is
+# the vector's own view). heap.toml's TextureProvider (its deleting
+# destructor's r3, sub_82594440.r3) is this one, to move here.
+[TextureProvider]
+measures = ["TextureProvider", "sub_82594440.r3"]
+size = 20
+origin = "embedded"
+vtable = 0x8206CCB4
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "TextureProviderVtable", note = "0x8206CCB4" },
+  { name = "vector", offset = 4, type = "u32", note = "the std::vector's allocator (empty, not read); the vector's functions' first" },
+  { name = "first", offset = 8, type = "ptr", to = "TextureSlot", note = "the first slot (0: no storage); the vector's functions' last" },
+  { name = "last", offset = 12, type = "ptr", to = "TextureSlot", note = "the end of the slots; the vector's functions' end of storage" },
+  { name = "end", offset = 16, type = "u32", note = "the end of the storage" },
+]
+
+# The texture provider's std::vector of texture pointers (16 bytes, at the
+# provider's +4), as its own functions see it (the measure files it as the
+# provider: TextureProvider's notes).
+[TexturePointerVector]
+size = 16
+origin = "embedded"
+fields = [
+  { name = "allocator", offset = 0, type = "u32", note = "empty, not read" },
+  { name = "first", offset = 4, type = "ptr", to = "TextureSlot", note = "the first slot (0: no storage)" },
+  { name = "last", offset = 8, type = "ptr", to = "TextureSlot", note = "the end of the slots" },
+  { name = "end", offset = 12, type = "u32", note = "the end of the storage" },
+]
+
+# A texture provider's slot (a texture pointer, or an XPR in slot 0 of a
+# model's), and the words the vector's functions take a value or a
+# position by.
+[TextureSlot]
+measures = ["new<?>@TextureProvider::Allocate", "TextureProvider::Assign.r5", "TextureProvider::At.ret",
+            "TextureProvider::InsertN.r4", "TextureProvider::InsertN.r6"]
+size = 4
+origin = "allocated"
+fields = [
+  { name = "texture", offset = 0, type = "u32" },
+]
+
+# The texture provider's vtable (0x8206CCB4).
+[TextureProviderVtable]
+measures = ["TextureProvider.+0", "Model.+80"]
+size = 44
+origin = "image"
+fields = [
+  { name = "clear_all", offset = 8, type = "fn", note = "slot 2 (0x82594328, scenery-lists.md)" },
+  { name = "get", offset = 12, type = "fn", note = "slot 3, TextureProvider::Get (0x825946B8)" },
+  { name = "set", offset = 16, type = "fn", note = "slot 4, TextureProvider::Set (0x82594718)" },
+  { name = "xpr_texture_5", offset = 20, type = "fn", note = "slots 5 to 7, TextureProvider::GetXprTexture (0x825941D0)" },
+  { name = "xpr_texture_6", offset = 24, type = "fn", note = "the environment texture" },
+  { name = "xpr_texture_7", offset = 28, type = "fn" },
+  { name = "find_xpr_texture_8", offset = 32, type = "fn", note = "slots 8 to 10, TextureProvider::FindXprTexture (0x82594230)" },
+  { name = "find_xpr_texture_9", offset = 36, type = "fn" },
+  { name = "find_xpr_texture_10", offset = 40, type = "fn" },
+]
+
+# An XPR object (24 bytes, a loaded XPR2; XPR::XPR sub_82596E68, XPR::Create
+# sub_82596F68, XPR::Release sub_825970A8). The measure files
+# CourseSet::InitParts' stores at +3724 to +3736 here (its own object's:
+# a measure fault).
+[XPR]
+measure = "XPR"
+size = 24
+origin = "embedded"
+fields = [
+  { name = "header_block", offset = 0, type = "u32", note = "the header block (Memory::AllocVirtual, freed with Memory::FreeLater): +0 the record count, the records from +4" },
+  { name = "header_size", offset = 4, type = "u32" },
+  { name = "data_block", offset = 8, type = "u32", note = "the data block (Memory::AllocPhysical 0xBC7F0000, freed with FreePhysicalLater 0x807F0000)" },
+  { name = "data_size", offset = 12, type = "u32" },
+  { name = "records", offset = 16, type = "ptr", to = "XprRecord", note = "the header block + 4" },
+  { name = "record_count", offset = 20, type = "u32", note = "the header block's +0" },
+  { name = "fault_3724", offset = 3724, type = "u32", note = "measure fault: CourseSet::InitParts' store (course-scenery.md)" },
+  { name = "fault_3728", offset = 3728, type = "u32", note = "measure fault: as fault_3724" },
+  { name = "fault_3732", offset = 3732, type = "u32", note = "measure fault: as fault_3724" },
+  { name = "fault_3736", offset = 3736, type = "u32", note = "measure fault: as fault_3724" },
+]
+
+# An XPR2 record (16 bytes, from the header block's +4). The measure joins
+# it with the header block itself (XPR +0), whose +0 is the record count.
+[XprRecord]
+measure = "new<?>@XPR::Create"
+size = 16
+origin = "allocated"
+fields = [
+  { name = "type", offset = 0, type = "u32", note = "`TX..` for a texture; the header block's +0: the record count" },
+  { name = "header_offset", offset = 4, type = "u32", note = "the resource header's offset in the header block" },
+  { name = "name", offset = 12, type = "u32", note = "the name's offset in the header block, made a pointer at load" },
+]
+
+# An XPR2 file (big-endian; XPR::Create's r4): the header block from +12,
+# the data block after it.
+[Xpr2File]
+measure = "XPR::Create.r4"
+size = 12
+origin = "file"
+fields = [
+  { name = "magic", offset = 0, type = "u32", note = "`XPR2` (0x58505232)" },
+  { name = "header_size", offset = 4, type = "u32" },
+  { name = "data_size", offset = 8, type = "u32" },
+]
+
+# A memory block (Memory::AllocVirtual sub_8258DFF0, AllocPhysicalEx
+# sub_8258E098, AllocPhysical sub_8258E138): the pointer handed out, its
+# 4 KiB header before it (MemoryBlockHeader).
+[MemoryBlock]
+measure = "Memory"
+size = 0
+origin = "allocated"
+fields = [
+  { name = "tag", offset = -4096, type = "u32", note = "the header's +0: `XLMM` (0x584C4D4D)" },
+  { name = "kind", offset = -4092, type = "u32", note = "the header's +4" },
+  { name = "passes", offset = -4088, type = "u32", note = "the header's +8" },
+  { name = "attributes", offset = -4084, type = "u32", note = "the header's +12 (Memory::FreePhysicalLater sets it)" },
+]
+
+# A memory block's header (4 KiB; the block is the header + 4096).
+[MemoryBlockHeader]
+measure = "new<?>@sub_8258E138"
+size = 4096
+origin = "allocated"
+fields = [
+  { name = "tag", offset = 0, type = "u32", note = "`XLMM` (0x584C4D4D), checked by Memory::FreeLater, cleared when freed" },
+  { name = "kind", offset = 4, type = "u32", note = "0 VirtualAlloc, 1 XPhysicalAllocEx, 2 XMemAlloc (PendingFrees::FreeDue frees by it)" },
+  { name = "passes", offset = 8, type = "u32", note = "the pass starts PendingFrees::FreeDue waits once it's put off (1 when made)" },
+  { name = "attributes", offset = 12, type = "u32", note = "XMemFree's attributes (0 when made)" },
+]
+
+# The pending frees (a std::list of memory block headers at 0x8296BD54).
+[PendingFreesList]
+measure = "PendingFrees"
+size = 12
+origin = "image"
+fields = [
+  { name = "head", offset = 4, type = "ptr", to = "PendingFreesNode", note = "the head node" },
+  { name = "size", offset = 8, type = "u32" },
+]
+
+# A pending frees' node (12 bytes, operator new).
+[PendingFreesNode]
+measures = ["new<12>@PendingFrees::Insert", "PendingFrees::Insert.r4"]
+size = 12
+origin = "allocated"
+fields = [
+  { name = "next", offset = 0, type = "ptr", to = "PendingFreesNode" },
+  { name = "previous", offset = 4, type = "ptr", to = "PendingFreesNode" },
+  { name = "header", offset = 8, type = "ptr", to = "MemoryBlockHeader" },
+]
+
+# The word PendingFrees::Insert takes its value by (r5): a header.
+[PendingFreesValue]
+measure = "PendingFrees::Insert.r5"
+size = 4
+origin = "file"
+fields = [
+  { name = "header", offset = 0, type = "ptr", to = "MemoryBlockHeader" },
+]
+
+# A shader pair's load (12 bytes, operator new; Shaders::LoadPair
+# sub_820A07F0, handed to the pixel shader's load callback
+# Shaders::OnPairLoaded sub_820A06D0 as r6).
+[ShaderPairLoad]
+measures = ["new<12>@Shaders::LoadPair", "Shaders::OnPairLoaded.r6"]
+size = 12
+origin = "allocated"
+fields = [
+  { name = "vertex_file", offset = 0, type = "u32", note = "in the shared load buffer" },
+  { name = "pixel_file", offset = 4, type = "u32", note = "right after the vertex file" },
+  { name = "pair", offset = 8, type = "u32", note = "the pair index (0-33, 1000-1005, 2000-2055)" },
+]
+
+# A shader file (ShaderFile::Parse sub_822A8568's r3).
+[ShaderFile]
+measures = ["sub_822A8568.r3", "sub_822A9EA8.r5.+0", "sub_822A9FD8.r5.+0"]
+size = 12
+origin = "file"
+fields = [
+  { name = "magic", offset = 0, type = "u32", note = "low 6 bits set: a vertex shader" },
+  { name = "header_size", offset = 4, type = "u32", note = "the bytes before the microcode (copied after the object's own)" },
+  { name = "microcode_size", offset = 8, type = "u32" },
+]
+
+# What ShaderFile::Parse writes (16 bytes on its caller's stack; the
+# shader header copies' r5).
+[ShaderFileRecord]
+measures = ["sub_822A8568.r4", "sub_822A9EA8.r5", "sub_822A9FD8.r5"]
+size = 16
+origin = "file"
+fields = [
+  { name = "file", offset = 0, type = "ptr", to = "ShaderFile" },
+  { name = "object_bytes", offset = 4, type = "u32", note = "592 (vertex) or 56 (pixel) + the header size" },
+  { name = "microcode", offset = 8, type = "u32", note = "the file + its header size" },
+  { name = "microcode_bytes", offset = 12, type = "u32" },
+]
+
+# A node file (the skeleton's +80: its view's +0; NodeFile::View
+# sub_825A21A8 reads it).
+[NodeFile]
+measures = ["Skeleton.+80", "sub_8259A9E0.r3.+80", "sub_82599A20.r3.+80", "sub_825A21A8.ret.+0"]
+size = 52
+origin = "file"
+fields = [
+  { name = "node_count", offset = 4, type = "u32" },
+  { name = "bone_count", offset = 8, type = "u32" },
+  { name = "first_bone", offset = 12, type = "u32", note = "the first bone's node" },
+  { name = "node_records_offset", offset = 16, type = "u32", note = "the view's +4 (skeleton +84)" },
+  { name = "rest_translations_offset", offset = 20, type = "u32", note = "the view's +8 (skeleton +88)" },
+  { name = "rest_angles_offset", offset = 24, type = "u32", note = "the view's +12 (skeleton +92)" },
+  { name = "rest_scales_offset", offset = 28, type = "u32", note = "the view's +16 (skeleton +96)" },
+  { name = "unknown_32", offset = 32, type = "u32", note = "an offset: the view's +20 (skeleton +100)" },
+  { name = "matrices_offset", offset = 36, type = "u32", note = "the view's +24 (skeleton +104): 64 bytes a node" },
+  { name = "unknown_40", offset = 40, type = "u32", note = "an offset: the view's +28 (skeleton +108)" },
+  { name = "tail_offset", offset = 44, type = "u32", note = "the view's +32, and +36 = it + 16" },
+  { name = "unknown_48", offset = 48, type = "u32", note = "an offset: the view's +40" },
+]
+
+# A node file's view (48 bytes, the skeleton's +80 to +124; NodeFile::View
+# sub_825A21A8's r3): the file's offsets made pointers.
+[NodeFileView]
+measure = "sub_825A21A8.r3"
+size = 48
+origin = "embedded"
+fields = [
+  { name = "file", offset = 0, type = "ptr", to = "NodeFile" },
+  { name = "node_records", offset = 4, type = "ptr", to = "SkeletonNodeRecord" },
+  { name = "rest_translations", offset = 8, type = "u32", note = "16 bytes a node" },
+  { name = "rest_angles", offset = 12, type = "u32", note = "16 bytes a node" },
+  { name = "rest_scales", offset = 16, type = "u32", note = "16 bytes a node" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "matrices", offset = 24, type = "u32", note = "the file's 64-byte matrices" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "tail", offset = 32, type = "u32" },
+  { name = "tail_16", offset = 36, type = "u32", note = "the tail + 16" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "non_bone_count", offset = 44, type = "u32", note = "the node count minus the bone count" },
+]
+
+# A node record (160 bytes, the skeleton's [+84] + 160i).
+[SkeletonNodeRecord]
+measure = "Skeleton.+84"
+size = 160
+origin = "file"
+fields = [
+  { name = "translation_node", offset = 92, type = "u32", note = "the node whose matrix's translation row is copied in (UpdateNodeMatrices)" },
+  { name = "parent", offset = 128, type = "s32", note = "-1 none" },
+  { name = "type", offset = 132, type = "u32", note = "4 or below (signed) a node; 8 and 16 others; flags 0x40 (ResetPose takes +64) and 0x80 (a bone)" },
+]
+
+# A node's state (144 bytes, the skeleton's [+136] + 144i; [+140] the first
+# bone's).
+[SkeletonNodeState]
+measures = ["Skeleton.+136", "Skeleton.+140"]
+size = 144
+origin = "allocated"
+fields = [
+  { name = "translation_x", offset = 0, type = "f32", note = "also read as a word (CursorCurve::Sample's cursor)" },
+  { name = "translation_y", offset = 4, type = "f32" },
+  { name = "translation_z", offset = 8, type = "f32" },
+  { name = "angle_x", offset = 16, type = "f32", note = "wrapped into [-pi, pi] by LocalMatrices" },
+  { name = "angle_y", offset = 20, type = "f32" },
+  { name = "angle_z", offset = 24, type = "f32" },
+  { name = "scale_x", offset = 32, type = "f32" },
+  { name = "scale_y", offset = 36, type = "f32" },
+  { name = "scale_z", offset = 40, type = "f32" },
+]
+
+# A node's matrix (64 bytes, the skeleton's [+148] + 64i): LocalMatrices
+# writes the identity's words and the translation row as doublewords too.
+[SkeletonMatrix]
+measure = "Skeleton.+148"
+size = 64
+origin = "allocated"
+fields = [
+  { name = "m00", offset = 0, type = "f32" },
+  { name = "row0_xy", offset = 0, type = "u64" },
+  { name = "m11", offset = 20, type = "f32" },
+  { name = "m22", offset = 40, type = "f32" },
+  { name = "m30", offset = 48, type = "f32", note = "the translation row" },
+  { name = "row3_xy", offset = 48, type = "u64" },
+  { name = "m31", offset = 52, type = "f32" },
+  { name = "m32", offset = 56, type = "f32" },
+  { name = "row3_zw", offset = 56, type = "u64" },
+]
+
+# A counted array SkeletonBase::SetUp (sub_8259A9E0) makes with operator
+# new[] (a 16-byte header holding the count, the entries from +16, each
+# 1.0 at +12, +28, +44, +60): the node states (144 bytes), the own
+# matrices and the bone matrices (64 bytes; the skeleton's +144).
+[SkeletonCountedArray]
+measures = ["new<4294967295>@sub_8259A9E0#2", "new<4294967295>@sub_8259A9E0#3",
+            "new<4294967295>@sub_8259A9E0#4", "sub_8259A9E0.r3.+144"]
+size = 16
+origin = "allocated"
+fields = [
+  { name = "count", offset = 0, type = "u32" },
+  { name = "first_one_12", offset = 28, type = "f32", note = "the first entry's +12: 1.0" },
+  { name = "first_one_28", offset = 44, type = "f32", note = "the first entry's +28: 1.0" },
+  { name = "unknown_52", offset = 52, type = "u32", note = "the bone matrices' (skeleton +144): 1" },
+  { name = "first_one_44", offset = 60, type = "f32", note = "the first entry's +44: 1.0" },
+  { name = "first_one_60", offset = 76, type = "f32", note = "the first entry's +60: 1.0" },
+  { name = "unknown_80", offset = 80, type = "u32", note = "a node state's word (lifted, not read)" },
+  { name = "unknown_148", offset = 148, type = "u32", note = "a node state's word (lifted, not read)" },
+]
+
+# A node's value (a float4 a node, the skeleton's +176; Skeleton::Bind's
+# operator new[], no header).
+[SkeletonNodeValue]
+measure = "new<4294967295>@sub_82599A20"
+size = 16
+origin = "allocated"
+fields = [
+  { name = "x", offset = 0, type = "f32", note = "0.0 at bind" },
+  { name = "y", offset = 4, type = "f32", note = "0.0 at bind" },
+  { name = "z", offset = 8, type = "f32", note = "0.0 at bind; also the node's animation time" },
+]
+
+# sub_820D8D20's r6 (lifted, never seen in play, not read): an object with
+# 464-byte part models from +240 (two, 24 bytes apart as it walks them) and
+# words it compares with its r3 to pick one.
+[PartModelPicker]
+measure = "sub_820D8D20.r6"
+size = 2288
+origin = "file"
+fields = [
+  { name = "unknown_196", offset = 196, type = "u32", note = "compared with r3 (not read)" },
+  { name = "unknown_1172", offset = 1172, type = "u32", note = "compared with r3 (not read)" },
+  { name = "unknown_2148", offset = 2148, type = "u32", note = "compared with r3 (not read)" },
+  { name = "unknown_2284", offset = 2284, type = "u32", note = "compared with r3 (not read)" },
+]
+
+[globals]
+load_buffer = { address = 0x826A5134, type = "u32", note = "the archive's shared load buffer (Shaders::LoadPair places the shader files in it)" }
+shader_cursor = { address = 0x826C1CD8, type = "u32", note = "the bytes Shaders::LoadAll's pairs have placed in the load buffer" }
+shared_vertex_table = { address = 0x826BFCB8, type = "bytes", count = 8224, note = "the vertex shaders by pair index (2,056 pointers)" }
+shared_pixel_table = { address = 0x826BDC98, type = "bytes", count = 8224, note = "the pixel shaders by pair index (2,056 pointers)" }
+shared_vertex_shaders = { address = 0x8296B7B4, type = "u32", note = "the graphics library's pointer to the vertex table (SetSharedShaders)" }
+shared_pixel_shaders = { address = 0x8296B7B8, type = "u32", note = "the graphics library's pointer to the pixel table" }
+stream_kinds = { address = 0x8265EC00, type = "u32", note = "VertexDeclaration's word table (by stream type; a second from +72)" }
+vertex_declarations = { address = 0x8296B7F4, type = "u32", note = "VertexDeclaration's table of declarations" }
+memory_blocks_lock = { address = 0x8296BD38, type = "bytes", count = 28, note = "the critical section over the memory blocks and the pending frees (a host mutex in its place)" }
+pending_frees = { address = 0x8296BD54, type = "bytes", count = 12, note = "the pending frees (a PendingFreesList)" }
+weight_multiply = { address = 0x82001BDC, type = "f32", note = "Model::Load's weight quantization: the factor" }
+weight_add = { address = 0x82001BE4, type = "f32", note = "Model::Load's weight quantization: the addend (0.5)" }
+weight_scale = { address = 0x820029D8, type = "f32", note = "Model::Load's weight quantization: the scale back" }

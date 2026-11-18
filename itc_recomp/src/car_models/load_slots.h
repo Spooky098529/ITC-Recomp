@@ -33,9 +33,8 @@ std::optional<uint32_t> LoadSlotReleaseBuffer(uint8_t* base, uint32_t slot);
 // same pages would fail the second free.
 bool LoadSlotReleasable(uint8_t* base, uint32_t slot, uint32_t* freed);
 
-// The scene's second set ([0x826C2E44]): its shared load buffer at +5056,
-// the buffer's size at +5060.
-constexpr uint32_t kSceneSet = 0x826C2E44;
+// The scene's second set ([0x826C2E44], CarModelsGlobals::scene): its shared
+// load buffer at +5056, the buffer's size at +5060.
 constexpr uint32_t kSharedBuffer = 5056;
 constexpr uint32_t kSharedBufferSize = 5060;
 

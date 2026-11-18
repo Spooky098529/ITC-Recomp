@@ -1,0 +1,39 @@
+# The schema of docs/functions/command-list.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The graphics library's command list (known-data.md's "command list";
+# src/command_list/): the double-buffered memory the main thread records
+# render commands into, in 16-byte slots, and the render thread replays a
+# tick later. The scene's is at scene + 8 (Scene::Scene sub_82098A98,
+# frame-driver.md). Slot addresses (+32 to +48) point into the buffers, not
+# at objects of their own.
+
+# Also the object the deleting destructor sub_8258CE00 reads (heap.toml held
+# it before; its entry there is to go).
+[CommandList]
+measures = ["CommandList", "sub_8258CE00.r3"]
+size = 53
+origin = "embedded"
+vtable = 0x8206C080
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8206C080" },
+  { name = "buffer", offset = 4, type = "u32", note = "the buffer being recorded, 0 or 1 (flipped each tick)" },
+  { name = "capacity", offset = 8, type = "u32", note = "each buffer's capacity in slots" },
+  { name = "used", offset = 12, type = "u32", note = "the slots used this tick" },
+  { name = "last_used", offset = 16, type = "u32", note = "the slots the last tick used" },
+  { name = "allocation", offset = 20, type = "u32", note = "both buffers' block, freed with operator delete[] by the destructor" },
+  { name = "buffer0", offset = 24, type = "u32", note = "the first buffer; +24 + 4 * buffer selects" },
+  { name = "buffer1", offset = 28, type = "u32", note = "the second buffer" },
+  { name = "next_chunk", offset = 32, type = "u32", note = "where the next chunk starts (a slot address)" },
+  { name = "chunk_start", offset = 36, type = "u32", note = "the last chunk's start (a slot address)" },
+  { name = "chunk_end", offset = 40, type = "u32", note = "the last chunk's end (a slot address)" },
+  { name = "write", offset = 44, type = "u32", note = "the write pointer (a slot address)" },
+  { name = "open_start", offset = 48, type = "u32", note = "the open chunk's start again (no reader found)" },
+  { name = "chunk_open", offset = 52, type = "u8", note = "1 while a chunk is open" },
+]
+
+[globals]
+open_chunks = { address = 0x8296BD28, type = "u32", note = "the count of chunks open (all lists); a debug message when one opens with another open" }

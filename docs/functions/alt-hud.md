@@ -74,6 +74,14 @@ front end). Two rows were corrected on the way: `MenuList::PressedX`
 answers 1 when +24 is 0 (so X flips the toggle), and `MenuList::Release`
 returns 0 when there's no block.
 
+The schema (E5 step 2, 2026-11-17): `itc_recomp/schema/alt-hud.toml`
+names the object (`AltHud`: +0 `shown`, +4 `tach_curve` with +104
+`tach_output`, +116 `boost_curve` with +216 `boost_output`, +228 `bar`,
++232 `bar_high`, +236 `bar_low`, +240 `car`, +244 to +252 `slot0` to
+`slot2`, +256 `big_view`, +260 `player`), the holder's two words
+(`AltHudHolder`: `object`, `menu_list`) and the image words read
+(`AltHudGlobals`); `src/alt_hud/` reads them through those views.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the

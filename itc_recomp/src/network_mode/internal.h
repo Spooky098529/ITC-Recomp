@@ -6,6 +6,9 @@
 
 #include "guest.h"
 #include "network_mode/network_mode.h"
+#include "schema/game_modes.h"
+#include "schema/menu_helpers.h"
+#include "schema/network_mode.h"
 
 namespace network_mode {
 
@@ -19,16 +22,18 @@ inline uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-// Posts the message (id, 0, 0) on the ring at `ring` (its count +600, start
-// +604, 50 slots of 12 bytes), as the originals do inline.
-inline void PostRing(uint8_t* base, uint32_t ring, uint32_t id) {
-  const uint32_t count = Load(base, ring + 600) + 1;
-  const uint32_t start = Load(base, ring + 604);
-  Store(base, ring + 600, count);
-  const uint32_t slot = ring + 12 * ((start + count - 1) % 50);
-  Store(base, slot + 0, id);
-  Store(base, slot + 4, 0);
-  Store(base, slot + 8, 0);
+// Posts the message (id, 0, 0) on the ring of the mode's dispatcher at
+// `dispatcher` (the mode's +36: 50 slots of 12 bytes), as the originals do
+// inline.
+inline void PostRing(uint8_t* base, uint32_t dispatcher, uint32_t id) {
+  const schema::NetModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t start = d.ring_start();
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(base, d.ring_address() + 12 * ((start + count - 1) % 50));
+  slot.set_id(id);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 }  // namespace network_mode

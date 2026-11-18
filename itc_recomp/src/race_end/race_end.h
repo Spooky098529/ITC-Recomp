@@ -33,10 +33,9 @@ struct Calls {
 constexpr uint32_t kNextModeFrame = 112;
 constexpr uint32_t kModeAfterRaceFrame = 144;
 
-// The race data ([0x826C5B2C]) words: the flags (0x8 an event race, 0x10 a
-// rival race, 0x8000 and 0x10000 the race mode's +32 slot 0's hold), the
-// kind of race and the race mode.
-constexpr uint32_t kRaceData = 0x826C5B2C;
+// The race data's ([0x826C5B2C], schema::RaceEndGlobals::race_data) words:
+// the flags (0x8 an event race, 0x10 a rival race, 0x8000 and 0x10000 the
+// race mode's +32 slot 0's hold), the kind of race and the race mode.
 constexpr uint32_t kFlags = 0x59AE4;
 constexpr uint32_t kKind = 0xA3AF0;
 constexpr uint32_t kRaceMode = 0xA3AF4;
@@ -44,21 +43,9 @@ constexpr uint32_t kRaceMode = 0xA3AF4;
 // the stage whose movies were shown.
 constexpr uint32_t kUnlocksShown = 0x1CA78;
 constexpr uint32_t kStageShown = 0x1D524;
-// The globals: the title's flag, the session, the fades' passes, the boot
-// movies' table (five ids, +20 the mode after, +24 skippable, +28 the
-// index).
-constexpr uint32_t kTitleFlag = 0x826364EC;
-constexpr uint32_t kSession = 0x82816E3C;
-constexpr uint32_t kFadeInPasses = 0x82001BEC;
-constexpr uint32_t kBootMovies = 0x826C5BAC;
-
-// The race mode's words: the dispatcher (+36), its ring (+240; the count at
-// +840, the start at +844), the +848 machine's state, whether to post the
-// Update message.
-constexpr uint32_t kDispatcher = 36;
-constexpr uint32_t kRing = 240;
-constexpr uint32_t kMachineState = 10452;
-constexpr uint32_t kPostUpdate = 167260;
+// The globals (the title's flag, the session, the fades' passes, the boot
+// movies' table) are schema::RaceEndGlobals (schema/race_end.h), the race
+// mode's words schema::RaceMode (schema/game_modes.h).
 
 // The guest functions.
 constexpr uint32_t kDispatch = 0x821062E8;      // GameMessages::Dispatch

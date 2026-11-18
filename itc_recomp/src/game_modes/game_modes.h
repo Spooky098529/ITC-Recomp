@@ -16,12 +16,10 @@ namespace game_modes {
 
 // --- The state machines (StateMachine::, Transition::, StateKey::) ---
 
-// A state machine: up to 200 48-byte transitions from +0, their count at
-// +9600 and the state at +9604.
-constexpr uint32_t kTransitionBytes = 48;
+// A state machine (schema::StateMachine, game-modes.toml): up to 200
+// 48-byte transitions (schema::StateTransition) from +0, their count and the
+// state after them.
 constexpr uint32_t kTransitions = 200;
-constexpr uint32_t kTransitionCount = 9600;
-constexpr uint32_t kState = 9604;
 // The empty functor's vtable (a transition with nothing to run).
 constexpr uint32_t kNoFunctor = 0x820069BC;
 
@@ -47,8 +45,8 @@ uint32_t StateMachineAdd(uint8_t* base, uint32_t machine, uint32_t key, uint32_t
 // or the static default (made on the first call; `found` false). The
 // original's r3 for the default is the address sign-extended, and for a
 // transition the machine's r3 plus the offset (the adapters' r3).
+// The default: schema::GameModesGlobals::default_transition.
 uint32_t StateMachineFind(uint8_t* base, uint32_t machine, const StateKey& key, bool* found);
-constexpr uint32_t kDefaultTransition = 0x826C5B68;
 // sub_82106280 StateMachine::Handle: the functor part for the current state
 // and the 12-byte message at `message`; the state moved to the transition's
 // next one when that isn't 0.
@@ -71,8 +69,8 @@ void ModeConstruct(uint8_t* base, uint32_t mode);
 
 // --- The race overlays' state machine's message handlers ---
 
-// The race overlays' list in their state machine: 25 slots from +9608.
-constexpr uint32_t kOverlays = 9608;
+// The race overlays' list in their state machine
+// (schema::RaceOverlaysMachine's overlays): 25 slots.
 constexpr uint32_t kOverlaySlots = 25;
 
 // sub_8215DD58: each overlay's +820 and +824 = 1.
@@ -106,11 +104,10 @@ void Member67760Construct(uint8_t* base, uint32_t object);
 // returns it.
 void Member13360Construct(uint8_t* base, uint32_t object);
 
-// A 28-byte buffer (vtable 0x82009390) holding a block at +20 from
-// VirtualAlloc. Freeing goes over the allocation layer only (the callers'
+// A 28-byte camera path buffer (schema::CameraPathBuffer, vtable
+// 0x82009390) holding a block at +20 from VirtualAlloc. Freeing goes over the allocation layer only (the callers'
 // adapters check hooks::NativeHeapActive): Buffer28Freeable says whether the
 // block is the layer's pages (or none), else the originals run.
-constexpr uint32_t kBuffer28Block = 20;
 bool Buffer28Freeable(uint8_t* base, uint32_t buffer);
 // sub_82152028 Buffer28::Free: the block freed (VirtualFree, MEM_RELEASE)
 // and +20 = 0; returns r3 as the original leaves it (0 without a block, else
@@ -125,7 +122,6 @@ uint32_t Buffer28Destroy(uint8_t* base, uint32_t buffer);
 // sub_82106A00: the four buffers at +43100 down to +43016 destroyed; r3 as
 // the last Free's. Only when each is Buffer28Freeable.
 constexpr uint32_t kBuffers28 = 43016;
-constexpr uint32_t kBuffer28Bytes = 28;
 bool Buffers28Freeable(uint8_t* base, uint32_t object);
 uint32_t Buffers28Destroy(uint8_t* base, uint32_t object);
 

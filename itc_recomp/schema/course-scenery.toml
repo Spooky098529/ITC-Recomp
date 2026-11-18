@@ -1,0 +1,476 @@
+# The schema of docs/functions/course-scenery.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The course scenery: its manager (248 bytes, physical memory, at
+# [0x826C5514] and [0x826C551C]), its five object pools (40-byte pool object
+# headers), the two lists of areas and models it streams, the visible areas
+# it hands the draw, the course set (pool 2), the areas' lights (pool 3) and
+# models (pool 4), and the texture animations (src/course_scenery/).
+#
+# Measure faults (the measure joins objects through shared registers):
+# - "Scenery" holds the manager and also, at +0 to +28, the scenery lists
+#   (SceneryItemList), their 12-byte table entries (the u16s at +0, +2), the
+#   visible areas (SceneryVisibleArea: DrawArea, Draw) and the 44-byte
+#   configuration (PoolSizes); the manager's fields there are named, the
+#   others are described in their own types.
+# - "PoolObject" holds the pool objects' header and, past +40, the course
+#   set's fields Scenery::DrawSetLists reads (CourseSet's, named set_ here).
+# - "DataFile::GetEntry.ret" joins an area's entry of the area file
+#   (CollectModels) and a light group (Lights::FindNearest).
+# - "Scenery.+24" joins the lists' tables (LoadAll) and the configuration's
+#   pool 0 asset word (PoolSizes' [[config + 24]]).
+# Left to other areas' types (not claimed here): "Scenery.+16.+56" (the
+# area model's Model, models.md) and
+# "Scenery::RecordHeadlightProjectors.r4.+8" (the CameraPass, cameras.md).
+
+# The manager (measures: its own, LoadAll's and Stream's r3 as SceneryList,
+# Lights::FindNearest's owner as Lights).
+[Scenery]
+measures = ["Scenery", "SceneryList", "Lights"]
+size = 248
+origin = "allocated"
+fields = [
+  { name = "pool_count", offset = 0, type = "u32", note = "5 (the manager is the pool set: ObjectPools)" },
+  { name = "table_area", offset = 0, type = "u16", note = "measure fault: a list table entry's area (SceneryListTableEntry)" },
+  { name = "table_model", offset = 2, type = "u16", note = "measure fault: a list table entry's model (SceneryListTableEntry)" },
+  { name = "pool_records", offset = 4, type = "ptr", to = "ObjectPoolRecord", note = "the pools' block: five 24-byte records, then the objects" },
+  { name = "mode", offset = 8, type = "u32", note = "the configuration's +0: 0 everything loaded at once, else streamed (2: [[+40]])" },
+  { name = "view_count_minus_1", offset = 12, type = "u32", note = "the configuration's +4: the views (players) less 1" },
+  { name = "unknown_16", offset = 16, type = "u32", note = "the configuration's +8" },
+  { name = "unknown_20", offset = 20, type = "u32", note = "the configuration's +12" },
+  { name = "unknown_24", offset = 24, type = "u32", note = "the configuration's +16" },
+  { name = "unknown_28", offset = 28, type = "u32", note = "the configuration's +20" },
+  { name = "pool0_asset", offset = 32, type = "ptr", to = "SceneryWord", note = "the configuration's +24: -> pool 0's asset id" },
+  { name = "course_table", offset = 36, type = "ptr", to = "SceneryCourseTable", note = "the configuration's +28: the course's table of areas" },
+  { name = "mode2_source", offset = 40, type = "ptr", to = "SceneryWord", note = "the configuration's +32: -> the mode taken in mode 2 when +12 is 0" },
+  { name = "pool0_on", offset = 44, type = "u32", note = "the configuration's +36: pool 0 has an object" },
+  { name = "pool1_on", offset = 48, type = "u32", note = "the configuration's +40: pool 1 is set up" },
+  { name = "unknown_52", offset = 52, type = "u32", note = "0 by Init" },
+  { name = "unknown_56", offset = 56, type = "u32", note = "0 by Init (+60 to +107 cleared too)" },
+  { name = "area_count", offset = 92, type = "u32", note = "the areas with a light asset (PoolSizes)" },
+  { name = "area_count_streamed", offset = 96, type = "u32", note = "the same count again: pool 3's objects and list A's cut when streamed" },
+  { name = "model_count", offset = 100, type = "u32", note = "the areas' models (PoolSizes)" },
+  { name = "model_cap", offset = 104, type = "u32", note = "the model count capped at 16: pool 4's objects and list B's cut when streamed" },
+  { name = "pool0_object", offset = 108, type = "ptr", to = "SceneryBlockObject", note = "pool 0's object (StartLoad, with +44)" },
+  { name = "course_set", offset = 112, type = "ptr", to = "CourseSet", note = "pool 2's object (StartLoad)" },
+  { name = "list_a_pool", offset = 116, type = "u32", note = "list A (the areas; a SceneryItemList at +116): its pool, 3" },
+  { name = "list_a_done", offset = 120, type = "u32" },
+  { name = "list_a_count", offset = 124, type = "u32" },
+  { name = "list_a_capacity", offset = 128, type = "u32" },
+  { name = "list_a_pointers", offset = 132, type = "u32", note = "the items' pointers, sorted nearest first" },
+  { name = "list_a_items", offset = 136, type = "ptr", to = "SceneryListItem" },
+  { name = "list_a_table", offset = 140, type = "ptr", to = "SceneryListTableEntry" },
+  { name = "list_b_pool", offset = 144, type = "u32", note = "list B (the models; a SceneryItemList at +144): its pool, 4" },
+  { name = "list_b_done", offset = 148, type = "u32" },
+  { name = "list_b_count", offset = 152, type = "u32" },
+  { name = "list_b_capacity", offset = 156, type = "u32" },
+  { name = "list_b_pointers", offset = 160, type = "u32" },
+  { name = "list_b_items", offset = 164, type = "ptr", to = "SceneryListItem" },
+  { name = "list_b_table", offset = 168, type = "ptr", to = "SceneryListTableEntry" },
+  { name = "last_pool", offset = 172, type = "u32", note = "the pool last asked to load (-1 none)" },
+  { name = "last_index", offset = 176, type = "u32", note = "its object's index (-1 none)" },
+  { name = "pool0_data_size", offset = 180, type = "u32" },
+  { name = "pool0_block", offset = 184, type = "u32", note = "pool 0's data block (AllocPhysical)" },
+  { name = "load_buffer", offset = 188, type = "u32", note = "the buffer the area models load into ([0x826A5134] or 0)" },
+  { name = "loading_all", offset = 192, type = "u32", note = "set while Scenery::IsLoaded loads everything" },
+  { name = "mask", offset = 196, type = "u32", note = "0x38435: camera pass bits, 0x10 the set's model, 0x20 its list, 0x400 the areas' lights drawn, 0x4000 the texture animations stopped" },
+  { name = "unknown_200", offset = 200, type = "f32", note = "192.0 (0x820067B8)" },
+  { name = "unknown_204", offset = 204, type = "f32", note = "72.0 (0x820067B4)" },
+  { name = "unknown_208", offset = 208, type = "f32", note = "256.0 (0x82001FAC)" },
+  { name = "unknown_212", offset = 212, type = "f32", note = "64.0 (0x820067B0)" },
+  { name = "visible_count", offset = 216, type = "u32", note = "the visible areas (Scenery::Update)" },
+  { name = "visible_capacity", offset = 220, type = "u32" },
+  { name = "visible_areas", offset = 224, type = "ptr", to = "SceneryVisibleArea", note = "272-byte entries" },
+  { name = "texture_provider", offset = 228, type = "ptr", to = "SceneryProviderVtable", note = "the TextureProvider made here (20 bytes, 64 slots); this word is its vtable 0x8206CCB4" },
+]
+
+# A scenery list (28 bytes; the manager's +116 and +144).
+[SceneryItemList]
+measure = "SceneryList::Sort.r4"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "pool", offset = 0, type = "u32", note = "3 (areas) or 4 (models)" },
+  { name = "done", offset = 4, type = "u32", note = "the items done (LoadAll)" },
+  { name = "count", offset = 8, type = "u32" },
+  { name = "capacity", offset = 12, type = "u32", note = "also the table's count" },
+  { name = "pointers", offset = 16, type = "u32", note = "an array of pointers to the items, sorted nearest first" },
+  { name = "items", offset = 20, type = "ptr", to = "SceneryListItem" },
+  { name = "table", offset = 24, type = "ptr", to = "SceneryListTableEntry" },
+]
+
+# A scenery list's item (16 bytes).
+[SceneryListItem]
+measures = ["Scenery.+4", "Scenery.+20"]
+size = 16
+origin = "allocated"
+fields = [
+  { name = "distance", offset = 0, type = "f32" },
+  { name = "mask", offset = 4, type = "u32", note = "the camera passes that see it" },
+  { name = "key", offset = 8, type = "u32", note = "the area and model halfwords as one word" },
+  { name = "area", offset = 8, type = "u16" },
+  { name = "model", offset = 10, type = "u16" },
+  { name = "object", offset = 12, type = "ptr", to = "PoolObject", note = "its pool's object, 0 while not loaded" },
+]
+
+# A scenery list's table entry (12 bytes): every key the list can hold.
+[SceneryListTableEntry]
+measure = "Scenery.+24"
+size = 12
+origin = "allocated"
+fields = [
+  { name = "key", offset = 0, type = "u32", note = "the area and model halfwords as one word (also PoolSizes' pool 0 asset word: a measure fault)" },
+  { name = "area", offset = 0, type = "u16" },
+  { name = "model", offset = 2, type = "u16" },
+  { name = "asset", offset = 4, type = "u32", note = "the asset id" },
+  { name = "object", offset = 8, type = "ptr", to = "PoolObject", note = "mode 0: its object once loaded" },
+  { name = "next_object", offset = 20, type = "u32", note = "the next entry's object (LoadAll's original reads it 12 bytes on)" },
+]
+
+# A word the configuration points to.
+[SceneryWord]
+measures = ["Scenery.+32", "Scenery.+40"]
+size = 4
+origin = "file"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "pool 0's asset id, or the mode in mode 2" },
+]
+
+# The 44-byte configuration Scenery::Setup copies to the manager's +8.
+[SceneryConfig]
+measure = "SceneryConfig"
+size = 44
+origin = "file"
+fields = [
+  { name = "mode", offset = 0, type = "u32", note = "0 everything loaded at once, else streamed" },
+  { name = "view_count_minus_1", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "pool0_asset", offset = 24, type = "ptr", to = "SceneryWord" },
+  { name = "course_table", offset = 28, type = "ptr", to = "SceneryCourseTable" },
+  { name = "mode2_source", offset = 32, type = "ptr", to = "SceneryWord" },
+  { name = "pool0_on", offset = 36, type = "u32" },
+  { name = "pool1_on", offset = 40, type = "u32" },
+]
+
+# The course's table of areas (the configuration's +28).
+[SceneryCourseTable]
+measures = ["Scenery.+28", "Scenery.+36", "SceneryConfig.+28"]
+size = 20
+origin = "file"
+fields = [
+  { name = "set_second_asset", offset = 8, type = "u32", note = "the course set's second asset (into its data; its size is pool 2's)" },
+  { name = "set_first_asset", offset = 12, type = "u32", note = "the course set's first asset (into a physical block)" },
+  { name = "area_count", offset = 16, type = "u32" },
+  { name = "light_asset", offset = 20, type = "u32", note = "area 0's light asset (area n's 12 n on; -1 ends them)" },
+  { name = "first_model_asset", offset = 24, type = "u32", note = "area 0's first model asset" },
+  { name = "last_model_asset", offset = 28, type = "u32", note = "area 0's last model asset" },
+]
+
+# The pool set (the manager's first 8 bytes).
+[ObjectPools]
+measure = "ObjectPools"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "count", offset = 0, type = "u32" },
+  { name = "records", offset = 4, type = "ptr", to = "ObjectPoolRecord", note = "the block (XPhysicalAlloc): the records, then the objects" },
+]
+
+# A pool's 24-byte record.
+[ObjectPoolRecord]
+measures = ["new<?>@ObjectPools::Init", "ObjectPools::Pool.ret"]
+size = 24
+origin = "allocated"
+fields = [
+  { name = "object_count", offset = 0, type = "u32" },
+  { name = "object_size", offset = 4, type = "u32" },
+  { name = "data_size", offset = 8, type = "u32" },
+  { name = "first_object", offset = 12, type = "ptr", to = "PoolObject" },
+  { name = "free_head", offset = 16, type = "ptr", to = "PoolObject" },
+  { name = "used_head", offset = 20, type = "ptr", to = "PoolObject" },
+]
+
+# A pool's 24-byte descriptor (ObjectPools::Init's r5; Scenery::SetupPools'
+# frame).
+[ObjectPoolDesc]
+measure = "ObjectPools::Init.r5"
+size = 24
+origin = "stack"
+fields = [
+  { name = "pool", offset = 0, type = "u32" },
+  { name = "object_size", offset = 4, type = "u32" },
+  { name = "data_size", offset = 8, type = "u32" },
+  { name = "object_count", offset = 12, type = "u32" },
+  { name = "data_count", offset = 16, type = "u32" },
+  { name = "factory", offset = 20, type = "fn", note = "makes each object (Scenery::MakePoolObject), 0 plain pool objects" },
+]
+
+# A pooled object's 40-byte header.
+[PoolObject]
+measures = ["PoolObject", "ObjectPools::Pool.ret.+20", "ObjectPools::Release.ret"]
+size = 40
+origin = "allocated"
+vtable = 0x82006848
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PoolObjectVtable" },
+  { name = "data", offset = 4, type = "u32", note = "its data buffer (+4 to +12 AllocData's record: the data, its size, the used)" },
+  { name = "data_size", offset = 8, type = "u32" },
+  { name = "data_used", offset = 12, type = "u32" },
+  { name = "index", offset = 16, type = "u32", note = "its index in the pool" },
+  { name = "prev", offset = 20, type = "ptr", to = "PoolObject", note = "on the pool's free or used list" },
+  { name = "next", offset = 24, type = "ptr", to = "PoolObject" },
+  { name = "unknown_28", offset = 28, type = "u32", note = "0 by the constructor" },
+  { name = "flags", offset = 32, type = "u32", note = "0x1 in use, 0x2 cleared when loaded, 0x8 loaded, 0x10 seen this update, 0x20 not seen, to be released" },
+  { name = "countdown", offset = 36, type = "u32", note = "the updates left before release (2; -1 none)" },
+  # Measure fault: CourseSet's fields (Scenery::DrawSetLists).
+  { name = "set_area_file", offset = 1056, type = "ptr", to = "SceneryDataFile", note = "CourseSet's area_file" },
+  { name = "set_texture_animations", offset = 1060, type = "ptr", to = "AnimationSet", note = "CourseSet's texture_animations" },
+  { name = "set_light_groups", offset = 1592, type = "ptr", to = "SceneryDataFile", note = "CourseSet's light_groups" },
+  { name = "set_list_c_count", offset = 1596, type = "u32", note = "CourseSet's list_c_count" },
+  { name = "set_list_c_head", offset = 1860, type = "u16", note = "CourseSet's list_c_head" },
+  { name = "set_list_d_count", offset = 2124, type = "u32" },
+  { name = "set_list_d_head", offset = 2388, type = "u16" },
+  { name = "set_list_e_count", offset = 2652, type = "u32" },
+  { name = "set_list_e_head", offset = 2916, type = "u16" },
+  { name = "set_points_animations", offset = 3788, type = "u32", note = "CourseSet's points_animations" },
+  { name = "set_points_provider", offset = 3792, type = "u32" },
+  { name = "set_points_race_word", offset = 3796, type = "u32" },
+  { name = "set_points_count", offset = 3800, type = "u32" },
+]
+
+# The pool objects' vtables (three slots).
+[PoolObjectVtable]
+measure = "PoolObject.+0"
+size = 12
+origin = "image"
+fields = [
+  { name = "key", offset = 0, type = "fn", note = "the key's address and size" },
+  { name = "load", offset = 4, type = "fn" },
+  { name = "reset", offset = 8, type = "fn" },
+]
+
+# Pools 0 and 1's objects (60 bytes; never loaded in play).
+[SceneryBlockObject]
+measure = "sub_820F1098.r3"
+size = 60
+origin = "allocated"
+vtable = 0x8200674C
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PoolObjectVtable", note = "0x8200674C pool 0's, 0x82006758 pool 1's" },
+  { name = "block", offset = 56, type = "u32", note = "0 by MakePoolObject; pool 0's load sub_820F1098 sets it" },
+]
+
+# The course's shared set (pool 2's object, 3,824 bytes).
+[CourseSet]
+measures = ["CourseSet", "CourseSet::OnLoaded.r6", "TextureAnimations"]
+size = 3824
+origin = "allocated"
+vtable = 0x82006784
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PoolObjectVtable" },
+  { name = "xpr", offset = 64, type = "bytes", count = 32, note = "its textures (an XPR; CourseSet::InitParts' +0)" },
+  { name = "model", offset = 96, type = "bytes", count = 432, note = "its model (a Model)" },
+  { name = "list_a", offset = 528, type = "bytes", count = 528, note = "a ModelList (entry 2)" },
+  { name = "area_file", offset = 1056, type = "ptr", to = "SceneryDataFile", note = "the second file's entry 0: the areas" },
+  { name = "texture_animations", offset = 1060, type = "ptr", to = "AnimationSet", note = "the second file's entry 1" },
+  { name = "list_b", offset = 1064, type = "bytes", count = 528, note = "a ModelList (entry 3)" },
+  { name = "light_groups", offset = 1592, type = "ptr", to = "SceneryDataFile", note = "the second file's entry 2" },
+  { name = "list_c_count", offset = 1596, type = "u32", note = "a ModelList (entry 4), drawn whole by DrawSetLists" },
+  { name = "list_c_head", offset = 1860, type = "u16", note = "its List64's head (+264)" },
+  { name = "list_d_count", offset = 2124, type = "u32", note = "a ModelList (entry 5), its B entries" },
+  { name = "list_d_head", offset = 2388, type = "u16" },
+  { name = "list_e_count", offset = 2652, type = "u32", note = "a ModelList (entry 6), its C entries" },
+  { name = "list_e_head", offset = 2916, type = "u16" },
+  { name = "points", offset = 3180, type = "bytes", count = 608, note = "a point list (entry 7, ModelList::LoadPoints)" },
+  { name = "points_animations", offset = 3788, type = "u32", note = "the point list's +608: the set's texture animations" },
+  { name = "points_provider", offset = 3792, type = "u32", note = "its +612: the texture provider" },
+  { name = "points_race_word", offset = 3796, type = "u32", note = "its +616: from the race's table at [0x826D82E8]" },
+  { name = "points_count", offset = 3800, type = "u32", note = "its +620" },
+  { name = "first_file", offset = 3808, type = "u32", note = "the first asset's block (AllocPhysical), freed once parsed" },
+  { name = "second_file", offset = 3812, type = "u32", note = "the second asset, in the object's data" },
+]
+
+# An area's lights (pool 3's object, 88 bytes).
+[AreaLights]
+measures = ["AreaLights", "Scenery.+12", "Lights.+224.+12"]
+size = 88
+origin = "allocated"
+vtable = 0x8200676C
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PoolObjectVtable" },
+  { name = "data", offset = 4, type = "u32", note = "the header's data: the loaded file" },
+  { name = "xpr", offset = 56, type = "bytes", count = 24, note = "an XPR (MakePoolObject)" },
+  { name = "light_file", offset = 80, type = "ptr", to = "SceneryDataFile", note = "the file's entry 0 (0 none): its light groups" },
+  { name = "key", offset = 84, type = "u32", note = "the key: the area and model halfwords" },
+  { name = "area", offset = 84, type = "u16" },
+  { name = "model", offset = 86, type = "u16" },
+]
+
+# An area's model (pool 4's object, 560 bytes).
+[AreaModel]
+measures = ["AreaModel", "Scenery.+16"]
+size = 560
+origin = "allocated"
+vtable = 0x82006778
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "PoolObjectVtable" },
+  { name = "model", offset = 56, type = "ptr", note = "its Model (+80) once parsed, else 0" },
+  { name = "xpr", offset = 60, type = "ptr", note = "its XPR (+528) once parsed, else 0" },
+  { name = "key", offset = 64, type = "u32", note = "the key: the area and model halfwords" },
+  { name = "area", offset = 64, type = "u16" },
+  { name = "model_number", offset = 66, type = "u16" },
+  { name = "own_model", offset = 80, type = "u32", note = "the Model made here (448 bytes); this word its vtable 0x82006764" },
+  { name = "own_xpr", offset = 528, type = "bytes", count = 32, note = "the XPR made here" },
+]
+
+# A visible area (272 bytes; the manager's +224).
+[SceneryVisibleArea]
+measure = "Lights.+224"
+size = 272
+origin = "allocated"
+fields = [
+  { name = "mask", offset = 0, type = "u32", note = "the camera passes that see it" },
+  { name = "model_count", offset = 4, type = "u32" },
+  { name = "model_capacity", offset = 8, type = "u32", note = "the manager's model count" },
+  { name = "lights", offset = 12, type = "ptr", to = "AreaLights" },
+  { name = "models", offset = 16, type = "ptr", to = "AreaModel", note = "the first of its models (4 bytes each)" },
+]
+
+# A data file of the course set or the areas (count, then offsets).
+[SceneryDataFile]
+measures = ["PoolObject.+1056", "PoolObject.+1592", "Scenery.+12.+80", "Lights.+224.+12.+80"]
+size = 4
+origin = "file"
+fields = [
+  { name = "count", offset = 0, type = "u32", note = "little-endian" },
+  { name = "count_byte", offset = 0, type = "u8", note = "its first byte" },
+]
+
+# An entry of those files (DataFile::GetEntry's answer): an area of the area
+# file (CollectModels) or a light group (Lights::FindNearest), joined.
+[SceneryFileEntry]
+measure = "DataFile::GetEntry.ret"
+size = 148
+origin = "file"
+fields = [
+  { name = "count", offset = 0, type = "u32", note = "an area's model count (big-endian), a light group's scans" },
+  { name = "corners", offset = 32, type = "bytes", count = 64, note = "an area's four 16-byte corners" },
+  { name = "light_count", offset = 60, type = "u32", note = "a light group's lights" },
+  { name = "light_x", offset = 76, type = "f32", note = "a light group's first light (48 bytes each)" },
+  { name = "light_xy", offset = 76, type = "u64" },
+  { name = "light_y", offset = 80, type = "f32" },
+  { name = "light_z", offset = 84, type = "f32" },
+  { name = "light_zw", offset = 84, type = "u64" },
+  { name = "light_16", offset = 92, type = "u64", note = "its bytes 16 to 23" },
+  { name = "model_number", offset = 96, type = "u32", note = "an area's first model record's number (96-byte records)" },
+  { name = "light_24", offset = 100, type = "u64", note = "its bytes 24 to 31" },
+]
+
+# What a view sees from (CollectAreas' and CollectModels' r5: a viewport entry).
+[SceneryViewport]
+measures = ["Scenery::CollectAreas.r5", "Scenery::CollectModels.r5"]
+size = 1612
+origin = "image"
+fields = [
+  { name = "far_distance", offset = 72, type = "f32" },
+  { name = "eye_x", offset = 1600, type = "f32" },
+  { name = "eye_z", offset = 1608, type = "f32" },
+]
+
+# A pass description (the draws' r4; Scenery::Draw's frame +80).
+[SceneryPassDesc]
+measures = ["Scenery::DrawArea.r4", "Scenery::DrawSetLists.r4", "Scenery::RecordHeadlightProjectors.r4"]
+size = 36
+origin = "stack"
+fields = [
+  { name = "camera_pass_object", offset = 8, type = "u32", note = "the camera pass (RecordHeadlightProjectors sets it)" },
+  { name = "player", offset = 12, type = "u32" },
+  { name = "viewport_entry", offset = 16, type = "u32" },
+  { name = "camera_pass", offset = 20, type = "u32", note = "the camera pass's number" },
+  { name = "key_a", offset = 24, type = "u32", note = "to [0x8296B90C]" },
+  { name = "key_b", offset = 28, type = "u32", note = "to [0x8296B900]" },
+  { name = "mask", offset = 32, type = "u32" },
+]
+
+# Lights::FindNearest's output (32 bytes a light) and point.
+[NearestLight]
+measure = "Lights::FindNearest.r4"
+size = 32
+origin = "stack"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+  { name = "w", offset = 12, type = "f32", note = "the float at 0x82000A30" },
+  { name = "f16", offset = 16, type = "f32", note = "the light's bytes 16 to 31" },
+  { name = "f20", offset = 20, type = "f32" },
+  { name = "f24", offset = 24, type = "f32" },
+  { name = "f28", offset = 28, type = "f32" },
+]
+
+[NearestLightPoint]
+measure = "Lights::FindNearest.r5"
+size = 12
+origin = "stack"
+fields = [
+  { name = "x", offset = 0, type = "f32" },
+  { name = "y", offset = 4, type = "f32" },
+  { name = "z", offset = 8, type = "f32" },
+]
+
+# The texture provider's vtable (the manager's +228's first word).
+[SceneryProviderVtable]
+measure = "Scenery.+228"
+size = 20
+origin = "image"
+fields = [
+  { name = "clear_all", offset = 8, type = "fn", note = "slot 2 (0x82594328)" },
+  { name = "set", offset = 16, type = "fn", note = "slot 4, TextureProvider::Set (0x82594718)" },
+]
+
+# The texture animations (the course set's +1060).
+[AnimationSet]
+measure = "AnimationSet"
+size = 8
+origin = "file"
+fields = [
+  { name = "count", offset = 0, type = "u32" },
+  { name = "first_offset", offset = 4, type = "u32", note = "the offsets, from the table's end (set + 4 (count + 1))" },
+]
+
+[Animation]
+measure = "Animation"
+size = 20
+origin = "file"
+fields = [
+  { name = "frame_count", offset = 0, type = "u32" },
+  { name = "frame", offset = 4, type = "u32" },
+  { name = "tick", offset = 8, type = "u32" },
+  { name = "length", offset = 12, type = "u32" },
+  { name = "first_start", offset = 16, type = "u32", note = "each frame's start tick from here; the texture words after them" },
+]
+
+[globals]
+manager = { address = 0x826C5514, type = "ptr", to = "Scenery", note = "set by Scenery::Init, cleared by ClearGlobal" }
+physical_held = { address = 0x826C5518, type = "u32", note = "the physical bytes the scenery holds" }
+created = { address = 0x826C551C, type = "ptr", to = "Scenery", note = "set by Scenery::Create, cleared by Destroy (the same object)" }
+load_buffer_size = { address = 0x826A5130, type = "u32", note = "the archive's shared load buffer's size" }
+load_buffer = { address = 0x826A5134, type = "u32", note = "the archive's shared load buffer" }
+create_float_200 = { address = 0x820067B8, type = "u32", note = "192.0, the manager's +200 (copied as bits)" }
+create_float_204 = { address = 0x820067B4, type = "u32", note = "72.0, the manager's +204" }
+create_float_208 = { address = 0x82001FAC, type = "u32", note = "256.0, the manager's +208" }
+create_float_212 = { address = 0x820067B0, type = "u32", note = "64.0, the manager's +212" }
+item_distance = { address = 0x82000A34, type = "f32", note = "0.0: StartLoad's distance for every item" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0 (the draws' ranges, inside an area's rectangle)" }
+key_a = { address = 0x8296B90C, type = "u32", note = "the render queue's key (the pass's +24)" }
+key_b = { address = 0x8296B900, type = "u32", note = "the render queue's key (the pass's +28)" }
+key_depth = { address = 0x8296B908, type = "u32", note = "the depth buckets' key" }
+depth_key = { address = 0x8296B8FC, type = "u32", note = "the depth draws' key" }
+other_key = { address = 0x8296B8F8, type = "u32", note = "the depth draws' second key" }

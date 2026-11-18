@@ -27,6 +27,7 @@
 #include "memory/heap.h"
 #include "memory/mapping.h"
 #include "movies/player.h"
+#include "schema/audio.h"
 
 #include "guest.h"
 
@@ -402,17 +403,17 @@ ITC_NATIVE_ENTRY_ALWAYS(824657E0) {
     lifted::original::c824657E0(ctx, base);
     return;
   }
-  uint32_t object = ctx.r3.u32;
+  const schema::AudioRenderDriver object(base, ctx.r3.u32);
   uint32_t callback = ctx.r4.u32;
-  uint32_t handle = guest::LoadU32(base, object + 16);
+  uint32_t handle = object.handle();
   if (handle) {
     g_system->Unregister(handle);
-    guest::StoreU32(base, object + 16, 0);
+    object.set_handle(0);
   }
   ctx.r3.u64 = 0;
   if (callback) {
-    handle = g_system->Register(callback, guest::LoadU32(base, object + 12));
-    guest::StoreU32(base, object + 16, handle);
+    handle = g_system->Register(callback, object.callback_arg());
+    object.set_handle(handle);
     if (!handle) {
       ctx.r3.u64 = uint32_t(0x80004005);  // E_FAIL
     }
@@ -427,7 +428,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82465870) {
     lifted::original::c82465870(ctx, base);
     return;
   }
-  uint32_t object = ctx.r3.u32;
+  const schema::AudioRenderDriver object(base, ctx.r3.u32);
   guest::StackFrame frame(ctx, 112);
   ctx.r3.u64 = ctx.r4.u64;
   ctx.r4.u64 = frame.Local(80);
@@ -435,7 +436,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82465870) {
   if (ctx.r3.s32 < 0) {
     return;
   }
-  g_system->Submit(guest::LoadU32(base, object + 16), guest::LoadU32(base, frame.Local(88)));
+  g_system->Submit(object.handle(), guest::LoadU32(base, frame.Local(88)));
   ctx.r3.u64 = 0;
 }
 
@@ -444,11 +445,11 @@ ITC_NATIVE_ENTRY_ALWAYS(82465870) {
 // sees none. The destructor's work: its plain C++ (audio/render_driver.h)
 // with --native_render_driver, else the original.
 ITC_NATIVE_ENTRY_ALWAYS(824658C8) {
-  uint32_t object = ctx.r3.u32;
-  uint32_t handle = guest::LoadU32(base, object + 16);
+  const schema::AudioRenderDriver object(base, ctx.r3.u32);
+  uint32_t handle = object.handle();
   if (g_system && native_audio::IsOurHandle(handle)) {
     g_system->Unregister(handle);
-    guest::StoreU32(base, object + 16, 0);
+    object.set_handle(0);
   }
   if (ITC_FLAG(native_render_driver)) {
     lifted_call::EnterR3<audio::RenderDriverDestroy>(ctx, base);

@@ -58,9 +58,9 @@ void Badges(const Movie& movie, uint32_t machine, bool gate_first, const uint32_
   for (uint32_t k = 0; k < 4; k++) {
     movie.Hide(11, 20 + k, lr[k]);
   }
-  const uint32_t badge = Load(base, 8 * Load(base, machine + 9828) + 9856 + machine);
+  const uint32_t badge = EventAt(base, machine, Machine(base, machine).event_cursor()).badge();
   if (badge == 0) {
-    if (!gate_first || (Load(base, machine + 10148) & 0x20) != 0) {
+    if (!gate_first || (Machine(base, machine).progress_bits() & 0x20) != 0) {
       movie.Show(11, 20, lr[4]);
     }
     movie.Show(11, 21, lr[5]);
@@ -77,7 +77,7 @@ void Badges(const Movie& movie, uint32_t machine, bool gate_first, const uint32_
 
 // The cursor's event type (its +9852 pair's +0).
 uint32_t CursorType(uint8_t* base, uint32_t machine) {
-  return Load(base, 8 * Load(base, machine + 9828) + machine + 9852);
+  return EventAt(base, machine, Machine(base, machine).event_cursor()).type();
 }
 
 // Page 5: the event's node (10, type + 1) shown and its children by type
@@ -91,7 +91,7 @@ void VariantChildren(const Movie& movie, uint32_t machine) {
   if (type > 8) {
     return;
   }
-  const bool variant = Load(base, machine + 9724) != 0;
+  const bool variant = Machine(base, machine).variant() != 0;
   switch (type) {
     case 0:
     case 2:
@@ -138,15 +138,15 @@ void VariantChildren(const Movie& movie, uint32_t machine) {
 // The race modes' textures (15, 4), (15, 5), (15, 3) = the mode (+9820).
 void ModeTextures(const Movie& movie, uint32_t machine, const uint32_t (&lr)[3]) {
   uint8_t* base = movie.base;
-  movie.Texture(15, 4, Load(base, machine + 9820), lr[0]);
-  movie.Texture(15, 5, Load(base, machine + 9820), lr[1]);
-  movie.Texture(15, 3, Load(base, machine + 9820), lr[2]);
+  movie.Texture(15, 4, Machine(base, machine).race_mode(), lr[0]);
+  movie.Texture(15, 5, Machine(base, machine).race_mode(), lr[1]);
+  movie.Texture(15, 3, Machine(base, machine).race_mode(), lr[2]);
 }
 
 // Page 4's list of event names (strings) in the frame from +96, by the
 // progress bits; the words past the list are left as they are.
 void EventNames(uint8_t* base, uint32_t machine, uint32_t frame) {
-  const uint32_t bits = Load(base, machine + 10148);
+  const uint32_t bits = Machine(base, machine).progress_bits();
   const uint32_t names = frame + 96;
   if ((bits & 0x20) != 0) {
     for (uint32_t i = 0; i < 15; i++) {
@@ -179,7 +179,7 @@ void EventNames(uint8_t* base, uint32_t machine, uint32_t frame) {
 
 // The name at the list's row `row` from the top (+9828 - +9972 + row).
 uint32_t RowName(uint8_t* base, uint32_t machine, uint32_t frame, uint32_t row) {
-  const uint32_t top = Load(base, machine + 9828) - Load(base, machine + 9972);
+  const uint32_t top = Machine(base, machine).event_cursor() - Machine(base, machine).visible_row();
   return Load(base, 4 * top + frame + 96 + 4 * row);
 }
 
@@ -188,11 +188,11 @@ void EventPage(const Movie& movie, uint32_t machine) {
   const uint32_t frame = movie.frame;
   ModeTextures(movie, machine, {0x8218BF80, 0x8218BF94, 0x8218BFA8});
   // The list's arrows: (-1, 17) hidden at its top, (-1, 18) at its bottom.
-  const uint32_t top = Load(base, machine + 9828) - Load(base, machine + 9972);
-  if (Load(base, machine + 9840) == top) {
+  const uint32_t top = Machine(base, machine).event_cursor() - Machine(base, machine).visible_row();
+  if (Machine(base, machine).first_event() == top) {
     movie.Hide(kSceneRoot, 17, 0x8218BFD0);
     movie.Show(kSceneRoot, 18, 0x8218C010);
-  } else if (Load(base, machine + 9844) == top + 2) {
+  } else if (Machine(base, machine).last_event() == top + 2) {
     movie.Show(kSceneRoot, 17, 0x8218BFE8);
     movie.Hide(kSceneRoot, 18, 0x8218BFF8);
   } else {
@@ -204,41 +204,41 @@ void EventPage(const Movie& movie, uint32_t machine) {
   movie.Text(20, 6, RowName(base, machine, frame, 1), 0x8218C168);
   movie.Text(20, 7, RowName(base, machine, frame, 2), 0x8218C190);
   // The row scrolled in: above the list (1) or below it (2).
-  const uint32_t scroll = Load(base, machine + 9836);
+  const uint32_t scroll = Machine(base, machine).scroll_flag();
   if (scroll == 1 || scroll == 2) {
-    const uint32_t cursor = Load(base, machine + 9828);
+    const uint32_t cursor = Machine(base, machine).event_cursor();
     uint32_t name;
     uint64_t child;
     if (scroll == 1) {
-      const uint32_t last = Load(base, machine + 9844);
+      const uint32_t last = Machine(base, machine).last_event();
       uint32_t first = 0;
-      if (last == cursor && (first = Load(base, machine + 9840)) == Load(base, machine + 9832)) {
+      if (last == cursor && (first = Machine(base, machine).first_event()) == Machine(base, machine).previous_event_cursor()) {
         name = Load(base, 4 * first + frame + 96);
       } else {
-        name = Load(base, 4 * (cursor - Load(base, machine + 9972)) + frame + 108);
+        name = Load(base, 4 * (cursor - Machine(base, machine).visible_row()) + frame + 108);
       }
       child = 8;
     } else {
-      const uint32_t first = Load(base, machine + 9840);
+      const uint32_t first = Machine(base, machine).first_event();
       uint32_t last = 0;
-      if (first == cursor && (last = Load(base, machine + 9844)) == Load(base, machine + 9832)) {
+      if (first == cursor && (last = Machine(base, machine).last_event()) == Machine(base, machine).previous_event_cursor()) {
         name = Load(base, 4 * last + frame + 96);
       } else {
-        name = Load(base, 4 * (cursor - Load(base, machine + 9972) - 1) + frame + 96);
+        name = Load(base, 4 * (cursor - Machine(base, machine).visible_row() - 1) + frame + 96);
       }
       child = 15;
     }
     movie.Text(20, child, name, 0x8218C248);
-    Store(base, machine + 9836, 0);
+    Machine(base, machine).set_scroll_flag(0);
   }
   // The event's kind and its variant's.
   movie.Show(8, 5, 0x8218C25C);
-  movie.Text(8, 5, uint64_t(Load(base, 8 * Load(base, machine + 9828) + machine + 9980)) + 395,
+  movie.Text(8, 5, uint64_t(EventKindAt(base, machine, Machine(base, machine).event_cursor()).kind()) + 395,
              0x8218C280);
-  if (Load(base, 8 * Load(base, machine + 9828) + 9984 + machine) != kNone) {
+  if (EventKindAt(base, machine, Machine(base, machine).event_cursor()).variant_kind() != kNone) {
     movie.Show(8, 6, 0x8218C2A8);
     movie.Text(8, 6,
-               uint64_t(Load(base, 8 * Load(base, machine + 9828) + 9984 + machine)) + 395,
+               uint64_t(EventKindAt(base, machine, Machine(base, machine).event_cursor()).variant_kind()) + 395,
                0x8218C2CC);
   } else {
     movie.Hide(8, 6, 0x8218C2D4);
@@ -290,9 +290,9 @@ uint64_t Refresh(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& c
   const Movie movie{base, calls, frame, FindMovie(base, kMovie, frame + 80)};
   const uint32_t m = movie.m;
   calls.Call(kSetChildNameText, frame, 0x8218BC58, m, 0, 6, machine_r3 + 10112);
-  calls.Call(kSetNumberText, frame, 0x8218BC6C, m, 0, 9, Load(base, machine + 10132));
-  movie.Text(0, 13, 8, 0x8218BC84, Load(base, machine + 10136));
-  movie.Texture(0, 11, Load(base, machine + 10140), 0x8218BC98);
+  calls.Call(kSetNumberText, frame, 0x8218BC6C, m, 0, 9, Machine(base, machine).money());
+  movie.Text(0, 13, 8, 0x8218BC84, Machine(base, machine).day());
+  movie.Texture(0, 11, Machine(base, machine).weekday(), 0x8218BC98);
   movie.Hide(2, 2, 0x8218BCA8);
   movie.Hide(2, 10, 0x8218BCB8);
   movie.Texture(2, 6, 1, 0x8218BCCC);
@@ -301,13 +301,13 @@ uint64_t Refresh(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& c
     movie.Hide(10, i, 0x8218BCFC);
   }
   uint64_t text;
-  switch (int32_t(Load(base, machine + kPage))) {
+  switch (int32_t(Machine(base, machine).page())) {
     case 3:
       ModeTextures(movie, machine, {0x8218C4DC, 0x8218C4F0, 0x8218C504});
       movie.Text(19, 5, 128, 0x8218C518);
       movie.Text(19, 6, 129, 0x8218C52C);
       movie.Text(19, 7, 130, 0x8218C540);
-      text = uint64_t(Load(base, machine + 9820)) + 545;
+      text = uint64_t(Machine(base, machine).race_mode()) + 545;
       break;
     case 4:
       EventPage(movie, machine);

@@ -10,6 +10,8 @@
 #include "guest.h"
 #include "location_screen/location_screen.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/location_screen.h"
+#include "schema/menu_helpers.h"
 #include "ui_movies/game.h"
 
 #include <bit>
@@ -22,7 +24,9 @@ constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kFinishAll = 0x8211DFF8;
 constexpr uint32_t kRun = 0x8211E1B8;
 
-inline uint32_t Screen(uint8_t* base) { return guest::LoadU32(base, kScreen); }
+using G = schema::LocationScreenGlobals;
+
+inline schema::LocationScreen Screen(uint8_t* base) { return G::screen(base); }
 
 // A float word through a float register and back (lfs, stfs).
 inline uint32_t ThroughFloat(uint8_t* base, uint32_t address) {

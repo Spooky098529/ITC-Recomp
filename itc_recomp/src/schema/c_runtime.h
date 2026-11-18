@@ -335,7 +335,7 @@ struct WideString : View {
   uint32_t units_address() const { return address + 0; }
 };
 
-// embedded; measure: memcpy.r3, memcpy.r4, XMemCpy.r3, XMemCpy.r4, XMemSet.r3, new<?>@XPR::Create.+12
+// embedded; measure: memcpy_825A7410.r3, memcpy_825A7410.r4, memcpy_825A7830.r3, memcpy_825A7830.r4, XMemCpy_82295890.r3, XMemCpy_82295890.r4, XMemCpy_82296FE0.r3, XMemCpy_82296FE0.r4, XMemSet.r3, new<?>@XPR::Create.+12
 struct ByteBuffer : View {
   using View::View;
   static constexpr uint32_t kSize = 0;

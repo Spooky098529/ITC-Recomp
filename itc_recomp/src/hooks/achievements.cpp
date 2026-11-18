@@ -14,6 +14,7 @@
 #include "hooks/app_start_up.h"
 #include "hooks/lifted_call.h"
 #include "lifted/sdk.h"
+#include "schema/achievements.h"
 
 ITC_FLAG_BOOL(native_achievements, true, "ITC",
               "Run the achievements (docs/functions/achievements.md: Achievements::Check "
@@ -62,8 +63,8 @@ class GuestCalls {
 }  // namespace
 
 ITC_REGS_STEP(TimeLessSteps) {
-  ctx.r3.u64 = achievements::TimeLess(guest::LoadU32(base, ctx.r3.u32),
-                                      guest::LoadU32(base, ctx.r4.u32));
+  ctx.r3.u64 = achievements::TimeLess(schema::AchievementsPackedTime(base, ctx.r3.u32).packed(),
+                                      schema::AchievementsPackedTime(base, ctx.r4.u32).packed());
 }
 
 ITC_REGS_STEP(AchievementsCheckSteps) {

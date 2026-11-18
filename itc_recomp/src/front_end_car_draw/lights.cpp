@@ -10,6 +10,7 @@
 #include "c_runtime/math.h"
 #include "car_scene_draw/ops.h"
 #include "guest.h"
+#include "schema/front_end_car_draw.h"
 
 namespace front_end_car_draw {
 
@@ -17,17 +18,16 @@ namespace {
 
 using namespace car_scene_draw::ops;
 
-constexpr uint32_t kMinusOne = 0x82001BE0;  // -1.0
-constexpr uint32_t kHalf = 0x82001BE4;      // 0.5
-constexpr uint32_t kDegree = 0x82002948;    // π/180
-constexpr uint32_t kThirdPi = 0x82009EB4;   // π/3
-
-// The scene lights' constants (docs/known-data.md).
-constexpr uint32_t kAmbient = 0x8265ED00;
-constexpr uint32_t kLightA = 0x8296B950, kLightB = 0x8296B980, kLightC = 0x8296B9B0;
-constexpr uint32_t kSpotPosition = 0x8296B9E0, kSpotColor = 0x8296BA60;
-constexpr uint32_t kSpotA = 0x8296BAE0, kSpotB = 0x8296BB60;  // 128 bytes each
-constexpr uint32_t kSpotDirection = 0x8296BBE0, kSpotCone = 0x8296BC60;
+// The constants and the scene lights' constants (docs/known-data.md).
+using G = schema::FrontEndCarDrawGlobals;
+constexpr uint32_t kAmbient = G::ambient_address();
+constexpr uint32_t kLightA = G::light_a_address(), kLightB = G::light_b_address(),
+                   kLightC = G::light_c_address();
+constexpr uint32_t kSpotPosition = G::spot_positions_address(),
+                   kSpotColor = G::spot_colors_address();
+constexpr uint32_t kSpotA = G::spot_a_address(), kSpotB = G::spot_b_address();
+constexpr uint32_t kSpotDirection = G::spot_directions_address(),
+                   kSpotCone = G::spot_cones_address();
 
 }  // namespace
 
@@ -38,7 +38,7 @@ uint32_t GarageStageSetLights(uint8_t* base, uint32_t lights, uint32_t mirrored,
   Store(base, f, stack);
   const bool mirror = int32_t(mirrored) != 0;
   Copy16Interleaved(base, kAmbient, lights + 1072);
-  const double minus_one = Lfs(base, kMinusOne);
+  const double minus_one = double(G::minus_one(base));
 
   // The three lights: +32 (y negated when mirrored, through the frame's
   // +128), +48, +64.
@@ -54,7 +54,7 @@ uint32_t GarageStageSetLights(uint8_t* base, uint32_t lights, uint32_t mirrored,
   }
 
   // Two 128-byte blocks of 0.0 through the frame's +80 to +111.
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   for (uint32_t k = 0; k < 8; k++) {
     Stfs(base, f + 80 + 4 * k, zero);
   }
@@ -74,11 +74,11 @@ uint32_t GarageStageSetLights(uint8_t* base, uint32_t lights, uint32_t mirrored,
   }
 
   // The four spots (q = +304 + 96i).
-  const double third_pi = Lfs(base, kThirdPi);
-  const double degree = Lfs(base, kDegree);
-  const double half = Lfs(base, kHalf);
+  const double third_pi = double(G::third_pi(base));
+  const double degree = double(G::degree(base));
+  const double half = double(G::half(base));
   Stfs(base, f + 140, third_pi);
-  const double one = Lfs(base, kOne);
+  const double one = double(G::one(base));
   Stfs(base, f + 108, one);
   for (uint32_t i = 0; i < 4; i++) {
     const uint32_t q = lights + 304 + 96 * i;

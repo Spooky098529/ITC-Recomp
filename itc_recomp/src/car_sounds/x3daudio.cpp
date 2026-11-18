@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "c_runtime/math.h"
 #include "guest.h"
+#include "schema/car_sounds.h"
 
 #include "base/float_mode.h"
 
@@ -16,6 +17,14 @@
 namespace x3daudio {
 
 namespace {
+
+using ConeView = schema::X3DAudioCone;
+using Curve = schema::X3DAudioCurve;
+using Dsp = schema::X3DAudioDspSettings;
+using Emitter = schema::X3DAudioEmitter;
+using Handle = schema::X3DAudioHandle;
+using Listener = schema::X3DAudioListener;
+using Vec = schema::X3DAudioVector;
 
 // The constants the curves read (lfs from the game's data).
 constexpr uint32_t kDefaultLast = 0x82002968;  // f6: the default curves' last values
@@ -50,8 +59,8 @@ double Lfd(uint8_t* base, uint32_t address) {
 // (mullw, add, the shift's low word), from the DSP settings' +8 (the source
 // channel count) and +0 (the matrix) read again, as the original does.
 uint32_t MatrixWord(uint8_t* base, uint32_t dsp, uint32_t row, uint32_t channel) {
-  const uint32_t sources = guest::LoadU32(base, dsp + 8);
-  const uint32_t matrix = guest::LoadU32(base, dsp + 0);
+  const uint32_t sources = Dsp(base, dsp).source_channels();
+  const uint32_t matrix = Dsp(base, dsp).matrix().address;
   return ((sources * row + channel) << 2) + matrix;
 }
 
@@ -76,23 +85,23 @@ constexpr uint32_t kAxisAbove = 0x82006910;  // f26
 
 void VecSub(uint8_t* base, uint32_t a, uint32_t b, uint32_t out) {
   ITC_NATIVE_RUNNING("sub_824819E0 X3DVec::Sub");
-  double f13 = Lfs(base, b + 0);
-  double f0 = Lfs(base, a + 0);
-  Stfs(base, out + 0, Single(f0 - f13));
-  f13 = Lfs(base, b + 4);
-  f0 = Lfs(base, a + 4);
-  Stfs(base, out + 4, Single(f0 - f13));
-  f0 = Lfs(base, a + 8);
-  f13 = Lfs(base, b + 8);
-  Stfs(base, out + 8, Single(f0 - f13));
+  double f13 = double(Vec(base, b).x());
+  double f0 = double(Vec(base, a).x());
+  Vec(base, out).set_x(float(Single(f0 - f13)));
+  f13 = double(Vec(base, b).y());
+  f0 = double(Vec(base, a).y());
+  Vec(base, out).set_y(float(Single(f0 - f13)));
+  f0 = double(Vec(base, a).z());
+  f13 = double(Vec(base, b).z());
+  Vec(base, out).set_z(float(Single(f0 - f13)));
 }
 
 float VecLength(uint8_t* base, uint32_t v) {
   ITC_NATIVE_RUNNING("sub_82481998 X3DVec::Length");
-  double f13 = Lfs(base, v + 4);
+  double f13 = double(Vec(base, v).y());
   f13 = f13 * f13;
-  double f0 = Lfs(base, v + 8);
-  const double f12 = Lfs(base, v + 0);
+  double f0 = double(Vec(base, v).z());
+  const double f12 = double(Vec(base, v).x());
   f0 = std::fma(f0, f0, f13);
   f0 = std::fma(f12, f12, f0);
   return float(std::sqrt(f0));
@@ -100,49 +109,49 @@ float VecLength(uint8_t* base, uint32_t v) {
 
 float VecDot(uint8_t* base, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_824819B8 X3DVec::Dot");
-  double f13 = Lfs(base, b + 4);
-  double f0 = Lfs(base, a + 4);
+  double f13 = double(Vec(base, b).y());
+  double f0 = double(Vec(base, a).y());
   f0 = Single(f0 * f13);
-  const double f12 = Lfs(base, b + 8);
-  f13 = Lfs(base, a + 8);
-  const double f11 = Lfs(base, a + 0);
-  const double f10 = Lfs(base, b + 0);
+  const double f12 = double(Vec(base, b).z());
+  f13 = double(Vec(base, a).z());
+  const double f11 = double(Vec(base, a).x());
+  const double f10 = double(Vec(base, b).x());
   f0 = Single(std::fma(f13, f12, f0));
   return float(std::fma(f11, f10, f0));
 }
 
 void VecCross(uint8_t* base, uint32_t a, uint32_t b, uint32_t out) {
   ITC_NATIVE_RUNNING("sub_82481A18 X3DVec::Cross");
-  double f13 = Lfs(base, b + 4);
-  double f0 = Lfs(base, a + 8);
+  double f13 = double(Vec(base, b).y());
+  double f0 = double(Vec(base, a).z());
   f0 = Single(f13 * f0);
-  double f12 = Lfs(base, b + 8);
-  f13 = Lfs(base, a + 4);
-  Stfs(base, out + 0, Single(std::fma(f13, f12, -f0)));
-  f13 = Lfs(base, b + 8);
-  f0 = Lfs(base, a + 0);
+  double f12 = double(Vec(base, b).z());
+  f13 = double(Vec(base, a).y());
+  Vec(base, out).set_x(float(Single(std::fma(f13, f12, -f0))));
+  f13 = double(Vec(base, b).z());
+  f0 = double(Vec(base, a).x());
   f0 = Single(f0 * f13);
-  f12 = Lfs(base, b + 0);
-  f13 = Lfs(base, a + 8);
-  Stfs(base, out + 4, Single(std::fma(f13, f12, -f0)));
-  f13 = Lfs(base, b + 0);
-  f0 = Lfs(base, a + 4);
+  f12 = double(Vec(base, b).x());
+  f13 = double(Vec(base, a).z());
+  Vec(base, out).set_y(float(Single(std::fma(f13, f12, -f0))));
+  f13 = double(Vec(base, b).x());
+  f0 = double(Vec(base, a).y());
   f0 = Single(f0 * f13);
-  f12 = Lfs(base, a + 0);
-  f13 = Lfs(base, b + 4);
-  Stfs(base, out + 8, Single(std::fma(f13, f12, -f0)));
+  f12 = double(Vec(base, a).x());
+  f13 = double(Vec(base, b).y());
+  Vec(base, out).set_z(float(Single(std::fma(f13, f12, -f0))));
 }
 
 float EvaluateCurve(uint8_t* base, uint32_t curve, double scaler, double distance) {
   ITC_NATIVE_RUNNING("sub_82480818 X3DAudio::EvaluateCurve");
-  const uint32_t count = guest::LoadU32(base, curve + 4);
+  const uint32_t count = Curve(base, curve).count();
   const double at = Single(distance / scaler);
   uint32_t i = 1;
   bool searched = false;  // the point found (or none past `at`)
   // Four points at a time while at least four are left (a signed check on
   // count - 1, then an unsigned one on count - 3, as the original's).
   if (int32_t(count - 1) >= 4) {
-    uint32_t p = guest::LoadU32(base, curve + 0) + 24;
+    uint32_t p = Curve(base, curve).points() + 24;
     for (;;) {
       if (Lfs(base, p - 16) > at) {
         searched = true;
@@ -171,7 +180,7 @@ float EvaluateCurve(uint8_t* base, uint32_t curve, double scaler, double distanc
     }
   }
   if (!searched && i < count) {
-    uint32_t p = guest::LoadU32(base, curve + 0) + (i << 3);
+    uint32_t p = Curve(base, curve).points() + (i << 3);
     for (;;) {
       if (Lfs(base, p) > at) {
         break;
@@ -184,7 +193,7 @@ float EvaluateCurve(uint8_t* base, uint32_t curve, double scaler, double distanc
     }
   }
   if (i < count) {
-    const uint32_t p = guest::LoadU32(base, curve + 0) + (i << 3);
+    const uint32_t p = Curve(base, curve).points() + (i << 3);
     double f13 = Lfs(base, p - 8);
     double f12 = Lfs(base, p + 0);
     const double f0 = Single(at - f13);
@@ -195,7 +204,7 @@ float EvaluateCurve(uint8_t* base, uint32_t curve, double scaler, double distanc
     f13 = Single(f12 / f13);
     return float(std::fma(f13, f0, f10));
   }
-  const uint32_t p = guest::LoadU32(base, curve + 0) + (count << 3);
+  const uint32_t p = Curve(base, curve).points() + (count << 3);
   return guest::LoadFloat(base, p - 4);
 }
 
@@ -209,8 +218,8 @@ uint32_t Curves(uint8_t* base, uint32_t emitter, uint32_t flags, uint32_t dsp, u
   // last)} built in the frame as the original stores it.
   auto evaluate = [&](uint32_t field, double first, double last) -> double {
     const uint32_t curve = guest::LoadU32(base, emitter + field);
-    const double distance = Lfs(base, dsp + 36);
-    const double scaler = Lfs(base, emitter + 84);
+    const double distance = double(Dsp(base, dsp).distance());
+    const double scaler = double(Emitter(base, emitter).curve_distance_scaler());
     if (curve != 0) {
       r3 = curve;
     } else {
@@ -225,59 +234,59 @@ uint32_t Curves(uint8_t* base, uint32_t emitter, uint32_t flags, uint32_t dsp, u
     return double(EvaluateCurve(base, r3, scaler, distance));
   };
   if (flags & 0x4) {
-    Stfs(base, dsp + 16, evaluate(72, f8, f6));
+    Dsp(base, dsp).set_lpf_direct(float(evaluate(72, f8, f6)));
   }
   if (flags & 0x8) {
-    Stfs(base, dsp + 20, evaluate(76, f6, f6));
+    Dsp(base, dsp).set_lpf_reverb(float(evaluate(76, f6, f6)));
   }
   if (flags & 0x10) {
-    Stfs(base, dsp + 24, evaluate(80, f7, f8));
+    Dsp(base, dsp).set_reverb_level(float(evaluate(80, f7, f8)));
   }
   if (!(flags & 0x1)) {
     return r3;
   }
   f6 = evaluate(64, f7, f8);
-  if (guest::LoadU32(base, emitter + 52) == 1) {
-    Stfs(base, guest::LoadU32(base, dsp + 0) + 0, f6);
+  if (Emitter(base, emitter).channel_count() == 1) {
+    Stfs(base, Dsp(base, dsp).matrix().address + 0, f6);
     return r3;
   }
   const double f5 = Lfs(base, kLfeAzimuth);
   uint32_t channel = 0;
   // The channels before the first LFE: the volume.
-  if (guest::LoadU32(base, emitter + 52) != 0) {
+  if (Emitter(base, emitter).channel_count() != 0) {
     uint32_t offset = 0;
     for (;;) {
-      const double azimuth = Lfs(base, guest::LoadU32(base, emitter + 60) + offset);
+      const double azimuth = Lfs(base, Emitter(base, emitter).channel_azimuths() + offset);
       if (azimuth == f5) {
         break;
       }
-      const uint32_t matrix = guest::LoadU32(base, dsp + 0);
+      const uint32_t matrix = Dsp(base, dsp).matrix().address;
       channel += 1;
       Stfs(base, offset + matrix, f6);
-      const uint32_t count = guest::LoadU32(base, emitter + 52);
+      const uint32_t count = Emitter(base, emitter).channel_count();
       offset += 4;
       if (!(channel < count)) {
         break;
       }
     }
   }
-  if (!(channel < guest::LoadU32(base, emitter + 52))) {
+  if (!(channel < Emitter(base, emitter).channel_count())) {
     return r3;
   }
   // The first LFE channel and every one after it: the LFE curve at the LFE
   // channels, the volume at the others.
   const double lfe = evaluate(68, f7, f8);
-  Stfs(base, (channel << 2) + guest::LoadU32(base, dsp + 0), lfe);
+  Stfs(base, (channel << 2) + Dsp(base, dsp).matrix().address, lfe);
   uint32_t next = channel + 1;
-  if (!(next < guest::LoadU32(base, emitter + 52))) {
+  if (!(next < Emitter(base, emitter).channel_count())) {
     return r3;
   }
   uint32_t offset = next << 2;
   for (;;) {
-    const double azimuth = Lfs(base, guest::LoadU32(base, emitter + 60) + offset);
-    const uint32_t matrix = guest::LoadU32(base, dsp + 0);
+    const double azimuth = Lfs(base, Emitter(base, emitter).channel_azimuths() + offset);
+    const uint32_t matrix = Dsp(base, dsp).matrix().address;
     Stfs(base, offset + matrix, azimuth == f5 ? lfe : f6);
-    const uint32_t count = guest::LoadU32(base, emitter + 52);
+    const uint32_t count = Emitter(base, emitter).channel_count();
     next += 1;
     offset += 4;
     if (!(next < count)) {
@@ -398,15 +407,15 @@ uint64_t Pan(uint8_t* base, uint64_t handle, uint32_t dsp, uint32_t channel, dou
   }
   // The channel's old row-0 value, then its column zeroed.
   const double f31 =
-      double(guest::LoadFloat(base, (channel << 2) + guest::LoadU32(base, dsp + 0)));
-  if (guest::LoadU32(base, dsp + 12) > 0) {
+      double(guest::LoadFloat(base, (channel << 2) + Dsp(base, dsp).matrix().address));
+  if (Dsp(base, dsp).destination_channels() > 0) {
     const double zero = Lfs(base, kZero);
     uint32_t row = 0;
     for (;;) {
       const uint32_t at = MatrixWord(base, dsp, row, channel);
       row += 1;
       Stfs(base, at, zero);
-      if (!(row < guest::LoadU32(base, dsp + 12))) {
+      if (!(row < Dsp(base, dsp).destination_channels())) {
         break;
       }
     }
@@ -446,22 +455,22 @@ uint64_t Matrix(uint8_t* base, uint64_t handle, uint32_t listener, uint64_t emit
   const uint32_t dsp = uint32_t(dsp64);
   const uint32_t h = uint32_t(handle);
   // The listener's front, then its frame's two other axes.
-  guest::StoreU32(base, frame + 88, guest::LoadU32(base, listener + 0));
-  guest::StoreU32(base, frame + 92, guest::LoadU32(base, listener + 4));
-  guest::StoreU32(base, frame + 96, guest::LoadU32(base, listener + 8));
+  guest::StoreU32(base, frame + 88, guest::LoadU32(base, Listener(base, listener).front_x_address()));
+  guest::StoreU32(base, frame + 92, guest::LoadU32(base, Listener(base, listener).front_y_address()));
+  guest::StoreU32(base, frame + 96, guest::LoadU32(base, Listener(base, listener).front_z_address()));
   VecCross(base, listener + 12, frame + 88, frame + 120);
   VecCross(base, frame + 88, frame + 120, frame + 152);
   uint64_t r3 = uint64_t(frame) + 88;
   const double f25 = Lfs(base, kZero);
-  uint32_t count = guest::LoadU32(base, e + 52);
+  uint32_t count = Emitter(base, e).channel_count();
   double f30 = f25, f29 = f25, f28 = f25;
   if (count > 1) {
     // The emitter's front scaled by the channel radius.
-    const double radius = Lfs(base, e + 56);
-    const double x = Lfs(base, e + 4);
-    const double y = Lfs(base, e + 8);
+    const double radius = double(Emitter(base, e).channel_radius());
+    const double x = double(Emitter(base, e).front_x());
+    const double y = double(Emitter(base, e).front_y());
     f30 = Single(x * radius);
-    const double z = Lfs(base, e + 12);
+    const double z = double(Emitter(base, e).front_z());
     f29 = Single(y * radius);
     f28 = Single(z * radius);
   }
@@ -478,27 +487,27 @@ uint64_t Matrix(uint8_t* base, uint64_t handle, uint32_t listener, uint64_t emit
   for (;;) {
     bool rotated = false;
     if (count > 1) {
-      const double azimuth = Lfs(base, guest::LoadU32(base, e + 60) + offset);
+      const double azimuth = Lfs(base, Emitter(base, e).channel_azimuths() + offset);
       if (!(azimuth == f23)) {
         rotated = true;
         f31 = Single(c_runtime::Cos(azimuth));
         const double s =
-            Single(c_runtime::Sin(Lfs(base, guest::LoadU32(base, e + 60) + offset)));
+            Single(c_runtime::Sin(Lfs(base, Emitter(base, e).channel_azimuths() + offset)));
         // The front offset rotated about the emitter's top (+16, +20, +24)
         // by the azimuth (a rotation matrix from its cos and sin), plus the
         // position (+28 to +36).
-        double f13 = Lfs(base, e + 24);
+        double f13 = double(Emitter(base, e).top_z());
         double f10 = s;
-        double f12 = Lfs(base, e + 16);
+        double f12 = double(Emitter(base, e).top_x());
         double f0 = Single(f27 - f31);
-        double f11 = Lfs(base, e + 20);
+        double f11 = double(Emitter(base, e).top_y());
         double f9 = Single(f12 * f13);
         double f7 = Single(f11 * f13);
-        const double f5 = Lfs(base, e + 32);
+        const double f5 = double(Emitter(base, e).position_y());
         double f8 = Single(f11 * f12);
-        const double f6 = Lfs(base, e + 28);
+        const double f6 = double(Emitter(base, e).position_x());
         double f1 = Single(f13 * f13);
-        const double f4 = Lfs(base, e + 36);
+        const double f4 = double(Emitter(base, e).position_z());
         double f2 = Single(f11 * f11);
         double f3 = Single(f12 * f12);
         f9 = Single(f9 * f0);
@@ -532,26 +541,26 @@ uint64_t Matrix(uint8_t* base, uint64_t handle, uint32_t listener, uint64_t emit
     }
     if (!rotated) {
       // The emitter's position (words).
-      guest::StoreU32(base, frame + 104, guest::LoadU32(base, e + 28));
-      guest::StoreU32(base, frame + 108, guest::LoadU32(base, e + 32));
-      guest::StoreU32(base, frame + 112, guest::LoadU32(base, e + 36));
+      guest::StoreU32(base, frame + 104, guest::LoadU32(base, Emitter(base, e).position_x_address()));
+      guest::StoreU32(base, frame + 108, guest::LoadU32(base, Emitter(base, e).position_y_address()));
+      guest::StoreU32(base, frame + 112, guest::LoadU32(base, Emitter(base, e).position_z_address()));
     }
-    if (guest::LoadU32(base, e + 52) > 1 &&
-        Lfs(base, guest::LoadU32(base, e + 60) + offset) == f23) {
+    if (Emitter(base, e).channel_count() > 1 &&
+        Lfs(base, Emitter(base, e).channel_azimuths() + offset) == f23) {
       // An LFE channel: its column zeroed, its volume on the LFE speaker.
-      const double volume = Lfs(base, offset + guest::LoadU32(base, dsp + 0));
-      if (guest::LoadU32(base, dsp + 12) > 0) {
+      const double volume = Lfs(base, offset + Dsp(base, dsp).matrix().address);
+      if (Dsp(base, dsp).destination_channels() > 0) {
         uint32_t row = 0;
         for (;;) {
           const uint32_t at = MatrixWord(base, dsp, row, channel);
           row += 1;
           Stfs(base, at, f25);
-          if (!(row < guest::LoadU32(base, dsp + 12))) {
+          if (!(row < Dsp(base, dsp).destination_channels())) {
             break;
           }
         }
       }
-      const uint32_t lfe = guest::LoadU32(base, h + 4);
+      const uint32_t lfe = Handle(base, h).lfe_speaker();
       if (int32_t(lfe) != -1) {
         Stfs(base, MatrixWord(base, dsp, lfe, channel), volume);
       }
@@ -582,14 +591,14 @@ uint64_t Matrix(uint8_t* base, uint64_t handle, uint32_t listener, uint64_t emit
       } else {
         // On the listener's axis: the volume split evenly over the
         // speakers but the LFE (the count stored as a doubleword).
-        const uint32_t lfe_index = guest::LoadU32(base, h + 4);
-        const uint32_t speakers = guest::LoadU32(base, dsp + 12);
+        const uint32_t lfe_index = Handle(base, h).lfe_speaker();
+        const uint32_t speakers = Dsp(base, dsp).destination_channels();
         uint64_t spread = speakers;
         if (int32_t(lfe_index) != -1) {
           spread = uint64_t(int64_t(speakers) - 1);
         }
         spread &= 0xFFFFFFFFull;
-        const uint32_t matrix = guest::LoadU32(base, dsp + 0);
+        const uint32_t matrix = Dsp(base, dsp).matrix().address;
         StoreU64(base, frame + 80, spread);
         double volume = Lfs(base, offset + matrix);
         const double n = Single(double(int64_t(LoadU64(base, frame + 80))));
@@ -597,18 +606,18 @@ uint64_t Matrix(uint8_t* base, uint64_t handle, uint32_t listener, uint64_t emit
         if (speakers != 0) {
           uint32_t row = 0;
           for (;;) {
-            const bool lfe = row == guest::LoadU32(base, h + 4);
+            const bool lfe = row == Handle(base, h).lfe_speaker();
             const uint32_t at = MatrixWord(base, dsp, row, channel);
             Stfs(base, at, lfe ? f25 : volume);
             row += 1;
-            if (!(row < guest::LoadU32(base, dsp + 12))) {
+            if (!(row < Dsp(base, dsp).destination_channels())) {
               break;
             }
           }
         }
       }
     }
-    count = guest::LoadU32(base, e + 52);
+    count = Emitter(base, e).channel_count();
     channel += 1;
     offset += 4;
     if (!(channel < count)) {
@@ -651,36 +660,36 @@ uint64_t Cone(uint8_t* base, uint64_t handle, uint32_t listener, uint32_t emitte
   // calls).
   auto pick = [&](uint32_t at, uint32_t cone, bool again) {
     if (volume) {
-      f11 = Lfs(base, (again ? guest::LoadU32(base, emitter + 0) : cone) + at);
+      f11 = Lfs(base, (again ? Emitter(base, emitter).cone().address : cone) + at);
     }
     if (lowpass) {
-      f12 = Lfs(base, (again ? guest::LoadU32(base, emitter + 0) : cone) + at + 8);
+      f12 = Lfs(base, (again ? Emitter(base, emitter).cone().address : cone) + at + 8);
     }
     if (reverb) {
-      f0 = Lfs(base, (again ? guest::LoadU32(base, emitter + 0) : cone) + at + 16);
+      f0 = Lfs(base, (again ? Emitter(base, emitter).cone().address : cone) + at + 16);
     }
   };
-  const uint32_t cone = guest::LoadU32(base, emitter + 0);
-  if (Lfs(base, cone + 4) == Lfs(base, kZero)) {
+  const uint32_t cone = Emitter(base, emitter).cone().address;
+  if (double(ConeView(base, cone).outer_angle()) == Lfs(base, kZero)) {
     pick(12, cone, false);
-  } else if (Lfs(base, cone + 0) == Lfs(base, kLfeAzimuth) ||
-             !(Lfs(base, dsp + 36) > Lfs(base, kAxisAbove))) {
+  } else if (double(ConeView(base, cone).inner_angle()) == Lfs(base, kLfeAzimuth) ||
+             !(double(Dsp(base, dsp).distance()) > Lfs(base, kAxisAbove))) {
     pick(8, cone, false);
   } else {
     // The cosine of the listener's angle off the emitter's front.
     VecSub(base, listener + 24, emitter + 28, frame + 88);
     const double dot = double(VecDot(base, frame + 88, emitter + 4));
     r3 = uint64_t(frame) + 88;
-    const uint32_t c = guest::LoadU32(base, emitter + 0);
-    const double distance = Lfs(base, dsp + 36);
-    const double inner = Lfs(base, c + 0);
+    const uint32_t c = Emitter(base, emitter).cone().address;
+    const double distance = double(Dsp(base, dsp).distance());
+    const double inner = double(ConeView(base, c).inner_angle());
     const double f30 = Lfs(base, kHalf);
     const double f31 = Single(dot / distance);
     const double f29 = Single(c_runtime::Cos(Single(inner * f30)));
     if (!(f31 < f29)) {
       pick(8, 0, true);
     } else {
-      const double outer = Lfs(base, guest::LoadU32(base, emitter + 0) + 4);
+      const double outer = Lfs(base, Emitter(base, emitter).cone().address + 4);
       const double cos_outer = Single(c_runtime::Cos(Single(outer * f30)));
       if (!(f31 > cos_outer)) {
         pick(12, 0, true);
@@ -694,29 +703,29 @@ uint64_t Cone(uint8_t* base, uint64_t handle, uint32_t listener, uint32_t emitte
           return Single(std::fma(Single(b - a), t, a));
         };
         if (volume) {
-          f11 = lerp(guest::LoadU32(base, emitter + 0), 8);
+          f11 = lerp(Emitter(base, emitter).cone().address, 8);
         }
         if (lowpass) {
-          f12 = lerp(guest::LoadU32(base, emitter + 0), 16);
+          f12 = lerp(Emitter(base, emitter).cone().address, 16);
         }
         if (reverb) {
-          f0 = lerp(guest::LoadU32(base, emitter + 0), 24);
+          f0 = lerp(Emitter(base, emitter).cone().address, 24);
         }
       }
     }
   }
   if (volume) {
-    const uint32_t matrix = guest::LoadU32(base, dsp + 0);
+    const uint32_t matrix = Dsp(base, dsp).matrix().address;
     Stfs(base, matrix + 0, Single(Lfs(base, matrix + 0) * f11));
   }
   if (flags & 0x4) {
-    Stfs(base, dsp + 16, Single(f12 * Lfs(base, dsp + 16)));
+    Dsp(base, dsp).set_lpf_direct(float(Single(f12 * double(Dsp(base, dsp).lpf_direct()))));
   }
   if (flags & 0x8) {
-    Stfs(base, dsp + 20, Single(Lfs(base, dsp + 20) * f12));
+    Dsp(base, dsp).set_lpf_reverb(float(Single(double(Dsp(base, dsp).lpf_reverb()) * f12)));
   }
   if (reverb) {
-    Stfs(base, dsp + 24, Single(Lfs(base, dsp + 24) * f0));
+    Dsp(base, dsp).set_reverb_level(float(Single(double(Dsp(base, dsp).reverb_level()) * f0)));
   }
   return r3;
 }
@@ -738,16 +747,16 @@ uint64_t Doppler(uint8_t* base, uint64_t handle, uint32_t listener, uint32_t emi
   double f0 = Lfs(base, kOne);
   double f31 = Lfs(base, kZero);
   double f10 = f31;
-  if (Lfs(base, dsp + 36) > Lfs(base, kAxisAbove)) {
+  if (double(Dsp(base, dsp).distance()) > Lfs(base, kAxisAbove)) {
     VecSub(base, listener + 24, emitter + 28, frame + 80);
     double f1 = double(VecDot(base, frame + 80, listener + 36));
-    f31 = Single(f1 / Lfs(base, dsp + 36));
+    f31 = Single(f1 / double(Dsp(base, dsp).distance()));
     f1 = double(VecDot(base, frame + 80, emitter + 40));
     r3 = uint64_t(frame) + 80;
-    f10 = Single(f1 / Lfs(base, dsp + 36));
-    double f13 = Lfs(base, emitter + 88);
+    f10 = Single(f1 / double(Dsp(base, dsp).distance()));
+    double f13 = double(Emitter(base, emitter).doppler_scaler());
     double f12 = Single(f13 * f31);
-    f0 = Lfs(base, h + 12);
+    f0 = double(Handle(base, h).doppler_limit());
     f13 = Single(f13 * f10);
     // Both clamped to [-c, c] (the negation by its sign bit).
     const double negated = std::bit_cast<double>(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000ull);
@@ -761,14 +770,14 @@ uint64_t Doppler(uint8_t* base, uint64_t handle, uint32_t listener, uint32_t emi
     } else if (f13 < negated) {
       f13 = negated;
     }
-    f0 = Lfs(base, h + 8);
+    f0 = double(Handle(base, h).speed_of_sound());
     f12 = Single(f0 - f12);
     f0 = Single(f0 - f13);
     f0 = Single(f12 / f0);
   }
-  Stfs(base, dsp + 28, f0);
-  Stfs(base, dsp + 44, f31);
-  Stfs(base, dsp + 40, f10);
+  Dsp(base, dsp).set_doppler_factor(float(f0));
+  Dsp(base, dsp).set_listener_velocity(float(f31));
+  Dsp(base, dsp).set_emitter_velocity(float(f10));
   return r3;
 }
 
@@ -795,7 +804,7 @@ std::optional<uint64_t> Calculate(uint8_t* base, const CalculateArgs& a, uint32_
   const uint32_t dsp = uint32_t(a.dsp);
   VecSub(base, listener + 24, emitter + 28, frame + 80);
   uint64_t r3 = uint64_t(frame) + 80;
-  Stfs(base, dsp + 36, double(VecLength(base, frame + 80)));
+  Dsp(base, dsp).set_distance(float(double(VecLength(base, frame + 80))));
   if (a.flags & 29) {
     // Curves' prologue: lr, r31, the back chain of its 128-byte frame.
     guest::StoreU32(base, frame - 8, 0x824818FC);
@@ -803,7 +812,7 @@ std::optional<uint64_t> Calculate(uint8_t* base, const CalculateArgs& a, uint32_
     guest::StoreU32(base, frame - 128, frame);
     const uint32_t curve = Curves(base, emitter, flags, dsp, frame - 128);
     r3 = curve != 0 ? uint64_t(curve) : a.handle;
-    if (guest::LoadU32(base, emitter + 52) == 1 && guest::LoadU32(base, emitter + 0) != 0) {
+    if (Emitter(base, emitter).channel_count() == 1 && Emitter(base, emitter).cone().address != 0) {
       r3 = Cone(base, a.handle, listener, emitter, flags, dsp, frame,
                 {0x8248192C, a.handle, a.dsp, a.emitter, s.f29, s.f30, s.f31});
     }

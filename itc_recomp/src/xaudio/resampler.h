@@ -24,8 +24,6 @@
 
 namespace xaudio {
 
-constexpr uint32_t kResamplerKernels = 0x8204CF08;
-
 // Resampler::Process (sub_8246F140): nothing (0) when the input or the
 // output is used up; when +80's low two bits are set, the ratio (+44, the
 // rates' quotient as floats) and the kernel (+76) picked again, and with

@@ -12,6 +12,7 @@
 #include "movies/player.h"
 #include "native/renderer.h"
 #include "native/state.h"
+#include "schema/movies.h"
 
 namespace movies::movie {
 
@@ -30,11 +31,11 @@ std::shared_ptr<Player> PlayerOf(uint32_t movie) {
 }
 
 bool CommandDone(uint8_t* base, uint32_t movie) {
-  return guest::LoadU32(base, movie + kCommandStatus) == kCommandDone;
+  return schema::Movie(base, movie).command_status() == kCommandDone;
 }
 
 void SetState(uint8_t* base, uint32_t movie, uint32_t state) {
-  guest::StoreU32(base, movie + kState, state);
+  schema::Movie(base, movie).set_state(state);
 }
 
 std::string GuestString(uint8_t* base, uint32_t address, uint32_t max) {
@@ -56,7 +57,8 @@ void Play(uint8_t* base, uint32_t movie, uint32_t path) {
   // strncpy(+48, path, 260): the path, then zeros to 260 bytes.
   std::string name = GuestString(base, path, kPathBytes);
   for (uint32_t i = 0; i < kPathBytes; i++) {
-    guest::StoreU8(base, movie + kPath + i, i < name.size() ? uint8_t(name[i]) : 0);
+    guest::StoreU8(base, schema::Movie(base, movie).path_address() + i,
+                   i < name.size() ? uint8_t(name[i]) : 0);
   }
   std::shared_ptr<Player> player;
   std::string error = "isn't in the game's data";
@@ -74,7 +76,7 @@ void Play(uint8_t* base, uint32_t movie, uint32_t path) {
     std::lock_guard<std::mutex> lock(g_mutex);
     g_players[movie] = player;
   }
-  guest::StoreU32(base, movie + kCommandStatus, kCommandDone);
+  schema::Movie(base, movie).set_command_status(kCommandDone);
   SetState(base, movie, kLoaded);
 }
 
@@ -126,7 +128,7 @@ void Resume(uint8_t* base, uint32_t movie) {
 }
 
 uint32_t GetState(uint8_t* base, uint32_t movie) {
-  return guest::LoadU32(base, movie + kState);
+  return schema::Movie(base, movie).state();
 }
 
 void Release(uint8_t* base, uint32_t movie) {

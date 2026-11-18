@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/input.h"
 
 #include <cstdlib>
 
@@ -34,18 +35,18 @@ uint32_t NewNode(uint8_t* base) {
 
 bool CanAllocate(uint8_t* base, uint32_t count) {
   // The original's bad_alloc path: 0xFFFFFFFF / count below 12.
-  if (count != 0 && 0xFFFFFFFFu / count < kNodeBytes) {
+  if (count != 0 && 0xFFFFFFFFu / count < schema::PtrListNode::kSize) {
     return false;
   }
-  return count * kNodeBytes <= 0xFFFFF000u && memory::crt::GetProcessHeap(base) != 0;
+  return count * schema::PtrListNode::kSize <= 0xFFFFF000u && memory::crt::GetProcessHeap(base) != 0;
 }
 
 std::optional<uint32_t> AllocateNodes(uint8_t* base, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82099C08 PtrList::AllocateNodes");
-  if (count != 0 && 0xFFFFFFFFu / count < kNodeBytes) {
+  if (count != 0 && 0xFFFFFFFFu / count < schema::PtrListNode::kSize) {
     return std::nullopt;
   }
-  return memory::crt::OperatorNew(base, count * kNodeBytes);
+  return memory::crt::OperatorNew(base, count * schema::PtrListNode::kSize);
 }
 
 bool IncSize(uint8_t* base, uint32_t list, uint32_t count) {
@@ -63,15 +64,15 @@ bool Construct(uint8_t* base, uint32_t list) {
   if (!CanAllocate(base, 1)) {
     return false;
   }
-  const uint32_t node = NewNode(base);
+  const schema::PtrListNode node(base, NewNode(base));
   // The original's null checks on the node and its +4.
-  if (node != 0) {
-    Store(base, node + kNext, node);
+  if (node.address != 0) {
+    node.set_next(node);
   }
-  if (node + kPrevious != 0) {
-    Store(base, node + kPrevious, node);
+  if (node.previous_address() != 0) {
+    node.set_previous(node);
   }
-  Store(base, list + kHead, node);
+  Store(base, list + kHead, node.address);
   Store(base, list + kSize, 0);
   return true;
 }
@@ -81,20 +82,21 @@ bool Insert(uint8_t* base, uint32_t list, uint32_t where, uint32_t value) {
   if (!CanAllocate(base, 1) || 0x3FFFFFFFu - Load(base, list + kSize) < 1) {
     return false;
   }
-  const uint32_t previous = Load(base, where + kPrevious);
-  const uint32_t node = NewNode(base);
-  if (node != 0) {
-    Store(base, node + kNext, where);
+  const schema::PtrListNode at(base, where);
+  const uint32_t previous = at.previous().address;
+  const schema::PtrListNode node(base, NewNode(base));
+  if (node.address != 0) {
+    node.set_next(where);
   }
-  if (node + kPrevious != 0) {
-    Store(base, node + kPrevious, previous);
+  if (node.previous_address() != 0) {
+    node.set_previous(previous);
   }
-  if (node + kValue != 0) {
-    Store(base, node + kValue, value);
+  if (node.value_address() != 0) {
+    node.set_value(value);
   }
   IncSize(base, list, 1);
-  Store(base, where + kPrevious, node);
-  Store(base, Load(base, node + kPrevious), node);
+  at.set_previous(node);
+  node.previous().set_next(node);
   return true;
 }
 
@@ -103,10 +105,13 @@ std::optional<uint32_t> Erase(uint8_t* base, uint32_t list, uint32_t iterator_li
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82098E80 PtrList::Erase");
-  const uint32_t next = Load(base, node + kNext);
+  const schema::PtrListNode n(base, node);
+  const uint32_t next = n.next().address;
   if (node != Load(base, list + kHead)) {
-    Store(base, Load(base, node + kPrevious) + kNext, Load(base, node + kNext));
-    Store(base, Load(base, node + kNext) + kPrevious, Load(base, node + kPrevious));
+    const schema::PtrListNode before = n.previous();
+    before.set_next(n.next());
+    const schema::PtrListNode after = n.next();
+    after.set_previous(n.previous());
     if (!memory::crt::OperatorDelete(node)) {
       ITC_LOG_ERROR("PtrList::Erase: operator delete refused {:08X}", node);
     }

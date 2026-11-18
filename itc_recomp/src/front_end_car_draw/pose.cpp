@@ -13,6 +13,7 @@
 #include "c_runtime/math.h"
 #include "car_scene_draw/ops.h"
 #include "guest.h"
+#include "schema/front_end_car_draw.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -23,8 +24,7 @@ namespace {
 
 using namespace car_scene_draw::ops;
 
-constexpr uint32_t kMinusOne = 0x82001BE0;  // -1.0
-constexpr uint32_t kHalf = 0x82001BE4;      // 0.5
+using G = schema::FrontEndCarDrawGlobals;
 
 // The return addresses of the original's calls.
 constexpr uint32_t kWorldMemcpy = 0x8217CB4C;
@@ -80,7 +80,7 @@ uint32_t GarageStagePoseCar(uint8_t* base, const Calls& calls, uint32_t holder, 
 
   // The body's height and pitch.
   uint32_t s = Load(base, holder);
-  const double half = Lfs(base, kHalf);
+  const double half = double(G::half(base));
   Stfs(base, s + 6144, Fmuls(Fadds(Lfs(base, s + 6140), Lfs(base, s + 6136)), half));
   s = Load(base, holder);
   const double rise = Fsubs(Lfs(base, s + 6136), Lfs(base, s + 6140));
@@ -94,7 +94,7 @@ uint32_t GarageStagePoseCar(uint8_t* base, const Calls& calls, uint32_t holder, 
   Copy16(base, f + 400, s + 80);
   Copy64(base, f + 208, f + 96);
   Stfs(base, f + 260, height);
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   Stfs(base, f + 256, zero);
   Stfs(base, f + 264, zero);
   Multiply(base, world, f + 208, world, kRaiseMultiply);
@@ -156,7 +156,7 @@ uint32_t GarageStagePoseCar(uint8_t* base, const Calls& calls, uint32_t holder, 
   }
 
   // The mirror: angles 0, position 0, scale (1, -1, 1).
-  const double one = Lfs(base, kOne);
+  const double one = double(G::one(base));
   for (const uint32_t at : {188u, 160u, 164u, 168u, 172u}) {
     Stfs(base, f + at, zero);
   }
@@ -164,7 +164,7 @@ uint32_t GarageStagePoseCar(uint8_t* base, const Calls& calls, uint32_t holder, 
   Stfs(base, f + 184, one);
   Stfs(base, f + 192, zero);
   Stfs(base, f + 196, zero);
-  Stfs(base, f + 180, Lfs(base, kMinusOne));
+  Stfs(base, f + 180, double(G::minus_one(base)));
   Stfs(base, f + 200, zero);
   Stfs(base, f + 204, zero);
   return accessories::FromScaleRotationTranslation(base, out, f + 192, f + 160, f + 176, f);

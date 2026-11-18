@@ -18,6 +18,7 @@
 #include "guest.h"
 #include "track_collision/track_collision.h"
 #include "vehicle_accessors/vehicle_accessors.h"
+#include "schema/camera_modes.h"
 
 #include <algorithm>
 #include <iterator>
@@ -29,10 +30,12 @@ using namespace steps;
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;           // 1.0
-constexpr uint32_t kDegrees = 0x82009300;       // the zoom's angle (55.0)
-constexpr uint32_t kVtable = 0x82006B3C;        // slot 0 Cutscene::Update, 1 OnPad
-constexpr uint32_t kRacersManager = 0x826D82F4;  // the racers' manager (a pointer)
+using G = schema::CameraModesGlobals;
+
+constexpr uint32_t kOne = G::one_address();                // 1.0
+constexpr uint32_t kDegrees = G::chase_degrees_address();  // the zoom's angle (55.0)
+constexpr uint32_t kVtable = schema::Cutscene::kVtable;    // slot 0 Cutscene::Update, 1 OnPad
+constexpr uint32_t kRacersManager = G::racers_manager_address();  // the racers' manager (a pointer)
 
 uint32_t Load(uint8_t* base, uint32_t a) { return guest::LoadU32(base, a); }
 void Store(uint8_t* base, uint32_t a, uint32_t v) { guest::StoreU32(base, a, v); }
@@ -43,12 +46,13 @@ void ResetList16(uint8_t* base, uint32_t list) {
     guest::StoreU16(base, list + 4 * i + 2, uint16_t(i));
     guest::StoreU16(base, list + 4 * i + 0, uint16_t(i + 1));
   }
-  guest::StoreU16(base, list + 60, 0xFFFF);
-  guest::StoreU16(base, list + 68, 0xFFFF);
-  guest::StoreU16(base, list + 70, 0xFFFF);
-  guest::StoreU16(base, list + 64, 0);
-  guest::StoreU16(base, list + 66, 0xFFFF);
-  guest::StoreU16(base, list + 72, 0);
+  const schema::List16 l(base, list);
+  guest::StoreU16(base, l.nodes_address() + 60, 0xFFFF);
+  l.set_head(0xFFFF);
+  l.set_unknown_70(0xFFFF);
+  l.set_free(0);
+  l.set_unknown_66(0xFFFF);
+  l.set_count(0);
 }
 
 // The script (+352) for the first record's id (the event), as the original's
@@ -121,25 +125,27 @@ constexpr int8_t kLogos[] = {0,  3,  -1, -1, -1, 1,  2,  4,  5,  6,  7,  8,  9, 
 uint32_t CutsceneConstruct(uint8_t* base, uint32_t cutscene, uint32_t viewport, uint32_t vehicle,
                            uint32_t frame, const CutsceneConstructCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82156CC0 Cutscene::Cutscene");
+  const schema::Cutscene c(base, cutscene);
+  const schema::RivalLogo rival(base, c.rival_logo_address());
   const uint32_t f = frame;
   uint32_t r23 = cutscene;
 
   // --- (1) The set-up ---
-  const uint32_t tracker = cutscene + 32;
+  const uint32_t tracker = c.tracker_address();
   Store(base, f + 1652, cutscene);  // the caller's frame's +20, as the original keeps it
   const double one = Lfs(base, kOne);
-  Store(base, cutscene + 16, 0);
-  Store(base, cutscene + 20, 0);
+  c.set_vehicle(0);
+  c.set_viewport(0);
   for (uint32_t at = 12; at <= 220; at += 16) {
     Stfs(base, tracker + at, one);
   }
   for (uint32_t at : {252u, 268u, 284u, 300u}) {
     Stfs(base, tracker + at, one);
   }
-  Store(base, cutscene + 0, kVtable);
-  game_modes::XprHolderConstruct(base, cutscene + 10780);
-  Store(base, cutscene + 16, vehicle);
-  Store(base, cutscene + 20, viewport);
+  c.set_vtable(kVtable);
+  game_modes::XprHolderConstruct(base, rival.holder_address());
+  c.set_vehicle(vehicle);
+  c.set_viewport(viewport);
   // The zoom: the video output's width (an integer, kept as a doubleword at
   // f + 768 as the original's conversion does), Camera::ZoomFromFov.
   const uint32_t video = calls.video_output(f, 0x82156D74);
@@ -148,19 +154,20 @@ uint32_t CutsceneConstruct(uint8_t* base, uint32_t cutscene, uint32_t viewport, 
   guest::StoreU32(base, f + 768, uint32_t(uint64_t(int64_t(width)) >> 32));
   guest::StoreU32(base, f + 772, uint32_t(int64_t(width)));
   const double zoom = ZoomFromFov(base, degrees, Single(double(int64_t(width)))).value();
-  cameras::ViewportSetZoom(base, Load(base, cutscene + 20), zoom);
+  cameras::ViewportSetZoom(base, c.viewport().address, zoom);
   {
-    const uint32_t v = Load(base, cutscene + 20);
-    const double ratio = Fdivs(Lfs(base, v + 1868), Lfs(base, v + 1864));
+    const uint32_t v = c.viewport().address;
+    const double ratio =
+        Fdivs(double(schema::Viewport(base, v).near()), double(schema::Viewport(base, v).zoom()));
     cameras::SetNear(base, Fmuls(ratio, zoom));
   }
   TargetTrack(base, tracker, vehicle, f - 256);
-  Store(base, cutscene + 356, 0);
-  Store(base, cutscene + 360, 0);
-  Store(base, cutscene + 352, 0xFFFFFFFFu);
-  ResetList16(base, cutscene + 364);  // the fade cues (32 bytes each)
-  ResetList16(base, cutscene + 952);  // the shots (608 bytes each)
-  Store(base, cutscene + 10756, 0);
+  c.set_frame(0);
+  c.set_shot(0);
+  c.set_script(0xFFFFFFFFu);
+  ResetList16(base, c.cues_address());   // the fade cues (32 bytes each)
+  ResetList16(base, c.shots_address());  // the shots (608 bytes each)
+  c.set_unknown_10756(0);
   calls.free_all();
   AnimsClear(base);
 
@@ -179,7 +186,7 @@ uint32_t CutsceneConstruct(uint8_t* base, uint32_t cutscene, uint32_t viewport, 
   Store(base, f + 764, 0xFFFFFFFFu);
   Store(base, f + kCutsceneRecordCount, r19);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t stages = Load(base, kRaceData) + 0x59620;
+  const uint32_t stages = G::race_data(base) + 0x59620;
   Store(base, f + 720, career::StageOf(base, save));
   {
     const uint32_t stage = Load(base, stages + 804);
@@ -192,7 +199,7 @@ uint32_t CutsceneConstruct(uint8_t* base, uint32_t cutscene, uint32_t viewport, 
   uint32_t r9 = Load(base, f + 732);
   for (int32_t s = 0; s < int32_t(Load(base, f + 1468)); s++) {
     const uint32_t racer = Load(base, f + 1436 + 8 * uint32_t(s));
-    const uint32_t record = uint32_t(uint64_t(racer) * 3936) + Load(base, kRaceData);
+    const uint32_t record = uint32_t(uint64_t(racer) * 3936) + G::race_data(base);
     if (((Load(base, record + 3936) >> 1) & 1) == 0) {
       continue;
     }
@@ -258,20 +265,20 @@ uint32_t CutsceneConstruct(uint8_t* base, uint32_t cutscene, uint32_t viewport, 
   // --- (3a) The script ---
   const int32_t event = int16_t(guest::LoadU16(base, f + kCutsceneRecords));
   if (const auto script = ScriptOfEvent(event)) {
-    Store(base, r23 + 352, *script);
+    schema::Cutscene(base, r23).set_script(*script);
   }
-  if (int32_t(Load(base, r23 + 352)) == -1) {
+  if (int32_t(schema::Cutscene(base, r23).script()) == -1) {
     // By the first record's byte (sign-extended, compared unsigned).
     const uint32_t byte = uint32_t(int32_t(int8_t(guest::LoadU8(base, f + kCutsceneRecords + 2))));
     if (byte < 1) {
-      Store(base, r23 + 352, 0);
+      schema::Cutscene(base, r23).set_script(0);
     } else if (byte == 1) {
-      Store(base, r23 + 352, 2);
+      schema::Cutscene(base, r23).set_script(2);
     } else if (byte < 3) {
-      Store(base, r23 + 352, 1);
+      schema::Cutscene(base, r23).set_script(1);
     }
   }
-  const uint32_t script = Load(base, r23 + 352);
+  const uint32_t script = schema::Cutscene(base, r23).script();
   if (int32_t(script) == -1) {
     return r23;
   }
@@ -283,7 +290,7 @@ uint32_t CutsceneConstruct(uint8_t* base, uint32_t cutscene, uint32_t viewport, 
 
   // --- (3b) The logo's choice ---
   uint32_t logo = 0xFFFFFFFFu, texture = 0xFFFFFFFFu;
-  const uint32_t key = Load(base, r23 + 352) - 1;
+  const uint32_t key = schema::Cutscene(base, r23).script() - 1;
   if (key <= 27) {
     logo = uint32_t(int32_t(kLogos[key]));
     if (key == 0) {
@@ -292,7 +299,7 @@ uint32_t CutsceneConstruct(uint8_t* base, uint32_t cutscene, uint32_t viewport, 
   }
 
   // --- (5) The logo ---
-  const uint32_t entry = r23 + 10760;
+  const uint32_t entry = schema::Cutscene(base, r23).rival_logo_address();
   RivalLogoConstruct(base, entry);
   RivalLogoOpen(base, entry, logo, texture, calls.open, calls.load_xpr);
   return r23;

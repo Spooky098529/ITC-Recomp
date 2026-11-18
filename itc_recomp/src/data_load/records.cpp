@@ -6,6 +6,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/data_load.h"
 
 #include <bit>
 #include <cstddef>
@@ -14,9 +15,11 @@ namespace data_load {
 
 namespace {
 
-// The float at `address` as lfs (to a double) and stfs leave its bits.
-uint32_t FloatWord(uint8_t* base, uint32_t address) {
-  const double value = double(std::bit_cast<float>(guest::LoadU32(base, address)));
+using G = schema::DataLoadGlobals;
+
+// A float lfs loaded (to a double), as stfs leaves its bits.
+uint32_t FloatWord(float loaded) {
+  const double value = double(loaded);
   return std::bit_cast<uint32_t>(float(value));
 }
 
@@ -44,7 +47,7 @@ constexpr uint16_t kRecordZero[] = {636, 652, 684, 716, 748, 764, 796,
 
 uint32_t Part464Construct(uint8_t* base, uint32_t part) {
   ITC_NATIVE_RUNNING("sub_821042A0 Part464::Part464");
-  StoreAll(base, part, kPart464Zero, FloatWord(base, kZeroFloat));
+  StoreAll(base, part, kPart464Zero, FloatWord(G::zero(base)));
   return part;
 }
 
@@ -52,26 +55,26 @@ uint32_t Member4080Construct(uint8_t* base, uint32_t member) {
   ITC_NATIVE_RUNNING("sub_82104690 Member4080::Member4080");
   Part464Construct(base, member + 16);
   Part464Construct(base, member + 480);
-  StoreAll(base, member, kMember4080Zero, FloatWord(base, kZeroFloat));
+  StoreAll(base, member, kMember4080Zero, FloatWord(G::zero(base)));
   return member;
 }
 
 uint32_t Member1136Construct(uint8_t* base, uint32_t member) {
   ITC_NATIVE_RUNNING("sub_82102888 Member1136::Member1136");
-  StoreAll(base, member, kMember1136Zero, FloatWord(base, kZeroFloat));
+  StoreAll(base, member, kMember1136Zero, FloatWord(G::zero(base)));
   return member;
 }
 
 uint32_t Record5232Construct(uint8_t* base, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_82104C20 Record5232::Record5232");
-  const uint32_t one = FloatWord(base, kOneFloat);
+  const uint32_t one = FloatWord(G::one(base));
   StoreAll(base, record, kRecordOne, one);
   for (uint32_t row = 0; row < 4; row++) {
     for (uint32_t k = 0; k < 4; k++) {
       guest::StoreU32(base, record + 252 + 96 * row + 16 * k, one);
     }
   }
-  StoreAll(base, record, kRecordZero, FloatWord(base, kZeroFloat));
+  StoreAll(base, record, kRecordZero, FloatWord(G::zero(base)));
   Member1136Construct(base, record + 1136);
   Member4080Construct(base, record + 4080);
   return record;

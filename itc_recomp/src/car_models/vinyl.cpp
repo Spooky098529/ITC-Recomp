@@ -8,6 +8,7 @@
 #include "guest.h"
 #include "memory/heap.h"
 #include "models/xpr.h"
+#include "schema/car_models.h"
 #include "texture_compression/compress_surface.h"
 
 #include <cstdlib>
@@ -16,6 +17,8 @@
 namespace car_models {
 
 namespace {
+
+using schema::CarModelsAddressWord;
 
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
@@ -52,11 +55,12 @@ uint32_t TextureCreate(uint8_t* base, uint32_t format, uint32_t width, uint32_t 
                        uint32_t header_out, uint32_t data_out, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820ECF08 Texture::Create");
   const uint32_t frame = stack - kTextureCreateFrameBytes;
+  const CarModelsAddressWord header_word(base, header_out), data_word(base, data_out);
   // VirtualAlloc(0, 52, MEM_COMMIT, PAGE_READWRITE), then memset.
-  Store(base, header_out, memory::AllocPages(52, 4096));
-  Clear(base, Load(base, header_out), 52);
+  header_word.set_value(memory::AllocPages(52, 4096));
+  Clear(base, header_word.value(), 52);
   // XGSetTextureHeader: its stack words, in the original's order.
-  const uint32_t header = Load(base, header_out);
+  const uint32_t header = header_word.value();
   Store(base, frame + 92, header);
   Store(base, frame + 108, 0);
   Store(base, frame + 100, 0);
@@ -67,27 +71,28 @@ uint32_t TextureCreate(uint8_t* base, uint32_t format, uint32_t width, uint32_t 
   // XPhysicalAlloc(size, -1, 0, 0x404), then memset.
   const uint32_t data =
       memory::AllocPhysical(size, 0, 0xFFFFFFFF, 0, PhysicalProtection(base, 0x404));
-  Store(base, data_out, data);
+  data_word.set_value(data);
   Clear(base, data, size);
-  models::RelocateResource(base, Load(base, header_out), Load(base, data_out));
+  models::RelocateResource(base, header_word.value(), data_word.value());
   return 1;
 }
 
 bool TextureFreeable(uint8_t* base, uint32_t header_in) {
-  const uint32_t header = Load(base, header_in);
+  const uint32_t header = CarModelsAddressWord(base, header_in).value();
   return header == 0 || memory::InRange(header);
 }
 
 uint32_t TextureFree(uint8_t* base, uint32_t header_in, uint32_t data_in) {
   ITC_NATIVE_RUNNING("sub_820ECFC8 Texture::Free");
-  if (const uint32_t header = Load(base, header_in); header != 0) {
+  const CarModelsAddressWord header_word(base, header_in), data_word(base, data_in);
+  if (const uint32_t header = header_word.value(); header != 0) {
     memory::FreePages(header);  // VirtualFree(header, 0, MEM_RELEASE)
-    Store(base, header_in, 0);
+    header_word.set_value(0);
   }
-  const uint32_t data = Load(base, data_in);
+  const uint32_t data = data_word.value();
   if (data != 0) {
     memory::FreePhysical(data);  // XPhysicalFree
-    Store(base, data_in, 0);
+    data_word.set_value(0);
   }
   return data;
 }
@@ -107,7 +112,8 @@ std::optional<uint32_t> VinylCompress(uint8_t* base, uint32_t width, uint32_t he
   const uint32_t texture = Load(base, f + 112);  // r26
   const uint32_t made = graphics::GetSurfaceLevel(base, texture, 0);  // r30
   graphics::LockSurfaceRect(base, made, f + 128, 0, 0);
-  const uint32_t sheet = graphics::GetSurfaceLevel(base, Load(base, header_in), 0);  // r29
+  const uint32_t sheet =
+      graphics::GetSurfaceLevel(base, CarModelsAddressWord(base, header_in).value(), 0);  // r29
   graphics::LockSurfaceRect(base, sheet, f + 120, 0, 16);
   for (uint32_t offset = 144; offset < 176; offset += 4) {
     Store(base, f + offset, 0);
@@ -133,8 +139,8 @@ std::optional<uint32_t> VinylCompress(uint8_t* base, uint32_t width, uint32_t he
   calls.release(made, 0);
   calls.release(sheet, 1);
   const uint32_t r3 = TextureFree(base, header_in, data_in);
-  Store(base, header_in, texture);
-  Store(base, data_in, Load(base, f + 116));
+  CarModelsAddressWord(base, header_in).set_value(texture);
+  CarModelsAddressWord(base, data_in).set_value(Load(base, f + 116));
   return r3;
 }
 

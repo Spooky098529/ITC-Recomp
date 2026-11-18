@@ -24,28 +24,28 @@ constexpr uint32_t kPageTable[5] = {0x82194078, 0x821941A8, 0x82191DE0, 0x821920
 uint64_t CarListPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82194078 GarageScreen::CarListPage");
   const uint32_t frame = Frame(base, sp, 96);
-  calls.Call(kListUpdate, frame, 0x82194094, Load(base, kList));
-  uint32_t list = Load(base, kList);
+  calls.Call(kListUpdate, frame, 0x82194094, List(base));
+  uint32_t list = List(base);
   uint32_t page;
   uint32_t sound;
   if (Load(base, list + 24) == 0 && Load(base, list + 4) == Load(base, list + 8)) {
     const uint64_t accepted = calls.Call(kListAccepted, frame, 0x821940B8, list);
-    list = Load(base, kList);
+    list = List(base);
     if (uint32_t(accepted) != 0) {
       // Into the car's menu: the selected car, transition 4 then 5, page 1.
       const uint32_t selection = race_screens::ListSelection(base, list);
-      Store(base, Data(base) + 44, selection);
-      Store(base, Data(base) + 48, Load(base, Load(base, kList) + 4));
+      Data(base).set_selection(selection);
+      Data(base).set_scroll(Load(base, List(base) + 4));
       ReloadStandCar(base, frame, calls);
-      const uint32_t pages = Load(base, kPages);
-      const uint32_t before = Load(base, pages + 0);
+      const PageObject pages = PagesOf(base);
+      const uint32_t before = pages.page();
       if (before != 1) {
-        Store(base, pages + 8, before);
+        pages.set_previous_page(before);
       }
-      Store(base, pages + 12, 4);
-      Store(base, pages + 16, 5);
-      Store(base, pages + 0, kNone);
-      Store(base, pages + 4, 1);
+      pages.set_step(4);
+      pages.set_queued_step(5);
+      pages.set_page(kNone);
+      pages.set_next_page(1);
       return calls.Call(kMenuSoundPlay, frame, 0x82194194, 0);
     }
     const uint64_t cancelled = calls.Call(kListCancelled, frame, 0x82194128, list);
@@ -58,7 +58,7 @@ uint64_t CarListPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     page = 0;  // the list moved (transition 2)
     sound = 4;
   }
-  PagesGo(base, Load(base, kPages), page, page == 4 ? 3 : 2, kNone);
+  PagesGo(PagesOf(base), page, page == 4 ? 3 : 2, kNone);
   return calls.Call(kMenuSoundPlay, frame, 0x82194194, sound);
 }
 
@@ -75,7 +75,7 @@ uint64_t UpdatePage(uint8_t* base, uint64_t r3, uint64_t mode, uint64_t r5, uint
   for (uint32_t i = 0; i < 5; i++) {
     Store(base, frame + 80 + 4 * i, kPageTable[i]);
   }
-  const uint32_t page = Load(base, Load(base, kPages) + 0);
+  const uint32_t page = PagesOf(base).page();
   if (page == kNone) {
     return r3;
   }

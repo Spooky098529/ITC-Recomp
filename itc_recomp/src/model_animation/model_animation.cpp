@@ -8,6 +8,7 @@
 #include "matrix_math/matrix_math.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "schema/model_animation.h"
 #include "xact/xact.h"
 
 #include <cstdlib>
@@ -19,7 +20,15 @@ namespace {
 
 using namespace car_physics::ops;
 
-constexpr uint32_t kTwo = 0x820021E8;  // the game's float 2.0
+using G = schema::ModelAnimationGlobals;
+using Set = schema::TrackSet;
+using Section = schema::AnimationSection;
+using Track = schema::AnimationTrack;
+using Channel = schema::AnimationChannel;
+using Key = schema::AnimationKey;
+using Skel = schema::Skeleton;
+using Cursor = schema::SkeletonCursor;
+using NodeEntry = schema::SkeletonNodeEntry;
 // malloc's largest size (memory/c_runtime_heap.cpp's kMaxSize).
 constexpr uint32_t kMaxAllocation = 0xFFFFF000;
 
@@ -57,14 +66,15 @@ uint32_t NewArray(uint8_t* base, uint32_t size) {
 // then TrackSet::Count), read before anything is written, for the set-ups'
 // checks.
 uint32_t SectionCount(uint8_t* base, uint32_t section) {
-  return section == 0 ? 0 : Load(base, section + 16);
+  return section == 0 ? 0 : Section(base, section).track_count();
 }
 
 // SetupFloat4 and Setup32: `stride`-byte values with a count header, at most
 // `max_count` (else operator new[](-1)), the time at +`time`.
 bool SetupWithHeader(uint8_t* base, uint32_t set, uint32_t section, uint32_t stride,
                      uint32_t max_count, uint32_t time) {
-  const uint32_t old = Load(base, set + 16);
+  const Set s(base, set);
+  const uint32_t old = s.values().address;
   const uint32_t count = SectionCount(base, section);
   uint32_t size = 0xFFFFFFFFu;
   if (count <= max_count && count * stride <= 0xFFFFFFEFu) {
@@ -76,7 +86,7 @@ bool SetupWithHeader(uint8_t* base, uint32_t set, uint32_t section, uint32_t str
   if (old != 0) {
     memory::crt::OperatorDeleteArray(old - 16);
   }
-  Store(base, set + 16, 0);
+  s.set_values(0u);
   TrackSetView(base, set, section);
   uint32_t n = TrackSetCount(base, set);
   if (n == 0) {
@@ -85,8 +95,9 @@ bool SetupWithHeader(uint8_t* base, uint32_t set, uint32_t section, uint32_t str
   const uint32_t block = NewArray(base, size);
   uint32_t values = 0;
   if (block != 0) {
-    Store(base, block, n);
-    values = block + 16;
+    const schema::TrackValueBlock values_block(base, block);
+    values_block.set_count(n);
+    values = values_block.values_address();
     int32_t left = int32_t(n) - 1;
     if (left >= 0) {
       const double one = Lfs(base, kOne);
@@ -98,14 +109,14 @@ bool SetupWithHeader(uint8_t* base, uint32_t set, uint32_t section, uint32_t str
       } while (left >= 0);
     }
   }
-  Store(base, set + 16, values);
+  s.set_values(values);
   if (!(int32_t(n) > 0)) {
     return true;
   }
   uint32_t offset = 0;
   do {
     const double start = TrackSetStartTime(base, set, 0xFFFFFFFFu);
-    const uint32_t at = offset + Load(base, set + 16);
+    const uint32_t at = offset + s.values().address;
     n--;
     offset += stride;
     Stfs(base, at + time, start);
@@ -115,14 +126,15 @@ bool SetupWithHeader(uint8_t* base, uint32_t set, uint32_t section, uint32_t str
 
 // Frees +16 (less `header`) and clears it.
 bool ReleaseValues(uint8_t* base, uint32_t set, uint32_t header) {
-  const uint32_t values = Load(base, set + 16);
+  const Set s(base, set);
+  const uint32_t values = s.values().address;
   if (values != 0 && !Deletable(values - header)) {
     return false;
   }
   if (values != 0) {
     memory::crt::OperatorDeleteArray(values - header);
   }
-  Store(base, set + 16, 0);
+  s.set_values(0u);
   return true;
 }
 
@@ -130,96 +142,104 @@ bool ReleaseValues(uint8_t* base, uint32_t set, uint32_t header) {
 
 void TrackSetClear(uint8_t* base, uint32_t set) {
   ITC_NATIVE_RUNNING("sub_825A6670 TrackSet::Clear");
-  Stfs(base, set + 12, Lfs(base, kZero));
-  Store(base, set + 0, 0);
-  Store(base, set + 4, 0);
-  Store(base, set + 8, 0);
+  const Set s(base, set);
+  s.set_start_time(float(Lfs(base, kZero)));
+  s.set_section(0u);
+  s.set_track_count_pointer(0);
+  s.set_tracks(0u);
 }
 
 uint32_t TrackSetConstruct(uint8_t* base, uint32_t set) {
   ITC_NATIVE_RUNNING("sub_825A1B70 TrackSet::TrackSet");
   TrackSetClear(base, set);
-  Store(base, set + 16, 0);
+  Set(base, set).set_values(0u);
   return set;
 }
 
 void TrackSetView(uint8_t* base, uint32_t set, uint32_t section) {
   ITC_NATIVE_RUNNING("sub_825A6690 TrackSet::View");
+  const Set s(base, set);
   if (section == 0) {
-    Stfs(base, set + 12, Lfs(base, kZero));
-    Store(base, set + 0, 0);
-    Store(base, set + 4, 0);
-    Store(base, set + 8, 0);
+    s.set_start_time(float(Lfs(base, kZero)));
+    s.set_section(0u);
+    s.set_track_count_pointer(0);
+    s.set_tracks(0u);
     return;
   }
-  Store(base, set + 0, section);
-  Store(base, set + 4, section + 16);
-  Store(base, set + 8, section + 20);
-  Stfs(base, set + 12, Lfs(base, section + 4));
+  const Section sec(base, section);
+  s.set_section(section);
+  s.set_track_count_pointer(sec.track_count_address());
+  s.set_tracks(sec.tracks_address());
+  s.set_start_time(sec.start_time());
 }
 
 uint32_t TrackSetCount(uint8_t* base, uint32_t set) {
   ITC_NATIVE_RUNNING("sub_825A66D8 TrackSet::Count");
-  if (Load(base, set + 0) == 0) {
+  const Set s(base, set);
+  if (!s.section()) {
     return 0;
   }
-  return Load(base, Load(base, set + 4));
+  return Load(base, s.track_count_pointer());
 }
 
 namespace {
 
-// StartTime and EndTime: the track's +`track_offset`, the section's
-// +`section_offset` for -1.
-double TrackTime(uint8_t* base, uint32_t set, uint32_t track, uint32_t section_offset,
-                 uint32_t track_offset) {
-  const uint32_t section = Load(base, set + 0);
-  if (section == 0) {
+// StartTime and EndTime: the track's start or end time, the section's for
+// -1.
+double TrackTime(uint8_t* base, uint32_t set, uint32_t track, bool end) {
+  const Set s(base, set);
+  const Section section = s.section();
+  if (!section) {
     return Lfs(base, kZero);
   }
   if (int32_t(track) == -1) {
-    return Lfs(base, section + section_offset);
+    return double(end ? section.end_time() : section.start_time());
   }
-  return Lfs(base, track * 80 + Load(base, set + 8) + track_offset);
+  const Track t(base, track * 80 + s.tracks().address);
+  return double(end ? t.end_time() : t.start_time());
 }
 
 }  // namespace
 
 double TrackSetStartTime(uint8_t* base, uint32_t set, uint32_t track) {
   ITC_NATIVE_RUNNING("sub_825A1F08 TrackSet::StartTime");
-  return TrackTime(base, set, track, 4, 72);
+  return TrackTime(base, set, track, false);
 }
 
 double TrackSetEndTime(uint8_t* base, uint32_t set, uint32_t track) {
   ITC_NATIVE_RUNNING("sub_825A1F50 TrackSet::EndTime");
-  return TrackTime(base, set, track, 8, 76);
+  return TrackTime(base, set, track, true);
 }
 
 uint32_t TrackSetTrack(uint8_t* base, uint32_t set, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_825A2000 TrackSet::Track");
-  if (Load(base, set + 0) == 0) {
+  const Set s(base, set);
+  if (!s.section()) {
     return 0;
   }
-  return index * 80 + Load(base, set + 8);
+  return index * 80 + s.tracks().address;
 }
 
 uint32_t TrackSetChannels(uint8_t* base, uint32_t set, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_825A2030 TrackSet::Channels");
-  const uint32_t section = Load(base, set + 0);
+  const Set s(base, set);
+  const uint32_t section = s.section().address;
   if (section == 0) {
     return 0;
   }
-  return Load(base, index * 80 + Load(base, set + 8) + 68) + section;
+  return Track(base, index * 80 + s.tracks().address).channels_offset() + section;
 }
 
 double KeyInterpolate(uint8_t* base, uint32_t key0, uint32_t key1, double time) {
   ITC_NATIVE_RUNNING("sub_825A66F8 Key::Interpolate");
-  const uint32_t flags = Load(base, key0 + 4);
+  const Key k0(base, key0), k1(base, key1);
+  const uint32_t flags = k0.flags();
   if ((flags & 2) != 0) {
     // Linear.
-    const double v0 = Lfs(base, key0 + 8);
-    const double t0 = Lfs(base, key0 + 0);
-    const double v1 = Lfs(base, key1 + 8);
-    const double t1 = Lfs(base, key1 + 0);
+    const double v0 = k0.value();
+    const double t0 = k0.time();
+    const double v1 = k1.value();
+    const double t1 = k1.time();
     const double dv = Fsubs(v1, v0);
     const double dt = Fsubs(t1, t0);
     const double x = Fsubs(time, t0);
@@ -227,19 +247,19 @@ double KeyInterpolate(uint8_t* base, uint32_t key0, uint32_t key1, double time) 
   }
   if ((flags & 8) != 0) {
     // Stepped.
-    return Lfs(base, key0 + 8);
+    return k0.value();
   }
-  // Cubic Hermite: the first key's out tangent (+16), the second's in (+12).
-  const double t0 = Lfs(base, key0 + 0);
-  const double t1 = Lfs(base, key1 + 0);
+  // Cubic Hermite: the first key's out tangent, the second's in.
+  const double t0 = k0.time();
+  const double t1 = k1.time();
   double f11 = Fsubs(time, t0);
   const double span = Fsubs(t1, t0);
-  const double v0 = Lfs(base, key0 + 8);
-  const double v1 = Lfs(base, key1 + 8);
+  const double v0 = k0.value();
+  const double v1 = k1.value();
   const double f6 = Fsubs(v0, v1);
-  const double in1 = Lfs(base, key1 + 12);
-  const double two = Lfs(base, kTwo);
-  const double out0 = Lfs(base, key0 + 16);
+  const double in1 = k1.in_tangent();
+  const double two = G::float_two(base);
+  const double out0 = k0.out_tangent();
   const double one = Lfs(base, kOne);
   const double s = Fdivs(f11, span);
   double f13 = Fsubs(s, one);
@@ -257,82 +277,89 @@ double KeyInterpolate(uint8_t* base, uint32_t key0, uint32_t key1, double time) 
 double CurveSample(uint8_t* base, uint32_t keys, uint32_t count, double time) {
   ITC_NATIVE_RUNNING("sub_825A1F98 Curve::Sample");
   if (!(int32_t(count) > 1)) {
-    return Lfs(base, keys + 8);
+    return Key(base, keys).value();
   }
   const uint32_t end = count * 20 + keys;
-  if (!(time < Lfs(base, end - 20))) {
-    return Lfs(base, end - 12);
+  const Key last(base, end - 20);
+  if (!(time < double(last.time()))) {
+    return last.value();
   }
   uint32_t key = keys + 20;
-  if (!(time < Lfs(base, key))) {
+  if (!(time < double(Key(base, key).time()))) {
     do {
       key += 20;
-    } while (!(time < Lfs(base, key)));
+    } while (!(time < double(Key(base, key).time())));
   }
-  if (time == Lfs(base, key)) {
-    return Lfs(base, key + 8);
+  if (time == double(Key(base, key).time())) {
+    return Key(base, key).value();
   }
   return KeyInterpolate(base, key - 20, key, time);
 }
 
 void TrackSetSampleFloat4(uint8_t* base, uint32_t set, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_825A1C88 TrackSet::SampleFloat4");
-  if (Load(base, set + 0) == 0) {
+  const Set s(base, set);
+  if (!s.section()) {
     return;
   }
-  const uint32_t track = TrackSetTrack(base, set, index);
+  const Track track(base, TrackSetTrack(base, set, index));
   uint32_t channel = TrackSetChannels(base, set, index);
   const uint32_t offset = index << 4;
   const double zero = Lfs(base, kZero);
   const double one = Lfs(base, kOne);
-  Stfs(base, offset + Load(base, set + 16), zero);
-  Stfs(base, offset + Load(base, set + 16) + 4, zero);
-  Stfs(base, offset + Load(base, set + 16) + 8, one);
-  if (!(int32_t(Load(base, track + 64)) > 0)) {
+  // The values are an array (16 bytes a track: x, y, z, the time).
+  Stfs(base, offset + s.values().address, zero);
+  Stfs(base, offset + s.values().address + 4, zero);
+  Stfs(base, offset + s.values().address + 8, one);
+  if (!(int32_t(track.channel_count()) > 0)) {
     return;
   }
   const uint32_t lanes = index << 2;
   int32_t i = 0;
   do {
-    const uint32_t keys = channel + 8;
-    const uint32_t values = Load(base, set + 16);
-    const uint32_t lane = (Load(base, channel + 4) + lanes) << 2;
-    const uint32_t key_count = Load(base, channel + 0);
+    const Channel c(base, channel);
+    const uint32_t keys = c.keys_address();
+    const uint32_t values = s.values().address;
+    const uint32_t lane = (c.component() + lanes) << 2;
+    const uint32_t key_count = c.key_count();
     const double value = CurveSample(base, keys, key_count, Lfs(base, values + offset + 12));
     Stfs(base, lane + values, value);
-    channel = Load(base, channel + 0) * 20 + keys;
+    channel = c.key_count() * 20 + keys;
     i++;
-  } while (i < int32_t(Load(base, track + 64)));
+  } while (i < int32_t(track.channel_count()));
 }
 
 void TrackSetSample32(uint8_t* base, uint32_t set, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_825A0FE0 TrackSet::Sample32");
-  if (Load(base, set + 0) == 0) {
+  const Set s(base, set);
+  if (!s.section()) {
     return;
   }
-  const uint32_t track = TrackSetTrack(base, set, index);
+  const Track track(base, TrackSetTrack(base, set, index));
   uint32_t channel = TrackSetChannels(base, set, index);
   const uint32_t offset = index << 5;
-  const uint32_t value = offset + Load(base, set + 16);
+  // The values are an array (32 bytes a track: +16 the time, +20 the mask).
+  const uint32_t value = offset + s.values().address;
   Store(base, value + 20, 0);
-  if (!(int32_t(Load(base, track + 64)) > 0)) {
+  if (!(int32_t(track.channel_count()) > 0)) {
     return;
   }
   int32_t i = 0;
   do {
-    const uint32_t component = Load(base, channel + 4);
-    const uint32_t keys = channel + 8;
+    const Channel c(base, channel);
+    const uint32_t component = c.component();
+    const uint32_t keys = c.keys_address();
     const uint32_t mask = Load(base, value + 20);
     // slw: shifts of 32 to 63 give 0.
     const uint32_t bit = (component & 0x20) != 0 ? 0 : 1u << (component & 0x1F);
     Store(base, value + 20, bit | mask);
-    const uint32_t key_count = Load(base, channel + 0);
+    const uint32_t key_count = c.key_count();
     const double sample =
-        CurveSample(base, keys, key_count, Lfs(base, offset + Load(base, set + 16) + 16));
+        CurveSample(base, keys, key_count, Lfs(base, offset + s.values().address + 16));
     Stfs(base, (component << 2) + value, sample);
-    channel = Load(base, channel + 0) * 20 + keys;
+    channel = c.key_count() * 20 + keys;
     i++;
-  } while (i < int32_t(Load(base, track + 64)));
+  } while (i < int32_t(track.channel_count()));
 }
 
 namespace {
@@ -340,10 +367,11 @@ namespace {
 // Advance and Advance32: the time at value + `time`, `stride`-byte values.
 uint32_t AdvanceTime(uint8_t* base, uint32_t set, uint32_t index, double step, uint32_t stride,
                      uint32_t time) {
-  if (Load(base, set + 0) == 0) {
+  const Set s(base, set);
+  if (!s.section()) {
     return 0;
   }
-  const uint32_t at = index * stride + Load(base, set + 16) + time;
+  const uint32_t at = index * stride + s.values().address + time;
   Stfs(base, at, Fadds(step, Lfs(base, at)));
   const double end = TrackSetEndTime(base, set, index);
   if (Lfs(base, at) > end) {
@@ -420,7 +448,8 @@ bool TrackSetSetup32(uint8_t* base, uint32_t set, uint32_t section) {
 
 bool TrackSetSetupFloat(uint8_t* base, uint32_t set, uint32_t section) {
   ITC_NATIVE_RUNNING("sub_825A1BE8 TrackSet::SetupFloat");
-  const uint32_t old = Load(base, set + 16);
+  const Set s(base, set);
+  const uint32_t old = s.values().address;
   const uint32_t count = SectionCount(base, section);
   const uint32_t size = count > 0x3FFFFFFF ? 0xFFFFFFFFu : count << 2;
   if ((old != 0 && !Deletable(old)) || (count != 0 && !Allocatable(base, size))) {
@@ -429,20 +458,20 @@ bool TrackSetSetupFloat(uint8_t* base, uint32_t set, uint32_t section) {
   if (old != 0) {
     memory::crt::OperatorDeleteArray(old);
   }
-  Store(base, set + 16, 0);
+  s.set_values(0u);
   TrackSetView(base, set, section);
   uint32_t n = TrackSetCount(base, set);
   if (n == 0) {
     return true;
   }
-  Store(base, set + 16, NewArray(base, size));
+  s.set_values(NewArray(base, size));
   if (!(int32_t(n) > 0)) {
     return true;
   }
   uint32_t offset = 0;
   do {
     const double start = TrackSetStartTime(base, set, 0xFFFFFFFFu);
-    const uint32_t values = Load(base, set + 16);
+    const uint32_t values = s.values().address;
     n--;
     Stfs(base, offset + values, start);
     offset += 4;
@@ -452,14 +481,15 @@ bool TrackSetSetupFloat(uint8_t* base, uint32_t set, uint32_t section) {
 
 bool TrackSetSetup208(uint8_t* base, uint32_t set, uint32_t section) {
   ITC_NATIVE_RUNNING("sub_825A1A38 TrackSet::Setup208");
-  const uint32_t old = Load(base, set + 16);
+  const Set s(base, set);
+  const uint32_t old = s.values().address;
   if (SectionCount(base, section) != 0 || (old != 0 && !Deletable(old - 16))) {
     return false;
   }
   if (old != 0) {
     memory::crt::OperatorDeleteArray(old - 16);
   }
-  Store(base, set + 16, 0);
+  s.set_values(0u);
   TrackSetView(base, set, section);
   // The count is 0 (checked above): nothing is allocated or set up.
   TrackSetCount(base, set);
@@ -471,22 +501,18 @@ bool TrackSetSetup208(uint8_t* base, uint32_t set, uint32_t section) {
 namespace {
 
 constexpr uint32_t kSkeletonBaseVtable = 0x8206CE60;
-constexpr uint32_t kSkeletonVtable = 0x8206CE50;
-constexpr uint32_t kPrimitiveDrawerVtable = 0x820721D4;
 
 // Whether SkeletonBase::Free frees all four natively.
 bool BaseFreeable(uint8_t* base, uint32_t skeleton) {
-  const uint32_t cursors = Load(base, skeleton + 128);
+  const Skel sk(base, skeleton);
+  const uint32_t cursors = sk.cursors().address;
   if (!Deletable(cursors)) {
     return false;
   }
-  for (uint32_t offset : {136u, 144u, 132u}) {
-    const uint32_t array = Load(base, skeleton + offset);
-    if (array != 0 && !Deletable(array - 16)) {
-      return false;
-    }
-  }
-  return true;
+  // The three arrays with a count header, in the original's order.
+  const auto freeable = [](uint32_t array) { return array == 0 || Deletable(array - 16); };
+  return freeable(sk.node_states()) && freeable(sk.bone_matrices()) &&
+         freeable(sk.own_matrices());
 }
 
 // Matrix::Multiply as its adapter does it: out = a * b, noted for
@@ -509,28 +535,36 @@ void CopyRow(uint8_t* base, uint32_t from, uint32_t to) {
 
 uint32_t SkeletonBaseConstruct(uint8_t* base, uint32_t skeleton) {
   ITC_NATIVE_RUNNING("sub_8259A140 SkeletonBase::SkeletonBase");
-  const uint32_t matrix = skeleton + 16;
+  const Skel sk(base, skeleton);
+  const uint32_t matrix = sk.matrix_address();
   const double one = Lfs(base, kOne);
-  Store(base, skeleton + 0, kSkeletonBaseVtable);
+  sk.set_vtable(kSkeletonBaseVtable);
   for (uint32_t row = 0; row < 4; row++) {
     Stfs(base, matrix + 16 * row + 12, one);
   }
-  xact::WaveEntryConstruct(base, skeleton + 80);
+  xact::WaveEntryConstruct(base, sk.node_file_address());
   // The identity, built on the original's stack and copied in.
   for (uint32_t word = 0; word < 16; word++) {
     Store(base, matrix + 4 * word, word % 5 == 0 ? 0x3F800000u : 0);
   }
-  for (uint32_t offset = 128; offset <= 160; offset += 4) {
-    Store(base, skeleton + offset, 0);
-  }
+  sk.set_cursors(0u);
+  sk.set_own_matrices(0);
+  sk.set_node_states(0);
+  sk.set_bone_states(0);
+  sk.set_bone_matrices(0);
+  sk.set_matrices(0);
+  sk.set_unknown_152(0);
+  sk.set_root_index(0);
+  sk.set_instance_count(0);
   return skeleton;
 }
 
 uint32_t SkeletonConstruct(uint8_t* base, uint32_t skeleton) {
   ITC_NATIVE_RUNNING("sub_82599758 Skeleton::Skeleton");
   SkeletonBaseConstruct(base, skeleton);
-  Store(base, skeleton + 176, 0);
-  Store(base, skeleton + 0, kSkeletonVtable);
+  const Skel sk(base, skeleton);
+  sk.set_node_values(0);
+  sk.set_vtable(Skel::kVtable);
   return skeleton;
 }
 
@@ -539,19 +573,24 @@ bool SkeletonBaseFree(uint8_t* base, uint32_t skeleton) {
   if (!BaseFreeable(base, skeleton)) {
     return false;
   }
-  const uint32_t cursors = Load(base, skeleton + 128);
+  const Skel sk(base, skeleton);
+  const uint32_t cursors = sk.cursors().address;
   if (cursors != 0) {
     memory::crt::OperatorDeleteArray(cursors);
   }
-  for (uint32_t offset : {136u, 144u, 132u}) {
-    const uint32_t array = Load(base, skeleton + offset);
+  // The three arrays with a count header, in the original's order.
+  const auto free_counted = [](uint32_t array) {
     if (array != 0) {
       memory::crt::OperatorDeleteArray(array - 16);
     }
-  }
-  for (uint32_t offset : {128u, 136u, 144u, 132u}) {
-    Store(base, skeleton + offset, 0);
-  }
+  };
+  free_counted(sk.node_states());
+  free_counted(sk.bone_matrices());
+  free_counted(sk.own_matrices());
+  sk.set_cursors(0u);
+  sk.set_node_states(0);
+  sk.set_bone_matrices(0);
+  sk.set_own_matrices(0);
   return true;
 }
 
@@ -560,44 +599,46 @@ bool SkeletonBaseDestruct(uint8_t* base, uint32_t skeleton) {
   if (!BaseFreeable(base, skeleton)) {
     return false;
   }
-  Store(base, skeleton + 0, kSkeletonBaseVtable);
+  Skel(base, skeleton).set_vtable(kSkeletonBaseVtable);
   return SkeletonBaseFree(base, skeleton);
 }
 
 bool SkeletonDestruct(uint8_t* base, uint32_t skeleton) {
   ITC_NATIVE_RUNNING("sub_825999C8 Skeleton::~Skeleton");
-  const uint32_t values = Load(base, skeleton + 176);
+  const Skel sk(base, skeleton);
+  const uint32_t values = sk.node_values();
   if (!Deletable(values) || !BaseFreeable(base, skeleton)) {
     return false;
   }
-  Store(base, skeleton + 0, kSkeletonVtable);
+  sk.set_vtable(Skel::kVtable);
   if (values != 0) {
     memory::crt::OperatorDeleteArray(values);
   }
-  Store(base, skeleton + 176, 0);
+  sk.set_node_values(0);
   return SkeletonBaseDestruct(base, skeleton);
 }
 
 bool SkeletonFreeNodeValues(uint8_t* base, uint32_t skeleton) {
   ITC_NATIVE_RUNNING("sub_825997A0 Skeleton::FreeNodeValues");
-  const uint32_t values = Load(base, skeleton + 176);
+  const Skel sk(base, skeleton);
+  const uint32_t values = sk.node_values();
   if (!Deletable(values)) {
     return false;
   }
   if (values != 0) {
     memory::crt::OperatorDeleteArray(values);
   }
-  Store(base, skeleton + 176, 0);
+  sk.set_node_values(0);
   return true;
 }
 
 bool TrackSetReleasable(uint8_t* base, uint32_t set, bool array) {
-  const uint32_t values = Load(base, set + 16);
+  const uint32_t values = Set(base, set).values().address;
   return values == 0 || Deletable(values - (array ? 16 : 0));
 }
 
 bool SkeletonDestructible(uint8_t* base, uint32_t skeleton) {
-  return Deletable(Load(base, skeleton + 176)) && BaseFreeable(base, skeleton);
+  return Deletable(Skel(base, skeleton).node_values()) && BaseFreeable(base, skeleton);
 }
 
 bool SkeletonBaseDestructible(uint8_t* base, uint32_t skeleton) {
@@ -673,41 +714,39 @@ bool SkeletonSetUp(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t mat
     return false;
   }
   SkeletonBaseFree(base, skeleton);
-  Store(base, skeleton + 160, uint32_t(instances));
+  const Skel sk(base, skeleton);
+  sk.set_instance_count(instances);
   if (instances <= 0) {
-    Store(base, skeleton + 160, 1);
+    sk.set_instance_count(1);
   }
   const uint32_t cursors = NewArray(base, count * 20);
   for (uint32_t k = 0; k < count; k++) {
     SkeletonCursorClear(base, cursors + 20 * k);
   }
-  Store(base, skeleton + 128, cursors);
-  const uint32_t view = skeleton + 80;
-  NodeFileView(base, view, file);
+  sk.set_cursors(cursors);
+  NodeFileView(base, sk.node_file_address(), file);
   const double one = Lfs(base, kOne);
-  const uint32_t node_count = Load(base, Load(base, view) + 4);
+  // The node file's +4 the node count, +8 the bones, +12 the first bone.
+  const uint32_t node_count = Load(base, sk.node_file() + 4);
   if (node_count != 0) {
-    Store(base, skeleton + 136,
-          CountedArray(base, node_count, 144, kNodeLimit, {12, 28, 44, 60}, one));
+    sk.set_node_states(CountedArray(base, node_count, 144, kNodeLimit, {12, 28, 44, 60}, one));
     if (matrices == 0) {
-      const uint32_t again = Load(base, Load(base, view) + 4);
+      const uint32_t again = Load(base, sk.node_file() + 4);
       const uint32_t array = CountedArray(base, again, 64, kMatrixLimit, {12, 28, 44, 60}, one);
-      Store(base, skeleton + 132, array);
-      Store(base, skeleton + 148, array);
+      sk.set_own_matrices(array);
+      sk.set_matrices(array);
     } else {
-      Store(base, skeleton + 148, matrices);
+      sk.set_matrices(matrices);
     }
   }
-  const uint32_t entry_count = Load(base, Load(base, view) + 8);
+  const uint32_t entry_count = Load(base, sk.node_file() + 8);
   if (entry_count != 0) {
-    Store(base, skeleton + 144,
-          CountedArray(base, entry_count, 64, kMatrixLimit, {12, 28, 44}, one));
-    for (int32_t i = 0; i < int32_t(Load(base, Load(base, view) + 8)); i++) {
-      Store(base, Load(base, skeleton + 144) + 64 * uint32_t(i) + 52, 1);
+    sk.set_bone_matrices(CountedArray(base, entry_count, 64, kMatrixLimit, {12, 28, 44}, one));
+    for (int32_t i = 0; i < int32_t(Load(base, sk.node_file() + 8)); i++) {
+      Store(base, sk.bone_matrices() + 64 * uint32_t(i) + 52, 1);
     }
   }
-  Store(base, skeleton + 140,
-        Load(base, skeleton + 136) + 144 * Load(base, Load(base, view) + 12));
+  sk.set_bone_states(sk.node_states() + 144 * Load(base, sk.node_file() + 12));
   return true;
 }
 
@@ -715,24 +754,25 @@ bool SkeletonBind(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t matr
   ITC_NATIVE_RUNNING("sub_82599A20 Skeleton::Bind");
   const uint32_t nodes = Load(base, file + 4);
   const uint32_t values_bytes = nodes > 0x0FFFFFFFu ? 0xFFFFFFFFu : nodes * 16;
-  if (!Deletable(Load(base, skeleton + 176)) ||
+  const Skel sk(base, skeleton);
+  if (!Deletable(sk.node_values()) ||
       (nodes != 0 && !Allocatable(base, values_bytes)) ||
       !SkeletonSetUp(base, skeleton, file, matrices, 1)) {
     return false;
   }
-  const uint32_t values = Load(base, skeleton + 176);
+  const uint32_t values = sk.node_values();
   if (values != 0) {
     memory::crt::OperatorDeleteArray(values);
   }
-  Store(base, skeleton + 176, 0);
-  const uint32_t count = Load(base, Load(base, skeleton + 80) + 4);
+  sk.set_node_values(0);
+  const uint32_t count = Load(base, sk.node_file() + 4);
   if (count != 0) {
-    Store(base, skeleton + 176, NewArray(base, values_bytes));
+    sk.set_node_values(NewArray(base, values_bytes));
   }
   const double zero = Lfs(base, kZero);
   int32_t n = int32_t(SkeletonNodeCount(base, skeleton));
   for (int32_t i = 0; i < n; i++) {
-    const uint32_t value = Load(base, skeleton + 176) + 16 * uint32_t(i);
+    const uint32_t value = sk.node_values() + 16 * uint32_t(i);
     Stfs(base, value + 0, zero);
     Stfs(base, value + 4, zero);
     Stfs(base, value + 8, zero);
@@ -743,79 +783,87 @@ bool SkeletonBind(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t matr
 
 void SkeletonCursorClear(uint8_t* base, uint32_t cursor) {
   ITC_NATIVE_RUNNING("sub_825A2068 SkeletonCursor::Clear");
-  Stfs(base, cursor + 12, Lfs(base, kZero));
-  Store(base, cursor + 0, 0);
-  Store(base, cursor + 4, 0);
-  Store(base, cursor + 8, 0);
-  Store(base, cursor + 16, 0);
+  const Cursor c(base, cursor);
+  c.set_start_time(float(Lfs(base, kZero)));
+  c.set_section(0u);
+  c.set_entry_count_pointer(0);
+  c.set_entries(0u);
+  c.set_unknown_16(0);
 }
 
 void SkeletonCursorView(uint8_t* base, uint32_t cursor, uint32_t section) {
   ITC_NATIVE_RUNNING("sub_825A2090 SkeletonCursor::View");
+  const Cursor c(base, cursor);
   if (section == 0) {
-    Stfs(base, cursor + 12, Lfs(base, kZero));
-    Store(base, cursor + 0, 0);
-    Store(base, cursor + 4, 0);
-    Store(base, cursor + 8, 0);
-    Store(base, cursor + 16, 0);
+    c.set_start_time(float(Lfs(base, kZero)));
+    c.set_section(0u);
+    c.set_entry_count_pointer(0);
+    c.set_entries(0u);
+    c.set_unknown_16(0);
     return;
   }
-  Store(base, cursor + 0, section);
-  Store(base, cursor + 4, section + 16);
-  Store(base, cursor + 8, section + 20);
-  Stfs(base, cursor + 12, Lfs(base, section + 4));
-  Store(base, cursor + 16, 0);
+  const Section sec(base, section);
+  c.set_section(section);
+  c.set_entry_count_pointer(sec.track_count_address());
+  c.set_entries(sec.tracks_address());
+  c.set_start_time(sec.start_time());
+  c.set_unknown_16(0);
 }
 
 void SkeletonLoadNodeValues(uint8_t* base, uint32_t skeleton, uint32_t section) {
   ITC_NATIVE_RUNNING("sub_825997E0 Skeleton::LoadNodeValues");
-  if (Load(base, skeleton + 176) == 0) {
+  const Skel sk(base, skeleton);
+  if (sk.node_values() == 0) {
     return;
   }
-  SkeletonCursorView(base, Load(base, skeleton + 128), section);
-  const uint32_t cursor = Load(base, skeleton + 128);
-  uint32_t entry = Load(base, cursor + 8);
-  if (!(int32_t(Load(base, Load(base, cursor + 4))) > 0)) {
+  SkeletonCursorView(base, sk.cursors().address, section);
+  const Cursor cursor = sk.cursors();
+  uint32_t entry = cursor.entries().address;
+  if (!(int32_t(Load(base, cursor.entry_count_pointer())) > 0)) {
     return;
   }
   int32_t i = 0;
   do {
-    const uint32_t node = Load(base, entry + 0);
-    const double a = Lfs(base, entry + 12);
-    const uint32_t value = (node << 4) + Load(base, skeleton + 176);
+    const NodeEntry e(base, entry);
+    const uint32_t node = e.node();
+    const double a = e.time();
+    // The node values are an array (a float4 a node).
+    const uint32_t value = (node << 4) + sk.node_values();
     i++;
     Stfs(base, value + 0, a);
     const double x = Lfs(base, value + 0);
-    const double b = Lfs(base, entry + 16);
+    const double b = e.unknown_16();
     entry += 20;
     Stfs(base, value + 4, b);
     Stfs(base, value + 8, x);
-  } while (i < int32_t(Load(base, Load(base, Load(base, skeleton + 128) + 4))));
+  } while (i < int32_t(Load(base, sk.cursors().entry_count_pointer())));
 }
 
 uint32_t SkeletonNodeCount(uint8_t* base, uint32_t skeleton) {
   ITC_NATIVE_RUNNING("sub_82599880 Skeleton::NodeCount");
-  if (Load(base, skeleton + 176) == 0) {
+  const Skel sk(base, skeleton);
+  if (sk.node_values() == 0) {
     return 0;
   }
-  return Load(base, Load(base, skeleton + 80) + 4);
+  return Load(base, sk.node_file() + 4);
 }
 
 MatricesResult SkeletonUpdateNodeMatrices(uint8_t* base, uint32_t skeleton) {
   ITC_NATIVE_RUNNING("sub_8259C3A8 Skeleton::UpdateNodeMatrices");
   // The node types the loop below takes, read first (the node file isn't
   // written here): 8 and 16 go to sub_8259B748 and sub_8259BE40.
-  for (int32_t i = 0; i < int32_t(Load(base, Load(base, skeleton + 80) + 4)); i++) {
-    const uint32_t type = Load(base, Load(base, skeleton + 84) + 160 * uint32_t(i) + 132);
+  const Skel sk(base, skeleton);
+  for (int32_t i = 0; i < int32_t(Load(base, sk.node_file() + 4)); i++) {
+    const uint32_t type = Load(base, sk.node_records() + 160 * uint32_t(i) + 132);
     if (int32_t(type) > 4 && (type == 8 || type == 16)) {
       return MatricesResult::kOriginal;
     }
   }
-  const uint32_t root = (Load(base, skeleton + 156) << 6) + Load(base, skeleton + 148);
-  Multiply(base, root, root, skeleton + 16, 0x8259C3D4);
-  uint32_t matrix = Load(base, skeleton + 148);
-  const uint32_t records = Load(base, skeleton + 84);
-  if (int32_t(Load(base, Load(base, skeleton + 80) + 4)) > 0) {
+  const uint32_t root = (sk.root_index() << 6) + sk.matrices();
+  Multiply(base, root, root, sk.matrix_address(), 0x8259C3D4);
+  uint32_t matrix = sk.matrices();
+  const uint32_t records = sk.node_records();
+  if (int32_t(Load(base, sk.node_file() + 4)) > 0) {
     uint32_t type_at = records + 132;
     uint32_t row = matrix + 48;
     uint32_t record = 0;
@@ -824,11 +872,11 @@ MatricesResult SkeletonUpdateNodeMatrices(uint8_t* base, uint32_t skeleton) {
       if (!(int32_t(Load(base, type_at)) > 4)) {
         const uint32_t parent = Load(base, type_at - 4);
         if (int32_t(parent) != -1) {
-          Multiply(base, matrix, matrix, (parent << 6) + Load(base, skeleton + 148), 0x8259C42C);
+          Multiply(base, matrix, matrix, (parent << 6) + sk.matrices(), 0x8259C42C);
         }
-        const uint32_t source = Load(base, record + Load(base, skeleton + 84) + 92);
+        const uint32_t source = Load(base, record + sk.node_records() + 92);
         if (int32_t(source) != -1) {
-          CopyRow(base, (source << 6) + Load(base, skeleton + 148) + 48, row);
+          CopyRow(base, (source << 6) + sk.matrices() + 48, row);
         }
       }
       i++;
@@ -836,33 +884,33 @@ MatricesResult SkeletonUpdateNodeMatrices(uint8_t* base, uint32_t skeleton) {
       type_at += 160;
       matrix += 64;
       row += 64;
-    } while (i < int32_t(Load(base, Load(base, skeleton + 80) + 4)));
+    } while (i < int32_t(Load(base, sk.node_file() + 4)));
   }
-  const uint32_t file = Load(base, skeleton + 80);
-  const uint32_t matrices = Load(base, skeleton + 148);
+  const uint32_t file = sk.node_file();
+  const uint32_t matrices = sk.matrices();
   const uint32_t first = Load(base, file + 12);
   matrix = (first << 6) + matrices;
-  uint32_t bone = first * 160 + Load(base, skeleton + 84) + 128;
+  uint32_t bone = first * 160 + sk.node_records() + 128;
   if (int32_t(Load(base, file + 8)) > 0) {
     int32_t i = 0;
     do {
       if ((Load(base, bone + 4) & 0x80) != 0) {
         const uint32_t parent = Load(base, bone + 0);
         if (int32_t(parent) != -1) {
-          Multiply(base, matrix, matrix, (parent << 6) + Load(base, skeleton + 148), 0x8259C528);
+          Multiply(base, matrix, matrix, (parent << 6) + sk.matrices(), 0x8259C528);
         }
       }
       i++;
       bone += 160;
       matrix += 64;
-    } while (i < int32_t(Load(base, Load(base, skeleton + 80) + 8)));
+    } while (i < int32_t(Load(base, sk.node_file() + 8)));
   }
   return MatricesResult::kMultiplied;
 }
 
 MatricesResult SkeletonUpdateMatrices(uint8_t* base, uint32_t skeleton) {
   ITC_NATIVE_RUNNING("sub_825998A0 Skeleton::UpdateMatrices");
-  if (Load(base, skeleton + 176) == 0) {
+  if (Skel(base, skeleton).node_values() == 0) {
     return MatricesResult::kNothing;
   }
   return SkeletonUpdateNodeMatrices(base, skeleton);
@@ -871,15 +919,17 @@ MatricesResult SkeletonUpdateMatrices(uint8_t* base, uint32_t skeleton) {
 double CursorCurveSample(uint8_t* base, uint32_t keys, uint32_t cursor, uint32_t count,
                          double time) {
   ITC_NATIVE_RUNNING("sub_825A20E8 CursorCurve::Sample");
+  const Key first(base, keys);
   if (!(int32_t(count) > 1)) {
-    return Lfs(base, keys + 8);
+    return first.value();
   }
   const uint32_t end = count * 20 + keys;
-  if (!(time < Lfs(base, end - 20))) {
-    return Lfs(base, end - 12);
+  const Key last(base, end - 20);
+  if (!(time < double(last.time()))) {
+    return last.value();
   }
-  if (!(time > Lfs(base, keys))) {
-    return Lfs(base, keys + 8);
+  if (!(time > double(first.time()))) {
+    return first.value();
   }
   const uint32_t at = Load(base, cursor);
   if (!(int32_t(at) > 0) || !(int32_t(at) < int32_t(count))) {
@@ -888,7 +938,7 @@ double CursorCurveSample(uint8_t* base, uint32_t keys, uint32_t cursor, uint32_t
   uint32_t next = Load(base, cursor) * 20 + keys;
   uint32_t key = next - 20;
   for (;;) {
-    if (!(Lfs(base, key) > time) && time < Lfs(base, next)) {
+    if (!(double(Key(base, key).time()) > time) && time < double(Key(base, next).time())) {
       return KeyInterpolate(base, key, next, time);
     }
     const uint32_t moved = Load(base, cursor) + 1;
@@ -906,14 +956,15 @@ double CursorCurveSample(uint8_t* base, uint32_t keys, uint32_t cursor, uint32_t
 
 bool SkeletonResetPose(uint8_t* base, uint32_t skeleton) {
   ITC_NATIVE_RUNNING("sub_82599AF0 Skeleton::ResetPose");
-  if (Load(base, skeleton + 176) == 0) {
+  const Skel sk(base, skeleton);
+  if (sk.node_values() == 0) {
     return false;
   }
-  uint32_t a = Load(base, skeleton + 92);
-  uint32_t node = Load(base, skeleton + 84) + 64;
-  uint32_t out = Load(base, skeleton + 136);
-  uint32_t b = Load(base, skeleton + 88);
-  uint32_t c = Load(base, skeleton + 96);
+  uint32_t a = sk.rest_angles();
+  uint32_t node = sk.node_records() + 64;
+  uint32_t out = sk.node_states();
+  uint32_t b = sk.rest_translations();
+  uint32_t c = sk.rest_scales();
   // 16 bytes as the original's two doubleword moves.
   auto copy16 = [&](uint32_t to, uint32_t from) {
     uint32_t words[4];
@@ -995,23 +1046,24 @@ int32_t Fctiwz(double x) {
 
 bool SkeletonLocalMatrices(uint8_t* base, uint32_t skeleton, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82599C58 Skeleton::LocalMatrices");
-  if (Load(base, skeleton + 176) == 0) {
+  const Skel sk(base, skeleton);
+  if (sk.node_values() == 0) {
     return false;
   }
   const uint32_t frame = stack - 320;
   const uint32_t turn = frame - 80;  // the rotations' own stack (r1 - 80)
   bool floats = false;
-  uint32_t node = Load(base, skeleton + 136);
-  uint32_t out = Load(base, skeleton + 148);
-  uint32_t file_matrix = Load(base, skeleton + 104);
+  uint32_t node = sk.node_states();
+  uint32_t out = sk.matrices();
+  uint32_t file_matrix = sk.file_matrices();
   int32_t count = int32_t(SkeletonNodeCount(base, skeleton));
   if (count > 0) {
     floats = true;
-    const double two_pi = Lfs(base, 0x82001FA8);
-    const double inverse = Lfs(base, 0x82001FA4);
+    const double two_pi = G::two_pi(base);
+    const double inverse = G::inverse_two_pi(base);
     uint32_t record = 0;
     for (int32_t i = 0; i < count; i++) {
-      if (int32_t(Load(base, Load(base, skeleton + 84) + record + 132)) <= 4) {
+      if (int32_t(Load(base, sk.node_records() + record + 132)) <= 4) {
         // The angles into [-pi, pi]: pi with each one's sign (its stored
         // bits ORed into 0x40490FDB), added, times 1 / (2 pi), truncated,
         // that many 2 pi taken off.
@@ -1080,14 +1132,14 @@ bool SkeletonLocalMatrices(uint8_t* base, uint32_t skeleton, uint32_t stack) {
   }
   // The bones (+132 bit 0x80) from the file's first bone ([+80] +12), [+80]
   // + 8 of them: their 144-byte records from +140, no wrap or scale.
-  const uint32_t file = Load(base, skeleton + 80);
+  const uint32_t file = sk.node_file();
   const uint32_t first = Load(base, file + 12) << 6;
-  out = Load(base, skeleton + 148) + first;
-  file_matrix = first + Load(base, skeleton + 104);
-  uint32_t bone = Load(base, skeleton + 140);
-  for (int32_t k = 0; k < int32_t(Load(base, Load(base, skeleton + 80) + 8)); k++) {
-    const uint32_t index = Load(base, Load(base, skeleton + 80) + 12) + uint32_t(k);
-    if ((Load(base, index * 160 + Load(base, skeleton + 84) + 132) & 0x80) != 0) {
+  out = sk.matrices() + first;
+  file_matrix = first + sk.file_matrices();
+  uint32_t bone = sk.bone_states();
+  for (int32_t k = 0; k < int32_t(Load(base, sk.node_file() + 8)); k++) {
+    const uint32_t index = Load(base, sk.node_file() + 12) + uint32_t(k);
+    if ((Load(base, index * 160 + sk.node_records() + 132) & 0x80) != 0) {
       floats = true;
       StoreIdentity(base, frame + 144);
       Copy64(base, frame + 144, out);
@@ -1114,62 +1166,69 @@ bool SkeletonLocalMatrices(uint8_t* base, uint32_t skeleton, uint32_t stack) {
 
 void SkeletonApplyAnimation(uint8_t* base, uint32_t skeleton) {
   ITC_NATIVE_RUNNING("sub_825998B8 Skeleton::ApplyAnimation");
-  uint32_t cursor = Load(base, skeleton + 128);
-  if (Load(base, cursor + 0) == 0) {
+  const Skel sk(base, skeleton);
+  Cursor cursor = sk.cursors();
+  if (!cursor.section()) {
     return;
   }
-  uint32_t entry = Load(base, cursor + 8);
-  if (!(int32_t(Load(base, Load(base, cursor + 4))) > 0)) {
+  uint32_t entry = cursor.entries().address;
+  if (!(int32_t(Load(base, cursor.entry_count_pointer())) > 0)) {
     return;
   }
   uint32_t offset = 0;
   int32_t i = 0;
   do {
-    const uint32_t node = Load(base, entry + 0);
-    const uint32_t entry_now = Load(base, cursor + 8) + offset;
-    const uint32_t time_at = (node << 4) + Load(base, skeleton + 176);
-    const uint32_t records = Load(base, skeleton + 136);
-    const uint32_t section = Load(base, cursor + 0);
-    const uint32_t channels = Load(base, entry + 4);
+    const NodeEntry e(base, entry);
+    const uint32_t node = e.node();
+    const NodeEntry entry_now(base, cursor.entries().address + offset);
+    // The node values (a float4 a node, +8 its time) and the node states
+    // (144 bytes, the channels' cursor words from +64) are arrays.
+    const uint32_t time_at = (node << 4) + sk.node_values();
+    const uint32_t records = sk.node_states();
+    const uint32_t section = cursor.section().address;
+    const uint32_t channels = e.channel_count();
     const uint32_t record = node * 144 + records;
-    uint32_t channel = Load(base, entry_now + 8) + section;
+    uint32_t channel = entry_now.channels_offset() + section;
     const double time = Lfs(base, time_at + 8);
     if (int32_t(channels) > 0) {
       int32_t j = 0;
       do {
-        const uint32_t component = Load(base, channel + 4);
-        const uint32_t keys = channel + 8;
-        const uint32_t key_count = Load(base, channel + 0);
+        const Channel c(base, channel);
+        const uint32_t component = c.component();
+        const uint32_t keys = c.keys_address();
+        const uint32_t key_count = c.key_count();
         const double value = CursorCurveSample(base, keys, ((component + 16) << 2) + record,
                                                key_count, time);
         Stfs(base, (component << 2) + record, value);
-        channel = Load(base, channel + 0) * 20 + keys;
+        channel = c.key_count() * 20 + keys;
         j++;
-      } while (j < int32_t(Load(base, entry + 4)));
+      } while (j < int32_t(e.channel_count()));
     }
-    cursor = Load(base, skeleton + 128);
+    cursor = sk.cursors();
     i++;
     offset += 20;
     entry += 20;
-  } while (i < int32_t(Load(base, Load(base, cursor + 4))));
+  } while (i < int32_t(Load(base, cursor.entry_count_pointer())));
 }
 
 bool PrimitiveDrawerConstruct(uint8_t* base, uint32_t drawer) {
   ITC_NATIVE_RUNNING("sub_825A1378 PrimitiveDrawer::PrimitiveDrawer");
-  Store(base, drawer + 0, kPrimitiveDrawerVtable);
+  const schema::PrimitiveDrawer d(base, drawer);
+  d.set_vtable(schema::PrimitiveDrawer::kVtable);
   const auto block = memory::crt::OperatorNew(base, 4);
   if (!block) {
     return false;
   }
-  Store(base, drawer + 4, *block);
+  d.set_declaration(*block);
   return true;
 }
 
 void RecordClear(uint8_t* base, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_825A18D8 RecordClear");
-  Stfs(base, record + 0, Lfs(base, kZero));
-  Store(base, record + 4, 0);
-  Store(base, record + 8, 0);
+  const schema::PhysicalPadRecord rec(base, record);
+  rec.set_unknown_0(float(Lfs(base, kZero)));
+  rec.set_unknown_4(0);
+  rec.set_unknown_8(0);
 }
 
 }  // namespace model_animation

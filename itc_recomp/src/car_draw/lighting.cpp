@@ -11,6 +11,7 @@
 #include "debug/frame_state_diff.h"
 #include "guest.h"
 #include "hooks/lights.h"
+#include "schema/car_draw.h"
 
 #include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
@@ -25,7 +26,8 @@ namespace {
 
 using Fpscr = ::base::FloatMode;
 
-constexpr uint32_t kScene = 0x826C2E44;
+using G = schema::CarDrawGlobals;
+
 constexpr uint32_t kOne = 0x82000A30;           // 1.0
 constexpr uint32_t kZero = 0x82000A34;          // 0.0
 constexpr uint32_t kMergeDistance = 0x820021F8;  // also c43's base
@@ -126,13 +128,14 @@ void MatrixShadow(uint8_t* base, uint32_t out, uint32_t light, uint32_t point, u
   ITC_NATIVE_RUNNING("sub_82597FE0 Matrix::Shadow");
   const uint32_t n = stack - 16;
   // The loads before the normalized normal's store, in the original's order.
-  const double py = Lfs(base, point + 4);
-  const double lx = Lfs(base, light + 0);
-  const double pz = Lfs(base, point + 8);
-  const double lz = Lfs(base, light + 8);
-  const double px = Lfs(base, point + 0);
-  const double ly = Lfs(base, light + 4);
-  const double lw = Lfs(base, light + 12);
+  const schema::ShadowVector p(base, point), l(base, light);
+  const double py = double(p.y());
+  const double lx = double(l.x());
+  const double pz = double(p.z());
+  const double lz = double(l.z());
+  const double px = double(p.x());
+  const double ly = double(l.y());
+  const double lw = double(l.w());
   {
     FlushToZero ftz;
     StoreVector(base, n, Normalize(VectorAt(base, normal), Half()));
@@ -174,21 +177,22 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
   const uint32_t out = uint32_t(out_r3);
   const uint32_t frame = stack - kGatherFrame;
   guest::StoreU32(base, frame, stack);  // the back chain, as stwu
-  const uint32_t block = guest::LoadU32(base, kScene) + 5248;
+  const schema::CarScene scene_at_entry = G::scene(base);
   const double f29 = Lfs(base, kZero);
   guest::StoreU32(base, stack + 20, out);
   guest::StoreU32(base, stack + 36, flag);
   const double f31 = Lfs(base, kOne);
-  const double f24 = Lfs(base, block + 272);
+  const double f24 = double(scene_at_entry.lighting_end());
   Stfs(base, frame + 144, f29);
   Stfs(base, frame + 148, f31);
   Stfs(base, frame + 152, f29);
   Stfs(base, frame + 156, f29);
-  // The scene's lighting vectors (+96, +112, +240, +256) into the frame.
-  CopyWords(base, frame + 240, block + 96, 4);
-  CopyWords(base, frame + 224, block + 112, 4);
-  CopyWords(base, frame + 256, block + 240, 4);
-  CopyWords(base, frame + 272, block + 256, 4);
+  // The scene's lighting vectors (its lighting block's +96, +112, +240,
+  // +256) into the frame.
+  CopyWords(base, frame + 240, scene_at_entry.gather_vector_a_lo_address(), 4);
+  CopyWords(base, frame + 224, scene_at_entry.gather_vector_b_lo_address(), 4);
+  CopyWords(base, frame + 256, scene_at_entry.cone_a_lo_address(), 4);
+  CopyWords(base, frame + 272, scene_at_entry.cone_b_lo_address(), 4);
   for (uint32_t i = 0; i < 10; i++) {
     guest::StoreU32(base, out + 4 * i, 0);
   }
@@ -206,8 +210,7 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
   Stfs(base, frame + 160, f28);
   debug::Vec4Transform(base, frame + 112, world, frame + 112);
   {
-    const double cone = Single(Lfs(base, guest::LoadU32(base, kScene) + 5500) *
-                               Lfs(base, kConeScale));
+    const double cone = Single(double(G::scene(base).cone_angle()) * Lfs(base, kConeScale));
     const double least = Single(c_runtime::Cos(cone));
     const uint32_t owner = guest::LoadU32(base, kLightSets);
     const double farthest = Lfs(base, kFarthest);
@@ -224,7 +227,7 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
     }
     uint32_t count = uint32_t(r3);
     if (count != 0) {
-      uint32_t scene = guest::LoadU32(base, kScene);
+      schema::CarScene scene = G::scene(base);
       simde__m128 half;
       {
         FlushToZero ftz;
@@ -241,7 +244,7 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
         Stfs(base, frame + 96, Single(Lfs(base, entry) - Lfs(base, frame + 112)));
         Stfs(base, frame + 108, f31);
         Stfs(base, at - 12, f31);
-        const double angle = Lfs(base, scene + 5500);
+        const double angle = double(scene.cone_angle());
         {
           FlushToZero ftz;
           StoreVector(base, frame + 96, Normalize(VectorAt(base, frame + 96), half));
@@ -272,8 +275,8 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
             MatrixShadow(base, r3, entry, frame + 112, frame + 176, frame);
           }
         }
-        scene = guest::LoadU32(base, kScene);
-        if (guest::LoadU32(base, scene + 5052) == 0 && int32_t(i) <= 1) {
+        scene = G::scene(base);
+        if (scene.lighting_fixed() == 0 && int32_t(i) <= 1) {
           const double cx = Single(Lfs(base, at - 8) * f30);
           const double cy = Single(Lfs(base, at - 4) * f30);
           const double cz = Single(Lfs(base, at + 0) * f30);

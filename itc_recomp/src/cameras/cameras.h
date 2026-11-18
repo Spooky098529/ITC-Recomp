@@ -20,6 +20,7 @@
 #pragma once
 
 #include "c_runtime/exit.h"
+#include "schema/cameras.h"
 
 #include <cstdint>
 #include <functional>
@@ -81,13 +82,14 @@ void Construct(uint8_t* base, uint32_t camera, uint32_t frame);
 // zoom, +564 the clear color, +572 the clear depth, +576 and +580 its
 // surfaces, +584 its type (0-20), +588 whether it's enabled.
 
-constexpr uint32_t kPasses = 0x826BAC00;
-constexpr uint32_t kPassBytes = 592;
+constexpr uint32_t kPasses = schema::CamerasGlobals::passes_address();
+constexpr uint32_t kPassBytes = schema::CameraPass::kSize;
 constexpr uint32_t kPassCount = 21;
 // The mode (CameraPasses::SetMode), the render targets' textures, the
-// viewports' block.
-constexpr uint32_t kMode = 0x826BABC0;
-constexpr uint32_t kViewports = 0x826C2CE8;
+// viewports' block (schema/cameras.h names them; these for other areas'
+// code).
+constexpr uint32_t kMode = schema::CamerasGlobals::mode_address();
+constexpr uint32_t kViewports = schema::CamerasGlobals::viewports_address();
 
 constexpr uint32_t Pass(uint32_t i) {
   return kPasses + kPassBytes * i;

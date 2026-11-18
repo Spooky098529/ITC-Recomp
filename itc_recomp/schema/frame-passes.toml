@@ -1,0 +1,168 @@
+# The schema of docs/functions/frame-passes.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+
+# The frame passes object (44 bytes, Framework::Init's, kept at the
+# framework's +108; known-data.md, "frame passes"). +8 to +43 is the boot
+# job, a 36-byte work item (known-data.md, "work item"; the same layout as
+# DebugText + 8 and the morph job's +184), named here with its own offset
+# in the comments.
+[FramePasses]
+measure = "FramePasses"
+size = 44
+origin = "allocated"
+vtable = 0x82000F20
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "FramePassesVtable" },
+  { name = "services", offset = 4, type = "ptr", to = "FramePassesServices", note = "the framework's +52 interface (slots 1 the first worker pool, 2 the renderer, 3 the scene)" },
+  { name = "job_vtable", offset = 8, type = "u32", note = "the job's +0: 0x820066DC" },
+  { name = "job_interface", offset = 12, type = "u32", note = "the job's +4: 0x82000AB4, then 0x82002908" },
+  { name = "job_worker_value", offset = 16, type = "u32", note = "the job's +8: a worker's value (set when it starts)" },
+  { name = "job_state", offset = 20, type = "u32", note = "the job's +12: 1 queued, 2 running, 3 done" },
+  { name = "job_skip", offset = 24, type = "u8", note = "the job's +16: the run isn't made when set" },
+  { name = "job_post_arg", offset = 25, type = "u8", note = "the job's +17: the post's r5 (1)" },
+  { name = "job_posted", offset = 26, type = "u8", note = "the job's +18: set while posted, cleared by Job::Wait" },
+  { name = "job_waiter", offset = 28, type = "ptr", to = "FramePassesJobWaiter", note = "the job's +20: the pool's waiter (copied unset from the constructor's frame until the post sets it)" },
+  { name = "job_delegate_vtable", offset = 32, type = "u32", note = "the job's +24: a member delegate's vtable 0x82002850 (0x82000ABC when destroyed)" },
+  { name = "job_delegate_object", offset = 36, type = "ptr", to = "FramePasses", note = "the delegate's object: this" },
+  { name = "job_delegate_target", offset = 40, type = "fn", note = "sub_82096330, the thunk to slot 0 (FramePasses::Boot)" },
+]
+
+# FramePasses' vtable (0x82000F20 in the image).
+[FramePassesVtable]
+measure = "FramePasses.+0"
+size = 28
+origin = "image"
+fields = [
+  { name = "slot_0_boot", offset = 0, type = "fn" },
+  { name = "slot_1_record", offset = 4, type = "fn" },
+  { name = "slot_2_flip_work_mem", offset = 8, type = "fn" },
+  { name = "slot_3_on_event", offset = 12, type = "fn" },
+  { name = "slot_4_deleting_destructor", offset = 16, type = "fn" },
+  { name = "slot_5_record_constants", offset = 20, type = "fn", note = "FramePasses::Record declines unless it is sub_82096360" },
+  { name = "slot_6_record_samplers", offset = 24, type = "fn", note = "FramePasses::Record declines unless it is sub_82096030" },
+]
+
+# The framework's +52 interface as FramePasses keeps it at its +4.
+[FramePassesServices]
+measure = "FramePasses.+4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "FramePassesServicesVtable" },
+]
+
+[FramePassesServicesVtable]
+measure = "FramePasses.+4.+0"
+size = 16
+origin = "image"
+fields = [
+  { name = "slot_1_worker_pool", offset = 4, type = "fn", note = "the first worker pool (framework + 68)" },
+  { name = "slot_2_renderer", offset = 8, type = "fn", note = "the renderer (framework + 76)" },
+  { name = "slot_3_scene", offset = 12, type = "fn", note = "the scene (framework + 80)" },
+]
+
+# FramePasses::FramePasses' r4: the block Framework::Init passes.
+[FramePassesBlock]
+measure = "FramePasses::FramePasses.r4"
+size = 8
+origin = "stack"
+fields = [
+  { name = "run_loop", offset = 0, type = "ptr", to = "FramePassesRunLoop" },
+  { name = "services", offset = 4, type = "ptr", to = "FramePassesServices", note = "the framework's +52 interface, kept at +4" },
+]
+
+# The run loop (App::Run's, vtable 0x82000FE8; framework.md's RunLoop and
+# app-start-up.md's AppRunLoop, the same object: to merge there) as
+# FramePasses::FramePasses and FramePasses::OnEvent meet it. The measure
+# joins the constructor's loads of the vtable's slots (+4, +8 of the
+# vtable) with the run loop itself (a measure fault): they fall in the
+# tick handler map's words here.
+[FramePassesRunLoop]
+measures = ["FramePasses::FramePasses.r4.+0", "FramePasses::OnEvent.r4"]
+size = 52
+origin = "embedded"
+vtable = 0x82000FE8
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "FramePassesRunLoopVtable" },
+  { name = "tick_handlers", offset = 4, type = "u32", note = "the tick handler map (a std::map by key): its first word" },
+  { name = "tick_handlers_head", offset = 8, type = "u32", note = "the tick handler map's head node" },
+]
+
+# The run loop's vtable (0x82000FE8 in the image).
+[FramePassesRunLoopVtable]
+measure = "FramePasses::OnEvent.r4.+0"
+size = 20
+origin = "image"
+fields = [
+  { name = "slot_1_add_listener", offset = 4, type = "fn" },
+  { name = "slot_2_add_tick_handler", offset = 8, type = "fn" },
+  { name = "slot_3_remove_listener", offset = 12, type = "fn" },
+  { name = "slot_4_remove_tick_handler", offset = 16, type = "fn" },
+]
+
+# The event the run loop gives its listeners (FramePasses::OnEvent's r5).
+[FramePassesEvent]
+measure = "FramePasses::OnEvent.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "code", offset = 0, type = "u32", note = "1: the tick handlers 3 and 20 and the listener for event 8 removed" },
+]
+
+# A delegate's object as the slot thunks sub_82096320 (slot 3) and
+# sub_82096350 (slot 2) meet it: FramePasses in play, others not read.
+[FramePassesDelegateObject]
+measures = ["sub_82096320.r3", "sub_82096350.r3"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "FramePassesDelegateObjectVtable" },
+]
+
+[FramePassesDelegateObjectVtable]
+measures = ["sub_82096320.r3.+0", "sub_82096350.r3.+0"]
+size = 16
+origin = "image"
+fields = [
+  { name = "slot_2", offset = 8, type = "fn", note = "sub_82096350's target" },
+  { name = "slot_3", offset = 12, type = "fn", note = "sub_82096320's target" },
+]
+
+# A work item's +20 (Job::Wait's): the pool's waiter interface (pool - 4).
+[FramePassesJobWaiter]
+measure = "Job.+20"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "FramePassesJobWaiterVtable" },
+]
+
+[FramePassesJobWaiterVtable]
+measure = "Job.+20.+0"
+size = 8
+origin = "image"
+fields = [
+  { name = "slot_1_wait", offset = 4, type = "fn", note = "called by Job::Wait with r4 = the job (probably the pool's wait)" },
+]
+
+[globals]
+work_mem_current = { address = 0x8296B780, type = "u32", note = "the work memory's current buffer (0 or 1), flipped by WorkMem::Flip" }
+work_mem_buffer_words = { address = 0x8296B784, type = "bytes", count = 8, note = "a word per buffer, zeroed for the new one by WorkMem::Flip (not read further)" }
+work_mem_headers_used = { address = 0x8296B798, type = "bytes", count = 8, note = "the vertex buffer headers used, a word per buffer" }
+work_mem_bytes_used = { address = 0x8296B7A0, type = "bytes", count = 8, note = "the bytes used, a word per buffer" }
+lod_bias = { address = 0x8296B8F4, type = "f32", note = "the samplers' LOD bias" }
+sort_key_group1 = { address = 0x8296B900, type = "u32", note = "the render queue's group 1 key (270 every pass)" }
+sort_key_depth = { address = 0x8296B908, type = "u32", note = "the render queue's depth key (163 every pass)" }
+sort_key_group0 = { address = 0x8296B90C, type = "u32", note = "the render queue's group 0 key (168 every pass)" }
+command_list = { address = 0x8296B918, type = "ptr", to = "CommandList", note = "the command list the primitive reset is recorded on" }
+render_queue = { address = 0x8296B91C, type = "u32", note = "the render queue the primitive reset is added to (its slot 4)" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0: Clear Z, the queue key, viewport min Z" }
+one = { address = 0x82000A30, type = "f32", note = "1.0: viewport max Z" }
+slope_bias = { address = 0x82000F18, type = "f32", note = "-8.0 (render state 204)" }
+depth_bias = { address = 0x82000F1C, type = "f32", note = "-0.0001 (render state 208)" }
+vertex_c86 = { address = 0x8265ED20, type = "bytes", count = 16, note = "vertex constant c86 (zero in the image, written at run time)" }
+pixel_c76 = { address = 0x8265ED30, type = "bytes", count = 16, note = "pixel constant c76 (zero in the image, written at run time)" }
+scene_target = { address = 0x8266D08C, type = "u32", note = "the scene target SceneTarget::RecordPasses is given" }

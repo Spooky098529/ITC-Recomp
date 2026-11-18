@@ -25,6 +25,7 @@
 #include "camera_modes/camera_modes.h"
 
 #include "guest.h"
+#include "schema/camera_modes.h"
 
 #include <span>
 
@@ -439,7 +440,7 @@ uint32_t CutsceneScripts(uint8_t* base, uint32_t cutscene, uint32_t script, uint
                          uint32_t frame, const CutsceneScriptCalls& calls) {
   const uint32_t f = frame;
   const uint32_t cues = f + 120;
-  const uint32_t shots = cutscene + 952;
+  const uint32_t shots = schema::Cutscene(base, cutscene).shots_address();
   for (const Step& step : kScripts[script]) {
     switch (step.kind) {
       case Kind::kWord:
@@ -466,7 +467,7 @@ uint32_t CutsceneScripts(uint8_t* base, uint32_t cutscene, uint32_t script, uint
         const uint32_t position =
             step.kind == Kind::kCueFirst
                 ? 0
-                : uint32_t(int32_t(int16_t(guest::LoadU16(base, cues + 72))));
+                : uint32_t(int32_t(int16_t(schema::List16(base, cues).count())));
         uint32_t to = 0;
         if (!List16Insert(base, cues, f + 80, position, 32, &to)) {
           calls.insert32(to, f + 80, 32, step.value);
@@ -478,7 +479,7 @@ uint32_t CutsceneScripts(uint8_t* base, uint32_t cutscene, uint32_t script, uint
         CutsceneInit(base, f + 784, f + 112, f - 192, calls.shot);
         break;
       case Kind::kAddShot: {
-        const uint32_t position = uint32_t(int32_t(int16_t(guest::LoadU16(base, shots + 72))));
+        const uint32_t position = uint32_t(int32_t(int16_t(schema::List16(base, shots).count())));
         uint32_t to = 0;
         if (!List16Insert(base, shots, f + 784, position, 608, &to)) {
           calls.insert608(to, f + 784, 608, step.value);

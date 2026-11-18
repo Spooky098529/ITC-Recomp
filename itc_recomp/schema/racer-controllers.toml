@@ -1,0 +1,93 @@
+# The schema of docs/functions/racer-controllers.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The racer controllers (src/racer_controllers/): what fills each car's
+# input record every tick. Not here: the car input record itself (20
+# bytes, ai-drivers.toml's CarInput; the measure also calls it
+# PlayerControl, ReadPad's r3, InputRecording, Append's r3, and
+# sub_82102A28.r3, Next's r3), the action mapper the measure calls
+# "Pad.+0" (its +2888 the player, action-mappers.toml's ActionMapper), the
+# race data (the measure's Racers), the vehicles and the input recordings'
+# block ([0x826C5B4C]).
+
+# The race flow (the race mode's +97548; RaceFlow::Init sub_82160AE0 sets
+# it up, race-flow.md): a StateMachine (game-modes.toml) with the racer
+# controllers' words after its count and state. Its handlers get it as r3.
+[RaceFlow]
+measure = "RaceFlow"
+size = 9620
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateTransition, game-modes.toml); 53 added by RaceFlow::Init" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32", note = "1 at set-up, 3 from RaceFlow::OnAbort (sub_8215F7B0)" },
+  { name = "flags", offset = 9608, type = "u32", note = "bit 0x1 set by RaceFlow::OnSetUp (unless the stage is of type 2 or 3, or kind 6's stage word +0 isn't 1)" },
+  { name = "player_a", offset = 9612, type = "u32", note = "the player of the human car whose vehicle flags (+6148) have 0x1 (0)" },
+  { name = "player_b", offset = 9616, type = "u32", note = "the player of the human car whose vehicle flags have 0x80 (1, or 0 when the race data's +0xA3AF0 is 6)" },
+]
+
+# The race mode's dispatcher (the race mode's +36; game-modes.toml's
+# RaceMode names the same words there): the race flow's handlers' r4, and
+# PlayerControl::ReadPad's r6 (the owner the pause messages go to).
+# Posting a message appends (id, 0, 0) to its ring.
+[RacerControlsDispatcher]
+measures = ["RaceFlow::OnState23.r4", "PlayerControl::ReadPad.r6"]
+size = 812
+origin = "embedded"
+fields = [
+  { name = "handlers", offset = 0, type = "bytes", count = 200, note = "50 handler pointers (state machines)" },
+  { name = "handler_count", offset = 200, type = "u32" },
+  { name = "ring", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (ModeMessage, game-modes.toml): 29 and 30 the pause (probably), 34 the replay's end posted here" },
+  { name = "ring_count", offset = 804, type = "u32" },
+  { name = "ring_start", offset = 808, type = "u32", note = "the ring's first slot" },
+]
+
+# A player's action mapper entry (0x826BAB80 + 8 x [0x826BABA4 + 4 x
+# player]), as Pad::IsConnected and Pad::IsWheel get it (r3) and
+# PlayerInput::Read reads it.
+[PlayerMapperEntry]
+measure = "Pad"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "mapper", offset = 0, type = "ptr", to = "ActionMapper", note = "the player's action mapper (+2888 the pad's player)" },
+  { name = "unread", offset = 4, type = "u32", note = "1 when the mapper isn't read (PlayerInput::Read answers 0)" },
+]
+
+# The word PlayerInput::Read and PlayerInput::Control write a control's
+# value into (r6; a word in the caller's frame): an integer for kinds 0 to
+# 3, a float for kind 4.
+[PlayerInputValue]
+measures = ["PlayerInput::Read.r6", "PlayerInput::Control.r6"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32", note = "kinds 0 to 2 a byte made a word (held, pressed, fired), 3 the analog word (signed)" },
+  { name = "value_float", offset = 0, type = "f32", note = "kind 4's float" },
+]
+
+# AiDriver::Setup's r5: the word that picks ResetControl (not 0) or
+# StartRace (0) after the profile is set.
+[AiDriverSetupHold]
+measure = "AiDriver::Setup.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "hold", offset = 0, type = "u32", note = "not 0: AiDriver::ResetControl (the driver held); 0: AiDriver::StartRace" },
+]
+
+[globals]
+race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (a pointer): +0x59620 the stages, +0x59AE4 the flags, +0xA3AD8 a finish count, +0xA3AF0 the kind (mode)" }
+input_records = { address = 0x826C5B30, type = "bytes", count = 28, note = "seven pointers to the cars' 20-byte input records (CarInput), by the racer's index; CarInputs::Create and Destroy" }
+input_recordings = { address = 0x826C5B4C, type = "u32", note = "the input recordings (a pointer): 0x107AC4 bytes a player, 54,000 records of 20 bytes, the count at +0x107AC0" }
+race = { address = 0x826D82F4, type = "u32", note = "the racers' manager (a pointer): +2308 the racers' records, +2364 their count" }
+input_manager = { address = 0x826BAB78, type = "u32", note = "the input manager (a pointer; ActionMappers::Init's object): slot 9 (+36) finds the pad object" }
+mapper_entries = { address = 0x826BAB80, type = "bytes", count = 32, note = "four 8-byte PlayerMapperEntry" }
+player_entries = { address = 0x826BABA4, type = "bytes", count = 16, note = "each player's mapper entry index" }
+pad_blocked0 = { address = 0x826C7960, type = "u32", note = "the pad blocked: ReadPad posts the pause (or returns) when either word is set" }
+pad_blocked1 = { address = 0x826C7964, type = "u32" }
+one = { address = 0x82000A30, type = "f32", note = "1.0: ReadPad's speed threshold" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }

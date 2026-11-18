@@ -24,19 +24,9 @@ namespace alt_hud {
 
 using Calls = race_hud_object::Calls;
 
-// The object's fields.
-constexpr uint32_t kShown = 0;      // node 3's flag (the toggle)
-constexpr uint32_t kTach = 4;       // the tachometer's curve (112 bytes)
-constexpr uint32_t kBoost = 116;    // the boost's curve (112 bytes)
-constexpr uint32_t kBar = 228;      // the bar's value, +232 and +236 its range
-constexpr uint32_t kCar = 240;      // Vehicle::Get(+260)
-constexpr uint32_t kSlots = 244;    // the three extra gauges' slots
-constexpr uint32_t kPlayer = 260;   // the player
-
+// The object's fields and the image words: schema::AltHud, AltHudHolder
+// and AltHudGlobals (itc_recomp/schema/alt-hud.toml).
 constexpr uint32_t kMovieId = 22;   // the dashboard's UI movie
-// The car input records ([0x826C5B30 + 4 x player]: +4 the throttle, +6
-// the brake, +8 the steering, signed halfwords).
-constexpr uint32_t kInputRecords = 0x826C5B30;
 
 // The guest functions called through `Calls`: memcpy where its plain C++
 // refuses, Car::SetupVehicle where its plain C++ refuses (its override),

@@ -25,6 +25,7 @@
 #include "hooks/direct_slots.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "schema/cameras.h"
 
 #include <functional>
 #include <optional>
@@ -268,7 +269,7 @@ bool CameraPassSetUpSurfaces(lifted::Regs& ctx, uint8_t* base) {
     cameras::SetUpSurfaces(
         base, frame, pass,
         {[&](int at) {
-           const uint32_t type = guest::LoadU32(base, pass + 584);
+           const uint32_t type = schema::CameraPass(base, pass).type();
            const ReturnAddresses r = at == 0 && type <= 20 ? kLock[type]
                                                           : ReturnAddresses{0x820A3950, 0x820A3960};
            return VideoOutputCall(ctx, base, r.first, r.second);
@@ -700,7 +701,7 @@ bool CameraUpdate(lifted::Regs& ctx, uint8_t* base) {
   });
   ctx.lr = lr;
   ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = camera + 144;
+  ctx.r3.u64 = schema::CameraPass(base, camera).view_projection_address();
   return true;
 }
 
@@ -739,7 +740,7 @@ ITC_REGS_STEP(RecordClear) {
 bool CameraPassRecordBegin(lifted::Regs& ctx, uint8_t* base) {
   static constexpr uint32_t kList[2] = {0x820A0CEC, 0x820A0CFC};
   const uint32_t pass = ctx.r3.u32;
-  const Route route = BeginRoute(guest::LoadU32(base, pass + 584));
+  const Route route = BeginRoute(schema::CameraPass(base, pass).type());
   if (!RecordPass(ctx, base, kList, route,
                   [&](uint32_t list) { return cameras::RecordBegin(base, list, pass); })) {
     ctx.r3.u64 = pass;
@@ -751,7 +752,7 @@ bool CameraPassRecordBegin(lifted::Regs& ctx, uint8_t* base) {
 bool CameraPassRecordEnd(lifted::Regs& ctx, uint8_t* base) {
   static constexpr uint32_t kList[2] = {0x820A1C5C, 0x820A1C6C};
   const uint32_t pass = ctx.r3.u32;
-  const Route route = EndRoute(guest::LoadU32(base, pass + 584));
+  const Route route = EndRoute(schema::CameraPass(base, pass).type());
   if (!RecordPass(ctx, base, kList, route, [&](uint32_t list) {
         return cameras::RecordEnd(base, list, pass, [&](uint32_t id) {
           // Through its override (the diagnostics' wrapper), as the original.
@@ -835,8 +836,10 @@ bool CameraPassUpdate(lifted::Regs& ctx, uint8_t* base) {
   // stop after the viewport size) or its view-projection (Matrix::Multiply's
   // out).
   ctx.fpscr.disableFlushMode();
-  const uint32_t type = guest::LoadU32(base, pass + 584);
-  ctx.r3.u64 = ((type >= 10 && type <= 18) || type == 20) ? pass : pass + 144;
+  const uint32_t type = schema::CameraPass(base, pass).type();
+  ctx.r3.u64 = ((type >= 10 && type <= 18) || type == 20)
+                   ? pass
+                   : schema::CameraPass(base, pass).view_projection_address();
   return true;
 }
 

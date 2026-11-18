@@ -10,14 +10,11 @@ namespace garage_screen {
 
 namespace {
 
-constexpr uint32_t kZero = 0x82000A34;        // the float 0.0
-constexpr uint32_t kValueTable = 0x8200A260;  // CarValue's weights (around it)
-constexpr uint32_t kPriceTable = 0x8200A348;  // SalePrice's constants
 
 // The weight of the car's part bit `n` (0 to 453) in CarValue: the address
 // of its float, or 0 for none (as the original's ranges test it).
 uint32_t WeightAt(uint32_t n) {
-  const uint32_t t = kValueTable;
+  const uint32_t t = G::value_weights_address();
   auto in = [n](uint32_t from, uint32_t to) { return n >= from && n <= to; };
   if (in(1, 9)) return t - 64 + 4 * n;
   if (in(11, 19)) return t - 104 + 4 * n;
@@ -51,7 +48,7 @@ double CarValue(uint8_t* base, uint32_t car, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82192378 GarageScreen::CarValue");
   // A leaf below the caller's frame: the count's doubleword at sp - 112.
   const double count = IntToFloat(base, sp - 112, Load(base, car + 1900));
-  double f1 = Lfs(base, kZero);
+  double f1 = double(G::zero(base));
   for (uint32_t n = 0; n < 454; n++) {
     // The part's bit in the words from +1904 (bit n mod 32 from the low end
     // of word n / 32).
@@ -71,17 +68,17 @@ uint64_t SalePrice(uint8_t* base, uint32_t car, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82192690 GarageScreen::SalePrice");
   const uint32_t frame = Frame(base, sp, 112);
   const double f13 = IntToFloat(base, frame + 80, Load(base, car + 1900));
-  const double f8 = double(float(f13 * Lfs(base, kPriceTable)));
+  const double f8 = double(float(f13 * double(G::price_constants(base))));
   const double value = CarValue(base, car, frame);
   // The factor: the first of nine thresholds (+52 on) not below the car's
   // float +1892 picks the one beside it (+84 on), the ninth's past them.
   const double mileage = Lfs(base, car + 1892);
   uint32_t i = 0;
-  while (i < 8 && Lfs(base, kPriceTable + 52 + 4 * i) < mileage) {
+  while (i < 8 && Lfs(base, G::price_constants_address() + 52 + 4 * i) < mileage) {
     i++;
   }
-  const double factor = Lfs(base, kPriceTable + 84 + 4 * i);
-  double f0 = double(float(value * Lfs(base, 0x82002208)));
+  const double factor = Lfs(base, G::price_constants_address() + 84 + 4 * i);
+  double f0 = double(float(value * double(G::value_factor(base))));
   f0 = double(float(f0 + f8));
   f0 = double(float(f0 * factor));
   Store(base, frame + 80, Fctiwz(f0));

@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "car_scene_draw/ops.h"
 #include "guest.h"
+#include "schema/front_end_car_draw.h"
 #include "scene/scene.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -15,10 +16,7 @@ namespace {
 
 using namespace car_scene_draw::ops;
 
-constexpr uint32_t kHalfDegree = 0x82009EA8;  // π/360 (0.5°)
-constexpr uint32_t kMinusPi = 0x820029C4;
-constexpr uint32_t kPi = 0x82002240;
-constexpr uint32_t kMirrored = 0x826C5100;  // the cull modes swapped (CarScene::Draw's readers)
+using G = schema::FrontEndCarDrawGlobals;
 
 constexpr uint32_t kGarageCameraUpdate = 0x8217BE98;
 constexpr uint32_t kPoseCar = 0x8217CAB8;
@@ -54,11 +52,11 @@ uint64_t GarageStageDraw(uint8_t* base, const Calls& calls, uint64_t r3, uint32_
   if (int32_t(turn) != 0) {
     // The yaw less 0.5°, wrapped: below -π to π, above π to -π.
     const uint32_t angles = Load(base, holder) + 80;
-    double yaw = Fsubs(Lfs(base, angles + 4), Lfs(base, kHalfDegree));
-    const double minus_pi = Lfs(base, kMinusPi);
+    double yaw = Fsubs(Lfs(base, angles + 4), double(G::half_degree(base)));
+    const double minus_pi = double(G::minus_pi(base));
     if (yaw < minus_pi) {
-      yaw = Lfs(base, kPi);
-    } else if (yaw > Lfs(base, kPi)) {
+      yaw = double(G::pi(base));
+    } else if (yaw > double(G::pi(base))) {
       yaw = minus_pi;
     }
     Stfs(base, angles + 4, yaw);
@@ -69,7 +67,7 @@ uint64_t GarageStageDraw(uint8_t* base, const Calls& calls, uint64_t r3, uint32_
     calls.call(kGarageCameraUpdate, regs, 1, nullptr, 0, f, 0x8217FF04, nullptr);
   }
   if (LoadS(base, Load(base, holder) + 6060) != 0) {
-    const double zero = Lfs(base, kZero);
+    const double zero = double(G::zero(base));
     GarageStageSetLightKit(base, calls, holder, 3, 0, 0, zero, zero, zero, f);
   }
   GarageStageSyncPlates(base, calls, holder, f);
@@ -84,7 +82,7 @@ uint64_t GarageStageDraw(uint8_t* base, const Calls& calls, uint64_t r3, uint32_
   Copy2(base, b + 664, stage + 56);
   stage = Load(base, holder);
   Copy2(base, b + 672, stage + 48);
-  const double one = Lfs(base, kOne);
+  const double one = double(G::one(base));
   Copy2(base, b + 680, stage + 56);
   stage = Load(base, holder);
   for (const uint32_t at : {92u, 108u, 124u, 140u}) {
@@ -103,7 +101,7 @@ uint64_t GarageStageDraw(uint8_t* base, const Calls& calls, uint64_t r3, uint32_
     return scene::SetInteriorWord(base, scene, word).value_or(uint32_t(r3_in));
   };
   const auto toggle_mirrored = [&]() {
-    Store(base, kMirrored, Load(base, kMirrored) == 0 ? 1 : 0);
+    G::set_mirrored(base, G::mirrored(base) == 0 ? 1 : 0);
   };
   const auto update = [&](uint64_t r3_in, uint32_t lr) {
     const uint64_t regs[1] = {r3_in};

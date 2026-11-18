@@ -1,0 +1,216 @@
+# The schema of docs/functions/car-settings.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The car settings screen: the type 2 mode's screen machine at its block's
+# +0x173D0 (and the type 5 mode's at its +848 block's +0), UI movie 3, where
+# the selected garage car's settings are adjusted page by page
+# (src/car_settings/). Its page object ([0x826D8458], 28 bytes) is a
+# PageObject and its menu ([0x826D845C], 68 bytes) a FrontEndMenu
+# (menu-helpers.toml's; the measure files them as
+# "new<28>@CarSettings::Create" and "new<68>@CarSettings::Create").
+
+# The screen's machine: a StateMachine (game-modes.toml) with a word of its
+# own after it, as the type 2 mode's other machines.
+[CarSettings]
+measure = "CarSettings"
+size = 9620
+origin = "embedded"
+fields = [
+  { name = "transitions", offset = 0, type = "bytes", count = 9600, note = "200 transitions, 48 bytes each (StateMachine's)" },
+  { name = "transition_count", offset = 9600, type = "u32" },
+  { name = "state", offset = 9604, type = "u32" },
+  { name = "loaded", offset = 9608, type = "u32", note = "1 once movie 3 is loaded (WaitForMovie)" },
+  { name = "reenter", offset = 9612, type = "u32", note = "nonzero: Create and WaitForMovie go to state 9 (open on its message)" },
+  { name = "delete_movie", offset = 9616, type = "u32", note = "as the type 2 mode's other machines (delete the movie on unload)" },
+]
+
+# The type 2 or type 5 mode as the handlers see it (r4): only its message
+# ring, which they post to.
+[CarSettingsMode]
+measures = ["CarSettings::Close.r4", "CarSettings::Leave.r4"]
+size = 812
+origin = "embedded"
+fields = [
+  { name = "messages", offset = 204, type = "bytes", count = 600, note = "50 messages of 12 bytes (id, two words)" },
+  { name = "message_count", offset = 804, type = "u32" },
+  { name = "message_start", offset = 808, type = "u32", note = "the ring's first slot" },
+]
+
+# The screen's data ([0x826D8460], 764 bytes, VirtualAlloc'ed by Create;
+# docs/known-data.md's "car settings"): three copies of the garage car's
+# settings, 116 bytes each (+0 the working copy, +116 the applied, +232 the
+# stock car's: floats the gear ratios and final drive, words one setting byte
+# of the car each), the best times of routes 8 to 10, the save's figures the
+# screen shows and the pages' state.
+[CarSettingsData]
+measure = "new<764>@CarSettings::Create"
+size = 764
+origin = "allocated"
+fields = [
+  { name = "working_gear_1", offset = 0, type = "f32", note = "car +40" },
+  { name = "working_gear_2", offset = 4, type = "f32", note = "car +44" },
+  { name = "working_gear_3", offset = 8, type = "f32", note = "car +48" },
+  { name = "working_gear_4", offset = 12, type = "f32", note = "car +52" },
+  { name = "working_gear_5", offset = 16, type = "f32", note = "car +56" },
+  { name = "working_gear_6", offset = 20, type = "f32", note = "car +60" },
+  { name = "working_final_drive", offset = 24, type = "f32", note = "car +36" },
+  { name = "working_setting_72", offset = 28, type = "u32", note = "car byte +72" },
+  { name = "working_setting_73", offset = 32, type = "u32", note = "car byte +73" },
+  { name = "working_setting_74", offset = 36, type = "u32", note = "car byte +74" },
+  { name = "working_setting_75", offset = 40, type = "u32", note = "car byte +75" },
+  { name = "working_setting_80", offset = 44, type = "u32", note = "car byte +80 (probably the front camber)" },
+  { name = "working_setting_81", offset = 48, type = "u32", note = "car byte +81 (probably the rear camber)" },
+  { name = "working_setting_78", offset = 52, type = "u32", note = "car byte +78" },
+  { name = "working_setting_79", offset = 56, type = "u32", note = "car byte +79" },
+  { name = "working_setting_82", offset = 60, type = "u32", note = "car byte +82" },
+  { name = "working_setting_83", offset = 64, type = "u32", note = "car byte +83" },
+  { name = "working_setting_84", offset = 68, type = "u32", note = "car byte +84" },
+  { name = "working_setting_85", offset = 72, type = "u32", note = "car byte +85" },
+  { name = "working_setting_86", offset = 76, type = "u32", note = "car byte +86" },
+  { name = "working_setting_87", offset = 80, type = "u32", note = "car byte +87" },
+  { name = "working_setting_88", offset = 84, type = "u32", note = "car byte +88" },
+  { name = "working_setting_89", offset = 88, type = "u32", note = "car byte +89" },
+  { name = "working_setting_94", offset = 92, type = "u32", note = "car byte +94" },
+  { name = "working_torque_share", offset = 96, type = "u32", note = "car byte +93 times 5 (probably the rear's torque share in percent)" },
+  { name = "working_setting_90", offset = 100, type = "u32", note = "car byte +90" },
+  { name = "working_setting_91", offset = 104, type = "u32", note = "car byte +91" },
+  { name = "working_setting_76", offset = 108, type = "u32", note = "car byte +76" },
+  { name = "working_setting_77", offset = 112, type = "u32", note = "car byte +77" },
+  { name = "applied_gear_1", offset = 116, type = "f32", note = "car +40" },
+  { name = "applied_gear_2", offset = 120, type = "f32", note = "car +44" },
+  { name = "applied_gear_3", offset = 124, type = "f32", note = "car +48" },
+  { name = "applied_gear_4", offset = 128, type = "f32", note = "car +52" },
+  { name = "applied_gear_5", offset = 132, type = "f32", note = "car +56" },
+  { name = "applied_gear_6", offset = 136, type = "f32", note = "car +60" },
+  { name = "applied_final_drive", offset = 140, type = "f32", note = "car +36" },
+  { name = "applied_setting_72", offset = 144, type = "u32", note = "car byte +72" },
+  { name = "applied_setting_73", offset = 148, type = "u32", note = "car byte +73" },
+  { name = "applied_setting_74", offset = 152, type = "u32", note = "car byte +74" },
+  { name = "applied_setting_75", offset = 156, type = "u32", note = "car byte +75" },
+  { name = "applied_setting_80", offset = 160, type = "u32", note = "car byte +80 (probably the front camber)" },
+  { name = "applied_setting_81", offset = 164, type = "u32", note = "car byte +81 (probably the rear camber)" },
+  { name = "applied_setting_78", offset = 168, type = "u32", note = "car byte +78" },
+  { name = "applied_setting_79", offset = 172, type = "u32", note = "car byte +79" },
+  { name = "applied_setting_82", offset = 176, type = "u32", note = "car byte +82" },
+  { name = "applied_setting_83", offset = 180, type = "u32", note = "car byte +83" },
+  { name = "applied_setting_84", offset = 184, type = "u32", note = "car byte +84" },
+  { name = "applied_setting_85", offset = 188, type = "u32", note = "car byte +85" },
+  { name = "applied_setting_86", offset = 192, type = "u32", note = "car byte +86" },
+  { name = "applied_setting_87", offset = 196, type = "u32", note = "car byte +87" },
+  { name = "applied_setting_88", offset = 200, type = "u32", note = "car byte +88" },
+  { name = "applied_setting_89", offset = 204, type = "u32", note = "car byte +89" },
+  { name = "applied_setting_94", offset = 208, type = "u32", note = "car byte +94" },
+  { name = "applied_torque_share", offset = 212, type = "u32", note = "car byte +93 times 5 (probably the rear's torque share in percent)" },
+  { name = "applied_setting_90", offset = 216, type = "u32", note = "car byte +90" },
+  { name = "applied_setting_91", offset = 220, type = "u32", note = "car byte +91" },
+  { name = "applied_setting_76", offset = 224, type = "u32", note = "car byte +76" },
+  { name = "applied_setting_77", offset = 228, type = "u32", note = "car byte +77" },
+  { name = "stock_gear_1", offset = 232, type = "f32", note = "car +40" },
+  { name = "stock_gear_2", offset = 236, type = "f32", note = "car +44" },
+  { name = "stock_gear_3", offset = 240, type = "f32", note = "car +48" },
+  { name = "stock_gear_4", offset = 244, type = "f32", note = "car +52" },
+  { name = "stock_gear_5", offset = 248, type = "f32", note = "car +56" },
+  { name = "stock_gear_6", offset = 252, type = "f32", note = "car +60" },
+  { name = "stock_final_drive", offset = 256, type = "f32", note = "car +36" },
+  { name = "stock_setting_72", offset = 260, type = "u32", note = "car byte +72" },
+  { name = "stock_setting_73", offset = 264, type = "u32", note = "car byte +73" },
+  { name = "stock_setting_74", offset = 268, type = "u32", note = "car byte +74" },
+  { name = "stock_setting_75", offset = 272, type = "u32", note = "car byte +75" },
+  { name = "stock_setting_80", offset = 276, type = "u32", note = "car byte +80 (probably the front camber)" },
+  { name = "stock_setting_81", offset = 280, type = "u32", note = "car byte +81 (probably the rear camber)" },
+  { name = "stock_setting_78", offset = 284, type = "u32", note = "car byte +78" },
+  { name = "stock_setting_79", offset = 288, type = "u32", note = "car byte +79" },
+  { name = "stock_setting_82", offset = 292, type = "u32", note = "car byte +82" },
+  { name = "stock_setting_83", offset = 296, type = "u32", note = "car byte +83" },
+  { name = "stock_setting_84", offset = 300, type = "u32", note = "car byte +84" },
+  { name = "stock_setting_85", offset = 304, type = "u32", note = "car byte +85" },
+  { name = "stock_setting_86", offset = 308, type = "u32", note = "car byte +86" },
+  { name = "stock_setting_87", offset = 312, type = "u32", note = "car byte +87" },
+  { name = "stock_setting_88", offset = 316, type = "u32", note = "car byte +88" },
+  { name = "stock_setting_89", offset = 320, type = "u32", note = "car byte +89" },
+  { name = "stock_setting_94", offset = 324, type = "u32", note = "car byte +94" },
+  { name = "stock_torque_share", offset = 328, type = "u32", note = "car byte +93 times 5 (probably the rear's torque share in percent)" },
+  { name = "stock_setting_90", offset = 332, type = "u32", note = "car byte +90" },
+  { name = "stock_setting_91", offset = 336, type = "u32", note = "car byte +91" },
+  { name = "stock_setting_76", offset = 340, type = "u32", note = "car byte +76" },
+  { name = "stock_setting_77", offset = 344, type = "u32", note = "car byte +77" },
+  { name = "route8_time", offset = 348, type = "u32", note = "route 8's best times: five 12-byte rows {the course record entry's +20, its +0, 1 when there}; row 0's first word" },
+  { name = "route8_entry_0", offset = 352, type = "u32", note = "the entry's +0" },
+  { name = "route8_present", offset = 356, type = "u32", note = "1 when there, 0 past the record's count" },
+  { name = "route8_rows", offset = 360, type = "bytes", count = 48, note = "rows 1 to 4" },
+  { name = "route9_time", offset = 408, type = "u32", note = "route 9's rows, as route 8's" },
+  { name = "route9_entry_0", offset = 412, type = "u32" },
+  { name = "route9_present", offset = 416, type = "u32" },
+  { name = "route9_rows", offset = 420, type = "bytes", count = 48 },
+  { name = "route10_time", offset = 468, type = "u32", note = "route 10's rows, as route 8's" },
+  { name = "route10_entry_0", offset = 472, type = "u32" },
+  { name = "route10_present", offset = 476, type = "u32" },
+  { name = "route10_rows", offset = 480, type = "bytes", count = 48 },
+  { name = "player_name", offset = 528, type = "bytes", count = 20, note = "the save's +8 to +27" },
+  { name = "money", offset = 548, type = "u32", note = "the save's +6116" },
+  { name = "weekday", offset = 552, type = "u32", note = "the day mod 7" },
+  { name = "day", offset = 556, type = "u32", note = "the save's +6100, at most 999" },
+  { name = "type5_mode", offset = 560, type = "u32", note = "1 in the type 5 mode (no test run, no stand car)" },
+  { name = "top_items", offset = 564, type = "u32", note = "5, or 4 in the type 5 mode (probably the top menu's item count)" },
+  { name = "course", offset = 568, type = "u32", note = "the test run's course picked, 0 to 3" },
+  { name = "dialog_answer", offset = 572, type = "u32", note = "0 yes, 1 no, 2 back" },
+  { name = "test_run_set_up", offset = 576, type = "u32", note = "1 once a test run is set up (Destroy then leaves the state at 11)" },
+  { name = "start_at_courses", offset = 580, type = "u32", note = "1 to start at the courses (ReenterToCourses)" },
+  { name = "allows_gears", offset = 584, type = "u32", note = "the tuning's +32 nonzero" },
+  { name = "allows_pages_9_10", offset = 588, type = "u32", note = "the tuning's +56 nonzero" },
+  { name = "allows_pages_11_16", offset = 592, type = "u32", note = "the tuning's +40 nonzero" },
+  { name = "allows_page_17", offset = 596, type = "u32", note = "the aero part's bit" },
+  { name = "spec_block2_100", offset = 600, type = "u32", note = "spec block 2's +100" },
+  { name = "gear_bounds", offset = 604, type = "bytes", count = 84, note = "seven 12-byte bounds of the gear ratios {min, max, ...}" },
+  { name = "drive_type", offset = 688, type = "u32", note = "block 2's byte +130 (probably the drive type; 4 both ends)" },
+  { name = "tuning_52", offset = 692, type = "u32", note = "the tuning's +52" },
+  { name = "car_data_388", offset = 696, type = "f32", note = "the car data's +388 (the gear page's speeds)" },
+  { name = "car_data_1280", offset = 700, type = "f32", note = "the car data's +1280 (the gear page's speeds)" },
+  { name = "unknown_704", offset = 704, type = "u32" },
+  { name = "stack", offset = 708, type = "bytes", count = 20, note = "a word stack" },
+  { name = "stack_count", offset = 728, type = "u32" },
+  { name = "apply_choice", offset = 732, type = "u32", note = "the apply item's choice: 0 apply, 1 the car's, 2 stock" },
+  { name = "previous_apply_choice", offset = 736, type = "u32" },
+  { name = "unknown_740", offset = 740, type = "u32", note = "0 at Fill" },
+  { name = "unknown_744", offset = 744, type = "u32", note = "Start: 0 when starting at the courses, else 1" },
+  { name = "unknown_748", offset = 748, type = "u32", note = "0 at Create, 1 at Fill" },
+  { name = "location", offset = 752, type = "u32", note = "the type 5 mode's location - 14, else 3 (Fill's SetText: string 369 + it)" },
+  { name = "unknown_756", offset = 756, type = "u32", note = "0 at Fill" },
+  { name = "unknown_760", offset = 760, type = "u32", note = "21 at Create, 10 at a test run" },
+]
+
+# A course record (408 bytes, docs/known-data.md's "course record": the save
+# data's 22 at +0x1D52C) as CourseRecord::Entry reads it (r4). Probably the
+# same object as "CourseRecords::Of.ret" (type67-screens.md's).
+[CourseRecord]
+measure = "CourseRecord::Entry.r4"
+size = 408
+origin = "embedded"
+fields = [
+  { name = "links", offset = 0, type = "bytes", count = 40, note = "ten halfword pairs: the entries' links (+0 the next, +2 the entry's index)" },
+  { name = "unknown_40", offset = 40, type = "u16" },
+  { name = "unknown_42", offset = 42, type = "u16" },
+  { name = "first", offset = 44, type = "u16", note = "the first link (the ranks followed from it)" },
+  { name = "unknown_46", offset = 46, type = "u16" },
+  { name = "count", offset = 48, type = "u16", note = "probably the entries' count" },
+  { name = "entries", offset = 52, type = "bytes", count = 280, note = "28 bytes each (CourseRecordEntry)" },
+  { name = "unknown_332", offset = 332, type = "bytes", count = 76, note = "a 76-byte record (cleared at the reset)" },
+]
+
+# A course record's 28-byte entry, as CourseRecord::Entry copies it out (r3).
+[CourseRecordEntry]
+measure = "CourseRecord::Entry.ret"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32", note = "the car settings' best time rows' second word" },
+  { name = "time", offset = 20, type = "u32", note = "probably the time: the best time rows' first word" },
+]
+
+[globals]
+pages = { address = 0x826D8458, type = "ptr", to = "PageObject" }
+menu = { address = 0x826D845C, type = "ptr", to = "FrontEndMenu", note = "a front-end menu (+16 = 4 at Create)" }
+data = { address = 0x826D8460, type = "ptr", to = "CarSettingsData" }

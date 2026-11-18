@@ -20,6 +20,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/framework.h"
 
 #include <optional>
 #include "lifted/sdk.h"
@@ -97,8 +98,8 @@ ITC_FRAMEWORK_WORD(82090908, SceneFrom36)
 // none reads it).
 ITC_NATIVE_ENTRY_ALWAYS(82091050) {
   ITC_FRAMEWORK_FALLBACK(82091050)
-  const uint32_t x = guest::LoadU32(base, ctx.r4.u32);
-  const uint32_t y = guest::LoadU32(base, ctx.r5.u32);
+  const uint32_t x = schema::DebugTextCoordinate(base, ctx.r4.u32).value();
+  const uint32_t y = schema::DebugTextCoordinate(base, ctx.r5.u32).value();
   fw::DebugTextSetPosition(base, ctx.r4.u32, ctx.r5.u32);
   ctx.r3.u64 = x;
   ctx.r4.u64 = y;
@@ -118,7 +119,8 @@ namespace {
 bool NativeHeap() { return ITC_FLAG(native_framework) && hooks::NativeHeapActive(); }
 
 fw::Iterator IteratorAt(uint8_t* base, uint32_t address) {
-  return {guest::LoadU32(base, address), guest::LoadU32(base, address + 4)};
+  const schema::HandlerMapIterator it(base, address);
+  return {it.map().address, it.node().address};
 }
 
 }  // namespace
@@ -131,7 +133,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82099B18) {
     lifted::original::c82099B18(ctx, base);
     return;
   }
-  guest::StoreU32(base, ctx.r3.u32 + 4, it.node);
+  schema::HandlerMapIterator(base, ctx.r3.u32).set_node(it.node);
 }
 
 // HandlerMap: r3 = the map; r3 the head.
@@ -161,9 +163,10 @@ ITC_NATIVE_ENTRY_ALWAYS(82093740) {
     lifted::original::c82093740(ctx, base);
     return;
   }
-  guest::StoreU32(base, ctx.r3.u32 + 0, result->where.container);
-  guest::StoreU32(base, ctx.r3.u32 + 4, result->where.node);
-  guest::StoreU8(base, ctx.r3.u32 + 8, result->inserted ? 1 : 0);
+  const schema::HandlerMapIterator answer(base, ctx.r3.u32);
+  answer.set_map(result->where.container);
+  answer.set_node(result->where.node);
+  answer.set_inserted(result->inserted ? 1 : 0);
 }
 
 // RequestVector::Clear: r3 = the vector; r3 the result in its 96-byte frame
@@ -297,24 +300,32 @@ ITC_NATIVE_ENTRY_ALWAYS(820902C8) {
   const uint32_t framework = ctx.r3.u32;
   const uint32_t loop = ctx.r4.u32;
   guest_call::InFrame(ctx, base, 128, 0x820902FC, [&](uint32_t frame) {
-    auto call = [&](uint32_t object, uint32_t offset, uint32_t r4, uint32_t return_address) {
+    // `target` reads the object's vtable slot (after r3 and r4 are set).
+    auto call = [&](uint32_t object, const auto& target, uint32_t r4, uint32_t return_address) {
       ctx.r3.u64 = object;
       ctx.r4.u64 = r4;
-      ctx.ctr.u64 = fw::VirtualTarget(base, object, offset);
+      ctx.ctr.u64 = target();
       ctx.lr = return_address;
       lifted::CallFromContext(ctx, base, ctx.ctr.u32);
       return ctx.r3.u32;
     };
     const fw::OnTickCalls calls{
-        [&](uint32_t manager, uint32_t key) { call(manager, 4, key, 0x820902FC); },
+        [&](uint32_t manager, uint32_t key) {
+          // InputManager::GetProcessor (the input manager's slot 1, input.md).
+          call(manager, [&] { return fw::VirtualTarget(base, manager, 4); }, key, 0x820902FC);
+        },
         [&](uint32_t app) {
           ctx.r3.u64 = app;
-          ctx.ctr.u64 = fw::VirtualTarget(base, app, 44);
+          ctx.ctr.u64 = schema::FrameworkAppInterface(base, app).vtable().is_running();
           ctx.lr = 0x82090314;
           lifted::CallFromContext(ctx, base, ctx.ctr.u32);
           return ctx.r3.u32;
         },
-        [&](uint32_t run_loop, uint32_t key) { call(run_loop, 16, key, 0x8209033C); }};
+        [&](uint32_t run_loop, uint32_t key) {
+          call(run_loop,
+               [&] { return schema::RunLoop(base, run_loop).vtable().remove_tick_handler(); }, key,
+               0x8209033C);
+        }};
     fw::FrameworkOnTick(base, framework, loop, frame + 80, calls);
   });
 }
@@ -334,20 +345,20 @@ void AddRequest(lifted::Regs& ctx, uint8_t* base, uint32_t type, uint32_t clone_
     const uint32_t request = frame + 80;
     const auto clone = [&](uint32_t object) {
       ctx.r3.u64 = object;
-      ctx.ctr.u64 = fw::VirtualTarget(base, object, 8);
+      ctx.ctr.u64 = schema::RunLoopDelegate(base, object).vtable().clone();
       ctx.lr = clone_return;
       lifted::CallFromContext(ctx, base, ctx.ctr.u32);
       return ctx.r3.u32;
     };
     const auto inserted = fw::RunLoopAddRequest(base, loop, type, key, delegate, request, clone);
     if (!inserted) {
-      ctx.r3.u64 = loop + fw::kRequests;
+      ctx.r3.u64 = schema::RunLoop(base, loop).requests_address();
       ctx.r4.u64 = request;
       ctx.lr = push_return;
       lifted::original::c8209A930(ctx, base);
       return;
     }
-    ctx.r3.u64 = *inserted ? frame - 16 : loop + fw::kRequests;
+    ctx.r3.u64 = *inserted ? frame - 16 : schema::RunLoop(base, loop).requests_address();
   });
 }
 
@@ -381,12 +392,13 @@ ITC_NATIVE_ENTRY_ALWAYS(8209AB48) {
 
 namespace {
 
-// A guest call of `object`'s slot at `offset` with the original's return
-// address; r3 its answer.
-uint32_t VirtualCallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t object, uint32_t offset,
+// A guest call of `object`'s vtable slot (`target` reads it, after r3 is
+// set) with the original's return address; r3 its answer.
+template <typename Target>
+uint32_t VirtualCallFrom(lifted::Regs& ctx, uint8_t* base, uint32_t object, const Target& target,
                          uint32_t return_address) {
   ctx.r3.u64 = object;
-  ctx.ctr.u64 = fw::VirtualTarget(base, object, offset);
+  ctx.ctr.u64 = target();
   ctx.lr = return_address;
   lifted::CallFromContext(ctx, base, ctx.ctr.u32);
   return ctx.r3.u32;
@@ -399,7 +411,10 @@ void PoolMaker(lifted::Regs& ctx, uint8_t* base, uint32_t vtable, uint32_t retur
   const uint32_t interface = ctx.r4.u32;
   guest_call::InFrame(ctx, base, 96, return_address, [&](uint32_t) {
     fw::PoolMakerConstruct(base, maker, vtable, interface, [&](uint32_t object) {
-      return VirtualCallFrom(ctx, base, object, 4, return_address);
+      return VirtualCallFrom(
+          ctx, base, object,
+          [&] { return schema::FrameworkInterface(base, object).vtable().slot_1(); },
+          return_address);
     });
   });
   ctx.r3.u64 = maker;
@@ -430,7 +445,11 @@ ITC_NATIVE_ENTRY_ALWAYS(82092710) {
         [&](uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate) {
           ctx.r4.u64 = key;
           ctx.r5.u64 = delegate;
-          VirtualCallFrom(ctx, base, loop, offset, offset == 8 ? 0x82092780 : 0x820927CC);
+          const auto slot = [&] {
+            const schema::RunLoopVtable vtable = schema::RunLoop(base, loop).vtable();
+            return offset == 8 ? vtable.add_tick_handler() : vtable.add_listener();
+          };
+          VirtualCallFrom(ctx, base, loop, slot, offset == 8 ? 0x82092780 : 0x820927CC);
         });
   });
   ctx.r3.u64 = frame_start;
@@ -452,7 +471,10 @@ ITC_NATIVE_ENTRY_ALWAYS(82091160) {
           guest_call::InFrame(ctx, base, 160, 0x82090F78, [&](uint32_t) {
             ctx.r4.u64 = job;
             ctx.r5.u64 = 1;
-            VirtualCallFrom(ctx, base, interface, 4, 0x82090F78);
+            VirtualCallFrom(
+                ctx, base, interface,
+                [&] { return schema::WorkerPoolInterface(base, interface).vtable().post(); },
+                0x82090F78);
           });
         });
       });

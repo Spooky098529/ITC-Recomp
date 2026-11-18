@@ -9,6 +9,7 @@
 #include "frame_passes/record.h"
 
 #include "models/model.h"
+#include "schema/frame_passes.h"
 
 #include <initializer_list>
 #include <utility>
@@ -17,11 +18,10 @@ namespace frame_passes::record {
 
 namespace {
 
+using G = schema::FramePassesGlobals;
+
 // The floats this part reads: 0.0 (the original's f31, loaded at part 1's
 // Clear), -8.0 (slope-scaled depth bias) and -0.0001 (depth bias).
-constexpr uint32_t kZero = 0x82000A34;
-constexpr uint32_t kSlopeBias = 0x82000F18;
-constexpr uint32_t kDepthBias = 0x82000F1C;
 
 // A float as the original moves it: loaded to a double, stored as a float.
 float LoadConverted(uint8_t* base, uint32_t address) {
@@ -121,13 +121,13 @@ void RecordPart2(Recorder& r) {
   r.Slot2(52, 0);
   {
     const uint32_t s = r.Slot();
-    FrameFloat(r, 80, LoadConverted(r.base, kDepthBias));
+    FrameFloat(r, 80, LoadConverted(r.base, G::depth_bias_address()));
     r.Store(s + 0, 44);
     r.Store(s + 4, 6);
   }
   {
     const uint32_t s = r.Slot();
-    FrameFloat(r, 84, LoadConverted(r.base, kSlopeBias));
+    FrameFloat(r, 84, LoadConverted(r.base, G::slope_bias_address()));
     r.Store(s + 0, 208);
     r.Store(s + 4, r.LoadFrame(80));
   }
@@ -137,7 +137,7 @@ void RecordPart2(Recorder& r) {
   // Head 8 (the frame's +120): the depth biases back to 0.0 (the original's
   // f31) through the frame's +80 and +84.
   r.StoreFrame(120, r.Head());
-  const float zero = LoadConverted(r.base, kZero);
+  const float zero = LoadConverted(r.base, G::zero_address());
   {
     const uint32_t s = r.Slot();
     FrameFloat(r, 80, zero);

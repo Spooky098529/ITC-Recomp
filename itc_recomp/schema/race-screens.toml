@@ -1,0 +1,307 @@
+# The schema of docs/functions/race-screens.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+
+[New4_PauseMenu_Create]
+measure = "new<4>@PauseMenu::Create"
+size = 4
+origin = "allocated"
+# 38 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[MenuList]
+measure = "MenuList"
+size = 1904
+origin = "allocated"
+# 29 functions; areas: alt-hud.md, car-dealer.md, car-list.md, front-end-screen-helpers.md, race-screens.md, save-data.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "ptr", to = "MenuList_20" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "ptr", to = "NewAny_MenuList_Init" },
+  { name = "unknown_228", offset = 228, type = "u32" },
+  { name = "unknown_232", offset = 232, type = "u32" },
+  { name = "unknown_1820", offset = 1820, type = "ptr", to = "MenuList" },
+  { name = "unknown_1900", offset = 1900, type = "u32" },
+]
+
+[New160_PauseMenu_Create]
+measure = "new<160>@PauseMenu::Create"
+size = 160
+origin = "allocated"
+# 29 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+  { name = "unknown_40", offset = 40, type = "u32" },
+  { name = "unknown_44", offset = 44, type = "u32" },
+  { name = "unknown_48", offset = 48, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "u32" },
+  { name = "unknown_56", offset = 56, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "unknown_64", offset = 64, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+  { name = "unknown_72", offset = 72, type = "u32" },
+  { name = "unknown_76", offset = 76, type = "u32" },
+  { name = "unknown_80", offset = 80, type = "u32" },
+  { name = "unknown_84", offset = 84, type = "u32" },
+  { name = "unknown_88", offset = 88, type = "u32" },
+  { name = "unknown_92", offset = 92, type = "u32" },
+  { name = "unknown_96", offset = 96, type = "u32" },
+  { name = "unknown_100", offset = 100, type = "u32" },
+  { name = "unknown_104", offset = 104, type = "u32" },
+  { name = "unknown_108", offset = 108, type = "u32" },
+  { name = "unknown_112", offset = 112, type = "u32" },
+  { name = "unknown_116", offset = 116, type = "u32" },
+  { name = "unknown_120", offset = 120, type = "u32" },
+  { name = "unknown_124", offset = 124, type = "u32" },
+  { name = "unknown_128", offset = 128, type = "u32" },
+  { name = "unknown_132", offset = 132, type = "u32" },
+  { name = "unknown_136", offset = 136, type = "u32" },
+  { name = "unknown_144", offset = 144, type = "u32" },
+  { name = "unknown_148", offset = 148, type = "ptr", to = "MenuList_20" },
+  { name = "unknown_152", offset = 152, type = "u32" },
+  { name = "unknown_156", offset = 156, type = "u32" },
+]
+
+[PauseMenu]
+measure = "PauseMenu"
+size = 4
+origin = "embedded"
+# 23 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "ptr", to = "UiMovies_Find_ret_0" },
+]
+
+[AfterRaceMenu]
+measure = "AfterRaceMenu"
+size = 36
+origin = "embedded"
+# 22 functions; areas: race-screens-unseen.md, race-screens.md, save-interface.md, type10-mode.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },  # also read as 2i/4i
+  { name = "unknown_2", offset = 2, type = "u16" },
+  { name = "unknown_6", offset = 6, type = "u16" },
+  { name = "unknown_8", offset = 8, type = "u16" },
+  { name = "unknown_10", offset = 10, type = "u16" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+]
+
+[CareerResults]
+measure = "CareerResults"
+size = 212
+origin = "allocated"
+# 14 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "f32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "f32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_164", offset = 164, type = "u32" },
+  { name = "unknown_168", offset = 168, type = "u32" },
+  { name = "unknown_172", offset = 172, type = "u32" },
+  { name = "unknown_180", offset = 180, type = "ptr", to = "UiMovies_Find_ret_0" },
+  { name = "unknown_184", offset = 184, type = "u32" },
+  { name = "unknown_196", offset = 196, type = "u32" },
+]
+
+[New4_AfterRaceMenu_Create]
+measure = "new<4>@AfterRaceMenu::Create"
+size = 4
+origin = "allocated"
+# 14 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[New40_RaceDialog_Create]
+measure = "new<40>@RaceDialog::Create"
+size = 40
+origin = "allocated"
+# 10 functions; areas: race-hud-object.md, race-screens.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_36", offset = 36, type = "u32" },
+]
+
+[New24_AfterRaceMenu_Create]
+measure = "new<24>@AfterRaceMenu::Create"
+size = 24
+origin = "allocated"
+# 7 functions; areas: race-hud-object.md, race-screens.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "ptr", to = "MenuList_20" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+]
+
+[New28_PauseMenu_Create]
+measure = "new<28>@PauseMenu::Create"
+size = 28
+origin = "allocated"
+# 5 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+]
+
+[New72_PauseMenu_Create]
+measure = "new<72>@PauseMenu::Create"
+size = 72
+origin = "allocated"
+# 4 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+]
+
+[NewAny_MenuList_Init]
+measure = "new<?>@MenuList::Init"
+size = 4
+origin = "embedded"
+# 4 functions; areas: race-screens.md, save-data.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceDialog]
+measure = "RaceDialog"
+size = 4
+origin = "embedded"
+# 3 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[ScreenPages]
+measure = "ScreenPages"
+size = 28
+origin = "embedded"
+# 3 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+]
+
+[New28_AfterRaceMenu_Create]
+measure = "new<28>@AfterRaceMenu::Create"
+size = 28
+origin = "allocated"
+# 3 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+]
+
+[New72_AfterRaceMenu_Create]
+measure = "new<72>@AfterRaceMenu::Create"
+size = 72
+origin = "allocated"
+# 3 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+]
+
+[New28_RaceDialog_Create]
+measure = "new<28>@RaceDialog::Create"
+size = 28
+origin = "allocated"
+# 2 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+]
+
+[New72_RaceDialog_Create]
+measure = "new<72>@RaceDialog::Create"
+size = 72
+origin = "allocated"
+# 2 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_60", offset = 60, type = "u32" },
+  { name = "unknown_68", offset = 68, type = "u32" },
+]
+
+[MenuList_20]
+measure = "MenuList.+20"
+size = -31524
+origin = "embedded"
+# 1 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_-31528", offset = -31528, type = "u32" },
+]
+
+[MenuList_20_31528]
+measure = "MenuList.+20.+-31528"
+size = 148
+origin = "embedded"
+# 1 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_144", offset = 144, type = "u32" },
+]
+
+[New4_PauseMenu_Create_0]
+measure = "new<4>@PauseMenu::Create.+0"
+size = 28
+origin = "embedded"
+# 1 functions; areas: race-screens.md
+fields = [
+  { name = "unknown_16", offset = 16, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+]

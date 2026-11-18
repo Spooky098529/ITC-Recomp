@@ -10,6 +10,7 @@
 #include "memory/c_runtime_heap.h"
 #include "c_runtime/strings.h"
 #include "native/refcount.h"
+#include "schema/graphics_resources.h"
 
 #include <array>
 #include <bit>
@@ -33,20 +34,25 @@ constexpr uint32_t kDataAttributes = 0x82800000;
 constexpr uint32_t kUsageWriteCombined = 0x4;
 constexpr uint32_t kUsage200 = 0x200;
 constexpr uint32_t kUnlocked = 0xFFFF0000;  // the locked ranges at +20 and +24
+using G = schema::GraphicsResourcesGlobals;
+using schema::BufferHeader;
+using schema::LevelDesc;
+using schema::ResourceHeader;
+using schema::SurfaceHeader;
+using schema::TextureHeader;
 // The formats' table (a halfword each, bits 8-11 a surface's format bits;
 // probably bits a pixel elsewhere).
-constexpr uint32_t kFormatTable = 0x82013468;
-// 1 while a depth surface holds the hi-z.
-constexpr uint32_t kHiZTaken = 0x829537C4;
+constexpr uint32_t kFormatTable = G::format_table_address();
 
 }  // namespace
 
 uint32_t ResourceType(uint8_t* base, uint32_t resource) {
   ITC_NATIVE_RUNNING("sub_822A6180 Resource::GetType");
-  const uint32_t common = Load(base, resource);
+  const ResourceHeader r(base, resource);
+  const uint32_t common = r.common();
   const uint32_t type = common & 0xF;
   if (type == 3) {
-    switch ((Load(base, resource + 48) >> 9) & 3) {
+    switch ((r.fetch_mips() >> 9) & 3) {
       case 3:
         return 18;  // cube
       case 2:
@@ -54,12 +60,12 @@ uint32_t ResourceType(uint8_t* base, uint32_t resource) {
       case 0:
         return 20;  // one-dimensional
       default:
-        return (Load(base, resource + 32) & 0x400) ? 19 : 3;  // an array, or 2D
+        return (r.fetch_format() & 0x400) ? 19 : 3;  // an array, or 2D
     }
   }
   if (type == 4 && (common & 0x40000000)) {
-    const uint32_t parent = Load(base, resource + 24);
-    if ((Load(base, parent + 48) & 0x600) == 0x400) {
+    const TextureHeader parent = r.parent();
+    if ((parent.fetch_mips() & 0x600) == 0x400) {
       return 16;  // a volume's slice
     }
   }
@@ -68,9 +74,10 @@ uint32_t ResourceType(uint8_t* base, uint32_t resource) {
 
 uint32_t TextureFormat(uint8_t* base, uint32_t texture) {
   ITC_NATIVE_RUNNING("sub_822A44A8 Texture::Format");
-  const uint32_t w40 = Load(base, texture + 40);
-  const uint32_t w28 = Load(base, texture + 28);
-  const uint32_t w32 = Load(base, texture + 32);
+  const TextureHeader t(base, texture);
+  const uint32_t w40 = t.fetch_swizzle();
+  const uint32_t w28 = t.fetch_tiling();
+  const uint32_t w32 = t.fetch_format();
   // The swizzle's four 3-bit fields (+40 bits 1-12), then +40's low bit.
   uint32_t swizzle = (w40 >> 7) & 0x3F;
   swizzle = (swizzle << 3) | ((w40 >> 4) & 7);
@@ -116,9 +123,10 @@ Block GpuBlockSize(uint32_t format) {
 
 Extent TextureBaseSize(uint8_t* base, uint32_t texture) {
   ITC_NATIVE_RUNNING("sub_822A4348 Texture::BaseSize");
-  const uint32_t dimension = (Load(base, texture + 48) >> 9) & 3;
-  const uint32_t add = ((Load(base, texture + 40) >> 30) & 2) + 1;
-  const uint32_t size = Load(base, texture + 36);
+  const TextureHeader t(base, texture);
+  const uint32_t dimension = (t.fetch_mips() >> 9) & 3;
+  const uint32_t add = ((t.fetch_swizzle() >> 30) & 2) + 1;
+  const uint32_t size = t.fetch_size();
   if (dimension == 0) {
     return {(size & 0xFFFFFF) + add, 1, 1};
   }
@@ -461,7 +469,8 @@ TextureHeaderSizes SetTextureHeader(uint8_t* base, uint32_t type, uint32_t width
 
 LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) {
   ITC_NATIVE_RUNNING("sub_822A4B98 Texture::LevelLayout");
-  const uint32_t format = Load(base, texture + 32) & 0x3F;
+  const TextureHeader t(base, texture);
+  const uint32_t format = t.fetch_format() & 0x3F;
   const uint32_t bits = guest::LoadU8(base, kFormatTable + 1 + (format << 1));
   const uint32_t type = ResourceType(base, texture);
   // The level's width, height and depth for TextureLevelSize (the
@@ -473,8 +482,8 @@ LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) 
   uint32_t at = level;
   if (type == 4) {
     const Extent size = TextureBaseSize(base, texture);
-    const uint32_t w28 = Load(base, texture + 28);
-    const uint32_t dimension = (Load(base, texture + 48) >> 9) & 3;
+    const uint32_t w28 = t.fetch_tiling();
+    const uint32_t dimension = (t.fetch_mips() >> 9) & 3;
     out_height = size.height;
     out_width = size.width;
     out_depth = size.depth;
@@ -485,13 +494,13 @@ LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) 
     TextureLevelSize(width, height, depth, bits, format, dimension, w28 >> 31);
     pitch = (row << 2) & 0x1FFFFFFC;
   } else {
-    const uint32_t border = Load(base, texture + 40) >> 31;
+    const uint32_t border = t.fetch_swizzle() >> 31;
     const uint32_t twice = border << 1;
     const Extent size = TextureBaseSize(base, texture);
     out_width = size.width;
     out_height = size.height;
     out_depth = size.depth;
-    const uint32_t w48 = Load(base, texture + 48);
+    const uint32_t w48 = t.fetch_mips();
     const uint32_t dimension = (w48 >> 9) & 3;
     const bool packed = (w48 & 0x800) != 0;
     // The base size rounded up to powers of two (less the border).
@@ -510,12 +519,12 @@ LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) 
         height = out_height;
         depth = out_depth;
       }
-      const uint32_t w28 = Load(base, texture + 28);
+      const uint32_t w28 = t.fetch_tiling();
       const uint32_t tiled = w28 >> 31;
       TextureLevelSize(width, height, depth, bits, format, dimension, tiled);
-      const uint32_t w32 = Load(base, texture + 32);
+      const uint32_t w32 = t.fetch_format();
       if (tiled == 0 && !(w32 & 0x400) && !packed && dimension == 1 &&
-          !(Load(base, texture + 44) & 0x3C0) && border == 0) {
+          !(t.fetch_mip_range() & 0x3C0) && border == 0) {
         // A linear 2D texture's height aligned only to its block.
         const Block block = GpuBlockSize(w32 & 0x3F);
         height = (block.height + out_height - 1) & ~(block.height - 1);
@@ -542,14 +551,13 @@ LevelLayout TextureLevelLayout(uint8_t* base, uint32_t texture, uint32_t level) 
       width = AtLeast1(Srw(pow_width, at));
       height = AtLeast1(Srw(pow_height, at));
       depth = AtLeast1(Srw(pow_depth, at));
-      TextureLevelSize(width, height, depth, bits, format, dimension,
-                       Load(base, texture + 28) >> 31);
+      TextureLevelSize(width, height, depth, bits, format, dimension, t.fetch_tiling() >> 31);
       pitch = (width * bits) >> 3;
     }
   }
   uint32_t slice = pitch * height;
-  if (!(!(Load(base, texture + 28) & 0x80000000) && at <= 1 && (type == 3 || type == 20)) &&
-      (Load(base, texture + 48) & 0x600) != 0x400) {
+  if (!(!(t.fetch_tiling() & 0x80000000) && at <= 1 && (type == 3 || type == 20)) &&
+      (t.fetch_mips() & 0x600) != 0x400) {
     slice = (slice + 4095) & 0xFFFFF000;
   }
   return {out_width, out_height, out_depth, pitch, slice};
@@ -592,10 +600,11 @@ MipTailPlace MipTailOffset(uint8_t* base, uint32_t level, uint32_t width, uint32
 
 LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level) {
   ITC_NATIVE_RUNNING("sub_822A4FF0 Texture::LevelOffset");
-  const uint32_t bits = guest::LoadU8(base, kFormatTable + 1 + ((Load(base, texture + 32) & 0x3F) << 1));
-  const uint32_t border = Load(base, texture + 40) >> 31;
-  const uint32_t dimension = (Load(base, texture + 48) >> 9) & 3;
-  const uint32_t tiled = Load(base, texture + 28) >> 31;
+  const TextureHeader t(base, texture);
+  const uint32_t bits = guest::LoadU8(base, kFormatTable + 1 + ((t.fetch_format() & 0x3F) << 1));
+  const uint32_t border = t.fetch_swizzle() >> 31;
+  const uint32_t dimension = (t.fetch_mips() >> 9) & 3;
+  const uint32_t tiled = t.fetch_tiling() >> 31;
   const uint32_t twice = border << 1;
   const Extent size = TextureBaseSize(base, texture);
   LevelPlace place{};
@@ -611,23 +620,23 @@ LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, ui
       dimension == 2 ? Slw(1, border - Clz(size.depth - twice - 1) + 32) : 1;
   // The base level itself in the mip tail (packed, a side at 16 texels).
   const bool packed_base =
-      (pow_w <= 16 || pow_h <= 16) && (Load(base, texture + 48) & 0x800) != 0;
+      (pow_w <= 16 || pow_h <= 16) && (t.fetch_mips() & 0x800) != 0;
   uint32_t start =
-      Load(base, texture + ((level != 0 && !packed_base) ? 48 : 32)) & 0xFFFFF000;  // r14
+      ((level != 0 && !packed_base) ? t.fetch_mips() : t.fetch_format()) & 0xFFFFF000;  // r14
   uint32_t pitch;           // r30
   uint32_t aligned_height;  // r19
   uint32_t aligned_depth;   // r17
   if (level == 0 && !packed_base) {
-    const uint32_t w48 = Load(base, texture + 48);
-    const uint32_t w32 = Load(base, texture + 32);
+    const uint32_t w48 = t.fetch_mips();
+    const uint32_t w32 = t.fetch_format();
     const uint32_t level_dimension = (w48 >> 9) & 3;
     const uint32_t format = w32 & 0x3F;
     uint32_t w = size.width, h = size.height, d = size.depth;
     TextureLevelSize(w, h, d, bits, format, level_dimension, tiled);
-    const uint32_t w28 = Load(base, texture + 28);
+    const uint32_t w28 = t.fetch_tiling();
     aligned_height = h;
     if (!(w28 & 0x80000000) && !(w32 & 0x400) && !(w48 & 0x800) && level_dimension == 1 &&
-        !(Load(base, texture + 44) & 0x3C0) && !(Load(base, texture + 40) & 0x80000000)) {
+        !(t.fetch_mip_range() & 0x3C0) && !(t.fetch_swizzle() & 0x80000000)) {
       // A linear 2D texture's height aligned only to its block.
       const Block block = GpuBlockSize(format);
       aligned_height = (block.height + size.height - 1) & ~(block.height - 1);
@@ -647,8 +656,8 @@ LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, ui
     uint32_t slices = 1;  // r16
     const uint32_t type = ResourceType(base, texture);
     if (type == 18 || type == 19) {
-      const uint32_t align = Slw(1, (Load(base, texture + 32) >> 9) & 2);
-      slices = ((Load(base, texture + 36) >> 26) + align) & ~(align - 1);
+      const uint32_t align = Slw(1, (t.fetch_format() >> 9) & 2);
+      slices = ((t.fetch_size() >> 26) + align) & ~(align - 1);
     }
     uint32_t log_w = 31 - Clz(pow_w);
     uint32_t log_h = 31 - Clz(pow_h);
@@ -662,10 +671,10 @@ LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, ui
     } else {
       left = int32_t(level - 1);
     }
-    const uint32_t w48 = Load(base, texture + 48);
+    const uint32_t w48 = t.fetch_mips();
     const uint32_t level_dimension = (w48 >> 9) & 3;
-    const uint32_t level_tiled = Load(base, texture + 28) >> 31;
-    const uint32_t format = Load(base, texture + 32) & 0x3F;
+    const uint32_t level_tiled = t.fetch_tiling() >> 31;
+    const uint32_t format = t.fetch_format() & 0x3F;
     pitch = 0;
     aligned_height = 0;
     aligned_depth = 0;
@@ -712,7 +721,7 @@ LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, ui
   const uint32_t aligned = (slice + 4095) & 0xFFFFF000;
   place.offset = aligned * face + start;
   place.pitch = pitch;
-  if ((Load(base, texture + 48) & 0x600) == 0x400) {
+  if ((t.fetch_mips() & 0x600) == 0x400) {
     place.slice = slice;
     place.size = (slice * aligned_depth + 4095) & 0xFFFFF000;
   } else {
@@ -725,35 +734,38 @@ LevelPlace TextureLevelOffset(uint8_t* base, uint32_t texture, uint32_t face, ui
 uint32_t TextureLevelDesc(uint8_t* base, uint32_t texture, uint32_t level, uint32_t desc) {
   ITC_NATIVE_RUNNING("sub_822A4F60 Texture::LevelDesc");
   const LevelLayout layout = TextureLevelLayout(base, texture, level);
-  Store(base, desc + 0, TextureFormat(base, texture));
+  const LevelDesc d(base, desc);
+  d.set_format(TextureFormat(base, texture));
   const uint32_t type = ResourceType(base, texture);
-  Store(base, desc + 4, type);
-  Store(base, desc + 8, 0);
-  Store(base, desc + 12, 0);
-  Store(base, desc + 20, 0);
-  Store(base, desc + 24, layout.width);
-  Store(base, desc + 28, layout.height);
-  Store(base, desc + 16, 0);
+  d.set_type(type);
+  d.set_usage(0);
+  d.set_pool(0);
+  d.set_multisample_quality(0);
+  d.set_width(layout.width);
+  d.set_height(layout.height);
+  d.set_multisample(0);
   return type;
 }
 
 uint32_t SurfaceDesc(uint8_t* base, uint32_t surface, uint32_t desc) {
   ITC_NATIVE_RUNNING("sub_822A5F50 Surface::GetDesc");
   uint32_t r3 = surface;
-  if (Load(base, surface) & 0x40000000) {
-    const uint32_t level = Load(base, surface + 28) >> 28;
-    r3 = TextureLevelDesc(base, Load(base, surface + 24), level, desc);
+  const SurfaceHeader s(base, surface);
+  const LevelDesc d(base, desc);
+  if (s.common() & 0x40000000) {
+    const uint32_t level = s.level_face() >> 28;
+    r3 = TextureLevelDesc(base, s.parent().address, level, desc);
   } else {
-    const uint32_t format = Load(base, surface + 40);
-    Store(base, desc + 8, 0);
-    Store(base, desc + 12, 0);
-    Store(base, desc + 20, 0);
-    Store(base, desc + 0, format);
-    Store(base, desc + 24, ((Load(base, surface + 36) >> 18) & 0x3FFF) + 1);
-    Store(base, desc + 28, ((Load(base, surface + 36) >> 3) & 0x7FFF) + 1);
-    Store(base, desc + 16, guest::LoadU16(base, surface + 24) & 3);
+    const uint32_t format = s.format();
+    d.set_usage(0);
+    d.set_pool(0);
+    d.set_multisample_quality(0);
+    d.set_format(format);
+    d.set_width(((s.size() >> 18) & 0x3FFF) + 1);
+    d.set_height(((s.size() >> 3) & 0x7FFF) + 1);
+    d.set_multisample(s.multisample() & 3);
   }
-  Store(base, desc + 4, 4);
+  d.set_type(4);
   return r3;
 }
 
@@ -765,9 +777,10 @@ SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, ui
   if (low == 54) {
     low = 7;
   }
-  Store(base, header + 4, 1);
-  Store(base, header + 0, 4);
-  Store(base, header + 20, kUnlocked);
+  const SurfaceHeader surface(base, header);
+  surface.set_ref_count(1);
+  surface.set_common(4);
+  surface.set_locked_base(kUnlocked);
   const uint32_t tiles = SurfaceEdramTiles(width, height, format, multisample);
   // The hi-z: 32 x 16 pixel blocks (samples counted), for depth formats.
   uint32_t hi_z = 0;
@@ -786,10 +799,11 @@ SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, ui
   uint32_t hi_z_base = 0xFFFFFFFF;
   uint32_t parameter8 = 0;
   if (parameters != 0) {
-    edram_base = Load(base, parameters + 0);
-    hi_z_base = Load(base, parameters + 4);
-    parameter8 = Load(base, parameters + 8);
-  } else if (depth && Load(base, kHiZTaken) == 0) {
+    const schema::SurfaceParameters p(base, parameters);
+    edram_base = p.edram_base();
+    hi_z_base = p.hi_z_base();
+    parameter8 = p.unknown_8();
+  } else if (depth && G::hi_z_taken(base) == 0) {
     hi_z_base = 0;
   }
   // The pitch: 80-pixel tiles (40 with 4x samples), and the width aligned.
@@ -802,19 +816,19 @@ SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, ui
     aligned = (width + 15) & ~15u;
   }
   const uint32_t pitch_word = (aligned << 2) | (uint32_t(multisample) & 3);
-  Store(base, header + 40, format);
-  Store(base, header + 24, (pitch_word << 16) | (pitch & 0x3FFF));
-  const uint32_t size = ((width - 1) << 18) | (((height - 1) << 3) & 0x3FFF8) |
-                        (Load(base, header + 36) & 7);
-  Store(base, header + 36, size);
+  surface.set_format(format);
+  surface.set_pitch((pitch_word << 16) | (pitch & 0x3FFF));
+  const uint32_t size =
+      ((width - 1) << 18) | (((height - 1) << 3) & 0x3FFF8) | (surface.size() & 7);
+  surface.set_size(size);
   const uint32_t format_bits = (guest::LoadU16(base, kFormatTable + (low << 1)) >> 8) & 0xF;
   if (depth) {
-    Store(base, header + 28, ((format_bits & 1) << 16) | (edram_base & 0xFFF));
+    surface.set_edram(((format_bits & 1) << 16) | (edram_base & 0xFFF));
     if (hi_z_base == 0xFFFFFFFF) {
-      Store(base, header + 32, 0);
+      surface.set_hi_z(0);
     } else {
       const uint32_t hi_z_word = (low != 22 ? 1 : 0) | (hi_z_base << 13);
-      Store(base, header + 32, (hi_z_word << 4) | 1);
+      surface.set_hi_z((hi_z_word << 4) | 1);
     }
   } else {
     uint32_t bits = format_bits;
@@ -823,9 +837,9 @@ SurfaceSizes SetSurfaceHeader(uint8_t* base, uint32_t width, uint32_t height, ui
       bits = 1;
     }
     bits = ((parameter8 << 4) & 0x3F0) | (bits & ~0x3F0u);
-    Store(base, header + 28, ((bits << 16) & 0x3FF0000) | (edram_base & 0xFFF));
+    surface.set_edram(((bits << 16) & 0x3FF0000) | (edram_base & 0xFFF));
   }
-  Store(base, header + 44, tiles * 5120);
+  surface.set_edram_bytes(tiles * 5120);
   return {tiles, hi_z};
 }
 
@@ -838,11 +852,12 @@ uint32_t CreateSurface(uint8_t* base, uint32_t width, uint32_t height, uint32_t 
   }
   const SurfaceSizes sizes =
       SetSurfaceHeader(base, width, height, format, multisample, parameters, header);
-  Store(base, header + 0, Load(base, header + 0) | 0x00100000);
+  const SurfaceHeader h(base, header);
+  h.set_common(h.common() | 0x00100000);
   if (parameters != 0) {
     return header;
   }
-  const uint32_t low = Load(base, header + 40) & 0x3F;
+  const uint32_t low = h.format() & 0x3F;
   const bool depth = low == 22 || low == 23;
   const std::optional<edram::Allocation> allocation = edram::Alloc(base, sizes.tiles);
   if (!allocation || !allocation->ok) {
@@ -855,11 +870,11 @@ uint32_t CreateSurface(uint8_t* base, uint32_t width, uint32_t height, uint32_t 
     memory::crt::XMemFree(header, kHeaderFreeAttributes);
     return 0;
   }
-  Store(base, header + 0, Load(base, header + 0) | 0x80000000);
-  Store(base, header + 28, (Load(base, header + 28) & 0xFFFFF000) | (edram_base & 0xFFF));
-  if (depth && Load(base, kHiZTaken) == 0) {
-    Store(base, kHiZTaken, 1);
-    Store(base, header + 32, Load(base, header + 32) & 0x1FFFF);
+  h.set_common(h.common() | 0x80000000);
+  h.set_edram((h.edram() & 0xFFFFF000) | (edram_base & 0xFFF));
+  if (depth && G::hi_z_taken(base) == 0) {
+    G::set_hi_z_taken(base, 1);
+    h.set_hi_z(h.hi_z() & 0x1FFFF);
   }
   return header;
 }
@@ -884,12 +899,13 @@ uint32_t CreateVertexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage) {
     memory::crt::XMemFree(header, kHeaderFreeAttributes);
     return 0;
   }
-  Store(base, header + 0, common);
-  Store(base, header + 4, 1);
-  const uint32_t old28 = Load(base, header + 28);
-  Store(base, header + 24, data | 3);
-  Store(base, header + 20, kUnlocked);
-  Store(base, header + 28, (bytes & 0x3FFFFFC) | (old28 & 0x8000000) | 0x10000000 | 2);
+  const BufferHeader h(base, header);
+  h.set_common(common);
+  h.set_ref_count(1);
+  const uint32_t old28 = h.size();
+  h.set_data(data | 3);
+  h.set_locked_base(kUnlocked);
+  h.set_size((bytes & 0x3FFFFFC) | (old28 & 0x8000000) | 0x10000000 | 2);
   return header;
 }
 
@@ -913,11 +929,12 @@ uint32_t CreateIndexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage, uint32
     memory::crt::XMemFree(header, kHeaderFreeAttributes);
     return 0;
   }
-  Store(base, header + 28, bytes);
-  Store(base, header + 0, common);
-  Store(base, header + 24, data);
-  Store(base, header + 4, 1);
-  Store(base, header + 20, kUnlocked);
+  const BufferHeader h(base, header);
+  h.set_size(bytes);
+  h.set_common(common);
+  h.set_data(data);
+  h.set_ref_count(1);
+  h.set_locked_base(kUnlocked);
   return header;
 }
 
@@ -946,8 +963,9 @@ uint32_t CreateTexture(uint8_t* base, uint32_t width, uint32_t height, uint32_t 
       return 0;
     }
   }
-  Store(base, header + 32, (Load(base, header + 32) & 0xFFF) | (data & 0xFFFFF000));
-  Store(base, header + 48, (Load(base, header + 48) & 0xFFF) | (mips & 0xFFFFF000));
+  const TextureHeader h(base, header);
+  h.set_fetch_format((h.fetch_format() & 0xFFF) | (data & 0xFFFFF000));
+  h.set_fetch_mips((h.fetch_mips() & 0xFFF) | (mips & 0xFFFFF000));
   return header;
 }
 
@@ -957,13 +975,14 @@ uint32_t GetSurfaceLevel(uint8_t* base, uint32_t texture, uint32_t level) {
   if (surface == 0) {
     return 0;
   }
-  const uint32_t common = 0x40100004 | (Load(base, texture) & 0x200000);
-  Store(base, surface + 24, texture);
-  Store(base, surface + 0, common);
-  const uint32_t w28 = Load(base, surface + 28);
-  Store(base, surface + 4, 1);
-  Store(base, surface + 20, kUnlocked);
-  Store(base, surface + 28, (w28 & 0x003FFFFF) | (level << 28));
+  const SurfaceHeader s(base, surface);
+  const uint32_t common = 0x40100004 | (TextureHeader(base, texture).common() & 0x200000);
+  s.set_parent(texture);
+  s.set_common(common);
+  const uint32_t w28 = s.level_face();
+  s.set_ref_count(1);
+  s.set_locked_base(kUnlocked);
+  s.set_level_face((w28 & 0x003FFFFF) | (level << 28));
   refcount::AddRef(base, texture);
   return surface;
 }
@@ -1086,7 +1105,7 @@ StreamSource GetStreamSource(uint8_t* base, uint32_t device, uint32_t stream) {
     // The stream's fetch constant's address, less the buffer's (+24's low
     // 29 bits, in the view its top 12 bits say).
     const uint32_t fetch = Load(base, device + ((223 - stream) << 3));
-    const uint32_t data = Load(base, source.buffer + 24);
+    const uint32_t data = BufferHeader(base, source.buffer).data();
     offset = fetch - ((((data >> 20) & 0xFFF) + 512) & 0x1000) - (data & 0x1FFFFFFF);
     refcount::AddRef(base, source.buffer);
   }
@@ -1126,15 +1145,16 @@ uint32_t LockResource(uint8_t* base, uint32_t resource, uint32_t mips, uint32_t 
   ITC_NATIVE_RUNNING("sub_822A63F8 Resource::Lock");
   // The fence wait and the cache flush packet are Dropped (resources.h).
   const uint32_t other_view = flags & 0x10;
-  if (other_view || (Load(base, resource) & 0x200000)) {
+  const ResourceHeader r(base, resource);
+  if (other_view || (r.common() & 0x200000)) {
     if (!(flags & 1)) {
       uint32_t offset, slot;
       if (mips != 0 && mip_data != 0) {
         offset = address - mip_data;
-        slot = resource + 24;
+        slot = r.locked_mips_address();
       } else {
         offset = address - data;
-        slot = resource + 20;
+        slot = r.locked_base_address();
       }
       const uint32_t range = Load(base, slot);
       uint32_t end = (offset + size + 127) >> 7;
@@ -1153,13 +1173,14 @@ uint32_t LockResource(uint8_t* base, uint32_t resource, uint32_t mips, uint32_t 
       address = OtherView(address);
     }
   }
-  AddToWord(base, resource, kLockCount);
+  AddToWord(base, r.common_address(), kLockCount);
   return address;
 }
 
 uint32_t UnlockResource(uint8_t* base, uint32_t resource, uint32_t data, uint32_t mip_data) {
   ITC_NATIVE_RUNNING("sub_822A6630 Resource::Unlock");
-  const uint32_t old = AddToWord(base, resource, 0u - kLockCount);
+  const ResourceHeader r(base, resource);
+  const uint32_t old = AddToWord(base, r.common_address(), 0u - kLockCount);
   uint32_t r3 = resource;
   if ((old & 0xF00) != 0x100) {
     return r3;
@@ -1167,20 +1188,20 @@ uint32_t UnlockResource(uint8_t* base, uint32_t resource, uint32_t data, uint32_
   // The last lock: the ranges reset (their data cache flush Dropped; r3 is
   // the flush's start address, as the original leaves it).
   auto reset = [&](uint32_t slot, uint32_t start_address) {
-    const uint32_t range = Load(base, resource + slot);
+    const uint32_t range = Load(base, slot);
     if (range == kUnlocked) {
       return;
     }
-    const uint32_t common = Load(base, resource);
-    Store(base, resource + slot, kUnlocked);
+    const uint32_t common = r.common();
+    Store(base, slot, kUnlocked);
     if (!(common & 0x200000)) {
       start_address = OtherView(start_address);
     }
     r3 = ((range >> 16) << 7) + start_address;
   };
-  reset(20, data);
+  reset(r.locked_base_address(), data);
   if (mip_data != 0) {
-    reset(24, mip_data);
+    reset(r.locked_mips_address(), mip_data);
   }
   return r3;
 }
@@ -1189,13 +1210,14 @@ LevelLock LockTextureLevel(uint8_t* base, uint32_t texture, uint32_t face, uint3
                            uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_822A54B0 Texture::LockLevel");
   const LevelPlace place = TextureLevelOffset(base, texture, face, level);
-  const Block block = GpuBlockSize(Load(base, texture + 32) & 0x3F);
+  const TextureHeader t(base, texture);
+  const Block block = GpuBlockSize(t.fetch_format() & 0x3F);
   LevelLock lock;
   lock.pitch = place.pitch * block.height;
   lock.slice = place.slice;
   lock.tail = place.tail;
-  lock.r3 = LockResource(base, texture, level, Load(base, texture + 32) & 0xFFFFF000,
-                         Load(base, texture + 48) & 0xFFFFF000, place.offset - place.tail,
+  lock.r3 = LockResource(base, texture, level, t.fetch_format() & 0xFFFFF000,
+                         t.fetch_mips() & 0xFFFFF000, place.offset - place.tail,
                          place.size, flags);
   lock.address = place.tail + lock.r3;
   return lock;
@@ -1207,13 +1229,14 @@ uint32_t LockTextureRect(uint8_t* base, uint32_t texture, uint32_t face, uint32_
   const LevelLock lock = LockTextureLevel(base, texture, face, level, flags);
   uint32_t bits = lock.address;
   if (rect != 0) {
-    const uint32_t format = Load(base, texture + 32) & 0x3F;
+    const uint32_t format = TextureHeader(base, texture).fetch_format() & 0x3F;
     const uint32_t pixel_bits = guest::LoadU8(base, kFormatTable + 1 + (format << 1));
-    bits = ((pixel_bits * Load(base, rect + 0)) >> 3) + Load(base, rect + 4) * lock.pitch +
-           lock.address;
+    const schema::GpuLockRect area(base, rect);
+    bits = ((pixel_bits * area.left()) >> 3) + area.top() * lock.pitch + lock.address;
   }
-  Store(base, locked + 0, lock.pitch);
-  Store(base, locked + 4, bits);
+  const schema::LockedRect out(base, locked);
+  out.set_pitch(lock.pitch);
+  out.set_bits(bits);
   return lock.r3;
 }
 
@@ -1225,33 +1248,34 @@ uint32_t LockTextureRectLevel(uint8_t* base, uint32_t texture, uint32_t level, u
 
 uint32_t UnlockTexture(uint8_t* base, uint32_t texture) {
   ITC_NATIVE_RUNNING("sub_822A43E0 Texture::Unlock");
-  return UnlockResource(base, texture, Load(base, texture + 32) & 0xFFFFF000,
-                        Load(base, texture + 48) & 0xFFFFF000);
+  const TextureHeader t(base, texture);
+  return UnlockResource(base, texture, t.fetch_format() & 0xFFFFF000, t.fetch_mips() & 0xFFFFF000);
 }
 
 uint32_t UnlockSurface(uint8_t* base, uint32_t surface) {
   ITC_NATIVE_RUNNING("sub_822A43F8 Surface::Unlock");
-  const uint32_t texture = Load(base, surface + 24);
-  return UnlockResource(base, texture, Load(base, texture + 32) & 0xFFFFF000,
-                        Load(base, texture + 48) & 0xFFFFF000);
+  const TextureHeader t = SurfaceHeader(base, surface).parent();
+  return UnlockResource(base, t.address, t.fetch_format() & 0xFFFFF000,
+                        t.fetch_mips() & 0xFFFFF000);
 }
 
 uint32_t LockSurfaceRect(uint8_t* base, uint32_t surface, uint32_t locked, uint32_t rect,
                          uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_822A5FE8 Surface::LockRect");
-  const uint32_t w28 = Load(base, surface + 28);
-  return LockTextureRect(base, Load(base, surface + 24), (w28 >> 22) & 0x3F, w28 >> 28, locked,
-                         rect, flags);
+  const SurfaceHeader s(base, surface);
+  const uint32_t w28 = s.level_face();
+  return LockTextureRect(base, s.parent().address, (w28 >> 22) & 0x3F, w28 >> 28, locked, rect,
+                         flags);
 }
 
 uint32_t LockVertexBuffer(uint8_t* base, uint32_t buffer, uint32_t offset, uint32_t size,
                           uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_822A68F8 VertexBuffer::Lock");
   if (size == 0) {
-    size = Load(base, buffer + 28) & 0x3FFFFFC;
+    size = BufferHeader(base, buffer).size() & 0x3FFFFFC;
     offset = 0;
   }
-  const uint32_t data = Load(base, buffer + 24) & 0xFFFFFFFC;
+  const uint32_t data = BufferHeader(base, buffer).data() & 0xFFFFFFFC;
   return LockResource(base, buffer, 0, data, 0, data + offset, size, flags);
 }
 
@@ -1259,10 +1283,10 @@ uint32_t LockIndexBuffer(uint8_t* base, uint32_t buffer, uint32_t offset, uint32
                          uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_822A6A18 IndexBuffer::Lock");
   if (size == 0) {
-    size = Load(base, buffer + 28);
+    size = BufferHeader(base, buffer).size();
     offset = 0;
   }
-  const uint32_t data = Load(base, buffer + 24);
+  const uint32_t data = BufferHeader(base, buffer).data();
   return LockResource(base, buffer, 0, data, 0, data + offset, size, flags | 2);
 }
 
@@ -1270,11 +1294,12 @@ uint32_t DestroySurface(uint8_t* base, uint32_t surface, uint32_t common) {
   ITC_NATIVE_RUNNING("sub_822A6268 Resource::DestroySurface");
   if (!(common & 0x40000000)) {
     if (common & 0x80000000) {
-      const uint32_t tiles = Load(base, surface + 44) / 5120;
-      edram::Free(base, Load(base, surface + 28) & 0xFFF, tiles);
+      const SurfaceHeader s(base, surface);
+      const uint32_t tiles = s.edram_bytes() / 5120;
+      edram::Free(base, s.edram() & 0xFFF, tiles);
     }
-    if (Load(base, surface + 32) & 1) {
-      Store(base, kHiZTaken, 0);
+    if (SurfaceHeader(base, surface).hi_z() & 1) {
+      G::set_hi_z_taken(base, 0);
     }
   }
   return memory::crt::XMemFree(surface, kHeaderFreeAttributes);
@@ -1282,38 +1307,39 @@ uint32_t DestroySurface(uint8_t* base, uint32_t surface, uint32_t common) {
 
 uint32_t UnlockVertexBuffer(uint8_t* base, uint32_t buffer) {
   ITC_NATIVE_RUNNING("sub_822A6958 VertexBuffer::Unlock");
-  return UnlockResource(base, buffer, Load(base, buffer + 24) & 0xFFFFFFFC, 0);
+  return UnlockResource(base, buffer, BufferHeader(base, buffer).data() & 0xFFFFFFFC, 0);
 }
 
 uint32_t UnlockIndexBuffer(uint8_t* base, uint32_t buffer) {
   ITC_NATIVE_RUNNING("sub_822A6A78 IndexBuffer::Unlock");
-  return UnlockResource(base, buffer, Load(base, buffer + 24), 0);
+  return UnlockResource(base, buffer, BufferHeader(base, buffer).data(), 0);
 }
 
 uint32_t DestroyResource(uint8_t* base, uint32_t resource) {
   ITC_NATIVE_RUNNING("sub_822A6210 Resource::Destroy");
   // The fence waits are Dropped (resources.h).
   constexpr uint32_t kDataFreeAttributes = 0xB1800000;
-  const uint32_t common = Load(base, resource);
+  const ResourceHeader r(base, resource);
+  const uint32_t common = r.common();
   switch (common & 0xF) {
     case 1:
-      memory::crt::XMemFree(Load(base, resource + 24) & 0xFFFFFFFC, kDataFreeAttributes);
+      memory::crt::XMemFree(r.data() & 0xFFFFFFFC, kDataFreeAttributes);
       break;
     case 2:
     case 7:
     case 8:
-      memory::crt::XMemFree(Load(base, resource + 24), kDataFreeAttributes);
+      memory::crt::XMemFree(r.data(), kDataFreeAttributes);
       break;
     case 3: {
-      const uint32_t mips = Load(base, resource + 48) & 0xFFFFF000;
-      memory::crt::XMemFree(Load(base, resource + 32) & 0xFFFFF000, kDataFreeAttributes);
+      const uint32_t mips = r.fetch_mips() & 0xFFFFF000;
+      memory::crt::XMemFree(r.fetch_format() & 0xFFFFF000, kDataFreeAttributes);
       memory::crt::XMemFree(mips, kDataFreeAttributes);
       break;
     }
     case 4:
       return DestroySurface(base, resource, common);
     case 6:
-      memory::crt::XMemFree(Load(base, resource + 48), kDataFreeAttributes);
+      memory::crt::XMemFree(r.fetch_mips(), kDataFreeAttributes);
       break;
     default:
       break;  // 5 and the others: the header only (9 is the adapter's)

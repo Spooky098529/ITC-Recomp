@@ -1,0 +1,220 @@
+# The schema of docs/functions/input.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The game's input below the action mappers: the input manager (made once at
+# boot, at the framework's +88) with five logical pads, four physical pads,
+# five input processors and five listener lists (src/input/, the update in
+# src/hooks/input_update.cpp; docs/known-data.md, docs/pause-menu-fix.md).
+# The physical pad (212 bytes, vtable 0x8206CBF4) is model-animation.toml's
+# (the measure's tie-break); the std::list of pointers is app-states.toml's
+# PtrList, its nodes are PtrListNode below.
+
+# The input manager (3,984 bytes, InputManager::InputManager sub_820991E0,
+# made by Input::Create).
+[InputManager]
+measures = ["InputManager", "Input", "InputManager::AddListener.r3"]
+size = 3984
+origin = "allocated"
+vtable = 0x82000F48
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82000F48: 0 sub_82098FF8, 1 GetProcessor, 2 GetLogicalPad, 3 AddListener, 4 sub_82099048, 5 GetPhysicalPad" },
+  { name = "framework_part", offset = 4, type = "u32", note = "the set-up block's +4: a pointer to the framework's +16" },
+  { name = "logical_pads", offset = 8, type = "bytes", count = 980, note = "five LogicalPads (196 bytes): 0-3 the players', 4 the any pad" },
+  { name = "physical_pads", offset = 988, type = "bytes", count = 852, note = "four physical pads (212 bytes, model-animation.toml's PhysicalPad)" },
+  { name = "processors", offset = 1840, type = "bytes", count = 2080, note = "five InputProcessors (416 bytes)" },
+  { name = "processor0_vtable", offset = 1840, type = "ptr", to = "InputProcessorVtable", note = "processor 0's vtable (Input::Update's read)" },
+  { name = "listener_lists", offset = 3920, type = "bytes", count = 60, note = "five PtrLists (12 bytes) of listeners, one per logical pad" },
+  { name = "listeners0_head", offset = 3924, type = "ptr", to = "PtrListNode", note = "list 0's head node (Input::Update's read)" },
+  { name = "listeners0_size", offset = 3928, type = "u32", note = "list 0's size" },
+  { name = "unknown_3980", offset = 3980, type = "u32", note = "not set by the constructor" },
+]
+
+# The input manager's constructor's argument block (InputManager::InputManager's
+# r4, Input::Create's r3).
+[InputManagerArgs]
+measure = "InputManager::InputManager.r4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "dispatcher", offset = 0, type = "ptr", to = "InputDispatcher", note = "the message dispatcher" },
+  { name = "framework_part", offset = 4, type = "u32", note = "a pointer to the framework's +16, kept at the manager's +4" },
+]
+
+# The message dispatcher the manager registers its handlers with.
+[InputDispatcher]
+measure = "InputManager::InputManager.r4.+0"
+size = 12
+origin = "embedded"
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "InputDispatcherVtable" },
+  { name = "fault_vtable_4", offset = 4, type = "u32", note = "measure fault: the vtable's slot +4 (InputDispatcherVtable), read through r11 after the vtable's load" },
+  { name = "fault_vtable_8", offset = 8, type = "u32", note = "measure fault: the vtable's slot +8, as fault_vtable_4" },
+]
+
+# The dispatcher's vtable, as far as the manager uses it.
+[InputDispatcherVtable]
+size = 12
+origin = "image"
+fields = [
+  { name = "register_7", offset = 4, type = "fn", note = "slot +4: registers message 7's handler (sub_82098CE8)" },
+  { name = "register_5", offset = 8, type = "fn", note = "slot +8: registers message 5's handler (Input::Update sub_820990F0)" },
+]
+
+# A logical pad (196 bytes, LogicalPad::LogicalPad sub_82591B38): the sum of
+# its bound devices' values, clamped (LogicalPad::Build).
+[LogicalPad]
+measures = ["LogicalPad", "InputProcessor::Update.r4", "LogicalPad::Bind.r3"]
+size = 196
+origin = "embedded"
+vtable = 0x8206CBEC
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "InputDeviceVtable", note = "0x8206CBEC (InputProcessor::Update's r4: any device, a logical pad in play)" },
+  { name = "bindings", offset = 4, type = "bytes", count = 32, note = "four InputPadBindings (8 bytes), cleared word by word by the constructor" },
+  { name = "values", offset = 36, type = "f32", note = "the 40 values (to +195): 0-7 the sticks and triggers (LX, LY, LT, 0, RX, RY, RT, 0), 8-39 the buttons" },
+]
+
+# A logical pad's binding (8 bytes, four at the pad's +4; LogicalPad::Bind).
+[InputPadBinding]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "enabled", offset = 0, type = "u8" },
+  { name = "device", offset = 4, type = "u32", note = "a physical pad, or for the any pad a logical pad 0-3" },
+]
+
+# A device's vtable (a logical pad's 0x8206CBEC, a physical pad's 0x8206CBF4),
+# as Input::Update reads it.
+[InputDeviceVtable]
+measure = "InputProcessor::Update.r4.+0"
+size = 8
+origin = "image"
+fields = [
+  { name = "destroy", offset = 0, type = "fn", note = "slot 0, probably the destructor (sub_82591898, sub_82592058)" },
+  { name = "values", offset = 4, type = "fn", note = "slot 1: the values' address (LogicalPad::Values sub_82591B30, PhysicalPad::Values sub_820988B8)" },
+]
+
+# An input processor or a listener (416 bytes, 16-byte aligned,
+# InputProcessor::InputProcessor sub_8258CE60 over InputProcessorBase
+# sub_825920D0): dead-zoned sticks, their lengths and directions, button
+# masks and hold-to-repeat counters ("The input processors" in
+# docs/pause-menu-fix.md). The _pair fields are two floats InputProcessor::Assign
+# copies as a doubleword.
+[InputProcessor]
+measures = ["InputProcessor", "InputProcessorBase", "InputProcessor::Assign.r4"]
+size = 416
+origin = "embedded"
+vtable = 0x8206C0C4
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "InputProcessorVtable", note = "0x8206C0C4 (the base's 0x8206CC00 first)" },
+  { name = "dead_zone_x", offset = 16, type = "f32", note = "0.5 at construction; the four dead zones apply to both sticks" },
+  { name = "dead_zone_x_pair", offset = 16, type = "u64" },
+  { name = "dead_zone_y", offset = 20, type = "f32", note = "0.5" },
+  { name = "dead_zone_trigger", offset = 24, type = "f32", note = "0.0" },
+  { name = "dead_zone_trigger_pair", offset = 24, type = "u64" },
+  { name = "dead_zone_unused", offset = 28, type = "f32", note = "0.0" },
+  { name = "raw_lx", offset = 32, type = "f32", note = "the pad's values 0-7 (to +63)" },
+  { name = "raw_lx_pair", offset = 32, type = "u64" },
+  { name = "raw_ly", offset = 36, type = "f32" },
+  { name = "raw_lt", offset = 40, type = "f32" },
+  { name = "raw_lt_pair", offset = 40, type = "u64" },
+  { name = "raw_3", offset = 44, type = "f32", note = "1.0 at construction (a vector's w)" },
+  { name = "raw_rx", offset = 48, type = "f32" },
+  { name = "raw_rx_pair", offset = 48, type = "u64" },
+  { name = "raw_ry", offset = 52, type = "f32" },
+  { name = "raw_rt", offset = 56, type = "f32" },
+  { name = "raw_rt_pair", offset = 56, type = "u64" },
+  { name = "raw_7", offset = 60, type = "f32", note = "1.0 at construction" },
+  { name = "adjusted_lx", offset = 64, type = "f32", note = "the raw values with the dead zone taken out (to +95)" },
+  { name = "adjusted_lx_pair", offset = 64, type = "u64" },
+  { name = "adjusted_ly", offset = 68, type = "f32" },
+  { name = "adjusted_lt", offset = 72, type = "f32" },
+  { name = "adjusted_lt_pair", offset = 72, type = "u64" },
+  { name = "adjusted_3", offset = 76, type = "f32", note = "1.0 at construction" },
+  { name = "adjusted_rx", offset = 80, type = "f32" },
+  { name = "adjusted_rx_pair", offset = 80, type = "u64" },
+  { name = "adjusted_ry", offset = 84, type = "f32" },
+  { name = "adjusted_rt", offset = 88, type = "f32" },
+  { name = "adjusted_rt_pair", offset = 88, type = "u64" },
+  { name = "adjusted_7", offset = 92, type = "f32", note = "1.0 at construction" },
+  { name = "left_direction_x", offset = 96, type = "f32", note = "the left stick's (x, y) normalized, or 0 (stvx: 16 bytes)" },
+  { name = "left_direction_x_pair", offset = 96, type = "u64" },
+  { name = "left_direction_y", offset = 100, type = "f32" },
+  { name = "left_direction_z", offset = 104, type = "f32" },
+  { name = "left_direction_z_pair", offset = 104, type = "u64" },
+  { name = "left_direction_w", offset = 108, type = "f32", note = "1.0 at construction" },
+  { name = "right_direction_x", offset = 112, type = "f32", note = "the right stick's, as the left's" },
+  { name = "right_direction_x_pair", offset = 112, type = "u64" },
+  { name = "right_direction_y", offset = 116, type = "f32" },
+  { name = "right_direction_z", offset = 120, type = "f32" },
+  { name = "right_direction_z_pair", offset = 120, type = "u64" },
+  { name = "right_direction_w", offset = 124, type = "f32", note = "1.0 at construction" },
+  { name = "left_length", offset = 128, type = "f32" },
+  { name = "right_length", offset = 132, type = "f32" },
+  { name = "buttons", offset = 136, type = "f32", note = "the pad's values 8-39 (32 floats, to +263)" },
+  { name = "pressed", offset = 264, type = "u32", note = "bits newly set this tick" },
+  { name = "released", offset = 268, type = "u32", note = "bits newly clear this tick" },
+  { name = "held", offset = 272, type = "u32", note = "bit i: buttons[i] above 0.5" },
+  { name = "repeat_delay", offset = 276, type = "s32", note = "20 at construction" },
+  { name = "repeat_period", offset = 280, type = "s32", note = "4 at construction" },
+  { name = "held_ticks", offset = 284, type = "bytes", count = 128, note = "32 counters (s32): the ticks each bit has been held" },
+]
+
+# The processors' vtable (0x8206C0C4; the base's 0x8206CC00), as
+# Input::Update reads it.
+[InputProcessorVtable]
+measure = "Input.+1840"
+size = 8
+origin = "image"
+fields = [
+  { name = "destroy", offset = 0, type = "fn", note = "slot 0: sub_8258CF40 (the base's sub_825925A8)" },
+  { name = "update", offset = 4, type = "fn", note = "slot 1: InputProcessor::Update sub_82592188" },
+]
+
+# An index passed by its address (the manager's slots 1, 2, 3 and 5, and
+# LogicalPad::Bind).
+[InputIndex]
+measures = ["InputManager::GetProcessor.r4", "InputManager::GetLogicalPad.r4", "InputManager::GetPhysicalPad.r4",
+            "InputManager::AddListener.r4", "LogicalPad::Bind.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "index", offset = 0, type = "u32" },
+]
+
+# A button mask passed by its address (the processors' pressed and repeat
+# tests; the held tests' is action-mappers.toml's ActionButtonMask).
+[InputButtonMask]
+measures = ["InputProcessor::TestPressed.r4", "InputProcessor::TestRepeat.r4",
+            "InputProcessor::AnyPressed.r4", "InputProcessor::PressedOrRepeat.r4"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "mask", offset = 0, type = "u32" },
+]
+
+# PtrList::Insert's value, passed by its address.
+[PtrListInsertValue]
+measure = "PtrList::Insert.r5"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+# A node of a std::list of pointers (12 bytes, PtrList::AllocateNodes): the
+# input manager's listener lists and the other PtrLists'.
+[PtrListNode]
+measure = "new<?>@PtrList::AllocateNodes"
+size = 12
+origin = "allocated"
+fields = [
+  { name = "next", offset = 0, type = "ptr", to = "PtrListNode" },
+  { name = "previous", offset = 4, type = "ptr", to = "PtrListNode" },
+  { name = "value", offset = 8, type = "u32", note = "a listener (an InputProcessor) in the input manager's lists" },
+  { name = "fault_request_12", offset = 12, type = "u32", note = "measure fault: AllocateNodes is the 12-byte allocator RequestVector::InsertN (framework.md) also uses: +12 to +23 are its block's second request" },
+  { name = "fault_request_16", offset = 16, type = "u32", note = "measure fault: as fault_request_12" },
+  { name = "fault_request_20", offset = 20, type = "u32", note = "measure fault: as fault_request_12" },
+]

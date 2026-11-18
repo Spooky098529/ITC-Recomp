@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "race_screens/race_screens.h"
+#include "schema/build_screen.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -19,7 +20,9 @@ uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, add
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
-uint32_t Screen(uint8_t* base) { return Load(base, kScreen); }
+using G = schema::BuildScreenGlobals;
+
+uint32_t Screen(uint8_t* base) { return G::screen(base).address; }
 
 // An ld then std: eight bytes copied.
 void Copy8(uint8_t* base, uint32_t from, uint32_t to) {
@@ -36,9 +39,9 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 // Keep: the screen's +`at` = the list's selection, +`at` + 4 its scroll.
 uint32_t Keep(uint8_t* base, uint32_t sp, uint32_t at) {
   Frame(base, sp, 96);
-  const uint32_t selection = race_screens::ListSelection(base, Load(base, kList));
+  const uint32_t selection = race_screens::ListSelection(base, G::list(base).address);
   Store(base, Screen(base) + at, selection);
-  Store(base, Screen(base) + at + 4, Load(base, Load(base, kList) + 4));
+  Store(base, Screen(base) + at + 4, Load(base, G::list(base).address + 4));
   return selection;
 }
 
@@ -46,9 +49,9 @@ uint32_t Keep(uint8_t* base, uint32_t sp, uint32_t at) {
 // fitted quietly.
 uint32_t Restore(uint8_t* base, uint32_t sp, uint32_t at) {
   Frame(base, sp, 112);
-  race_screens::ListSetSelection(base, Load(base, kList), Load(base, Screen(base) + at));
-  Store(base, Load(base, kList) + 4, Load(base, Screen(base) + at + 4));
-  const uint32_t list = Load(base, kList);
+  race_screens::ListSetSelection(base, G::list(base).address, Load(base, Screen(base) + at));
+  Store(base, G::list(base).address + 4, Load(base, Screen(base) + at + 4));
+  const uint32_t list = G::list(base).address;
   race_screens::ListFit(base, list, 1);
   return list;
 }
@@ -108,10 +111,10 @@ uint64_t InitGroupLists(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t n = Load(base, Screen(base) + kShownCount);
   const uint32_t shown = int32_t(n) > 11 ? 11 : n;
   const bool many = int32_t(n) > 11;
-  InitList(calls, base, frame, many ? 0x8219BFAC : 0x8219BF68, Load(base, kList), n, shown, 154,
+  InitList(calls, base, frame, many ? 0x8219BFAC : 0x8219BF68, G::list(base).address, n, shown, 154,
            153, 155, 156);
-  InitList(calls, base, frame, many ? 0x8219BFDC : 0x8219BF98, Load(base, kGroupList), n, shown,
-           156, 155, 153, 154);
+  InitList(calls, base, frame, many ? 0x8219BFDC : 0x8219BF98, G::group_list(base).address, n,
+           shown, 156, 155, 153, 154);
   return RestoreGroupList(base, frame);
 }
 
@@ -121,7 +124,7 @@ uint64_t InitStandList(uint8_t* base, uint32_t sp, const Calls& calls) {
   const int64_t n = int16_t(guest::LoadU16(base, Screen(base) + kBuildCount));
   const int64_t shown = int32_t(n) > 1 ? 1 : n;
   return InitList(calls, base, frame, int32_t(n) > 1 ? 0x8219C0F0 : 0x8219C0D4,
-                  Load(base, kList), uint64_t(n), uint64_t(shown), 154, 153, 155, 156);
+                  G::list(base).address, uint64_t(n), uint64_t(shown), 154, 153, 155, 156);
 }
 
 uint32_t ValueText(uint8_t* base, uint32_t sp, uint32_t value) {
@@ -171,7 +174,7 @@ void Insert(uint8_t* base, uint32_t sp, uint32_t list, uint32_t pointer, uint32_
     node = Node(list, Link(base, node));
   }
   const uint32_t slot = Link(base, node + 2);
-  Store(base, list + ((slot + 403) << 2), Load(base, pointer));
+  Store(base, list + ((slot + 403) << 2), schema::BuildScreenInsertValue(base, pointer).build());
 }
 
 uint32_t MarkGroups(uint8_t* base) {

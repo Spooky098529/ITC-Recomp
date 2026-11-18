@@ -200,7 +200,7 @@ ITC_REGS_STEP(CameraModesStep82153160) {
 ITC_REGS_STEP(CameraModesStep821524F0) {
   ctx.fpscr.disableFlushMode();
   cm::ResetRoll(base);
-  ctx.r3.u64 = guest::LoadU32(base, guest::LoadU32(base, cm::kViewports) + 4);
+  ctx.r3.u64 = schema::CameraModesGlobals::viewports(base).second().address;
 }
 
 // Camera::ZoomFromFov: f1 = degrees, f2 = the width; f1 = the zoom. Where
@@ -492,7 +492,7 @@ ITC_REGS_STEP(CameraModesStep82153290) {
   const uint32_t tracker = ctx.r3.u32, vehicle = ctx.r4.u32;
   cm::TargetTrack(base, tracker, vehicle, ctx.r1.u32 - 256);
   if (vehicle != 0) {
-    ctx.r3.u64 = tracker + 224;
+    ctx.r3.u64 = schema::CameraTarget(base, tracker).track_position_address();
   }
 }
 
@@ -503,7 +503,7 @@ ITC_REGS_STEP(CameraModesStep82152CD8) {
   ctx.fpscr.disableFlushMode();
   const uint32_t camera = ctx.r3.u32;
   cm::Shake(base, camera, ctx.r1.u32 - 96);
-  ctx.r3.u64 = guest::LoadU32(base, camera + 20);
+  ctx.r3.u64 = schema::ChaseCamera(base, camera).viewport().address;
 }
 
 // Viewport::PullBack (no adapter: only ChaseCamera::Update's plain C++ calls
@@ -682,7 +682,7 @@ namespace {
 // leaves it.
 void ShotCameraOriginal(lifted::Regs& ctx, uint8_t* base, uint32_t shot, uint32_t frame,
                         uint32_t object) {
-  const uint32_t time = guest::LoadU32(base, shot + 600);
+  const uint32_t time = schema::CutsceneShot(base, shot).time();
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame + 304;
   guest_call::InFrame(ctx, base, 304, 0x82155834, [&](uint32_t) {
@@ -1308,8 +1308,9 @@ namespace hooks {
 // from the machine's 64-bit r3, src/hooks/game_modes.cpp).
 ITC_REGS_STEP(CameraModesStep82159950) {
   ctx.fpscr.disableFlushMode();
-  const uint64_t machine_r3 = ctx.r3.u64 + cm::kMachine;
-  const uint32_t machine = ctx.r3.u32 + cm::kMachine;
+  const uint32_t machine_offset = schema::CameraDirector(base, 0).machine_address();
+  const uint64_t machine_r3 = ctx.r3.u64 + machine_offset;
+  const uint32_t machine = ctx.r3.u32 + machine_offset;
   bool replaced = false;
   const uint32_t r3 =
       cm::DirectorInitStates(base, ctx.r3.u32, ctx.r1.u32 - cm::kInitStatesFrame, &replaced);

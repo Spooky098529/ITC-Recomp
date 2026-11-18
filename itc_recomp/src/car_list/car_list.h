@@ -47,9 +47,8 @@ constexpr uint32_t kSetCarName = 0x822417E8;
 constexpr uint32_t kSetPrice = 0x8224E7E8;
 // Slot 3 of the C panels: Panel7C::ShowArrows (ours), else a guest call.
 constexpr uint32_t kPanel7CShowArrows = 0x82241868;
-// The doubles the stats scale by (lfd).
-constexpr uint32_t kStatsScaleA = 0x82009F00;
-constexpr uint32_t kStatsScaleB = 0x82009F08;
+// The doubles the stats scale by (lfd): CarListGlobals' stats_scale_a and
+// stats_scale_b (schema/car_list.h).
 
 // --- The panel groups (panels.cpp) ---
 
@@ -177,9 +176,8 @@ uint64_t Panel6CSetStats(uint8_t* base, uint32_t panel, uint32_t record, uint32_
 // sub_8224D7E0 CarPanelBase::~CarPanelBase: +0 = 0x820111C0. r3 left.
 constexpr uint32_t kCarPanelBaseVtable = 0x820111C0;
 uint64_t CarPanelBaseDestruct(uint8_t* base, uint64_t panel);
-// sub_8224EBB0 ConfirmPanel::ConfirmPanel: +0 = 0x82010B5C, +4 = 0, +8 = 2,
-// +12 to +36 = -1. r3 left.
-constexpr uint32_t kConfirmPanelVtable = 0x82010B5C;
+// sub_8224EBB0 ConfirmPanel::ConfirmPanel: +0 = 0x82010B5C
+// (schema::ConfirmPanel::kVtable), +4 = 0, +8 = 2, +12 to +36 = -1. r3 left.
 uint64_t ConfirmPanelConstruct(uint8_t* base, uint64_t panel);
 // sub_82241868 Panel7C::ShowArrows (slot 3; r4 shown).
 uint64_t Panel7CShowArrows(uint8_t* base, uint32_t panel, uint64_t shown, uint32_t sp,
@@ -193,10 +191,9 @@ uint64_t CarShowStats(uint8_t* base, uint64_t panel_r3, uint32_t entry, uint32_t
 
 // --- PanelSet's leaves (set.cpp; r3 the set, b = the set + 4 its base) ---
 
-// The two-player word (0 in PanelSet, 1 in PanelSetPair).
-constexpr uint32_t kTwoPlayers = 0x82815EAC;
-// The players' save data pointer sub_82105678 answers (two players).
-constexpr uint32_t kPairSaveData = 0x826C5B5C;
+// The two-player word (0 in PanelSet, 1 in PanelSetPair) and the players'
+// save data pointer sub_82105678 answers (two players): CarListGlobals'
+// two_players and pair_save_data (schema/car_list.h).
 
 // sub_822496C8 PanelSet::Reset (slot 2): the base's words reset. r3 left.
 uint64_t SetReset(uint8_t* base, uint64_t set);
@@ -218,12 +215,8 @@ uint64_t SaveData(uint8_t* base, uint32_t b, uint32_t sp);
 
 // --- The destructors (set.cpp) ---
 
-// The vtables they store: PanelGroupBase's, PanelSetBase's, PanelSet's and
-// the interface's PanelSet leaves.
-constexpr uint32_t kPanelGroupBaseVtable = 0x82010974;
-constexpr uint32_t kPanelSetBaseVtable = 0x820110C4;
-constexpr uint32_t kPanelSetVtable = 0x820110C8;
-constexpr uint32_t kPanelSetInterfaceVtable = 0x82011018;
+// The vtables they store (PanelGroupBase's, PanelSetBase's, PanelSet's and
+// the interface's PanelSet leaves) are their schema types' kVtable.
 // operator delete (its override).
 constexpr uint32_t kOperatorDelete = 0x825A70E8;
 
@@ -249,7 +242,7 @@ uint64_t SetInterfaceDeletingDestruct(uint8_t* base, uint64_t set, uint64_t flag
 // Picked; 4, 7 (no Free), 11 to 13 and 15 to 17 the empty sub_82106540, 9,
 // 10 and 18 sub_825C8388 (0), 14 sub_825C8390 (1). ---
 
-constexpr uint32_t kPanelSetPairVtable = 0x82011118;
+// Its vtable is schema::PanelSetPair::kVtable; the second base's offset:
 constexpr uint32_t kPairSecondBase = 1976;
 // sub_8224B750 PanelSetPair::PanelSetPair: r4 to r10 the first base's F,
 // the second's F, the first's E, the second's E, the first's D, the
@@ -305,10 +298,8 @@ constexpr uint32_t kVirtualFree = 0x82295330;
 constexpr uint32_t kFadeIn = 0x8209D038;
 constexpr uint32_t kFadeOut = 0x8209D0C8;
 constexpr uint32_t kTabFinished = 0x825C8390;
-// The fades' pass counts (FadeIn's, FadeOut's) and the steps' wait word.
-constexpr uint32_t kFadeInPasses = 0x82001BEC;
-constexpr uint32_t kFadeOutPasses = 0x82001BF0;
-constexpr uint32_t kFadeWait = 0x82815EB0;
+// The fades' pass counts (FadeIn's, FadeOut's) and the steps' wait word:
+// CarListGlobals' fade_in_passes, fade_out_passes and fade_wait.
 
 // sub_82249558 PanelSetBase::ToTabs.
 uint64_t ToTabs(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
@@ -381,10 +372,10 @@ constexpr uint32_t kMemcpy = 0x825A7410;
 // C++, the original where c_runtime::Memcpy refuses).
 uint64_t Build(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 
-// The stand's holders ([0x826D83E0]: three slots, by the player) and the
-// guest calls ShowStandCar makes: Car::Refresh's original where its plain
-// C++ declines, GarageStage::SetCarClass through its override.
-constexpr uint32_t kStandHolders = 0x826D83E0;
+// The stand's holders ([0x826D83E0], CarListGlobals' stand_holders: three
+// slots, by the player) and the guest calls ShowStandCar makes:
+// Car::Refresh's original where its plain C++ declines,
+// GarageStage::SetCarClass through its override.
 constexpr uint32_t kCarRefresh = 0x820C4998;
 constexpr uint32_t kSetCarClass = 0x8217FDC8;
 // sub_8224A490 PanelSetBase::ShowStandCar (r4 a color; below 0 the rows'
@@ -450,13 +441,12 @@ uint64_t CarPage(uint8_t* base, uint64_t b, uint32_t sp, const Calls& calls);
 // The guest calls the update makes: GarageStage::ReloadModel, SetCar,
 // Command, IsBusy and Draw through their overrides (the garage tab's car,
 // GarageScreen::CopyGarageCar, its plain C++); the two-player stand's wait
-// word.
+// word (CarListGlobals' stand_wait).
 constexpr uint32_t kReloadModel = 0x8217F880;
 constexpr uint32_t kSetCar = 0x8217FD58;
 constexpr uint32_t kGarageStageCommand = 0x82180108;
 constexpr uint32_t kGarageStageIsBusy = 0x82179BE0;
 constexpr uint32_t kGarageStageDraw = 0x8217FE60;
-constexpr uint32_t kStandWait = 0x826379B8;
 
 // sub_821807D8 GarageStages::DrawAll: the three stages of [0x826D83E0]
 // (GarageStage::SetDrawWord's plain C++): each holding a model has its draw
@@ -517,9 +507,8 @@ uint64_t CarPick(uint8_t* base, uint64_t panel_r3, uint64_t action, uint64_t bef
 
 // --- The power graph's record (panels.cpp) ---
 
-// The power graph screen's record's holder ([0x82815EBC]; the record at
-// its +8).
-constexpr uint32_t kPowerGraph = 0x82815EBC;
+// The power graph screen's record's holder is CarListGlobals' power_graph
+// ([0x82815EBC]; the record at its +8).
 // sub_82250368 PowerGraph::SetEntry (r3 an entry, r4 the tab; a leaf, its
 // switch's case 0 and 4 the split piece sub_822503F0, merged). r3 left.
 uint64_t PowerGraphSetEntry(uint8_t* base, uint64_t entry, uint64_t tab);

@@ -9,12 +9,13 @@
 #include "base/log.h"
 #include "command_list/command_list.h"
 #include "graphics/video_output.h"
+#include "schema/frame_passes.h"
 
 namespace frame_passes {
 
 namespace {
 
-constexpr uint32_t kWorkMemCurrent = 0x8296B780;
+using G = schema::FramePassesGlobals;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -62,12 +63,12 @@ uint32_t Slot16(uint8_t* base, uint32_t list, uint32_t from) {
 
 void WorkMemFlip(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82589A78 WorkMem::Flip");
-  const uint32_t current = Load(base, kWorkMemCurrent) ^ 1;
-  Store(base, kWorkMemCurrent, current);
+  const uint32_t current = G::work_mem_current(base) ^ 1;
+  G::set_work_mem_current(base, current);
   const uint32_t at = current << 2;
-  Store(base, kWorkMemCurrent + 4 + 28 + at, 0);
-  Store(base, kWorkMemCurrent + 4 + 20 + at, 0);
-  Store(base, kWorkMemCurrent + 4 + at, 0);
+  Store(base, G::work_mem_bytes_used_address() + at, 0);
+  Store(base, G::work_mem_headers_used_address() + at, 0);
+  Store(base, G::work_mem_buffer_words_address() + at, 0);
 }
 
 void FlipWorkMem(uint8_t* base) {
@@ -77,7 +78,7 @@ void FlipWorkMem(uint8_t* base) {
 
 uint32_t DelegateSlot2Target(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82096350 Delegate slot 2 thunk");
-  return Load(base, Load(base, object) + 8);
+  return schema::FramePassesDelegateObject(base, object).vtable().slot_2();
 }
 
 std::optional<uint32_t> RecordConstants(uint8_t* base, uint32_t list) {
@@ -86,9 +87,9 @@ std::optional<uint32_t> RecordConstants(uint8_t* base, uint32_t list) {
     return std::nullopt;
   }
   Slot3(base, list, 7, 1, 0x00015601u);  // vertex, float, c86, 1
-  Slot16(base, list, 0x8265ED20);
+  Slot16(base, list, G::vertex_c86_address());
   Slot3(base, list, 7, 1, 0x01014C01u);  // pixel, float, c76, 1
-  return Slot16(base, list, 0x8265ED30);
+  return Slot16(base, list, G::pixel_c76_address());
 }
 
 std::optional<uint32_t> RecordSamplers(uint8_t* base, uint32_t list) {
@@ -116,7 +117,7 @@ std::optional<uint32_t> RecordSamplers(uint8_t* base, uint32_t list) {
 
 std::optional<uint32_t> RecordPrimitiveReset(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82589990 FramePasses::RecordPrimitiveReset");
-  const uint32_t list = Load(base, kCommandList);
+  const uint32_t list = G::command_list(base).address;
   if (!Ready(base, list, 5)) {
     return std::nullopt;
   }
@@ -145,7 +146,8 @@ bool JobWait(uint8_t* base, uint32_t job, const std::function<void(uint32_t obje
 uint32_t Boot(uint8_t* base, uint32_t passes, uint32_t frame, const BootCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820962B8 FramePasses::Boot");
   namespace vo = graphics::video_output;
-  const uint32_t video_output = calls.video_output(Load(base, passes + 4));
+  const uint32_t video_output =
+      calls.video_output(schema::FramePasses(base, passes).services().address);
   const uint32_t device = vo::LockDevice(base, video_output);
   const uint32_t local = frame + 80;
   Store(base, local, device);
@@ -159,24 +161,26 @@ uint32_t Construct(uint8_t* base, uint32_t passes, uint32_t block, uint32_t fram
   ITC_NATIVE_RUNNING("sub_82098630 FramePasses::FramePasses");
   constexpr uint32_t kDelegateVtable = 0x82002850;
   constexpr uint32_t kFunctorBase = 0x82000ABC;
-  const uint32_t job = passes + 8;
-  Store(base, passes + 0, 0x82000F20);
-  const uint32_t interface = Load(base, block + 4);
-  Store(base, passes + 4, interface);
+  const schema::FramePasses p(base, passes);
+  const schema::FramePassesBlock b(base, block);
+  const uint32_t job = p.job_vtable_address();
+  p.set_vtable(schema::FramePasses::kVtable);
+  const uint32_t interface = b.services().address;
+  p.set_services(interface);
   // The job, as the original leaves it (its +4 0x82000AB4, then the job's
   // vtable 0x82002908; the fields stored twice once).
-  Store(base, job + 0, 0x820066DC);
-  Store(base, job + 4, 0x82002908);
-  Store(base, job + 8, 0);
-  Store(base, job + 12, 0);
-  guest::StoreU8(base, job + 16, 0);
-  guest::StoreU8(base, job + 17, 1);
-  guest::StoreU8(base, job + 18, 0);
-  Store(base, job + 20, stack_word);
-  Store(base, job + 24, kDelegateVtable);
-  Store(base, job + 28, passes);
-  Store(base, job + 32, 0x82096330);  // slot 0, FramePasses::Boot
-  calls.post(Load(base, passes + 4), job);
+  p.set_job_vtable(0x820066DC);
+  p.set_job_interface(0x82002908);
+  p.set_job_worker_value(0);
+  p.set_job_state(0);
+  p.set_job_skip(0);
+  p.set_job_post_arg(1);
+  p.set_job_posted(0);
+  p.set_job_waiter(stack_word);
+  p.set_job_delegate_vtable(kDelegateVtable);
+  p.set_job_delegate_object(passes);
+  p.set_job_delegate_target(0x82096330);  // slot 0, FramePasses::Boot
+  calls.post(p.services().address, job);
   calls.wait(job);
 
   const uint32_t key = frame + 80;
@@ -185,7 +189,7 @@ uint32_t Construct(uint8_t* base, uint32_t passes, uint32_t block, uint32_t fram
   Store(base, frame + 88, kDelegateVtable);
   Store(base, frame + 96, 0x82096340);
   Store(base, key, 3);
-  calls.add(Load(base, block + 0), 8, key, frame + 88, 0x82098750);
+  calls.add(b.run_loop().address, 8, key, frame + 88, 0x82098750);
   // Tick handler 20: slot 2 (FramePasses::FlipWorkMem) through sub_82096350;
   // the first delegate destroyed.
   Store(base, frame + 104, kDelegateVtable);
@@ -193,7 +197,7 @@ uint32_t Construct(uint8_t* base, uint32_t passes, uint32_t block, uint32_t fram
   Store(base, frame + 88, kFunctorBase);
   Store(base, frame + 112, 0x82096350);
   Store(base, key, 20);
-  calls.add(Load(base, block + 0), 8, key, frame + 104, 0x82098794);
+  calls.add(b.run_loop().address, 8, key, frame + 104, 0x82098794);
   // The listener for event 8: slot 3 (FramePasses::OnEvent) through
   // sub_82096320; the second delegate destroyed (the third isn't).
   Store(base, frame + 104, kFunctorBase);
@@ -201,7 +205,7 @@ uint32_t Construct(uint8_t* base, uint32_t passes, uint32_t block, uint32_t fram
   Store(base, frame + 120, kDelegateVtable);
   Store(base, frame + 128, 0x82096320);
   Store(base, key, 8);
-  calls.add(Load(base, block + 0), 4, key, frame + 120, 0x820987D8);
+  calls.add(b.run_loop().address, 4, key, frame + 120, 0x820987D8);
   return passes;
 }
 

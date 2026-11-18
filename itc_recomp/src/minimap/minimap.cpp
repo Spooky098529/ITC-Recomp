@@ -11,22 +11,22 @@
 #include "guest.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
+#include "schema/minimap.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace minimap {
 
 namespace {
 
-// The image's 1.0 (0x82000A30), stored by the originals' stfs.
-constexpr uint32_t kOne = 0x82000A30;
+using G = schema::MinimapGlobals;
+using List = schema::MinimapList80;
+using Entry = schema::MinimapRacerEntry;
+using TriangleView = schema::MinimapTriangle;
 
 // The originals' lfs and stfs copy of a float.
 void CopyFloat(uint8_t* base, uint32_t to, uint32_t from) {
   guest::StoreFloat(base, to, guest::LoadFloat(base, from));
 }
-
-// An 80-slot list's fields.
-constexpr uint32_t kFree = 320, kHead = 324, kCount = 328, kData = 336;
 
 int32_t LoadS16(uint8_t* base, uint32_t address) {
   return int16_t(guest::LoadU16(base, address));
@@ -38,7 +38,7 @@ uint32_t NodeAddress(uint32_t list, int32_t index) { return uint32_t(index) * 4 
 // The node `steps` steps from the head (32 bits, as the originals walk it):
 // the head's node, then each node's next.
 uint32_t NodeAt(uint8_t* base, uint32_t list, uint32_t steps) {
-  uint32_t node = NodeAddress(list, LoadS16(base, list + kHead));
+  uint32_t node = NodeAddress(list, int16_t(List(base, list).head()));
   for (uint32_t n = steps; n != 0; n--) {
     node = NodeAddress(list, LoadS16(base, node));
   }
@@ -47,7 +47,7 @@ uint32_t NodeAt(uint8_t* base, uint32_t list, uint32_t steps) {
 
 // The node's data slot's address (its signed halfword +2, 64 bytes a slot).
 uint32_t DataAt(uint8_t* base, uint32_t list, uint32_t node) {
-  return uint32_t(LoadS16(base, node + 2)) * 64 + list + kData;
+  return uint32_t(LoadS16(base, node + 2)) * 64 + List(base, list).data_address();
 }
 
 // An identity's row `row` (the originals' vupkd3d128 and vpermwi128): 1.0
@@ -65,7 +65,7 @@ uint32_t RaceFindPlayerEntry(uint8_t* base, uint32_t manager, uint32_t which) {
   const int32_t count = int32_t(guest::LoadU32(base, manager + 2368));
   const uint32_t flag = which != 0 ? 0x4 : 0x8;
   for (int32_t i = 0; i < count; i++) {
-    if ((guest::LoadU32(base, manager + 4 + 28 * uint32_t(i)) & flag) != 0) {
+    if ((Entry(base, manager + 4 + 28 * uint32_t(i)).flags() & flag) != 0) {
       return manager + 4 + 28 * uint32_t(i);
     }
   }
@@ -74,7 +74,7 @@ uint32_t RaceFindPlayerEntry(uint8_t* base, uint32_t manager, uint32_t which) {
 
 uint32_t RaceRacerVehicle(uint8_t* base, uint32_t racer) {
   ITC_NATIVE_RUNNING("sub_82170578 Race::RacerVehicle");
-  const uint32_t manager = guest::LoadU32(base, kRaceManager);
+  const uint32_t manager = G::racers_manager(base);
   if (manager == 0) {
     return 0;
   }
@@ -90,19 +90,20 @@ void SetListPoint(uint8_t* base, uint32_t list, uint32_t out, uint32_t entry, ui
   const float x = guest::LoadFloat(base, from + 0);
   const float y = guest::LoadFloat(base, from + 4);
   const float z = guest::LoadFloat(base, from + 8);
-  const uint32_t w = guest::LoadU32(base, kOne);
-  guest::StoreFloat(base, out + 0, x);
-  guest::StoreFloat(base, out + 4, y);
-  guest::StoreFloat(base, out + 8, z);
-  guest::StoreU32(base, out + 12, w);
+  const float w = G::one(base);
+  const schema::MinimapPoint to(base, out);
+  to.set_x(x);
+  to.set_y(y);
+  to.set_z(z);
+  to.set_w(w);
 }
 
 std::optional<int32_t> RacerMarkerType(uint8_t* base, uint32_t entry, int32_t branch) {
   ITC_NATIVE_RUNNING("sub_820F2D28 Minimap::RacerMarkerType");
   int32_t type;
-  const uint32_t record = guest::LoadU32(base, kRaceData) + 48 +
-                          3936 * guest::LoadU32(base, entry + 24);
-  if ((guest::LoadU32(base, entry) & 0x10) != 0) {
+  const Entry e(base, entry);
+  const uint32_t record = G::race_data(base) + 48 + 3936 * e.record();
+  if ((e.flags() & 0x10) != 0) {
     type = 1;
   } else if (int32_t id = int32_t(guest::LoadU32(base, record + 3912)); id == -1) {
     type = 1;
@@ -127,14 +128,14 @@ std::optional<int32_t> RacerMarkerType(uint8_t* base, uint32_t entry, int32_t br
       type = 2;
     }
   }
-  const uint16_t section = guest::LoadU16(base, entry + 8);
-  if (int16_t(section) <= -1 || LoadS16(base, entry + 10) <= -1) {
+  const uint16_t section = e.section();
+  if (int16_t(section) <= -1 || int16_t(e.slice()) <= -1) {
     return -1;
   }
   if (type == 1) {
     return 1;
   }
-  const uint32_t sections = guest::LoadU32(base, guest::LoadU32(base, kRoute) + 12);
+  const uint32_t sections = guest::LoadU32(base, G::route(base) + 12);
   const int32_t own = guest::LoadU8(base, guest::LoadU32(base, sections + 4 * section) + 3);
   // The branches the player's shows (the original's switch on branch - 1;
   // case 1 is sub_820F2E68 in the generated code), else only its own.
@@ -173,36 +174,40 @@ bool Scaling(uint8_t* base, uint32_t out, uint32_t vector) {
   for (uint32_t row = 0; row < 4; row++) {
     StoreIdentityRow(base, out + 16 * row, row);
   }
-  CopyFloat(base, out + 0, vector + 0);
-  CopyFloat(base, out + 20, vector + 4);
-  CopyFloat(base, out + 40, vector + 8);
+  const schema::MinimapScale scale(base, vector);
+  guest::StoreFloat(base, out + 0, scale.x());
+  guest::StoreFloat(base, out + 20, scale.y());
+  guest::StoreFloat(base, out + 40, scale.z());
   return true;
 }
 
 void TriangleInit(uint8_t* base, uint32_t triangle) {
   ITC_NATIVE_RUNNING("sub_820F4040 Triangle::Init");
-  const uint32_t one = guest::LoadU32(base, kOne);
-  for (uint32_t offset : {12u, 28u, 44u, 60u}) {
-    guest::StoreU32(base, triangle + offset, one);
-  }
-  guest::StoreU32(base, triangle + 64, 0);
-  guest::StoreU32(base, triangle + 68, 0);
-  guest::StoreU32(base, triangle + 72, 2);
+  const TriangleView t(base, triangle);
+  const float one = G::one(base);
+  t.set_world_row0_w(one);
+  t.set_world_row1_w(one);
+  t.set_world_row2_w(one);
+  t.set_world_row3_w(one);
+  t.set_kind(0);
+  t.set_mode_a(0);
+  t.set_mode_b(2);
   for (uint32_t row = 0; row < 4; row++) {
-    StoreIdentityRow(base, (triangle + 16 * row) & ~0xFu, row);
+    StoreIdentityRow(base, (t.world_address() + 16 * row) & ~0xFu, row);
   }
-  for (uint32_t offset : {92u, 108u, 124u}) {
-    guest::StoreU32(base, triangle + offset, one);
-  }
+  t.set_vertex0_w(one);
+  t.set_vertex1_w(one);
+  t.set_vertex2_w(one);
 }
 
 void List80Link(uint8_t* base, uint32_t list, int16_t position) {
   ITC_NATIVE_RUNNING("sub_820F40C0 List80::Link");
+  const List l(base, list);
   uint32_t after;
   if (position == 0) {
-    after = list + kHead;
+    after = l.head_address();
   } else {
-    int32_t index = LoadS16(base, list + kHead);
+    int32_t index = int16_t(l.head());
     uint32_t n = uint32_t(int32_t(position));
     for (;;) {
       after = NodeAddress(list, index);
@@ -212,13 +217,13 @@ void List80Link(uint8_t* base, uint32_t list, int16_t position) {
       index = LoadS16(base, after);
     }
   }
-  const uint32_t free_node = NodeAddress(list, LoadS16(base, list + kFree));
-  const uint16_t free_index = guest::LoadU16(base, list + kFree);
-  guest::StoreU16(base, list + kFree, guest::LoadU16(base, free_node));
+  const uint32_t free_node = NodeAddress(list, int16_t(l.free_head()));
+  const uint16_t free_index = l.free_head();
+  l.set_free_head(guest::LoadU16(base, free_node));
   guest::StoreU16(base, free_node, free_index);
   guest::StoreU16(base, free_node, guest::LoadU16(base, after));
   guest::StoreU16(base, after, free_index);
-  guest::StoreU16(base, list + kCount, guest::LoadU16(base, list + kCount) + 1);
+  l.set_count(uint16_t(l.count() + 1));
 }
 
 uint32_t List80Insert(uint8_t* base, uint32_t list, uint32_t matrix, uint32_t position) {
@@ -236,7 +241,7 @@ bool List80Copy(uint8_t* base, uint32_t out, uint32_t list, uint32_t position) {
     return false;
   }
   const uint32_t from = DataAt(base, list, NodeAt(base, list, position));
-  const uint32_t one = guest::LoadU32(base, kOne);
+  const uint32_t one = guest::LoadU32(base, G::one_address());
   for (uint32_t offset : {12u, 28u, 44u, 60u}) {
     guest::StoreU32(base, out + offset, one);
   }
@@ -246,13 +251,13 @@ bool List80Copy(uint8_t* base, uint32_t out, uint32_t list, uint32_t position) {
 std::optional<uint32_t> RecordTransform(uint8_t* base, uint32_t pass, uint32_t primitive,
                                         uint32_t product) {
   ITC_NATIVE_RUNNING("sub_8217AEA8 Primitive::RecordTransform");
-  const uint32_t list = guest::LoadU32(base, kTransformList);
+  const uint32_t list = G::triangle_list(base);
   const uint32_t used = guest::LoadU32(base, list + 12);
   if (used + 5 < used || used + 5 >= guest::LoadU32(base, list + 8)) {
     return std::nullopt;
   }
   // The original's 1.0 stores before the multiply (overwritten by it).
-  const uint32_t one = guest::LoadU32(base, kOne);
+  const uint32_t one = guest::LoadU32(base, G::one_address());
   for (uint32_t offset : {12u, 28u, 44u, 60u}) {
     guest::StoreU32(base, product + offset, one);
   }
@@ -276,7 +281,7 @@ std::optional<uint32_t> RecordTransform(uint8_t* base, uint32_t pass, uint32_t p
 
 TriangleRecording TriangleRecord(uint8_t* base, uint32_t triangle) {
   ITC_NATIVE_RUNNING("sub_8217DAA0 Triangle::Record");
-  const uint32_t kind = guest::LoadU32(base, triangle + 64);
+  const uint32_t kind = TriangleView(base, triangle).kind();
   return kind == 0 ? TriangleRecording::kFlat
                    : kind == 1 ? TriangleRecording::kOther : TriangleRecording::kNone;
 }
@@ -284,7 +289,7 @@ TriangleRecording TriangleRecord(uint8_t* base, uint32_t triangle) {
 std::optional<uint32_t> TriangleRecordFlat(uint8_t* base, uint32_t triangle, uint32_t pass,
                                            uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8217C370 Triangle::RecordFlat");
-  const uint32_t list = guest::LoadU32(base, kTriangleLists + 4);
+  const uint32_t list = G::triangle_list(base);
   // The header, the transform's five, [13], the vertices' header and five,
   // and [15]: 14 slots, with no chunk open on any list.
   const uint32_t used = guest::LoadU32(base, list + 12);
@@ -303,14 +308,16 @@ std::optional<uint32_t> TriangleRecordFlat(uint8_t* base, uint32_t triangle, uin
   guest::StoreU32(base, slot + 12, 0);
   uint32_t vertex = command_list::AllocateVertices(base, list, 3, true);
   for (uint32_t i = 0; i < 3; i++) {
-    const uint32_t from = triangle + 80 + 16 * i;
-    CopyFloat(base, vertex + 0, from + 0);
-    CopyFloat(base, vertex + 4, from + 4);
-    CopyFloat(base, vertex + 8, from + 8);
-    const uint32_t color = (guest::LoadU32(base, from + 60) << 24) |
-                           (uint32_t(guest::LoadU8(base, from + 51)) << 16) |
-                           (uint32_t(guest::LoadU8(base, from + 55)) << 8) |
-                           guest::LoadU8(base, from + 59);
+    // The view moved 16 bytes a vertex: its vertex 0 and color 0 are vertex
+    // i's.
+    const TriangleView from(base, triangle + 16 * i);
+    guest::StoreFloat(base, vertex + 0, from.vertex0_x());
+    guest::StoreFloat(base, vertex + 4, from.vertex0_y());
+    guest::StoreFloat(base, vertex + 8, from.vertex0_z());
+    const uint32_t color = (from.color0_alpha() << 24) |
+                           (uint32_t(from.color0_red_byte()) << 16) |
+                           (uint32_t(from.color0_green_byte()) << 8) |
+                           from.color0_blue_byte();
     guest::StoreU32(base, vertex + 12, color);
     vertex += 24;
   }
@@ -403,10 +410,12 @@ struct Marker {
   uint32_t triangles;
   uint32_t colored;  // triangles 0 to colored - 1 in the color, the rest black
 };
-constexpr Marker kCarMarker = {0x826C5520, 0x826C5670, 0x825DAEF8, kCarMarkerSources,
-                               std::size(kCarMarkerSources), 7, 1};
-constexpr Marker kPointMarker = {0x826C5680, 0x826C5AA0, 0x825DAF00, kPointMarkerSources,
-                                 std::size(kPointMarkerSources), 22, 6};
+constexpr Marker kCarMarker = {G::car_marker_table_address(), G::car_marker_guard_address(),
+                               0x825DAEF8, kCarMarkerSources, std::size(kCarMarkerSources), 7,
+                               1};
+constexpr Marker kPointMarker = {G::point_marker_table_address(),
+                                 G::point_marker_guard_address(), 0x825DAF00,
+                                 kPointMarkerSources, std::size(kPointMarkerSources), 22, 6};
 static_assert(std::size(kCarMarkerSources) == 7 * 12);
 static_assert(std::size(kPointMarkerSources) == 22 * 12);
 
@@ -421,26 +430,31 @@ void DrawMarker(uint8_t* base, const Marker& marker, uint32_t pass, uint32_t col
     c_runtime::AtexitFrom(base, marker.clean_up, calls.atexit);
   }
   const uint32_t triangle = frame + kMarkerTriangle;
+  const TriangleView t(base, triangle);
   for (uint32_t i = 0; i < marker.triangles; i++) {
     TriangleInit(base, triangle);
-    // The vertices (+80 to +127), lfs and stfs.
+    // The vertices, lfs and stfs.
     for (uint32_t k = 0; k < 12; k++) {
-      CopyFloat(base, triangle + 80 + 4 * k, marker.table + 48 * i + 4 * k);
+      CopyFloat(base, t.vertices_address() + 4 * k, marker.table + 48 * i + 4 * k);
     }
-    // The three vertices' colors (+128 to +175): the color's four words, or
-    // (0, 0, 0, 255).
+    // The three vertices' colors: the color's four words, or (0, 0, 0, 255).
     uint32_t words[4] = {0, 0, 0, 255};
     if (i < marker.colored) {
-      for (uint32_t k = 0; k < 4; k++) {
-        words[k] = guest::LoadU32(base, color + 4 * k);
-      }
+      const schema::MinimapColor c(base, color);
+      words[0] = c.red();
+      words[1] = c.green();
+      words[2] = c.blue();
+      words[3] = c.alpha();
     }
     for (uint32_t v = 0; v < 3; v++) {
-      for (uint32_t k = 0; k < 4; k++) {
-        guest::StoreU32(base, triangle + 128 + 16 * v + 4 * k, words[k]);
-      }
+      // The view moved 16 bytes a vertex: its color 0 is vertex v's.
+      const TriangleView to(base, triangle + 16 * v);
+      to.set_color0_red(words[0]);
+      to.set_color0_green(words[1]);
+      to.set_color0_blue(words[2]);
+      to.set_color0_alpha(words[3]);
     }
-    if (!c_runtime::Memcpy(base, triangle, matrix, 64)) {
+    if (!c_runtime::Memcpy(base, t.world_address(), matrix, 64)) {
       calls.memcpy(calls.user, triangle, matrix, 64);
     }
     calls.record(calls.user, triangle, pass, kMarkerKey);

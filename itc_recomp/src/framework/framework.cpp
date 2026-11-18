@@ -9,42 +9,43 @@
 #include "framework/run_loop.h"
 #include "models/xpr.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/framework.h"
 
 namespace framework {
 
 uint32_t Flag133(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82090760 Framework flag +133");
-  return guest::LoadU8(base, object + 133);
+  return schema::Framework(base, object).restart_requested();
 }
 
 uint32_t Flag134(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82090768 Framework flag +134");
-  return guest::LoadU8(base, object + 134);
+  return schema::Framework(base, object).app_finished();
 }
 
 uint32_t Word60(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82090770 word +60");
-  return guest::LoadU32(base, object + 60);
+  return schema::FrameworkGetterSelf(base, object).word_60();
 }
 
 uint32_t Word64(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82090778 word +64");
-  return guest::LoadU32(base, object + 64);
+  return schema::FrameworkGetterSelf(base, object).word_64();
 }
 
 uint32_t Word88(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82090788 word +88");
-  return guest::LoadU32(base, object + 88);
+  return schema::FrameworkGetterSelf(base, object).word_88();
 }
 
 uint32_t Word68(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_8248F030 word +68");
-  return guest::LoadU32(base, object + 68);
+  return schema::FrameworkGetterSelf(base, object).word_68();
 }
 
 uint32_t Word44(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_824892F8 word +44");
-  return guest::LoadU32(base, object + 44);
+  return schema::FrameworkGetterSelf(base, object).word_44();
 }
 
 uint32_t InputManagerFrom36(uint8_t* base, uint32_t self) {
@@ -89,10 +90,11 @@ uint32_t SceneFrom36(uint8_t* base, uint32_t self) {
 
 void DebugFontSetPosition(uint8_t* base, uint32_t x, uint32_t y) {
   ITC_NATIVE_RUNNING("sub_8258BE08 DebugFont::SetPosition");
-  guest::StoreU32(base, kDebugFontPosition + 8, x);
-  guest::StoreU32(base, kDebugFontPosition + 12, y);
-  guest::StoreU32(base, kDebugFontPosition + 0, x);
-  guest::StoreU32(base, kDebugFontPosition + 4, y);
+  using Globals = schema::FrameworkGlobals;
+  Globals::set_debug_font_line_x(base, x);
+  Globals::set_debug_font_line_y(base, y);
+  Globals::set_debug_font_cursor_x(base, x);
+  Globals::set_debug_font_cursor_y(base, y);
 }
 
 uint64_t DebugFontInit(uint8_t* base, uint32_t data, uint32_t sp, const GuestCall& call) {
@@ -100,18 +102,21 @@ uint64_t DebugFontInit(uint8_t* base, uint32_t data, uint32_t sp, const GuestCal
   constexpr uint32_t kNew = 0x825A6880, kXprCreate = 0x82596F68;
   const uint32_t frame = sp - 112;
   guest::StoreU32(base, frame, sp);
-  const uint32_t font = kDebugFontPosition;
-  guest::StoreU8(base, kDebugFontFlag, 1);
-  for (uint32_t offset = 0; offset <= 16; offset += 4) {
-    guest::StoreU32(base, font + offset, 0);
-  }
-  guest::StoreU32(base, font + 8, 32);
-  guest::StoreU32(base, font + 12, 0);
-  guest::StoreU32(base, font + 0, 32);
-  guest::StoreU32(base, font + 4, 0);
-  for (uint32_t offset = 16; offset < 20; offset++) {
-    guest::StoreU8(base, font + offset, 255);
-  }
+  using Globals = schema::FrameworkGlobals;
+  Globals::set_debug_font_loaded(base, 1);
+  Globals::set_debug_font_cursor_x(base, 0);
+  Globals::set_debug_font_cursor_y(base, 0);
+  Globals::set_debug_font_line_x(base, 0);
+  Globals::set_debug_font_line_y(base, 0);
+  Globals::set_debug_font_word_16(base, 0);
+  Globals::set_debug_font_line_x(base, 32);
+  Globals::set_debug_font_line_y(base, 0);
+  Globals::set_debug_font_cursor_x(base, 32);
+  Globals::set_debug_font_cursor_y(base, 0);
+  Globals::set_debug_font_byte_16(base, 255);
+  Globals::set_debug_font_byte_17(base, 255);
+  Globals::set_debug_font_byte_18(base, 255);
+  Globals::set_debug_font_byte_19(base, 255);
   uint32_t xpr;
   if (const auto block = memory::crt::OperatorNew(base, 24)) {
     xpr = *block;
@@ -121,12 +126,12 @@ uint64_t DebugFontInit(uint8_t* base, uint32_t data, uint32_t sp, const GuestCal
   if (xpr != 0) {
     models::XprConstruct(base, xpr);
   }
-  guest::StoreU32(base, font + 20, xpr);
+  Globals::set_debug_font_xpr(base, xpr);
   const uint64_t r3 = call(kXprCreate, frame, 0x8258BDF0, xpr, data, 0);
   // lfs and two stfs: the float through a double and back.
-  const float scale = float(double(guest::LoadFloat(base, 0x82001FAC)));
-  guest::StoreFloat(base, font + 32, scale);
-  guest::StoreFloat(base, font + 36, scale);
+  const float scale = float(double(Globals::debug_font_default_scale(base)));
+  Globals::set_debug_font_scale_x(base, scale);
+  Globals::set_debug_font_scale_y(base, scale);
   return r3;
 }
 
@@ -142,19 +147,20 @@ uint32_t DebugTextLoadFont(uint8_t* base, uint32_t text, uint32_t sp, const Gues
   guest::StoreU8(base, frame + 80, 0);
   if ((call(kOpen, frame, 0x82090CF8, file, kName, frame + 80) & 0xFF) != 0) {
     const uint32_t size = file_layer::FileGetSize(base, file);
-    guest::StoreU32(base, text + 44, size);
+    const schema::DebugText debug_text(base, text);
+    debug_text.set_font_size(size);
     uint32_t buffer;
     if (const auto block = memory::crt::OperatorNew(base, size)) {
       buffer = *block;
     } else {
       buffer = uint32_t(call(kNew, frame, 0x82090D10, size, 0, 0));
     }
-    guest::StoreU32(base, frame + 84, guest::LoadU32(base, text + 44));
-    guest::StoreU32(base, text + 48, buffer);
+    guest::StoreU32(base, frame + 84, debug_text.font_size());
+    debug_text.set_font_data(buffer);
     call(kRead, frame, 0x82090D2C, file, buffer, frame + 84);
     call(kClose, frame, 0x82090D34, file, 0, 0);
-    DebugFontInit(base, guest::LoadU32(base, text + 48), frame, call);
-    guest::StoreU32(base, kDebugFontPosition + 40, 681);  // sub_8258BE48(681)
+    DebugFontInit(base, debug_text.font_data(), frame, call);
+    schema::FrameworkGlobals::set_debug_font_word_40(base, 681);  // sub_8258BE48(681)
   }
   file_layer::GameFileDestruct(base, file);
   return file;
@@ -162,7 +168,8 @@ uint32_t DebugTextLoadFont(uint8_t* base, uint32_t text, uint32_t sp, const Gues
 
 void DebugTextSetPosition(uint8_t* base, uint32_t x, uint32_t y) {
   ITC_NATIVE_RUNNING("sub_82091050 DebugText::SetPosition");
-  DebugFontSetPosition(base, guest::LoadU32(base, x), guest::LoadU32(base, y));
+  DebugFontSetPosition(base, schema::DebugTextCoordinate(base, x).value(),
+                       schema::DebugTextCoordinate(base, y).value());
 }
 
 uint32_t VirtualTarget(uint8_t* base, uint32_t object, uint32_t offset) {
@@ -171,29 +178,29 @@ uint32_t VirtualTarget(uint8_t* base, uint32_t object, uint32_t offset) {
 
 uint32_t DelegateSlot0Target(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82096330 Delegate slot 0 thunk");
-  return VirtualTarget(base, object, 0);
+  return schema::DelegateTarget(base, object).vtable().slot_0();
 }
 
 uint32_t DelegateSlot1Target(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82096340 Delegate slot 1 thunk");
-  return VirtualTarget(base, object, 4);
+  return schema::DelegateTarget(base, object).vtable().slot_1();
 }
 
 uint32_t TickHandlerTarget(uint8_t* base, uint32_t delegate) {
   ITC_NATIVE_RUNNING("sub_82099A98 TickHandler::Invoke");
-  return VirtualTarget(base, delegate, 4);
+  return schema::RunLoopDelegate(base, delegate).vtable().invoke();
 }
 
 VirtualCall FrameworkStartCall(uint8_t* base, uint32_t framework) {
   ITC_NATIVE_RUNNING("sub_820902B0 Framework::Start");
-  const uint32_t app = guest::LoadU32(base, framework + 120);
-  return {app, VirtualTarget(base, app, 36)};
+  const schema::FrameworkAppInterface app = schema::Framework(base, framework).app();
+  return {app.address, app.vtable().start()};
 }
 
 VirtualCall AppInputSourceCall(uint8_t* base, uint32_t self) {
   ITC_NATIVE_RUNNING("sub_82094350 App input source");
-  const uint32_t source = guest::LoadU32(base, self + 20);
-  return {source, VirtualTarget(base, source, 4)};
+  const schema::FrameworkInterface source = schema::AppPart4(base, self).framework_interface();
+  return {source.address, source.vtable().slot_1()};
 }
 
 VirtualCall AppInputSourceFrom16Call(uint8_t* base, uint32_t self) {
@@ -204,14 +211,15 @@ VirtualCall AppInputSourceFrom16Call(uint8_t* base, uint32_t self) {
 void FrameworkOnTick(uint8_t* base, uint32_t framework, uint32_t loop, uint32_t key,
                      const OnTickCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820902C8 Framework::OnTick");
+  const schema::Framework fw(base, framework);
   guest::StoreU32(base, key, 0);
-  calls.get_processor(guest::LoadU32(base, framework + 88), key);
-  const uint32_t app = guest::LoadU32(base, framework + 120);
-  guest::StoreU8(base, framework + 133, 0);
+  calls.get_processor(fw.input_manager(), key);
+  const uint32_t app = fw.app().address;
+  fw.set_restart_requested(0);
   if ((calls.app_continues(app) & 0xFF) == 0) {
     guest::StoreU32(base, key, 7);
     calls.remove_tick_handler(loop, key);
-    guest::StoreU8(base, framework + 134, 1);
+    fw.set_app_finished(1);
   }
 }
 
@@ -223,10 +231,11 @@ std::optional<bool> RunLoopAddRequest(uint8_t* base, uint32_t loop, uint32_t typ
   } else {
     ITC_NATIVE_RUNNING("sub_8209AB48 RunLoop::AddListener");
   }
-  guest::StoreU32(base, request + 0, type);
-  guest::StoreU32(base, request + 4, guest::LoadU32(base, key));
-  guest::StoreU32(base, request + 8, clone(delegate));
-  return RequestsPushBack(base, loop + kRequests, request);
+  const schema::Request built(base, request);
+  built.set_type(type);
+  built.set_key(schema::RunLoopHandlerKey(base, key).key());
+  built.set_delegate(clone(delegate));
+  return RequestsPushBack(base, schema::RunLoop(base, loop).requests_address(), request);
 }
 
 void FrameworkConstruct(uint8_t* base, uint32_t framework) {
@@ -235,15 +244,26 @@ void FrameworkConstruct(uint8_t* base, uint32_t framework) {
       0x82000B90, 0x82000B8C, 0x82000B84, 0x82000B80, 0x82000B7C, 0x82000B70,
       0x82000B4C, 0x82000B38, 0x82000B28, 0x82000AFC, 0x82000AF4, 0x82000AEC,
       0x82000AE4, 0x82000AD4, 0x82000ACC, 0x82000AC8};
+  // The sixteen interfaces' vtable words, +0 to +60 in order.
+  const schema::Framework fw(base, framework);
   for (uint32_t i = 0; i < 16; i++) {
-    guest::StoreU32(base, framework + 4 * i, kVtables[i]);
+    guest::StoreU32(base, fw.vtable_address() + 4 * i, kVtables[i]);
   }
-  for (uint32_t at : {64u, 76u, 80u, 68u, 72u, 88u, 92u, 96u, 100u, 104u, 124u, 128u}) {
-    guest::StoreU32(base, framework + at, 0);
-  }
-  guest::StoreU8(base, framework + 132, 0);
-  guest::StoreU8(base, framework + 133, 0);
-  guest::StoreU8(base, framework + 134, 0);
+  fw.set_run_loop(0u);
+  fw.set_frame_driver(0);
+  fw.set_scene(0);
+  fw.set_worker_pool(0u);
+  fw.set_worker_pool_2(0u);
+  fw.set_input_manager(0);
+  fw.set_debug_text(0u);
+  fw.set_unknown_96(0);
+  fw.set_unknown_100(0);
+  fw.set_unknown_104(0);
+  fw.set_save_devices(0);
+  fw.set_users(0);
+  fw.set_unknown_132(0);
+  fw.set_restart_requested(0);
+  fw.set_app_finished(0);
 }
 
 std::optional<uint32_t> FrameworkCreate(uint8_t* base, uint32_t holder) {
@@ -260,7 +280,7 @@ std::optional<uint32_t> FrameworkCreate(uint8_t* base, uint32_t holder) {
     FrameworkConstruct(base, *block);
     framework = *block;
   }
-  guest::StoreU32(base, holder, framework);
+  schema::FrameworkHolder(base, holder).set_framework(framework);
   return holder;
 }
 
@@ -271,8 +291,10 @@ uint32_t PoolMakerConstruct(uint8_t* base, uint32_t maker, uint32_t vtable, uint
   } else {
     ITC_NATIVE_RUNNING("sub_820AC848 PoolMaker2::PoolMaker2");
   }
-  guest::StoreU32(base, maker + 0, vtable);
-  guest::StoreU32(base, maker + 4, pool(interface));
+  // The first maker's layout (PoolMaker, morph-jobs.md) is the same.
+  const schema::MorphJobMaker made(base, maker);
+  made.set_vtable(vtable);
+  made.set_worker_pool(pool(interface));
   return maker;
 }
 
@@ -284,44 +306,49 @@ uint32_t FrameStartConstruct(uint8_t* base, uint32_t frame_start, uint32_t block
   const uint32_t key = frame + 80;
   const uint32_t tick = frame + 88;
   const uint32_t listener = frame + 104;
-  guest::StoreU32(base, tick + 4, frame_start);
-  guest::StoreU32(base, frame_start + 0, 0x82000D84);
-  guest::StoreU32(base, tick + 0, kDelegateVtable);
+  // The delegates are in the frame (Delegate's layout, RunLoopDelegate).
+  const schema::RunLoopDelegate tick_delegate(base, tick), listener_delegate(base, listener);
+  const schema::FrameStart made(base, frame_start);
+  const schema::FrameStartBlock set_up(base, block);
+  tick_delegate.set_object(frame_start);
+  made.set_vtable(schema::FrameStart::kVtable);
+  tick_delegate.set_vtable(kDelegateVtable);
   guest::StoreU32(base, key, 4);
-  guest::StoreU32(base, tick + 8, 0x82096330);
-  guest::StoreU32(base, frame_start + 4, guest::LoadU32(base, block + 4));
-  add(guest::LoadU32(base, block + 0), 8, key, tick);
+  tick_delegate.set_function(0x82096330);
+  made.set_framework_interface(set_up.framework_interface());
+  add(set_up.run_loop().address, 8, key, tick);
   // The tick handler's delegate destroyed (its base vtable), the listener's
   // built.
-  guest::StoreU32(base, listener + 4, frame_start);
-  guest::StoreU32(base, tick + 0, 0x82000ABC);
-  guest::StoreU32(base, listener + 0, kDelegateVtable);
-  guest::StoreU32(base, listener + 8, 0x82096340);
+  listener_delegate.set_object(frame_start);
+  tick_delegate.set_vtable(0x82000ABC);
+  listener_delegate.set_vtable(kDelegateVtable);
+  listener_delegate.set_function(0x82096340);
   guest::StoreU32(base, key, 2);
-  add(guest::LoadU32(base, block + 0), 4, key, listener);
+  add(set_up.run_loop().address, 4, key, listener);
   return frame_start;
 }
 
 uint32_t DebugTextConstruct(uint8_t* base, uint32_t text, uint32_t block, uint32_t stack_word,
                             const std::function<void(uint32_t interface, uint32_t job)>& post) {
   ITC_NATIVE_RUNNING("sub_82090EA8 DebugText::DebugText");
-  const uint32_t job = text + 8;
-  guest::StoreU32(base, text + 0, 0x82000BC8);
-  guest::StoreU32(base, text + 4, guest::LoadU32(base, block + 0));
-  guest::StoreU32(base, job + 0, 0x820066DC);
-  guest::StoreU32(base, job + 4, 0x82002908);
-  guest::StoreU32(base, job + 8, 0);
-  guest::StoreU32(base, job + 12, 0);
-  guest::StoreU8(base, job + 16, 0);
-  guest::StoreU8(base, job + 17, 1);
-  guest::StoreU8(base, job + 18, 0);
-  guest::StoreU32(base, job + 20, stack_word);
-  guest::StoreU32(base, job + 24, 0x82002850);
-  guest::StoreU32(base, job + 28, text);
-  guest::StoreU32(base, job + 32, 0x82090CC0);  // the debug font's load
-  guest::StoreU32(base, text + 48, 0);
-  guest::StoreU32(base, kDebugTextGlobal, text);
-  post(guest::LoadU32(base, block + 4), job);
+  const schema::DebugText made(base, text);
+  const schema::DebugTextBlock set_up(base, block);
+  made.set_vtable(schema::DebugText::kVtable);
+  made.set_framework_interface(set_up.framework_interface());
+  made.set_job_vtable(0x820066DC);
+  made.set_job_vtable_4(0x82002908);
+  made.set_job_unknown_8(0);
+  made.set_job_state(0);
+  made.set_job_unknown_16(0);
+  made.set_job_unknown_17(1);
+  made.set_job_unknown_18(0);
+  made.set_job_unknown_20(stack_word);
+  made.set_job_delegate_vtable(0x82002850);
+  made.set_job_delegate_object(text);
+  made.set_job_delegate_function(0x82090CC0);  // the debug font's load
+  made.set_font_data(0);
+  schema::FrameworkGlobals::set_debug_text(base, text);
+  post(set_up.worker_pool().address, made.job_vtable_address());
   return text;
 }
 

@@ -10,6 +10,7 @@
 #include "guest.h"
 #include "race_overlays/race_overlays.h"
 #include "race_setup/race_setup.h"
+#include "schema/career.h"
 
 namespace career {
 
@@ -21,12 +22,12 @@ constexpr uint32_t kCaps = 96;       // 13 words: the picks allowed by kind
 constexpr uint32_t kCounts = 160;    // words by (kind x 6 + location)
 constexpr uint32_t kPicked = 480;    // 200 words: the entries picked
 constexpr uint32_t kEntries = 1280;  // {table, index} by (kind x 6 + location) x 192 + n
-// The save data's parts.
-constexpr uint32_t kTable0Done = 0x1CA7C;   // a bit set: table 0's entries granted
-constexpr uint32_t kTable0List = 0x1C778;   // 12-byte records, the count at +768
-constexpr uint32_t kTable1Words = 0x1B278;  // table 1's words by entry
-constexpr uint32_t kTableWords = 0x1B578;   // tables 2 to 7's, 768 bytes a table
-constexpr uint32_t kOffers = 0x1AD20;       // 6 locations of 100 bytes, the count at +96
+// The table words' tables 1 and 2 (+0x1B278, +0x1B578 in the save data):
+// 768 bytes a table.
+constexpr uint32_t kTable1Words = 0x300;
+constexpr uint32_t kTableWords = 0x600;
+// An offers record's count (100 bytes a location).
+constexpr uint32_t kOfferCount = 96;
 // RaceData::ResetGlobal's frame (its native r3 is from below it).
 constexpr uint32_t kResetFrame = 112;
 
@@ -49,12 +50,13 @@ void SetBit(uint8_t* base, uint32_t set, int32_t b) {
 // An entry's three conditions {kind, value} at +24 (all needed when +20 is
 // set, else any; none listed passes): Condition::Test's answers.
 bool ConditionsPass(uint8_t* base, uint32_t entry, uint32_t location, uint32_t frame) {
+  const schema::CareerEntry56 e(base, entry);
   bool grant = false;
-  const bool all = guest::LoadU32(base, entry + 20) != 0;
+  const bool all = e.all_conditions() != 0;
   for (int32_t k = 0; k < 3; k++) {
-    const uint32_t condition = entry + 24 + 8 * uint32_t(k);
-    if (int32_t(guest::LoadU32(base, condition + 0)) == -1 ||
-        int32_t(guest::LoadU32(base, condition + 4)) == -1) {
+    const uint32_t condition = e.conditions_address() + 8 * uint32_t(k);
+    const schema::CareerCondition c(base, condition);
+    if (int32_t(c.kind()) == -1 || int32_t(c.value()) == -1) {
       if (k == 0) {
         grant = true;
       }
@@ -79,7 +81,7 @@ bool ConditionsPass(uint8_t* base, uint32_t entry, uint32_t location, uint32_t f
 // added to that list on the frame.
 void Collect(uint8_t* base, uint32_t frame, uint32_t entry, int32_t location, uint32_t table,
              uint32_t index) {
-  const uint32_t at = guest::LoadU32(base, entry + 0) * 6 + uint32_t(location) - 14;
+  const uint32_t at = schema::CareerEntry56(base, entry).kind() * 6 + uint32_t(location) - 14;
   const uint32_t count_at = frame + kCounts + (at << 2);
   const uint32_t n = guest::LoadU32(base, count_at);
   const uint32_t slot = (at * 192 + n) << 3;
@@ -104,6 +106,7 @@ uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t locati
                     const race_event::Guest& guest, MakeCall make, void* user) {
   ITC_NATIVE_RUNNING("sub_82114268 Career::SetUpEvent");
   const uint32_t frame = sp - kSetUpEventFrame;
+  const schema::CareerSave sv(base, save);
   // The arguments in the caller's frame (RaceEvent::Make reads them there).
   guest::StoreU32(base, sp + 28, mode);
   guest::StoreU32(base, sp + 36, location);
@@ -113,11 +116,11 @@ uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t locati
   for (int32_t l = 14; l < 20; l++) {
     SetBit(base, frame + kLocations, l);
   }
-  guest::StoreU32(base, save + 6104, mode);
-  guest::StoreU32(base, save + 6108, location);
-  guest::StoreU32(base, save + 6112, 48);
+  sv.set_mode(mode);
+  sv.set_location(location);
+  sv.set_next_location(48);
   race_setup::RaceDataResetGlobal(base, frame - kResetFrame);
-  const int32_t day = int32_t(guest::LoadU32(base, save + 6100));
+  const int32_t day = int32_t(sv.day());
   if (day <= 999 && day == 1) {
     // RaceData::ResetGlobal's r3 (its adapter's).
     return uint64_t(frame) - kResetFrame - 112 - 128 - race_setup::kRouteFrameBytes + 80;
@@ -127,40 +130,40 @@ uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t locati
   const int32_t here = int32_t(guest::LoadU32(base, sp + 36));
   if (here >= 0 && BitSet(base, frame + kLocations, here)) {
     for (int32_t i = 0;; i++) {
-      if (i >= 0 && BitSet(base, save + kTable0Done, i)) {
+      if (i >= 0 && BitSet(base, sv.table0_done_address(), i)) {
         continue;
       }
       const uint32_t entry = data_tables::Entry56(base, 0, uint32_t(i));
-      if (int32_t(guest::LoadU32(base, entry + 0)) == -1) {
+      const schema::CareerEntry56 e(base, entry);
+      if (int32_t(e.kind()) == -1) {
         break;
       }
-      const uint32_t mask = guest::LoadU32(base, entry + 4);
+      const uint32_t mask = e.mask();
       if ((mask & 0x40) != 0 && (mask & 0x3F) == 0) {
         continue;
       }
       const uint32_t stage = StageOf(base, save);
-      if (Entry56Allows(base, entry, guest::LoadU32(base, save + 6104),
-                        guest::LoadU32(base, save + 6108), stage, 1) == 0) {
+      if (Entry56Allows(base, entry, sv.mode(), sv.location(), stage, 1) == 0) {
         continue;
       }
       if (!ConditionsPass(base, entry, 0, frame)) {
         continue;
       }
       if (i >= 0) {
-        SetBit(base, save + kTable0Done, i);
+        SetBit(base, sv.table0_done_address(), i);
       }
-      const uint32_t list = save + kTable0List;
-      const uint32_t at = guest::LoadU32(base, list + 768) * 12 + list;
+      const uint32_t list = sv.unlocks_shown_address();
+      const uint32_t at = sv.unlocks_shown_count() * 12 + list;
       guest::StoreU32(base, at + 0, 0);
       guest::StoreU32(base, at + 4, 0);
       guest::StoreU32(base, at + 8, uint32_t(i));
-      guest::StoreU32(base, list + 768, guest::LoadU32(base, list + 768) + 1);
+      sv.set_unlocks_shown_count(sv.unlocks_shown_count() + 1);
     }
   }
 
   // The offers cleared, and the frame's counts.
   for (uint32_t l = 0; l < 6; l++) {
-    guest::StoreU32(base, save + kOffers + 96 + 100 * l, 0);
+    guest::StoreU32(base, sv.offers_address() + kOfferCount + 100 * l, 0);
     for (uint32_t k = 0; k < 13; k++) {
       guest::StoreU32(base, frame + kCounts + 4 * l + 24 * k, 0);
     }
@@ -169,17 +172,16 @@ uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t locati
   // Table 1's entries, for each location 14 to 19.
   for (int32_t l = 14; l < 20; l++) {
     uint32_t i = 0;
-    uint32_t word = save + kTable1Words;
+    uint32_t word = sv.table_words_address() + kTable1Words;
     for (uint32_t entry = data_tables::Entry56(base, 1, 0);
-         int32_t(guest::LoadU32(base, entry + 0)) != -1;
+         int32_t(schema::CareerEntry56(base, entry).kind()) != -1;
          i++, word += 4, entry = data_tables::Entry56(base, 1, i)) {
-      const int32_t kind = int32_t(guest::LoadU32(base, entry + 0));
+      const int32_t kind = int32_t(schema::CareerEntry56(base, entry).kind());
       if (Done(kind, guest::LoadU32(base, word))) {
         continue;
       }
       const uint32_t stage = StageOf(base, save);
-      if (Entry56Allows(base, entry, guest::LoadU32(base, save + 6104), uint32_t(l), stage, 1) ==
-          0) {
+      if (Entry56Allows(base, entry, sv.mode(), uint32_t(l), stage, 1) == 0) {
         continue;
       }
       if (!ConditionsPass(base, entry, 1, frame)) {
@@ -193,22 +195,23 @@ uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t locati
   for (int32_t l = 14; l < 20; l++) {
     const uint32_t table = uint32_t(l - 12);
     uint32_t i = 0;
-    uint32_t word = save + kTableWords + 768 * uint32_t(l - 14);
+    uint32_t word = sv.table_words_address() + kTableWords + 768 * uint32_t(l - 14);
     for (uint32_t entry = data_tables::Entry56(base, table, 0);
-         int32_t(guest::LoadU32(base, entry + 0)) != -1;
+         int32_t(schema::CareerEntry56(base, entry).kind()) != -1;
          i++, word += 4, entry = data_tables::Entry56(base, table, i)) {
-      const int32_t kind = int32_t(guest::LoadU32(base, entry + 0));
+      const schema::CareerEntry56 e(base, entry);
+      const int32_t kind = int32_t(e.kind());
       if (Done(kind, guest::LoadU32(base, word))) {
         continue;
       }
       const int32_t stage = int32_t(StageOf(base, save));
-      const uint32_t entry_mode = guest::LoadU32(base, save + 6104);
+      const uint32_t entry_mode = sv.mode();
       if (kind == 4) {
         continue;
       }
       // The entry's mask: bits 7 to 9 the modes 0, 1 and others (mode 3
       // untested), bits 10 to 14 the stages (13 for stage 4).
-      const uint32_t mask = guest::LoadU32(base, entry + 4);
+      const uint32_t mask = e.mask();
       bool ok = false;
       if ((mask & 0x380) != 0 && int32_t(entry_mode) != 3) {
         const uint32_t bit = entry_mode == 0 ? 7 : entry_mode == 1 ? 8 : 9;
@@ -250,7 +253,7 @@ uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t locati
     guest::StoreU32(base, frame + kCaps + 4 * k, 0);
   }
   for (uint32_t l = 0; l < 6; l++) {
-    const uint32_t offers = save + kOffers + 100 * l;
+    const uint32_t offers = sv.offers_address() + 100 * l;
     int32_t picks = 0;
     for (uint32_t k = 0; k < 13; k++) {
       const int32_t count = int32_t(guest::LoadU32(base, frame + kCounts + 4 * l + 24 * k));
@@ -274,11 +277,11 @@ uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t locati
         const uint32_t from = frame + kEntries + ((list + uint32_t(index)) << 3);
         const uint32_t table = guest::LoadU32(base, from + 0);
         const uint32_t entry = guest::LoadU32(base, from + 4);
-        const uint32_t at = guest::LoadU32(base, offers + 96) * 12 + offers;
+        const uint32_t at = guest::LoadU32(base, offers + kOfferCount) * 12 + offers;
         guest::StoreU32(base, at + 0, 0);
         guest::StoreU32(base, at + 4, table);
         guest::StoreU32(base, at + 8, entry);
-        guest::StoreU32(base, offers + 96, guest::LoadU32(base, offers + 96) + 1);
+        guest::StoreU32(base, offers + kOfferCount, guest::LoadU32(base, offers + kOfferCount) + 1);
         taken++;
         picks++;
         if (taken >= n) {

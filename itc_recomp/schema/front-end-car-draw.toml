@@ -1,0 +1,137 @@
+# The schema of docs/functions/front-end-car-draw.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The front end's car draw: the garage stage (the car's stand on the
+# front-end screens, docs/known-data.md's "garage stage") draws its car,
+# runs its animation list and takes its commands (src/front_end_car_draw/).
+# The stage itself (GarageStage, GarageLights in the measure) is another
+# area's; this file holds its animation list and the objects only this
+# area's code reaches.
+
+# The stage's values an animation entry steps (an entry's +12): the stage
+# + 32 for types 0 and 2 to 5 (docs/known-data.md's "garage stage": +32
+# the bonnet, +48 to +63 copied to the scene model's +4944, +80 to +95 the
+# car's angles), the garage camera (stage + 112) for types 6 and 7. An
+# interior pointer into the stage: to fold into the stage's type.
+[GarageAnimValues]
+measure = "GarageAnims.+12"
+size = 68
+origin = "embedded"
+fields = [
+  { name = "bonnet", offset = 0, type = "f32", note = "stage +32: opened and closed by types 2 and 3 (probably the bonnet; the scene model's +4928)" },
+  { name = "doors", offset = 20, type = "f32", note = "stage +52: opened and closed by types 4 and 5 (the doors' runners, probably)" },
+  { name = "doors_b", offset = 24, type = "f32", note = "stage +56: the second door value (OpenDoorsB, CloseDoorsB)" },
+  { name = "angle_x", offset = 48, type = "f32", note = "stage +80: the car's first angle (probably about x; GarageStage::StepAngles' 13 clears it, a preset's +48)" },
+  { name = "yaw", offset = 52, type = "f32", note = "stage +84: the car's yaw (turned 0.5 degrees a step)" },
+  { name = "angle_z", offset = 56, type = "f32", note = "stage +88: the car's third angle (probably about z; StepAngles' 11 and 12)" },
+  { name = "doors_word", offset = 64, type = "u32", note = "stage +96: a word OpenDoorsB and CloseDoorsB set" },
+]
+
+# The stage's animation list (stage + 5600): 16 entries of 28 bytes
+# (GarageAnimEntry), the count at +448 (stage +6048). The fields at +0 to
+# +24 are entry 0's (the measure meets an entry as the list's address
+# plus 28i); the hand port reads entry i as GarageAnimEntry(list + 28i).
+[GarageAnimList]
+measure = "GarageAnims"
+size = 452
+origin = "embedded"
+fields = [
+  { name = "type", offset = 0, type = "s32", note = "entry 0's type: 0 turn, 1 cancel, 2 open, 3 close, 4 open the doors, 5 close them, 6 and 7 the camera" },
+  { name = "steps", offset = 4, type = "f32", note = "entry 0's steps (60.0 or 20.0)" },
+  { name = "word", offset = 8, type = "u32", note = "entry 0's word (1: turn until cancelled)" },
+  { name = "value", offset = 12, type = "ptr", to = "GarageAnimValues", note = "entry 0's value's address" },
+  { name = "model_index", offset = 16, type = "u32", note = "entry 0's scene model's index (the stage's +8)" },
+  { name = "done", offset = 20, type = "u32", note = "entry 0 finished" },
+  { name = "camera_step", offset = 24, type = "f32", note = "entry 0's float: type 6's (360.0 - the camera's orbit angle) / steps, else 0.0" },
+  { name = "entries_1_to_15", offset = 28, type = "bytes", count = 420, note = "entries 1 to 15 (GarageAnimEntry)" },
+  { name = "count", offset = 448, type = "u32", note = "the entries in use (stage +6048); no bound check on 16" },
+]
+
+# One animation entry (28 bytes) of GarageAnimList, or its copies in
+# GarageAnims::Run's and Add's frames.
+[GarageAnimEntry]
+size = 28
+origin = "embedded"
+fields = [
+  { name = "type", offset = 0, type = "s32", note = "0 turn, 1 cancel, 2 open, 3 close, 4 open the doors, 5 close them, 6 and 7 the camera" },
+  { name = "steps", offset = 4, type = "f32" },
+  { name = "word", offset = 8, type = "u32", note = "1: turn until cancelled" },
+  { name = "value", offset = 12, type = "ptr", to = "GarageAnimValues", note = "the value stepped (stage + 32, or the camera at stage + 112)" },
+  { name = "model_index", offset = 16, type = "u32", note = "the scene model's index in pool 7" },
+  { name = "done", offset = 20, type = "u32" },
+  { name = "camera_step", offset = 24, type = "f32", note = "type 6's (360.0 - the camera's orbit angle) / steps, else 0.0" },
+]
+
+# The parts' point block (the scene parts' +176) as Plates::Hide and Show
+# meet it: car-draw.toml's PartsPoints, to merge there.
+[FrontEndPlatePoints]
+measure = "Plates"
+size = 4580
+origin = "embedded"
+fields = [
+  { name = "front_plate_set", offset = 2640, type = "u32", note = "the front bumper's own plate texture flag (PartsPoints' +2640)" },
+  { name = "rear_plate_set", offset = 4576, type = "u32", note = "the rear bumper's own plate texture flag (its group's +1680)" },
+]
+
+# The scene model's parts (pool 1, the scene model's +5060) as
+# GarageStage::SyncPlates meets them: the measure's SceneParts, to merge
+# there.
+[FrontEndSceneParts]
+measure = "TrafficCar.+5060"
+size = 2820
+origin = "embedded"
+fields = [
+  { name = "front_plate_set", offset = 2816, type = "u32", note = "the point block's (+176) +2640: the plates shown" },
+]
+
+# The car scene ([0x826C2E44]) as Floor::Draw meets it: car-draw.toml's
+# CarScene, to merge there.
+[FrontEndFloorScene]
+measure = "Floor"
+size = 4576
+origin = "embedded"
+fields = [
+  { name = "model_set", offset = 4, type = "s32", note = "0 the front end (set a), 1 the race and parking area (CarScene's +4)" },
+  { name = "floor_shape_count", offset = 4572, type = "s32", note = "the part model at +4160's shape count (its +412): the shapes Floor::Draw draws" },
+]
+
+# Floor::Draw's matrix (GarageStage::Draw's copy of the car's world
+# matrix): a Matrix (matrix-math), to merge there.
+[FloorDrawMatrix]
+measure = "Floor::Draw.r4"
+size = 64
+origin = "embedded"
+fields = [
+  { name = "row3_xy", offset = 48, type = "u64", note = "the last row's x and y (set to 0.0, 0.0)" },
+  { name = "row3_zw", offset = 56, type = "u64", note = "the last row's z and w (set to 0.0, 1.0)" },
+]
+
+[globals]
+one = { address = 0x82000A30, type = "f32", note = "1.0" }
+zero = { address = 0x82000A34, type = "f32", note = "0.0" }
+minus_one = { address = 0x82001BE0, type = "f32", note = "-1.0 (the mirror's y)" }
+half = { address = 0x82001BE4, type = "f32", note = "0.5" }
+pi = { address = 0x82002240, type = "f32", note = "the yaw's wrap" }
+three_sixty = { address = 0x82002244, type = "f32", note = "360.0 (GarageAnims::Add's type 6)" }
+twenty = { address = 0x82002568, type = "f32", note = "20.0: the camera animations' steps" }
+degree = { address = 0x82002948, type = "f32", note = "pi/180" }
+minus_pi = { address = 0x820029C4, type = "f32", note = "the yaw's wrap" }
+sixty = { address = 0x82000F14, type = "f32", note = "60.0: the car animations' steps" }
+half_degree = { address = 0x82009EA8, type = "f32", note = "pi/360 (0.5 degrees): the yaw's step" }
+third_pi = { address = 0x82009EB4, type = "f32", note = "pi/3: the spots' cones' fourth word" }
+focal = { address = 0x82009EB8, type = "f32", note = "640.0: the garage camera's focal length over tan(fov)" }
+car_limits = { address = 0x82635E90, type = "bytes", count = 48, note = "the per-car stand animation limits, 48 bytes a car by the scene model's +48: +0 the most GarageAnims::Open and Close take the value to (the first car's here)" }
+mirrored = { address = 0x826C5100, type = "u32", note = "the cull swap: the cull modes 2 and 6 swapped while set (toggled around the mirrored car draw)" }
+ambient = { address = 0x8265ED00, type = "bytes", count = 16, note = "pixel c40's x, y, z (the stage lights' +1072)" }
+light_a = { address = 0x8296B950, type = "bytes", count = 48, note = "the scene lights' three vectors (the stage lights' +32 + 96i, y negated when mirrored)" }
+light_b = { address = 0x8296B980, type = "bytes", count = 48, note = "three (the stage lights' +48 + 96i)" }
+light_c = { address = 0x8296B9B0, type = "bytes", count = 48, note = "three (the stage lights' +64 + 96i)" }
+spot_positions = { address = 0x8296B9E0, type = "bytes", count = 128, note = "the spots' positions, 4 of 8 set (q +0)" }
+spot_colors = { address = 0x8296BA60, type = "bytes", count = 128, note = "the spots' colors, probably (q +80)" }
+spot_a = { address = 0x8296BAE0, type = "bytes", count = 128, note = "cleared to 0.0, then q +32" }
+spot_b = { address = 0x8296BB60, type = "bytes", count = 128, note = "cleared to 0.0, then q +48" }
+spot_directions = { address = 0x8296BBE0, type = "bytes", count = 128, note = "the spots' directions, normalized" }
+spot_cones = { address = 0x8296BC60, type = "bytes", count = 128, note = "the spots' cones: cos(inner/2), cos(outer/2), 1 / their difference, pi/3" }

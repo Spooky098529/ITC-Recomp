@@ -7,6 +7,7 @@
 
 #include "car_scene_draw/ops.h"
 #include "guest.h"
+#include "schema/car_scene_draw.h"
 
 #include "base/log.h"
 
@@ -19,9 +20,9 @@ namespace {
 
 using namespace ops;
 
-constexpr uint32_t kBoxMin = 0x8206CE44;        // the box's starting min (probably FLT_MAX)
-constexpr uint32_t kBoxMax = 0x8206CE40;        // its starting max (probably -FLT_MAX)
-constexpr uint32_t kCrossingEpsilon = 0x8206CE48;  // SegmentCrossing's smallest |plane . dir|
+using G = schema::CarSceneDrawGlobals;
+using Point = schema::CarScenePoint;
+using Plane = schema::CarScenePlane;
 
 constexpr uint32_t kFrustumFrame = 336;
 constexpr uint32_t kBoxFrame = 128;
@@ -34,24 +35,25 @@ uint32_t PlaneIntersect3(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, ui
                          uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_825976C8 Plane::Intersect3");
   const uint32_t s = stack;
-  const double one = Lfs(base, kOne);
+  const Plane pa(base, a), pb(base, b), pc(base, c);
+  const double one = double(G::one(base));
   // b's x, y, z and 1.0 at s - 64, c's at s - 48, then a's over b's, each
   // read back as a vector.
-  Stfs(base, s - 64, Lfs(base, b + 0));
-  Stfs(base, s - 60, Lfs(base, b + 4));
-  Stfs(base, s - 56, Lfs(base, b + 8));
+  Stfs(base, s - 64, double(pb.x()));
+  Stfs(base, s - 60, double(pb.y()));
+  Stfs(base, s - 56, double(pb.z()));
   Stfs(base, s - 52, one);
-  Stfs(base, s - 48, Lfs(base, c + 0));
-  Stfs(base, s - 44, Lfs(base, c + 4));
-  const double cz = Lfs(base, c + 8);
+  Stfs(base, s - 48, double(pc.x()));
+  Stfs(base, s - 44, double(pc.y()));
+  const double cz = double(pc.z());
   const simde__m128 vb = Lvx(base, s - 64);
   Stfs(base, s - 40, cz);
   const simde__m128 v10 = Permute<0x78>(vb);
   Stfs(base, s - 36, one);
   const simde__m128 v11 = Permute<0x9C>(vb);
-  Stfs(base, s - 64, Lfs(base, a + 0));
-  Stfs(base, s - 60, Lfs(base, a + 4));
-  const double az = Lfs(base, a + 8);
+  Stfs(base, s - 64, double(pa.x()));
+  Stfs(base, s - 60, double(pa.y()));
+  const double az = double(pa.z());
   const simde__m128 vc = Lvx(base, s - 48);
   Stfs(base, s - 56, az);
   const simde__m128 v8 = Permute<0x9C>(vc);
@@ -82,16 +84,16 @@ uint32_t PlaneIntersect3(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, ui
   if (exponent == 0 || exponent == 0x7F800000u) {
     return 0;
   }
-  double f13 = Lfs(base, a + 12);
+  double f13 = double(pa.d());
   f0 = Fdivs(one, f0);
   double f9 = Fmuls(f13, Lfs(base, s - 48));
   double f8 = Fmuls(f13, Lfs(base, s - 44));
   f13 = Fmuls(f13, Lfs(base, s - 40));
-  double f12 = Lfs(base, b + 12);
+  double f12 = double(pb.d());
   const double f7 = Fmuls(f12, Lfs(base, s - 64));
   const double f6 = Fmuls(f12, Lfs(base, s - 60));
   f12 = Fmuls(f12, Lfs(base, s - 56));
-  double f11 = Lfs(base, c + 12);
+  double f11 = double(pc.d());
   const double f5 = Fmuls(f11, Lfs(base, s - 32));
   const double f4 = Fmuls(f11, Lfs(base, s - 28));
   f11 = Fmuls(f11, Lfs(base, s - 24));
@@ -106,7 +108,7 @@ uint32_t PlaneIntersect3(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, ui
   Stfs(base, s - 12, Fmuls(Fneg(f9), f0));
   Stfs(base, s - 8, Fmuls(Fneg(f13), f0));
   Copy16(base, out, s - 16);
-  Stfs(base, out + 12, one);
+  Point(base, out).set_w(float(one));
   return 1;
 }
 
@@ -114,12 +116,16 @@ uint32_t FrustumFromMatrix(uint8_t* base, uint32_t out, uint32_t matrix, uint32_
   ITC_NATIVE_RUNNING("sub_82597878 Frustum::FromMatrix");
   const uint32_t f = stack - kFrustumFrame;
   Store(base, f, stack);  // the back chain, as stwu
-  auto m = [&](int row, int column) { return Lfs(base, matrix + 16 * row + 4 * column); };
+  const schema::CarSceneFrustum frustum(base, out);
+  // The matrix's row `row`, column `column` (CarSceneMatrix's m<row><column>).
+  auto m = [&](int row, int column) {
+    return Lfs(base, schema::CarSceneMatrix(base, matrix).m00_address() + 16 * row + 4 * column);
+  };
   auto st = [&](uint32_t offset, double value) { Stfs(base, f + offset, value); };
   auto copy = [&](uint32_t to, uint32_t from) { Copy16(base, f + to, f + from); };
-  const double one = Lfs(base, kOne);
+  const double one = double(G::one(base));
   for (uint32_t k = 0; k < 8; k++) {
-    Stfs(base, out + 128 + 16 * k + 12, one);  // the corners' w
+    Point(base, frustum.corners_address() + 16 * k).set_w(float(one));  // the corners' w
   }
   // The six planes from the matrix's w column (3) with and against its x,
   // y and z columns, built through the frame as the original: each written
@@ -191,22 +197,23 @@ uint32_t FrustumFromMatrix(uint8_t* base, uint32_t out, uint32_t matrix, uint32_
       st(80 + 4 * i, xyz[k][i]);
     }
     for (uint32_t i = 0; i < 4; i++) {
-      Store(base, out + 16 * k + 4 * i, Load(base, f + 80 + 4 * i));
+      Store(base, frustum.planes_address() + 16 * k + 4 * i, Load(base, f + 80 + 4 * i));
     }
   }
   // +96 + 4 k: plane k's code, 1 for x < 0, 2 for y, 4 for z.
-  const double zero = Lfs(base, kZero);
+  const double zero = double(G::zero(base));
   for (uint32_t k = 0; k < 6; k++) {
     const uint32_t code = (xyz[k][0] < zero ? 1u : 0u) | (xyz[k][1] < zero ? 2u : 0u) |
                           (xyz[k][2] < zero ? 4u : 0u);
-    Store(base, out + 96 + 4 * k, code);
+    Store(base, frustum.plane_codes_address() + 4 * k, code);
   }
   // Corner k from planes 4 or 5, 2 or 3 and 0 or 1 by k's bits.
   for (uint32_t k = 0; k < 8; k++) {
-    const uint32_t a = (k & 1) != 0 ? out + 64 : out + 80;
-    const uint32_t b = (k & 2) != 0 ? out + 48 : out + 32;
-    const uint32_t c = (k & 4) != 0 ? out + 0 : out + 16;
-    PlaneIntersect3(base, out + 128 + 16 * k, a, b, c, f);
+    const uint32_t planes = frustum.planes_address();
+    const uint32_t a = (k & 1) != 0 ? planes + 64 : planes + 80;
+    const uint32_t b = (k & 2) != 0 ? planes + 48 : planes + 32;
+    const uint32_t c = (k & 4) != 0 ? planes + 0 : planes + 16;
+    PlaneIntersect3(base, frustum.corners_address() + 16 * k, a, b, c, f);
   }
   return out;
 }
@@ -215,31 +222,33 @@ uint32_t PlaneSegmentCrossing(uint8_t* base, uint32_t out, uint32_t plane, uint3
                               uint32_t a, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82597E58 Plane::SegmentCrossing");
   const uint32_t s = stack;
-  const double f12 = Lfs(base, plane + 0);
-  double f11 = Lfs(base, plane + 4);
+  const Plane pl(base, plane);
+  const Point pa(base, a), pb(base, b), po(base, out);
+  const double f12 = double(pl.x());
+  double f11 = double(pl.y());
   Stfs(base, s - 28, f11);
-  const double ax = Lfs(base, a + 0);
+  const double ax = double(pa.x());
   Stfs(base, s - 32, f12);
-  const double one = Lfs(base, kOne);
-  double f8 = Lfs(base, b + 0);
-  const double ay = Lfs(base, a + 4);
+  const double one = double(G::one(base));
+  double f8 = double(pb.x());
+  const double ay = double(pa.y());
   f8 = Fsubs(f8, ax);
-  double f7 = Lfs(base, b + 4);
+  double f7 = double(pb.y());
   f11 = Fmuls(ay, f11);
   Stfs(base, s - 16, f8);
   f7 = Fsubs(f7, ay);
-  Stfs(base, s - 20, Lfs(base, kZero));
-  const double pz = Lfs(base, plane + 8);
+  Stfs(base, s - 20, double(G::zero(base)));
+  const double pz = double(pl.z());
   Stfs(base, s - 24, pz);
-  const double az = Lfs(base, a + 8);
-  const double bz = Lfs(base, b + 8);
+  const double az = double(pa.z());
+  const double bz = double(pb.z());
   Stfs(base, s - 12, f7);
   f7 = Fsubs(bz, az);
   Stfs(base, s - 4, one);
   const simde__m128 v7 = Lvx(base, s - 32);  // the plane's x, y, z and 0.0
   f11 = Fmadds(az, pz, f11);
   Stfs(base, s - 8, f7);
-  const double pd = Lfs(base, plane + 12);
+  const double pd = double(pl.d());
   const simde__m128 v10 = Lvx(base, s - 16);  // b - a and 1.0
   simde__m128 v0;
   simde__m128 v11;
@@ -278,7 +287,7 @@ uint32_t PlaneSegmentCrossing(uint8_t* base, uint32_t out, uint32_t plane, uint3
     Stvx(base, s - 32, v0);
   }
   const double along = Lfs(base, s - 32);
-  if (Fabs(along) < Lfs(base, kCrossingEpsilon)) {
+  if (Fabs(along) < double(G::crossing_epsilon(base))) {
     return 0;
   }
   // t = -(plane . a + d) / (plane . dir); out = dir t, then + a.
@@ -292,16 +301,16 @@ uint32_t PlaneSegmentCrossing(uint8_t* base, uint32_t out, uint32_t plane, uint3
   f12b = Lfs(base, s - 8);
   Stfs(base, s - 24, Fmuls(f12b, f0));
   Copy16(base, out, s - 32);
-  const double x = Fadds(Lfs(base, out + 0), Lfs(base, a + 0));
+  const double x = Fadds(double(po.x()), double(pa.x()));
   Stfs(base, s - 16, x);
-  const double ay2 = Lfs(base, a + 4);
-  const double az2 = Lfs(base, a + 8);
-  const double oy = Lfs(base, out + 4);
-  const double oz = Lfs(base, out + 8);
+  const double ay2 = double(pa.y());
+  const double az2 = double(pa.z());
+  const double oy = double(po.y());
+  const double oz = double(po.z());
   Stfs(base, s - 12, Fadds(oy, ay2));
   Stfs(base, s - 8, Fadds(oz, az2));
   Copy16(base, out, s - 16);
-  Stfs(base, out + 12, one);
+  po.set_w(float(one));
   return 1;
 }
 
@@ -309,49 +318,54 @@ uint32_t PlaneSegmentCrossing(uint8_t* base, uint32_t out, uint32_t plane, uint3
 
 uint32_t Vector16Size(uint8_t* base, uint32_t vector) {
   ITC_NATIVE_RUNNING("sub_825971E8 Vector16::Size");
-  const uint32_t first = Load(base, vector + 4);
+  const schema::Vector16 v(base, vector);
+  const uint32_t first = v.first().address;
   if (first == 0) {
     return 0;
   }
-  return uint32_t(int32_t(Load(base, vector + 8) - first) >> 4);
+  return uint32_t(int32_t(v.last().address - first) >> 4);
 }
 
 void BoxExtend(uint8_t* base, uint32_t box, uint32_t point) {
   ITC_NATIVE_RUNNING("sub_82597150 Box::Extend");
   // min = the point's unless min is below it (a NaN on either side takes
   // the point's).
+  // (x, y, z: the fields at +0, +4, +8 of the min, the max and the point.)
+  const schema::CarSceneBox b(base, box);
+  const uint32_t p0 = Point(base, point).x_address();
   for (uint32_t i = 0; i < 12; i += 4) {
-    const double min = Lfs(base, box + i);
-    const double p = Lfs(base, point + i);
-    Stfs(base, box + i, min < p ? min : p);
+    const double min = Lfs(base, b.min_x_address() + i);
+    const double p = Lfs(base, p0 + i);
+    Stfs(base, b.min_x_address() + i, min < p ? min : p);
   }
   // max = the point's unless max is above it.
   for (uint32_t i = 0; i < 12; i += 4) {
-    const double p = Lfs(base, point + i);
-    const double max = Lfs(base, box + 16 + i);
-    Stfs(base, box + 16 + i, max > p ? max : p);
+    const double p = Lfs(base, p0 + i);
+    const double max = Lfs(base, b.max_x_address() + i);
+    Stfs(base, b.max_x_address() + i, max > p ? max : p);
   }
 }
 
 uint32_t BoxFromPoints(uint8_t* base, uint32_t box, uint32_t vector, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82597210 Box::FromPoints");
   Store(base, stack - kBoxFrame, stack);  // the back chain, as stwu
-  const double min = Lfs(base, kBoxMin);
-  Stfs(base, box + 0, min);
-  Stfs(base, box + 4, min);
-  Stfs(base, box + 8, min);
-  const double one = Lfs(base, kOne);
-  Stfs(base, box + 12, one);
-  Stfs(base, box + 28, one);
-  const double max = Lfs(base, kBoxMax);
-  Stfs(base, box + 16, max);
-  Stfs(base, box + 20, max);
-  Stfs(base, box + 24, max);
+  const schema::CarSceneBox b(base, box);
+  const double min = double(G::box_min(base));
+  b.set_min_x(float(min));
+  b.set_min_y(float(min));
+  b.set_min_z(float(min));
+  const double one = double(G::one(base));
+  b.set_min_w(float(one));
+  b.set_max_w(float(one));
+  const double max = double(G::box_max(base));
+  b.set_max_x(float(max));
+  b.set_max_y(float(max));
+  b.set_max_z(float(max));
   if (Vector16Size(base, vector) != 0) {
     uint32_t i = 0;
     uint32_t offset = 0;
     do {
-      BoxExtend(base, box, Load(base, vector + 4) + offset);
+      BoxExtend(base, box, schema::Vector16(base, vector).first().address + offset);
       i++;
       offset += 16;
     } while (i < Vector16Size(base, vector));

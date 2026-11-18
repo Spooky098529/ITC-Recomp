@@ -13,6 +13,7 @@
 #include "data_tables/data_tables.h"
 #include "guest.h"
 #include "race_states/steps.h"
+#include "schema/race_hud_machine.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 ITC_FLAG_DECLARE(bool, multiplayer_menu_items);
@@ -20,6 +21,11 @@ ITC_FLAG_DECLARE(bool, multiplayer_menu_items);
 namespace race_hud_machine {
 
 namespace {
+
+using G = schema::RaceHudMachineGlobals;
+using Machine = schema::RaceHudMachine;
+using Screens = schema::RaceScreens;
+using Result = schema::RacerResultsRecord;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 
@@ -29,24 +35,18 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return sp - bytes;
 }
 
-uint32_t Holder(uint8_t* base, uint32_t machine) { return Load(base, machine + kHolder); }
+uint32_t Holder(uint8_t* base, uint32_t machine) { return Machine(base, machine).holder().address; }
 
 bool ReplayBit(uint8_t* base, uint32_t holder) {
-  return (Load(base, holder + kHolderFlags) & 1) != 0;
+  return (Screens(base, holder).flags() & 1) != 0;
 }
-
-// The race data ([0x826C5B2C]).
-constexpr uint32_t kRaceData = 0x826C5B2C;
-// The racers' manager ([0x826D82F4]: +2308 the player's entry, its +24 the
-// racer record's index).
-constexpr uint32_t kRacers = 0x826D82F4;
 
 }  // namespace
 
 std::optional<uint64_t> PreRaceUpdate(uint8_t* base, uint64_t r3, uint32_t sp,
                                       const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Load(base, machine + kKind));
+  const int32_t kind = int32_t(Machine(base, machine).kind());
   if (kind == 4) {
     return std::nullopt;
   }
@@ -64,7 +64,7 @@ std::optional<uint64_t> PreRaceUpdate(uint8_t* base, uint64_t r3, uint32_t sp,
 std::optional<uint64_t> PreRaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
                                     const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t kind = Load(base, machine + kKind);
+  const uint32_t kind = Machine(base, machine).kind();
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
@@ -81,7 +81,7 @@ std::optional<uint64_t> PreRaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
 std::optional<uint64_t> CountdownDraw(uint8_t* base, uint64_t r3, uint32_t sp,
                                       const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t kind = Load(base, machine + kKind);
+  const uint32_t kind = Machine(base, machine).kind();
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
@@ -115,7 +115,7 @@ uint64_t EndIntro(uint8_t* base, uint32_t machine, uint32_t sp, uint32_t lr,
 std::optional<uint64_t> IntroUpdate(uint8_t* base, uint64_t r3, uint32_t sp,
                                     const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Load(base, machine + kKind));
+  const int32_t kind = int32_t(Machine(base, machine).kind());
   if (kind == 4) {
     return std::nullopt;
   }
@@ -132,7 +132,7 @@ std::optional<uint64_t> IntroUpdate(uint8_t* base, uint64_t r3, uint32_t sp,
 std::optional<uint64_t> IntroDraw(uint8_t* base, uint64_t r3, uint32_t sp,
                                   const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t kind = Load(base, machine + kKind);
+  const uint32_t kind = Machine(base, machine).kind();
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
@@ -149,14 +149,14 @@ std::optional<uint64_t> IntroDraw(uint8_t* base, uint64_t r3, uint32_t sp,
 std::optional<uint64_t> CountdownUpdate(uint8_t* base, uint64_t r3, uint32_t sp,
                                         const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Load(base, machine + kKind));
+  const int32_t kind = int32_t(Machine(base, machine).kind());
   if (kind == 4) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216CB98 RaceHudMachine::CountdownUpdate");
   const uint32_t frame = Frame(base, sp, 112);
   if (kind == 5) {
-    guest::StoreU32(base, machine + kState, 7);
+    Machine(base, machine).set_state(7);
     return r3;
   }
   if (kind <= 0 || (kind > 3 && kind != 6)) {
@@ -167,8 +167,8 @@ std::optional<uint64_t> CountdownUpdate(uint8_t* base, uint64_t r3, uint32_t sp,
   callees.Call(kHudTickPanel, frame, 0x8216CC04, Holder(base, machine) + kHud);
   const uint64_t last =
       callees.Call(kHudUpdateView, frame, 0x8216CC10, Holder(base, machine) + kHud);
-  if (Load(base, Holder(base, machine) + kCountdownRunning) == 0) {
-    guest::StoreU32(base, machine + kState, 7);
+  if (Screens(base, Holder(base, machine)).hud_countdown_running() == 0) {
+    Machine(base, machine).set_state(7);
   }
   return last;
 }
@@ -176,7 +176,7 @@ std::optional<uint64_t> CountdownUpdate(uint8_t* base, uint64_t r3, uint32_t sp,
 std::optional<uint64_t> RaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
                                  const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t kind = Load(base, machine + kKind);
+  const uint32_t kind = Machine(base, machine).kind();
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
@@ -198,7 +198,7 @@ std::optional<uint64_t> RaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
 std::optional<uint64_t> RaceUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                    const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Load(base, machine + kKind));
+  const int32_t kind = int32_t(Machine(base, machine).kind());
   if (kind == 4) {
     return std::nullopt;
   }
@@ -225,9 +225,9 @@ std::optional<uint64_t> RaceUpdate(uint8_t* base, uint64_t r3, uint32_t dispatch
 std::optional<uint64_t> ResultsUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                       const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t race = Load(base, kRaceData);
+  const uint32_t race = G::race_data(base).address;
   const int32_t race_kind = int32_t(Load(base, race + 0xA3AF0));
-  const uint32_t kind = Load(base, machine + kKind);
+  const uint32_t kind = Machine(base, machine).kind();
   // Kind 4's sub_82216850 and the results of race kinds 2, 4 and 6 and of
   // kind 1 outside the career (sub_8221F930, sub_8221FFF0) are never seen
   // in play: the original runs.
@@ -246,13 +246,13 @@ std::optional<uint64_t> ResultsUpdate(uint8_t* base, uint64_t r3, uint32_t dispa
   uint64_t answer = 0;
   if (race_kind == 1 && IsFirstDay(base, frame) == 0) {
     answer = callees.Call(kCareerResultsUpdate, frame, 0x8216E0C4,
-                          Load(base, Holder(base, machine) + 1024));
+                          Screens(base, Holder(base, machine)).career_results().address);
   }
   const uint32_t first_day = IsFirstDay(base, frame);
   if (first_day != 0) {
     race_states::steps::Post(base, dispatcher, 48);
   } else if (uint32_t(answer) != 0 || ReplayBit(base, Holder(base, machine))) {
-    guest::StoreU32(base, machine + kState, 22);
+    Machine(base, machine).set_state(22);
   }
   return first_day;
 }
@@ -260,13 +260,13 @@ std::optional<uint64_t> ResultsUpdate(uint8_t* base, uint64_t r3, uint32_t dispa
 std::optional<uint64_t> PauseUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                     const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Load(base, machine + kKind));
+  const int32_t kind = int32_t(Machine(base, machine).kind());
   if (kind == 4) {
     return std::nullopt;  // kind 4's pause (sub_82211458), never seen in play
   }
   ITC_NATIVE_RUNNING("sub_8216DB70 RaceHudMachine::PauseUpdate");
   const uint32_t frame = Frame(base, sp, 128);
-  const int32_t mode = int32_t(Load(base, Load(base, kRaceData) + 0xA3AF4));
+  const int32_t mode = int32_t(Load(base, G::race_data(base).address + 0xA3AF4));
   uint64_t answer = 0;
   if (kind > 0 && (kind <= 3 || kind == 5 || kind == 6)) {
     if (kind == 6 && mode == 8) {
@@ -277,7 +277,7 @@ std::optional<uint64_t> PauseUpdate(uint8_t* base, uint64_t r3, uint32_t dispatc
     }
     // PauseMenu::Update's handlers don't read r4: the dispatcher passed.
     answer = callees.Call(kPauseMenuUpdate, frame, 0x8216DC04,
-                          Load(base, Load(base, kHolderGlobal) + 1012), dispatcher);
+                          G::holder(base).pause_menu().address, dispatcher);
   }
   switch (uint32_t(answer)) {
     case 1:
@@ -301,11 +301,11 @@ std::optional<uint64_t> PauseUpdate(uint8_t* base, uint64_t r3, uint32_t dispatc
       break;
     case 8:
       return callees.Call(kHudApplyOptions, frame, 0x8216DD14,
-                          uint64_t(Load(base, kHolderGlobal)) + kHud);
+                          uint64_t(G::holder(base).address) + kHud);
     case 9:
       race_states::steps::Post(base, dispatcher, 48);
       if (mode == 7) {
-        guest::StoreU32(base, Load(base, 0x82816E3C) + 240, 1);
+        guest::StoreU32(base, G::network_session(base).address + 240, 1);
       }
       break;
     default:
@@ -317,10 +317,10 @@ std::optional<uint64_t> PauseUpdate(uint8_t* base, uint64_t r3, uint32_t dispatc
 std::optional<uint64_t> AfterRaceUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher,
                                         uint32_t sp, const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t race = Load(base, kRaceData);
-  const uint32_t kind = Load(base, machine + kKind);
+  const uint32_t race = G::race_data(base).address;
+  const uint32_t kind = Machine(base, machine).kind();
   const uint32_t record = vehicle_accessors::RacerRecordsAt(base, race + 0x59AE8, 0xFFFFFFFFu);
-  const uint32_t word = Load(base, record + 3916);
+  const uint32_t word = Result(base, record).kind6_result();
   // Kind 0's +12 screen, kind 4's and kind 6's screen after the race
   // (sub_8220B9E8, sub_82216850, sub_8221F1E8), never seen in play: the
   // original.
@@ -339,10 +339,11 @@ std::optional<uint64_t> AfterRaceUpdate(uint8_t* base, uint64_t r3, uint32_t dis
   auto post = [&](uint32_t message, bool set) {
     race_states::steps::Post(base, dispatcher, message);
     const uint32_t holder = Holder(base, machine);
-    const uint32_t flags = Load(base, holder + kHolderFlags);
-    guest::StoreU32(base, holder + kHolderFlags, set ? (flags | 1) : (flags & ~1u));
+    const Screens screens(base, holder);
+    const uint32_t flags = screens.flags();
+    screens.set_flags(set ? (flags | 1) : (flags & ~1u));
   };
-  const int32_t now = int32_t(Load(base, machine + kKind));
+  const int32_t now = int32_t(Machine(base, machine).kind());
   if (now <= 0) {
     return last;
   }
@@ -356,7 +357,7 @@ std::optional<uint64_t> AfterRaceUpdate(uint8_t* base, uint64_t r3, uint32_t dis
     return last;
   }
   const uint64_t answer = callees.Call(kAfterRaceUpdate, frame, 0x8216DF90,
-                                       Load(base, Holder(base, machine) + 1020));
+                                       Screens(base, Holder(base, machine)).after_race_menu().address);
   switch (uint32_t(answer)) {
     case 1:
     case 8:
@@ -383,7 +384,7 @@ std::optional<uint64_t> AfterRaceUpdate(uint8_t* base, uint64_t r3, uint32_t dis
 std::optional<uint64_t> CloseResults(uint8_t* base, uint64_t r3, uint32_t sp,
                                      const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t race = Load(base, kRaceData);
+  const uint32_t race = G::race_data(base).address;
   const int32_t kind = int32_t(Load(base, race + 0xA3AF0));
   if (kind == 6) {
     return std::nullopt;  // kind 6's screen after the race, never seen in play
@@ -394,21 +395,22 @@ std::optional<uint64_t> CloseResults(uint8_t* base, uint64_t r3, uint32_t sp,
   // loads are left).
   if (kind == 1) {
     const int32_t mode = int32_t(Load(base, race + 0xA3AF4));
-    Load(base, Load(base, machine + kHolder) + (mode != 0 ? 1024 : 1028));
+    const Screens screens(base, Holder(base, machine));
+    mode != 0 ? screens.career_results() : screens.race_results();
   } else if (kind == 2) {
-    Load(base, Load(base, machine + kHolder) + 1028);
+    Screens(base, Holder(base, machine)).race_results();
   } else if (kind == 4) {
-    Load(base, Load(base, machine + kHolder) + 1032);
+    Screens(base, Holder(base, machine)).split_results_screen();
   }
   const uint64_t closed =
-      callees.Call(kAfterRaceClose, frame, 0x8216D24C, Load(base, Holder(base, machine) + 1020));
-  guest::StoreU32(base, Holder(base, machine) + 440, 1);
+      callees.Call(kAfterRaceClose, frame, 0x8216D24C, Screens(base, Holder(base, machine)).after_race_menu().address);
+  Screens(base, Holder(base, machine)).set_hud_signs_on(1);
   return closed;
 }
 
 std::optional<uint64_t> SetUp(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Load(base, machine + kKind));
+  const int32_t kind = int32_t(Machine(base, machine).kind());
   if (kind == 4) {
     return std::nullopt;
   }
@@ -432,8 +434,8 @@ std::optional<uint64_t> SetUp(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
     hud = holder + kHud;
     // The player's racer record's word +3888 (race data + 3,936 x (its
     // index + 1)), bit 0x400.
-    const uint32_t index = Load(base, Load(base, Load(base, kRacers) + 2308) + 24);
-    const uint32_t word = Load(base, (index + 1) * 3936 + Load(base, kRaceData));
+    const uint32_t index = Load(base, Load(base, G::racers_manager(base).address + 2308) + 24);
+    const uint32_t word = Load(base, (index + 1) * 3936 + G::race_data(base).address);
     const uint32_t player = (word >> 10) & 1;
     callees.Call(kHudSetPlayer, frame, player != 0 ? 0x8216D4D8 : 0x8216D4E8, hud, player);
     callees.Call(kAltSetUp, frame, 0x8216D4F4, holder + kAltHud, player);
@@ -449,17 +451,17 @@ std::optional<uint64_t> SetUp(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
     callees.Call(kHudApplyOptions, frame, 0x8216D5E4, hud);
     last = callees.Call(kHudSetUpSigns, frame, 0x8216D5EC, hud);
   }
-  guest::StoreU32(base, machine + kFlag, 0);
+  Machine(base, machine).set_message30(0);
   return last;
 }
 
 uint64_t CreateScreens(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216CA28 RaceHudMachine::CreateScreens");
   const uint32_t frame = Frame(base, sp, 112);
-  guest::StoreU32(base, machine + kKind, Load(base, Load(base, kRaceData) + 0xA3AF0));
-  const uint32_t race = Load(base, kRaceData);
+  Machine(base, machine).set_kind(Load(base, G::race_data(base).address + 0xA3AF0));
+  const uint32_t race = G::race_data(base).address;
   const int32_t type = int32_t(vehicle_accessors::StagesType(base, race + 0x59620, 0xFFFFFFFFu));
-  const uint32_t kind = Load(base, machine + kKind);
+  const uint32_t kind = Machine(base, machine).kind();
   // The holder's kind, or -1 for none.
   int32_t holder_kind = -1;
   auto by_type = [type](int32_t even, int32_t odd) {
@@ -476,7 +478,7 @@ uint64_t CreateScreens(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
       if (type == 0 || type == 2 || type == 4) {
         holder_kind = 0;
       } else if (type == 1 || type == 3) {
-        holder_kind = Load(base, Load(base, kRaceData) + 0xA3AF4) == 0 ? 2 : 1;
+        holder_kind = Load(base, G::race_data(base).address + 0xA3AF4) == 0 ? 2 : 1;
       }
       break;
     case 2:
@@ -502,7 +504,7 @@ uint64_t CreateScreens(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
   if (holder_kind >= 0) {
     r3 = callees.Call(kScreensCreate, frame, 0x8216CB74, uint32_t(holder_kind));
   }
-  guest::StoreU32(base, machine + kHolder, Load(base, kHolderGlobal));
+  Machine(base, machine).set_holder(G::holder(base).address);
   return r3;
 }
 
@@ -510,8 +512,8 @@ uint64_t StartCountdown(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& ca
   ITC_NATIVE_RUNNING("sub_8216CC60 RaceHudMachine::StartCountdown");
   const uint32_t machine = uint32_t(r3);
   const uint32_t frame = Frame(base, sp, 112);
-  const int32_t kind = int32_t(Load(base, machine + kKind));
-  const uint32_t race = Load(base, kRaceData);
+  const int32_t kind = int32_t(Machine(base, machine).kind());
+  const uint32_t race = G::race_data(base).address;
   uint64_t result = r3;
   auto type = [&]() {
     const uint32_t t = vehicle_accessors::StagesType(base, race + 0x59620, 0xFFFFFFFFu);
@@ -523,7 +525,7 @@ uint64_t StartCountdown(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& ca
     case 1: {
       const uint32_t t = type();
       if (t == 1 || t == 3) {
-        mode = Load(base, Load(base, kRaceData) + 0xA3AF4) == 0 ? 2 : 1;
+        mode = Load(base, G::race_data(base).address + 0xA3AF4) == 0 ? 2 : 1;
       }
       break;
     }
@@ -546,18 +548,17 @@ uint64_t StartCountdown(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& ca
   if (ReplayBit(base, Holder(base, machine))) {
     return result;
   }
-  const int32_t now = int32_t(Load(base, machine + kKind));
+  const int32_t now = int32_t(Machine(base, machine).kind());
   if (now <= 0) {
     return result;
   }
-  const uint32_t progress = race_hud_object::kRaceProgress;
   if (now <= 3 || now == 6) {
-    guest::StoreU32(base, Holder(base, machine) + 460, Load(base, progress) + 2184);
+    Screens(base, Holder(base, machine)).set_hud_results(G::race_progress(base).address + 2184);
     callees.Call(kHudSetMode, frame, 0x8216CDB4, Holder(base, machine) + kHud, mode);
     return callees.Call(kHudStartCountdown, frame, 0x8216CDC0, Holder(base, machine) + kHud);
   }
   if (now == 4) {
-    guest::StoreU32(base, Holder(base, machine) + 1000, Load(base, progress) + 2184);
+    Screens(base, Holder(base, machine)).set_split_results(G::race_progress(base).address + 2184);
     callees.Call(k656SetMode, frame, 0x8216CDEC, Holder(base, machine) + 656, mode);
     return callees.Call(k656Start, frame, 0x8216CDF8, Holder(base, machine) + 656);
   }
@@ -568,34 +569,34 @@ uint64_t ClosePause(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callee
   ITC_NATIVE_RUNNING("sub_8216C658 RaceHudMachine::ClosePause");
   const uint32_t machine = uint32_t(r3);
   const uint32_t frame = Frame(base, sp, 96);
-  const int32_t kind = int32_t(Load(base, machine + kKind));
+  const int32_t kind = int32_t(Machine(base, machine).kind());
   uint64_t last = r3;
   if (kind == 4) {
     // The empty sub_82106540 on the holder's +1016: its r3 left.
-    last = Load(base, Holder(base, machine) + 1016);
+    last = Screens(base, Holder(base, machine)).kind4_pause_menu().address;
   } else if (kind > 0 && (kind <= 3 || kind == 6)) {
-    callees.Call(kPauseMenuClose, frame, 0x8216C69C, Load(base, Holder(base, machine) + 1012));
+    callees.Call(kPauseMenuClose, frame, 0x8216C69C, Screens(base, Holder(base, machine)).pause_menu().address);
     last = callees.Call(kHudApplyOptions, frame, 0x8216C6A8,
                         uint64_t(Holder(base, machine)) + kHud);
   }
-  guest::StoreU32(base, machine + kFlag, 0);
+  Machine(base, machine).set_message30(0);
   return last;
 }
 
 std::optional<uint64_t> ResultsDraw(uint8_t* base, uint64_t r3, uint32_t sp,
                                     const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t race = Load(base, kRaceData);
+  const uint32_t race = G::race_data(base).address;
   const uint32_t race_kind = Load(base, race + 0xA3AF0);
   const bool career = race_kind == 1 && Load(base, race + 0xA3AF4) != 0;
-  if (Load(base, machine + kKind) == 4 || race_kind == 0 || race_kind == 2 || race_kind == 4 ||
+  if (Machine(base, machine).kind() == 4 || race_kind == 0 || race_kind == 2 || race_kind == 4 ||
       race_kind == 6 || (race_kind == 1 && !career)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8216D6D0 RaceHudMachine::ResultsDraw");
   const uint32_t frame = Frame(base, sp, 96);
   if (career && IsFirstDay(base, frame) == 0) {
-    callees.Call(kCareerResultsDraw, frame, 0x8216D76C, Load(base, Holder(base, machine) + 1024));
+    callees.Call(kCareerResultsDraw, frame, 0x8216D76C, Screens(base, Holder(base, machine)).career_results().address);
   }
   return callees.Call(kHudDraw, frame, 0x8216D794, uint64_t(Holder(base, machine)) + kHud);
 }
@@ -603,14 +604,14 @@ std::optional<uint64_t> ResultsDraw(uint8_t* base, uint64_t r3, uint32_t sp,
 std::optional<uint64_t> AfterRaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
                                       const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const uint32_t race = Load(base, kRaceData);
-  const uint32_t kind = Load(base, machine + kKind);
+  const uint32_t race = G::race_data(base).address;
+  const uint32_t kind = Machine(base, machine).kind();
   const uint32_t record = vehicle_accessors::RacerRecordsAt(base, race + 0x59AE8, 0xFFFFFFFFu);
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
   if (kind == 6) {
-    const int32_t word = int32_t(Load(base, record + 3916));
+    const int32_t word = int32_t(Result(base, record).kind6_result());
     if (word == 1 || word == 3) {
       return std::nullopt;
     }
@@ -627,7 +628,7 @@ std::optional<uint64_t> AfterRaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
 std::optional<uint64_t> PauseDraw(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216CF08 RaceHudMachine::PauseDraw");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t kind = Load(base, machine + kKind);
+  const uint32_t kind = Machine(base, machine).kind();
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
@@ -648,7 +649,7 @@ std::optional<uint64_t> RacePauseDraw(uint8_t* base, uint64_t r3, uint32_t sp,
                                       const Calls& callees) {
   ITC_NATIVE_RUNNING("sub_8216CFE0 RaceHudMachine::RacePauseDraw");
   const uint32_t machine = uint32_t(r3);
-  const uint32_t kind = Load(base, machine + kKind);
+  const uint32_t kind = Machine(base, machine).kind();
   if (kind == 0 || kind == 4) {
     return std::nullopt;
   }
@@ -671,7 +672,7 @@ namespace {
 // PauseMenu::Open(holder +1012, page, flag) as a tail call.
 uint64_t OpenAt(uint8_t* base, uint32_t holder, uint64_t page, uint64_t flag, uint32_t sp,
                 uint32_t lr, const Calls& callees) {
-  return callees.Call(kPauseMenuOpen, sp, lr, Load(base, holder + 1012), page, flag);
+  return callees.Call(kPauseMenuOpen, sp, lr, Screens(base, holder).pause_menu().address, page, flag);
 }
 
 }  // namespace
@@ -679,7 +680,7 @@ uint64_t OpenAt(uint8_t* base, uint32_t holder, uint64_t page, uint64_t flag, ui
 std::optional<uint64_t> OpenPause(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
                                   const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Load(base, machine + kKind));
+  const int32_t kind = int32_t(Machine(base, machine).kind());
   if (kind == 4 || kind == 6) {
     return std::nullopt;
   }
@@ -703,7 +704,7 @@ std::optional<uint64_t> OpenPause(uint8_t* base, uint64_t r3, uint32_t sp, uint3
 std::optional<uint64_t> OpenRacePause(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
                                       const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
-  const int32_t kind = int32_t(Load(base, machine + kKind));
+  const int32_t kind = int32_t(Machine(base, machine).kind());
   if (kind == 4 || (kind == 6 && !ReplayBit(base, Holder(base, machine)))) {
     return std::nullopt;
   }
@@ -717,7 +718,7 @@ std::optional<uint64_t> OpenRacePause(uint8_t* base, uint64_t r3, uint32_t sp, u
       if (ReplayBit(base, holder)) {
         return OpenAt(base, holder, 8, 0, sp, lr, callees);
       }
-      if (Load(base, Load(base, kRaceData) + 0xA3AF4) != 0) {
+      if (Load(base, G::race_data(base).address + 0xA3AF4) != 0) {
         return OpenCareerPause(base, machine, sp, callees);
       }
       return OpenAt(base, holder, 2, 0, sp, lr, callees);
@@ -741,7 +742,7 @@ uint64_t OpenCareerPause(uint8_t* base, uint32_t machine, uint32_t sp, const Cal
 uint32_t IsFirstDay(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8216D3F0 RaceHudMachine::IsFirstDay");
   Frame(base, sp, 96);
-  if (int32_t(Load(base, Load(base, kRaceData) + 0xA3AF0)) != 1) {
+  if (int32_t(Load(base, G::race_data(base).address + 0xA3AF0)) != 1) {
     return 0;
   }
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
@@ -825,9 +826,9 @@ uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees
   const uint32_t machine = uint32_t(r3);
   const uint32_t frame = Frame(base, sp, 96);
   uint64_t last = r3;
-  switch (int32_t(Load(base, machine + kKind))) {
+  switch (int32_t(Machine(base, machine).kind())) {
     case 1:
-      if (Load(base, Load(base, kRaceData) + 0xA3AF4) == 0) {
+      if (Load(base, G::race_data(base).address + 0xA3AF4) == 0) {
         last = callees.Call(kShowResults, frame, 0x8216E630, r3, 1);
       } else {
         last = IsFirstDay(base, frame);
@@ -858,7 +859,7 @@ uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees
     default:
       break;
   }
-  guest::StoreU32(base, Holder(base, machine) + 440, 0);
+  Screens(base, Holder(base, machine)).set_hud_signs_on(0);
   return last;
 }
 
@@ -871,9 +872,9 @@ uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callee
   auto store = [&](uint32_t offset, uint32_t value) { guest::StoreU32(base, block + offset, value); };
   auto word = [&](uint32_t offset) { return Load(base, block + offset); };
   const uint32_t result =
-      vehicle_accessors::RacerRecordsAt(base, Load(base, kRaceData) + 0x59AE8, 0xFFFFFFFFu);
+      vehicle_accessors::RacerRecordsAt(base, G::race_data(base).address + 0x59AE8, 0xFFFFFFFFu);
   uint32_t save = 0;
-  if (int32_t(Load(base, machine + kKind)) == 1) {
+  if (int32_t(Machine(base, machine).kind()) == 1) {
     save = vehicle_accessors::SaveDataOf(base, 0);
   }
   if (!ReplayBit(base, Holder(base, machine))) {
@@ -881,9 +882,9 @@ uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callee
     for (uint32_t i = 0; i < 168; i++) {
       base[block + i] = 0;
     }
-    const int32_t outcome = int32_t(Load(base, result + 3920));
+    const int32_t outcome = int32_t(Result(base, result).outcome());
     if (outcome == 1) {
-      const int32_t place = int32_t(Load(base, result + 3924));
+      const int32_t place = int32_t(Result(base, result).finish());
       if (place == 1) {
         store(0, 0);
       } else if (place == 2) {
@@ -891,16 +892,16 @@ uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callee
       } else if (place == 3) {
         store(0, 1);
       }
-      if (int32_t(Load(base, result + 3924)) == 1) {
+      if (int32_t(Result(base, result).finish()) == 1) {
         store(8, 0);
         store(4, 0);
         store(20, 0);
-        const double f0 = Fmuls(Lfs(base, result + 828), Lfs(base, 0x82001FD8));
+        const double f0 = Fmuls(Lfs(base, Result(base, result).e0_route_distance_address()), Lfs(base, G::prize_distance_scale_address()));
         guest::StoreU32(base, frame + 80, uint32_t(Fctiwz(f0)));
         store(8, uint32_t(int32_t(Load(base, frame + 80)) / 1000));
-        if (int32_t(Load(base, result + 0)) > 1) {
+        if (int32_t(Result(base, result).count()) > 1) {
           int32_t i = 1;
-          uint32_t at = result + 980;
+          uint32_t at = Result(base, result).e1_item_address();
           do {
             const uint32_t prize = OpponentPrize(base, Load(base, at), frame);
             store(4, prize + word(4));
@@ -908,7 +909,7 @@ uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callee
             i++;
             at += 972;
             store(20, bonus + word(20));
-          } while (i < int32_t(Load(base, result + 0)));
+          } while (i < int32_t(Result(base, result).count()));
         }
       }
     } else if (outcome == 3) {
@@ -916,25 +917,25 @@ uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callee
       store(8, 0);
       store(0, 2);
     }
-    const double f30 = Lfs(base, 0x82000A30);
-    const double f31 = Lfs(base, 0x82000A34);
+    const double f30 = Lfs(base, G::one_address());
+    const double f31 = Lfs(base, G::zero_address());
     double factor = f31;
     if (save != 0) {
       const uint32_t day = save + 72;
       // DayBlock::WinStreak again before each test, as the original.
       auto streak = [&] { return int32_t(int16_t(career::DayBlockWinStreak(base, day))); };
       if (streak() >= 20) {
-        factor = Lfs(base, 0x820021E8);
+        factor = Lfs(base, G::streak_factor_20_address());
       } else if (streak() >= 15) {
-        factor = Lfs(base, 0x82002CF0);
+        factor = Lfs(base, G::streak_factor_15_address());
       } else if (streak() >= 10) {
-        factor = Lfs(base, 0x820027A8);
+        factor = Lfs(base, G::streak_factor_10_address());
       } else if (streak() >= 7) {
-        factor = Lfs(base, 0x820029F0);
+        factor = Lfs(base, G::streak_factor_7_address());
       } else if (streak() >= 5) {
-        factor = Lfs(base, 0x820029D4);
+        factor = Lfs(base, G::streak_factor_5_address());
       } else if (streak() >= 3) {
-        factor = Lfs(base, 0x82002CB0);
+        factor = Lfs(base, G::streak_factor_3_address());
       } else {
         factor = f30;
       }
@@ -948,22 +949,22 @@ uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callee
       store(16, uint32_t(Fctiwz(Fmuls(Single(double(sum)), factor))));
     }
     double f0;
-    if (guest::LoadU16(base, result + 968) == 0) {
+    if (Result(base, result).e0_split_count() == 0) {
       f0 = f31;
       Stfs(base, block + 24, f0);
     } else {
-      f0 = Lfs(base, result + 844);
+      f0 = Lfs(base, Result(base, result).e0_split_0_address());
       Stfs(base, block + 24, f0);
       if (f0 == f31) {
         f0 = f30;
         Stfs(base, block + 24, f0);
       }
     }
-    const double scale = Lfs(base, 0x82001BE0);
+    const double scale = Lfs(base, G::split_scale_address());
     store(28, uint32_t(Fctiwz(Fmuls(f0, scale))));
-    if (int32_t(int16_t(guest::LoadU16(base, result + 968))) > 1) {
+    if (int32_t(int16_t(Result(base, result).e0_split_count())) > 1) {
       int32_t k = 1;
-      uint32_t at = result + 852;
+      uint32_t at = Result(base, result).e0_split_1_address();
       do {
         double value = Lfs(base, at);
         Stfs(base, frame + 80, value);
@@ -983,10 +984,10 @@ uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callee
         const uint32_t pair = frame + 128 + (n << 3);
         guest::StoreU32(base, pair, high);
         guest::StoreU32(base, pair + 4, low);
-      } while (k < int32_t(int16_t(guest::LoadU16(base, result + 968))));
+      } while (k < int32_t(int16_t(Result(base, result).e0_split_count())));
     }
     store(164, Load(base, save + 6116));
-    callees.Call(kCareerResultsOpen, frame, 0x8216E4A4, Load(base, Holder(base, machine) + 1024),
+    callees.Call(kCareerResultsOpen, frame, 0x8216E4A4, Screens(base, Holder(base, machine)).career_results().address,
                  block);
     uint64_t total = uint64_t(word(28)) + word(16) + word(20);
     const uint32_t pairs = word(160);
@@ -1001,19 +1002,19 @@ uint64_t AwardPrize(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callee
     guest::StoreU32(base, save + 6116, money);
     career::StatsAddPoints(base, save + 48, total);
   }
-  const uint32_t flag = Load(base, result + 3920) == 3 ? 1 : 0;
-  uint32_t race = Load(base, kRaceData);
+  const uint32_t flag = Result(base, result).outcome() == 3 ? 1 : 0;
+  uint32_t race = G::race_data(base).address;
   uint32_t menu;
   if (Load(base, race + 0xA3AF4) == 0) {
     menu = 4;
   } else if (vehicle_accessors::StagesHasNext(base, race + 0x59620) != 0 &&
-             int32_t(Load(base, result + 3924)) == 1) {
+             int32_t(Result(base, result).finish()) == 1) {
     menu = 3;
   } else {
-    race = Load(base, kRaceData);
+    race = G::race_data(base).address;
     menu = int32_t(vehicle_accessors::StagesWord808(base, race + 0x59620)) != 0 ? 1 : 0;
   }
-  return callees.Call(kAfterRaceOpen, frame, 0x8216E5A0, Load(base, Holder(base, machine) + 1020),
+  return callees.Call(kAfterRaceOpen, frame, 0x8216E5A0, Screens(base, Holder(base, machine)).after_race_menu().address,
                       menu, flag);
 }
 

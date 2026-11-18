@@ -11,6 +11,7 @@
 #include "models/memory_blocks.h"
 #include "models/xpr.h"
 #include "race_overlays/race_overlays.h"
+#include "schema/game_modes.h"
 
 #include <cstdlib>
 
@@ -20,6 +21,8 @@ namespace game_modes {
 
 namespace {
 
+using G = schema::GameModesGlobals;
+
 // The mode's base vtables (+0 and +32, after the intermediate one at +0)
 // and its default delegate's (at +8).
 constexpr uint32_t kModeVtableIntermediate = 0x82006B44;
@@ -27,59 +30,51 @@ constexpr uint32_t kModeVtable = 0x820069EC;
 constexpr uint32_t kModeVtable32 = 0x82006A0C;
 constexpr uint32_t kDefaultDelegateVtable = 0x82006B20;
 
-// A transition's parts: the key (+0, four words), the functor pointer
-// (+16), its storage (six words from +20) and the next state (+44). A
-// functor part (StateMachine::Add's r5) is laid out as a transition's from
-// +16: the pointer at +0, the storage from +4, the next state at +28.
-constexpr uint32_t kFunctorPointer = 16;
-constexpr uint32_t kFunctorStorage = 20;
-constexpr uint32_t kNextState = 44;
+// A transition's functor storage: six words (schema::StateTransition's
+// storage, schema::StateFunctorPart's from +4).
 constexpr uint32_t kStorageWords = 6;
-
-// StateMachine::Find's static default functor part (functor pointer,
-// storage, next state at +28) and its guard (bit 0x1).
-constexpr uint32_t kDefaultGuard = 0x826C5B88;
 
 }  // namespace
 
 void ModesConstruct(uint8_t* base, uint32_t holder, uint32_t type) {
   ITC_NATIVE_RUNNING("sub_821067F8 Modes::Modes");
-  guest::StoreU32(base, holder, 0x82006AF0);
-  guest::StoreU32(base, 0x826032DC, type);
-  guest::StoreU32(base, 0x826032E0, type);
-  guest::StoreU32(base, holder + 4, 0);
-  guest::StoreU32(base, 0x826C5B8C, 0);  // the data load's flag
-  guest::StoreU32(base, 0x826BAB3C, 0);  // the sign-in watch's state
+  const schema::ModeHolder h(base, holder);
+  h.set_vtable(schema::ModeHolder::kVtable);
+  G::set_current_type(base, type);
+  G::set_previous_type(base, type);
+  h.set_mode(0);
+  G::set_data_loaded(base, 0);
+  G::set_sign_in_state(base, 0);
   for (uint32_t i = 0; i < 7; i++) {
-    guest::StoreU32(base, 0x826BAB40 + 4 * i, 0);  // its checks
+    guest::StoreU32(base, G::mode_checks_address() + 4 * i, 0);
   }
-  guest::StoreU32(base, 0x826BAB70, 0);
-  guest::StoreU32(base, 0x826C5B90, 0);  // the play time frame counter
+  G::set_remake_save_data(base, 0);
+  G::set_play_frames(base, 0);
 }
 
 StateKey LoadStateKey(uint8_t* base, uint32_t address) {
+  const schema::TransitionKey k(base, address);
   StateKey key;
-  for (uint32_t i = 0; i < 4; i++) {
-    key.words[i] = guest::LoadU32(base, address + 4 * i);
-  }
+  key.words[0] = k.state();
+  key.words[1] = k.message();
+  key.words[2] = k.arg0();
+  key.words[3] = k.arg1();
   return key;
 }
 
 bool StateKeyEquals(uint8_t* base, uint32_t a, const StateKey& b) {
   ITC_NATIVE_RUNNING("sub_82106040 StateKey::Equals");
-  for (uint32_t i = 0; i < 4; i++) {
-    if (int32_t(guest::LoadU32(base, a + 4 * i)) != int32_t(b.words[i])) {
-      return false;
-    }
-  }
-  return true;
+  const schema::TransitionKey k(base, a);
+  return int32_t(k.state()) == int32_t(b.words[0]) &&
+         int32_t(k.message()) == int32_t(b.words[1]) &&
+         int32_t(k.arg0()) == int32_t(b.words[2]) && int32_t(k.arg1()) == int32_t(b.words[3]);
 }
 
 int32_t StateMachineIndexOf(uint8_t* base, uint32_t machine, const StateKey& key) {
   ITC_NATIVE_RUNNING("sub_821060A0 StateMachine::IndexOf");
-  const uint32_t count = guest::LoadU32(base, machine + kTransitionCount);
+  const uint32_t count = schema::StateMachine(base, machine).transition_count();
   uint32_t transition = machine;
-  for (uint32_t i = 0; i < count; i++, transition += kTransitionBytes) {
+  for (uint32_t i = 0; i < count; i++, transition += schema::StateTransition::kSize) {
     if (StateKeyEquals(base, transition, key)) {
       return int32_t(i);
     }
@@ -93,87 +88,99 @@ uint32_t StateMachineAdd(uint8_t* base, uint32_t machine, uint32_t key, uint32_t
   const StateKey k = LoadStateKey(base, key);
   const int32_t index = StateMachineIndexOf(base, machine, k);
   *replaced = index != -1;
+  const schema::StateFunctorPart from(base, functor);
   if (index != -1) {
     // The functor part replaced, the key kept.
-    const uint32_t part = machine + kTransitionBytes * uint32_t(index) + kFunctorPointer;
+    const schema::StateFunctorPart part(
+        base, schema::StateTransition(base, machine + schema::StateTransition::kSize *
+                                                          uint32_t(index))
+                  .functor_address());
     for (uint32_t i = 0; i < kStorageWords; i++) {
-      guest::StoreU32(base, part + 4 + 4 * i, guest::LoadU32(base, functor + 4 + 4 * i));
+      guest::StoreU32(base, part.storage_address() + 4 * i,
+                      guest::LoadU32(base, from.storage_address() + 4 * i));
     }
-    guest::StoreU32(base, part, part + 4);
-    guest::StoreU32(base, part + 28, guest::LoadU32(base, functor + 28));
+    part.set_functor(part.storage_address());
+    part.set_next_state(from.next_state());
     return uint32_t(index);
   }
   // The original makes the transition on its stack (Transition::Make), then
   // counts it and copies it in (Transition::Assign): its words read first.
   uint32_t storage[kStorageWords];
   for (uint32_t i = 0; i < kStorageWords; i++) {
-    storage[i] = guest::LoadU32(base, functor + 4 + 4 * i);
+    storage[i] = guest::LoadU32(base, from.storage_address() + 4 * i);
   }
-  const uint32_t next = guest::LoadU32(base, functor + 28);
-  const uint32_t count = guest::LoadU32(base, machine + kTransitionCount);
-  guest::StoreU32(base, machine + kTransitionCount, count + 1);
-  const uint32_t transition = machine + kTransitionBytes * count;
-  for (uint32_t i = 0; i < 4; i++) {
-    guest::StoreU32(base, transition + 4 * i, k.words[i]);
-  }
+  const uint32_t next = from.next_state();
+  const schema::StateMachine m(base, machine);
+  const uint32_t count = m.transition_count();
+  m.set_transition_count(count + 1);
+  const schema::StateTransition t(base, machine + schema::StateTransition::kSize * count);
+  t.set_state(k.words[0]);
+  t.set_message(k.words[1]);
+  t.set_arg0(k.words[2]);
+  t.set_arg1(k.words[3]);
   for (uint32_t i = 0; i < kStorageWords; i++) {
-    guest::StoreU32(base, transition + kFunctorStorage + 4 * i, storage[i]);
+    guest::StoreU32(base, t.storage_address() + 4 * i, storage[i]);
   }
-  guest::StoreU32(base, transition + kFunctorPointer, transition + kFunctorStorage);
-  guest::StoreU32(base, transition + kNextState, next);
-  return transition;
+  t.set_functor(t.storage_address());
+  t.set_next_state(next);
+  return t.address;
 }
 
 uint32_t StateMachineFind(uint8_t* base, uint32_t machine, const StateKey& key, bool* found) {
   ITC_NATIVE_RUNNING("sub_821061F0 StateMachine::Find");
-  const uint32_t guard = guest::LoadU32(base, kDefaultGuard);
+  const uint32_t guard = G::default_guard(base);
   if ((guard & 1) == 0) {
-    guest::StoreU32(base, kDefaultGuard, guard | 1);
-    guest::StoreU32(base, kDefaultTransition + 4, kNoFunctor);
-    guest::StoreU32(base, kDefaultTransition + 0, kDefaultTransition + 4);
-    guest::StoreU32(base, kDefaultTransition + 28, 0);
+    G::set_default_guard(base, guard | 1);
+    const schema::StateFunctorPart d(base, G::default_transition_address());
+    d.set_functor_vtable(kNoFunctor);
+    d.set_functor(d.storage_address());
+    d.set_next_state(0);
   }
   const int32_t index = StateMachineIndexOf(base, machine, key);
   *found = index != -1;
   if (index == -1) {
-    return kDefaultTransition;
+    return G::default_transition_address();
   }
-  return machine + kTransitionBytes * uint32_t(index) + kFunctorPointer;
+  return schema::StateTransition(base, machine + schema::StateTransition::kSize * uint32_t(index))
+      .functor_address();
 }
 
 uint32_t StateMachineHandle(uint8_t* base, uint32_t machine, uint32_t message, bool* found) {
   ITC_NATIVE_RUNNING("sub_82106280 StateMachine::Handle");
   // The key as the original builds it on its stack: the message's words,
   // then the state.
+  const schema::ModeMessage m(base, message);
+  const schema::StateMachine sm(base, machine);
   StateKey key;
-  key.words[1] = guest::LoadU32(base, message + 0);
-  key.words[2] = guest::LoadU32(base, message + 4);
-  key.words[3] = guest::LoadU32(base, message + 8);
-  key.words[0] = guest::LoadU32(base, machine + kState);
+  key.words[1] = m.id();
+  key.words[2] = m.arg0();
+  key.words[3] = m.arg1();
+  key.words[0] = sm.state();
   const uint32_t part = StateMachineFind(base, machine, key, found);
-  const uint32_t next = guest::LoadU32(base, part + 28);
+  const uint32_t next = schema::StateFunctorPart(base, part).next_state();
   if (next != 0) {
-    guest::StoreU32(base, machine + kState, next);
+    sm.set_state(next);
   }
   return part;
 }
 
 void StateMachineConstruct(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_82107108 StateMachine::StateMachine");
-  uint32_t transition = machine;
-  for (uint32_t i = 0; i < kTransitions; i++, transition += kTransitionBytes) {
-    for (uint32_t w = 0; w < 4; w++) {
-      guest::StoreU32(base, transition + 4 * w, 0);
-    }
-    guest::StoreU32(base, transition + kFunctorPointer, 0);
+  for (uint32_t i = 0; i < kTransitions; i++) {
+    const schema::StateTransition t(base, machine + schema::StateTransition::kSize * i);
+    t.set_state(0);
+    t.set_message(0);
+    t.set_arg0(0);
+    t.set_arg1(0);
+    t.set_functor(0);
     // The functor's storage gets the empty functor's vtable (a null
     // storage address, which can't happen, would get nothing).
-    const uint32_t storage = transition + kFunctorStorage;
+    const uint32_t storage = t.storage_address();
     if (storage != 0) {
-      guest::StoreU32(base, storage, kNoFunctor);
+      t.set_functor_vtable(kNoFunctor);
     }
-    guest::StoreU32(base, transition + kNextState, 0);
-    guest::StoreU32(base, transition + kFunctorPointer, storage);
+    t.set_next_state(0);
+    t.set_functor(storage);
   }
 }
 
@@ -199,8 +206,9 @@ namespace {
 // an overlay (the slot read again for each store, as the originals do).
 template <typename Each>
 void ForEachOverlay(uint8_t* base, uint32_t machine, Each each) {
+  const schema::RaceOverlaysMachine m(base, machine);
   for (uint32_t i = 0; i < kOverlaySlots; i++) {
-    const uint32_t slot = machine + kOverlays + 4 * i;
+    const uint32_t slot = m.overlays_address() + 4 * i;
     if (guest::LoadU32(base, slot) != 0) {
       each(slot);
     }
@@ -251,11 +259,8 @@ void OverlaysReset(uint8_t* base, uint32_t machine,
 namespace {
 
 constexpr uint32_t kMember67760Vtable = 0x820093C4;
-constexpr uint32_t kBuffer28Vtable = 0x82009390;
 constexpr uint32_t kMember13360Vtable = 0x820093BC;
 constexpr uint32_t kMember43136Vtable = 0x82006B24;
-// The word Member13360's +452 is set to.
-constexpr uint32_t kMember13360Word452 = 0x82618BB4;
 
 // The 1.0s the camera modes' objects start with: from +44 to +252 and +284
 // to +332, every 16 bytes (the w words of their matrices, probably).
@@ -267,8 +272,8 @@ void StoreOnes(uint8_t* base, uint32_t object, uint32_t one) {
     guest::StoreU32(base, object + offset, one);
   }
 }
-// 1.0 in .rdata, the w words' value.
-constexpr uint32_t kOne = 0x82000A30;
+// 1.0 in .rdata, the w words' value, loaded as its bits.
+uint32_t LoadOne(uint8_t* base) { return guest::LoadU32(base, G::one_address()); }
 
 }  // namespace
 
@@ -276,7 +281,7 @@ void Member67760Construct(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82155D90 Member67760::Member67760");
   // The original loads the float and stores it back as a single (the same
   // bits for the constant 1.0).
-  const uint32_t one = guest::LoadU32(base, kOne);
+  const uint32_t one = LoadOne(base);
   guest::StoreU32(base, object + 16, 0);
   guest::StoreU32(base, object + 20, 0);
   StoreOnes(base, object, one);
@@ -298,7 +303,7 @@ void Member67760Construct(uint8_t* base, uint32_t object) {
 
 void Member13360Construct(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82155118 Member13360::Member13360");
-  const uint32_t one = guest::LoadU32(base, kOne);
+  const uint32_t one = LoadOne(base);
   guest::StoreU32(base, object + 16, 0);
   guest::StoreU32(base, object + 20, 0);
   StoreOnes(base, object, one);
@@ -307,12 +312,13 @@ void Member13360Construct(uint8_t* base, uint32_t object) {
   guest::StoreU32(base, object + 412, one);
   guest::StoreU32(base, object + 428, one);
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t buffer = object + kBuffers28 + kBuffer28Bytes * i;
-    guest::StoreU32(base, buffer + 12, 0xFFFFFFFF);
-    guest::StoreU32(base, buffer + 0, kBuffer28Vtable);
-    guest::StoreU32(base, buffer + 16, 0xFFFFFFFF);
-    guest::StoreU32(base, buffer + 20, 0);
-    guest::StoreU32(base, buffer + 24, 0);
+    const schema::CameraPathBuffer buffer(base,
+                                          object + kBuffers28 + schema::CameraPathBuffer::kSize * i);
+    buffer.set_index(0xFFFFFFFF);
+    buffer.set_vtable(schema::CameraPathBuffer::kVtable);
+    buffer.set_serial(0xFFFFFFFF);
+    buffer.set_block(0);
+    buffer.set_state(0);
   }
   const uint32_t inner = object + 43136;
   guest::StoreU32(base, inner + 16, 0);
@@ -321,51 +327,53 @@ void Member13360Construct(uint8_t* base, uint32_t object) {
   guest::StoreU32(base, inner + 0, kMember43136Vtable);
   StoreOnes(base, inner, one);
   guest::StoreU32(base, inner + 364, one);
-  const uint32_t word = guest::LoadU32(base, kMember13360Word452);
+  const uint32_t word = G::tv_camera_range_count(base);
   guest::StoreU32(base, object + 360, 0xFFFFFFFF);
   guest::StoreU32(base, object + 448, 0);
   guest::StoreU32(base, object + 452, word);
   // Each buffer reset (Buffer28::Reset; with no block yet, nothing freed).
   for (uint32_t i = 0; i < 4; i++) {
-    Buffer28Reset(base, object + kBuffers28 + kBuffer28Bytes * i);
+    Buffer28Reset(base, object + kBuffers28 + schema::CameraPathBuffer::kSize * i);
   }
 }
 
 bool Buffer28Freeable(uint8_t* base, uint32_t buffer) {
-  const uint32_t block = guest::LoadU32(base, buffer + kBuffer28Block);
+  const uint32_t block = schema::CameraPathBuffer(base, buffer).block();
   return block == 0 || memory::IsPages(block);
 }
 
 uint32_t Buffer28Free(uint8_t* base, uint32_t buffer) {
   ITC_NATIVE_RUNNING("sub_82152028 Buffer28::Free");
-  const uint32_t block = guest::LoadU32(base, buffer + kBuffer28Block);
+  const schema::CameraPathBuffer b(base, buffer);
+  const uint32_t block = b.block();
   if (block == 0) {
     return 0;
   }
   const uint32_t r3 = memory::FreePages(block) ? 1 : 0;
-  guest::StoreU32(base, buffer + kBuffer28Block, 0);
+  b.set_block(0);
   return r3;
 }
 
 uint32_t Buffer28Reset(uint8_t* base, uint32_t buffer) {
   ITC_NATIVE_RUNNING("sub_82152D38 Buffer28::Reset");
   const uint32_t r3 = Buffer28Free(base, buffer);
-  guest::StoreU32(base, buffer + 12, 0xFFFFFFFF);
-  guest::StoreU32(base, buffer + 16, 0xFFFFFFFF);
-  guest::StoreU32(base, buffer + 20, 0);
-  guest::StoreU32(base, buffer + 24, 0);
+  const schema::CameraPathBuffer b(base, buffer);
+  b.set_index(0xFFFFFFFF);
+  b.set_serial(0xFFFFFFFF);
+  b.set_block(0);
+  b.set_state(0);
   return r3;
 }
 
 uint32_t Buffer28Destroy(uint8_t* base, uint32_t buffer) {
   ITC_NATIVE_RUNNING("sub_82152D28 Buffer28::~Buffer28");
-  guest::StoreU32(base, buffer + 0, kBuffer28Vtable);
+  schema::CameraPathBuffer(base, buffer).set_vtable(schema::CameraPathBuffer::kVtable);
   return Buffer28Free(base, buffer);
 }
 
 bool Buffers28Freeable(uint8_t* base, uint32_t object) {
   for (uint32_t i = 0; i < 4; i++) {
-    if (!Buffer28Freeable(base, object + kBuffers28 + kBuffer28Bytes * i)) {
+    if (!Buffer28Freeable(base, object + kBuffers28 + schema::CameraPathBuffer::kSize * i)) {
       return false;
     }
   }
@@ -376,20 +384,21 @@ uint32_t Buffers28Destroy(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82106A00 Buffers28::~Buffers28");
   uint32_t r3 = 0;
   for (int32_t i = 3; i >= 0; i--) {
-    r3 = Buffer28Destroy(base, object + kBuffers28 + kBuffer28Bytes * uint32_t(i));
+    r3 = Buffer28Destroy(base, object + kBuffers28 + schema::CameraPathBuffer::kSize * uint32_t(i));
   }
   return r3;
 }
 
 void XprHolderConstruct(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_821067A0 XprHolder::XprHolder");
-  models::XprConstruct(base, object + 4);
-  for (uint32_t i = 0; i < 2; i++) {
-    const uint32_t record = object + 32 + 12 * i;
-    guest::StoreU32(base, record + 0, 0);
-    guest::StoreU32(base, record + 4, 0);
-    guest::StoreU32(base, record + 8, 0);
-  }
+  const schema::XprHolder h(base, object);
+  models::XprConstruct(base, h.xpr_address());
+  h.set_record0_word0(0);
+  h.set_record0_word1(0);
+  h.set_record0_word2(0);
+  h.set_record1_word0(0);
+  h.set_record1_word1(0);
+  h.set_record1_word2(0);
 }
 
 namespace {
@@ -408,15 +417,15 @@ std::optional<uint32_t> RaceModeMemberDestruct(uint8_t* base, uint32_t member) {
       !Buffers28Freeable(base, member + kRaceModeMemberBuffers)) {
     return std::nullopt;
   }
-  const uint32_t holder = member + kRaceModeMemberXprHolder;
+  const schema::XprHolder holder(base, member + kRaceModeMemberXprHolder);
   guest::StoreU32(base, member + 0, kRaceModeMemberVtable);
-  for (int32_t i = 1; i >= 0; i--) {
-    const uint32_t record = holder + 32 + 12 * uint32_t(i);
-    guest::StoreU32(base, record + 0, 0);
-    guest::StoreU32(base, record + 4, 0);
-    guest::StoreU32(base, record + 8, 0);
-  }
-  if (!models::XprDestruct(base, holder + 4)) {
+  holder.set_record1_word0(0);
+  holder.set_record1_word1(0);
+  holder.set_record1_word2(0);
+  holder.set_record0_word0(0);
+  holder.set_record0_word1(0);
+  holder.set_record0_word2(0);
+  if (!models::XprDestruct(base, holder.xpr_address())) {
     ITC_LOG_ERROR("RaceModeMember::~RaceModeMember: XPR::~XPR refused after its checks");
     std::abort();
   }
@@ -440,19 +449,16 @@ void RecordConstruct(uint8_t* base, uint32_t record, uint32_t vtable, uint32_t o
   guest::StoreU32(base, record + 1100, one);
 }
 
-// The race mode's vtables (+0 and +32) and its state machines but the
-// member's, and its XPR and the race overlays' list.
-constexpr uint32_t kRaceModeVtable = 0x82006D34;
+// The race mode's +32 vtable (its +0 one is schema::RaceMode::kVtable).
 constexpr uint32_t kRaceModeVtable32 = 0x82006D28;
-constexpr uint32_t kRaceModeDispatcher = 36;
-constexpr uint32_t kRaceModeMember = 10512;
-constexpr uint32_t kRaceModeXpr = 147892;
-constexpr uint32_t kRaceModeOverlays = 157552;
+// The dispatcher's place in every mode (boot-mode.toml's GameMode).
+constexpr uint32_t kModeDispatcher = 36;
 
 void MachineConstruct(uint8_t* base, uint32_t machine) {
   StateMachineConstruct(base, machine);
-  guest::StoreU32(base, machine + kTransitionCount, 0);
-  guest::StoreU32(base, machine + kState, 0);
+  const schema::StateMachine m(base, machine);
+  m.set_transition_count(0);
+  m.set_state(0);
 }
 
 // What every mode's constructor does first: the base (Mode::Mode), the
@@ -461,7 +467,7 @@ void MachineConstruct(uint8_t* base, uint32_t machine) {
 void ModeBaseConstruct(uint8_t* base, uint32_t mode, uint32_t vtable, uint32_t vtable32,
                        bool word848 = false) {
   ModeConstruct(base, mode);
-  const uint32_t dispatcher = mode + kRaceModeDispatcher;
+  const uint32_t dispatcher = mode + kModeDispatcher;
   guest::StoreU32(base, dispatcher + 200, 0);
   for (uint32_t i = 0; i < 50 * 3; i++) {
     guest::StoreU32(base, dispatcher + 204 + 4 * i, 0);
@@ -469,7 +475,7 @@ void ModeBaseConstruct(uint8_t* base, uint32_t mode, uint32_t vtable, uint32_t v
   guest::StoreU32(base, dispatcher + 804, 0);
   guest::StoreU32(base, dispatcher + 808, 0);
   if (word848) {
-    guest::StoreU32(base, mode + 848, 0);
+    schema::GameModeType6(base, mode).set_word_848(0);
   }
   guest::StoreU32(base, mode + 0, vtable);
   guest::StoreU32(base, mode + 32, vtable32);
@@ -479,7 +485,7 @@ void ModeBaseConstruct(uint8_t* base, uint32_t mode, uint32_t vtable, uint32_t v
 
 void Member56896Construct(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82106A50 Member56896::Member56896");
-  const uint32_t one = guest::LoadU32(base, kOne);
+  const uint32_t one = LoadOne(base);
   guest::StoreU32(base, object + 16, 0);
   guest::StoreU32(base, object + 20, 0);
   StoreOnes(base, object, one);
@@ -492,7 +498,7 @@ void RaceModeMemberConstruct(uint8_t* base, uint32_t member) {
   MachineConstruct(base, member + 16);
   guest::StoreU32(base, member + 0, kRaceModeMemberVtable);
   // The original loads the 1.0 once (f31) for all its stores.
-  const uint32_t one = guest::LoadU32(base, kOne);
+  const uint32_t one = LoadOne(base);
   RecordConstruct(base, member + 9648, kRecordVtable, one);
   RecordConstruct(base, member + 9648 + kRecordBytes, kRecordVtable, one);
   RecordConstruct(base, member + 11856, kRecord11856Vtable, one);
@@ -516,19 +522,20 @@ void RaceModeMemberConstruct(uint8_t* base, uint32_t member) {
 
 void RaceModeConstruct(uint8_t* base, uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_821073B8 RaceMode::RaceMode");
-  ModeBaseConstruct(base, mode, kRaceModeVtable, kRaceModeVtable32);
-  MachineConstruct(base, mode + 848);
-  RaceModeMemberConstruct(base, mode + kRaceModeMember);
-  MachineConstruct(base, mode + 87936);
-  MachineConstruct(base, mode + 97548);
-  MachineConstruct(base, mode + 107168);
-  MachineConstruct(base, mode + 116812);
-  MachineConstruct(base, mode + 128664);
-  MachineConstruct(base, mode + 138284);
-  models::XprConstruct(base, mode + kRaceModeXpr);
-  MachineConstruct(base, mode + 147944);
-  race_overlays::RaceOverlaysClear(base, mode + kRaceModeOverlays);
-  MachineConstruct(base, mode + 157652);
+  ModeBaseConstruct(base, mode, schema::RaceMode::kVtable, kRaceModeVtable32);
+  const schema::RaceMode m(base, mode);
+  MachineConstruct(base, m.course_setup_address());
+  RaceModeMemberConstruct(base, m.camera_director_address());
+  MachineConstruct(base, m.race_scene_address());
+  MachineConstruct(base, m.race_flow_address());
+  MachineConstruct(base, m.race_states_address());
+  MachineConstruct(base, m.race_world_address());
+  MachineConstruct(base, m.race_hud_machine_address());
+  MachineConstruct(base, m.race_sounds_address());
+  models::XprConstruct(base, m.xpr_address());
+  MachineConstruct(base, m.overlays_machine_address());
+  race_overlays::RaceOverlaysClear(base, m.overlays_address());
+  MachineConstruct(base, m.machine_157652_address());
 }
 
 void MachineMemberConstruct(uint8_t* base, uint32_t machine) {

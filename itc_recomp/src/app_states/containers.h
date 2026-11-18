@@ -21,25 +21,14 @@
 
 namespace app_states {
 
-// The message vector: +4 first, +8 last, +12 end (the app's +76).
-constexpr uint32_t kVectorFirst = 4;
-constexpr uint32_t kVectorLast = 8;
-constexpr uint32_t kVectorEnd = 12;
+// The message vector (the app's +76), the operation list and its nodes, the
+// delegate: schema/app_states.h (itc_recomp/schema/app-states.toml).
 constexpr uint32_t kMessagesMaxSize = 0x3FFFFFFF;
 
-// The operation list: +4 the head node, +8 the size; a node +0 next, +4
-// previous, +8 and +12 the operation (its type, then a state).
-constexpr uint32_t kListHead = 4;
-constexpr uint32_t kListSize = 8;
-constexpr uint32_t kNodeNext = 0;
-constexpr uint32_t kNodePrevious = 4;
-constexpr uint32_t kNodeValue = 8;
-constexpr uint32_t kOpNodeBytes = 16;
 constexpr uint32_t kOpListMaxSize = 0x1FFFFFFF;
 
 // The delegate's vtable (slot 1 Delegate::Invoke, 2 Delegate::Clone).
 constexpr uint32_t kDelegateVtable = 0x82002850;
-constexpr uint32_t kDelegateBytes = 12;
 
 // sub_82092E70 MessageVector::Erase (erase(first, last)): the words after
 // `last` moved down to `first`, last set back. `first` and `last` are the
@@ -77,7 +66,6 @@ std::optional<uint32_t> OpBuyNode(uint8_t* base, uint32_t next, uint32_t previou
 // `state`} appended to the layer's queue (+36). False, with nothing done,
 // where the original must run (IncSize's length_error, no heap).
 bool LayerPush(uint8_t* base, uint32_t layer, uint32_t state);
-constexpr uint32_t kLayerOps = 36;
 
 // sub_820938C0 MessageVector::InsertN (_Insert_n): `count` copies of
 // `value` inserted before the element `where` (a new block from

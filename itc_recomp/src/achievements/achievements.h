@@ -14,28 +14,15 @@
 namespace achievements {
 
 constexpr int kCount = 27;
-// The 27 pairs {kind, id} (.rdata, docs/known-data.md).
-constexpr uint32_t kTable = 0x82011FB8;
-// The course time targets: 8 pairs {route, packed time}.
-constexpr uint32_t kCourseTargets = 0x82012090;
+// The image's tables and blocks: schema::AchievementsGlobals
+// (itc_recomp/schema/achievements.toml). The course time targets: 8.
 constexpr uint32_t kCourseTargetCount = 8;
-// The count thresholds, read as this + 4 x the pair's index (23 to 26 land
-// on the table at 0x820120D0).
-constexpr uint32_t kThresholds = 0x82012074;
-// The race's progress ([it] +6076 the route, +2204 the player's time).
-constexpr uint32_t kProgress = 0x826D82E8;
+// The race's progress (AchievementsGlobals::progress): +6076 the route,
+// +2204 the player's time.
 constexpr uint32_t kProgressRoute = 6076;
 constexpr uint32_t kProgressTime = 2204;
-// The user table's +364: a word per signed-in slot.
-constexpr uint32_t kUserCounts = 0x826C77DC;
 // The items' wins: the halfword at SaveData::Of(0) + this + 12 x the item.
 constexpr uint32_t kItemWins = 0x199FA;
-// Player 0's controller's user.
-constexpr uint32_t kPlayerUser = 0x826BABA4;
-// The write's blocks: 27 entries {user, id} and 27 XOVERLAPPEDs.
-constexpr uint32_t kEntries = 0x828164F0;
-constexpr uint32_t kOverlappeds = 0x828161F8;
-constexpr uint32_t kOverlappedBytes = 28;
 // XUserWriteAchievements (system-services.md) and the original's return
 // address after it.
 constexpr uint32_t kWriteAchievements = 0x82294E58;

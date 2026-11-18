@@ -80,7 +80,7 @@ bool PoseCar(uint8_t* base, uint32_t sp, uint32_t model, uint32_t index, const C
   guest::StoreU32(base, frame + 80, index);
   const uint32_t event = race_setup::EventCurrent(base);
   const uint32_t item =
-      race_event::GroupItem(base, event, guest::LoadU32(base, Screen(base) + 804), index);
+      race_event::GroupItem(base, event, Screen(base).group_kind(), index);
   Copy(base, calls, frame, 0x822285DC, frame + 6240, item, 3008);
   guest::StoreU32(base, model + 732, 1);
   StoreIdentity(base, frame + 96);

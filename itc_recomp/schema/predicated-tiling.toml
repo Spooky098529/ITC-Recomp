@@ -1,0 +1,140 @@
+# The schema of docs/functions/predicated-tiling.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# The device's own fields (+10800..+13076, the workers' blocks) are
+# device-state.md's Device. Left out of this file, though the measure files
+# them here (reported to the lead): Device::Resolve.r6 and
+# sub_822B2598.ret.+13428 (texture headers: graphics-resources.md's
+# TextureHeader), the gamma ramps sub_822B0D18.r4, sub_822B0E08.r3 and
+# sub_822B0E60.r3 (device-state.md's DeviceGammaRamp), Device::WriteCallback.ret
+# (a write position: command-buffer.md's CommandWritePosition),
+# sub_822AF550.r5 and .r6 (out words: graphics-resources.md's GpuOutWord) and
+# sub_822B2598.ret (a measure fault: sub_822B2598 leaves r3, the device, as it
+# is, so its "return" is device-state.md's Device).
+
+# The library's tiling workers' shared state (400 bytes at device +10812 to
+# +11212; docs/known-data.md, "device +10812..+11208"): made by
+# Device::CreateWorkers (sub_822B6D70), read by Device::WorkerThread
+# (sub_822B69A8) and Device::WorkerJob (sub_822B6780, which never runs in play)
+# and the walk's helpers. The measure names it after a worker block's +0
+# (the block is met as the device).
+[TilingWorkerState]
+measure = "Device.+0"
+size = 400
+origin = "gpu"
+fields = [
+  { name = "job_lock", offset = 0, type = "u32", note = "the job's spin lock (lwarx/stwcx.; 1 held)" },
+  { name = "ring", offset = 4, type = "u32", note = "the primary ring (device +13496); 0 tells the workers to exit" },
+  { name = "ring_write", offset = 8, type = "u32", note = "the primary ring's write position" },
+  { name = "ring_mask", offset = 12, type = "u32", note = "the ring's device +13500" },
+  { name = "entry_function", offset = 16, type = "fn", note = "the walk's function, called for each of a plain entry's words (set by a 0x80000000 entry)" },
+  { name = "entry_argument", offset = 20, type = "u32", note = "its first argument (set with it)" },
+  { name = "entry_index", offset = 24, type = "u32", note = "the plain entry's word being called (counts up to +28)" },
+  { name = "entry_count", offset = 28, type = "u32", note = "the plain entry's word count (its low half)" },
+  { name = "entry_data", offset = 32, type = "ptr", to = "TilingChainWords", note = "the plain entry's words (after its count)" },
+  { name = "position", offset = 36, type = "ptr", to = "TilingChainWords", note = "the walk's position (the next entry); kept by WorkerNextBlock (sub_822B60C8) when it waits" },
+  { name = "select_mode", offset = 40, type = "u32", note = "probably the markers' nesting: its top bits pick each tile's select bits (1 or 2, WriteBinSelect sub_822B6370)" },
+  { name = "tile", offset = 44, type = "u32", note = "the current tile (WorkerMarkers sub_822B6528, WriteBinSelect); the job masks the draws (sub_822B6288) when it's 1" },
+  { name = "job_depth", offset = 48, type = "u32", note = "the job's depth: a wake while it runs (above 1) continues the saved walk" },
+  { name = "job_running", offset = 52, type = "u32", note = "1 when a job takes a header; WorkerNextBlock clears it at the chain's end with the depth at 0" },
+  { name = "pending_kicks", offset = 56, type = "u32", note = "kicks deferred until the GPU's interrupts (device +10868; always 0 in play)" },
+  { name = "next_block_lock", offset = 60, type = "u32", note = "a spin lock (KfAcquireSpinLock, WorkerNextBlock)" },
+  { name = "next_block_event", offset = 64, type = "bytes", count = 16, note = "an event (KEVENT) WorkerNextBlock waits on for the chain's next block" },
+  { name = "pending_header", offset = 80, type = "ptr", to = "TilingChainWords", note = "the callback's argument (Device::WakeWorker sub_822B6A78): the segment chain's first block, the tiling header at its +4; cleared when the job takes it" },
+  { name = "walk_block", offset = 84, type = "ptr", to = "TilingChainWords", note = "the walk's block: the header's, then each next block (WorkerNextBlock's return)" },
+  { name = "end_marker", offset = 92, type = "u32", note = "0xC0000000" },
+  { name = "walk_handoff", offset = 104, type = "u32", note = "1 while a nested wake hands its walk to the running job, which spins until the markers' walk clears it" },
+  { name = "l2_area", offset = 108, type = "u32", note = "the L2-locked area (0x7F100000)" },
+  { name = "header_copy", offset = 112, type = "bytes", count = 256, note = "the tiling header's copy (the draw chain's and third chain's first blocks, the flags, +124 the tile count, the tiles)" },
+  { name = "bin_select", offset = 368, type = "u32", note = "the last bin select written (0x7FFFFFFF reset by the job)" },
+  { name = "nest_positions", offset = 372, type = "bytes", count = 16, note = "probably the 0x82-0x84 markers' saved positions (not read in detail)" },
+  { name = "tiling_start", offset = 388, type = "u32", note = "the 0x86000000 marker's position (the tiles' replay goes back there)" },
+  { name = "tiling_start_word", offset = 392, type = "u32", note = "kept with it (not read in detail)" },
+  { name = "last_worker_cpu", offset = 396, type = "u32", note = "the CPU of the last worker made (device +11208): its worker waits with a 30 ms timeout" },
+]
+
+# A position in the segment chain's words, as Device::WorkerJob walks it:
+# a block (its +0 link word, then the 256-byte tiling header at +4 and the
+# first entry at +260) or an entry (a 0x80000000 entry's function and
+# argument at +4 and +8). Never read in play (the job never runs).
+[TilingChainWords]
+measure = "Device.+0.+36"
+size = 264
+origin = "gpu"
+fields = [
+  { name = "next_function", offset = 4, type = "u32", note = "after a 0x80000000 entry: the walk's function; in a header block, the header's first word" },
+  { name = "next_argument", offset = 8, type = "u32", note = "after a 0x80000000 entry: the function's argument" },
+  { name = "first_entry", offset = 260, type = "u32", note = "in a header block: the first entry after the header" },
+]
+
+# A tile's rectangle, 16 bytes (Device::BeginTiling's r6 holds the tile
+# count of them; the display's tiling block at 0x82600350 +16): BeginTiling
+# copies them to device +12492 and keeps the widest right and tallest
+# bottom at +12916 and +12920 (the measure names the type after +12916).
+[TilingTileRect]
+measure = "Device.+12916"
+size = 16
+origin = "gpu"
+fields = [
+  { name = "left", offset = 0, type = "u32" },
+  { name = "top", offset = 4, type = "u32" },
+  { name = "right", offset = 8, type = "u32" },
+  { name = "bottom", offset = 12, type = "u32" },
+]
+
+# The display scaler's parameters (28 bytes: the presentation parameters'
+# +96, kept at device +13284; probably D3DVIDEO_SCALER_PARAMETERS' layout:
+# a source rectangle, the scaled output size, a filter profile): read by
+# sub_822B2598 (from sub_822B42D0) and compared by Device::Swap (its r5).
+[ScalerParameters]
+measures = ["sub_822B2598.r4", "Device::Swap.r5"]
+size = 28
+origin = "gpu"
+fields = [
+  { name = "source_left_byte", offset = 0, type = "u8", note = "Device::Swap's byte read of +0 (its r5, never other than the device's own in play)" },
+  { name = "source_left", offset = 0, type = "u32", note = "probably" },
+  { name = "source_top", offset = 4, type = "u32", note = "probably" },
+  { name = "source_right", offset = 8, type = "u32", note = "probably" },
+  { name = "source_bottom", offset = 12, type = "u32", note = "probably" },
+  { name = "scaled_width", offset = 16, type = "u32", note = "probably" },
+  { name = "scaled_height", offset = 20, type = "u32", note = "probably" },
+  { name = "filter_profile", offset = 24, type = "u32", note = "probably; not 0: the set-up's +24 and +40 are 3" },
+]
+
+# The display scaler's set-up (56 bytes) sub_822B2598 makes from its
+# parameters, copied into the device at +13368 by sub_822B4250 (and +13312 at
+# the first Swap). Not read in detail.
+[ScalerSetUp]
+measure = "sub_822B2598.r5"
+size = 56
+origin = "gpu"
+fields = [
+  { name = "source_left", offset = 0, type = "u32", note = "the parameters' +0" },
+  { name = "source_top", offset = 4, type = "u32", note = "the parameters' +4" },
+  { name = "source_right", offset = 8, type = "u32", note = "the parameters' +8" },
+  { name = "source_bottom", offset = 12, type = "u32", note = "the parameters' +12" },
+  { name = "scaled_width", offset = 16, type = "u32", note = "the parameters' +16" },
+  { name = "scaled_height", offset = 20, type = "u32", note = "the parameters' +20" },
+  { name = "horizontal_filter", offset = 24, type = "u32", note = "probably: 3 with a filter profile, else 0" },
+  { name = "unknown_28", offset = 28, type = "u32", note = "0" },
+  { name = "unknown_32", offset = 32, type = "u32", note = "0" },
+  { name = "unknown_36", offset = 36, type = "u32", note = "0" },
+  { name = "vertical_filter", offset = 40, type = "u32", note = "probably: as +24" },
+  { name = "unknown_44", offset = 44, type = "u32", note = "0" },
+  { name = "unknown_48", offset = 48, type = "u32", note = "0" },
+  { name = "unknown_52", offset = 52, type = "u32", note = "0" },
+]
+
+# sub_822AF438's r4 (Device::Resolve's clear depth word, its stack +100
+# argument): only +8 read, a GPU format in its low 6 bits indexing the
+# format flags at 0x82013468. Not seen in play; not read in detail.
+[ResolveClearTarget]
+measure = "sub_822AF438.r4"
+size = 12
+origin = "gpu"
+fields = [
+  { name = "format", offset = 8, type = "u32", note = "the low 6 bits a GPU format (probably a surface's format word)" },
+]

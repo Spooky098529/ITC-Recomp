@@ -26,17 +26,9 @@ namespace action_mappers {
 constexpr uint32_t kRepeatUpdateFunction = 0x8210B568;
 constexpr uint32_t kCurveApplyFunction = 0x8210B5B8;
 
-// The mapper's fields (docs/known-data.md, "action mapper").
+// The mapper's actions (its fields: schema::ActionMapper,
+// itc_recomp/schema/action-mappers.toml).
 constexpr uint32_t kActions = 30;
-constexpr uint32_t kWords = 448;          // held, held before, pressed, released, fired, pending
-constexpr uint32_t kConfig = 372;         // four pointers: kinds, links, analog kinds, links
-constexpr uint32_t kRaw = 388;            // 30 u16s: the raw values
-constexpr uint32_t kRepeatPointers = 472; // 30 pointers to the repeat objects
-constexpr uint32_t kAnalog = 1072;        // 30 u16s, then 30 floats at +60
-constexpr uint32_t kCurvePointers = 1252; // 30 pointers to the curve objects
-constexpr uint32_t kThresholds = 1852;    // 30 entries of 20 bytes
-constexpr uint32_t kListener = 2464;      // the listener (an input processor)
-constexpr uint32_t kPadValues = 2880;     // pointer to the logical pad's values
 
 // --- The leaves ---
 
@@ -66,8 +58,6 @@ uint32_t ListenerTestValue(uint8_t* base, uint32_t listener, uint32_t mask);
 void NoteListenerTest(uint32_t caller, uint32_t listener, uint32_t mask, uint32_t result);
 
 // --- The client list (one, at [0x82970C14]) and its nodes ---
-
-constexpr uint32_t kClientList = 0x82970C14;
 
 // ClientNode::ClientNode (sub_8259C6D0): vtable 0x82071380, +4 the type, +8
 // the next node (0).

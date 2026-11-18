@@ -3,6 +3,7 @@
 #include "framework/run_loop.h"
 
 #include "guest.h"
+#include "schema/framework.h"
 
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
@@ -14,19 +15,28 @@ namespace framework {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
+using Map = schema::HandlerMap;
+using Node = schema::HandlerMapNode;
+using Vector = schema::RequestVector;
+using Request = schema::Request;
+
+uint32_t Left(uint8_t* base, uint32_t node) { return Node(base, node).left().address; }
+uint32_t Parent(uint8_t* base, uint32_t node) { return Node(base, node).parent().address; }
+uint32_t Right(uint8_t* base, uint32_t node) { return Node(base, node).right().address; }
+bool IsNil(uint8_t* base, uint32_t node) { return Node(base, node).is_nil() != 0; }
+uint8_t Color(uint8_t* base, uint32_t node) { return Node(base, node).color(); }
+void SetColor(uint8_t* base, uint32_t node, uint8_t color) { Node(base, node).set_color(color); }
+uint32_t Head(uint8_t* base, uint32_t map) { return Map(base, map).head().address; }
+uint32_t First(uint8_t* base, uint32_t vector) { return Vector(base, vector).first().address; }
+uint32_t Last(uint8_t* base, uint32_t vector) { return Vector(base, vector).last().address; }
+uint32_t End(uint8_t* base, uint32_t vector) { return Vector(base, vector).end().address; }
+// A request's three words copied, word by word.
+void CopyRequest(uint8_t* base, uint32_t to, uint32_t from) {
+  const Request source(base, from), target(base, to);
+  target.set_type(source.type());
+  target.set_key(source.key());
+  target.set_delegate(source.delegate());
 }
-uint32_t Left(uint8_t* base, uint32_t node) { return Load(base, node + kNodeLeft); }
-uint32_t Parent(uint8_t* base, uint32_t node) { return Load(base, node + kNodeParent); }
-uint32_t Right(uint8_t* base, uint32_t node) { return Load(base, node + kNodeRight); }
-bool IsNil(uint8_t* base, uint32_t node) { return guest::LoadU8(base, node + kNodeIsNil) != 0; }
-uint8_t Color(uint8_t* base, uint32_t node) { return guest::LoadU8(base, node + kNodeColor); }
-void SetColor(uint8_t* base, uint32_t node, uint8_t color) {
-  guest::StoreU8(base, node + kNodeColor, color);
-}
-uint32_t Head(uint8_t* base, uint32_t map) { return Load(base, map + kMapHead); }
 
 // A node allocated after CanAllocate said it could be.
 uint32_t NewBlock(uint8_t* base) {
@@ -103,57 +113,57 @@ bool MapDecrement(uint8_t* base, Iterator& it) {
 void MapRotateLeft(uint8_t* base, uint32_t map, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_82092B10 HandlerMap::RotateLeft");
   const uint32_t up = Right(base, node);
-  Store(base, node + kNodeRight, Left(base, up));
+  Node(base, node).set_right(Left(base, up));
   const uint32_t moved = Left(base, up);
   if (!IsNil(base, moved)) {
-    Store(base, moved + kNodeParent, node);
+    Node(base, moved).set_parent(node);
   }
-  Store(base, up + kNodeParent, Parent(base, node));
+  Node(base, up).set_parent(Parent(base, node));
   const uint32_t head = Head(base, map);
   if (node == Parent(base, head)) {
-    Store(base, head + kNodeParent, up);
+    Node(base, head).set_parent(up);
   } else {
     const uint32_t parent = Parent(base, node);
     if (node == Left(base, parent)) {
-      Store(base, parent + kNodeLeft, up);
+      Node(base, parent).set_left(up);
     } else {
-      Store(base, parent + kNodeRight, up);
+      Node(base, parent).set_right(up);
     }
   }
-  Store(base, up + kNodeLeft, node);
-  Store(base, node + kNodeParent, up);
+  Node(base, up).set_left(node);
+  Node(base, node).set_parent(up);
 }
 
 void MapRotateRight(uint8_t* base, uint32_t map, uint32_t node) {
   ITC_NATIVE_RUNNING("sub_82092A00 HandlerMap::RotateRight");
   const uint32_t up = Left(base, node);
-  Store(base, node + kNodeLeft, Right(base, up));
+  Node(base, node).set_left(Right(base, up));
   const uint32_t moved = Right(base, up);
   if (!IsNil(base, moved)) {
-    Store(base, moved + kNodeParent, node);
+    Node(base, moved).set_parent(node);
   }
-  Store(base, up + kNodeParent, Parent(base, node));
+  Node(base, up).set_parent(Parent(base, node));
   const uint32_t head = Head(base, map);
   if (node == Parent(base, head)) {
-    Store(base, head + kNodeParent, up);
+    Node(base, head).set_parent(up);
   } else {
     const uint32_t parent = Parent(base, node);
     if (node == Right(base, parent)) {
-      Store(base, parent + kNodeRight, up);
+      Node(base, parent).set_right(up);
     } else {
-      Store(base, parent + kNodeLeft, up);
+      Node(base, parent).set_left(up);
     }
   }
-  Store(base, up + kNodeRight, node);
-  Store(base, node + kNodeParent, up);
+  Node(base, up).set_right(node);
+  Node(base, node).set_parent(up);
 }
 
 std::optional<uint32_t> MapAllocateNodes(uint8_t* base, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_82099C80 HandlerMap::AllocateNodes");
-  if (count != 0 && 0xFFFFFFFFu / count < kNodeBytes) {
+  if (count != 0 && 0xFFFFFFFFu / count < Node::kSize) {
     return std::nullopt;
   }
-  return memory::crt::OperatorNew(base, count * kNodeBytes);
+  return memory::crt::OperatorNew(base, count * Node::kSize);
 }
 
 uint32_t MapNewHead(uint8_t* base) {
@@ -161,28 +171,28 @@ uint32_t MapNewHead(uint8_t* base) {
   const uint32_t node = NewBlock(base);
   // The original's null checks on the node, +4 and +8.
   if (node != 0) {
-    Store(base, node + kNodeLeft, 0);
+    Node(base, node).set_left(0);
   }
-  if (node + 4 != 0) {
-    Store(base, node + kNodeParent, 0);
+  if (Node(base, node).parent_address() != 0) {
+    Node(base, node).set_parent(0);
   }
-  if (node + 8 != 0) {
-    Store(base, node + kNodeRight, 0);
+  if (Node(base, node).right_address() != 0) {
+    Node(base, node).set_right(0);
   }
   SetColor(base, node, 1);
-  guest::StoreU8(base, node + kNodeIsNil, 0);
+  Node(base, node).set_is_nil(0);
   return node;
 }
 
 uint32_t MapConstruct(uint8_t* base, uint32_t map) {
   ITC_NATIVE_RUNNING("sub_82099FB0 HandlerMap::HandlerMap");
   const uint32_t head = MapNewHead(base);
-  Store(base, map + kMapHead, head);
-  guest::StoreU8(base, head + kNodeIsNil, 1);
-  Store(base, head + kNodeParent, head);
-  Store(base, head + kNodeLeft, head);
-  Store(base, head + kNodeRight, head);
-  Store(base, map + kMapSize, 0);
+  Map(base, map).set_head(head);
+  Node(base, head).set_is_nil(1);
+  Node(base, head).set_parent(head);
+  Node(base, head).set_left(head);
+  Node(base, head).set_right(head);
+  Map(base, map).set_size(0);
   return head;
 }
 
@@ -191,49 +201,51 @@ uint32_t MapNewNodeOf(uint8_t* base, uint32_t left, uint32_t parent, uint32_t ri
   ITC_NATIVE_RUNNING("sub_82099E20 HandlerMap::NewNode");
   const uint32_t node = NewBlock(base);
   if (node != 0) {
-    Store(base, node + kNodeLeft, left);
-    Store(base, node + kNodeParent, parent);
-    Store(base, node + kNodeRight, right);
-    Store(base, node + kNodeKey, key);
+    Node(base, node).set_left(left);
+    Node(base, node).set_parent(parent);
+    Node(base, node).set_right(right);
+    Node(base, node).set_key(key);
     SetColor(base, node, color);
-    guest::StoreU8(base, node + kNodeIsNil, 0);
-    Store(base, node + kNodeDelegate, delegate);
+    Node(base, node).set_is_nil(0);
+    Node(base, node).set_delegate(delegate);
   }
   return node;
 }
 
 uint32_t MapNewNode(uint8_t* base, uint32_t left, uint32_t parent, uint32_t right, uint32_t value,
                     uint8_t color) {
-  return MapNewNodeOf(base, left, parent, right, Load(base, value), Load(base, value + 4), color);
+  const schema::HandlerMapValue v(base, value);
+  return MapNewNodeOf(base, left, parent, right, v.key(), v.delegate().address, color);
 }
 
 std::optional<Iterator> MapInsert(uint8_t* base, uint32_t map, bool add_left, uint32_t where,
                                   uint32_t value) {
-  return MapInsertOf(base, map, add_left, where, Load(base, value), Load(base, value + 4));
+  const schema::HandlerMapValue v(base, value);
+  return MapInsertOf(base, map, add_left, where, v.key(), v.delegate().address);
 }
 
 std::optional<Iterator> MapInsertOf(uint8_t* base, uint32_t map, bool add_left, uint32_t where,
                                     uint32_t key, uint32_t delegate) {
-  if (Load(base, map + kMapSize) >= kMapMaxSize || !CanAllocate(base)) {
+  if (Map(base, map).size() >= kMapMaxSize || !CanAllocate(base)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82093400 HandlerMap::InsertNode");
   const uint32_t head = Head(base, map);
   const uint32_t node = MapNewNodeOf(base, head, where, head, key, delegate, 0);
-  Store(base, map + kMapSize, Load(base, map + kMapSize) + 1);
+  Map(base, map).set_size(Map(base, map).size() + 1);
   if (where == head) {
-    Store(base, head + kNodeParent, node);
-    Store(base, head + kNodeLeft, node);
-    Store(base, head + kNodeRight, node);
+    Node(base, head).set_parent(node);
+    Node(base, head).set_left(node);
+    Node(base, head).set_right(node);
   } else if (add_left) {
-    Store(base, where + kNodeLeft, node);
+    Node(base, where).set_left(node);
     if (where == Left(base, head)) {
-      Store(base, head + kNodeLeft, node);
+      Node(base, head).set_left(node);
     }
   } else {
-    Store(base, where + kNodeRight, node);
+    Node(base, where).set_right(node);
     if (where == Right(base, head)) {
-      Store(base, head + kNodeRight, node);
+      Node(base, head).set_right(node);
     }
   }
   uint32_t x = node;
@@ -279,12 +291,13 @@ std::optional<Iterator> MapInsertOf(uint8_t* base, uint32_t map, bool add_left, 
 }
 
 std::optional<InsertResult> MapInsertUnique(uint8_t* base, uint32_t map, uint32_t value) {
-  return MapInsertUniqueOf(base, map, Load(base, value), Load(base, value + 4));
+  const schema::HandlerMapValue v(base, value);
+  return MapInsertUniqueOf(base, map, v.key(), v.delegate().address);
 }
 
 std::optional<InsertResult> MapInsertUniqueOf(uint8_t* base, uint32_t map, uint32_t key,
                                               uint32_t delegate) {
-  if (Load(base, map + kMapSize) >= kMapMaxSize || !CanAllocate(base)) {
+  if (Map(base, map).size() >= kMapMaxSize || !CanAllocate(base)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82093740 HandlerMap::Insert");
@@ -293,7 +306,7 @@ std::optional<InsertResult> MapInsertUniqueOf(uint8_t* base, uint32_t map, uint3
   bool add_left = true;
   for (uint32_t x = Parent(base, head); !IsNil(base, x);) {
     where = x;
-    add_left = key < Load(base, x + kNodeKey);
+    add_left = key < Node(base, x).key();
     x = add_left ? Left(base, x) : Right(base, x);
   }
   Iterator it{map, where};
@@ -305,7 +318,7 @@ std::optional<InsertResult> MapInsertUniqueOf(uint8_t* base, uint32_t map, uint3
       return std::nullopt;
     }
   }
-  if (Load(base, it.node + kNodeKey) < key) {
+  if (Node(base, it.node).key() < key) {
     return InsertResult{*MapInsertOf(base, map, add_left, where, key, delegate), true};
   }
   return InsertResult{it, false};
@@ -317,23 +330,21 @@ bool RequestsErase(uint8_t* base, uint32_t vector, Iterator first, Iterator last
   }
   ITC_NATIVE_RUNNING("sub_82092EF8 RequestVector::Erase");
   if (last.node != first.node) {
-    const uint32_t end = Load(base, vector + kVectorLast);
+    const uint32_t end = Last(base, vector);
     const int32_t moved = int32_t(end - last.node) / int32_t(kRequestBytes);
     const uint32_t new_last = first.node + uint32_t(moved) * kRequestBytes;
     const uint32_t delta = first.node - last.node;
     for (uint32_t from = last.node; from != end; from += kRequestBytes) {
-      for (uint32_t word = 0; word < kRequestBytes; word += 4) {
-        Store(base, from + delta + word, Load(base, from + word));
-      }
+      CopyRequest(base, from + delta, from);
     }
-    Store(base, vector + kVectorLast, new_last);
+    Vector(base, vector).set_last(new_last);
   }
   return true;
 }
 
 bool RequestsClear(uint8_t* base, uint32_t vector) {
-  const uint32_t first = Load(base, vector + kVectorFirst);
-  const uint32_t last = Load(base, vector + kVectorLast);
+  const uint32_t first = First(base, vector);
+  const uint32_t last = Last(base, vector);
   if (first > last) {
     return false;
   }
@@ -345,30 +356,26 @@ namespace {
 
 int32_t Count(uint32_t from, uint32_t to) { return int32_t(to - from) / int32_t(kRequestBytes); }
 
-void CopyRequest(uint8_t* base, uint32_t to, uint32_t from) {
-  for (uint32_t word = 0; word < kRequestBytes; word += 4) {
-    Store(base, to + word, Load(base, from + word));
-  }
-}
-
 void StoreRequest(uint8_t* base, uint32_t to, const uint32_t (&value)[3]) {
-  Store(base, to + 0, value[0]);
-  Store(base, to + 4, value[1]);
-  Store(base, to + 8, value[2]);
+  const Request request(base, to);
+  request.set_type(value[0]);
+  request.set_key(value[1]);
+  request.set_delegate(value[2]);
 }
 
 }  // namespace
 
 bool RequestsInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t count,
                      uint32_t value) {
-  const uint32_t request[3] = {Load(base, value), Load(base, value + 4), Load(base, value + 8)};
-  const uint32_t first = Load(base, vector + kVectorFirst);
-  const uint32_t capacity = first == 0 ? 0 : uint32_t(Count(first, Load(base, vector + kVectorEnd)));
+  const Request source(base, value);
+  const uint32_t request[3] = {source.type(), source.key(), source.delegate().address};
+  const uint32_t first = First(base, vector);
+  const uint32_t capacity = first == 0 ? 0 : uint32_t(Count(first, End(base, vector)));
   if (count == 0) {
     ITC_NATIVE_RUNNING("sub_8209A0E8 RequestVector::InsertN");
     return true;
   }
-  const uint32_t last = Load(base, vector + kVectorLast);
+  const uint32_t last = Last(base, vector);
   const uint32_t size = first == 0 ? 0 : uint32_t(Count(first, last));
   if (kRequestsMaxSize - size < count) {
     return false;  // the length_error
@@ -409,15 +416,15 @@ bool RequestsInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t co
         }
       }
     }
-    const uint32_t old_first = Load(base, vector + kVectorFirst);
+    const uint32_t old_first = First(base, vector);
     const uint32_t new_size =
-        (old_first == 0 ? 0 : uint32_t(Count(old_first, Load(base, vector + kVectorLast)))) + count;
+        (old_first == 0 ? 0 : uint32_t(Count(old_first, Last(base, vector)))) + count;
     if (old_first != 0) {
       memory::crt::OperatorDelete(old_first);
     }
-    Store(base, vector + kVectorFirst, block);
-    Store(base, vector + kVectorEnd, block + new_capacity * kRequestBytes);
-    Store(base, vector + kVectorLast, block + new_size * kRequestBytes);
+    Vector(base, vector).set_first(block);
+    Vector(base, vector).set_end(block + new_capacity * kRequestBytes);
+    Vector(base, vector).set_last(block + new_size * kRequestBytes);
     return true;
   }
   if (uint32_t(Count(where, last)) >= count) {
@@ -432,16 +439,16 @@ bool RequestsInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t co
       CopyRequest(base, to, from);
     }
   }
-  uint32_t fill = Load(base, vector + kVectorLast);
+  uint32_t fill = Last(base, vector);
   for (int32_t left = int32_t(count) - Count(where, fill); left != 0;
        left--, fill += kRequestBytes) {
     if (fill != 0) {
       StoreRequest(base, fill, request);
     }
   }
-  const uint32_t new_last = Load(base, vector + kVectorLast) + count * kRequestBytes;
+  const uint32_t new_last = Last(base, vector) + count * kRequestBytes;
   const uint32_t old_last = new_last - count * kRequestBytes;
-  Store(base, vector + kVectorLast, new_last);
+  Vector(base, vector).set_last(new_last);
   for (uint32_t at = where; at != old_last; at += kRequestBytes) {
     StoreRequest(base, at, request);
   }
@@ -450,8 +457,8 @@ bool RequestsInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t co
 
 std::optional<Iterator> RequestsInsert(uint8_t* base, uint32_t vector, Iterator where,
                                        uint32_t value) {
-  const uint32_t first = Load(base, vector + kVectorFirst);
-  const uint32_t last = Load(base, vector + kVectorLast);
+  const uint32_t first = First(base, vector);
+  const uint32_t last = Last(base, vector);
   int32_t offset = 0;
   if (first != 0 && Count(first, last) != 0) {
     if (first > last || where.container == 0 || where.container != vector) {
@@ -467,19 +474,19 @@ std::optional<Iterator> RequestsInsert(uint8_t* base, uint32_t vector, Iterator 
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8209A600 RequestVector::Insert");
-  return Iterator{vector, Load(base, vector + kVectorFirst) + uint32_t(offset) * kRequestBytes};
+  return Iterator{vector, First(base, vector) + uint32_t(offset) * kRequestBytes};
 }
 
 std::optional<bool> RequestsPushBack(uint8_t* base, uint32_t vector, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_8209A930 RequestVector::PushBack");
-  const uint32_t first = Load(base, vector + kVectorFirst);
-  const uint32_t last = Load(base, vector + kVectorLast);
+  const uint32_t first = First(base, vector);
+  const uint32_t last = Last(base, vector);
   if (first != 0 &&
-      uint32_t(Count(first, last)) < uint32_t(Count(first, Load(base, vector + kVectorEnd)))) {
+      uint32_t(Count(first, last)) < uint32_t(Count(first, End(base, vector)))) {
     if (last != 0) {
       CopyRequest(base, last, value);
     }
-    Store(base, vector + kVectorLast, last + kRequestBytes);
+    Vector(base, vector).set_last(last + kRequestBytes);
     return false;
   }
   if (first > last || !RequestsInsert(base, vector, {vector, last}, value)) {
@@ -490,15 +497,17 @@ std::optional<bool> RequestsPushBack(uint8_t* base, uint32_t vector, uint32_t va
 
 uint32_t RunLoopConstruct(uint8_t* base, uint32_t loop) {
   ITC_NATIVE_RUNNING("sub_8209A9F0 RunLoop::RunLoop");
-  Store(base, loop + 0, kRunLoopVtable);
-  MapConstruct(base, loop + kTickHandlers);
-  MapConstruct(base, loop + kListeners);
-  Store(base, loop + kRequests + kVectorFirst, 0);
-  Store(base, loop + kRequests + kVectorLast, 0);
-  Store(base, loop + kRequests + kVectorEnd, 0);
-  guest::StoreU8(base, loop + 48, 0);
-  guest::StoreU8(base, loop + 49, 0);
-  guest::StoreU8(base, loop + 50, 0);
+  const schema::RunLoop run_loop(base, loop);
+  run_loop.set_vtable(schema::RunLoop::kVtable);
+  MapConstruct(base, run_loop.tick_handlers_address());
+  MapConstruct(base, run_loop.listeners_address());
+  const Vector requests(base, run_loop.requests_address());
+  requests.set_first(0u);
+  requests.set_last(0u);
+  requests.set_end(0u);
+  run_loop.set_unknown_48(0);
+  run_loop.set_unknown_49(0);
+  run_loop.set_unknown_50(0);
   return loop;
 }
 
@@ -511,7 +520,8 @@ std::optional<bool> RunLoopApplyRequest(uint8_t* base, uint32_t loop, uint32_t t
     ITC_NATIVE_RUNNING("sub_8209A458 RunLoop::ApplyRequest");
     return false;
   }
-  const uint32_t map = loop + (type == 0 ? kTickHandlers : kListeners);
+  const schema::RunLoop run_loop(base, loop);
+  const uint32_t map = type == 0 ? run_loop.tick_handlers_address() : run_loop.listeners_address();
   if (!MapInsertUniqueOf(base, map, key, delegate)) {
     return std::nullopt;
   }

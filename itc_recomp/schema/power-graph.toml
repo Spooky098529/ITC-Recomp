@@ -1,0 +1,60 @@
+# The schema of docs/functions/power-graph.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# Left out (other areas describe them; their measure names belong there):
+# "PowerGraph::Draw.r6" is a car data (CarData, car-physics.toml: +1280
+# rev_limit, +1292 torque_curve, +1420 torque); "CarList" is a car list
+# entry (CarListEntry, car-list.toml: +8432 car_id).
+
+# A single sprite (144 bytes; sprites.md's layout, reset by
+# Sprite::ResetStyle2, race-overlays.md), as Line::RecordFlat reads it: one
+# line segment between two ends. PowerGraph::Draw builds two sets of 32 on
+# its stack. Probably the same type as race-overlays.md's "Sprite".
+[LineSprite]
+measure = "Line::RecordFlat.r4"
+size = 144
+origin = "embedded"
+fields = [
+  { name = "world_matrix", offset = 0, type = "bytes", count = 64, note = "the identity at the reset" },
+  { name = "end0_x", offset = 80, type = "f32" },
+  { name = "end0_y", offset = 84, type = "f32" },
+  { name = "end0_z", offset = 88, type = "f32" },
+  { name = "end1_x", offset = 96, type = "f32" },
+  { name = "end1_y", offset = 100, type = "f32" },
+  { name = "end1_z", offset = 104, type = "f32" },
+  { name = "end0_red", offset = 112, type = "u32", note = "0 to 255" },
+  { name = "end0_red_byte", offset = 115, type = "u8", note = "end0_red's low byte, as Line::RecordFlat reads it" },
+  { name = "end0_green", offset = 116, type = "u32" },
+  { name = "end0_green_byte", offset = 119, type = "u8" },
+  { name = "end0_blue", offset = 120, type = "u32" },
+  { name = "end0_blue_byte", offset = 123, type = "u8" },
+  { name = "end0_alpha", offset = 124, type = "u32", note = "shifted into the vertex color's top byte" },
+  { name = "end1_red", offset = 128, type = "u32" },
+  { name = "end1_red_byte", offset = 131, type = "u8" },
+  { name = "end1_green", offset = 132, type = "u32" },
+  { name = "end1_green_byte", offset = 135, type = "u8" },
+  { name = "end1_blue", offset = 136, type = "u32" },
+  { name = "end1_blue_byte", offset = 139, type = "u8" },
+  { name = "end1_alpha", offset = 140, type = "u32" },
+]
+
+# The spec sheet's screen (the type 2 block's +56624, type2-screens.md),
+# as its update sub_821B8F60 writes it: a StateMachine (game-modes.toml)
+# at +0, its state at +9604 (the old value of [0x826D846C] +8 when not 21).
+[SpecSheetMachine]
+measure = "sub_821B8F60.r3"
+size = 9608
+origin = "embedded"
+fields = [
+  { name = "state", offset = 9604, type = "u32", note = "the StateMachine's state" },
+]
+
+[globals]
+line_queue = { address = 0x826D83D8, type = "u32", note = "the line recorder's render queue, stored by every Line::RecordFlat" }
+line_list = { address = 0x826D83DC, type = "u32", note = "the line recorder's command list, stored by every Line::RecordFlat" }
+transform_list = { address = 0x826D83D4, type = "u32", note = "Primitive::RecordTransform's command list" }
+stand_holder = { address = 0x826D83E0, type = "u32", note = "the front end's car holder; its +0 word is PowerGraph::Draw's r3" }
+graph_shown = { address = 0x82815EC0, type = "u32", note = "the car list's graph drawn while set (power-graph-screen.md)" }

@@ -22,6 +22,10 @@ namespace {
 
 using guest::LoadU32;
 using guest::StoreU32;
+using G = schema::NetworkModeGlobals;
+using Mode = schema::ModeType12;
+using Block = schema::NetModeBlock;
+using NetMachine = schema::NetMachine;
 
 using InitStatesFn = uint32_t (*)(uint8_t*, uint32_t, uint32_t, bool*);
 
@@ -59,17 +63,17 @@ constexpr uint32_t kOpened[] = {kTaCourseAt,  kScreen6At, kScreen7At,  kDialog10
 // from a race with the network's state 0, screen 7 with it 1, else the mode
 // select (0).
 uint32_t FirstScreen(uint8_t* base) {
-  const int32_t before = int32_t(LoadU32(base, kModeBefore));
-  const uint32_t session = LoadU32(base, kSession);
-  if (before == 1 && session != 0) {
-    if (LoadU32(base, session + 244) != 0) {
+  const int32_t before = int32_t(G::mode_before(base));
+  const schema::Session session = G::session(base);
+  if (before == 1 && session.address != 0) {
+    if (session.ranking_after_race() != 0) {
       return 4;
     }
-    if (LoadU32(base, session + 240) != 0) {
+    if (session.screen3_after_race() != 0) {
       return 3;
     }
   }
-  const int32_t state = int32_t(LoadU32(base, kNetworkState));
+  const int32_t state = int32_t(G::network_state(base));
   if (before == 1 && state == 0) {
     return 9;
   }
@@ -83,31 +87,32 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
   const uint32_t frame = sp - kInitFrame;
   StoreU32(base, frame, sp);
   StoreU32(base, sp + 20, mode);
-  auto block = [&] { return LoadU32(base, mode + kBlock); };
+  const Mode m(base, mode);
+  auto block = [&] { return m.block().address; };
   calls.Call(kScreenStart, frame, 0x82278070, mode);
   const uint64_t strings =
-      calls.Call(kStringsLoad, frame, 0x82278080, LoadU32(base, kStringTable), kStringFile);
+      calls.Call(kStringsLoad, frame, 0x82278080, G::string_table(base).address, kStringFile);
   calls.Call(kArchiveWaitIdle, frame, 0x82278084, strings, kStringFile);
   calls.Call(kStandSceneCreate, frame, 0x8227808C, 1);
-  const uint64_t allocated = calls.Call(kVirtualAlloc, frame, 0x822780A4, 0, kBlockBytes, 4096, 4);
-  StoreU32(base, mode + kBlock, uint32_t(allocated));
+  const uint64_t allocated =
+      calls.Call(kVirtualAlloc, frame, 0x822780A4, 0, Block::kSize, 4096, 4);
+  m.set_block(uint32_t(allocated));
   // The fades' table's page, kept in the frame for the second FadeIn.
-  StoreU32(base, frame + 112, kFadesPasses & 0xFFFF0000u);
-  calls.Call(kFadeIn, frame, 0x822780C8, LoadU32(base, kFadesPasses), 0, 0, 0);
-  for (const Member& m : kMembers) {
+  StoreU32(base, frame + 112, G::fades_passes_address() & 0xFFFF0000u);
+  calls.Call(kFadeIn, frame, 0x822780C8, G::fades_passes(base), 0, 0, 0);
+  for (const Member& member : kMembers) {
     bool replaced = false;
-    m.init(base, block() + m.offset, frame - m.frame, &replaced);
+    member.init(base, block() + member.offset, frame - member.frame, &replaced);
   }
-  const uint32_t dispatcher = mode + kDispatcher;
-  for (const Member& m : kMembers) {
-    const uint32_t count = LoadU32(base, dispatcher + 200);
-    const uint32_t machine = block() + m.offset;
-    StoreU32(base, dispatcher + 200, count + 1);
-    StoreU32(base, dispatcher + (count << 2), machine);
+  for (const Member& member : kMembers) {
+    const uint32_t count = m.handler_count();
+    const uint32_t machine = block() + member.offset;
+    m.set_handler_count(count + 1);
+    StoreU32(base, m.handlers_address() + (count << 2), machine);
   }
   const uint32_t first = FirstScreen(base);
-  StoreU32(base, block() + kFirstShown, first);
-  StoreU32(base, block() + kShown, first);
+  Block(base, block()).set_first_shown(first);
+  Block(base, block()).set_shown(first);
   // The frame's words the first four machines' +9612 and +9616 are copied
   // from.
   StoreU32(base, frame + 88, 0);
@@ -116,24 +121,24 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
   StoreU32(base, frame + 104, 0);
   StoreU32(base, frame + 84, 1);
   StoreU32(base, frame + 92, 1);
-  StoreU32(base, block() + kModeSelectAt + 9612, 1);
+  NetMachine(base, block() + kModeSelectAt).set_reenter(1);
   StoreU32(base, frame + 100, 1);
-  StoreU32(base, block() + kModeSelectAt + 9616, 0);
-  StoreU32(base, block() + kScreen1At + 9612, LoadU32(base, frame + 84));
-  StoreU32(base, block() + kScreen1At + 9616, LoadU32(base, frame + 88));
-  StoreU32(base, block() + kScreen3At + 9612, LoadU32(base, frame + 92));
-  StoreU32(base, block() + kScreen3At + 9616, LoadU32(base, frame + 96));
-  StoreU32(base, block() + kRankingAt + 9612, LoadU32(base, frame + 100));
-  StoreU32(base, block() + kRankingAt + 9616, LoadU32(base, frame + 104));
+  NetMachine(base, block() + kModeSelectAt).set_delete_movie(0);
+  NetMachine(base, block() + kScreen1At).set_reenter(LoadU32(base, frame + 84));
+  NetMachine(base, block() + kScreen1At).set_delete_movie(LoadU32(base, frame + 88));
+  NetMachine(base, block() + kScreen3At).set_reenter(LoadU32(base, frame + 92));
+  NetMachine(base, block() + kScreen3At).set_delete_movie(LoadU32(base, frame + 96));
+  NetMachine(base, block() + kRankingAt).set_reenter(LoadU32(base, frame + 100));
+  NetMachine(base, block() + kRankingAt).set_delete_movie(LoadU32(base, frame + 104));
   bool first_opened = true;
   for (const uint32_t offset : kOpened) {
     if (first_opened) {
-      StoreU32(base, block() + offset + 9616, 0);
-      StoreU32(base, block() + offset + 9612, 1);
+      NetMachine(base, block() + offset).set_delete_movie(0);
+      NetMachine(base, block() + offset).set_reenter(1);
       first_opened = false;
     } else {
-      StoreU32(base, block() + offset + 9612, 1);
-      StoreU32(base, block() + offset + 9616, 0);
+      NetMachine(base, block() + offset).set_reenter(1);
+      NetMachine(base, block() + offset).set_delete_movie(0);
     }
   }
   calls.Call(kLoadingShow, frame, 0x82278568, 1, 0, ~uint64_t(0));
@@ -143,18 +148,18 @@ uint64_t ModeInit(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls)
   // The delegate: WaitForLoads through Mode::Slot8Thunk.
   StoreU32(base, frame + 116, 0);
   StoreU32(base, frame + 112, kSlot8Thunk);
-  const uint32_t delegate = mode + 8;
+  const uint32_t delegate = m.delegate_vtable_address();
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;
     const uint32_t function = LoadU32(base, frame + 112), adjustment = LoadU32(base, frame + 116);
-    StoreU32(base, delegate + 4, mode);
-    StoreU32(base, delegate + 8, function);
-    StoreU32(base, delegate + 12, adjustment);
-    StoreU32(base, delegate + 0, kDelegateVtable);
+    m.set_delegate_object(mode);
+    m.set_delegate_function(function);
+    m.set_delegate_adjustment(adjustment);
+    m.set_delegate_vtable(kDelegateVtable);
   }
-  StoreU32(base, mode + 4, holder);
-  StoreU32(base, block() + kSessionMade, 0);
+  m.set_delegate_ptr(holder);
+  Block(base, block()).set_session_made(0);
   return r3;
 }
 
@@ -222,15 +227,16 @@ void Store64(uint8_t* base, uint32_t at, uint64_t value) {
 // The holder 0 when the delegate's address wraps to 0 (never: kept as the
 // originals test it).
 void Delegate(uint8_t* base, uint32_t mode, uint32_t slot) {
-  const uint32_t delegate = mode + 8;
+  const Mode m(base, mode);
+  const uint32_t delegate = m.delegate_vtable_address();
   uint32_t holder = 0;
   if (delegate != 0) {
     holder = delegate;
-    Store(base, delegate + 4, mode);
-    Store64(base, delegate + 8, Load64(base, slot));
-    Store(base, delegate + 0, kDelegateVtable);
+    m.set_delegate_object(mode);
+    Store64(base, m.delegate_function_address(), Load64(base, slot));
+    m.set_delegate_vtable(kDelegateVtable);
   }
-  Store(base, mode + 4, holder);
+  m.set_delegate_ptr(holder);
 }
 // The same to `function`: the doubleword (function, 0) written at `slot`
 // first, as the originals build it there.
@@ -246,23 +252,26 @@ void ClearAnswer(uint8_t* base, uint32_t answer) {
   guest::StoreU8(base, answer, 0);
 }
 
-uint32_t BlockOf(uint8_t* base, uint32_t mode) { return Load(base, mode + kBlock); }
+uint32_t BlockOf(uint8_t* base, uint32_t mode) { return Mode(base, mode).block().address; }
+
+// The mode's dispatcher (+36), whose ring PostRing posts to.
+uint32_t DispatcherOf(uint32_t mode) { return Mode(nullptr, mode).handlers_address(); }
 
 int32_t ShownState(uint8_t* base, uint32_t mode) {
   const uint32_t block = BlockOf(base, mode);
-  return int32_t(Load(base, Machine(block, Load(base, block + kShown)) + kMachineState));
+  return int32_t(NetMachine(base, Machine(block, Block(base, block).shown())).state());
 }
 
 void Dispatch(const Calls& calls, uint32_t mode, uint32_t frame, uint32_t lr) {
   // Its r4 a leftover the dispatcher doesn't read.
-  calls.Call(kDispatch, frame, lr, mode + kDispatcher, mode);
+  calls.Call(kDispatch, frame, lr, DispatcherOf(mode), mode);
 }
 
 // The sound manager's slot (bytes into its vtable) with r4 and r5; the
 // manager loaded again for each call, as the originals do.
 uint64_t SoundSlot(uint8_t* base, const Calls& calls, uint32_t slot, uint32_t frame, uint32_t lr,
                    uint32_t r4, uint32_t r5 = 0) {
-  const uint32_t manager = Load(base, kSoundManager);
+  const uint32_t manager = G::sound_manager(base).address;
   return calls.Call(Load(base, Load(base, manager) + slot), frame, lr, manager, r4, r5);
 }
 
@@ -273,7 +282,7 @@ void Answer(uint8_t* base, uint32_t mode, uint32_t block, uint32_t frame) {
   guest::StoreU8(base, frame + 80, 1);
   const uint64_t answer = Load64(base, frame + 80);
   Store(base, frame + 84, 0);
-  Store64(base, block + kNextAnswer, answer);
+  Store64(base, Block(base, block).next_answer_address(), answer);
   Store(base, frame + 80, kSlot12Thunk);
   Delegate(base, mode, frame + 80);
 }
@@ -282,14 +291,14 @@ void Answer(uint8_t* base, uint32_t mode, uint32_t block, uint32_t frame) {
 void SessionRelease(uint8_t* base, uint32_t session, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82291670 Session::Release");
   const uint32_t frame = Frame(base, sp, 96);
-  const uint32_t rows = session + kSessionRows;
-  if (Load(base, rows) != 0) {
-    calls.Call(kOperatorDelete, frame, 0x82291698, Load(base, rows));
-    Store(base, rows, 0);
+  const schema::Session s(base, session);
+  if (s.rows() != 0) {
+    calls.Call(kOperatorDelete, frame, 0x82291698, s.rows());
+    s.set_rows(0);
   }
-  if (Load(base, kSessionBuffer) != 0) {
-    calls.Call(kOperatorDeleteArray, frame, 0x822916B4, Load(base, kSessionBuffer));
-    Store(base, kSessionBuffer, 0);
+  if (G::leaderboard_results(base).address != 0) {
+    calls.Call(kOperatorDeleteArray, frame, 0x822916B4, G::leaderboard_results(base).address);
+    G::set_leaderboard_results(base, 0u);
   }
 }
 
@@ -297,26 +306,26 @@ void SessionRelease(uint8_t* base, uint32_t session, uint32_t sp, const Calls& c
 // built at +96.
 void SetUpTimeAttack(uint8_t* base, uint32_t mode, uint32_t frame, const Calls& calls) {
   calls.Call(kResetGlobal, frame, 0x8227BB10);
-  Store(base, Load(base, kRaceData) + 0xA3AF0, 6);
-  Store(base, Load(base, kRaceData) + 0xA3AF4, 7);
-  calls.Call(kRaceSetRoute, frame, 0x8227BB4C, Load(base, kTaRoute), 48);
-  calls.Call(kStagesSetRoute, frame, 0x8227BB6C, Load(base, kRaceData) + kStageList,
-             Load(base, kTaRoute), 48, ~uint64_t(0));
-  if (Load(base, kTaHasKind) != 0) {
-    const int32_t kind = int32_t(Load(base, kTaKind));
+  Store(base, G::race_data(base).address + 0xA3AF0, 6);
+  Store(base, G::race_data(base).address + 0xA3AF4, 7);
+  calls.Call(kRaceSetRoute, frame, 0x8227BB4C, G::ta_route(base), 48);
+  calls.Call(kStagesSetRoute, frame, 0x8227BB6C, G::race_data(base).address + kStageList,
+             G::ta_route(base), 48, ~uint64_t(0));
+  if (G::ta_has_kind(base) != 0) {
+    const int32_t kind = int32_t(G::ta_kind(base));
     calls.Call(kSetWord59618, frame, 0x8227BBAC, kind == 1 ? 2 : kind == 2 ? 1 : 3);
   }
   const uint32_t car = frame + 96;
   calls.Call(kCarInit, frame, 0x8227BBB4, car);
-  calls.Call(kMemcpy, frame, 0x8227BBCC, car, kTaCar, kTaCarBytes);
-  Store(base, car + 3892, Load(base, kTaCarWord));
+  calls.Call(kMemcpy, frame, 0x8227BBCC, car, G::ta_car_address(), kTaCarBytes);
+  Store(base, car + 3892, G::ta_car_word(base));
   calls.Call(kCarRefresh, frame, 0x8227BBE0, car);
   const double zero = double(std::bit_cast<float>(Load(base, kZero)));
   calls.Call(kAddRacer, frame, 0x8227BBF8, car, 0, 0, 0, &zero);
-  calls.Call(kStagesAddRacer, frame, 0x8227BC10, Load(base, kRaceData) + kStageList, 0, 2,
+  calls.Call(kStagesAddRacer, frame, 0x8227BC10, G::race_data(base).address + kStageList, 0, 2,
              ~uint64_t(0));
   calls.Call(kAddStage, frame, 0x8227BC18, 1);
-  calls.Call(kSetWord32, frame, 0x8227BC20, Load(base, kTaKind));
+  calls.Call(kSetWord32, frame, 0x8227BC20, G::ta_kind(base));
   calls.Call(kPlaceRacers, frame, 0x8227BC24);
   // The answer 1 (the race), the session's +240 and +216.
   Store(base, frame + 84, 1);
@@ -324,9 +333,9 @@ void SetUpTimeAttack(uint8_t* base, uint32_t mode, uint32_t frame, const Calls& 
   const uint64_t answer = Load64(base, frame + 80);
   Store(base, frame + 84, 0);
   Store(base, frame + 80, kSlot12Thunk);
-  Store(base, Load(base, kSession) + 240, 0);
-  Store(base, Load(base, kSession) + 216, Load(base, kTaSessionWord));
-  Store64(base, BlockOf(base, mode) + kNextAnswer, answer);
+  G::session(base).set_screen3_after_race(0);
+  G::session(base).set_ta_car_word(G::ta_session_word(base));
+  Store64(base, Block(base, BlockOf(base, mode)).next_answer_address(), answer);
   Delegate(base, mode, frame + 80);
 }
 
@@ -347,9 +356,9 @@ uint32_t FindShown(uint8_t* base, uint32_t block) {
     if (machine == 0) {
       continue;
     }
-    const int32_t state = int32_t(Load(base, machine + kMachineState));
+    const int32_t state = int32_t(NetMachine(base, machine).state());
     if (state == 5 || state == 4) {
-      Store(base, block + kShown, index);
+      Block(base, block).set_shown(index);
       return index;
     }
   }
@@ -359,7 +368,7 @@ uint32_t FindShown(uint8_t* base, uint32_t block) {
 uint32_t AllLoaded(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_82277EE0 ModeType12::AllLoaded");
   for (const uint32_t offset : kLoadedOrder) {
-    if (Load(base, block + offset + kMachineLoaded) == 0) {
+    if (NetMachine(base, block + offset).loaded() == 0) {
       return 0;
     }
   }
@@ -378,44 +387,44 @@ void WaitForLoads(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
         SoundSlot(base, calls, kIsBankLoadingSlot, frame, 0x8227B4A0, frame + 80);
     if ((loading & 0xFF) == 0) {
       calls.Call(kLoadingFinish, frame, 0x8227B4B0, ~uint64_t(0));
-      const int32_t first = int32_t(Load(base, BlockOf(base, mode) + kShown));
+      const int32_t first = int32_t(Block(base, BlockOf(base, mode)).shown());
       // The first screen's open message, its cue (bank, cue words in the
       // frame) and whether the sign-in watch's check goes on.
       bool watch = true;
       if (first == 0) {
-        PostRing(base, mode + kRing, 5);
+        PostRing(base, DispatcherOf(mode), 5);
         Store(base, frame + 108, 1);
         Store(base, frame + 112, 1);
         calls.Call(kSoundPlay, frame, 0x8227B6BC, frame + 112, frame + 108);
         watch = false;
       } else if (first == 3) {
-        PostRing(base, mode + kRing, 9);
+        PostRing(base, DispatcherOf(mode), 9);
         Store(base, frame + 100, 1);
         Store(base, frame + 104, 1);
         calls.Call(kSoundPlay, frame, 0x8227B594, frame + 104, frame + 100);
       } else if (first == 4) {
-        PostRing(base, mode + kRing, 10);
+        PostRing(base, DispatcherOf(mode), 10);
         Store(base, frame + 92, 1);
         Store(base, frame + 96, 1);
         calls.Call(kSoundPlay, frame, 0x8227B594, frame + 96, frame + 92);
       } else if (first == 7) {
-        PostRing(base, mode + kRing, 13);
+        PostRing(base, DispatcherOf(mode), 13);
         Store(base, frame + 88, 1);
         Store(base, frame + 84, 3);
         calls.Call(kSoundPlay, frame, 0x8227B594, frame + 88, frame + 84);
       } else if (first == 9) {
-        PostRing(base, mode + kRing, 15);
+        PostRing(base, DispatcherOf(mode), 15);
       } else {
         watch = false;
       }
       if (watch) {
-        Store(base, kSignInWatch + 16, 0);
+        G::set_sign_in_live_check(base, 0);
       }
       calls.Call(kFadeOut, frame, 0x8227B6D4, 1, 0, 0, 0);
       SetDelegate(base, mode, frame + 112, kNextModeThunk);
     }
   }
-  PostRing(base, mode + kRing, 1);
+  PostRing(base, DispatcherOf(mode), 1);
   Dispatch(calls, mode, frame, 0x8227B760);
 }
 
@@ -428,18 +437,18 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
     SetDelegate(base, mode, frame + 80, kSlot11Thunk);
   }
   if (ShownState(base, mode) == 10) {
-    PostRing(base, mode + kRing, 4);
+    PostRing(base, DispatcherOf(mode), 4);
   }
-  PostRing(base, mode + kRing, 1);
-  PostRing(base, mode + kRing, 0);
+  PostRing(base, DispatcherOf(mode), 1);
+  PostRing(base, DispatcherOf(mode), 0);
   Dispatch(calls, mode, frame, 0x8227BABC);
   const uint32_t block = BlockOf(base, mode);
-  if (int32_t(Load(base, block + kScreen7At + kMachineState)) == 11 ||
-      int32_t(Load(base, block + kRankingAt + kMachineState)) == 11) {
+  if (int32_t(NetMachine(base, Block(base, block).screen7_address()).state()) == 11 ||
+      int32_t(NetMachine(base, Block(base, block).ranking_address()).state()) == 11) {
     // The race.
     Store(base, frame + 84, 1);
     Answer(base, mode, block, frame);
-  } else if (int32_t(Load(base, block + kTaCourseAt + kMachineState)) == 11) {
+  } else if (int32_t(NetMachine(base, Block(base, block).ta_course_address()).state()) == 11) {
     SetUpTimeAttack(base, mode, frame, calls);
   } else if (ShownState(base, mode) == 13) {
     // The garage.
@@ -451,9 +460,9 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
     guest::StoreU8(base, frame + 80, 1);
     const uint64_t next = Load64(base, frame + 80);
     Store(base, frame + 84, 0);
-    Store64(base, block + kNextAnswer, next);
+    Store64(base, Block(base, block).next_answer_address(), next);
     Store(base, frame + 80, kSlot12Thunk);
-    Store(base, kTitleFlag, Load(base, BlockOf(base, mode) + kSessionMade) != 0 ? 1 : 0);
+    G::set_title_flag(base, Block(base, BlockOf(base, mode)).session_made() != 0 ? 1 : 0);
     Delegate(base, mode, frame + 80);
     SessionFree(base, frame, calls);
   }
@@ -474,7 +483,7 @@ void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, con
   const uint32_t frame = Frame(base, sp, 128);
   ClearAnswer(base, answer);
   FindShown(base, BlockOf(base, mode));
-  PostRing(base, mode + kRing, 3);
+  PostRing(base, DispatcherOf(mode), 3);
   Dispatch(calls, mode, frame, 0x8227B8E4);
   SetDelegate(base, mode, frame + 80, kSlot10Thunk);
 }
@@ -486,11 +495,11 @@ void WaitForShown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
   ClearAnswer(base, answer);
   FindShown(base, BlockOf(base, mode));
   const uint32_t block = BlockOf(base, mode);
-  const uint32_t machine = Machine(block, Load(base, block + kShown));
-  if (int32_t(Load(base, machine + kMachineLoaded)) == 1) {
+  const uint32_t machine = Machine(block, Block(base, block).shown());
+  if (int32_t(NetMachine(base, machine).loaded()) == 1) {
     SetDelegate(base, mode, frame + 80, kNextModeThunk);
   }
-  PostRing(base, mode + kRing, 1);
+  PostRing(base, DispatcherOf(mode), 1);
   Dispatch(calls, mode, frame, 0x8227B84C);
 }
 
@@ -500,7 +509,7 @@ void Teardown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
   ClearAnswer(base, answer);
   // The screen's cue stopped: bank 1's cue 3 for screen 7, else its cue 1.
   uint32_t bank = frame + 92, cue = frame + 88;
-  if (int32_t(Load(base, BlockOf(base, mode) + kShown)) == 7) {
+  if (int32_t(Block(base, BlockOf(base, mode)).shown()) == 7) {
     Store(base, frame + 84, 1);
     Store(base, frame + 80, 3);
     bank = frame + 84;
@@ -510,18 +519,18 @@ void Teardown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
     Store(base, frame + 92, 1);
   }
   SoundSlot(base, calls, kStopCueSlot, frame, 0x8227BE8C, bank, cue);
-  PostRing(base, mode + kRing, 1);
-  PostRing(base, mode + kRing, 0);
+  PostRing(base, DispatcherOf(mode), 1);
+  PostRing(base, DispatcherOf(mode), 0);
   Dispatch(calls, mode, frame, 0x8227BF24);
   const uint64_t done = calls.Call(kPollTeardown, frame, 0x8227BF28);
   if (int32_t(done) == 0) {
     return;
   }
-  const uint32_t block = BlockOf(base, mode);
-  const uint32_t session = Load(base, kSession);
-  Store(base, answer + 0, Load(base, block + kNextAnswer));
-  Store(base, answer + 4, Load(base, block + kNextAnswer + 4));
-  if (session != 0 && Load(base, block + kSessionMade) != 0) {
+  const Block block(base, BlockOf(base, mode));
+  const uint32_t session = G::session(base).address;
+  Store(base, answer + 0, block.next_answer_hi());
+  Store(base, answer + 4, block.next_answer_mode());
+  if (session != 0 && block.session_made() != 0) {
     SessionFree(base, frame, calls);
   }
 }
@@ -529,7 +538,9 @@ void Teardown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
 uint64_t ForceExit(uint8_t* base, uint32_t object, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822788D8 ModeType12::ForceExit");
   const uint32_t frame = Frame(base, sp, 240);
-  const uint32_t shown = Load(base, Load(base, object + 816) + kShown);
+  // The mode seen from its +32 interface (`object`).
+  const Mode mode(base, object - 32);
+  const uint32_t shown = mode.block().shown();
   Store(base, frame + 80, 1);
   if ((SoundSlot(base, calls, kIsBankLoadingSlot, frame, 0x8227891C, frame + 80) & 0xFF) == 0) {
     // Bank 1's cues 0 to 3 stopped when playing: each check's (cue, bank)
@@ -557,7 +568,7 @@ uint64_t ForceExit(uint8_t* base, uint32_t object, uint32_t sp, const Calls& cal
   }
   // Screen 9 running: bank 2's cue 0 stopped when playing and the bank
   // isn't loading, and the bank released.
-  if (int32_t(Load(base, Load(base, object + 816) + kScreen9At + kMachineState)) == 5) {
+  if (int32_t(NetMachine(base, mode.block().screen9_address()).state()) == 5) {
     Store(base, frame + 148, 2);
     if ((SoundSlot(base, calls, kIsBankLoadingSlot, frame, 0x82278AA4, frame + 148) & 0xFF) == 0) {
       Store(base, frame + 152, 0);
@@ -574,80 +585,82 @@ uint64_t ForceExit(uint8_t* base, uint32_t object, uint32_t sp, const Calls& cal
     SoundSlot(base, calls, kReleaseBankSlot, frame, 0x82278B18, frame + 168);
   }
   SessionFree(base, frame, calls);
-  Store(base, Load(base, object + 816) + kPowerGraphAt + kMachineState, 9);
-  PostRing(base, object + 208, shown + 20);
-  const uint32_t machine = Machine(Load(base, object + 816), shown);
-  Store(base, machine + kMachineState, 10);
+  NetMachine(base, mode.block().power_graph_address()).set_state(9);
+  PostRing(base, mode.handlers_address(), shown + 20);
+  const uint32_t machine = Machine(mode.block().address, shown);
+  NetMachine(base, machine).set_state(10);
   return machine;
 }
 
 uint32_t Resume(uint8_t* base, uint32_t object, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82278B98 ModeType12::Resume");
   Frame(base, sp, 96);
-  const uint32_t block = Load(base, object + 816);
-  const uint32_t machine = Machine(block, Load(base, block + kShown));
-  Store(base, machine + kMachineAgain, 0);
-  PostRing(base, object + 208, 44);
+  // The mode seen from its +32 interface (`object`).
+  const Mode mode(base, object - 32);
+  const Block block = mode.block();
+  const uint32_t machine = Machine(block.address, block.shown());
+  NetMachine(base, machine).set_again(0);
+  PostRing(base, mode.handlers_address(), 44);
   return machine;
 }
 
 uint64_t SessionFree(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82292710 Session::Free");
   const uint32_t frame = Frame(base, sp, 96);
-  const uint32_t session = Load(base, kSession);
+  const uint32_t session = G::session(base).address;
   if (session == 0) {
     return 0;
   }
   SessionRelease(base, session, frame, calls);
   const uint64_t r3 =
-      calls.Call(kVirtualFree, frame, 0x82292748, Load(base, kSession), 0, kMemRelease);
-  Store(base, kSession, 0);
+      calls.Call(kVirtualFree, frame, 0x82292748, G::session(base).address, 0, kMemRelease);
+  G::set_session(base, 0u);
   return r3;
 }
 
 uint64_t SessionInit(uint8_t* base, uint64_t session_r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_822915C0 Session::Init");
   Frame(base, sp, 112);
-  const uint32_t session = uint32_t(session_r3);
+  const schema::Session s(base, uint32_t(session_r3));
   auto store64 = [&](uint32_t at, uint64_t value) {
     Store(base, at, uint32_t(value >> 32));
     Store(base, at + 4, uint32_t(value));
   };
   constexpr uint32_t kTimeout = 0x36EE80;  // 3,600,000
-  Store(base, kSessionState, 0);
-  Store(base, session + 160, 0);
-  Store(base, kSessionBuffer, 0);
-  Store(base, session + 180, 0);
-  Store(base, session + 188, 1);
-  Store(base, session + 224, 0);
-  Store(base, session + 232, 0);
-  store64(session + 208, kTimeout);
-  store64(session + 200, kTimeout);
-  Store(base, session + 216, 0);
-  Store(base, session + 220, 0xFFFFFFFFu);
-  Store(base, session + 144, 0);
-  Store(base, session + 228, 0);
-  Store(base, session + 236, 0);
-  Store(base, session + 192, 1);
-  store64(session + 168, 0);
-  Store(base, session + 240, 0);
-  Store(base, session + 244, 0);
-  Store(base, session + kSessionRows - 4, 1);
-  Store(base, session + kSessionRows, 0);
+  G::set_session_state(base, 0);
+  s.set_unknown_160(0);
+  G::set_leaderboard_results(base, 0u);
+  s.set_read_state(0);
+  s.set_view_id(1);
+  s.set_unknown_224(0);
+  s.set_unknown_232(0);
+  store64(s.best_time_address(), kTimeout);
+  store64(s.race_time_address(), kTimeout);
+  s.set_ta_car_word(0);
+  s.set_unknown_220(0xFFFFFFFFu);
+  s.set_read_started(0);
+  s.set_privilege(0);
+  s.set_upload_state(0);
+  s.set_unknown_192(1);
+  store64(s.xuid_address(), 0);
+  s.set_screen3_after_race(0);
+  s.set_ranking_after_race(0);
+  s.set_unknown_1297712(1);
+  s.set_rows(0);
   // XMemSet's plain C++ (its r3 the destination, as it came).
-  c_runtime::XMemSet(base, session + 248, 0, 256);
+  c_runtime::XMemSet(base, s.cleared_address(), 0, 256);
   return session_r3 + 248;
 }
 
 uint64_t SessionMake(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822926B8 Session::Make");
   const uint32_t frame = Frame(base, sp, 96);
-  if (Load(base, kSession) != 0) {
+  if (G::session(base).address != 0) {
     return r3;
   }
   const uint64_t session =
-      calls.Call(kVirtualAlloc, frame, 0x822926F0, 0, kSessionBytes, 0x1000, 4);
-  Store(base, kSession, uint32_t(session));
+      calls.Call(kVirtualAlloc, frame, 0x822926F0, 0, schema::Session::kSize, 0x1000, 4);
+  G::set_session(base, uint32_t(session));
   return SessionInit(base, session, frame);
 }
 

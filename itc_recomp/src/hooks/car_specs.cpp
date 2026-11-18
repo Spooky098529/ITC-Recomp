@@ -27,6 +27,7 @@
 #include "hooks/archive.h"
 #include "hooks/heap.h"
 #include "lifted/sdk.h"
+#include "schema/car_specs.h"
 
 ITC_FLAG_BOOL(native_car_specs, true, "ITC",
               "Run the car parameter tables (docs/functions/car-specs.md: the loads' "
@@ -110,7 +111,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820C9E00) {
   uint32_t parts[9];
   GetCarParts(base, ctx.r4.u32, parts);
   for (uint32_t i = 0; i < 9; i++) {
-    guest::StoreU32(base, ctx.r3.u32 + 4 * i, parts[i]);
+    guest::StoreU32(base, schema::CarPartTables(base, ctx.r3.u32).table74_address() + 4 * i,
+                    parts[i]);
   }
 }
 
@@ -123,7 +125,8 @@ ITC_NATIVE_ENTRY_ALWAYS(820C9E00) {
     ITC_CAR_SPECS_FALLBACK(address)                                    \
     uint32_t parts[9];                                                 \
     for (uint32_t i = 0; i < 9; i++) {                                 \
-      parts[i] = guest::LoadU32(base, ctx.r4.u32 + 4 * i);             \
+      parts[i] = guest::LoadU32(                                       \
+          base, schema::CarPartTables(base, ctx.r4.u32).table74_address() + 4 * i); \
     }                                                                  \
     if (!function(base, ctx.r3.u32, parts, ctx.r5.s32)) {              \
       lifted::original::c##address(ctx, base);                    \
