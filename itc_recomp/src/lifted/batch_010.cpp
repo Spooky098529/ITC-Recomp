@@ -6,6 +6,9 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/car_settings.h"
+#include "schema/car_specs.h"
+#include "schema/race_event.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -1925,7 +1928,7 @@ lifted::Result f821AF0A8(uint8_t* base, uint64_t r1, uint64_t r13, double f1) {
   // cmplwi r9,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r9), 0, so);
   // lha r10,204(r11)
-  r10 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r11) + 204))));
+  r10 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::SaveData(base, uint32_t(r11) - 6120).garage_head_address()))));
   // b 0x821af0e8
   goto loc_821AF0E8;
 loc_821AF0E0:
@@ -2015,7 +2018,7 @@ loc_821AF0E8:
   // lis r31,-32146
   r31 = uint64_t(int64_t(-2106720256));
   // lwz r10,6100(r3)
-  r10 = guest::LoadU32(base, uint32_t(r3) + 6100);
+  r10 = guest::LoadU32(base, schema::SaveData(base, uint32_t(r3)).day_address());
   // addi r9,r3,8
   r9 = uint64_t(int64_t(int64_t(r3) + 8));
   // lwz r11,-31648(r31)
@@ -2028,11 +2031,11 @@ loc_821AF0E8:
   ctr = r11;
 loc_821AF188:
   // lwz r11,0(r9)
-  r11 = guest::LoadU32(base, uint32_t(r9) + 0);
+  r11 = guest::LoadU32(base, schema::SaveData(base, uint32_t(r9) - 8).pick_head_address());
   // addi r9,r9,4
   r9 = uint64_t(int64_t(int64_t(r9) + 4));
   // stw r11,0(r8)
-  guest::StoreU32(base, uint32_t(r8) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r8) - 528).player_name_address(), uint32_t(r11));
   // addi r8,r8,4
   r8 = uint64_t(int64_t(int64_t(r8) + 4));
   // bdnz 0x821af188
@@ -2041,7 +2044,7 @@ loc_821AF188:
   // li r11,7
   r11 = uint64_t(int64_t(7));
   // lwz r9,6116(r3)
-  r9 = guest::LoadU32(base, uint32_t(r3) + 6116);
+  r9 = guest::LoadU32(base, schema::SaveData(base, uint32_t(r3)).money_address());
   // cmpwi cr6,r10,999
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 999, so);
   // divw r11,r10,r11
@@ -2051,13 +2054,13 @@ loc_821AF188:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r9,548(r11)
-  guest::StoreU32(base, uint32_t(r11) + 548, uint32_t(r9));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).money_address(), uint32_t(r9));
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // subf r9,r8,r10
   r9 = r10 - r8;
   // stw r9,552(r11)
-  guest::StoreU32(base, uint32_t(r11) + 552, uint32_t(r9));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).weekday_address(), uint32_t(r9));
   // ble cr6,0x821af1cc
   if (!cr6.gt) goto loc_821AF1CC;
   // li r10,999
@@ -2070,7 +2073,7 @@ loc_821AF1CC:
   // li r24,0
   r24 = uint64_t(int64_t(0));
   // stw r10,556(r11)
-  guest::StoreU32(base, uint32_t(r11) + 556, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).day_address(), uint32_t(r10));
   // lwz r11,32(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 32);
   // cmpwi cr6,r11,0
@@ -2080,12 +2083,12 @@ loc_821AF1CC:
   // bne cr6,0x821af1f4
   if (!cr6.eq) goto loc_821AF1F4;
   // stw r24,584(r11)
-  guest::StoreU32(base, uint32_t(r11) + 584, uint32_t(r24));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).allows_gears_address(), uint32_t(r24));
   // b 0x821af1f8
   goto loc_821AF1F8;
 loc_821AF1F4:
   // stw r25,584(r11)
-  guest::StoreU32(base, uint32_t(r11) + 584, uint32_t(r25));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).allows_gears_address(), uint32_t(r25));
 loc_821AF1F8:
   // lwz r11,56(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 56);
@@ -2096,12 +2099,12 @@ loc_821AF1F8:
   // bne cr6,0x821af210
   if (!cr6.eq) goto loc_821AF210;
   // stw r24,588(r11)
-  guest::StoreU32(base, uint32_t(r11) + 588, uint32_t(r24));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).allows_pages_9_10_address(), uint32_t(r24));
   // b 0x821af214
   goto loc_821AF214;
 loc_821AF210:
   // stw r25,588(r11)
-  guest::StoreU32(base, uint32_t(r11) + 588, uint32_t(r25));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).allows_pages_9_10_address(), uint32_t(r25));
 loc_821AF214:
   // lwz r11,40(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 40);
@@ -2112,12 +2115,12 @@ loc_821AF214:
   // bne cr6,0x821af22c
   if (!cr6.eq) goto loc_821AF22C;
   // stw r24,592(r11)
-  guest::StoreU32(base, uint32_t(r11) + 592, uint32_t(r24));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).allows_pages_11_16_address(), uint32_t(r24));
   // b 0x821af230
   goto loc_821AF230;
 loc_821AF22C:
   // stw r25,592(r11)
-  guest::StoreU32(base, uint32_t(r11) + 592, uint32_t(r25));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).allows_pages_11_16_address(), uint32_t(r25));
 loc_821AF230:
   // lwz r11,136(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 136);
@@ -2159,7 +2162,7 @@ loc_821AF248:
   // (left out: dead in C++)
   { const lifted::Result o = game::AeroParts::Get82(base, LIFTED_ARGS(0x821AF274, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,24(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 24);
+  r11 = guest::LoadU32(base, schema::AeroPartRecord(base, uint32_t(r3)).flags_address());
   // rlwinm. r11,r11,0,29,29
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0x4;
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
@@ -2169,27 +2172,27 @@ loc_821AF27C:
   // beq 0x821af28c
   if (cr0.eq) goto loc_821AF28C;
   // stw r25,596(r11)
-  guest::StoreU32(base, uint32_t(r11) + 596, uint32_t(r25));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).allows_page_17_address(), uint32_t(r25));
   // b 0x821af290
   goto loc_821AF290;
 loc_821AF28C:
   // stw r24,596(r11)
-  guest::StoreU32(base, uint32_t(r11) + 596, uint32_t(r24));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).allows_page_17_address(), uint32_t(r24));
 loc_821AF290:
   // lbz r10,130(r28)
-  r10 = guest::LoadU8(base, uint32_t(r28) + 130);
+  r10 = guest::LoadU8(base, schema::CarSpecCopies(base, uint32_t(r28)).unknown_130_address());
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,688(r11)
-  guest::StoreU32(base, uint32_t(r11) + 688, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).drive_type_address(), uint32_t(r10));
   // lwz r10,52(r29)
   r10 = guest::LoadU32(base, uint32_t(r29) + 52);
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,692(r11)
-  guest::StoreU32(base, uint32_t(r11) + 692, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).tuning_52_address(), uint32_t(r10));
   // lfs f0,8388(r1)
   lifted::ScalarFloatMode();
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 8388);
@@ -2198,17 +2201,17 @@ loc_821AF290:
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stfs f0,696(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 696, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).car_data_388_address(), temp.u32);
   // lfs f0,9280(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 9280);
   f0 = double(temp.f32);
   // stfs f0,700(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 700, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).car_data_1280_address(), temp.u32);
   // lwz r10,100(r28)
-  r10 = guest::LoadU32(base, uint32_t(r28) + 100);
+  r10 = guest::LoadU32(base, schema::CarSpecCopies(base, uint32_t(r28)).unknown_100_address());
   // stw r10,600(r11)
-  guest::StoreU32(base, uint32_t(r11) + 600, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).spec_block2_100_address(), uint32_t(r10));
   // bl 0x82105620
   // (left out: dead in C++)
   { const lifted::Result o = game::SaveData::Of(base, LIFTED_ARGS(0x821AF2CC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2263,7 +2266,7 @@ loc_821AF290:
   r30 = r24;
 loc_821AF328:
   // lha r11,48(r28)
-  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r28) + 48))));
+  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::CourseRecord(base, uint32_t(r28)).count_address()))));
   // cmplw cr6,r11,r29
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r29), so);
   // ble cr6,0x821af388
@@ -2290,26 +2293,26 @@ loc_821AF328:
   // addi r3,r1,96
   r3 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r11,20(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 20);
+  r11 = guest::LoadU32(base, schema::CourseRecordEntry(base, uint32_t(r11)).time_address());
   // stw r11,348(r10)
-  guest::StoreU32(base, uint32_t(r10) + 348, uint32_t(r11));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r10)).route8_time_address(), uint32_t(r11));
   // bl 0x821aae90
   // (left out: dead in C++)
   r3 = game::CourseRecord::Entry(base, r1, r13, r3, r4, r5);
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // lwz r10,0(r3)
-  r10 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r10 = guest::LoadU32(base, schema::CourseRecordEntry(base, uint32_t(r3)).unknown_0_address());
   // add r11,r30,r11
   r11 = r30 + r11;
   // stw r10,352(r11)
-  guest::StoreU32(base, uint32_t(r11) + 352, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).route8_entry_0_address(), uint32_t(r10));
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // add r11,r30,r11
   r11 = r30 + r11;
   // stw r25,356(r11)
-  guest::StoreU32(base, uint32_t(r11) + 356, uint32_t(r25));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).route8_present_address(), uint32_t(r25));
   // b 0x821af394
   goto loc_821AF394;
 loc_821AF388:
@@ -2318,7 +2321,7 @@ loc_821AF388:
   // add r11,r30,r11
   r11 = r30 + r11;
   // stw r24,356(r11)
-  guest::StoreU32(base, uint32_t(r11) + 356, uint32_t(r24));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).route8_present_address(), uint32_t(r24));
 loc_821AF394:
   // addi r30,r30,12
   r30 = uint64_t(int64_t(int64_t(r30) + 12));
@@ -2334,7 +2337,7 @@ loc_821AF394:
   r30 = r24;
 loc_821AF3AC:
   // lha r11,48(r27)
-  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r27) + 48))));
+  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::CourseRecord(base, uint32_t(r27)).count_address()))));
   // cmplw cr6,r11,r29
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r29), so);
   // ble cr6,0x821af40c
@@ -2361,26 +2364,26 @@ loc_821AF3AC:
   // addi r3,r1,144
   r3 = uint64_t(int64_t(int64_t(r1) + 144));
   // lwz r11,20(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 20);
+  r11 = guest::LoadU32(base, schema::CourseRecordEntry(base, uint32_t(r11)).time_address());
   // stw r11,408(r10)
-  guest::StoreU32(base, uint32_t(r10) + 408, uint32_t(r11));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r10)).route9_time_address(), uint32_t(r11));
   // bl 0x821aae90
   // (left out: dead in C++)
   r3 = game::CourseRecord::Entry(base, r1, r13, r3, r4, r5);
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // lwz r10,0(r3)
-  r10 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r10 = guest::LoadU32(base, schema::CourseRecordEntry(base, uint32_t(r3)).unknown_0_address());
   // add r11,r30,r11
   r11 = r30 + r11;
   // stw r10,412(r11)
-  guest::StoreU32(base, uint32_t(r11) + 412, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).route9_entry_0_address(), uint32_t(r10));
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // add r11,r30,r11
   r11 = r30 + r11;
   // stw r25,416(r11)
-  guest::StoreU32(base, uint32_t(r11) + 416, uint32_t(r25));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).route9_present_address(), uint32_t(r25));
   // b 0x821af418
   goto loc_821AF418;
 loc_821AF40C:
@@ -2389,7 +2392,7 @@ loc_821AF40C:
   // add r11,r30,r11
   r11 = r30 + r11;
   // stw r24,416(r11)
-  guest::StoreU32(base, uint32_t(r11) + 416, uint32_t(r24));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).route9_present_address(), uint32_t(r24));
 loc_821AF418:
   // addi r30,r30,12
   r30 = uint64_t(int64_t(int64_t(r30) + 12));
@@ -2405,7 +2408,7 @@ loc_821AF418:
   r30 = r24;
 loc_821AF430:
   // lha r11,48(r26)
-  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r26) + 48))));
+  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::CourseRecord(base, uint32_t(r26)).count_address()))));
   // cmplw cr6,r11,r29
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r29), so);
   // ble cr6,0x821af490
@@ -2432,26 +2435,26 @@ loc_821AF430:
   // addi r3,r1,144
   r3 = uint64_t(int64_t(int64_t(r1) + 144));
   // lwz r11,20(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 20);
+  r11 = guest::LoadU32(base, schema::CourseRecordEntry(base, uint32_t(r11)).time_address());
   // stw r11,468(r10)
-  guest::StoreU32(base, uint32_t(r10) + 468, uint32_t(r11));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r10)).route10_time_address(), uint32_t(r11));
   // bl 0x821aae90
   // (left out: dead in C++)
   r3 = game::CourseRecord::Entry(base, r1, r13, r3, r4, r5);
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // lwz r10,0(r3)
-  r10 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r10 = guest::LoadU32(base, schema::CourseRecordEntry(base, uint32_t(r3)).unknown_0_address());
   // add r11,r30,r11
   r11 = r30 + r11;
   // stw r10,472(r11)
-  guest::StoreU32(base, uint32_t(r11) + 472, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).route10_entry_0_address(), uint32_t(r10));
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // add r11,r30,r11
   r11 = r30 + r11;
   // stw r25,476(r11)
-  guest::StoreU32(base, uint32_t(r11) + 476, uint32_t(r25));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).route10_present_address(), uint32_t(r25));
   // b 0x821af49c
   goto loc_821AF49C;
 loc_821AF490:
@@ -2460,7 +2463,7 @@ loc_821AF490:
   // add r11,r30,r11
   r11 = r30 + r11;
   // stw r24,476(r11)
-  guest::StoreU32(base, uint32_t(r11) + 476, uint32_t(r24));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).route10_present_address(), uint32_t(r24));
 loc_821AF49C:
   // addi r30,r30,12
   r30 = uint64_t(int64_t(int64_t(r30) + 12));
@@ -2478,43 +2481,43 @@ loc_821AF49C:
   f0 = double(temp.f32);
   // stfs f0,116(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 116, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_gear_1_address(), temp.u32);
   // lfs f0,4140(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 4140);
   f0 = double(temp.f32);
   // stfs f0,120(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 120, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_gear_2_address(), temp.u32);
   // lfs f0,4144(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 4144);
   f0 = double(temp.f32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_gear_3_address(), temp.u32);
   // lfs f0,4148(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 4148);
   f0 = double(temp.f32);
   // stfs f0,128(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 128, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_gear_4_address(), temp.u32);
   // lfs f0,4152(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 4152);
   f0 = double(temp.f32);
   // stfs f0,132(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 132, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_gear_5_address(), temp.u32);
   // lfs f0,4156(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 4156);
   f0 = double(temp.f32);
   // stfs f0,136(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 136, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_gear_6_address(), temp.u32);
   // lfs f0,4132(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 4132);
   f0 = double(temp.f32);
   // stfs f0,140(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 140, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_final_drive_address(), temp.u32);
   // lbz r11,4168(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4168);
   // extsb r10,r11
@@ -2522,7 +2525,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,144(r11)
-  guest::StoreU32(base, uint32_t(r11) + 144, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_72_address(), uint32_t(r10));
   // lbz r11,4169(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4169);
   // extsb r10,r11
@@ -2530,7 +2533,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,148(r11)
-  guest::StoreU32(base, uint32_t(r11) + 148, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_73_address(), uint32_t(r10));
   // lbz r11,4170(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4170);
   // extsb r10,r11
@@ -2538,7 +2541,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,152(r11)
-  guest::StoreU32(base, uint32_t(r11) + 152, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_74_address(), uint32_t(r10));
   // lbz r11,4171(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4171);
   // extsb r10,r11
@@ -2546,7 +2549,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,156(r11)
-  guest::StoreU32(base, uint32_t(r11) + 156, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_75_address(), uint32_t(r10));
   // lbz r11,4176(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4176);
   // extsb r10,r11
@@ -2554,7 +2557,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,160(r11)
-  guest::StoreU32(base, uint32_t(r11) + 160, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_80_address(), uint32_t(r10));
   // lbz r11,4177(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4177);
   // extsb r10,r11
@@ -2562,7 +2565,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,164(r11)
-  guest::StoreU32(base, uint32_t(r11) + 164, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_81_address(), uint32_t(r10));
   // lbz r11,4174(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4174);
   // extsb r10,r11
@@ -2570,7 +2573,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,168(r11)
-  guest::StoreU32(base, uint32_t(r11) + 168, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_78_address(), uint32_t(r10));
   // lbz r11,4175(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4175);
   // extsb r10,r11
@@ -2578,7 +2581,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,172(r11)
-  guest::StoreU32(base, uint32_t(r11) + 172, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_79_address(), uint32_t(r10));
   // lbz r11,4178(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4178);
   // extsb r10,r11
@@ -2586,7 +2589,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,176(r11)
-  guest::StoreU32(base, uint32_t(r11) + 176, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_82_address(), uint32_t(r10));
   // lbz r11,4179(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4179);
   // extsb r10,r11
@@ -2594,7 +2597,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,180(r11)
-  guest::StoreU32(base, uint32_t(r11) + 180, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_83_address(), uint32_t(r10));
   // lbz r11,4180(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4180);
   // extsb r10,r11
@@ -2602,7 +2605,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,184(r11)
-  guest::StoreU32(base, uint32_t(r11) + 184, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_84_address(), uint32_t(r10));
   // lbz r11,4181(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4181);
   // extsb r10,r11
@@ -2610,7 +2613,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,188(r11)
-  guest::StoreU32(base, uint32_t(r11) + 188, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_85_address(), uint32_t(r10));
   // lbz r11,4182(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4182);
   // extsb r10,r11
@@ -2618,7 +2621,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,192(r11)
-  guest::StoreU32(base, uint32_t(r11) + 192, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_86_address(), uint32_t(r10));
   // lbz r11,4183(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4183);
   // extsb r10,r11
@@ -2626,7 +2629,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,196(r11)
-  guest::StoreU32(base, uint32_t(r11) + 196, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_87_address(), uint32_t(r10));
   // lbz r11,4184(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4184);
   // extsb r10,r11
@@ -2634,7 +2637,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,200(r11)
-  guest::StoreU32(base, uint32_t(r11) + 200, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_88_address(), uint32_t(r10));
   // lbz r11,4185(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4185);
   // extsb r10,r11
@@ -2642,7 +2645,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,204(r11)
-  guest::StoreU32(base, uint32_t(r11) + 204, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_89_address(), uint32_t(r10));
   // lbz r11,4190(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4190);
   // extsb r10,r11
@@ -2650,7 +2653,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,208(r11)
-  guest::StoreU32(base, uint32_t(r11) + 208, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_94_address(), uint32_t(r10));
   // lbz r11,4189(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4189);
   // extsb r11,r11
@@ -2660,7 +2663,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,212(r11)
-  guest::StoreU32(base, uint32_t(r11) + 212, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_torque_share_address(), uint32_t(r10));
   // lbz r11,4172(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4172);
   // extsb r10,r11
@@ -2668,7 +2671,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,224(r11)
-  guest::StoreU32(base, uint32_t(r11) + 224, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_76_address(), uint32_t(r10));
   // lbz r11,4173(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4173);
   // extsb r10,r11
@@ -2676,7 +2679,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,228(r11)
-  guest::StoreU32(base, uint32_t(r11) + 228, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_77_address(), uint32_t(r10));
   // lbz r11,4186(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4186);
   // extsb r10,r11
@@ -2684,7 +2687,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,216(r11)
-  guest::StoreU32(base, uint32_t(r11) + 216, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_90_address(), uint32_t(r10));
   // lbz r11,4187(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 4187);
   // extsb r10,r11
@@ -2692,7 +2695,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,220(r11)
-  guest::StoreU32(base, uint32_t(r11) + 220, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_91_address(), uint32_t(r10));
   // lfs f0,232(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 232);
   f0 = double(temp.f32);
@@ -2700,43 +2703,43 @@ loc_821AF49C:
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stfs f0,232(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 232, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_gear_1_address(), temp.u32);
   // lfs f0,236(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 236);
   f0 = double(temp.f32);
   // stfs f0,236(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 236, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_gear_2_address(), temp.u32);
   // lfs f0,240(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 240);
   f0 = double(temp.f32);
   // stfs f0,240(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 240, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_gear_3_address(), temp.u32);
   // lfs f0,244(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 244);
   f0 = double(temp.f32);
   // stfs f0,244(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 244, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_gear_4_address(), temp.u32);
   // lfs f0,248(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 248);
   f0 = double(temp.f32);
   // stfs f0,248(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 248, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_gear_5_address(), temp.u32);
   // lfs f0,252(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 252);
   f0 = double(temp.f32);
   // stfs f0,252(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 252, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_gear_6_address(), temp.u32);
   // lfs f0,228(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 228);
   f0 = double(temp.f32);
   // stfs f0,256(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 256, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_final_drive_address(), temp.u32);
   // lbz r11,264(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 264);
   // extsb r10,r11
@@ -2744,7 +2747,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,260(r11)
-  guest::StoreU32(base, uint32_t(r11) + 260, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_72_address(), uint32_t(r10));
   // lbz r11,265(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 265);
   // extsb r10,r11
@@ -2752,7 +2755,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,264(r11)
-  guest::StoreU32(base, uint32_t(r11) + 264, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_73_address(), uint32_t(r10));
   // lbz r11,266(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 266);
   // extsb r10,r11
@@ -2760,7 +2763,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,268(r11)
-  guest::StoreU32(base, uint32_t(r11) + 268, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_74_address(), uint32_t(r10));
   // lbz r11,267(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 267);
   // extsb r10,r11
@@ -2768,7 +2771,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,272(r11)
-  guest::StoreU32(base, uint32_t(r11) + 272, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_75_address(), uint32_t(r10));
   // lbz r11,272(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 272);
   // extsb r10,r11
@@ -2776,7 +2779,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,276(r11)
-  guest::StoreU32(base, uint32_t(r11) + 276, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_80_address(), uint32_t(r10));
   // lbz r11,273(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 273);
   // extsb r10,r11
@@ -2784,7 +2787,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,280(r11)
-  guest::StoreU32(base, uint32_t(r11) + 280, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_81_address(), uint32_t(r10));
   // lbz r11,270(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 270);
   // extsb r10,r11
@@ -2792,7 +2795,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,284(r11)
-  guest::StoreU32(base, uint32_t(r11) + 284, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_78_address(), uint32_t(r10));
   // lbz r11,271(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 271);
   // extsb r10,r11
@@ -2800,7 +2803,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,288(r11)
-  guest::StoreU32(base, uint32_t(r11) + 288, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_79_address(), uint32_t(r10));
   // lbz r11,274(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 274);
   // extsb r10,r11
@@ -2808,7 +2811,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,292(r11)
-  guest::StoreU32(base, uint32_t(r11) + 292, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_82_address(), uint32_t(r10));
   // lbz r11,275(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 275);
   // extsb r10,r11
@@ -2816,7 +2819,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,296(r11)
-  guest::StoreU32(base, uint32_t(r11) + 296, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_83_address(), uint32_t(r10));
   // lbz r11,276(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 276);
   // extsb r10,r11
@@ -2824,7 +2827,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,300(r11)
-  guest::StoreU32(base, uint32_t(r11) + 300, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_84_address(), uint32_t(r10));
   // lbz r11,277(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 277);
   // extsb r10,r11
@@ -2832,7 +2835,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,304(r11)
-  guest::StoreU32(base, uint32_t(r11) + 304, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_85_address(), uint32_t(r10));
   // lbz r11,278(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 278);
   // extsb r10,r11
@@ -2840,7 +2843,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,308(r11)
-  guest::StoreU32(base, uint32_t(r11) + 308, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_86_address(), uint32_t(r10));
   // lbz r11,279(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 279);
   // extsb r10,r11
@@ -2848,7 +2851,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,312(r11)
-  guest::StoreU32(base, uint32_t(r11) + 312, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_87_address(), uint32_t(r10));
   // lbz r11,280(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 280);
   // extsb r10,r11
@@ -2856,7 +2859,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,316(r11)
-  guest::StoreU32(base, uint32_t(r11) + 316, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_88_address(), uint32_t(r10));
   // lbz r11,281(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 281);
   // extsb r10,r11
@@ -2864,7 +2867,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,320(r11)
-  guest::StoreU32(base, uint32_t(r11) + 320, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_89_address(), uint32_t(r10));
   // lbz r11,286(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 286);
   // extsb r10,r11
@@ -2872,7 +2875,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,324(r11)
-  guest::StoreU32(base, uint32_t(r11) + 324, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_94_address(), uint32_t(r10));
   // lbz r11,285(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 285);
   // extsb r11,r11
@@ -2882,7 +2885,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,328(r11)
-  guest::StoreU32(base, uint32_t(r11) + 328, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_torque_share_address(), uint32_t(r10));
   // lbz r11,268(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 268);
   // extsb r10,r11
@@ -2890,7 +2893,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,340(r11)
-  guest::StoreU32(base, uint32_t(r11) + 340, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_76_address(), uint32_t(r10));
   // lbz r11,269(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 269);
   // extsb r10,r11
@@ -2898,7 +2901,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,344(r11)
-  guest::StoreU32(base, uint32_t(r11) + 344, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_77_address(), uint32_t(r10));
   // lbz r11,282(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 282);
   // extsb r10,r11
@@ -2906,7 +2909,7 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,332(r11)
-  guest::StoreU32(base, uint32_t(r11) + 332, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_90_address(), uint32_t(r10));
   // lbz r11,283(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 283);
   // extsb r10,r11
@@ -2914,11 +2917,11 @@ loc_821AF49C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,336(r11)
-  guest::StoreU32(base, uint32_t(r11) + 336, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).stock_setting_91_address(), uint32_t(r10));
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // lwz r10,584(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 584);
+  r10 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).allows_gears_address());
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // bne cr6,0x821af83c
@@ -2928,7 +2931,7 @@ loc_821AF49C:
   f0 = double(temp.f32);
   // stfs f0,116(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 116, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_gear_1_address(), temp.u32);
   // rotlwi r11,r11,0
   r11 = __builtin_rotateleft32(uint32_t(r11), 0);
   // lfs f0,236(r1)
@@ -2944,34 +2947,34 @@ loc_821AF49C:
   f0 = double(temp.f32);
   // stfs f0,124(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 124, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_gear_3_address(), temp.u32);
   // lfs f0,244(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 244);
   f0 = double(temp.f32);
   // stfs f0,128(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 128, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_gear_4_address(), temp.u32);
   // lfs f0,248(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 248);
   f0 = double(temp.f32);
   // stfs f0,132(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 132, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_gear_5_address(), temp.u32);
   // lfs f0,252(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 252);
   f0 = double(temp.f32);
   // stfs f0,136(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 136, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_gear_6_address(), temp.u32);
   // lfs f0,228(r1)
   temp.u32 = guest::LoadU32(base, uint32_t(r1) + 228);
   f0 = double(temp.f32);
   // stfs f0,140(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 140, temp.u32);
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_final_drive_address(), temp.u32);
 loc_821AF83C:
   // lwz r10,588(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 588);
+  r10 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).allows_pages_9_10_address());
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // bne cr6,0x821af868
@@ -2981,7 +2984,7 @@ loc_821AF83C:
   // extsb r10,r10
   r10 = uint64_t(int64_t(int8_t(r10)));
   // stw r10,152(r11)
-  guest::StoreU32(base, uint32_t(r11) + 152, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_74_address(), uint32_t(r10));
   // lbz r11,267(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 267);
   // extsb r10,r11
@@ -2989,12 +2992,12 @@ loc_821AF83C:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,156(r11)
-  guest::StoreU32(base, uint32_t(r11) + 156, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_75_address(), uint32_t(r10));
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
 loc_821AF868:
   // lwz r10,592(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 592);
+  r10 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).allows_pages_11_16_address());
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // bne cr6,0x821af934
@@ -3004,7 +3007,7 @@ loc_821AF868:
   // extsb r10,r10
   r10 = uint64_t(int64_t(int8_t(r10)));
   // stw r10,160(r11)
-  guest::StoreU32(base, uint32_t(r11) + 160, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_80_address(), uint32_t(r10));
   // lbz r11,273(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 273);
   // extsb r10,r11
@@ -3012,7 +3015,7 @@ loc_821AF868:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,164(r11)
-  guest::StoreU32(base, uint32_t(r11) + 164, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_81_address(), uint32_t(r10));
   // lbz r11,270(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 270);
   // extsb r10,r11
@@ -3020,7 +3023,7 @@ loc_821AF868:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,168(r11)
-  guest::StoreU32(base, uint32_t(r11) + 168, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_78_address(), uint32_t(r10));
   // lbz r11,271(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 271);
   // extsb r10,r11
@@ -3028,7 +3031,7 @@ loc_821AF868:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,172(r11)
-  guest::StoreU32(base, uint32_t(r11) + 172, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_79_address(), uint32_t(r10));
   // lbz r11,274(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 274);
   // extsb r10,r11
@@ -3036,7 +3039,7 @@ loc_821AF868:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,176(r11)
-  guest::StoreU32(base, uint32_t(r11) + 176, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_82_address(), uint32_t(r10));
   // lbz r11,275(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 275);
   // extsb r10,r11
@@ -3044,7 +3047,7 @@ loc_821AF868:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,180(r11)
-  guest::StoreU32(base, uint32_t(r11) + 180, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_83_address(), uint32_t(r10));
   // lbz r11,276(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 276);
   // extsb r10,r11
@@ -3052,7 +3055,7 @@ loc_821AF868:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,184(r11)
-  guest::StoreU32(base, uint32_t(r11) + 184, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_84_address(), uint32_t(r10));
   // lbz r11,277(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 277);
   // extsb r10,r11
@@ -3060,7 +3063,7 @@ loc_821AF868:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,188(r11)
-  guest::StoreU32(base, uint32_t(r11) + 188, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_85_address(), uint32_t(r10));
   // lbz r11,278(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 278);
   // extsb r10,r11
@@ -3068,7 +3071,7 @@ loc_821AF868:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,192(r11)
-  guest::StoreU32(base, uint32_t(r11) + 192, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_86_address(), uint32_t(r10));
   // lbz r11,279(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 279);
   // extsb r10,r11
@@ -3076,7 +3079,7 @@ loc_821AF868:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,196(r11)
-  guest::StoreU32(base, uint32_t(r11) + 196, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_87_address(), uint32_t(r10));
   // lbz r11,280(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 280);
   // extsb r10,r11
@@ -3084,7 +3087,7 @@ loc_821AF868:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,200(r11)
-  guest::StoreU32(base, uint32_t(r11) + 200, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_88_address(), uint32_t(r10));
   // lbz r11,281(r1)
   r11 = guest::LoadU8(base, uint32_t(r1) + 281);
   // extsb r10,r11
@@ -3092,12 +3095,12 @@ loc_821AF868:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,204(r11)
-  guest::StoreU32(base, uint32_t(r11) + 204, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_89_address(), uint32_t(r10));
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
 loc_821AF934:
   // lwz r10,596(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 596);
+  r10 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).allows_page_17_address());
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // bne cr6,0x821af950
@@ -3107,7 +3110,7 @@ loc_821AF934:
   // extsb r10,r10
   r10 = uint64_t(int64_t(int8_t(r10)));
   // stw r10,208(r11)
-  guest::StoreU32(base, uint32_t(r11) + 208, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).applied_setting_94_address(), uint32_t(r10));
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
 loc_821AF950:
@@ -3131,17 +3134,17 @@ loc_821AF950:
   // lwz r10,-31648(r31)
   r10 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // lwz r11,6108(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 6108);
+  r11 = guest::LoadU32(base, schema::SaveData(base, uint32_t(r3)).location_address());
   // li r9,3
   r9 = uint64_t(int64_t(3));
   // cmpwi cr6,r11,14
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 14, so);
   // stw r25,560(r10)
-  guest::StoreU32(base, uint32_t(r10) + 560, uint32_t(r25));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r10)).type5_mode_address(), uint32_t(r25));
   // lwz r10,-31648(r31)
   r10 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r9,752(r10)
-  guest::StoreU32(base, uint32_t(r10) + 752, uint32_t(r9));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r10)).location_address(), uint32_t(r9));
   // beq cr6,0x821af9f0
   if (cr6.eq) goto loc_821AF9F0;
   // cmpwi cr6,r11,15
@@ -3177,7 +3180,7 @@ loc_821AF9C8:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r9,752(r11)
-  guest::StoreU32(base, uint32_t(r11) + 752, uint32_t(r9));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).location_address(), uint32_t(r9));
   // b 0x821afa00
   goto loc_821AFA00;
 loc_821AF9D4:
@@ -3187,26 +3190,26 @@ loc_821AF9D8:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r10,752(r11)
-  guest::StoreU32(base, uint32_t(r11) + 752, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).location_address(), uint32_t(r10));
   // b 0x821afa00
   goto loc_821AFA00;
 loc_821AF9E4:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r25,752(r11)
-  guest::StoreU32(base, uint32_t(r11) + 752, uint32_t(r25));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).location_address(), uint32_t(r25));
   // b 0x821afa00
   goto loc_821AFA00;
 loc_821AF9F0:
   // lwz r11,-31648(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31648);
   // stw r24,752(r11)
-  guest::StoreU32(base, uint32_t(r11) + 752, uint32_t(r24));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).location_address(), uint32_t(r24));
   // b 0x821afa00
   goto loc_821AFA00;
 loc_821AF9FC:
   // stw r24,560(r11)
-  guest::StoreU32(base, uint32_t(r11) + 560, uint32_t(r24));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).type5_mode_address(), uint32_t(r24));
 loc_821AFA00:
   // addi r1,r1,9936
   r1 = uint64_t(int64_t(int64_t(r1) + 9936));
@@ -3248,7 +3251,7 @@ uint64_t f821AFA08(uint8_t* base, uint64_t r1, uint64_t r13) {
   // cmplwi r10,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // lha r11,204(r8)
-  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r8) + 204))));
+  r11 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::SaveData(base, uint32_t(r8) - 6120).garage_head_address()))));
   // b 0x821afa40
   goto loc_821AFA40;
 loc_821AFA38:
@@ -3279,7 +3282,7 @@ loc_821AFA40:
   r11 = r11 + r8;
   // lfs f0,116(r9)
   lifted::ScalarFloatMode();
-  temp.u32 = guest::LoadU32(base, uint32_t(r9) + 116);
+  temp.u32 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_gear_1_address());
   f0 = double(temp.f32);
   // stfs f0,252(r11)
   temp.f32 = float(f0);
@@ -3287,7 +3290,7 @@ loc_821AFA40:
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lfs f0,120(r9)
-  temp.u32 = guest::LoadU32(base, uint32_t(r9) + 120);
+  temp.u32 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_gear_2_address());
   f0 = double(temp.f32);
   // stfs f0,256(r11)
   temp.f32 = float(f0);
@@ -3295,7 +3298,7 @@ loc_821AFA40:
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lfs f0,124(r9)
-  temp.u32 = guest::LoadU32(base, uint32_t(r9) + 124);
+  temp.u32 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_gear_3_address());
   f0 = double(temp.f32);
   // stfs f0,260(r11)
   temp.f32 = float(f0);
@@ -3303,7 +3306,7 @@ loc_821AFA40:
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lfs f0,128(r9)
-  temp.u32 = guest::LoadU32(base, uint32_t(r9) + 128);
+  temp.u32 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_gear_4_address());
   f0 = double(temp.f32);
   // stfs f0,264(r11)
   temp.f32 = float(f0);
@@ -3311,7 +3314,7 @@ loc_821AFA40:
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lfs f0,132(r9)
-  temp.u32 = guest::LoadU32(base, uint32_t(r9) + 132);
+  temp.u32 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_gear_5_address());
   f0 = double(temp.f32);
   // stfs f0,268(r11)
   temp.f32 = float(f0);
@@ -3319,7 +3322,7 @@ loc_821AFA40:
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lfs f0,136(r9)
-  temp.u32 = guest::LoadU32(base, uint32_t(r9) + 136);
+  temp.u32 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_gear_6_address());
   f0 = double(temp.f32);
   // stfs f0,272(r11)
   temp.f32 = float(f0);
@@ -3327,7 +3330,7 @@ loc_821AFA40:
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lfs f0,140(r9)
-  temp.u32 = guest::LoadU32(base, uint32_t(r9) + 140);
+  temp.u32 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_final_drive_address());
   f0 = double(temp.f32);
   // stfs f0,248(r11)
   temp.f32 = float(f0);
@@ -3335,109 +3338,109 @@ loc_821AFA40:
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,144(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 144);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_72_address());
   // stb r9,284(r11)
   guest::StoreU8(base, uint32_t(r11) + 284, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,148(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 148);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_73_address());
   // stb r9,285(r11)
   guest::StoreU8(base, uint32_t(r11) + 285, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,152(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 152);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_74_address());
   // stb r9,286(r11)
   guest::StoreU8(base, uint32_t(r11) + 286, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,156(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 156);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_75_address());
   // stb r9,287(r11)
   guest::StoreU8(base, uint32_t(r11) + 287, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,160(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 160);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_80_address());
   // stb r9,292(r11)
   guest::StoreU8(base, uint32_t(r11) + 292, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,164(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 164);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_81_address());
   // stb r9,293(r11)
   guest::StoreU8(base, uint32_t(r11) + 293, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,168(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 168);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_78_address());
   // stb r9,290(r11)
   guest::StoreU8(base, uint32_t(r11) + 290, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,172(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 172);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_79_address());
   // stb r9,291(r11)
   guest::StoreU8(base, uint32_t(r11) + 291, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,176(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 176);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_82_address());
   // stb r9,294(r11)
   guest::StoreU8(base, uint32_t(r11) + 294, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,180(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 180);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_83_address());
   // stb r9,295(r11)
   guest::StoreU8(base, uint32_t(r11) + 295, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,184(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 184);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_84_address());
   // stb r9,296(r11)
   guest::StoreU8(base, uint32_t(r11) + 296, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,188(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 188);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_85_address());
   // stb r9,297(r11)
   guest::StoreU8(base, uint32_t(r11) + 297, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,192(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 192);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_86_address());
   // stb r9,298(r11)
   guest::StoreU8(base, uint32_t(r11) + 298, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,196(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 196);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_87_address());
   // stb r9,299(r11)
   guest::StoreU8(base, uint32_t(r11) + 299, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,200(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 200);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_88_address());
   // stb r9,300(r11)
   guest::StoreU8(base, uint32_t(r11) + 300, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,204(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 204);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_89_address());
   // stb r9,301(r11)
   guest::StoreU8(base, uint32_t(r11) + 301, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,208(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 208);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_94_address());
   // stb r9,306(r11)
   guest::StoreU8(base, uint32_t(r11) + 306, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,212(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 212);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_torque_share_address());
   // divw r9,r9,r7
   r9 = uint32_t((int32_t(r7) && !(int32_t(r9) == INT32_MIN && int32_t(r7) == -1)) ? int32_t(r9) / int32_t(r7) : 0);
   // stb r9,305(r11)
@@ -3445,25 +3448,25 @@ loc_821AFA40:
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,224(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 224);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_76_address());
   // stb r9,288(r11)
   guest::StoreU8(base, uint32_t(r11) + 288, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,228(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 228);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_77_address());
   // stb r9,289(r11)
   guest::StoreU8(base, uint32_t(r11) + 289, uint8_t(r9));
   // lwz r9,-31648(r10)
   r9 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r9,216(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 216);
+  r9 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r9)).applied_setting_90_address());
   // stb r9,302(r11)
   guest::StoreU8(base, uint32_t(r11) + 302, uint8_t(r9));
   // lwz r10,-31648(r10)
   r10 = guest::LoadU32(base, uint32_t(r10) + -31648);
   // lwz r10,220(r10)
-  r10 = guest::LoadU32(base, uint32_t(r10) + 220);
+  r10 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r10)).applied_setting_91_address());
   // stb r10,303(r11)
   guest::StoreU8(base, uint32_t(r11) + 303, uint8_t(r10));
   // addi r1,r1,96
@@ -3502,7 +3505,7 @@ lifted::Result f821AFBD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // lwz r11,-31648(r9)
   r11 = guest::LoadU32(base, uint32_t(r9) + -31648);
   // lwz r11,580(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 580);
+  r11 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).start_at_courses_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // lis r11,-32146
@@ -3541,7 +3544,7 @@ loc_821AFC10:
   // lwz r11,-31648(r9)
   r11 = guest::LoadU32(base, uint32_t(r9) + -31648);
   // stw r5,744(r11)
-  guest::StoreU32(base, uint32_t(r11) + 744, uint32_t(r5));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).unknown_744_address(), uint32_t(r5));
   // b 0x821afc74
   goto loc_821AFC74;
 loc_821AFC40:
@@ -3550,7 +3553,7 @@ loc_821AFC40:
   // beq 0x821afc4c
   if (cr0.eq) goto loc_821AFC4C;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).working_gear_3_address(), uint32_t(r10));
 loc_821AFC4C:
   // li r10,1
   r10 = uint64_t(int64_t(1));
@@ -3561,17 +3564,17 @@ loc_821AFC4C:
   // li r6,-1
   r6 = uint64_t(int64_t(-1));
   // stw r10,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).working_gear_4_address(), uint32_t(r10));
   // stw r8,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r8));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).working_gear_5_address(), uint32_t(r8));
   // stw r7,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r7));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).working_gear_2_address(), uint32_t(r7));
   // stw r6,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r6));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).working_gear_1_address(), uint32_t(r6));
   // lwz r11,-31648(r9)
   r11 = guest::LoadU32(base, uint32_t(r9) + -31648);
   // stw r10,744(r11)
-  guest::StoreU32(base, uint32_t(r11) + 744, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).unknown_744_address(), uint32_t(r10));
 loc_821AFC74:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
@@ -3632,9 +3635,9 @@ loc_821AFCC0:
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // lwz r10,600(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 600);
+  r10 = guest::LoadU32(base, schema::CarSettingsMode(base, uint32_t(r11) - 204).message_count_address());
   // lwz r6,604(r11)
-  r6 = guest::LoadU32(base, uint32_t(r11) + 604);
+  r6 = guest::LoadU32(base, schema::CarSettingsMode(base, uint32_t(r11) - 204).message_start_address());
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // add r6,r6,r10
@@ -3642,7 +3645,7 @@ loc_821AFCC0:
   // addi r6,r6,-1
   r6 = uint64_t(int64_t(int64_t(r6) + -1));
   // stw r10,600(r11)
-  guest::StoreU32(base, uint32_t(r11) + 600, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsMode(base, uint32_t(r11) - 204).message_count_address(), uint32_t(r10));
   // divwu r5,r6,r5
   r5 = uint32_t(uint32_t(r5) ? uint32_t(r6) / uint32_t(r5) : 0);
   // mulli r5,r5,50
@@ -3666,7 +3669,7 @@ loc_821AFD08:
   // li r11,9
   r11 = uint64_t(int64_t(9));
   // stw r11,9604(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9604, uint32_t(r11));
+  guest::StoreU32(base, schema::CarSettings(base, uint32_t(r31)).state_address(), uint32_t(r11));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)

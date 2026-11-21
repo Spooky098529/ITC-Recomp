@@ -6,6 +6,16 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/car_settings.h"
+#include "schema/menu_helpers.h"
+#include "schema/menu_sounds.h"
+#include "schema/options_screen.h"
+#include "schema/race_event.h"
+#include "schema/tuning_pages.h"
+#include "schema/tuning_screen.h"
+#include "schema/type2_screens.h"
+#include "schema/type6_type7_modes.h"
+#include "schema/ui_movies_game.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -2056,7 +2066,7 @@ lifted::Result f821B6818(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r9,r9,9816
   r9 = uint64_t(int64_t(int64_t(r9) + 9816));
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // addi r14,r14,5752
   r14 = uint64_t(int64_t(int64_t(r14) + 5752));
   // addi r10,r10,-17104
@@ -2707,13 +2717,13 @@ loc_821B6E6C:
   // lwz r11,-31648(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + -31648);
   // lwz r10,560(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 560);
+  r10 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).type5_mode_address());
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // beq cr6,0x821b6f98
   if (cr6.eq) goto loc_821B6F98;
   // lwz r10,744(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 744);
+  r10 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).unknown_744_address());
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // bne cr6,0x821b6f58
@@ -2734,7 +2744,7 @@ loc_821B6E6C:
   // cmplwi r9,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r9), 0, so);
   // lha r10,204(r11)
-  r10 = uint64_t(int64_t(int16_t(guest::LoadU16(base, uint32_t(r11) + 204))));
+  r10 = uint64_t(int64_t(int16_t(guest::LoadU16(base, schema::SaveData(base, uint32_t(r11) - 6120).garage_head_address()))));
   // b 0x821b6eb8
   goto loc_821B6EB8;
 loc_821B6EB0:
@@ -2778,18 +2788,18 @@ loc_821B6EB8:
   // lwz r11,-31776(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31776);
   // lwz r3,0(r11)
-  r3 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r3 = guest::LoadU32(base, schema::StandHolder(base, uint32_t(r11)).stage_block_0_address());
   // bl 0x8217f880
   // (left out: dead in C++)
   { const lifted::Result o = game::GarageStage::ReloadModel(base, LIFTED_ARGS(0x821B6EFC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,-31648(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + -31648);
   // stw r3,744(r11)
-  guest::StoreU32(base, uint32_t(r11) + 744, uint32_t(r3));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).unknown_744_address(), uint32_t(r3));
   // lwz r11,-31648(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + -31648);
   // lwz r10,744(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 744);
+  r10 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).unknown_744_address());
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq cr6,0x821b6f98
@@ -2826,7 +2836,7 @@ loc_821B6EB8:
   // addi r4,r1,2528
   r4 = uint64_t(int64_t(int64_t(r1) + 2528));
   // lwz r3,0(r11)
-  r3 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r3 = guest::LoadU32(base, schema::StandHolder(base, uint32_t(r11)).stage_block_0_address());
   // bl 0x8217fd58
   // (left out: dead in C++)
   { const lifted::Result o = game::GarageStage::SetCar(base, LIFTED_ARGS(0x821B6F54, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2846,7 +2856,7 @@ loc_821B6F58:
   // lwz r11,0(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 0);
   // lwz r3,0(r11)
-  r3 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r3 = guest::LoadU32(base, schema::StandHolder(base, uint32_t(r11)).stage_block_0_address());
   // bne cr6,0x821b6f7c
   if (!cr6.eq) goto loc_821B6F7C;
   // li r4,0
@@ -2862,7 +2872,7 @@ loc_821B6F7C:
   // li r4,0
   r4 = uint64_t(int64_t(0));
   // lwz r3,0(r11)
-  r3 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r3 = guest::LoadU32(base, schema::StandHolder(base, uint32_t(r11)).stage_block_0_address());
   // bl 0x8217fe60
   // (left out: dead in C++)
   { const lifted::Result o = game::GarageStage::Draw(base, LIFTED_ARGS(0x821B6F94, r31)); r3 = o.r3; f1 = o.f1; }
@@ -2871,7 +2881,7 @@ loc_821B6F94:
   r11 = guest::LoadU32(base, uint32_t(r30) + -31648);
 loc_821B6F98:
   // lwz r11,760(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 760);
+  r11 = guest::LoadU32(base, schema::CarSettingsData(base, uint32_t(r11)).unknown_760_address());
   // cmpwi cr6,r11,21
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 21, so);
   // beq cr6,0x821b6fb8
@@ -2885,7 +2895,7 @@ loc_821B6F98:
   // lwz r11,-31648(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + -31648);
   // stw r10,760(r11)
-  guest::StoreU32(base, uint32_t(r11) + 760, uint32_t(r10));
+  guest::StoreU32(base, schema::CarSettingsData(base, uint32_t(r11)).unknown_760_address(), uint32_t(r10));
 loc_821B6FB8:
   // addi r1,r1,6592
   r1 = uint64_t(int64_t(int64_t(r1) + 6592));
@@ -2901,7 +2911,7 @@ void f821B8238(uint8_t* base, uint64_t r3) {
   lifted::Cr cr0, cr6;
   uint8_t so = 0;
   // lwz r11,9608(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 9608);
+  r11 = guest::LoadU32(base, schema::SpecSheet(base, uint32_t(r3)).loaded_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821b8280
@@ -2911,13 +2921,13 @@ void f821B8238(uint8_t* base, uint64_t r3) {
   // lwz r11,-31644(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31644);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi r10,0
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq 0x821b825c
   if (cr0.eq) goto loc_821B825C;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821B825C:
   // li r9,0
   r9 = uint64_t(int64_t(0));
@@ -2926,22 +2936,22 @@ loc_821B825C:
   // li r8,4
   r8 = uint64_t(int64_t(4));
   // stw r9,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
   // stw r10,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r10));
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r9));
   // stw r10,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r10));
   // stw r8,9604(r3)
-  guest::StoreU32(base, uint32_t(r3) + 9604, uint32_t(r8));
+  guest::StoreU32(base, schema::SpecSheet(base, uint32_t(r3)).state_address(), uint32_t(r8));
   // blr
   return;
 loc_821B8280:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9604(r3)
-  guest::StoreU32(base, uint32_t(r3) + 9604, uint32_t(r11));
+  guest::StoreU32(base, schema::SpecSheet(base, uint32_t(r3)).state_address(), uint32_t(r11));
   // blr
   return;
 }
@@ -3629,7 +3639,7 @@ lifted::Result f821B8840(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r10,84(r1)
   guest::StoreU32(base, uint32_t(r1) + 84, uint32_t(r10));
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r11 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi cr6,r11,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), -1, so);
   // beq cr6,0x821b8890
@@ -3803,7 +3813,7 @@ lifted::Result f821B8F60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lis r31,-32146
   r31 = uint64_t(int64_t(-2106720256));
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // lis r10,-32228
   r10 = uint64_t(int64_t(-2112094208));
   // lis r9,-32228
@@ -3819,7 +3829,7 @@ lifted::Result f821B8F60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,80(r1)
   guest::StoreU32(base, uint32_t(r1) + 80, uint32_t(r9));
   // lwz r10,12(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 12);
+  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).step_address());
   // cmpwi cr6,r10,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), -1, so);
   // beq cr6,0x821b9060
@@ -3848,7 +3858,7 @@ lifted::Result f821B8F60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // beq 0x821b9068
   if (cr0.eq) goto loc_821B9068;
   // lwz r9,16(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 16);
+  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address());
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // cmpwi cr6,r9,-1
@@ -3856,9 +3866,9 @@ lifted::Result f821B8F60(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // bne cr6,0x821b9020
   if (!cr6.eq) goto loc_821B9020;
   // lwz r8,4(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 4);
+  r8 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address());
   // stw r8,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r8));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r8));
   // b 0x821b9030
   goto loc_821B9030;
 loc_821B9020:
@@ -3866,22 +3876,22 @@ loc_821B9020:
   r8 = uint64_t(int64_t(-1));
 loc_821B9024:
   // lwz r9,16(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 16);
+  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address());
   // stw r8,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r8));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r8));
   // stw r10,20(r11)
-  guest::StoreU32(base, uint32_t(r11) + 20, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).unknown_20_address(), uint32_t(r10));
 loc_821B9030:
   // stw r9,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
 loc_821B9034:
   // stw r10,24(r11)
-  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_started_address(), uint32_t(r10));
   // b 0x821b9068
   goto loc_821B9068;
 loc_821B903C:
   // lwz r9,16(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 16);
+  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address());
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // li r8,-1
@@ -3891,11 +3901,11 @@ loc_821B903C:
   // bne cr6,0x821b9024
   if (!cr6.eq) goto loc_821B9024;
   // lwz r9,4(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 4);
+  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address());
   // stw r8,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r8));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r8));
   // stw r9,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r9));
   // b 0x821b9034
   goto loc_821B9034;
 loc_821B9060:
@@ -3910,24 +3920,24 @@ loc_821B9068:
   // lwz r11,-31636(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31636);
   // lwz r9,8(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 8);
+  r9 = guest::LoadU32(base, schema::SpecSheetData(base, uint32_t(r11)).next_state_address());
   // cmpwi cr6,r9,21
   cr6 = lifted::Compare<int32_t>(int32_t(r9), 21, so);
   // beq cr6,0x821b9090
   if (cr6.eq) goto loc_821B9090;
   // stw r9,9604(r30)
-  guest::StoreU32(base, uint32_t(r30) + 9604, uint32_t(r9));
+  guest::StoreU32(base, schema::SpecSheet(base, uint32_t(r30)).state_address(), uint32_t(r9));
   // li r8,21
   r8 = uint64_t(int64_t(21));
   // lwz r11,-31636(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31636);
   // stw r8,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r8));
+  guest::StoreU32(base, schema::SpecSheetData(base, uint32_t(r11)).next_state_address(), uint32_t(r8));
   // lwz r11,-31636(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31636);
 loc_821B9090:
   // lwz r10,4(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 4);
+  r10 = guest::LoadU32(base, schema::SpecSheetData(base, uint32_t(r11)).graph_drawn_address());
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq cr6,0x821b90c0
@@ -3939,7 +3949,7 @@ loc_821B9090:
   // lwz r11,-31776(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31776);
   // lwz r3,0(r11)
-  r3 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r3 = guest::LoadU32(base, schema::StandHolder(base, uint32_t(r11)).stage_block_0_address());
   // lis r11,-32255
   r11 = uint64_t(int64_t(-2113863680));
   // lfs f2,-23204(r11)
@@ -3980,7 +3990,7 @@ void f821B9F98(uint8_t* base) {
   // lwz r11,-31624(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31624);
   // stw r10,708(r11)
-  guest::StoreU32(base, uint32_t(r11) + 708, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).dialog_cancel_address(), uint32_t(r10));
   // blr
   return;
 }
@@ -4008,7 +4018,7 @@ lifted::Result f821BA010(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31624(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31624);
   // lwz r11,700(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 700);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).preview_state_address());
   // cmpwi r11,0
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne 0x821ba070
@@ -4028,9 +4038,9 @@ lifted::Result f821BA010(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r3,23680(r11)
   r3 = guest::LoadU32(base, uint32_t(r11) + 23680);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
   // lwz r11,52(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 52);
+  r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).stop_cue_address());
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -4041,7 +4051,7 @@ lifted::Result f821BA010(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r10,1
   r10 = uint64_t(int64_t(1));
   // stw r10,700(r11)
-  guest::StoreU32(base, uint32_t(r11) + 700, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).preview_state_address(), uint32_t(r10));
   // b 0x821ba0d8
   goto loc_821BA0D8;
 loc_821BA070:
@@ -4066,9 +4076,9 @@ loc_821BA070:
   // lwz r3,23680(r11)
   r3 = guest::LoadU32(base, uint32_t(r11) + 23680);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
   // lwz r11,56(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 56);
+  r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).is_cue_playing_address());
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -4135,7 +4145,7 @@ lifted::Result f821BA0F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31624(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31624);
   // lwz r11,700(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 700);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).preview_state_address());
   // cmpwi r11,0
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne 0x821ba14c
@@ -4155,9 +4165,9 @@ lifted::Result f821BA0F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r3,23680(r11)
   r3 = guest::LoadU32(base, uint32_t(r11) + 23680);
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
   // lwz r11,52(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 52);
+  r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).stop_cue_address());
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -4169,7 +4179,7 @@ lifted::Result f821BA0F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   r10 = uint64_t(int64_t(1));
 loc_821BA144:
   // stw r10,700(r11)
-  guest::StoreU32(base, uint32_t(r11) + 700, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).preview_state_address(), uint32_t(r10));
   // b 0x821ba374
   goto loc_821BA374;
 loc_821BA14C:
@@ -4194,9 +4204,9 @@ loc_821BA14C:
   // stw r11,92(r1)
   guest::StoreU32(base, uint32_t(r1) + 92, uint32_t(r11));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
   // lwz r11,56(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 56);
+  r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).is_cue_playing_address());
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -4210,9 +4220,9 @@ loc_821BA14C:
   // lwz r11,-31624(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31624);
   // lwz r10,696(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 696);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).track_loaded_address());
   // lwz r9,692(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 692);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).track_previewed_address());
   // cmpw cr6,r10,r9
   cr6 = lifted::Compare<int32_t>(int32_t(r10), int32_t(r9), so);
   // bne cr6,0x821ba1a8
@@ -4229,9 +4239,9 @@ loc_821BA1A8:
   // stw r30,100(r1)
   guest::StoreU32(base, uint32_t(r1) + 100, uint32_t(r30));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
   // lwz r11,20(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 20);
+  r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).release_bank_address());
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -4240,7 +4250,7 @@ loc_821BA1A8:
   // lwz r11,-31624(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31624);
   // stw r30,700(r11)
-  guest::StoreU32(base, uint32_t(r11) + 700, uint32_t(r30));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).preview_state_address(), uint32_t(r30));
   // b 0x821ba374
   goto loc_821BA374;
 loc_821BA1D0:
@@ -4257,9 +4267,9 @@ loc_821BA1D0:
   // addi r4,r1,104
   r4 = uint64_t(int64_t(int64_t(r1) + 104));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, schema::AudioManager(base, uint32_t(r3)).vtable_address());
   // lwz r11,32(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 32);
+  r11 = guest::LoadU32(base, schema::AudioManagerVtable(base, uint32_t(r11)).is_bank_slot_empty_address());
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -4307,7 +4317,7 @@ loc_821BA1D0:
   // lis r5,-32256
   r5 = uint64_t(int64_t(-2113929216));
   // lwz r11,692(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 692);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).track_previewed_address());
   // lis r7,-32256
   r7 = uint64_t(int64_t(-2113929216));
   // stw r29,160(r1)
@@ -4400,13 +4410,13 @@ loc_821BA1D0:
   // li r9,3
   r9 = uint64_t(int64_t(3));
   // lwz r10,692(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 692);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).track_previewed_address());
   // stw r10,696(r11)
-  guest::StoreU32(base, uint32_t(r11) + 696, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).track_loaded_address(), uint32_t(r10));
   // lwz r11,-31624(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31624);
   // stw r9,700(r11)
-  guest::StoreU32(base, uint32_t(r11) + 700, uint32_t(r9));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).preview_state_address(), uint32_t(r9));
   // b 0x821ba374
   goto loc_821BA374;
 loc_821BA314:
@@ -4415,9 +4425,9 @@ loc_821BA314:
   // addi r4,r1,112
   r4 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMusicPlayResult(base, uint32_t(r3)).vtable_address());
   // lwz r11,24(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 24);
+  r11 = guest::LoadU32(base, schema::OptionsMusicPlayVtable(base, uint32_t(r11)).slot_6_address());
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -4845,15 +4855,15 @@ uint64_t f821BB420(uint8_t* base, uint64_t r1, uint64_t r3) {
   // lwz r11,-31596(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31596);
   // lwz r8,340(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 340);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_2_address());
   // lwz r10,332(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 332);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_0_address());
   // lwz r9,336(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 336);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_1_address());
   // stw r8,-40(r1)
   guest::StoreU32(base, uint32_t(r1) + -40, uint32_t(r8));
   // lwz r8,344(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 344);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_3_address());
   // stw r10,-48(r1)
   guest::StoreU32(base, uint32_t(r1) + -48, uint32_t(r10));
   // li r10,0
@@ -4865,33 +4875,33 @@ uint64_t f821BB420(uint8_t* base, uint64_t r1, uint64_t r3) {
   // stw r8,-36(r1)
   guest::StoreU32(base, uint32_t(r1) + -36, uint32_t(r8));
   // lwz r8,348(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 348);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_4_address());
   // stw r8,-32(r1)
   guest::StoreU32(base, uint32_t(r1) + -32, uint32_t(r8));
   // lwz r8,352(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 352);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_5_address());
   // stw r8,-28(r1)
   guest::StoreU32(base, uint32_t(r1) + -28, uint32_t(r8));
   // lwz r8,368(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 368);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_9_address());
   // stw r8,-24(r1)
   guest::StoreU32(base, uint32_t(r1) + -24, uint32_t(r8));
   // lwz r8,360(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 360);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_7_address());
   // stw r8,-20(r1)
   guest::StoreU32(base, uint32_t(r1) + -20, uint32_t(r8));
   // lwz r8,364(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 364);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_8_address());
   // stw r8,-16(r1)
   guest::StoreU32(base, uint32_t(r1) + -16, uint32_t(r8));
   // lwz r8,356(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 356);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_6_address());
   // stw r8,-12(r1)
   guest::StoreU32(base, uint32_t(r1) + -12, uint32_t(r8));
   // lwz r8,372(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 372);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_10_address());
   // lwz r11,376(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 376);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_11_address());
   // stw r8,-8(r1)
   guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r8));
   // stw r11,-4(r1)
@@ -4946,21 +4956,21 @@ uint64_t f821BB4D0(uint8_t* base, uint64_t r1) {
   // lwz r11,-31596(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31596);
   // lwz r8,340(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 340);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_2_address());
   // lwz r10,332(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 332);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_0_address());
   // stw r8,-40(r1)
   guest::StoreU32(base, uint32_t(r1) + -40, uint32_t(r8));
   // lwz r8,344(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 344);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_3_address());
   // stw r10,-48(r1)
   guest::StoreU32(base, uint32_t(r1) + -48, uint32_t(r10));
   // lwz r10,336(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 336);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_1_address());
   // stw r8,-36(r1)
   guest::StoreU32(base, uint32_t(r1) + -36, uint32_t(r8));
   // lwz r8,348(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 348);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_4_address());
   // stw r10,-44(r1)
   guest::StoreU32(base, uint32_t(r1) + -44, uint32_t(r10));
   // addi r10,r1,-48
@@ -4968,29 +4978,29 @@ uint64_t f821BB4D0(uint8_t* base, uint64_t r1) {
   // stw r8,-32(r1)
   guest::StoreU32(base, uint32_t(r1) + -32, uint32_t(r8));
   // lwz r8,352(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 352);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_5_address());
   // stw r8,-28(r1)
   guest::StoreU32(base, uint32_t(r1) + -28, uint32_t(r8));
   // lwz r8,368(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 368);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_9_address());
   // stw r8,-24(r1)
   guest::StoreU32(base, uint32_t(r1) + -24, uint32_t(r8));
   // lwz r8,360(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 360);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_7_address());
   // stw r8,-20(r1)
   guest::StoreU32(base, uint32_t(r1) + -20, uint32_t(r8));
   // lwz r8,364(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 364);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_8_address());
   // stw r8,-16(r1)
   guest::StoreU32(base, uint32_t(r1) + -16, uint32_t(r8));
   // lwz r8,356(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 356);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_6_address());
   // stw r8,-12(r1)
   guest::StoreU32(base, uint32_t(r1) + -12, uint32_t(r8));
   // lwz r8,372(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 372);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_10_address());
   // lwz r11,376(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 376);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_11_address());
   // stw r8,-8(r1)
   guest::StoreU32(base, uint32_t(r1) + -8, uint32_t(r8));
   // stw r11,-4(r1)
@@ -5052,15 +5062,15 @@ uint64_t f821BB5F8(uint8_t* base, uint64_t r1, uint64_t r3) {
   // lwz r11,-31596(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31596);
   // lwz r8,412(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 412);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_2_address());
   // lwz r10,404(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 404);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_0_address());
   // lwz r9,408(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 408);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_1_address());
   // stw r8,-24(r1)
   guest::StoreU32(base, uint32_t(r1) + -24, uint32_t(r8));
   // lwz r8,420(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 420);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_4_address());
   // stw r10,-32(r1)
   guest::StoreU32(base, uint32_t(r1) + -32, uint32_t(r10));
   // li r10,0
@@ -5072,9 +5082,9 @@ uint64_t f821BB5F8(uint8_t* base, uint64_t r1, uint64_t r3) {
   // stw r8,-20(r1)
   guest::StoreU32(base, uint32_t(r1) + -20, uint32_t(r8));
   // lwz r8,416(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 416);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_3_address());
   // lwz r11,424(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 424);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_5_address());
   // stw r8,-16(r1)
   guest::StoreU32(base, uint32_t(r1) + -16, uint32_t(r8));
   // stw r11,-12(r1)
@@ -5129,23 +5139,23 @@ uint64_t f821BB678(uint8_t* base, uint64_t r1) {
   // lwz r11,-31596(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31596);
   // lwz r8,412(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 412);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_2_address());
   // lwz r10,404(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 404);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_0_address());
   // stw r8,-24(r1)
   guest::StoreU32(base, uint32_t(r1) + -24, uint32_t(r8));
   // lwz r8,420(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 420);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_4_address());
   // stw r10,-32(r1)
   guest::StoreU32(base, uint32_t(r1) + -32, uint32_t(r10));
   // lwz r10,408(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 408);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_1_address());
   // stw r8,-20(r1)
   guest::StoreU32(base, uint32_t(r1) + -20, uint32_t(r8));
   // lwz r8,416(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 416);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_3_address());
   // lwz r11,424(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 424);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_5_address());
   // stw r10,-28(r1)
   guest::StoreU32(base, uint32_t(r1) + -28, uint32_t(r10));
   // addi r10,r1,-32
@@ -5236,9 +5246,9 @@ lifted::Result f821BD680(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821BD6B0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r31)).transitions_address());
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821bd6e8
@@ -5264,7 +5274,7 @@ lifted::Result f821BD680(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r31)).transitions_address(), uint32_t(r11));
 loc_821BD6E8:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -5337,9 +5347,9 @@ lifted::Result f821BDA38(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821BDA68, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r31)).transitions_address());
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821bdaa8
@@ -5369,7 +5379,7 @@ lifted::Result f821BDA38(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r31)).transitions_address(), uint32_t(r11));
 loc_821BDAA8:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -5430,9 +5440,9 @@ lifted::Result f821BDC18(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821BDC48, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r31)).transitions_address());
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821bdc88
@@ -5462,7 +5472,7 @@ lifted::Result f821BDC18(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r31)).transitions_address(), uint32_t(r11));
 loc_821BDC88:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -5522,9 +5532,9 @@ lifted::Result f821BDCB0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r10,459
   r10 = uint64_t(int64_t(459));
   // lwz r11,0(r27)
-  r11 = guest::LoadU32(base, uint32_t(r27) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r27)).transitions_address());
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // stw r10,96(r1)
@@ -5608,7 +5618,7 @@ loc_821BDD7C:
   // li r4,528
   r4 = uint64_t(int64_t(528));
   // lwz r11,660(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 660);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x821bdd94
@@ -5646,7 +5656,7 @@ loc_821BDD94:
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,660(r11)
-  guest::StoreU32(base, uint32_t(r11) + 660, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address(), uint32_t(r10));
 loc_821BDDCC:
   // cmpwi cr6,r28,12
   cr6 = lifted::Compare<int32_t>(int32_t(r28), 12, so);
@@ -5705,7 +5715,7 @@ loc_821BDDFC:
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r11,660(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 660);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address());
   // mr r3,r31
   r3 = r31;
   // cmpwi cr6,r11,1
@@ -5738,7 +5748,7 @@ loc_821BDE60:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r27)
-  guest::StoreU32(base, uint32_t(r27) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r27)).transitions_address(), uint32_t(r11));
 loc_821BDE70:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -5792,9 +5802,9 @@ lifted::Result f821BDFA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821BDFD8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r31)).transitions_address());
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821be018
@@ -5824,7 +5834,7 @@ lifted::Result f821BDFA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r31)).transitions_address(), uint32_t(r11));
 loc_821BE018:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -5884,9 +5894,9 @@ lifted::Result f821BE040(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r10,698
   r10 = uint64_t(int64_t(698));
   // lwz r11,0(r27)
-  r11 = guest::LoadU32(base, uint32_t(r27) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r27)).transitions_address());
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // stw r10,96(r1)
@@ -5970,7 +5980,7 @@ loc_821BE10C:
   // li r4,767
   r4 = uint64_t(int64_t(767));
   // lwz r11,660(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 660);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x821be124
@@ -6008,7 +6018,7 @@ loc_821BE124:
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,660(r11)
-  guest::StoreU32(base, uint32_t(r11) + 660, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address(), uint32_t(r10));
 loc_821BE15C:
   // cmpwi cr6,r28,6
   cr6 = lifted::Compare<int32_t>(int32_t(r28), 6, so);
@@ -6067,7 +6077,7 @@ loc_821BE18C:
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r11,660(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 660);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address());
   // mr r3,r31
   r3 = r31;
   // cmpwi cr6,r11,1
@@ -6100,7 +6110,7 @@ loc_821BE1F0:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r27)
-  guest::StoreU32(base, uint32_t(r27) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r27)).transitions_address(), uint32_t(r11));
 loc_821BE200:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -6156,7 +6166,7 @@ uint64_t f821BE4A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r4,5
   r4 = uint64_t(int64_t(5));
   // bl 0x8211a578
@@ -6181,7 +6191,7 @@ uint64_t f821BE4A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // stfs f31,16(r3)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r3) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).y_address(), temp.u32);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -6234,7 +6244,7 @@ uint64_t f821BE7A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r4,6
   r4 = uint64_t(int64_t(6));
   // bl 0x8211a578
@@ -6259,7 +6269,7 @@ uint64_t f821BE7A8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // stfs f31,16(r3)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r3) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).y_address(), temp.u32);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -6312,7 +6322,7 @@ uint64_t f821BEDC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r4,7
   r4 = uint64_t(int64_t(7));
   // bl 0x8211a578
@@ -6342,7 +6352,7 @@ uint64_t f821BEDC8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // stfs f31,16(r3)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r3) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).y_address(), temp.u32);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -6390,7 +6400,7 @@ lifted::Result f821BEE48(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r5,2
   r5 = uint64_t(int64_t(2));
   // li r4,8
@@ -6398,13 +6408,13 @@ lifted::Result f821BEE48(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // lwz r11,-31624(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31624);
   // lwz r10,260(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 260);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_slider_0_address());
   // stw r10,88(r1)
   guest::StoreU32(base, uint32_t(r1) + 88, uint32_t(r10));
   // lwz r10,264(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 264);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_slider_1_address());
   // lwz r11,268(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 268);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_slider_2_address());
   // stw r10,92(r1)
   guest::StoreU32(base, uint32_t(r1) + 92, uint32_t(r10));
   // stw r11,96(r1)
@@ -6479,7 +6489,7 @@ uint64_t f821BEED8(uint8_t* base, uint64_t r1, uint64_t r13) {
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r5,2
   r5 = uint64_t(int64_t(2));
   // li r4,8
@@ -6487,13 +6497,13 @@ uint64_t f821BEED8(uint8_t* base, uint64_t r1, uint64_t r13) {
   // lwz r11,-31624(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31624);
   // lwz r10,260(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 260);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_slider_0_address());
   // stw r10,88(r1)
   guest::StoreU32(base, uint32_t(r1) + 88, uint32_t(r10));
   // lwz r10,264(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 264);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_slider_1_address());
   // lwz r11,268(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 268);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_slider_2_address());
   // stw r10,92(r1)
   guest::StoreU32(base, uint32_t(r1) + 92, uint32_t(r10));
   // stw r11,96(r1)
@@ -6573,7 +6583,7 @@ uint64_t f821BEF68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // li r5,2
   r5 = uint64_t(int64_t(2));
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r4,8
   r4 = uint64_t(int64_t(8));
   // bl 0x8211a578
@@ -6603,7 +6613,7 @@ uint64_t f821BEF68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // stfs f31,16(r3)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r3) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).y_address(), temp.u32);
   // addi r1,r1,112
   r1 = uint64_t(int64_t(int64_t(r1) + 112));
   // lwz r12,-8(r1)
@@ -6649,7 +6659,7 @@ lifted::Result f821BF2B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821BF2DC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r28,0(r3)
-  r28 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r28 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r5,2
   r5 = uint64_t(int64_t(2));
   // li r4,10
@@ -6672,49 +6682,49 @@ lifted::Result f821BF2B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lwz r11,-31624(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31624);
   // lwz r10,284(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 284);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_0_address());
   // stw r10,96(r1)
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r10));
   // lwz r10,288(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 288);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_1_address());
   // stw r10,100(r1)
   guest::StoreU32(base, uint32_t(r1) + 100, uint32_t(r10));
   // lwz r10,292(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 292);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_2_address());
   // stw r10,104(r1)
   guest::StoreU32(base, uint32_t(r1) + 104, uint32_t(r10));
   // lwz r10,296(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 296);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_3_address());
   // stw r10,108(r1)
   guest::StoreU32(base, uint32_t(r1) + 108, uint32_t(r10));
   // lwz r10,300(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 300);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_4_address());
   // stw r10,112(r1)
   guest::StoreU32(base, uint32_t(r1) + 112, uint32_t(r10));
   // lwz r10,304(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 304);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_5_address());
   // stw r10,116(r1)
   guest::StoreU32(base, uint32_t(r1) + 116, uint32_t(r10));
   // lwz r10,320(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 320);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_9_address());
   // stw r10,120(r1)
   guest::StoreU32(base, uint32_t(r1) + 120, uint32_t(r10));
   // lwz r10,312(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 312);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_7_address());
   // stw r10,124(r1)
   guest::StoreU32(base, uint32_t(r1) + 124, uint32_t(r10));
   // lwz r10,316(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 316);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_8_address());
   // stw r10,128(r1)
   guest::StoreU32(base, uint32_t(r1) + 128, uint32_t(r10));
   // lwz r10,308(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 308);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_6_address());
   // stw r10,132(r1)
   guest::StoreU32(base, uint32_t(r1) + 132, uint32_t(r10));
   // lwz r10,324(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 324);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_10_address());
   // lwz r11,328(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 328);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_11_address());
   // stw r10,136(r1)
   guest::StoreU32(base, uint32_t(r1) + 136, uint32_t(r10));
   // stw r11,140(r1)
@@ -6761,7 +6771,7 @@ loc_821BF368:
   // addi r29,r29,4
   r29 = uint64_t(int64_t(int64_t(r29) + 4));
   // stw r11,108(r3)
-  guest::StoreU32(base, uint32_t(r3) + 108, uint32_t(r11));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).texture_entry_address(), uint32_t(r11));
   // bne 0x821bf368
   if (!cr0.eq) goto loc_821BF368;
   // addi r1,r1,208
@@ -6804,7 +6814,7 @@ lifted::Result f821BF3C0(uint8_t* base, uint64_t r1, uint64_t r13, double f1) {
   // li r11,460
   r11 = uint64_t(int64_t(460));
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r28,0
   r28 = uint64_t(int64_t(0));
   // li r31,0
@@ -6996,7 +7006,7 @@ lifted::Result f821BF7F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821BF81C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r5,2
   r5 = uint64_t(int64_t(2));
   // li r4,12
@@ -7015,15 +7025,15 @@ lifted::Result f821BF7F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lwz r11,-31624(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31624);
   // lwz r10,380(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 380);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_analog_0_address());
   // stw r10,128(r1)
   guest::StoreU32(base, uint32_t(r1) + 128, uint32_t(r10));
   // lwz r10,384(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 384);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_analog_1_address());
   // stw r10,132(r1)
   guest::StoreU32(base, uint32_t(r1) + 132, uint32_t(r10));
   // lwz r10,388(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 388);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_analog_2_address());
   // stw r10,136(r1)
   guest::StoreU32(base, uint32_t(r1) + 136, uint32_t(r10));
   // li r10,351
@@ -7031,7 +7041,7 @@ lifted::Result f821BF7F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // stw r10,96(r1)
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r10));
   // lwz r10,396(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 396);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_analog_4_address());
   // stw r10,140(r1)
   guest::StoreU32(base, uint32_t(r1) + 140, uint32_t(r10));
   // li r10,352
@@ -7039,9 +7049,9 @@ lifted::Result f821BF7F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // stw r10,100(r1)
   guest::StoreU32(base, uint32_t(r1) + 100, uint32_t(r10));
   // lwz r10,392(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 392);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_analog_3_address());
   // lwz r11,400(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 400);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_analog_5_address());
   // stw r10,144(r1)
   guest::StoreU32(base, uint32_t(r1) + 144, uint32_t(r10));
   // li r10,353
@@ -7110,7 +7120,7 @@ loc_821BF8A4:
   // cmpwi cr6,r31,24
   cr6 = lifted::Compare<int32_t>(int32_t(r31), 24, so);
   // stw r10,108(r3)
-  guest::StoreU32(base, uint32_t(r3) + 108, uint32_t(r10));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).texture_entry_address(), uint32_t(r10));
   // blt cr6,0x821bf8a4
   if (cr6.lt) goto loc_821BF8A4;
   // addi r1,r1,208
@@ -7153,7 +7163,7 @@ lifted::Result f821BF908(uint8_t* base, uint64_t r1, uint64_t r13, double f1) {
   // li r11,699
   r11 = uint64_t(int64_t(699));
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r28,0
   r28 = uint64_t(int64_t(0));
   // li r31,0
@@ -7350,9 +7360,9 @@ uint64_t f821BFBD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821BFC08, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address());
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821bfc48
@@ -7382,7 +7392,7 @@ uint64_t f821BFBD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address(), uint32_t(r11));
 loc_821BFC48:
   // li r3,1
   r3 = uint64_t(int64_t(1));
@@ -7434,9 +7444,9 @@ lifted::Result f821BFC68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821BFC94, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address());
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821bfcf0
@@ -7446,7 +7456,7 @@ lifted::Result f821BFC68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31600);
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // blt cr6,0x821bfce0
@@ -7484,7 +7494,7 @@ loc_821BFCE8:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address(), uint32_t(r11));
 loc_821BFCF0:
   // li r3,1
   r3 = uint64_t(int64_t(1));
@@ -7536,9 +7546,9 @@ uint64_t f821BFD08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821BFD38, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address());
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821bfd78
@@ -7568,7 +7578,7 @@ uint64_t f821BFD08(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address(), uint32_t(r11));
 loc_821BFD78:
   // li r3,1
   r3 = uint64_t(int64_t(1));
@@ -7621,9 +7631,9 @@ lifted::Result f821BFD98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r10,530
   r10 = uint64_t(int64_t(530));
   // lwz r11,0(r28)
-  r11 = guest::LoadU32(base, uint32_t(r28) + 0);
+  r11 = guest::LoadU32(base, schema::ControllerOptions(base, uint32_t(r28)).fault_step_started_address());
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // stw r10,96(r1)
@@ -7685,9 +7695,9 @@ lifted::Result f821BFD98(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31600);
   // lwz r30,4(r11)
-  r30 = guest::LoadU32(base, uint32_t(r11) + 4);
+  r30 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address());
   // lwz r29,0(r11)
-  r29 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r29 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
   // cmpwi cr6,r30,12
   cr6 = lifted::Compare<int32_t>(int32_t(r30), 12, so);
   // bge cr6,0x821bfe5c
@@ -7797,7 +7807,7 @@ loc_821BFF00:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r28)
-  guest::StoreU32(base, uint32_t(r28) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::ControllerOptions(base, uint32_t(r28)).fault_step_started_address(), uint32_t(r11));
 loc_821BFF10:
   // li r3,1
   r3 = uint64_t(int64_t(1));
@@ -7842,9 +7852,9 @@ lifted::Result f821BFF20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821BFF4C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address());
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821bff84
@@ -7854,7 +7864,7 @@ lifted::Result f821BFF20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31600);
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
   // cmpwi cr6,r11,12
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 12, so);
   // addi r4,r11,581
@@ -7870,7 +7880,7 @@ loc_821BFF78:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address(), uint32_t(r11));
 loc_821BFF84:
   // li r3,1
   r3 = uint64_t(int64_t(1));
@@ -7922,9 +7932,9 @@ uint64_t f821BFFA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821BFFD0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address());
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821c0010
@@ -7954,7 +7964,7 @@ uint64_t f821BFFA0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3) {
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address(), uint32_t(r11));
 loc_821C0010:
   // li r3,1
   r3 = uint64_t(int64_t(1));
@@ -8007,9 +8017,9 @@ lifted::Result f821C0030(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r10,769
   r10 = uint64_t(int64_t(769));
   // lwz r11,0(r28)
-  r11 = guest::LoadU32(base, uint32_t(r28) + 0);
+  r11 = guest::LoadU32(base, schema::ControllerOptions(base, uint32_t(r28)).fault_step_started_address());
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // stw r10,96(r1)
@@ -8071,9 +8081,9 @@ lifted::Result f821C0030(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31600);
   // lwz r30,4(r11)
-  r30 = guest::LoadU32(base, uint32_t(r11) + 4);
+  r30 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address());
   // lwz r29,0(r11)
-  r29 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r29 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
   // cmpwi cr6,r30,6
   cr6 = lifted::Compare<int32_t>(int32_t(r30), 6, so);
   // bge cr6,0x821c00f4
@@ -8183,7 +8193,7 @@ loc_821C0198:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r28)
-  guest::StoreU32(base, uint32_t(r28) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::ControllerOptions(base, uint32_t(r28)).fault_step_started_address(), uint32_t(r11));
 loc_821C01A8:
   // li r3,1
   r3 = uint64_t(int64_t(1));
@@ -8228,9 +8238,9 @@ lifted::Result f821C01B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821C01E4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address());
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821c021c
@@ -8240,7 +8250,7 @@ lifted::Result f821C01B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31600);
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
   // cmpwi cr6,r11,6
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 6, so);
   // addi r4,r11,820
@@ -8256,7 +8266,7 @@ loc_821C0210:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address(), uint32_t(r11));
 loc_821C021C:
   // li r3,1
   r3 = uint64_t(int64_t(1));
@@ -8305,7 +8315,7 @@ lifted::Result f821C02B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r5,5
   r5 = uint64_t(int64_t(5));
   // li r4,8
@@ -8313,13 +8323,13 @@ lifted::Result f821C02B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // lwz r11,-31596(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31596);
   // lwz r10,272(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 272);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_slider_0_address());
   // stw r10,88(r1)
   guest::StoreU32(base, uint32_t(r1) + 88, uint32_t(r10));
   // lwz r10,276(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 276);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_slider_1_address());
   // lwz r11,280(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 280);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_slider_2_address());
   // stw r10,92(r1)
   guest::StoreU32(base, uint32_t(r1) + 92, uint32_t(r10));
   // stw r11,96(r1)
@@ -8394,7 +8404,7 @@ uint64_t f821C0348(uint8_t* base, uint64_t r1, uint64_t r13) {
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r5,5
   r5 = uint64_t(int64_t(5));
   // li r4,8
@@ -8402,13 +8412,13 @@ uint64_t f821C0348(uint8_t* base, uint64_t r1, uint64_t r13) {
   // lwz r11,-31596(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31596);
   // lwz r10,272(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 272);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_slider_0_address());
   // stw r10,88(r1)
   guest::StoreU32(base, uint32_t(r1) + 88, uint32_t(r10));
   // lwz r10,276(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 276);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_slider_1_address());
   // lwz r11,280(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 280);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_slider_2_address());
   // stw r10,92(r1)
   guest::StoreU32(base, uint32_t(r1) + 92, uint32_t(r10));
   // stw r11,96(r1)
@@ -8481,7 +8491,7 @@ lifted::Result f821C03D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821C03FC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r28,0(r3)
-  r28 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r28 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r5,5
   r5 = uint64_t(int64_t(5));
   // li r4,10
@@ -8504,49 +8514,49 @@ lifted::Result f821C03D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lwz r11,-31596(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31596);
   // lwz r10,332(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 332);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_0_address());
   // stw r10,96(r1)
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r10));
   // lwz r10,336(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 336);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_1_address());
   // stw r10,100(r1)
   guest::StoreU32(base, uint32_t(r1) + 100, uint32_t(r10));
   // lwz r10,340(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 340);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_2_address());
   // stw r10,104(r1)
   guest::StoreU32(base, uint32_t(r1) + 104, uint32_t(r10));
   // lwz r10,344(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 344);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_3_address());
   // stw r10,108(r1)
   guest::StoreU32(base, uint32_t(r1) + 108, uint32_t(r10));
   // lwz r10,348(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 348);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_4_address());
   // stw r10,112(r1)
   guest::StoreU32(base, uint32_t(r1) + 112, uint32_t(r10));
   // lwz r10,352(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 352);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_5_address());
   // stw r10,116(r1)
   guest::StoreU32(base, uint32_t(r1) + 116, uint32_t(r10));
   // lwz r10,368(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 368);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_9_address());
   // stw r10,120(r1)
   guest::StoreU32(base, uint32_t(r1) + 120, uint32_t(r10));
   // lwz r10,360(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 360);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_7_address());
   // stw r10,124(r1)
   guest::StoreU32(base, uint32_t(r1) + 124, uint32_t(r10));
   // lwz r10,364(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 364);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_8_address());
   // stw r10,128(r1)
   guest::StoreU32(base, uint32_t(r1) + 128, uint32_t(r10));
   // lwz r10,356(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 356);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_6_address());
   // stw r10,132(r1)
   guest::StoreU32(base, uint32_t(r1) + 132, uint32_t(r10));
   // lwz r10,372(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 372);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_10_address());
   // lwz r11,376(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 376);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_button_11_address());
   // stw r10,136(r1)
   guest::StoreU32(base, uint32_t(r1) + 136, uint32_t(r10));
   // stw r11,140(r1)
@@ -8593,7 +8603,7 @@ loc_821C0488:
   // addi r29,r29,4
   r29 = uint64_t(int64_t(int64_t(r29) + 4));
   // stw r11,108(r3)
-  guest::StoreU32(base, uint32_t(r3) + 108, uint32_t(r11));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).texture_entry_address(), uint32_t(r11));
   // bne 0x821c0488
   if (!cr0.eq) goto loc_821C0488;
   // addi r1,r1,208
@@ -8636,7 +8646,7 @@ lifted::Result f821C04E0(uint8_t* base, uint64_t r1, uint64_t r13, double f1) {
   // li r11,531
   r11 = uint64_t(int64_t(531));
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r28,0
   r28 = uint64_t(int64_t(0));
   // li r31,0
@@ -8828,7 +8838,7 @@ lifted::Result f821C0640(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821C0664, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r5,5
   r5 = uint64_t(int64_t(5));
   // li r4,12
@@ -8847,15 +8857,15 @@ lifted::Result f821C0640(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lwz r11,-31596(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31596);
   // lwz r10,404(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 404);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_0_address());
   // stw r10,128(r1)
   guest::StoreU32(base, uint32_t(r1) + 128, uint32_t(r10));
   // lwz r10,408(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 408);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_1_address());
   // stw r10,132(r1)
   guest::StoreU32(base, uint32_t(r1) + 132, uint32_t(r10));
   // lwz r10,412(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 412);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_2_address());
   // stw r10,136(r1)
   guest::StoreU32(base, uint32_t(r1) + 136, uint32_t(r10));
   // li r10,351
@@ -8863,7 +8873,7 @@ lifted::Result f821C0640(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // stw r10,96(r1)
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r10));
   // lwz r10,420(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 420);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_4_address());
   // stw r10,140(r1)
   guest::StoreU32(base, uint32_t(r1) + 140, uint32_t(r10));
   // li r10,352
@@ -8871,9 +8881,9 @@ lifted::Result f821C0640(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // stw r10,100(r1)
   guest::StoreU32(base, uint32_t(r1) + 100, uint32_t(r10));
   // lwz r10,416(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 416);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_3_address());
   // lwz r11,424(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 424);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_p1_analog_5_address());
   // stw r10,144(r1)
   guest::StoreU32(base, uint32_t(r1) + 144, uint32_t(r10));
   // li r10,353
@@ -8942,7 +8952,7 @@ loc_821C06EC:
   // cmpwi cr6,r31,24
   cr6 = lifted::Compare<int32_t>(int32_t(r31), 24, so);
   // stw r10,108(r3)
-  guest::StoreU32(base, uint32_t(r3) + 108, uint32_t(r10));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).texture_entry_address(), uint32_t(r10));
   // blt cr6,0x821c06ec
   if (cr6.lt) goto loc_821C06EC;
   // addi r1,r1,208
@@ -8985,7 +8995,7 @@ lifted::Result f821C0750(uint8_t* base, uint64_t r1, uint64_t r13, double f1) {
   // li r11,770
   r11 = uint64_t(int64_t(770));
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r28,0
   r28 = uint64_t(int64_t(0));
   // li r31,0
@@ -9185,14 +9195,14 @@ lifted::Result f821C0EF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   // lwz r10,-31624(r31)
   r10 = guest::LoadU32(base, uint32_t(r31) + -31624);
   // lwz r30,0(r11)
-  r30 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r11)).value_address());
   // addi r29,r10,12
   r29 = uint64_t(int64_t(int64_t(r10) + 12));
   // bl 0x82105620
   // (left out: dead in C++)
   { const lifted::Result o = game::SaveData::Of(base, LIFTED_ARGS(0x821C0F30, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,6100(r3)
-  r10 = guest::LoadU32(base, uint32_t(r3) + 6100);
+  r10 = guest::LoadU32(base, schema::SaveData(base, uint32_t(r3)).day_address());
   // mr r8,r29
   r8 = r29;
   // li r11,5
@@ -9203,18 +9213,18 @@ lifted::Result f821C0EF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r7, 
   ctr = r11;
 loc_821C0F44:
   // lwz r11,0(r9)
-  r11 = guest::LoadU32(base, uint32_t(r9) + 0);
+  r11 = guest::LoadU32(base, schema::SaveData(base, uint32_t(r9) - 8).pick_head_address());
   // addi r9,r9,4
   r9 = uint64_t(int64_t(int64_t(r9) + 4));
   // stw r11,0(r8)
-  guest::StoreU32(base, uint32_t(r8) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r8) - 12).name_0_address(), uint32_t(r11));
   // addi r8,r8,4
   r8 = uint64_t(int64_t(int64_t(r8) + 4));
   // bdnz 0x821c0f44
   --ctr;
   if (uint32_t(ctr) != 0) goto loc_821C0F44;
   // lwz r11,6116(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 6116);
+  r11 = guest::LoadU32(base, schema::SaveData(base, uint32_t(r3)).money_address());
   // divw r9,r10,r28
   r9 = uint32_t((int32_t(r28) && !(int32_t(r10) == INT32_MIN && int32_t(r28) == -1)) ? int32_t(r10) / int32_t(r28) : 0);
   // cmpwi cr6,r10,999
@@ -9222,18 +9232,18 @@ loc_821C0F44:
   // mulli r9,r9,7
   r9 = uint64_t(int64_t(static_cast<int64_t>(r9 * static_cast<uint64_t>(7))));
   // stw r11,20(r29)
-  guest::StoreU32(base, uint32_t(r29) + 20, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r29) - 12).money_address(), uint32_t(r11));
   // subf r11,r9,r10
   r11 = r10 - r9;
   // stw r11,24(r29)
-  guest::StoreU32(base, uint32_t(r29) + 24, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r29) - 12).day_of_week_address(), uint32_t(r11));
   // ble cr6,0x821c0f7c
   if (!cr6.gt) goto loc_821C0F7C;
   // li r10,999
   r10 = uint64_t(int64_t(999));
 loc_821C0F7C:
   // stw r10,28(r29)
-  guest::StoreU32(base, uint32_t(r29) + 28, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r29) - 12).day_address(), uint32_t(r10));
   // li r5,6
   r5 = uint64_t(int64_t(6));
   // lwz r11,-31624(r31)
@@ -9256,7 +9266,7 @@ loc_821C0F7C:
   // mr r3,r30
   r3 = r30;
   // lwz r6,32(r11)
-  r6 = guest::LoadU32(base, uint32_t(r11) + 32);
+  r6 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).money_address());
   // bl 0x8211c740
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::SetNumberText(base, LIFTED_ARGS(0x821C0FB0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -9271,7 +9281,7 @@ loc_821C0F7C:
   // mr r3,r30
   r3 = r30;
   // lwz r7,40(r11)
-  r7 = guest::LoadU32(base, uint32_t(r11) + 40);
+  r7 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).day_address());
   // bl 0x8211c1f8
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::SetText(base, LIFTED_ARGS(0x821C0FCC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -9287,9 +9297,9 @@ loc_821C0F7C:
   // lwz r11,-31624(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31624);
   // lwz r11,36(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 36);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).day_of_week_address());
   // stw r11,108(r3)
-  guest::StoreU32(base, uint32_t(r3) + 108, uint32_t(r11));
+  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r3)).draw_context_address() + 44, uint32_t(r11));
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6ed8
@@ -9422,7 +9432,7 @@ loc_821C1B38:
   // bne cr6,0x821c1c00
   if (!cr6.eq) goto loc_821C1C00;
   // lwz r7,660(r10)
-  r7 = guest::LoadU32(base, uint32_t(r10) + 660);
+  r7 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10)).ok_default_address());
   // cmpwi cr6,r7,0
   cr6 = lifted::Compare<int32_t>(int32_t(r7), 0, so);
   // bne cr6,0x821c1bc4
@@ -9432,17 +9442,17 @@ loc_821C1B38:
   // addi r10,r10,68
   r10 = uint64_t(int64_t(int64_t(r10) + 68));
   // lwz r8,0(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11) - 260).edit_slider_0_address());
   // stw r8,0(r10)
-  guest::StoreU32(base, uint32_t(r10) + 0, uint32_t(r8));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r10) - 68).current_slider_0_address(), uint32_t(r8));
   // lwz r8,4(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + 4);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11) - 260).edit_slider_1_address());
   // stw r8,4(r10)
-  guest::StoreU32(base, uint32_t(r10) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r10) - 68).current_slider_1_address(), uint32_t(r8));
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 8);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11) - 260).edit_slider_2_address());
   // stw r11,8(r10)
-  guest::StoreU32(base, uint32_t(r10) + 8, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r10) - 68).current_slider_2_address(), uint32_t(r11));
   // lwz r11,-31624(r9)
   r11 = guest::LoadU32(base, uint32_t(r9) + -31624);
   // addi r10,r11,272
@@ -9450,17 +9460,17 @@ loc_821C1B38:
   // addi r11,r11,80
   r11 = uint64_t(int64_t(int64_t(r11) + 80));
   // lwz r9,0(r10)
-  r9 = guest::LoadU32(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 272).edit_p1_slider_0_address());
   // stw r9,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 80).current_p1_slider_0_address(), uint32_t(r9));
   // lwz r9,4(r10)
-  r9 = guest::LoadU32(base, uint32_t(r10) + 4);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 272).edit_p1_slider_1_address());
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 80).current_p1_slider_1_address(), uint32_t(r9));
   // lwz r10,8(r10)
-  r10 = guest::LoadU32(base, uint32_t(r10) + 8);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 272).edit_p1_slider_2_address());
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 80).current_p1_slider_2_address(), uint32_t(r10));
   // bl 0x821beed8
   // (left out: dead in C++)
   r3 = game::Options::ShowSliderMarks2P(base, r1, r13);
@@ -9541,17 +9551,17 @@ loc_821C1C20:
   // addi r11,r11,260
   r11 = uint64_t(int64_t(int64_t(r11) + 260));
   // lwz r8,0(r9)
-  r8 = guest::LoadU32(base, uint32_t(r9) + 0);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r9) - 68).current_slider_0_address());
   // stw r8,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r8));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 260).edit_slider_0_address(), uint32_t(r8));
   // lwz r8,4(r9)
-  r8 = guest::LoadU32(base, uint32_t(r9) + 4);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r9) - 68).current_slider_1_address());
   // stw r8,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 260).edit_slider_1_address(), uint32_t(r8));
   // lwz r9,8(r9)
-  r9 = guest::LoadU32(base, uint32_t(r9) + 8);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r9) - 68).current_slider_2_address());
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 260).edit_slider_2_address(), uint32_t(r9));
   // lwz r11,-31624(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31624);
   // addi r10,r11,80
@@ -9559,17 +9569,17 @@ loc_821C1C20:
   // addi r11,r11,272
   r11 = uint64_t(int64_t(int64_t(r11) + 272));
   // lwz r9,0(r10)
-  r9 = guest::LoadU32(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 80).current_p1_slider_0_address());
   // stw r9,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 272).edit_p1_slider_0_address(), uint32_t(r9));
   // lwz r9,4(r10)
-  r9 = guest::LoadU32(base, uint32_t(r10) + 4);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 80).current_p1_slider_1_address());
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 272).edit_p1_slider_1_address(), uint32_t(r9));
   // lwz r10,8(r10)
-  r10 = guest::LoadU32(base, uint32_t(r10) + 8);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 80).current_p1_slider_2_address());
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 272).edit_p1_slider_2_address(), uint32_t(r10));
   // bl 0x821bee48
   // (left out: dead in C++)
   { const lifted::Result o = game::Options::ShowSliderNumbers2P(base, r1, r13, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
@@ -9582,26 +9592,26 @@ loc_821C1C8C:
   // lwz r10,-31604(r11)
   r10 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r11,0(r10)
-  r11 = guest::LoadU32(base, uint32_t(r10) + 0);
+  r11 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r10)).page_address());
   // cmpwi cr6,r11,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), -1, so);
   // beq cr6,0x821c1ca8
   if (cr6.eq) goto loc_821C1CA8;
   // stw r11,8(r10)
-  guest::StoreU32(base, uint32_t(r10) + 8, uint32_t(r11));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).previous_page_address(), uint32_t(r11));
 loc_821C1CA8:
   // li r9,3
   r9 = uint64_t(int64_t(3));
   // li r11,-1
   r11 = uint64_t(int64_t(-1));
   // stw r9,12(r10)
-  guest::StoreU32(base, uint32_t(r10) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).step_address(), uint32_t(r9));
   // stw r11,16(r10)
-  guest::StoreU32(base, uint32_t(r10) + 16, uint32_t(r11));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).queued_step_address(), uint32_t(r11));
   // stw r11,4(r10)
-  guest::StoreU32(base, uint32_t(r10) + 4, uint32_t(r11));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).next_page_address(), uint32_t(r11));
   // stw r11,0(r10)
-  guest::StoreU32(base, uint32_t(r10) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).page_address(), uint32_t(r11));
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // lwz r10,-31632(r10)
@@ -9765,7 +9775,7 @@ loc_821C1F78:
   // bne cr6,0x821c2090
   if (!cr6.eq) goto loc_821C2090;
   // lwz r8,660(r9)
-  r8 = guest::LoadU32(base, uint32_t(r9) + 660);
+  r8 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r9)).ok_default_address());
   // cmpwi cr6,r8,0
   cr6 = lifted::Compare<int32_t>(int32_t(r8), 0, so);
   // bne cr6,0x821c205c
@@ -9841,22 +9851,22 @@ loc_821C200C:
   // lwz r10,-31604(r10)
   r10 = guest::LoadU32(base, uint32_t(r10) + -31604);
   // lwz r9,0(r10)
-  r9 = guest::LoadU32(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r10)).page_address());
   // cmpwi cr6,r9,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r9), -1, so);
   // beq cr6,0x821c2040
   if (cr6.eq) goto loc_821C2040;
   // stw r9,8(r10)
-  guest::StoreU32(base, uint32_t(r10) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).previous_page_address(), uint32_t(r9));
 loc_821C2040:
   // li r9,7
   r9 = uint64_t(int64_t(7));
   // stw r11,16(r10)
-  guest::StoreU32(base, uint32_t(r10) + 16, uint32_t(r11));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).queued_step_address(), uint32_t(r11));
   // stw r11,4(r10)
-  guest::StoreU32(base, uint32_t(r10) + 4, uint32_t(r11));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).next_page_address(), uint32_t(r11));
   // stw r9,12(r10)
-  guest::StoreU32(base, uint32_t(r10) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).step_address(), uint32_t(r9));
   // b 0x821c1f70
   goto loc_821C1F70;
 loc_821C2054:
@@ -9908,7 +9918,7 @@ loc_821C2090:
   // lwz r11,-31624(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31624);
   // stw r8,660(r11)
-  guest::StoreU32(base, uint32_t(r11) + 660, uint32_t(r8));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address(), uint32_t(r8));
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r10,-31632(r11)
@@ -10014,27 +10024,27 @@ loc_821C2144:
   // lwz r10,-31604(r10)
   r10 = guest::LoadU32(base, uint32_t(r10) + -31604);
   // lwz r9,0(r10)
-  r9 = guest::LoadU32(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r10)).page_address());
   // cmpwi cr6,r9,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r9), -1, so);
   // beq cr6,0x821c2178
   if (cr6.eq) goto loc_821C2178;
   // stw r9,8(r10)
-  guest::StoreU32(base, uint32_t(r10) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).previous_page_address(), uint32_t(r9));
 loc_821C2178:
   // li r9,7
   r9 = uint64_t(int64_t(7));
   // stw r11,4(r10)
-  guest::StoreU32(base, uint32_t(r10) + 4, uint32_t(r11));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).next_page_address(), uint32_t(r11));
   // li r3,2
   r3 = uint64_t(int64_t(2));
 loc_821C2184:
   // stw r11,0(r10)
-  guest::StoreU32(base, uint32_t(r10) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).page_address(), uint32_t(r11));
   // stw r11,16(r10)
-  guest::StoreU32(base, uint32_t(r10) + 16, uint32_t(r11));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).queued_step_address(), uint32_t(r11));
   // stw r9,12(r10)
-  guest::StoreU32(base, uint32_t(r10) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r10)).step_address(), uint32_t(r9));
 loc_821C2190:
   // bl 0x821103f0
   // (left out: dead in C++)
@@ -10085,9 +10095,9 @@ lifted::Result f821C36F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821C3718, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r26)
-  r11 = guest::LoadU32(base, uint32_t(r26) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r26)).transitions_address());
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821c38f8
@@ -10121,7 +10131,7 @@ lifted::Result f821C36F0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,344
   r4 = uint64_t(int64_t(344));
   // lwz r11,660(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 660);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821c3770
@@ -10139,7 +10149,7 @@ loc_821C3770:
   // cmpwi cr6,r29,0
   cr6 = lifted::Compare<int32_t>(int32_t(r29), 0, so);
   // stw r10,660(r11)
-  guest::StoreU32(base, uint32_t(r11) + 660, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address(), uint32_t(r10));
   // bne cr6,0x821c3790
   if (!cr6.eq) goto loc_821C3790;
   // li r3,0
@@ -10204,7 +10214,7 @@ loc_821C37C0:
   // mr r3,r31
   r3 = r31;
   // lwz r11,660(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 660);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821c380c
@@ -10352,7 +10362,7 @@ loc_821C38F0:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r26)
-  guest::StoreU32(base, uint32_t(r26) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r26)).transitions_address(), uint32_t(r11));
 loc_821C38F8:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -10406,9 +10416,9 @@ lifted::Result f821C3910(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821C3940, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r30)).transitions_address());
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821c39e8
@@ -10430,7 +10440,7 @@ lifted::Result f821C3910(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31624(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31624);
   // lwz r11,660(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 660);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821c39a8
@@ -10498,7 +10508,7 @@ loc_821C39E0:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r30)
-  guest::StoreU32(base, uint32_t(r30) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r30)).transitions_address(), uint32_t(r11));
 loc_821C39E8:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -10558,7 +10568,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,423
   r11 = uint64_t(int64_t(423));
   // lwz r10,0(r26)
-  r10 = guest::LoadU32(base, uint32_t(r26) + 0);
+  r10 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r26)).transitions_address());
   // lis r29,-32146
   r29 = uint64_t(int64_t(-2106720256));
   // stw r11,144(r1)
@@ -10566,7 +10576,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31624(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + -31624);
   // lwz r9,284(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 284);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_0_address());
   // stw r9,96(r1)
   guest::StoreU32(base, uint32_t(r1) + 96, uint32_t(r9));
   // li r9,425
@@ -10574,7 +10584,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,148(r1)
   guest::StoreU32(base, uint32_t(r1) + 148, uint32_t(r9));
   // lwz r9,288(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 288);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_1_address());
   // stw r9,100(r1)
   guest::StoreU32(base, uint32_t(r1) + 100, uint32_t(r9));
   // li r9,427
@@ -10582,7 +10592,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,152(r1)
   guest::StoreU32(base, uint32_t(r1) + 152, uint32_t(r9));
   // lwz r9,292(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 292);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_2_address());
   // stw r9,104(r1)
   guest::StoreU32(base, uint32_t(r1) + 104, uint32_t(r9));
   // li r9,429
@@ -10590,7 +10600,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,156(r1)
   guest::StoreU32(base, uint32_t(r1) + 156, uint32_t(r9));
   // lwz r9,296(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 296);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_3_address());
   // stw r9,108(r1)
   guest::StoreU32(base, uint32_t(r1) + 108, uint32_t(r9));
   // li r9,431
@@ -10598,7 +10608,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,160(r1)
   guest::StoreU32(base, uint32_t(r1) + 160, uint32_t(r9));
   // lwz r9,300(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 300);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_4_address());
   // stw r9,112(r1)
   guest::StoreU32(base, uint32_t(r1) + 112, uint32_t(r9));
   // li r9,433
@@ -10606,7 +10616,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,164(r1)
   guest::StoreU32(base, uint32_t(r1) + 164, uint32_t(r9));
   // lwz r9,304(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 304);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_5_address());
   // stw r9,116(r1)
   guest::StoreU32(base, uint32_t(r1) + 116, uint32_t(r9));
   // li r9,435
@@ -10614,7 +10624,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,168(r1)
   guest::StoreU32(base, uint32_t(r1) + 168, uint32_t(r9));
   // lwz r9,320(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 320);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_9_address());
   // stw r9,120(r1)
   guest::StoreU32(base, uint32_t(r1) + 120, uint32_t(r9));
   // li r9,437
@@ -10622,7 +10632,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,172(r1)
   guest::StoreU32(base, uint32_t(r1) + 172, uint32_t(r9));
   // lwz r9,312(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 312);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_7_address());
   // stw r9,124(r1)
   guest::StoreU32(base, uint32_t(r1) + 124, uint32_t(r9));
   // li r9,439
@@ -10630,7 +10640,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,176(r1)
   guest::StoreU32(base, uint32_t(r1) + 176, uint32_t(r9));
   // lwz r9,316(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 316);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_8_address());
   // stw r9,128(r1)
   guest::StoreU32(base, uint32_t(r1) + 128, uint32_t(r9));
   // li r9,441
@@ -10638,7 +10648,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,180(r1)
   guest::StoreU32(base, uint32_t(r1) + 180, uint32_t(r9));
   // lwz r9,308(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 308);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_6_address());
   // stw r9,132(r1)
   guest::StoreU32(base, uint32_t(r1) + 132, uint32_t(r9));
   // li r9,443
@@ -10646,7 +10656,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,184(r1)
   guest::StoreU32(base, uint32_t(r1) + 184, uint32_t(r9));
   // lwz r9,324(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 324);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_10_address());
   // stw r9,136(r1)
   guest::StoreU32(base, uint32_t(r1) + 136, uint32_t(r9));
   // li r9,445
@@ -10654,7 +10664,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r9,188(r1)
   guest::StoreU32(base, uint32_t(r1) + 188, uint32_t(r9));
   // lwz r9,328(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 328);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).edit_button_11_address());
   // stw r9,140(r1)
   guest::StoreU32(base, uint32_t(r1) + 140, uint32_t(r9));
   // li r9,447
@@ -10708,7 +10718,7 @@ lifted::Result f821C3A10(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r9,436
   r9 = uint64_t(int64_t(436));
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r9,252(r1)
@@ -10866,7 +10876,7 @@ loc_821C3C64:
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r10,660(r11)
-  guest::StoreU32(base, uint32_t(r11) + 660, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address(), uint32_t(r10));
 loc_821C3C9C:
   // cmpwi cr6,r27,12
   cr6 = lifted::Compare<int32_t>(int32_t(r27), 12, so);
@@ -10925,7 +10935,7 @@ loc_821C3CCC:
   // li r5,0
   r5 = uint64_t(int64_t(0));
   // lwz r11,660(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 660);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address());
   // mr r3,r31
   r3 = r31;
   // cmpwi cr6,r11,1
@@ -11088,7 +11098,7 @@ loc_821C3E24:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r26)
-  guest::StoreU32(base, uint32_t(r26) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r26)).transitions_address(), uint32_t(r11));
 loc_821C3E2C:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -11147,7 +11157,7 @@ lifted::Result f821C5350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lis r29,-32146
   r29 = uint64_t(int64_t(-2106720256));
   // lwz r30,0(r10)
-  r30 = guest::LoadU32(base, uint32_t(r10) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r10)).value_address());
   // li r10,3
   r10 = uint64_t(int64_t(3));
   // lwz r11,-31628(r11)
@@ -11191,17 +11201,17 @@ lifted::Result f821C5350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // addi r11,r11,260
   r11 = uint64_t(int64_t(int64_t(r11) + 260));
   // lwz r9,0(r10)
-  r9 = guest::LoadU32(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 68).current_slider_0_address());
   // stw r9,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 260).edit_slider_0_address(), uint32_t(r9));
   // lwz r9,4(r10)
-  r9 = guest::LoadU32(base, uint32_t(r10) + 4);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 68).current_slider_1_address());
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 260).edit_slider_1_address(), uint32_t(r9));
   // lwz r10,8(r10)
-  r10 = guest::LoadU32(base, uint32_t(r10) + 8);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 68).current_slider_2_address());
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 260).edit_slider_2_address(), uint32_t(r10));
   // lwz r11,-31624(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + -31624);
   // addi r10,r11,80
@@ -11209,17 +11219,17 @@ lifted::Result f821C5350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // addi r11,r11,272
   r11 = uint64_t(int64_t(int64_t(r11) + 272));
   // lwz r9,0(r10)
-  r9 = guest::LoadU32(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 80).current_p1_slider_0_address());
   // stw r9,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 272).edit_p1_slider_0_address(), uint32_t(r9));
   // lwz r9,4(r10)
-  r9 = guest::LoadU32(base, uint32_t(r10) + 4);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 80).current_p1_slider_1_address());
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 272).edit_p1_slider_1_address(), uint32_t(r9));
   // lwz r10,8(r10)
-  r10 = guest::LoadU32(base, uint32_t(r10) + 8);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 80).current_p1_slider_2_address());
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 272).edit_p1_slider_2_address(), uint32_t(r10));
   // bl 0x821bfa68
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x821BFA68, LIFTED_ARGS(0x821C5420, r31)); r3 = o.r3; f1 = o.f1; }
@@ -11232,7 +11242,7 @@ lifted::Result f821C5350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mr r3,r30
   r3 = r30;
   // stw r31,660(r11)
-  guest::StoreU32(base, uint32_t(r11) + 660, uint32_t(r31));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address(), uint32_t(r31));
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821C5438, r31)); r3 = o.r3; f1 = o.f1; }
@@ -11381,7 +11391,7 @@ loc_821C5498:
   // mr r3,r29
   r3 = r29;
   // stw r31,80(r11)
-  guest::StoreU32(base, uint32_t(r11) + 80, uint32_t(r31));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).visible_address(), uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821C5538, r31)); r3 = o.r3; f1 = o.f1; }
@@ -11392,7 +11402,7 @@ loc_821C5498:
   // mr r3,r29
   r3 = r29;
   // stw r31,80(r11)
-  guest::StoreU32(base, uint32_t(r11) + 80, uint32_t(r31));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).visible_address(), uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821C554C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -11403,7 +11413,7 @@ loc_821C5498:
   // mr r3,r29
   r3 = r29;
   // stw r31,80(r11)
-  guest::StoreU32(base, uint32_t(r11) + 80, uint32_t(r31));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).visible_address(), uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821C5560, r31)); r3 = o.r3; f1 = o.f1; }
@@ -11460,7 +11470,7 @@ lifted::Result f821C56B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r31,0
   r31 = uint64_t(int64_t(0));
   // li r10,12
@@ -11517,7 +11527,7 @@ lifted::Result f821C56B0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // li r3,-1
   r3 = uint64_t(int64_t(-1));
   // stw r31,660(r11)
-  guest::StoreU32(base, uint32_t(r11) + 660, uint32_t(r31));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address(), uint32_t(r31));
   // bl 0x821bfa68
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x821BFA68, LIFTED_ARGS(0x821C5750, r31)); r3 = o.r3; f1 = o.f1; }
@@ -11628,7 +11638,7 @@ lifted::Result f821C5900(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r30,0(r3)
-  r30 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r30 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r31,0
   r31 = uint64_t(int64_t(0));
   // li r10,6
@@ -11685,7 +11695,7 @@ lifted::Result f821C5900(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // li r3,-1
   r3 = uint64_t(int64_t(-1));
   // stw r31,660(r11)
-  guest::StoreU32(base, uint32_t(r11) + 660, uint32_t(r31));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address(), uint32_t(r31));
   // bl 0x821bfa68
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x821BFA68, LIFTED_ARGS(0x821C59A0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -11793,7 +11803,7 @@ lifted::Result f821C5A20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31600(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31600);
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 8);
+  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821c5a6c
@@ -11803,13 +11813,13 @@ lifted::Result f821C5A20(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi r10,0
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq 0x821c5a64
   if (cr0.eq) goto loc_821C5A64;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821C5A64:
   // li r9,1
   r9 = uint64_t(int64_t(1));
@@ -11828,13 +11838,13 @@ loc_821C5A6C:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi r10,0
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq 0x821c5a90
   if (cr0.eq) goto loc_821C5A90;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821C5A90:
   // li r9,2
   r9 = uint64_t(int64_t(2));
@@ -11842,17 +11852,17 @@ loc_821C5A94:
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
   // stw r9,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r3,4
   r3 = uint64_t(int64_t(4));
   // stw r10,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r10));
   // stw r8,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r8));
   // stw r10,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r10));
   // bl 0x821103f0
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821C5AB4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -11878,7 +11888,7 @@ loc_821C5AB8:
   // lwz r11,-31600(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31600);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
   // cmpwi cr6,r10,3
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 3, so);
   // bne cr6,0x821c5b14
@@ -11892,17 +11902,17 @@ loc_821C5AB8:
   // addi r11,r11,272
   r11 = uint64_t(int64_t(int64_t(r11) + 272));
   // lwz r9,0(r10)
-  r9 = guest::LoadU32(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 464).default_p1_slider_0_address());
   // stw r9,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 272).edit_p1_slider_0_address(), uint32_t(r9));
   // lwz r9,4(r10)
-  r9 = guest::LoadU32(base, uint32_t(r10) + 4);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 464).default_p1_slider_1_address());
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 272).edit_p1_slider_1_address(), uint32_t(r9));
   // lwz r10,8(r10)
-  r10 = guest::LoadU32(base, uint32_t(r10) + 8);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r10) - 464).default_p1_slider_2_address());
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::OptionsSettings(base, uint32_t(r11) - 272).edit_p1_slider_2_address(), uint32_t(r10));
   // bl 0x821c02b8
   // (left out: dead in C++)
   { const lifted::Result o = game::ControllerOptions::ShowSliders(base, r1, r13, r7, r8, r9, f1); r3 = o.r3; f1 = o.f1; }
@@ -11922,13 +11932,13 @@ loc_821C5B14:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi r10,0
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq 0x821c5b3c
   if (cr0.eq) goto loc_821C5B3C;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821C5B3C:
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
@@ -11937,13 +11947,13 @@ loc_821C5B3C:
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // stw r10,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r10));
   // stw r9,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
   // stw r8,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r8));
   // stw r10,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r10));
 loc_821C5B58:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
@@ -11985,7 +11995,7 @@ lifted::Result f821C5B70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31600(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31600);
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 8);
+  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821c5bc4
@@ -12000,13 +12010,13 @@ lifted::Result f821C5B70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // beq cr6,0x821c5bbc
   if (cr6.eq) goto loc_821C5BBC;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821C5BBC:
   // li r9,5
   r9 = uint64_t(int64_t(5));
@@ -12030,13 +12040,13 @@ loc_821C5BC4:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // beq cr6,0x821c5bf0
   if (cr6.eq) goto loc_821C5BF0;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821C5BF0:
   // li r9,6
   r9 = uint64_t(int64_t(6));
@@ -12044,15 +12054,15 @@ loc_821C5BF4:
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
   // stw r9,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
   // li r8,1
   r8 = uint64_t(int64_t(1));
   // stw r10,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r10));
   // stw r8,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r8));
   // stw r10,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r10));
   // b 0x821c5c5c
   goto loc_821C5C5C;
 loc_821C5C10:
@@ -12075,7 +12085,7 @@ loc_821C5C10:
   // lwz r11,-31600(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31600);
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
   // cmpwi cr6,r11,12
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 12, so);
   // bne cr6,0x821c5c5c
@@ -12140,7 +12150,7 @@ lifted::Result f821C5C70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31600(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31600);
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 8);
+  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821c5cbc
@@ -12150,13 +12160,13 @@ lifted::Result f821C5C70(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r5, 
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi cr6,r10,2
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 2, so);
   // beq cr6,0x821c5cb4
   if (cr6.eq) goto loc_821C5CB4;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821C5CB4:
   // li r9,9
   r9 = uint64_t(int64_t(9));
@@ -12175,13 +12185,13 @@ loc_821C5CBC:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi cr6,r10,2
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 2, so);
   // beq cr6,0x821c5ce0
   if (cr6.eq) goto loc_821C5CE0;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821C5CE0:
   // li r9,10
   r9 = uint64_t(int64_t(10));
@@ -12189,17 +12199,17 @@ loc_821C5CE4:
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
   // stw r9,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
   // li r8,2
   r8 = uint64_t(int64_t(2));
   // li r3,4
   r3 = uint64_t(int64_t(4));
   // stw r10,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r10));
   // stw r8,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r8));
   // stw r10,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r10));
   // bl 0x821103f0
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821C5D04, r31)); r3 = o.r3; f1 = o.f1; }
@@ -12225,7 +12235,7 @@ loc_821C5D08:
   // lwz r11,-31600(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + -31600);
   // lwz r11,0(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
   // cmpwi cr6,r11,6
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 6, so);
   // bne cr6,0x821c5d54
@@ -12295,9 +12305,9 @@ lifted::Result f821C5D68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821C5D90, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r27)
-  r11 = guest::LoadU32(base, uint32_t(r27) + 0);
+  r11 = guest::LoadU32(base, schema::ControllerOptions(base, uint32_t(r27)).fault_step_started_address());
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821c5f2c
@@ -12307,9 +12317,9 @@ lifted::Result f821C5D68(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31600(r28)
   r11 = guest::LoadU32(base, uint32_t(r28) + -31600);
   // lwz r29,4(r11)
-  r29 = guest::LoadU32(base, uint32_t(r11) + 4);
+  r29 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address());
   // lwz r30,0(r11)
-  r30 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r30 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address());
   // cmplwi cr6,r29,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r29), 1, so);
   // blt cr6,0x821c5e08
@@ -12491,7 +12501,7 @@ loc_821C5EC0:
   // lwz r11,-31600(r28)
   r11 = guest::LoadU32(base, uint32_t(r28) + -31600);
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 8);
+  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // bne cr6,0x821c5f00
@@ -12525,7 +12535,7 @@ loc_821C5F24:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r27)
-  guest::StoreU32(base, uint32_t(r27) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::ControllerOptions(base, uint32_t(r27)).fault_step_started_address(), uint32_t(r11));
 loc_821C5F2C:
   // li r3,1
   r3 = uint64_t(int64_t(1));
@@ -12556,7 +12566,7 @@ lifted::Result f821C5F38(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r31,r3
   r31 = r3;
   // lwz r11,0(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 0);
+  r11 = guest::LoadU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821c5f64
@@ -12567,7 +12577,7 @@ lifted::Result f821C5F38(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::ControllerOptions(base, uint32_t(r31)).fault_step_started_address(), uint32_t(r11));
 loc_821C5F64:
   // li r3,1
   r3 = uint64_t(int64_t(1));
@@ -12607,39 +12617,39 @@ lifted::Result f821C61B0(uint8_t* base, uint64_t r1, uint64_t r13, double f1) {
   // lwz r11,-31600(r9)
   r11 = guest::LoadU32(base, uint32_t(r9) + -31600);
   // stw r10,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_item_address(), uint32_t(r10));
   // stw r10,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address(), uint32_t(r10));
   // stw r10,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r10));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address(), uint32_t(r10));
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address(), uint32_t(r10));
   // stw r10,40(r11)
-  guest::StoreU32(base, uint32_t(r11) + 40, uint32_t(r10));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wrapped_address(), uint32_t(r10));
   // stw r10,48(r11)
-  guest::StoreU32(base, uint32_t(r11) + 48, uint32_t(r10));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).visible_row_address(), uint32_t(r10));
   // stw r10,52(r11)
-  guest::StoreU32(base, uint32_t(r11) + 52, uint32_t(r10));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_row_address(), uint32_t(r10));
   // stw r10,36(r11)
-  guest::StoreU32(base, uint32_t(r11) + 36, uint32_t(r10));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).side_address(), uint32_t(r10));
   // stw r10,64(r11)
-  guest::StoreU32(base, uint32_t(r11) + 64, uint32_t(r10));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r10));
   // stw r10,24(r11)
-  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r10));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).up_down_locked_address(), uint32_t(r10));
   // stw r10,28(r11)
-  guest::StoreU32(base, uint32_t(r11) + 28, uint32_t(r10));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).left_right_steps_address(), uint32_t(r10));
   // stw r10,32(r11)
-  guest::StoreU32(base, uint32_t(r11) + 32, uint32_t(r10));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).shoulders_step_address(), uint32_t(r10));
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // stw r7,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r7));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).last_item_address(), uint32_t(r7));
   // stw r8,20(r11)
-  guest::StoreU32(base, uint32_t(r11) + 20, uint32_t(r8));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wraps_address(), uint32_t(r8));
   // lwz r11,-31600(r9)
   r11 = guest::LoadU32(base, uint32_t(r9) + -31600);
   // stw r8,64(r11)
-  guest::StoreU32(base, uint32_t(r11) + 64, uint32_t(r8));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r8));
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r11,-31624(r11)
@@ -12693,7 +12703,7 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // lwz r29,0(r3)
-  r29 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r29 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r31,0
   r31 = uint64_t(int64_t(0));
   // li r9,1
@@ -12705,39 +12715,39 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lwz r11,-31600(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31600);
   // stw r31,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_item_address(), uint32_t(r31));
   // stw r8,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r8));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).last_item_address(), uint32_t(r8));
   // stw r9,20(r11)
-  guest::StoreU32(base, uint32_t(r11) + 20, uint32_t(r9));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wraps_address(), uint32_t(r9));
   // stw r31,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address(), uint32_t(r31));
   // stw r31,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address(), uint32_t(r31));
   // stw r31,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address(), uint32_t(r31));
   // stw r31,40(r11)
-  guest::StoreU32(base, uint32_t(r11) + 40, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wrapped_address(), uint32_t(r31));
   // stw r31,48(r11)
-  guest::StoreU32(base, uint32_t(r11) + 48, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).visible_row_address(), uint32_t(r31));
   // stw r31,52(r11)
-  guest::StoreU32(base, uint32_t(r11) + 52, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_row_address(), uint32_t(r31));
   // stw r31,36(r11)
-  guest::StoreU32(base, uint32_t(r11) + 36, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).side_address(), uint32_t(r31));
   // stw r31,64(r11)
-  guest::StoreU32(base, uint32_t(r11) + 64, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r31));
   // stw r31,24(r11)
-  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).up_down_locked_address(), uint32_t(r31));
   // stw r31,28(r11)
-  guest::StoreU32(base, uint32_t(r11) + 28, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).left_right_steps_address(), uint32_t(r31));
   // stw r31,32(r11)
-  guest::StoreU32(base, uint32_t(r11) + 32, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).shoulders_step_address(), uint32_t(r31));
   // lwz r11,-31600(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31600);
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // stw r9,64(r11)
-  guest::StoreU32(base, uint32_t(r11) + 64, uint32_t(r9));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r9));
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r11,-31624(r11)
@@ -12777,7 +12787,7 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mr r3,r30
   r3 = r30;
   // stw r31,80(r11)
-  guest::StoreU32(base, uint32_t(r11) + 80, uint32_t(r31));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).visible_address(), uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821C6308, r31)); r3 = o.r3; f1 = o.f1; }
@@ -12788,7 +12798,7 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mr r3,r30
   r3 = r30;
   // stw r31,80(r11)
-  guest::StoreU32(base, uint32_t(r11) + 80, uint32_t(r31));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).visible_address(), uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821C631C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -12799,7 +12809,7 @@ lifted::Result f821C6238(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mr r3,r30
   r3 = r30;
   // stw r31,80(r11)
-  guest::StoreU32(base, uint32_t(r11) + 80, uint32_t(r31));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).visible_address(), uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821C6330, r31)); r3 = o.r3; f1 = o.f1; }
@@ -12853,7 +12863,7 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // lwz r29,0(r3)
-  r29 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r29 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // li r31,0
   r31 = uint64_t(int64_t(0));
   // li r9,1
@@ -12865,39 +12875,39 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // lwz r11,-31600(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31600);
   // stw r31,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).first_item_address(), uint32_t(r31));
   // stw r8,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r8));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).last_item_address(), uint32_t(r8));
   // stw r9,20(r11)
-  guest::StoreU32(base, uint32_t(r11) + 20, uint32_t(r9));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wraps_address(), uint32_t(r9));
   // stw r31,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).cursor_address(), uint32_t(r31));
   // stw r31,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_address(), uint32_t(r31));
   // stw r31,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).moved_address(), uint32_t(r31));
   // stw r31,40(r11)
-  guest::StoreU32(base, uint32_t(r11) + 40, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).wrapped_address(), uint32_t(r31));
   // stw r31,48(r11)
-  guest::StoreU32(base, uint32_t(r11) + 48, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).visible_row_address(), uint32_t(r31));
   // stw r31,52(r11)
-  guest::StoreU32(base, uint32_t(r11) + 52, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).previous_row_address(), uint32_t(r31));
   // stw r31,36(r11)
-  guest::StoreU32(base, uint32_t(r11) + 36, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).side_address(), uint32_t(r31));
   // stw r31,64(r11)
-  guest::StoreU32(base, uint32_t(r11) + 64, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r31));
   // stw r31,24(r11)
-  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).up_down_locked_address(), uint32_t(r31));
   // stw r31,28(r11)
-  guest::StoreU32(base, uint32_t(r11) + 28, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).left_right_steps_address(), uint32_t(r31));
   // stw r31,32(r11)
-  guest::StoreU32(base, uint32_t(r11) + 32, uint32_t(r31));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).shoulders_step_address(), uint32_t(r31));
   // lwz r11,-31600(r10)
   r11 = guest::LoadU32(base, uint32_t(r10) + -31600);
   // lis r10,-32146
   r10 = uint64_t(int64_t(-2106720256));
   // stw r9,64(r11)
-  guest::StoreU32(base, uint32_t(r11) + 64, uint32_t(r9));
+  guest::StoreU32(base, schema::FrontEndMenu(base, uint32_t(r11)).player_address(), uint32_t(r9));
   // lis r11,-32146
   r11 = uint64_t(int64_t(-2106720256));
   // lwz r11,-31624(r11)
@@ -12937,7 +12947,7 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mr r3,r30
   r3 = r30;
   // stw r31,80(r11)
-  guest::StoreU32(base, uint32_t(r11) + 80, uint32_t(r31));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).visible_address(), uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821C6420, r31)); r3 = o.r3; f1 = o.f1; }
@@ -12948,7 +12958,7 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mr r3,r30
   r3 = r30;
   // stw r31,80(r11)
-  guest::StoreU32(base, uint32_t(r11) + 80, uint32_t(r31));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).visible_address(), uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821C6434, r31)); r3 = o.r3; f1 = o.f1; }
@@ -12959,7 +12969,7 @@ lifted::Result f821C6350(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r6, 
   // mr r3,r30
   r3 = r30;
   // stw r31,80(r11)
-  guest::StoreU32(base, uint32_t(r11) + 80, uint32_t(r31));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).visible_address(), uint32_t(r31));
   // bl 0x8259d658
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821C6448, r31)); r3 = o.r3; f1 = o.f1; }
@@ -13015,9 +13025,9 @@ lifted::Result f821C7188(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821C71B0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r26)
-  r11 = guest::LoadU32(base, uint32_t(r26) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r26)).transitions_address());
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // lis r27,-32146
   r27 = uint64_t(int64_t(-2106720256));
   // cmpwi cr6,r11,0
@@ -13070,9 +13080,9 @@ lifted::Result f821C7188(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r29,r30
   r29 = r30;
   // lwz r9,4(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 4);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).context_address());
   // lwz r10,664(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 664);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).category_cursor_address());
   // mulli r11,r9,7
   r11 = uint64_t(int64_t(static_cast<int64_t>(r9 * static_cast<uint64_t>(7))));
   // add r11,r11,r10
@@ -13220,7 +13230,7 @@ loc_821C72F4:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Play(base, LIFTED_ARGS(0x821C7314, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r24,0(r26)
-  guest::StoreU32(base, uint32_t(r26) + 0, uint32_t(r24));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r26)).transitions_address(), uint32_t(r24));
 loc_821C7318:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -13236,9 +13246,9 @@ loc_821C7318:
   // lwz r11,-31624(r27)
   r11 = guest::LoadU32(base, uint32_t(r27) + -31624);
   // lwz r9,4(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 4);
+  r9 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).context_address());
   // lwz r10,664(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 664);
+  r10 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).category_cursor_address());
   // mulli r11,r9,7
   r11 = uint64_t(int64_t(static_cast<int64_t>(r9 * static_cast<uint64_t>(7))));
   // add r11,r11,r10
@@ -13354,26 +13364,26 @@ loc_821C73E4:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi cr6,r10,2
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 2, so);
   // beq cr6,0x821c7420
   if (cr6.eq) goto loc_821C7420;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821C7420:
   // li r10,2
   r10 = uint64_t(int64_t(2));
   // stw r10,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r10));
 loc_821C7428:
   // stw r9,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r9));
 loc_821C742C:
   // stw r30,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r30));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).queued_step_address(), uint32_t(r30));
   // stw r30,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r30));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).page_address(), uint32_t(r30));
   // b 0x821c75d0
   goto loc_821C75D0;
 loc_821C7438:
@@ -13382,12 +13392,12 @@ loc_821C7438:
   // beq cr6,0x821c7444
   if (cr6.eq) goto loc_821C7444;
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
 loc_821C7444:
   // li r9,33
   r9 = uint64_t(int64_t(33));
   // stw r25,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r25));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r25));
   // b 0x821c75b8
   goto loc_821C75B8;
 loc_821C7450:
@@ -13431,20 +13441,20 @@ loc_821C7470:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // beq cr6,0x821c74ac
   if (cr6.eq) goto loc_821C74AC;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821C74AC:
   // li r10,4
   r10 = uint64_t(int64_t(4));
   // stw r24,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r24));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r24));
   // stw r10,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r10));
   // b 0x821c742c
   goto loc_821C742C;
 loc_821C74BC:
@@ -13453,7 +13463,7 @@ loc_821C74BC:
   // beq cr6,0x821c74c8
   if (cr6.eq) goto loc_821C74C8;
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
 loc_821C74C8:
   // li r9,5
   r9 = uint64_t(int64_t(5));
@@ -13461,9 +13471,9 @@ loc_821C74C8:
   r7 = uint64_t(int64_t(25));
 loc_821C74D0:
   // stw r7,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r7));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).step_address(), uint32_t(r7));
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r9));
   // b 0x821c75bc
   goto loc_821C75BC;
 loc_821C74DC:
@@ -13507,16 +13517,16 @@ loc_821C74FC:
   // lwz r11,-31604(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31604);
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::PageObject(base, uint32_t(r11)).page_address());
   // cmpwi r10,0
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq 0x821c7538
   if (cr0.eq) goto loc_821C7538;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821C7538:
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).next_page_address(), uint32_t(r9));
   // b 0x821c7428
   goto loc_821C7428;
 loc_821C7540:
@@ -13525,7 +13535,7 @@ loc_821C7540:
   // beq cr6,0x821c754c
   if (cr6.eq) goto loc_821C754C;
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::PageObject(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
 loc_821C754C:
   // li r9,3
   r9 = uint64_t(int64_t(3));
@@ -13646,9 +13656,9 @@ lifted::Result f821C79B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821C79E8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r30)).transitions_address());
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821c7a9c
@@ -13678,7 +13688,7 @@ lifted::Result f821C79B8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,-31624(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31624);
   // lwz r11,660(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 660);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821c7a3c
@@ -13745,7 +13755,7 @@ loc_821C7A60:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r30)
-  guest::StoreU32(base, uint32_t(r30) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r30)).transitions_address(), uint32_t(r11));
 loc_821C7A9C:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -13842,9 +13852,9 @@ lifted::Result f821C7BF0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821C7C20, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r30)).transitions_address());
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821c7cac
@@ -13871,7 +13881,7 @@ loc_821C7C4C:
   // lwz r11,-31624(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31624);
   // lwz r11,660(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 660);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821c7c68
@@ -13916,7 +13926,7 @@ loc_821C7C68:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r30)
-  guest::StoreU32(base, uint32_t(r30) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r30)).transitions_address(), uint32_t(r11));
 loc_821C7CAC:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -14013,9 +14023,9 @@ lifted::Result f821C7E00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821C7E30, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::OptionsMachine(base, uint32_t(r30)).transitions_address());
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821c7ebc
@@ -14042,7 +14052,7 @@ loc_821C7E5C:
   // lwz r11,-31624(r11)
   r11 = guest::LoadU32(base, uint32_t(r11) + -31624);
   // lwz r11,660(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 660);
+  r11 = guest::LoadU32(base, schema::OptionsSettings(base, uint32_t(r11)).ok_default_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821c7e78
@@ -14087,7 +14097,7 @@ loc_821C7E78:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,0(r30)
-  guest::StoreU32(base, uint32_t(r30) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::OptionsMachine(base, uint32_t(r30)).transitions_address(), uint32_t(r11));
 loc_821C7EBC:
   // li r4,0
   r4 = uint64_t(int64_t(0));
@@ -14194,29 +14204,29 @@ lifted::Result f821D4540(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovies::Find(base, LIFTED_ARGS(0x821D4580, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,10040(r30)
-  r10 = guest::LoadU32(base, uint32_t(r30) + 10040);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).category_menu_address());
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // lwz r11,8(r10)
-  r11 = guest::LoadU32(base, uint32_t(r10) + 8);
+  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r10)).moved_address());
   // cmpwi cr6,r11,-1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), -1, so);
   // bne cr6,0x821d48b4
   if (!cr6.eq) goto loc_821D48B4;
   // lwz r11,9656(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 9656);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).category_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // bne cr6,0x821d4680
   if (!cr6.eq) goto loc_821D4680;
   // lbz r9,9660(r30)
-  r9 = guest::LoadU8(base, uint32_t(r30) + 9660);
+  r9 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).item_address());
   // cmplwi cr6,r9,3
   cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 3, so);
   // bne cr6,0x821d4680
   if (!cr6.eq) goto loc_821D4680;
   // lwz r11,40(r10)
-  r11 = guest::LoadU32(base, uint32_t(r10) + 40);
+  r11 = guest::LoadU32(base, schema::FrontEndMenu(base, uint32_t(r10)).wrapped_address());
   // li r4,779
   r4 = uint64_t(int64_t(779));
   // mr r3,r31
@@ -14245,7 +14255,7 @@ lifted::Result f821D4540(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821D45E0, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r10,9663(r30)
-  r10 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r10 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r11,r3
   r11 = r3;
   // std r10,80(r1)
@@ -14266,9 +14276,9 @@ lifted::Result f821D4540(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   f0 = double(float(f13 * f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
   // lbz r11,9679(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9679);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).color_rows_address());
 loc_821D460C:
   // addi r4,r11,733
   r4 = uint64_t(int64_t(int64_t(r11) + 733));
@@ -14279,7 +14289,7 @@ loc_821D4610:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D4618, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,734
@@ -14288,7 +14298,7 @@ loc_821D4610:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D4628, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -14305,7 +14315,7 @@ loc_821D4610:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D4648, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // addi r4,r11,734
   r4 = uint64_t(int64_t(int64_t(r11) + 734));
   // b 0x821d4b90
@@ -14330,7 +14340,7 @@ loc_821D4654:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D4674, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // addi r4,r11,735
   r4 = uint64_t(int64_t(int64_t(r11) + 735));
   // b 0x821d4610
@@ -14341,7 +14351,7 @@ loc_821D4680:
   // bne cr6,0x821d4810
   if (!cr6.eq) goto loc_821D4810;
   // lbz r9,9660(r30)
-  r9 = guest::LoadU8(base, uint32_t(r30) + 9660);
+  r9 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).item_address());
   // cmplwi cr6,r9,4
   cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 4, so);
   // bne cr6,0x821d4810
@@ -14381,7 +14391,7 @@ loc_821D4680:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821D46D0, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r10,9663(r30)
-  r10 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r10 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r11,r3
   r11 = r3;
   // mr r3,r31
@@ -14404,16 +14414,16 @@ loc_821D4680:
   f0 = double(float(f13 * f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).y_address(), temp.u32);
   // lbz r11,9679(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9679);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).color_rows_address());
   // addi r4,r11,631
   r4 = uint64_t(int64_t(int64_t(r11) + 631));
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D4708, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,632
@@ -14422,7 +14432,7 @@ loc_821D4680:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D4718, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -14439,7 +14449,7 @@ loc_821D4680:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D4738, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,632
@@ -14448,7 +14458,7 @@ loc_821D4680:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::LoopNamed(base, LIFTED_ARGS(0x821D4748, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9679(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9679);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).color_rows_address());
 loc_821D474C:
   // addi r4,r11,570
   r4 = uint64_t(int64_t(int64_t(r11) + 570));
@@ -14459,7 +14469,7 @@ loc_821D4750:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D4758, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,571
@@ -14468,7 +14478,7 @@ loc_821D4750:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D4768, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -14485,7 +14495,7 @@ loc_821D4750:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D4788, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // addi r4,r11,571
   r4 = uint64_t(int64_t(int64_t(r11) + 571));
   // b 0x821d4b90
@@ -14510,7 +14520,7 @@ loc_821D4794:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D47B4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,633
@@ -14519,7 +14529,7 @@ loc_821D4794:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D47C4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,632
@@ -14528,7 +14538,7 @@ loc_821D4794:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D47D4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -14545,7 +14555,7 @@ loc_821D4794:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D47F4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,632
@@ -14554,7 +14564,7 @@ loc_821D4794:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::LoopNamed(base, LIFTED_ARGS(0x821D4804, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // addi r4,r11,572
   r4 = uint64_t(int64_t(int64_t(r11) + 572));
   // b 0x821d4750
@@ -14565,7 +14575,7 @@ loc_821D4810:
   // bne cr6,0x821d501c
   if (!cr6.eq) goto loc_821D501C;
   // lbz r11,9660(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9660);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).item_address());
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // bne 0x821d501c
@@ -14600,7 +14610,7 @@ loc_821D4810:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821D4858, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r10,9663(r30)
-  r10 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r10 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r11,r3
   r11 = r3;
   // std r10,80(r1)
@@ -14621,9 +14631,9 @@ loc_821D4810:
   f0 = double(float(f13 * f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
   // lbz r11,9679(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9679);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).color_rows_address());
   // b 0x821d4b4c
   goto loc_821D4B4C;
 loc_821D4888:
@@ -14646,7 +14656,7 @@ loc_821D4888:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D48A8, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // addi r4,r11,772
   r4 = uint64_t(int64_t(int64_t(r11) + 772));
   // b 0x821d4b50
@@ -14657,13 +14667,13 @@ loc_821D48B4:
   // bne cr6,0x821d4b9c
   if (!cr6.eq) goto loc_821D4B9C;
   // lwz r11,9656(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 9656);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).category_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // bne cr6,0x821d4964
   if (!cr6.eq) goto loc_821D4964;
   // lbz r9,9660(r30)
-  r9 = guest::LoadU8(base, uint32_t(r30) + 9660);
+  r9 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).item_address());
   // cmplwi cr6,r9,3
   cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 3, so);
   // bne cr6,0x821d4964
@@ -14698,7 +14708,7 @@ loc_821D48B4:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821D4908, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r10,9663(r30)
-  r10 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r10 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r11,r3
   r11 = r3;
   // li r4,734
@@ -14721,7 +14731,7 @@ loc_821D48B4:
   f0 = double(float(f13 * f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
   // b 0x821d4610
   goto loc_821D4610;
 loc_821D4938:
@@ -14746,7 +14756,7 @@ loc_821D4938:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D495C, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // b 0x821d460c
   goto loc_821D460C;
 loc_821D4964:
@@ -14755,7 +14765,7 @@ loc_821D4964:
   // bne cr6,0x821d4aac
   if (!cr6.eq) goto loc_821D4AAC;
   // lbz r9,9660(r30)
-  r9 = guest::LoadU8(base, uint32_t(r30) + 9660);
+  r9 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).item_address());
   // cmplwi cr6,r9,4
   cr6 = lifted::Compare<uint32_t>(uint32_t(r9), 4, so);
   // bne cr6,0x821d4aac
@@ -14795,7 +14805,7 @@ loc_821D4964:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821D49B4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r10,9663(r30)
-  r10 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r10 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r11,r3
   r11 = r3;
   // li r4,632
@@ -14820,12 +14830,12 @@ loc_821D4964:
   f0 = double(float(f13 * f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).y_address(), temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D49E8, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,632
@@ -14834,7 +14844,7 @@ loc_821D4964:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D49F8, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -14851,7 +14861,7 @@ loc_821D4964:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D4A18, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,632
@@ -14885,7 +14895,7 @@ loc_821D4A30:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D4A54, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,631
@@ -14894,7 +14904,7 @@ loc_821D4A30:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D4A64, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,632
@@ -14903,7 +14913,7 @@ loc_821D4A30:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D4A74, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -14920,7 +14930,7 @@ loc_821D4A30:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D4A94, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,632
@@ -14929,7 +14939,7 @@ loc_821D4A30:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::LoopNamed(base, LIFTED_ARGS(0x821D4AA4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // b 0x821d474c
   goto loc_821D474C;
 loc_821D4AAC:
@@ -14938,7 +14948,7 @@ loc_821D4AAC:
   // bne cr6,0x821d501c
   if (!cr6.eq) goto loc_821D501C;
   // lbz r11,9660(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9660);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).item_address());
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // bne 0x821d501c
@@ -14973,7 +14983,7 @@ loc_821D4AAC:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821D4AF4, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r10,9663(r30)
-  r10 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r10 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r11,r3
   r11 = r3;
   // li r4,771
@@ -14996,7 +15006,7 @@ loc_821D4AAC:
   f0 = double(float(f13 * f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
   // b 0x821d4b50
   goto loc_821D4B50;
 loc_821D4B24:
@@ -15021,7 +15031,7 @@ loc_821D4B24:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D4B48, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
 loc_821D4B4C:
   // addi r4,r11,770
   r4 = uint64_t(int64_t(int64_t(r11) + 770));
@@ -15032,7 +15042,7 @@ loc_821D4B50:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D4B58, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,771
@@ -15041,7 +15051,7 @@ loc_821D4B50:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821D4B68, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -15058,7 +15068,7 @@ loc_821D4B50:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821D4B88, r31)); r3 = o.r3; f1 = o.f1; }
   // lbz r11,9663(r30)
-  r11 = guest::LoadU8(base, uint32_t(r30) + 9663);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).bonnet_choice_address());
   // addi r4,r11,771
   r4 = uint64_t(int64_t(int64_t(r11) + 771));
 loc_821D4B90:
@@ -15095,13 +15105,13 @@ loc_821D4B9C:
   // beq 0x821d4ca0
   if (cr0.eq) goto loc_821D4CA0;
   // lwz r11,9656(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 9656);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).category_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // bne cr6,0x821d4c00
   if (!cr6.eq) goto loc_821D4C00;
   // lbz r10,9660(r30)
-  r10 = guest::LoadU8(base, uint32_t(r30) + 9660);
+  r10 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r30)).item_address());
   // cmplwi cr6,r10,3
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 3, so);
   // bne cr6,0x821d4c00
@@ -15774,7 +15784,7 @@ lifted::Result f821E9920(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,4(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 4);
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x821e9990
@@ -16089,7 +16099,7 @@ loc_821E9B84:
   f0 = double(float(f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
   // b 0x821e9c4c
   goto loc_821E9C4C;
 loc_821E9B98:
@@ -16290,7 +16300,7 @@ lifted::Result f821E9DD8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,4(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 4);
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x821e9e48
@@ -16583,7 +16593,7 @@ loc_821EA014:
   f0 = double(float(f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
   // b 0x821ea0dc
   goto loc_821EA0DC;
 loc_821EA028:
@@ -16789,7 +16799,7 @@ lifted::Result f821EA898(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,4(r29)
   r11 = guest::LoadU32(base, uint32_t(r29) + 4);
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x821ea910
@@ -16939,7 +16949,7 @@ loc_821EA9C0:
   if (cr0.eq) goto loc_821EAAD8;
 loc_821EA9EC:
   // lwz r11,9652(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 9652);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).state_address());
   // cmpwi cr6,r11,21
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 21, so);
   // beq cr6,0x821eaad8
@@ -16986,7 +16996,7 @@ loc_821EAA18:
   // mr r3,r31
   r3 = r31;
   // lwa r10,30512(r30)
-  r10 = uint64_t(int64_t(int32_t(guest::LoadU32(base, uint32_t(r30) + 30512))));
+  r10 = uint64_t(int64_t(int32_t(guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).kit0_value_0_address()))));
   // std r10,80(r1)
   guest::StoreU64(base, uint32_t(r1) + 80, r10);
   // lfd f0,80(r1)
@@ -17012,7 +17022,7 @@ loc_821EAA18:
   f0 = double(float(f0 * f30));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).x_address(), temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EAA74, r31)); r3 = o.r3; f1 = o.f1; }
@@ -17030,7 +17040,7 @@ loc_821EAA18:
   // mr r3,r31
   r3 = r31;
   // lwa r10,30516(r30)
-  r10 = uint64_t(int64_t(int32_t(guest::LoadU32(base, uint32_t(r30) + 30516))));
+  r10 = uint64_t(int64_t(int32_t(guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).kit0_value_1_address()))));
   // std r10,80(r1)
   guest::StoreU64(base, uint32_t(r1) + 80, r10);
   // lfd f0,80(r1)
@@ -17046,7 +17056,7 @@ loc_821EAA18:
   f0 = double(float(f0 * f30));
   // stfs f0,12(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 12, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).x_address(), temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EAAB0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -17056,7 +17066,7 @@ loc_821EAA18:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821EAAB8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwa r11,30520(r30)
-  r11 = uint64_t(int64_t(int32_t(guest::LoadU32(base, uint32_t(r30) + 30520))));
+  r11 = uint64_t(int64_t(int32_t(guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).kit0_value_2_address()))));
   // std r11,80(r1)
   guest::StoreU64(base, uint32_t(r1) + 80, r11);
   // lfd f0,80(r1)
@@ -17072,22 +17082,22 @@ loc_821EAA18:
   f0 = double(float(f0 * f30));
   // stfs f0,12(r3)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r3) + 12, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).x_address(), temp.u32);
 loc_821EAAD8:
   // lwz r11,9708(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 9708);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).refresh_pending_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // bne cr6,0x821eae50
   if (!cr6.eq) goto loc_821EAE50;
   // lwz r11,9652(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 9652);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).state_address());
   // cmpwi cr6,r11,21
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 21, so);
   // bne cr6,0x821eae50
   if (!cr6.eq) goto loc_821EAE50;
   // lwz r11,30532(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 30532);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).unknown_30532_address());
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // blt cr6,0x821eab48
@@ -17105,7 +17115,7 @@ loc_821EAAD8:
   // bge cr6,0x821eab54
   if (!cr6.lt) goto loc_821EAB54;
   // lwz r11,30540(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 30540);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).unknown_30540_address());
   // addi r4,r11,219
   r4 = uint64_t(int64_t(int64_t(r11) + 219));
   // b 0x821eab4c
@@ -17119,7 +17129,7 @@ loc_821EAB20:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EAB2C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30536(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 30536);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).unknown_30536_address());
   // addi r4,r11,294
   r4 = uint64_t(int64_t(int64_t(r11) + 294));
   // b 0x821eab4c
@@ -17145,7 +17155,7 @@ loc_821EAB4C:
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EAB54, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EAB54:
   // lwz r11,30508(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 30508);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).kit0_row_address());
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // blt cr6,0x821eadf4
@@ -17192,7 +17202,7 @@ loc_821EAB54:
   f0 = double(temp.f32);
   // stfs f0,68(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).alpha_address(), temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EABB0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -17222,7 +17232,7 @@ loc_821EAB54:
   f31 = double(temp.f32);
   // stfs f31,68(r10)
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r10) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).alpha_address(), temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EABE0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -17247,7 +17257,7 @@ loc_821EAB54:
   // stfs f31,68(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r11) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).alpha_address(), temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EAC08, r31)); r3 = o.r3; f1 = o.f1; }
@@ -17272,7 +17282,7 @@ loc_821EAB54:
   // stfs f31,68(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r11) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).alpha_address(), temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EAC30, r31)); r3 = o.r3; f1 = o.f1; }
@@ -17295,9 +17305,9 @@ loc_821EAB54:
   // stfs f31,68(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r11) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).alpha_address(), temp.u32);
   // lwz r11,30524(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 30524);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).kit0_value_3_address());
   // addi r4,r11,4
   r4 = uint64_t(int64_t(int64_t(r11) + 4));
   // bl 0x8259d658
@@ -17316,9 +17326,9 @@ loc_821EAB54:
   f0 = double(temp.f32);
   // stfs f0,68(r3)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r3) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).alpha_address(), temp.u32);
   // lwz r11,30528(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 30528);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).kit0_cursor_b_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,219
@@ -17327,7 +17337,7 @@ loc_821EAB54:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EAC80, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30528(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 30528);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).kit0_cursor_b_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -17344,7 +17354,7 @@ loc_821EAB54:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EACA0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30528(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 30528);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).kit0_cursor_b_address());
   // addi r4,r11,219
   r4 = uint64_t(int64_t(int64_t(r11) + 219));
   // b 0x821eae48
@@ -17378,7 +17388,7 @@ loc_821EACAC:
   f0 = double(temp.f32);
   // stfs f0,68(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).alpha_address(), temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EACE0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -17405,7 +17415,7 @@ loc_821EACAC:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::LoopNamed(base, LIFTED_ARGS(0x821EAD08, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30524(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 30524);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).kit0_value_3_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,294
@@ -17414,7 +17424,7 @@ loc_821EACAC:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EAD18, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30524(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 30524);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).kit0_value_3_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -17431,7 +17441,7 @@ loc_821EACAC:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EAD38, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30524(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 30524);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30)).kit0_value_3_address());
   // addi r4,r11,294
   r4 = uint64_t(int64_t(int64_t(r11) + 294));
   // b 0x821eae48
@@ -17465,7 +17475,7 @@ loc_821EAD44:
   f0 = double(temp.f32);
   // stfs f0,68(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).alpha_address(), temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EAD78, r31)); r3 = o.r3; f1 = o.f1; }
@@ -17517,7 +17527,7 @@ loc_821EAD9C:
   f0 = double(temp.f32);
   // stfs f0,68(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).alpha_address(), temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EADD0, r31)); r3 = o.r3; f1 = o.f1; }
@@ -17569,7 +17579,7 @@ loc_821EADF4:
   f0 = double(temp.f32);
   // stfs f0,68(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).alpha_address(), temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EAE28, r31)); r3 = o.r3; f1 = o.f1; }
@@ -17665,7 +17675,7 @@ lifted::Result f821EB2A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x821eb314
@@ -17815,7 +17825,7 @@ loc_821EB3C4:
   if (cr0.eq) goto loc_821EB5AC;
 loc_821EB3F0:
   // lwz r11,9652(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 9652);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).state_address());
   // cmpwi cr6,r11,22
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 22, so);
   // beq cr6,0x821eb5ac
@@ -17854,7 +17864,7 @@ loc_821EB41C:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821EB434, r31)); r3 = o.r3; f1 = o.f1; }
   // lwa r11,30552(r29)
-  r11 = uint64_t(int64_t(int32_t(guest::LoadU32(base, uint32_t(r29) + 30552))));
+  r11 = uint64_t(int64_t(int32_t(guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).kit1_value_1_address()))));
   // std r11,80(r1)
   guest::StoreU64(base, uint32_t(r1) + 80, r11);
   // lfd f0,80(r1)
@@ -17880,9 +17890,9 @@ loc_821EB41C:
   f0 = double(float(f13 * f0));
   // stfs f0,12(r3)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r3) + 12, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).x_address(), temp.u32);
   // lwz r11,30544(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30544);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).kit1_row_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne cr6,0x821eb5ac
@@ -17897,7 +17907,7 @@ loc_821EB41C:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EB480, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30548(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30548);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).kit1_value_0_address());
   // mr r4,r3
   r4 = r3;
   // li r5,450
@@ -17919,7 +17929,7 @@ loc_821EB41C:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EB4A8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30568(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30568);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).unknown_30568_address());
   // mr r4,r3
   r4 = r3;
   // li r5,450
@@ -18068,19 +18078,19 @@ loc_821EB594:
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EB5AC, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EB5AC:
   // lwz r11,9708(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 9708);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).refresh_pending_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // bne cr6,0x821eb8d0
   if (!cr6.eq) goto loc_821EB8D0;
   // lwz r11,9652(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 9652);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).state_address());
   // cmpwi cr6,r11,22
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 22, so);
   // bne cr6,0x821eb8d0
   if (!cr6.eq) goto loc_821EB8D0;
   // lwz r11,30564(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30564);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).unknown_30564_address());
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // blt cr6,0x821eb60c
@@ -18094,7 +18104,7 @@ loc_821EB5AC:
   // bne cr6,0x821eb618
   if (!cr6.eq) goto loc_821EB618;
   // lwz r11,30576(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30576);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).unknown_30576_address());
   // addi r4,r11,309
   r4 = uint64_t(int64_t(int64_t(r11) + 309));
   // b 0x821eb610
@@ -18108,7 +18118,7 @@ loc_821EB5EC:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EB5F8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30572(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30572);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).unknown_30572_address());
   // addi r4,r11,366
   r4 = uint64_t(int64_t(int64_t(r11) + 366));
   // b 0x821eb610
@@ -18129,7 +18139,7 @@ loc_821EB610:
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EB618, r31)); r3 = o.r3; f1 = o.f1; }
 loc_821EB618:
   // lwz r11,30544(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30544);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).kit1_row_address());
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // blt cr6,0x821eb874
@@ -18172,7 +18182,7 @@ loc_821EB618:
   f0 = double(temp.f32);
   // stfs f0,68(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).alpha_address(), temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EB66C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -18197,7 +18207,7 @@ loc_821EB618:
   f31 = double(temp.f32);
   // stfs f31,68(r10)
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r10) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).alpha_address(), temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EB694, r31)); r3 = o.r3; f1 = o.f1; }
@@ -18212,7 +18222,7 @@ loc_821EB618:
   // stfs f31,68(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r11) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).draw_context_address() + 4, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EB6AC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -18227,7 +18237,7 @@ loc_821EB618:
   // stfs f31,68(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r11) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).draw_context_address() + 4, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EB6C4, r31)); r3 = o.r3; f1 = o.f1; }
@@ -18242,7 +18252,7 @@ loc_821EB618:
   // stfs f31,68(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r11) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).draw_context_address() + 4, temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EB6DC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -18267,7 +18277,7 @@ loc_821EB618:
   // stfs f31,68(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r11) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).alpha_address(), temp.u32);
   // bl 0x8211a578
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FindNode(base, LIFTED_ARGS(0x821EB704, r31)); r3 = o.r3; f1 = o.f1; }
@@ -18290,9 +18300,9 @@ loc_821EB618:
   // stfs f31,68(r11)
   lifted::ScalarFloatMode();
   temp.f32 = float(f31);
-  guest::StoreU32(base, uint32_t(r11) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).alpha_address(), temp.u32);
   // lwz r11,30556(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30556);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).kit1_value_2_address());
   // addi r4,r11,4
   r4 = uint64_t(int64_t(int64_t(r11) + 4));
   // bl 0x8259d658
@@ -18315,16 +18325,16 @@ loc_821EB618:
   f0 = double(temp.f32);
   // stfs f0,68(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).alpha_address(), temp.u32);
   // lwz r11,30560(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30560);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).kit1_cursor_b_address());
   // addi r4,r11,309
   r4 = uint64_t(int64_t(int64_t(r11) + 309));
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EB758, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30560(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30560);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).kit1_cursor_b_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -18341,7 +18351,7 @@ loc_821EB618:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EB778, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30560(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30560);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).kit1_cursor_b_address());
   // addi r4,r11,309
   r4 = uint64_t(int64_t(int64_t(r11) + 309));
   // b 0x821eb8c8
@@ -18375,7 +18385,7 @@ loc_821EB784:
   f0 = double(temp.f32);
   // stfs f0,68(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).alpha_address(), temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EB7B8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -18402,7 +18412,7 @@ loc_821EB784:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::LoopNamed(base, LIFTED_ARGS(0x821EB7E0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30556(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30556);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).kit1_value_2_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,366
@@ -18411,7 +18421,7 @@ loc_821EB784:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EB7F0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30556(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30556);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).kit1_value_2_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -18428,7 +18438,7 @@ loc_821EB784:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EB810, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30556(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 30556);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).kit1_value_2_address());
   // addi r4,r11,366
   r4 = uint64_t(int64_t(int64_t(r11) + 366));
   // b 0x821eb8c8
@@ -18462,7 +18472,7 @@ loc_821EB81C:
   f0 = double(temp.f32);
   // stfs f0,68(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).alpha_address(), temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EB850, r31)); r3 = o.r3; f1 = o.f1; }
@@ -18514,7 +18524,7 @@ loc_821EB874:
   f0 = double(temp.f32);
   // stfs f0,68(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).alpha_address(), temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EB8A8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -18605,7 +18615,7 @@ lifted::Result f821EBA00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x821eba70
@@ -18853,7 +18863,7 @@ loc_821EBB94:
   goto loc_821EBDBC;
 loc_821EBBFC:
   // lwz r11,9708(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 9708);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).refresh_pending_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821ebdbc
@@ -18902,7 +18912,7 @@ loc_821EBBFC:
   // addi r30,r30,-31996
   r30 = uint64_t(int64_t(int64_t(r30) + -31996));
   // lwz r10,0(r30)
-  r10 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33540).interior_mode_address());
   // mulli r10,r10,40
   r10 = uint64_t(int64_t(static_cast<int64_t>(r10 * static_cast<uint64_t>(40))));
   // extsw r10,r10
@@ -18922,7 +18932,7 @@ loc_821EBC6C:
   f0 = double(float(f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
   // b 0x821ebd64
   goto loc_821EBD64;
 loc_821EBC80:
@@ -18953,14 +18963,14 @@ loc_821EBC80:
   // addi r30,r30,-31996
   r30 = uint64_t(int64_t(int64_t(r30) + -31996));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33540).interior_mode_address());
   // addi r5,r11,1
   r5 = uint64_t(int64_t(int64_t(r11) + 1));
   // b 0x821ebd64
   goto loc_821EBD64;
 loc_821EBCBC:
   // lwz r11,9708(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 9708);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).refresh_pending_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821ebdbc
@@ -19009,7 +19019,7 @@ loc_821EBCBC:
   // addi r30,r30,-31996
   r30 = uint64_t(int64_t(int64_t(r30) + -31996));
   // lwz r10,0(r30)
-  r10 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33540).interior_mode_address());
   // mulli r10,r10,40
   r10 = uint64_t(int64_t(static_cast<int64_t>(r10 * static_cast<uint64_t>(40))));
   // extsw r10,r10
@@ -19047,7 +19057,7 @@ loc_821EBD30:
   // addi r30,r30,-31996
   r30 = uint64_t(int64_t(int64_t(r30) + -31996));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33540).interior_mode_address());
   // addi r5,r11,3
   r5 = uint64_t(int64_t(int64_t(r11) + 3));
 loc_821EBD64:
@@ -19059,7 +19069,7 @@ loc_821EBD64:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Finish(base, LIFTED_ARGS(0x821EBD70, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33540).interior_mode_address());
   // li r4,27
   r4 = uint64_t(int64_t(27));
   // addi r5,r11,2
@@ -19070,7 +19080,7 @@ loc_821EBD64:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Finish(base, LIFTED_ARGS(0x821EBD84, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33540).interior_mode_address());
   // li r9,0
   r9 = uint64_t(int64_t(0));
   // li r8,0
@@ -19089,7 +19099,7 @@ loc_821EBD64:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Play(base, LIFTED_ARGS(0x821EBDA8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33540).interior_mode_address());
   // li r4,27
   r4 = uint64_t(int64_t(27));
   // addi r5,r11,2
@@ -19155,7 +19165,7 @@ lifted::Result f821EC038(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x821ec0a8
@@ -19326,7 +19336,7 @@ loc_821EC160:
   // addi r30,r30,-31988
   r30 = uint64_t(int64_t(int64_t(r30) + -31988));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // cmpwi cr6,r11,3
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 3, so);
   // bne cr6,0x821ec1c4
@@ -19347,7 +19357,7 @@ loc_821EC1C4:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC1CC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // addi r4,r11,501
   r4 = uint64_t(int64_t(int64_t(r11) + 501));
 loc_821EC1D4:
@@ -19365,7 +19375,7 @@ loc_821EC1D4:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EC1EC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // mr r3,r31
   r3 = r31;
   // cmpwi cr6,r11,3
@@ -19388,7 +19398,7 @@ loc_821EC20C:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC214, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // addi r4,r11,444
   r4 = uint64_t(int64_t(int64_t(r11) + 444));
 loc_821EC21C:
@@ -19411,7 +19421,7 @@ loc_821EC21C:
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x821CD868, LIFTED_ARGS(0x821EC23C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // cmpw cr6,r3,r11
   cr6 = lifted::Compare<int32_t>(int32_t(r3), int32_t(r11), so);
   // mr r3,r31
@@ -19438,7 +19448,7 @@ loc_821EC264:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC26C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // addi r4,r11,455
   r4 = uint64_t(int64_t(int64_t(r11) + 455));
   // b 0x821ec308
@@ -19455,19 +19465,19 @@ loc_821EC278:
   goto loc_821EC308;
 loc_821EC288:
   // lwz r11,4(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 4);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).unknown_33552_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x821ec694
   if (cr6.eq) goto loc_821EC694;
   // lwz r3,0(r30)
-  r3 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r3 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // li r4,158
   r4 = uint64_t(int64_t(158));
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, schema::TuningPagesScreenWord(base, uint32_t(r3)).value_address());
   // lwz r11,40(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 40);
+  r11 = guest::LoadU32(base, schema::TuningPagesIndexFault(base, uint32_t(r11)).fault_40_address());
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -19546,7 +19556,7 @@ loc_821EC308:
   goto loc_821EC694;
 loc_821EC324:
   // lwz r11,9708(r28)
-  r11 = guest::LoadU32(base, uint32_t(r28) + 9708);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r28)).refresh_pending_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821ec694
@@ -19600,7 +19610,7 @@ loc_821EC324:
   // mr r3,r31
   r3 = r31;
   // lwz r10,0(r30)
-  r10 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // mulli r10,r10,40
   r10 = uint64_t(int64_t(static_cast<int64_t>(r10 * static_cast<uint64_t>(40))));
   // extsw r10,r10
@@ -19616,12 +19626,12 @@ loc_821EC324:
   f0 = double(float(f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).y_address(), temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC3AC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,489
@@ -19630,7 +19640,7 @@ loc_821EC324:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC3BC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -19647,7 +19657,7 @@ loc_821EC324:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EC3DC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,489
@@ -19667,7 +19677,7 @@ loc_821EC3F4:
   // addi r30,r30,-31988
   r30 = uint64_t(int64_t(int64_t(r30) + -31988));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // cmpwi cr6,r11,3
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 3, so);
   // bne cr6,0x821ec4a8
@@ -19780,7 +19790,7 @@ loc_821EC4A8:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EC4C8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,488
@@ -19789,7 +19799,7 @@ loc_821EC4A8:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC4D8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,489
@@ -19798,7 +19808,7 @@ loc_821EC4A8:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC4E8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -19815,7 +19825,7 @@ loc_821EC4A8:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EC508, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,489
@@ -19824,14 +19834,14 @@ loc_821EC4A8:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::LoopNamed(base, LIFTED_ARGS(0x821EC518, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // addi r4,r11,427
   r4 = uint64_t(int64_t(int64_t(r11) + 427));
   // b 0x821ec64c
   goto loc_821EC64C;
 loc_821EC524:
   // lwz r11,9708(r28)
-  r11 = guest::LoadU32(base, uint32_t(r28) + 9708);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r28)).refresh_pending_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821ec694
@@ -19888,7 +19898,7 @@ loc_821EC524:
   f0 = double(temp.f32);
   // stfs f0,16(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).y_address(), temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC590, r31)); r3 = o.r3; f1 = o.f1; }
@@ -19951,14 +19961,14 @@ loc_821EC5CC:
   // addi r30,r30,-31988
   r30 = uint64_t(int64_t(int64_t(r30) + -31988));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // addi r4,r11,490
   r4 = uint64_t(int64_t(int64_t(r11) + 490));
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC604, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,489
@@ -19967,7 +19977,7 @@ loc_821EC5CC:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC614, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -19984,7 +19994,7 @@ loc_821EC5CC:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EC634, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,489
@@ -19993,7 +20003,7 @@ loc_821EC5CC:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::LoopNamed(base, LIFTED_ARGS(0x821EC644, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // addi r4,r11,429
   r4 = uint64_t(int64_t(int64_t(r11) + 429));
 loc_821EC64C:
@@ -20003,7 +20013,7 @@ loc_821EC64C:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC654, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,428
@@ -20012,7 +20022,7 @@ loc_821EC64C:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC664, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -20029,7 +20039,7 @@ loc_821EC64C:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EC684, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // addi r4,r11,428
   r4 = uint64_t(int64_t(int64_t(r11) + 428));
 loc_821EC68C:
@@ -20094,7 +20104,7 @@ lifted::Result f821EC7E0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x821ec850
@@ -20311,7 +20321,7 @@ loc_821EC968:
   // addi r30,r30,-31988
   r30 = uint64_t(int64_t(int64_t(r30) + -31988));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // cmpwi cr6,r11,3
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 3, so);
   // bne cr6,0x821ec9c0
@@ -20332,7 +20342,7 @@ loc_821EC9C0:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EC9C8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // addi r4,r11,515
   r4 = uint64_t(int64_t(int64_t(r11) + 515));
 loc_821EC9D0:
@@ -20350,7 +20360,7 @@ loc_821EC9D0:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EC9E8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // mr r3,r31
   r3 = r31;
   // cmpwi cr6,r11,3
@@ -20373,7 +20383,7 @@ loc_821ECA08:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821ECA10, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // addi r4,r11,466
   r4 = uint64_t(int64_t(int64_t(r11) + 466));
 loc_821ECA18:
@@ -20396,7 +20406,7 @@ loc_821ECA18:
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x821CD868, LIFTED_ARGS(0x821ECA38, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // cmpw cr6,r3,r11
   cr6 = lifted::Compare<int32_t>(int32_t(r3), int32_t(r11), so);
   // mr r3,r31
@@ -20423,7 +20433,7 @@ loc_821ECA60:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821ECA68, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33548).interior_pick_address());
   // addi r4,r11,476
   r4 = uint64_t(int64_t(int64_t(r11) + 476));
   // b 0x821eca80
@@ -20476,7 +20486,7 @@ loc_821ECA80:
   goto loc_821ECC5C;
 loc_821ECAC4:
   // lwz r11,9708(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 9708);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).refresh_pending_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821ecc5c
@@ -20521,7 +20531,7 @@ loc_821ECAC4:
   // addi r30,r30,-31980
   r30 = uint64_t(int64_t(int64_t(r30) + -31980));
   // lwz r10,0(r30)
-  r10 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33556).unknown_33556_address());
   // mulli r10,r10,40
   r10 = uint64_t(int64_t(static_cast<int64_t>(r10 * static_cast<uint64_t>(40))));
   // extsw r10,r10
@@ -20541,7 +20551,7 @@ loc_821ECB2C:
   f0 = double(float(f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovie(base, uint32_t(r11)).live_scene_address(), temp.u32);
   // b 0x821ecc14
   goto loc_821ECC14;
 loc_821ECB40:
@@ -20570,14 +20580,14 @@ loc_821ECB40:
   // addi r30,r30,-31980
   r30 = uint64_t(int64_t(int64_t(r30) + -31980));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33556).unknown_33556_address());
   // addi r4,r11,770
   r4 = uint64_t(int64_t(int64_t(r11) + 770));
   // b 0x821ecc14
   goto loc_821ECC14;
 loc_821ECB78:
   // lwz r11,9708(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 9708);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29)).refresh_pending_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821ecc5c
@@ -20622,7 +20632,7 @@ loc_821ECB78:
   // addi r30,r30,-31980
   r30 = uint64_t(int64_t(int64_t(r30) + -31980));
   // lwz r10,0(r30)
-  r10 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33556).unknown_33556_address());
   // mulli r10,r10,40
   r10 = uint64_t(int64_t(static_cast<int64_t>(r10 * static_cast<uint64_t>(40))));
   // extsw r10,r10
@@ -20658,7 +20668,7 @@ loc_821ECBE4:
   // addi r30,r30,-31980
   r30 = uint64_t(int64_t(int64_t(r30) + -31980));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33556).unknown_33556_address());
   // addi r4,r11,772
   r4 = uint64_t(int64_t(int64_t(r11) + 772));
 loc_821ECC14:
@@ -20668,7 +20678,7 @@ loc_821ECC14:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821ECC1C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33556).unknown_33556_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,771
@@ -20677,7 +20687,7 @@ loc_821ECC14:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821ECC2C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33556).unknown_33556_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -20694,7 +20704,7 @@ loc_821ECC14:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821ECC4C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33556).unknown_33556_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,771
@@ -20758,7 +20768,7 @@ lifted::Result f821ED108(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x821ed178
@@ -21212,7 +21222,7 @@ loc_821ED450:
   goto loc_821EDB54;
 loc_821ED468:
   // lwz r11,9708(r26)
-  r11 = guest::LoadU32(base, uint32_t(r26) + 9708);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r26)).refresh_pending_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821edb68
@@ -21224,7 +21234,7 @@ loc_821ED468:
   // addi r30,r30,-31964
   r30 = uint64_t(int64_t(int64_t(r30) + -31964));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33572).interior_pair_index_address());
   // cmpwi r11,0
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // bne 0x821ed49c
@@ -21245,7 +21255,7 @@ loc_821ED49C:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821ED4A4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33572).interior_pair_index_address());
   // addi r4,r11,145
   r4 = uint64_t(int64_t(int64_t(r11) + 145));
 loc_821ED4AC:
@@ -21263,7 +21273,7 @@ loc_821ED4AC:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821ED4C4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33572).interior_pair_index_address());
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // blt cr6,0x821ed5d8
@@ -21456,7 +21466,7 @@ loc_821ED5DC:
   goto loc_821ED9AC;
 loc_821ED614:
   // lwz r11,9708(r26)
-  r11 = guest::LoadU32(base, uint32_t(r26) + 9708);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r26)).refresh_pending_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821edb68
@@ -21468,7 +21478,7 @@ loc_821ED614:
   // addi r30,r30,-31964
   r30 = uint64_t(int64_t(int64_t(r30) + -31964));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33572).interior_pair_index_address());
   // cmpwi cr6,r11,4
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 4, so);
   // bne cr6,0x821ed648
@@ -21490,7 +21500,7 @@ loc_821ED648:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821ED650, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33572).interior_pair_index_address());
   // subfic r4,r11,155
   ca = uint32_t(r11) <= 155;
   r4 = static_cast<uint64_t>(155) - r11;
@@ -21509,7 +21519,7 @@ loc_821ED658:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821ED670, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33572).interior_pair_index_address());
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // blt cr6,0x821ed6b4
@@ -21552,7 +21562,7 @@ loc_821ED6B4:
   goto loc_821ED5DC;
 loc_821ED6BC:
   // lwz r11,9708(r26)
-  r11 = guest::LoadU32(base, uint32_t(r26) + 9708);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r26)).refresh_pending_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821edb68
@@ -21623,7 +21633,7 @@ loc_821ED6BC:
   f0 = double(temp.f32);
   // stfs f0,16(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).y_address(), temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821ED740, r31)); r3 = o.r3; f1 = o.f1; }
@@ -21700,14 +21710,14 @@ loc_821ED7BC:
   // li r4,6
   r4 = uint64_t(int64_t(6));
   // stw r11,80(r28)
-  guest::StoreU32(base, uint32_t(r28) + 80, uint32_t(r11));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r28)).visible_address(), uint32_t(r11));
   // mr r3,r29
   r3 = r29;
   // bl 0x8259d658
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821ED7CC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r27)
-  r11 = guest::LoadU32(base, uint32_t(r27) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r27) - 33564).interior_page_mode_address());
   // mulli r11,r11,5
   r11 = uint64_t(int64_t(static_cast<int64_t>(r11 * static_cast<uint64_t>(5))));
   // add r11,r11,r30
@@ -21717,7 +21727,7 @@ loc_821ED7BC:
   // cmpwi cr6,r30,5
   cr6 = lifted::Compare<int32_t>(int32_t(r30), 5, so);
   // stw r11,108(r3)
-  guest::StoreU32(base, uint32_t(r3) + 108, uint32_t(r11));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).texture_entry_address(), uint32_t(r11));
   // blt cr6,0x821ed780
   if (cr6.lt) goto loc_821ED780;
   // b 0x821edb68
@@ -21730,7 +21740,7 @@ loc_821ED7EC:
   // addi r30,r30,-31972
   r30 = uint64_t(int64_t(int64_t(r30) + -31972));
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33564).interior_page_mode_address());
   // cmpwi cr6,r11,4
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 4, so);
   // bne cr6,0x821ed894
@@ -21835,7 +21845,7 @@ loc_821ED894:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821ED8B4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33564).interior_page_mode_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,73
@@ -21844,7 +21854,7 @@ loc_821ED894:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821ED8C4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33564).interior_page_mode_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,74
@@ -21853,7 +21863,7 @@ loc_821ED894:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821ED8D4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33564).interior_page_mode_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -21870,12 +21880,12 @@ loc_821ED894:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821ED8F4, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33564).interior_page_mode_address());
   // b 0x821edb34
   goto loc_821EDB34;
 loc_821ED8FC:
   // lwz r11,9708(r26)
-  r11 = guest::LoadU32(base, uint32_t(r26) + 9708);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r26)).refresh_pending_address());
   // cmpwi cr6,r11,0
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // beq cr6,0x821edb68
@@ -21946,7 +21956,7 @@ loc_821ED8FC:
   f0 = double(temp.f32);
   // stfs f0,16(r10)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r10) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r10)).y_address(), temp.u32);
   // bl 0x8211df20
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821ED980, r31)); r3 = o.r3; f1 = o.f1; }
@@ -21988,7 +21998,7 @@ loc_821ED9B8:
   // addi r29,r29,-31972
   r29 = uint64_t(int64_t(int64_t(r29) + -31972));
   // lwz r11,0(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29) - 33564).interior_page_mode_address());
   // cmpwi cr6,r11,3
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 3, so);
   // bne cr6,0x821edad0
@@ -22116,14 +22126,14 @@ loc_821EDAA0:
   // li r4,6
   r4 = uint64_t(int64_t(6));
   // stw r11,80(r27)
-  guest::StoreU32(base, uint32_t(r27) + 80, uint32_t(r11));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r27)).visible_address(), uint32_t(r11));
   // mr r3,r28
   r3 = r28;
   // bl 0x8259d658
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::Child(base, LIFTED_ARGS(0x821EDAB0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29) - 33564).interior_page_mode_address());
   // mulli r11,r11,5
   r11 = uint64_t(int64_t(static_cast<int64_t>(r11 * static_cast<uint64_t>(5))));
   // add r11,r11,r30
@@ -22133,7 +22143,7 @@ loc_821EDAA0:
   // cmpwi cr6,r30,5
   cr6 = lifted::Compare<int32_t>(int32_t(r30), 5, so);
   // stw r11,108(r3)
-  guest::StoreU32(base, uint32_t(r3) + 108, uint32_t(r11));
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).texture_entry_address(), uint32_t(r11));
   // blt cr6,0x821eda64
   if (cr6.lt) goto loc_821EDA64;
   // b 0x821edb68
@@ -22158,7 +22168,7 @@ loc_821EDAD0:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EDAF0, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29) - 33564).interior_page_mode_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,75
@@ -22167,7 +22177,7 @@ loc_821EDAD0:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EDB00, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29) - 33564).interior_page_mode_address());
   // mr r3,r31
   r3 = r31;
   // addi r4,r11,74
@@ -22176,7 +22186,7 @@ loc_821EDAD0:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::FinishNamed(base, LIFTED_ARGS(0x821EDB10, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29) - 33564).interior_page_mode_address());
   // li r8,0
   r8 = uint64_t(int64_t(0));
   // li r7,0
@@ -22193,7 +22203,7 @@ loc_821EDAD0:
   // (left out: dead in C++)
   { const lifted::Result o = game::UiMovie::PlayNamed(base, LIFTED_ARGS(0x821EDB30, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,0(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 0);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r29) - 33564).interior_page_mode_address());
 loc_821EDB34:
   // addi r4,r11,74
   r4 = uint64_t(int64_t(int64_t(r11) + 74));
@@ -22281,7 +22291,7 @@ lifted::Result f821EDCA8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // lwz r31,0(r3)
-  r31 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r31 = guest::LoadU32(base, schema::UiMovieTableValue(base, uint32_t(r3)).value_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // beq cr6,0x821edd18
@@ -22411,7 +22421,7 @@ loc_821EDD9C:
   // addi r30,r30,-31960
   r30 = uint64_t(int64_t(int64_t(r30) + -31960));
   // lwz r4,0(r30)
-  r4 = guest::LoadU32(base, uint32_t(r30) + 0);
+  r4 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r30) - 33576).interior_slot_address());
   // bl 0x821ce188
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x821CE188, LIFTED_ARGS(0x821EDDDC, r31)); r3 = o.r3; f1 = o.f1; }
@@ -22697,7 +22707,7 @@ loc_821EDF4C:
   f0 = double(float(f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).y_address(), temp.u32);
   // lwz r4,0(r30)
   r4 = guest::LoadU32(base, uint32_t(r30) + 0);
   // bl 0x821ce188
@@ -22786,7 +22796,7 @@ loc_821EE02C:
   f0 = double(temp.f32);
   // stfs f0,68(r3)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r3) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).alpha_address(), temp.u32);
 loc_821EE064:
   // li r4,115
   r4 = uint64_t(int64_t(115));
@@ -22911,7 +22921,7 @@ loc_821EE100:
   f0 = double(temp.f32);
   // stfs f0,68(r3)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r3) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).alpha_address(), temp.u32);
 loc_821EE13C:
   // lwz r11,0(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 0);
@@ -22989,7 +22999,7 @@ loc_821EE148:
   f0 = double(float(f0));
   // stfs f0,16(r11)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r11) + 16, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r11)).y_address(), temp.u32);
   // lwz r4,0(r30)
   r4 = guest::LoadU32(base, uint32_t(r30) + 0);
   // bl 0x821ce188
@@ -23078,7 +23088,7 @@ loc_821EE228:
   f0 = double(temp.f32);
   // stfs f0,68(r3)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r3) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).alpha_address(), temp.u32);
 loc_821EE260:
   // li r4,111
   r4 = uint64_t(int64_t(111));
@@ -23201,7 +23211,7 @@ loc_821EE2F8:
   f0 = double(temp.f32);
   // stfs f0,68(r3)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r3) + 68, temp.u32);
+  guest::StoreU32(base, schema::UiMovieNode(base, uint32_t(r3)).alpha_address(), temp.u32);
 loc_821EE334:
   // lwz r11,0(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 0);
@@ -23430,13 +23440,13 @@ loc_821EF400:
   // li r9,-1
   r9 = uint64_t(int64_t(-1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // stw r11,9716(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9716, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).command_first_run_address(), uint32_t(r11));
   // lbz r11,10008(r31)
-  r11 = guest::LoadU8(base, uint32_t(r31) + 10008);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address());
   // stw r7,30500(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30500, uint32_t(r7));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_kind_address(), uint32_t(r7));
   // addi r11,r11,2439
   r11 = uint64_t(int64_t(int64_t(r11) + 2439));
   // rlwinm r11,r11,2,0,29
@@ -23444,39 +23454,39 @@ loc_821EF400:
   // stwx r8,r11,r31
   guest::StoreU32(base, uint32_t(r11) + uint32_t(r31), uint32_t(r8));
   // lbz r8,10008(r31)
-  r8 = guest::LoadU8(base, uint32_t(r31) + 10008);
+  r8 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address());
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // addi r8,r8,1
   r8 = uint64_t(int64_t(int64_t(r8) + 1));
   // stw r10,9652(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9652, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address(), uint32_t(r10));
   // stb r8,10008(r31)
-  guest::StoreU8(base, uint32_t(r31) + 10008, uint8_t(r8));
+  guest::StoreU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address(), uint8_t(r8));
   // stw r10,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).resume_address(), uint32_t(r10));
   // stw r10,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address(), uint32_t(r10));
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
   // stw r9,20(r11)
-  guest::StoreU32(base, uint32_t(r11) + 20, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).step_address(), uint32_t(r9));
   // stw r9,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).current_address(), uint32_t(r9));
   // stw r7,24(r11)
-  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r7));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).started_address(), uint32_t(r7));
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // lwz r8,9652(r31)
-  r8 = guest::LoadU32(base, uint32_t(r31) + 9652);
+  r8 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address());
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address());
   // cmpw cr6,r8,r10
   cr6 = lifted::Compare<int32_t>(int32_t(r8), int32_t(r10), so);
   // beq cr6,0x821ef4a8
   if (cr6.eq) goto loc_821EF4A8;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821EF4A8:
   // li r10,12
   r10 = uint64_t(int64_t(12));
@@ -23519,13 +23529,13 @@ loc_821EF4B0:
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lbz r11,10008(r31)
-  r11 = guest::LoadU8(base, uint32_t(r31) + 10008);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address());
   // addi r10,r11,255
   r10 = uint64_t(int64_t(int64_t(r11) + 255));
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // clrlwi r10,r10,24
   r10 = uint32_t(r10) & 0xFF;
   // mr r8,r10
@@ -23533,49 +23543,49 @@ loc_821EF4B0:
   // addi r8,r8,2439
   r8 = uint64_t(int64_t(int64_t(r8) + 2439));
   // stb r10,10008(r31)
-  guest::StoreU8(base, uint32_t(r31) + 10008, uint8_t(r10));
+  guest::StoreU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address(), uint8_t(r10));
   // rlwinm r8,r8,2,0,29
   r8 = __builtin_rotateleft64(uint32_t(r8) | (r8 << 32), 2) & 0xFFFFFFFC;
   // lwzx r10,r8,r31
   r10 = guest::LoadU32(base, uint32_t(r8) + uint32_t(r31));
   // stw r10,9652(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9652, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address(), uint32_t(r10));
   // stw r9,20(r11)
-  guest::StoreU32(base, uint32_t(r11) + 20, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).step_address(), uint32_t(r9));
   // stw r9,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).current_address(), uint32_t(r9));
   // stw r7,24(r11)
-  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r7));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).started_address(), uint32_t(r7));
   // stw r10,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).resume_address(), uint32_t(r10));
   // stw r10,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address(), uint32_t(r10));
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // lwz r8,9652(r31)
-  r8 = guest::LoadU32(base, uint32_t(r31) + 9652);
+  r8 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address());
   // lwz r10,0(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r10 = guest::LoadU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address());
   // cmpw cr6,r8,r10
   cr6 = lifted::Compare<int32_t>(int32_t(r8), int32_t(r10), so);
   // beq cr6,0x821ef54c
   if (cr6.eq) goto loc_821EF54C;
   // stw r10,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r10));
 loc_821EF54C:
   // li r10,2
   r10 = uint64_t(int64_t(2));
 loc_821EF550:
   // stw r10,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).current_address(), uint32_t(r10));
   // stw r9,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).next_address(), uint32_t(r9));
   // stw r8,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).resume_address(), uint32_t(r8));
   // stw r9,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address(), uint32_t(r9));
   // b 0x821ef5c4
   goto loc_821EF5C4;
 loc_821EF564:
@@ -23585,7 +23595,7 @@ loc_821EF564:
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821EF56C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,30492(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30492);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_group_address());
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // addi r10,r10,1
@@ -23593,16 +23603,16 @@ loc_821EF564:
   // cmpwi cr6,r10,3
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 3, so);
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // stw r10,30492(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30492, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_group_address(), uint32_t(r10));
   // ble cr6,0x821ef5bc
   if (!cr6.gt) goto loc_821EF5BC;
   // li r10,0
   r10 = uint64_t(int64_t(0));
 loc_821EF58C:
   // stw r10,30492(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30492, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_group_address(), uint32_t(r10));
   // b 0x821ef5c0
   goto loc_821EF5C0;
 loc_821EF594:
@@ -23612,7 +23622,7 @@ loc_821EF594:
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821EF59C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,30492(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30492);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_group_address());
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // addic. r10,r10,-1
@@ -23620,9 +23630,9 @@ loc_821EF594:
   r10 = uint64_t(int64_t(int64_t(r10) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // stw r10,30492(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30492, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_group_address(), uint32_t(r10));
   // bge 0x821ef5bc
   if (!cr0.lt) goto loc_821EF5BC;
   // li r10,3
@@ -23634,7 +23644,7 @@ loc_821EF5BC:
   r11 = uint64_t(int64_t(0));
 loc_821EF5C0:
   // stw r11,30496(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30496, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30496_address(), uint32_t(r11));
 loc_821EF5C4:
   // mr r3,r31
   r3 = r31;
@@ -23823,11 +23833,11 @@ loc_821EF6C8:
   // li r10,20
   r10 = uint64_t(int64_t(20));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // stw r11,9716(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9716, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).command_first_run_address(), uint32_t(r11));
   // lbz r11,10008(r31)
-  r11 = guest::LoadU8(base, uint32_t(r31) + 10008);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address());
   // addi r11,r11,2439
   r11 = uint64_t(int64_t(int64_t(r11) + 2439));
   // rlwinm r11,r11,2,0,29
@@ -23835,19 +23845,19 @@ loc_821EF6C8:
   // stwx r10,r11,r31
   guest::StoreU32(base, uint32_t(r11) + uint32_t(r31), uint32_t(r10));
   // lbz r10,10008(r31)
-  r10 = guest::LoadU8(base, uint32_t(r31) + 10008);
+  r10 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address());
   // lwz r11,30500(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30500);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_kind_address());
   // addi r10,r10,1
   r10 = uint64_t(int64_t(int64_t(r10) + 1));
   // cmpwi r11,0
   cr0 = lifted::Compare<int32_t>(int32_t(r11), 0, so);
   // stb r10,10008(r31)
-  guest::StoreU8(base, uint32_t(r31) + 10008, uint8_t(r10));
+  guest::StoreU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address(), uint8_t(r10));
   // bne 0x821ef810
   if (!cr0.eq) goto loc_821EF810;
   // lwz r10,30492(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30492);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_group_address());
   // cmpwi cr6,r10,3
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 3, so);
   // beq cr6,0x821ef78c
@@ -23875,17 +23885,17 @@ loc_821EF6C8:
   // rlwinm r8,r8,2,0,29
   r8 = __builtin_rotateleft64(uint32_t(r8) | (r8 << 32), 2) & 0xFFFFFFFC;
   // stw r11,30508(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30508, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_row_address(), uint32_t(r11));
   // rlwinm r7,r7,2,0,29
   r7 = __builtin_rotateleft64(uint32_t(r7) | (r7 << 32), 2) & 0xFFFFFFFC;
   // lwzx r9,r9,r31
   r9 = guest::LoadU32(base, uint32_t(r9) + uint32_t(r31));
   // stw r9,30512(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30512, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_0_address(), uint32_t(r9));
   // lwzx r9,r8,r31
   r9 = guest::LoadU32(base, uint32_t(r8) + uint32_t(r31));
   // stw r9,30516(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30516, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_1_address(), uint32_t(r9));
   // lwzx r9,r7,r31
   r9 = guest::LoadU32(base, uint32_t(r7) + uint32_t(r31));
   // b 0x821ef7a0
@@ -23896,64 +23906,64 @@ loc_821EF78C:
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r9,30512(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30512, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_0_address(), uint32_t(r9));
   // stw r11,30508(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30508, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_row_address(), uint32_t(r11));
   // stw r9,30516(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30516, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_1_address(), uint32_t(r9));
 loc_821EF7A0:
   // addi r10,r10,7661
   r10 = uint64_t(int64_t(int64_t(r10) + 7661));
   // stw r11,30528(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30528, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address(), uint32_t(r11));
   // stw r9,30520(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30520, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_2_address(), uint32_t(r9));
   // li r8,21
   r8 = uint64_t(int64_t(21));
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // lwz r9,10036(r31)
-  r9 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r9 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // lwzx r7,r10,r31
   r7 = guest::LoadU32(base, uint32_t(r10) + uint32_t(r31));
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
   // stw r11,30532(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30532, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30532_address(), uint32_t(r11));
   // stw r11,30540(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30540, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30540_address(), uint32_t(r11));
   // stw r8,9652(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9652, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address(), uint32_t(r8));
   // stw r7,30524(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30524, uint32_t(r7));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_3_address(), uint32_t(r7));
   // rotlwi r7,r7,0
   r7 = __builtin_rotateleft32(uint32_t(r7), 0);
   // stw r7,30536(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30536, uint32_t(r7));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30536_address(), uint32_t(r7));
   // stw r8,4(r9)
-  guest::StoreU32(base, uint32_t(r9) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).resume_address(), uint32_t(r8));
   // stw r8,0(r9)
-  guest::StoreU32(base, uint32_t(r9) + 0, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).page_address(), uint32_t(r8));
   // stw r8,8(r9)
-  guest::StoreU32(base, uint32_t(r9) + 8, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).previous_page_address(), uint32_t(r8));
   // stw r10,20(r9)
-  guest::StoreU32(base, uint32_t(r9) + 20, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).step_address(), uint32_t(r10));
   // stw r10,12(r9)
-  guest::StoreU32(base, uint32_t(r9) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).current_address(), uint32_t(r10));
   // stw r11,24(r9)
-  guest::StoreU32(base, uint32_t(r9) + 24, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).started_address(), uint32_t(r11));
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // lwz r8,9652(r31)
-  r8 = guest::LoadU32(base, uint32_t(r31) + 9652);
+  r8 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address());
   // lwz r9,0(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r9 = guest::LoadU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address());
   // cmpw cr6,r8,r9
   cr6 = lifted::Compare<int32_t>(int32_t(r8), int32_t(r9), so);
   // beq cr6,0x821ef808
   if (cr6.eq) goto loc_821EF808;
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
 loc_821EF808:
   // li r9,13
   r9 = uint64_t(int64_t(13));
@@ -23965,7 +23975,7 @@ loc_821EF810:
   // bne cr6,0x821ef8e8
   if (!cr6.eq) goto loc_821EF8E8;
   // lwz r10,30492(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30492);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_group_address());
   // cmpwi cr6,r10,3
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 3, so);
   // beq cr6,0x821ef860
@@ -23991,11 +24001,11 @@ loc_821EF810:
   // rlwinm r8,r8,2,0,29
   r8 = __builtin_rotateleft64(uint32_t(r8) | (r8 << 32), 2) & 0xFFFFFFFC;
   // stw r11,30544(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30544, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_row_address(), uint32_t(r11));
   // lwzx r9,r9,r31
   r9 = guest::LoadU32(base, uint32_t(r9) + uint32_t(r31));
   // stw r9,30548(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30548, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_0_address(), uint32_t(r9));
   // lwzx r9,r8,r31
   r9 = guest::LoadU32(base, uint32_t(r8) + uint32_t(r31));
   // b 0x821ef870
@@ -24006,66 +24016,66 @@ loc_821EF860:
   // li r9,180
   r9 = uint64_t(int64_t(180));
   // stw r11,30544(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30544, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_row_address(), uint32_t(r11));
   // stw r11,30548(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30548, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_0_address(), uint32_t(r11));
 loc_821EF870:
   // addi r10,r10,7677
   r10 = uint64_t(int64_t(int64_t(r10) + 7677));
   // stw r9,30552(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30552, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_1_address(), uint32_t(r9));
   // stw r11,30560(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30560, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address(), uint32_t(r11));
   // li r8,22
   r8 = uint64_t(int64_t(22));
   // rlwinm r10,r10,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r10) | (r10 << 32), 2) & 0xFFFFFFFC;
   // lwz r9,30548(r31)
-  r9 = guest::LoadU32(base, uint32_t(r31) + 30548);
+  r9 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_0_address());
   // lwzx r7,r10,r31
   r7 = guest::LoadU32(base, uint32_t(r10) + uint32_t(r31));
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
   // stw r9,30568(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30568, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30568_address(), uint32_t(r9));
   // lwz r9,10036(r31)
-  r9 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r9 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // stw r11,30564(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30564, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30564_address(), uint32_t(r11));
   // stw r11,30576(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30576, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30576_address(), uint32_t(r11));
   // stw r7,30556(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30556, uint32_t(r7));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_2_address(), uint32_t(r7));
   // rotlwi r7,r7,0
   r7 = __builtin_rotateleft32(uint32_t(r7), 0);
   // stw r8,9652(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9652, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address(), uint32_t(r8));
   // stw r7,30572(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30572, uint32_t(r7));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30572_address(), uint32_t(r7));
   // stw r8,4(r9)
-  guest::StoreU32(base, uint32_t(r9) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).resume_address(), uint32_t(r8));
   // stw r8,0(r9)
-  guest::StoreU32(base, uint32_t(r9) + 0, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).page_address(), uint32_t(r8));
   // stw r8,8(r9)
-  guest::StoreU32(base, uint32_t(r9) + 8, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).previous_page_address(), uint32_t(r8));
   // stw r10,20(r9)
-  guest::StoreU32(base, uint32_t(r9) + 20, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).step_address(), uint32_t(r10));
   // stw r10,12(r9)
-  guest::StoreU32(base, uint32_t(r9) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).current_address(), uint32_t(r10));
   // stw r11,24(r9)
-  guest::StoreU32(base, uint32_t(r9) + 24, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).started_address(), uint32_t(r11));
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // lwz r8,9652(r31)
-  r8 = guest::LoadU32(base, uint32_t(r31) + 9652);
+  r8 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address());
   // lwz r9,0(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r9 = guest::LoadU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address());
   // cmpw cr6,r8,r9
   cr6 = lifted::Compare<int32_t>(int32_t(r8), int32_t(r9), so);
   // beq cr6,0x821ef8e0
   if (cr6.eq) goto loc_821EF8E0;
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
 loc_821EF8E0:
   // li r9,14
   r9 = uint64_t(int64_t(14));
@@ -24079,39 +24089,39 @@ loc_821EF8E8:
   // li r8,14
   r8 = uint64_t(int64_t(14));
   // lwz r9,10036(r31)
-  r9 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r9 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
   // stw r8,9652(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9652, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address(), uint32_t(r8));
   // stw r11,9672(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9672, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).remove_cursor_address(), uint32_t(r11));
   // stw r8,4(r9)
-  guest::StoreU32(base, uint32_t(r9) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).resume_address(), uint32_t(r8));
   // stw r8,0(r9)
-  guest::StoreU32(base, uint32_t(r9) + 0, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).page_address(), uint32_t(r8));
   // stw r8,8(r9)
-  guest::StoreU32(base, uint32_t(r9) + 8, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).previous_page_address(), uint32_t(r8));
   // stw r10,20(r9)
-  guest::StoreU32(base, uint32_t(r9) + 20, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).step_address(), uint32_t(r10));
   // stw r10,12(r9)
-  guest::StoreU32(base, uint32_t(r9) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).current_address(), uint32_t(r10));
   // stw r11,24(r9)
-  guest::StoreU32(base, uint32_t(r9) + 24, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r9)).started_address(), uint32_t(r11));
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // lwz r8,9652(r31)
-  r8 = guest::LoadU32(base, uint32_t(r31) + 9652);
+  r8 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address());
   // lwz r9,0(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r9 = guest::LoadU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address());
   // cmpw cr6,r8,r9
   cr6 = lifted::Compare<int32_t>(int32_t(r8), int32_t(r9), so);
   // beq cr6,0x821ef938
   if (cr6.eq) goto loc_821EF938;
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
 loc_821EF938:
   // li r9,63
   r9 = uint64_t(int64_t(63));
@@ -24154,13 +24164,13 @@ loc_821EF940:
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lbz r11,10008(r31)
-  r11 = guest::LoadU8(base, uint32_t(r31) + 10008);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address());
   // addi r9,r11,255
   r9 = uint64_t(int64_t(int64_t(r11) + 255));
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // clrlwi r9,r9,24
   r9 = uint32_t(r9) & 0xFF;
   // mr r8,r9
@@ -24168,49 +24178,49 @@ loc_821EF940:
   // addi r8,r8,2439
   r8 = uint64_t(int64_t(int64_t(r8) + 2439));
   // stb r9,10008(r31)
-  guest::StoreU8(base, uint32_t(r31) + 10008, uint8_t(r9));
+  guest::StoreU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address(), uint8_t(r9));
   // rlwinm r8,r8,2,0,29
   r8 = __builtin_rotateleft64(uint32_t(r8) | (r8 << 32), 2) & 0xFFFFFFFC;
   // lwzx r9,r8,r31
   r9 = guest::LoadU32(base, uint32_t(r8) + uint32_t(r31));
   // stw r9,9652(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9652, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address(), uint32_t(r9));
   // stw r10,20(r11)
-  guest::StoreU32(base, uint32_t(r11) + 20, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).step_address(), uint32_t(r10));
   // stw r10,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).current_address(), uint32_t(r10));
   // stw r7,24(r11)
-  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r7));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).started_address(), uint32_t(r7));
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).resume_address(), uint32_t(r9));
   // stw r9,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address(), uint32_t(r9));
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // lwz r8,9652(r31)
-  r8 = guest::LoadU32(base, uint32_t(r31) + 9652);
+  r8 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address());
   // lwz r9,0(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r9 = guest::LoadU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address());
   // cmpw cr6,r8,r9
   cr6 = lifted::Compare<int32_t>(int32_t(r8), int32_t(r9), so);
   // beq cr6,0x821ef9dc
   if (cr6.eq) goto loc_821EF9DC;
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
 loc_821EF9DC:
   // li r9,11
   r9 = uint64_t(int64_t(11));
 loc_821EF9E0:
   // stw r9,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).current_address(), uint32_t(r9));
   // stw r10,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).next_address(), uint32_t(r10));
   // stw r8,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).resume_address(), uint32_t(r8));
   // stw r10,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address(), uint32_t(r10));
   // b 0x821efa54
   goto loc_821EFA54;
 loc_821EF9F4:
@@ -24220,7 +24230,7 @@ loc_821EF9F4:
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821EF9FC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,30500(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30500);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_kind_address());
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // addi r10,r10,1
@@ -24228,16 +24238,16 @@ loc_821EF9F4:
   // cmpwi cr6,r10,2
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 2, so);
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // stw r10,30500(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30500, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_kind_address(), uint32_t(r10));
   // ble cr6,0x821efa4c
   if (!cr6.gt) goto loc_821EFA4C;
   // li r10,0
   r10 = uint64_t(int64_t(0));
 loc_821EFA1C:
   // stw r10,30500(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30500, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_kind_address(), uint32_t(r10));
   // b 0x821efa50
   goto loc_821EFA50;
 loc_821EFA24:
@@ -24247,7 +24257,7 @@ loc_821EFA24:
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821EFA2C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r10,30500(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30500);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_kind_address());
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // addic. r10,r10,-1
@@ -24255,9 +24265,9 @@ loc_821EFA24:
   r10 = uint64_t(int64_t(int64_t(r10) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // stw r10,30500(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30500, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_kind_address(), uint32_t(r10));
   // bge 0x821efa4c
   if (!cr0.lt) goto loc_821EFA4C;
   // li r10,2
@@ -24269,7 +24279,7 @@ loc_821EFA4C:
   r11 = uint64_t(int64_t(0));
 loc_821EFA50:
   // stw r11,30504(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30504, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30504_address(), uint32_t(r11));
 loc_821EFA54:
   // mr r3,r31
   r3 = r31;
@@ -24555,13 +24565,13 @@ loc_821EFC08:
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821EFC3C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30508(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30508);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_row_address());
   // cmpwi cr6,r11,4
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 4, so);
   // bne cr6,0x821efd14
   if (!cr6.eq) goto loc_821EFD14;
   // lwz r10,30528(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30528);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address());
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // bne cr6,0x821efc64
@@ -24571,7 +24581,7 @@ loc_821EFC08:
   // li r9,12
   r9 = uint64_t(int64_t(12));
   // stb r8,9667(r31)
-  guest::StoreU8(base, uint32_t(r31) + 9667, uint8_t(r8));
+  guest::StoreU8(base, schema::TuningScreen(base, uint32_t(r31)).keep_cursor_address(), uint8_t(r8));
   // b 0x821efc84
   goto loc_821EFC84;
 loc_821EFC64:
@@ -24580,7 +24590,7 @@ loc_821EFC64:
   // bne cr6,0x821efd14
   if (!cr6.eq) goto loc_821EFD14;
   // lwz r10,30528(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30528);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address());
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // bne cr6,0x821efd00
@@ -24590,7 +24600,7 @@ loc_821EFC64:
   // li r9,13
   r9 = uint64_t(int64_t(13));
   // stb r8,9668(r31)
-  guest::StoreU8(base, uint32_t(r31) + 9668, uint8_t(r8));
+  guest::StoreU8(base, schema::TuningScreen(base, uint32_t(r31)).discard_cursor_address(), uint8_t(r8));
 loc_821EFC84:
   // li r11,1
   r11 = uint64_t(int64_t(1));
@@ -24599,9 +24609,9 @@ loc_821EFC84:
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lbz r11,10008(r31)
-  r11 = guest::LoadU8(base, uint32_t(r31) + 10008);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address());
   // addi r11,r11,2439
   r11 = uint64_t(int64_t(int64_t(r11) + 2439));
   // rlwinm r11,r11,2,0,29
@@ -24609,50 +24619,50 @@ loc_821EFC84:
   // stwx r7,r11,r31
   guest::StoreU32(base, uint32_t(r11) + uint32_t(r31), uint32_t(r7));
   // lbz r7,10008(r31)
-  r7 = guest::LoadU8(base, uint32_t(r31) + 10008);
+  r7 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address());
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // addi r7,r7,1
   r7 = uint64_t(int64_t(int64_t(r7) + 1));
   // stw r9,9652(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9652, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address(), uint32_t(r9));
   // stb r7,10008(r31)
-  guest::StoreU8(base, uint32_t(r31) + 10008, uint8_t(r7));
+  guest::StoreU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address(), uint8_t(r7));
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).resume_address(), uint32_t(r9));
   // stw r9,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address(), uint32_t(r9));
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
   // stw r10,20(r11)
-  guest::StoreU32(base, uint32_t(r11) + 20, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).step_address(), uint32_t(r10));
   // stw r10,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).current_address(), uint32_t(r10));
   // stw r8,24(r11)
-  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).started_address(), uint32_t(r8));
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // lwz r8,9652(r31)
-  r8 = guest::LoadU32(base, uint32_t(r31) + 9652);
+  r8 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address());
   // lwz r9,0(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r9 = guest::LoadU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address());
   // cmpw cr6,r8,r9
   cr6 = lifted::Compare<int32_t>(int32_t(r8), int32_t(r9), so);
   // beq cr6,0x821efce8
   if (cr6.eq) goto loc_821EFCE8;
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
 loc_821EFCE8:
   // li r9,63
   r9 = uint64_t(int64_t(63));
   // stw r9,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).current_address(), uint32_t(r9));
   // stw r10,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).next_address(), uint32_t(r10));
   // stw r8,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).resume_address(), uint32_t(r8));
   // stw r10,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address(), uint32_t(r10));
   // b 0x821f02f8
   goto loc_821F02F8;
 loc_821EFD00:
@@ -24661,28 +24671,28 @@ loc_821EFD00:
   // bne cr6,0x821efd14
   if (!cr6.eq) goto loc_821EFD14;
   // lwz r10,30528(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30528);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address());
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq cr6,0x821f02f8
   if (cr6.eq) goto loc_821F02F8;
 loc_821EFD14:
   // lwz r10,30524(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30524);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_3_address());
   // li r9,1
   r9 = uint64_t(int64_t(1));
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // stw r11,30532(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30532, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30532_address(), uint32_t(r11));
   // lwz r11,30528(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30528);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address());
   // stw r10,30536(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30536, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30536_address(), uint32_t(r10));
   // stw r9,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r9));
   // stw r7,30528(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30528, uint32_t(r7));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address(), uint32_t(r7));
   // b 0x821efda0
   goto loc_821EFDA0;
 loc_821EFD38:
@@ -24716,48 +24726,48 @@ loc_821EFD38:
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821EFD6C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30508(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30508);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_row_address());
   // cmpwi cr6,r11,4
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 4, so);
   // bne cr6,0x821efd84
   if (!cr6.eq) goto loc_821EFD84;
   // lwz r10,30528(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30528);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address());
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // beq cr6,0x821f02f8
   if (cr6.eq) goto loc_821F02F8;
 loc_821EFD84:
   // lwz r9,30524(r31)
-  r9 = guest::LoadU32(base, uint32_t(r31) + 30524);
+  r9 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_3_address());
   // li r10,1
   r10 = uint64_t(int64_t(1));
   // stw r11,30532(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30532, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30532_address(), uint32_t(r11));
   // lwz r11,30528(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30528);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address());
   // stw r9,30536(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30536, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30536_address(), uint32_t(r9));
   // stw r10,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r10));
   // stw r10,30528(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30528, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address(), uint32_t(r10));
 loc_821EFDA0:
   // li r8,4
   r8 = uint64_t(int64_t(4));
   // stw r11,30540(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30540, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30540_address(), uint32_t(r11));
   // stw r8,30508(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30508, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_row_address(), uint32_t(r8));
   // b 0x821f02f8
   goto loc_821F02F8;
 loc_821EFDB0:
   // lwz r11,30508(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30508);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_row_address());
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // stw r11,30532(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30532, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30532_address(), uint32_t(r11));
   // blt cr6,0x821eff78
   if (cr6.lt) goto loc_821EFF78;
   // beq cr6,0x821efecc
@@ -24773,49 +24783,49 @@ loc_821EFDB0:
   // bge cr6,0x821f02f8
   if (!cr6.lt) goto loc_821F02F8;
   // lwz r11,30528(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30528);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address());
   // addi r10,r11,1
   r10 = uint64_t(int64_t(int64_t(r11) + 1));
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // stw r11,30540(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30540, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30540_address(), uint32_t(r11));
   // stw r10,30528(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30528, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address(), uint32_t(r10));
   // ble cr6,0x821f02e8
   if (!cr6.gt) goto loc_821F02E8;
   // li r11,1
   r11 = uint64_t(int64_t(1));
 loc_821EFDF4:
   // stw r11,30528(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30528, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address(), uint32_t(r11));
   // b 0x821f02f8
   goto loc_821F02F8;
 loc_821EFDFC:
   // lwz r11,30524(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30524);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_3_address());
   // addi r10,r11,1
   r10 = uint64_t(int64_t(int64_t(r11) + 1));
   // cmpwi cr6,r10,7
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 7, so);
   // stw r11,30536(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30536, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30536_address(), uint32_t(r11));
   // stw r10,30524(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30524, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_3_address(), uint32_t(r10));
   // ble cr6,0x821f02e8
   if (!cr6.gt) goto loc_821F02E8;
   // li r11,7
   r11 = uint64_t(int64_t(7));
 loc_821EFE18:
   // stw r11,30524(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30524, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_3_address(), uint32_t(r11));
   // b 0x821f02f8
   goto loc_821F02F8;
 loc_821EFE20:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // cmpwi cr6,r11,1
@@ -24847,7 +24857,7 @@ loc_821EFE20:
   if (!cr6.lt) goto loc_821EFE68;
 loc_821EFE5C:
   // lwz r11,30520(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30520);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_2_address());
   // addi r11,r11,1
   r11 = uint64_t(int64_t(int64_t(r11) + 1));
   // b 0x821efeb0
@@ -24884,19 +24894,19 @@ loc_821EFE68:
   if (!cr6.lt) goto loc_821EFEA8;
 loc_821EFE9C:
   // lwz r11,30520(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30520);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_2_address());
   // addi r11,r11,2
   r11 = uint64_t(int64_t(int64_t(r11) + 2));
   // b 0x821efeb0
   goto loc_821EFEB0;
 loc_821EFEA8:
   // lwz r11,30520(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30520);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_2_address());
   // addi r11,r11,5
   r11 = uint64_t(int64_t(int64_t(r11) + 5));
 loc_821EFEB0:
   // stw r11,30520(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30520, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_2_address(), uint32_t(r11));
   // rotlwi r11,r11,0
   r11 = __builtin_rotateleft32(uint32_t(r11), 0);
   // cmpwi cr6,r11,360
@@ -24907,14 +24917,14 @@ loc_821EFEB0:
   r11 = uint64_t(int64_t(360));
 loc_821EFEC4:
   // stw r11,30520(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30520, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_2_address(), uint32_t(r11));
   // b 0x821f02f8
   goto loc_821F02F8;
 loc_821EFECC:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // cmpwi cr6,r11,1
@@ -24946,7 +24956,7 @@ loc_821EFECC:
   if (!cr6.lt) goto loc_821EFF14;
 loc_821EFF08:
   // lwz r11,30516(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30516);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_1_address());
   // addi r11,r11,1
   r11 = uint64_t(int64_t(int64_t(r11) + 1));
   // b 0x821eff5c
@@ -24983,19 +24993,19 @@ loc_821EFF14:
   if (!cr6.lt) goto loc_821EFF54;
 loc_821EFF48:
   // lwz r11,30516(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30516);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_1_address());
   // addi r11,r11,2
   r11 = uint64_t(int64_t(int64_t(r11) + 2));
   // b 0x821eff5c
   goto loc_821EFF5C;
 loc_821EFF54:
   // lwz r11,30516(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30516);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_1_address());
   // addi r11,r11,5
   r11 = uint64_t(int64_t(int64_t(r11) + 5));
 loc_821EFF5C:
   // stw r11,30516(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30516, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_1_address(), uint32_t(r11));
   // rotlwi r11,r11,0
   r11 = __builtin_rotateleft32(uint32_t(r11), 0);
   // cmpwi cr6,r11,360
@@ -25006,14 +25016,14 @@ loc_821EFF5C:
   r11 = uint64_t(int64_t(360));
 loc_821EFF70:
   // stw r11,30516(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30516, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_1_address(), uint32_t(r11));
   // b 0x821f02f8
   goto loc_821F02F8;
 loc_821EFF78:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // cmpwi cr6,r11,1
@@ -25045,7 +25055,7 @@ loc_821EFF78:
   if (!cr6.lt) goto loc_821EFFC0;
 loc_821EFFB4:
   // lwz r11,30512(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30512);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_0_address());
   // addi r11,r11,1
   r11 = uint64_t(int64_t(int64_t(r11) + 1));
   // b 0x821f0008
@@ -25082,19 +25092,19 @@ loc_821EFFC0:
   if (!cr6.lt) goto loc_821F0000;
 loc_821EFFF4:
   // lwz r11,30512(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30512);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_0_address());
   // addi r11,r11,2
   r11 = uint64_t(int64_t(int64_t(r11) + 2));
   // b 0x821f0008
   goto loc_821F0008;
 loc_821F0000:
   // lwz r11,30512(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30512);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_0_address());
   // addi r11,r11,5
   r11 = uint64_t(int64_t(int64_t(r11) + 5));
 loc_821F0008:
   // stw r11,30512(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30512, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_0_address(), uint32_t(r11));
   // rotlwi r11,r11,0
   r11 = __builtin_rotateleft32(uint32_t(r11), 0);
   // cmpwi cr6,r11,360
@@ -25105,7 +25115,7 @@ loc_821F0008:
   r11 = uint64_t(int64_t(360));
 loc_821F001C:
   // stw r11,30512(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30512, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_0_address(), uint32_t(r11));
   // b 0x821f02f8
   goto loc_821F02F8;
 loc_821F0024:
@@ -25118,11 +25128,11 @@ loc_821F0024:
   goto loc_821F02F8;
 loc_821F0030:
   // lwz r11,30508(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30508);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_row_address());
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // stw r11,30532(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30532, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30532_address(), uint32_t(r11));
   // blt cr6,0x821f01e0
   if (cr6.lt) goto loc_821F01E0;
   // beq cr6,0x821f0138
@@ -25138,15 +25148,15 @@ loc_821F0030:
   // bge cr6,0x821f02f8
   if (!cr6.lt) goto loc_821F02F8;
   // lwz r11,30528(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30528);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address());
   // addic. r10,r11,-1
   ca = uint32_t(r11) > 0;
   r10 = uint64_t(int64_t(int64_t(r11) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,30540(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30540, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30540_address(), uint32_t(r11));
   // stw r10,30528(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30528, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address(), uint32_t(r10));
   // bge 0x821f02e8
   if (!cr0.lt) goto loc_821F02E8;
   // li r11,0
@@ -25155,15 +25165,15 @@ loc_821F0030:
   goto loc_821EFDF4;
 loc_821F0074:
   // lwz r11,30524(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30524);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_3_address());
   // addic. r10,r11,-1
   ca = uint32_t(r11) > 0;
   r10 = uint64_t(int64_t(int64_t(r11) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,30536(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30536, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30536_address(), uint32_t(r11));
   // stw r10,30524(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30524, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_3_address(), uint32_t(r10));
   // bge 0x821f02e8
   if (!cr0.lt) goto loc_821F02E8;
   // li r11,0
@@ -25174,7 +25184,7 @@ loc_821F0090:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // cmpwi cr6,r11,1
@@ -25206,7 +25216,7 @@ loc_821F0090:
   if (!cr6.lt) goto loc_821F00D8;
 loc_821F00CC:
   // lwz r11,30520(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30520);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_2_address());
   // addi r11,r11,-1
   r11 = uint64_t(int64_t(int64_t(r11) + -1));
   // b 0x821f0120
@@ -25243,19 +25253,19 @@ loc_821F00D8:
   if (!cr6.lt) goto loc_821F0118;
 loc_821F010C:
   // lwz r11,30520(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30520);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_2_address());
   // addi r11,r11,-2
   r11 = uint64_t(int64_t(int64_t(r11) + -2));
   // b 0x821f0120
   goto loc_821F0120;
 loc_821F0118:
   // lwz r11,30520(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30520);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_2_address());
   // addi r11,r11,-5
   r11 = uint64_t(int64_t(int64_t(r11) + -5));
 loc_821F0120:
   // stw r11,30520(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30520, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_2_address(), uint32_t(r11));
   // rotlwi r11,r11,0
   r11 = __builtin_rotateleft32(uint32_t(r11), 0);
   // cmpwi cr6,r11,0
@@ -25270,7 +25280,7 @@ loc_821F0138:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // cmpwi cr6,r11,1
@@ -25302,7 +25312,7 @@ loc_821F0138:
   if (!cr6.lt) goto loc_821F0180;
 loc_821F0174:
   // lwz r11,30516(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30516);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_1_address());
   // addi r11,r11,-1
   r11 = uint64_t(int64_t(int64_t(r11) + -1));
   // b 0x821f01c8
@@ -25339,19 +25349,19 @@ loc_821F0180:
   if (!cr6.lt) goto loc_821F01C0;
 loc_821F01B4:
   // lwz r11,30516(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30516);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_1_address());
   // addi r11,r11,-2
   r11 = uint64_t(int64_t(int64_t(r11) + -2));
   // b 0x821f01c8
   goto loc_821F01C8;
 loc_821F01C0:
   // lwz r11,30516(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30516);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_1_address());
   // addi r11,r11,-5
   r11 = uint64_t(int64_t(int64_t(r11) + -5));
 loc_821F01C8:
   // stw r11,30516(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30516, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_1_address(), uint32_t(r11));
   // rotlwi r11,r11,0
   r11 = __builtin_rotateleft32(uint32_t(r11), 0);
   // cmpwi cr6,r11,0
@@ -25366,7 +25376,7 @@ loc_821F01E0:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // cmpwi cr6,r11,1
@@ -25398,7 +25408,7 @@ loc_821F01E0:
   if (!cr6.lt) goto loc_821F0228;
 loc_821F021C:
   // lwz r11,30512(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30512);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_0_address());
   // addi r11,r11,-1
   r11 = uint64_t(int64_t(int64_t(r11) + -1));
   // b 0x821f0270
@@ -25435,19 +25445,19 @@ loc_821F0228:
   if (!cr6.lt) goto loc_821F0268;
 loc_821F025C:
   // lwz r11,30512(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30512);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_0_address());
   // addi r11,r11,-2
   r11 = uint64_t(int64_t(int64_t(r11) + -2));
   // b 0x821f0270
   goto loc_821F0270;
 loc_821F0268:
   // lwz r11,30512(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30512);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_0_address());
   // addi r11,r11,-5
   r11 = uint64_t(int64_t(int64_t(r11) + -5));
 loc_821F0270:
   // stw r11,30512(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30512, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_0_address(), uint32_t(r11));
   // rotlwi r11,r11,0
   r11 = __builtin_rotateleft32(uint32_t(r11), 0);
   // cmpwi cr6,r11,0
@@ -25460,23 +25470,23 @@ loc_821F0270:
   goto loc_821F001C;
 loc_821F0288:
   // lwz r11,30524(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30524);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_3_address());
   // lwz r10,30528(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30528);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address());
   // stw r11,30536(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30536, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30536_address(), uint32_t(r11));
   // lwz r11,30508(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30508);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_row_address());
   // stw r10,30540(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30540, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30540_address(), uint32_t(r10));
   // addi r10,r11,1
   r10 = uint64_t(int64_t(int64_t(r11) + 1));
   // cmpwi cr6,r10,4
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 4, so);
   // stw r11,30532(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30532, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30532_address(), uint32_t(r11));
   // stw r10,30508(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30508, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_row_address(), uint32_t(r10));
   // ble cr6,0x821f02e8
   if (!cr6.gt) goto loc_821F02E8;
   // li r11,4
@@ -25485,30 +25495,30 @@ loc_821F0288:
   goto loc_821F02E0;
 loc_821F02B8:
   // lwz r11,30524(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30524);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_value_3_address());
   // lwz r10,30528(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30528);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_cursor_b_address());
   // stw r11,30536(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30536, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30536_address(), uint32_t(r11));
   // lwz r11,30508(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30508);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_row_address());
   // stw r10,30540(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30540, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30540_address(), uint32_t(r10));
   // addic. r10,r11,-1
   ca = uint32_t(r11) > 0;
   r10 = uint64_t(int64_t(int64_t(r11) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,30532(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30532, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30532_address(), uint32_t(r11));
   // stw r10,30508(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30508, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_row_address(), uint32_t(r10));
   // bge 0x821f02e8
   if (!cr0.lt) goto loc_821F02E8;
   // li r11,0
   r11 = uint64_t(int64_t(0));
 loc_821F02E0:
   // stw r11,30508(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30508, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit0_row_address(), uint32_t(r11));
   // b 0x821f02f8
   goto loc_821F02F8;
 loc_821F02E8:
@@ -25520,7 +25530,7 @@ loc_821F02E8:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
 loc_821F02F8:
   // mr r3,r31
   r3 = r31;
@@ -25806,13 +25816,13 @@ loc_821F04A8:
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821F04DC, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30544(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30544);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_row_address());
   // cmpwi cr6,r11,3
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 3, so);
   // bne cr6,0x821f05b4
   if (!cr6.eq) goto loc_821F05B4;
   // lwz r10,30560(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30560);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address());
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // bne cr6,0x821f0504
@@ -25822,7 +25832,7 @@ loc_821F04A8:
   // li r9,12
   r9 = uint64_t(int64_t(12));
   // stb r8,9667(r31)
-  guest::StoreU8(base, uint32_t(r31) + 9667, uint8_t(r8));
+  guest::StoreU8(base, schema::TuningScreen(base, uint32_t(r31)).keep_cursor_address(), uint8_t(r8));
   // b 0x821f0524
   goto loc_821F0524;
 loc_821F0504:
@@ -25831,7 +25841,7 @@ loc_821F0504:
   // bne cr6,0x821f05b4
   if (!cr6.eq) goto loc_821F05B4;
   // lwz r10,30560(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30560);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address());
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // bne cr6,0x821f05a0
@@ -25841,7 +25851,7 @@ loc_821F0504:
   // li r9,13
   r9 = uint64_t(int64_t(13));
   // stb r8,9668(r31)
-  guest::StoreU8(base, uint32_t(r31) + 9668, uint8_t(r8));
+  guest::StoreU8(base, schema::TuningScreen(base, uint32_t(r31)).discard_cursor_address(), uint8_t(r8));
 loc_821F0524:
   // li r11,1
   r11 = uint64_t(int64_t(1));
@@ -25850,9 +25860,9 @@ loc_821F0524:
   // li r10,-1
   r10 = uint64_t(int64_t(-1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lbz r11,10008(r31)
-  r11 = guest::LoadU8(base, uint32_t(r31) + 10008);
+  r11 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address());
   // addi r11,r11,2439
   r11 = uint64_t(int64_t(int64_t(r11) + 2439));
   // rlwinm r11,r11,2,0,29
@@ -25860,50 +25870,50 @@ loc_821F0524:
   // stwx r7,r11,r31
   guest::StoreU32(base, uint32_t(r11) + uint32_t(r31), uint32_t(r7));
   // lbz r7,10008(r31)
-  r7 = guest::LoadU8(base, uint32_t(r31) + 10008);
+  r7 = guest::LoadU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address());
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // addi r7,r7,1
   r7 = uint64_t(int64_t(int64_t(r7) + 1));
   // stw r9,9652(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9652, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address(), uint32_t(r9));
   // stb r7,10008(r31)
-  guest::StoreU8(base, uint32_t(r31) + 10008, uint8_t(r7));
+  guest::StoreU8(base, schema::TuningScreen(base, uint32_t(r31)).history_depth_address(), uint8_t(r7));
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).resume_address(), uint32_t(r9));
   // stw r9,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address(), uint32_t(r9));
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
   // stw r10,20(r11)
-  guest::StoreU32(base, uint32_t(r11) + 20, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).step_address(), uint32_t(r10));
   // stw r10,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).current_address(), uint32_t(r10));
   // stw r8,24(r11)
-  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).started_address(), uint32_t(r8));
   // lwz r11,10036(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 10036);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).queue_address());
   // lwz r8,9652(r31)
-  r8 = guest::LoadU32(base, uint32_t(r31) + 9652);
+  r8 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).state_address());
   // lwz r9,0(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r9 = guest::LoadU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address());
   // cmpw cr6,r8,r9
   cr6 = lifted::Compare<int32_t>(int32_t(r8), int32_t(r9), so);
   // beq cr6,0x821f0588
   if (cr6.eq) goto loc_821F0588;
   // stw r9,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).previous_page_address(), uint32_t(r9));
 loc_821F0588:
   // li r9,63
   r9 = uint64_t(int64_t(63));
   // stw r9,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).current_address(), uint32_t(r9));
   // stw r10,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).next_address(), uint32_t(r10));
   // stw r8,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).resume_address(), uint32_t(r8));
   // stw r10,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningCommandQueue(base, uint32_t(r11)).page_address(), uint32_t(r10));
   // b 0x821f0974
   goto loc_821F0974;
 loc_821F05A0:
@@ -25912,28 +25922,28 @@ loc_821F05A0:
   // bne cr6,0x821f05b4
   if (!cr6.eq) goto loc_821F05B4;
   // lwz r10,30560(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30560);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address());
   // cmpwi cr6,r10,0
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // beq cr6,0x821f0974
   if (cr6.eq) goto loc_821F0974;
 loc_821F05B4:
   // lwz r10,30556(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30556);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_2_address());
   // li r9,1
   r9 = uint64_t(int64_t(1));
   // li r7,0
   r7 = uint64_t(int64_t(0));
   // stw r11,30564(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30564, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30564_address(), uint32_t(r11));
   // lwz r11,30560(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30560);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address());
   // stw r10,30572(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30572, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30572_address(), uint32_t(r10));
   // stw r9,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r9));
   // stw r7,30560(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30560, uint32_t(r7));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address(), uint32_t(r7));
   // b 0x821f0640
   goto loc_821F0640;
 loc_821F05D8:
@@ -25967,48 +25977,48 @@ loc_821F05D8:
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821F060C, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30544(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30544);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_row_address());
   // cmpwi cr6,r11,3
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 3, so);
   // bne cr6,0x821f0624
   if (!cr6.eq) goto loc_821F0624;
   // lwz r10,30560(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30560);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address());
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // beq cr6,0x821f0974
   if (cr6.eq) goto loc_821F0974;
 loc_821F0624:
   // lwz r9,30556(r31)
-  r9 = guest::LoadU32(base, uint32_t(r31) + 30556);
+  r9 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_2_address());
   // li r10,1
   r10 = uint64_t(int64_t(1));
   // stw r11,30564(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30564, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30564_address(), uint32_t(r11));
   // lwz r11,30560(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30560);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address());
   // stw r9,30572(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30572, uint32_t(r9));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30572_address(), uint32_t(r9));
   // stw r10,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r10));
   // stw r10,30560(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30560, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address(), uint32_t(r10));
 loc_821F0640:
   // li r8,3
   r8 = uint64_t(int64_t(3));
   // stw r11,30576(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30576, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30576_address(), uint32_t(r11));
   // stw r8,30544(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30544, uint32_t(r8));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_row_address(), uint32_t(r8));
   // b 0x821f0974
   goto loc_821F0974;
 loc_821F0650:
   // lwz r11,30544(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30544);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_row_address());
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // stw r11,30564(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30564, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30564_address(), uint32_t(r11));
   // blt cr6,0x821f0770
   if (cr6.lt) goto loc_821F0770;
   // beq cr6,0x821f06b8
@@ -26020,49 +26030,49 @@ loc_821F0650:
   // bne cr6,0x821f0974
   if (!cr6.eq) goto loc_821F0974;
   // lwz r11,30560(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30560);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address());
   // addi r10,r11,1
   r10 = uint64_t(int64_t(int64_t(r11) + 1));
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // stw r11,30576(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30576, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30576_address(), uint32_t(r11));
   // stw r10,30560(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30560, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address(), uint32_t(r10));
   // ble cr6,0x821f0964
   if (!cr6.gt) goto loc_821F0964;
   // li r11,1
   r11 = uint64_t(int64_t(1));
 loc_821F068C:
   // stw r11,30560(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30560, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address(), uint32_t(r11));
   // b 0x821f0974
   goto loc_821F0974;
 loc_821F0694:
   // lwz r11,30556(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30556);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_2_address());
   // addi r10,r11,1
   r10 = uint64_t(int64_t(int64_t(r11) + 1));
   // cmpwi cr6,r10,7
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 7, so);
   // stw r11,30572(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30572, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30572_address(), uint32_t(r11));
   // stw r10,30556(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30556, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_2_address(), uint32_t(r10));
   // ble cr6,0x821f0964
   if (!cr6.gt) goto loc_821F0964;
   // li r11,7
   r11 = uint64_t(int64_t(7));
 loc_821F06B0:
   // stw r11,30556(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30556, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_2_address(), uint32_t(r11));
   // b 0x821f0974
   goto loc_821F0974;
 loc_821F06B8:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // cmpwi cr6,r11,1
@@ -26094,7 +26104,7 @@ loc_821F06B8:
   if (!cr6.lt) goto loc_821F0700;
 loc_821F06F4:
   // lwz r11,30552(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30552);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_1_address());
   // addi r11,r11,1
   r11 = uint64_t(int64_t(int64_t(r11) + 1));
   // b 0x821f0748
@@ -26131,19 +26141,19 @@ loc_821F0700:
   if (!cr6.lt) goto loc_821F0740;
 loc_821F0734:
   // lwz r11,30552(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30552);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_1_address());
   // addi r11,r11,2
   r11 = uint64_t(int64_t(int64_t(r11) + 2));
   // b 0x821f0748
   goto loc_821F0748;
 loc_821F0740:
   // lwz r11,30552(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30552);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_1_address());
   // addi r11,r11,5
   r11 = uint64_t(int64_t(int64_t(r11) + 5));
 loc_821F0748:
   // stw r11,30552(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30552, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_1_address(), uint32_t(r11));
   // rotlwi r11,r11,0
   r11 = __builtin_rotateleft32(uint32_t(r11), 0);
   // cmpwi cr6,r11,360
@@ -26154,7 +26164,7 @@ loc_821F0748:
   r11 = uint64_t(int64_t(360));
 loc_821F075C:
   // stw r11,30552(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30552, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_1_address(), uint32_t(r11));
   // b 0x821f0974
   goto loc_821F0974;
 loc_821F0764:
@@ -26174,19 +26184,19 @@ loc_821F0770:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // lwz r10,30492(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30492);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_group_address());
   // cmpwi cr6,r10,1
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 1, so);
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lwz r11,30548(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30548);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_0_address());
   // addi r10,r11,1
   r10 = uint64_t(int64_t(int64_t(r11) + 1));
   // stw r11,30568(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30568, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30568_address(), uint32_t(r11));
   // stw r10,30548(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30548, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_0_address(), uint32_t(r10));
   // bne cr6,0x821f07a4
   if (!cr6.eq) goto loc_821F07A4;
   // cmpwi cr6,r10,9
@@ -26203,16 +26213,16 @@ loc_821F07A8:
   r11 = uint64_t(int64_t(0));
 loc_821F07B0:
   // stw r11,30548(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30548, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_0_address(), uint32_t(r11));
   // b 0x821f0974
   goto loc_821F0974;
 loc_821F07B8:
   // lwz r11,30544(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30544);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_row_address());
   // cmplwi cr6,r11,1
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 1, so);
   // stw r11,30564(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30564, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30564_address(), uint32_t(r11));
   // blt cr6,0x821f08b8
   if (cr6.lt) goto loc_821F08B8;
   // beq cr6,0x821f0810
@@ -26224,15 +26234,15 @@ loc_821F07B8:
   // bne cr6,0x821f0974
   if (!cr6.eq) goto loc_821F0974;
   // lwz r11,30560(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30560);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address());
   // addic. r10,r11,-1
   ca = uint32_t(r11) > 0;
   r10 = uint64_t(int64_t(int64_t(r11) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,30576(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30576, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30576_address(), uint32_t(r11));
   // stw r10,30560(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30560, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address(), uint32_t(r10));
   // bge 0x821f0964
   if (!cr0.lt) goto loc_821F0964;
   // li r11,0
@@ -26241,15 +26251,15 @@ loc_821F07B8:
   goto loc_821F068C;
 loc_821F07F4:
   // lwz r11,30556(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30556);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_2_address());
   // addic. r10,r11,-1
   ca = uint32_t(r11) > 0;
   r10 = uint64_t(int64_t(int64_t(r11) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,30572(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30572, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30572_address(), uint32_t(r11));
   // stw r10,30556(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30556, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_2_address(), uint32_t(r10));
   // bge 0x821f0964
   if (!cr0.lt) goto loc_821F0964;
   // li r11,0
@@ -26260,7 +26270,7 @@ loc_821F0810:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // lwz r11,4(r30)
   r11 = guest::LoadU32(base, uint32_t(r30) + 4);
   // cmpwi cr6,r11,1
@@ -26292,7 +26302,7 @@ loc_821F0810:
   if (!cr6.lt) goto loc_821F0858;
 loc_821F084C:
   // lwz r11,30552(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30552);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_1_address());
   // addi r11,r11,-1
   r11 = uint64_t(int64_t(int64_t(r11) + -1));
   // b 0x821f08a0
@@ -26329,19 +26339,19 @@ loc_821F0858:
   if (!cr6.lt) goto loc_821F0898;
 loc_821F088C:
   // lwz r11,30552(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30552);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_1_address());
   // addi r11,r11,-2
   r11 = uint64_t(int64_t(int64_t(r11) + -2));
   // b 0x821f08a0
   goto loc_821F08A0;
 loc_821F0898:
   // lwz r11,30552(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30552);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_1_address());
   // addi r11,r11,-5
   r11 = uint64_t(int64_t(int64_t(r11) + -5));
 loc_821F08A0:
   // stw r11,30552(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30552, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_1_address(), uint32_t(r11));
   // rotlwi r11,r11,0
   r11 = __builtin_rotateleft32(uint32_t(r11), 0);
   // cmpwi cr6,r11,0
@@ -26358,22 +26368,22 @@ loc_821F08B8:
   // li r3,4
   r3 = uint64_t(int64_t(4));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
   // bl 0x821103f0
   // (left out: dead in C++)
   { const lifted::Result o = game::MenuSound::Play(base, LIFTED_ARGS(0x821F08C8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r11,30492(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30492);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).light_kit_group_address());
   // cmpwi cr6,r11,1
   cr6 = lifted::Compare<int32_t>(int32_t(r11), 1, so);
   // lwz r11,30548(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30548);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_0_address());
   // addi r10,r11,-1
   r10 = uint64_t(int64_t(int64_t(r11) + -1));
   // stw r11,30568(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30568, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30568_address(), uint32_t(r11));
   // stw r10,30548(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30548, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_0_address(), uint32_t(r10));
   // bne cr6,0x821f08f4
   if (!cr6.eq) goto loc_821F08F4;
   // cmpwi cr6,r10,0
@@ -26395,23 +26405,23 @@ loc_821F08F4:
   goto loc_821F07B0;
 loc_821F0904:
   // lwz r11,30556(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30556);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_2_address());
   // lwz r10,30560(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30560);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address());
   // stw r11,30572(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30572, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30572_address(), uint32_t(r11));
   // lwz r11,30544(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30544);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_row_address());
   // stw r10,30576(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30576, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30576_address(), uint32_t(r10));
   // addi r10,r11,1
   r10 = uint64_t(int64_t(int64_t(r11) + 1));
   // cmpwi cr6,r10,3
   cr6 = lifted::Compare<int32_t>(int32_t(r10), 3, so);
   // stw r11,30564(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30564, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30564_address(), uint32_t(r11));
   // stw r10,30544(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30544, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_row_address(), uint32_t(r10));
   // ble cr6,0x821f0964
   if (!cr6.gt) goto loc_821F0964;
   // li r11,3
@@ -26420,30 +26430,30 @@ loc_821F0904:
   goto loc_821F095C;
 loc_821F0934:
   // lwz r11,30556(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30556);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_value_2_address());
   // lwz r10,30560(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 30560);
+  r10 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_cursor_b_address());
   // stw r11,30572(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30572, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30572_address(), uint32_t(r11));
   // lwz r11,30544(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 30544);
+  r11 = guest::LoadU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_row_address());
   // stw r10,30576(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30576, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30576_address(), uint32_t(r10));
   // addic. r10,r11,-1
   ca = uint32_t(r11) > 0;
   r10 = uint64_t(int64_t(int64_t(r11) + -1));
   cr0 = lifted::Compare<int32_t>(int32_t(r10), 0, so);
   // stw r11,30564(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30564, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).unknown_30564_address(), uint32_t(r11));
   // stw r10,30544(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30544, uint32_t(r10));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_row_address(), uint32_t(r10));
   // bge 0x821f0964
   if (!cr0.lt) goto loc_821F0964;
   // li r11,0
   r11 = uint64_t(int64_t(0));
 loc_821F095C:
   // stw r11,30544(r31)
-  guest::StoreU32(base, uint32_t(r31) + 30544, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).kit1_row_address(), uint32_t(r11));
   // b 0x821f0974
   goto loc_821F0974;
 loc_821F0964:
@@ -26455,7 +26465,7 @@ loc_821F0964:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stw r11,9708(r31)
-  guest::StoreU32(base, uint32_t(r31) + 9708, uint32_t(r11));
+  guest::StoreU32(base, schema::TuningScreen(base, uint32_t(r31)).refresh_pending_address(), uint32_t(r11));
 loc_821F0974:
   // mr r3,r31
   r3 = r31;

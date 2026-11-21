@@ -6,6 +6,11 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/audio.h"
+#include "schema/video_output.h"
+#include "schema/xaudio.h"
+#include "schema/xaudio_engine.h"
+#include "schema/xaudio_objects.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -92,25 +97,25 @@ loc_8245FEDC:
   // stw r10,4(r31)
   guest::StoreU32(base, uint32_t(r31) + 4, uint32_t(r10));
   // lwz r9,0(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r9 = guest::LoadU32(base, schema::XAudioMasteringVoice(base, uint32_t(r11) - 24).active_next_address());
   // cmplw cr6,r9,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r9), uint32_t(r11), so);
   // beq cr6,0x8245ff18
   if (cr6.eq) goto loc_8245FF18;
   // lwz r10,4(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 4);
+  r10 = guest::LoadU32(base, schema::XAudioMasteringVoice(base, uint32_t(r11) - 24).active_prev_address());
   // stw r10,4(r9)
-  guest::StoreU32(base, uint32_t(r9) + 4, uint32_t(r10));
+  guest::StoreU32(base, schema::XAudioList(base, uint32_t(r9)).prev_address(), uint32_t(r10));
   // lwz r10,4(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 4);
+  r10 = guest::LoadU32(base, schema::XAudioMasteringVoice(base, uint32_t(r11) - 24).active_prev_address());
   // lwz r9,0(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 0);
+  r9 = guest::LoadU32(base, schema::XAudioMasteringVoice(base, uint32_t(r11) - 24).active_next_address());
   // stw r9,0(r10)
-  guest::StoreU32(base, uint32_t(r10) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::XAudioList(base, uint32_t(r10)).next_address(), uint32_t(r9));
   // stw r11,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r11));
+  guest::StoreU32(base, schema::XAudioMasteringVoice(base, uint32_t(r11) - 24).active_prev_address(), uint32_t(r11));
   // stw r11,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::XAudioMasteringVoice(base, uint32_t(r11) - 24).active_next_address(), uint32_t(r11));
   // lwz r8,8(r31)
   r8 = guest::LoadU32(base, uint32_t(r31) + 8);
   // lwz r10,4(r31)
@@ -167,13 +172,13 @@ void f824601F8(uint8_t* base, uint64_t r3, uint64_t r4) {
   // addi r11,r4,3
   r11 = uint64_t(int64_t(int64_t(r4) + 3));
   // lwz r10,16(r3)
-  r10 = guest::LoadU32(base, uint32_t(r3) + 16);
+  r10 = guest::LoadU32(base, schema::XAudioBumpAllocator(base, uint32_t(r3)).capacity_address());
   // rlwinm r11,r11,0,0,29
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 0) & 0xFFFFFFFC;
   // add r11,r11,r10
   r11 = r11 + r10;
   // stw r11,16(r3)
-  guest::StoreU32(base, uint32_t(r3) + 16, uint32_t(r11));
+  guest::StoreU32(base, schema::XAudioBumpAllocator(base, uint32_t(r3)).capacity_address(), uint32_t(r11));
   // blr
   return;
 }
@@ -201,7 +206,7 @@ lifted::Result f82460210(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r5,r4
   r5 = r4;
   // lwz r4,16(r31)
-  r4 = guest::LoadU32(base, uint32_t(r31) + 16);
+  r4 = guest::LoadU32(base, schema::XAudioBumpAllocator(base, uint32_t(r31)).capacity_address());
   // cmplwi cr6,r4,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r4), 0, so);
   // bne cr6,0x8246024c
@@ -455,29 +460,29 @@ lifted::Result f82460538(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // lis r10,-32251
   r10 = uint64_t(int64_t(-2113601536));
   // stw r6,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r6));
+  guest::StoreU32(base, schema::XAudioAllocBlock(base, uint32_t(r11)).ref_count_address(), uint32_t(r6));
   // stw r9,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r9));
+  guest::StoreU32(base, schema::XAudioAllocBlock(base, uint32_t(r11)).interface_vtable_address(), uint32_t(r9));
   // addi r7,r10,-22164
   r7 = uint64_t(int64_t(int64_t(r10) + -22164));
   // li r10,0
   r10 = uint64_t(int64_t(0));
   // stw r8,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r8));
+  guest::StoreU32(base, schema::XAudioAllocBlock(base, uint32_t(r11)).vtable_address(), uint32_t(r8));
   // mr r3,r10
   r3 = r10;
   // stw r7,4(r11)
-  guest::StoreU32(base, uint32_t(r11) + 4, uint32_t(r7));
+  guest::StoreU32(base, schema::XAudioAllocBlock(base, uint32_t(r11)).interface_vtable_address(), uint32_t(r7));
   // stw r10,12(r11)
-  guest::StoreU32(base, uint32_t(r11) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::XAudioAllocBlock(base, uint32_t(r11)).attributes_address(), uint32_t(r10));
   // stw r10,16(r11)
-  guest::StoreU32(base, uint32_t(r11) + 16, uint32_t(r10));
+  guest::StoreU32(base, schema::XAudioAllocBlock(base, uint32_t(r11)).capacity_address(), uint32_t(r10));
   // stw r10,20(r11)
-  guest::StoreU32(base, uint32_t(r11) + 20, uint32_t(r10));
+  guest::StoreU32(base, schema::XAudioAllocBlock(base, uint32_t(r11)).used_address(), uint32_t(r10));
   // stw r10,24(r11)
-  guest::StoreU32(base, uint32_t(r11) + 24, uint32_t(r10));
+  guest::StoreU32(base, schema::XAudioAllocBlock(base, uint32_t(r11)).block_address(), uint32_t(r10));
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::XAudioEngineOutWord(base, uint32_t(r31)).object_address(), uint32_t(r11));
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));
   // lwz r12,-8(r1)
@@ -585,7 +590,7 @@ lifted::Result f824613A0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r11,r4
   r11 = r4;
   // lbz r10,60(r3)
-  r10 = guest::LoadU8(base, uint32_t(r3) + 60);
+  r10 = guest::LoadU8(base, schema::XAudioVoice(base, uint32_t(r3)).effect_count_address());
   // mr r4,r5
   r4 = r5;
   // clrlwi r11,r11,24
@@ -649,7 +654,7 @@ uint64_t f82461490(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5) {
   lifted::Cr cr6;
   uint8_t so = 0;
   // lbz r10,60(r3)
-  r10 = guest::LoadU8(base, uint32_t(r3) + 60);
+  r10 = guest::LoadU8(base, schema::XAudioVoice(base, uint32_t(r3)).effect_count_address());
   // clrlwi r11,r4,24
   r11 = uint32_t(r4) & 0xFF;
   // cmplw cr6,r11,r10
@@ -674,7 +679,7 @@ loc_824614AC:
   // lbz r11,5(r11)
   r11 = guest::LoadU8(base, uint32_t(r11) + 5);
   // stb r11,0(r5)
-  guest::StoreU8(base, uint32_t(r5) + 0, uint8_t(r11));
+  guest::StoreU8(base, schema::XAudioByteOut(base, uint32_t(r5)).value_address(), uint8_t(r11));
   // blr
   return r3;
 }
@@ -686,7 +691,7 @@ uint64_t f824614C8(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5) {
   lifted::Cr cr6;
   uint8_t so = 0;
   // lbz r10,60(r3)
-  r10 = guest::LoadU8(base, uint32_t(r3) + 60);
+  r10 = guest::LoadU8(base, schema::XAudioVoice(base, uint32_t(r3)).effect_count_address());
   // clrlwi r11,r4,24
   r11 = uint32_t(r4) & 0xFF;
   // cmplw cr6,r11,r10
@@ -898,9 +903,9 @@ loc_82461FAC:
   // addi r11,r11,-17752
   r11 = uint64_t(int64_t(int64_t(r11) + -17752));
   // ld r7,0(r10)
-  r7 = guest::LoadU64(base, uint32_t(r10) + 0);
+  r7 = guest::LoadU64(base, schema::PerfTimerSet(base, uint32_t(r10) - 309920).unknown_309920_address());
   // ld r9,0(r11)
-  r9 = guest::LoadU64(base, uint32_t(r11) + 0);
+  r9 = guest::LoadU64(base, schema::PerfTimerSet(base, uint32_t(r11) - 309928).unknown_309928_address());
   // std r7,96(r1)
   guest::StoreU64(base, uint32_t(r1) + 96, r7);
   // lfd f0,88(r1)
@@ -932,11 +937,11 @@ loc_82461FAC:
   f0 = double(float(f0));
   // stfs f0,0(r26)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r26) + 0, temp.u32);
+  guest::StoreU32(base, schema::PerfTimerResult(base, uint32_t(r26)).value_address(), temp.u32);
   // std r27,0(r10)
-  guest::StoreU64(base, uint32_t(r10) + 0, r27);
+  guest::StoreU64(base, schema::PerfTimerSet(base, uint32_t(r10) - 309920).unknown_309920_address(), r27);
   // std r27,0(r11)
-  guest::StoreU64(base, uint32_t(r11) + 0, r27);
+  guest::StoreU64(base, schema::PerfTimerSet(base, uint32_t(r11) - 309928).unknown_309928_address(), r27);
   // lwz r11,4(r31)
   r11 = guest::LoadU32(base, uint32_t(r31) + 4);
   // cmpwi cr6,r11,0
@@ -1040,9 +1045,9 @@ loc_824620C4:
   // stw r11,4(r31)
   guest::StoreU32(base, uint32_t(r31) + 4, uint32_t(r11));
   // lwz r10,16(r29)
-  r10 = guest::LoadU32(base, uint32_t(r29) + 16);
+  r10 = guest::LoadU32(base, schema::PerfTimerSet(base, uint32_t(r29)).entry_address());
   // lwz r10,4(r10)
-  r10 = guest::LoadU32(base, uint32_t(r10) + 4);
+  r10 = guest::LoadU32(base, schema::PerfTimerSetEntry(base, uint32_t(r10)).unknown_4_address());
   // add r10,r10,r29
   r10 = r10 + r29;
   // lfs f13,108(r10)
@@ -1097,7 +1102,7 @@ loc_82462128:
   f0 = double(float(f31 * f0));
   // stfs f0,0(r26)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r26) + 0, temp.u32);
+  guest::StoreU32(base, schema::PerfTimerResult(base, uint32_t(r26)).value_address(), temp.u32);
 loc_82462138:
   // mr r3,r27
   r3 = r27;
@@ -1146,15 +1151,15 @@ lifted::Result f82465398(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r31,52
   r11 = uint64_t(int64_t(int64_t(r31) + 52));
   // lwz r8,-52(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + -52);
+  r8 = guest::LoadU32(base, schema::XAudioCodecInner192(base, uint32_t(r11) + 140).outer_vbtable_address());
   // lwz r8,4(r8)
-  r8 = guest::LoadU32(base, uint32_t(r8) + 4);
+  r8 = guest::LoadU32(base, schema::XAudioCodecVbtable(base, uint32_t(r8)).vbase_offset_address());
   // add r11,r8,r11
   r11 = r8 + r11;
   // stw r10,-52(r11)
   guest::StoreU32(base, uint32_t(r11) + -52, uint32_t(r10));
   // stw r9,192(r31)
-  guest::StoreU32(base, uint32_t(r31) + 192, uint32_t(r9));
+  guest::StoreU32(base, schema::XAudioCodecInner192(base, uint32_t(r31) + 192).vtable_address(), uint32_t(r9));
   // beq cr6,0x824653f4
   if (cr6.eq) goto loc_824653F4;
   // lis r11,-32107
@@ -1188,11 +1193,11 @@ uint64_t f82465418(uint8_t* base, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82465418 (lifted)");
   uint64_t r11 = 0;
   // lwz r11,12(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 12);
+  r11 = guest::LoadU32(base, schema::XAudioObject(base, uint32_t(r3)).owner_address());
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // stw r11,0(r4)
-  guest::StoreU32(base, uint32_t(r4) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::FactoryObjectOut(base, uint32_t(r4)).object_address(), uint32_t(r11));
   // blr
   return r3;
 }
@@ -1232,15 +1237,15 @@ lifted::Result f82465590(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r31,52
   r11 = uint64_t(int64_t(int64_t(r31) + 52));
   // lwz r8,-52(r11)
-  r8 = guest::LoadU32(base, uint32_t(r11) + -52);
+  r8 = guest::LoadU32(base, schema::XAudioCodecInner52(base, uint32_t(r11)).outer_vbtable_address());
   // lwz r8,4(r8)
-  r8 = guest::LoadU32(base, uint32_t(r8) + 4);
+  r8 = guest::LoadU32(base, schema::XAudioCodecVbtable(base, uint32_t(r8)).vbase_offset_address());
   // add r8,r8,r11
   r8 = r8 + r11;
   // stw r10,-52(r8)
   guest::StoreU32(base, uint32_t(r8) + -52, uint32_t(r10));
   // stw r9,0(r11)
-  guest::StoreU32(base, uint32_t(r11) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::XAudioCodecInner52(base, uint32_t(r11)).vtable_address(), uint32_t(r9));
   // beq cr6,0x824655ec
   if (cr6.eq) goto loc_824655EC;
   // lis r11,-32107
@@ -1303,7 +1308,7 @@ uint64_t f82465850(uint8_t* base, uint64_t r4) {
 void f82465868(uint8_t* base, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82465868 (lifted)");
   // stw r3,0(r4)
-  guest::StoreU32(base, uint32_t(r4) + 0, uint32_t(r3));
+  guest::StoreU32(base, schema::FactoryObjectOut(base, uint32_t(r4)).object_address(), uint32_t(r3));
   // blr
   return;
 }
@@ -1317,7 +1322,7 @@ uint64_t f824658B8(uint8_t* base, uint64_t r4) {
   // li r3,0
   r3 = uint64_t(int64_t(0));
   // stw r11,0(r4)
-  guest::StoreU32(base, uint32_t(r4) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::FactorySizeOut(base, uint32_t(r4)).size_address(), uint32_t(r11));
   // blr
   return r3;
 }
@@ -1350,9 +1355,9 @@ lifted::Result f82465970(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r3,r28
   r3 = r28;
   // lwz r11,0(r28)
-  r11 = guest::LoadU32(base, uint32_t(r28) + 0);
+  r11 = guest::LoadU32(base, schema::XAudioBumpAllocator(base, uint32_t(r28)).vtable_address());
   // lwz r11,20(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 20);
+  r11 = guest::LoadU32(base, schema::XAudioBumpAllocatorVtable(base, uint32_t(r11)).allocate_address());
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -1387,7 +1392,7 @@ lifted::Result f82465970(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r5,r28
   r5 = r28;
   // lwz r11,4(r29)
-  r11 = guest::LoadU32(base, uint32_t(r29) + 4);
+  r11 = guest::LoadU32(base, schema::AudioRenderDriver(base, uint32_t(r29)).inner_vtable_address());
   // mr r4,r29
   r4 = r29;
   // stw r11,8(r31)
@@ -1412,7 +1417,7 @@ lifted::Result f82465970(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // blt cr6,0x82465a24
   if (cr6.lt) goto loc_82465A24;
   // stw r30,0(r27)
-  guest::StoreU32(base, uint32_t(r27) + 0, uint32_t(r30));
+  guest::StoreU32(base, schema::FactoryObjectOut(base, uint32_t(r27)).object_address(), uint32_t(r30));
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6ed4
@@ -3504,9 +3509,9 @@ lifted::Result f82467450(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r4
   r30 = r4;
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::XAudioCodec(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // stw r10,0(r3)
-  guest::StoreU32(base, uint32_t(r3) + 0, uint32_t(r10));
+  guest::StoreU32(base, schema::XAudioCodec(base, uint32_t(r3) - 12).base_vtable_address(), uint32_t(r10));
   // bl 0x82469960
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x82469960, LIFTED_ARGS(0x8246748C, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3519,7 +3524,7 @@ lifted::Result f82467450(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // cmplwi cr6,r10,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::XAudioCodec(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // beq cr6,0x824674b8
   if (cr6.eq) goto loc_824674B8;
   // lis r11,-32107
@@ -3581,7 +3586,7 @@ lifted::Result f82469A88(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r4
   r30 = r4;
   // stw r11,0(r31)
-  guest::StoreU32(base, uint32_t(r31) + 0, uint32_t(r11));
+  guest::StoreU32(base, schema::CodecBase(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // bl 0x8246e0e8
   // (left out: dead in C++)
   { const lifted::Result o = lifted::Call(base, 0x8246E0E8, LIFTED_ARGS(0x82469AB8, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3828,7 +3833,7 @@ lifted::Result f8246A7D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r5
   r30 = r5;
   // lbz r11,266(r31)
-  r11 = guest::LoadU8(base, uint32_t(r31) + 266);
+  r11 = guest::LoadU8(base, schema::XmaCodec(base, uint32_t(r31)).submit_mode_address());
   // cmplwi cr6,r11,2
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 2, so);
   // bne cr6,0x8246a804
@@ -3843,9 +3848,9 @@ loc_8246A804:
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // stb r11,266(r31)
-  guest::StoreU8(base, uint32_t(r31) + 266, uint8_t(r11));
+  guest::StoreU8(base, schema::XmaCodec(base, uint32_t(r31)).submit_mode_address(), uint8_t(r11));
   // lwz r11,8(r4)
-  r11 = guest::LoadU32(base, uint32_t(r4) + 8);
+  r11 = guest::LoadU32(base, schema::XAudioPacket(base, uint32_t(r4)).loop_count_address());
   // cmplwi cr6,r11,255
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), 255, so);
   // ble cr6,0x8246a838
@@ -4258,9 +4263,9 @@ lifted::Result f8246AB00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,1
   r11 = uint64_t(int64_t(1));
   // sth r11,108(r31)
-  guest::StoreU16(base, uint32_t(r31) + 108, uint16_t(r11));
+  guest::StoreU16(base, schema::XmaCodec(base, uint32_t(r31)).block_size_address(), uint16_t(r11));
   // sth r11,110(r31)
-  guest::StoreU16(base, uint32_t(r31) + 110, uint16_t(r11));
+  guest::StoreU16(base, schema::XmaCodec(base, uint32_t(r31)).block_size_2_address(), uint16_t(r11));
 loc_8246AB30:
   // addi r1,r1,96
   r1 = uint64_t(int64_t(int64_t(r1) + 96));

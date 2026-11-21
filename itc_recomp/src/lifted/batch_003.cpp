@@ -6,7 +6,10 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/cameras.h"
 #include "schema/heap.h"
+#include "schema/movies.h"
+#include "schema/screen_objects.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -625,9 +628,9 @@ lifted::Result f820A7BD0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   uint64_t r11 = 0, r31 = 0, ctr = 0;
   double f1 = 0.0, f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // lwz r11,0(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r11 = guest::LoadU32(base, schema::MoviePlayer(base, uint32_t(r3)).vtable_address());
   // lwz r11,8(r11)
-  r11 = guest::LoadU32(base, uint32_t(r11) + 8);
+  r11 = guest::LoadU32(base, schema::MoviePlayerVtable(base, uint32_t(r11)).release_address());
   // mtctr r11
   ctr = r11;
   // bctr
@@ -3094,7 +3097,7 @@ lifted::Result f820A9200(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   uint64_t r4 = 0, r5 = 0, r6 = 0, r9 = 0, r10 = 0, r31 = 0;
   double f2 = 0.0, f3 = 0.0, f4 = 0.0, f5 = 0.0, f6 = 0.0, f7 = 0.0, f8 = 0.0, f9 = 0.0, f10 = 0.0, f11 = 0.0, f12 = 0.0, f13 = 0.0;
   // lwz r3,4(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 4);
+  r3 = guest::LoadU32(base, schema::AppCameraList(base, uint32_t(r3)).vector_address());
   // b 0x820a9198
   { const lifted::Result o = lifted::Call(base, 0x820A9198, LIFTED_ARGS(lr, r31)); r3 = o.r3; f1 = o.f1; }
   return {r3, f1};
@@ -3319,13 +3322,13 @@ lifted::Result f820A9330(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r4
   r30 = r4;
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 4);
+  r11 = guest::LoadU32(base, schema::StdWordVector(base, uint32_t(r31)).first_address());
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x820a936c
   if (cr0.eq) goto loc_820A936C;
   // lwz r10,8(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 8);
+  r10 = guest::LoadU32(base, schema::StdWordVector(base, uint32_t(r31)).last_address());
   // subf r11,r11,r10
   r11 = r10 - r11;
   // srawi r11,r11,2
@@ -3341,9 +3344,9 @@ loc_820A936C:
   { const lifted::Result o = f820A9270(base, r1, r13, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
 loc_820A9370:
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 4);
+  r11 = guest::LoadU32(base, schema::StdWordVector(base, uint32_t(r31)).first_address());
   // lwz r10,8(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 8);
+  r10 = guest::LoadU32(base, schema::StdWordVector(base, uint32_t(r31)).last_address());
   // cmplw cr6,r11,r10
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
   // ble cr6,0x820a9384
@@ -3362,7 +3365,7 @@ loc_820A9384:
   // ld r11,80(r1)
   r11 = guest::LoadU64(base, uint32_t(r1) + 80);
   // lwz r9,8(r31)
-  r9 = guest::LoadU32(base, uint32_t(r31) + 8);
+  r9 = guest::LoadU32(base, schema::StdWordVector(base, uint32_t(r31)).last_address());
   // cmplw cr6,r3,r9
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), uint32_t(r9), so);
   // std r11,80(r1)
@@ -3370,7 +3373,7 @@ loc_820A9384:
   // bgt cr6,0x820a93b4
   if (cr6.gt) goto loc_820A93B4;
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 4);
+  r11 = guest::LoadU32(base, schema::StdWordVector(base, uint32_t(r31)).first_address());
   // cmplw cr6,r3,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), uint32_t(r11), so);
   // bge cr6,0x820a93b8
@@ -3424,13 +3427,13 @@ lifted::Result f820A93E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r3
   r30 = r3;
   // lwz r25,0(r6)
-  r25 = guest::LoadU32(base, uint32_t(r6) + 0);
+  r25 = guest::LoadU32(base, schema::CameraListWord(base, uint32_t(r6)).value_address());
   // std r4,168(r1)
   guest::StoreU64(base, uint32_t(r1) + 168, r4);
   // mr r27,r5
   r27 = r5;
   // lwz r10,4(r30)
-  r10 = guest::LoadU32(base, uint32_t(r30) + 4);
+  r10 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).first_address());
   // cmplwi r10,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // bne 0x820a9418
@@ -3441,7 +3444,7 @@ lifted::Result f820A93E8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   goto loc_820A9424;
 loc_820A9418:
   // lwz r11,12(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 12);
+  r11 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).end_address());
   // subf r11,r10,r11
   r11 = r11 - r10;
   // srawi r8,r11,2
@@ -3462,7 +3465,7 @@ loc_820A9424:
   goto loc_820A9448;
 loc_820A943C:
   // lwz r11,8(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 8);
+  r11 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address());
   // subf r11,r10,r11
   r11 = r11 - r10;
   // srawi r11,r11,2
@@ -3495,7 +3498,7 @@ loc_820A9464:
   goto loc_820A9480;
 loc_820A9474:
   // lwz r11,8(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 8);
+  r11 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address());
   // subf r11,r10,r11
   r11 = r11 - r10;
   // srawi r11,r11,2
@@ -3531,7 +3534,7 @@ loc_820A94A4:
   goto loc_820A94C0;
 loc_820A94B4:
   // lwz r11,8(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 8);
+  r11 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address());
   // subf r11,r10,r11
   r11 = r11 - r10;
   // srawi r11,r11,2
@@ -3554,7 +3557,7 @@ loc_820A94C0:
   goto loc_820A94E8;
 loc_820A94DC:
   // lwz r11,8(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 8);
+  r11 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address());
   // subf r11,r10,r11
   r11 = r11 - r10;
   // srawi r11,r11,2
@@ -3572,7 +3575,7 @@ loc_820A94EC:
   // (left out: dead in C++)
   { const lifted::Result o = game::MessageVector::Allocate(base, LIFTED_ARGS(0x820A94F8, r31)); r3 = o.r3; f1 = o.f1; }
   // lwz r5,4(r30)
-  r5 = guest::LoadU32(base, uint32_t(r30) + 4);
+  r5 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).first_address());
   // lwz r31,172(r1)
   r31 = guest::LoadU32(base, uint32_t(r1) + 172);
   // mr r29,r3
@@ -3617,7 +3620,7 @@ loc_820A9538:
   if (uint32_t(ctr) != 0) goto loc_820A9538;
 loc_820A9544:
   // lwz r11,8(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 8);
+  r11 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address());
   // subf r11,r31,r11
   r11 = r11 - r31;
   // srawi. r11,r11,2
@@ -3641,7 +3644,7 @@ loc_820A9544:
   { const lifted::Result o = game::memmove_s(base, LIFTED_ARGS(0x820A956C, r31)); r3 = o.r3; f1 = o.f1; }
 loc_820A956C:
   // lwz r3,4(r30)
-  r3 = guest::LoadU32(base, uint32_t(r30) + 4);
+  r3 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).first_address());
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // bne 0x820a9580
@@ -3652,7 +3655,7 @@ loc_820A956C:
   goto loc_820A958C;
 loc_820A9580:
   // lwz r11,8(r30)
-  r11 = guest::LoadU32(base, uint32_t(r30) + 8);
+  r11 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address());
   // subf r11,r3,r11
   r11 = r11 - r3;
   // srawi r11,r11,2
@@ -3672,7 +3675,7 @@ loc_820A959C:
   // rlwinm r10,r26,2,0,29
   r10 = __builtin_rotateleft64(uint32_t(r26) | (r26 << 32), 2) & 0xFFFFFFFC;
   // stw r29,4(r30)
-  guest::StoreU32(base, uint32_t(r30) + 4, uint32_t(r29));
+  guest::StoreU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).first_address(), uint32_t(r29));
   // rlwinm r11,r31,2,0,29
   r11 = __builtin_rotateleft64(uint32_t(r31) | (r31 << 32), 2) & 0xFFFFFFFC;
   // add r10,r10,r29
@@ -3680,14 +3683,14 @@ loc_820A959C:
   // add r11,r11,r29
   r11 = r11 + r29;
   // stw r10,12(r30)
-  guest::StoreU32(base, uint32_t(r30) + 12, uint32_t(r10));
+  guest::StoreU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).end_address(), uint32_t(r10));
   // stw r11,8(r30)
-  guest::StoreU32(base, uint32_t(r30) + 8, uint32_t(r11));
+  guest::StoreU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address(), uint32_t(r11));
   // b 0x820a96c4
   goto loc_820A96C4;
 loc_820A95BC:
   // lwz r28,8(r30)
-  r28 = guest::LoadU32(base, uint32_t(r30) + 8);
+  r28 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address());
   // lwz r31,172(r1)
   r31 = guest::LoadU32(base, uint32_t(r1) + 172);
   // subf r11,r31,r28
@@ -3718,7 +3721,7 @@ loc_820A95BC:
   { const lifted::Result o = game::memmove_s(base, LIFTED_ARGS(0x820A95F4, r31)); r3 = o.r3; f1 = o.f1; }
 loc_820A95F4:
   // lwz r10,8(r30)
-  r10 = guest::LoadU32(base, uint32_t(r30) + 8);
+  r10 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address());
   // subf r11,r31,r10
   r11 = r10 - r31;
   // srawi r11,r11,2
@@ -3737,7 +3740,7 @@ loc_820A95F4:
   ctr = r11;
 loc_820A9614:
   // stw r25,0(r10)
-  guest::StoreU32(base, uint32_t(r10) + 0, uint32_t(r25));
+  guest::StoreU32(base, schema::CameraListWord(base, uint32_t(r10)).value_address(), uint32_t(r25));
   // addi r10,r10,4
   r10 = uint64_t(int64_t(int64_t(r10) + 4));
   // bdnz 0x820a9614
@@ -3745,7 +3748,7 @@ loc_820A9614:
   if (uint32_t(ctr) != 0) goto loc_820A9614;
 loc_820A9620:
   // lwz r10,8(r30)
-  r10 = guest::LoadU32(base, uint32_t(r30) + 8);
+  r10 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address());
   // rlwinm r11,r27,2,0,29
   r11 = __builtin_rotateleft64(uint32_t(r27) | (r27 << 32), 2) & 0xFFFFFFFC;
   // mr r9,r31
@@ -3757,7 +3760,7 @@ loc_820A9620:
   // cmplw cr6,r31,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r31), uint32_t(r11), so);
   // stw r10,8(r30)
-  guest::StoreU32(base, uint32_t(r30) + 8, uint32_t(r10));
+  guest::StoreU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address(), uint32_t(r10));
   // beq cr6,0x820a96c4
   if (cr6.eq) goto loc_820A96C4;
 loc_820A9640:
@@ -3775,7 +3778,7 @@ loc_820A9654:
   // rlwinm r26,r27,2,0,29
   r26 = __builtin_rotateleft64(uint32_t(r27) | (r27 << 32), 2) & 0xFFFFFFFC;
   // lwz r3,8(r30)
-  r3 = guest::LoadU32(base, uint32_t(r30) + 8);
+  r3 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address());
   // subf r29,r26,r28
   r29 = r28 - r26;
   // subf r11,r29,r28
@@ -3801,7 +3804,7 @@ loc_820A9680:
   // subf r11,r31,r29
   r11 = r29 - r31;
   // stw r27,8(r30)
-  guest::StoreU32(base, uint32_t(r30) + 8, uint32_t(r27));
+  guest::StoreU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r30)).last_address(), uint32_t(r27));
   // srawi. r11,r11,2
   ca = (int32_t(r11) < 0) & ((uint32_t(r11) & 0x3) != 0);
   r11 = uint64_t(int64_t(int32_t(r11) >> 2));
@@ -3861,15 +3864,15 @@ lifted::Result f820A96D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   guest::StoreU32(base, ea, uint32_t(r1));
   r1 = (r1 & 0xFFFFFFFF00000000ull) | uint32_t(uint32_t(ea));
   // lwz r3,4(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 4);
+  r3 = guest::LoadU32(base, schema::StdWordVectorOwner(base, uint32_t(r3)).vector_address());
   // lwz r11,4(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 4);
+  r11 = guest::LoadU32(base, schema::StdWordVector(base, uint32_t(r3)).first_address());
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x820a9724
   if (cr0.eq) goto loc_820A9724;
   // lwz r10,8(r3)
-  r10 = guest::LoadU32(base, uint32_t(r3) + 8);
+  r10 = guest::LoadU32(base, schema::StdWordVector(base, uint32_t(r3)).last_address());
   // subf r11,r11,r10
   r11 = r10 - r11;
   // srawi. r11,r11,2
@@ -3879,13 +3882,13 @@ lifted::Result f820A96D0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // beq 0x820a9724
   if (cr0.eq) goto loc_820A9724;
   // lwz r11,4(r3)
-  r11 = guest::LoadU32(base, uint32_t(r3) + 4);
+  r11 = guest::LoadU32(base, schema::StdWordVector(base, uint32_t(r3)).first_address());
   // cmplwi r11,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r11), 0, so);
   // beq 0x820a9714
   if (cr0.eq) goto loc_820A9714;
   // lwz r10,8(r3)
-  r10 = guest::LoadU32(base, uint32_t(r3) + 8);
+  r10 = guest::LoadU32(base, schema::StdWordVector(base, uint32_t(r3)).last_address());
   // subf r11,r11,r10
   r11 = r10 - r11;
   // srawi r11,r11,2
@@ -3898,7 +3901,7 @@ loc_820A9714:
   // (left out: dead in C++)
   { const lifted::Result o = f820A9330(base, r1, r13, r3, r4, r5, r6, r7, r8, r9, r10, f1); r3 = o.r3; f1 = o.f1; }
   // lwz r3,0(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 0);
+  r3 = guest::LoadU32(base, schema::StdWordVectorElement(base, uint32_t(r3)).value_address());
   // b 0x820a9728
   goto loc_820A9728;
 loc_820A9724:
@@ -3938,7 +3941,7 @@ lifted::Result f820A9738(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r29,r3
   r29 = r3;
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 4);
+  r11 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r31)).first_address());
   // std r4,160(r1)
   guest::StoreU64(base, uint32_t(r1) + 160, r4);
   // cmplwi r11,0
@@ -3946,7 +3949,7 @@ lifted::Result f820A9738(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // beq 0x820a9770
   if (cr0.eq) goto loc_820A9770;
   // lwz r10,8(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 8);
+  r10 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r31)).last_address());
   // subf r9,r11,r10
   r9 = r10 - r11;
   // srawi. r9,r9,2
@@ -3998,9 +4001,9 @@ loc_820A97A8:
   // (left out: dead in C++)
   { const lifted::Result o = f820A93E8(base, r1, r13, r3, r4, r5, r6, r7, f1); r3 = o.r3; f1 = o.f1; }
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 4);
+  r11 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r31)).first_address());
   // lwz r10,8(r31)
-  r10 = guest::LoadU32(base, uint32_t(r31) + 8);
+  r10 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r31)).last_address());
   // cmplw cr6,r11,r10
   cr6 = lifted::Compare<uint32_t>(uint32_t(r11), uint32_t(r10), so);
   // ble cr6,0x820a97c8
@@ -4019,7 +4022,7 @@ loc_820A97C8:
   // ld r11,80(r1)
   r11 = guest::LoadU64(base, uint32_t(r1) + 80);
   // lwz r9,8(r31)
-  r9 = guest::LoadU32(base, uint32_t(r31) + 8);
+  r9 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r31)).last_address());
   // cmplw cr6,r10,r9
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r9), so);
   // std r11,80(r1)
@@ -4027,7 +4030,7 @@ loc_820A97C8:
   // bgt cr6,0x820a97f8
   if (cr6.gt) goto loc_820A97F8;
   // lwz r11,4(r31)
-  r11 = guest::LoadU32(base, uint32_t(r31) + 4);
+  r11 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r31)).first_address());
   // cmplw cr6,r10,r11
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r11), so);
   // bge cr6,0x820a97fc
@@ -4043,7 +4046,7 @@ loc_820A97FC:
   // ld r11,80(r1)
   r11 = guest::LoadU64(base, uint32_t(r1) + 80);
   // std r11,0(r29)
-  guest::StoreU64(base, uint32_t(r29) + 0, r11);
+  guest::StoreU64(base, schema::CameraListIterator(base, uint32_t(r29)).pair_address(), r11);
   // addi r1,r1,128
   r1 = uint64_t(int64_t(int64_t(r1) + 128));
   // b 0x825a6edc
@@ -4071,7 +4074,7 @@ lifted::Result f820A9818(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r6,r4
   r6 = r4;
   // lwz r10,4(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 4);
+  r10 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r11)).first_address());
   // cmplwi r10,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r10), 0, so);
   // bne 0x820a9840
@@ -4082,7 +4085,7 @@ lifted::Result f820A9818(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   goto loc_820A984C;
 loc_820A9840:
   // lwz r9,8(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 8);
+  r9 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r11)).last_address());
   // subf r9,r10,r9
   r9 = r9 - r10;
   // srawi r8,r9,2
@@ -4094,7 +4097,7 @@ loc_820A984C:
   // beq cr6,0x820a9880
   if (cr6.eq) goto loc_820A9880;
   // lwz r9,12(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 12);
+  r9 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r11)).end_address());
   // subf r9,r10,r9
   r9 = r9 - r10;
   // srawi r9,r9,2
@@ -4105,20 +4108,20 @@ loc_820A984C:
   // bge cr6,0x820a9880
   if (!cr6.lt) goto loc_820A9880;
   // lwz r10,8(r11)
-  r10 = guest::LoadU32(base, uint32_t(r11) + 8);
+  r10 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r11)).last_address());
   // lwz r9,0(r6)
-  r9 = guest::LoadU32(base, uint32_t(r6) + 0);
+  r9 = guest::LoadU32(base, schema::CameraListWord(base, uint32_t(r6)).value_address());
   // addi r8,r10,4
   r8 = uint64_t(int64_t(int64_t(r10) + 4));
   // stw r9,0(r10)
-  guest::StoreU32(base, uint32_t(r10) + 0, uint32_t(r9));
+  guest::StoreU32(base, schema::CameraListWord(base, uint32_t(r10)).value_address(), uint32_t(r9));
   // stw r8,8(r11)
-  guest::StoreU32(base, uint32_t(r11) + 8, uint32_t(r8));
+  guest::StoreU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r11)).last_address(), uint32_t(r8));
   // b 0x820a98ac
   goto loc_820A98AC;
 loc_820A9880:
   // lwz r9,8(r11)
-  r9 = guest::LoadU32(base, uint32_t(r11) + 8);
+  r9 = guest::LoadU32(base, schema::NewAny_MessageVector_Allocate(base, uint32_t(r11)).last_address());
   // cmplw cr6,r10,r9
   cr6 = lifted::Compare<uint32_t>(uint32_t(r10), uint32_t(r9), so);
   // ble cr6,0x820a9890
@@ -4176,7 +4179,7 @@ lifted::Result f820A9928(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r4,r1,124
   r4 = uint64_t(int64_t(int64_t(r1) + 124));
   // lwz r3,4(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 4);
+  r3 = guest::LoadU32(base, schema::AppCameraList(base, uint32_t(r3)).vector_address());
   // bl 0x820a9818
   // (left out: dead in C++)
   { const lifted::Result o = f820A9818(base, r1, r13, r3, r4, r7, f1); r3 = o.r3; f1 = o.f1; }

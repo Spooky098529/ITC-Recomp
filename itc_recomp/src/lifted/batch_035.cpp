@@ -7,6 +7,9 @@
 #include "lifted/names.h"
 #include "lifted/sdk.h"
 #include "schema/c_runtime.h"
+#include "schema/race_setup.h"
+#include "schema/system_services.h"
+#include "schema/xact.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -33,7 +36,7 @@ namespace lifted {
 uint64_t f82099BA0(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82099BA0 (lifted)");
   // lwz r3,24(r3)
-  r3 = guest::LoadU32(base, uint32_t(r3) + 24);
+  r3 = guest::LoadU32(base, schema::XACTWaveEntry(base, uint32_t(r3)).play_length_address());
   // blr
   return r3;
 }
@@ -54,9 +57,9 @@ void f82101D20(uint8_t* base, uint64_t r3) {
   r11 = uint64_t(int64_t(0));
   // stfs f0,792(r3)
   temp.f32 = float(f0);
-  guest::StoreU32(base, uint32_t(r3) + 792, temp.u32);
+  guest::StoreU32(base, schema::RaceDataEntry(base, uint32_t(r3)).mean_address(), temp.u32);
   // stw r11,796(r3)
-  guest::StoreU32(base, uint32_t(r3) + 796, uint32_t(r11));
+  guest::StoreU32(base, schema::RaceDataEntry(base, uint32_t(r3)).mean_count_address(), uint32_t(r11));
   // blr
   return;
 }
@@ -162,7 +165,7 @@ uint64_t f82297340(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, uint64
   r9 = r11;
 loc_82297368:
   // lbz r8,0(r11)
-  r8 = guest::LoadU8(base, uint32_t(r11) + 0);
+  r8 = guest::LoadU8(base, schema::Utf8Bytes(base, uint32_t(r11)).byte0_address());
   // addi r11,r11,1
   r11 = uint64_t(int64_t(int64_t(r11) + 1));
   // cmplwi cr6,r8,0
@@ -210,7 +213,7 @@ loc_82297388:
   r30 = uint64_t(int64_t(int64_t(r11) + -30744));
 loc_822973C4:
   // lbz r8,0(r10)
-  r8 = guest::LoadU8(base, uint32_t(r10) + 0);
+  r8 = guest::LoadU8(base, schema::Utf8Bytes(base, uint32_t(r10)).byte0_address());
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // lbzx r9,r8,r30
@@ -253,7 +256,7 @@ loc_822973C4:
   r11 = __builtin_rotateleft64(uint32_t(r8) | (r8 << 32), 6) & 0xFFFFFFC0;
 loc_82297418:
   // lbz r9,0(r10)
-  r9 = guest::LoadU8(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU8(base, schema::Utf8Bytes(base, uint32_t(r10) - 1).byte1_address());
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // addi r10,r10,1
@@ -264,7 +267,7 @@ loc_82297418:
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 6) & 0xFFFFFFC0;
 loc_8229742C:
   // lbz r9,0(r10)
-  r9 = guest::LoadU8(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU8(base, schema::Utf8Bytes(base, uint32_t(r10) - 2).byte2_address());
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // addi r10,r10,1
@@ -275,7 +278,7 @@ loc_8229742C:
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 6) & 0xFFFFFFC0;
 loc_82297440:
   // lbz r9,0(r10)
-  r9 = guest::LoadU8(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU8(base, schema::Utf8Bytes(base, uint32_t(r10) - 3).byte3_address());
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // addi r10,r10,1
@@ -286,7 +289,7 @@ loc_82297440:
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 6) & 0xFFFFFFC0;
 loc_82297454:
   // lbz r9,0(r10)
-  r9 = guest::LoadU8(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU8(base, schema::Utf8Bytes(base, uint32_t(r10) - 4).byte4_address());
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // addi r10,r10,1
@@ -297,7 +300,7 @@ loc_82297454:
   r11 = __builtin_rotateleft64(uint32_t(r11) | (r11 << 32), 6) & 0xFFFFFFC0;
 loc_82297468:
   // lbz r9,0(r10)
-  r9 = guest::LoadU8(base, uint32_t(r10) + 0);
+  r9 = guest::LoadU8(base, schema::Utf8Bytes(base, uint32_t(r10) - 5).byte5_address());
   // addi r31,r31,1
   r31 = uint64_t(int64_t(int64_t(r31) + 1));
   // addi r10,r10,1
@@ -362,7 +365,7 @@ loc_822974C0:
   // add r9,r8,r9
   r9 = r8 + r9;
   // sth r9,0(r5)
-  guest::StoreU16(base, uint32_t(r5) + 0, uint16_t(r9));
+  guest::StoreU16(base, schema::Utf16Chars(base, uint32_t(r5)).char0_address(), uint16_t(r9));
   // addi r5,r5,2
   r5 = uint64_t(int64_t(int64_t(r5) + 2));
 loc_822974EC:
@@ -382,7 +385,7 @@ loc_822974EC:
   r11 = r9 + r11;
 loc_82297508:
   // sth r11,0(r5)
-  guest::StoreU16(base, uint32_t(r5) + 0, uint16_t(r11));
+  guest::StoreU16(base, schema::Utf16Chars(base, uint32_t(r5) - 2).char1_address(), uint16_t(r11));
   // addi r5,r5,2
   r5 = uint64_t(int64_t(int64_t(r5) + 2));
 loc_82297510:
