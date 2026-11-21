@@ -8,7 +8,11 @@ export const meta = {
   ],
 }
 
+// args.areas: the areas to convert. args.cross_areas (optional): the areas
+// the Cross-area phase takes (every area with a schema file, when an earlier
+// run converted some); by default the areas converted in this run.
 const AREAS = args.areas
+const CROSS = args.cross_areas || null
 
 // At most 6 agents at once (the user's call): workers take the items in order.
 const CONCURRENCY = 6
@@ -73,13 +77,19 @@ const integration = await agent(
 The repo root (where CLAUDE.md is), branch e5-native-16-11-26. Don't build, don't run the game, no git commands that change anything, don't run lift.py, lift_originals.py or type_map.py.
 1. Run python3 -I itc_recomp/tools/schema_gen.py (full). Fix every error it reports by editing the itc_recomp/schema/*.toml files: TOML syntax errors, duplicate type names (rename one, prefixing its area's name, and fix every \`to = \` and every C++ use: grep -rn "schema::<Name>" itc_recomp/src), unknown pointee types (point to the right type, or make the field u32), two types claiming one measure name (keep it on the type its area owns most; if they are the same object, merge them into one type in the owner's file and point the other area's uses at it). Repeat until it runs clean.
 2. Run python3 -I itc_recomp/tools/schema_check.py (all areas) and fix what fits no field (a missing field or a wrong width) in the owning file.
-3. Here are the area agents' notes for the lead; act on the ones about schema files (moving a type to its owner, a field another area needs added to a type you own now); leave notes about code files in your report:
+3. Here are the area agents' notes for the lead (this run's below; an earlier run's in docs/loops/e5-swarm-reports.md, "For the lead"); act on the ones about schema files (moving a type to its owner, a field another area needs added to a type you own now); leave notes about code files in your report:
 ${JSON.stringify(reports.map(r => ({ area: r.area, for_lead: r.for_lead })).filter(r => r.for_lead && r.for_lead.length > 3))}
 Report: schema_gen's and schema_check's last lines, every rename (old -> new, files touched), and what you left.`,
   { label: 'integrate', phase: 'Integrate' })
 
 phase('Cross-area')
-const crossed = await pool(reports, r => agent(
+// Areas converted in an earlier run have no report in this one: their first
+// pass's notes are in docs/loops/e5-swarm-reports.md.
+const crossItems = CROSS
+  ? CROSS.map(area => reports.find(r => r.area === area) ||
+      { area, accesses_left: 'see docs/loops/e5-swarm-reports.md, this area\'s "Left as offsets" (if it is listed there)' })
+  : reports
+const crossed = await pool(crossItems, r => agent(
 `You're one of many agents doing the second pass of E5 step 2 at once. Your area: \`${r.area}\` (docs/functions/${r.area}.md). In the first pass you (another agent) wrote itc_recomp/schema/${r.area}.toml and switched your area's hand ports to your own types' views; every area's schema now exists and src/schema/ holds every view (the integrator ran the full generator).
 ${RULES}
 Your work: in your area's hand-port files, switch the accesses to objects OTHER areas' schema files describe (grep -n "measure\\|^\\[" itc_recomp/schema/*.toml to find a type; its view is schema::<Type> in src/schema/<area_>.h, globals in schema::<Area>Globals) to their views, the same way (same loads and stores, same order). The first pass's note on what it left: ${JSON.stringify(r.accesses_left)}. If a field you need is missing from another area's type, don't edit that file: list it in your report. Also fix anything in your files that no longer matches a renamed type (the integrator renamed clashing types; grep your files for schema:: names and check they exist in src/schema/).

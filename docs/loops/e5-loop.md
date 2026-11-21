@@ -173,14 +173,21 @@ the fixes the checks call for.
 
 ### To resume
 
-From the session that ran it: Workflow with the run's script and
-`resumeFromRunId` (the same script and args: the finished agents come from
-its journal). From another session: run
-`itc_recomp/tools/workflows/e5-step2-swarm.js` as a new Workflow with
-`args.areas` = the areas left to convert (above). Its Integrate and
-Cross-area phases then cover only those: run Integrate once more and the
-Cross-area agents for every area (all 130 and the four done before)
-afterwards, or edit the script so Cross-area takes the full list.
+From another session (the user has to ask for a workflow in their own
+words; resume only when the user's current message asks for it): run
+`itc_recomp/tools/workflows/e5-step2-swarm.js` as a Workflow (`scriptPath`)
+with
+- `args.areas`: the areas left to convert (above);
+- `args.cross_areas`: every area with a schema file
+  (`ls itc_recomp/schema/*.toml`, the file names without `.toml`), so
+  the Cross-area phase covers the areas converted earlier too (their first
+  pass's notes come from `docs/loops/e5-swarm-reports.md`).
+It runs 6 agents at a time (the user's call). If a usage limit stops it,
+commit the tree as a WIP snapshot, update "Where it stands" here and the
+reports file, and wait for the user before resuming (Workflow with the
+same `scriptPath`, `resumeFromRunId` and args replays the finished agents).
+When it finishes: the lead's validation (above), then this file and
+`docs/e5-native.md` updated.
 
 ### For the lead after the swarm (found so far)
 
