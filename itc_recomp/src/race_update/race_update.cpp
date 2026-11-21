@@ -14,6 +14,7 @@
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
 #include "post_effects/post_effects.h"
+#include "schema/race_update.h"
 #include "screen_objects/screen_objects.h"
 #include "track_collision/track_collision.h"
 #include "track_zones/track_zones.h"
@@ -25,6 +26,7 @@ namespace race_update {
 namespace {
 
 namespace ops = car_scene_draw::ops;
+using G = schema::RaceUpdateGlobals;
 
 // Signed remainder over 32 bits (divw, mulli, subf).
 int32_t Rem(int32_t a, int32_t b) { return int32_t(uint32_t(a) - uint32_t(a / b) * uint32_t(b)); }
@@ -69,31 +71,33 @@ void VaryCar(uint8_t* base, uint32_t car, int32_t racer, int32_t vehicle, int32_
 void UploadDirectional(uint8_t* base, uint32_t entry, uint32_t n, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8215C698 RaceLights::UploadDirectional");
   const uint32_t slot = n << 4;
+  const schema::RaceLightEntry light(base, entry);
   // The 1.0 at stack - 4 (overwritten by the vector below, as the original).
-  ops::Store(base, stack - 4, ops::Load(base, ops::kOne));
+  ops::Store(base, stack - 4, ops::Load(base, G::one_address()));
   {
     ops::FlushToZero flush;
-    const simde__m128 v = ops::Lvx(base, entry + 16);
+    const simde__m128 v = ops::Lvx(base, light.direction_address());
     const simde__m128 normalized = ops::Normalized(v, ops::Dot3(v, v));
     ops::Stvx(base, stack - 16, normalized);
   }
-  ops::Copy16(base, kDirections + slot, stack - 16);
-  ops::Copy16Interleaved(base, kSecond + slot, entry + 32);
-  ops::Copy16Interleaved(base, kThird + slot, entry + 48);
+  ops::Copy16(base, G::light_directions_address() + slot, stack - 16);
+  ops::Copy16Interleaved(base, G::light_second_address() + slot, light.second_address());
+  ops::Copy16Interleaved(base, G::light_third_address() + slot, light.third_address());
 }
 
 uint32_t LightsUpdate(uint8_t* base, uint32_t set, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8215D008 RaceLights::Update");
-  const uint32_t zero = ops::Load(base, ops::kZero);
+  const uint32_t zero = ops::Load(base, G::zero_address());
   ops::Store(base, frame + 80, zero);
   ops::Store(base, frame + 84, zero);
   ops::Store(base, frame + 88, zero);
-  ops::Store(base, frame + 92, ops::Load(base, ops::kOne));
-  ops::Copy16(base, kOrigin, frame + 80);
+  ops::Store(base, frame + 92, ops::Load(base, G::one_address()));
+  ops::Copy16(base, G::light_origin_address(), frame + 80);
+  const schema::RaceLights lights(base, set);
   uint32_t n = 0;
   for (uint32_t i = 0; i < 11; i++) {
-    const uint32_t entry = set + 16 + 96 * i;
-    if (ops::Load(base, entry) == 1) {
+    const uint32_t entry = lights.entries_address() + schema::RaceLightEntry::kSize * i;
+    if (schema::RaceLightEntry(base, entry).kind() == 1) {
       UploadDirectional(base, entry, n, frame);
       n++;
     }
@@ -108,15 +112,15 @@ uint32_t LoadScenery(uint8_t* base, const course_scenery::Calls& calls, uint32_t
   const uint32_t frame = stack - 160;
   guest::StoreU32(base, frame, stack);
   cs::Create(base);
-  guest::StoreU32(base, scene + 0, guest::LoadU32(base, cs::kCreated));
-  const uint32_t data = guest::LoadU32(base, kRaceData);
+  schema::RaceScene(base, scene).set_scenery(guest::LoadU32(base, cs::kCreated));
+  const uint32_t data = G::race_data(base).address;
   const int32_t course = int32_t(guest::LoadU32(base, data + 4));
   const uint32_t index = course == 8 || course == 9 || course == 10
                              ? track_collision::TimesThreePlus(1, 0)
                              : track_collision::TimesThreePlus(0, guest::LoadU32(base, data + 32));
-  const uint32_t entry = kSceneryConfigs + (index << 3);
+  const uint32_t entry = G::scenery_configs_address() + (index << 3);
   const uint32_t config = frame + 80;
-  const uint32_t split = guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 0xA3AF0);
+  const uint32_t split = guest::LoadU32(base, G::race_data(base).address + 0xA3AF0);
   guest::StoreU32(base, config + 0, 1);
   guest::StoreU32(base, config + 8, 0);
   guest::StoreU32(base, config + 12, 0);
@@ -138,22 +142,22 @@ uint32_t RemakeCarModel(uint8_t* base, const GuestCall& call, uint32_t stack, ui
   constexpr uint32_t kSetUpB = 0x820C5B28, kMemcpy = 0x825A7410;
   const uint32_t frame = stack - 208;
   guest::StoreU32(base, frame, stack);
-  const uint32_t model_now = guest::LoadU32(base, slot + 0);
+  const schema::RaceCarSlot car_slot(base, slot);
+  const uint32_t model_now = car_slot.model().address;
   if (model_now != 0 &&
       int32_t(call(kPollLoad, {model_now}, frame, 0x8215C10C)) == 0) {
     return 0;
   }
-  const uint32_t held = guest::LoadU32(base, slot + 4272);
+  const uint32_t held = uint32_t(car_slot.pool_index());
   if (int32_t(held) != -1) {
     call(kReleaseB, {scene, 7, held}, frame, 0x8215C12C);
-    guest::StoreU32(base, slot + 4272, 0xFFFFFFFFu);
+    car_slot.set_pool_index(-1);
   }
-  guest::StoreU32(base, slot + 4272,
-                  uint32_t(vehicle_accessors::ScenePoolsClaimB(base, scene, 7)));
-  const uint32_t record = slot + 16;
+  car_slot.set_pool_index(int32_t(uint32_t(vehicle_accessors::ScenePoolsClaimB(base, scene, 7))));
+  const uint32_t record = car_slot.record_address();
   call(kFromCar, {record, car, pick}, frame, 0x8215C15C);
   const uint32_t model = uint32_t(
-      call(kSetUpB, {scene, 7, guest::LoadU32(base, slot + 4272), record}, frame, 0x8215C170));
+      call(kSetUpB, {scene, 7, uint32_t(car_slot.pool_index()), record}, frame, 0x8215C170));
   const uint32_t block = model + 4288;
   // The identity as the original builds it in its frame (+80), copied to
   // the block's +16 and +336.
@@ -162,7 +166,7 @@ uint32_t RemakeCarModel(uint8_t* base, const GuestCall& call, uint32_t stack, ui
       guest::StoreFloat(base, frame + 80 + 4 * i, i % 5 == 0 ? 1.0f : 0.0f);
     }
   };
-  guest::StoreU32(base, slot + 0, model);
+  car_slot.set_model(model);
   guest::StoreU32(base, block + 8, 1);
   identity();
   if (!native::Buffers_Memcpy(base, block + 16, frame + 80, 64, 0x8215C1CC)) {
@@ -172,8 +176,8 @@ uint32_t RemakeCarModel(uint8_t* base, const GuestCall& call, uint32_t stack, ui
   if (!native::Buffers_Memcpy(base, block + 336, frame + 80, 64, 0x8215C210)) {
     call(kMemcpy, {block + 336, frame + 80, 64}, frame, 0x8215C210);
   }
-  if (int32_t(guest::LoadU32(base, record)) == 3) {
-    const int32_t kind = int32_t(guest::LoadU32(base, slot + 32));
+  if (int32_t(car_slot.record_kind()) == 3) {
+    const int32_t kind = int32_t(car_slot.record_block());
     if (kind == 0 || kind == 7) {
       guest::StoreU32(base, block + 592, 1);
     }
@@ -226,27 +230,32 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
   namespace va = vehicle_accessors;
   using ops::Lfs;
   using ops::Stfs;
-  constexpr uint32_t kPass0 = 0x826BAC00, kScene = 0x826C2E44, kRacers = 0x826D82F4;
-  constexpr uint32_t kViewports = 0x826C2CE8, kInputs = 0x826C5B30, kFollowed = 0x826C7824;
+  constexpr uint32_t kPass0 = G::camera_pass0_address(), kInputs = G::input_records_address();
   constexpr uint32_t kPollLoad = 0x820DA318, kReleaseB = 0x820C5C88, kStagesCopy = 0x820FFD88;
   const uint32_t f = stack - 976;
   guest::StoreU32(base, f, stack);
-  const uint32_t scene = guest::LoadU32(base, kScene);
+  // `slots` is the race scene's +16 (its car slots' count).
+  const schema::RaceScene race_scene(base, slots - 16);
+  const auto slot_at = [&](uint32_t v) {
+    return schema::RaceCarSlot(base,
+                               race_scene.car_slots_address() + schema::RaceCarSlot::kSize * v);
+  };
+  const uint32_t scene = G::car_scene(base).address;
   // Pass 0's two points and their direction into the frame's +96.
   Stfs(base, f + 112, Lfs(base, kPass0 + 400));
   Stfs(base, f + 116, Lfs(base, kPass0 + 404));
   Stfs(base, f + 120, Lfs(base, kPass0 + 408));
   Stfs(base, f + 96, Lfs(base, kPass0 + 416));
   Stfs(base, f + 100, Lfs(base, kPass0 + 420));
-  const double one = Lfs(base, ops::kOne);
+  const double one = Lfs(base, G::one_address());
   const double z424 = Lfs(base, kPass0 + 424);
   Stfs(base, f + 124, one);
   Stfs(base, f + 104, z424);
   Stfs(base, f + 108, one);
   vector_library::Vec3Direction(base, f + 96, f + 96, f + 112);
   // The slots' seen flags and their blocks' +8 and +12.
-  for (int32_t v = 0; v < int32_t(guest::LoadU32(base, slots)); v++) {
-    const uint32_t model = guest::LoadU32(base, slots + 16 + 4288 * uint32_t(v));
+  for (int32_t v = 0; v < int32_t(race_scene.car_slot_count()); v++) {
+    const uint32_t model = slot_at(uint32_t(v)).model().address;
     guest::StoreU32(base, f + 592 + 4 * uint32_t(v), 0);
     if (model != 0) {
       guest::StoreU32(base, model + 4296, 0);
@@ -255,20 +264,20 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
   }
   uint64_t r3 = track_collision::RaceRacerCount(base);
   if (int32_t(r3) > 0) {
-    const double zero = Lfs(base, ops::kZero);
-    const double scale = Lfs(base, 0x820021E8);
-    const double low = Lfs(base, 0x820097A0);
-    const double high = Lfs(base, 0x8200979C);
+    const double zero = Lfs(base, G::zero_address());
+    const double scale = double(G::wheel_load_scale(base));
+    const double low = double(G::slip_low(base));
+    const double high = double(G::slip_high(base));
     for (uint32_t j = 0; int32_t(j) < int32_t(r3);) {
-      const uint32_t racer = guest::LoadU32(base, guest::LoadU32(base, kRacers) + 2308 + 4 * j);
+      const uint32_t racer = guest::LoadU32(base, G::racers(base).address + 2308 + 4 * j);
       const uint32_t v = guest::LoadU32(base, racer + 20);
       const uint32_t vehicle = va::VehicleGet(base, v);
       const uint32_t flags = guest::LoadU32(base, racer + 0);
-      const uint32_t slot = slots + v * 4288 + 16;
+      const uint32_t slot = slot_at(v).address;
       guest::StoreU32(base, f + 592 + (v << 2), 1);
       if ((flags & 0x200) != 0 && v != 0) {
         const uint32_t index = guest::LoadU32(base, racer + 24);
-        const uint32_t car = index * 3936 + guest::LoadU32(base, kRaceData) + 48;
+        const uint32_t car = index * 3936 + G::race_data(base).address + 48;
         uint64_t pick;
         if ((flags & 0x2) != 0) {
           const uint32_t plus16 = guest::LoadU32(base, racer + 16);
@@ -282,31 +291,31 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
           guest::StoreU32(base, racer, guest::LoadU32(base, racer) & ~0x200u);
         }
       }
-      const uint32_t model = guest::LoadU32(base, slot);
+      const uint32_t model = schema::RaceCarSlot(base, slot).model().address;
       if (model != 0) {
         const uint32_t block = model + 4288;
         // The view: hidden (mode 2), the cockpit (mode 1) or drawn.
         bool hidden = false, cockpit = false;
-        if (guest::LoadU32(base, guest::LoadU32(base, kViewports) + 8) == 0) {
+        if (guest::LoadU32(base, G::viewports(base).address + 8) == 0) {
           const uint32_t vflags = guest::LoadU32(base, vehicle + 6148);
           if ((vflags & 0x1) != 0 || (vflags & 0x80) != 0) {
-            const uint32_t stages = guest::LoadU32(base, kRaceData) + 0x59620;
+            const uint32_t stages = G::race_data(base).address + 0x59620;
             if (!va::StagesCopy(base, f + 688, stages, 0xFFFFFFFFu)) {
               call(kStagesCopy, {f + 688, stages, 0xFFFFFFFFFFFFFFFFull}, f, 0x8215C9A0);
             }
-            const uint32_t data = guest::LoadU32(base, kRaceData);
+            const uint32_t data = G::race_data(base).address;
             const int32_t mode = int32_t(guest::LoadU32(base, data + 0xA3AF0));
             if (mode == 6 && int32_t(guest::LoadU32(base, f + 688)) != 1) {
-              const uint32_t mask = guest::LoadU32(base, kFollowed + 0) == 0 ? 0x80 : 0x1;
+              const uint32_t mask = G::followed(base) == 0 ? 0x80 : 0x1;
               const uint32_t now = guest::LoadU32(base, vehicle + 6148);
               const int32_t view = int32_t(guest::LoadU32(
-                  base, guest::LoadU32(base, guest::LoadU32(base, kViewports)) + 1860));
+                  base, guest::LoadU32(base, G::viewports(base).address) + 1860));
               if (int32_t(mask & now) == int32_t(mask)) {
                 hidden = view == 2;
                 cockpit = view == 1;
               }
             } else {
-              const uint32_t viewports = guest::LoadU32(base, kViewports);
+              const uint32_t viewports = G::viewports(base).address;
               const uint32_t viewport =
                   (guest::LoadU32(base, vehicle + 6148) & 0x1) != 0
                       ? guest::LoadU32(base, viewports + 0)
@@ -414,24 +423,24 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
   }
   // The slots no racer has: their pool index released once their model is
   // done loading (or there's none).
-  for (int32_t v = 0; v < int32_t(guest::LoadU32(base, slots)); v++) {
-    const uint32_t slot = slots + 16 + 4288 * uint32_t(v);
+  for (int32_t v = 0; v < int32_t(race_scene.car_slot_count()); v++) {
+    const schema::RaceCarSlot slot = slot_at(uint32_t(v));
     if (guest::LoadU32(base, f + 592 + 4 * uint32_t(v)) != 0) {
       continue;
     }
-    r3 = guest::LoadU32(base, slot + 0);
+    r3 = slot.model().address;
     if (uint32_t(r3) != 0) {
       r3 = call(kPollLoad, {r3}, f, 0x8215CF1C);
       if (int32_t(r3) == 0) {
         continue;
       }
     }
-    const uint32_t index = guest::LoadU32(base, slot + 4272);
+    const uint32_t index = uint32_t(slot.pool_index());
     if (int32_t(index) == -1) {
       continue;
     }
     r3 = call(kReleaseB, {scene, 7, index}, f, 0x8215CF3C);
-    guest::StoreU32(base, slot + 4272, 0xFFFFFFFFu);
+    slot.set_pool_index(-1);
   }
   return r3;
 }
@@ -439,60 +448,66 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
 uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint32_t stack, uint32_t scene) {
   ITC_NATIVE_RUNNING("sub_8215D2B0 RaceScene::Update");
   constexpr uint32_t kStart = 0x8212EDF8, kStop = 0x8212EED0, kSetSpeed = 0x8212FCC8;
-  constexpr uint32_t kSplitMode = 0xA3AF0, kHumans = 0x59614, kFollowed = 0x826C7824;
+  constexpr uint32_t kSplitMode = 0xA3AF0, kHumans = 0x59614;
   const uint32_t f = stack - 144;
   guest::StoreU32(base, f, stack);
-  LightsUpdate(base, scene + 30064, f - kLightsFrame);
-  calls.scenery_update(guest::LoadU32(base, scene + 0), scene, f);
-  TickUpdate(base, calls.call, f, scene + 16);
+  const schema::RaceScene race_scene(base, scene);
+  LightsUpdate(base, race_scene.lights_address(), f - kLightsFrame);
+  calls.scenery_update(race_scene.scenery<schema::View>().address, scene, f);
+  TickUpdate(base, calls.call, f, race_scene.car_slot_count_address());
   post_effects::MarkUpdated(base);
   uint32_t first = 0;
   {
-    const uint32_t data = guest::LoadU32(base, kRaceData);
+    const uint32_t data = G::race_data(base).address;
     if (int32_t(guest::LoadU32(base, data + kSplitMode)) == 6 &&
         int32_t(guest::LoadU32(base, data + kHumans)) == 2) {
-      first = guest::LoadU32(base, kFollowed) == 0 ? 1 : 0;
+      first = G::followed(base) == 0 ? 1 : 0;
     }
   }
   const uint32_t a = track_zones::RacersVehicle(base, first);
   const uint32_t b = track_zones::RacersVehicle(base, 1);
   uint64_t r3 = b;
-  const double per = ops::Lfs(base, 0x820086EC);  // 1/300
+  const double per = double(G::speed_scale(base));  // 1/300
   // One followed car: its glow, its screen object started or stopped, and
   // the object's speed. `lrs`: the original's return addresses (the slot,
-  // Start, Stop, SetSpeed).
-  auto follow = [&](uint32_t vehicle, uint32_t at, uint32_t effect, const uint32_t (&lrs)[4]) {
+  // Start, Stop, SetSpeed). `object_of`: the scene's screen object it drives.
+  using ObjectOf = schema::View (schema::RaceScene::*)() const;
+  auto follow = [&](uint32_t vehicle, ObjectOf object_of, uint32_t effect,
+                    const uint32_t (&lrs)[4]) {
     const double speed = double(Vehicle_GetSpeedKmh(base, vehicle));
     const uint32_t glow = post_effects::Get(base, effect);
     const uint32_t slot = guest::LoadU32(base, guest::LoadU32(base, glow) + 96);
     calls.call_f1(slot, glow, speed, f, lrs[0]);
     const uint8_t nitrous = guest::LoadU8(base, vehicle + 2424);
-    const uint32_t object = guest::LoadU32(base, scene + at);
+    const uint32_t object = (race_scene.*object_of)().address;
     if (nitrous != 0 && guest::LoadU8(base, object + 24) == 0) {
       calls.call(kStart, {object}, f, lrs[1]);
     } else if (nitrous == 0) {
-      const uint32_t now = guest::LoadU32(base, scene + at);
+      const uint32_t now = (race_scene.*object_of)().address;
       if (guest::LoadU8(base, now + 24) != 0) {
         calls.call(kStop, {now}, f, lrs[2]);
       }
     }
     const double strength = ops::Fmuls(double(Vehicle_GetSpeedKmh(base, vehicle)), per);
-    const uint32_t target = guest::LoadU32(base, scene + at);
+    const uint32_t target = (race_scene.*object_of)().address;
     if (screen_objects::SetSpeed(base, target, strength)) {
       r3 = target;
     } else {
       r3 = calls.call_f1(kSetSpeed, target, strength, f, lrs[3]);
     }
   };
-  if (int32_t(guest::LoadU32(base, guest::LoadU32(base, kRaceData) + kSplitMode)) == 4) {
-    if (a != 0 && guest::LoadU32(base, scene + 31156) != 0) {
-      follow(a, 31156, 5, {0x8215D398, 0x8215D3B8, 0x8215D3D8, 0x8215D3EC});
+  if (int32_t(guest::LoadU32(base, G::race_data(base).address + kSplitMode)) == 4) {
+    if (a != 0 && race_scene.screen_object_first().address != 0) {
+      follow(a, &schema::RaceScene::screen_object_first, 5,
+             {0x8215D398, 0x8215D3B8, 0x8215D3D8, 0x8215D3EC});
     }
-    if (b != 0 && guest::LoadU32(base, scene + 31160) != 0) {
-      follow(b, 31160, 9, {0x8215D428, 0x8215D448, 0x8215D468, 0x8215D514});
+    if (b != 0 && race_scene.screen_object_second().address != 0) {
+      follow(b, &schema::RaceScene::screen_object_second, 9,
+             {0x8215D428, 0x8215D448, 0x8215D468, 0x8215D514});
     }
-  } else if (a != 0 && guest::LoadU32(base, scene + 31152) != 0) {
-    follow(a, 31152, 1, {0x8215D4B8, 0x8215D4D8, 0x8215D4F8, 0x8215D514});
+  } else if (a != 0 && race_scene.screen_object().address != 0) {
+    follow(a, &schema::RaceScene::screen_object, 1,
+           {0x8215D4B8, 0x8215D4D8, 0x8215D4F8, 0x8215D514});
   }
   return r3;
 }

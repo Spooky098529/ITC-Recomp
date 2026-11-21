@@ -105,25 +105,25 @@ uint64_t FadeMusic(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint64_t category = CallSlot(base, calls, kGetCategorySlot, frame, 0x82175938, 2,
                                      kMusicName);
   Store(base, frame + 80, uint32_t(category));
-  const double kept = double(guest::LoadFloat(base, kKeptMusicVolume));
+  const double kept = double(Globals::kept_music_volume(base));
   const double zero = double(guest::LoadFloat(base, kZero));
   if (kept == zero) {
     return 1;
   }
   const uint32_t manager = Load(base, kSoundManager);
   const double tenth = double(guest::LoadFloat(base, kTenth));
-  const double volume = double(guest::LoadFloat(base, kMusicVolume));
+  const double volume = double(Globals::music_volume(base));
   // fnmsubs: -(kept * tenth - volume), fused, rounded to single.
   const double faded = double(float(-std::fma(kept, tenth, -volume)));
-  guest::StoreFloat(base, kMusicVolume, float(faded));
+  Globals::set_music_volume(base, float(faded));
   if (faded > zero) {
     calls.Call(Slot(base, manager, kSetCategoryVolumeSlot), frame, 0x821759BC, 3, manager,
-               frame + 80, kMusicVolume);
+               frame + 80, Globals::music_volume_address());
     return 0;
   }
-  guest::StoreFloat(base, kMusicVolume, float(zero));
+  Globals::set_music_volume(base, float(zero));
   calls.Call(Slot(base, manager, kSetCategoryVolumeSlot), frame, 0x82175994, 3, manager,
-             frame + 80, kMusicVolume);
+             frame + 80, Globals::music_volume_address());
   return 1;
 }
 
@@ -134,22 +134,22 @@ uint64_t RestoreMusicVolume(uint8_t* base, uint32_t sp, const Calls& calls) {
                                      kMusicName);
   Store(base, frame + 80, uint32_t(category));
   const uint32_t manager = Load(base, kSoundManager);
-  CopySingle(base, kKeptMusicVolume, kMusicVolume);
+  CopySingle(base, Globals::kept_music_volume_address(), Globals::music_volume_address());
   return calls.Call(Slot(base, manager, kSetCategoryVolumeSlot), frame, 0x82175A28, 3, manager,
-                    frame + 80, kMusicVolume);
+                    frame + 80, Globals::music_volume_address());
 }
 
 uint64_t EndTick(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82175A40 RaceSounds::EndTick");
   const uint32_t machine = uint32_t(r3);
   const uint32_t frame = Frame(base, sp, 112);
-  if (Load(base, machine + kFlags) & 0x20) {
+  if (Sounds(base, machine).flags() & 0x20) {
     return r3;
   }
   Store(base, frame + 80, 0);
   Store(base, frame + 84, 2);
   CallSlot(base, calls, kStopCueSlot, frame, 0x82175A94, 3, frame + 84, frame + 80);
-  Store(base, machine + kFlags, Load(base, machine + kFlags) | 0x20);
+  Sounds(base, machine).set_flags(Sounds(base, machine).flags() | 0x20);
   return PauseEach(base, frame, 0x82175AC0, calls);
 }
 
@@ -180,9 +180,9 @@ uint64_t ResumeCars(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t OnStageCountdown(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82175D20 RaceSounds::OnStageCountdown");
   const uint32_t machine = uint32_t(r3);
-  CopySingle(base, kEffectsVolume2, kEffectsVolume);
-  Store(base, machine + kCarsStep, 1);
-  Store(base, machine + kFlags, Load(base, machine + kFlags) & ~0x4000u);
+  CopySingle(base, Globals::effects_volume_2_address(), Globals::effects_volume_address());
+  Sounds(base, machine).set_cars_step(1);
+  Sounds(base, machine).set_flags(Sounds(base, machine).flags() & ~0x4000u);
   return r3;
 }
 
@@ -190,23 +190,23 @@ uint64_t OnRollingStartDone(uint8_t* base, uint64_t r3, uint32_t sp, const Calls
   ITC_NATIVE_RUNNING("sub_82175D48 RaceSounds::OnRollingStartDone");
   const uint32_t machine = uint32_t(r3);
   const uint32_t frame = Frame(base, sp, 96);
-  const uint32_t flags = Load(base, machine + kFlags);
+  const uint32_t flags = Sounds(base, machine).flags();
   if ((flags & 0x20000) && !(flags & 0x4000)) {
     r3 = calls.Call(kCarSoundsStopAll, frame, 0x82175D74, 1, r3);
-    Store(base, machine + kFlags, (Load(base, machine + kFlags) | 0x4000) & ~0x10000u);
+    Sounds(base, machine).set_flags((Sounds(base, machine).flags() | 0x4000) & ~0x10000u);
   }
-  const uint32_t after = Load(base, machine + kFlags);
-  Store(base, machine + kCarsStep, 1);
-  Store(base, machine + kFlags, after & ~0x4000u);
+  const uint32_t after = Sounds(base, machine).flags();
+  Sounds(base, machine).set_cars_step(1);
+  Sounds(base, machine).set_flags(after & ~0x4000u);
   return r3;
 }
 
 uint64_t OnAbortDone(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82175CF8 RaceSounds::OnAbortDone");
   const uint32_t machine = uint32_t(r3);
-  Store(base, machine + kCarsStep, 1);
-  Store(base, machine + kFlags, Load(base, machine + kFlags) & ~0x4000u);
-  CopySingle(base, kEffectsVolume2, kEffectsVolume);
+  Sounds(base, machine).set_cars_step(1);
+  Sounds(base, machine).set_flags(Sounds(base, machine).flags() & ~0x4000u);
+  CopySingle(base, Globals::effects_volume_2_address(), Globals::effects_volume_address());
   return r3;
 }
 
@@ -216,19 +216,22 @@ uint64_t Unload(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 144);
   calls.Call(kCarSoundsRelease, frame, 0x821772EC, 1, r3);
   for (uint32_t i = 0; i < kCarSoundCount; i++) {
-    calls.Call(kXPhysicalFree, frame, 0x82177318, 1, Load(base, kSlotBuffer1 + 4 * i));
-    calls.Call(kXPhysicalFree, frame, 0x82177320, 1, Load(base, kSlotBuffer0 + 4 * i));
-    calls.Call(kSoundHolderDelete, frame, 0x82177328, 1, kCarViews + 8 * i);
-    calls.Call(kSoundHolderDelete, frame, 0x82177330, 1, kCarViews + 8 * i + 4);
+    calls.Call(kXPhysicalFree, frame, 0x82177318, 1,
+               Load(base, Globals::slot_buffers_1_address() + 4 * i));
+    calls.Call(kXPhysicalFree, frame, 0x82177320, 1,
+               Load(base, Globals::slot_buffers_0_address() + 4 * i));
+    calls.Call(kSoundHolderDelete, frame, 0x82177328, 1, Globals::car_views_address() + 8 * i);
+    calls.Call(kSoundHolderDelete, frame, 0x82177330, 1, Globals::car_views_address() + 8 * i + 4);
   }
   Store(base, frame + 80, 2);
   CallSlot(base, calls, kReleaseBankSlot, frame, 0x82177364, 2, frame + 80);
-  return calls.Call(kXPhysicalFree, frame, 0x8217736C, 1, Load(base, machine + kEffectsBank));
+  return calls.Call(kXPhysicalFree, frame, 0x8217736C, 1,
+                    Sounds(base, machine).effects_bank().address);
 }
 
 void OnEffectsBankLoaded(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82175ED0 RaceSounds::OnEffectsBankLoaded");
-  Store(base, kEffectsBankArrived, 1);
+  Globals::set_effects_bank_arrived(base, 1);
 }
 
 }  // namespace race_sounds

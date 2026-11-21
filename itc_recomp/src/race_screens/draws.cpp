@@ -4,6 +4,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/race_screens.h"
 
 #include <initializer_list>
 
@@ -11,7 +13,7 @@ namespace race_screens {
 
 namespace {
 
-uint32_t Get(uint8_t* base, uint32_t global) { return guest::LoadU32(base, global); }
+using G = schema::RaceScreensGlobals;
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   guest::StoreU32(base, sp - bytes, sp);
@@ -52,24 +54,25 @@ uint64_t PauseMenuDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls&
               0x8220C868, 0x8220DD98, 0x8220C930, 0x8220EFA8, 0x8220F6D0, 0x8220CA28, 0x8220DF30,
               0x8220E0F8, 0x8220F0A0, 0x8220F788, 0x8220CAB0, 0x8220E1F8, 0x8220F1B8,
               0x8220F2A8});
-  const uint32_t pages = Get(base, kPausePages);
-  const int32_t transition = int32_t(guest::LoadU32(base, pages + 12));
+  const uint32_t pages = G::pause_pages(base).address;
+  const int32_t transition = int32_t(schema::PageObject(base, pages).step());
   uint64_t r3;
   if (transition == -1) {
-    r3 = calls.Call(kRun, frame, 0x8220FC78, guest::LoadU32(base, screen), 0);
+    r3 = calls.Call(kRun, frame, 0x8220FC78, schema::PauseMenuScreen(base, screen).movie().address, 0);
   } else if (transition < 0) {
     PagesFinish(base, pages, 1);
     r3 = pages;
   } else {
-    const uint64_t regs[8] = {uint64_t(pages) + 24,  Register(0x8220F0A0), Register(0x8220F788),
+    const uint64_t regs[8] = {schema::PageObject(base, pages).step_started_address(),
+                              Register(0x8220F0A0), Register(0x8220F788),
                               Register(0x8220CAB0), Register(0x8220E1F8), Register(0x8220F1B8),
                               Register(0x8220F2A8), uint64_t(frame) + 80};
     const uint64_t result = RunHandler(base, frame, transition, regs, 0x8220FC50, calls);
-    const uint32_t now = Get(base, kPausePages);
+    const uint32_t now = G::pause_pages(base).address;
     PagesFinish(base, now, uint32_t(result));
     r3 = now;
   }
-  if (int32_t(guest::LoadU32(base, Get(base, kPausePages))) == 4) {
+  if (int32_t(G::pause_pages(base).page()) == 4) {
     r3 = RaceDialogDraw(base, frame, calls);
   }
   return r3;
@@ -86,21 +89,22 @@ uint64_t AfterRaceMenuDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Ca
   StoreTable(base, frame,
              {0x8221A730, 0x8221A7A8, 0x8221A8A8, 0x8221AA20, 0x8221A950, 0x8221B918, 0x8221AAD8,
               0x8221B3C8, 0x8221B9C8, 0x8221AB60});
-  const uint32_t pages = Get(base, kAfterPages);
-  const int32_t transition = int32_t(guest::LoadU32(base, pages + 12));
+  const uint32_t pages = G::after_pages(base).address;
+  const int32_t transition = int32_t(schema::PageObject(base, pages).step());
   uint64_t r3;
   if (transition < 0) {
-    r3 = calls.Call(kRun, frame, 0x8221BCF0, guest::LoadU32(base, screen), 0);
+    r3 = calls.Call(kRun, frame, 0x8221BCF0, schema::AfterRaceMenuScreen(base, screen).movie().address, 0);
   } else {
-    const uint64_t regs[8] = {uint64_t(pages) + 24,  Register(0x8221A950), Register(0x8221B918),
+    const uint64_t regs[8] = {schema::PageObject(base, pages).step_started_address(),
+                              Register(0x8221A950), Register(0x8221B918),
                               Register(0x8221AAD8), Register(0x8221B3C8), Register(0x8221B9C8),
                               Register(0x8221AB60), uint64_t(frame) + 80};
     const uint64_t result = RunHandler(base, frame, transition, regs, 0x8221BCC8, calls);
-    const uint32_t now = Get(base, kAfterPages);
+    const uint32_t now = G::after_pages(base).address;
     PagesFinish(base, now, uint32_t(result));
     r3 = now;
   }
-  const int32_t page = int32_t(guest::LoadU32(base, Get(base, kAfterPages)));
+  const int32_t page = int32_t(G::after_pages(base).page());
   if ((page >= 2 && page <= 4) || page == 6) {
     r3 = RaceDialogDraw(base, frame, calls);
   }
@@ -114,16 +118,17 @@ uint64_t CareerResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Ca
   StoreTable(base, frame,
              {0x82219210, 0x822192B0, 0x822195C0, 0x82219678, 0x82219730, 0x8221A110, 0x822193D8,
               0x822194A0, 0x82219530});
-  const int32_t transition = int32_t(guest::LoadU32(base, screen + 196));
+  const schema::CareerResultsScreen results(base, screen);
+  const int32_t transition = int32_t(results.pages_step());
   if (transition < 0) {
-    return calls.Call(kRun, frame, 0x8221A3CC, guest::LoadU32(base, screen + 180), 0);
+    return calls.Call(kRun, frame, 0x8221A3CC, results.movie().address, 0);
   }
-  const uint64_t regs[8] = {uint64_t(screen) + 208, Register(0x822195C0), Register(0x82219678),
+  const uint64_t regs[8] = {results.pages_step_started_address(), Register(0x822195C0), Register(0x82219678),
                             Register(0x82219730),   Register(0x8221A110), Register(0x822193D8),
                             Register(0x822194A0),   uint64_t(frame) + 80};
   const uint64_t result = RunHandler(base, frame, transition, regs, 0x8221A3A8, calls);
-  PagesFinish(base, screen + 184, uint32_t(result));
-  return uint64_t(screen) + 184;
+  PagesFinish(base, results.pages_page_address(), uint32_t(result));
+  return results.pages_page_address();
 }
 
 }  // namespace race_screens

@@ -1,0 +1,378 @@
+# The schema of docs/functions/race-world.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+
+[Vehicle_Get_ret]
+measure = "Vehicle::Get.ret"
+size = 6264
+origin = "embedded"
+# 41 functions; areas: ai-drivers.md, collision-world.md, race-hud-machine.md, race-hud-object.md, race-screens.md, race-states.md, race-update.md, race-world.md, racer-controllers.md, replay-snapshots.md
+fields = [
+  { name = "unknown_272", offset = 272, type = "u32" },
+  { name = "unknown_324", offset = 324, type = "f32" },
+  { name = "unknown_336", offset = 336, type = "u32" },
+  { name = "unknown_340", offset = 340, type = "u32" },
+  { name = "unknown_348", offset = 348, type = "u32" },
+  { name = "unknown_416", offset = 416, type = "f32" },
+  { name = "unknown_452", offset = 452, type = "f32" },
+  { name = "unknown_636", offset = 636, type = "f32" },
+  { name = "unknown_664", offset = 664, type = "f32" },
+  { name = "unknown_2249", offset = 2249, type = "u8" },
+  { name = "unknown_2252", offset = 2252, type = "u32" },
+  { name = "unknown_2384", offset = 2384, type = "u8" },
+  { name = "unknown_2420", offset = 2420, type = "f32" },
+  { name = "unknown_2424", offset = 2424, type = "u8" },
+  { name = "unknown_2944", offset = 2944, type = "f32" },
+  { name = "unknown_3960", offset = 3960, type = "u32" },
+  { name = "unknown_5712", offset = 5712, type = "u32" },
+  { name = "unknown_6148", offset = 6148, type = "u32" },
+  { name = "unknown_6152", offset = 6152, type = "u32" },
+  { name = "unknown_6160", offset = 6160, type = "f32" },
+  { name = "unknown_6168", offset = 6168, type = "u32" },
+  { name = "unknown_6176", offset = 6176, type = "u64" },
+  { name = "unknown_6184", offset = 6184, type = "u64" },
+  { name = "unknown_6224", offset = 6224, type = "f32" },
+  { name = "unknown_6228", offset = 6228, type = "f32" },
+  { name = "unknown_6232", offset = 6232, type = "u32" },
+  { name = "unknown_6236", offset = 6236, type = "f32" },
+  { name = "unknown_6240", offset = 6240, type = "u32" },
+  { name = "unknown_6244", offset = 6244, type = "f32" },
+  { name = "unknown_6248", offset = 6248, type = "f32" },
+  { name = "unknown_6252", offset = 6252, type = "f32" },
+  { name = "unknown_6256", offset = 6256, type = "f32" },
+  { name = "unknown_6260", offset = 6260, type = "f32" },
+]
+
+[Race]
+measure = "Race"
+size = 363592
+origin = "allocated"
+# 27 functions; areas: ai-drivers.md, collision-world.md, minimap.md, post-effects.md, race-event.md, race-hud-machine.md, race-scene.md, race-setup.md, race-states.md, race-world.md, replay-snapshots.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },  # also read as 1i/4i
+  { name = "unknown_12", offset = 12, type = "u32" },  # also read as 2i/4i
+  { name = "unknown_14", offset = 14, type = "u16" },
+  { name = "unknown_16", offset = 16, type = "f32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_32", offset = 32, type = "u32" },
+  { name = "unknown_2160", offset = 2160, type = "u32" },
+  { name = "unknown_2164", offset = 2164, type = "u32" },
+  { name = "unknown_2168", offset = 2168, type = "u16" },
+  { name = "unknown_2170", offset = 2170, type = "u16" },
+  { name = "unknown_2172", offset = 2172, type = "f32" },
+  { name = "unknown_2176", offset = 2176, type = "u32" },
+  { name = "unknown_2180", offset = 2180, type = "u32" },
+  { name = "unknown_2184", offset = 2184, type = "u32" },
+  { name = "unknown_2308", offset = 2308, type = "u32" },
+  { name = "unknown_2336", offset = 2336, type = "u32" },
+  { name = "unknown_2364", offset = 2364, type = "u32" },
+  { name = "unknown_2368", offset = 2368, type = "u32" },
+  { name = "unknown_2372", offset = 2372, type = "u32" },
+  { name = "unknown_2376", offset = 2376, type = "u32" },
+  { name = "unknown_2380", offset = 2380, type = "u32" },
+  { name = "unknown_2384", offset = 2384, type = "u32" },
+  { name = "unknown_2388", offset = 2388, type = "u32" },
+  { name = "unknown_3888", offset = 3888, type = "u32" },
+  { name = "unknown_6008", offset = 6008, type = "u32" },
+  { name = "unknown_6012", offset = 6012, type = "u16" },
+  { name = "unknown_6100", offset = 6100, type = "u32" },
+  { name = "unknown_6104", offset = 6104, type = "u32" },
+  { name = "unknown_6108", offset = 6108, type = "u32" },
+  { name = "unknown_6112", offset = 6112, type = "u32" },
+  { name = "unknown_6324", offset = 6324, type = "u16" },
+  { name = "unknown_31152", offset = 31152, type = "u32" },
+  { name = "unknown_31156", offset = 31156, type = "u32" },
+  { name = "unknown_31160", offset = 31160, type = "u32" },
+  { name = "unknown_104736", offset = 104736, type = "u32" },
+  { name = "unknown_104928", offset = 104928, type = "u32" },
+  { name = "unknown_362392", offset = 362392, type = "u32" },
+]
+
+[RaceManager]
+measure = "RaceManager"
+size = 360004
+origin = "embedded"
+# 15 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },  # also read as 2i/4i
+  { name = "unknown_10", offset = 10, type = "u16" },
+  { name = "unknown_12", offset = 12, type = "u32" },  # also read as 2i/4i
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+  { name = "unknown_28", offset = 28, type = "u32" },
+  { name = "unknown_52", offset = 52, type = "u32" },
+  { name = "unknown_2160", offset = 2160, type = "u32" },
+  { name = "unknown_2164", offset = 2164, type = "u32" },
+  { name = "unknown_2168", offset = 2168, type = "u32" },
+  { name = "unknown_2176", offset = 2176, type = "u32" },
+  { name = "unknown_2180", offset = 2180, type = "u32" },
+  { name = "unknown_2184", offset = 2184, type = "u32" },
+  { name = "unknown_2188", offset = 2188, type = "u32" },
+  { name = "unknown_2192", offset = 2192, type = "u32" },
+  { name = "unknown_2204", offset = 2204, type = "u32" },
+  { name = "unknown_2208", offset = 2208, type = "u32" },
+  { name = "unknown_2212", offset = 2212, type = "u32" },
+  { name = "unknown_2336", offset = 2336, type = "u32" },
+  { name = "unknown_2364", offset = 2364, type = "u32" },
+  { name = "unknown_2368", offset = 2368, type = "u32" },
+  { name = "unknown_2372", offset = 2372, type = "u32" },
+  { name = "unknown_2376", offset = 2376, type = "u32" },
+  { name = "unknown_2380", offset = 2380, type = "u32" },
+  { name = "unknown_2384", offset = 2384, type = "u32" },
+  { name = "unknown_2388", offset = 2388, type = "u32" },
+  { name = "unknown_360000", offset = 360000, type = "u32" },
+]
+
+[AiDriver_DriveCar_ret]
+measure = "AiDriver::DriveCar.ret"
+size = 4
+origin = "embedded"
+# 5 functions; areas: race-world.md, racer-controllers.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceWorld]
+measure = "RaceWorld"
+size = 11852
+origin = "embedded"
+# 4 functions; areas: race-world.md
+fields = [
+  { name = "unknown_9604", offset = 9604, type = "u32" },
+  { name = "unknown_9608", offset = 9608, type = "u32" },
+  { name = "unknown_9628", offset = 9628, type = "u32" },
+  { name = "unknown_9632", offset = 9632, type = "u32" },
+  { name = "unknown_9700", offset = 9700, type = "u32" },
+  { name = "unknown_11844", offset = 11844, type = "u32" },
+  { name = "unknown_11848", offset = 11848, type = "u32" },
+]
+
+[SortedList]
+measure = "SortedList"
+size = 1612
+origin = "embedded"
+# 2 functions; areas: race-world.md
+fields = [
+  { name = "unknown_4", offset = 4, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "ptr", to = "SortedList" },
+  { name = "unknown_12", offset = 12, type = "ptr", to = "SortedList" },
+  { name = "unknown_1600", offset = 1600, type = "ptr", to = "SortedList" },
+  { name = "unknown_1604", offset = 1604, type = "ptr", to = "SortedList" },
+  { name = "unknown_1608", offset = 1608, type = "u32" },
+]
+
+[sub_820B6880_ret]
+measure = "sub_820B6880.ret"
+size = 16
+origin = "embedded"
+# 2 functions; areas: camera-modes.md, race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u64" },
+  { name = "unknown_8", offset = 8, type = "u64" },
+]
+
+[RaceEvent_Entry_ret]
+measure = "RaceEvent::Entry.ret"
+size = 8
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_4", offset = 4, type = "u16" },
+  { name = "unknown_6", offset = 6, type = "u16" },
+]
+
+[RaceEvent_PlaceEntry_r5]
+measure = "RaceEvent::PlaceEntry.r5"
+size = 2
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u16" },
+]
+
+[RaceEvent_PlaceEntry_r6]
+measure = "RaceEvent::PlaceEntry.r6"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u16" },
+  { name = "unknown_2", offset = 2, type = "u16" },
+]
+
+[RaceEvent_PlaceEntry_r7]
+measure = "RaceEvent::PlaceEntry.r7"
+size = 2
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u16" },
+]
+
+[RaceEvent_PlaceGroup_r4]
+measure = "RaceEvent::PlaceGroup.r4"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceEvent_PlaceGroup_r6]
+measure = "RaceEvent::PlaceGroup.r6"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceEvent_PlaceGroup_r7]
+measure = "RaceEvent::PlaceGroup.r7"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceEvent_PlaceGroupFixed_r4]
+measure = "RaceEvent::PlaceGroupFixed.r4"
+size = 2
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u16" },
+]
+
+[RaceEvent_PlaceGroupFixed_r5]
+measure = "RaceEvent::PlaceGroupFixed.r5"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceEvent_PlaceGroupSplit_r6]
+measure = "RaceEvent::PlaceGroupSplit.r6"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceEvent_PlaceGroupSplit_r7]
+measure = "RaceEvent::PlaceGroupSplit.r7"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceEvent_PlaceGroupTwoRows_r7]
+measure = "RaceEvent::PlaceGroupTwoRows.r7"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceEvent_PlaceStarts_r4]
+measure = "RaceEvent::PlaceStarts.r4"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceEvent_PlaceStarts_r5]
+measure = "RaceEvent::PlaceStarts.r5"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceManager_GiveVehicle_r4]
+measure = "RaceManager::GiveVehicle.r4"
+size = 28
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_20", offset = 20, type = "u32" },
+  { name = "unknown_24", offset = 24, type = "u32" },
+]
+
+[RaceManager_JumpSections_r4]
+measure = "RaceManager::JumpSections.r4"
+size = 12
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "f32" },
+  { name = "unknown_8", offset = 8, type = "f32" },
+]
+
+[RaceManager_JumpSections_r5]
+measure = "RaceManager::JumpSections.r5"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceManager_JumpSections_r6]
+measure = "RaceManager::JumpSections.r6"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceManager_JumpSections_r7]
+measure = "RaceManager::JumpSections.r7"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[RaceManager_Neighbours_r4]
+measure = "RaceManager::Neighbours.r4"
+size = 4
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[SaveData]
+measure = "SaveData"
+size = 104740
+origin = "embedded"
+# 1 functions; areas: race-world.md
+fields = [
+  { name = "unknown_4908", offset = 4908, type = "f32" },
+  { name = "unknown_6040", offset = 6040, type = "f32" },
+  { name = "unknown_6324", offset = 6324, type = "u16" },
+  { name = "unknown_104736", offset = 104736, type = "u32" },
+]

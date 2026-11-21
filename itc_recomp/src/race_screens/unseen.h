@@ -9,6 +9,9 @@
 // original's return address, so the UI movie calls see what they'd see.
 // Adapters: src/hooks/race_screens_unseen.cpp (behind
 // --native_race_screens_unseen).
+// The screens' objects and the image words below are read through the
+// schema's views (schema/race_screens_unseen.h, from
+// itc_recomp/schema/race-screens-unseen.toml).
 
 #pragma once
 
@@ -33,7 +36,6 @@ namespace race_screens {
 // SetNodeText's unset varargs are passed as 0 (the user's call for the
 // parking area, 2026-10-30: only dead words of the caller's frame differ).
 // The items by kind: six words a kind at 0x8200CD08, -1 ends them.
-constexpr uint32_t kPause4Items = 0x8200CD08;
 
 // sub_82211390 PauseMenu4::Open (r3 the screen, r4 the player who paused,
 // r5 the kind): UI movie 5 found (the id at the frame's +80) into the
@@ -151,8 +153,6 @@ uint64_t Pause4CloseVolume(uint8_t* base, uint32_t step, uint32_t sp, const Call
 // Finish, the mapper's slot 10 (MapperPressed), Stages::Copy and the shared
 // "returns 1" (sub_825C8390) by their plain C++. SetText's unset varargs are
 // passed as 0 (the user's call for the parking area, 2026-10-30).
-constexpr uint32_t kSplitTicks = 0x82814E20;
-constexpr uint32_t kSplitExchanged = 0x82814E24;
 
 // sub_8221F990 RaceResults::Open (r3 the screen, r4 the 20-byte block):
 // the block copied to +0, UI movie 7 found (the id at the frame's +80) into
@@ -221,13 +221,6 @@ uint64_t SplitResultsClose(uint8_t* base, uint32_t step, uint32_t sp, const Call
 // 384-byte entries), its peer mode word (the list used when set), the other
 // console's answer (a byte, 255 none yet) and the word beside it, and the
 // pointer whose +7244 is the id sent.
-constexpr uint32_t kSignInWatchState = 0x826BAB3C;
-constexpr uint32_t kSignInWatchReason = 0x826BAB5C;
-constexpr uint32_t kNetPeers = 0x826C7308;
-constexpr uint32_t kNetPeerMode = 0x826C7824;
-constexpr uint32_t kNetAnswer = 0x826C6B0C;
-constexpr uint32_t kNetAnswerWord = 0x826C6B04;
-constexpr uint32_t kNetPlayers = 0x826D82E8;
 
 // sub_822200E0 SplitResults::Draw (r3 the screen), from a 2,816-byte frame:
 // the stage copied to the frame's +96 (Stages::Copy). In the network battle
@@ -264,10 +257,6 @@ uint64_t SplitResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Cal
 // MenuList::Selection and the confirm dialog's draw by their plain C++.
 // SetText's and SetNodeText's unset varargs are passed as 0 (the user's
 // call for the parking area, 2026-10-30).
-constexpr uint32_t kKind6Session = 0x82816E3C;
-constexpr uint32_t kKind6Course = 0x82816660;
-constexpr uint32_t kKind6CourseFlag = 0x82816680;
-constexpr uint32_t kKind6Replays = 0x828161F0;
 
 // sub_8221C168 Kind6Menu::Close: UiMovie::FinishAll on each of the screen's
 // four movies (+24 to +36) that isn't 0. The last call's r3 (or the last
@@ -377,8 +366,6 @@ uint64_t Kind6CloseWaiting(uint8_t* base, uint32_t step, uint32_t sp, const Call
 // (Kind6LeaderboardRead); ScreenPages::Go,
 // RaceDialog::Update and Open, ShowPanelA, SetUpList, FindNode and Child by
 // their plain C++.
-constexpr uint32_t kKind6Results = 0x826C6AD4;
-constexpr uint32_t kKind6ReadSpec = 0x826C72F4;
 
 // sub_822914A8 (the network manager's, the player's rank): the rows read
 // searched for the session's XUID (+168, a doubleword); its rank (+8) less
@@ -395,7 +382,6 @@ uint64_t Kind6NetState(uint8_t* base, uint64_t state, uint32_t sp, const Calls& 
 
 // The leaderboard read's spec (XUSER_STATS_SPEC: +0 the view id, +4 the
 // column count, +8 the column ids as halfwords).
-constexpr uint32_t kKind6StatsSpec = 0x826C6410;
 // sub_82292648 Leaderboard::SetUpSpec (no arguments; its jump table's
 // sixteen cases sub_82292690 merged): the spec's +0 = [0x826C72F4]; for 1
 // to 16, +4 = 3 and the columns 1, 2, 3. Returns the spec (r11 in the

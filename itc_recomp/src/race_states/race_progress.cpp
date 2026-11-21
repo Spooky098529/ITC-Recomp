@@ -19,20 +19,15 @@ using namespace car_physics::ops;
 namespace va = vehicle_accessors;
 
 using namespace steps;
-
-namespace {
-
-constexpr uint32_t kProgressBytes = 7248;
-constexpr uint32_t kTickSeconds = 0x826193A4;  // 1/30
-constexpr uint32_t kThousand = 0x82001BDC;     // 1000.0
-
-}  // namespace
+using G = schema::RaceStatesGlobals;
+using Progress = schema::RaceProgress;
+using Slot = schema::RaceProgressSlot;
 
 // --- The race's progress ---
 
 std::optional<uint32_t> ProgressCreate(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821698B0 RaceProgress::Create");
-  const auto block = memory::crt::OperatorNew(base, kProgressBytes);
+  const auto block = memory::crt::OperatorNew(base, Progress::kSize);
   if (!block) {
     return std::nullopt;
   }
@@ -44,7 +39,7 @@ std::optional<uint32_t> ProgressCreate(uint8_t* base) {
       Store(base, at + 4, 0);
     }
   }
-  Store(base, kProgress, p);
+  G::set_progress(base, p);
   return p;
 }
 
@@ -54,48 +49,49 @@ bool ProgressResetNative(uint32_t frame) {
 
 void ProgressReset(uint8_t* base, uint32_t progress, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_821648E0 RaceProgress::Reset");
-  race_setup::RecordReset(base, progress + 2184, frame - 128);
+  const Progress p(base, progress);
+  race_setup::RecordReset(base, p.results_address(), frame - 128);
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t s = progress + 48 + kSlotBytes * i;
-    Store(base, s - 8, 0);
-    Store(base, s - 4, 0);
-    Store(base, s, 0);
-    Store(base, s + 516, 0);
-    guest::StoreU16(base, s + 524, 0xFFFF);
-    Store(base, s + 520, 2);
-    guest::StoreU16(base, s + 526, 0xFFFF);
+    const Slot s(base, p.slots_address() + Slot::kSize * i);
+    s.set_hold_0(0);
+    s.set_hold_1(0);
+    s.set_entry(0u);
+    s.set_section_count(0);
+    s.set_start_section(0xFFFF);
+    s.set_level(2);
+    s.set_start_slice(0xFFFF);
   }
   for (uint32_t k = 0; k < 256; k++) {
-    const uint32_t at = progress + 6636 + 2 * k;
-    guest::StoreU16(base, at - 516, 0xFFFF);
-    guest::StoreU16(base, at, 0xFFFF);
+    guest::StoreU16(base, p.sections_passed_address() + 2 * k, 0xFFFF);
+    guest::StoreU16(base, p.path_address() + 2 * k, 0xFFFF);
   }
-  Store(base, progress + 6632, 0);
-  Store(base, progress + 7148, 0);
-  CopyWord(base, kZero, progress + 7156);
+  p.set_sections_passed_count(0);
+  p.set_path_count(0);
+  CopyWord(base, kZero, p.race_length_address());
   for (uint32_t k = 0; k < 15; k++) {
-    Store(base, progress + 7160 + 4 * k, 0);
+    Store(base, p.lap_distances_address() + 4 * k, 0);
   }
-  Store(base, progress + 7228, 0);
-  Store(base, progress + 7220, 0);
-  Store(base, progress + 7224, 0);
-  Store(base, progress + 7240, 0xFFFFFFFF);
-  CopyWord(base, kOne, progress + 7232);
-  CopyWord(base, kOne, progress + 7236);
+  p.set_word_7228(0);
+  p.set_race_checks(0);
+  p.set_entry_checks(0);
+  p.set_item_shown(0xFFFFFFFF);
+  CopyWord(base, kOne, p.track_hit_cost_address());
+  CopyWord(base, kOne, p.car_hit_cost_address());
 }
 
 void SetChecks(uint8_t* base, uint32_t progress, uint32_t kind, uint32_t type, uint32_t word) {
   ITC_NATIVE_RUNNING("sub_821649B8 RaceProgress::SetChecks");
-  Store(base, progress + 6100, type);
-  Store(base, progress + 7220, 0);
-  Store(base, progress + 7224, 0);
+  const Progress p(base, progress);
+  p.set_stage_type(type);
+  p.set_race_checks(0);
+  p.set_entry_checks(0);
   if (type == 1 || type == 3) {
-    Store(base, progress + 7220, 0x11);
-    Store(base, progress + 7224, 0x417);
+    p.set_race_checks(0x11);
+    p.set_entry_checks(0x417);
   } else if (type == 0 || type == 2) {
     const uint32_t extra = int32_t(kind) == 1 && word != 0 ? 0x8 : 0;
-    Store(base, progress + 7220, extra | 0x3);
-    Store(base, progress + 7224, 0x481);
+    p.set_race_checks(extra | 0x3);
+    p.set_entry_checks(0x481);
   }
 }
 
@@ -103,8 +99,8 @@ void ReleaseRacers(uint8_t* base, uint32_t progress, uint32_t sp, bool heap,
                    const race_world::OriginalCall& original) {
   ITC_NATIVE_RUNNING("sub_82163440 RaceProgress::ReleaseRacers");
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t slot = progress + 48 + kSlotBytes * i;
-    const uint32_t entry = Load(base, slot);
+    const uint32_t entry =
+        Slot(base, Progress(base, progress).slots_address() + Slot::kSize * i).entry().address;
     if (entry == 0) {
       continue;
     }
@@ -116,7 +112,7 @@ void ReleaseRacers(uint8_t* base, uint32_t progress, uint32_t sp, bool heap,
       Store(base, entry, Load(base, entry) & ~bit);
     }
   }
-  race_world::Refresh(base, Load(base, race_world::kManager), sp - 1904, heap, original);
+  race_world::Refresh(base, G::racers_manager(base), sp - 1904, heap, original);
 }
 
 uint32_t CountTime(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index) {
@@ -133,7 +129,8 @@ uint32_t CountTime(uint8_t* base, uint32_t out, uint32_t progress, uint32_t inde
 void TickFraction(uint8_t* base, uint32_t progress, uint32_t index, uint32_t time,
                   uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82163140 RaceProgress::TickFraction");
-  const uint32_t entry = Load(base, index * kSlotBytes + progress + 48);
+  const uint32_t entry =
+      Slot(base, index * Slot::kSize + Progress(base, progress).slots_address()).entry().address;
   const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
   const double past = Lfs(base, vehicle + 6228);
   const double distance = double(va::VehicleDistancePerFrame(base, vehicle));
@@ -142,24 +139,26 @@ void TickFraction(uint8_t* base, uint32_t progress, uint32_t index, uint32_t tim
   }
   double f = Fdivs(past, distance);
   f = Fsubs(Lfs(base, kOne), f);
-  f = Fmuls(f, Lfs(base, kTickSeconds));
-  f = Fmuls(f, Lfs(base, kThousand));
+  f = Fmuls(f, Lfs(base, G::tick_seconds_address()));
+  f = Fmuls(f, Lfs(base, G::thousand_address()));
   Store(base, frame + 80, FctiwzWord(f));
-  const uint64_t r3 = uint64_t(Unpack(Load(base, time))) - uint64_t(Load(base, frame + 80));
-  Store(base, time, uint32_t(race_setup::TimePack(r3)));
+  const schema::PackedTime t(base, time);
+  const uint64_t r3 = uint64_t(Unpack(t.packed())) - uint64_t(Load(base, frame + 80));
+  t.set_packed(uint32_t(race_setup::TimePack(r3)));
 }
 
 void Rank(uint8_t* base, uint32_t progress, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82162D80 RaceProgress::Rank");
   const uint32_t list = frame + 80;
   race_world::SortedListClear(base, list);
-  if (int32_t(Load(base, progress + 2184)) > 0) {
-    for (int32_t i = 0; i < int32_t(Load(base, progress + 2184)); i++) {
+  const Progress p(base, progress);
+  if (int32_t(p.results_count()) > 0) {
+    for (int32_t i = 0; i < int32_t(p.results_count()); i++) {
       const uint32_t e = progress + kEntries + kEntryBytes * uint32_t(i);
       race_world::SortedListInsert(base, list, e, Lfs(base, e + 824));
     }
   }
-  uint32_t place = Load(base, progress + 2184) - 1;
+  uint32_t place = p.results_count() - 1;
   for (uint32_t node = Load(base, frame + 1680); node != 0; node = Load(base, node + 12)) {
     Store(base, Load(base, node) + 8, place);
     place--;
@@ -241,11 +240,12 @@ int64_t SectionsBefore(uint8_t* base, uint32_t a, uint32_t b, uint32_t sp, bool*
 
 uint32_t PositionNotAfter(uint8_t* base, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_821622A8 RoutePosition::NotAfter");
-  const int16_t sa = int16_t(guest::LoadU16(base, a)), sb = int16_t(guest::LoadU16(base, b));
+  const schema::RoutePosition pa(base, a), pb(base, b);
+  const int16_t sa = int16_t(pa.section()), sb = int16_t(pb.section());
   if (sa != sb) {
     return sa < sb ? 1 : 0;
   }
-  const int16_t la = int16_t(guest::LoadU16(base, a + 2)), lb = int16_t(guest::LoadU16(base, b + 2));
+  const int16_t la = int16_t(pa.slice()), lb = int16_t(pb.slice());
   return la <= lb ? 1 : 0;
 }
 

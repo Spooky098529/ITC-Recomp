@@ -7,6 +7,8 @@
 #include "base/log.h"
 #include "debug/pause_menu_log.h"
 #include "guest.h"
+#include "schema/menu_helpers.h"
+#include "schema/race_screens.h"
 
 namespace race_screens {
 
@@ -14,18 +16,14 @@ namespace {
 
 int32_t S(uint32_t value) { return int32_t(value); }
 
-uint32_t Word(uint8_t* base, uint32_t list, uint32_t field) {
-  return guest::LoadU32(base, list + field);
-}
+schema::MenuList L(uint8_t* base, uint32_t list) { return schema::MenuList(base, list); }
 
-void SetWord(uint8_t* base, uint32_t list, uint32_t field, uint32_t value) {
-  guest::StoreU32(base, list + field, value);
-}
+schema::PageObject P(uint8_t* base, uint32_t pages) { return schema::PageObject(base, pages); }
 
 // The list's player's entry in the action mappers' table.
 uint32_t EntryOf(uint8_t* base, uint32_t list) {
   const uint32_t index =
-      guest::LoadU32(base, Word(base, list, kListPlayer) * 4 + kControllerEntries);
+      guest::LoadU32(base, L(base, list).player() * 4 + kControllerEntries);
   return index * 8 + kMapperEntries;
 }
 
@@ -72,28 +70,28 @@ uint32_t Pressed(uint8_t* base, uint32_t list, uint32_t action, uint32_t sp, uin
   if ((r3 & 0xFF) == 0) {
     return 0;
   }
-  return S(Word(base, list, kListMove)) == 0 ? 1 : 0;
+  return S(L(base, list).move()) == 0 ? 1 : 0;
 }
 
 // The scroll kept around `selection` (the absolute item): the original's
 // steps after a move (MenuList::Update's 0x8220C314 and 0x8220C420), with
 // `count` the item count it compares against.
 void KeepInView(uint8_t* base, uint32_t list, int32_t selection, int32_t count) {
-  const int32_t shown = S(Word(base, list, kListShown));
-  const int32_t scroll = S(Word(base, list, kListScroll));
+  const int32_t shown = S(L(base, list).shown());
+  const int32_t scroll = S(L(base, list).scroll());
   if (selection < scroll + shown) {
     if (scroll > selection) {
-      SetWord(base, list, kListScroll, uint32_t(selection));
+      L(base, list).set_scroll(uint32_t(selection));
     }
   } else {
-    SetWord(base, list, kListScroll, uint32_t(selection - shown + 1));
+    L(base, list).set_scroll(uint32_t(selection - shown + 1));
   }
   const int32_t last = count - shown;
-  const int32_t now = S(Word(base, list, kListScroll));
+  const int32_t now = S(L(base, list).scroll());
   if (now > last) {
-    SetWord(base, list, kListScroll, uint32_t(last));
+    L(base, list).set_scroll(uint32_t(last));
   } else if (now < 0) {
-    SetWord(base, list, kListScroll, 0);
+    L(base, list).set_scroll(0);
   }
 }
 
@@ -101,26 +99,26 @@ void KeepInView(uint8_t* base, uint32_t list, int32_t selection, int32_t count) 
 
 void PagesInit(uint8_t* base, uint32_t pages, uint32_t page) {
   ITC_NATIVE_RUNNING("sub_8220BA98 ScreenPages::Init");
-  guest::StoreU32(base, pages + 4, page);
-  guest::StoreU32(base, pages + 0, page);
-  guest::StoreU32(base, pages + 8, page);
-  guest::StoreU32(base, pages + 20, uint32_t(-1));
-  guest::StoreU32(base, pages + 12, uint32_t(-1));
-  guest::StoreU32(base, pages + 24, 0);
+  P(base, pages).set_next_page(page);
+  P(base, pages).set_page(page);
+  P(base, pages).set_previous_page(page);
+  P(base, pages).set_unknown_20(uint32_t(-1));
+  P(base, pages).set_step(uint32_t(-1));
+  P(base, pages).set_step_started(0);
 }
 
 void PagesGo(uint8_t* base, uint32_t pages, uint32_t page, uint32_t transition, uint32_t queued) {
   ITC_NATIVE_RUNNING("sub_8220BA68 ScreenPages::Go");
   if (S(transition) == -1) {
-    guest::StoreU32(base, pages + 0, page);
-    guest::StoreU32(base, pages + 12, uint32_t(-1));
-    guest::StoreU32(base, pages + 16, uint32_t(-1));
+    P(base, pages).set_page(page);
+    P(base, pages).set_step(uint32_t(-1));
+    P(base, pages).set_queued_step(uint32_t(-1));
     return;
   }
-  guest::StoreU32(base, pages + 12, transition);
-  guest::StoreU32(base, pages + 16, queued);
-  guest::StoreU32(base, pages + 4, page);
-  guest::StoreU32(base, pages + 0, uint32_t(-1));
+  P(base, pages).set_step(transition);
+  P(base, pages).set_queued_step(queued);
+  P(base, pages).set_next_page(page);
+  P(base, pages).set_page(uint32_t(-1));
 }
 
 void PagesFinish(uint8_t* base, uint32_t pages, uint32_t result) {
@@ -128,17 +126,17 @@ void PagesFinish(uint8_t* base, uint32_t pages, uint32_t result) {
   if (S(result) == 0) {
     return;
   }
-  const uint32_t queued = guest::LoadU32(base, pages + 16);
+  const uint32_t queued = P(base, pages).queued_step();
   if (S(queued) == -1) {
-    const uint32_t page = guest::LoadU32(base, pages + 4);
-    guest::StoreU32(base, pages + 12, uint32_t(-1));
-    guest::StoreU32(base, pages + 0, page);
+    const uint32_t page = P(base, pages).next_page();
+    P(base, pages).set_step(uint32_t(-1));
+    P(base, pages).set_page(page);
   } else {
-    guest::StoreU32(base, pages + 20, 0);
-    guest::StoreU32(base, pages + 12, queued);
-    guest::StoreU32(base, pages + 16, uint32_t(-1));
+    P(base, pages).set_unknown_20(0);
+    P(base, pages).set_step(queued);
+    P(base, pages).set_queued_step(uint32_t(-1));
   }
-  guest::StoreU32(base, pages + 24, 0);
+  P(base, pages).set_step_started(0);
 }
 
 uint64_t MapperPressed(uint8_t* base, uint32_t mapper, uint32_t action, uint32_t frame,
@@ -148,40 +146,40 @@ uint64_t MapperPressed(uint8_t* base, uint32_t mapper, uint32_t action, uint32_t
 
 uint32_t ListSelection(uint8_t* base, uint32_t list) {
   ITC_NATIVE_RUNNING("sub_8220BC20 MenuList::Selection");
-  return Word(base, list, kListSelection);
+  return L(base, list).selection();
 }
 
 void ListSetSelection(uint8_t* base, uint32_t list, uint32_t selection) {
   ITC_NATIVE_RUNNING("sub_8220BC30 MenuList::SetSelection");
-  const uint32_t old = Word(base, list, kListSelection);
-  SetWord(base, list, kListSelection, selection);
-  SetWord(base, list, kListSelectionBefore, old);
+  const uint32_t old = L(base, list).selection();
+  L(base, list).set_selection(selection);
+  L(base, list).set_selection_before(old);
 }
 
 void ListSetEnabled(uint8_t* base, uint32_t list, uint32_t item, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_8220BC00 MenuList::SetEnabled");
-  guest::StoreU32(base, Word(base, list, kListBlock) + item * 4, value);
+  guest::StoreU32(base, L(base, list).enabled().address + item * 4, value);
 }
 
 uint32_t ListIsEnabled(uint8_t* base, uint32_t list, uint32_t item) {
   ITC_NATIVE_RUNNING("sub_8220BC10 MenuList::IsEnabled");
-  return guest::LoadU32(base, Word(base, list, kListBlock) + item * 4);
+  return guest::LoadU32(base, L(base, list).enabled().address + item * 4);
 }
 
 void ListFit(uint8_t* base, uint32_t list, uint32_t quiet) {
   ITC_NATIVE_RUNNING("sub_8220BC40 MenuList::Fit");
-  const int32_t count = S(Word(base, list, kListCount));
-  const int32_t shown = S(Word(base, list, kListShown));
-  const int32_t old_selection = S(Word(base, list, kListSelection));
-  int32_t scroll = S(Word(base, list, kListScroll));
+  const int32_t count = S(L(base, list).count());
+  const int32_t shown = S(L(base, list).shown());
+  const int32_t old_selection = S(L(base, list).selection());
+  int32_t scroll = S(L(base, list).scroll());
   const int32_t last = int32_t(uint32_t(count) - uint32_t(shown));
   int32_t item = int32_t(uint32_t(scroll) + uint32_t(old_selection));
   const int32_t room = last < 0 ? 0 : last;
   if (room < scroll) {
     scroll = room;
   }
-  SetWord(base, list, kListScroll, uint32_t(scroll));
-  if (S(Word(base, list, kListWraps)) != 0) {
+  L(base, list).set_scroll(uint32_t(scroll));
+  if (S(L(base, list).wraps()) != 0) {
     if (item < 0) {
       item = count;
     } else if (item > count) {
@@ -195,28 +193,28 @@ void ListFit(uint8_t* base, uint32_t list, uint32_t quiet) {
     }
   }
   if (item >= int32_t(uint32_t(shown) + uint32_t(scroll))) {
-    SetWord(base, list, kListScroll, uint32_t(item) - uint32_t(shown) + 1);
+    L(base, list).set_scroll(uint32_t(item) - uint32_t(shown) + 1);
   } else if (scroll > item) {
-    SetWord(base, list, kListScroll, uint32_t(item));
+    L(base, list).set_scroll(uint32_t(item));
   }
-  const int32_t now = S(Word(base, list, kListScroll));
+  const int32_t now = S(L(base, list).scroll());
   if (now > last) {
-    SetWord(base, list, kListScroll, uint32_t(last));
+    L(base, list).set_scroll(uint32_t(last));
   } else if (now < 0) {
-    SetWord(base, list, kListScroll, 0);
+    L(base, list).set_scroll(0);
   }
-  const uint32_t top = Word(base, list, kListScroll);
+  const uint32_t top = L(base, list).scroll();
   const uint32_t selection = uint32_t(item) - top;
-  SetWord(base, list, kListSelection, selection);
+  L(base, list).set_selection(selection);
   if (S(quiet) != 0) {
-    SetWord(base, list, kListScrollBefore, top);
-    SetWord(base, list, kListSelectionBefore, selection);
-    SetWord(base, list, kListMove, 0);
+    L(base, list).set_scroll_before(top);
+    L(base, list).set_selection_before(selection);
+    L(base, list).set_move(0);
     return;
   }
-  SetWord(base, list, kListSelectionBefore, uint32_t(old_selection));
+  L(base, list).set_selection_before(uint32_t(old_selection));
   const int32_t moved = int32_t(selection - uint32_t(old_selection));
-  SetWord(base, list, kListMove, moved > 0 ? 1u : moved < 0 ? uint32_t(-1) : 0u);
+  L(base, list).set_move(moved > 0 ? 1u : moved < 0 ? uint32_t(-1) : 0u);
 }
 
 uint32_t ListFired(uint8_t* base, uint32_t list, uint32_t action, uint32_t sp, bool native_slots,
@@ -259,30 +257,30 @@ uint64_t ListUpdate(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots
   ITC_NATIVE_RUNNING("sub_8220C1E0 MenuList::Update");
   const uint32_t frame = sp - 144;
   guest::StoreU32(base, frame, sp);
-  int32_t scroll = int32_t(Word(base, list, kListCount) - Word(base, list, kListShown));
+  int32_t scroll = int32_t(L(base, list).count() - L(base, list).shown());
   if (scroll < 0) {
     scroll = 0;
   }
-  const int32_t old_scroll = S(Word(base, list, kListScroll));
+  const int32_t old_scroll = S(L(base, list).scroll());
   if (!(scroll < old_scroll)) {
     scroll = old_scroll;
   }
-  int32_t item = int32_t(Word(base, list, kListSelection) + uint32_t(scroll));
-  SetWord(base, list, kListScroll, uint32_t(scroll));
-  SetWord(base, list, kListScrollBefore, uint32_t(scroll));
-  SetWord(base, list, kListSide, 0);
+  int32_t item = int32_t(L(base, list).selection() + uint32_t(scroll));
+  L(base, list).set_scroll(uint32_t(scroll));
+  L(base, list).set_scroll_before(uint32_t(scroll));
+  L(base, list).set_side(0);
   const int32_t from = item;
-  SetWord(base, list, kListWrapped, 0);
-  if (ListFired(base, list, Word(base, list, kListLeft), frame, native_slots, calls) != 0) {
-    SetWord(base, list, kListSide, uint32_t(-1));
-  } else if (ListFired(base, list, Word(base, list, kListRight), frame, native_slots, calls) !=
+  L(base, list).set_wrapped(0);
+  if (ListFired(base, list, L(base, list).left_action(), frame, native_slots, calls) != 0) {
+    L(base, list).set_side(uint32_t(-1));
+  } else if (ListFired(base, list, L(base, list).right_action(), frame, native_slots, calls) !=
              0) {
-    SetWord(base, list, kListSide, 1);
-  } else if (ListFired(base, list, Word(base, list, kListUp), frame, native_slots, calls) != 0) {
+    L(base, list).set_side(1);
+  } else if (ListFired(base, list, L(base, list).up_action(), frame, native_slots, calls) != 0) {
     // Up: the nearest enabled item above, else (wrapping) the last one
     // below the count down to it.
     bool found = false;
-    const uint32_t block = Word(base, list, kListBlock);
+    const uint32_t block = L(base, list).enabled().address;
     for (int32_t k = item - 1; k >= 0; k--) {
       if (guest::LoadU32(base, block + uint32_t(k) * 4) != 0) {
         item = k;
@@ -290,10 +288,10 @@ uint64_t ListUpdate(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots
         break;
       }
     }
-    if (S(Word(base, list, kListWraps)) != 0 && !found) {
-      int32_t k = S(Word(base, list, kListCount));
+    if (S(L(base, list).wraps()) != 0 && !found) {
+      int32_t k = S(L(base, list).count());
       if (k > item) {
-        const uint32_t wrap_block = Word(base, list, kListBlock);
+        const uint32_t wrap_block = L(base, list).enabled().address;
         for (; k > item; k--) {
           if (guest::LoadU32(base, wrap_block + uint32_t(k) * 4) != 0) {
             item = k;
@@ -302,19 +300,19 @@ uint64_t ListUpdate(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots
         }
       }
     }
-    KeepInView(base, list, item, S(Word(base, list, kListCount)));
+    KeepInView(base, list, item, S(L(base, list).count()));
     if (item > from) {
-      SetWord(base, list, kListWrapped, 1);
+      L(base, list).set_wrapped(1);
     }
-  } else if (ListFired(base, list, Word(base, list, kListDown), frame, native_slots, calls) !=
+  } else if (ListFired(base, list, L(base, list).down_action(), frame, native_slots, calls) !=
              0) {
     // Down: the nearest enabled item below, else (wrapping) the first one
     // from 0 up to it.
-    const int32_t count = S(Word(base, list, kListCount));
+    const int32_t count = S(L(base, list).count());
     bool found = false;
     int32_t k = item + 1;
     if (k < count) {
-      const uint32_t block = Word(base, list, kListBlock);
+      const uint32_t block = L(base, list).enabled().address;
       for (;;) {
         if (guest::LoadU32(base, block + uint32_t(k) * 4) != 0) {
           item = k;
@@ -322,13 +320,13 @@ uint64_t ListUpdate(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots
           break;
         }
         k++;
-        if (!(k < S(Word(base, list, kListCount)))) {
+        if (!(k < S(L(base, list).count()))) {
           break;
         }
       }
     }
-    if (S(Word(base, list, kListWraps)) != 0 && !found && item > 0) {
-      const uint32_t block = Word(base, list, kListBlock);
+    if (S(L(base, list).wraps()) != 0 && !found && item > 0) {
+      const uint32_t block = L(base, list).enabled().address;
       for (int32_t j = 0; j < item; j++) {
         if (guest::LoadU32(base, block + uint32_t(j) * 4) != 0) {
           item = j;
@@ -338,20 +336,20 @@ uint64_t ListUpdate(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots
     }
     KeepInView(base, list, item, count);
     if (item < from) {
-      SetWord(base, list, kListWrapped, 1);
+      L(base, list).set_wrapped(1);
     }
   }
-  const uint32_t old_selection = Word(base, list, kListSelection);
-  const uint32_t top = Word(base, list, kListScroll);
-  SetWord(base, list, kListMove, 0);
+  const uint32_t old_selection = L(base, list).selection();
+  const uint32_t top = L(base, list).scroll();
+  L(base, list).set_move(0);
   const uint32_t selection = uint32_t(item) - top;
-  SetWord(base, list, kListSelectionBefore, old_selection);
+  L(base, list).set_selection_before(old_selection);
   const int32_t moved = int32_t(selection - old_selection);
-  SetWord(base, list, kListSelection, selection);
+  L(base, list).set_selection(selection);
   if (moved > 0) {
-    SetWord(base, list, kListMove, 1);
+    L(base, list).set_move(1);
   } else if (moved < 0) {
-    SetWord(base, list, kListMove, uint32_t(-1));
+    L(base, list).set_move(uint32_t(-1));
   }
   return ~uint64_t(0);
 }
@@ -359,13 +357,13 @@ uint64_t ListUpdate(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots
 uint32_t ListAccepted(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots,
                       const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220BD50 MenuList::Accepted");
-  return Pressed(base, list, Word(base, list, kListAccept), sp, 0x8220BDAC, native_slots, calls);
+  return Pressed(base, list, L(base, list).accept_action(), sp, 0x8220BDAC, native_slots, calls);
 }
 
 uint32_t ListCancelled(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots,
                        const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220BDE0 MenuList::Cancelled");
-  return Pressed(base, list, Word(base, list, kListBack), sp, 0x8220BE3C, native_slots, calls);
+  return Pressed(base, list, L(base, list).back_action(), sp, 0x8220BE3C, native_slots, calls);
 }
 
 uint32_t ListPressed152(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots,

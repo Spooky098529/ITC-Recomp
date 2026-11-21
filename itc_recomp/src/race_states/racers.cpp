@@ -19,27 +19,27 @@ using namespace steps;
 namespace va = vehicle_accessors;
 namespace vl = vector_library;
 
+using G = schema::RaceStatesGlobals;
+using Machine = schema::RaceStates;
+
 namespace {
 
-constexpr uint32_t kClose = 0x8200257C;  // 50.0
+constexpr uint32_t kRecordBytes = 3936;  // a racer record
 
-uint32_t RaceData(uint8_t* base) {
-  return Load(base, race_world::kRaceData);
-}
 uint32_t Stages(uint8_t* base) {
-  return RaceData(base) + 0x59620;
+  return G::race_data(base).stages_address();
 }
 // The racers' list's entry j (the manager's +2308).
 uint32_t Racer(uint8_t* base, uint32_t j) {
-  return Load(base, Load(base, race_world::kManager) + 2308 + 4 * j);
+  return Load(base, G::racers_manager(base) + 2308 + 4 * j);
 }
-// The first racer record (from the race data's +48, its count +0x595E0)
+// The first racer record (from the race data's +48, its count +0x59610)
 // flagged 0x1 (the player's): its index, or -1 with none.
 int32_t PlayerRecord(uint8_t* base) {
-  const uint32_t records = RaceData(base) + 48;
-  const int32_t count = int32_t(Load(base, records + 0x595E0));
+  const schema::RaceData data = G::race_data(base);
+  const int32_t count = int32_t(data.car_count());
   for (int32_t i = 0; i < count; i++) {
-    if (Load(base, records + 3888 + 3936 * uint32_t(i)) & 1) {
+    if (Load(base, data.record0_flags_address() + kRecordBytes * uint32_t(i)) & 1) {
       return i;
     }
   }
@@ -51,7 +51,7 @@ bool OtherInStage(uint8_t* base, uint32_t entry) {
   if (va::StagesHasRacer(base, Stages(base), record, 0xFFFFFFFF) == 0) {
     return false;
   }
-  return !(Load(base, (record + 1) * 3936 + RaceData(base)) & 1);
+  return !(Load(base, G::race_data(base).record0_flags_address() + kRecordBytes * record) & 1);
 }
 // A route position's (the halfwords at `position`) slice center: the
 // section's record (its unsigned halfword x 4 in the table) + 124 + 84 x
@@ -167,61 +167,61 @@ uint32_t RacersStill(uint8_t* base, uint32_t count) {
 
 void CountdownTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_821674A0 RaceStates::CountdownTick");
+  const Machine m(base, machine);
   if (RacersNear(base, frame - 208) == 0) {
     Post(base, dispatcher, 19);
-    Store(base, machine + 9616, 0);
-    Store(base, machine + 9620, 0);
+    m.set_ticks(0);
+    m.set_word_9620(0);
     ai_drivers::ClearAll(base, frame - 128);
     return;
   }
-  const uint32_t ticks = Load(base, machine + 9616);
+  const uint32_t ticks = m.ticks();
   if (ticks < 120) {
-    Store(base, machine + 9616, ticks + 1);
+    m.set_ticks(ticks + 1);
     return;
   }
   Post(base, dispatcher, 28);
-  Store(base, machine + 9616, 0);
-  Store(base, machine + 9620, 0);
+  m.set_ticks(0);
+  m.set_word_9620(0);
+  const schema::RaceData data = G::race_data(base);
+  data.set_flags(data.flags() & ~0x1000u);
+  // The original loads the pointer twice here (the store's, the load's).
   const uint32_t flags = FlagsAddress(base);
-  Store(base, flags, Load(base, flags) & ~0x1000u);
-  Store(base, FlagsAddress(base), Load(base, FlagsAddress(base)) & ~0x2000u);
+  Store(base, flags, G::race_data(base).flags() & ~0x2000u);
   ai_drivers::ResetAll(base, frame - 128);
 }
 
 namespace {
 
-constexpr uint32_t kFadeInPasses = 0x82001BEC;   // 5
-constexpr uint32_t kFadeOutPasses = 0x82001BF0;  // 15
-constexpr uint32_t kSignInState = 0x826BAB3C;
-constexpr uint32_t kSignInReason = 0x826BAB5C;
-
 void ChangeFlags(uint8_t* base, uint32_t set, uint32_t clear) {
-  const uint32_t at = FlagsAddress(base);
-  Store(base, at, (Load(base, at) | set) & ~clear);
+  const schema::RaceData data = G::race_data(base);
+  data.set_flags((data.flags() | set) & ~clear);
 }
 
 }  // namespace
 
 bool StandingStartTickNative(uint8_t* base, uint32_t machine) {
-  return !(int32_t(Kind(base)) == 6 && Load(base, machine + 9616) < 900 &&
-           Load(base, machine + 9636) != 0 && Load(base, machine + 9640) <= 900 &&
+  const Machine m(base, machine);
+  return !(int32_t(Kind(base)) == 6 && m.ticks() < 900 && m.settled() != 0 &&
+           m.settled_ticks() <= 900 &&
            int32_t(va::StagesType(base, Stages(base), 0xFFFFFFFF)) != 1);
 }
 
 void StandingStartTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame,
                        bool heap, const StandingCalls& calls) {
   ITC_NATIVE_RUNNING("sub_821692C8 RaceStates::StandingStartTick");
+  const Machine m(base, machine);
   if (RacersNear(base, frame - 208) == 0) {
     Post(base, dispatcher, 19);
     ai_drivers::ClearAll(base, frame - 128);
     return;
   }
-  if (Load(base, machine + 9616) >= 900) {
+  if (m.ticks() >= 900) {
     // The racers put back at the start, step by step.
-    const uint32_t step = Load(base, machine + 9612);
+    const uint32_t step = m.step();
     if (step == 0) {
-      mode_tick::ScreenFadesFadeOut(base, Load(base, kFadeOutPasses), 0, 0, 0, 0);
-      Store(base, machine + 9612, 1);
+      mode_tick::ScreenFadesFadeOut(base, G::fade_out_passes(base), 0, 0, 0, 0);
+      m.set_step(1);
     }
     if (step <= 1) {
       if (!FadesDone(base)) {
@@ -231,44 +231,42 @@ void StandingStartTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uin
       ChangeFlags(base, 0x100, 0);
       ChangeFlags(base, 0x2000, 0);
       ChangeFlags(base, 0x4000, 0);
-      race_world::Refresh(base, Load(base, race_world::kManager), frame - 1904, heap,
-                          calls.refresh);
-      Store(base, machine + 9612, 2);
+      race_world::Refresh(base, G::racers_manager(base), frame - 1904, heap, calls.refresh);
+      m.set_step(2);
     } else if (step == 2) {
       race_world::Place(base, machine, 1, 0, frame, calls.start);
-      race_world::ListRacers(base, Load(base, race_world::kManager), frame - 1872, heap,
-                             calls.list);
-      Store(base, machine + 9612, 3);
+      race_world::ListRacers(base, G::racers_manager(base), frame - 1872, heap, calls.list);
+      m.set_step(3);
     } else if (step == 3) {
       Post(base, dispatcher, 31);
       ChangeFlags(base, 0, 0x100);
       Post(base, dispatcher, 32);
       ChangeFlags(base, 0, 0x2000);
       ChangeFlags(base, 0, 0x4000);
-      mode_tick::ScreenFadesFadeIn(base, Load(base, kFadeInPasses), 0, 0, 0, 0);
-      Store(base, machine + 9612, 4);
+      mode_tick::ScreenFadesFadeIn(base, G::fade_in_passes(base), 0, 0, 0, 0);
+      m.set_step(4);
     } else if (step == 4) {
-      Store(base, machine + 9616, 0);
-      Store(base, machine + 9612, 0);
-      Store(base, machine + 9628, 0);
-      Store(base, machine + 9632, 0);
+      m.set_ticks(0);
+      m.set_step(0);
+      m.set_still_ticks(0);
+      m.set_word_9632(0);
     }
     return;
   }
   const bool linked = int32_t(Kind(base)) == 6;
   if (!linked) {
     if (RacersClose(base, frame - 208) == 0) {
-      Store(base, machine + 9616, 900);
+      m.set_ticks(900);
     } else {
-      Store(base, machine + 9616, Load(base, machine + 9616) + 1);
+      m.set_ticks(m.ticks() + 1);
     }
   }
   const uint32_t copy = frame + 80;
   if (!va::StagesCopy(base, copy, Stages(base), 0xFFFFFFFF)) {
     calls.start.original(0x820FFD88, frame, copy, Stages(base), 0xFFFFFFFFFFFFFFFFull);
   }
-  if (Load(base, machine + 9636) == 0) {
-    if (RacersStill(base, machine + 9628) != 1 || !FadesDone(base)) {
+  if (m.settled() == 0) {
+    if (RacersStill(base, m.still_ticks_address()) != 1 || !FadesDone(base)) {
       return;
     }
     if (!(int32_t(Kind(base)) == 6 && int32_t(Load(base, copy)) != 1)) {
@@ -280,23 +278,25 @@ void StandingStartTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uin
         return;
       }
     }
-    Store(base, machine + 9636, 1);
+    m.set_settled(1);
     ChangeFlags(base, 0, 0x1);
     return;
   }
-  if (Load(base, machine + 9640) > 900) {
-    if (int32_t(Load(base, kSignInState)) == 0) {
-      Store(base, kSignInState, 1);
-      Store(base, kSignInReason, 6);
+  if (m.settled_ticks() > 900) {
+    if (int32_t(G::sign_in_state(base)) == 0) {
+      G::set_sign_in_state(base, 1);
+      G::set_sign_in_reason(base, 6);
     }
     return;
   }
   // The System Link case (kind 6, the copy's +0 not 1) is the original's
   // (StandingStartTickNative).
   Post(base, dispatcher, 26);
-  for (uint32_t at : {9628u, 9632u, 9616u, 9636u, 9640u}) {
-    Store(base, machine + at, 0);
-  }
+  m.set_still_ticks(0);
+  m.set_word_9632(0);
+  m.set_ticks(0);
+  m.set_settled(0);
+  m.set_settled_ticks(0);
   ai_drivers::ClearAll(base, frame - 128);
 }
 

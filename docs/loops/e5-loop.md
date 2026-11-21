@@ -112,3 +112,85 @@ bytes at the same addresses, read and written in the same order.
 - `base` the parameter shadows the `base` namespace: `::base::` inside.
 - Never edit `src/lifted/` or `src/schema/` by hand: change the tool or
   the schema and generate again.
+
+## Step 2 as a swarm (the user's call, 2026-11-18)
+
+The user asked for as many parallel agents as possible, the conversion of
+every area in one go, the lead validating once at the end and the issues
+fixed after; then for at most 6 agents at a time. Run as a Workflow (the
+script: `itc_recomp/tools/workflows/e5-step2-swarm.js`; `args`: `{"areas":
+[...]}`), in three phases:
+
+1. **Convert**, one agent per area (6 at a time): its schema file, its own
+   types named, its hand ports switched to them. Agents only edit (their
+   own area's files: `schema/<area>.toml`, its hand-port files, its
+   `docs/functions/<area>.md`); they never build, run the game, use git,
+   run `lift.py`, `lift_originals.py`, `type_map.py` or the full
+   `schema_gen.py` (only `schema_gen.py --area <area>`, which skips other
+   files mid-edit).
+2. **Integrate**, one agent: the full `schema_gen.py` and
+   `schema_check.py` run clean (renames of clashing types, two types
+   claiming one measure name merged, missing pointees), the areas' notes
+   about schema files acted on.
+3. **Cross-area**, one agent per area again: accesses to types other areas
+   own switched to their views.
+
+Then the lead (not an agent): `lift.py reemit`, `lift_originals.py --all`,
+the full `schema_gen.py`, `schema_check.py`, the build (fixing what doesn't
+compile), an attract race, the pad replay, a frame dump, the commit; then
+the fixes the checks call for.
+
+### Where it stands (2026-11-21)
+
+- Done before the swarm, one at a time: `type2-dialog` (the pilot),
+  `heap`, `c-runtime` (built, checked, committed), `xaudio-objects` (edits
+  only, in the tree).
+- Convert done for 78 areas; the usage limit stopped the runs three times
+  (each a resume of the same Workflow run, its finished agents replayed
+  from the journal). **Left to convert (52):** race-overlays,
+  race-screens, race-states, race-world, replay-snapshots, save-data,
+  save-interface, save-screen, scene-loaders, scene, scene-models,
+  scenery-lists, scene-target, screen-constructors, screen-objects,
+  second-set, shader-objects, single-commands, sound-cues, sprites,
+  stand-models, std-string, sticker-editor, strings-and-font,
+  system-services, texture-compression, title-screen, todays-result,
+  track-route, track-zones, tuning-machine, tuning-pages, tuning-screen,
+  type10-mode, type2-mode, type2-screens, type5-mode, type67-screens,
+  type6-type7-modes, type8-mode, type8-screens, ui-movies-game, ui-movies,
+  user-info, vehicle-accessors, vehicle, video-output, xact, xact-tracks,
+  xact-waves, xaudio-engine, xaudio. Some of these were stopped partway:
+  their files may hold part of the work (the next agent picks up from
+  them; the seed never overwrites).
+- Integrate and Cross-area: not started.
+- The tree is committed as it was at each stop (WIP commits, not built).
+  `lifted.md` and `functions.md` (rows not yet in an area) aren't in the
+  swarm's list.
+
+### To resume
+
+From the session that ran it: Workflow with the run's script and
+`resumeFromRunId` (the same script and args: the finished agents come from
+its journal). From another session: run
+`itc_recomp/tools/workflows/e5-step2-swarm.js` as a new Workflow with
+`args.areas` = the areas left to convert (above). Its Integrate and
+Cross-area phases then cover only those: run Integrate once more and the
+Cross-area agents for every area (all 130 and the four done before)
+afterwards, or edit the script so Cross-area takes the full list.
+
+### For the lead after the swarm (found so far)
+
+- **A measure fault** (`type_map.py`): a pointer into an object (`this +
+  96`, a sub-object) votes for the callee's parameter as the whole object:
+  the vote ignores the offset. It joins embedded objects with their
+  owners (XAudio's reverb stages with `ReverbCore`, `Reverb::Run`'s I3DL2
+  side with `Reverb`). Fix: a nonzero offset votes for an embedded type
+  (`T@+96`). Done after the swarm (it renames measure types under the
+  agents' feet), then `schema_check.py` again and the schema files' measure
+  names updated.
+- XAudio's `Size` functions' descriptor joined with the object it
+  describes (`xaudio-objects`' note); the codec's inner object joined with
+  the outer codec.
+- `docs/known-data.md` says XAudio's converter state is 96 bytes: it's 88
+  (`xaudio-objects`).
+- `src/schema/types.h` and the other headers are stale until the full
+  `schema_gen.py`.

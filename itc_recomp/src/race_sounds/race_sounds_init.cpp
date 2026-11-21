@@ -691,10 +691,6 @@ constexpr Step kSteps[] = {
     {Op::kAdd, F(80), F(1568), kAll},
 };
 
-// The scene models' sound slots' load callbacks' contexts (the slot's
-// index) and the seven "loading" bytes.
-constexpr uint32_t kSlotContext = 0x826D8334;
-constexpr uint32_t kSlotLoading = 0x826D8350;
 // The two buffers' sizes.
 constexpr uint32_t kBuffer1Bytes = 0x6B080;
 constexpr uint32_t kBuffer0Bytes = 0x5D2D0;
@@ -715,23 +711,23 @@ uint32_t Init(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls, 
   ITC_NATIVE_RUNNING("sub_82177378 RaceSounds::Init");
   const uint32_t frame = sp - kInitFrame;
   Store(base, frame, sp);
-  Store(base, machine + kKind, guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 0xA3AF0));
+  Sounds(base, machine).set_kind(guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 0xA3AF0));
   uint64_t last = 0;
   for (uint32_t i = 0; i < kCarSoundCount; i++) {
-    Store(base, kSlotArrived + 4 * i, 0);
-    Store(base, kSlotAsked + 4 * i, 0);
-    guest::StoreU8(base, kSlotLoading + i, 0);
-    Store(base, kSlotContext + 4 * i, i);
-    Store(base, kSlotBuffer1 + 4 * i, 0);
-    Store(base, kSlotBuffer0 + 4 * i, 0);
+    Store(base, Globals::slot_arrived_address() + 4 * i, 0);
+    Store(base, Globals::slot_asked_address() + 4 * i, 0);
+    guest::StoreU8(base, Globals::slot_files_arrived_address() + i, 0);
+    Store(base, Globals::slot_contexts_address() + 4 * i, i);
+    Store(base, Globals::slot_buffers_1_address() + 4 * i, 0);
+    Store(base, Globals::slot_buffers_0_address() + 4 * i, 0);
     const uint64_t buffer1 = calls.Call(kXPhysicalAlloc, frame, 0x82177410, 4, kBuffer1Bytes,
                                         0xFFFFFFFFFFFFFFFFull, 2048, 4);
-    Store(base, kSlotBuffer1 + 4 * i, uint32_t(buffer1));
+    Store(base, Globals::slot_buffers_1_address() + 4 * i, uint32_t(buffer1));
     last = calls.Call(kXPhysicalAlloc, frame, 0x82177430, 4, kBuffer0Bytes,
                       0xFFFFFFFFFFFFFFFFull, 2048, 4);
-    Store(base, kSlotBuffer0 + 4 * i, uint32_t(last));
+    Store(base, Globals::slot_buffers_0_address() + 4 * i, uint32_t(last));
     Clear(base, uint32_t(last), kBuffer0Bytes);
-    last = guest::LoadU32(base, kSlotBuffer1 + 4 * i);
+    last = guest::LoadU32(base, Globals::slot_buffers_1_address() + 4 * i);
     Clear(base, uint32_t(last), kBuffer1Bytes);
   }
   // CarSounds::Init with memset's r3 to r5 left.
@@ -749,7 +745,7 @@ uint32_t Init(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls, 
   };
   uint32_t r3 = 0;
   for (const Step& step : kSteps) {
-    if (!(step.kinds & KindClass(guest::LoadU32(base, machine + kKind)))) {
+    if (!(step.kinds & KindClass(Sounds(base, machine).kind()))) {
       continue;
     }
     switch (step.op) {

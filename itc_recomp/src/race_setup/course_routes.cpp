@@ -21,6 +21,7 @@
 #include "c_runtime/strings.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/race_setup.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace race_setup {
@@ -567,10 +568,11 @@ namespace {
 // its word +0, +12 = sub_820FFEB0's pair (into frame + 80, then copied by
 // halfwords).
 void RoutePositions(uint8_t* base, uint32_t route, uint32_t frame, uint32_t first) {
-  guest::StoreU32(base, route + 8, first);
+  const schema::Route r(base, route);
+  r.set_first_position(first);
   vehicle_accessors::PairsLast(base, frame + 80, frame + 96);
-  guest::StoreU16(base, route + 12, guest::LoadU16(base, frame + 80));
-  guest::StoreU16(base, route + 14, guest::LoadU16(base, frame + 82));
+  r.set_last_section(guest::LoadU16(base, frame + 80));
+  r.set_last_slice(guest::LoadU16(base, frame + 82));
 }
 
 }  // namespace
@@ -580,8 +582,9 @@ bool RouteSet(uint8_t* base, uint32_t route, uint32_t index, uint32_t location, 
     return false;
   }
   ITC_NATIVE_RUNNING("sub_82101A10 Route::Set");
-  guest::StoreU32(base, route + 0, index);
-  guest::StoreU32(base, route + 4, int32_t(location) == 48 ? index + 20 : location);
+  const schema::Route r(base, route);
+  r.set_course_route(index);
+  r.set_location(int32_t(location) == 48 ? index + 20 : location);
   const uint32_t first = CopyRoute(base, frame, kRouteFrameOut, index, 0x82101A58);
   RoutePositions(base, route, frame, first);
   return true;
@@ -592,8 +595,9 @@ bool RouteReset(uint8_t* base, uint32_t route, uint32_t frame) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_82101990 Route::Reset");
-  guest::StoreU32(base, route + 0, 0);
-  guest::StoreU32(base, route + 4, 20);
+  const schema::Route r(base, route);
+  r.set_course_route(0);
+  r.set_location(20);
   const uint32_t first = CopyRoute(base, frame, kRouteFrameOut, 0, 0x821019D0);
   RoutePositions(base, route, frame, first);
   return true;
@@ -655,7 +659,8 @@ bool RaceSetRoute(uint8_t* base, uint32_t index, uint32_t location, uint32_t fra
     return false;
   }
   ITC_NATIVE_RUNNING("sub_82101D38 Race::SetRoute");
-  return RouteSet(base, guest::LoadU32(base, kRaceData) + 4, index, location, frame);
+  return RouteSet(base, schema::RaceSetupGlobals::race_data(base).address + 4, index, location,
+                  frame);
 }
 
 bool StagesSetRoute(uint8_t* base, uint32_t list, uint32_t index, uint32_t location,

@@ -12,6 +12,7 @@
 #include "hooks/app_start_up.h"
 #include "base/log.h"
 #include "race_setup/race_setup.h"
+#include "schema/race_setup.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, native_car_physics);
@@ -160,7 +161,7 @@ ITC_REGS_STEP(RaceSetupEntryReset) {
   ctx.fpscr.disableFlushMode();
   rs::EntryReset(base, ctx.r3.u32);
   ctx.r3.u64 = ctx.r1.u64 - 144 + 80;
-  ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero(base));
 }
 
 ITC_REGS_STEP(RaceSetupCourseRecordReset) {
@@ -271,7 +272,7 @@ ITC_REGS_STEP(RaceSetupRecordReset) {
   // Route::Reset's r3 (its frame + 80), and f1 as the entries' resets leave
   // it (0.0).
   ctx.r3.u64 = ctx.r1.u64 - 128 - rs::kRouteFrameBytes + 80;
-  ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero(base));
 }
 
 ITC_REGS_STEP(RaceSetupRaceSetRoute) {
@@ -301,7 +302,7 @@ ITC_REGS_STEP(RaceSetupRaceDataReset) {
   }
   // The last sub_82101F68's r3 (its Route::Reset's frame + 80) and f1.
   ctx.r3.u64 = ctx.r1.u64 - 112 - 112 - 128 - rs::kRouteFrameBytes + 80;
-  ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero(base));
 }
 
 ITC_REGS_STEP(RaceSetupRaceDataResetGlobal) {
@@ -314,7 +315,7 @@ ITC_REGS_STEP(RaceSetupRaceDataResetGlobal) {
     return;
   }
   ctx.r3.u64 = ctx.r1.u64 - 112 - 112 - 128 - rs::kRouteFrameBytes + 80;
-  ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
+  ctx.f1.f64 = double(schema::RaceSetupGlobals::zero(base));
 }
 
 namespace {
