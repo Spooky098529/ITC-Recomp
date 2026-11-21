@@ -1,0 +1,47 @@
+# The schema of docs/functions/save-data.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+
+[BitSet400]
+measure = "BitSet400"
+size = 4
+origin = "embedded"
+# 1 functions; areas: save-data.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[ControlMap]
+measure = "ControlMap"
+size = 4
+origin = "embedded"
+# 1 functions; areas: save-data.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+]
+
+[CourseRecords]
+measure = "CourseRecords"
+size = 20
+origin = "embedded"
+# 1 functions; areas: save-data.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+  { name = "unknown_8", offset = 8, type = "u32" },
+  { name = "unknown_12", offset = 12, type = "u32" },
+  { name = "unknown_16", offset = 16, type = "u16" },
+  { name = "unknown_18", offset = 18, type = "u16" },
+]
+
+[CourseRecords_Of_r4]
+measure = "CourseRecords::Of.r4"
+size = 8
+origin = "embedded"
+# 1 functions; areas: save-data.md
+fields = [
+  { name = "unknown_0", offset = 0, type = "u32" },
+  { name = "unknown_4", offset = 4, type = "u32" },
+]
