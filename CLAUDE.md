@@ -44,10 +44,11 @@ allocation is native: native code allocates through it without `ctx`.
 calls, stacks and data made real C++ over host memory, ending the
 360-shaped guest memory (and the renderer's mirrors). In progress on
 `e5-native-16-11-26` (not merged): steps 0 and 1 done; step 2 (the
-schema, `itc_recomp/schema/`, and named fields) under way, run by
-`docs/loops/e5-loop.md` (its "Step 2 as a swarm" says where it stands and
-how to resume; the agents' reports in `docs/loops/e5-swarm-reports.md`).
-The WIP commits on the branch since `b291e5f5` aren't built or checked.
+schema, `itc_recomp/schema/`, and named fields) done 2026-11-21 by a swarm
+(`docs/loops/e5-loop.md`, "Step 2 as a swarm"; the agents' reports in
+`docs/loops/e5-swarm-reports.md`): 134 areas, 1,608 types, built, an
+attract race and a frame dump checked; the pad replay and the lead's list
+there (the measure's offset fault first) are left.
 `docs/old-hardware.md` is the plan (not started) for running below
 Vulkan 1.3, and why not OpenGL.
 `docs/rexglue-removal.md` is the plan for a native port without the

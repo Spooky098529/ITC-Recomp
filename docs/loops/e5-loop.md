@@ -145,29 +145,26 @@ the fixes the checks call for.
 - Done before the swarm, one at a time: `type2-dialog` (the pilot),
   `heap`, `c-runtime` (built, checked, committed), `xaudio-objects` (edits
   only, in the tree).
-- Convert done for all 130 areas (the usage limit stopped the runs five
-  times; the last run, `wf_444dbbee-5ac`, resumed once).
-- Integrate done (2026-11-21): the full `schema_gen.py` gives 134 areas,
-  1,604 types; `schema_check.py` gives 0 accesses that fit no field. Its
-  report (merges, renames, fault fields, edits in `src/lifted/`) is in the
-  reports file.
-- Cross-area done for 91 areas; **left (43):** race-world, scene-loaders,
-  scenery-lists, screen-constructors, second-set, shader-objects,
-  single-commands, sound-cues, sprites, stand-models, std-string,
-  sticker-editor, strings-and-font, system-services, texture-compression,
-  title-screen, todays-result, track-route, track-zones, tuning-machine,
-  tuning-pages, tuning-screen, type10-mode, type2-dialog, type2-mode,
-  type2-screens, type5-mode, type6-type7-modes, type67-screens, type8-mode,
-  type8-screens, ui-movies, ui-movies-game, user-info, vehicle,
-  vehicle-accessors, video-output, xact, xact-tracks, xact-waves, xaudio,
-  xaudio-engine, xaudio-objects.
-- The agents' reports (130 convert, the integration, 91 cross-area) (what each left, its notes for the lead):
-  `docs/loops/e5-swarm-reports.md`, copied from the journal; the
-  Integrate phase takes their notes about schema files, the lead the rest.
-- The 2026-11-21 run was started by the user (`/e5-swarm`) and stopped by
-  the usage limit; resumed only when the user says so.
-- The tree is committed as it was at each stop (WIP commits, not built).
-  `lifted.md` and `functions.md` (rows not yet in an area) aren't in the
+- Convert done for all 130 areas, Integrate and Cross-area (134 areas)
+  done: the swarm finished 2026-11-21 (`wf_444dbbee-5ac`, stopped by the
+  usage limit twice and resumed; 187 agents). The integration merged the
+  types two areas both described, renamed to the owners' names, and gave
+  the measure's faults `fault_*` fields with notes.
+- The lead's validation (2026-11-21): the full `schema_gen.py` (134 areas,
+  1,608 types) and `schema_check.py` (0 accesses that fit no field);
+  `lift.py reemit` (43 batches, 3,726 functions) and `lift_originals.py
+  --all` (2,369 lifted; `sub_825B0BE4` refused, as before); the build,
+  after three fixes (a field named `register`, now refused by
+  `schema_gen.py` with every C++ keyword; `car_settings/handlers.cpp` on
+  `FrontEndMenu`'s old names; a stale SDL configure check after a glibc
+  update, in the build directory only); an attract race (`attract_race.sh
+  40`: 38 s at 30 ticks/s, the frame cap, no error lines) and a frame dump
+  (the race drawn right). **The pad replay didn't run:** `/dev/uinput`
+  can't open since the system's kernel was upgraded without a reboot (no
+  modules for the running kernel); run it after a reboot.
+- The agents' reports (130 convert, the integration, 134 cross-area):
+  `docs/loops/e5-swarm-reports.md`, copied from the journal.
+- `lifted.md` and `functions.md` (rows not yet in an area) weren't in the
   swarm's list.
 
 ### To resume
@@ -190,6 +187,8 @@ When it finishes: the lead's validation (above), then this file and
 
 ### For the lead after the swarm (found so far)
 
+- The pad replay (`scripted_run.sh itc_recomp/pad_recordings/race_test.jsonl`)
+  after a reboot: step 2's last check.
 - **A measure fault** (`type_map.py`): a pointer into an object (`this +
   96`, a sub-object) votes for the callee's parameter as the whole object:
   the vote ignores the offset. It joins embedded objects with their
@@ -203,5 +202,9 @@ When it finishes: the lead's validation (above), then this file and
   the outer codec.
 - `docs/known-data.md` says XAudio's converter state is 96 bytes: it's 88
   (`xaudio-objects`).
-- `src/schema/types.h` and the other headers are stale until the full
-  `schema_gen.py`.
+- The integration's `fault_*` fields (`CarScene`, `Kind6Menu`, `Movie`,
+  `RaceScene`, `RouteRange`, race-setup's `Car`) are the measure's faults
+  standing in for fields: the offset fault above removes most; then the
+  fields go.
+- The areas' reports list the accesses left as offsets (loops over tables,
+  stack words, register arithmetic) and their notes for the lead.
