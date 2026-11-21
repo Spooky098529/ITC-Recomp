@@ -145,28 +145,20 @@ the fixes the checks call for.
 - Done before the swarm, one at a time: `type2-dialog` (the pilot),
   `heap`, `c-runtime` (built, checked, committed), `xaudio-objects` (edits
   only, in the tree).
-- Convert done for 78 areas; the usage limit stopped the runs three times
-  (each a resume of the same Workflow run, its finished agents replayed
-  from the journal). **Left to convert (52):** race-overlays,
-  race-screens, race-states, race-world, replay-snapshots, save-data,
-  save-interface, save-screen, scene-loaders, scene, scene-models,
-  scenery-lists, scene-target, screen-constructors, screen-objects,
-  second-set, shader-objects, single-commands, sound-cues, sprites,
-  stand-models, std-string, sticker-editor, strings-and-font,
-  system-services, texture-compression, title-screen, todays-result,
-  track-route, track-zones, tuning-machine, tuning-pages, tuning-screen,
-  type10-mode, type2-mode, type2-screens, type5-mode, type67-screens,
-  type6-type7-modes, type8-mode, type8-screens, ui-movies-game, ui-movies,
-  user-info, vehicle-accessors, vehicle, video-output, xact, xact-tracks,
-  xact-waves, xaudio-engine, xaudio. Some of these were stopped partway:
-  their files may hold part of the work (the next agent picks up from
-  them; the seed never overwrites).
+- Convert done for 119 areas; the usage limit stopped the runs four times
+  (each earlier stop a resume of the same Workflow run, its finished agents
+  replayed from the journal; the fourth stop, 2026-11-21, ended a new run,
+  `wf_444dbbee-5ac`, which converted 41). **Left to convert (11):**
+  type8-screens, ui-movies-game, ui-movies, vehicle-accessors, vehicle,
+  video-output, xact, xact-tracks, xact-waves, xaudio-engine, xaudio. Some
+  were stopped partway: their files may hold part of the work (the next
+  agent picks up from them; the seed never overwrites).
 - Integrate and Cross-area: not started.
-- The 78 agents' reports (what each left, its notes for the lead):
+- The 119 agents' reports (what each left, its notes for the lead):
   `docs/loops/e5-swarm-reports.md`, copied from the journal; the
   Integrate phase takes their notes about schema files, the lead the rest.
-- Stopped by the user's call (2026-11-21): not resumed until the user
-  says so. `save-data.toml` is only seeded (its agent was stopped).
+- The 2026-11-21 run was started by the user (`/e5-swarm`) and stopped by
+  the usage limit; resumed only when the user says so.
 - The tree is committed as it was at each stop (WIP commits, not built).
   `lifted.md` and `functions.md` (rows not yet in an area) aren't in the
   swarm's list.
