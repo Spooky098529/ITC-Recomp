@@ -162,6 +162,11 @@ the fixes the checks call for.
   their files may hold part of the work (the next agent picks up from
   them; the seed never overwrites).
 - Integrate and Cross-area: not started.
+- The 78 agents' reports (what each left, its notes for the lead):
+  `docs/loops/e5-swarm-reports.md`, copied from the journal; the
+  Integrate phase takes their notes about schema files, the lead the rest.
+- Stopped by the user's call (2026-11-21): not resumed until the user
+  says so. `save-data.toml` is only seeded (its agent was stopped).
 - The tree is committed as it was at each stop (WIP commits, not built).
   `lifted.md` and `functions.md` (rows not yet in an area) aren't in the
   swarm's list.

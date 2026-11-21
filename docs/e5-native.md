@@ -352,6 +352,19 @@ This step changes nothing the game sees: the same bytes, the same
 addresses. It's what makes the rest possible: once code says
 `machine.started()`, where `started` lives can change in one place.
 
+In progress (2026-11-21, on `e5-native-16-11-26`): the tools are done
+(`schema_seed.py`, `schema_gen.py` with `--area`, `schema_check.py`,
+`schema_lib.py`; `lift.py` names lifted fields from the schema), and the
+areas are converted by the loop in `docs/loops/e5-loop.md`. One at a time
+first: the type 2 dialog (the pilot), the heap and the C runtime (built,
+checked, committed), XAudio's objects (edited, not built). Then, by the
+user's call, as a swarm of parallel agents ("Step 2 as a swarm" there: the
+process, the state, how to resume, what the lead owes after): 78 areas
+converted, 52 left, the integration and cross-area passes not run, nothing
+since the C runtime built or checked. The agents' reports are in
+`docs/loops/e5-swarm-reports.md`. The swarm is stopped until the user
+says to resume it.
+
 ### 3. Private objects to the host
 
 For each area, the types step 1 found private (touched by that area only,
