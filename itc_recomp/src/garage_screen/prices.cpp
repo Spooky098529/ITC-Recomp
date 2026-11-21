@@ -47,12 +47,13 @@ uint32_t WeightAt(uint32_t n) {
 double CarValue(uint8_t* base, uint32_t car, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82192378 GarageScreen::CarValue");
   // A leaf below the caller's frame: the count's doubleword at sp - 112.
-  const double count = IntToFloat(base, sp - 112, Load(base, car + 1900));
+  const schema::GarageCar garage_car(base, car);
+  const double count = IntToFloat(base, sp - 112, garage_car.spec_744());
   double f1 = double(G::zero(base));
   for (uint32_t n = 0; n < 454; n++) {
     // The part's bit in the words from +1904 (bit n mod 32 from the low end
     // of word n / 32).
-    const uint32_t word = Load(base, car + 1904 + 4 * (n >> 5));
+    const uint32_t word = Load(base, garage_car.owned_parts_address() + 4 * (n >> 5));
     if ((word & (1u << (n & 31))) == 0) {
       continue;
     }
@@ -67,12 +68,13 @@ double CarValue(uint8_t* base, uint32_t car, uint32_t sp) {
 uint64_t SalePrice(uint8_t* base, uint32_t car, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82192690 GarageScreen::SalePrice");
   const uint32_t frame = Frame(base, sp, 112);
-  const double f13 = IntToFloat(base, frame + 80, Load(base, car + 1900));
+  const schema::GarageCar garage_car(base, car);
+  const double f13 = IntToFloat(base, frame + 80, garage_car.spec_744());
   const double f8 = double(float(f13 * double(G::price_constants(base))));
   const double value = CarValue(base, car, frame);
   // The factor: the first of nine thresholds (+52 on) not below the car's
   // float +1892 picks the one beside it (+84 on), the ninth's past them.
-  const double mileage = Lfs(base, car + 1892);
+  const double mileage = double(garage_car.racer_float());
   uint32_t i = 0;
   while (i < 8 && Lfs(base, G::price_constants_address() + 52 + 4 * i) < mileage) {
     i++;

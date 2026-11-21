@@ -368,28 +368,38 @@ struct RaceHudSignNode : View {
 
 // The image words docs/functions/race-hud-object.md's code uses.
 struct RaceHudObjectGlobals {
-  // the race data: +4 the course, the racers' records 3,936 bytes each from +0, +0xA3AF4 the race mode
+  // the race data (race-states.toml's RaceData; left untyped: alt_hud.cpp reads it without that header): +4 the course, the racers' records 3,936 bytes each from +0, +0xA3AF4 the race mode
   static View race_data(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C5B2Cu)); }
   static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
   static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
   // the race's progress: +2184 the HUD's racers, +7156 a distance, +7240 the item shown
-  static View race_progress(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D82E8u)); }
+  template <typename T = RaceProgress>
+  static T race_progress(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D82E8u)); }
+  static void set_race_progress(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D82E8u, v.address); }
   static void set_race_progress(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D82E8u, v); }
   static constexpr uint32_t race_progress_address() { return 0x826D82E8u; }
   // the viewports (camera-modes.toml's Viewports): +0 viewport 0 (+1860 its view)
-  static View viewports(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C2CE8u)); }
+  template <typename T = Viewports>
+  static T viewports(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C2CE8u)); }
+  static void set_viewports(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C2CE8u, v.address); }
   static void set_viewports(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C2CE8u, v); }
   static constexpr uint32_t viewports_address() { return 0x826C2CE8u; }
   // the track zones' owner (track-zones.md)
-  static View track_zones(uint8_t* base) { return View(base, guest::LoadU32(base, 0x828161ECu)); }
+  template <typename T = TrackZones>
+  static T track_zones(uint8_t* base) { return T(base, guest::LoadU32(base, 0x828161ECu)); }
+  static void set_track_zones(uint8_t* base, const View& v) { guest::StoreU32(base, 0x828161ECu, v.address); }
   static void set_track_zones(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x828161ECu, v); }
   static constexpr uint32_t track_zones_address() { return 0x828161ECu; }
   // the in-race screens' holder (race-hud-machine.toml's RaceScreens)
-  static View screens_holder(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D84F0u)); }
+  template <typename T = RaceScreens>
+  static T screens_holder(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D84F0u)); }
+  static void set_screens_holder(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D84F0u, v.address); }
   static void set_screens_holder(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D84F0u, v); }
   static constexpr uint32_t screens_holder_address() { return 0x826D84F0u; }
   // the string table (Strings::Load and Release, 47)
-  static View strings(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C5C34u)); }
+  template <typename T = Strings>
+  static T strings(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5C34u)); }
+  static void set_strings(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5C34u, v.address); }
   static void set_strings(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5C34u, v); }
   static constexpr uint32_t strings_address() { return 0x826C5C34u; }
 };

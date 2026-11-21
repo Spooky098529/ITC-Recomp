@@ -14,6 +14,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/race_hud.h"
 #include "race_hud/race_hud.h"
+#include "schema/camera_modes.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_race_hud, true, "ITC",
@@ -79,7 +80,7 @@ ITC_REGS_STEP(DrawRivalLogo) {
       return;
     }
     ctx.r3.u64 = *movie;
-    ctx.r4.u64 = guest::LoadU32(base, entry + 8);
+    ctx.r4.u64 = schema::RivalLogo(base, entry).movie();
     ctx.lr = 0x82211A88;
     lifted::Enter(ctx, base, game::UiMovie::FinishNamed);
     race_hud::RivalLogoFinished(base, entry);

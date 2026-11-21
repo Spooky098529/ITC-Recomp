@@ -9,7 +9,11 @@
 #include "hooks/last_error.h"
 #include "mode_tick/mode_tick.h"
 #include "movies/movie.h"
+#include "schema/action_mappers.h"
 #include "schema/boot_mode.h"
+#include "schema/movies.h"
+#include "schema/racer_controllers.h"
+#include "schema/type6_type7_modes.h"
 
 namespace boot_mode {
 
@@ -22,14 +26,15 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
 
-// A movie class slot (a tail call from the caller's frame at `sp`): ours
-// where the slot holds it, else the guest's. r3 as the slot leaves it (ours
-// leave the object).
-uint64_t MovieSlot(uint8_t* base, uint32_t offset, uint32_t ours,
+// A movie class slot (MovieVtable's, a tail call from the caller's frame at
+// `sp`): ours where the slot holds it, else the guest's. r3 as the slot
+// leaves it (ours leave the object).
+using MovieSlotField = uint32_t (schema::MovieVtable::*)() const;
+uint64_t MovieSlot(uint8_t* base, MovieSlotField slot, uint32_t ours,
                    void (*native)(uint8_t*, uint32_t), uint32_t sp, uint32_t lr,
                    const Calls& calls) {
-  const uint32_t movie = Load(base, kMovieClass);
-  const uint32_t target = Load(base, Load(base, movie) + offset);
+  const uint32_t movie = schema::MoviesGlobals::movie_class(base).address;
+  const uint32_t target = (schema::Movie(base, movie).vtable().*slot)();
   if (calls.ffmpeg_movies && target == ours) {
     native(base, movie);
     return movie;
@@ -122,8 +127,8 @@ constexpr Step kMachineSteps[] = {
 uint64_t MoviesPlay(uint8_t* base, uint32_t id, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A43A8 Movies::Play");
   const uint32_t path = Load(base, kMoviePaths + (id << 2));
-  const uint32_t movie = Load(base, kMovieClass);
-  const uint32_t target = Load(base, Load(base, movie) + 4);
+  const uint32_t movie = schema::MoviesGlobals::movie_class(base).address;
+  const uint32_t target = schema::Movie(base, movie).vtable().play();
   if (calls.ffmpeg_movies && target == kMoviePlay) {
     movies::movie::Play(base, movie, path);
     return movie;
@@ -133,27 +138,27 @@ uint64_t MoviesPlay(uint8_t* base, uint32_t id, uint32_t sp, uint32_t lr, const 
 
 uint64_t MoviesStart(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A43D8 Movies::Start");
-  return MovieSlot(base, 8, kMovieStart, movies::movie::Start, sp, lr, calls);
+  return MovieSlot(base, &schema::MovieVtable::start, kMovieStart, movies::movie::Start, sp, lr, calls);
 }
 
 uint64_t MoviesStop(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A43F0 Movies::Stop");
-  return MovieSlot(base, 12, kMovieStop, movies::movie::Stop, sp, lr, calls);
+  return MovieSlot(base, &schema::MovieVtable::stop, kMovieStop, movies::movie::Stop, sp, lr, calls);
 }
 
 uint64_t MoviesPause(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A4408 Movies::Pause");
-  return MovieSlot(base, 16, kMoviePause, movies::movie::Pause, sp, lr, calls);
+  return MovieSlot(base, &schema::MovieVtable::pause, kMoviePause, movies::movie::Pause, sp, lr, calls);
 }
 
 uint64_t MoviesResume(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A4420 Movies::Resume");
-  return MovieSlot(base, 20, kMovieResume, movies::movie::Resume, sp, lr, calls);
+  return MovieSlot(base, &schema::MovieVtable::resume, kMovieResume, movies::movie::Resume, sp, lr, calls);
 }
 
 uint64_t MoviesRelease(uint8_t* base, uint32_t sp, uint32_t lr, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_820A4438 Movies::Release");
-  return MovieSlot(base, 28, kMovieRelease, movies::movie::Release, sp, lr, calls);
+  return MovieSlot(base, &schema::MovieVtable::release, kMovieRelease, movies::movie::Release, sp, lr, calls);
 }
 
 uint64_t MoviesState(uint8_t* base, uint32_t frame, const Calls& calls) {
@@ -161,8 +166,8 @@ uint64_t MoviesState(uint8_t* base, uint32_t frame, const Calls& calls) {
   if (calls.finished_early && calls.finished_early()) {
     return 1;
   }
-  const uint32_t movie = Load(base, kMovieClass);
-  const uint32_t target = Load(base, Load(base, movie) + 24);
+  const uint32_t movie = schema::MoviesGlobals::movie_class(base).address;
+  const uint32_t target = schema::Movie(base, movie).vtable().state();
   uint32_t state;
   if (calls.ffmpeg_movies && target == kMovieGetState) {
     state = movies::movie::GetState(base, movie);
@@ -196,9 +201,11 @@ uint64_t WaitForMovie(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint
   const schema::BootMachine boot(base, machine);
   bool end = false;
   if (G::skippable(base) != 0) {
-    const uint32_t entry = kActionMappers + (Load(base, kCurrentPlayer) << 3);
-    if (Load(base, entry + 4) != 1) {
-      const uint32_t mapper = Load(base, entry);
+    using RC = schema::RacerControllersGlobals;
+    const schema::PlayerMapperEntry entry(
+        base, RC::mapper_entries_address() + (Load(base, RC::player_entries_address()) << 3));
+    if (entry.unread() != 1) {
+      const uint32_t mapper = entry.mapper().address;
       const uint32_t target = Load(base, Load(base, mapper) + 40);
       if ((calls.call(target, frame, 0x82107CC0, mapper, kSkipAction) & 0xFF) != 0) {
         end = true;
@@ -401,9 +408,17 @@ void ModeDelegateInvoke(uint8_t* base, uint32_t answer, uint32_t delegate, uint3
 void ScreenMachineConstruct(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_82107358 ScreenMachine::ScreenMachine");
   game_modes::StateMachineConstruct(base, machine);
-  for (uint32_t offset = 9600; offset <= 9636; offset += 4) {
-    Store(base, machine + offset, 0);
-  }
+  const schema::ScreenMachine screen(base, machine);
+  screen.set_transition_count(0);
+  screen.set_state(0);
+  screen.set_loaded(0);
+  screen.set_reenter(0);
+  screen.set_delete_movie(0);
+  screen.set_word_9620(0);
+  screen.set_word_9624(0);
+  screen.set_word_9628(0);
+  screen.set_word_9632(0);
+  screen.set_word_9636(0);
 }
 
 }  // namespace boot_mode

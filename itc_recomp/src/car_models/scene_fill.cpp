@@ -7,7 +7,9 @@
 #include "guest.h"
 #include "material_passes/material_passes.h"
 #include "memory/heap.h"
+#include "schema/car_draw.h"
 #include "schema/car_models.h"
+#include "schema/scene_loaders.h"
 #include "scene/scene.h"
 #include "second_set/objects.h"
 
@@ -18,7 +20,6 @@ namespace {
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 
 using G = schema::CarModelsGlobals;
 
@@ -31,31 +32,37 @@ uint32_t SceneSetUp(uint8_t* base, uint32_t scene, uint32_t record, uint32_t r5,
   const uint32_t frame = sp - kSceneSetUpFrame;
   Store(base, frame, sp);
   const schema::CarSceneSetUpRecord rec(base, record);
-  Store(base, scene + 5044, r5);
-  Store(base, scene + 0, 3);
-  Store(base, scene + 4, rec.model_set());
-  Store(base, scene + 8, rec.car_models());
-  Store(base, scene + 12, rec.parts());
-  Store(base, scene + 16, rec.interiors() + rec.cockpits() + rec.traffic());
-  Store(base, scene + 20, rec.cockpits());
-  Store(base, scene + 24, rec.pool4_objects());
-  Store(base, scene + 28, rec.wheels() + rec.traffic() + rec.models());
-  Store(base, scene + 32, rec.traffic() + rec.models());
-  Store(base, scene + 36, rec.traffic());
-  Store(base, scene + 40, rec.load_buffer());
-  Store(base, scene + 44, rec.load_buffer_size());
+  const schema::CarScene s(base, scene);
+  s.set_set_up_r5(r5);
+  s.set_state(3);
+  s.set_model_set(rec.model_set());
+  s.set_car_model_count(rec.car_models());
+  s.set_parts_count(rec.parts());
+  s.set_interior_count(rec.interiors() + rec.cockpits() + rec.traffic());
+  s.set_cockpit_count(rec.cockpits());
+  s.set_light_kit_count(rec.pool4_objects());
+  s.set_wheels_count(rec.wheels() + rec.traffic() + rec.models());
+  s.set_scene_model_count(rec.traffic() + rec.models());
+  s.set_traffic_count(rec.traffic());
+  s.set_own_load_buffer(rec.load_buffer());
+  s.set_own_load_buffer_size(rec.load_buffer_size());
   material_passes::PaintPaletteInit(base, frame);
   if (rec.load_buffer() == 0) {
-    Store(base, scene + 5056, G::archive_buffer(base));
-    Store(base, scene + 5060, G::archive_buffer_size(base));
+    s.set_load_buffer(G::archive_buffer(base));
+    s.set_load_buffer_size(G::archive_buffer_size(base));
   } else {
-    const uint32_t buffer = Load(base, scene + 40), size = Load(base, scene + 44);
-    Store(base, scene + 5056, buffer);
-    Store(base, scene + 5060, size);
+    const uint32_t buffer = s.own_load_buffer(), size = s.own_load_buffer_size();
+    s.set_load_buffer(buffer);
+    s.set_load_buffer_size(size);
   }
   scene::LoadAssets(base, scene, pcr, load);
-  // The counts' offsets in the scene, by pool.
-  static constexpr uint32_t kCounts[8] = {8, 12, 20, 16, 24, 28, 36, 32};
+  // The counts in the scene, by pool.
+  using Count = uint32_t (schema::CarScene::*)() const;
+  static constexpr Count kCounts[8] = {
+      &schema::CarScene::car_model_count,  &schema::CarScene::parts_count,
+      &schema::CarScene::cockpit_count,    &schema::CarScene::interior_count,
+      &schema::CarScene::light_kit_count,  &schema::CarScene::wheels_count,
+      &schema::CarScene::traffic_count,    &schema::CarScene::scene_model_count};
   using Construct = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t);
   static constexpr Construct kConstructs[8] = {
       second_set::SceneCarModelConstruct, second_set::ScenePartsConstruct,
@@ -63,16 +70,16 @@ uint32_t SceneSetUp(uint8_t* base, uint32_t scene, uint32_t record, uint32_t r5,
       second_set::SceneLightsConstruct,   second_set::SceneWheelsConstruct,
       second_set::SceneTrafficConstruct,  second_set::SceneModelConstruct};
   for (uint32_t pool = 0; pool < 8; pool++) {
-    const int32_t count = int32_t(Load(base, scene + kCounts[pool]));
+    const int32_t count = int32_t((s.*kCounts[pool])());
     for (int32_t i = 0; i < count; i++) {
       const uint32_t object = memory::AllocPages(kSecondSetBytes[pool], 4096);
       if (object != 0) {
-        kConstructs[pool](base, object, scene + 4944 + 12 * pool, frame);
+        kConstructs[pool](base, object, s.car_models_first_address() + 12 * pool, frame);
       }
-      Store(base, object + 20, uint32_t(i));
+      schema::PoolNode(base, object).set_index(uint32_t(i));
     }
   }
-  return scene_loaders::CreateA(base, Load(base, scene + 5040), record, create);
+  return scene_loaders::CreateA(base, s.first_set(), record, create);
 }
 
 }  // namespace car_models

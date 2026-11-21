@@ -121,9 +121,11 @@ uint64_t SetSwatchColor(uint8_t* base, uint32_t node, uint32_t record, uint32_t 
   ITC_NATIVE_RUNNING("sub_82181270 CarDealer::SetSwatchColor");
   Frame(base, sp, 96);
   const uint32_t child = ui_movies::Child(base, node, 2);
-  Store(base, child + 56, Load(base, record + 0));
-  Store(base, child + 60, Load(base, record + 4));
-  Store(base, child + 64, Load(base, record + 8));
+  const Node node_child(base, child);
+  const Swatch swatch(base, record);
+  node_child.set_red(swatch.red());
+  node_child.set_green(swatch.green());
+  node_child.set_blue(swatch.blue());
   return child;
 }
 
@@ -134,12 +136,14 @@ uint64_t ShowSwatches(uint8_t* base, uint32_t sp) {
   const uint32_t row = ui_movies::FindNode(base, movie, 26, 1);
   uint64_t r3 = row;
   const int32_t count = int32_t(Colors(base, G::data(base).colors_address()).count());
-  const uint32_t scroll = Load(base, G::list_menu(base).address + 4);
+  const uint32_t scroll = G::list_menu(base).scroll();
   const int32_t shown = count < 9 ? count : 9;
   // The colors' records from the scroll on.
   uint32_t at = scroll << 2;
   for (int32_t i = 0; i < shown; i++) {
-    const uint32_t node = ui_movies::FindNode(base, movie, 26, Load(base, row + 100) + uint32_t(i));
+    // The row's +100 read as a word (the group's first child index).
+    const uint32_t first = Load(base, Node(base, row).width_address());
+    const uint32_t node = ui_movies::FindNode(base, movie, 26, first + uint32_t(i));
     const uint32_t record = Load(base, at + G::data(base).colors_address());
     r3 = SetSwatchColor(base, node, record, frame);
     at += 4;
@@ -160,7 +164,7 @@ uint64_t FillStatus(uint8_t* base, uint32_t sp, const Calls& calls) {
   calls.Call(kSetNumberText, frame, 0x82183B40, movie, 15, 9, data.money());
   SetText(calls, frame, 0x82183B5C, movie, 15, 13, 8, G::data(base).day());
   const uint32_t day = ui_movies::FindNode(base, movie, 15, 11);
-  Store(base, day + 108, G::data(base).weekday());
+  Node(base, day).set_texture_entry(G::data(base).weekday());
   const uint32_t prompts[6] = {0, 0, 1, 1, 0xFFFFFFFFu, 0xFFFFFFFFu};
   const uint64_t r3 = SetPrompts(base, prompts, frame);
   G::data(base).set_leaving_bought(0);

@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: Car
+// embedded; measure: Car, RacerRecord
 struct Car : View {
   using View::View;
   static constexpr uint32_t kSize = 3936;
@@ -593,7 +593,7 @@ struct Car : View {
   uint32_t fault_scene_model_address() const { return address + 4288; }
 };
 
-// embedded; measure: -
+// embedded; measure: sub_820CC470.ret
 struct CarDecal : View {
   using View::View;
   static constexpr uint32_t kSize = 32;
@@ -1119,8 +1119,10 @@ struct RaceSetupGlobals {
   static constexpr uint32_t traffic_start_address() { return 0x8200692Cu; }
   // two halfword bits for each event % 7 (Race::SetUp; -1 none)
   static constexpr uint32_t event_bits_address() { return 0x82008114u; }
-  // the race data (+4 the route, +48 the racer records, +0x59620 the stage list, +0x59AE8 the 77 records)
-  static View race_data(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  // the race data (race-states.toml; +4 the route, +48 the racer records, +0x59620 the stage list, +0x59AE8 the 77 records)
+  template <typename T = RaceData>
+  static T race_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  static void set_race_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B2Cu, v.address); }
   static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
   static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
   // the race event (RaceEvent::Current)

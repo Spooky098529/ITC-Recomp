@@ -47,12 +47,13 @@ uint64_t CopyGarageCar(uint8_t* base, uint64_t out, uint32_t garage, uint32_t in
                        uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82192770 GarageScreen::CopyGarageCar");
   const uint32_t frame = Frame(base, sp, 96);
-  uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204))));
+  const schema::CareerGarageList list(base, garage);
+  uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(list.head())));
   for (uint32_t n = index; n != 0; n--) {
     link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, link))));
   }
   const int32_t slot = int16_t(guest::LoadU16(base, link + 2));
-  const uint32_t from = garage + 1968 * uint32_t(slot) + 212;
+  const uint32_t from = list.cars_address() + 1968 * uint32_t(slot);
   if (!native::Buffers_Memcpy(base, uint32_t(out), from, 1968, 0x821927CC)) {
     calls.Call(kMemcpy, frame, 0x821927CC, out, from, 1968);
   }
@@ -107,7 +108,7 @@ uint64_t SetUpView(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82194AC8 GarageScreen::SetUpView");
   const uint32_t frame = Frame(base, sp, 96);
   StageCommand(base, 58, frame, 0x82194AEC, calls);
-  Store(base, Load(base, Holder(base)) + 6052, 0);
+  Stage(base).set_reflection(0);
   return SetHelpLine(base, 553, frame, calls);
 }
 

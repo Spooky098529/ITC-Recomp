@@ -99,7 +99,8 @@ uint64_t Update(uint8_t* base, uint32_t sp, const Calls& calls) {
   // garage, its id at the car's +12).
   const uint32_t record =
       GarageRecord(base, data.save(), data.scroll() + data.selection());
-  const uint64_t block = calls.Call(kBlockOf, frame, 0x821964A8, Load(base, record + 224));
+  const uint64_t block = calls.Call(kBlockOf, frame, 0x821964A8,
+                                    schema::CarMakersCar(base, record + 212).car_id());
   r3 = calls.Call(kReloadModel, frame, 0x821964B8, Holder(base), block);
   Data(base).set_stand_model(uint32_t(r3));
   if (Data(base).stand_model() == 0) {

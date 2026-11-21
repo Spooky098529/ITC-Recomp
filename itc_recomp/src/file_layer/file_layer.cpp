@@ -4,25 +4,28 @@
 #include "c_runtime/format.h"
 #include "guest.h"
 #include "schema/file_layer.h"
+#include "schema/files_and_saves.h"
+#include "schema/std_string.h"
 
 namespace file_layer {
 
 uint32_t FileGetSize(uint8_t* base, uint32_t file) {
   ITC_NATIVE_RUNNING("sub_822B80D8 File::GetSize");
-  return guest::LoadU32(base, file + 12);
+  return schema::File(base, file).size();
 }
 
 void FileConstruct(uint8_t* base, uint32_t file) {
   ITC_NATIVE_RUNNING("sub_8258C938 File::File");
-  guest::StoreU32(base, file + 8, 0);
-  guest::StoreU32(base, file + 0, kFileVtable);
-  guest::StoreU32(base, file + 4, 0xFFFFFFFFu);
-  guest::StoreU32(base, file + 12, 0);
+  const schema::File f(base, file);
+  f.set_position(0);
+  f.set_vtable(kFileVtable);
+  f.set_handle(0xFFFFFFFFu);
+  f.set_size(0);
 }
 
 void FileDestruct(uint8_t* base, uint32_t file) {
   ITC_NATIVE_RUNNING("sub_8258C5F8 File::~File");
-  guest::StoreU32(base, file, kStreamVtable);
+  schema::File(base, file).set_vtable(kStreamVtable);
 }
 
 void AsyncFileConstruct(uint8_t* base, uint32_t file) {
@@ -71,7 +74,8 @@ namespace {
 // A std::string's text (std-string.md: in place at +4 under 16 bytes of
 // capacity, +24, else the block at +4).
 uint32_t StringText(uint8_t* base, uint32_t string) {
-  return guest::LoadU32(base, string + 24) < 16 ? string + 4 : guest::LoadU32(base, string + 4);
+  const schema::StdString s(base, string);
+  return s.capacity() < 16 ? s.text_address() : s.block();
 }
 
 using Globals = schema::FileLayerGlobals;

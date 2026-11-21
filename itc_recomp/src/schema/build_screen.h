@@ -27,19 +27,27 @@ struct BuildScreenGlobals {
   static void set_machine(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D843Cu, v); }
   static constexpr uint32_t machine_address() { return 0x826D843Cu; }
   // the level's menu list (72 bytes, a "menu list")
-  static View list(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D8440u)); }
+  template <typename T = MenuList>
+  static T list(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D8440u)); }
+  static void set_list(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D8440u, v.address); }
   static void set_list(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8440u, v); }
   static constexpr uint32_t list_address() { return 0x826D8440u; }
   // the groups' menu list, stepped by left and right on levels 1 and 2
-  static View group_list(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D8444u)); }
+  template <typename T = MenuList>
+  static T group_list(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D8444u)); }
+  static void set_group_list(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D8444u, v.address); }
   static void set_group_list(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8444u, v); }
   static constexpr uint32_t group_list_address() { return 0x826D8444u; }
   // the screen data (type2-screens.md's type)
-  static View screen(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D8448u)); }
+  template <typename T = BuildScreenData>
+  static T screen(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D8448u)); }
+  static void set_screen(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D8448u, v.address); }
   static void set_screen(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8448u, v); }
   static constexpr uint32_t screen_address() { return 0x826D8448u; }
   // the stand scene's holder: three 4-byte blocks, each holding a garage stage at +0
-  static View stand_holder(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D83E0u)); }
+  template <typename T = StandHolder>
+  static T stand_holder(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D83E0u)); }
+  static void set_stand_holder(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D83E0u, v.address); }
   static void set_stand_holder(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D83E0u, v); }
   static constexpr uint32_t stand_holder_address() { return 0x826D83E0u; }
   // the screen fades' fade-out counts word

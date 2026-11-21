@@ -104,12 +104,13 @@ void ReleaseRacers(uint8_t* base, uint32_t progress, uint32_t sp, bool heap,
     if (entry == 0) {
       continue;
     }
-    uint32_t flags = Load(base, entry);
+    const RacerEntry e(base, entry);
+    uint32_t flags = e.flags();
     if (flags & 0x1000) {
-      Store(base, entry, flags | 0x20);
+      e.set_flags(flags | 0x20);
     }
     for (uint32_t bit : {0x2000u, 0x1000u, 0x10u, 0x4000u, 0x400u}) {
-      Store(base, entry, Load(base, entry) & ~bit);
+      e.set_flags(e.flags() & ~bit);
     }
   }
   race_world::Refresh(base, G::racers_manager(base), sp - 1904, heap, original);
@@ -133,8 +134,8 @@ void TickFraction(uint8_t* base, uint32_t progress, uint32_t index, uint32_t tim
   ITC_NATIVE_RUNNING("sub_82163140 RaceProgress::TickFraction");
   const uint32_t entry =
       Slot(base, index * Slot::kSize + Progress(base, progress).slots_address()).entry().address;
-  const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
-  const double past = Lfs(base, vehicle + 6228);
+  const uint32_t vehicle = va::VehicleGet(base, RacerEntry(base, entry).vehicle_index());
+  const double past = Lfs(base, CarStatus(base, VehicleView(base, vehicle).status_address()).along_address());
   const double distance = double(va::VehicleDistancePerFrame(base, vehicle));
   if (distance == Lfs(base, kZero)) {
     return;
@@ -151,7 +152,7 @@ void TickFraction(uint8_t* base, uint32_t progress, uint32_t index, uint32_t tim
 
 void Rank(uint8_t* base, uint32_t progress, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82162D80 RaceProgress::Rank");
-  const uint32_t list = frame + 80;
+  const uint32_t list = frame + 80;  // a RaceSortedList (race-world.toml)
   race_world::SortedListClear(base, list);
   const Progress p(base, progress);
   if (int32_t(p.results_count()) > 0) {
@@ -162,8 +163,12 @@ void Rank(uint8_t* base, uint32_t progress, uint32_t frame) {
     }
   }
   uint32_t place = p.results_count() - 1;
-  for (uint32_t node = Load(base, frame + 1680); node != 0; node = Load(base, node + 12)) {
-    Store(base, Load(base, node) + 8, place);
+  // Each node's item is an entry's record index (+2188 + 972 i): its place
+  // is 8 bytes on.
+  const uint32_t to_place = p.e0_place_address() - p.e0_record_index_address();
+  for (uint32_t node = schema::RaceSortedList(base, list).first().address; node != 0;
+       node = schema::RaceSortedNode(base, node).next().address) {
+    Store(base, schema::RaceSortedNode(base, node).item() + to_place, place);
     place--;
   }
 }

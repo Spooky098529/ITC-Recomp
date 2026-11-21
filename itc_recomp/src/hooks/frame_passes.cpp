@@ -19,6 +19,7 @@
 #include "hooks/post_effects.h"
 #include "hooks/scene_target.h"
 #include "lifted/sdk.h"
+#include "schema/device_shaders.h"
 #include "schema/frame_passes.h"
 
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
@@ -111,7 +112,7 @@ void hooks::FramePassesRecordPrimitiveReset(lifted::Regs& ctx, uint8_t* base) {
     ctx.r5.u64 = 0;
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = double(schema::FramePassesGlobals::zero(base));
-    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 16);
+    const uint32_t function = schema::RenderQueue(base, ctx.r3.u32).vtable().add();
     ctx.ctr.u64 = function;
     ctx.lr = 0x82589A6C;
     lifted::CallFromContext(ctx, base, function);

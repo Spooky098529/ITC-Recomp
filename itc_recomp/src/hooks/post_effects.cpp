@@ -41,6 +41,7 @@
 #include "hooks/heap.h"
 #include "hooks/post_effects.h"
 #include "post_effects/post_effects.h"
+#include "schema/app_start_up.h"
 
 #include <optional>
 #include "lifted/sdk.h"
@@ -218,10 +219,11 @@ bool FreesNative() {
 // slot 7, then that object's slot 3, as guest calls with the original's
 // return addresses. r3 = the video output after.
 uint32_t VideoOutputCall(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
-  ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
+  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app(base).address;
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
-  const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  const uint32_t slot7 =
+      guest::LoadU32(base, schema::AppInterface16(base, ctx.r3.u32).vtable() + 28);
   if (!hooks::DirectSlotCall(ctx, base, slot7)) {
     lifted::CallFromContext(ctx, base, slot7);
   }

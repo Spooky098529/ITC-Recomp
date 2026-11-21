@@ -2,6 +2,7 @@
 // (docs/functions/race-screens.md): see race_screens.h.
 
 #include "race_screens/race_screens.h"
+#include "race_screens/ui_node.h"
 
 #include "base/log.h"
 #include "guest.h"
@@ -190,15 +191,15 @@ uint64_t AfterRaceMenuShowItems(uint8_t* base, uint32_t sp, const Calls& calls) 
   const uint32_t movie = Movie(base);
   const uint32_t node = ui_movies::FindNode(base, movie, 4, 0);
   uint64_t r3 = node;
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, node + 104)); i++) {
+  for (int32_t i = 0; i < int32_t(ChildCount(base, node)); i++) {
     const uint32_t item =
         Item(base, G::after_data(base).kind(), uint32_t(i));
-    const uint64_t child = uint64_t(guest::LoadU32(base, node + 100)) + uint64_t(i);
+    const uint64_t child = uint64_t(FirstChild(base, node)) + uint64_t(i);
     if (int32_t(item) != -1 && i < 4) {
       r3 = calls.Call(kSetText, frame, 0x8221AC88, movie, 4, child, uint64_t(item) + 1960);
     } else {
       const uint32_t hidden = ui_movies::FindNode(base, movie, 4, uint32_t(child));
-      guest::StoreU32(base, hidden + 80, 0);
+      UiNode(base, hidden).set_visible(0);
       r3 = hidden;
     }
   }
@@ -232,14 +233,14 @@ uint32_t AfterRaceMenuColorItems(uint8_t* base, uint32_t screen, uint32_t sp) {
   const uint32_t node =
       ui_movies::FindNode(base, schema::AfterRaceMenuScreen(base, screen).movie().address, 4, 0);
   uint32_t r3 = node;
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, node + 104)); i++) {
+  for (int32_t i = 0; i < int32_t(ChildCount(base, node)); i++) {
     const bool enabled = ListIsEnabled(base, G::after_list(base).address, uint32_t(i)) != 0;
     const uint32_t color[3] = {enabled ? 205u : 255u, enabled ? 235u : 255u,
                                enabled ? 67u : 255u};
     for (uint32_t k = 0; k < 3; k++) {
       r3 = ui_movies::FindNode(base, schema::AfterRaceMenuScreen(base, screen).movie().address, 4,
-                               guest::LoadU32(base, node + 100) + uint32_t(i));
-      guest::StoreU32(base, r3 + 56 + 4 * k, color[k]);
+                               FirstChild(base, node) + uint32_t(i));
+      guest::StoreU32(base, UiNode(base, r3).red_address() + 4 * k, color[k]);
     }
   }
   return r3;

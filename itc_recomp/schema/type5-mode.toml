@@ -23,6 +23,7 @@
 # in Interrupt and ForceExit: iface_* below, 32 bytes before the fields they
 # are) and the block FindShown gets (fault_* at +9604 and +28920).
 [ModeType5]
+# measures from LocationScreenMode (location-screen), merged at the integration
 measures = [
   "ModeType5",
   "ModeType5::LeaveScreen.r4",
@@ -30,7 +31,7 @@ measures = [
   "ModeType5::NextMode.r4",
   "ModeType5::WaitForLoads.r4",
   "ModeType5::WaitForShown.r4",
-]
+  "FrontEndMode::NextMode.r4"]
 size = 852
 origin = "allocated"
 vtable = 0x82006C24
@@ -61,12 +62,13 @@ fields = [
 # then the shown machine and the next mode's answer. location-screen.toml's
 # LocationScreenModeBlock is this block as FrontEndMode::NextMode meets it.
 [Type5ModeBlock]
+# measures from LocationScreenModeBlock (location-screen), merged at the integration
 measures = [
   "ModeType5.+816",
   "ModeType5::NextMode.r4.+848",
   "ModeType5::WaitForLoads.r4.+848",
   "ModeType5::Leaving.r4.+848",
-]
+  "FrontEndMode::NextMode.r4.+848"]
 size = 28940
 origin = "allocated"
 fields = [

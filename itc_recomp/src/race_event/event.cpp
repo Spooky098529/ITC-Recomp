@@ -15,7 +15,12 @@
 #include "race_overlays/race_overlays.h"
 #include "race_setup/race_setup.h"
 #include "race_world/race_world.h"
+#include "schema/career.h"
+#include "schema/minimap.h"
 #include "schema/race_event.h"
+#include "schema/race_states.h"
+#include "schema/race_world.h"
+#include "schema/track_route.h"
 #include "strings_and_font/steps.h"
 #include "track_route/track_route.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -39,6 +44,11 @@ using GroupEntry = schema::EventGroupEntry;
 using Pools = schema::EventPools;
 using ItemV = schema::OpponentItem;
 using SaveV = schema::SaveData;
+using Record = schema::CareerItemRecord;
+using Manager = schema::RaceManager;
+using ManagerEntry = schema::MinimapRacerEntry;
+using RouteFile = schema::TrackRouteFile;
+using Position = schema::RoutePosition;
 
 // The pools of a location (EventPools, 608 bytes).
 constexpr uint32_t kPoolsBytes = Pools::kSize;
@@ -224,7 +234,7 @@ void Destroy(uint8_t* base) {
 uint32_t ItemsBeaten(uint8_t* base, uint32_t records, uint32_t id) {
   ITC_NATIVE_RUNNING("sub_82143528 Items::Beaten");
   const int32_t n = LoadS16(base, id);
-  if (guest::LoadU16(base, uint32_t(n) * 12 + records + 2) == 0) {
+  if (Record(base, uint32_t(n) * Record::kSize + records).wins() == 0) {
     return 0;
   }
   const ItemV item(base, Item(base, uint32_t(n)));
@@ -234,7 +244,7 @@ uint32_t ItemsBeaten(uint8_t* base, uint32_t records, uint32_t id) {
     if (r < 0) {
       continue;
     }
-    if (guest::LoadU16(base, uint32_t(r) * 12 + records + 2) == 0) {
+    if (Record(base, uint32_t(r) * Record::kSize + records).wins() == 0) {
       return 0;
     }
     if (item.race_kind() == 3 && ItemsBeaten(base, records, rival) == 0) {
@@ -740,20 +750,24 @@ uint32_t FindRacer(uint8_t* base, uint32_t entry, uint32_t& out) {
   if (manager == 0) {
     return 0;
   }
-  const int32_t count = LoadS32(base, manager + 2368);
+  const int32_t count = int32_t(Manager(base, manager).entry_count());
   const uint32_t records = G::race_data(base).address + 48;
   for (int32_t i = 0; i < count; i++) {
-    const uint32_t at = manager + 4 + 28 * uint32_t(i);
-    const uint32_t record = guest::LoadU32(base, at + 24) * 3936 + records;
+    const ManagerEntry at(base, Manager(base, manager).entries_address() +
+                                    ManagerEntry::kSize * uint32_t(i));
+    // The entry's +24 (its racer record's index; MinimapRacerEntry names no
+    // field there) and the record's +3912 (its item id; no racer record type
+    // names it).
+    const uint32_t record = guest::LoadU32(base, at.address + 24) * 3936 + records;
     if (record == 0 || LoadS32(base, record + 3912) != int16_t(item.id())) {
       continue;
     }
     e.set_flag(1);
-    out = at + 8;
+    out = at.position_address();
     if (item.counts_owned() == 1) {
       return 2;
     }
-    guest::StoreU32(base, at, guest::LoadU32(base, at) & ~0x20u);
+    at.set_flags(at.flags() & ~0x20u);
     return 1;
   }
   return 0;
@@ -783,11 +797,13 @@ uint64_t SectionRival(uint8_t* base, uint32_t event, uint32_t position, const Gu
     uint32_t at = 0;
     FindRacer(base, entry.address, at);
     if (at != 0) {
-      guest::StoreU16(base, at + 0, guest::LoadU16(base, position + 0));
-      guest::StoreU16(base, at + 2, guest::LoadU16(base, position + 2));
-      const double length = double(guest::LoadFloat(base, G::route(base).address + 8));
+      const Position to(base, at);
+      const Position from(base, position);
+      to.set_section(from.section());
+      to.set_slice(from.slice());
+      const double length = double(RouteFile(base, G::route(base).address).slice_length());
       const uint16_t step = FctiwzLow(Fdivs(double(G::back_step(base)), length));
-      guest::StoreU16(base, at + 2, uint16_t(guest::LoadU16(base, at + 2) - step));
+      to.set_slice(uint16_t(to.slice() - step));
       track_route::Normalize(base, G::route_address(), at, 0);
     }
     return entry.item_id();
@@ -807,16 +823,18 @@ uint64_t PlaceUnlocked(uint8_t* base, uint32_t event, uint32_t position, uint32_
   // Its frame: +80 the position's copy, +84 FindRacer's answer.
   const uint32_t frame = sp - kPlaceUnlockedFrame;
   const uint32_t copy = frame + 80;
+  const Position copy_v(base, copy);
+  const Position from(base, position);
   uint32_t found = 0;
   uint16_t step = 0;
   guest::StoreU32(base, frame + 84, 0);
-  guest::StoreU32(base, copy, guest::LoadU32(base, position));
+  copy_v.set_word(from.word());
   if (guest::LoadU32(base, flag) != 0) {
-    const double length = double(guest::LoadFloat(base, G::route(base).address + 8));
+    const double length = double(RouteFile(base, G::route(base).address).slice_length());
     const double unit = Fdivs(double(G::slice_unit(base)), length);
     const double back = Fmuls(unit, double(G::back_scale(base)));
     const double forward = Fmuls(unit, double(G::forward_scale(base)));
-    guest::StoreU16(base, copy + 2, uint16_t(guest::LoadU16(base, copy + 2) - FctiwzLow(back)));
+    copy_v.set_slice(uint16_t(copy_v.slice() - FctiwzLow(back)));
     step = FctiwzLow(forward);
     track_route::ToMainRoad(base, G::route_address(), copy, 1, frame - 144);
   }
@@ -840,18 +858,18 @@ uint64_t PlaceUnlocked(uint8_t* base, uint32_t event, uint32_t position, uint32_
       // The kind on its frame (+88), BranchMasksFor pointed at it.
       guest::StoreU32(base, frame + 88, uint32_t(int32_t(int8_t(item.location()))));
       const uint32_t masks = ai_drivers::BranchMasksFor(base, frame + 88);
-      guest::StoreU16(base, copy + 2, uint16_t(guest::LoadU16(base, copy + 2) + step));
-      guest::StoreU32(base, found, guest::LoadU32(base, copy));
+      copy_v.set_slice(uint16_t(copy_v.slice() + step));
+      Position(base, found).set_word(copy_v.word());
       track_route::Normalize(base, G::route_address(), found, masks);
     } else if (r == 2) {
       if (guest::LoadU32(base, flag) == 0 || found == 0) {
         continue;
       }
-      guest::StoreU16(base, found + 0, guest::LoadU16(base, position + 0));
-      guest::StoreU16(base, found + 2, guest::LoadU16(base, position + 2));
-      const double length = double(guest::LoadFloat(base, G::route(base).address + 8));
-      guest::StoreU16(base, found + 2,
-                      uint16_t(guest::LoadU16(base, found + 2) - FctiwzLow(Fdivs(far, length))));
+      const Position to(base, found);
+      to.set_section(from.section());
+      to.set_slice(from.slice());
+      const double length = double(RouteFile(base, G::route(base).address).slice_length());
+      to.set_slice(uint16_t(to.slice() - FctiwzLow(Fdivs(far, length))));
       track_route::Normalize(base, G::route_address(), found, 0);
     }
   }

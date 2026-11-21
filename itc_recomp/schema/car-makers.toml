@@ -14,6 +14,7 @@
 # and Copy), filled from a car object by SceneModelRecord::FromCar.
 [SceneModelRecord]
 measure = "SceneModelRecord"
+measures = ["SceneModelRecord::Copy.r4"]
 size = 4244
 origin = "embedded"
 fields = [
@@ -262,6 +263,7 @@ fields = [
 
 # One of a car object's 32-byte decals (+96).
 [CarMakersCarDecal]
+measures = ["TuningScreen::GarageDecal.ret"]
 size = 32
 origin = "embedded"
 fields = [
@@ -291,6 +293,7 @@ fields = [
 # (known-data's "garage car"; a save data's garage holds them at +6332).
 [GarageCar]
 measure = "GarageCar"
+measures = ["sub_8218D708.r3"]
 size = 1968
 origin = "embedded"
 fields = [

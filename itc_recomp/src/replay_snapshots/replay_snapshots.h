@@ -11,9 +11,14 @@
 // The snapshot, the record and its parts are schema views
 // (itc_recomp/schema/replay-snapshots.toml: ReplaySnapshot, ReplayRecord,
 // ReplayBodyState, ReplayVehiclePhysics, ReplayCollisionState,
-// ReplayShapeState) and the image words ReplaySnapshotsGlobals; the
-// vehicle's, body's, collision object's and shape's sides stay offsets
-// (other areas' types).
+// ReplayShapeState) and the image words ReplaySnapshotsGlobals; the other
+// sides are other areas' views: the vehicle and its rigid body (car-physics'
+// Vehicle, RigidBody), the collision object (vehicle-accessors'
+// CollisionObject; its +48, +64 and +80 stay offsets, no fields), the
+// placed shape (collision's BoxShape), the racers' manager (race-world's
+// RaceManager), the kept replay (type10-mode's KeptReplay) and the race
+// data (race-states' RaceData, its racer records' words still offsets).
+// The input recordings' blocks have no type (offsets).
 //
 // The objects are guest objects shared with the recompiled code, so these
 // work on guest memory with the originals' loads and stores in their order:

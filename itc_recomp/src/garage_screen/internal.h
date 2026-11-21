@@ -10,8 +10,15 @@
 #include "garage_screen/garage_screen.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/car_makers.h"
+#include "schema/career.h"
 #include "schema/garage_screen.h"
 #include "schema/menu_helpers.h"
+#include "schema/race_event.h"
+#include "schema/race_screens.h"
+#include "schema/stand_models.h"
+#include "schema/tuning_screen.h"
+#include "schema/type2_screens.h"
 #include "ui_movies/game.h"
 
 namespace garage_screen {
@@ -20,6 +27,9 @@ using G = schema::GarageScreenGlobals;
 using Machine = schema::GarageScreen;
 using PageObject = schema::PageObject;
 using ScreenData = schema::GarageScreenData;
+using MenuList = schema::MenuList;
+using SaveData = schema::SaveData;
+using Node = schema::UiMovieNode;
 
 inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -50,15 +60,21 @@ inline PageObject PagesOf(uint8_t* base) { return G::pages(base); }
 // The two menu lists' addresses ([0x826D8424], [0x826D8428]).
 inline uint32_t List(uint8_t* base) { return G::list(base).address; }
 inline uint32_t List2(uint8_t* base) { return G::list2(base).address; }
+// The two menu lists as race-screens' MenuList.
+inline MenuList ListView(uint8_t* base) { return G::list(base); }
+inline MenuList List2View(uint8_t* base) { return G::list2(base); }
+// The screen's save data (the data's +36).
+inline SaveData Save(uint8_t* base) { return Data(base).save(); }
 
 // The garage car record at `index` in the save's garage (+6120): the list
 // walked from its head (the halfword +204) `index` times through each
 // node's halfword +0 (nodes at the garage + 4 × the index), then the slot
 // (the node's halfword +2); the record at the garage + 1,968 × the slot
 // (the car itself at its +212). As the originals walk it inline.
-inline uint32_t GarageRecord(uint8_t* base, uint32_t save, uint32_t index) {
-  const uint32_t garage = save + 6120;
-  uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204))));
+inline uint32_t GarageRecord(uint8_t* base, const SaveData& save, uint32_t index) {
+  const schema::CareerGarageList list(base, save.garage_address());
+  const uint32_t garage = list.address;
+  uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(list.head())));
   while (index != 0) {
     link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, link))));
     index -= 1;
@@ -81,7 +97,11 @@ inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
 }
 
 // The garage stage's holder ([[0x826D83E0]]).
-inline uint32_t Holder(uint8_t* base) { return Load(base, G::stand_holder(base).address); }
+inline uint32_t Holder(uint8_t* base) { return G::stand_holder(base).stage_block_0(); }
+// The garage stage (the holder's +0).
+inline schema::GarageStage Stage(uint8_t* base) {
+  return schema::GarageStage(base, Load(base, Holder(base)));
+}
 
 // The page object's moves the pages make inline: to `page` after
 // `transition` then `queued` (-1 for none), +8 the page before unless it

@@ -16,6 +16,7 @@
 #include "hooks/guest_call.h"
 #include "lifted/sdk.h"
 #include "schema/command_buffer.h"
+#include "schema/device_state.h"
 
 ITC_FLAG_BOOL(native_command_buffer, true, "ITC",
               "Run the graphics library's command buffer (docs/functions/command-buffer.md: "
@@ -51,7 +52,7 @@ ITC_COMMAND_BUFFER(8229E9D0, ctx.r3.u64 = cb::WriteCallback(base, ctx.r3.u32, ct
 // Reserve: the recording command buffer's path (never in play) is the
 // original's.
 ITC_COMMAND_BUFFER(8229E308, {
-  if (guest::LoadU32(base, ctx.r3.u32 + cb::kRecorder) != 0) {
+  if (schema::Device(base, ctx.r3.u32).recorder().address != 0) {
     lifted::original::c8229E308(ctx, base);
     return;
   }
@@ -60,7 +61,8 @@ ITC_COMMAND_BUFFER(8229E308, {
 // The chains: a recording command buffer (+13160, never in play) makes
 // Reserve the original's, so they run the original whole.
 ITC_COMMAND_BUFFER(8229EB10, {
-  if (guest::LoadU32(base, schema::CommandChain(base, ctx.r3.u32).device() + cb::kRecorder) != 0) {
+  if (schema::Device(base, schema::CommandChain(base, ctx.r3.u32).device()).recorder().address !=
+      0) {
     lifted::original::c8229EB10(ctx, base);
     return;
   }

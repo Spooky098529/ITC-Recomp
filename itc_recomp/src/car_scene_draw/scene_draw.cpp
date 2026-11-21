@@ -25,7 +25,13 @@
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 #include "native/buffers.h"
+#include "schema/camera_modes.h"
+#include "schema/cameras.h"
+#include "schema/car_draw.h"
 #include "schema/car_scene_draw.h"
+#include "schema/device_shaders.h"
+#include "schema/race_states.h"
+#include "schema/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <cstring>
@@ -43,6 +49,8 @@ constexpr uint32_t kPassSize = 592;
 using G = schema::CarSceneDrawGlobals;
 using Record = schema::CarSceneDrawRecord;
 using Description = schema::ScenePass;
+using CameraPass = schema::CameraPass;
+using SceneModel = schema::SceneModel;
 
 // Record r of the three at 0x82002D40.
 Record RecordAt(uint8_t* base, uint32_t r) {
@@ -129,7 +137,7 @@ class SceneDraw {
   // The description's keys and mask around Car::DrawUpdate(model).
   void DrawModel(uint32_t i, uint32_t p, uint32_t model, uint64_t r24);
   uint32_t list_at_(uint32_t n) {
-    const uint32_t list = scene_ + 5028;
+    const uint32_t list = Scene().scene_models_first_address();
     return uint32_t(Wrapped(base_, kListAt, list, [&] {
       return uint64_t(vehicle_accessors::ListAt(base_, list, n));
     }));
@@ -198,15 +206,15 @@ class SceneDraw {
   // key, f1 = 0.0), the getters at x and x + 16, the call at x + 0x2C.
   void Submit(uint32_t chunk, uint32_t key, uint32_t x) {
     const uint32_t queue = Get(2, x);
-    const uint32_t function = Load(base_, Load(base_, queue) + 16);
+    const uint32_t function = Load(base_, schema::RenderQueue(base_, queue).vtable().add_address());
     Call(function, {queue, chunk, key}, x + 0x2C, {zero_});
   }
   // One slot's three words.
   void Command(uint32_t x, uint32_t w0, uint32_t w1, uint32_t w2) {
-    const uint32_t slot = Allocate(1, x);
-    Store(base_, slot + 0, w0);
-    Store(base_, slot + 4, w1);
-    Store(base_, slot + 8, w2);
+    const schema::ChunkCommand slot(base_, Allocate(1, x));
+    slot.set_id(w0);
+    slot.set_arg0(w1);
+    slot.set_arg1(w2);
   }
 
   // --- Callees ---
@@ -238,13 +246,13 @@ class SceneDraw {
     const uint64_t player = Wrapped(base_, kPlayerModel, index, [&] {
       return uint64_t(CarScenePlayerModel(base_, index));
     });
-    const uint32_t list = scene_ + 5028;
+    const uint32_t list = Scene().scene_models_first_address();
     return uint32_t(Wrapped(base_, kListAt, list, [&] {
       return uint64_t(vehicle_accessors::ListAt(base_, list, uint32_t(player)));
     }));
   }
   void SetLight(uint32_t direction, double distance) {
-    const uint32_t pass = Load(base_, f_ + 1716) + 5072;
+    const uint32_t pass = schema::CarScene(base_, Load(base_, f_ + 1716)).pass_camera_address();
     Wrapped(base_, kSetLight, pass, [&] {
       return uint64_t(ScenePassSetLight(base_, pass, direction, distance, f_, calls_.memcpy));
     });
@@ -288,6 +296,8 @@ class SceneDraw {
   void SharedTextures(uint32_t record);
   uint32_t Projections(uint32_t record, uint32_t model, uint32_t pass);
   void LightArrays();
+
+  schema::CarScene Scene() const { return schema::CarScene(base_, scene_); }
 
   uint8_t* base_;
   const SceneDrawCalls& calls_;
@@ -350,8 +360,8 @@ uint32_t SceneDraw::ProjectionChunk(const ChunkSteps& s, uint32_t reg, uint32_t 
 void SceneDraw::SizeConstant(uint32_t slot, uint32_t pass, uint32_t temp) {
   Stfs(base_, temp + 8, zero_);
   Stfs(base_, temp + 12, zero_);
-  const int32_t width = LoadS(base_, pass + 504);
-  const int32_t height = LoadS(base_, pass + 508);
+  const int32_t width = LoadS(base_, CameraPass(base_, pass).viewport_width_address());
+  const int32_t height = LoadS(base_, CameraPass(base_, pass).viewport_height_address());
   StoreDoubleword(base_, f_ + 240, uint64_t(int64_t(width)));
   StoreDoubleword(base_, f_ + 256, uint64_t(int64_t(height)));
   Stfs(base_, temp + 0, Frsp(double(int64_t(width))));
@@ -369,8 +379,9 @@ void SceneDraw::HeightConstant(uint32_t slot, uint32_t height) {
 void SceneDraw::SetUp(uint32_t matrix) {
   // Pass 0's view-projection kept (put back at the end), then with a matrix
   // the matrix times it for the draw.
+  const uint32_t pass0 = CameraPass(base_, kCameraPasses).view_projection_address();
   for (uint32_t i = 0; i < 64; i += 8) {
-    CopyDoubleword(base_, f_ + 1328 + i, kCameraPasses + 144 + i);
+    CopyDoubleword(base_, f_ + 1328 + i, pass0 + i);
   }
   Store(base_, f_ + 88, kCameraPasses);
   one_ = double(G::one(base_));
@@ -379,11 +390,10 @@ void SceneDraw::SetUp(uint32_t matrix) {
     Stfs(base_, f_ + 1036, one_);
     Stfs(base_, f_ + 1052, one_);
     Stfs(base_, f_ + 1068, one_);
-    matrix_math::Multiply(base_, f_ + 1008, matrix, kCameraPasses + 144);
-    interpolation::BlendState_OnMultiply(base_, f_ + 1008, matrix, kCameraPasses + 144,
-                                         0x820C5E7C);
+    matrix_math::Multiply(base_, f_ + 1008, matrix, pass0);
+    interpolation::BlendState_OnMultiply(base_, f_ + 1008, matrix, pass0, 0x820C5E7C);
     FlushOff();
-    CopyMatrix(kCameraPasses + 144, f_ + 1008, 0x820C5E88);
+    CopyMatrix(pass0, f_ + 1008, 0x820C5E88);
   }
   Store(base_, f_ + 192, 0);
   Store(base_, f_ + 228, G::headlight_colors_b_address());
@@ -395,7 +405,7 @@ void SceneDraw::SetUp(uint32_t matrix) {
 uint64_t SceneDraw::FirstPath() {
   // The shared assets' texture when slot 0 is done.
   uint32_t texture = 0;
-  if (LoadS(base_, scene_ + 84) == 3) {
+  if (LoadS(base_, Scene().asset141_state_address()) == 3) {
     texture = uint32_t(XprTexture(scene_ + 88));
   }
   G::set_shared_texture(base_, texture);
@@ -435,14 +445,14 @@ uint64_t SceneDraw::FirstPath() {
     const uint32_t pass = Pass(base_, record.car_pass());
     const uint32_t model = RecordModel(record.model_index());
     r24 = model;
-    if (LoadS(base_, pass + 588) != 0 && model != 0) {
+    if (LoadS(base_, CameraPass(base_, pass).enabled_address()) != 0 && model != 0) {
       SetLight(f_ + 128, light_distance);
       // The model's position (its matrix's (0, 0, 0, 1)) at +272.
       Stfs(base_, f_ + 272, zero_);
       Stfs(base_, f_ + 276, zero_);
       Stfs(base_, f_ + 280, zero_);
       Stfs(base_, f_ + 284, one_);
-      Memcpy(f_ + 528, model + 4304, 64, 0x820C6040);
+      Memcpy(f_ + 528, SceneModel(base_, model).matrix_address(), 64, 0x820C6040);
       Transform(f_ + 272, f_ + 528, f_ + 272);
       // The eye (+592): the position plus the direction times `distance`;
       // up (0, 1, 0) at +496.
@@ -478,7 +488,7 @@ uint64_t SceneDraw::FirstPath() {
         return uint64_t(out);
       });
       const uint32_t light_pass = Pass(base_, record.light_pass());  // w4
-      CopyMatrix(light_pass + 144, out, 0x820C6108);
+      CopyMatrix(CameraPass(base_, light_pass).view_projection_address(), out, 0x820C6108);
       r24 = ProjectionChunk(
           kSteps, 14, out, 7, 0, record.light_target(), 77,
           [&](uint32_t slot) { SizeConstant(slot, light_pass, f_ + 144); },
@@ -578,7 +588,7 @@ void SceneDraw::LightArrays() {
     CopyDoubleword(base_, G::light_vectors_b_address() + 32 + i, f_ + 208 + i);
   }
   for (uint32_t i = 0; i < 16; i += 8) {
-    CopyDoubleword(base_, G::light_vector_address() + i, scene_ + 5280 + i);
+    CopyDoubleword(base_, G::light_vector_address() + i, Scene().light_vector_lo_address() + i);
   }
 }
 
@@ -591,11 +601,11 @@ void SceneDraw::HeadlightProjector(uint32_t record, uint32_t model) {
   const uint32_t scene = Load(base_, f_ + 1716);
   Stfs(base_, f_ + 444, one_);
   Stfs(base_, f_ + 476, one_);
-  Copy16(base_, f_ + 480, scene + 5376);
+  Copy16(base_, f_ + 480, schema::CarScene(base_, scene).headlight_position_lo_address());
   // The model's matrix at +528; the eye (+432) = the scene's +5376 through
   // it, then its last row cleared: the beam (+464) and up (+384, (0, 1, 0))
   // turned by it.
-  Memcpy(f_ + 528, model + 4304, 64, 0x820C690C);
+  Memcpy(f_ + 528, SceneModel(base_, model).matrix_address(), 64, 0x820C690C);
   Stfs(base_, f_ + 384, zero_);
   Stfs(base_, f_ + 388, one_);
   Stfs(base_, f_ + 392, zero_);
@@ -612,7 +622,7 @@ void SceneDraw::HeadlightProjector(uint32_t record, uint32_t model) {
   for (uint32_t i = 0; i < 16; i += 4) {
     Stfs(base_, f_ + 128 + i, Fneg(Lfs(base_, f_ + 464 + i)));
   }
-  const double fov = Lfs(base_, scene + 5436);
+  const double fov = Lfs(base_, schema::CarScene(base_, scene).projector_fov_address());
   Stfs(base_, f_ + 828, one_);
   Stfs(base_, f_ + 844, one_);
   Stfs(base_, f_ + 860, one_);
@@ -640,7 +650,7 @@ void SceneDraw::HeadlightProjector(uint32_t record, uint32_t model) {
   }
   const Record rec(base_, record);
   const uint32_t pass = Pass(base_, rec.headlight_pass());  // w1
-  CopyMatrix(pass + 144, out, 0x820C6A48);
+  CopyMatrix(CameraPass(base_, pass).view_projection_address(), out, 0x820C6A48);
   static constexpr ChunkSteps kSteps = {
       0x820C6A5C, 0x820C6A84, 0x820C6ABC, 0x820C6AFC, 0x820C6B30, 0x820C6B68,
       0x820C6BA4, 0x820C6BE0, 0x820C6C1C, 0x820C6C54, 0x820C6C9C, 0x820C6CDC,
@@ -653,7 +663,8 @@ void SceneDraw::HeadlightProjector(uint32_t record, uint32_t model) {
 void SceneDraw::SharedTextures(uint32_t record) {
   Open(0x820C6E08);
   const uint32_t chunk = Allocate(1, 0x820C6E30);
-  const uint32_t provider = Load(base_, f_ + 1716) + 432;
+  const uint32_t provider =
+      schema::CarScene(base_, Load(base_, f_ + 1716)).texture_provider_145_address();
   Store(base_, f_ + 96, 5);
   guest::StoreU16(base_, chunk + 2, 5);
   Store(base_, f_ + 80, provider);
@@ -709,7 +720,7 @@ uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) 
     Stfs(base_, at + 4, zero_);
     Stfs(base_, at + 8, zero_);
     Stfs(base_, at + 12, one_);
-    Memcpy(matrix, model + 4304, 64, lr);
+    Memcpy(matrix, SceneModel(base_, model).matrix_address(), 64, lr);
     Transform(at, matrix, at);
   };
   auto ones = [&](uint32_t out) {
@@ -721,7 +732,7 @@ uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) 
   // [0x820021F4] into pass w2.
   {
     position(f_ + 352, f_ + 1200, 0x820C7124);
-    const double ratio = Fdivs(scale, Lfs(base_, pass + 368));
+    const double ratio = Fdivs(scale, Lfs(base_, CameraPass(base_, pass).field_of_view_address()));
     const double height = Lfs(base_, f_ + 356);
     ones(f_ + 752);
     const double low = Fsubs(height, band);
@@ -729,7 +740,8 @@ uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) 
     const double least = Fmuls(ratio, band);
     const double cut = Fmuls(ratio, cut1);
     Fit(f_ + 752, pass, f_ + 304, high, low, cut, least, far1, 0x820C7174);
-    CopyMatrix(Pass(base_, rec.fit_down_pass()) + 144, f_ + 752, 0x820C7190);
+    CopyMatrix(CameraPass(base_, Pass(base_, rec.fit_down_pass())).view_projection_address(),
+               f_ + 752, 0x820C7190);
     static constexpr ChunkSteps kSteps = {
         0x820C71A4, 0x820C71CC, 0x820C7204, 0x820C7244, 0x820C7278, 0x820C72B0,
         0x820C72E8, 0x820C7320, 0x820C7358, 0x820C7390, 0x820C73D4, 0x820C7414,
@@ -741,7 +753,7 @@ uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) 
   // (4) Between the height ± [0x820021F4] into pass w3.
   {
     position(f_ + 320, f_ + 1264, 0x820C7508);
-    const double ratio = Fdivs(scale, Lfs(base_, pass + 368));
+    const double ratio = Fdivs(scale, Lfs(base_, CameraPass(base_, pass).field_of_view_address()));
     ones(f_ + 944);
     const double least = Fmuls(ratio, least2);
     const double cut = Fmuls(ratio, cut2);
@@ -749,7 +761,8 @@ uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) 
     const double low = Fsubs(height, band);
     const double high = Fadds(height, band);
     Fit(f_ + 944, pass, f_ + 304, high, low, cut, least, far2, 0x820C7558);
-    CopyMatrix(Pass(base_, rec.fit_band_pass()) + 144, f_ + 944, 0x820C7574);
+    CopyMatrix(CameraPass(base_, Pass(base_, rec.fit_band_pass())).view_projection_address(),
+               f_ + 944, 0x820C7574);
     static constexpr ChunkSteps kSteps = {
         0x820C7588, 0x820C75B0, 0x820C75E8, 0x820C7628, 0x820C765C, 0x820C7694,
         0x820C76CC, 0x820C7704, 0x820C773C, 0x820C7774, 0x820C77B8, 0x820C77F8,
@@ -763,7 +776,7 @@ uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) 
   {
     SetLight(f_ + 176, far1);
     position(f_ + 416, f_ + 1120, 0x820C7900);
-    const double ratio = Fdivs(scale, Lfs(base_, pass + 368));
+    const double ratio = Fdivs(scale, Lfs(base_, CameraPass(base_, pass).field_of_view_address()));
     ones(f_ + 880);
     const double least = Fmuls(ratio, least3);
     const double cut = Fmuls(ratio, cut3);
@@ -771,7 +784,8 @@ uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) 
     const double low = Fsubs(height, band);
     const double high = Fadds(height, band);
     Fit(f_ + 880, pass, f_ + 176, high, low, cut, least, far3, 0x820C7950);
-    CopyMatrix(Pass(base_, rec.light_pass()) + 144, f_ + 880, 0x820C796C);
+    CopyMatrix(CameraPass(base_, Pass(base_, rec.light_pass())).view_projection_address(),
+               f_ + 880, 0x820C796C);
     static constexpr ChunkSteps kSteps = {
         0x820C7980, 0x820C79A8, 0x820C79E0, 0x820C7A20, 0x820C7A54, 0x820C7A8C,
         0x820C7AC4, 0x820C7AFC, 0x820C7B34, 0x820C7B6C, 0,          0,
@@ -787,7 +801,7 @@ uint64_t SceneDraw::SecondPath() {
   // [0x8296B8F0]: the shared assets' texture when the scene's +5044 is set,
   // else render target 1.
   uint32_t texture;
-  if (LoadS(base_, scene_ + 5044) != 0) {
+  if (LoadS(base_, Scene().set_up_r5_address()) != 0) {
     texture = uint32_t(XprTexture(scene_ + 88));
   } else {
     texture = RenderTarget(1);
@@ -800,7 +814,7 @@ uint64_t SceneDraw::SecondPath() {
   // fits' direction (0, 1, 0, 0) at +304.
   Stfs(base_, f_ + 176, double(G::light_x(base_)));
   zero_ = double(G::zero(base_));
-  const bool parking = LoadS(base_, scene_ + 5052) != 0;
+  const bool parking = LoadS(base_, Scene().lighting_fixed_address()) != 0;
   Stfs(base_, f_ + 184, zero_);
   Stfs(base_, f_ + 188, zero_);
   Stfs(base_, f_ + 304, zero_);
@@ -821,7 +835,7 @@ uint64_t SceneDraw::SecondPath() {
     const uint32_t pass = Load(base_, f_ + 88) + record.car_pass() * kPassSize;
     r24 = pass;
     const uint32_t model = RecordModel(record.model_index());
-    if (LoadS(base_, pass + 588) != 0 && model != 0) {
+    if (LoadS(base_, CameraPass(base_, pass).enabled_address()) != 0 && model != 0) {
       HeadlightProjector(record.address, model);
       SharedTextures(record.address);
       r24 = Projections(record.address, model, pass);
@@ -836,7 +850,7 @@ uint64_t SceneDraw::SecondPath() {
 
 
 void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
-  const uint32_t count = Load(base_, scene_ + 5036);
+  const uint32_t count = Load(base_, Scene().scene_models_count_address());
   Store(base_, f_ + 96, count);
   G::set_queue_key_group0(base_, G::queue_key_a_start(base_));
   G::set_queue_key_group1(base_, G::queue_key_b_start(base_));
@@ -845,9 +859,9 @@ void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
   uint32_t p = 0;
   Store(base_, f_ + 160, p);
   {
-    const uint32_t race = G::race_data(base_).address;
-    const int32_t kind = LoadS(base_, race + 0xA3AF0);
-    const uint32_t word = Load(base_, race + 0x59614);
+    const schema::RaceData race = G::race_data(base_);
+    const int32_t kind = LoadS(base_, race.kind_address());
+    const uint32_t word = race.added_count();
     if (kind == 6 && word == 2) {
       p = G::second_human(base_) == 0 ? 1 : 0;
       Store(base_, f_ + 160, p);
@@ -866,14 +880,14 @@ void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
   Store(base_, f_ + 368, G::front_end_description_address());
   Store(base_, f_ + 348, G::mode8_description_address());
   Store(base_, f_ + 92, G::pass_descriptions_address());
-  const Description description(base_, scene_ + 5072);  // r20
-  const uint32_t lights = scene_ + 5248;  // r22
+  const Description description(base_, Scene().pass_camera_address());  // r20
+  const uint32_t lights = Scene().car_light_factor_a_address();  // r22
 
   // The description's camera pass, or 0 when it isn't active (the
   // original's add. and +588 checks, made again at each use).
   auto active_pass = [&]() -> uint32_t {
     const uint32_t pass = description.camera_pass() * kPassSize + Load(base_, f_ + 88);
-    if (pass == 0 || LoadS(base_, pass + 588) == 0) {
+    if (pass == 0 || LoadS(base_, CameraPass(base_, pass).enabled_address()) == 0) {
       return 0;
     }
     return pass;
@@ -882,13 +896,14 @@ void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
   // Viewport v's view mode is 2 (probably the cockpit).
   auto cockpit_view = [&](uint32_t v) {
     const uint32_t viewport = Load(base_, G::viewports(base_).address + 4 * v);
-    return viewport != 0 && LoadS(base_, viewport + 1860) == 2;
+    return viewport != 0 &&
+           LoadS(base_, schema::Viewport(base_, viewport).view_mode_address()) == 2;
   };
   // List::At(n)'s +4296 = value when it exists (two List::At calls, as the
   // original).
   auto show = [&](uint32_t n, uint32_t value) {
     if (list_at(n) != 0) {
-      Store(base_, list_at(n) + 4296, value);
+      Store(base_, SceneModel(base_, list_at(n)).draw_enabled_address(), value);
     }
   };
 
@@ -902,14 +917,16 @@ void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
     Memcpy(description.address, offset + table, 64, 0x820C7D9C);
     if (active_pass() != 0) {
       // The pass's eye to 0x8265ECE0 and its view to 0x8265ECA0.
-      Copy16(base_, Load(base_, f_ + 344), active_pass() + 400);
-      CopyMatrix(Load(base_, f_ + 340), active_pass() + 16, 0x820C7E28);
+      Copy16(base_, Load(base_, f_ + 344),
+             CameraPass(base_, active_pass()).eye_xy_address());
+      CopyMatrix(Load(base_, f_ + 340), CameraPass(base_, active_pass()).view_address(),
+                 0x820C7E28);
       if (second_path) {
         // The player's and model 1's +4296 by the pass's type.
-        const uint32_t type = Load(base_, active_pass() + 584);
+        const uint32_t type = Load(base_, CameraPass(base_, active_pass()).type_address());
         if (type == 0) {
           const uint32_t stage = f_ + 1120;
-          const uint32_t stages = G::race_data(base_).address + 0x59620;
+          const uint32_t stages = G::race_data(base_).stages_address();
           if (!debug::IsHidden(kStagesCopy)) {
             debug::FrameStateDiff_Before(base_);
             FlushOff();
@@ -922,11 +939,11 @@ void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
               Call(kStagesCopy, {stage, stages, 0xFFFFFFFFFFFFFFFFull}, 0x820C7F54);
             }
           }
-          const uint32_t race = G::race_data(base_).address;
-          if ((LoadS(base_, race + 0xA3AF0) != 6 || LoadS(base_, stage) == 1) &&
-              (Load(base_, race + 0x59AE4) & 0x80) == 0 && list_at(p) != 0) {
+          const schema::RaceData race = G::race_data(base_);
+          if ((LoadS(base_, race.kind_address()) != 6 || LoadS(base_, stage) == 1) &&
+              (race.flags() & 0x80) == 0 && list_at(p) != 0) {
             const uint32_t value = cockpit_view(0) ? 0 : 1;
-            Store(base_, list_at(p) + 4296, value);
+            Store(base_, SceneModel(base_, list_at(p)).draw_enabled_address(), value);
           }
         } else if (type == 1) {
           show(1, 1);
@@ -945,10 +962,11 @@ void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
       const int32_t models = LoadS(base_, f_ + 96);  // r28
       for (uint32_t i = 0; int32_t(i) < models; i++) {
         const uint32_t model = list_at(i);  // r18
-        if (LoadS(base_, model + 16) != 3 || Load(base_, model + 5048) == 0) {
+        if (LoadS(base_, SceneModel(base_, model).state_address()) != 3 ||
+            Load(base_, SceneModel(base_, model).car_model_address()) == 0) {
           continue;
         }
-        if (second_path && LoadS(base_, scene_ + 5052) == 0) {
+        if (second_path && LoadS(base_, Scene().lighting_fixed_address()) == 0) {
           r24 = OtherHeadlights(i, lights);
         }
         DrawModel(i, p, model, r24);
@@ -988,8 +1006,9 @@ uint64_t SceneDraw::OtherHeadlights(uint32_t i, uint32_t lights) {
       SceneModelBeam(base_, beam, other);
       return uint64_t(beam);
     });
-    if (j == i || other == 0 || LoadS(base_, other + 16) != 3 ||
-        Load(base_, other + 5048) == 0 || LoadS(base_, other + 32) == 3) {
+    if (j == i || other == 0 || LoadS(base_, SceneModel(base_, other).state_address()) != 3 ||
+        Load(base_, SceneModel(base_, other).car_model_address()) == 0 ||
+        LoadS(base_, SceneModel(base_, other).kind_address()) == 3) {
       continue;
     }
     const uint32_t at = slot << 4;
@@ -998,7 +1017,7 @@ uint64_t SceneDraw::OtherHeadlights(uint32_t i, uint32_t lights) {
     }
     // Its position (the scene's +5376 through its matrix) at +608, its beam
     // through it at +448, the beam's minus (+128) normalized at +480.
-    Memcpy(f_ + 528, other + 4304, 64, 0x820C8134);
+    Memcpy(f_ + 528, SceneModel(base_, other).matrix_address(), 64, 0x820C8134);
     Transform(f_ + 608, f_ + 528, f_ + 672);
     Stfs(base_, f_ + 588, zero_);
     Stfs(base_, f_ + 584, zero_);
@@ -1065,7 +1084,7 @@ uint64_t SceneDraw::OtherHeadlights(uint32_t i, uint32_t lights) {
 }
 
 void SceneDraw::DrawModel(uint32_t i, uint32_t p, uint32_t model, uint64_t r24) {
-  const Description description(base_, scene_ + 5072);
+  const Description description(base_, Scene().pass_camera_address());
   // The render queue's keys: the description's +64 to +72 keep them, they
   // take its +20 to +28.
   const uint32_t key_b = description.group1_key();
@@ -1081,17 +1100,17 @@ void SceneDraw::DrawModel(uint32_t i, uint32_t p, uint32_t model, uint64_t r24) 
   // type (pass 0's address, 584, read when the pass isn't active, as the
   // original).
   uint32_t pass = description.camera_pass() * kPassSize + Load(base_, f_ + 88);
-  const uint32_t saved = Load(base_, scene_ + 5132);
+  const uint32_t saved = Load(base_, Scene().pass_mask_address());
   uint32_t mask = saved;
-  if (pass == 0 || LoadS(base_, pass + 588) == 0) {
+  if (pass == 0 || LoadS(base_, CameraPass(base_, pass).enabled_address()) == 0) {
     pass = 0;
   }
-  const uint32_t type = Load(base_, pass + 584);
+  const uint32_t type = Load(base_, CameraPass(base_, pass).type_address());
   if (type == 0) {
     if (p == i) {
       mask &= ~0x4u;
     }
-    if (LoadS(base_, scene_ + 5052) != 0) {
+    if (LoadS(base_, Scene().lighting_fixed_address()) != 0) {
       mask &= ~0x8u;
       mask &= ~0xE0u;
     }
@@ -1104,13 +1123,13 @@ void SceneDraw::DrawModel(uint32_t i, uint32_t p, uint32_t model, uint64_t r24) 
       mask &= ~0x4u;
     }
   }
-  Store(base_, scene_ + 5132, mask);
+  Store(base_, Scene().pass_mask_address(), mask);
   Wrapped(base_, kCarDrawUpdate, model, [&] {
     calls_.car_draw_update(model, r24, f_, 0x820C840C);
     return uint64_t(0);
   });
-  const uint32_t key = Load(base_, scene_ + 5144);
-  Store(base_, scene_ + 5132, saved);
+  const uint32_t key = Load(base_, Scene().pass_saved_key_depth_address());
+  Store(base_, Scene().pass_mask_address(), saved);
   G::set_queue_key_depth(base_, key);
   const uint32_t b = description.saved_group1_key();
   const uint32_t a = description.saved_group0_key();
@@ -1129,7 +1148,7 @@ uint32_t CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack
   ITC_NATIVE_RUNNING("sub_820C5DE8 CarScene::Draw");
   const uint32_t f = stack - kSceneDrawFrame;
   Store(base, f, stack);  // the back chain, as stwu
-  const int32_t state = LoadS(base, scene + 0);
+  const int32_t state = LoadS(base, schema::CarScene(base, scene).state_address());
   Store(base, f + 1716, scene);
   if (state == 4) {
     return scene;  // r3 as it came
@@ -1139,7 +1158,7 @@ uint32_t CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack
   SceneDrawFrame frame;
   frame.f = f;
   frame.scene = scene;
-  frame.second_path = LoadS(base, scene + 4) != 0;
+  frame.second_path = LoadS(base, schema::CarScene(base, scene).model_set_address()) != 0;
   const uint64_t r24 = frame.second_path ? draw.SecondPath() : draw.FirstPath();
   // Both paths: the pass descriptions, then pass 0's view-projection put
   // back.

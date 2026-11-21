@@ -9,6 +9,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/xact_waves.h"
 
 #include <initializer_list>
 
@@ -17,16 +18,15 @@ namespace xact {
 namespace {
 
 namespace xa = xaudio;
+using Voice = schema::XACTVoice;
+using G = schema::XactWavesGlobals;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
-// A float moved as the original's lfs and stfs do (through a double).
-void MoveFloat(uint8_t* base, uint32_t to, uint32_t from) {
-  const double value = double(guest::LoadFloat(base, from));
-  guest::StoreFloat(base, to, float(value));
-}
+// A float loaded as the original's lfs does (through a double).
+double LoadF(uint8_t* base, uint32_t from) { return double(guest::LoadFloat(base, from)); }
 
 xa::Regs Args(std::initializer_list<uint64_t> r) {
   xa::Regs regs;
@@ -52,7 +52,6 @@ constexpr uint32_t kCreateSourceFrame = 128;  // XAudioCreateSourceVoice
 constexpr uint32_t kInitFrame = 128;     // XACTVoice::Init
 constexpr uint32_t kDestructFrame = 112;  // XACTVoice::~XACTVoice
 
-constexpr uint32_t kOne = 0x82000A30;  // 1.0f
 constexpr uint32_t kOutOfMemory = 0x8007000Eu;
 
 // (r4 != 0) as the original's cntlzw, rlwinm and xori give it.
@@ -64,13 +63,15 @@ uint32_t VoiceInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t
                    uint32_t level, uint32_t reverb, const Thread& thread, uint32_t frame,
                    const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825C9B60 XACTVoice::Init");
-  SetRegs(call, Args({description, voice + 4}));
-  uint32_t r3 = xa::ApiCreateSourceVoice(base, description, voice + 4, true, thread,
-                                         xa::FrameBelow(base, frame, kCreateSourceFrame), call);
+  const Voice v(base, voice);
+  SetRegs(call, Args({description, v.source_voice_address()}));
+  uint32_t r3 =
+      xa::ApiCreateSourceVoice(base, description, v.source_voice_address(), true, thread,
+                               xa::FrameBelow(base, frame, kCreateSourceFrame), call);
   if (int32_t(r3) < 0) {
     return r3;
   }
-  guest::StoreU8(base, voice + 12, guest::LoadU8(base, description + 4));
+  v.set_channels(guest::LoadU8(base, description + 4));
   if (reverb == 0) {
     return r3;
   }
@@ -78,8 +79,8 @@ uint32_t VoiceInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t
   xa::Regs regs = Args({submix_holder});
   regs.sp = frame;
   r3 = call(xa::Method(base, submix_holder, 4), 0x825C9BB8, regs);
-  Store(base, voice + 8, r3);
-  MoveFloat(base, voice + 16, level);
+  v.set_reverb_voice(r3);
+  v.set_reverb_level(float(LoadF(base, level)));
   regs = Args({voice, 0});
   regs.sp = frame;
   return call(xa::Method(base, voice, 32), 0x825C9BE0, regs);
@@ -95,12 +96,13 @@ uint32_t VoiceCreate(uint8_t* base, uint32_t description, uint32_t holder, uint3
     Store(base, out, 0);
     return kOutOfMemory;
   }
-  Store(base, voice + 4, 0);
-  Store(base, voice + 8, 0);
-  guest::StoreU8(base, voice + 12, 0);
-  MoveFloat(base, voice + 16, kOne);
-  Store(base, voice + 0, kVoiceVtable);
-  Store(base, voice + 20, 1);
+  const Voice v(base, voice);
+  v.set_source_voice(0);
+  v.set_reverb_voice(0);
+  v.set_channels(0);
+  v.set_reverb_level(float(LoadF(base, G::one_address())));
+  v.set_vtable(kVoiceVtable);
+  v.set_outputs_unset(1);
   SetRegs(call, Args({voice, description, holder, level, reverb}));
   const uint32_t r3 = VoiceInit(base, voice, description, holder, level, reverb, thread,
                                 xa::FrameBelow(base, frame, kInitFrame), call);
@@ -124,7 +126,7 @@ uint32_t VoiceCreate(uint8_t* base, uint32_t description, uint32_t holder, uint3
 uint32_t VoiceGetState(uint8_t* base, uint32_t voice, uint32_t out, uint32_t frame,
                        const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825C9DB8 XACTVoice::GetState");
-  const uint32_t source = Load(base, voice + 4);
+  const uint32_t source = Voice(base, voice).source_voice();
   SetRegs(call, Args({source, frame + 80}));
   xa::FrameBelow(base, frame, kApiFrame);
   const uint32_t r3 = xa::ApiGetState(base, source, frame + 80, 0, 0, 0, call);
@@ -137,7 +139,7 @@ uint32_t VoiceGetState(uint8_t* base, uint32_t voice, uint32_t out, uint32_t fra
 uint32_t VoiceSetVolume(uint8_t* base, uint32_t voice, double volume, uint32_t sp,
                         const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825C9BE8 XACTVoice::SetVolume");
-  const uint32_t source = Load(base, voice + 4);
+  const uint32_t source = Voice(base, voice).source_voice();
   SetRegs(call, ArgsF1({source}, volume));
   xa::FrameBelow(base, sp, kApiFrame);
   return xa::ApiSetVolume(base, source, volume, call);
@@ -146,7 +148,7 @@ uint32_t VoiceSetVolume(uint8_t* base, uint32_t voice, double volume, uint32_t s
 uint32_t VoiceSetPitch(uint8_t* base, uint32_t voice, double ratio, uint32_t sp,
                        const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825C9BF0 XACTVoice::SetPitch");
-  const uint32_t source = Load(base, voice + 4);
+  const uint32_t source = Voice(base, voice).source_voice();
   SetRegs(call, ArgsF1({source}, ratio));
   xa::FrameBelow(base, sp, kApiFrame);
   return xa::ApiSetFrequencyRatio(base, source, ratio, call);
@@ -155,7 +157,7 @@ uint32_t VoiceSetPitch(uint8_t* base, uint32_t voice, double ratio, uint32_t sp,
 uint32_t VoiceStart(uint8_t* base, uint32_t voice, uint32_t deferred, const Thread& thread,
                     uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825C9BF8 XACTVoice::Start");
-  const uint32_t source = Load(base, voice + 4);
+  const uint32_t source = Voice(base, voice).source_voice();
   const uint32_t flags = NotZero(deferred);
   SetRegs(call, Args({source, flags}));
   xa::FrameBelow(base, sp, kApiFrame);
@@ -165,7 +167,7 @@ uint32_t VoiceStart(uint8_t* base, uint32_t voice, uint32_t deferred, const Thre
 uint32_t VoiceStop(uint8_t* base, uint32_t voice, uint32_t now, uint32_t sp,
                    const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825C9C10 XACTVoice::Stop");
-  const uint32_t source = Load(base, voice + 4);
+  const uint32_t source = Voice(base, voice).source_voice();
   const uint32_t flags = NotZero(now);
   SetRegs(call, Args({source, flags}));
   xa::FrameBelow(base, sp, kApiFrame);
@@ -174,7 +176,7 @@ uint32_t VoiceStop(uint8_t* base, uint32_t voice, uint32_t now, uint32_t sp,
 
 uint32_t VoiceFlushPackets(uint8_t* base, uint32_t voice, uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825C9C28 XACTVoice::FlushPackets");
-  const uint32_t source = Load(base, voice + 4);
+  const uint32_t source = Voice(base, voice).source_voice();
   SetRegs(call, Args({source}));
   xa::FrameBelow(base, sp, kApiFrame);
   return xa::ApiFlushPackets(base, source, 0, 0, 0, 0, call);
@@ -191,7 +193,7 @@ uint32_t VoiceSubmitPacket(uint8_t* base, uint32_t voice, uint32_t packet, uint3
   for (uint32_t i = 0; i < 5; i++) {
     Store(base, to + 12 + 4 * i, Load(base, packet + 20 + 4 * i));
   }
-  const uint32_t source = Load(base, voice + 4);
+  const uint32_t source = Voice(base, voice).source_voice();
   const uint32_t r5 = NotZero(flag);
   SetRegs(call, Args({source, to, r5}));
   xa::FrameBelow(base, frame, kCodec36Frame);
@@ -201,8 +203,9 @@ uint32_t VoiceSubmitPacket(uint8_t* base, uint32_t voice, uint32_t packet, uint3
 uint32_t VoiceDeletingDestruct(uint8_t* base, uint32_t voice, uint32_t flags, uint32_t frame,
                                const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825CA448 XACTVoice::~XACTVoice (deleting)");
-  Store(base, voice + 0, kVoiceVtable);
-  const uint32_t source = Load(base, voice + 4);
+  const Voice v(base, voice);
+  v.set_vtable(kVoiceVtable);
+  const uint32_t source = v.source_voice();
   if (source != 0) {
     SetRegs(call, Args({source}));
     xa::FrameBelow(base, frame, kApiFrame);

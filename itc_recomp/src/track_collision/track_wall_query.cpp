@@ -9,6 +9,7 @@
 #include "base/log.h"
 #include "collision/collision.h"
 #include "schema/collision_world.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -30,10 +31,6 @@ using Fpscr = ::base::FloatMode;
 using G = schema::CollisionWorldGlobals;
 using Query = schema::WallQuery;
 
-constexpr uint32_t kRaceData = 0x826C5B2C;     // the race data's pointer
-constexpr uint32_t kRaceMode = 0xA3AF4;        // its word: the race mode
-constexpr uint32_t kStageFlags = 0x59620 + 1220;  // the stage list's flags
-constexpr uint32_t kGameState = 0x826D82E8;    // a pointer: its +6100 read for mode 5
 constexpr uint32_t kWallHit = 0x01000000;      // the hit's surface bits
 constexpr uint32_t kWallLimit = 128;           // the walls kept in the tested list
 
@@ -100,8 +97,8 @@ void Copy16(uint8_t* base, uint32_t from, uint32_t to) {
 }
 
 // The stage list's flags with 0x20 or 0x40: 0, else 1.
-uint32_t StageFlagsSkip(uint8_t* base, uint32_t race) {
-  const uint32_t flags = guest::LoadU32(base, race + kStageFlags);
+uint32_t StageFlagsSkip(const schema::RaceData& race) {
+  const uint32_t flags = race.flags();
   return (flags & 0x20) != 0 || (flags & 0x40) != 0 ? 0 : 1;
 }
 
@@ -186,24 +183,23 @@ uint32_t WallQueryModeSkips(uint8_t* base, uint32_t word) {
   if (guest::LoadU32(base, word) == 2) {
     return 1;
   }
-  const uint32_t race = guest::LoadU32(base, kRaceData);
-  const int32_t mode = int32_t(guest::LoadU32(base, race + kRaceMode));
+  const schema::RaceData race = G::race_data(base);
+  const int32_t mode = int32_t(race.race_mode());
   if (mode < 3) {
     return 1;
   }
   if (mode <= 4) {
-    return StageFlagsSkip(base, race);
+    return StageFlagsSkip(race);
   }
   if (mode == 5) {
-    const int32_t state =
-        int32_t(guest::LoadU32(base, guest::LoadU32(base, kGameState) + 6100));
-    return state == 1 || state == 3 ? StageFlagsSkip(base, race) : 1;
+    const int32_t state = int32_t(G::race_progress(base).stage_type());
+    return state == 1 || state == 3 ? StageFlagsSkip(race) : 1;
   }
   if (mode <= 6) {
     return 1;
   }
   if (mode <= 8) {
-    return StageFlagsSkip(base, race);
+    return StageFlagsSkip(race);
   }
   return 1;
 }
@@ -222,11 +218,11 @@ uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t
       if (guest::LoadU16(base, a) != 0) {
         return 0;
       }
-      const uint32_t race = guest::LoadU32(base, kRaceData);
-      if (int32_t(guest::LoadU32(base, race + kRaceMode)) != 2) {
+      const schema::RaceData race = G::race_data(base);
+      if (int32_t(race.race_mode()) != 2) {
         return 0;
       }
-      const uint32_t flags = guest::LoadU32(base, race + kStageFlags);
+      const uint32_t flags = race.flags();
       if ((flags & 0x20) != 0 || (flags & 0x40) != 0) {
         return 0;
       }
@@ -238,11 +234,11 @@ uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t
       if (guest::LoadU16(base, a) == 2) {
         return 1;
       }
-      const uint32_t race = guest::LoadU32(base, kRaceData);
-      if (int32_t(guest::LoadU32(base, race + kRaceMode)) != 2) {
+      const schema::RaceData race = G::race_data(base);
+      if (int32_t(race.race_mode()) != 2) {
         return 1;
       }
-      const uint32_t w = guest::LoadU32(base, race + 20);
+      const uint32_t w = race.branch_flags();
       if (k == 8) {
         return (w & 0x10) != 0 ? 1 : 0;
       }
@@ -256,7 +252,7 @@ uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t
       if (WallQueryModeSkips(base, frame + 80) != 0) {
         return 1;
       }
-      const int32_t v = int32_t(guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 4));
+      const int32_t v = int32_t(G::race_data(base).route_course());
       if (v < 4) {
         return 1;
       }
@@ -273,7 +269,7 @@ uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t
     if (WallQueryModeSkips(base, frame + 80) != 0) {
       return 1;
     }
-    const uint32_t v = guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 4);
+    const uint32_t v = G::race_data(base).route_course();
     return v - uint32_t(offset) != 0 ? 1 : 0;
   }
   if (k >= 50) {
@@ -281,7 +277,7 @@ uint32_t WallQueryIgnoresWall(uint8_t* base, uint32_t kind, uint32_t a, uint32_t
     // bit is set.
     const uint32_t bit = k - 50;
     const uint32_t word =
-        guest::LoadU32(base, guest::LoadU32(base, kRaceData) + ((bit >> 5) + 6) * 4);
+        guest::LoadU32(base, G::race_data(base).drawn_entries_address() + (bit >> 5) * 4);
     return (word & (1u << (bit & 31))) != 0 ? 0 : 1;
   }
   return 1;

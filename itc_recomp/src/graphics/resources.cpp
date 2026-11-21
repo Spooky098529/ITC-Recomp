@@ -10,6 +10,7 @@
 #include "memory/c_runtime_heap.h"
 #include "c_runtime/strings.h"
 #include "native/refcount.h"
+#include "schema/device_state.h"
 #include "schema/graphics_resources.h"
 
 #include <array>
@@ -1089,28 +1090,29 @@ uint32_t Current(uint8_t* base, uint32_t slot) {
 
 uint32_t GetRenderTarget(uint8_t* base, uint32_t device, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_822A3998 Device::GetRenderTarget");
-  return Current(base, device + ((index + 3046) << 2));
+  return Current(base, schema::Device(base, device).render_target0_address() + 4 * index);
 }
 
 uint32_t GetDepthStencilSurface(uint8_t* base, uint32_t device) {
   ITC_NATIVE_RUNNING("sub_822A39E0 Device::GetDepthStencilSurface");
-  return Current(base, device + 12200);
+  return Current(base, schema::Device(base, device).depth_surface_address());
 }
 
 StreamSource GetStreamSource(uint8_t* base, uint32_t device, uint32_t stream) {
   ITC_NATIVE_RUNNING("sub_822A3880 Device::GetStreamSource");
-  StreamSource source{Load(base, device + ((stream + 3051) << 2)), 0, 0};
+  const schema::Device d(base, device);
+  StreamSource source{Load(base, d.streams_address() + 4 * stream), 0, 0};
   uint32_t offset = 0;
   if (source.buffer != 0) {
     // The stream's fetch constant's address, less the buffer's (+24's low
     // 29 bits, in the view its top 12 bits say).
-    const uint32_t fetch = Load(base, device + ((223 - stream) << 3));
+    const uint32_t fetch = Load(base, d.fetch_constants_address() + 760 - 8 * stream);
     const uint32_t data = BufferHeader(base, source.buffer).data();
     offset = fetch - ((((data >> 20) & 0xFFF) + 512) & 0x1000) - (data & 0x1FFFFFFF);
     refcount::AddRef(base, source.buffer);
   }
   source.offset = offset << 2;
-  source.stride = uint32_t(guest::LoadU8(base, device + stream + 12272)) << 2;
+  source.stride = uint32_t(guest::LoadU8(base, d.stream_strides_address() + stream)) << 2;
   return source;
 }
 

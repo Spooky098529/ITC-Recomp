@@ -266,11 +266,15 @@ struct CarDealerGlobals {
   static void set_pages(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D83E8u, v); }
   static constexpr uint32_t pages_address() { return 0x826D83E8u; }
   // a menu list (72 bytes): the page's menu
-  static View list_menu(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D83ECu)); }
+  template <typename T = MenuList>
+  static T list_menu(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D83ECu)); }
+  static void set_list_menu(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D83ECu, v.address); }
   static void set_list_menu(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D83ECu, v); }
   static constexpr uint32_t list_menu_address() { return 0x826D83ECu; }
   // a menu list (72 bytes): the car list's selection on page 2, the colors' on page 3
-  static View color_menu(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D83F0u)); }
+  template <typename T = MenuList>
+  static T color_menu(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D83F0u)); }
+  static void set_color_menu(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D83F0u, v.address); }
   static void set_color_menu(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D83F0u, v); }
   static constexpr uint32_t color_menu_address() { return 0x826D83F0u; }
   template <typename T = CarDealerData>

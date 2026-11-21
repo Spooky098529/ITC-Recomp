@@ -5,6 +5,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "schema/c_runtime.h"
+#include "schema/c_runtime_core.h"
 
 namespace c_runtime {
 
@@ -15,9 +16,6 @@ constexpr uint32_t kSetLastError = 0x82296FD0;
 constexpr uint32_t kTlsGetValue = 0x825DBBF4;  // KeTlsGetValue's thunk
 constexpr uint32_t kTlsSetValue = 0x825DBC04;  // KeTlsSetValue's thunk
 constexpr uint32_t kGetptd = 0x825AA580;
-constexpr uint32_t kGetterSlot = 0x8266B7B8;   // the TLS index holding the getter
-constexpr uint32_t kDataIndex = 0x8266B7B4;    // the index the getter is given
-constexpr uint32_t kGetter = 0x82971160;       // the getter set at start-up
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
@@ -31,17 +29,19 @@ uint32_t ThreadData(uint8_t* base, uint32_t sp, uint32_t lr, const ThreadDataCal
   const uint32_t getptd = Frame(base, sp, 96);
   const uint32_t noexit = Frame(base, getptd, 112);
   const uint64_t saved = call.Call(kGetLastError, noexit, 0x825AA4D0, 0, 0);
-  // sub_825AA400 (96 bytes below): the getter put in its slot when empty.
+  // sub_825AA400 (96 bytes below): the getter (__getvalueindex's slot) put
+  // in its slot when empty; the getter is given __flsindex.
+  using Core = schema::CRuntimeCoreGlobals;
   const uint32_t init = Frame(base, noexit, 96);
-  if (uint32_t(call.Call(kTlsGetValue, init, 0x825AA41C, 1, guest::LoadU32(base, kGetterSlot))) ==
+  if (uint32_t(call.Call(kTlsGetValue, init, 0x825AA41C, 1, Core::getvalue_index(base))) ==
       0) {
-    call.Call(kTlsSetValue, init, 0x825AA434, 2, guest::LoadU32(base, kGetterSlot),
-              guest::LoadU32(base, kGetter));
+    call.Call(kTlsSetValue, init, 0x825AA434, 2, Core::getvalue_index(base),
+              Core::fls_get_value(base));
   }
   const uint32_t getter =
-      uint32_t(call.Call(kTlsGetValue, noexit, 0x825AA4E4, 1, guest::LoadU32(base, kGetterSlot)));
+      uint32_t(call.Call(kTlsGetValue, noexit, 0x825AA4E4, 1, Core::getvalue_index(base)));
   const uint32_t data =
-      uint32_t(call.Call(getter, noexit, 0x825AA4F8, 1, guest::LoadU32(base, kDataIndex)));
+      uint32_t(call.Call(getter, noexit, 0x825AA4F8, 1, Core::fls_index(base)));
   call.Call(kSetLastError, noexit, 0x825AA570, 1, saved);
   if (data != 0) {
     return data;

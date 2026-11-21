@@ -8,6 +8,8 @@
 #include "lifted/sdk.h"
 #include "schema/c_runtime.h"
 #include "schema/heap.h"
+#include "schema/model_animation.h"
+#include "schema/models.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -593,7 +595,7 @@ lifted::Result f82599BE0(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r11,-12720
   r11 = uint64_t(int64_t(int64_t(r11) + -12720));
   // lwz r3,176(r31)
-  r3 = guest::LoadU32(base, schema::Skeleton(base, uint32_t(r31)).node_vectors_address());
+  r3 = guest::LoadU32(base, schema::Skeleton(base, uint32_t(r31)).node_values_address());
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // stw r11,0(r31)
@@ -609,7 +611,7 @@ loc_82599C18:
   // mr r3,r31
   r3 = r31;
   // stw r11,176(r31)
-  guest::StoreU32(base, schema::Skeleton(base, uint32_t(r31)).node_vectors_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::Skeleton(base, uint32_t(r31)).node_values_address(), uint32_t(r11));
   // bl 0x8259a9d0
   // (left out: dead in C++)
   { const lifted::Result o = game::SkeletonBase::Dtor(base, LIFTED_ARGS(0x82599C28, r31)); r3 = o.r3; f1 = o.f1; }
@@ -3143,7 +3145,7 @@ lifted::Result f825A13D8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // mr r30,r4
   r30 = r4;
   // lwz r3,4(r31)
-  r3 = guest::LoadU32(base, schema::PrimitiveDrawer(base, uint32_t(r31)).unknown_4_address());
+  r3 = guest::LoadU32(base, schema::PrimitiveDrawer(base, uint32_t(r31)).declaration_address());
   // stw r11,0(r31)
   guest::StoreU32(base, schema::PrimitiveDrawer(base, uint32_t(r31)).vtable_address(), uint32_t(r11));
   // bl 0x825a70e8

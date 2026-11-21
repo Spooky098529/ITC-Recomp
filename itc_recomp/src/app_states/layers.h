@@ -78,8 +78,6 @@ std::optional<uint32_t> StatesCreate(uint8_t* base, uint32_t setup, uint32_t fra
 // bytes. Its r3 (the slot's), or nullopt.
 std::optional<uint32_t> AppStart(uint8_t* base, uint32_t interface, uint32_t frame,
                                  const AppCalls& calls);
-constexpr uint32_t kBootMovies = 0x826C5BAC;
-constexpr uint32_t kStartFlag = 0x826364EC;
 
 // --- The layers' walks ---
 

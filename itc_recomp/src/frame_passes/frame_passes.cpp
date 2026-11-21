@@ -9,7 +9,9 @@
 #include "base/log.h"
 #include "command_list/command_list.h"
 #include "graphics/video_output.h"
+#include "schema/command_list.h"
 #include "schema/frame_passes.h"
+#include "schema/morph_jobs.h"
 
 namespace frame_passes {
 
@@ -25,13 +27,14 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
 // Whether the list has room for `slots` more (a record inside a chunk
 // already open: only the room).
 bool Room(uint8_t* base, uint32_t list, uint64_t slots) {
-  return uint64_t(Load(base, list + 12)) + slots < Load(base, list + 8);
+  const schema::CommandList l(base, list);
+  return uint64_t(l.used()) + slots < l.capacity();
 }
 // Whether a record opening its own chunk may go on: no chunk open (on this
 // list or another), and room for `slots`.
 bool Ready(uint8_t* base, uint32_t list, uint64_t slots) {
-  return guest::LoadU8(base, list + 52) == 0 && Load(base, command_list::kOpenChunks) == 0 &&
-         Room(base, list, slots);
+  return schema::CommandList(base, list).chunk_open() == 0 &&
+         schema::CommandListGlobals::open_chunks(base) == 0 && Room(base, list, slots);
 }
 
 uint32_t Slot(uint8_t* base, uint32_t list) { return command_list::AllocateSlots(base, list, 1); }
@@ -135,11 +138,12 @@ std::optional<uint32_t> RecordPrimitiveReset(uint8_t* base) {
 
 bool JobWait(uint8_t* base, uint32_t job, const std::function<void(uint32_t object)>& wait) {
   ITC_NATIVE_RUNNING("sub_82094B10 Job::Wait");
-  if (guest::LoadU8(base, job + 18) == 0) {
+  const schema::WorkItem item(base, job);
+  if (item.posted() == 0) {
     return false;
   }
-  wait(Load(base, job + 20));
-  guest::StoreU8(base, job + 18, 0);
+  wait(item.waiter().address);
+  item.set_posted(0);
   return true;
 }
 

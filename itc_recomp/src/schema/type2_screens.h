@@ -527,7 +527,7 @@ struct BuildRecord : View {
   uint32_t car_build_address() const { return address + 48; }
 };
 
-// embedded; measure: PowerGraphScreen
+// embedded; measure: PowerGraphScreen, sub_821B8F60.r3
 struct SpecSheet : View {
   using View::View;
   static constexpr uint32_t kSize = 9616;

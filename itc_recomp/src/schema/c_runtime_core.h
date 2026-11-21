@@ -173,10 +173,10 @@ struct ExceptionRecord : View {
   uint32_t record() const { return guest::LoadU32(base, address + 8); }
   void set_record(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t record_address() const { return address + 8; }
-  // where it was raised
-  uint32_t address() const { return guest::LoadU32(base, address + 12); }
-  void set_address(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t address_address() const { return address + 12; }
+  // where it was raised (ExceptionAddress; not "address", which would hide View::address)
+  uint32_t exception_address() const { return guest::LoadU32(base, address + 12); }
+  void set_exception_address(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t exception_address_address() const { return address + 12; }
   // 3 for a C++ exception
   uint32_t parameter_count() const { return guest::LoadU32(base, address + 16); }
   void set_parameter_count(uint32_t v) const { guest::StoreU32(base, address + 16, v); }

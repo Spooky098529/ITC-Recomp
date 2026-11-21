@@ -8,6 +8,9 @@
 #include "guest.h"
 #include "location_screen/internal.h"
 #include "race_event/race_event.h"
+#include "schema/career.h"
+#include "schema/race_event.h"
+#include "schema/tuning_screen.h"
 #include "ui_movies/ui_movies.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -17,8 +20,11 @@ using namespace detail;
 
 namespace {
 
-// An item's record in the save data: save + kItemRecords + 12 id.
-uint32_t Record(uint32_t save, int32_t id) { return uint32_t(id) * 12 + save + kItemRecords; }
+// An item's record in the save data (+0x199F8 + 12 id).
+schema::CareerItemRecord Record(uint8_t* base, uint32_t save, int32_t id) {
+  return schema::CareerItemRecord(
+      base, schema::SaveData(base, save).item_records_address() + uint32_t(id) * 12);
+}
 
 // The picked opponent's item (RaceEvent::GroupItem of +804 and +800, +800
 // stored at the frame's +80) copied to `to`.
@@ -32,11 +38,10 @@ void CopyOpponent(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t lr
 
 // An item's state by its record: 0 none, 1 seen (+4 or +0 set), 2 won (+2).
 uint32_t ItemState(uint8_t* base, uint32_t save, int32_t id) {
-  if (int16_t(guest::LoadU16(base, Record(save, id) + 2)) != 0) {
+  if (int16_t(Record(base, save, id).wins()) != 0) {
     return 2;
   }
-  if (guest::LoadU16(base, Record(save, id) + 4) != 0 ||
-      guest::LoadU16(base, Record(save, id)) != 0) {
+  if (Record(base, save, id).outcome3() != 0 || Record(base, save, id).losses() != 0) {
     return 1;
   }
   return 0;
@@ -147,7 +152,7 @@ uint32_t ShowOpponentInfo(uint8_t* base, uint32_t sp, const Calls& calls) {
       if (owned == -1) {
         break;
       }
-      if (guest::LoadU16(base, Record(save, owned) + 2) == 0) {
+      if (Record(base, save, owned).wins() == 0) {
         SetTexture(base, movie, 12, 17, 1);
         break;
       }
@@ -161,12 +166,12 @@ uint32_t ShowOpponentInfo(uint8_t* base, uint32_t sp, const Calls& calls) {
     HideNode(base, movie, 12, 14);
     ShowNode(base, movie, 12, 15);
     child = ui_movies::Child(base, level_node, 0);
-    guest::StoreU32(base, child + 108, uint32_t(id - 310));
+    schema::UiMovieNode(base, child).set_texture_entry(uint32_t(id - 310));
   } else {
     ShowNode(base, movie, 12, 14);
     HideNode(base, movie, 12, 15);
     child = ui_movies::Child(base, name_node, 0);
-    guest::StoreU32(base, child + 108, uint32_t(category));
+    schema::UiMovieNode(base, child).set_texture_entry(uint32_t(category));
   }
   return child;
 }
@@ -211,7 +216,7 @@ uint32_t Transition12(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
                data_tables::Item(base, uint32_t(last)), 3008);
           found = true;
         }
-        if (guest::LoadU16(base, Record(save, last) + 2) == 0) {
+        if (Record(base, save, last).wins() == 0) {
           kind = 7;
           break;
         }
@@ -254,14 +259,14 @@ uint64_t ShowCard(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t has_card = HasCard(base, calls, frame, 0x8222BC70);
   for (uint32_t m = 0; m < 27; m++) {
     const uint32_t node = ui_movies::FindNode(base, movie, 2, m + 1);
-    guest::StoreU32(base, node + 80, 0);
+    schema::UiMovieNode(base, node).set_visible(0);
     for (uint32_t j = 0; j < 4; j++) {
-      guest::StoreU32(base, ui_movies::Child(base, node, j + 6) + 80, 0);
+      schema::UiMovieNode(base, ui_movies::Child(base, node, j + 6)).set_visible(0);
     }
     FinishNamed(calls, frame, 0x8222BCC4, movie, m);
   }
   for (uint32_t m = 0; m < 27; m++) {
-    guest::StoreU32(base, ui_movies::FindNode(base, movie, 3, m + 6) + 80, 0);
+    schema::UiMovieNode(base, ui_movies::FindNode(base, movie, 3, m + 6)).set_visible(0);
   }
   SetText(base, calls, frame, movie, 3, 55, 402);
   SetText(base, calls, frame, movie, 3, 56, 401);
@@ -284,7 +289,7 @@ uint64_t ShowCard(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   LoopLast(base, frame, movie);
   const uint32_t node = ui_movies::FindNode(base, movie, 2, first + 1);
-  guest::StoreU32(base, ui_movies::Child(base, node, row.child()) + 80, 1);
+  schema::UiMovieNode(base, ui_movies::Child(base, node, row.child())).set_visible(1);
   uint64_t r3 = 0;
   for (uint32_t m = 0; m < 12; m++) {
     r3 = calls.Call(kFinishNamed, frame, 0x8222BE4C, movie, 39 + m);

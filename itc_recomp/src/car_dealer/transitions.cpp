@@ -7,17 +7,18 @@
 #include "base/log.h"
 #include "car_dealer/internal.h"
 #include "guest.h"
+#include "schema/mode_tick.h"
+#include "schema/race_menu.h"
 #include "ui_movies/game.h"
 
 namespace car_dealer {
 
 namespace {
 
-// The screen fades' counts (mode-tick.md).
-constexpr uint32_t kFadeOutCount = 0x826A50E4;
-constexpr uint32_t kFadeInCount = 0x826A50DC;
-// ScreenFades::FadeOut's layer word.
-constexpr uint32_t kFadeOutLayer = 0x82001BF0;
+// The screen fades' counts are mode-tick.toml's; FadeOut's passes word
+// (0x82001BF0) race-menu.toml's.
+using Ticks = schema::ModeTickGlobals;
+using Fades = schema::RaceMenuGlobals;
 constexpr uint32_t kNone = 0xFFFFFFFFu;
 
 // The named animation calls on movie 4 (UiMovie::PlayNamed with r5, r6 to
@@ -54,11 +55,11 @@ uint64_t Transition3(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = FindMovie(base, 4, frame + 80);
   if (Load(base, step) == 0) {
-    calls.Call(kFadeOut, frame, 0x82181DC4, Load(base, kFadeOutLayer), 0, 0, 0);
+    calls.Call(kFadeOut, frame, 0x82181DC4, Fades::fade_out_passes(base), 0, 0, 0);
     Store(base, step, 1);
   }
   calls.Call(kRun, frame, 0x82181DD8, movie, 0);
-  return (Load(base, kFadeOutCount) | Load(base, kFadeInCount)) == 0 ? 1 : 0;
+  return (Ticks::fade_out_count_0(base) | Ticks::fade_in_count_0(base)) == 0 ? 1 : 0;
 }
 
 uint64_t Transition0(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
@@ -277,9 +278,9 @@ uint64_t Transition7(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
     const uint64_t selection = Selection(base, calls, frame, 0x82183E24);
     const uint64_t before =
         calls.Call(kListSelectionBefore, frame, 0x82183E30, G::list_menu(base).address);
-    const uint32_t list = G::list_menu(base).address;
-    const uint32_t scroll = Load(base, list + 4);
-    const int32_t moved = int32_t(scroll - Load(base, list + 8));
+    const MenuList list = G::list_menu(base);
+    const uint32_t scroll = list.scroll();
+    const int32_t moved = int32_t(scroll - list.scroll_before());
     Finish(calls, frame, 0x82183E50, movie, before + 24);
     Play(calls, frame, 0x82183E70, movie, selection + 24);
     Loop(calls, frame, 0x82183E7C, movie, selection + 24);
@@ -339,9 +340,9 @@ uint64_t Transition17(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
     const uint64_t selection = Selection(base, calls, frame, 0x8218405C);
     const uint64_t before =
         calls.Call(kListSelectionBefore, frame, 0x82184068, G::list_menu(base).address);
-    const uint32_t list = G::list_menu(base).address;
-    const uint32_t scroll = Load(base, list + 4);
-    const int32_t moved = int32_t(scroll - Load(base, list + 8));
+    const MenuList list = G::list_menu(base);
+    const uint32_t scroll = list.scroll();
+    const int32_t moved = int32_t(scroll - list.scroll_before());
     G::data(base).set_color_selection(uint32_t(selection));
     G::data(base).set_color_scroll(scroll);
     Finish(calls, frame, 0x8218409C, movie, before + 134);
@@ -350,10 +351,10 @@ uint64_t Transition17(uint8_t* base, uint32_t step, uint32_t sp, const Calls& ca
     Finish(calls, frame, 0x821840D4, movie, 143);
     Finish(calls, frame, 0x821840E0, movie, 144);
     calls.Call(kShowCarByIdWithClass, frame, 0x821840E8, uint64_t(scroll) + selection);
-    const uint32_t menu = G::list_menu(base).address;
-    if (Load(base, menu + 32) == 0) {
+    const MenuList menu = G::list_menu(base);
+    if (menu.wrapped() == 0) {
       // The move's arrow by its sign (none when 0).
-      const int32_t move = int32_t(Load(base, menu + 24));
+      const int32_t move = int32_t(menu.move());
       if (move > 0) {
         Play(calls, frame, 0x82184130, movie, 144);
       } else if (move < 0) {

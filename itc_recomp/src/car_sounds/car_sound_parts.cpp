@@ -14,7 +14,14 @@
 #include "c_runtime/math.h"
 #include "guest.h"
 #include "hooks/vehicle.h"
+#include "schema/camera_modes.h"
+#include "schema/car_physics.h"
 #include "schema/car_sounds.h"
+#include "schema/collision_world.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
+#include "schema/race_world.h"
+#include "schema/ai_drivers.h"
 #include "vehicle/vehicle.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -181,14 +188,14 @@ uint32_t HitImpact(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices&
                    uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210E778 HitSounds::Impact");
   const schema::CarSoundHits p(base, part);
-  if ((Load(base, vehicle + 6152) & 1) == 0) {
+  if ((schema::Vehicle(base, vehicle).collision_flags() & 1) == 0) {
     return part;
   }
   uint32_t level = 0;   // r29
   uint64_t wave = 0;    // r28
   double strength = LoadF(base, kZero);  // f31
   Store(base, frame + 80, 0);
-  uint32_t r3 = Load(base, vehicle + 340);
+  uint32_t r3 = schema::Vehicle(base, vehicle).collision_object();
   if (r3 != 0) {
     SetRegs(call, Args({r3, 0x00FFFFFF}));
     r3 = va::CollisionObjectFirstContact(base, r3, 0x00FFFFFF);
@@ -235,7 +242,7 @@ uint32_t HitScrape(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices&
                    uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210E938 HitSounds::Scrape");
   const schema::CarSoundHits p(base, part);
-  const uint32_t flags = Load(base, vehicle + 6152);
+  const uint32_t flags = schema::Vehicle(base, vehicle).collision_flags();
   if ((flags & 1) != 0 || (flags & 2) == 0) {
     // Out of contact: the looping voice (+56) stopped once it has played
     // more than two ticks since (+52).
@@ -253,7 +260,7 @@ uint32_t HitScrape(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices&
     return r3;
   }
   double amount = LoadF(base, kZero);  // f27
-  uint32_t r3 = Load(base, vehicle + 340);
+  uint32_t r3 = schema::Vehicle(base, vehicle).collision_object();
   if (r3 != 0) {
     SetRegs(call, Args({r3, 0xFF000000}));
     r3 = va::CollisionObjectFirstContact(base, r3, 0xFF000000);
@@ -308,7 +315,7 @@ uint32_t HitWave9(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices& 
                   uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210EB90 HitSounds::Wave9");
   const schema::CarSoundHits p(base, part);
-  if ((Load(base, vehicle + 6152) & 4) == 0) {
+  if ((schema::Vehicle(base, vehicle).collision_flags() & 4) == 0) {
     return part;
   }
   const uint32_t r3 =
@@ -348,16 +355,17 @@ uint32_t Part736Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t 
                        const Voices& voices, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210EBF0 CarSound::Part736Update");
   const schema::CarSoundGear p(base, part);
-  if (Load(base, vehicle + 2252) == 0) {
+  if (schema::Vehicle(base, vehicle).gear() == 0) {
     return part;
   }
-  if (guest::LoadU8(base, vehicle + 2948) != 0) {
-    const uint32_t specs = Load(base, vehicle + 5712);
+  if (schema::Vehicle(base, vehicle).wastegate_open() != 0) {
+    const schema::Car car(base, schema::Vehicle(base, vehicle).car());
     double scale;
-    if (guest::LoadU8(base, specs + 2019) == 1) {
+    // +2019: a byte inside the car's block 2 (no field of its own yet).
+    if (guest::LoadU8(base, car.address + 2019) == 1) {
       scale = LoadF(base, 0x82007FC8);
     } else {
-      const uint32_t kind = Load(base, specs + 1656);
+      const uint32_t kind = car.engine_stage();
       if (kind < 2) {
         scale = LoadF(base, 0x82007FD4);
       } else if (kind < 5) {
@@ -367,7 +375,7 @@ uint32_t Part736Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t 
       }
     }
     if (p.wait_ticks() == 0) {
-      const double f13 = Single(LoadF(base, vehicle + 2952) * scale);
+      const double f13 = Single(double(schema::Vehicle(base, vehicle).wastegate()) * scale);
       const uint32_t slot = Play(base, part, 4, 0, Single(f13 * LoadF(base, 0x82002C50)),
                                  LoadF(base, kPitch), voices, frame, call);
       p.set_slot(slot);
@@ -387,10 +395,10 @@ uint32_t Part840Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t 
   ITC_NATIVE_RUNNING("sub_8210ECF0 CarSound::Part840Update");
   const schema::CarSoundEvents p(base, part);
   const double pitch = LoadF(base, kPitch);
-  if (guest::LoadU8(base, vehicle + 2504) != 0) {
+  if (schema::Vehicle(base, vehicle).backfire() != 0) {
     Play(base, part, 6, 0, LoadF(base, kVolume), pitch, voices, frame, call);
   }
-  if (guest::LoadU8(base, vehicle + 2960) != 0 && p.wave18_wait() == 0) {
+  if (schema::Vehicle(base, vehicle).blow_off_open() != 0 && p.wave18_wait() == 0) {
     Play(base, part, 18, 0, LoadF(base, kVolume), pitch, voices, frame, call);
     p.set_wave18_wait(2);
   }
@@ -411,7 +419,7 @@ uint32_t Part888Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t 
   const double rest = LoadF(base, 0x82001BE0);  // f28
   const double step = LoadF(base, kOne);        // f29
   if (int32_t(p.playing()) == 0) {
-    if (guest::LoadU8(base, vehicle + 2424) != 0) {
+    if (schema::Vehicle(base, vehicle).nitrous_on() != 0) {
       if (double(p.fade_in()) == rest) {
         p.set_fade_in(float(LoadF(base, 0x82007FB8)));
       }
@@ -429,7 +437,7 @@ uint32_t Part888Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t 
     const double f13 = Single(double(p.fade_in()) * LoadF(base, 0x820029EC));
     const uint32_t voice = VoiceAt(base, part, p.slot());
     SetVolume(base, voice, Fmadds(f13, LoadF(base, 0x82007FD8), full), frame, call);
-    if (guest::LoadU8(base, vehicle + 2424) == 0 && double(p.fade_out()) == rest) {
+    if (schema::Vehicle(base, vehicle).nitrous_on() == 0 && double(p.fade_out()) == rest) {
       p.set_fade_out(float(LoadF(base, 0x820029D0)));
     }
   }
@@ -459,7 +467,7 @@ uint32_t WindSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
   // The four halfwords at the vehicle's +5410 (96 bytes apart), bit 0.
   bool any = false;
   for (uint32_t i = 0; i < 4; i++) {
-    if ((guest::LoadU16(base, vehicle + 5410 + 96 * i) & 1) != 0) {
+    if ((schema::TrackPosition(base, schema::Vehicle(base, vehicle).wheel_track_positions_address() + 96 * i).flags() & 1) != 0) {
       any = true;
       break;
     }
@@ -479,7 +487,7 @@ uint32_t WindSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
         if (f0 > one) {
           f0 = one;
         }
-        const uint32_t view_mode = Load(base, Load(base, Load(base, 0x826C2CE8)) + 1860);
+        const uint32_t view_mode = schema::CameraModesGlobals::viewports(base).first().view_mode();
         if (int32_t(view_mode) == 1) {
           scale = LoadF(base, 0x820021F4);
         }
@@ -502,7 +510,7 @@ uint32_t PassBySoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint6
   if (vehicle == 0) {
     return part;
   }
-  if ((Load(base, vehicle + 6148) & 0x81) == 0 && int32_t(passed) != 0) {
+  if ((schema::Vehicle(base, vehicle).car_flags() & 0x81) == 0 && int32_t(passed) != 0) {
     Play(base, part, 15, 0, LoadF(base, 0x82002A10), LoadF(base, kPitch), voices, frame, call);
   }
   return Update(base, part, output, frame, call);
@@ -707,7 +715,7 @@ uint32_t EngineSoundUpdate(uint8_t* base, uint32_t engine, uint32_t vehicle, uin
   constexpr uint32_t k = 0x82007FC8;  // r29
   double speed;                       // f30
   if (vehicle != 0) {
-    const double top = LoadF(base, Load(base, vehicle + 272) + 1280);
+    const double top = double(schema::Vehicle(base, vehicle).car_data().rev_limit());
     SetRegs(call, Args({vehicle}));
     const double value = double(va::VehicleFloat2224(base, vehicle));
     SetF1(call, value);
@@ -725,14 +733,14 @@ uint32_t EngineSoundUpdate(uint8_t* base, uint32_t engine, uint32_t vehicle, uin
   double load;                             // f31
   if (vehicle != 0) {
     double target;  // f12
-    if (guest::LoadU8(base, vehicle + 2248) != 0) {
+    if (schema::Vehicle(base, vehicle).unknown_2248() != 0) {
       target = zero;
-    } else if (LoadF(base, vehicle + 2268) > zero && int32_t(Load(base, vehicle + 2256)) != 0) {
+    } else if (double(schema::Vehicle(base, vehicle).shift_timer()) > zero && schema::Vehicle(base, vehicle).gear_previous() != 0) {
       target = zero;
-    } else if (int32_t(Load(base, vehicle + 2252)) == -1) {
-      target = LoadF(base, vehicle + 288);
+    } else if (schema::Vehicle(base, vehicle).gear() == -1) {
+      target = double(schema::Vehicle(base, vehicle).reverse_throttle());
     } else {
-      target = LoadF(base, vehicle + 284);
+      target = double(schema::Vehicle(base, vehicle).throttle());
     }
     const double last = double(e.load());
     load = Fmadds(Single(target - last), LoadF(base, 0x82002968), last);
@@ -887,7 +895,7 @@ uint32_t TireSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
   SetF1(call, slip);
   uint32_t grounded = 0;  // r9: the wheels whose +433 is set
   for (uint32_t i = 0; i < 4; i++) {
-    if (guest::LoadU8(base, vehicle + 433 + 368 * i) != 0) {
+    if (schema::VehicleWheel(base, schema::Vehicle(base, vehicle).wheels_address() + 368 * i).on_ground() != 0) {
       grounded++;
     }
   }
@@ -998,9 +1006,6 @@ uint32_t RollSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
 
 namespace {
 
-constexpr uint32_t kRaceData = 0x826C5B2C;     // the race data: its +0xA3AF4 the race mode
-constexpr uint32_t kRaceMode = 0xA3AF4;
-constexpr uint32_t kSideWord = 0x826C7824;     // 0 picks input record 1 in mode 8
 constexpr uint32_t kHornButton = 0x20000;      // the input word's bit (probably the horn)
 constexpr uint32_t kHornVolume = 0x82007FD8;
 constexpr uint32_t kHornPitchScale = 1600;     // SetPitchScaled's r9
@@ -1035,8 +1040,8 @@ uint64_t Fctiwz64(double value) {
 void HornUpdate(uint8_t* base, uint32_t part, uint32_t record, uint32_t horn, uint32_t flag_at,
                 uint32_t slot_at, double volume, double pitch, double f3, const Voices& voices,
                 uint32_t frame, const GuestCall& call) {
-  for (uint32_t i = 0; i < schema::CarInputRecord::kSize; i += 4) {
-    Store(base, frame + 80 + i, Load(base, schema::CarInputRecord(base, record).address + i));
+  for (uint32_t i = 0; i < schema::CarInput::kSize; i += 4) {
+    Store(base, frame + 80 + i, Load(base, schema::CarInput(base, record).address + i));
   }
   const uint32_t flag = Load(base, flag_at);
   if ((Load(base, frame + 80) & kHornButton) != 0) {
@@ -1070,13 +1075,13 @@ uint32_t HornSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
   if (vehicle == 0) {
     return part;
   }
-  const uint32_t mode = Load(base, Load(base, kRaceData) + kRaceMode);
-  const uint32_t horn = Load(base, Load(base, vehicle + 5712) + 1796) & 0xFF;
+  const uint32_t mode = schema::RaceStatesGlobals::race_data(base).race_mode();
+  const uint32_t horn = schema::Car(base, schema::Vehicle(base, vehicle).car()).exterior_item_3() & 0xFF;
   if (int32_t(mode) == 8) {
     const double pitch = LoadF(base, kPitch);       // f31
     const double volume = LoadF(base, kHornVolume);  // f28
-    const uint32_t side = Load(base, kSideWord) == 0 ? 1 : 0;  // r30
-    const uint32_t flags = Load(base, vehicle + 6148);
+    const uint32_t side = schema::RaceWorldGlobals::human_flag(base) == 0 ? 1 : 0;  // r30: 0 picks input record 1 in mode 8
+    const uint32_t flags = schema::Vehicle(base, vehicle).car_flags();
     const bool first = (flags & 1) != 0, second = (flags & 0x80) != 0;
     if (side == 0 ? first : second) {
       HornUpdate(base, part, Load(base, G::input_records_address() + 4 * side), horn,
@@ -1098,7 +1103,7 @@ uint32_t TurboSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64
                           const Voices& voices, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8210F4E8 TurboSound::Update");
   const schema::CarSoundTurbo p(base, part);
-  const double boost = LoadF(base, vehicle + 2944);  // f30
+  const double boost = double(schema::Vehicle(base, vehicle).boost());  // f30
   // The volume +60 up by +59 x [0x82008068], at most [0x82008064] (the
   // byte through the frame's +80).
   {
@@ -1221,7 +1226,7 @@ uint64_t CarSoundUpdate(uint8_t* base, uint64_t sound64, const Update3DSaves& s,
   }
   // r29: the vehicle's +6148 has bit 0x1 or 0x80 (the players' cars,
   // probably).
-  const uint64_t players = (Load(base, vehicle + 6148) & 0x81) != 0 ? 1 : 0;
+  const uint64_t players = (schema::Vehicle(base, vehicle).car_flags() & 0x81) != 0 ? 1 : 0;
   Update3DSaves saves = s;
   saves.lr = kUpdate3DReturn;
   saves.r29 = players;
@@ -1243,7 +1248,7 @@ uint64_t CarSoundUpdate(uint8_t* base, uint64_t sound64, const Update3DSaves& s,
   // half-word +5314 bit 1 (+0 the state: 1 inside, 0 outside).
   if (players != 0) {
     const uint32_t state = cs.tunnel_reverb();
-    const bool inside = (guest::LoadU16(base, cs.vehicle<schema::View>().address + 5314) & 2) != 0;
+    const bool inside = (schema::TrackPosition(base, cs.vehicle().own_track_position_address()).flags() & 2) != 0;
     if (state == 0) {
       if (inside) {
         r3 = SetReverb(base, G::reverb_tunnel_address(), 80, frame, call);

@@ -33,17 +33,13 @@ struct Calls {
 constexpr uint32_t kNextModeFrame = 112;
 constexpr uint32_t kModeAfterRaceFrame = 144;
 
-// The race data's ([0x826C5B2C], schema::RaceEndGlobals::race_data) words:
-// the flags (0x8 an event race, 0x10 a rival race, 0x8000 and 0x10000 the
-// race mode's +32 slot 0's hold), the kind of race and the race mode.
-constexpr uint32_t kFlags = 0x59AE4;
-constexpr uint32_t kKind = 0xA3AF0;
-constexpr uint32_t kRaceMode = 0xA3AF4;
-// The save data's words: the unlocks to show (the table-0 list's count) and
-// the stage whose movies were shown.
-constexpr uint32_t kUnlocksShown = 0x1CA78;
-constexpr uint32_t kStageShown = 0x1D524;
-// The globals (the title's flag, the session, the fades' passes, the boot
+// The race data ([0x826C5B2C], schema::RaceEndGlobals::race_data) is
+// race-states.toml's schema::RaceData (its flags: 0x8 an event race, 0x10 a
+// rival race, 0x8000 and 0x10000 the race mode's +32 slot 0's hold; the
+// kind of race; the race mode), the save data race-event.toml's
+// schema::SaveData (the unlocks to show, the stage whose movies were shown,
+// the day), the 8-byte answer boot-mode.toml's schema::ModeAnswer. The
+// globals (the title's flag, the session, the fades' passes, the boot
 // movies' table) are schema::RaceEndGlobals (schema/race_end.h), the race
 // mode's words schema::RaceMode (schema/game_modes.h).
 

@@ -8,6 +8,7 @@
 #include "debug/pause_menu_log.h"
 #include "guest.h"
 #include "schema/menu_helpers.h"
+#include "schema/racer_controllers.h"
 
 namespace menu_helpers {
 
@@ -16,6 +17,14 @@ namespace {
 int32_t S(uint32_t value) { return int32_t(value); }
 
 using Menu = schema::FrontEndMenu;
+using Entry = schema::PlayerMapperEntry;
+
+// The player's mapper entry: [kControllerEntries + 4 * player]'s index into
+// the 8-byte entries at kMapperEntries.
+uint32_t EntryOf(uint8_t* base, uint32_t player) {
+  const uint32_t index = guest::LoadU32(base, player * 4 + kControllerEntries);
+  return index * Entry::kSize + kMapperEntries;
+}
 
 // The mapper's read slot at `offset` in its vtable on `action`, as the
 // original's bctrl from `frame` returning to `lr`: ActionMapper::Pressed's
@@ -40,10 +49,11 @@ uint64_t ReadSlot(uint8_t* base, uint32_t mapper, uint32_t offset, uint64_t acti
 // +4 and +0 are read again on every try, as the original does.
 bool Try(uint8_t* base, uint32_t entry, uint32_t offset, uint64_t action, uint32_t frame,
          uint32_t lr, bool native_slots, const Calls& calls) {
-  if (S(guest::LoadU32(base, entry + 4)) == 1) {
+  const Entry e(base, entry);
+  if (S(e.unread()) == 1) {
     return false;
   }
-  const uint32_t mapper = guest::LoadU32(base, entry);
+  const uint32_t mapper = e.mapper<schema::View>().address;
   return (ReadSlot(base, mapper, offset, action, frame, lr, native_slots, calls) & 0xFF) != 0;
 }
 
@@ -71,10 +81,9 @@ uint32_t Step(uint8_t* base, uint32_t menu, uint32_t sp, bool native_slots, cons
   const uint32_t player = m.player();
   const uint32_t cursor = m.cursor();
   const uint32_t locked = m.up_down_locked();
-  const uint32_t index = guest::LoadU32(base, player * 4 + kControllerEntries);
+  const uint32_t entry = EntryOf(base, player);
   m.set_previous(cursor);
   m.set_side(0);
-  const uint32_t entry = index * 8 + kMapperEntries;
 
   // (1) Up and down (and the side asked), the first fired wins.
   if (locked == 0) {
@@ -188,8 +197,7 @@ uint32_t Pressed(uint8_t* base, uint32_t menu, uint64_t action, uint32_t sp, boo
     return 0;
   }
   const uint32_t player = m.player();
-  const uint32_t index = guest::LoadU32(base, player * 4 + kControllerEntries);
-  const uint32_t entry = index * 8 + kMapperEntries;
+  const uint32_t entry = EntryOf(base, player);
   return Try(base, entry, kPressedOffset, action, frame, 0x82186540, native_slots, calls) ? 1 : 0;
 }
 

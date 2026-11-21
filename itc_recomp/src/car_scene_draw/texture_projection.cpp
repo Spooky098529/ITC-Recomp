@@ -16,6 +16,7 @@
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/cameras.h"
 #include "schema/car_scene_draw.h"
 
 #include <cstdlib>
@@ -28,6 +29,7 @@ using namespace ops;
 
 using G = schema::CarSceneDrawGlobals;
 using Point = schema::CarScenePoint;
+using CameraPass = schema::CameraPass;
 
 constexpr uint32_t kFitFrame = 1248;
 // The frame's objects: the std::vector of points, its box and the frustum.
@@ -160,7 +162,7 @@ void CrossingSpread(uint8_t* base, uint32_t sp, uint32_t plane, uint32_t length,
 }  // namespace
 
 bool TextureProjectionFitDeclines(uint8_t* base, uint32_t pass) {
-  return PerspectiveDeclines(base, Lfs(base, pass + 368));
+  return PerspectiveDeclines(base, Lfs(base, CameraPass(base, pass).field_of_view_address()));
 }
 
 bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t direction,
@@ -179,11 +181,11 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
   const simde__m128 dir = VNormalized(dir_in, VDot3(dir_in, dir_in));
   Stvx(base, sp + 336, dir);
   // The pass's view (+560) and projection (+656).
-  Copy64(base, sp + 560, pass + 16);
-  Copy64(base, sp + 656, pass + 80);
+  Copy64(base, sp + 560, CameraPass(base, pass).view_address());
+  Copy64(base, sp + 656, CameraPass(base, pass).projection_address());
   // Its near and far ordered, the far cut to far_cut.
-  double far_plane = Lfs(base, pass + 388);   // f20
-  double near_plane = Lfs(base, pass + 384);  // f25
+  double far_plane = Lfs(base, CameraPass(base, pass).far_address());   // f20
+  double near_plane = Lfs(base, CameraPass(base, pass).near_address());  // f25
   if (far_plane < near_plane) {
     const double swapped = far_plane;
     far_plane = near_plane;
@@ -193,9 +195,9 @@ bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t d
     far_plane = far_cut;
   }
   {
-    const double width = Lfs(base, pass + 376);
-    const double height = Lfs(base, pass + 380);
-    const double fov = Lfs(base, pass + 368);
+    const double width = Lfs(base, CameraPass(base, pass).width_address());
+    const double height = Lfs(base, CameraPass(base, pass).height_address());
+    const double fov = Lfs(base, CameraPass(base, pass).field_of_view_address());
     Perspective(base, sp + 656, fov, Fdivs(width, height), near_plane, far_plane, sp);
   }
   // The std::vector of 16-byte points at +128, empty.

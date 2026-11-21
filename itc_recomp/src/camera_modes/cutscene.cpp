@@ -19,6 +19,11 @@
 #include "track_collision/track_collision.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 #include "schema/camera_modes.h"
+#include "schema/minimap.h"
+#include "schema/race_event.h"
+#include "schema/race_states.h"
+#include "schema/race_world.h"
+#include "schema/video_output.h"
 
 #include <algorithm>
 #include <iterator>
@@ -150,7 +155,7 @@ uint32_t CutsceneConstruct(uint8_t* base, uint32_t cutscene, uint32_t viewport, 
   // f + 768 as the original's conversion does), Camera::ZoomFromFov.
   const uint32_t video = calls.video_output(f, 0x82156D74);
   const double degrees = Lfs(base, kDegrees);
-  const int32_t width = int32_t(Load(base, video + 296));
+  const int32_t width = int32_t(schema::VideoOutput(base, video).display_width());
   guest::StoreU32(base, f + 768, uint32_t(uint64_t(int64_t(width)) >> 32));
   guest::StoreU32(base, f + 772, uint32_t(int64_t(width)));
   const double zoom = ZoomFromFov(base, degrees, Single(double(int64_t(width)))).value();
@@ -186,10 +191,11 @@ uint32_t CutsceneConstruct(uint8_t* base, uint32_t cutscene, uint32_t viewport, 
   Store(base, f + 764, 0xFFFFFFFFu);
   Store(base, f + kCutsceneRecordCount, r19);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t stages = G::race_data(base) + 0x59620;
+  const schema::RaceData race(base, G::race_data(base));
+  const uint32_t stages = race.stages_address();
   Store(base, f + 720, career::StageOf(base, save));
   {
-    const uint32_t stage = Load(base, stages + 804);
+    const uint32_t stage = race.current_stage();
     if (!vehicle_accessors::StagesCopy(base, f + 1392, stages, stage)) {
       calls.stages_copy(f + 1392, stages, stage);
     }
@@ -200,27 +206,27 @@ uint32_t CutsceneConstruct(uint8_t* base, uint32_t cutscene, uint32_t viewport, 
   for (int32_t s = 0; s < int32_t(Load(base, f + 1468)); s++) {
     const uint32_t racer = Load(base, f + 1436 + 8 * uint32_t(s));
     const uint32_t record = uint32_t(uint64_t(racer) * 3936) + G::race_data(base);
-    if (((Load(base, record + 3936) >> 1) & 1) == 0) {
+    if (((schema::RaceData(base, record).record0_flags() >> 1) & 1) == 0) {
       continue;
     }
     // The racers' manager's racer with the same id: its vehicle and flag.
     uint32_t r20 = 0;
     bool flagged = false;
     for (int32_t n = 0; n < int32_t(track_collision::RaceRacerCount(base)); n++) {
-      const uint32_t entry = Load(base, Load(base, kRacersManager) + 2308 + 4 * uint32_t(n));
-      if (int32_t(racer) == int32_t(Load(base, entry + 24))) {
-        r20 = vehicle_accessors::VehicleGet(base, Load(base, entry + 20));
-        flagged = (Load(base, entry + 0) & 0x400) != 0;
+      const uint32_t entry = Load(base, schema::RaceManager(base, Load(base, kRacersManager)).racers_address() + 4 * uint32_t(n));
+      if (int32_t(racer) == int32_t(schema::MinimapRacerEntry(base, entry).record())) {
+        r20 = vehicle_accessors::VehicleGet(base, schema::MinimapRacerEntry(base, entry).vehicle_index());
+        flagged = (schema::MinimapRacerEntry(base, entry).flags() & 0x400) != 0;
         break;
       }
     }
     // Its item: byte +35 and halfword +88 (-1 without one).
-    const uint32_t id = Load(base, record + 3960);
+    const uint32_t id = schema::RaceData(base, record).record0_racer_id();
     uint32_t r21 = 0xFFFFFFFFu, r24 = 0xFFFFFFFFu;
     if (int32_t(id) >= 0) {
       const uint32_t item = data_tables::Item(base, id);
-      r21 = guest::LoadU8(base, item + 35);
-      r24 = guest::LoadU16(base, item + 88);
+      r21 = schema::OpponentItem(base, item).kind();
+      r24 = schema::OpponentItem(base, item).race_kind();
     }
     // Appended (each index from the count as the original reads it).
     const uint16_t r10 = uint16_t(id);

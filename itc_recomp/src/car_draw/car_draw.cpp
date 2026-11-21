@@ -11,6 +11,10 @@
 #include "models/model.h"
 #include "native/buffers.h"
 #include "schema/car_draw.h"
+#include "schema/frame_driver.h"
+#include "schema/models.h"
+#include "schema/race_states.h"
+#include "schema/race_update.h"
 #include "track_zones/track_zones.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -24,7 +28,7 @@ namespace {
 
 namespace sl = scenery_lists;
 
-constexpr uint32_t kRecordList = 0x8296B918;
+constexpr uint32_t kRecordList = schema::FrameDriverGlobals::scene_list_address();
 using G = schema::CarDrawGlobals;
 
 constexpr uint32_t kOne = 0x82000A30;   // 1.0
@@ -84,7 +88,7 @@ std::optional<Draw> ModelDraw(uint8_t* base, const Calls& calls, uint32_t stack,
   }
   const uint32_t frame = Frame(base, stack, kModelDrawFrame);
   Draw draw;
-  if (guest::LoadU32(base, model + 28) == 0) {
+  if (schema::Model(base, model).header().address == 0) {
     draw.r3 = model;
     return draw;
   }
@@ -216,10 +220,6 @@ std::optional<Draw> CarPartDraw(uint8_t* base, const Calls& calls, uint32_t stac
 uint32_t SceneModelIsNearPlayerHeight(uint8_t* base, const Calls& calls, uint32_t stack,
                                       uint32_t pass, uint32_t position) {
   ITC_NATIVE_RUNNING("sub_820DAB58 SceneModel::IsNearPlayerHeight");
-  constexpr uint32_t kRaceData = 0x826C5B2C;
-  constexpr uint32_t kRaceKind = 0xA3AF0;
-  constexpr uint32_t kRaceWord = 0x59614;
-  constexpr uint32_t kSecondPlayer = 0x826C7824;
   constexpr uint32_t kHeightApart = 0x82002DF4;
   const uint32_t frame = Frame(base, stack, kNearPlayerHeightFrame);
   if (vehicle_accessors::VehicleGet(base, 0) == 0) {
@@ -232,10 +232,9 @@ uint32_t SceneModelIsNearPlayerHeight(uint8_t* base, const Calls& calls, uint32_
   } else if (index >= 4) {
     return 1;
   } else {
-    const uint32_t race = guest::LoadU32(base, kRaceData);
-    if (int32_t(guest::LoadU32(base, race + kRaceKind)) == 6 &&
-        int32_t(guest::LoadU32(base, race + kRaceWord)) == 2) {
-      player = guest::LoadU32(base, kSecondPlayer) == 0 ? 1 : 0;
+    const schema::RaceData race = schema::RaceStatesGlobals::race_data(base);
+    if (int32_t(race.kind()) == 6 && int32_t(race.added_count()) == 2) {
+      player = schema::RaceUpdateGlobals::followed(base) == 0 ? 1 : 0;
     }
   }
   const uint32_t vehicle = track_zones::RacersVehicle(base, player);

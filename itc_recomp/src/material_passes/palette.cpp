@@ -16,6 +16,7 @@
 #include "base/log.h"
 #include "camera_modes/steps.h"
 #include "guest.h"
+#include "schema/car_draw.h"
 #include "schema/material_passes.h"
 
 namespace material_passes {
@@ -26,7 +27,6 @@ namespace {
 
 using G = schema::MaterialPassesGlobals;
 
-constexpr uint32_t kScene = 0x826C2E44;    // the scene's pointer
 constexpr uint32_t kFrameBytes = 1184;
 
 // The float constants in .rdata the palette is built from, named by value.
@@ -135,7 +135,7 @@ std::optional<uint64_t> PaintPaletteInit(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820D2330 PaintPalette::Init");
   const uint32_t frame = sp - kFrameBytes;
   guest::StoreU32(base, frame, sp);  // the back chain, as stwu
-  const uint32_t scene = guest::LoadU32(base, kScene);
+  const uint32_t scene = schema::CarDrawGlobals::scene(base).address;
   guest::StoreU32(base, frame + 24, scene);
   if (scene == 0) {
     return std::nullopt;
@@ -147,7 +147,7 @@ std::optional<uint64_t> PaintPaletteInit(uint8_t* base, uint32_t sp) {
       Move(base, frame + local.offset, local.constant);
     }
   }
-  const bool set = int32_t(guest::LoadU32(base, scene + 4)) != 0;
+  const bool set = int32_t(schema::CarScene(base, scene).model_set()) != 0;
   for (uint32_t e = 0; e < 16; e++) {
     const Entry& entry = kEntries[e];
     const schema::PaintPaletteEntry at(base, G::paint_palette_address() + 64 * e);

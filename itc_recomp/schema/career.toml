@@ -22,7 +22,8 @@
 
 # A player's save data, as the career reads it.
 [CareerSave]
-measures = ["Career", "Progress", "Garage", "Items", "ItemRecords", "memcpy_825A7410.ret"]
+measures = ["Career", "Progress", "Garage", "Items", "ItemRecords", "memcpy_825A7410.ret",
+            "PlayTime"]
 size = 129400
 origin = "allocated"
 fields = [
@@ -93,6 +94,7 @@ fields = [
 # The stats record: the save data's +48.
 [CareerStats]
 measure = "Stats"
+measures = ["PlayTime::Add.r4"]
 size = 6040
 origin = "embedded"
 fields = [
@@ -148,6 +150,7 @@ fields = [
   { name = "save_best_16", offset = 6044, type = "u32", note = "measure fault: the save data's +6044 (stats +5996)" },
   { name = "save_kind5_won", offset = 6048, type = "u32", note = "measure fault: the save data's +6048" },
   { name = "save_mode", offset = 6104, type = "u32", note = "measure fault: the save data's +6104 (the mode)" },
+  { name = "fault_6040", offset = 6040, type = "u32", note = "measure fault: PlayTime::Add's load and store here are the save data's +6088 mark (save-interface's report), joined with the stats" },
 ]
 
 # A 24-byte counter (the stats record's +0 and +4924), the day block (stats
@@ -379,4 +382,4 @@ scale_788 = { address = 0x820082A0, type = "f32", note = "Stats::AddRaceResult's
 scale_828 = { address = 0x820029D8, type = "f32", note = "Stats::AddRaceResult's scale of the result's +828 (not read)" }
 day_log_scale = { address = 0x82001FBC, type = "f32", note = "DayLog::SumRaces' scale" }
 play_time_frames = { address = 0x826C5B90, type = "u32", note = "the play time's frame counter (PlayTime::Add)" }
-race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (race-states.toml)" }

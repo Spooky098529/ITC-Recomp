@@ -21,6 +21,7 @@
 #include "matrix_math/matrix_math.h"
 #include "race_event/race_event.h"
 #include "race_setup/race_setup.h"
+#include "schema/car_draw.h"
 
 #include <bit>
 
@@ -82,7 +83,8 @@ bool PoseCar(uint8_t* base, uint32_t sp, uint32_t model, uint32_t index, const C
   const uint32_t item =
       race_event::GroupItem(base, event, Screen(base).group_kind(), index);
   Copy(base, calls, frame, 0x822285DC, frame + 6240, item, 3008);
-  guest::StoreU32(base, model + 732, 1);
+  const schema::CarDrawBlock block(base, model);
+  block.set_no_side_offset(1);
   StoreIdentity(base, frame + 96);
   Copy64(base, frame + 416, frame + 96);
   // The car at +2336 from the item's build (+160), its data at +480.
@@ -125,7 +127,7 @@ bool PoseCar(uint8_t* base, uint32_t sp, uint32_t model, uint32_t index, const C
   const double zero = Lfs(base, 0x82000A34);
   Stfs(base, frame + 208, zero);
   Stfs(base, frame + 216, zero);
-  const uint32_t matrix = model + 16;
+  const uint32_t matrix = block.world_address();
   Multiply(base, matrix, frame + 160, matrix, 0x82228768);
   StoreIdentity(base, frame + 96);
   Copy64(base, frame + 352, frame + 96);
@@ -143,8 +145,8 @@ bool PoseCar(uint8_t* base, uint32_t sp, uint32_t model, uint32_t index, const C
   for (uint32_t r26 = 0; r26 < 2; r26++) {
     for (uint32_t r30 = 0; r30 < 2; r30++) {
       const uint32_t k = r30 + 2 * r26;
-      const uint32_t turn = model + 64 * k + 336;
-      const uint32_t place = model + 64 * k + 80;
+      const uint32_t turn = block.wheel_s0_address() + 64 * k;
+      const uint32_t place = block.wheel_r0_address() + 64 * k;
       StoreIdentity(base, frame + 96);
       Copy(base, calls, frame, 0x82228878, turn, frame + 96, 64);
       StoreIdentity(base, frame + 224);
@@ -186,7 +188,8 @@ bool PoseCar(uint8_t* base, uint32_t sp, uint32_t model, uint32_t index, const C
   }
   Stfs(base, frame + 84, f30);
   for (uint32_t k = 0; k < 4; k++) {
-    mm::RotateZ(base, model + 80 + 64 * k, model + 80 + 64 * k, frame + 84, frame - 80);
+    const uint32_t place = block.wheel_r0_address() + 64 * k;
+    mm::RotateZ(base, place, place, frame + 84, frame - 80);
   }
   return true;
 }

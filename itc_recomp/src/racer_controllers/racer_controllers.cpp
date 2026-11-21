@@ -13,8 +13,17 @@
 #include "memory/c_runtime_heap.h"
 #include "hooks/heap.h"
 #include "memory/heap.h"
+#include "schema/action_mappers.h"
+#include "schema/ai_drivers.h"
+#include "schema/car_physics.h"
 #include "schema/game_modes.h"
+#include "schema/minimap.h"
+#include "schema/race_event.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
+#include "schema/race_world.h"
 #include "schema/racer_controllers.h"
+#include "schema/vehicle_accessors.h"
 #include "track_collision/track_collision.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -37,8 +46,8 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
 // The current stage's word +0 (the stage the race data's list +804 names),
 // as Stages::Copy's copy of it holds it.
 uint32_t CurrentStageWord0(uint8_t* base, uint32_t race) {
-  const uint32_t stages = race + kStages;
-  return Load(base, stages + 80 * Load(base, stages + 804));
+  const schema::Stages stages(base, schema::RaceData(base, race).stages_address());
+  return schema::RaceStage(base, stages.address + 80 * stages.current()).type();
 }
 
 }  // namespace
@@ -131,12 +140,12 @@ bool OnSetUp(uint8_t* base, uint32_t flow, uint32_t* r3) {
   const uint32_t race = Globals::race_data(base);
   const uint32_t stage_word = CurrentStageWord0(base, race);
   const uint32_t type23 =
-      vehicle_accessors::StagesIsType2Or3(base, Globals::race_data(base) + kStages, 0xFFFFFFFFu);
+      vehicle_accessors::StagesIsType2Or3(base, schema::RaceData(base, Globals::race_data(base)).stages_address(), 0xFFFFFFFFu);
   *r3 = type23;
   if (type23 != 0) {
     return true;
   }
-  if (int32_t(Load(base, Globals::race_data(base) + kMode)) == 6 && int32_t(stage_word) != 1) {
+  if (int32_t(schema::RaceData(base, Globals::race_data(base)).kind()) == 6 && int32_t(stage_word) != 1) {
     return true;
   }
   const schema::RaceFlow race_flow(base, flow);
@@ -159,9 +168,10 @@ void Copy20(uint8_t* base, uint32_t to, uint32_t from) {
   }
 }
 
-// The racers' index word (+20) of the race's i-th racer record.
-uint32_t RacerWord(uint8_t* base, uint32_t i, uint32_t offset) {
-  return Load(base, Load(base, Globals::race(base) + 2308 + 4 * i) + offset);
+// The racers' manager's i-th racer entry (its +2308 list).
+schema::MinimapRacerEntry RacerEntry(uint8_t* base, uint32_t i) {
+  return schema::MinimapRacerEntry(
+      base, Load(base, schema::RaceManager(base, Globals::race(base)).racers_address() + 4 * i));
 }
 
 }  // namespace
@@ -172,7 +182,7 @@ void DriveByAi(uint8_t* base, uint32_t index, uint32_t hold, uint32_t sp, const 
   const uint32_t frame = sp - 160;
   const uint32_t record = frame + 112;
   Store(base, frame, sp);  // the frame's back chain, for the call
-  if ((Load(base, Globals::race_data(base) + kFlags) & 0x100) != 0) {
+  if ((schema::RaceData(base, Globals::race_data(base)).flags() & 0x100) != 0) {
     return;
   }
   calls.drive_car(calls.user, record, index, hold, frame, 0x8215F9A8);
@@ -186,7 +196,7 @@ uint32_t HoldAll(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = sp - 112;
   for (int32_t i = 0; i < int32_t(track_collision::RaceRacerCount(base)); i++) {
     uint64_t r3 = 0;
-    DriveByAi(base, RacerWord(base, uint32_t(i), 20), 1, frame, calls, &r3);
+    DriveByAi(base, RacerEntry(base, uint32_t(i)).vehicle_index(), 1, frame, calls, &r3);
   }
   return 1;
 }
@@ -196,7 +206,7 @@ uint32_t ClearAllRecords(uint8_t* base, uint32_t sp) {
   const uint32_t record = sp - 144 + 80;
   ai_drivers::ClearCarInput(base, record);
   for (int32_t i = 0; i < int32_t(track_collision::RaceRacerCount(base)); i++) {
-    Copy20(base, InputOf(base, RacerWord(base, uint32_t(i), 20)), record);
+    Copy20(base, InputOf(base, RacerEntry(base, uint32_t(i)).vehicle_index()), record);
   }
   return 1;
 }
@@ -210,9 +220,9 @@ uint32_t OnState16(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8215FB90 RaceFlow::OnState16");
   const uint32_t frame = sp - 208;
   const uint32_t stage_word = CurrentStageWord0(base, Globals::race_data(base));
-  if (vehicle_accessors::StagesIsType2Or3(base, Globals::race_data(base) + kStages, 0xFFFFFFFFu) ==
+  if (vehicle_accessors::StagesIsType2Or3(base, schema::RaceData(base, Globals::race_data(base)).stages_address(), 0xFFFFFFFFu) ==
           0 &&
-      (int32_t(Load(base, Globals::race_data(base) + kMode)) != 6 || int32_t(stage_word) == 1)) {
+      (int32_t(schema::RaceData(base, Globals::race_data(base)).kind()) != 6 || int32_t(stage_word) == 1)) {
     return HoldAll(base, frame, calls);
   }
   return ClearAllRecords(base, frame);
@@ -370,7 +380,7 @@ uint64_t FindPad(uint8_t* base, uint32_t entry, uint32_t sp, uint32_t frame_byte
   const uint32_t mapper = schema::PlayerMapperEntry(base, entry).mapper<schema::View>().address;
   const uint32_t manager = Globals::input_manager(base);
   Store(base, frame, sp);
-  Store(base, frame + 80, Load(base, mapper + 2888));
+  Store(base, frame + 80, schema::ActionMapper(base, mapper).player());
   const uint64_t object = calls.call(calls.user, Load(base, Load(base, manager) + 36), manager, 0,
                                      false, frame, lr9, nullptr);
   return calls.call(calls.user, Load(base, Load(base, uint32_t(object)) + 20), object,
@@ -398,7 +408,7 @@ namespace {
 // The settings bytes (+0x1F880 + 3 x player) and control map (+0x1F888 +
 // 120 x player) of the save data's player 0 (SaveData::Of(0)).
 uint32_t Settings(uint8_t* base, uint32_t player) {
-  return vehicle_accessors::SaveDataOf(base, 0) + 3 * player + 0x1F880;
+  return schema::SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).setting_0_address() + 3 * player;
 }
 uint32_t ControlMap(uint8_t* base, uint32_t player) {
   return vehicle_accessors::SaveDataOf(base, 0) + 120 * player + 0x1F888;
@@ -432,7 +442,8 @@ int32_t Pedal(uint8_t* base, uint32_t word) {
 }
 
 void OrFlags(uint8_t* base, uint32_t record, uint32_t bits) {
-  Store(base, record, Load(base, record) | bits);
+  const schema::CarInput input(base, record);
+  input.set_flags(input.flags() | bits);
 }
 
 // The pause: flags 0x1000, message 30 for player 1, then 29.
@@ -485,13 +496,14 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
   Store(base, button, 0);
   Store(base, word, 0);
   ai_drivers::ClearCarInput(base, record);
+  const schema::CarInput input(base, record);
   Regs regs{0, 0, false};
   const auto control = [&](uint32_t which, uint32_t kind, uint32_t out) {
     return Control(base, player, which, kind, out, frame, calls, &regs);
   };
   const uint32_t race = Globals::race_data(base);
   const bool by_stage =
-      int32_t(Load(base, race + kMode)) == 6 && int32_t(CurrentStageWord0(base, race)) != 1;
+      int32_t(schema::RaceData(base, race).kind()) == 6 && int32_t(CurrentStageWord0(base, race)) != 1;
   if (!by_stage && (PadIsConnected(base, entry, frame, calls) == 0 ||
                     int32_t(Globals::pad_blocked0(base)) != 0 ||
                     int32_t(Globals::pad_blocked1(base)) != 0)) {
@@ -502,22 +514,22 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
   }
   if (PadIsWheel(base, entry, frame, calls) != 0) {
     map += 60;
-    guest::StoreU8(base, record + 17, 1);
+    input.set_kind(1);
   }
   // The throttle (+4).
   uint32_t answer = control(Load(base, map + 4), 3, word);
   OrFlags(base, record, answer != 0 ? 0x08000000 : 0x04000000);
   int32_t v = Pedal(base, word);
-  guest::StoreU16(base, record + 4, uint16_t(v));
+  input.set_throttle(uint16_t(v));
   if (int16_t(v) != 0) {
     OrFlags(base, record, 0x4);
   }
-  guest::StoreU8(base, record + 14, guest::LoadU8(base, settings + 1));
+  input.set_throttle_rate(guest::LoadU8(base, settings + 1));
   // The brake (+6), then the reverse and the speed's checks.
   answer = control(Load(base, map + 8), 3, word);
   OrFlags(base, record, answer != 0 ? 0x20000000 : 0x10000000);
   const int16_t brake = int16_t(Pedal(base, word));
-  guest::StoreU16(base, record + 6, uint16_t(brake));
+  input.set_brake(uint16_t(brake));
   bool have_speed = false;
   double speed = 0;
   const auto fast = [&]() {
@@ -526,28 +538,28 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
     return !(speed < double(Globals::one(base)));
   };
   const auto reverse = [&]() {
-    const uint32_t flags = Load(base, record);
-    guest::StoreU16(base, record + 6, 0);
-    Store(base, record, flags | 0x200);
+    const uint32_t flags = input.flags();
+    input.set_brake(0);
+    input.set_flags(flags | 0x200);
   };
-  if (int32_t(Load(base, vehicle + 2252)) == -1) {
-    if (guest::LoadU16(base, record + 4) != 0) {
+  if (schema::Vehicle(base, vehicle).gear() == -1) {
+    if (input.throttle() != 0) {
       if (fast()) {
-        guest::StoreU16(base, record + 6, 32767);
+        input.set_brake(32767);
       }
     } else if (brake != 0) {
       reverse();
     }
   } else if (brake != 0) {
-    if (!fast() && guest::LoadU16(base, record + 4) == 0) {
+    if (!fast() && input.throttle() == 0) {
       reverse();
     } else {
       OrFlags(base, record, 0x8);
     }
   }
-  guest::StoreU8(base, record + 15, guest::LoadU8(base, settings + 2));
+  input.set_brake_rate(guest::LoadU8(base, settings + 2));
   // The steering (+8): control 1, or the map's +0 when that reads 0.
-  const bool wheel = guest::LoadU8(base, record + 17) == 1;
+  const bool wheel = input.kind() == 1;
   const int32_t dead = wheel ? 1000 : 5000;
   const int32_t scale = wheel ? -130 : -110;
   Store(base, word, 0);
@@ -560,9 +572,9 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
   }
   v = Mul(scale, int32_t(Load(base, word))) / 100;
   if (v > 32767) {
-    guest::StoreU16(base, record + 8, 32767);
+    input.set_steering(32767);
   } else if (v < -32767) {
-    guest::StoreU16(base, record + 8, uint16_t(-32767));
+    input.set_steering(uint16_t(-32767));
   }
   bool zero;
   if (v >= 0) {
@@ -586,13 +598,13 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
       Store(base, word, uint32_t(v));
     }
   }
-  guest::StoreU16(base, record + 8, uint16_t(v));
-  guest::StoreU8(base, record + 16, guest::LoadU8(base, settings + 0));
+  input.set_steering(uint16_t(v));
+  input.set_steering_rate(guest::LoadU8(base, settings + 0));
   // +10 (as the throttle).
   answer = control(Load(base, map + 12), 3, word);
   OrFlags(base, record, answer != 0 ? 0x80000000 : 0x40000000);
   v = Pedal(base, word);
-  guest::StoreU16(base, record + 10, uint16_t(v));
+  input.set_handbrake(uint16_t(v));
   if (int16_t(v) != 0) {
     OrFlags(base, record, 0x8000);
   }
@@ -632,7 +644,7 @@ uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player
       Store(base, word, uint32_t(v));
     }
   }
-  guest::StoreU16(base, record + 12, uint16_t(v));
+  input.set_camera(uint16_t(v));
   // The buttons: (control, kind, flag); kind 1 pressed, 0 held.
   static constexpr uint32_t kButtons[8][3] = {
       {24, 1, 0x1},   {28, 1, 0x2},   {16, 0, 0x200},   {20, 1, 0x40},
@@ -661,55 +673,57 @@ uint32_t PlayerUpdate(uint8_t* base, uint32_t slot, uint32_t index, uint32_t pla
   ITC_NATIVE_RUNNING("sub_821604C8 PlayerControl::Update");
   const uint32_t frame = sp - 192;
   const uint32_t record = frame + 80;
+  const schema::CarInput input(base, record);
   Store(base, frame, sp);  // the frame's back chain, for ReadPad's calls
   const uint32_t vehicle = vehicle_accessors::VehicleGet(base, index);
   const uint32_t offset = slot * 3936;
   uint32_t race = Globals::race_data(base);
-  const uint32_t racer = race + offset;
-  if ((Load(base, race + kFlags) & 0x100) != 0) {
+  const schema::Car racer(base, schema::RaceData(base, race).racer_records_address() + offset);
+  if ((schema::RaceData(base, race).flags() & 0x100) != 0) {
     return 0;
   }
-  if (Load(base, racer + 3940) == 0 && guest::LoadU8(base, vehicle + 2249) != 0) {
-    guest::StoreU8(base, vehicle + 2249, 0);
+  if (racer.unknown_3892() == 0 && schema::Vehicle(base, vehicle).automatic() != 0) {
+    schema::Vehicle(base, vehicle).set_automatic(0);
     race = Globals::race_data(base);
   }
   // Mode 1, without the race data's flag 0x80, for player 0: whether the
   // input record had 0x20000 before.
   const auto counting = [&](uint32_t at) {
-    return int32_t(Load(base, at + kMode)) == 1 && (Load(base, at + kFlags) & 0x80) == 0 &&
+    return int32_t(schema::RaceData(base, at).kind()) == 1 && (schema::RaceData(base, at).flags() & 0x80) == 0 &&
            int32_t(player) == 0;
   };
   bool held_before = false;
   if (counting(race)) {
     Copy20(base, record, InputOf(base, index));
-    held_before = (Load(base, record) & 0x20000) != 0;
+    held_before = (input.flags() & 0x20000) != 0;
   }
   uint32_t result = 0;
-  if ((Load(base, racer + 3936) & 0x400) != 0) {
+  if ((racer.flags() & 0x400) != 0) {
     ai_drivers::ClearCarInput(base, record);
   } else {
     result = ReadPad(base, record, index, player, owner, may_pause, frame, calls);
     race = Globals::race_data(base);
-    const uint32_t flags = Load(base, race + kFlags);
+    const uint32_t flags = schema::RaceData(base, race).flags();
     if ((flags & 0x40) != 0) {
       // The replay: the next recorded record, with the pad's flags 0xC0
       // and halfword +12 kept.
-      const uint16_t kept12 = guest::LoadU16(base, record + 12);
-      const uint32_t kept_flags = Load(base, record) & 0xC0;
+      const uint16_t kept12 = input.camera();
+      const uint32_t kept_flags = input.flags() & 0xC0;
       if (RecordingNext(base, record, player) == 0) {
-        const uint32_t at = Globals::race_data(base) + kFlags;
-        Store(base, at, Load(base, at) | 0x20000);
+        const schema::RaceData data(base, Globals::race_data(base));
+        data.set_flags(data.flags() | 0x20000);
       }
-      const uint32_t replayed = Load(base, record);
-      guest::StoreU16(base, record + 12, kept12);
-      Store(base, record, (replayed & ~0xC0u) | kept_flags);
+      const uint32_t replayed = input.flags();
+      input.set_camera(kept12);
+      input.set_flags((replayed & ~0xC0u) | kept_flags);
       race = Globals::race_data(base);
     } else if ((flags & 0x20) != 0) {
       RecordingAppend(base, record, player);
       race = Globals::race_data(base);
     }
-    if (counting(race) && held_before && (Load(base, record) & 0x20000) == 0) {
-      Store(base, race + kCount, Load(base, race + kCount) + 1);
+    if (counting(race) && held_before && (input.flags() & 0x20000) == 0) {
+      const schema::RaceData data(base, race);
+      data.set_finish_count(data.finish_count() + 1);
     }
   }
   Copy20(base, InputOf(base, index), record);
@@ -722,7 +736,7 @@ void DriveByAiWithPad(uint8_t* base, uint32_t index, uint32_t hold, uint32_t pla
   const uint32_t frame = sp - 192;
   const uint32_t ai = frame + 128;
   Store(base, frame, sp);  // the frame's back chain, for the calls
-  if ((Load(base, Globals::race_data(base) + kFlags) & 0x100) != 0) {
+  if ((schema::RaceData(base, Globals::race_data(base)).flags() & 0x100) != 0) {
     return;
   }
   calls.drive_car(calls.user, ai, index, hold, frame, 0x8215F820);
@@ -794,8 +808,8 @@ uint32_t AllByAi(uint8_t* base, uint32_t flow, uint32_t sp, const Calls& calls) 
   ITC_NATIVE_RUNNING("sub_8215FA68 RaceFlow::AllByAi");
   const uint32_t frame = sp - 144;
   for (int32_t i = 0; i < int32_t(track_collision::RaceRacerCount(base)); i++) {
-    const uint32_t index = RacerWord(base, uint32_t(i), 20);
-    const uint32_t flags = Load(base, vehicle_accessors::VehicleGet(base, index) + 6148);
+    const uint32_t index = RacerEntry(base, uint32_t(i)).vehicle_index();
+    const uint32_t flags = schema::Vehicle(base, vehicle_accessors::VehicleGet(base, index)).car_flags();
     if ((flags & 0x1) != 0 || (flags & 0x80) != 0) {
       const schema::RaceFlow race_flow(base, flow);
       const uint32_t player = (flags & 0x1) != 0 ? race_flow.player_a() : race_flow.player_b();
@@ -824,10 +838,10 @@ uint32_t ByRacer(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp, cons
   const uint32_t frame = sp - 144;
   uint32_t first = 0;
   for (int32_t i = 0; i < int32_t(track_collision::RaceRacerCount(base)); i++) {
-    const uint32_t index = RacerWord(base, uint32_t(i), 20);
-    const uint32_t flags = Load(base, vehicle_accessors::VehicleGet(base, index) + 6148);
-    const uint32_t racer = Load(base, Globals::race(base) + 2308 + 4 * uint32_t(i));
-    const uint32_t slot = Load(base, racer + 24);
+    const uint32_t index = RacerEntry(base, uint32_t(i)).vehicle_index();
+    const uint32_t flags = schema::Vehicle(base, vehicle_accessors::VehicleGet(base, index)).car_flags();
+    const schema::MinimapRacerEntry racer = RacerEntry(base, uint32_t(i));
+    const uint32_t slot = racer.record();
     if ((flags & 0x1) != 0) {
       first = PlayerUpdate(base, slot, index, schema::RaceFlow(base, flow).player_a(), owner,
                            pause_first(), frame, calls);
@@ -836,7 +850,7 @@ uint32_t ByRacer(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp, cons
                    pause_second(first), frame, calls);
     } else {
       uint64_t r3 = 0;
-      DriveByAi(base, index, hold(Load(base, racer + 0)), frame, calls, &r3);
+      DriveByAi(base, index, hold(racer.flags()), frame, calls, &r3);
     }
   }
   return 1;
@@ -880,9 +894,9 @@ uint32_t OnState22(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
   ITC_NATIVE_RUNNING("sub_82160948 RaceFlow::OnState22");
   const uint32_t frame = sp - 208;
   const uint32_t stage_word = CurrentStageWord0(base, Globals::race_data(base));
-  if (vehicle_accessors::StagesIsType2Or3(base, Globals::race_data(base) + kStages, 0xFFFFFFFFu) ==
+  if (vehicle_accessors::StagesIsType2Or3(base, schema::RaceData(base, Globals::race_data(base)).stages_address(), 0xFFFFFFFFu) ==
           0 &&
-      (int32_t(Load(base, Globals::race_data(base) + kMode)) != 6 || int32_t(stage_word) == 1)) {
+      (int32_t(schema::RaceData(base, Globals::race_data(base)).kind()) != 6 || int32_t(stage_word) == 1)) {
     return AllByAi(base, flow, frame, calls);
   }
   return PlayersAndAiNoPause(base, flow, owner, frame, calls);
@@ -894,15 +908,15 @@ uint32_t OnState23(uint8_t* base, uint32_t flow, uint32_t owner, uint32_t sp,
   const uint32_t frame = sp - 192;
   const uint32_t stage_word = CurrentStageWord0(base, Globals::race_data(base));
   uint32_t result;
-  if (int32_t(Load(base, Globals::race_data(base) + kMode)) == 6 && int32_t(stage_word) != 1) {
+  if (int32_t(schema::RaceData(base, Globals::race_data(base)).kind()) == 6 && int32_t(stage_word) != 1) {
     result = PlayersAndAiNoPause(base, flow, owner, frame, calls);
   } else {
     result = PlayersAndAi(base, flow, owner, frame, calls);
   }
-  const uint32_t at = Globals::race_data(base) + kFlags;
-  if ((Load(base, at) & 0x20000) != 0) {
-    Store(base, at, Load(base, at) & ~0x20000u);
-    if ((Load(base, Globals::race_data(base) + kFlags) & 0x40) != 0) {
+  const schema::RaceData data(base, Globals::race_data(base));
+  if ((data.flags() & 0x20000) != 0) {
+    data.set_flags(data.flags() & ~0x20000u);
+    if ((schema::RaceData(base, Globals::race_data(base)).flags() & 0x40) != 0) {
       PostMessage(base, owner, 34);
     }
   }
@@ -914,8 +928,8 @@ uint32_t OnState34(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = sp - 128;
   uint32_t count = track_collision::RaceRacerCount(base);
   for (int32_t i = 0; i < int32_t(count); count = track_collision::RaceRacerCount(base)) {
-    const uint32_t index = RacerWord(base, uint32_t(i), 20);
-    const uint32_t flags = Load(base, vehicle_accessors::VehicleGet(base, index) + 6148);
+    const uint32_t index = RacerEntry(base, uint32_t(i)).vehicle_index();
+    const uint32_t flags = schema::Vehicle(base, vehicle_accessors::VehicleGet(base, index)).car_flags();
     uint64_t r3 = 0;
     DriveByAi(base, index, (flags & 0x1) != 0 ? 0 : 1, frame, calls, &r3);
     i++;

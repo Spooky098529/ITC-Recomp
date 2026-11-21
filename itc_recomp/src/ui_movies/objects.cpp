@@ -830,7 +830,7 @@ uint32_t UnloadMovie(uint8_t* base, uint32_t movie, uint32_t frame, const Unload
   while (m.texture_count() != 0) {
     const uint32_t count = textures.count() - 1;
     textures.set_count(count);
-    const uint32_t entry = Load(base, textures.words() + (count << 2));
+    const uint32_t entry = schema::UiMovieWord(base, textures.words() + (count << 2)).value();
     if (entry != 0) {
       Store(base, entry + 0, 0);
       Store(base, entry + 4, 0);

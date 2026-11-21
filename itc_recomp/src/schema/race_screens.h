@@ -18,7 +18,7 @@ struct MenuListEnabled : View {
   uint32_t item_0_address() const { return address + 0; }
 };
 
-// allocated; measure: MenuList, new<72>@PauseMenu::Create, new<72>@AfterRaceMenu::Create, new<72>@RaceDialog::Create
+// allocated; measure: MenuList, new<72>@PauseMenu::Create, new<72>@AfterRaceMenu::Create, new<72>@RaceDialog::Create, new<72>@PauseMenu4::Create, new<72>@SaveScreen::OnEnter, new<72>@TitleScreen::Create, new<72>@ReplayTheater::Create, new<72>@PlateEditor::Create, new<72>@BuildScreen::Create, new<72>@BuildScreen::Create#2, new<72>@GarageScreen::Create, new<72>@GarageScreen::Create#2, new<72>@RaceScreens::Make1004, new<72>@CarDealer::Create#2
 struct MenuList : View {
   using View::View;
   static constexpr uint32_t kSize = 72;

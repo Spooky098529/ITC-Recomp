@@ -183,24 +183,6 @@ struct VehicleCameraCurve : View {
   uint32_t unknown_720_address() const { return address + 720; }
 };
 
-// embedded; measure: RoutePosition, AiPath::NoteFixedSections.ret
-struct VehicleRoutePosition : View {
-  using View::View;
-  static constexpr uint32_t kSize = 4;
-  // section and slice read or written as one word
-  uint32_t word() const { return guest::LoadU32(base, address + 0); }
-  void set_word(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t word_address() const { return address + 0; }
-  // signed
-  uint16_t section() const { return guest::LoadU16(base, address + 0); }
-  void set_section(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
-  uint32_t section_address() const { return address + 0; }
-  // signed
-  uint16_t slice() const { return guest::LoadU16(base, address + 2); }
-  void set_slice(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
-  uint32_t slice_address() const { return address + 2; }
-};
-
 // embedded; measure: RigidBody::Position.ret
 struct VehicleBodyPosition : View {
   using View::View;
@@ -295,48 +277,6 @@ struct VehicleTrackPositionSource : View {
   uint16_t half_82() const { return guest::LoadU16(base, address + 82); }
   void set_half_82(uint16_t v) const { guest::StoreU16(base, address + 82, v); }
   uint32_t half_82_address() const { return address + 82; }
-};
-
-// embedded; measure: Vehicle::ApplyInput.r4
-struct VehicleCarInput : View {
-  using View::View;
-  static constexpr uint32_t kSize = 20;
-  // 0x02000000 digital steering, 0x20000000 the digital brake, 0x08000000 the digital throttle, 0x80000000 the handbrake ramp, 0x200 reverse, 0x1 and 0x2 the gear changes, 0x2000, 0x10000 the nitrous' toggle
-  uint32_t flags() const { return guest::LoadU32(base, address + 0); }
-  void set_flags(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t flags_address() const { return address + 0; }
-  // signed, out of 32,767
-  uint16_t throttle() const { return guest::LoadU16(base, address + 4); }
-  void set_throttle(uint16_t v) const { guest::StoreU16(base, address + 4, v); }
-  uint32_t throttle_address() const { return address + 4; }
-  // signed, out of 32,767
-  uint16_t brake() const { return guest::LoadU16(base, address + 6); }
-  void set_brake(uint16_t v) const { guest::StoreU16(base, address + 6, v); }
-  uint32_t brake_address() const { return address + 6; }
-  // signed, out of 32,767
-  uint16_t steering() const { return guest::LoadU16(base, address + 8); }
-  void set_steering(uint16_t v) const { guest::StoreU16(base, address + 8, v); }
-  uint32_t steering_address() const { return address + 8; }
-  // 32,767 for the handbrake
-  uint16_t handbrake() const { return guest::LoadU16(base, address + 10); }
-  void set_handbrake(uint16_t v) const { guest::StoreU16(base, address + 10, v); }
-  uint32_t handbrake_address() const { return address + 10; }
-  // signed: the throttle's curve
-  uint8_t throttle_rate() const { return guest::LoadU8(base, address + 14); }
-  void set_throttle_rate(uint8_t v) const { guest::StoreU8(base, address + 14, v); }
-  uint32_t throttle_rate_address() const { return address + 14; }
-  // signed: the brake's curve
-  uint8_t brake_rate() const { return guest::LoadU8(base, address + 15); }
-  void set_brake_rate(uint8_t v) const { guest::StoreU8(base, address + 15, v); }
-  uint32_t brake_rate_address() const { return address + 15; }
-  // signed: the pad's or wheel's steering rate
-  uint8_t steering_rate() const { return guest::LoadU8(base, address + 16); }
-  void set_steering_rate(uint8_t v) const { guest::StoreU8(base, address + 16, v); }
-  uint32_t steering_rate_address() const { return address + 16; }
-  // 0 the pad, 1 a wheel, 2 an AI driver
-  uint8_t kind() const { return guest::LoadU8(base, address + 17); }
-  void set_kind(uint8_t v) const { guest::StoreU8(base, address + 17, v); }
-  uint32_t kind_address() const { return address + 17; }
 };
 
 // embedded; measure: VehicleStatus::Update.r5

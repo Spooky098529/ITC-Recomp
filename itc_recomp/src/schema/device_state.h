@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// gpu; measure: Device
+// gpu; measure: Device, BeginVertices.r3, BeginIndexedVertices.r3, EndVertices.r3, sub_8229FC40.r3, sub_822ADC08.r3, sub_822ADE30.r3, sub_822ADEF0.r3, sub_822AE070.r3, sub_822AE1D0.r3
 struct Device : View {
   using View::View;
   static constexpr uint32_t kSize = 20444;
@@ -1419,7 +1419,7 @@ struct DeviceDummySegment : View {
   uint32_t count_address() const { return address + 4; }
 };
 
-// gpu; measure: Device.+12468, Device.+12472, Device.+12476, Device.+12480, Device.+12484, Device::SetDepthStencilSurface.r4, Device::SetRenderTarget.r5
+// gpu; measure: Device.+12468, Device.+12472, Device.+12476, Device.+12480, Device.+12484, Device::SetDepthStencilSurface.r4, Device::SetRenderTarget.r5, sub_8229FC40.r3.+12200
 struct DeviceSurface : View {
   using View::View;
   static constexpr uint32_t kSize = 48;

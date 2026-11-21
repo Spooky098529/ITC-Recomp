@@ -20,6 +20,7 @@
 #include "race_setup/race_setup.h"
 #include "schema/screen_constructors.h"
 #include "schema/type8_screens.h"
+#include "schema/type67_screens.h"
 #include "screen_constructors/screen_constructors.h"
 #include "type67_screens/list_pages.h"
 #include "type8_screens/part_helpers.h"

@@ -19,6 +19,8 @@
 #include "memory/c_runtime_heap.h"
 #include "track_collision/track_collision.h"
 #include "schema/vehicle.h"
+#include "schema/race_states.h"
+#include "schema/ai_drivers.h"
 #include "track_route/track_route.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -116,7 +118,7 @@ uint32_t RoutePositionStep(uint8_t* base, uint32_t position, uint32_t step, uint
   ITC_NATIVE_RUNNING("sub_82170F90 RoutePosition::Step");
   guest::StoreU32(base, frame + 80, uint32_t(int32_t(int16_t(kind))));
   const uint32_t masks = ai_drivers::BranchMasksFor(base, frame + 80);
-  const schema::VehicleRoutePosition p(base, position);
+  const schema::RoutePosition p(base, position);
   p.set_slice(uint16_t(p.slice() + step));
   return track_route::Normalize(base, G::route_address(), position, masks);
 }
@@ -292,9 +294,9 @@ uint64_t RateOf(uint8_t byte) {
 }
 // The brake's and throttle's curve: x = the input / 32,767, x^2 + (x - x^2
 // + x - x^2) x (rate x 0.05) (as fmadds).
-using InputHalf = uint16_t (schema::VehicleCarInput::*)() const;
-using InputByte = uint8_t (schema::VehicleCarInput::*)() const;
-double PedalCurve(uint8_t* base, const schema::VehicleCarInput& in, InputHalf pedal, InputByte rate_of,
+using InputHalf = uint16_t (schema::CarInput::*)() const;
+using InputByte = uint8_t (schema::CarInput::*)() const;
+double PedalCurve(uint8_t* base, const schema::CarInput& in, InputHalf pedal, InputByte rate_of,
                   uint32_t frame) {
   const double x0 = IntThroughStack(base, frame + 88, uint64_t(int64_t(int16_t((in.*pedal)()))));
   const double rate = IntThroughStack(base, frame + 80, RateOf((in.*rate_of)()));
@@ -311,7 +313,7 @@ double PedalCurve(uint8_t* base, const schema::VehicleCarInput& in, InputHalf pe
 bool VehicleApplyInput(uint8_t* base, uint32_t vehicle, uint32_t input, uint32_t frame,
                        const SteerOriginal& steer_original) {
   const uint32_t v = vehicle;
-  const schema::VehicleCarInput in(base, input);
+  const schema::CarInput in(base, input);
   const uint32_t kind = uint32_t(int32_t(int8_t(in.kind())));
   const uint32_t flags = in.flags();
   // The callees never seen in play: decided first (the setters before them
@@ -353,11 +355,11 @@ bool VehicleApplyInput(uint8_t* base, uint32_t vehicle, uint32_t input, uint32_t
     cp::VehicleSetSteering(base, v, Fmuls(IntThroughStack(base, frame + 80, uint64_t(steer)), scale));
   }
   cp::VehicleSetBrake(base, v,
-                      PedalCurve(base, in, &schema::VehicleCarInput::brake,
-                                 &schema::VehicleCarInput::brake_rate, frame));
+                      PedalCurve(base, in, &schema::CarInput::brake,
+                                 &schema::CarInput::brake_rate, frame));
   cp::VehicleSetThrottle(base, v,
-                         PedalCurve(base, in, &schema::VehicleCarInput::throttle,
-                                    &schema::VehicleCarInput::throttle_rate, frame));
+                         PedalCurve(base, in, &schema::CarInput::throttle,
+                                    &schema::CarInput::throttle_rate, frame));
   if ((flags & 0x80000000) != 0) {
     const uint32_t on = in.handbrake() == 32767 ? 1 : 0;
     cp::VehicleRampHandbrake(base, v, on, Fmuls(dt, Lfs(base, kFour)));
@@ -1051,7 +1053,10 @@ void VehicleTick(uint8_t* base, uint32_t vehicle, uint32_t racer, uint32_t car, 
       r.r4 = input;
       call(0x820BFD30, f, r);
     }
-    guest::StoreU32(base, input, guest::LoadU32(base, input) & 0xFFFFFFFCu & ~0x10000u);
+    {
+      const schema::CarInput in(base, input);
+      in.set_flags(in.flags() & 0xFFFFFFFCu & ~0x10000u);
+    }
     const double dt = double(G::step_seconds(base));
     if (cp::CollisionWorldCallbackKnown(base)) {
       cp::VehiclePhysicsStep(base, v, dt, f - 112, [&](uint32_t address) {
@@ -1214,7 +1219,7 @@ bool VehiclePlaceOnRoute(uint8_t* base, uint32_t vehicle, uint32_t position, dou
     }
   };
   // The route positions: back (+80), on (+144) and its own (+176).
-  const schema::VehicleRoutePosition route_position(base, position);
+  const schema::RoutePosition route_position(base, position);
   const uint32_t word = route_position.word();
   guest::StoreU32(base, f + 176, word);
   guest::StoreU32(base, f + 80, word);

@@ -2,6 +2,7 @@
 // (docs/functions/race-screens.md): see race_screens.h.
 
 #include "race_screens/race_screens.h"
+#include "race_screens/ui_node.h"
 
 #include "base/log.h"
 #include "camera_modes/steps.h"
@@ -191,15 +192,15 @@ uint64_t PauseMenuShowItems(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t movie = PauseMovie(base);
   const uint32_t node = ui_movies::FindNode(base, movie, 7, 0);
   uint64_t r3 = node;
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, node + 104)); i++) {
+  for (int32_t i = 0; i < int32_t(ChildCount(base, node)); i++) {
     const uint32_t kind = G::pause_data(base).kind();
     const uint32_t item = guest::LoadU32(base, kPauseItems + (kind * 6 + uint32_t(i)) * 4);
-    const uint64_t child = uint64_t(guest::LoadU32(base, node + 100)) + uint64_t(i);
+    const uint64_t child = uint64_t(FirstChild(base, node)) + uint64_t(i);
     if (int32_t(item) != -1 && i < 6) {
       r3 = calls.Call(kSetText, frame, 0x8220CBC0, movie, 7, child, uint64_t(item) + 1989);
     } else {
       const uint32_t hidden = ui_movies::FindNode(base, movie, 7, uint32_t(child));
-      guest::StoreU32(base, hidden + 80, 0);
+      UiNode(base, hidden).set_visible(0);
       r3 = hidden;
     }
   }
@@ -214,7 +215,7 @@ uint32_t PauseMenuSetArrowA(uint8_t* base, uint64_t value, uint32_t sp) {
   guest::StoreU32(base, frame + 80, uint32_t(uint64_t(word) >> 32));
   guest::StoreU32(base, frame + 84, uint32_t(word));
   const uint32_t child = ui_movies::Child(base, node, 0);
-  guest::StoreU32(base, child + 16, std::bit_cast<uint32_t>(float(double(word))));
+  UiNode(base, child).set_y(float(double(word)));
   return child;
 }
 
@@ -230,20 +231,20 @@ uint32_t PauseMenuShowOptions(uint8_t* base, uint32_t sp) {
   guest::StoreU32(base, frame + 96, data.last_item_ok());
   const uint32_t group = ui_movies::FindNode(base, movie, 8, 2);
   uint32_t r3 = group;
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, group + 104)); i++) {
-    const uint32_t part = ui_movies::FindNode(base, movie, 8, guest::LoadU32(base, group + 100) + i);
-    const uint32_t first = ui_movies::FindNode(base, movie, 8, guest::LoadU32(base, part + 100));
+  for (int32_t i = 0; i < int32_t(ChildCount(base, group)); i++) {
+    const uint32_t part = ui_movies::FindNode(base, movie, 8, FirstChild(base, group) + i);
+    const uint32_t first = ui_movies::FindNode(base, movie, 8, FirstChild(base, part));
     const uint32_t first0 = ui_movies::Child(base, first, 0);
     const uint32_t first2 = ui_movies::Child(base, first, 2);
     const uint32_t second =
-        ui_movies::FindNode(base, movie, 8, guest::LoadU32(base, part + 100) + 1);
+        ui_movies::FindNode(base, movie, 8, FirstChild(base, part) + 1);
     const uint32_t second0 = ui_movies::Child(base, second, 0);
     const uint32_t second2 = ui_movies::Child(base, second, 2);
     const bool on = int32_t(guest::LoadU32(base, frame + 80 + 4 * uint32_t(i))) == 1;
-    guest::StoreU32(base, first0 + 108, on ? 0 : 1);
-    guest::StoreU32(base, first2 + 80, on ? 1 : 0);
-    guest::StoreU32(base, second0 + 108, on ? 1 : 0);
-    guest::StoreU32(base, second2 + 80, on ? 0 : 1);
+    UiNode(base, first0).set_texture_entry(on ? 0 : 1);
+    UiNode(base, first2).set_visible(on ? 1 : 0);
+    UiNode(base, second0).set_texture_entry(on ? 1 : 0);
+    UiNode(base, second2).set_visible(on ? 0 : 1);
     r3 = second2;
   }
   return r3;
@@ -261,7 +262,7 @@ uint64_t PauseMenuShowVolume(uint8_t* base, uint32_t node, uint64_t volume, uint
   uint32_t mark = 0;
   for (int32_t i = 1; i <= 15; i++) {
     mark = ui_movies::Child(base, node, uint32_t(i + 3));
-    guest::StoreU32(base, mark + 80, i == int32_t(uint32_t(volume)) ? 1 : 0);
+    UiNode(base, mark).set_visible(i == int32_t(uint32_t(volume)) ? 1 : 0);
   }
   return mark;
 }
@@ -296,7 +297,7 @@ uint32_t PauseMenuShowSlider(uint8_t* base, uint32_t slider, uint64_t value, uin
   guest::StoreU32(base, frame + 80, uint32_t(uint64_t(rest) >> 32));
   guest::StoreU32(base, frame + 84, uint32_t(rest));
   const uint32_t bar = ui_movies::Child(base, slider, 2);
-  Stfs(base, bar + 12, Single(double(rest)));
+  Stfs(base, UiNode(base, bar).x_address(), Single(double(rest)));
   return bar;
 }
 
@@ -419,13 +420,13 @@ uint32_t PauseMenuColorItems(uint8_t* base, uint32_t sp) {
   const uint32_t movie = PauseMovie(base);
   const uint32_t node = ui_movies::FindNode(base, movie, 7, 0);
   uint32_t r3 = node;
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, node + 104)); i++) {
+  for (int32_t i = 0; i < int32_t(ChildCount(base, node)); i++) {
     const bool enabled = ListIsEnabled(base, G::pause_list(base).address, uint32_t(i)) != 0;
     const uint32_t color[3] = {enabled ? 205u : 255u, enabled ? 235u : 255u,
                                enabled ? 67u : 255u};
     for (uint32_t k = 0; k < 3; k++) {
-      r3 = ui_movies::FindNode(base, movie, 7, guest::LoadU32(base, node + 100) + uint32_t(i));
-      guest::StoreU32(base, r3 + 56 + 4 * k, color[k]);
+      r3 = ui_movies::FindNode(base, movie, 7, FirstChild(base, node) + uint32_t(i));
+      guest::StoreU32(base, UiNode(base, r3).red_address() + 4 * k, color[k]);
     }
   }
   return r3;
@@ -611,7 +612,7 @@ uint64_t PauseMenuShowCareer(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t movie = PauseMovie(base);
   const uint32_t panel = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 0);
   const uint32_t kind = G::pause_data(base).kind();
-  guest::StoreU32(base, panel + 80, kind <= 2 ? 1 : 0);
+  UiNode(base, panel).set_visible(kind <= 2 ? 1 : 0);
   // UiMovie::SetText(movie, -1, child, id, value) through its override, its
   // unset varargs 0 (the user's call, 2026-10-30).
   auto text = [&](uint32_t lr, uint64_t child, uint64_t id, uint64_t value) {
@@ -640,7 +641,7 @@ uint64_t PauseMenuShowCareer(uint8_t* base, uint32_t sp, const Calls& calls) {
   text(0x8220D584, 32, 2010, 0);
   text(0x8220D598, 33, 2011, 0);
   const uint32_t weekday = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 24);
-  guest::StoreU32(base, weekday + 108, G::pause_data(base).weekday());
+  UiNode(base, weekday).set_texture_entry(G::pause_data(base).weekday());
   return weekday;
 }
 

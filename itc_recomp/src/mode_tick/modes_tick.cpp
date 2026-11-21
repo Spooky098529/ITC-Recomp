@@ -6,6 +6,7 @@
 
 #include "base/log.h"
 #include "hooks/lifted_call.h"
+#include "schema/boot_mode.h"
 #include "schema/game_modes.h"
 #include "schema/mode_tick.h"
 
@@ -48,7 +49,7 @@ uint64_t ModesTick(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t holder, ui
   uint64_t r3 = 0;
   const schema::ModeHolder modes(base, holder);
   G::set_play_time_frames(base, G::play_time_frames(base) + 1);
-  if (modes.mode<schema::View>().address == 0) {
+  if (modes.mode().address == 0) {
     // The first mode: made by type, its settings, then its set-up (slot 0);
     // the layer's slot 1 asked twice.
     call(kGlobalMemoryStatus, {frame + 112});
@@ -57,7 +58,7 @@ uint64_t ModesTick(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t holder, ui
     call(kSetChecks, {holder, G::mode_type(base)});
     call(kSetSceneTargetMode, {holder, G::mode_type(base)});
     r3 = call(kPresenceSetForMode, {G::mode_type(base)});
-    const uint32_t mode = modes.mode<schema::View>().address;
+    const uint32_t mode = modes.mode().address;
     call(Slot(base, mode, 0), {mode});
     r3 = call(Slot(base, layer, 4), {layer});
     G::set_layer_answer_0(base, uint32_t(r3));
@@ -74,11 +75,11 @@ uint64_t ModesTick(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t holder, ui
   call(kActionMappersUpdate, {G::mapper_clients(base)});
   G::set_network_counter(base, G::network_counter(base) - 1);
   call(kNetworkUpdate, {G::mode_type(base)});
-  call(kSignInWatchUpdate, {kSignInWatch, modes.mode<schema::View>().address});
+  call(kSignInWatchUpdate, {kSignInWatch, modes.mode().address});
   call(kFlipRing, {});
   // The mode's delegate (+4, slot 0): an 8-byte answer, a byte (change the
   // mode) and the new type.
-  const uint32_t delegate = guest::LoadU32(base, modes.mode<schema::View>().address + 4);
+  const uint32_t delegate = modes.mode().delegate_ptr().address;
   call(Slot(base, delegate, 0), {frame + 104, delegate});
   guest::StoreU32(base, frame + 88, guest::LoadU32(base, frame + 104));
   guest::StoreU32(base, frame + 92, guest::LoadU32(base, frame + 108));
@@ -88,9 +89,9 @@ uint64_t ModesTick(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t holder, ui
     // next pass makes the new one.
     G::set_old_mode_type(base, G::mode_type(base));
     G::set_mode_type(base, guest::LoadU32(base, frame + 92));
-    uint32_t mode = modes.mode<schema::View>().address;
+    uint32_t mode = modes.mode().address;
     r3 = call(Slot(base, mode, 4), {mode});
-    mode = modes.mode<schema::View>().address;
+    mode = modes.mode().address;
     r3 = mode;
     if (mode != 0) {
       r3 = call(Slot(base, mode, 28), {mode, 1});

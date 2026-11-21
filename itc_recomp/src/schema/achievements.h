@@ -123,8 +123,10 @@ struct AchievementsGlobals {
   static uint32_t user_counts(uint8_t* base) { return guest::LoadU32(base, 0x826C77DCu); }
   static void set_user_counts(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C77DCu, v); }
   static constexpr uint32_t user_counts_address() { return 0x826C77DCu; }
-  // the race's progress (+6076 the route, +2204 the player's time)
-  static View progress(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D82E8u)); }
+  // the race's progress (race-states' RaceProgress: +6076 the route, +2204 the player's time)
+  template <typename T = RaceProgress>
+  static T progress(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D82E8u)); }
+  static void set_progress(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D82E8u, v.address); }
   static void set_progress(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D82E8u, v); }
   static constexpr uint32_t progress_address() { return 0x826D82E8u; }
   // the first of the write's 27 AchievementOverlapped (its InternalLow)

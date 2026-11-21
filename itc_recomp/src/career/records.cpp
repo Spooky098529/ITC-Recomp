@@ -9,6 +9,8 @@
 #include "data_tables/data_tables.h"
 #include "guest.h"
 #include "schema/career.h"
+#include "schema/race_hud_machine.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <cstring>
@@ -288,20 +290,25 @@ uint32_t ItemRecordsAddOutcome3(uint8_t* base, uint32_t save, uint32_t id, uint3
 uint32_t ResultRecordFill(uint8_t* base, uint32_t out, uint32_t race) {
   ITC_NATIVE_RUNNING("sub_82110850 ResultRecord::Fill");
   const schema::CareerResultRecord r(base, out);
-  const uint32_t result = vehicle_accessors::RacerRecordsAt(base, race + 0x59AE8, 0xFFFFFFFFu);
-  r.set_value_812(guest::LoadU32(base, result + 812));
-  r.set_value_816(guest::LoadU32(base, result + 816));
-  r.set_mean_796(guest::LoadU32(base, result + 796));
-  r.set_mean_796_count(guest::LoadU32(base, result + 800));
-  const uint32_t racer = race + 3936 * guest::LoadU32(base, result + 4);
-  r.set_racer_60(guest::LoadU32(base, racer + 60));
-  r.set_won(int32_t(guest::LoadU32(base, result + 3924)) == 1 ? 1 : 0);
+  const schema::RaceData rd(base, race);
+  const uint32_t result =
+      vehicle_accessors::RacerRecordsAt(base, rd.results_address(), 0xFFFFFFFFu);
+  const schema::RacerResultsRecord rr(base, result);
+  r.set_value_812(rr.e0_track_hits());
+  r.set_value_816(rr.e0_car_hits());
+  r.set_mean_796(rr.e0_mean_speed());
+  r.set_mean_796_count(rr.unknown_800());
+  // The racer record's entry 0 place: the race data's +48 + 3,936 x index, +12.
+  const schema::RacerResultsRecord racer(
+      base, rd.racer_records_address() + schema::RacerResultsRecord::kSize * rr.e0_record_index());
+  r.set_racer_60(racer.e0_place());
+  r.set_won(int32_t(rr.finish()) == 1 ? 1 : 0);
   for (uint32_t i = 0; i < 3; i++) {
     guest::StoreU32(base, r.opponent_1_address() + 4 * i,
-                    guest::LoadU32(base, result + 980 + 972 * i));
+                    guest::LoadU32(base, rr.e1_item_address() + 972 * i));
   }
-  r.set_value_968(uint32_t(int32_t(int16_t(guest::LoadU16(base, result + 968)))));
-  r.set_value_972(guest::LoadU32(base, result + 972));
+  r.set_value_968(uint32_t(int32_t(int16_t(rr.e0_split_count()))));
+  r.set_value_972(rr.e0_input_seen());
   r.set_race_mode(schema::CareerFillRaceData(base, race).mode());
   return result;
 }

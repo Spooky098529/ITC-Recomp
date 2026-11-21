@@ -10,6 +10,8 @@
 #include "game_modes/game_modes.h"
 #include "memory/c_runtime_heap.h"
 #include "schema/app_states.h"
+#include "schema/boot_mode.h"
+#include "schema/options_screen.h"
 #include "std_list/ptr_list.h"
 
 namespace app_states {
@@ -198,13 +200,14 @@ std::optional<uint32_t> AppStart(uint8_t* base, uint32_t interface, uint32_t fra
   }
   ITC_NATIVE_RUNNING("sub_82092878 App::Start");
   calls.set_register(31, interface);
+  using Boot = schema::BootModeGlobals;
   for (uint32_t at = 0; at <= 16; at += 4) {
-    Store(base, kBootMovies + at, 11);
+    Store(base, Boot::movie_ids_address() + at, 11);
   }
-  Store(base, kBootMovies + 28, 0);
-  Store(base, kBootMovies + 0, 10);
-  Store(base, kBootMovies + 20, 4);
-  Store(base, kBootMovies + 24, 0);
+  Boot::set_movie_index(base, 0);
+  Store(base, Boot::movie_ids_address() + 0, 10);
+  Boot::set_next_type(base, 4);
+  Boot::set_skippable(base, 0);
   uint32_t state = 0;
   if (*holder != 0) {
     game_modes::ModesConstruct(base, *holder, 3);
@@ -225,7 +228,7 @@ std::optional<uint32_t> AppStart(uint8_t* base, uint32_t interface, uint32_t fra
   } else {
     r3 = calls.call(target, states, uint64_t(state), std::nullopt, 0x82092908);
   }
-  Store(base, kStartFlag, 2);
+  schema::OptionsScreenGlobals::set_return_menu(base, 2);
   return r3;
 }
 

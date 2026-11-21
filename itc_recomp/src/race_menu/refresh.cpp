@@ -38,7 +38,7 @@ struct Movie {
 
 // A child's +80 (its shown flag) written.
 void SetChildFlag(uint8_t* base, uint32_t node, uint32_t i, uint32_t value) {
-  Store(base, ui_movies::Child(base, node, i) + 80, value);
+  Node(base, ui_movies::Child(base, node, i)).set_visible(value);
 }
 
 // Two children's flags written in turn (the first, then the second).

@@ -18,6 +18,7 @@ using guest::StoreU32;
 
 using G = schema::OptionsScreenGlobals;
 using S = schema::OptionsSettings;
+using SaveData = schema::SaveData;
 
 S Settings(uint8_t* base) { return G::settings(base); }
 
@@ -63,10 +64,12 @@ uint64_t SettingsRead(uint8_t* base, uint32_t sp, const Calls& calls) {
     case 8: Settings(base).set_context(4); break;
     default: break;
   }
-  const uint32_t shown = (LoadU32(base, vehicle_accessors::SaveDataOf(base, 0) + 6092) >> 5) & 1;
+  const uint32_t shown =
+      (SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).stages() >> 5) & 1;
   Settings(base).set_music_preview_shown(
-      LoadU32(base, vehicle_accessors::SaveDataOf(base, 0) + 4) | shown);
-  const uint32_t options = vehicle_accessors::SaveDataOf(base, 0) + kSaveOptions;
+      SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).shown_items() | shown);
+  const uint32_t options =
+      SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).options_address();
   for (uint32_t i = 0; i < 4; i++) {
     StoreU32(base, Settings(base).current_hud_0_address() + 4 * i, LoadU32(base, options + 4 * i));
   }
@@ -113,12 +116,12 @@ uint64_t SettingsRead(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   const S o = Settings(base);
   if (int32_t(o.context()) == 1) {
-    const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-    const int32_t day = int32_t(LoadU32(base, save + 6100));
+    const SaveData save(base, vehicle_accessors::SaveDataOf(base, 0));
+    const int32_t day = int32_t(save.day());
     for (uint32_t i = 0; i < 5; i++) {
-      StoreU32(base, o.name_0_address() + 4 * i, LoadU32(base, save + 8 + 4 * i));
+      StoreU32(base, o.name_0_address() + 4 * i, LoadU32(base, save.pick_head_address() + 4 * i));
     }
-    o.set_money(LoadU32(base, save + 6116));
+    o.set_money(save.money());
     o.set_day_of_week(uint32_t(day - (day / 7) * 7));
     o.set_day(uint32_t(day > 999 ? 999 : day));
   }
@@ -133,7 +136,8 @@ uint64_t SettingsWrite(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821BAE10 Settings::Write");
   const uint32_t frame = sp - 176;
   StoreU32(base, frame, sp);
-  const uint32_t options = vehicle_accessors::SaveDataOf(base, 0) + kSaveOptions;
+  const uint32_t options =
+      SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).options_address();
   for (uint32_t i = 0; i < 4; i++) {
     StoreU32(base, options + 4 * i, LoadU32(base, Settings(base).current_hud_0_address() + 4 * i));
   }

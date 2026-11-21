@@ -12,6 +12,9 @@
 #include "guest.h"
 #include "hooks/lights.h"
 #include "schema/car_draw.h"
+#include "schema/car_scene_draw.h"
+#include "schema/course_scenery.h"
+#include "schema/scenery_lists.h"
 
 #include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
@@ -34,14 +37,13 @@ constexpr uint32_t kMergeDistance = 0x820021F8;  // also c43's base
 constexpr uint32_t kColorScale = 0x82002200;
 constexpr uint32_t kFarthest = 0x82002814;
 constexpr uint32_t kConeScale = 0x82002A3C;
-constexpr uint32_t kLightSets = 0x826C551C;
-constexpr uint32_t kLightPositions = 0x8296B9E0;
-constexpr uint32_t kLightAmbient = 0x8296BA60;
-constexpr uint32_t kLightColorsA = 0x8296BAE0;
-constexpr uint32_t kLightColorsB = 0x8296BB60;
-constexpr uint32_t kLightDirections = 0x8296BBE0;
-constexpr uint32_t kLightBlock240 = 0x8296BC60;
-constexpr uint32_t kShadowWeights = 0x8265ED10;  // pixel c43 of the depth records
+constexpr uint32_t kLightPositions = schema::CarSceneDrawGlobals::headlight_positions_address();
+constexpr uint32_t kLightAmbient = schema::CarSceneDrawGlobals::headlight_shapes_address();
+constexpr uint32_t kLightColorsA = schema::CarSceneDrawGlobals::headlight_colors_a_address();
+constexpr uint32_t kLightColorsB = schema::CarSceneDrawGlobals::headlight_colors_b_address();
+constexpr uint32_t kLightDirections = schema::CarSceneDrawGlobals::headlight_directions_address();
+constexpr uint32_t kLightBlock240 = schema::CarSceneDrawGlobals::headlight_vectors_address();
+constexpr uint32_t kShadowWeights = schema::SceneryListsGlobals::depth_constant_address();  // pixel c43 of the depth records
 
 // Flush-to-zero on while alive (the vector unit's mode), put back after.
 class FlushToZero {
@@ -212,7 +214,7 @@ uint64_t CarLightingGather(uint8_t* base, const Calls& calls, uint32_t stack, ui
   {
     const double cone = Single(double(G::scene(base).cone_angle()) * Lfs(base, kConeScale));
     const double least = Single(c_runtime::Cos(cone));
-    const uint32_t owner = guest::LoadU32(base, kLightSets);
+    const uint32_t owner = schema::CourseSceneryGlobals::created(base).address;
     const double farthest = Lfs(base, kFarthest);
     uint64_t r3;
     if (const auto found = lights::FindNearest(base, owner, frame + 288, frame + 112, 10,

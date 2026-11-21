@@ -27,8 +27,6 @@ struct Calls;
 
 namespace front_end_car_draw {
 
-constexpr uint32_t kScene = 0x826C2E44;  // [it] the car scene
-
 // What the plain C++ can't do itself.
 struct Calls {
   // Any guest function `function` (through the function table: its

@@ -6,6 +6,8 @@
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
 #include "schema/achievements.h"
+#include "schema/race_event.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace achievements {
@@ -34,7 +36,8 @@ uint32_t AllBeaten(uint8_t* base, uint32_t list, uint32_t count, uint32_t sp) {
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t item = guest::LoadU32(base, list + 4 * i);
-    if (guest::LoadU16(base, item * 12 + save + kItemWins) == 0) {
+    // The item's record: SaveData's item records are 12 bytes by item id.
+    if (schema::SaveData(base, item * 12 + save).item_record_wins() == 0) {
       return 0;
     }
   }
@@ -95,10 +98,10 @@ uint32_t Check(uint8_t* base, uint32_t kind, uint32_t out, uint32_t sp) {
       }
       word.set_earned(AllBeaten(base, list, count, frame));
     } else if (index <= 22) {  // ids 17 to 24: route id - 17
-      const uint32_t progress = schema::AchievementsGlobals::progress(base).address;
-      if (int32_t(guest::LoadU32(base, progress + kProgressRoute)) == int32_t(index - 15)) {
-        word.set_earned(BeatsCourseTime(base, progress + kProgressRoute,
-                                        progress + kProgressTime, frame));
+      const schema::RaceProgress progress = schema::AchievementsGlobals::progress(base);
+      if (int32_t(progress.route_course()) == int32_t(index - 15)) {
+        word.set_earned(BeatsCourseTime(base, progress.route_course_address(),
+                                        progress.e0_time_address(), frame));
       }
     } else if (index <= 26) {  // ids 25 to 28: a count of the player's
       const int32_t slot = mode_tick::PlayersSignedInSlot(base, 0);

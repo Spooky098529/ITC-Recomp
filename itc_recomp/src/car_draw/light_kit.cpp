@@ -13,7 +13,9 @@
 #include "material_passes/material_passes.h"
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
+#include "schema/cameras.h"
 #include "schema/car_draw.h"
+#include "schema/scene_models.h"
 #include "second_set/objects.h"
 
 namespace car_draw {
@@ -23,7 +25,7 @@ namespace {
 using G = schema::CarDrawGlobals;
 using Record = schema::LightKitRecord;
 
-constexpr uint32_t kCameraPasses = 0x826BAC00;
+constexpr uint32_t kCameraPasses = schema::CamerasGlobals::passes_address();
 constexpr uint32_t kOne = 0x82000A30;           // 1.0
 constexpr uint32_t kFrontEndY = 0x820029D8;     // the copy's world y in the front end
 constexpr uint32_t kCarPartDraw = 0x820D06F0;
@@ -197,12 +199,12 @@ Left SceneLightsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
   }
   Memcpy(base, calls, local, block, 736, frame, 0x820DDEB0);
   const uint32_t view_projection = frame + 144;
-  if (int32_t(schema::CarScene(base, Load(base, kit + 13160)).model_set()) == 0) {
+  if (int32_t(schema::SceneLightKit(base, kit).scene().model_set()) == 0) {
     // The front end: camera pass 0's view-projection, the copy's world y
     // (+68) the float at 0x820029D8, its world the identity first with the
     // block's +724 set.
-    matrix_math::Copy(base, view_projection, kCameraPasses + 144);
-    interpolation::BlendState_OnCopy(base, view_projection, kCameraPasses + 144, 0x820DDED4);
+    matrix_math::Copy(base, view_projection, schema::CameraPass(base, kCameraPasses).view_projection_address());
+    interpolation::BlendState_OnCopy(base, view_projection, schema::CameraPass(base, kCameraPasses).view_projection_address(), 0x820DDED4);
     const double y = Lfs(base, kFrontEndY);
     Stfs(base, frame + 276, y);
     if (int32_t(Load(base, frame + 932)) != 0) {
@@ -215,21 +217,21 @@ Left SceneLightsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
       Stfs(base, frame + 276, y);
     }
   } else {
-    uint32_t pass = kCameraPasses + scene.pass_light_kit_camera() * 592;
-    if (pass == 0 || int32_t(Load(base, pass + 588)) == 0) {
+    uint32_t pass = kCameraPasses + scene.pass_light_kit_camera() * schema::CameraPass::kSize;
+    if (pass == 0 || int32_t(schema::CameraPass(base, pass).enabled()) == 0) {
       pass = 0;
     }
-    matrix_math::Copy(base, view_projection, pass + 144);
-    interpolation::BlendState_OnCopy(base, view_projection, pass + 144, 0x820DDF7C);
+    matrix_math::Copy(base, view_projection, schema::CameraPass(base, pass).view_projection_address());
+    interpolation::BlendState_OnCopy(base, view_projection, schema::CameraPass(base, pass).view_projection_address(), 0x820DDF7C);
   }
-  if (int32_t(schema::CarScene(base, Load(base, kit + 13160)).blink_timers_held()) == 0 &&
+  if (int32_t(schema::SceneLightKit(base, kit).scene().blink_timers_held()) == 0 &&
       advance_blink) {
-    BlinkTimersAdvance(base, kit + 96, frame);
+    BlinkTimersAdvance(base, schema::SceneLightKit(base, kit).points_address(), frame);
   }
   G::set_lights_flip(base, G::lights_flip(base) == 0 ? 1 : 0);
   // The groups at the point block's (kit + 96) +48, +4384, +8720, their
   // counters the block's.
-  const schema::LightPoints timers(base, kit + 96);
+  const schema::LightPoints timers(base, schema::SceneLightKit(base, kit).points_address());
   struct Group {
     LightGroup which;
     uint32_t offset;

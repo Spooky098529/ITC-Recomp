@@ -7,6 +7,7 @@
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
 #include "schema/app_start_up.h"
+#include "schema/movies.h"
 
 #include <algorithm>
 
@@ -15,12 +16,6 @@ namespace app_start_up {
 namespace {
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
-uint32_t VirtualTarget(uint8_t* base, uint32_t object, uint32_t offset) {
-  return Load(base, Load(base, object) + offset);
-}
 
 constexpr uint32_t kDeclarationAttributes = 0x24800000;
 
@@ -50,12 +45,13 @@ void ClearWords8110(uint8_t* base) {
 }
 
 std::optional<uint32_t> MoviesSet(uint8_t* base, uint32_t interface) {
-  if (VirtualTarget(base, interface, 44) != kInterfaceMovie) {
+  const schema::AppInterface16 app(base, interface);
+  if (Load(base, app.vtable() + 44) != kInterfaceMovie) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820A4360 Movies::Set");
-  const uint32_t movie = schema::AppInterface16(base, interface).movie();
-  Store(base, kMovieClass, movie);
+  const uint32_t movie = app.movie();
+  schema::MoviesGlobals::set_movie_class(base, movie);
   return movie;
 }
 

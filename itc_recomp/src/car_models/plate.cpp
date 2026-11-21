@@ -11,7 +11,9 @@
 #include "graphics/resources.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/car_draw.h"
 #include "schema/car_models.h"
+#include "schema/scene.h"
 
 #include <cstdlib>
 
@@ -61,9 +63,11 @@ uint32_t PlateImage(uint8_t* base, uint32_t set, uint32_t kind, uint32_t index,
   ITC_NATIVE_RUNNING("sub_820C4DD8 PlateImage");
   static constexpr uint32_t kFirst[] = {0, 4, 7, 11, 15};
   const uint32_t j = (kind < 5 ? kFirst[kind] : 0) + index;
-  Copy(base, header_out, j * 20 + set + 3732, 20, 0x820C4E50);
+  // The scene's assets (scene.toml's SceneAssets at the car scene's +64).
+  const schema::SceneAssets assets(base, schema::CarScene(base, set).assets_address());
+  Copy(base, header_out, assets.plate_tga_headers_address() + j * 20, 20, 0x820C4E50);
   schema::CarModelsAddressWord(base, pixels_out)
-      .set_value(Load(base, ((j + 914) << 2) + set));
+      .set_value(Load(base, assets.plate_tga_pixels_address() + (j << 2)));
   return header_out;
 }
 
@@ -111,7 +115,7 @@ std::optional<uint32_t> MakePlate(uint8_t* base, uint32_t header_a, uint32_t dat
     StoreDoubleword(base, stack + 48 + 8 * i, regs[i]);
   }
   const auto word = [&](uint32_t k) { return Load(base, stack + 48 + 4 * k); };
-  const uint32_t set = schema::CarModelsGlobals::scene<schema::View>(base).address;
+  const uint32_t set = schema::CarModelsGlobals::scene(base).address;
   TgaHeaderClear(base, f + 336);
   TgaHeaderClear(base, f + 128);
   TgaHeaderClear(base, f + 224);

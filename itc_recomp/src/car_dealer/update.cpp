@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "car_dealer/internal.h"
 #include "guest.h"
+#include "schema/race_menu.h"
 
 namespace car_dealer {
 
@@ -166,7 +167,8 @@ uint64_t Start(uint8_t* base, uint32_t sp, const Calls& calls) {
   calls.Call(kStageSetDrawWord, frame, 0x82184C1C, Stage(base), 0);
   calls.Call(kStageDraw, frame, 0x82184C30, Stage(base), 0, 1);
   calls.Call(kStageSetDrawWord, frame, 0x82184C40, Stage(base), 1);
-  return calls.Call(kFadeIn, frame, 0x82184C5C, Load(base, 0x82001BEC), 0, 0, 0);
+  return calls.Call(kFadeIn, frame, 0x82184C5C, schema::RaceMenuGlobals::fade_in_passes(base), 0, 0,
+                    0);
 }
 
 uint64_t OnDialogDone(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp,

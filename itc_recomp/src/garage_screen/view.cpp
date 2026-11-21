@@ -8,6 +8,7 @@
 #include "base/log.h"
 #include "garage_screen/internal.h"
 #include "race_screens/race_screens.h"
+#include "schema/racer_controllers.h"
 #include "type67_modes/type67_modes.h"
 
 namespace garage_screen {
@@ -28,11 +29,11 @@ uint32_t Entry(uint8_t* base) {
 // into `*r3`; whether its low byte is set.
 bool Ask(uint8_t* base, uint32_t slot, uint32_t action, uint32_t frame, uint32_t lr,
          const Calls& calls, uint64_t* r3) {
-  const uint32_t entry = Entry(base);
-  if (int32_t(Load(base, entry + 4)) == 1) {
+  const schema::PlayerMapperEntry entry(base, Entry(base));
+  if (int32_t(entry.unread()) == 1) {
     return false;
   }
-  const uint32_t mapper = Load(base, entry + 0);
+  const uint32_t mapper = entry.mapper<schema::View>().address;
   *r3 = calls.Call(Load(base, Load(base, mapper) + slot), frame, lr, mapper, action);
   return (*r3 & 0xFF) != 0;
 }
@@ -88,7 +89,8 @@ uint64_t ActionsPage(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& cal
   calls.Call(kListUpdate, frame, 0x821941D0, List2(base));
   const uint32_t list = List(base);
   auto moved = [base](uint32_t l) {
-    return Load(base, l + 24) != 0 || int32_t(Load(base, l + 4) - Load(base, l + 8)) != 0;
+    const MenuList m(base, l);
+    return m.move() != 0 || int32_t(m.scroll() - m.scroll_before()) != 0;
   };
   auto go = [base](uint32_t unless, uint32_t transition, uint32_t page) {
     const PageObject pages = Pages(base, unless);
@@ -125,7 +127,7 @@ uint64_t ActionsPage(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& cal
   const uint32_t index = data.scroll() + data.selection();
   const uint32_t car = GarageRecord(base, data.save(), index) + 212;
   const bool current =
-      int32_t(index) == int32_t(Load(base, data.save() + 0x19920));
+      int32_t(index) == int32_t(data.save().selected_car());
   uint32_t prompts[6] = {0, 0, kNone, kNone, kNone, kNone};
   if (action == 0 || action == 1) {
     // Make it the current car, or sell it: a question (the dialog's message
@@ -216,7 +218,7 @@ uint64_t ViewOptionsPage(uint8_t* base, uint64_t mode, uint32_t sp, const Calls&
     pages.set_page(kNone);
     r3 = Sound(sound, frame, 0x82192220, calls);
   };
-  if (Load(base, List(base) + 24) != 0) {
+  if (ListView(base).move() != 0) {
     go(3, 14, 3, 4);  // the option moved
   } else if (Ask(base, kFiredSlot, 159, frame, 0x821920C4, calls, &r3)) {
     const uint32_t option = race_screens::ListSelection(base, List(base));

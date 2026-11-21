@@ -20,11 +20,8 @@
 namespace racer_controllers {
 
 // The race data ([0x826C5B2C], the cars' input records, the input
-// recordings and the race: schema::RacerControllersGlobals). The race data's stage list, flags, mode and finish count.
-constexpr uint32_t kStages = 0x59620;
-constexpr uint32_t kFlags = 0x59AE4;
-constexpr uint32_t kMode = 0xA3AF0;
-constexpr uint32_t kCount = 0xA3AD8;
+// recordings and the race: schema::RacerControllersGlobals; the race data's
+// stage list, flags, kind and finish count through schema::RaceData).
 // A player's recording: 54,000 records of 20 bytes, the count (and read
 // position) at +0x107AC0, 0x107AC4 bytes a player.
 constexpr uint32_t kRecordingBytes = 0x107AC4;

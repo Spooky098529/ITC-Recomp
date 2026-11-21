@@ -398,6 +398,33 @@ fields = [
   { name = "mask", offset = 32, type = "u32" },
 ]
 
+# Scenery::Draw's pass table (0x82603060, 20 entries of 24 bytes): the
+# words copied into a pass description's +12 to +32 (SceneryPassDesc).
+[SceneryPassEntry]
+size = 24
+origin = "image"
+fields = [
+  { name = "player", offset = 0, type = "u32", note = "the viewport ([[0x826C2CE8] + 4 x it])" },
+  { name = "viewport_entry", offset = 4, type = "u32", note = "the viewport's 80-byte entry" },
+  { name = "camera_pass", offset = 8, type = "u32", note = "the camera pass's number (0x826BAC00 + 592 x it)" },
+  { name = "key_a", offset = 12, type = "u32" },
+  { name = "key_b", offset = 16, type = "u32" },
+  { name = "mask", offset = 20, type = "u32" },
+]
+
+# The views' masks (0x82602F80, 14 records of 16 bytes): Scenery::Update
+# sets each record's camera pass from its viewport, ViewMask ORs the bits of
+# a view's records whose pass is enabled.
+[SceneryViewMask]
+size = 16
+origin = "image"
+fields = [
+  { name = "view", offset = 0, type = "u32", note = "the view (also the viewport's player for CameraPass::FromViewport)" },
+  { name = "viewport_entry", offset = 4, type = "u32" },
+  { name = "camera_pass", offset = 8, type = "u32", note = "the camera pass's number" },
+  { name = "bits", offset = 12, type = "u32" },
+]
+
 # Lights::FindNearest's output (32 bytes a light) and point.
 [NearestLight]
 measure = "Lights::FindNearest.r4"
@@ -474,3 +501,8 @@ key_b = { address = 0x8296B900, type = "u32", note = "the render queue's key (th
 key_depth = { address = 0x8296B908, type = "u32", note = "the depth buckets' key" }
 depth_key = { address = 0x8296B8FC, type = "u32", note = "the depth draws' key" }
 other_key = { address = 0x8296B8F8, type = "u32", note = "the depth draws' second key" }
+pass_table = { address = 0x82603060, type = "bytes", count = 480, note = "Scenery::Draw's 20 SceneryPassEntry records" }
+view_masks = { address = 0x82602F80, type = "bytes", count = 224, note = "the 14 SceneryViewMask records" }
+range_x = { address = 0x82001FCC, type = "f32", note = "the course set's model's draw range, x (also material-passes' projector_depth_bias)" }
+range_y = { address = 0x82006804, type = "f32", note = "the course set's model's draw range, y (also scenery-lists' point_range_far)" }
+headlight_near_plane = { address = 0x82001FBC, type = "f32", note = "0.1, the headlight projectors' near plane" }

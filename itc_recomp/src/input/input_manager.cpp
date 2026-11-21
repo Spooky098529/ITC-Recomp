@@ -8,7 +8,9 @@
 #include "memory/c_runtime_heap.h"
 #include "std_list/ptr_list.h"
 #include "model_animation/model_animation.h"
+#include "schema/app_states.h"
 #include "schema/input.h"
+#include "schema/model_animation.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -17,7 +19,6 @@ namespace input {
 
 namespace {
 
-constexpr uint32_t kPhysicalPadVtable = 0x8206CBF4;
 constexpr uint32_t kProcessorBaseVtable = 0x8206CC00;
 
 constexpr uint32_t kHalf = 0x82001BE4;  // the game's float 0.5
@@ -50,10 +51,11 @@ void LogicalPadConstruct(uint8_t* base, uint32_t pad) {
 
 void PhysicalPadConstruct(uint8_t* base, uint32_t pad) {
   ITC_NATIVE_RUNNING("sub_82591B68 PhysicalPad::PhysicalPad");
-  Store(base, pad, kPhysicalPadVtable);
-  Store(base, pad + 4, 0);
-  model_animation::RecordClear(base, pad + 168);
-  model_animation::RecordClear(base, pad + 180);
+  const schema::PhysicalPad p(base, pad);
+  p.set_vtable(schema::PhysicalPad::kVtable);
+  p.set_unknown_4(0);
+  model_animation::RecordClear(base, p.record_a_address());
+  model_animation::RecordClear(base, p.record_b_address());
 }
 
 void LogicalPadBind(uint8_t* base, uint32_t pad, uint32_t index, uint32_t device) {
@@ -71,7 +73,7 @@ uint32_t LogicalPadValues(uint32_t pad) {
 
 uint32_t PhysicalPadValues(uint32_t pad) {
   ITC_NATIVE_RUNNING("sub_820988B8 PhysicalPad::Values");
-  return pad + 8;
+  return schema::PhysicalPad(nullptr, pad).values_address();
 }
 
 void InputProcessorBaseConstruct(uint8_t* base, uint32_t p) {
@@ -166,7 +168,7 @@ uint32_t ManagerLogicalPad(uint32_t manager, uint32_t index) {
 
 uint32_t ManagerPhysicalPad(uint32_t manager, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82098FE0 InputManager::GetPhysicalPad");
-  return schema::InputManager(nullptr, manager).physical_pads_address() + kPhysicalPadBytes * index;
+  return schema::InputManager(nullptr, manager).physical_pads_address() + schema::PhysicalPad::kSize * index;
 }
 
 std::optional<uint32_t> ManagerAllocate(uint8_t* base) {
@@ -185,13 +187,13 @@ bool ManagerConstructMembers(uint8_t* base, uint32_t manager, uint32_t block) {
     LogicalPadConstruct(base, m.logical_pads_address() + schema::LogicalPad::kSize * i);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    PhysicalPadConstruct(base, m.physical_pads_address() + kPhysicalPadBytes * i);
+    PhysicalPadConstruct(base, m.physical_pads_address() + schema::PhysicalPad::kSize * i);
   }
   for (uint32_t i = 0; i < 5; i++) {
     InputProcessorConstruct(base, m.processors_address() + schema::InputProcessor::kSize * i);
   }
   for (uint32_t i = 0; i < 5; i++) {
-    if (!std_list::Construct(base, m.listener_lists_address() + kListenerListBytes * i)) {
+    if (!std_list::Construct(base, m.listener_lists_address() + schema::PtrList::kSize * i)) {
       ITC_LOG_ERROR("InputManager: a listener list refused after its checks");
       std::abort();
     }
@@ -205,7 +207,7 @@ void ManagerBindPads(uint8_t* base, uint32_t manager) {
   const uint32_t pads = m.logical_pads_address();
   for (uint32_t i = 0; i < 4; i++) {
     LogicalPadBind(base, pads + schema::LogicalPad::kSize * i, 0,
-                   m.physical_pads_address() + kPhysicalPadBytes * i);
+                   m.physical_pads_address() + schema::PhysicalPad::kSize * i);
   }
   const uint32_t any = pads + schema::LogicalPad::kSize * 4;
   for (uint32_t i = 0; i < 4; i++) {
@@ -216,11 +218,12 @@ void ManagerBindPads(uint8_t* base, uint32_t manager) {
 bool ManagerAddListener(uint8_t* base, uint32_t manager, uint32_t index, uint32_t listener) {
   ITC_NATIVE_RUNNING("sub_82099430 InputManager::AddListener");
   const schema::InputManager m(base, manager);
-  const uint32_t list = m.listener_lists_address() + kListenerListBytes * index;
-  if (Load(base, list + std_list::kSize) != 0 || !std_list::CanAllocate(base, 1)) {
+  const uint32_t list = m.listener_lists_address() + schema::PtrList::kSize * index;
+  const schema::PtrList l(base, list);
+  if (l.size() != 0 || !std_list::CanAllocate(base, 1)) {
     return false;
   }
-  if (!std_list::Insert(base, list, Load(base, list + std_list::kHead), listener)) {
+  if (!std_list::Insert(base, list, l.head<schema::PtrListNode>().address, listener)) {
     ITC_LOG_ERROR("InputManager::AddListener: the node refused after its checks");
     std::abort();
   }

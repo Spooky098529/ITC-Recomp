@@ -303,7 +303,7 @@ fields = [
   { name = "step", offset = 9656, type = "u32", note = "-1 none" },
   { name = "queued_step", offset = 9660, type = "u32" },
   { name = "step_started", offset = 9668, type = "u32", note = "the step's first-pass word" },
-  { name = "node_table", offset = 9672, type = "ptr", to = "ListNodeTable", note = "the node table (+10360)" },
+  { name = "node_table", offset = 9672, type = "ptr", to = "PairedNodeTable", note = "the node table (+10360)" },
   { name = "part", offset = 9676, type = "ptr", to = "Type8ListPart", note = "the list part (+10844)" },
   { name = "movie_id", offset = 9680, type = "u32", note = "its UI movie" },
   { name = "race_set", offset = 9688, type = "u32", note = "1 once the race is set (ListScreen::OnLeft goes to state 11)" },
@@ -388,7 +388,7 @@ vtable = 0x82010CF0
 fields = [
   { name = "vtable", offset = 0, type = "ptr", to = "Type8ScreenVtable", note = "0x82010CF0" },
   { name = "state", offset = 9608, type = "u32", note = "the machine's state (10: leave, SetUpRace)" },
-  { name = "node_table", offset = 9672, type = "ptr", to = "ListColorNodeTable", note = "the color node table (+10432)" },
+  { name = "node_table", offset = 9672, type = "ptr", to = "ColorNodeTable", note = "the color node table (+10432)" },
   { name = "part", offset = 9676, type = "ptr", to = "Type8ColorListPart", note = "the list part (+11040)" },
   { name = "movie_id", offset = 9680, type = "u32" },
   { name = "unknown_9684", offset = 9684, type = "u32", note = "0 in the constructor" },

@@ -14,6 +14,8 @@
 #include "track_zones/track_zones.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 #include "schema/camera_modes.h"
+#include "schema/race_event.h"
+#include "schema/race_states.h"
 
 namespace camera_modes {
 
@@ -607,18 +609,16 @@ uint32_t DirectorSetMode(uint8_t* base, uint32_t director, uint32_t view, uint32
 
 namespace {
 
-constexpr uint32_t kRaceKind = 0xA3AF0;      // the race data's kind (4 split screen, 6 ...)
-
 // OnRaceStart's and Resume's choice of the followed player: with the race's
 // kind 6 and the current stage's copy's first word (Stages::Copy of stage
 // -1 into `frame` + 80) not 1, 1 when [0x826C7824] is 0, else 0; nullopt
 // where the original leaves them.
 std::optional<uint32_t> Followed(uint8_t* base, uint32_t frame, const StagesCopyCall& stages_copy) {
   const uint32_t race = G::race_data(base);
-  if (int32_t(guest::LoadU32(base, race + kRaceKind)) != 6) {
+  if (int32_t(schema::RaceData(base, race).kind()) != 6) {
     return std::nullopt;
   }
-  const uint32_t stages = race + 0x59620;
+  const uint32_t stages = schema::RaceData(base, race).stages_address();
   if (!vehicle_accessors::StagesCopy(base, frame + 80, stages, 0xFFFFFFFF)) {
     stages_copy(frame + 80, stages, 0xFFFFFFFF);
   }
@@ -638,8 +638,8 @@ void DirectorOnRaceStart(uint8_t* base, uint32_t director, uint32_t frame,
   const schema::Viewport first = holder.first();
   const schema::Viewport second = holder.second();
   const Director d(base, director);
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0) + 131072 - 1956;
-  if (int32_t(guest::LoadU32(base, G::race_data(base) + kRaceKind)) == 4) {
+  const schema::SaveData save(base, vehicle_accessors::SaveDataOf(base, 0));
+  if (int32_t(schema::RaceData(base, G::race_data(base)).kind()) == 4) {
     G::viewports(base).set_split(1);
   }
   if (const auto followed = Followed(base, frame, stages_copy)) {
@@ -648,7 +648,7 @@ void DirectorOnRaceStart(uint8_t* base, uint32_t director, uint32_t frame,
   }
   if (G::viewports(base).split() == 0) {
     d.set_start_view(0);
-    const uint32_t setting = guest::LoadU32(base, save + 24);
+    const uint32_t setting = save.camera_view();
     if (setting == 0) {
       d.set_start_view(2);
     } else if (setting == 1) {
@@ -690,7 +690,7 @@ void DirectorResume(uint8_t* base, uint32_t director, uint32_t frame,
   // Without the kind 6 path, or with [0x826C7824] set, both are 0.
   d.set_followed(followed);
   d.set_followed_input(followed);
-  if (int32_t(guest::LoadU32(base, G::race_data(base) + kRaceKind)) == 4) {
+  if (int32_t(schema::RaceData(base, G::race_data(base)).kind()) == 4) {
     G::viewports(base).set_split(1);
     first.set_view_mode(2);
     second.set_view_mode(2);
@@ -723,7 +723,7 @@ void DirectorUpdate(uint8_t* base, uint32_t director, uint32_t frame,
     guest::StoreU32(base, frame + 96 + 4 * i, guest::LoadU32(base, input + 4 * i));
   }
   const uint32_t buttons = guest::LoadU32(base, frame + 96);
-  auto tv_flag = [&] { return (guest::LoadU32(base, G::race_data(base) + 0x59AE4) >> 7) & 1; };
+  auto tv_flag = [&] { return (schema::RaceData(base, G::race_data(base)).flags() >> 7) & 1; };
   if (buttons & 0x40) {
     // The camera button: viewport 0's view mode cycles.
     const uint32_t mode = first.view_mode();

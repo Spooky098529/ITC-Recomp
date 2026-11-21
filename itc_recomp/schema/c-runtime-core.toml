@@ -144,7 +144,7 @@ fields = [
   { name = "code", offset = 0, type = "u32", note = "0xE06D7363 for a C++ exception" },
   { name = "flags", offset = 4, type = "u32" },
   { name = "record", offset = 8, type = "u32", note = "the chained record" },
-  { name = "address", offset = 12, type = "fn", note = "where it was raised" },
+  { name = "exception_address", offset = 12, type = "fn", note = "where it was raised (ExceptionAddress; not \"address\", which would hide View::address)" },
   { name = "parameter_count", offset = 16, type = "u32", note = "3 for a C++ exception" },
   { name = "magic", offset = 20, type = "u32", note = "the first parameter: a C++ exception's magic (0x19930520 to 0x19930522, 0x01994000)" },
   { name = "object", offset = 24, type = "u32", note = "the second: the thrown object" },

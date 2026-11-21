@@ -381,24 +381,7 @@ fields = [
   { name = "value", offset = 0, type = "u32" },
 ]
 
-# A car input record (20 bytes, CarInputs::Create; [0x826C5B30 + 4i]); the
-# horn copies it whole.
-[CarInputRecord]
-measure = "new<20>@CarInputs::Create"
-size = 20
-origin = "allocated"
-fields = [
-  { name = "flags", offset = 0, type = "u32", note = "0x20000 the horn (probably), more in docs/known-data.md" },
-  { name = "throttle", offset = 4, type = "u16" },
-  { name = "brake", offset = 6, type = "u16" },
-  { name = "steering", offset = 8, type = "u16", note = "signed, out of 32,767" },
-  { name = "handbrake", offset = 10, type = "u16", note = "probably" },
-  { name = "camera", offset = 12, type = "u16", note = "probably" },
-  { name = "settings", offset = 14, type = "bytes", count = 3, note = "the player's three settings bytes (from the pad)" },
-  { name = "kind", offset = 17, type = "u8", note = "0 the pad, 1 a wheel, 2 an AI driver" },
-]
-
-# --- X3DAudio (the library linked into the game; the 360's older layout) ---
+# CarInputRecord: merged into ai-drivers.toml's CarInput at the integration (the same object).
 
 # The handle (X3DAudioInitialize's, at 0x826C5C90).
 [X3DAudioHandle]

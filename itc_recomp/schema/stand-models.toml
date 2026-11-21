@@ -110,6 +110,7 @@ fields = [
 # stand model's word.
 [TrafficCar]
 measure = "TrafficCar"
+measures = ["SceneModel.+5100.+16780"]
 size = 16780
 origin = "allocated"
 vtable = 0x820050B4

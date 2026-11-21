@@ -51,7 +51,7 @@ uint32_t SectionsJoin(uint8_t* base, uint32_t a, uint32_t b, uint32_t out_a, uin
   Store(base, sp - 76, 7);
   Store(base, sp - 72, 8);
   Store(base, sp - 68, 9);
-  const uint32_t table = Load(base, file + 12);
+  const uint32_t table = RouteFile(base, file).sections();
   const uint32_t ra = Load(base, table + ((a << 2) & 0x3FFFC));
   const uint32_t rb = Load(base, table + ((b << 2) & 0x3FFFC));
   for (uint32_t i = 0, link = 0;;) {
@@ -59,7 +59,7 @@ uint32_t SectionsJoin(uint8_t* base, uint32_t a, uint32_t b, uint32_t out_a, uin
     if (forward == -1) {
       break;
     }
-    const uint32_t rf = Load(base, Load(base, file + 12) + ((uint32_t(forward) << 2) & 0x3FFFC));
+    const uint32_t rf = Load(base, RouteFile(base, file).sections() + ((uint32_t(forward) << 2) & 0x3FFFC));
     for (uint32_t m = 0, side = 6;;) {
       const int32_t beside = Link(base, rf, side);
       if (beside != -1) {
@@ -102,10 +102,10 @@ uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
   ITC_NATIVE_RUNNING("sub_82163C50 RaceProgress::FollowRoute");
   const Progress p(base, progress);
   const Slot slot(base, index * Slot::kSize + p.slots_address());
-  const uint32_t vehicle = va::VehicleGet(base, Load(base, slot.entry().address + 20));
+  const uint32_t vehicle = va::VehicleGet(base, slot.entry().vehicle_index());
   // The car's input record (20 bytes) copied to the frame's +96.
   {
-    const uint32_t car = Load(base, slot.entry().address + 20);
+    const uint32_t car = slot.entry().vehicle_index();
     const uint32_t from = Load(base, G::input_records_address() + ((car << 2) & 0x3FC));
     for (uint32_t k = 0; k < 20; k += 4) {
       Store(base, frame + 96 + k, Load(base, from + k));
@@ -121,7 +121,7 @@ uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
   if (nonzero(frame + 102) || nonzero(frame + 106)) {
     Store(base, p.e0_input_seen_address() + e, 1);
   }
-  if (guest::LoadU8(base, vehicle + 2424) != 0) {
+  if (VehicleView(base, vehicle).nitrous_on() != 0) {
     const uint32_t ticks = p.e0_vehicle_byte_ticks_address() + e;
     Store(base, ticks, Load(base, ticks) + 1);
   }
@@ -254,7 +254,8 @@ uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
   }
   if (along) {
     const uint32_t start = p.start();
-    const double ahead = Lfs(base, vehicle + 6228);
+    const double ahead =
+        Lfs(base, CarStatus(base, VehicleView(base, vehicle).status_address()).along_address());
     const uint32_t at = Load(base, frame + 80);
     Store(base, frame + 84, start);
     Stfs(base, p.e0_route_distance_address() + e, ahead);

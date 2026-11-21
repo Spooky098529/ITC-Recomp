@@ -12,6 +12,7 @@
 #include "mode_tick/mode_tick.h"
 #include "schema/location_screen.h"
 #include "schema/menu_helpers.h"
+#include "schema/tuning_screen.h"
 #include "ui_movies/game.h"
 
 #include <bit>
@@ -67,13 +68,13 @@ inline uint32_t SetNodeText(uint8_t* base, const Calls& calls, uint32_t frame, u
 
 inline uint32_t ShowNode(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  guest::StoreU32(base, node + 80, 1);
+  schema::UiMovieNode(base, node).set_visible(1);
   return node;
 }
 
 inline uint32_t HideNode(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  guest::StoreU32(base, node + 80, 0);
+  schema::UiMovieNode(base, node).set_visible(0);
   return node;
 }
 

@@ -13,6 +13,8 @@
 #include "guest.h"
 #include "location_screen/internal.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/career.h"
+#include "schema/race_event.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -35,7 +37,7 @@ uint32_t ResetMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   SetText(base, calls, frame, movie, 0xFFFFFFFFu, 35,
           Screen(base).location_index() + 369);
-  SetText(base, calls, frame, movie, 0xFFFFFFFFu, 36, guest::LoadU32(base, save + 6104) + 128);
+  SetText(base, calls, frame, movie, 0xFFFFFFFFu, 36, schema::SaveData(base, save).mode() + 128);
   for (uint32_t i = 0; i < 5; i++) {
     SetText(base, calls, frame, movie, 9, guest::LoadU32(base, frame + 128 + 4 * i),
             guest::LoadU32(base, frame + 96 + 4 * i));
@@ -78,20 +80,22 @@ uint32_t ShowUnlockEntry(uint8_t* base, uint32_t sp, const Calls& calls) {
   guest::StoreU32(base, frame, sp);
   const uint32_t movie = Movie(base, frame, kMenusMovie);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t list = save + 0x1C778;
+  const schema::SaveData save_data(base, save);
+  const uint32_t list = save_data.unlocks_shown_address();
   const uint32_t n = Screen(base).unlock_position();
-  if (n >= guest::LoadU32(base, list + 768)) {
+  if (n >= save_data.unlocks_shown_count()) {
     return save;
   }
   const uint32_t entry = n * 12 + list;
-  const uint32_t e56 =
-      data_tables::Entry56(base, guest::LoadU32(base, entry + 4), guest::LoadU32(base, entry + 8));
+  const schema::CareerEntry56 e56(
+      base,
+      data_tables::Entry56(base, guest::LoadU32(base, entry + 4), guest::LoadU32(base, entry + 8)));
   Screen(base).set_entry_table(guest::LoadU32(base, entry + 4));
   Screen(base).set_entry_offset(guest::LoadU32(base, entry + 8));
-  SetText(base, calls, frame, movie, 4, 1, guest::LoadU32(base, e56 + 12) + 4650);
+  SetText(base, calls, frame, movie, 4, 1, e56.text() + 4650);
   SetText(base, calls, frame, movie, 4, 2, guest::LoadU32(base, entry + 8) + 6683);
-  SetPictureTexture(base, movie, 6, 1, PictureA(base, guest::LoadU32(base, e56 + 16)));
-  SetPictureTexture(base, movie, 6, 0, PictureB(base, guest::LoadU32(base, e56 + 16)));
+  SetPictureTexture(base, movie, 6, 1, PictureA(base, e56.image()));
+  SetPictureTexture(base, movie, 6, 0, PictureB(base, e56.image()));
   const schema::LocationScreen screen = Screen(base);
   screen.set_unlock_position(screen.unlock_position() + 1);
   if (Required(ui_movies::HasMoreText(base, movie, 4, 2), "sub_8211D8D8") != 0) {
@@ -150,21 +154,21 @@ uint32_t ShowListEntry(uint8_t* base, uint32_t sp, const Calls& calls) {
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t table = guest::LoadU32(base, frame + 100 + 12 * i);
     const uint32_t index = guest::LoadU32(base, frame + 104 + 12 * i);
-    const uint32_t e56 = data_tables::Entry56(base, table, index);
+    const schema::CareerEntry56 e56(base, data_tables::Entry56(base, table, index));
     const uint32_t flags = ((table * 192 + index + 27614) << 2) + save;
     const bool hidden = guest::LoadU32(base, flags) == 2;
     ShowNode(base, movie, 10, 5 + i);
     ShowNode(base, movie, 0xFFFFFFFFu, 27 + i);
     if (i == G::list_menu(base).cursor()) {
-      SetPictureTexture(base, movie, 6, 1, PictureA(base, guest::LoadU32(base, e56 + 16)));
-      SetPictureTexture(base, movie, 6, 0, PictureB(base, guest::LoadU32(base, e56 + 16)));
+      SetPictureTexture(base, movie, 6, 1, PictureA(base, e56.image()));
+      SetPictureTexture(base, movie, 6, 0, PictureB(base, e56.image()));
     }
     if (hidden) {
       HideNode(base, movie, 0xFFFFFFFFu, 19 + i);
     } else {
       ShowNode(base, movie, 0xFFFFFFFFu, 19 + i);
     }
-    r3 = SetText(base, calls, frame, movie, 10, 5 + i, guest::LoadU32(base, e56 + 12) + 4650);
+    r3 = SetText(base, calls, frame, movie, 10, 5 + i, e56.text() + 4650);
   }
   return r3;
 }

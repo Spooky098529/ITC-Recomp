@@ -178,7 +178,7 @@ struct SecondSetCockpitPoints : View {
   uint32_t word_4080_address() const { return address + 4080; }
 };
 
-// allocated; measure: SceneInterior
+// allocated; measure: SceneInterior, List::At.ret.+5068
 struct SceneInterior : View {
   using View::View;
   static constexpr uint32_t kSize = 11680;
@@ -565,7 +565,7 @@ struct SceneWheels : View {
   void set_points_matrix(uint32_t v) const { guest::StoreU32(base, address + 200, v); }
   uint32_t points_matrix_address() const { return address + 200; }
   // the point block's +12: the record's address (+32)
-  template <typename T = SecondSetWheelsRecord>
+  template <typename T = SceneModelsWheelsRecord>
   T points_record() const { return T(base, guest::LoadU32(base, address + 204)); }
   void set_points_record(const View& v) const { guest::StoreU32(base, address + 204, v.address); }
   void set_points_record(uint32_t v) const { guest::StoreU32(base, address + 204, v); }
@@ -624,13 +624,13 @@ struct SecondSetWheelPoints : View {
   void set_entry_value(float v) const { guest::StoreFloat(base, address + 0, v); }
   uint32_t entry_value_address() const { return address + 0; }
   // the block's (traffic) and a group's: the car record (its +0 the block)
-  template <typename T = SecondSetWheelCarRecord>
+  template <typename T = CarRecord>
   T car_record() const { return T(base, guest::LoadU32(base, address + 4)); }
   void set_car_record(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
   void set_car_record(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t car_record_address() const { return address + 4; }
   // a group's: the wheels record; the block's: the traffic body's tire positions (a matrix)
-  template <typename T = SecondSetWheelsRecord>
+  template <typename T = SceneModelsWheelsRecord>
   T wheels_record() const { return T(base, guest::LoadU32(base, address + 8)); }
   void set_wheels_record(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
   void set_wheels_record(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
@@ -673,7 +673,7 @@ struct SecondSetWheelPoints : View {
   uint32_t front_tire_car_record() const { return guest::LoadU32(base, address + 36); }
   void set_front_tire_car_record(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
   uint32_t front_tire_car_record_address() const { return address + 36; }
-  template <typename T = SecondSetWheelsRecord>
+  template <typename T = SceneModelsWheelsRecord>
   T front_tire_wheels_record() const { return T(base, guest::LoadU32(base, address + 40)); }
   void set_front_tire_wheels_record(const View& v) const { guest::StoreU32(base, address + 40, v.address); }
   void set_front_tire_wheels_record(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
@@ -805,7 +805,7 @@ struct SecondSetWheelPoints : View {
   uint32_t rear_tire_car_record() const { return guest::LoadU32(base, address + 1876); }
   void set_rear_tire_car_record(uint32_t v) const { guest::StoreU32(base, address + 1876, v); }
   uint32_t rear_tire_car_record_address() const { return address + 1876; }
-  template <typename T = SecondSetWheelsRecord>
+  template <typename T = SceneModelsWheelsRecord>
   T rear_tire_wheels_record() const { return T(base, guest::LoadU32(base, address + 1880)); }
   void set_rear_tire_wheels_record(const View& v) const { guest::StoreU32(base, address + 1880, v.address); }
   void set_rear_tire_wheels_record(uint32_t v) const { guest::StoreU32(base, address + 1880, v); }
@@ -888,12 +888,12 @@ struct SecondSetWheelPoints : View {
   // set a's rear rim's group
   uint32_t rim_a_rear_address() const { return address + 5456; }
   // measure fault: the matrix word, filed as pointing to the wheels record
-  template <typename T = SecondSetWheelsRecord>
+  template <typename T = SceneModelsWheelsRecord>
   T rim_a_rear_matrix() const { return T(base, guest::LoadU32(base, address + 5456)); }
   void set_rim_a_rear_matrix(const View& v) const { guest::StoreU32(base, address + 5456, v.address); }
   void set_rim_a_rear_matrix(uint32_t v) const { guest::StoreU32(base, address + 5456, v); }
   uint32_t rim_a_rear_matrix_address() const { return address + 5456; }
-  template <typename T = SecondSetWheelsRecord>
+  template <typename T = SceneModelsWheelsRecord>
   T rim_a_rear_wheels_record() const { return T(base, guest::LoadU32(base, address + 5464)); }
   void set_rim_a_rear_wheels_record(const View& v) const { guest::StoreU32(base, address + 5464, v.address); }
   void set_rim_a_rear_wheels_record(uint32_t v) const { guest::StoreU32(base, address + 5464, v); }
@@ -1000,88 +1000,6 @@ struct SecondSetWheelMatrix : View {
   uint64_t row3_zw() const { return guest::LoadU64(base, address + 56); }
   void set_row3_zw(uint64_t v) const { guest::StoreU64(base, address + 56, v); }
   uint32_t row3_zw_address() const { return address + 56; }
-};
-
-// embedded; measure: WheelPoints.+4
-struct SecondSetWheelCarRecord : View {
-  using View::View;
-  static constexpr uint32_t kSize = 4;
-  // the model block (the tire table's entry, 24 bytes each at 0x82003EF8)
-  uint32_t block() const { return guest::LoadU32(base, address + 0); }
-  void set_block(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t block_address() const { return address + 0; }
-};
-
-// embedded; measure: WheelPoints.+8944
-struct SecondSetWheelsRecord : View {
-  using View::View;
-  static constexpr uint32_t kSize = 156;
-  // the car's kind (3 traffic). Measure fault: also sub_820E6F28's entry words
-  uint32_t kind() const { return guest::LoadU32(base, address + 0); }
-  void set_kind(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t kind_address() const { return address + 0; }
-  // 0 when morphed once at set-up
-  uint32_t morph_each_draw() const { return guest::LoadU32(base, address + 8); }
-  void set_morph_each_draw(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t morph_each_draw_address() const { return address + 8; }
-  // +32 and +36 read as a doubleword (the brakes' draws)
-  uint64_t rear_wheel_f36() const { return guest::LoadU64(base, address + 32); }
-  void set_rear_wheel_f36(uint64_t v) const { guest::StoreU64(base, address + 32, v); }
-  uint32_t rear_wheel_f36_address() const { return address + 32; }
-  // +40 and +44 read as a doubleword
-  uint64_t rear_f40_44() const { return guest::LoadU64(base, address + 40); }
-  void set_rear_f40_44(uint64_t v) const { guest::StoreU64(base, address + 40, v); }
-  uint32_t rear_f40_44_address() const { return address + 40; }
-  // -1: the tire table's
-  uint32_t front_size_index() const { return guest::LoadU32(base, address + 44); }
-  void set_front_size_index(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
-  uint32_t front_size_index_address() const { return address + 44; }
-  uint32_t front_size_a() const { return guest::LoadU32(base, address + 48); }
-  void set_front_size_a(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
-  uint32_t front_size_a_address() const { return address + 48; }
-  uint32_t front_size_b() const { return guest::LoadU32(base, address + 52); }
-  void set_front_size_b(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
-  uint32_t front_size_b_address() const { return address + 52; }
-  uint32_t rear_size_index() const { return guest::LoadU32(base, address + 56); }
-  void set_rear_size_index(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
-  uint32_t rear_size_index_address() const { return address + 56; }
-  uint32_t rear_size_a() const { return guest::LoadU32(base, address + 60); }
-  void set_rear_size_a(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
-  uint32_t rear_size_a_address() const { return address + 60; }
-  float rear_size_b() const { return guest::LoadFloat(base, address + 64); }
-  void set_rear_size_b(float v) const { guest::StoreFloat(base, address + 64, v); }
-  uint32_t rear_size_b_address() const { return address + 64; }
-  // +1 to the brakes' steps for 3 to 5, +2 for 6
-  uint32_t brake_kind() const { return guest::LoadU32(base, address + 68); }
-  void set_brake_kind(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
-  uint32_t brake_kind_address() const { return address + 68; }
-  // added to the index table's entry for the front tire
-  uint32_t front_index_add() const { return guest::LoadU32(base, address + 72); }
-  void set_front_index_add(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
-  uint32_t front_index_add_address() const { return address + 72; }
-  uint32_t rear_index_add() const { return guest::LoadU32(base, address + 76); }
-  void set_rear_index_add(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
-  uint32_t rear_index_add_address() const { return address + 76; }
-  uint32_t caliper_a() const { return guest::LoadU32(base, address + 84); }
-  void set_caliper_a(uint32_t v) const { guest::StoreU32(base, address + 84, v); }
-  uint32_t caliper_a_address() const { return address + 84; }
-  // the calipers' texture (PartModel::SetTexture)
-  uint32_t caliper_texture() const { return guest::LoadU32(base, address + 88); }
-  void set_caliper_texture(uint32_t v) const { guest::StoreU32(base, address + 88, v); }
-  uint32_t caliper_texture_address() const { return address + 88; }
-  float front_brake_turn() const { return guest::LoadFloat(base, address + 100); }
-  void set_front_brake_turn(float v) const { guest::StoreFloat(base, address + 100, v); }
-  uint32_t front_brake_turn_address() const { return address + 100; }
-  float rear_brake_turn() const { return guest::LoadFloat(base, address + 104); }
-  void set_rear_brake_turn(float v) const { guest::StoreFloat(base, address + 104, v); }
-  uint32_t rear_brake_turn_address() const { return address + 104; }
-  // the brakes' morph steps (- 9) for the front
-  uint32_t front_brake_size() const { return guest::LoadU32(base, address + 108); }
-  void set_front_brake_size(uint32_t v) const { guest::StoreU32(base, address + 108, v); }
-  uint32_t front_brake_size_address() const { return address + 108; }
-  uint32_t rear_brake_size() const { return guest::LoadU32(base, address + 112); }
-  void set_rear_brake_size(uint32_t v) const { guest::StoreU32(base, address + 112, v); }
-  uint32_t rear_brake_size_address() const { return address + 112; }
 };
 
 // allocated; measure: SceneTraffic
@@ -1308,16 +1226,6 @@ struct SecondSetModelNode : View {
   uint32_t shape_address() const { return address + 40; }
 };
 
-// embedded; measure: PartsPoints.+0
-struct SecondSetPointSkeleton : View {
-  using View::View;
-  static constexpr uint32_t kSize = 140;
-  // the nodes' 144-byte records (model-animation.toml's Skeleton): +16 the float FindHeadlights takes
-  uint32_t node_states() const { return guest::LoadU32(base, address + 136); }
-  void set_node_states(uint32_t v) const { guest::StoreU32(base, address + 136, v); }
-  uint32_t node_states_address() const { return address + 136; }
-};
-
 // embedded; measure: PartsPoints.+1444, PartsPoints.+1924
 struct SecondSetPlateModel : View {
   using View::View;
@@ -1330,160 +1238,6 @@ struct SecondSetPlateModel : View {
   uint32_t texture() const { return guest::LoadU32(base, address + 456); }
   void set_texture(uint32_t v) const { guest::StoreU32(base, address + 456, v); }
   uint32_t texture_address() const { return address + 456; }
-};
-
-// embedded; measure: PartsPoints.+37088
-struct SecondSetSceneRef : View {
-  using View::View;
-  static constexpr uint32_t kSize = 8;
-  // 0 set a (the front end), 1 set b (a race)
-  uint32_t model_set() const { return guest::LoadU32(base, address + 4); }
-  void set_model_set(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t model_set_address() const { return address + 4; }
-};
-
-// embedded; measure: SceneModelBlock
-struct SceneModelBlock : View {
-  using View::View;
-  static constexpr uint32_t kSize = 736;
-  // +0 to +7 cleared as a doubleword
-  uint64_t head() const { return guest::LoadU64(base, address + 0); }
-  void set_head(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
-  uint32_t head_address() const { return address + 0; }
-  // the scene model's +4296: 0 draws nothing
-  uint32_t drawn() const { return guest::LoadU32(base, address + 8); }
-  void set_drawn(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t drawn_address() const { return address + 8; }
-  // the scene model's +4300
-  uint32_t cockpit_only() const { return guest::LoadU32(base, address + 12); }
-  void set_cockpit_only(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t cockpit_only_address() const { return address + 12; }
-  // the scene model's matrix (+4304; the identity from Reset)
-  uint32_t world_address() const { return address + 16; }
-  // 1.0 (the constructor)
-  float world_row0_w() const { return guest::LoadFloat(base, address + 28); }
-  void set_world_row0_w(float v) const { guest::StoreFloat(base, address + 28, v); }
-  uint32_t world_row0_w_address() const { return address + 28; }
-  float world_row1_w() const { return guest::LoadFloat(base, address + 44); }
-  void set_world_row1_w(float v) const { guest::StoreFloat(base, address + 44, v); }
-  uint32_t world_row1_w_address() const { return address + 44; }
-  float world_row2_w() const { return guest::LoadFloat(base, address + 60); }
-  void set_world_row2_w(float v) const { guest::StoreFloat(base, address + 60, v); }
-  uint32_t world_row2_w_address() const { return address + 60; }
-  float world_row3_w() const { return guest::LoadFloat(base, address + 76); }
-  void set_world_row3_w(float v) const { guest::StoreFloat(base, address + 76, v); }
-  uint32_t world_row3_w_address() const { return address + 76; }
-  // the wheels' turns R_0 to R_3, 64 bytes each
-  uint32_t wheel_turns_address() const { return address + 80; }
-  // 1.0 (the constructor; every row's w of the eight matrices)
-  float wheel_r0_row0_w() const { return guest::LoadFloat(base, address + 92); }
-  void set_wheel_r0_row0_w(float v) const { guest::StoreFloat(base, address + 92, v); }
-  uint32_t wheel_r0_row0_w_address() const { return address + 92; }
-  float wheel_r0_row1_w() const { return guest::LoadFloat(base, address + 108); }
-  void set_wheel_r0_row1_w(float v) const { guest::StoreFloat(base, address + 108, v); }
-  uint32_t wheel_r0_row1_w_address() const { return address + 108; }
-  float wheel_r0_row2_w() const { return guest::LoadFloat(base, address + 124); }
-  void set_wheel_r0_row2_w(float v) const { guest::StoreFloat(base, address + 124, v); }
-  uint32_t wheel_r0_row2_w_address() const { return address + 124; }
-  float wheel_r0_row3_w() const { return guest::LoadFloat(base, address + 140); }
-  void set_wheel_r0_row3_w(float v) const { guest::StoreFloat(base, address + 140, v); }
-  uint32_t wheel_r0_row3_w_address() const { return address + 140; }
-  // the wheels' spins S_0 to S_3, 64 bytes each
-  uint32_t wheel_spins_address() const { return address + 336; }
-  float wheel_s0_row0_w() const { return guest::LoadFloat(base, address + 348); }
-  void set_wheel_s0_row0_w(float v) const { guest::StoreFloat(base, address + 348, v); }
-  uint32_t wheel_s0_row0_w_address() const { return address + 348; }
-  float wheel_s0_row1_w() const { return guest::LoadFloat(base, address + 364); }
-  void set_wheel_s0_row1_w(float v) const { guest::StoreFloat(base, address + 364, v); }
-  uint32_t wheel_s0_row1_w_address() const { return address + 364; }
-  float wheel_s0_row2_w() const { return guest::LoadFloat(base, address + 380); }
-  void set_wheel_s0_row2_w(float v) const { guest::StoreFloat(base, address + 380, v); }
-  uint32_t wheel_s0_row2_w_address() const { return address + 380; }
-  float wheel_s0_row3_w() const { return guest::LoadFloat(base, address + 396); }
-  void set_wheel_s0_row3_w(float v) const { guest::StoreFloat(base, address + 396, v); }
-  uint32_t wheel_s0_row3_w_address() const { return address + 396; }
-  // set: the rear tires and rims drawn a second time, shifted
-  uint32_t rear_second_matrix() const { return guest::LoadU32(base, address + 592); }
-  void set_rear_second_matrix(uint32_t v) const { guest::StoreU32(base, address + 592, v); }
-  uint32_t rear_second_matrix_address() const { return address + 592; }
-  // four words (2 from Reset): set b's rims' records
-  uint32_t rim_looks_address() const { return address + 596; }
-  uint32_t front_rim_look_a() const { return guest::LoadU32(base, address + 596); }
-  void set_front_rim_look_a(uint32_t v) const { guest::StoreU32(base, address + 596, v); }
-  uint32_t front_rim_look_a_address() const { return address + 596; }
-  // four floats (0.0 from Reset): record 10's alpha on the brakes
-  uint32_t brake_alphas_address() const { return address + 612; }
-  float front_brake_alpha_a() const { return guest::LoadFloat(base, address + 612); }
-  void set_front_brake_alpha_a(float v) const { guest::StoreFloat(base, address + 612, v); }
-  uint32_t front_brake_alpha_a_address() const { return address + 612; }
-  // [0x8200296C] from Reset
-  float window_alpha_02() const { return guest::LoadFloat(base, address + 628); }
-  void set_window_alpha_02(float v) const { guest::StoreFloat(base, address + 628, v); }
-  uint32_t window_alpha_02_address() const { return address + 628; }
-  // [0x82002A10] from Reset
-  float window_alpha_01() const { return guest::LoadFloat(base, address + 632); }
-  void set_window_alpha_01(float v) const { guest::StoreFloat(base, address + 632, v); }
-  uint32_t window_alpha_01_address() const { return address + 632; }
-  // [0x82002208] from Reset
-  float lights_alpha() const { return guest::LoadFloat(base, address + 636); }
-  void set_lights_alpha(float v) const { guest::StoreFloat(base, address + 636, v); }
-  uint32_t lights_alpha_address() const { return address + 636; }
-  float bonnet_angle() const { return guest::LoadFloat(base, address + 640); }
-  void set_bonnet_angle(float v) const { guest::StoreFloat(base, address + 640, v); }
-  uint32_t bonnet_angle_address() const { return address + 640; }
-  // the left door's float4 (0.0 from Reset; w 1.0 from the constructor, then 0.0)
-  float left_door_x() const { return guest::LoadFloat(base, address + 656); }
-  void set_left_door_x(float v) const { guest::StoreFloat(base, address + 656, v); }
-  uint32_t left_door_x_address() const { return address + 656; }
-  float left_door_theta() const { return guest::LoadFloat(base, address + 660); }
-  void set_left_door_theta(float v) const { guest::StoreFloat(base, address + 660, v); }
-  uint32_t left_door_theta_address() const { return address + 660; }
-  float left_door_phi() const { return guest::LoadFloat(base, address + 664); }
-  void set_left_door_phi(float v) const { guest::StoreFloat(base, address + 664, v); }
-  uint32_t left_door_phi_address() const { return address + 664; }
-  float left_door_w() const { return guest::LoadFloat(base, address + 668); }
-  void set_left_door_w(float v) const { guest::StoreFloat(base, address + 668, v); }
-  uint32_t left_door_w_address() const { return address + 668; }
-  // the right door's float4
-  float right_door_x() const { return guest::LoadFloat(base, address + 672); }
-  void set_right_door_x(float v) const { guest::StoreFloat(base, address + 672, v); }
-  uint32_t right_door_x_address() const { return address + 672; }
-  float right_door_theta() const { return guest::LoadFloat(base, address + 676); }
-  void set_right_door_theta(float v) const { guest::StoreFloat(base, address + 676, v); }
-  uint32_t right_door_theta_address() const { return address + 676; }
-  float right_door_phi() const { return guest::LoadFloat(base, address + 680); }
-  void set_right_door_phi(float v) const { guest::StoreFloat(base, address + 680, v); }
-  uint32_t right_door_phi_address() const { return address + 680; }
-  float right_door_w() const { return guest::LoadFloat(base, address + 684); }
-  void set_right_door_w(float v) const { guest::StoreFloat(base, address + 684, v); }
-  uint32_t right_door_w_address() const { return address + 684; }
-  // set: the pop-up's angle from +692
-  uint32_t popup_set() const { return guest::LoadU32(base, address + 688); }
-  void set_popup_set(uint32_t v) const { guest::StoreU32(base, address + 688, v); }
-  uint32_t popup_set_address() const { return address + 688; }
-  float popup_angle() const { return guest::LoadFloat(base, address + 692); }
-  void set_popup_angle(float v) const { guest::StoreFloat(base, address + 692, v); }
-  uint32_t popup_angle_address() const { return address + 692; }
-  // the digital speedometer's value
-  float speed() const { return guest::LoadFloat(base, address + 696); }
-  void set_speed(float v) const { guest::StoreFloat(base, address + 696, v); }
-  uint32_t speed_address() const { return address + 696; }
-  // 0.0 from Reset
-  float unknown_700() const { return guest::LoadFloat(base, address + 700); }
-  void set_unknown_700(float v) const { guest::StoreFloat(base, address + 700, v); }
-  uint32_t unknown_700_address() const { return address + 700; }
-  // set: the light kit's world the identity in the front end
-  uint32_t identity_world() const { return guest::LoadU32(base, address + 724); }
-  void set_identity_world(uint32_t v) const { guest::StoreU32(base, address + 724, v); }
-  uint32_t identity_world_address() const { return address + 724; }
-  // 0 from Reset (not read in detail)
-  uint32_t word_728() const { return guest::LoadU32(base, address + 728); }
-  void set_word_728(uint32_t v) const { guest::StoreU32(base, address + 728, v); }
-  uint32_t word_728_address() const { return address + 728; }
-  // 1 from Reset: the wheels' sides not moved
-  uint32_t no_side_offset() const { return guest::LoadU32(base, address + 732); }
-  void set_no_side_offset(uint32_t v) const { guest::StoreU32(base, address + 732, v); }
-  uint32_t no_side_offset_address() const { return address + 732; }
 };
 
 // embedded; measure: Morph, Morph::Run.r4, Morph::SetUp.r4

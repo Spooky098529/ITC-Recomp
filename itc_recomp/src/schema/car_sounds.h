@@ -733,40 +733,6 @@ struct CarSoundWaveWord : View {
   uint32_t value_address() const { return address + 0; }
 };
 
-// allocated; measure: new<20>@CarInputs::Create
-struct CarInputRecord : View {
-  using View::View;
-  static constexpr uint32_t kSize = 20;
-  // 0x20000 the horn (probably), more in docs/known-data.md
-  uint32_t flags() const { return guest::LoadU32(base, address + 0); }
-  void set_flags(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t flags_address() const { return address + 0; }
-  uint16_t throttle() const { return guest::LoadU16(base, address + 4); }
-  void set_throttle(uint16_t v) const { guest::StoreU16(base, address + 4, v); }
-  uint32_t throttle_address() const { return address + 4; }
-  uint16_t brake() const { return guest::LoadU16(base, address + 6); }
-  void set_brake(uint16_t v) const { guest::StoreU16(base, address + 6, v); }
-  uint32_t brake_address() const { return address + 6; }
-  // signed, out of 32,767
-  uint16_t steering() const { return guest::LoadU16(base, address + 8); }
-  void set_steering(uint16_t v) const { guest::StoreU16(base, address + 8, v); }
-  uint32_t steering_address() const { return address + 8; }
-  // probably
-  uint16_t handbrake() const { return guest::LoadU16(base, address + 10); }
-  void set_handbrake(uint16_t v) const { guest::StoreU16(base, address + 10, v); }
-  uint32_t handbrake_address() const { return address + 10; }
-  // probably
-  uint16_t camera() const { return guest::LoadU16(base, address + 12); }
-  void set_camera(uint16_t v) const { guest::StoreU16(base, address + 12, v); }
-  uint32_t camera_address() const { return address + 12; }
-  // the player's three settings bytes (from the pad)
-  uint32_t settings_address() const { return address + 14; }
-  // 0 the pad, 1 a wheel, 2 an AI driver
-  uint8_t kind() const { return guest::LoadU8(base, address + 17); }
-  void set_kind(uint8_t v) const { guest::StoreU8(base, address + 17, v); }
-  uint32_t kind_address() const { return address + 17; }
-};
-
 // image; measure: X3DAudio
 struct X3DAudioHandle : View {
   using View::View;

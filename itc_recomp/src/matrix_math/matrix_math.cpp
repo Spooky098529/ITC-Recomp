@@ -7,6 +7,7 @@
 #include "camera_modes/camera_modes.h"
 #include "interpolation/blend_state.h"
 #include "schema/matrix_math.h"
+#include "schema/vehicle_accessors.h"
 #include "vehicle_accessors/vectors.h"
 
 #include "base/float_mode.h"
@@ -25,6 +26,7 @@ using schema::Matrix;
 using schema::MatrixMathFloat;
 using schema::MatrixMathVector3;
 using schema::Quaternion;
+using schema::VectorLibVector;
 using G = schema::MatrixMathGlobals;
 
 // --- Scalar steps, as the translated code's doubles ---
@@ -447,10 +449,11 @@ void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
 
 void Vec3SwapXZ(uint8_t* base, uint32_t v) {
   ITC_NATIVE_RUNNING("sub_820AB688 Vec3::SwapXZ");
-  const uint32_t x = guest::LoadU32(base, v + 0);
-  const uint32_t z = guest::LoadU32(base, v + 8);
-  guest::StoreU32(base, v + 8, x);
-  guest::StoreU32(base, v + 0, z);
+  const VectorLibVector vector(base, v);
+  const uint32_t x = vector.x_bits();
+  const uint32_t z = vector.z_bits();
+  vector.set_z_bits(x);
+  vector.set_x_bits(z);
 }
 
 void SetWsToOne(uint8_t* base, uint32_t m) {
@@ -493,15 +496,16 @@ void InverseRotate(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
   const double vz = double(vector.z());
   const double t20z = Fmuls(vz, t(2, 0));
   const double t22z = Fmuls(vz, t(2, 2));
-  CopyWord(base, G::zero_address(), out + 12);
+  const VectorLibVector result(base, out);
+  CopyWord(base, G::zero_address(), result.w_address());
   const double t11y = Fmuls(vy, t(1, 1));
   const double vx = double(vector.x());
   const double x0 = Fmadds(vx, t(0, 0), t20z);
   const double y0 = Fmadds(vz, t(2, 1), t11y);
   const double z0 = Fmadds(vx, t(0, 2), t22z);
-  Stfs(base, out + 0, Fmadds(vy, t(1, 0), x0));
-  Stfs(base, out + 4, Fmadds(vx, t(0, 1), y0));
-  Stfs(base, out + 8, Fmadds(vy, t(1, 2), z0));
+  Stfs(base, result.x_address(), Fmadds(vy, t(1, 0), x0));
+  Stfs(base, result.y_address(), Fmadds(vx, t(0, 1), y0));
+  Stfs(base, result.z_address(), Fmadds(vy, t(1, 2), z0));
 }
 
 void Set(uint8_t* base, uint32_t out, uint32_t in) {
@@ -592,7 +596,9 @@ float QuaternionLengthSquared(uint8_t* base, uint32_t q) {
 void ProjectPoint(uint8_t* base, uint32_t out, uint32_t m, uint32_t p) {
   ITC_NATIVE_RUNNING("sub_82293600 Matrix::ProjectPoint");
   const Matrix matrix(base, m);
-  const double py = Lfs(base, p + 4);
+  const VectorLibVector point(base, p);
+  const VectorLibVector result(base, out);
+  const double py = Lfs(base, point.y_address());
   const double m28 = double(matrix.m13());
   const double w0 = Fmuls(m28, py);
   const double m20 = double(matrix.m11());
@@ -600,13 +606,13 @@ void ProjectPoint(uint8_t* base, uint32_t out, uint32_t m, uint32_t p) {
   const double y0 = Fmuls(m20, py);
   const double m16 = double(matrix.m10());
   const double z0 = Fmuls(m24, py);
-  const double px = Lfs(base, p + 0);
+  const double px = Lfs(base, point.x_address());
   const double x0 = Fmuls(py, m16);
   const double m12 = double(matrix.m03());
   const double m4 = double(matrix.m01());
   const double m8 = double(matrix.m02());
   const double m0 = double(matrix.m00());
-  const double pz = Lfs(base, p + 8);
+  const double pz = Lfs(base, point.z_address());
   const double m44 = double(matrix.m23());
   const double w1 = Fmadds(m12, px, w0);
   const double m36 = double(matrix.m21());
@@ -620,7 +626,7 @@ void ProjectPoint(uint8_t* base, uint32_t out, uint32_t m, uint32_t p) {
   const double m48 = double(matrix.m30());
   const double one = double(G::one(base));
   const double m56 = double(matrix.m32());
-  Stfs(base, out + 12, one);
+  Stfs(base, result.w_address(), one);
   const double w2 = Fmadds(m44, pz, w1);
   const double y2 = Fmadds(m36, pz, y1);
   const double z2 = Fmadds(m40, pz, z1);
@@ -630,9 +636,9 @@ void ProjectPoint(uint8_t* base, uint32_t out, uint32_t m, uint32_t p) {
   const double z = Fadds(z2, m56);
   const double x = Fadds(x2, m48);
   const double inverse = Fdivs(one, w);
-  Stfs(base, out + 0, Fmuls(x, inverse));
-  Stfs(base, out + 4, Fmuls(inverse, y));
-  Stfs(base, out + 8, Fmuls(inverse, z));
+  Stfs(base, result.x_address(), Fmuls(x, inverse));
+  Stfs(base, result.y_address(), Fmuls(inverse, y));
+  Stfs(base, result.z_address(), Fmuls(inverse, z));
 }
 
 void QuaternionFromMatrix(uint8_t* base, uint32_t out, uint32_t m) {

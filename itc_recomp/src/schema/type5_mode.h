@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: ModeType5, ModeType5::LeaveScreen.r4, ModeType5::Leaving.r4, ModeType5::NextMode.r4, ModeType5::WaitForLoads.r4, ModeType5::WaitForShown.r4
+// allocated; measure: ModeType5, ModeType5::LeaveScreen.r4, ModeType5::Leaving.r4, ModeType5::NextMode.r4, ModeType5::WaitForLoads.r4, ModeType5::WaitForShown.r4, FrontEndMode::NextMode.r4
 struct ModeType5 : View {
   using View::View;
   static constexpr uint32_t kSize = 852;
@@ -83,7 +83,7 @@ struct ModeType5 : View {
   uint32_t fault_shown_address() const { return address + 28920; }
 };
 
-// allocated; measure: ModeType5.+816, ModeType5::NextMode.r4.+848, ModeType5::WaitForLoads.r4.+848, ModeType5::Leaving.r4.+848
+// allocated; measure: ModeType5.+816, ModeType5::NextMode.r4.+848, ModeType5::WaitForLoads.r4.+848, ModeType5::Leaving.r4.+848, FrontEndMode::NextMode.r4.+848
 struct Type5ModeBlock : View {
   using View::View;
   static constexpr uint32_t kSize = 28940;

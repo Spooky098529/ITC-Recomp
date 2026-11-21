@@ -107,7 +107,7 @@ struct RaceEvent : View {
   uint32_t list_address() const { return address + 156; }
 };
 
-// allocated; measure: new<?>@RaceEvent::Alloc
+// allocated; measure: new<?>@RaceEvent::Alloc, RaceEvent::Entry.ret
 struct RaceEventEntry : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -123,6 +123,14 @@ struct RaceEventEntry : View {
   uint32_t flag() const { return guest::LoadU32(base, address + 8); }
   void set_flag(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t flag_address() const { return address + 8; }
+  // start's high halfword: the start's route section (RaceManager::AddRacers)
+  uint16_t start_section() const { return guest::LoadU16(base, address + 4); }
+  void set_start_section(uint16_t v) const { guest::StoreU16(base, address + 4, v); }
+  uint32_t start_section_address() const { return address + 4; }
+  // start's low halfword: its slice
+  uint16_t start_slice() const { return guest::LoadU16(base, address + 6); }
+  void set_start_slice(uint16_t v) const { guest::StoreU16(base, address + 6, v); }
+  uint32_t start_slice_address() const { return address + 6; }
 };
 
 // embedded; measure: EventGroup
@@ -688,7 +696,7 @@ struct OpponentItem : View {
   uint32_t build_paint_4_address() const { return address + 2808; }
 };
 
-// allocated; measure: SaveData::Of.ret
+// allocated; measure: SaveData::Of.ret, SaveData
 struct SaveData : View {
   using View::View;
   static constexpr uint32_t kSize = 129400;
@@ -904,6 +912,10 @@ struct SaveData : View {
   uint8_t setting_5() const { return guest::LoadU8(base, address + 129157); }
   void set_setting_5(uint8_t v) const { guest::StoreU8(base, address + 129157, v); }
   uint32_t setting_5_address() const { return address + 129157; }
+  // the second distance total, beside +4908 (SaveData::AddDistance; race-world's report)
+  float distance_total_2() const { return guest::LoadFloat(base, address + 6040); }
+  void set_distance_total_2(float v) const { guest::StoreFloat(base, address + 6040, v); }
+  uint32_t distance_total_2_address() const { return address + 6040; }
 };
 
 // embedded; measure: sub_820C4550.ret, SceneModelRecord::SetWheels.ret

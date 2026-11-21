@@ -11,6 +11,8 @@
 #include "strings_and_font/strings_and_font.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 #include "save_interface/save_interface.h"
+#include "schema/career.h"
+#include "schema/files_and_saves.h"
 #include "schema/save_interface.h"
 
 #include <cstring>
@@ -218,13 +220,16 @@ std::optional<uint32_t> ReplaysSort(uint8_t* base, uint32_t records, uint32_t te
 
 void PlayTimeAdd(uint8_t* base, uint32_t out, uint32_t stats) {
   ITC_NATIVE_RUNNING("sub_821109B8 PlayTime::Add");
-  const uint32_t frames = guest::LoadU8(base, stats + 6038);
-  const uint32_t hours = Load(base, stats + 6032);
-  const uint32_t minutes = guest::LoadU8(base, stats + 6036);
-  const uint32_t seconds = guest::LoadU8(base, stats + 6037);
+  // career.toml's CareerStats: +6032 the hours, +6036 to +6038 the minutes,
+  // seconds and frames, +6040 (a measure fault there) the last mark.
+  const schema::CareerStats st(base, stats);
+  const uint32_t frames = st.unknown_6038();
+  const uint32_t hours = st.unknown_6032();
+  const uint32_t minutes = st.unknown_6036();
+  const uint32_t seconds = st.unknown_6037();
   const uint32_t now = G::play_time_frames(base);
-  const uint32_t last = Load(base, stats + 6040);
-  Store(base, stats + 6040, now);
+  const uint32_t last = st.fault_6040();
+  st.set_fault_6040(now);
   const uint32_t d = now - last;
   uint32_t f = d - (d / 30) * 30 + frames;
   uint32_t h = d / 108000 + hours;
@@ -245,11 +250,12 @@ void PlayTimeAdd(uint8_t* base, uint32_t out, uint32_t stats) {
     h += q;
     m -= 60 * q;
   }
-  guest::StoreU8(base, stats + 6037, uint8_t(s));
-  guest::StoreU8(base, stats + 6036, uint8_t(m));
-  guest::StoreU8(base, stats + 6038, uint8_t(f));
-  const uint32_t word = Load(base, stats + 6036);
-  Store(base, stats + 6032, h);
+  st.set_unknown_6037(uint8_t(s));
+  st.set_unknown_6036(uint8_t(m));
+  st.set_unknown_6038(uint8_t(f));
+  // The word at +6036 (the minutes, seconds, frames and the next byte).
+  const uint32_t word = Load(base, st.unknown_6036_address());
+  st.set_unknown_6032(h);
   Store(base, out + 0, h);
   Store(base, out + 4, word);
 }
@@ -341,7 +347,8 @@ std::optional<uint32_t> GameDataCheck(uint8_t* base, uint32_t player) {
       return std::nullopt;
     }
     // strcmp of the file name (XCONTENT_DATA +264) with "SystemData.bin".
-    uint32_t a = uint32_t(*entry + 264), b = kGameDataFile;
+    uint32_t a = schema::XContentData(base, uint32_t(*entry)).file_name_address(),
+             b = kGameDataFile;
     int32_t diff;
     for (;;) {
       const uint32_t c = guest::LoadU8(base, a);
@@ -398,7 +405,9 @@ std::optional<uint32_t> ReplaysCount(uint8_t* base, uint32_t out) {
     return 4;
   }
   for (int32_t i = 0; i < int32_t(*count); i++) {
-    const uint32_t name = uint32_t(*InterfaceSaveAt(base, *ReplaySlot(base), uint64_t(i)) + 264);
+    const uint32_t name =
+        schema::XContentData(base, uint32_t(*InterfaceSaveAt(base, *ReplaySlot(base), uint64_t(i))))
+            .file_name_address();
     if (StartsWithRep(base, name)) {
       Store(base, out, Load(base, out) + 1);
     }
@@ -425,7 +434,7 @@ std::optional<uint32_t> ReplaysReadEntry(uint8_t* base, uint32_t index, uint32_t
     ITC_NATIVE_RUNNING("sub_822900E0 Replays::ReadEntry");
     return 4;
   }
-  if (StartsWithRep(base, uint32_t(*save + 264))) {
+  if (StartsWithRep(base, schema::XContentData(base, uint32_t(*save)).file_name_address())) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_822900E0 Replays::ReadEntry");
@@ -509,7 +518,7 @@ std::optional<uint32_t> ReplaysBuildList(
 
 uint32_t PlayTimeUpdate(uint8_t* base, uint32_t save, uint32_t out) {
   ITC_NATIVE_RUNNING("sub_82112838 PlayTime::Update");
-  PlayTimeAdd(base, out, save + 48);
+  PlayTimeAdd(base, out, schema::CareerSave(base, save).stats_address());
   return out;
 }
 

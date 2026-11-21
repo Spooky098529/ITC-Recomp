@@ -11,8 +11,13 @@
 #include "graphics/video_output.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "schema/car_draw.h"
+#include "schema/command_list.h"
+#include "schema/course_scenery.h"
 #include "schema/graphics_resources.h"
 #include "schema/post_effects.h"
+#include "schema/race_update.h"
+#include "schema/screen_objects.h"
 
 #include <bit>
 #include <cmath>
@@ -64,23 +69,28 @@ void ToggleNoHistory(uint8_t* base) {
 
 void ToggleScreenObjectHidden(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_8212EDE0 ScreenObject::ToggleHidden");
-  guest::StoreU8(base, object + 25, guest::LoadU8(base, object + 25) == 0 ? 1 : 0);
+  const schema::ScreenObject screen(base, object);
+  screen.set_hidden(screen.hidden() == 0 ? 1 : 0);
 }
 
 uint32_t ToggleRaceEffects(uint8_t* base, uint32_t race) {
   ITC_NATIVE_RUNNING("sub_8215B690 Race::ToggleEffects");
+  const schema::RaceScene scene_object(base, race);
   uint32_t r3 = 0;
+  // The race's screen object, then split screen's two (+31152 to +31160).
   for (uint32_t i = 0; i < 3; i++) {
-    r3 = guest::LoadU32(base, race + 31152 + 4 * i);
+    r3 = i == 0   ? scene_object.screen_object().address
+         : i == 1 ? scene_object.screen_object_first().address
+                  : scene_object.screen_object_second().address;
     if (r3 != 0) {
       ToggleScreenObjectHidden(base, r3);
     }
   }
   ToggleNoHistory(base);
-  const uint32_t scenery = G::scenery<schema::View>(base).address;
-  guest::StoreU32(base, scenery + 196, guest::LoadU32(base, scenery + 196) ^ 0x4000u);
-  const uint32_t scene = G::scene<schema::View>(base).address;
-  guest::StoreU32(base, scene + 5048, guest::LoadU32(base, scene + 5048) == 0 ? 1 : 0);
+  const schema::Scenery scenery = G::scenery<schema::Scenery>(base);
+  scenery.set_mask(scenery.mask() ^ 0x4000u);
+  const schema::CarScene scene = G::scene<schema::CarScene>(base);
+  scene.set_blink_timers_held(scene.blink_timers_held() == 0 ? 1 : 0);
   return r3;
 }
 
@@ -172,8 +182,9 @@ constexpr uint32_t kZero = 0x82000A34;  // 0.0
 // slots used then below the capacity); the last is the largest unless the
 // count wraps, which is left to the original too.
 bool Room(uint8_t* base, uint32_t list, uint32_t slots) {
-  const uint32_t used = guest::LoadU32(base, list + 12);
-  return used + slots < guest::LoadU32(base, list + 8) && used + slots >= used;
+  const schema::CommandList commands(base, list);
+  const uint32_t used = commands.used();
+  return used + slots < commands.capacity() && used + slots >= used;
 }
 
 uint32_t Slot(uint8_t* base, uint32_t list) {

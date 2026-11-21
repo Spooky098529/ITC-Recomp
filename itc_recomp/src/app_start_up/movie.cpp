@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/app_start_up.h"
 #include "schema/movies.h"
 
 #include <atomic>
@@ -76,8 +77,9 @@ std::optional<uint32_t> MovieWrapperConstruct(uint8_t* base, uint32_t wrapper) {
 std::optional<uint32_t> MovieConstruct(uint8_t* base, uint32_t movie, uint32_t block,
                                        uint32_t frame, const MovieCalls& calls) {
   const schema::Movie m(base, movie);
+  const schema::AppSetUpBlock set_up(base, block);
   m.set_vtable(kMovieVtable);
-  m.set_framework_interface(Load(base, block + 4));
+  m.set_framework_interface(set_up.framework_interface());
   // The command at +12 (as the sound manager's at +1584).
   m.set_command_vtable_4(0x82000AB4);
   m.set_unknown_20(0);
@@ -106,13 +108,13 @@ std::optional<uint32_t> MovieConstruct(uint8_t* base, uint32_t movie, uint32_t b
   Store(base, frame + 80, 1);
   Store(base, frame + 88, kDelegateVtable);
   Store(base, frame + 96, 0x820AE808);
-  calls.virtual_call(Load(base, block + 0), 8, frame + 80, frame + 88, 0x820AEB64);
+  calls.virtual_call(set_up.run_loop().address, 8, frame + 80, frame + 88, 0x820AEB64);
   Store(base, frame + 108, movie);
   Store(base, frame + 80, 1);
   Store(base, frame + 88, 0x82000ABC);
   Store(base, frame + 104, kDelegateVtable);
   Store(base, frame + 112, 0x820AE818);
-  calls.virtual_call(Load(base, block + 0), 4, frame + 80, frame + 104, 0x820AEBAC);
+  calls.virtual_call(set_up.run_loop().address, 4, frame + 80, frame + 104, 0x820AEBAC);
   m.set_state(0);
   return movie;
 }

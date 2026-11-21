@@ -7,7 +7,12 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/camera_modes.h"
+#include "schema/cameras.h"
+#include "schema/car_physics.h"
 #include "schema/car_sounds.h"
+#include "schema/race_states.h"
+#include "schema/race_world.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -24,12 +29,11 @@ namespace {
 using Fpscr = ::base::FloatMode;
 
 // The globals and constants Update3D reads.
-constexpr uint32_t kRaceData = 0x826C5B2C;      // the race data: +0xA3AF0, +0xA3AF4
-constexpr uint32_t kRaceKind = 0xA3AF0;         // 4: the camera pass may be the second
-constexpr uint32_t kRaceMode = 0xA3AF4;         // 8: the side word below picks the car
-constexpr uint32_t kViewports = 0x826C2CE8;     // +0 viewport 0 (+1860 its view mode), +8 the second
-constexpr uint32_t kCameraPasses = 0x826BAC00;  // 592 bytes each
-constexpr uint32_t kSideWords = 0x826C7820;     // +4: which of the vehicle's +6148 bits
+// The race data's kind (4: the camera pass may be the second) and mode (8:
+// the human flag picks the car); the viewports (the first's view mode, the
+// split word picks the second camera pass); the human flag (0x826C7820's
+// +4): which of the vehicle's car flags.
+constexpr uint32_t kCameraPasses = schema::CamerasGlobals::passes_address();  // 592 bytes each
 constexpr uint32_t kVolume = schema::CarSoundsGlobals::effects_volume_address();  // f30
 constexpr uint32_t kZero = 0x82000A34;          // f31
 constexpr uint32_t kTicks = 0x82001FD8;         // the velocities' first factor (splat)
@@ -40,7 +44,8 @@ constexpr uint32_t kDopplerDrop = 0x8200806C;   // the Doppler factor's fall
 constexpr uint32_t kDopplerOne = 0x82007FC8;    // the Doppler factor it falls through
 constexpr uint64_t kHandle =  // lis/addi: sign-extended
     0xFFFFFFFF00000000ull | schema::CarSoundsGlobals::x3daudio_address();
-constexpr uint64_t kSideWords64 = 0xFFFFFFFF826C7820ull;
+constexpr uint64_t kSideWords64 =  // lis/addi: sign-extended
+    0xFFFFFFFF00000000ull | schema::RaceWorldGlobals::start_object_address();
 constexpr uint32_t kCalculateReturn = 0x8210FA64;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
@@ -151,25 +156,25 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
   Store(base, frame, sp);
 
   // The race data's kind and the viewports pick the camera pass.
-  const uint32_t race = Load(base, kRaceData);
-  const uint32_t kind = Load(base, race + kRaceKind);
-  const uint32_t viewports = Load(base, kViewports);
+  const schema::RaceData race = schema::RaceStatesGlobals::race_data(base);
+  const uint32_t kind = race.kind();
+  const schema::Viewports viewports = schema::CameraModesGlobals::viewports(base);
   uint64_t camera64 = 0xFFFFFFFF00000000ull | kCameraPasses;
-  if (kind == 4 && Load(base, viewports + 8) != 0) {
+  if (kind == 4 && viewports.split() != 0) {
     camera64 += 592;
   }
-  const uint32_t camera = uint32_t(camera64);
-  const uint32_t viewport = Load(base, viewports + 0);
+  const schema::CameraPass camera(base, uint32_t(camera64));
+  const schema::Viewport viewport = viewports.first();
   const uint32_t emitter_at = cs.emitter_position_x_address();    // r24
   const uint32_t listener_at = cs.listener_position_x_address();  // r26
   const double volume = Lfs(base, kVolume);  // f30
-  const uint32_t view_mode = Load(base, viewport + 1860);  // r23
+  const uint32_t view_mode = viewport.view_mode();  // r23
   const simde__m128 old_emitter = LoadLanes(base, emitter_at);   // v127
   const simde__m128 old_listener = LoadLanes(base, listener_at); // v126
   const uint32_t zero_word = Word(base, kZero);
   const double zero = Lfs(base, kZero);  // f31
   Store(base, frame + 108, zero_word);
-  const uint32_t mode = Load(base, race + kRaceMode);  // r29
+  const uint32_t mode = race.race_mode();  // r29
   const bool own_view = int32_t(view_mode) == 1 && uint32_t(r4) == 1;
 
   // Whether the car is the one at the camera (its emitter put there, and its
@@ -177,24 +182,24 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
   // vehicle's +6148 (0x1 when it's set, 0x80 when it's 0).
   auto at_camera = [&] {
     if (mode == 8) {
-      const bool side_zero = Load(base, kSideWords + 4) == 0;
+      const bool side_zero = schema::RaceWorldGlobals::human_flag(base) == 0;
       if (!own_view) {
         return false;
       }
-      if (!side_zero && (Load(base, vehicle + 6148) & 0x1) != 0) {
+      if (!side_zero && (schema::Vehicle(base, vehicle).car_flags() & 0x1) != 0) {
         return true;
       }
-      return side_zero && ((Load(base, vehicle + 6148) >> 7) & 1) != 0;
+      return side_zero && ((schema::Vehicle(base, vehicle).car_flags() >> 7) & 1) != 0;
     }
     return own_view;
   };
 
   if (at_camera()) {
     for (uint32_t i = 0; i < 12; i += 4) {
-      Store(base, frame + 96 + i, Word(base, camera + 400 + i));
+      Store(base, frame + 96 + i, Word(base, camera.eye_x_address() + i));
     }
   } else {
-    const uint32_t body = Load(base, cs.vehicle<schema::View>().address + 336);
+    const uint32_t body = cs.vehicle().body<schema::View>().address;
     vector_library::Vec4Copy(base, frame + 96, vehicle_accessors::RigidBodyPosition(body));
   }
 
@@ -206,14 +211,14 @@ uint64_t Update3D(uint8_t* base, uint64_t sound64, uint64_t r4, uint64_t vehicle
   Store(base, cs.emitter_position_z_address(), ez);
   Store(base, emitter_at, ex);
   Store(base, cs.emitter_position_y_address(), ey);
-  Store(base, listener_at, Word(base, camera + 400));
-  Store(base, cs.listener_position_y_address(), Word(base, camera + 404));
-  Store(base, cs.listener_position_z_address(), Word(base, camera + 408));
+  Store(base, listener_at, Word(base, camera.eye_x_address()));
+  Store(base, cs.listener_position_y_address(), Word(base, camera.eye_y_address()));
+  Store(base, cs.listener_position_z_address(), Word(base, camera.eye_z_address()));
   const simde__m128 listener_moved = VectorSub(LoadLanes(base, listener_at), old_listener);
   // The listener's front: the camera pass's +464 and +472, y 0.
-  Store(base, l.front_x_address(), Word(base, camera + 464));
+  Store(base, l.front_x_address(), Word(base, camera.forward_x_address()));
   Store(base, l.front_y_address(), zero_word);
-  const uint32_t front_z = Word(base, camera + 472);
+  const uint32_t front_z = Word(base, camera.forward_z_address());
   const uint32_t ticks = Word(base, kTicks);
   Store(base, frame + 80, ticks);
   Store(base, l.front_z_address(), front_z);

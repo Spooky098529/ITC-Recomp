@@ -9,6 +9,8 @@
 #include "input/input_manager.h"
 #include "memory/c_runtime_heap.h"
 #include "schema/action_mappers.h"
+#include "schema/app_states.h"
+#include "schema/input.h"
 #include "std_list/ptr_list.h"
 
 #include <immintrin.h>
@@ -122,8 +124,7 @@ uint32_t IndexOf(uint32_t id) {
 
 uint32_t ListenerHeld(uint8_t* base, uint32_t listener, uint32_t mask) {
   ITC_NATIVE_RUNNING("sub_825924E0 InputProcessor::AllHeld");
-  // The input processor's held word (+272): input.md's type.
-  return (guest::LoadU32(base, listener + 272) & mask) == mask ? 1 : 0;
+  return (schema::InputProcessor(base, listener).held() & mask) == mask ? 1 : 0;
 }
 
 uint32_t ListenerTestValue(uint8_t* base, uint32_t listener, uint32_t mask) {
@@ -841,10 +842,6 @@ constexpr uint32_t kGetLogicalPad = 0x82098CD0;  // the manager's slot 2
 constexpr uint32_t kAddListener = 0x82099430;    // its slot 3
 constexpr uint32_t kLogicalPadValues = 0x82591B30;  // the pad's slot 1
 
-uint32_t VtableSlot(uint8_t* base, uint32_t object, uint32_t offset) {
-  return guest::LoadU32(base, guest::LoadU32(base, object) + offset);
-}
-
 }  // namespace
 
 bool MapperBindKnown(uint8_t* base, uint32_t mapper, uint32_t object) {
@@ -860,12 +857,11 @@ bool MapperBindKnown(uint8_t* base, uint32_t mapper, uint32_t object) {
       manager.vtable().get_logical_pad() != kGetLogicalPad) {
     return false;
   }
-  const uint32_t list =
-      object + input::kManagerListeners + input::kListenerListBytes * player;
-  const uint32_t pad = input::ManagerLogicalPad(object, player);
-  // The logical pad's slot 1 (input.md's type).
-  return guest::LoadU32(base, list + std_list::kSize) == 0 &&
-         std_list::CanAllocate(base, 1) && VtableSlot(base, pad, 4) == kLogicalPadValues;
+  const schema::PtrList list(base, schema::InputManager(base, object).listener_lists_address() +
+                                       schema::PtrList::kSize * player);
+  const schema::LogicalPad pad(base, input::ManagerLogicalPad(object, player));
+  return list.size() == 0 && std_list::CanAllocate(base, 1) &&
+         pad.vtable().values() == kLogicalPadValues;
 }
 
 uint32_t MapperBind(uint8_t* base, uint32_t mapper, uint32_t object) {

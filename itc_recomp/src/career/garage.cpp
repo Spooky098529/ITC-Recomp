@@ -7,19 +7,22 @@
 #include "car_specs/car_specs.h"
 #include "guest.h"
 #include "race_setup/race_setup.h"
+#include "schema/car_makers.h"
 #include "schema/career.h"
+#include "schema/garage_screen.h"
 
 namespace career {
 
 uint32_t CarSetModelAndClass(uint8_t* base, uint32_t car, uint32_t id, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821104D8 Car::SetModelAndClass");
   const uint32_t frame = sp - kSetModelAndClassFrame;
-  const uint32_t spec = car_specs::GetCarSpec(base, id);
-  const uint32_t old = guest::LoadU32(base, car + 1884);
+  const schema::CarSpec spec(base, car_specs::GetCarSpec(base, id));
+  const schema::GarageCar gc(base, car);
+  const uint32_t old = gc.spec_748();
   race_setup::SetModel(base, car, id);
   // The spec's byte +708 as 0 to 3; above 7, a word of the frame the
   // original never writes (read as it is).
-  const uint32_t kind = guest::LoadU8(base, spec + 708);
+  const uint32_t kind = spec.engine_type();
   uint32_t value;
   if (kind < 3) {
     value = 0;
@@ -33,9 +36,10 @@ uint32_t CarSetModelAndClass(uint8_t* base, uint32_t car, uint32_t id, uint32_t 
     value = guest::LoadU32(base, frame + 80);
   }
   guest::StoreU32(base, car + 1648, value);
-  guest::StoreU32(base, car + 1884, int32_t(old) == 3 ? 3 : guest::LoadU32(base, spec + 748));
-  const uint32_t now = car_specs::GetCarSpec(base, guest::LoadU32(base, car + 12));
-  guest::StoreU32(base, car + 1900, guest::LoadU32(base, now + 744));
+  gc.set_spec_748(int32_t(old) == 3 ? 3 : spec.class_word());
+  // The garage car's head is a car object's (CarMakersCar): +12 its id.
+  const uint32_t now = car_specs::GetCarSpec(base, schema::CarMakersCar(base, car).car_id());
+  gc.set_spec_744(schema::CarSpec(base, now).price());
   return now;
 }
 
@@ -72,7 +76,7 @@ uint32_t GarageAdd(uint8_t* base, uint32_t save, uint32_t car, uint32_t sp, Copy
   if (word != 0) {
     r3 = CarSpecWord744(base, added);
     if (r3 != word) {
-      guest::StoreU32(base, added + 1900, word);
+      schema::GarageCar(base, added).set_spec_744(word);
     }
   }
   return r3;

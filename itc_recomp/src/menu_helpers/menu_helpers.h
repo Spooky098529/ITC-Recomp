@@ -12,10 +12,14 @@
 
 #include <cstdint>
 
+#include "schema/racer_controllers.h"
+
 namespace menu_helpers {
 
-constexpr uint32_t kMapperEntries = 0x826BAB80;      // 8 bytes a player: the mapper, blocked
-constexpr uint32_t kControllerEntries = 0x826BABA4;  // a word a player: its entry's index
+// The players' mapper entries (8 bytes a player, schema::PlayerMapperEntry)
+// and each player's entry index (a word a player): racer-controllers.toml's.
+constexpr uint32_t kMapperEntries = schema::RacerControllersGlobals::mapper_entries_address();
+constexpr uint32_t kControllerEntries = schema::RacerControllersGlobals::player_entries_address();
 // The mapper's read slots the helpers call, and the functions their native
 // paths stand for.
 constexpr uint32_t kPressedOffset = 40;  // slot 10

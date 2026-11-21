@@ -80,16 +80,7 @@ fields = [
   { name = "draw_hook", offset = 4, type = "fn", note = "slot 1, the per-draw hook (empty, sub_82106540)" },
 ]
 
-# The render queue's vtable as the draws reach it through [0x8296B91C] (the
-# scene's +64; the measure files the queue as a scene, so its vtable as
-# "Scene.+0"). device-shaders.toml's RenderQueueVtable is the same table.
-[SceneryRenderQueueVtable]
-measure = "Scene.+0"
-size = 20
-origin = "image"
-fields = [
-  { name = "add", offset = 16, type = "fn", note = "slot 4: an entry handed to the queue (r4 the entry, r5 the sort key, f1 the depth)" },
-]
+# SceneryRenderQueueVtable: merged into device-shaders.toml's RenderQueueVtable at the integration (the same object).
 
 # The object constants Recorder::RecordObject records (its header slot,
 # then c0-c3 = world x view-projection, c4-c7 the world, c8 the camera).
@@ -123,16 +114,7 @@ fields = [
   { name = "second_stride", offset = 24, type = "u32", note = "the shape's +280: the second stream's stride" },
 ]
 
-# The material animation's track set (the model's +364, a TrackSet,
-# model-animation.toml), as sub_825A1148 reads it (never seen in play).
-[SceneryMaterialTrackSet]
-measure = "sub_825A1148.r3"
-size = 20
-origin = "embedded"
-fields = [
-  { name = "section", offset = 0, type = "u32", note = "the part file's section (0: no animation)" },
-  { name = "values", offset = 16, type = "u32", note = "32 bytes a track: four floats and +20 the mask of those set" },
-]
+# SceneryMaterialTrackSet: merged into model-animation.toml's TrackSet at the integration (the same object).
 
 [globals]
 race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (a pointer): +4 the course, +20 flags, +24 the +2124 list's entries' flags, +0x59620 the stages, +0x59AE4 flags, +0xA3AF0 the race kind, +0xA3AF4 the race mode" }

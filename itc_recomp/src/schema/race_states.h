@@ -817,7 +817,7 @@ struct PackedTime : View {
   uint32_t packed_address() const { return address + 0; }
 };
 
-// embedded; measure: RoutePosition::MapToSection.r4, RoutePosition::NotAfter.r4, sub_820FFE98.ret, sub_820FFF10.ret
+// embedded; measure: RoutePosition::MapToSection.r4, RoutePosition::NotAfter.r4, sub_820FFE98.ret, sub_820FFF10.ret, RoutePosition, AiPath::NoteFixedSections.ret
 struct RoutePosition : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -845,7 +845,7 @@ struct SectionsJoinLink : View {
   uint32_t link_address() const { return address + 0; }
 };
 
-// embedded; measure: sub_820FFD48.ret
+// embedded; measure: sub_820FFD48.ret, sub_820FFD48.r3
 struct StageRoute : View {
   using View::View;
   static constexpr uint32_t kSize = 16;

@@ -539,11 +539,15 @@ struct CarSceneDrawGlobals {
   static void set_viewports(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C2CE8u, v); }
   static constexpr uint32_t viewports_address() { return 0x826C2CE8u; }
   // the car scene (scene.md)
-  static View scene(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C2E44u)); }
+  template <typename T = CarScene>
+  static T scene(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C2E44u)); }
+  static void set_scene(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C2E44u, v.address); }
   static void set_scene(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C2E44u, v); }
   static constexpr uint32_t scene_address() { return 0x826C2E44u; }
   // the race data (+0xA3AF0 the race kind, +0x59614, +0x59620 the stages, +0x59AE4)
-  static View race_data(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  template <typename T = RaceData>
+  static T race_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  static void set_race_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B2Cu, v.address); }
   static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
   static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
   // the word Minimap::Draw reads for the human car (0x826C7820's +4)

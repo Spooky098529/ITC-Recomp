@@ -10,12 +10,12 @@
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
 #include "schema/app_start_up.h"
+#include "schema/scene_target.h"
 
 namespace app_start_up {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
@@ -57,30 +57,29 @@ uint32_t SceneTargetConstruct(uint8_t* base, uint32_t target, uint32_t frame,
                               const VideoOutputCall& video_output) {
   ITC_NATIVE_RUNNING("sub_8209B070 SceneTarget::SceneTarget");
   namespace vo = graphics::video_output;
-  Store(base, target + 16, 1024);
-  Store(base, target + 28, 0);
-  Store(base, target + 20, 576);
+  const schema::SceneTarget self(base, target);
+  self.set_width(1024);
+  self.set_mode(0);
+  self.set_height(576);
   const uint32_t local = frame + 80;
   Store(base, local, vo::LockDevice(base, video_output(0)));
-  const uint32_t width = Load(base, target + 16);
-  const uint32_t height = Load(base, target + 20);
+  const uint32_t width = self.width();
+  const uint32_t height = self.height();
   Parameters(base, frame + 112, 0);
   Parameters(base, frame + 96, 0);
-  Store(base, target + 4,
-        graphics::CreateSurface(base, width, height, kColorFormat, 1, frame + 112));
+  self.set_color(graphics::CreateSurface(base, width, height, kColorFormat, 1, frame + 112));
   Store(base, frame + 96, graphics::SurfaceEdramTiles(width, height, kTextureFormat, 1));
   Store(base, frame + 100, 0);
-  Store(base, target + 0,
-        graphics::CreateSurface(base, width, height, kDepthFormat, 1, frame + 96));
-  Store(base, target + 24,
-        graphics::CreateTexture(base, 1280, 720, 1, 1, 0, kTextureFormat, 3));
+  self.set_depth(graphics::CreateSurface(base, width, height, kDepthFormat, 1, frame + 96));
+  self.set_texture(graphics::CreateTexture(base, 1280, 720, 1, 1, 0, kTextureFormat, 3));
   const auto tiling = schema::AppStartUpGlobals::display_tiling(base);
   const uint32_t type = tiling.multisample_type();
   Parameters(base, frame + 112, 0);
   Parameters(base, frame + 96, 0);
   TilingLargestTile(base, tiling.address, frame + 88);
-  const uint32_t tile_width = Load(base, frame + 88);
-  const uint32_t tile_height = Load(base, frame + 92);
+  const schema::TilingTileSize largest(base, frame + 88);
+  const uint32_t tile_width = largest.width();
+  const uint32_t tile_height = largest.height();
   uint32_t w = 0;
   uint32_t h = 0;
   if (type == 0) {
@@ -96,12 +95,12 @@ uint32_t SceneTargetConstruct(uint8_t* base, uint32_t target, uint32_t frame,
   h = (h + 31) & ~31u;
   w = (w + 31) & ~31u;
   const int32_t multisample = int32_t(type);
-  Store(base, target + 12,
-        graphics::CreateSurface(base, w, h, kColorFormat, multisample, frame + 112));
+  self.set_tile_color(
+      graphics::CreateSurface(base, w, h, kColorFormat, multisample, frame + 112));
   Store(base, frame + 96, graphics::SurfaceEdramTiles(w, h, kColorFormat, multisample));
   Store(base, frame + 100, 0);
-  Store(base, target + 8,
-        graphics::CreateSurface(base, w, h, kDepthFormat, multisample, frame + 96));
+  self.set_tile_depth(
+      graphics::CreateSurface(base, w, h, kDepthFormat, multisample, frame + 96));
   vo::UnlockDevice(base, video_output(1), local);
   return target;
 }

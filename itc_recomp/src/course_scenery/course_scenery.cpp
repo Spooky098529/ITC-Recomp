@@ -18,6 +18,8 @@
 #include "native/buffers.h"
 #include "scenery_lists/scenery_lists.h"
 #include "schema/course_scenery.h"
+#include "schema/models.h"
+#include "schema/scenery_lists.h"
 
 #include <cstdlib>
 #include <initializer_list>
@@ -717,18 +719,19 @@ void LimitLargeModels(uint8_t* base, uint32_t manager, uint32_t stack) {
 
 void ModelListInit(uint8_t* base, uint32_t list) {
   ITC_NATIVE_RUNNING("sub_820F1A20 ModelList::Init");
-  const uint32_t nodes = list + 4;
+  const schema::ModelList l(base, list);
+  const uint32_t nodes = l.nodes_address();
   for (uint32_t i = 0; i < 64; i++) {
     guest::StoreU16(base, nodes + 4 * i + 2, uint16_t(i));
     guest::StoreU16(base, nodes + 4 * i + 0, uint16_t(i + 1));
   }
-  guest::StoreU16(base, nodes + 256, 0);
-  guest::StoreU16(base, nodes + 264, 0);
-  guest::StoreU16(base, nodes + 252, 0xFFFF);
-  guest::StoreU16(base, nodes + 260, 0xFFFF);
-  guest::StoreU16(base, nodes + 262, 0xFFFF);
-  guest::StoreU16(base, nodes + 258, 0xFFFF);
-  Store(base, list + 0, 0);
+  l.set_free_head(0);
+  l.set_list_count(0);
+  l.set_node63_next(0xFFFF);
+  l.set_head(0xFFFF);
+  l.set_list_262(0xFFFF);
+  l.set_list_258(0xFFFF);
+  l.set_count(0);
 }
 
 void ClearGlobal(uint8_t* base) {
@@ -1329,7 +1332,7 @@ struct ParseCalls {
 uint32_t LoadModel(uint8_t* base, ParseCalls& parse, uint32_t model, uint32_t entry,
                    uint32_t lr) {
   if (model != 0 && models::ModelLoad(base, model, entry, 0, parse.ModelLoad())) {
-    return Load(base, model + 412);
+    return schema::Model(base, model).shape_count();
   }
   return parse.Call(lr, 0x82596920, {model, entry, 0});
 }
@@ -1566,7 +1569,11 @@ void CourseSetInitParts(uint8_t* base, const Calls& calls, uint32_t stack, uint3
   for (uint32_t offset : {464u, 1000u, 1532u, 2060u, 2588u, 3116u}) {
     ModelListInit(base, parts + offset);
   }
-  for (uint32_t offset : {608u, 612u, 616u, 620u}) Store(base, parts + 3116 + offset, 0);
+  const schema::ModelList points(base, parts + 3116);
+  points.set_animations(0u);
+  points.set_texture_provider(0);
+  points.set_first_group(0);
+  points.set_point_group_count(0);
 }
 
 void AreaModelConstruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model,

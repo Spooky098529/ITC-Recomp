@@ -8,6 +8,7 @@
 #include "guest.h"
 #include "memory/heap.h"
 #include "schema/menu_helpers.h"
+#include "schema/type67_screens.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -28,6 +29,7 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 
 using G = schema::OptionsScreenGlobals;
 using S = schema::OptionsSettings;
+using Node = schema::UiMovieNode;
 
 S Settings(uint8_t* base) { return G::settings(base); }
 
@@ -55,7 +57,7 @@ void StoreTable(uint8_t* base, uint32_t at, const uint32_t (&table)[n]) {
 // `page` after, and the sub-pages' to 5.
 void CancelDialog(uint8_t* base, uint32_t pages_global, uint32_t step, uint32_t page) {
   if (Settings(base).dialog_cancel() == 0 ||
-      LoadU32(base, LoadU32(base, pages_global) + 0) == 5) {
+      schema::OptionsSubPageBlock(base, LoadU32(base, pages_global)).page() == 5) {
     return;
   }
   const schema::PageObject p = G::pages(base);
@@ -67,14 +69,14 @@ void CancelDialog(uint8_t* base, uint32_t pages_global, uint32_t step, uint32_t 
   p.set_queued_step(kMinusOne);
   p.set_next_page(page);
   p.set_page(kMinusOne);
-  const uint32_t pages = LoadU32(base, pages_global);
-  const uint32_t sub = LoadU32(base, pages + 0);
+  const schema::OptionsSubPageBlock pages(base, LoadU32(base, pages_global));
+  const uint32_t sub = pages.page();
   if (sub != 5) {
-    StoreU32(base, pages + 8, sub);
+    pages.set_previous_page(sub);
   }
-  StoreU32(base, pages + 12, kMinusOne);
-  StoreU32(base, pages + 16, kMinusOne);
-  StoreU32(base, pages + 0, 5);
+  pages.set_step(kMinusOne);
+  pages.set_queued_step(kMinusOne);
+  pages.set_page(5);
 }
 
 }  // namespace
@@ -160,7 +162,7 @@ uint64_t SavePage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   static constexpr uint32_t kPages[7] = {0x821BBC10, 0x821BC7B0, 0x821BC940, 0x821C2620,
                                          0x821B9FB0, 0x821B9FF8, 0x821BBC68};
   StoreTable(base, frame + 80, kPages);
-  const int32_t sub = int32_t(LoadU32(base, G::load_pages(base) + 0));
+  const int32_t sub = int32_t(schema::OptionsLoadSaveGlobals::load_pages(base).page());
   if (sub >= 0) {
     const uint32_t handler = LoadU32(base, frame + 80 + (uint32_t(sub) << 2));
     CallAll(calls, handler, frame, 0x821C705C,
@@ -177,7 +179,7 @@ uint64_t Category6Page(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, con
   static constexpr uint32_t kPages[6] = {0x821BBCC0, 0x821BCA60, 0x821BCC10,
                                          0x821BBD18, 0x821BA508, 0x821B9FF8};
   StoreTable(base, frame + 80, kPages);
-  const int32_t sub = int32_t(LoadU32(base, G::save_pages(base) + 0));
+  const int32_t sub = int32_t(schema::OptionsLoadSaveGlobals::save_pages(base).page());
   if (sub < 0) {
     return r3;
   }
@@ -234,18 +236,20 @@ uint64_t ShowPrompts(uint8_t* base, const uint64_t (&values)[6], uint32_t sp) {
   uint32_t r3 = 0;
   for (uint32_t i = 0; i < 3; i++) {
     const uint32_t prompt = ui_movies::FindNode(base, m, 1, i);
-    const uint32_t first = ui_movies::FindNode(base, m, 1, LoadU32(base, prompt + 100));
-    const uint32_t second = ui_movies::FindNode(base, m, 1, LoadU32(base, prompt + 100) + 1);
+    const uint32_t first =
+        ui_movies::FindNode(base, m, 1, LoadU32(base, Node(base, prompt).width_address()));
+    const uint32_t second =
+        ui_movies::FindNode(base, m, 1, LoadU32(base, Node(base, prompt).width_address()) + 1);
     r3 = second;
     const uint32_t a = LoadU32(base, frame + 88 + 4 * i);
     const uint32_t b = LoadU32(base, frame + 104 + 4 * i);
     if (a == kMinusOne || b == kMinusOne) {
-      StoreU32(base, prompt + 80, 0);
+      Node(base, prompt).set_visible(0);
       continue;
     }
-    StoreU32(base, prompt + 80, 1);
-    StoreU32(base, first + 108, a);
-    StoreU32(base, second + 108, b);
+    Node(base, prompt).set_visible(1);
+    Node(base, first).set_texture_entry(a);
+    Node(base, second).set_texture_entry(b);
   }
   return r3;
 }
@@ -260,8 +264,8 @@ uint64_t SettingsReload(uint8_t* base, uint32_t sp, const Calls& calls) {
       calls.Call(kShowCareerInfo, frame, 0x821C1044);
       career::PlayTimeMark(base, vehicle_accessors::SaveDataOf(base, 0));
       break;
-    case 2: StoreU32(base, 0x826367E8 + 1972, kMinusOne); break;
-    case 3: StoreU32(base, 0x826371D0 + 1972, kMinusOne); break;
+    case 2: schema::Type67ScreensGlobals::set_type6_car_list(base, kMinusOne); break;
+    case 3: schema::Type67ScreensGlobals::set_type7_car_list(base, kMinusOne); break;
     default: break;
   }
   return SettingsRead(base, frame, calls);
@@ -274,12 +278,12 @@ uint64_t OnLeft(uint8_t* base, uint32_t sp, const Calls& calls) {
   // and slot 5 (ReleaseBank: bank 2 at +88).
   StoreU32(base, frame + 80, 0);
   StoreU32(base, frame + 84, 2);
-  uint32_t manager = LoadU32(base, kSoundManagerGlobal);
-  calls.Call(LoadU32(base, LoadU32(base, manager) + 52), frame, 0x821B9EAC, manager, frame + 84,
+  schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
+  calls.Call(manager.vtable().stop_cue(), frame, 0x821B9EAC, manager.address, frame + 84,
              frame + 80);
-  manager = LoadU32(base, kSoundManagerGlobal);
+  manager = schema::MenuSoundsGlobals::sound_manager(base);
   StoreU32(base, frame + 88, 2);
-  calls.Call(LoadU32(base, LoadU32(base, manager) + 20), frame, 0x821B9EC8, manager, frame + 88);
+  calls.Call(manager.vtable().release_bank(), frame, 0x821B9EC8, manager.address, frame + 88);
   // VirtualFree(block, 0, MEM_RELEASE) of the seven blocks, over the
   // allocation layer's pages (the adapter runs it only with the native
   // heap active), then the globals 0.
@@ -364,15 +368,15 @@ uint64_t SetUpMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t title = ui_movies::FindNode(base, m, 17, 1);
   // The career's panel (context 1) or the others' with the title's frame.
   const auto others = [&](uint32_t title_frame) {
-    StoreU32(base, career + 80, 0);
-    StoreU32(base, other + 80, 1);
-    StoreU32(base, title + 108, title_frame);
+    Node(base, career).set_visible(0);
+    Node(base, other).set_visible(1);
+    Node(base, title).set_texture_entry(title_frame);
   };
   switch (Settings(base).context()) {
     case 0: others(4); break;
     case 1: {
-      StoreU32(base, career + 80, 1);
-      StoreU32(base, other + 80, 0);
+      Node(base, career).set_visible(1);
+      Node(base, other).set_visible(0);
       calls.Call(kSetChildNameText, frame, 0x821BD0D4, m, 16, 6, Settings(base).name_0_address());
       calls.Call(kSetNumberText, frame, 0x821BD0EC, m, 16, 9, Settings(base).money());
       // UiMovie::SetText(m, 16, 13, 8, the day): its unset varargs r8 to
@@ -380,7 +384,7 @@ uint64_t SetUpMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
       CallAll(calls, kSetText, frame, 0x821BD108,
               {m, 16, 13, 8, Settings(base).day(), 0, 0, 0});
       const uint32_t weekday = ui_movies::FindNode(base, m, 16, 11);
-      StoreU32(base, weekday + 108, Settings(base).day_of_week());
+      Node(base, weekday).set_texture_entry(Settings(base).day_of_week());
       break;
     }
     case 2: others(0); break;
@@ -388,20 +392,20 @@ uint64_t SetUpMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
     case 4: others(2); break;
     default: break;
   }
-  StoreU32(base, ui_movies::FindNode(base, m, 1, 4) + 108, 0);
-  StoreU32(base, ui_movies::FindNode(base, m, 1, 5) + 108, 0);
-  StoreU32(base, ui_movies::FindNode(base, m, 1, 6) + 108, 1);
-  StoreU32(base, ui_movies::FindNode(base, m, 1, 7) + 108, 1);
-  StoreU32(base, ui_movies::FindNode(base, m, 1, 8) + 80, 0);
-  StoreU32(base, ui_movies::FindNode(base, m, 1, 9) + 80, 0);
+  Node(base, ui_movies::FindNode(base, m, 1, 4)).set_texture_entry(0);
+  Node(base, ui_movies::FindNode(base, m, 1, 5)).set_texture_entry(0);
+  Node(base, ui_movies::FindNode(base, m, 1, 6)).set_texture_entry(1);
+  Node(base, ui_movies::FindNode(base, m, 1, 7)).set_texture_entry(1);
+  Node(base, ui_movies::FindNode(base, m, 1, 8)).set_visible(0);
+  Node(base, ui_movies::FindNode(base, m, 1, 9)).set_visible(0);
   // The menu music playing: the first of bank 1's cues 0 to 3 the sound
   // manager's slot 14 (IsCuePlaying, bank at +88 and cue at +84) answers.
   uint64_t r3 = 0;
   for (uint32_t cue = 0; cue < 4; cue++) {
     StoreU32(base, frame + 84, cue);
     StoreU32(base, frame + 88, 1);
-    const uint32_t manager = LoadU32(base, kSoundManagerGlobal);
-    r3 = calls.Call(LoadU32(base, LoadU32(base, manager) + 56), frame, 0x821BD1EC, manager,
+    const schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
+    r3 = calls.Call(manager.vtable().is_cue_playing(), frame, 0x821BD1EC, manager.address,
                     frame + 88, frame + 84);
     if ((r3 & 0xFF) != 0) {
       Settings(base).set_menu_music_cue(cue);

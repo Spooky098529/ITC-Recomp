@@ -18,6 +18,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/scenery_lists.h"
 #include "minimap/minimap.h"
+#include "schema/device_shaders.h"
 #include "schema/minimap.h"
 #include "lifted/sdk.h"
 
@@ -140,7 +141,7 @@ ITC_REGS_STEP(MinimapTriangleRecordFlat) {
     ctx.r5.u64 = key;
     ctx.fpscr.disableFlushMode();
     ctx.f1.f64 = double(schema::MinimapGlobals::zero(base));
-    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+    lifted::CallFromContext(ctx, base, schema::RenderQueue(base, queue).vtable().add());
   });
   ctx.lr = lr;
 }

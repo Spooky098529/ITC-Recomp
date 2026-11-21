@@ -8,51 +8,6 @@
 
 namespace schema {
 
-// file; measure: UiMovies::Find.ret.+0
-struct UiMovieObject : View {
-  using View::View;
-  static constexpr uint32_t kSize = 20048;
-  // the live scene (animated and drawn)
-  uint32_t live_scene() const { return guest::LoadU32(base, address + 16); }
-  void set_live_scene(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t live_scene_address() const { return address + 16; }
-  // the live pose saved at each update's start
-  uint32_t saved_scene() const { return guest::LoadU32(base, address + 20); }
-  void set_saved_scene(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t saved_scene_address() const { return address + 20; }
-  // the file's scene (for resets)
-  uint32_t file_scene() const { return guest::LoadU32(base, address + 24); }
-  void set_file_scene(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
-  uint32_t file_scene_address() const { return address + 24; }
-  // the texture vector's data
-  template <typename T = UiMovieTextureTable>
-  T textures() const { return T(base, guest::LoadU32(base, address + 28)); }
-  void set_textures(const View& v) const { guest::StoreU32(base, address + 28, v.address); }
-  void set_textures(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t textures_address() const { return address + 28; }
-  // 512
-  uint32_t texture_capacity() const { return guest::LoadU32(base, address + 32); }
-  void set_texture_capacity(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
-  uint32_t texture_capacity_address() const { return address + 32; }
-  uint32_t texture_count() const { return guest::LoadU32(base, address + 36); }
-  void set_texture_count(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
-  uint32_t texture_count_address() const { return address + 36; }
-  // the text list's items (128 bytes each)
-  uint32_t texts() const { return guest::LoadU32(base, address + 40); }
-  void set_texts(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
-  uint32_t texts_address() const { return address + 40; }
-  uint32_t text_capacity() const { return guest::LoadU32(base, address + 44); }
-  void set_text_capacity(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
-  uint32_t text_capacity_address() const { return address + 44; }
-  uint32_t text_count() const { return guest::LoadU32(base, address + 48); }
-  void set_text_count(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
-  uint32_t text_count_address() const { return address + 48; }
-  // measure fault: LocationScreen::Page0's r31 is an image base, r31 + 20044 the global 0x82814E4C (the location's menu), not a field
-  uint32_t fault_location_menu() const { return guest::LoadU32(base, address + 20044); }
-  void set_fault_location_menu(uint32_t v) const { guest::StoreU32(base, address + 20044, v); }
-  uint32_t fault_location_menu_address() const { return address + 20044; }
-};
-
 // embedded; measure: UiMovies::Find.ret.+0.+28
 struct UiMovieTextureTable : View {
   using View::View;
@@ -199,7 +154,7 @@ struct UiMovieTextureTable : View {
   uint32_t texture_196_address() const { return address + 784; }
 };
 
-// embedded; measure: UiMovies::Find.ret.+0.+28.+640, UiMovies::Find.ret.+0.+28.+644, UiMovies::Find.ret.+0.+28.+648, UiMovies::Find.ret.+0.+28.+652, UiMovies::Find.ret.+0.+28.+656, UiMovies::Find.ret.+0.+28.+660, UiMovies::Find.ret.+0.+28.+672, UiMovies::Find.ret.+0.+28.+676, UiMovies::Find.ret.+0.+28.+680, UiMovies::Find.ret.+0.+28.+684, UiMovies::Find.ret.+0.+28.+688, UiMovies::Find.ret.+0.+28.+692, UiMovies::Find.ret.+0.+28.+700, UiMovies::Find.ret.+0.+28.+708, UiMovies::Find.ret.+0.+28.+712, UiMovies::Find.ret.+0.+28.+724, UiMovies::Find.ret.+0.+28.+732, UiMovies::Find.ret.+0.+28.+736, UiMovies::Find.ret.+0.+28.+764, UiMovies::Find.ret.+0.+28.+768, UiMovies::Find.ret.+0.+28.+772, UiMovies::Find.ret.+0.+28.+776, UiMovies::Find.ret.+0.+28.+780, UiMovies::Find.ret.+0.+28.+784
+// embedded; measure: UiMovies::Find.ret.+0.+28.+640, UiMovies::Find.ret.+0.+28.+644, UiMovies::Find.ret.+0.+28.+648, UiMovies::Find.ret.+0.+28.+652, UiMovies::Find.ret.+0.+28.+656, UiMovies::Find.ret.+0.+28.+660, UiMovies::Find.ret.+0.+28.+672, UiMovies::Find.ret.+0.+28.+676, UiMovies::Find.ret.+0.+28.+680, UiMovies::Find.ret.+0.+28.+684, UiMovies::Find.ret.+0.+28.+688, UiMovies::Find.ret.+0.+28.+692, UiMovies::Find.ret.+0.+28.+700, UiMovies::Find.ret.+0.+28.+708, UiMovies::Find.ret.+0.+28.+712, UiMovies::Find.ret.+0.+28.+724, UiMovies::Find.ret.+0.+28.+732, UiMovies::Find.ret.+0.+28.+736, UiMovies::Find.ret.+0.+28.+764, UiMovies::Find.ret.+0.+28.+768, UiMovies::Find.ret.+0.+28.+772, UiMovies::Find.ret.+0.+28.+776, UiMovies::Find.ret.+0.+28.+780, UiMovies::Find.ret.+0.+28.+784, UiMovies::Find.ret.+0.+28.+636
 struct UiMovieTexture : View {
   using View::View;
   static constexpr uint32_t kSize = 12;

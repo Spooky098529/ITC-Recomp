@@ -13,7 +13,10 @@
 #include "c_runtime/math.h"
 #include "car_scene_draw/ops.h"
 #include "guest.h"
+#include "schema/car_draw.h"
 #include "schema/front_end_car_draw.h"
+#include "schema/stand_models.h"
+#include "schema/type6_type7_modes.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -25,6 +28,9 @@ namespace {
 using namespace car_scene_draw::ops;
 
 using G = schema::FrontEndCarDrawGlobals;
+using Slot = schema::StandSlot;
+using Stage = schema::GarageStage;
+using Block = schema::CarDrawBlock;
 
 // The return addresses of the original's calls.
 constexpr uint32_t kWorldMemcpy = 0x8217CB4C;
@@ -67,10 +73,12 @@ uint32_t GarageStagePoseCar(uint8_t* base, const Calls& calls, uint32_t holder, 
   ITC_NATIVE_RUNNING("sub_8217CAB8 GarageStage::PoseCar");
   const uint32_t f = stack - 800;
   Store(base, f, stack);
-  vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7,
-                                    Load(base, Load(base, holder) + 8));
-  const uint32_t world = block + 16;
-  Store(base, block + 732, 1);
+  const Slot slot(base, holder);
+  const Block blk(base, block);
+  vehicle_accessors::ScenePoolsGetB(base, schema::CarDrawGlobals::scene(base).address, 7,
+                                    slot.stage().model_index());
+  const uint32_t world = blk.world_address();
+  blk.set_no_side_offset(1);
   StoreIdentity(base, f + 96);
   Memcpy(base, calls, world, f + 96, 64, f, kWorldMemcpy);
   StoreIdentity(base, f + 96);
@@ -79,19 +87,19 @@ uint32_t GarageStagePoseCar(uint8_t* base, const Calls& calls, uint32_t holder, 
   Memcpy(base, calls, out, f + 96, 64, f, kOutMemcpy);
 
   // The body's height and pitch.
-  uint32_t s = Load(base, holder);
+  Stage s = slot.stage();
   const double half = double(G::half(base));
-  Stfs(base, s + 6144, Fmuls(Fadds(Lfs(base, s + 6140), Lfs(base, s + 6136)), half));
-  s = Load(base, holder);
-  const double rise = Fsubs(Lfs(base, s + 6136), Lfs(base, s + 6140));
-  const double pitch_angle = Frsp(c_runtime::Atan2(rise, Lfs(base, s + 6152)));
-  s = Load(base, holder);
-  Stfs(base, s + 6148, pitch_angle);
-  s = Load(base, holder);
+  s.set_mean_height(float(Fmuls(Fadds(double(s.rear_height()), double(s.front_height())), half)));
+  s = slot.stage();
+  const double rise = Fsubs(double(s.front_height()), double(s.rear_height()));
+  const double pitch_angle = Frsp(c_runtime::Atan2(rise, double(s.wheelbase())));
+  s = slot.stage();
+  s.set_pitch(float(pitch_angle));
+  s = slot.stage();
   StoreIdentity(base, f + 96);
-  const double height = Lfs(base, s + 6144);
-  const double pitch = Lfs(base, s + 6148);
-  Copy16(base, f + 400, s + 80);
+  const double height = double(s.mean_height());
+  const double pitch = double(s.pitch());
+  Copy16(base, f + 400, s.angle_x_address());
   Copy64(base, f + 208, f + 96);
   Stfs(base, f + 260, height);
   const double zero = double(G::zero(base));
@@ -114,38 +122,39 @@ uint32_t GarageStagePoseCar(uint8_t* base, const Calls& calls, uint32_t holder, 
   for (uint32_t a = 0; a < 2; a++) {
     for (uint32_t side = 0; side < 2; side++) {
       const uint32_t i = 2 * a + side;
-      const uint32_t wheel_turn = block + 336 + 64 * i;
-      const uint32_t placement = block + 80 + 64 * i;
+      const uint32_t wheel_turn = blk.wheel_spins_address() + 64 * i;
+      const uint32_t placement = blk.wheel_turns_address() + 64 * i;
       StoreIdentity(base, f + 96);
       Memcpy(base, calls, wheel_turn, f + 96, 64, f, kTurnsMemcpy);
       StoreIdentity(base, f + 272);
       Memcpy(base, calls, placement, f + 272, 64, f, kPlacementsMemcpy);
 
       // The camber (negated on side 1), then the toe (negated on side 0).
-      s = Load(base, holder);
-      const double camber = Lfs(base, s + (a == 0 ? 6112 : 6116));
+      s = slot.stage();
+      const double camber = double(a == 0 ? s.front_camber() : s.rear_camber());
       Stfs(base, angle, side == 1 ? Fneg(camber) : camber);
       matrix_math::RotateX(base, wheel_turn, wheel_turn, angle, turn);
-      s = Load(base, holder);
-      const double toe = Lfs(base, s + (a == 0 ? 6120 : 6124));
+      s = slot.stage();
+      const double toe = double(a == 0 ? s.front_toe() : s.rear_toe());
       Stfs(base, angle, side == 0 ? Fneg(toe) : toe);
       matrix_math::RotateY(base, wheel_turn, wheel_turn, angle, turn);
 
       // The placement: x half the wheelbase (negated at the rear), y the
       // side's height less the body's, z the axle's track (negated on side
       // 0), then turned back by the pitch.
-      s = Load(base, holder);
-      const double wheelbase = Lfs(base, s + 6152);
+      s = slot.stage();
+      const double wheelbase = double(s.wheelbase());
       const double x = a == 0 ? Fmuls(wheelbase, half) : Fneg(Fmuls(wheelbase, half));
-      const double track = Lfs(base, s + (a == 0 ? 6184 : 6200));
+      const double track = double(a == 0 ? s.front_axle_z() : s.rear_axle_z());
       const double z = side == 0 ? Fneg(track) : track;
-      const double side_height = Lfs(base, s + (side == 0 ? 6104 : 6108));
+      const double side_height =
+          double(side == 0 ? s.front_wheel_height() : s.rear_wheel_height());
       StoreIdentity(base, f + 336);
-      const double y = Fsubs(side_height, Lfs(base, s + 6144));
+      const double y = Fsubs(side_height, double(s.mean_height()));
       Copy64(base, f + 480, f + 336);
       StoreIdentity(base, f + 208);
       Copy64(base, f + 544, f + 208);
-      Stfs(base, angle, Fneg(Lfs(base, s + 6148)));
+      Stfs(base, angle, Fneg(double(s.pitch())));
       matrix_math::RotateZ(base, f + 544, f + 544, angle, turn);
       Stfs(base, f + 528, x);
       Stfs(base, f + 532, y);

@@ -313,7 +313,9 @@ fields = [
 # met whole as a word. RoutePosition::NotAfter's and MapToSection's
 # argument, the copies sub_820FFE98 and sub_820FFF10 answer.
 [RoutePosition]
-measures = ["RoutePosition::MapToSection.r4", "RoutePosition::NotAfter.r4", "sub_820FFE98.ret", "sub_820FFF10.ret"]
+# measures from VehicleRoutePosition (vehicle), merged at the integration
+measures = ["RoutePosition::MapToSection.r4", "RoutePosition::NotAfter.r4", "sub_820FFE98.ret", "sub_820FFF10.ret",
+  "RoutePosition", "AiPath::NoteFixedSections.ret"]
 size = 4
 origin = "embedded"
 fields = [
@@ -335,6 +337,8 @@ fields = [
 # A stage's route (16 bytes, the stage's +24 copied by sub_820FFD48; the
 # race data's +4 route and the progress's +6076 have the same layout).
 [StageRoute]
+# measures from AccessorStageRoute (vehicle-accessors), merged at the integration
+measures = ["sub_820FFD48.r3"]
 measure = "sub_820FFD48.ret"
 size = 16
 origin = "embedded"

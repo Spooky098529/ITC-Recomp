@@ -79,6 +79,14 @@ struct RouteRange : View {
   uint32_t check_beside() const { return guest::LoadU32(base, address + 1060); }
   void set_check_beside(uint32_t v) const { guest::StoreU32(base, address + 1060, v); }
   uint32_t check_beside_address() const { return address + 1060; }
+  // measure fault: RouteRange::Advance's and ToNeighbor's r3 is an out position on the stack (section at +0), joined with the range; tools/type_map.py should split it
+  uint16_t fault_out_section() const { return guest::LoadU16(base, address + 0); }
+  void set_fault_out_section(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t fault_out_section_address() const { return address + 0; }
+  // measure fault: the out position's slice at +2 (Advance, ToNeighbor)
+  uint16_t fault_out_slice() const { return guest::LoadU16(base, address + 2); }
+  void set_fault_out_slice(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t fault_out_slice_address() const { return address + 2; }
 };
 
 // allocated; measure: TrackZones

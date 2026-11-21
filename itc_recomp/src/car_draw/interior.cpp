@@ -17,7 +17,11 @@
 #include "material_passes/material_passes.h"
 #include "matrix_math/matrix_math.h"
 #include "scene_models/scene_models.h"
+#include "schema/accessories.h"
+#include "schema/cameras.h"
 #include "schema/car_draw.h"
+#include "schema/models.h"
+#include "schema/second_set.h"
 
 namespace car_draw {
 
@@ -34,7 +38,7 @@ constexpr uint32_t kPoseDials = 0x820E45A8;
 constexpr uint32_t kAccessoryDraw = 0x820EFA78;
 using G = schema::CarDrawGlobals;
 
-constexpr uint32_t kCameraPasses = 0x826BAC00;
+constexpr uint32_t kCameraPasses = schema::CamerasGlobals::passes_address();
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -71,7 +75,7 @@ Left InteriorDrawDialFaces(uint8_t* base, const Calls& calls, uint32_t stack, ui
                            uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820E3170 InteriorDials::DrawFaces");
   const uint32_t frame = Frame(base, stack, kInteriorSmallFrame);
-  const uint32_t world = block + 16, vp = pass + 144;
+  const uint32_t world = block + 16, vp = schema::CameraPass(base, pass).view_projection_address();
   const schema::InteriorDials dials(base, group);
   const uint32_t speed = dials.record().speedometer() == 0 ? Record(4) : Record(5);
   Left left = Part(base, calls, frame, group + speed, vp, world, caller_r24, caller_r28,
@@ -96,8 +100,8 @@ Left InteriorDrawDigitalSpeed(uint8_t* base, const Calls& calls, uint32_t stack,
   // divw by 10 (truncating; INT32_MIN / 10 is defined).
   auto divw = [](int32_t a) { return a / 10; };
   const uint32_t provider = dials.digit_provider();
-  const uint32_t kept = Load(base, model + 48);
-  Store(base, model + 48, provider);
+  const uint32_t kept = schema::Model(base, model).texture_provider().address;
+  schema::Model(base, model).set_texture_provider(provider);
   const int32_t tens = divw(n);
   material_passes::SetTexture(base, model, uint32_t(n) - uint32_t(tens) * 10u,
                               int32_t(dials.ones_shape()), frame);
@@ -106,13 +110,13 @@ Left InteriorDrawDigitalSpeed(uint8_t* base, const Calls& calls, uint32_t stack,
                               int32_t(dials.tens_shape()), frame);
   material_passes::SetTexture(base, model, uint32_t(tens_tens),
                               int32_t(dials.hundreds_shape()), frame);
-  const uint32_t world = block + 16, vp = pass + 144;
+  const uint32_t world = block + 16, vp = schema::CameraPass(base, pass).view_projection_address();
   // r28 the view-projection from here on.
   Part(base, calls, frame, group + Record(9), vp, world, caller_r24, vp, 0x820E3A9C);
   Part(base, calls, frame, group + Record(10), vp, world, caller_r24, vp, 0x820E3AB4);
   const Left left =
       Part(base, calls, frame, group + Record(11), vp, world, caller_r24, vp, 0x820E3ACC);
-  Store(base, model + 48, kept);
+  schema::Model(base, model).set_texture_provider(kept);
   return left;
 }
 
@@ -161,7 +165,7 @@ Left InteriorDrawMeterFaces(uint8_t* base, const Calls& calls, uint32_t stack, u
   ITC_NATIVE_RUNNING("sub_820E3AD8 InteriorMeters::DrawFaces");
   const uint32_t frame = Frame(base, stack, kInteriorMetersFrame);
   const uint32_t group = uint32_t(group64);
-  const uint32_t world = block + 16, vp = pass + 144;
+  const uint32_t world = block + 16, vp = schema::CameraPass(base, pass).view_projection_address();
   Left left{false, group64};
   uint32_t r28 = 0;
   for (uint32_t i = 0; i < 7; i++) {
@@ -197,7 +201,7 @@ Left InteriorDrawRollCage(uint8_t* base, const Calls& calls, uint32_t stack, uin
                           uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820E3548 InteriorPoints::DrawRollCage");
   const uint32_t frame = Frame(base, stack, kInteriorSmallFrame);
-  const uint32_t world = block + 16, vp = pass + 144;
+  const uint32_t world = block + 16, vp = schema::CameraPass(base, pass).view_projection_address();
   const int32_t cage = int32_t(schema::InteriorRecord(base, Load(base, group)).roll_cage());
   if (cage == 1 || cage == 2) {
     Part(base, calls, frame, group + Record(cage - 1), vp, world, caller_r24, caller_r28,
@@ -270,7 +274,7 @@ Left InteriorDrawSeats(uint8_t* base, const Calls& calls, uint32_t stack, uint32
             0x820E3DC8);
   SeatWorld(base, frame, frame + 144, frame + 400, Load(base, group + 4) + 16, world, one,
             0x820E3E58, 0x820E3E64);
-  const uint32_t vp = pass + 144;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address();
   if (int32_t(schema::InteriorRecord(base, Load(base, group)).seat_model()) == 0) {
     // The stock seats, with the block's world (the seat worlds unused).
     Part(base, calls, frame, group + Record(2), vp, world, caller_r24, caller_r28, 0x820E404C);
@@ -324,7 +328,7 @@ constexpr uint32_t kRollCage = 10464;
 // `frame` returning to `lr`: its plain C++, else its original.
 Left Body(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t points,
           schema::CarScene scene, uint32_t block, uint32_t pass, uint32_t r24, uint32_t lr) {
-  const uint32_t world = block + 16, vp = pass + 144;
+  const uint32_t world = block + 16, vp = schema::CameraPass(base, pass).view_projection_address();
   const uint32_t r6 =
       (scene.pass_mask() & 0x2) != 0 ? schema::CarDrawBlock(base, block).cockpit_only() : 0;
   const auto draw = CarPartDraw(base, calls, frame, points, vp, world, r6, 0, r24, world);
@@ -345,14 +349,14 @@ Left Steering(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t points
   const uint32_t group = points + kSteering;
   const uint32_t record =
       group + schema::InteriorRecord(base, Load(base, group)).steering_wheel() * 240 + 16;
-  return Part(base, calls, frame, record, pass + 144, block + 16, r24, block + 16, lr);
+  return Part(base, calls, frame, record, schema::CameraPass(base, pass).view_projection_address(), block + 16, r24, block + 16, lr);
 }
 
 // The scene's current camera pass: 0x826BAC00 + 592 x [scene + 5072], or 0
 // when it's 0 or disabled (its +588).
 uint32_t CurrentPass(uint8_t* base, schema::CarScene scene) {
-  const uint32_t pass = kCameraPasses + scene.pass_camera() * 592;
-  if (int32_t(pass) == 0 || int32_t(Load(base, pass + 588)) == 0) {
+  const uint32_t pass = kCameraPasses + scene.pass_camera() * schema::CameraPass::kSize;
+  if (int32_t(pass) == 0 || int32_t(schema::CameraPass(base, pass).enabled()) == 0) {
     return 0;
   }
   return pass;
@@ -403,12 +407,13 @@ Left SceneInteriorDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64
   ITC_NATIVE_RUNNING("sub_820E53F0 SceneInterior::Draw");
   const uint32_t frame = Frame(base, stack, kInteriorSmallFrame);
   const uint32_t interior = uint32_t(interior64);
+  const schema::SceneInterior object(base, interior);
   Left left{false, interior64};
   uint32_t accessory = 0;
-  if (int32_t(Load(base, interior + 11616)) != 0) {
+  if (int32_t(object.points_accessory_shown()) != 0) {
     const uint32_t set = scene_models::Accessories(base);
     left = Left{false, set};
-    const int32_t which = int32_t(Load(base, interior + 152));
+    const int32_t which = int32_t(object.accessory());
     if (which != 3) {
       const uint32_t entry = Load(base, set + ((uint32_t(which) + 1) << 2));
       if (entry != 0) {
@@ -416,14 +421,14 @@ Left SceneInteriorDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64
       }
     }
   }
-  const uint32_t set = schema::CarScene(base, Load(base, interior + 11668)).model_set();
+  const uint32_t set = object.scene().model_set();
   if (set == 0) {
-    left = InteriorDrawFrontEnd(base, calls, frame, interior + 160, block, caller_r24);
+    left = InteriorDrawFrontEnd(base, calls, frame, object.points_address(), block, caller_r24);
     if (accessory == 0) {
       return left;
     }
-    const uint32_t texture = Load(base, interior + 156);
-    if (int32_t(Load(base, accessory + 1040)) != int32_t(texture)) {
+    const uint32_t texture = object.accessory_arg();
+    if (int32_t(schema::Accessory(base, accessory).texture_index()) != int32_t(texture)) {
       // Accessory::SetTexture's plain C++; the texture provider's slot a
       // guest call from its frame.
       left.in_ctx = false;
@@ -436,7 +441,7 @@ Left SceneInteriorDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64
           });
     }
   } else if (set == 1) {
-    left = InteriorDrawRace(base, calls, frame, interior + 160, block, caller_r24);
+    left = InteriorDrawRace(base, calls, frame, object.points_address(), block, caller_r24);
     if (accessory == 0) {
       return left;
     }

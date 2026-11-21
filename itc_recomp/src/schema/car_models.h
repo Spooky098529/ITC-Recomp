@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: CarModel, CarModel.+24, Vinyl, CarModel::OnDecalLoaded.r6, CarModel::OnFileLoaded.r6, CarModel::OnFileLoadedB.r6, CarInterior.+24, Wheels.+24, SceneWheels.+192.+24
+// allocated; measure: CarModel, CarModel.+24, Vinyl, CarModel::OnDecalLoaded.r6, CarModel::OnFileLoaded.r6, CarModel::OnFileLoadedB.r6, CarInterior.+24, Wheels.+24, SceneWheels.+192.+24, List::At.ret.+24, Cockpit.+24, CarParts.+5328, TrafficCar.+24
 struct CarModel : View {
   using View::View;
   static constexpr uint32_t kSize = 7264;
@@ -202,7 +202,7 @@ struct CarModel : View {
   // six indices into the body XPR (-1 none)
   uint32_t xpr_indices_address() const { return address + 7232; }
   // the first set of scene pools ([0x826C2E40], scene-loaders.md): its +8 the model set (0 a, 1 b)
-  template <typename T = CarModelsFirstSet>
+  template <typename T = ScenePools>
   T first_set() const { return T(base, guest::LoadU32(base, address + 7256)); }
   void set_first_set(const View& v) const { guest::StoreU32(base, address + 7256, v.address); }
   void set_first_set(uint32_t v) const { guest::StoreU32(base, address + 7256, v); }
@@ -334,24 +334,14 @@ struct CarInterior : View {
   void set_cockpit(uint32_t v) const { guest::StoreU32(base, address + 3088, v); }
   uint32_t cockpit_address() const { return address + 3088; }
   // the interior's
-  template <typename T = CarModelsFirstSet>
+  template <typename T = ScenePools>
   T first_set() const { return T(base, guest::LoadU32(base, address + 3092)); }
   void set_first_set(const View& v) const { guest::StoreU32(base, address + 3092, v.address); }
   void set_first_set(uint32_t v) const { guest::StoreU32(base, address + 3092, v); }
   uint32_t first_set_address() const { return address + 3092; }
 };
 
-// allocated; measure: CarInterior.+3092
-struct CarModelsFirstSet : View {
-  using View::View;
-  static constexpr uint32_t kSize = 12;
-  // 0 set a, 1 set b
-  uint32_t model_set() const { return guest::LoadU32(base, address + 8); }
-  void set_model_set(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t model_set_address() const { return address + 8; }
-};
-
-// allocated; measure: SceneWheels.+192
+// allocated; measure: SceneWheels.+192, SceneCockpit.+24, SceneInterior::Link.r4, ScenePool4.+24
 struct CarModelsSceneCarModel : View {
   using View::View;
   static constexpr uint32_t kSize = 28;
@@ -711,7 +701,7 @@ struct DecalTriangle : View {
   uint32_t y2_address() const { return address + 36; }
 };
 
-// embedded; measure: CarScene::SetUp.r4
+// embedded; measure: CarScene::SetUp.r4, SceneSetUp
 struct CarSceneSetUpRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 48;
@@ -894,14 +884,14 @@ struct CarWheels : View {
   void set_traffic(uint32_t v) const { guest::StoreU32(base, address + 3264, v); }
   uint32_t traffic_address() const { return address + 3264; }
   // the first set of scene pools ([0x826C2E40]): its +8 picks rims (0) or brakes
-  template <typename T = CarModelsFirstSet>
+  template <typename T = ScenePools>
   T first_set() const { return T(base, guest::LoadU32(base, address + 3268)); }
   void set_first_set(const View& v) const { guest::StoreU32(base, address + 3268, v.address); }
   void set_first_set(uint32_t v) const { guest::StoreU32(base, address + 3268, v); }
   uint32_t first_set_address() const { return address + 3268; }
 };
 
-// allocated; measure: ScenePools.+52
+// allocated; measure: ScenePools.+52, new<140>@ScenePools::MakeA.+52
 struct CarModelsDeferredRelease : View {
   using View::View;
   static constexpr uint32_t kSize = 20;

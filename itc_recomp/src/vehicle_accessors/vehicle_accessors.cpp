@@ -5,6 +5,10 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "schema/vehicle_accessors.h"
+#include "schema/car_physics.h"
+#include "schema/collision.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vectors.h"
 
 #include <bit>
@@ -19,14 +23,14 @@ namespace {
 
 using G = schema::VehicleAccessorsGlobals;
 using CollisionObject = schema::CollisionObject;
-using Contact = schema::CollisionObjectContact;
+using Contact = schema::CollisionContact;
 using Stages = schema::Stages;
 using RaceStage = schema::RaceStage;
-using RacerRecord = schema::AccessorRacerRecord;
+using RacerRecord = schema::Car;
 using RacerRecordArray = schema::RacerRecordArray;
 using List = schema::AccessorList;
 using ListNode = schema::AccessorListNode;
-using Box = schema::VehicleBox;
+using Box = schema::BoxShape;
 using Pair = schema::AccessorPair;
 using Matrix = schema::VectorLibMatrix;
 
@@ -476,7 +480,7 @@ uint32_t CollisionObjectFirstContact(uint8_t* base, uint32_t object, uint32_t ma
 
 uint32_t CollisionObjectWord264(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_820B7CB8 CollisionObject::Word264");
-  return CollisionObject(base, object).first_pair().address;
+  return CollisionObject(base, object).first_pair<schema::View>().address;
 }
 
 void CollisionObjectSetWord264(uint8_t* base, uint32_t object, uint32_t value) {
@@ -735,8 +739,8 @@ uint32_t StagesWord48(uint8_t* base, uint32_t stages, uint32_t slot, uint32_t st
 
 void StagesCopy24(uint8_t* base, uint32_t out, uint32_t stages, uint32_t stage) {
   ITC_NATIVE_RUNNING("sub_820FFD48 Stages::Copy24");
-  const schema::AccessorStageRoute from(base, RaceStage(base, Stage(base, stages, stage)).route_address());
-  const schema::AccessorStageRoute to(base, out);
+  const schema::StageRoute from(base, RaceStage(base, Stage(base, stages, stage)).route_address());
+  const schema::StageRoute to(base, out);
   const uint32_t course = from.course();
   const uint32_t location = from.location();
   const uint32_t first_position = from.first_position();

@@ -4,7 +4,15 @@
 
 #include "race_world/race_world.h"
 
+#include "schema/car_physics.h"
+#include "schema/collision_world.h"
+#include "schema/minimap.h"
+#include "schema/race_event.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
 #include "schema/race_world.h"
+#include "schema/track_route.h"
+#include "schema/vehicle.h"
 
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
@@ -20,6 +28,9 @@ namespace race_world {
 
 using M = schema::RaceManager;
 using G = schema::RaceWorldGlobals;
+using E = schema::MinimapRacerEntry;
+using RD = schema::RaceData;
+using Car = schema::Car;
 
 using namespace car_physics::ops;
 namespace va = vehicle_accessors;
@@ -27,13 +38,7 @@ namespace va = vehicle_accessors;
 namespace {
 
 constexpr uint32_t kInputs = 0x826C5B30;        // the racers' input records
-constexpr uint32_t kStagesOffset = 0x59620;     // the race data's stages
-constexpr uint32_t kFlagsOffset = 0x59AE4;      // the race data's flags
-constexpr uint32_t kCountOffset = 48 + 0x595E0;  // the race data's record count
-constexpr uint32_t kModeOffset = 0xA3AF0;
-constexpr uint32_t kKindOffset = 0xA3AF4;
 constexpr uint32_t kCurrent = 0xFFFFFFFFu;       // the current stage
-constexpr uint32_t kStartObject = 0x826C7820;    // its +4: the start from an object
 constexpr uint32_t kStartPosition = 0x826C6B0C;  // its +2, +4: the start's halfwords
 constexpr uint32_t kRollingSpeed = 0x820097FC;
 
@@ -48,6 +53,14 @@ uint32_t Manager(uint8_t* base) {
 }
 uint32_t RaceData(uint8_t* base) {
   return Load(base, kRaceData);
+}
+// The race data's stages (+0x59620).
+uint32_t Stages(uint8_t* base) {
+  return RD(base, RaceData(base)).stages_address();
+}
+// The racer record `number` (the race data's +48 + 3,936 x number).
+Car CarOf(uint8_t* base, uint32_t number) {
+  return Car(base, number * Car::kSize + RD(base, RaceData(base)).racer_records_address());
 }
 // A halfword's value sign-extended, as the originals' extsh.
 uint32_t S16(uint32_t value) {
@@ -64,14 +77,14 @@ uint32_t RacerCount(uint8_t* base) {
 // Stages::Copy of the current stage into `out`; its original where the
 // plain C++ refuses.
 void CopyStage(uint8_t* base, uint32_t out, uint32_t sp, const StartCalls& calls) {
-  const uint32_t stages = RaceData(base) + kStagesOffset;
+  const uint32_t stages = Stages(base);
   if (!va::StagesCopy(base, out, stages, kCurrent)) {
     calls.original(0x820FFD88, sp, out, stages, 0xFFFFFFFFFFFFFFFFull);
   }
 }
 
 uint32_t HasRacer(uint8_t* base, uint32_t record) {
-  return va::StagesHasRacer(base, RaceData(base) + kStagesOffset, record, kCurrent);
+  return va::StagesHasRacer(base, Stages(base), record, kCurrent);
 }
 
 // Vehicle::PlaceOnRoute (the whole original where its plain C++ refuses).
@@ -105,28 +118,28 @@ void Settle(uint8_t* base, uint32_t frame, uint32_t ticks, Settled which, uint32
   for (uint32_t tick = ticks; tick != 0; tick--) {
     calls.update_drivers(frame, update_lr);
     for (int32_t i = 0; i < int32_t(RacerCount(base)); i++) {
-      const uint32_t entry = Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i));
-      const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
-      if (which == Settled::kRollingInStage && (Load(base, entry) & 0x400) == 0) {
+      const E entry(base, Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i)));
+      const uint32_t vehicle = va::VehicleGet(base, entry.vehicle_index());
+      if (which == Settled::kRollingInStage && (entry.flags() & 0x400) == 0) {
         continue;
       }
-      if (which != Settled::kAll && HasRacer(base, Load(base, entry + 24)) == 0) {
+      if (which != Settled::kAll && HasRacer(base, entry.record()) == 0) {
         continue;
       }
       const uint32_t from = uint32_t(
-          calls.drive_car(frame + input, Load(base, entry + 20), 1, frame, drive_lr));
+          calls.drive_car(frame + input, entry.vehicle_index(), 1, frame, drive_lr));
       for (uint32_t w = 0; w < 5; w++) {
         Store(base, frame + copy + 4 * w, Load(base, from + 4 * w));
       }
-      const uint32_t to = Load(base, kInputs + ((Load(base, entry + 20) << 2) & 0x3FC));
+      const uint32_t to = Load(base, kInputs + ((entry.vehicle_index() << 2) & 0x3FC));
       for (uint32_t w = 0; w < 5; w++) {
         Store(base, to + 4 * w, Load(base, frame + copy + 4 * w));
       }
-      vehicle::VehicleTick(base, vehicle, Load(base, entry + 20), 0, 1, frame - 144, calls.tick);
+      vehicle::VehicleTick(base, vehicle, entry.vehicle_index(), 0, 1, frame - 144, calls.tick);
       if (note) {
-        const uint32_t identity = va::VehicleIdentity(vehicle) + 4;
-        guest::StoreU16(base, entry + 8, guest::LoadU16(base, identity + 0));
-        guest::StoreU16(base, entry + 10, guest::LoadU16(base, identity + 2));
+        const schema::TrackPosition identity(base, va::VehicleIdentity(vehicle));
+        entry.set_section(identity.route_section());
+        entry.set_slice(identity.route_slice());
       }
     }
     track_collision::TrackCollisionTick(base, frame - 144, calls.collision);
@@ -141,10 +154,10 @@ void OnLoaded(uint8_t* base, uint32_t frame, const StartCalls& calls) {
   bool held = false;
   {
     const uint32_t race = RaceData(base);
-    if (va::StagesIsType2Or3(base, race + kStagesOffset, kCurrent) != 0 ||
-        (int32_t(Load(base, RaceData(base) + kModeOffset)) == 6 &&
+    if (va::StagesIsType2Or3(base, RD(base, race).stages_address(), kCurrent) != 0 ||
+        (int32_t(RD(base, RaceData(base)).kind()) == 6 &&
          int32_t(Load(base, frame + 160)) != 1)) {
-      const uint32_t flags = RaceData(base) + kFlagsOffset;
+      const uint32_t flags = RD(base, RaceData(base)).flags_address();
       held = true;
       Store(base, flags, Load(base, flags) | 0x2000);
     }
@@ -152,7 +165,7 @@ void OnLoaded(uint8_t* base, uint32_t frame, const StartCalls& calls) {
   if (!vehicle::VehiclesCreate(base, frame - 112)) {
     calls.original(0x820C3BD0, frame, 0, 0, 0);
   }
-  const uint32_t first = RaceData(base) + 48;
+  const uint32_t first = RD(base, RaceData(base)).racer_records_address();
   for (uint32_t i = 0; i < 7; i++) {
     const uint32_t vehicle = va::VehicleGet(base, i);
     double f1 = 0.0;
@@ -170,11 +183,11 @@ void OnLoaded(uint8_t* base, uint32_t frame, const StartCalls& calls) {
   if (!Create(base)) {
     calls.original(0x821715B8, frame, 0, 0, 0);
   }
-  AddRacers(base, Manager(base), RaceData(base) + 48, frame - 2000);
+  AddRacers(base, Manager(base), RD(base, RaceData(base)).racer_records_address(), frame - 2000);
   for (int32_t i = 0; i < int32_t(RacerCount(base)); i++) {
-    const uint32_t entry = Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i));
-    const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
-    const uint32_t car = Load(base, entry + 24) * 3936 + RaceData(base) + 48;
+    const E entry(base, Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i)));
+    const uint32_t vehicle = va::VehicleGet(base, entry.vehicle_index());
+    const uint32_t car = CarOf(base, entry.record()).address;
     double f1 = 0.0;
     vehicle::VehicleSetUp(base, vehicle, car, frame - 224, true, true, calls.setup_original, &f1);
   }
@@ -182,35 +195,41 @@ void OnLoaded(uint8_t* base, uint32_t frame, const StartCalls& calls) {
     const double across = Lfs(base, kZero);
     for (int32_t i = 0; i < int32_t(RacerCount(base)); i++) {
       const uint32_t slot = 4 * uint32_t(i);
-      const uint32_t entry = Load(base, M(base, Manager(base)).racers_address() + slot);
-      const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
-      const uint32_t record = Load(base, entry + 24);
-      const uint32_t car = record * 3936 + RaceData(base);
+      const E entry(base, Load(base, M(base, Manager(base)).racers_address() + slot));
+      const uint32_t vehicle = va::VehicleGet(base, entry.vehicle_index());
+      const uint32_t record = entry.record();
+      const Car car = CarOf(base, record);
       const uint32_t has = HasRacer(base, record);
       bool rest = false;
-      if (held || (int32_t(Load(base, RaceData(base) + kModeOffset)) == 6 &&
+      if (held || (int32_t(RD(base, RaceData(base)).kind()) == 6 &&
                    int32_t(Load(base, frame + 160)) != 1)) {
         rest = has != 0;
       }
-      guest::StoreU8(base, vehicle + 2384, rest ? 1 : 0);
-      const int32_t kind = int32_t(Load(base, RaceData(base) + kKindOffset));
+      schema::Vehicle(base, vehicle).set_forced_rest(rest ? 1 : 0);
+      const int32_t kind = int32_t(RD(base, RaceData(base)).race_mode());
       const uint32_t lane = kind == 0 || kind == 1 ? 0xFFFFFFFFu : Mod2(uint32_t(i));
-      track_route::ClampPosition(base, frame + 80, Load(base, Load(base, M(base, Manager(base)).racers_address() + slot) + 8));
-      PlaceOnRoute(base, vehicle, frame + 80, Lfs(base, car + 3956), across, lane, frame, calls);
+      track_route::ClampPosition(
+          base, frame + 80,
+          E(base, Load(base, M(base, Manager(base)).racers_address() + slot)).position());
+      PlaceOnRoute(base, vehicle, frame + 80, double(car.start_float()), across, lane, frame,
+                   calls);
     }
   }
   Settle(base, frame, 30, Settled::kAll, 128, 96, false, 0x82173CE8, 0x82173D20, calls);
   for (int32_t i = 0; i < int32_t(RacerCount(base)); i++) {
-    const uint32_t entry = Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i));
-    const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
-    const uint32_t car = Load(base, entry + 24) * 3936 + RaceData(base);
-    Stfs(base, vehicle + 6244, Lfs(base, car + 3968));
+    const E entry(base, Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i)));
+    const uint32_t vehicle = va::VehicleGet(base, entry.vehicle_index());
+    const Car car = CarOf(base, entry.record());
+    Stfs(base,
+         schema::VehicleStatus(base, schema::Vehicle(base, vehicle).status_address())
+             .trip_km_address(),
+         double(car.racer_value()));
   }
   ListRacers(base, Manager(base), frame - 1872, true,
              [&](uint32_t address, uint32_t sp, uint32_t r3) {
                return calls.original(address, sp, r3, 0, 0);
              });
-  const uint32_t flags = RaceData(base) + kFlagsOffset;
+  const uint32_t flags = RD(base, RaceData(base)).flags_address();
   Store(base, flags, Load(base, flags) | 0x200);
   NoteMarkedRacer(base, frame - 144);
 }
@@ -227,11 +246,11 @@ void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint3
   uint32_t player = 0;
   bool found = false;
   {
-    const uint32_t records = RaceData(base) + 48;
-    const int32_t count = int32_t(Load(base, RaceData(base) + kCountOffset));
+    const uint32_t records = RD(base, RaceData(base)).racer_records_address();
+    const int32_t count = int32_t(RD(base, RaceData(base)).car_count());
     for (int32_t i = 0; i < count; i++) {
-      if ((Load(base, records + 3936 * uint32_t(i) + 3888) & 0x1) != 0) {
-        player = Load(base, EntryOfRecord(base, uint32_t(i)) + 8);
+      if ((Car(base, records + Car::kSize * uint32_t(i)).flags() & 0x1) != 0) {
+        player = E(base, EntryOfRecord(base, uint32_t(i))).position();
         found = true;
         break;
       }
@@ -243,8 +262,8 @@ void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint3
   bool backward = false;
   if (back != 0) {
     backward = true;
-  } else if (int32_t(Load(base, RaceData(base) + kModeOffset)) == 1) {
-    const int32_t value = int32_t(Load(base, va::SaveDataOf(base, 0) + 6100));
+  } else if (int32_t(RD(base, RaceData(base)).kind()) == 1) {
+    const int32_t value = int32_t(schema::SaveData(base, va::SaveDataOf(base, 0)).day());
     backward = value == 1;
   }
   int32_t placed = 0;
@@ -252,23 +271,22 @@ void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint3
   if (int32_t(RacerCount(base)) > 0) {
     const double zero = Lfs(base, kZero);
     for (int32_t i = 0; i < int32_t(RacerCount(base)); i++) {
-      const uint32_t entry = Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i));
-      const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
-      const uint32_t number = Load(base, entry + 24);
-      const uint32_t car = number * 3936 + RaceData(base);
+      const E entry(base, Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i)));
+      const uint32_t vehicle = va::VehicleGet(base, entry.vehicle_index());
+      const uint32_t number = entry.record();
+      const Car car = CarOf(base, number);
       if (HasRacer(base, number) == 0) {
         continue;
       }
       CopyStage(base, frame + 160, frame, calls);
-      const bool stage23 =
-          va::StagesIsType2Or3(base, RaceData(base) + kStagesOffset, kCurrent) != 0;
-      const bool rest = stage23 || int32_t(Load(base, RaceData(base) + kKindOffset)) == 8;
-      guest::StoreU8(base, vehicle + 2384, rest ? 1 : 0);
+      const bool stage23 = va::StagesIsType2Or3(base, Stages(base), kCurrent) != 0;
+      const bool rest = stage23 || int32_t(RD(base, RaceData(base)).race_mode()) == 8;
+      schema::Vehicle(base, vehicle).set_forced_rest(rest ? 1 : 0);
       uint32_t lane = Mod2(uint32_t(placed));
       const uint32_t race = RaceData(base);
-      if (int32_t(Load(base, race + kKindOffset)) == 8) {
+      if (int32_t(RD(base, race).race_mode()) == 8) {
         uint32_t start;
-        if (Load(base, kStartObject + 4) != 0) {
+        if (G::human_flag(base) != 0) {
           start = Load(base, Load(base, Load(base, sp + 20) + 9624) + 7244);
         } else {
           start = (uint32_t(guest::LoadU16(base, kStartPosition + 2)) << 16) |
@@ -276,28 +294,31 @@ void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint3
         }
         Store(base, frame + 80, start);
         track_route::ToMainRoad(base, kRoute, frame + 80, 1, frame - 144);
-        const uint32_t section = guest::LoadU16(base, frame + 80);
-        const uint32_t file = Load(base, kRoute);
-        const uint32_t record = Load(base, (section << 2) + Load(base, file + 12)) + 124;
-        const uint32_t slice = S16(guest::LoadU16(base, frame + 82)) * 84 + record;
-        const uint32_t lanes = guest::LoadU8(base, slice + 56) & 0xF;
+        const schema::TrackRoutePosition at(base, frame + 80);
+        const uint32_t section = at.section();
+        const schema::TrackRouteFile file = schema::TrackRoute(base, kRoute).file();
+        const schema::TrackRouteSection record(base, Load(base, (section << 2) + file.sections()));
+        const schema::TrackRouteSlice slice(
+            base, S16(at.slice()) * schema::TrackRouteSlice::kSize + record.slices_address());
+        const uint32_t lanes = slice.lanes() & 0xF;
         if (!(int32_t(lane) < int32_t(lanes))) {
           lane = lanes - 1;
           vehicle::RoutePositionStep(base, frame + 80, 0xFFFFFFFFu, 0xFFFFFFFFu, frame - 112);
         }
         PlaceOnRoute(base, vehicle, frame + 80, zero, zero, lane, frame, calls);
-        Store(base, car + 3952, Load(base, frame + 80));
+        car.set_start_position(Load(base, frame + 80));
         placed++;
         continue;
       }
-      const bool type23 = va::StagesIsType2Or3(base, race + kStagesOffset, kCurrent) != 0;
+      const bool type23 = va::StagesIsType2Or3(base, RD(base, race).stages_address(), kCurrent) != 0;
       Store(base, frame + 80, player);
-      const uint32_t flags = Load(base, car + 3936);
+      const uint32_t flags = car.flags();
       if ((flags & 0x1) == 0) {
-        const int32_t id = int32_t(Load(base, car + 3960));
+        const int32_t id = int32_t(car.item_id());
         const uint32_t kind =
             id < 0 ? 0xFFFFFFFFu
-                   : uint32_t(int32_t(int8_t(guest::LoadU8(base, data_tables::Item(base, uint32_t(id)) + 36))));
+                   : uint32_t(int32_t(int8_t(
+                         schema::OpponentItem(base, data_tables::Item(base, uint32_t(id))).location())));
         bool step_forward;  // RoutePosition::Step with `ahead`
         uint32_t step = 0;
         if (type23) {
@@ -319,7 +340,7 @@ void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint3
         ahead++;
         behind--;
       }
-      PlaceOnRoute(base, vehicle, frame + 80, Lfs(base, car + 3956), zero, lane, frame, calls);
+      PlaceOnRoute(base, vehicle, frame + 80, double(car.start_float()), zero, lane, frame, calls);
       placed++;
     }
   }
@@ -328,7 +349,7 @@ void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint3
   }
   CopyStage(base, frame + 160, frame, calls);
   uint32_t ticks = 30;
-  if (int32_t(Load(base, RaceData(base) + kModeOffset)) == 6 &&
+  if (int32_t(RD(base, RaceData(base)).kind()) == 6 &&
       int32_t(Load(base, frame + 160)) != 1) {
     ticks = 300;
   }
@@ -338,50 +359,50 @@ void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint3
 void PlaceRolling(uint8_t* base, uint32_t object, uint32_t settle, uint32_t frame,
                   const StartCalls& calls) {
   ITC_NATIVE_RUNNING("sub_821662E0 RaceStart::PlaceRolling");
-  const uint32_t records = RaceData(base) + 48;
+  const RD race(base, RaceData(base));
+  const uint32_t records = race.racer_records_address();
   Place(base, object, 0, 0, frame, calls);
   uint32_t player = 0;
   {
-    const int32_t count = int32_t(Load(base, records + 0x595E0));
+    const int32_t count = int32_t(race.car_count());
     for (int32_t i = 0; i < count; i++) {
-      if ((Load(base, records + 3936 * uint32_t(i) + 3888) & 0x1) != 0) {
+      if ((Car(base, records + Car::kSize * uint32_t(i)).flags() & 0x1) != 0) {
         player = EntryOfRecord(base, uint32_t(i));
         break;
       }
     }
   }
   bool all = false;
-  if (int32_t(Load(base, RaceData(base) + kModeOffset)) == 1) {
-    const int32_t value = int32_t(Load(base, va::SaveDataOf(base, 0) + 6100));
+  if (int32_t(RD(base, RaceData(base)).kind()) == 1) {
+    const int32_t value = int32_t(schema::SaveData(base, va::SaveDataOf(base, 0)).day());
     all = (value <= 999 && value == 1) ||
-          va::StagesIsType2Or3(base, RaceData(base) + kStagesOffset, kCurrent) != 0;
+          va::StagesIsType2Or3(base, Stages(base), kCurrent) != 0;
   }
   if (int32_t(RacerCount(base)) > 0) {
     const double zero = Lfs(base, kZero);
     int32_t placed = 0, ahead = 10, behind = -10;
     for (int32_t i = 0; i < int32_t(RacerCount(base)); i++) {
-      uint32_t entry = Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i));
-      const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
-      const uint32_t number = Load(base, entry + 24);
-      const uint32_t car = number * 3936 + RaceData(base);
+      const E entry(base, Load(base, M(base, Manager(base)).racers_address() + 4 * uint32_t(i)));
+      const uint32_t vehicle = va::VehicleGet(base, entry.vehicle_index());
+      const uint32_t number = entry.record();
+      const Car car = CarOf(base, number);
       if (HasRacer(base, number) == 0) {
         continue;
       }
-      guest::StoreU8(base, vehicle + 2384, 0);
-      if ((Load(base, car + 3936) & 0x1) != 0) {
+      schema::Vehicle(base, vehicle).set_forced_rest(0);
+      if ((car.flags() & 0x1) != 0) {
         continue;
       }
-      if ((Load(base, entry) & 0x400) == 0 && !all) {
+      if ((entry.flags() & 0x400) == 0 && !all) {
         continue;
       }
-      const uint32_t from = player + 8;
-      entry += 8;
-      guest::StoreU16(base, entry + 0, guest::LoadU16(base, from + 0));
-      guest::StoreU16(base, entry + 2, guest::LoadU16(base, from + 2));
+      const E from(base, player);
+      entry.set_section(from.section());
+      entry.set_slice(from.slice());
       const uint32_t step = S16(uint32_t(all ? ahead : behind));
-      StepToMainRoad(base, entry, step, 0xFFFFFFFFu, frame - 112);
-      PlaceOnRoute(base, vehicle, entry, Lfs(base, kRollingSpeed), zero, Mod2(uint32_t(placed)),
-                   frame, calls);
+      StepToMainRoad(base, entry.position_address(), step, 0xFFFFFFFFu, frame - 112);
+      PlaceOnRoute(base, vehicle, entry.position_address(), Lfs(base, kRollingSpeed), zero,
+                   Mod2(uint32_t(placed)), frame, calls);
       placed++;
       ahead += 2;
       behind -= 2;

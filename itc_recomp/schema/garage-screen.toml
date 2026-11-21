@@ -58,7 +58,7 @@ fields = [
   { name = "money", offset = 24, type = "u32", note = "save data +6116; the sale adds its price" },
   { name = "day", offset = 28, type = "u32", note = "save data +6100, at most 999" },
   { name = "weekday", offset = 32, type = "u32", note = "the day mod 7" },
-  { name = "save", offset = 36, type = "u32", note = "player 0's save data (SaveData::Of)" },
+  { name = "save", offset = 36, type = "ptr", to = "SaveData", note = "player 0's save data (SaveData::Of)" },
   { name = "selection", offset = 44, type = "u32", note = "the selected row (+ scroll: the car's index in the garage)" },
   { name = "scroll", offset = 48, type = "u32", note = "the list's scroll" },
   { name = "action", offset = 52, type = "u32", note = "the action to select when the actions are set up again" },
@@ -147,12 +147,12 @@ fields = [
 
 [globals]
 pages = { address = 0x826D8420, type = "ptr", to = "PageObject", note = "pages 0 the car list, 1 the car's five actions, 2 the view on the stand, 3 the view's options, 4 leaving; 18 transitions" }
-list = { address = 0x826D8424, type = "ptr", note = "a MenuList (72 bytes): the car list (page 0), the actions (page 1) or the view's options (page 3)" }
-list2 = { address = 0x826D8428, type = "ptr", note = "a MenuList (72 bytes): the car list beside the actions; Destroy doesn't free it" }
+list = { address = 0x826D8424, type = "ptr", to = "MenuList", note = "a MenuList (72 bytes): the car list (page 0), the actions (page 1) or the view's options (page 3)" }
+list2 = { address = 0x826D8428, type = "ptr", to = "MenuList", note = "a MenuList (72 bytes): the car list beside the actions; Destroy doesn't free it" }
 data = { address = 0x826D842C, type = "ptr", to = "GarageScreenData" }
-stand_holder = { address = 0x826D83E0, type = "ptr", note = "the stand scene's holder (StandScene::Create): +0 the garage stage's holder, whose +0 is the stage" }
-plate_editor = { address = 0x826D8438, type = "ptr", note = "the license plate editor's data (76 bytes, type2-screens.md)" }
-spec_sheet = { address = 0x826D846C, type = "ptr", note = "the power graph screen's data (1,968 bytes, type2-screens.md)" }
+stand_holder = { address = 0x826D83E0, type = "ptr", to = "StandHolder", note = "the stand scene's holder (StandScene::Create): +0 the garage stage's holder, whose +0 is the stage" }
+plate_editor = { address = 0x826D8438, type = "ptr", to = "PlateEditorData", note = "the license plate editor's data (76 bytes, type2-screens.md)" }
+spec_sheet = { address = 0x826D846C, type = "ptr", to = "SpecSheetData", note = "the power graph screen's data (1,968 bytes, type2-screens.md)" }
 fade_in_argument = { address = 0x82001BEC, type = "u32", note = "Start's ScreenFades::FadeIn r3" }
 fade_out_argument = { address = 0x82001BF0, type = "u32", note = "Transition3's ScreenFades::FadeOut r3" }
 fade_count_a = { address = 0x826A50DC, type = "u32", note = "a screen fade's count (Transition3 waits for both at 0)" }

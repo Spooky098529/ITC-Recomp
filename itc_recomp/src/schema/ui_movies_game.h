@@ -59,7 +59,7 @@ struct UiMovieText : View {
   uint32_t first_line_address() const { return address + 24; }
 };
 
-// embedded; measure: TextItem, sub_8211AED0.r3, sub_8211AED0.r4
+// embedded; measure: TextItem, sub_8211AED0.r3, sub_8211AED0.r4, UiMovie.+100.+0, sub_8259E620.r4
 struct UiMovieTextItem : View {
   using View::View;
   static constexpr uint32_t kSize = 128;
@@ -86,9 +86,9 @@ struct UiMovieTextItem : View {
   void set_matrix_15(float v) const { guest::StoreFloat(base, address + 76, v); }
   uint32_t matrix_15_address() const { return address + 76; }
   // a float, 0.0 when made (copied as words)
-  uint32_t unknown_80() const { return guest::LoadU32(base, address + 80); }
-  void set_unknown_80(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
-  uint32_t unknown_80_address() const { return address + 80; }
+  uint32_t depth() const { return guest::LoadU32(base, address + 80); }
+  void set_depth(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
+  uint32_t depth_address() const { return address + 80; }
   // the color's scales (+84 to +96), floats copied as words; 0.0 when made
   uint32_t red() const { return guest::LoadU32(base, address + 84); }
   void set_red(uint32_t v) const { guest::StoreU32(base, address + 84, v); }
@@ -127,7 +127,7 @@ struct UiMovieTextItemArray : View {
   uint32_t count_address() const { return address + 0; }
 };
 
-// allocated; measure: UiMovie, sub_8211A9E8.r3, sub_8211AC90.r3, sub_8211E378.r3, sub_8211C4F0.r3, sub_8211C5F8.r3, UiMovie::OnLoaded.r6
+// allocated; measure: UiMovie, sub_8211A9E8.r3, sub_8211AC90.r3, sub_8211E378.r3, sub_8211C4F0.r3, sub_8211C5F8.r3, UiMovie::OnLoaded.r6, UiMovies::Find.ret.+0
 struct UiMovie : View {
   using View::View;
   static constexpr uint32_t kSize = 40976;
@@ -251,6 +251,10 @@ struct UiMovie : View {
   uint32_t id_address() const { return address + 40916; }
   // a copy of the last started animation's slot (UiMovieAnimationSlot)
   uint32_t last_started_address() const { return address + 40920; }
+  // measure fault: LocationScreen::Page0's r31 is an image base, r31 + 20044 the global 0x82814E4C (the location's menu), not a field (from UiMovieObject, tuning-pages)
+  uint32_t fault_location_menu() const { return guest::LoadU32(base, address + 20044); }
+  void set_fault_location_menu(uint32_t v) const { guest::StoreU32(base, address + 20044, v); }
+  uint32_t fault_location_menu_address() const { return address + 20044; }
 };
 
 // embedded; measure: AnimationList
@@ -280,6 +284,20 @@ struct UiMovieAnimationList : View {
   uint32_t count_address() const { return address + 136; }
   // 32 UiMovieAnimationSlot of 40 bytes
   uint32_t slots_address() const { return address + 140; }
+};
+
+// embedded; measure: -
+struct UiMovieAnimationLink : View {
+  using View::View;
+  static constexpr uint32_t kSize = 4;
+  // the next link's index (signed; -1 ends a chain)
+  uint16_t next() const { return guest::LoadU16(base, address + 0); }
+  void set_next(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t next_address() const { return address + 0; }
+  // its slot's index (signed)
+  uint16_t slot() const { return guest::LoadU16(base, address + 2); }
+  void set_slot(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t slot_address() const { return address + 2; }
 };
 
 // embedded; measure: -
@@ -414,7 +432,7 @@ struct UiMovieNamedAnimation : View {
   uint32_t animation_address() const { return address + 32; }
 };
 
-// embedded; measure: Quad
+// embedded; measure: Quad, sub_8259DAD0.r3, sub_8259E098.r3, sub_8259EBE8.r3
 struct UiMovieQuad : View {
   using View::View;
   static constexpr uint32_t kSize = 116;

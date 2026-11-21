@@ -8,6 +8,7 @@
 #include "boot_mode/boot_mode.h"
 #include "guest.h"
 #include "schema/screen_constructors.h"
+#include "schema/type67_screens.h"
 
 namespace screen_constructors {
 
@@ -526,9 +527,9 @@ void Type7ListScreen(uint8_t* base, uint32_t screen) {
   Store(base, screen + 9804, 1);
   Store(base, screen + 9768, 3);
   Store(base, screen + 9748, 0);
-  Store(base, schema::ListColorNodeTable(base, table).children_address(), 6);
+  Store(base, schema::ColorNodeTable(base, table).children_address(), 6);
   for (uint32_t i = 1; i < 4; i++) {
-    const schema::ListColorNodeTable t(base, Load(base, screen + 9672));
+    const schema::ColorNodeTable t(base, Load(base, screen + 9672));
     Store(base, t.children_address() + 4 * i, 6 + i);  // +300 to +308: 7 to 9
   }
   Store(base, screen + 9784, 2);
@@ -619,7 +620,7 @@ void Type6ListScreen(uint8_t* base, uint32_t screen) {
     Store(base, screen + 9936 + 4 * i, 10 + i);  // +9936 to +9964: 10 to 17
   }
   // The node table's words, each through [+9672] read again.
-  auto table = [&] { return schema::ListNodeTable(base, Load(base, screen + 9672)); };
+  auto table = [&] { return schema::PairedNodeTable(base, Load(base, screen + 9672)); };
   table().set_node_set_a(10);
   table().set_node_set_b(9);
   for (uint32_t i = 0; i < 4; i++) {
@@ -636,8 +637,8 @@ void Type6ListScreen(uint8_t* base, uint32_t screen) {
     const auto t = table();
     Store(base, t.more_anims_address() + 4 * i, 77 + i);  // +124 to +152: 77 to 84
   }
-  table().set_node_base_a(6);
-  table().set_node_base_b(55);
+  table().set_extra_node_base(6);
+  table().set_text_node_base(55);
 }
 
 uint32_t NodeScreen(uint8_t* base, uint32_t screen, uint32_t sp) {

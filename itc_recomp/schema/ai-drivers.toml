@@ -87,7 +87,7 @@ fields = [
   { name = "road_angle", offset = 148, type = "f32", note = "its angle to the road (the slice's direction less the heading)" },
   { name = "steer_shift", offset = 152, type = "f32", note = "written by AiDriver::SteerToTarget; AiPath::SetRanges' shift (x 0.2)" },
   { name = "slice_offset", offset = 156, type = "f32", note = "its offset along its slice" },
-  { name = "vehicle", offset = 160, type = "ptr", note = "its vehicle (Vehicle::Get)" },
+  { name = "vehicle", offset = 160, type = "ptr", to = "Vehicle", note = "its vehicle (Vehicle::Get)" },
   { name = "speed_limit", offset = 164, type = "f32", note = "500.0 none" },
   { name = "speed_limit_other", offset = 168, type = "f32", note = "500.0 none (lowered for a racer ahead, AiDriver::AdjustForOther)" },
   { name = "others", offset = 172, type = "bytes", count = 280, note = "seven AiOther, one per other racer by its index" },
@@ -314,8 +314,13 @@ fields = [
 # A car input record (18 bytes used of 20; 0x826C5B30's records, filled by
 # AiDriver::Drive or the pad).
 [CarInput]
+# measures from CarInputRecord (car-sounds), merged at the integration
+# measures from VehicleCarInput (vehicle), merged at the integration
 measure = "CarInput"
-measures = ["AiDriver::Drive.r4"]
+measures = ["AiDriver::Drive.r4",
+            "AiDriver::DriveCar.ret",
+  "Vehicle::ApplyInput.r4",
+  "new<20>@CarInputs::Create"]
 size = 20
 origin = "embedded"
 fields = [
@@ -325,10 +330,11 @@ fields = [
   { name = "steering", offset = 8, type = "u16", note = "signed, out of 32,767" },
   { name = "handbrake", offset = 10, type = "u16", note = "32,767 for the handbrake, probably" },
   { name = "camera", offset = 12, type = "u16", note = "signed: probably the camera (from the pad)" },
-  { name = "setting_a", offset = 14, type = "u8", note = "from the pad: the player's settings byte +1" },
-  { name = "setting_b", offset = 15, type = "u8", note = "the settings byte +2" },
-  { name = "setting_c", offset = 16, type = "u8", note = "the settings byte +0" },
+  { name = "throttle_rate", offset = 14, type = "u8", note = "from the pad: the player's settings byte +1; signed: the throttle's curve (Vehicle::ApplyInput)" },
+  { name = "brake_rate", offset = 15, type = "u8", note = "the settings byte +2; signed: the brake's curve" },
+  { name = "steering_rate", offset = 16, type = "u8", note = "the settings byte +0; signed: the pad's or wheel's steering rate" },
   { name = "kind", offset = 17, type = "u8", note = "0 the pad, 1 a wheel, 2 an AI driver" },
+  { name = "settings", offset = 14, type = "bytes", count = 3, note = "the player's three settings bytes (from the pad) (from CarInputRecord, car-sounds)" },
 ]
 
 # A corner of the course's route (the route file's +16 table, by number).
@@ -431,10 +437,10 @@ fields = [
 
 [globals]
 drivers = { address = 0x826C6074, type = "ptr", to = "AiDriver", note = "7 drivers of 6,160 bytes (AiDrivers::Create)" }
-race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data (+20 the branch flags, +4 a word, +0xA3AF0 and +0xA3AF4)" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (+20 the branch flags, +4 a word, +0xA3AF0 and +0xA3AF4)" }
 inputs = { address = 0x826C5B30, type = "u32", note = "a word a racer: its input (probably)" }
-race_state = { address = 0x826D82E8, type = "ptr", note = "+6100 read by AiPath::RaceAllowsSides, +2184 the skill entries" }
-race = { address = 0x826D82F4, type = "ptr", note = "the race: +2308 its racers" }
+race_state = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "+6100 read by AiPath::RaceAllowsSides, +2184 the skill entries" }
+race = { address = 0x826D82F4, type = "ptr", to = "RaceManager", note = "the race: +2308 its racers" }
 branch_mask_lists = { address = 0x82008970, type = "bytes", count = 80, note = "lists of words ending with 0, 16 bytes apart" }
 section_lists = { address = 0x82008A08, type = "bytes", count = 768, note = "AiPath::PreferredSections' lists, 64 bytes each" }
 hundred = { address = 0x82002A0C, type = "f32", note = "100.0" }

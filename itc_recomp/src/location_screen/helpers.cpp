@@ -8,8 +8,12 @@
 #include "data_tables/data_tables.h"
 #include "guest.h"
 #include "race_event/race_event.h"
+#include "schema/career.h"
 #include "schema/location_screen.h"
 #include "schema/menu_helpers.h"
+#include "schema/race_event.h"
+#include "schema/race_hud_machine.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace location_screen {
@@ -134,7 +138,7 @@ void OnMessage14(uint8_t* base) {
 uint32_t HasMoreUnlocks(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_822281D8 LocationScreen::HasMoreUnlocks");
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t count = guest::LoadU32(base, save + kUnlockCount);
+  const uint32_t count = schema::SaveData(base, save).unlocks_shown_count();
   return Screen(base).unlock_position() < count ? 1 : 0;
 }
 
@@ -142,9 +146,9 @@ uint32_t NextUnlockEntry(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82227618 LocationScreen::NextUnlockEntry");
   vehicle_accessors::SaveDataOf(base, 0);
   const schema::LocationScreen screen = Screen(base);
-  const uint32_t entry =
-      data_tables::Entry56(base, screen.entry_table(), screen.entry_offset());
-  const uint32_t next = guest::LoadU32(base, entry + 8);
+  const schema::CareerEntry56 entry(
+      base, data_tables::Entry56(base, screen.entry_table(), screen.entry_offset()));
+  const uint32_t next = entry.next_page();
   if (next != 0) {
     const schema::LocationScreen at = Screen(base);
     at.set_entry_offset(next + at.entry_offset());
@@ -173,23 +177,25 @@ std::optional<uint32_t> OpponentHasCard(uint8_t* base, uint32_t sp) {
 
 std::optional<uint32_t> NextResultText(uint8_t* base, uint32_t sp) {
   const uint32_t frame = sp - kItemFrame;
-  const uint32_t records = guest::LoadU32(base, kRaceData) + kRacerRecords;
+  const uint32_t records = schema::RaceStatesGlobals::race_data(base).results_address();
   const uint32_t id =
-      guest::LoadU32(base, vehicle_accessors::RacerRecordsAt(base, records, 0) + 980);
+      schema::RacerResultsRecord(base, vehicle_accessors::RacerRecordsAt(base, records, 0))
+          .e1_item();
   const uint32_t item = data_tables::Item(base, id);
   if (!CanCopyItem(frame + 80, item)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_822271F8 LocationScreen::NextResultText");
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t human = vehicle_accessors::RacerRecordsAt(base, records, 0xFFFFFFFFu);
+  const schema::RacerResultsRecord human(
+      base, vehicle_accessors::RacerRecordsAt(base, records, 0xFFFFFFFFu));
   c_runtime::Memcpy(base, frame + 80, item, 3008);
-  const uint32_t owner =
-      guest::LoadU16(base, frame + 168) == 3 ? guest::LoadU32(base, human + 980) : id;
+  const uint32_t owner = guest::LoadU16(base, frame + 168) == 3 ? human.e1_item() : id;
   uint32_t k = 12;
-  if (int32_t(guest::LoadU32(base, human + 3924)) == 1) {
-    const uint32_t record = uint32_t(uint64_t(owner) * 12) + save;
-    k = int16_t(guest::LoadU16(base, record + kItemRecords + 2)) == 1 ? 10 : 11;
+  if (int32_t(human.finish()) == 1) {
+    const schema::CareerItemRecord record(
+        base, schema::SaveData(base, save).item_records_address() + uint32_t(uint64_t(owner) * 12));
+    k = int16_t(record.wins()) == 1 ? 10 : 11;
   }
   return StepEntry20(base, data_tables::Find20(base, id, k));
 }
@@ -207,24 +213,26 @@ uint32_t NextOpponentText(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = sp - kNextOpponentTextFrame;
   guest::StoreU32(base, frame, sp);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  vehicle_accessors::RacerRecordsAt(base, guest::LoadU32(base, kRaceData) + kRacerRecords,
-                                    0xFFFFFFFFu);
+  vehicle_accessors::RacerRecordsAt(
+      base, schema::RaceStatesGlobals::race_data(base).results_address(), 0xFFFFFFFFu);
   guest::StoreU32(base, frame + 80, Screen(base).picked_opponent());
   const uint32_t event = guest::LoadU32(base, race_event::kEvent);
   const uint32_t item = race_event::GroupItem(base, event, Screen(base).group_kind(),
                                               guest::LoadU32(base, frame + 80));
   Copy(base, calls, frame, 0x82227498, frame + 96, item, 3008);
   const int32_t id = int16_t(guest::LoadU16(base, frame + 96));
-  // An item's record: save + 12 id + kItemRecords (+0, +2 and +4 halfwords).
-  auto record = [&](int32_t of) { return save + uint32_t(of) * 12 + kItemRecords; };
+  // An item's record in the save data (+0x199F8 + 12 id).
+  auto record = [&](int32_t of) {
+    return schema::CareerItemRecord(
+        base, schema::SaveData(base, save).item_records_address() + uint32_t(of) * 12);
+  };
   bool owned_kind3 = false;
   uint32_t kind;
   if (race_event::ItemsAvailable(base, uint32_t(id), calls.EventFrom(frame)) == 0) {
     kind = 9;
   } else {
-    const bool won = int16_t(guest::LoadU16(base, record(id) + 2)) != 0;
-    if (!won && guest::LoadU16(base, record(id) + 4) == 0 &&
-        guest::LoadU16(base, record(id)) == 0) {
+    const bool won = int16_t(record(id).wins()) != 0;
+    if (!won && record(id).outcome3() == 0 && record(id).losses() == 0) {
       kind = 6;
     } else if (!won) {
       kind = 7;
@@ -249,7 +257,7 @@ uint32_t NextOpponentText(uint8_t* base, uint32_t sp, const Calls& calls) {
       if (next == -1) {
         break;
       }
-      if (guest::LoadU16(base, record(next) + 2) == 0) {
+      if (record(next).wins() == 0) {
         kind = 7;
         break;
       }

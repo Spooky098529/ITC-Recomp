@@ -6,6 +6,7 @@
 #include "archive/archive.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/archive.h"
 #include "schema/data_tables.h"
 
 #include <bit>
@@ -162,8 +163,10 @@ namespace {
 // The TOC's size for `id` as Init reads it: the unpacked size, or the stored
 // size when that's 0. `toc` is Archive::Toc's answer.
 uint32_t TocSize(uint8_t* base, uint32_t toc, uint32_t id) {
-  const uint32_t unpacked = guest::LoadU32(base, toc + 16 * id + 24);
-  return unpacked != 0 ? unpacked : guest::LoadU32(base, toc + 16 * id + 20);
+  // The TOC's 16-byte header, then id's entry at (id + 1) x 16.
+  const schema::ArchiveTocEntry entry(base, toc + 16 * (id + 1));
+  const uint32_t unpacked = entry.unpacked_size();
+  return unpacked != 0 ? unpacked : entry.stored_size();
 }
 
 // The loads pending up by one.

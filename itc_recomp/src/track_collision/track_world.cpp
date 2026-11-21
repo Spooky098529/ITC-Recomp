@@ -7,7 +7,14 @@
 #include "car_physics/float_ops.h"
 
 #include "base/log.h"
+#include "schema/car_physics.h"
 #include "schema/collision_world.h"
+#include "schema/minimap.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
+#include "schema/race_world.h"
+#include "schema/track_route.h"
+#include "schema/vehicle.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace track_collision {
@@ -23,17 +30,19 @@ uint32_t TimesThreePlus(uint32_t a, uint32_t b) {
 
 uint32_t RaceRacerCount(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821705F8 Race::RacerCount");
-  return guest::LoadU32(base, guest::LoadU32(base, 0x826D82F4) + 2364);
+  return G::racers_manager(base).racer_count();
 }
 
 uint32_t RacersCarsCollide(uint8_t* base, uint32_t records) {
   ITC_NATIVE_RUNNING("sub_820FEFF8 Racers::CarsCollide");
-  const int32_t count = int32_t(guest::LoadU32(base, records + 0x595E0));
+  // r3 is the racers object at the race data's +48 (the measure's fault:
+  // its car count is RaceData's +0x59610).
+  const int32_t count = int32_t(schema::RaceData(base, records).fault_car_count());
   if (count == 1) {
     return 0;
   }
   for (int32_t i = 0; i < count; i++) {
-    if ((guest::LoadU32(base, records + 3888 + 3936 * uint32_t(i)) & 0x8) != 0) {
+    if ((schema::Car(base, records + 3936 * uint32_t(i)).flags() & 0x8) != 0) {
       return 0;
     }
   }
@@ -43,9 +52,9 @@ uint32_t RacersCarsCollide(uint8_t* base, uint32_t records) {
 void TrackCollisionTick(uint8_t* base, uint32_t frame, const cp::CollisionGuestCall& guest) {
   ITC_NATIVE_RUNNING("sub_820FF050 TrackCollision::Tick");
   namespace va = vehicle_accessors;
-  const uint32_t records = guest::LoadU32(base, 0x826C5B2C) + 48;
+  const uint32_t records = G::race_data(base).racer_records_address();
   double dt = double(G::tick_step(base));
-  if (schema::TrackMesh(base, kMesh).state() != 2 || guest::LoadU32(base, kRoute + 8) != 2) {
+  if (schema::TrackMesh(base, kMesh).state() != 2 || schema::TrackRoute(base, kRoute).state() != 2) {
     return;
   }
   const uint32_t collide = RacersCarsCollide(base, records);
@@ -54,31 +63,33 @@ void TrackCollisionTick(uint8_t* base, uint32_t frame, const cp::CollisionGuestC
   }
   cp::CollisionWorldUpdate(base, dt, frame - 176, collide, guest);
   for (int32_t i = 0; i < int32_t(RaceRacerCount(base)); i++) {
-    const uint32_t racer =
-        guest::LoadU32(base, guest::LoadU32(base, 0x826D82F4) + 2308 + 4 * uint32_t(i));
-    const uint32_t vehicle = va::VehicleGet(base, guest::LoadU32(base, racer + 20));
-    uint32_t contact = guest::LoadU32(base, guest::LoadU32(base, vehicle + 340) + 240);
-    guest::StoreU32(base, vehicle + 6152, 0);
+    const schema::MinimapRacerEntry racer(
+        base, guest::LoadU32(base, G::racers_manager(base).racers_address() + 4 * uint32_t(i)));
+    const schema::Vehicle vehicle(base, va::VehicleGet(base, racer.vehicle_index()));
+    const schema::VehicleStatus status(base, vehicle.status_address());
+    uint32_t contact =
+        schema::CollisionWorldObject(base, vehicle.collision_object()).first_contact().address;
+    vehicle.set_collision_flags(0);
     while (contact != 0) {
       if (va::ContactObject(base, contact) != 0) {
-        guest::StoreU32(base, vehicle + 6152, guest::LoadU32(base, vehicle + 6152) | 1);
+        vehicle.set_collision_flags(vehicle.collision_flags() | 1);
       } else {
         va::ContactOtherObject(base, contact);
-        guest::StoreU32(base, vehicle + 6152, guest::LoadU32(base, vehicle + 6152) | 2);
-        Stfs(base, vehicle + 6236, double(va::ContactStrength(base, contact)));
+        vehicle.set_collision_flags(vehicle.collision_flags() | 2);
+        Stfs(base, status.unknown_76_address(), double(va::ContactStrength(base, contact)));
       }
       contact = va::ContactNext(base, contact, 0xFFFFFFFF);
     }
-    const uint32_t off_ground = guest::LoadU32(base, vehicle + 6240);
-    if (guest::LoadU32(base, vehicle + 348) == 0) {
-      guest::StoreU32(base, vehicle + 6240, off_ground + 1);
+    const uint32_t off_ground = status.unknown_80();
+    if (vehicle.wheels_on_ground() == 0) {
+      status.set_unknown_80(off_ground + 1);
       continue;
     }
     if (int32_t(off_ground) >= 10) {
-      guest::StoreU32(base, vehicle + 6152, guest::LoadU32(base, vehicle + 6152) | 4);
-      guest::StoreU32(base, vehicle + 6232, guest::LoadU32(base, vehicle + 6240));
+      vehicle.set_collision_flags(vehicle.collision_flags() | 4);
+      status.set_landing_ticks(status.unknown_80());
     }
-    guest::StoreU32(base, vehicle + 6240, 0);
+    status.set_unknown_80(0);
   }
 }
 

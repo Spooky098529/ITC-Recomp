@@ -17,7 +17,8 @@
 # +2016, +2160's the car data's axle records, Vehicle::SetupFromCar's and
 # ApplyTuning's r3 the car data): the fields marked so are those.
 [Vehicle]
-measures = ["Vehicle", "Vehicle::UpdateDrivenAxle.ret"]
+measures = ["Vehicle", "Vehicle::UpdateDrivenAxle.ret",
+            "Vehicle::Get.ret"]
 size = 6268
 origin = "embedded"
 fields = [
@@ -332,7 +333,9 @@ fields = [
 
 # The vehicle's rigid body (its +336; also a collision object's +16).
 [RigidBody]
-measures = ["RigidBody", "CollisionObject.+16", "CollisionPair.+20.+16"]
+# measures from AccessorRigidBody (vehicle-accessors), merged at the integration
+measures = ["RigidBody", "CollisionObject.+16", "CollisionPair.+20.+16",
+  "sub_820B68A0.r3"]
 size = 528
 origin = "allocated"
 fields = [
@@ -423,6 +426,7 @@ fields = [
 # "car data" row; B1 = the spec's block 1, B2 block 2, E the engine stage).
 [CarData]
 measure = "CarData"
+measures = ["PowerGraph::Draw.r6"]
 size = 1844
 origin = "embedded"
 fields = [
@@ -714,7 +718,9 @@ fields = [
 
 # A contact on a collision object (from its +240, linked by +68; the world's +48).
 [CollisionContact]
-measures = ["new<4294967295>@CollisionWorld::Create#4", "CollisionWorld::NewContact.ret"]
+# measures from CollisionObjectContact (vehicle-accessors), merged at the integration
+measures = ["new<4294967295>@CollisionWorld::Create#4", "CollisionWorld::NewContact.ret",
+  "Contact", "CollisionObject.+240.+68"]
 size = 80
 origin = "allocated"
 fields = [
@@ -725,11 +731,13 @@ fields = [
   { name = "push_direction", offset = 48, type = "bytes", count = 16 },
   { name = "strength", offset = 64, type = "f32", note = "the approach speed into the surface" },
   { name = "next", offset = 68, type = "ptr", to = "CollisionContact" },
+  { name = "push_direction_x", offset = 48, type = "f32", note = "from CollisionObjectContact (vehicle-accessors)" },
+  { name = "push_direction_y", offset = 52, type = "f32", note = "from CollisionObjectContact (vehicle-accessors)" },
 ]
 
 # A hit record (80 bytes, the world's +64 and +68; written by the track's queries).
 [CollisionHit]
-measures = ["new<4294967295>@CollisionWorld::Create#3", "new<4294967295>@CollisionWorld::SetQueryCapacity", "CollisionRecords::Merge.r4", "CollisionWorld::Create.r6"]
+measures = ["new<4294967295>@CollisionWorld::Create#3", "new<4294967295>@CollisionWorld::SetQueryCapacity", "CollisionRecords::Merge.r4", "CollisionWorld::Create.r6", "WallQuery.+8"]
 size = 80
 origin = "allocated"
 fields = [

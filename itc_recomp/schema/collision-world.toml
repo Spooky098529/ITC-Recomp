@@ -223,7 +223,7 @@ fields = [
   { name = "hit_count", offset = 0, type = "u32" },
   { name = "fault_wall_kind", offset = 0, type = "u16", note = "measure fault: WallQuery::IgnoresWall's r3 is the wall's kind's address; ModeSkips' r3 a word's (it fits hit_count)" },
   { name = "time", offset = 4, type = "f32", note = "2.0" },
-  { name = "hits", offset = 8, type = "u32", note = "the collision world's hit records (80 bytes each, car-physics.toml's CollisionHit; the measure's WallQuery.+8)" },
+  { name = "hits", offset = 8, type = "ptr", to = "CollisionHit", note = "the collision world's hit records (80 bytes each, car-physics.toml's CollisionHit; the measure's WallQuery.+8)" },
   { name = "record", offset = 12, type = "ptr", to = "WallQueryShapeRecord", note = "the collision object's shape record" },
   { name = "wall_a_x", offset = 16, type = "f32", note = "the wall's first end" },
   { name = "wall_a_y", offset = 20, type = "f32" },
@@ -404,3 +404,6 @@ outward = { address = 0x8200690C, type = "f32", note = "the wall query: the face
 corner_reach = { address = 0x82002CB0, type = "f32", note = "the wall query's corner reach" }
 corner_margin = { address = 0x82001FBC, type = "f32", note = "the wall query's corner margin" }
 corner_order = { address = 0x82006900, type = "bytes", count = 8, note = "the order of a box's first 8 corners (bytes)" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (race-states.toml): +4 the course route's index, +20 the branch flags, +24 the route bits, +48 the racer records, +0x59AE4 the stage flags, +0xA3AF4 the race mode" }
+race_progress = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "the race's progress (race-states.toml): +6100 read by WallQuery::ModeSkips for mode 5" }
+racers_manager = { address = 0x826D82F4, type = "ptr", to = "RaceManager", note = "the racers' manager (race-world.toml): +2308 the racers, +2364 their count" }

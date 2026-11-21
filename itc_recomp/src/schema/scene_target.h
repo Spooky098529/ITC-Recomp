@@ -121,8 +121,10 @@ struct SceneTargetGlobals {
   static uint32_t rect_list(uint8_t* base) { return guest::LoadU32(base, 0x826D83D4u); }
   static void set_rect_list(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D83D4u, v); }
   static constexpr uint32_t rect_list_address() { return 0x826D83D4u; }
-  // the display's tiling block (app-start-up.md's Tiling): +12 the tile count, +16 the tiles
-  static uint32_t display_tiling(uint8_t* base) { return guest::LoadU32(base, 0x8260034Cu); }
+  // the display's tiling block (app-start-up.md's Tiling): its tile count and tiles
+  template <typename T = Tiling>
+  static T display_tiling(uint8_t* base) { return T(base, guest::LoadU32(base, 0x8260034Cu)); }
+  static void set_display_tiling(uint8_t* base, const View& v) { guest::StoreU32(base, 0x8260034Cu, v.address); }
   static void set_display_tiling(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x8260034Cu, v); }
   static constexpr uint32_t display_tiling_address() { return 0x8260034Cu; }
   // 1.0

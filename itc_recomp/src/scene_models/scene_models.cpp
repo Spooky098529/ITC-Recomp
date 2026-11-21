@@ -9,8 +9,11 @@
 #include "memory/heap.h"
 #include "schema/accessories.h"
 #include "schema/car_draw.h"
+#include "schema/car_makers.h"
 #include "schema/car_models.h"
+#include "schema/load_poll.h"
 #include "schema/scene_models.h"
+#include "schema/second_set.h"
 
 namespace scene_models {
 
@@ -19,11 +22,6 @@ namespace {
 // The image's floats the originals load with lfs (1.0, 0.0, -1.0, 0.5 and
 // the others) are SceneModelsGlobals'.
 using G = schema::SceneModelsGlobals;
-
-// The originals' lfs and stfs copy of a float.
-void CopyFloat(uint8_t* base, uint32_t to, uint32_t from) {
-  guest::StoreFloat(base, to, guest::LoadFloat(base, from));
-}
 
 // A doubleword's ld and std, as two words.
 void CopyDoubleword(uint8_t* base, uint32_t to, uint32_t from) {
@@ -64,6 +62,15 @@ void ForEachLayer(const schema::CarRecord& record, F f) {
   }
 }
 
+// The scene model record's interior record (+3772) and wheels record
+// (+4036): car-makers' SceneModelRecord names no field at their starts.
+uint32_t InteriorRecordOf(const schema::SceneModelRecord& r) {
+  return r.interior_engine_grade_address() - 4;
+}
+uint32_t WheelsRecordOf(const schema::SceneModelRecord& r) {
+  return r.wheels_painted_address() - 4;
+}
+
 }  // namespace
 
 uint32_t Accessories(uint8_t* base) {
@@ -73,13 +80,14 @@ uint32_t Accessories(uint8_t* base) {
 
 uint32_t Accessory(uint8_t* base, uint32_t interior) {
   ITC_NATIVE_RUNNING("sub_820D97B8 SceneModel::Accessory");
-  const uint32_t set = Accessories(base);
-  const uint32_t which = guest::LoadU32(base, interior + 140);
+  const schema::Accessories set(base, Accessories(base));
+  const uint32_t which = schema::CarInterior(base, interior).accessory();
   if (which == 3) {
     return 0;
   }
-  const uint32_t entry = guest::LoadU32(base, ((which + 1) << 2) + set);
-  return entry == 0 ? 0 : entry + 48;
+  // The set's entries (+4, +8, +12) by the accessory picked.
+  const uint32_t entry = guest::LoadU32(base, set.entry_0_address() + (which << 2));
+  return entry == 0 ? 0 : schema::AccessoryEntry(base, entry).accessory_address();
 }
 
 void OnSoundLoaded(uint8_t* base, uint32_t context) {
@@ -97,7 +105,7 @@ void OnSoundLoaded(uint8_t* base, uint32_t context) {
 
 void WheelsSetRecord(uint8_t* base, uint32_t wheels, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_820E7378 SceneWheels::SetRecord");
-  guest::StoreU32(base, wheels + 16776, value);
+  schema::SceneWheels(base, wheels).set_traffic_record(value);
 }
 
 void SetCarModel(uint8_t* base, uint32_t object, uint32_t car_model) {
@@ -107,30 +115,38 @@ void SetCarModel(uint8_t* base, uint32_t object, uint32_t car_model) {
 
 void PartsLink(uint8_t* base, uint32_t parts, uint32_t car_model) {
   ITC_NATIVE_RUNNING("sub_820DF1A8 SceneParts::Link");
-  guest::StoreU32(base, parts + 24, car_model);
-  guest::StoreU32(base, parts + 28, guest::LoadU32(base, car_model + 24) + 3760);
+  const schema::SceneParts p(base, parts);
+  p.set_scene_car_model(car_model);
+  p.set_skeleton(
+      schema::CarModelsSceneCarModel(base, car_model).car_model().skeleton_address());
 }
 
 void PartsSetRecord(uint8_t* base, uint32_t parts, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_820DF1C0 SceneParts::SetRecord");
-  guest::StoreU32(base, parts + 37248, value);
+  // The point block's scene model record.
+  schema::PartsPoints(base, schema::SceneParts(base, parts).points_address())
+      .set_scene_model_record(value);
 }
 
 void InteriorLink(uint8_t* base, uint32_t interior, uint32_t car_model) {
   ITC_NATIVE_RUNNING("sub_820E37D0 SceneInterior::Link");
-  guest::StoreU32(base, interior + 24, car_model);
-  guest::StoreU32(base, interior + 28, guest::LoadU32(base, car_model + 24) + 3760);
-  guest::StoreU32(base, interior + 32, guest::LoadU32(base, car_model + 24) + 4048);
+  const schema::SceneInterior i(base, interior);
+  const schema::CarModelsSceneCarModel model(base, car_model);
+  i.set_car_model(car_model);
+  // The first set's car model, read twice as the original does.
+  i.set_skeleton(model.car_model().skeleton_address());
+  i.set_texture_set(model.car_model().texture_providers_address());
 }
 
 void SetWord11452(uint8_t* base, uint32_t object, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_820E3658 SetWord11452");
-  guest::StoreU32(base, object + 11452, value);
+  // r3 is an interior's point block (the interior + 160).
+  schema::SecondSetInteriorPoints(base, object).set_cockpit(value);
 }
 
 bool CarModelSetRecord(uint8_t* base, uint32_t car_model, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D3C70 CarModel::SetRecord");
-  const uint32_t to = car_model + 32;
+  const uint32_t to = schema::CarModel(base, car_model).record_address();
   if (to >= kPhysical) {
     return false;
   }
@@ -153,14 +169,15 @@ bool CarRecordCopy(uint8_t* base, uint32_t to, uint32_t from) {
   t.set_emblem_choice(f.emblem_choice());
   t.set_emblem_word(f.emblem_word());
   ForEachLayer(t, [&](uint32_t r) {
-    for (uint32_t field : {0u, 4u, 8u}) {
-      guest::StoreU32(base, to + r + field, guest::LoadU32(base, from + r + field));
-    }
-    CopyDoubleword(base, to + r + 16, from + r + 16);
-    CopyDoubleword(base, to + r + 24, from + r + 24);
-    CopyFloat(base, to + r + 32, from + r + 32);
-    CopyDoubleword(base, to + r + 48, from + r + 48);
-    CopyDoubleword(base, to + r + 56, from + r + 56);
+    const schema::CarModelDecalRecord tl(base, to + r), fl(base, from + r);
+    tl.set_index(fl.index());
+    tl.set_mirrored(fl.mirrored());
+    tl.set_region(fl.region());
+    CopyDoubleword(base, tl.offset_xy_address(), fl.offset_xy_address());
+    CopyDoubleword(base, tl.offset_zw_address(), fl.offset_zw_address());
+    tl.set_rotation(fl.rotation());
+    CopyDoubleword(base, tl.scale_address(), fl.scale_address());
+    CopyDoubleword(base, tl.scale_address() + 8, fl.scale_address() + 8);
   });
   if (!c_runtime::Memcpy(base, t.plate_address(), f.plate_address(), 48)) {
     return false;
@@ -178,16 +195,26 @@ bool SceneModelRecordCopy(uint8_t* base, uint32_t to, uint32_t from) {
       from - to < kSceneModelRecordBytes) {
     return false;
   }
-  guest::StoreU32(base, to, guest::LoadU32(base, from));
-  if (!CarRecordCopy(base, to + 16, from + 16)) {
+  const schema::SceneModelRecord t(base, to), f(base, from);
+  t.set_kind(f.kind());
+  if (!CarRecordCopy(base, t.block_address(), f.block_address())) {
     return false;
   }
-  struct Part {
-    uint32_t offset, bytes;
+  // The parts', interior's, cockpit's, wheels' and light kit's records, in
+  // order.
+  const uint32_t kParts[][2] = {
+      {t.parts_aero0_address(), f.parts_aero0_address()},
+      {InteriorRecordOf(t), InteriorRecordOf(f)},
+      {t.cockpit_bonnet_address(), f.cockpit_bonnet_address()},
+      {WheelsRecordOf(t), WheelsRecordOf(f)},
+      {t.layer0_b_address(), f.layer0_b_address()},
   };
-  constexpr Part kParts[] = {{3712, 60}, {3772, 120}, {3892, 144}, {4036, 156}, {4192, 52}};
-  for (const Part& part : kParts) {
-    if (!c_runtime::Memcpy(base, to + part.offset, from + part.offset, part.bytes)) {
+  constexpr uint32_t kBytes[] = {schema::PartsRecord::kSize, schema::InteriorRecord::kSize,
+                                 schema::SceneModelsCockpitRecord::kSize,
+                                 schema::SceneModelsWheelsRecord::kSize,
+                                 schema::LightKitRecord::kSize};
+  for (uint32_t i = 0; i < 5; i++) {
+    if (!c_runtime::Memcpy(base, kParts[i][0], kParts[i][1], kBytes[i])) {
       return false;
     }
   }
@@ -196,9 +223,11 @@ bool SceneModelRecordCopy(uint8_t* base, uint32_t to, uint32_t from) {
 
 void SceneModelRecordConstruct(uint8_t* base, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820DB240 SceneModelRecord::SceneModelRecord");
-  CarRecordSetW(base, record + 16);
-  Record12Reset(base, record + 4036 + 44);
-  Record12Reset(base, record + 4036 + 56);
+  const schema::SceneModelRecord r(base, record);
+  CarRecordSetW(base, r.block_address());
+  // The wheels record's front and rear sizes (+44, +56).
+  Record12Reset(base, r.front_size_address());
+  Record12Reset(base, r.rear_size_address());
 }
 
 void CarRecordSetW(uint8_t* base, uint32_t record) {
@@ -212,8 +241,10 @@ void CarRecordSetW(uint8_t* base, uint32_t record) {
     }
   }
   ForEachLayer(r, [&](uint32_t layer) {
-    guest::StoreFloat(base, record + layer + 28, G::one(base));
-    guest::StoreFloat(base, record + layer + 60, G::one(base));
+    const schema::CarModelDecalRecord l(base, record + layer);
+    // The offset's w (+28) and the scale's (+60).
+    guest::StoreFloat(base, l.offset_zw_address() + 4, G::one(base));
+    guest::StoreFloat(base, l.scale_address() + 12, G::one(base));
   });
 }
 
@@ -227,18 +258,19 @@ void Record12Reset(uint8_t* base, uint32_t record) {
 
 void LayerReset(uint8_t* base, uint32_t layer) {
   ITC_NATIVE_RUNNING("sub_820D0A20 Layer::Reset");
-  guest::StoreU32(base, layer + 4, 0);
-  guest::StoreU32(base, layer + 8, 8);
-  guest::StoreU32(base, layer + 0, 0xFFFFFFFFu);
+  const schema::CarModelDecalRecord l(base, layer);
+  l.set_mirrored(0);
+  l.set_region(8);
+  l.set_index(0xFFFFFFFFu);
   // The offset (0, 0, 0, 1), built in the original's stack and copied as
   // two doublewords.
-  guest::StoreFloat(base, layer + 16, G::zero(base));
-  guest::StoreFloat(base, layer + 20, G::zero(base));
-  guest::StoreFloat(base, layer + 24, G::zero(base));
-  guest::StoreFloat(base, layer + 28, G::one(base));
-  guest::StoreFloat(base, layer + 32, G::zero(base));
-  for (uint32_t offset = 48; offset < 64; offset += 4) {
-    guest::StoreFloat(base, layer + offset, G::one(base));
+  guest::StoreFloat(base, l.offset_xy_address(), G::zero(base));
+  guest::StoreFloat(base, l.offset_xy_address() + 4, G::zero(base));
+  guest::StoreFloat(base, l.offset_zw_address(), G::zero(base));
+  guest::StoreFloat(base, l.offset_zw_address() + 4, G::one(base));
+  l.set_rotation(G::zero(base));
+  for (uint32_t offset = 0; offset < 16; offset += 4) {
+    guest::StoreFloat(base, l.scale_address() + offset, G::one(base));
   }
 }
 
@@ -263,28 +295,31 @@ uint32_t CarRecordReset(uint8_t* base, uint32_t record) {
   }
   r.set_emblem_choice(0);
   r.set_emblem_word(0);
-  // A layer's +8 (the region) and the sticker group's size.
-  constexpr uint32_t kRegion = 8, kGroupBytes = 6 * kLayerBytes;
+  // The sticker group's size.
+  constexpr uint32_t kGroupBytes = 6 * kLayerBytes;
   for (uint32_t i = 0; i < 3; i++) {
-    LayerReset(base, r.vinyl_layers_a_address() + kLayerBytes * i);
-    guest::StoreU32(base, r.vinyl_layers_a_address() + kLayerBytes * i + kRegion, 8);
-    LayerReset(base, r.vinyl_layers_b_address() + kLayerBytes * i);
-    guest::StoreU32(base, r.vinyl_layers_b_address() + kLayerBytes * i + kRegion, 0);
+    const schema::CarModelDecalRecord a(base, r.vinyl_layers_a_address() + kLayerBytes * i);
+    LayerReset(base, a.address);
+    a.set_region(8);
+    const schema::CarModelDecalRecord b(base, r.vinyl_layers_b_address() + kLayerBytes * i);
+    LayerReset(base, b.address);
+    b.set_region(0);
   }
   // The stickers' eight groups: the region at +8, and +4 = 1 in the third
   // and the last.
   constexpr uint32_t kRegions[8] = {8, 2, 1, 3, 4, 7, 6, 5};
   for (uint32_t j = 0; j < 6; j++) {
     for (uint32_t group = 0; group < 8; group++) {
-      const uint32_t layer = r.stickers_address() + kGroupBytes * group + kLayerBytes * j;
-      LayerReset(base, layer);
+      const schema::CarModelDecalRecord layer(
+          base, r.stickers_address() + kGroupBytes * group + kLayerBytes * j);
+      LayerReset(base, layer.address);
       if (group == 7) {
-        guest::StoreU32(base, layer + 4, 1);
-        guest::StoreU32(base, layer + 8, kRegions[group]);
+        layer.set_mirrored(1);
+        layer.set_region(kRegions[group]);
       } else {
-        guest::StoreU32(base, layer + 8, kRegions[group]);
+        layer.set_region(kRegions[group]);
         if (group == 2) {
-          guest::StoreU32(base, layer + 4, 1);
+          layer.set_mirrored(1);
         }
       }
     }
@@ -309,28 +344,60 @@ uint32_t CarRecordReset(uint8_t* base, uint32_t record) {
 
 void PartsRecordReset(uint8_t* base, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D3558 PartsRecord::Reset");
-  Clear(base, record, 60);
-  for (uint32_t offset = 0; offset < 60; offset += 4) {
-    guest::StoreU32(base, record + offset, offset == 52 ? 3 : 0);
-  }
+  const schema::PartsRecord p(base, record);
+  Clear(base, record, schema::PartsRecord::kSize);
+  p.set_unknown_0(0);
+  p.set_unknown_4(0);
+  p.set_unknown_8(0);
+  p.set_doors_body_kind(0);
+  p.set_unknown_16(0);
+  p.set_unknown_20(0);
+  p.set_unknown_24(0);
+  p.set_door_panel_kind(0);
+  p.set_headlight_color(0);
+  p.set_unknown_36(0);
+  p.set_unknown_40(0);
+  p.set_unknown_44(0);
+  p.set_unknown_48(0);
+  p.set_unknown_52(3);
+  p.set_unknown_56(0);
 }
 
 void InteriorRecordReset(uint8_t* base, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D3840 InteriorRecord::Reset");
-  Clear(base, record, 120);
-  struct Word {
-    uint32_t offset, value;
-  };
+  const schema::InteriorRecord i(base, record);
+  Clear(base, record, schema::InteriorRecord::kSize);
   // The original's store order.
-  constexpr Word kWords[] = {
-      {0, 0},  {4, 0},  {92, 0}, {96, 0}, {100, 0}, {104, 0}, {108, 0}, {112, 3},
-      {116, 0}, {8, 0}, {12, 0}, {16, 0}, {20, 0},  {24, 0},  {28, 1},  {32, 0},
-      {36, 0}, {40, 2}, {44, 0}, {48, 0}, {52, 3},  {56, 0},  {60, 0},  {64, 4},
-      {68, 0}, {72, 1}, {76, 0}, {80, 0}, {84, 1},  {88, 1},
-  };
-  for (const Word& word : kWords) {
-    guest::StoreU32(base, record + word.offset, word.value);
-  }
+  i.set_speedometer(0);
+  i.set_tachometer(0);
+  i.set_steering_wheel(0);
+  i.set_seat_texture(0);
+  i.set_seat_model(0);
+  i.set_roll_cage(0);
+  i.set_strut_bar(0);
+  i.set_accessory(3);
+  i.set_unknown_116(0);
+  i.set_gauge0_present(0);
+  i.set_gauge0_kind(0);
+  i.set_unknown_16(0);
+  i.set_gauge1_present(0);
+  i.set_gauge1_kind(0);
+  i.set_unknown_28(1);
+  i.set_gauge2_present(0);
+  i.set_gauge2_kind(0);
+  i.set_unknown_40(2);
+  i.set_gauge3_present(0);
+  i.set_gauge3_kind(0);
+  i.set_unknown_52(3);
+  i.set_gauge4_present(0);
+  i.set_gauge4_kind(0);
+  i.set_unknown_64(4);
+  i.set_gauge5_present(0);
+  i.set_gauge5_kind(1);
+  i.set_unknown_76(0);
+  i.set_gauge6_present(0);
+  i.set_gauge6_kind(1);
+  i.set_unknown_88(1);
 }
 
 uint32_t CockpitRecordReset(uint8_t* base, uint32_t record) {
@@ -369,9 +436,9 @@ void WheelsRecordReset(uint8_t* base, uint32_t record) {
   w.set_unknown_128(G::zero(base));
   w.set_unknown_124(0xFFFFFFFFu);
   w.set_unknown_132(G::zero(base));
-  w.set_unknown_72(0);
+  w.set_front_index_add(0);
   w.set_unknown_136(G::zero(base));
-  w.set_unknown_76(0);
+  w.set_rear_index_add(0);
   w.set_unknown_140(G::zero(base));
   w.set_unknown_80(0);
   w.set_unknown_144(G::zero(base));
@@ -391,32 +458,34 @@ void WheelsRecordReset(uint8_t* base, uint32_t record) {
 
 void Pool4RecordReset(uint8_t* base, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D34E0 Pool4Record::Reset");
-  Clear(base, record, 52);
-  guest::StoreU32(base, record + 0, 0);
-  guest::StoreFloat(base, record + 8, G::one(base));
-  guest::StoreFloat(base, record + 12, G::one(base));
-  guest::StoreU32(base, record + 4, 0);
-  guest::StoreFloat(base, record + 16, G::one(base));
-  guest::StoreU32(base, record + 20, 0);
-  guest::StoreFloat(base, record + 24, G::one(base));
-  guest::StoreFloat(base, record + 28, G::one(base));
-  guest::StoreFloat(base, record + 32, G::one(base));
-  guest::StoreU32(base, record + 36, 0);
-  guest::StoreFloat(base, record + 40, G::one(base));
-  guest::StoreFloat(base, record + 44, G::one(base));
-  guest::StoreFloat(base, record + 48, G::one(base));
+  const schema::LightKitRecord k(base, record);
+  Clear(base, record, schema::LightKitRecord::kSize);
+  k.set_texture(0);
+  k.set_front_on(G::one(base));
+  k.set_front_fade(G::one(base));
+  k.set_front_mode(0);
+  k.set_front_rate(G::one(base));
+  k.set_sides_mode(0);
+  k.set_sides_on(G::one(base));
+  k.set_sides_fade(G::one(base));
+  k.set_sides_rate(G::one(base));
+  k.set_rear_mode(0);
+  k.set_rear_on(G::one(base));
+  k.set_rear_fade(G::one(base));
+  k.set_rear_rate(G::one(base));
 }
 
 uint32_t SceneModelRecordReset(uint8_t* base, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D9810 SceneModelRecord::Reset");
-  guest::StoreU32(base, record, 1);
-  CarRecordReset(base, record + 16);
-  PartsRecordReset(base, record + 3712);
-  InteriorRecordReset(base, record + 3772);
-  CockpitRecordReset(base, record + 3892);
-  WheelsRecordReset(base, record + 4036);
-  Pool4RecordReset(base, record + 4192);
-  return record + 4192;
+  const schema::SceneModelRecord r(base, record);
+  r.set_kind(1);
+  CarRecordReset(base, r.block_address());
+  PartsRecordReset(base, r.parts_aero0_address());
+  InteriorRecordReset(base, InteriorRecordOf(r));
+  CockpitRecordReset(base, r.cockpit_bonnet_address());
+  WheelsRecordReset(base, WheelsRecordOf(r));
+  Pool4RecordReset(base, r.layer0_b_address());
+  return r.layer0_b_address();
 }
 
 uint32_t AllocPages(uint8_t* base, uint32_t out, uint32_t size) {
@@ -443,17 +512,20 @@ std::optional<uint64_t> ModelUpdate(uint8_t* base, uint32_t model, uint32_t sp,
       m.set_build_pending(0);
     }
   }
-  const uint32_t scene = m.scene().address;
-  if (guest::LoadU32(base, scene + 5048) != 0) {
+  const schema::CarScene scene = m.scene();
+  if (scene.blink_timers_held() != 0) {
     return r3;
   }
-  const bool cockpit = guest::LoadU32(base, scene + 4) != 0;
+  const bool cockpit = scene.model_set() != 0;
   if (m.interior_ready() == 0 || m.car_model().address == 0 ||
       (cockpit ? m.cockpit() : m.draw_enabled()) == 0) {
     return r3;
   }
-  // The interior's +36: its first-set interior.
-  const uint32_t accessory = Accessory(base, guest::LoadU32(base, m.interior() + 36));
+  // The scene interior's first-set interior (scene-loaders' Interior, read
+  // here for its accessory as car-models' CarInterior).
+  const uint32_t accessory = Accessory(
+      base,
+      schema::SceneInterior(base, m.interior()).first_set_interior<schema::CarInterior>().address);
   if (accessory == 0) {
     return 0;
   }
@@ -467,9 +539,8 @@ std::optional<uint64_t> ModelUpdate(uint8_t* base, uint32_t model, uint32_t sp,
       guest::StoreU32(base, frame + 144 + 16 * row + 4 * column, value);
     }
   }
-  // The car model's +24 (the first set's car model), its accessory node's
-  // position at +7216.
-  const uint32_t node = guest::LoadU32(base, m.car_model().address + 24) + 7216;
+  // The first set's car model's accessory node's position.
+  const uint32_t node = m.car_model().car_model().accessory_position_address();
   for (uint32_t w = 0; w < 4; w++) {
     guest::StoreU32(base, frame + 192 + 4 * w, guest::LoadU32(base, node + 4 * w));
   }

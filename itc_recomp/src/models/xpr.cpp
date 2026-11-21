@@ -7,6 +7,7 @@
 #include "graphics/resources.h"
 #include "models/memory_blocks.h"
 #include "native/buffers.h"
+#include "schema/graphics_resources.h"
 #include "schema/models.h"
 
 #include <cstdlib>
@@ -16,13 +17,6 @@
 namespace models {
 
 namespace {
-
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
-uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
-}
 
 // A put-off free refused after the checks.
 void Require(bool done, const char* what) {
@@ -98,10 +92,11 @@ uint32_t Moved(uint32_t word, uint32_t by) {
 uint32_t RelocateTexture(uint8_t* base, uint32_t header, uint32_t base_address,
                          uint32_t mip_address) {
   ITC_NATIVE_RUNNING("sub_8235A990 TextureHeader::Relocate");
-  Store(base, header + 0x20, Moved(Load(base, header + 0x20), base_address));
-  const uint32_t levels = ((Load(base, header + 44) >> 6) & 0xF) + 1;
+  const schema::TextureHeader t(base, header);
+  t.set_fetch_format(Moved(t.fetch_format(), base_address));
+  const uint32_t levels = ((t.fetch_mip_range() >> 6) & 0xF) + 1;
   if (levels > 1) {
-    Store(base, header + 0x30, Moved(Load(base, header + 0x30), mip_address));
+    t.set_fetch_mips(Moved(t.fetch_mips(), mip_address));
   }
   return levels;
 }
@@ -110,13 +105,14 @@ uint32_t RelocateResource(uint8_t* base, uint32_t resource, uint32_t address) {
   ITC_NATIVE_RUNNING("sub_8235A9F8 Resource::Relocate");
   const uint32_t type = graphics::ResourceType(base, resource);
   const int32_t kind = int32_t(type);
+  const schema::ResourceHeader r(base, resource);
   if (kind == 1) {
-    const uint32_t word = Load(base, resource + 24);
-    Store(base, resource + 24, (((word & ~3u) + address) & ~3u) | (word & 3u));
+    const uint32_t word = r.data();
+    r.set_data((((word & ~3u) + address) & ~3u) | (word & 3u));
   } else if (kind == 2 || kind == 8) {
-    Store(base, resource + 24, Load(base, resource + 24) + address);
+    r.set_data(r.data() + address);
   } else if (kind == 3 || (kind > 8 && type - 17 <= 3)) {
-    const uint32_t mip = (Load(base, resource + 48) & 0xFFFFF000u) != 0 ? address : 0;
+    const uint32_t mip = (r.fetch_mips() & 0xFFFFF000u) != 0 ? address : 0;
     return RelocateTexture(base, resource, address, mip);
   }
   return type;

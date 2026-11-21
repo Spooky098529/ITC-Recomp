@@ -7,6 +7,7 @@
 #include "car_sounds/car_sounds.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
+#include "schema/race_event.h"  // OpponentItem (DataTables::Item's answer)
 #include "track_collision/track_collision.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -32,13 +33,6 @@ void Clear24(uint8_t* base, uint32_t address) {
   }
 }
 
-// The car sound of vehicle `v` as the loops form it: 0 while the array is
-// 0.
-uint32_t CarSoundOf(uint8_t* base, uint32_t v) {
-  const uint32_t array = Load(base, kCarSounds);
-  return array == 0 ? 0 : array + kCarSoundBytes * v;
-}
-
 // One car's sound set up over its slot's buffers, as SetUpCars and
 // UpdateCars do it (`effects` set: the effects' view set up again first):
 // CarSound::Stop, the two views cleared and set up, CarSound::Start with
@@ -47,7 +41,7 @@ uint32_t CarSoundOf(uint8_t* base, uint32_t v) {
 // 1.0, the slot no longer asked. Returns r3 (Vehicle::Get's).
 uint64_t SetUpCar(uint8_t* base, uint32_t machine, uint32_t v, uint32_t frame, bool effects,
                   uint32_t stop_lr, uint32_t start_lr, const Calls& calls) {
-  const uint32_t sound = CarSoundOf(base, v);
+  const uint32_t sound = CarSoundAt(base, v);
   calls.Call(kCarSoundStop, frame, stop_lr, 1, sound);
   if (effects) {
     car_sounds::WaveBankViewInit(base, Sounds(base, machine).effects_view_address(),
@@ -60,15 +54,15 @@ uint64_t SetUpCar(uint8_t* base, uint32_t machine, uint32_t v, uint32_t frame, b
                                Load(base, Globals::slot_buffers_1_address() + 4 * v));
   car_sounds::WaveBankViewInit(base, Load(base, views),
                                Load(base, Globals::slot_buffers_0_address() + 4 * v));
-  const uint32_t j = Load(base, kBankIndexJ + 4 * v);
-  const uint32_t i = Load(base, kBankIndexI + 4 * v);
+  const uint32_t j = Load(base, CarSounds::sound_picks_b_address() + 4 * v);
+  const uint32_t i = Load(base, CarSounds::sound_picks_a_address() + 4 * v);
   calls.Call(kCarSoundStart, frame, start_lr, 3, sound, views,
              Sounds(base, machine).effects_view_address());
   car_sounds::SetBanks(base, sound, i, j);
   calls.Leave(i, j);
   const uint32_t vehicle = vehicle_accessors::VehicleGet(base, v);
-  guest::StoreFloat(base, sound + 1252, float(double(guest::LoadFloat(base, kOne))));
-  Store(base, sound + 400, vehicle);
+  schema::CarSound(base, sound).set_engine_gain(float(double(RaceStates::one(base))));
+  schema::CarSound(base, sound).set_vehicle(vehicle);
   Store(base, Globals::slot_asked_address() + 4 * v, 0);
   // A compare of i - 18 with 26 follows, with no branch after it (dead).
   return vehicle;
@@ -82,7 +76,8 @@ struct ForgetAtEnd {
 
 // The racer n's vehicle index.
 uint32_t RacerVehicle(uint8_t* base, uint32_t n) {
-  return Load(base, Load(base, Load(base, kRace) + 2308 + 4 * n) + 20);
+  const uint32_t racers = schema::RaceWorldGlobals::racers_manager(base).racers_address();
+  return schema::MinimapRacerEntry(base, Load(base, racers + 4 * n)).vehicle_index();
 }
 
 }  // namespace
@@ -139,7 +134,7 @@ uint64_t UpdateCars(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls)
   for (int32_t n = 0; n < int32_t(count);) {
     const uint32_t v = RacerVehicle(base, uint32_t(n));
     if (Load(base, Globals::slot_asked_address() + 4 * v) == 0) {
-      calls.Call(kCarSoundUpdate, frame, 0x821760F8, 1, CarSoundOf(base, v));
+      calls.Call(kCarSoundUpdate, frame, 0x821760F8, 1, CarSoundAt(base, v));
     }
     n++;
     count = track_collision::RaceRacerCount(base);
@@ -147,13 +142,13 @@ uint64_t UpdateCars(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls)
   }
   // The system UI: the car sounds paused while either word is set, resumed
   // once both are clear.
-  uint32_t a = Load(base, kSystemUi0), b = Load(base, kSystemUi1);
+  uint32_t a = schema::BootModeGlobals::pad_blocked0(base), b = schema::BootModeGlobals::pad_blocked1(base);
   if (a != 0 || b != 0) {
     if (Sounds(base, machine).cars_paused() == 0) {
       r3 = PauseCars(base, frame, calls);
       Sounds(base, machine).set_cars_paused(1);
-      a = Load(base, kSystemUi0);
-      b = Load(base, kSystemUi1);
+      a = schema::BootModeGlobals::pad_blocked0(base);
+      b = schema::BootModeGlobals::pad_blocked1(base);
     }
     if (a != 0 || b != 0) {
       return r3;
@@ -170,14 +165,19 @@ uint64_t PickRivalMusic(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821764F0 RaceSounds::PickRivalMusic");
   const uint32_t machine = uint32_t(r3);
   Frame(base, sp, 112);
-  const uint32_t results = Load(base, kProgress) + 2184;
-  const uint32_t count = Load(base, results);
-  const int32_t item = int32_t(Load(base, results + 972 * count - 964));
+  // The results record's last entry's item (+972 * count - 964: entry
+  // count - 1's +4).
+  const uint32_t results = RaceStates::progress(base).results_address();
+  const uint32_t count = schema::RacerResultsRecord(base, results).count();
+  const int32_t item =
+      int32_t(schema::RacerResultsRecord(base, results + 972 * (count - 1)).e0_item());
   uint32_t flag = 0x40;
   if (int32_t(count) != 1 && item != -1) {
     r3 = data_tables::Item(base, uint32_t(item));
-    // The class byte, sign-extended, compared unsigned.
-    const uint32_t kind = uint32_t(int32_t(int8_t(guest::LoadU8(base, uint32_t(r3) + 35))));
+    // The class byte (race-event.toml's OpponentItem), sign-extended,
+    // compared unsigned.
+    const uint32_t kind =
+        uint32_t(int32_t(int8_t(schema::OpponentItem(base, uint32_t(r3)).kind())));
     if (kind < 1) {
       flag = 0x40;
     } else if (kind == 1) {
@@ -222,7 +222,7 @@ uint64_t PlayRivalMusic(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& ca
     Sounds(base, machine).set_flags(Sounds(base, machine).flags() & ~flag);
   };
   if (Sounds(base, machine).flags() & 0x40) {
-    const uint32_t course = Load(base, Load(base, kRaceData) + 32);
+    const uint32_t course = RaceStates::race_data(base).mode();
     if (course < 1) {
       play(4, 82, 92, 0x8217638C);
     } else if (course == 1) {

@@ -9,6 +9,8 @@
 #include "camera_modes/steps.h"
 #include "career/career.h"
 #include "guest.h"
+#include "schema/career.h"
+#include "schema/race_event.h"
 #include "schema/race_screens.h"
 #include "helpers/debug_output.h"
 #include "memory/heap.h"
@@ -315,53 +317,53 @@ uint64_t PauseMenuLoadData(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8220F840 PauseMenu::LoadData");
   const uint32_t frame = sp - 6176;
   Frame(base, sp, 6176);
-  const uint32_t options = vehicle_accessors::SaveDataOf(base, 0) + 0x1F85C;
+  // Player 0's save data (race-event.toml's SaveData): its options from
+  // +0x1F85C.
+  const schema::SaveData options(base, vehicle_accessors::SaveDataOf(base, 0));
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   uint64_t r3 = save;
   // Each store reads [0x826D84D4] after its load, as the original does.
   {
-    const uint32_t value = guest::LoadU32(base, options + 0);
+    const uint32_t value = options.hud_option_0();
     PauseData(base).set_hud_option_0(value);
   }
   {
-    const uint32_t value = guest::LoadU32(base, options + 4);
+    const uint32_t value = options.hud_option_1();
     PauseData(base).set_hud_option_1(value);
   }
   {
-    const uint32_t value = guest::LoadU32(base, options + 8);
+    const uint32_t value = options.hud_option_2();
     PauseData(base).set_hud_option_2(value);
   }
   {
     const schema::PauseMenuData data = PauseData(base);
-    data.set_hud_option_3(guest::LoadU32(base, options + 12));
+    data.set_hud_option_3(options.hud_option_3());
   }
   PauseData(base).set_hud_default_0(1);
   PauseData(base).set_hud_default_1(1);
   PauseData(base).set_hud_default_2(1);
   PauseData(base).set_hud_default_3(1);
-  auto signed_byte = [&](uint32_t offset) {
-    return uint32_t(int32_t(int8_t(guest::LoadU8(base, options + offset))));
-  };
+  auto signed_byte = [](uint8_t byte) { return uint32_t(int32_t(int8_t(byte))); };
   {
-    const uint32_t value = signed_byte(28);
+    const uint32_t value = signed_byte(options.effects_volume());  // +28
     PauseData(base).set_music_volume_saved(value);
   }
   {
-    const uint32_t value = signed_byte(29);
+    const uint32_t value = signed_byte(options.music_volume());  // +29
     PauseData(base).set_effects_volume_saved(value);
   }
   PauseData(base).set_music_volume_default(15);
   PauseData(base).set_effects_volume_default(15);
   {
-    const uint32_t value = signed_byte(36);
+    const uint32_t value = signed_byte(options.setting_0());
     PauseData(base).set_adjust_saved_0(value);
   }
   {
-    const uint32_t value = signed_byte(37);
+    const uint32_t value = signed_byte(options.setting_1());
     PauseData(base).set_adjust_saved_1(value);
   }
   {
-    const uint32_t value = signed_byte(38);
+    const uint32_t value = signed_byte(options.setting_2());
     PauseData(base).set_adjust_saved_2(value);
   }
   PauseData(base).set_adjust_default_0(0);
@@ -373,19 +375,22 @@ uint64_t PauseMenuLoadData(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   // The career's numbers, from a copy of the save data's stats on the
   // stack (frame + 80) and the player's vehicle.
-  Copy(base, calls, frame, 0x8220F978, frame + 80, save + 48, 6044);
+  // (The stats, +48, are career.toml's CareerSave's: race-event.toml's
+  // SaveData has no field there.)
+  Copy(base, calls, frame, 0x8220F978, frame + 80, schema::CareerSave(base, save).stats_address(),
+       6044);
   const uint32_t vehicle = vehicle_accessors::VehicleGet(base, 0);
   {
-    const uint32_t value = guest::LoadU32(base, save + 6116);
+    const uint32_t value = schema::SaveData(base, save).money();
     PauseData(base).set_money(value);
   }
   {
-    const int32_t day = int32_t(guest::LoadU32(base, save + 6100));
+    const int32_t day = int32_t(schema::SaveData(base, save).day());
     const int32_t week = day / 7;
     PauseData(base).set_weekday(uint32_t(day) - uint32_t(week) * 7);
   }
   {
-    int32_t day = int32_t(guest::LoadU32(base, save + 6100));
+    int32_t day = int32_t(schema::SaveData(base, save).day());
     if (day > 999) {
       day = 999;
     }
@@ -419,16 +424,18 @@ uint64_t PauseMenuSaveOptions(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220D6A0 PauseMenu::SaveOptions");
   Frame(base, sp, 96);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t options = save + 0x1F85C;
-  guest::StoreU32(base, options + 0, PauseData(base).hud_option_0());
-  guest::StoreU32(base, options + 4, PauseData(base).hud_option_1());
-  guest::StoreU32(base, options + 8, PauseData(base).hud_option_2());
-  guest::StoreU32(base, options + 12, PauseData(base).hud_option_3());
-  guest::StoreU8(base, options + 28, uint8_t(PauseData(base).music_volume_saved()));
-  guest::StoreU8(base, options + 29, uint8_t(PauseData(base).effects_volume_saved()));
-  guest::StoreU8(base, options + 36, uint8_t(PauseData(base).adjust_saved_0()));
-  guest::StoreU8(base, options + 37, uint8_t(PauseData(base).adjust_saved_1()));
-  guest::StoreU8(base, options + 38, uint8_t(PauseData(base).adjust_saved_2()));
+  // The options (race-event.toml's SaveData from +0x1F85C; it names the
+  // bytes +28 and +29 the other way round from the pause data).
+  const schema::SaveData options(base, save);
+  options.set_hud_option_0(PauseData(base).hud_option_0());
+  options.set_hud_option_1(PauseData(base).hud_option_1());
+  options.set_hud_option_2(PauseData(base).hud_option_2());
+  options.set_hud_option_3(PauseData(base).hud_option_3());
+  options.set_effects_volume(uint8_t(PauseData(base).music_volume_saved()));
+  options.set_music_volume(uint8_t(PauseData(base).effects_volume_saved()));
+  options.set_setting_0(uint8_t(PauseData(base).adjust_saved_0()));
+  options.set_setting_1(uint8_t(PauseData(base).adjust_saved_1()));
+  options.set_setting_2(uint8_t(PauseData(base).adjust_saved_2()));
   return save;
 }
 
@@ -441,11 +448,11 @@ uint64_t PauseMenuSaveHudOptions(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220D740 PauseMenu::SaveHudOptions");
   Frame(base, sp, 96);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t options = save + 0x1F85C;
-  guest::StoreU32(base, options + 0, PauseData(base).hud_edit_0());
-  guest::StoreU32(base, options + 4, PauseData(base).hud_edit_1());
-  guest::StoreU32(base, options + 8, PauseData(base).hud_edit_2());
-  guest::StoreU32(base, options + 12, PauseData(base).hud_edit_3());
+  const schema::SaveData options(base, save);
+  options.set_hud_option_0(PauseData(base).hud_edit_0());
+  options.set_hud_option_1(PauseData(base).hud_edit_1());
+  options.set_hud_option_2(PauseData(base).hud_edit_2());
+  options.set_hud_option_3(PauseData(base).hud_edit_3());
   return save;
 }
 

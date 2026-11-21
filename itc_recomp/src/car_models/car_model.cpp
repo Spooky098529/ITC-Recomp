@@ -11,7 +11,9 @@
 #include "model_animation/model_animation.h"
 #include "models/part_model.h"
 #include "native/buffers.h"
+#include "schema/car_draw.h"
 #include "schema/car_models.h"
+#include "schema/scene_loaders.h"
 #include "scene_loaders/objects.h"
 #include "scene_models/scene_models.h"
 
@@ -119,8 +121,7 @@ int64_t CarModelLoadSetB(uint8_t* base, uint32_t car_model, uint32_t pcr,
   LoadSlotLoad(base, car.node_file_slot_address(), car.block() * 197 + 11063, car_model,
                kOnFileLoadedB, pcr, load);
   const uint32_t block = car.block();
-  const uint32_t buffer =
-      guest::LoadU32(base, G::scene<schema::View>(base).address + kSharedBuffer);
+  const uint32_t buffer = G::scene(base).load_buffer();
   const uint32_t id = block * 197 + 11061;
   car.set_body_xpr_id(id);
   car.set_body_xpr_size(archive::AssetSize(base, id));
@@ -233,9 +234,11 @@ uint32_t CarModelReloadDecals(uint8_t* base, uint32_t car_model, uint32_t stack,
 
 uint32_t CarModelSetVinylTextures(uint8_t* base, uint32_t scene_model) {
   ITC_NATIVE_RUNNING("sub_820D5F88 CarModel::SetVinylTextures");
-  uint32_t model = scene_model + 688;
+  // r3 is the first set's cockpit body (scene-loaders.toml's Cockpit).
+  const schema::Cockpit cockpit(base, scene_model);
+  uint32_t model = cockpit.part_models_address();
   for (int k = 0; k < 6; k++, model += 464) {
-    const CarModel car(base, guest::LoadU32(base, scene_model + 24));
+    const CarModel car = cockpit.car_model();
     models::PartModelSetVinylTextures(base, model, car.vinyl_sheet(), car.unknown_6692());
   }
   return model - 464;

@@ -12,6 +12,10 @@
 #include "race_setup/race_setup.h"
 #include "save_data/save_data.h"
 #include "schema/car_makers.h"
+#include "schema/car_scene_draw.h"
+#include "schema/career.h"
+#include "schema/race_event.h"
+#include "schema/tuning_screen.h"
 
 namespace car_makers {
 
@@ -43,7 +47,7 @@ uint64_t GarageCarReset(uint8_t* base, const front_end_car_draw::Calls& calls, u
   const schema::GarageCar g(base, car);
   race_setup::CarClear(base, car);
   // The 0.0's bits, copied as words (the original's lwz and stw).
-  const uint32_t zero = Load(base, kZero);
+  const uint32_t zero = Load(base, schema::CarSceneDrawGlobals::zero_address());
   Store(base, g.unknown_1888_address(), zero);
   g.set_spec_748(0);
   Store(base, g.racer_float_address(), zero);
@@ -79,7 +83,7 @@ uint64_t FromGarageCar(uint8_t* base, const front_end_car_draw::Calls& calls, ui
     const uint64_t regs[1] = {car};
     calls.call(kRefresh, regs, 1, nullptr, 0, frame, 0x82179A9C, nullptr);
   }
-  const double zero = Lfs(base, kZero);
+  const double zero = Lfs(base, schema::CarSceneDrawGlobals::zero_address());
   if (race_setup::AddRacerNative(base, car)) {
     race_setup::AddRacer(base, car, 0, zero, 0);
   } else {
@@ -106,19 +110,23 @@ uint64_t FromGarageCar(uint8_t* base, const front_end_car_draw::Calls& calls, ui
 uint64_t TuningScreenSetUpCarData(uint8_t* base, const front_end_car_draw::Calls& calls,
                                   uint32_t screen, uint32_t stack, double* f1) {
   ITC_NATIVE_RUNNING("sub_821DF2F8 TuningScreen::SetUpCarData");
-  const uint32_t save = Load(base, screen + 18904);
-  const uint32_t nodes = save + 6120;
-  uint32_t n = Load(base, save + 0x19920);
-  uint32_t node = uint32_t(int32_t(int16_t(guest::LoadU16(base, nodes + 204)))) * 4 + nodes;
+  const schema::TuningScreen tuning(base, screen);
+  const schema::SaveData save(base, tuning.save_data().address);
+  // The garage list (career.toml's): 4-byte nodes {+0 next, +2 slot}.
+  const schema::CareerGarageList garage(base, save.garage_address());
+  const uint32_t nodes = garage.nodes_address();
+  uint32_t n = save.selected_car();
+  uint32_t node = uint32_t(int32_t(int16_t(garage.head()))) * 4 + nodes;
   while (n != 0) {
     node = uint32_t(int32_t(int16_t(guest::LoadU16(base, node)))) * 4 + nodes;
     n--;
   }
   const int64_t slot = int16_t(guest::LoadU16(base, node + 2));
-  const uint32_t car = uint32_t(uint64_t(slot) * 1968) + nodes + 212;
-  const uint32_t holder = Load(base, G::stand_holder(base).address);
+  const uint32_t car = uint32_t(uint64_t(slot) * 1968) + garage.cars_address();
+  const uint32_t holder =
+      schema::StandHolder(base, G::stand_holder(base).address).stage_block_0();
   (void)holder;  // r3, not read by FromGarageCar
-  return FromGarageCar(base, calls, car, screen + 18912, stack, f1);
+  return FromGarageCar(base, calls, car, tuning.car_data_address(), stack, f1);
 }
 
 }  // namespace car_makers

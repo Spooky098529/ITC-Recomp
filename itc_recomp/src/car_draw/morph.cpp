@@ -10,6 +10,10 @@
 #include "guest.h"
 #include "models/xpr.h"
 #include "schema/car_draw.h"
+#include "schema/frame_driver.h"
+#include "schema/graphics_resources.h"
+#include "schema/models.h"
+#include "schema/second_set.h"
 #include "scenery_lists/scenery_lists.h"
 #include "second_set/morph.h"
 
@@ -23,15 +27,15 @@ namespace sl = scenery_lists;
 
 // The work memory: the current buffer's index, and per buffer (4i) the
 // headers taken, the bytes used and the start; the capacity; the headers.
-constexpr uint32_t kWorkIndex = 0x8296B780;
-constexpr uint32_t kWorkHeaders = 0x8296B798;
-constexpr uint32_t kWorkUsed = 0x8296B7A0;
-constexpr uint32_t kWorkStart = 0x8296B7A8;
-constexpr uint32_t kWorkCapacity = 0x8296B7B0;
+constexpr uint32_t kWorkIndex = schema::FrameDriverGlobals::work_buffer_address();
+constexpr uint32_t kWorkHeaders = schema::FrameDriverGlobals::work_headers_used_address();
+constexpr uint32_t kWorkUsed = schema::FrameDriverGlobals::work_bytes_used_address();
+constexpr uint32_t kWorkStart = schema::FrameDriverGlobals::work_start_address();
+constexpr uint32_t kWorkCapacity = schema::FrameDriverGlobals::work_capacity_address();
 constexpr uint32_t kHeaderTable = 0x82957780;
 constexpr uint32_t kHeadersPerBuffer = 1280;
 
-constexpr uint32_t kRecordList = 0x8296B918;
+constexpr uint32_t kRecordList = schema::FrameDriverGlobals::scene_list_address();
 constexpr uint32_t kReleaseBucket = 0x8296B904;
 constexpr uint32_t kMakeMorphJob = 0x820AC7F0;  // the second pool maker's slot 1
 constexpr uint32_t kZero = 0x82000A34;  // 0.0
@@ -87,18 +91,19 @@ uint32_t XgSetVertexBufferHeader(uint8_t* base, uint32_t length, uint32_t usage,
   for (uint32_t i = 0; i < 32; i += 4) {
     Store(base, header + i, 0);
   }
-  Store(base, header + 0, 1);
+  const schema::BufferHeader h(base, header);
+  h.set_common(1);
   if ((usage & 0x4) != 0) {
-    Store(base, header + 0, 0x00200001);
+    h.set_common(0x00200001);
   }
   if ((usage & 0x200) != 0) {
-    Store(base, header + 0, Load(base, header + 0) | 0x00400000);
+    h.set_common(h.common() | 0x00400000);
   }
-  Store(base, header + 4, 1);
-  const uint32_t kept = Load(base, header + 28) & 0x08000000;
-  Store(base, header + 20, 0xFFFF0000);
-  Store(base, header + 24, offset | 3);
-  Store(base, header + 28, (length & 0x03FFFFFC) | kept | 0x10000000 | 2);
+  h.set_ref_count(1);
+  const uint32_t kept = h.size() & 0x08000000;
+  h.set_locked_base(0xFFFF0000);
+  h.set_data(offset | 3);
+  h.set_size((length & 0x03FFFFFC) | kept | 0x10000000 | 2);
   return header;
 }
 
@@ -164,10 +169,12 @@ std::optional<Left> ModelQueueJobRelease(uint8_t* base, const Calls& calls, uint
 std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t model,
                                     uint32_t morph, uint64_t shape_index, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_82595110 Model::MorphShape");
-  const uint32_t shape = uint32_t(shape_index * 544 + Load(base, model + 40));
-  const uint32_t stream0 = Load(base, shape + 400);
-  const uint32_t stream1 = Load(base, shape + 404);
-  const uint32_t weights = Load(base, shape + 408);
+  const uint32_t shape = uint32_t(shape_index * schema::ModelShape::kSize +
+                                  schema::Model(base, model).shapes().address);
+  const schema::ModelShape s(base, shape);
+  const uint32_t stream0 = s.skin_array_a();
+  const uint32_t stream1 = s.skin_array_b();
+  const uint32_t weights = s.skin().address;
   // Both allocations and the release checked before anything is done.
   {
     const uint32_t i4 = Load(base, kWorkIndex) << 2;
@@ -195,15 +202,16 @@ std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t 
     }
     return *memory;
   };
-  Store(base, shape + 416, alloc(shape + 412, Load(base, stream0 + 12)));
+  Store(base, shape + 416, alloc(s.skinned_stream1_address(), Load(base, stream0 + 12)));
   const uint32_t bytes1 = Load(base, stream1 + 12);
   if (bytes1 == 0) {
     Store(base, shape + 424, 0);
   } else {
-    Store(base, shape + 424, alloc(shape + 420, bytes1));
+    Store(base, shape + 424, alloc(s.skinned_stream2_address(), bytes1));
   }
-  Store(base, morph + 8, Load(base, shape + 416));
-  Store(base, morph + 12, Load(base, shape + 424));
+  const schema::Morph m(base, morph);
+  m.set_out1(Load(base, shape + 416));
+  m.set_out2(Load(base, shape + 424));
   const uint32_t maker = schema::CarDrawGlobals::pool_maker(base);
   Left left;
   if (maker != 0) {
@@ -221,7 +229,7 @@ std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t 
       const uint64_t regs[2] = {maker, morph};
       job = uint32_t(calls.call(slot, regs, 2, frame, 0x825951A4));
     }
-    Store(base, weights + 20, job);
+    schema::SkinBlock(base, weights).set_object(job);
     const auto release = ModelQueueJobRelease(base, calls, job, frame);
     if (!release) {
       ITC_LOG_ERROR("car_draw: Model::QueueJobRelease declined after its checks");
@@ -237,9 +245,9 @@ std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t 
       calls.call(0x8258BD28, regs, 1, frame, 0x825951CC);
       left.in_ctx = true;
     }
-    Store(base, weights + 20, 0);
+    schema::SkinBlock(base, weights).set_object(0);
   }
-  Store(base, shape + 428, 1);
+  s.set_skinned(1);
   return left;
 }
 

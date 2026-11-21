@@ -16,6 +16,7 @@
 #include "material_passes/material_passes.h"
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
+#include "schema/cameras.h"
 #include "schema/car_draw.h"
 
 #include <cmath>
@@ -149,7 +150,7 @@ Left CoverAlpha(uint8_t* base, uint32_t record, uint32_t block, uint32_t frame) 
 // (r3 its out, left as the call set it), else its original.
 Left ViewTransposed(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t pass,
                     uint32_t lr) {
-  const uint32_t out = frame + 656, view = pass + 16;
+  const uint32_t out = frame + 656, view = schema::CameraPass(base, pass).view_address();
   if (material_passes::TransposeRotation(base, out, view, frame)) {
     return Left{false, out};
   }
@@ -207,11 +208,11 @@ void TowardEye(uint8_t* base, uint32_t frame, uint32_t pass,
                std::initializer_list<uint32_t> ones) {
   const double one = Lfs(base, kOne);
   double f12 = Lfs(base, frame + 392);
-  double f0 = Fsubs(Lfs(base, pass + 408), f12);
+  double f0 = Fsubs(double(schema::CameraPass(base, pass).eye_z()), f12);
   f12 = Lfs(base, frame + 388);
-  double f13 = Fsubs(Lfs(base, pass + 404), f12);
+  double f13 = Fsubs(double(schema::CameraPass(base, pass).eye_y()), f12);
   const double f11 = Lfs(base, frame + 384);
-  f12 = Fsubs(Lfs(base, pass + 400), f11);
+  f12 = Fsubs(double(schema::CameraPass(base, pass).eye_x()), f11);
   Stfs(base, frame + 172, one);
   Identity(base, frame + 272);
   double length = Fmuls(f0, f0);
@@ -285,7 +286,7 @@ constexpr TailSites kTrafficTailSites = {
 // 0x40 (`any_with_0x40`).
 Left TailGlows(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group, uint32_t block,
                uint32_t pass, bool any_with_0x40, const TailSites& sites) {
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   Left left;
   // The 1.0 w's of the view's transposed rotation and of the matrix at +336.
   const double one = Lfs(base, kOne);
@@ -407,7 +408,7 @@ Left PartsDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint
                          uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820DF8B0 PartsPoints::DrawTailLights");
   const uint32_t frame = Frame(base, stack, kPartsTailLightsFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   auto lamp = [&](uint32_t record, uint32_t lr) {
     return PartsDrawRecord(base, calls, frame, group + record, vp, world, 0, caller_r24,
                            caller_r28, lr);
@@ -438,7 +439,7 @@ Left TrafficDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, ui
                            uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820E5B08 TrafficPoints::DrawTailLights");
   const uint32_t frame = Frame(base, stack, kTrafficTailLightsFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   auto lamp = [&](uint32_t record, uint32_t lr) {
     return PartsDrawRecord(base, calls, frame, group + record, vp, world, 0, caller_r24,
                            caller_r28, lr);
@@ -469,7 +470,7 @@ Left PartsDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint
   }
   // The lamps with the pop-up's matrix (+3120): low, high, the winkers; the
   // cover. r28 is the pass here.
-  const uint32_t vp = pass + 144, popup = points.headlights_popup_matrix_address();
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), popup = points.headlights_popup_matrix_address();
   auto lamp = [&](uint32_t record, uint32_t lr) {
     return PartsDrawRecord(base, calls, frame, group + record, vp, popup, 0, caller_r24, pass,
                            lr);
@@ -596,7 +597,7 @@ Left TrafficDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, ui
                            uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820E61D8 TrafficPoints::DrawHeadlights");
   const uint32_t frame = Frame(base, stack, kTrafficHeadlightsFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   // hl00add_low with bit 0x1 (r28 the caller's), then the cover with its
   // alpha (r28 the block's world from here on).
   if (Bits(base, block) & 0x1) {

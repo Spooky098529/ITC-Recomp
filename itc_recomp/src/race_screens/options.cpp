@@ -2,11 +2,14 @@
 // see race_screens.h.
 
 #include "race_screens/race_screens.h"
+#include "race_screens/ui_node.h"
 
 #include "base/log.h"
 #include "guest.h"
 #include "schema/menu_helpers.h"
+#include "schema/race_event.h"
 #include "schema/race_screens.h"
+#include "schema/race_states.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -17,9 +20,8 @@ namespace {
 
 constexpr uint64_t kNone = ~uint64_t(0);
 
-uint32_t Get(uint8_t* base, uint32_t global) { return guest::LoadU32(base, global); }
-
 using G = schema::RaceScreensGlobals;
+using RaceGlobals = schema::RaceStatesGlobals;
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   guest::StoreU32(base, sp - bytes, sp);
@@ -94,12 +96,12 @@ uint64_t PauseMenuMainPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     case 4: {
       // Stages::Copy of the current stage into the frame's +80 (its plain
       // C++, or the original through its adapter where it declines).
-      const uint32_t stages = Get(base, kRaceData) + 0x59620;
+      const uint32_t stages = RaceGlobals::race_data(base).stages_address();
       if (!vehicle_accessors::StagesCopy(base, frame + 80, stages, 0xFFFFFFFFu)) {
         calls.Call(kStagesCopy, frame, 0x8220DAA4, frame + 80, stages, kNone);
       }
       uint32_t answer = 4;
-      if (int32_t(guest::LoadU32(base, Get(base, kRaceData) + 0xA3AF0)) == 6 &&
+      if (int32_t(RaceGlobals::race_data(base).kind()) == 6 &&
           int32_t(guest::LoadU32(base, frame + 80)) != 1 &&
           guest::LoadU32(base, kStageWord) == 0) {
         answer = 5;
@@ -267,9 +269,12 @@ uint32_t PauseMenuSaveVolumes(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8220D7A0 PauseMenu::SaveVolumes");
   Frame(base, sp, 96);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t options = save + 0x1F85C;
-  guest::StoreU8(base, options + 28, uint8_t(G::pause_data(base).music_volume()));
-  guest::StoreU8(base, options + 29, uint8_t(G::pause_data(base).effects_volume()));
+  // The options' bytes +28 and +29 (race-event.toml's SaveData names them
+  // effects_volume and music_volume, the other way round from the pause
+  // data's).
+  const schema::SaveData options(base, save);
+  options.set_effects_volume(uint8_t(G::pause_data(base).music_volume()));
+  options.set_music_volume(uint8_t(G::pause_data(base).effects_volume()));
   return save;
 }
 
@@ -369,12 +374,12 @@ uint64_t PauseMenuSetUpOptions(uint8_t* base, uint32_t sp, const Calls& calls) {
   NodeText(calls, frame, 0x8220E634, movie, ui_movies::Child(base, marks, 3), 4);
   NodeText(calls, frame, 0x8220E650, movie, ui_movies::Child(base, marks, 4), 7);
   const uint32_t rows = ui_movies::FindNode(base, movie, 8, 2);
-  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, rows + 104)); i++) {
+  for (int32_t i = 0; i < int32_t(ChildCount(base, rows)); i++) {
     const uint32_t row =
-        ui_movies::FindNode(base, movie, 8, guest::LoadU32(base, rows + 100) + uint32_t(i));
-    const uint32_t on = ui_movies::FindNode(base, movie, 8, guest::LoadU32(base, row + 100));
+        ui_movies::FindNode(base, movie, 8, FirstChild(base, rows) + uint32_t(i));
+    const uint32_t on = ui_movies::FindNode(base, movie, 8, FirstChild(base, row));
     NodeText(calls, frame, 0x8220E6B4, movie, ui_movies::Child(base, on, 1), 0);
-    const uint32_t off = ui_movies::FindNode(base, movie, 8, guest::LoadU32(base, row + 100) + 1);
+    const uint32_t off = ui_movies::FindNode(base, movie, 8, FirstChild(base, row) + 1);
     NodeText(calls, frame, 0x8220E6E0, movie, ui_movies::Child(base, off, 1), 1);
   }
   return PauseMenuShowOptions(base, frame);

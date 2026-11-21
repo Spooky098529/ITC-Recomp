@@ -817,62 +817,6 @@ struct ReplayShapeState : View {
   uint32_t unknown_448_address() const { return address + 448; }
 };
 
-// embedded; measure: Part464::Restore.r4, Part464::Save.r4
-struct ReplayPlacedBox : View {
-  using View::View;
-  static constexpr uint32_t kSize = 496;
-  float car_float_16() const { return guest::LoadFloat(base, address + 16); }
-  void set_car_float_16(float v) const { guest::StoreFloat(base, address + 16, v); }
-  uint32_t car_float_16_address() const { return address + 16; }
-  float car_float_20() const { return guest::LoadFloat(base, address + 20); }
-  void set_car_float_20(float v) const { guest::StoreFloat(base, address + 20, v); }
-  uint32_t car_float_20_address() const { return address + 20; }
-  float car_float_24() const { return guest::LoadFloat(base, address + 24); }
-  void set_car_float_24(float v) const { guest::StoreFloat(base, address + 24, v); }
-  uint32_t car_float_24_address() const { return address + 24; }
-  float friction() const { return guest::LoadFloat(base, address + 28); }
-  void set_friction(float v) const { guest::StoreFloat(base, address + 28, v); }
-  uint32_t friction_address() const { return address + 28; }
-  float radius() const { return guest::LoadFloat(base, address + 32); }
-  void set_radius(float v) const { guest::StoreFloat(base, address + 32, v); }
-  uint32_t radius_address() const { return address + 32; }
-  uint32_t center_address() const { return address + 48; }
-  uint32_t axis0_address() const { return address + 64; }
-  uint32_t axis1_address() const { return address + 80; }
-  uint32_t axis2_address() const { return address + 96; }
-  // saved as a word (the record part's +448)
-  uint16_t unknown_112() const { return guest::LoadU16(base, address + 112); }
-  void set_unknown_112(uint16_t v) const { guest::StoreU16(base, address + 112, v); }
-  uint32_t unknown_112_address() const { return address + 112; }
-  uint32_t half_extent_address() const { return address + 128; }
-  uint32_t inverse_half_extent_address() const { return address + 144; }
-  uint32_t corners_address() const { return address + 176; }
-  float face_px_distance() const { return guest::LoadFloat(base, address + 304); }
-  void set_face_px_distance(float v) const { guest::StoreFloat(base, address + 304, v); }
-  uint32_t face_px_distance_address() const { return address + 304; }
-  uint32_t face_px_normal_address() const { return address + 320; }
-  float face_py_distance() const { return guest::LoadFloat(base, address + 336); }
-  void set_face_py_distance(float v) const { guest::StoreFloat(base, address + 336, v); }
-  uint32_t face_py_distance_address() const { return address + 336; }
-  uint32_t face_py_normal_address() const { return address + 352; }
-  float face_pz_distance() const { return guest::LoadFloat(base, address + 368); }
-  void set_face_pz_distance(float v) const { guest::StoreFloat(base, address + 368, v); }
-  uint32_t face_pz_distance_address() const { return address + 368; }
-  uint32_t face_pz_normal_address() const { return address + 384; }
-  float face_nx_distance() const { return guest::LoadFloat(base, address + 400); }
-  void set_face_nx_distance(float v) const { guest::StoreFloat(base, address + 400, v); }
-  uint32_t face_nx_distance_address() const { return address + 400; }
-  uint32_t face_nx_normal_address() const { return address + 416; }
-  float face_ny_distance() const { return guest::LoadFloat(base, address + 432); }
-  void set_face_ny_distance(float v) const { guest::StoreFloat(base, address + 432, v); }
-  uint32_t face_ny_distance_address() const { return address + 432; }
-  uint32_t face_ny_normal_address() const { return address + 448; }
-  float face_nz_distance() const { return guest::LoadFloat(base, address + 464); }
-  void set_face_nz_distance(float v) const { guest::StoreFloat(base, address + 464, v); }
-  uint32_t face_nz_distance_address() const { return address + 464; }
-  uint32_t face_nz_normal_address() const { return address + 480; }
-};
-
 // embedded; measure: Member4080::Copy.r4
 struct ReplayCopySource : View {
   using View::View;

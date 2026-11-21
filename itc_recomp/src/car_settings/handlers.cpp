@@ -7,6 +7,7 @@
 #include "guest.h"
 #include "schema/car_settings.h"
 #include "schema/menu_helpers.h"
+#include "schema/mode_tick.h"
 #include "ui_movies/game.h"
 
 namespace car_settings {
@@ -124,7 +125,7 @@ uint64_t Close(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp, cons
     calls.Call(kFinishAll, frame, 0x821AAFB8, movie);
     r3 = calls.Call(kMoviesDelete, frame, 0x821AAFC0, kMovie);
   }
-  const uint32_t type = Load(base, kModeType);
+  const uint32_t type = schema::ModeTickGlobals::mode_type(base);
   if (type == 2 || type == 5) {
     Post(base, mode, 4);
   }

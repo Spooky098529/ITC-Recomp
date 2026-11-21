@@ -121,11 +121,12 @@ void FreeStartTick(uint8_t* base, uint32_t machine, uint32_t dispatcher) {
     bool hold = false;
     for (int32_t i = 0; i < count; i++) {
       const uint32_t vehicle = va::VehicleGet(base, uint32_t(i));
-      if (vehicle == 0 || (Load(base, vehicle + 6148) & 129) == 0) {
+      if (vehicle == 0 || (VehicleView(base, vehicle).car_flags() & 129) == 0) {
         continue;
       }
       const uint32_t identity = va::VehicleIdentity(vehicle);
-      if (int32_t(track_route::SliceTest(base, race_world::kRoute, identity + 4)) == 1) {
+      if (int32_t(track_route::SliceTest(base, race_world::kRoute,
+                                              TrackPos(base, identity).route_section_address())) == 1) {
         hold = true;
         break;
       }

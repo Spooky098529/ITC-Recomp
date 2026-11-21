@@ -62,7 +62,7 @@ fields = [
   { name = "next", offset = 228, type = "ptr", to = "CollisionObject", note = "the next in the world's active or free list" },
   { name = "previous", offset = 232, type = "ptr", to = "CollisionObject" },
   { name = "unknown_236", offset = 236, type = "u32" },
-  { name = "first_contact", offset = 240, type = "ptr", to = "CollisionObjectContact", note = "its contacts, linked by their +68" },
+  { name = "first_contact", offset = 240, type = "ptr", to = "CollisionContact", note = "its contacts, linked by their +68" },
   { name = "groups", offset = 244, type = "u32", note = "its own groups (CollisionObject::AddGroups, RemoveGroups)" },
   { name = "collides_with", offset = 248, type = "u32", note = "the groups it collides with" },
   { name = "mask", offset = 252, type = "u32", note = "a bit mask (sub_820B7D18 clears bits)" },
@@ -81,25 +81,7 @@ fields = [
   { name = "push_out_w", offset = 316, type = "f32" },
 ]
 
-# A contact on a collision object (from its +240, linked by +68): the
-# collision world's 80-byte records (CollisionWorld::NewContact).
-[CollisionObjectContact]
-measure = "Contact"
-measures = ["CollisionObject.+240.+68"]
-size = 80
-origin = "allocated"
-# 5 functions; areas: collision.md, vehicle-accessors.md
-fields = [
-  { name = "other", offset = 0, type = "u32", note = "the other object (Contact::Object when the top byte of the flags is 0, sub_820B8CE0 when not)" },
-  { name = "flags", offset = 4, type = "u32", note = "matched against masks" },
-  { name = "position", offset = 16, type = "bytes", count = 16, note = "Contact::Position's address" },
-  { name = "normal", offset = 32, type = "bytes", count = 16, note = "the hit's normal" },
-  { name = "push_direction", offset = 48, type = "bytes", count = 16 },
-  { name = "push_direction_x", offset = 48, type = "f32" },
-  { name = "push_direction_y", offset = 52, type = "f32" },
-  { name = "strength", offset = 64, type = "f32", note = "the approach speed into the surface (Contact::Strength)" },
-  { name = "next", offset = 68, type = "ptr", to = "CollisionObjectContact" },
-]
+# CollisionObjectContact: merged into car-physics.toml's CollisionContact at the integration (the same object).
 
 # Two of the collision world's 80-byte hit records (the hits array as the
 # measure meets it; car-physics.toml's CollisionHit is one record), and
@@ -162,32 +144,7 @@ fields = [
   { name = "slot_count", offset = 76, type = "u32", note = "its slot count (Stages::AddRacer)" },
 ]
 
-# Stage::Copy24's (sub_820FFD48) out: a stage's route (16 bytes).
-[AccessorStageRoute]
-measure = "sub_820FFD48.r3"
-size = 16
-origin = "embedded"
-fields = [
-  { name = "course", offset = 0, type = "u32", note = "a course route's index" },
-  { name = "location", offset = 4, type = "u32" },
-  { name = "first_position", offset = 8, type = "u32", note = "section and slice" },
-  { name = "last_position", offset = 12, type = "u32", note = "section and slice (the finish)" },
-]
-
-# A racer record (3,936 bytes: the race data's 93 from +48; the fields
-# RacerRecord::Init sets and Racers::IndexOf reads).
-[AccessorRacerRecord]
-measure = "RacerRecord"
-size = 3936
-origin = "embedded"
-fields = [
-  { name = "start_section", offset = 3904, type = "u16", note = "-1 after RacerRecord::Init" },
-  { name = "start_slice", offset = 3906, type = "u16", note = "-1 after RacerRecord::Init" },
-  { name = "item_id", offset = 3912, type = "u32", note = "the data tables' item (-1 none); Racers::IndexOf's id" },
-  { name = "entry_index", offset = 3916, type = "u32", note = "the event's entry (-1 none)" },
-  { name = "racer_value", offset = 3920, type = "f32" },
-  { name = "racer_word", offset = 3924, type = "u32" },
-]
+# AccessorStageRoute: merged into race-states.toml's StageRoute at the integration (the same object).
 
 # An array of 3,936-byte racer records with the count at +0x49FE0 (room for
 # 77: the race data's results records at +0x59AE8; RacerRecords::Add, At).
@@ -238,24 +195,7 @@ fields = [
   { name = "fault_5072", offset = 5072, type = "u32", note = "a measure fault (another node type's)" },
 ]
 
-# The vehicle's +344 object, its collision box (collision.toml's BoxShape,
-# to join), with sub_820B99B0 to sub_820B99C8's halfwords (also met through
-# the track's wall query's +12).
-[VehicleBox]
-measure = "Vehicle.+344"
-measures = ["WallQuery.+12.+0"]
-size = 116
-origin = "embedded"
-# 8 functions; areas: car-physics.md, vehicle-accessors.md, vehicle.md
-fields = [
-  { name = "vtable", offset = 0, type = "u32", note = "0x82002B30 (a box)" },
-  { name = "car_float_16", offset = 16, type = "f32", note = "set from the car data's +1792 and +1796 (sub_820B9660)" },
-  { name = "car_float_20", offset = 20, type = "f32", note = "sub_820B9658" },
-  { name = "car_float_24", offset = 24, type = "f32", note = "sub_820B9678" },
-  { name = "friction", offset = 28, type = "f32", note = "sub_820B9670 sets it, sub_820B9668 reads it" },
-  { name = "unknown_112", offset = 112, type = "u16", note = "sub_820B99B0, sub_820B99B8" },
-  { name = "unknown_114", offset = 114, type = "u16", note = "sub_820B99C0, sub_820B99C8, sub_820C0450" },
-]
+# VehicleBox: merged into collision.toml's BoxShape at the integration (the same object).
 
 # The vector library's 16-byte vector: x, y, z at +0, +4, +8 and a w at +12
 # (Vec3 and Vec4 alike); copies move the words' bits (the *_bits fields).
@@ -331,28 +271,9 @@ fields = [
   { name = "pair4_second", offset = 18, type = "u16" },
 ]
 
-# A decal entry as sub_820CC470 sets it (race-setup.toml's CarDecal).
-[AccessorCarDecal]
-measure = "sub_820CC470.ret"
-size = 24
-origin = "embedded"
-# 2 functions; areas: race-setup.md, vehicle-accessors.md
-fields = [
-  { name = "angle", offset = 16, type = "f32" },
-  { name = "packed", offset = 20, type = "u32", note = "sub_820CC470's r4" },
-]
+# AccessorCarDecal: merged into race-setup.toml's CarDecal at the integration (the same object).
 
-# A rigid body as sub_820B68A0 reads it (car-physics.toml's RigidBody).
-[AccessorRigidBody]
-measure = "sub_820B68A0.r3"
-size = 52
-origin = "embedded"
-fields = [
-  { name = "fixed", offset = 0, type = "u8", note = "set: immovable" },
-  { name = "float_48", offset = 48, type = "f32", note = "sub_820B68A0's answer when not fixed" },
-]
-
-# The lifted functions' arguments below are not read (docs/functions/lifted.md).
+# AccessorRigidBody: merged into car-physics.toml's RigidBody at the integration (the same object).
 
 # sub_820B9680's r3, sub_82293F68's and sub_82293FD0's r4: a float at +32
 # (probably a shape's radius, BoxShape's +32).

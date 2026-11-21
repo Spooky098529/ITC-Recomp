@@ -314,7 +314,7 @@ struct PanelSetBase : View {
   uint32_t busy_anim_done_address() const { return address + 1968; }
 };
 
-// embedded; measure: PanelSet
+// embedded; measure: PanelSet, PanelScreen.+9644
 struct PanelSet : View {
   using View::View;
   static constexpr uint32_t kSize = 1976;
@@ -699,7 +699,7 @@ struct CarListColorList : View {
   uint32_t count_address() const { return address + 52; }
 };
 
-// allocated; measure: ColorPanel::SetSwatch.r5
+// allocated; measure: ColorPanel::SetSwatch.r5, new<32>@PanelSetBase::SetUpColors
 struct CarListColor : View {
   using View::View;
   static constexpr uint32_t kSize = 32;
@@ -723,6 +723,14 @@ struct CarListColor : View {
   float value() const { return guest::LoadFloat(base, address + 24); }
   void set_value(float v) const { guest::StoreFloat(base, address + 24, v); }
   uint32_t value_address() const { return address + 24; }
+  // red and green read as one doubleword (Color::HsvToRgb's copy)
+  uint64_t red_green() const { return guest::LoadU64(base, address + 0); }
+  void set_red_green(uint64_t v) const { guest::StoreU64(base, address + 0, v); }
+  uint32_t red_green_address() const { return address + 0; }
+  // blue and +12 read as one doubleword (Color::HsvToRgb's copy)
+  uint64_t blue_unknown_12() const { return guest::LoadU64(base, address + 8); }
+  void set_blue_unknown_12(uint64_t v) const { guest::StoreU64(base, address + 8, v); }
+  uint32_t blue_unknown_12_address() const { return address + 8; }
 };
 
 // embedded; measure: PanelSetBase.+1892
@@ -780,7 +788,7 @@ struct CarListStats : View {
   uint32_t unknown_28_address() const { return address + 28; }
 };
 
-// embedded; measure: PanelGroupBase
+// embedded; measure: PanelGroupBase, PanelGroup6B, PanelGroup7B
 struct PanelGroupBase : View {
   using View::View;
   static constexpr uint32_t kSize = 36;
@@ -831,10 +839,14 @@ struct PanelPart : View {
   uint32_t group_address() const { return address + 4; }
 };
 
-// embedded; measure: TabPanel
+// embedded; measure: TabPanel, PanelFBase, Panel6F, Panel7F
 struct TabPanel : View {
   using View::View;
   static constexpr uint32_t kSize = 144;
+  // 0x82010B5C (NodeBase's) from PanelFBase, 0x82010974 from Panel6F and Panel7F
+  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
+  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_address() const { return address + 0; }
   // its panel group
   View group() const { return View(base, guest::LoadU32(base, address + 4)); }
   void set_group(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
@@ -938,7 +950,7 @@ struct TabPanel : View {
   uint32_t two_players_address() const { return address + 140; }
 };
 
-// embedded; measure: RowPanel, MenuList.+1900
+// embedded; measure: RowPanel, MenuList.+1900, PanelE, PanelEBase
 struct RowPanel : View {
   using View::View;
   static constexpr uint32_t kSize = 160;
@@ -966,6 +978,18 @@ struct RowPanel : View {
   uint32_t spare_row_node() const { return guest::LoadU32(base, address + 60); }
   void set_spare_row_node(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
   uint32_t spare_row_node_address() const { return address + 60; }
+  // 5 in PanelE::PanelE
+  uint32_t unknown_64() const { return guest::LoadU32(base, address + 64); }
+  void set_unknown_64(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
+  uint32_t unknown_64_address() const { return address + 64; }
+  // 15 in PanelE::PanelE
+  uint32_t unknown_68() const { return guest::LoadU32(base, address + 68); }
+  void set_unknown_68(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
+  uint32_t unknown_68_address() const { return address + 68; }
+  // 16 in PanelE::PanelE
+  uint32_t unknown_72() const { return guest::LoadU32(base, address + 72); }
+  void set_unknown_72(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
+  uint32_t unknown_72_address() const { return address + 72; }
   uint32_t show_anim() const { return guest::LoadU32(base, address + 76); }
   void set_show_anim(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
   uint32_t show_anim_address() const { return address + 76; }
@@ -1017,6 +1041,14 @@ struct RowPanel : View {
   uint32_t text_third() const { return guest::LoadU32(base, address + 132); }
   void set_text_third(uint32_t v) const { guest::StoreU32(base, address + 132, v); }
   uint32_t text_third_address() const { return address + 132; }
+  // 8 in PanelE::PanelE (after the texts' 5 to 7)
+  uint32_t unknown_136() const { return guest::LoadU32(base, address + 136); }
+  void set_unknown_136(uint32_t v) const { guest::StoreU32(base, address + 136, v); }
+  uint32_t unknown_136_address() const { return address + 136; }
+  // -1 in PanelE::PanelE
+  uint32_t unknown_140() const { return guest::LoadU32(base, address + 140); }
+  void set_unknown_140(uint32_t v) const { guest::StoreU32(base, address + 140, v); }
+  uint32_t unknown_140_address() const { return address + 140; }
   // the more-rows marker child
   uint32_t cursor() const { return guest::LoadU32(base, address + 144); }
   void set_cursor(uint32_t v) const { guest::StoreU32(base, address + 144, v); }
@@ -1035,10 +1067,14 @@ struct RowPanel : View {
   uint32_t two_players_address() const { return address + 156; }
 };
 
-// embedded; measure: ColorPanel
+// embedded; measure: ColorPanel, PanelDBase, Panel6D, Panel7D
 struct ColorPanel : View {
   using View::View;
   static constexpr uint32_t kSize = 92;
+  // 0x82010B5C (NodeBase's) from PanelDBase, 0x82010974 from Panel6D and Panel7D
+  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
+  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t vtable_address() const { return address + 0; }
   // its panel group
   View group() const { return View(base, guest::LoadU32(base, address + 4)); }
   void set_group(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
@@ -1115,7 +1151,7 @@ struct ColorPanel : View {
   uint32_t two_players_address() const { return address + 88; }
 };
 
-// allocated; measure: CarPanel, CarPanelBase, Panel6C, Panel7C
+// allocated; measure: CarPanel, CarPanelBase, Panel6C, Panel7C, PanelCBase
 struct CarPanel : View {
   using View::View;
   static constexpr uint32_t kSize = 320;
@@ -1214,9 +1250,17 @@ struct CarPanel : View {
   uint32_t texts() const { return guest::LoadU32(base, address + 144); }
   void set_texts(uint32_t v) const { guest::StoreU32(base, address + 144, v); }
   uint32_t texts_address() const { return address + 144; }
+  // -1 in PanelCBase::PanelCBase
+  uint32_t unknown_148() const { return guest::LoadU32(base, address + 148); }
+  void set_unknown_148(uint32_t v) const { guest::StoreU32(base, address + 148, v); }
+  uint32_t unknown_148_address() const { return address + 148; }
   uint32_t cursor() const { return guest::LoadU32(base, address + 152); }
   void set_cursor(uint32_t v) const { guest::StoreU32(base, address + 152, v); }
   uint32_t cursor_address() const { return address + 152; }
+  // -1 in PanelCBase::PanelCBase
+  uint32_t unknown_156() const { return guest::LoadU32(base, address + 156); }
+  void set_unknown_156(uint32_t v) const { guest::StoreU32(base, address + 156, v); }
+  uint32_t unknown_156_address() const { return address + 156; }
   // 22 child indices of the stats node: CarPanel::SetStats uses +160 to +180 and +216 to +228, Panel6C::SetStats +160 to +244
   uint32_t stats_children_address() const { return address + 160; }
   uint32_t price_child() const { return guest::LoadU32(base, address + 260); }
@@ -1330,7 +1374,9 @@ struct CarListGlobals {
   static void set_fade_wait(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x82815EB0u, v); }
   static constexpr uint32_t fade_wait_address() { return 0x82815EB0u; }
   // the power graph screen's record block (its record at +8)
-  static View power_graph(uint8_t* base) { return View(base, guest::LoadU32(base, 0x82815EBCu)); }
+  template <typename T = PowerGraphScreenData>
+  static T power_graph(uint8_t* base) { return T(base, guest::LoadU32(base, 0x82815EBCu)); }
+  static void set_power_graph(uint8_t* base, const View& v) { guest::StoreU32(base, 0x82815EBCu, v.address); }
   static void set_power_graph(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x82815EBCu, v); }
   static constexpr uint32_t power_graph_address() { return 0x82815EBCu; }
   // the players' save data (sub_82105678's), 120,108 bytes each
@@ -1338,7 +1384,9 @@ struct CarListGlobals {
   static void set_pair_save_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B5Cu, v); }
   static constexpr uint32_t pair_save_data_address() { return 0x826C5B5Cu; }
   // the stand's holders: three slots, by the player
-  static View stand_holders(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D83E0u)); }
+  template <typename T = StandHolder>
+  static T stand_holders(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D83E0u)); }
+  static void set_stand_holders(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D83E0u, v.address); }
   static void set_stand_holders(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D83E0u, v); }
   static constexpr uint32_t stand_holders_address() { return 0x826D83E0u; }
   // the two-player stand's wait word

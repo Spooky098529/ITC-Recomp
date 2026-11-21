@@ -7,6 +7,8 @@
 #include "data_tables/data_tables.h"
 #include "guest.h"
 #include "schema/career.h"
+#include "schema/data_tables.h"
+#include "schema/race_event.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace career {
@@ -28,10 +30,11 @@ void SetBit(uint8_t* base, uint32_t set, int32_t b) {
   guest::StoreU32(base, word, guest::LoadU32(base, word) | (1u << (b & 31)));
 }
 
-// The item kinds' mask test: bit (the item's halfword +42 + 9) of `mask`,
+// The item kinds' mask test: bit (the item's level, halfword +42, + 9) of `mask`,
 // the shift from that sum's low byte as the original's slw.
 bool KindAllowed(uint8_t* base, uint32_t item, uint32_t mask) {
-  const uint32_t shift = uint32_t(int32_t(int16_t(guest::LoadU16(base, item + 42))) + 9) & 0xFF;
+  const uint32_t shift =
+      uint32_t(int32_t(int16_t(schema::OpponentItem(base, item).level())) + 9) & 0xFF;
   const uint32_t bit = (shift & 0x20) != 0 ? 0 : (1u << (shift & 0x1F));
   return (bit & mask) != 0;
 }
@@ -40,8 +43,7 @@ bool KindAllowed(uint8_t* base, uint32_t item, uint32_t mask) {
 
 bool ConditionTestFits(uint8_t* base, uint32_t sp) {
   const uint32_t to = sp - kConditionTestFrame + 80;
-  const int32_t items =
-      int32_t(guest::LoadU32(base, guest::LoadU32(base, data_tables::kTables) + 8));
+  const int32_t items = int32_t(schema::DataTablesGlobals::tables(base).item_count());
   return items <= 0 ||
          (to < 0xA0000000u &&
           !c_runtime::MayShare(to, 3008, data_tables::Item(base, 0), 3008 * uint32_t(items)));
@@ -94,16 +96,15 @@ std::optional<uint32_t> ConditionTest(uint8_t* base, uint32_t condition, uint32_
     default: {
       // 7 (sub_821129E0's case, merged here), 8, 9: the items counted, each
       // copied onto the stack first (only the last copy is left there).
-      const uint32_t tables = data_tables::kTables;
       const uint32_t to = sp - kConditionTestFrame + 80;
       if (!ConditionTestFits(base, sp)) {
         return std::nullopt;  // nothing written yet
       }
       int32_t count = 0;
       int32_t i = 0;
-      for (; i < int32_t(guest::LoadU32(base, guest::LoadU32(base, tables) + 8)); i++) {
+      for (; i < int32_t(schema::DataTablesGlobals::tables(base).item_count()); i++) {
         const uint32_t item = data_tables::Item(base, uint32_t(i));
-        const uint8_t item_kind = guest::LoadU8(base, item + 35);
+        const uint8_t item_kind = schema::OpponentItem(base, item).kind();
         bool counted;
         if (kind == 8) {
           counted = item_kind == 2;

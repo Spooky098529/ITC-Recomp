@@ -293,6 +293,6 @@ live_mask = { address = 0x826C795C, type = "u32", note = "the users on Live (pro
 action_mapper_entries = { address = 0x826BAB80, type = "bytes", count = 32, note = "four 8-byte entries: +4 blocked (action-mappers.md)" }
 
 # Modes::SetChecks and SetSceneTargetMode.
-race_data = { address = 0x826C5B2C, type = "u32", note = "the race data: +0x59620 the stage list, +0xA3AF0 the human cars' arrangement (6 is two)" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data: +0x59620 the stage list, +0xA3AF0 the human cars' arrangement (6 is two)" }
 boot_movie = { address = 0x826C5BAC, type = "u32", note = "the boot movies' first id: 10 the UBI logo" }
-scene_target = { address = 0x8266D08C, type = "u32", note = "the 1024 x 576 target object: +28 its mode" }
+scene_target = { address = 0x8266D08C, type = "ptr", to = "SceneTarget", note = "the 1024 x 576 target object: +28 its mode" }

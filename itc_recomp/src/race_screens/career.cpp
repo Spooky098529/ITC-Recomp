@@ -2,13 +2,16 @@
 // (docs/functions/race-screens.md): see race_screens.h.
 
 #include "race_screens/race_screens.h"
+#include "race_screens/ui_node.h"
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "camera_modes/steps.h"
 #include "guest.h"
 #include "schema/menu_helpers.h"
+#include "schema/action_mappers.h"
 #include "schema/race_screens.h"
+#include "schema/racer_controllers.h"
 #include "ui_movies/game.h"
 
 #include <bit>
@@ -91,15 +94,18 @@ uint64_t CareerResultsClose1(uint8_t* base, uint32_t step, uint32_t sp, const Ca
 uint64_t CareerResultsPage1(uint8_t* base, uint32_t sp, bool native_slots, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82219A78 CareerResults::Page1");
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t entry = guest::LoadU32(base, kControllerEntries) * 8 + kMapperEntries;
+  using Controllers = schema::RacerControllersGlobals;
+  const schema::PlayerMapperEntry entry(
+      base, guest::LoadU32(base, Controllers::player_entries_address()) * 8 +
+                Controllers::mapper_entries_address());
   const schema::CareerResultsScreen screen = Screen(base);
   // Accept, then back: each 0 when the entry's +4 is 1, else the slot's low
   // byte.
   auto pressed = [&](uint32_t action, uint32_t lr) {
-    if (int32_t(guest::LoadU32(base, entry + 4)) == 1) {
+    if (int32_t(entry.unread()) == 1) {
       return false;
     }
-    return (MapperPressed(base, guest::LoadU32(base, entry), action, frame, lr, native_slots,
+    return (MapperPressed(base, entry.mapper().address, action, frame, lr, native_slots,
                           calls) &
             0xFF) != 0;
   };
@@ -157,8 +163,8 @@ uint64_t CareerResultsSetTexts(uint8_t* base, uint32_t screen, uint32_t sp, cons
   // string `id` (`id` + i where `step`).
   auto children = [&](uint64_t sub_scene, uint32_t index, uint64_t id, bool step, uint32_t lr) {
     const uint32_t node = ui_movies::FindNode(base, movie(), uint32_t(sub_scene), index);
-    for (int64_t i = 0; i < int32_t(guest::LoadU32(base, node + 104)); i++) {
-      SetText(calls, frame, lr, movie(), sub_scene, uint64_t(i) + Word(base, node + 100),
+    for (int64_t i = 0; i < int32_t(ChildCount(base, node)); i++) {
+      SetText(calls, frame, lr, movie(), sub_scene, uint64_t(i) + FirstChild(base, node),
               step ? uint64_t(i) + id : id);
     }
   };
@@ -231,7 +237,7 @@ uint64_t CareerResultsOpen(uint8_t* base, uint32_t screen, uint32_t block, uint3
   const uint32_t node = ui_movies::FindNode(base, Movie(base), 0xFFFFFFFFu, 11);
   const uint32_t kind = Screen(base).kind();
   if (kind < 3) {
-    guest::StoreU32(base, node + 108, kind);
+    UiNode(base, node).set_texture_entry(kind);
   }
   return node;
 }

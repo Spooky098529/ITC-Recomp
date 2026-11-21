@@ -11,7 +11,13 @@
 #include "hooks/vehicle.h"
 #include "memory/c_runtime_heap.h"
 #include "race_setup/race_setup.h"
+#include "schema/ai_drivers.h"
 #include "schema/alt_hud.h"
+#include "schema/car_physics.h"
+#include "schema/career.h"
+#include "schema/race_hud_object.h"
+#include "schema/race_setup.h"
+#include "schema/vehicle.h"
 #include "ui_movies/game.h"
 #include "vehicle/vehicle.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -89,9 +95,10 @@ uint32_t SetUpGauges(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& c
   Frame(base, sp, 496);
   const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 80));
   const uint32_t player = Object(base, holder).player();
-  const uint32_t record = player * rh::kRecordBytes + guest::LoadU32(base, rh::kRaceData);
+  const uint32_t record =
+      player * rh::kRecordBytes + schema::RaceHudObjectGlobals::race_data(base).address;
   const uint32_t car = record + 48;
-  const uint32_t index = guest::LoadU32(base, car + 12);
+  const uint32_t index = schema::Car(base, car).car_id();
   const uint32_t power = PowerClass(base, car, frame, calls);
   Copy(base, calls, frame, 0x82216CB8, frame + 96, G::tach_curves_address(), 112);
   Copy(base, calls, frame, 0x82216CC8, frame + 208, G::tach_curves_address() + 112, 112);
@@ -101,7 +108,7 @@ uint32_t SetUpGauges(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& c
       guest::LoadU32(base, (((index << 2) + power) << 2) + G::curve_table_address() + 4);
   Copy(base, calls, frame, 0x82216D18, Object(base, holder).tach_curve_address(),
        curve * 112 + frame + 96, 112);
-  const double zero = Lfs(base, rh::kZero);
+  const double zero = double(schema::CareerGlobals::zero(base));
   rh::CurveEval(base, Object(base, holder).tach_curve_address(), zero);
   const uint32_t node = ui_movies::FindNode(base, movie, 7, 8);
   guest::StoreU32(base, node + 108, face);
@@ -130,8 +137,9 @@ uint32_t SetUpExtraGauges(uint8_t* base, uint32_t holder, uint32_t sp) {
   const uint32_t frame = sp - 160;
   Frame(base, sp, 160);
   const uint32_t movie = guest::LoadU32(base, FindMovie(base, frame + 92));
-  const uint32_t car = Object(base, holder).car().address;
-  uint32_t entry = guest::LoadU32(base, car + 5712) + 1824 + 8;
+  const schema::Vehicle car(base, Object(base, holder).car().address);
+  // The car's five 12-byte entries from choice0_c (+1832), 12 bytes apart.
+  uint32_t entry = schema::Car(base, car.car()).choice0_c_address();
   uint32_t kept = 0;
   guest::StoreU32(base, frame + 88, 0);
   guest::StoreU32(base, frame + 84, 0);
@@ -154,7 +162,7 @@ uint32_t SetUpExtraGauges(uint8_t* base, uint32_t holder, uint32_t sp) {
         break;
     }
   }
-  if (int32_t(guest::LoadU32(base, guest::LoadU32(base, car + 5712) + 12)) == 10) {
+  if (int32_t(schema::Car(base, car.car()).car_id()) == 10) {
     kept = 1;
   }
   guest::StoreU32(base, frame + 96, frame + 80);
@@ -387,35 +395,40 @@ uint32_t Tick(uint8_t* base, uint32_t holder, uint32_t sp, bool native_slots, co
   }
   const schema::AltHud object = Object(base, holder);
   const uint32_t car = object.car().address;
+  const schema::Vehicle vehicle(base, car);
+  const schema::VehicleStatus status(base, vehicle.status_address());
   const uint32_t player = object.player();
-  const uint32_t input = guest::LoadU32(base, ((player << 2) & 0x3FC) + G::input_records_address());
+  const schema::CarInput input(
+      base, guest::LoadU32(base, ((player << 2) & 0x3FC) + G::input_records_address()));
   *f1 = double(Vehicle_GetSpeedKmh(base, car));
   const double speed = Single(*f1 * LoadDouble(base, G::kmh_factor_address()));
   guest::StoreU32(base, frame + 80, uint32_t(Fctiwz(speed)));
   SetSpeed(base, guest::LoadU32(base, frame + 80), frame, f1);
-  const int32_t int149 = Fctiwz(Lfs(base, car + 6252));
-  const int32_t int119 = Fctiwz(Lfs(base, car + 6256));
-  const double value = Lfs(base, car + 6260);
+  const int32_t int149 = Fctiwz(double(status.water_temperature()));
+  const int32_t int119 = Fctiwz(double(status.oil_temperature()));
+  const double value = double(status.engine_output());
   guest::StoreU32(base, frame + 80, uint32_t(int149));
   const uint32_t r6 = guest::LoadU32(base, frame + 80);
   guest::StoreU32(base, frame + 80, uint32_t(int119));
   const uint32_t r5 = guest::LoadU32(base, frame + 80);
   alt_hud::UpdateExtraGauges(base, holder, value, r5, r6, frame, calls);
-  SetGear(base, int32_t(guest::LoadU32(base, car + 2252)), frame);
+  SetGear(base, vehicle.gear(), frame);
   *f1 = double(vehicle_accessors::VehicleFloat2224(base, car));
   SetTach(base, holder, *f1, frame);
-  *f1 = Lfs(base, car + 2420);
+  *f1 = double(vehicle.nitrous_value());
   SetBar(base, holder, *f1, frame);
-  *f1 = Lfs(base, car + 2944);
+  *f1 = double(vehicle.boost());
   SetBoost(base, holder, *f1, frame);
-  SetNode25(base, guest::LoadU32(base, guest::LoadU32(base, car + 5712) + 3892), frame);
+  SetNode25(base, schema::Car(base, vehicle.car()).unknown_3892(), frame);
   const double scale = double(G::input_scale(base));
   static constexpr struct {
-    uint32_t offset;
+    uint16_t (schema::CarInput::*get)() const;
     uint32_t (*set)(uint8_t*, double, uint32_t);
-  } kInputs[3] = {{4, SetThrottle}, {6, SetBrake}, {8, SetSteering}};
+  } kInputs[3] = {{&schema::CarInput::throttle, SetThrottle},
+                  {&schema::CarInput::brake, SetBrake},
+                  {&schema::CarInput::steering, SetSteering}};
   for (const auto& in : kInputs) {
-    const int64_t word = int16_t(guest::LoadU16(base, input + in.offset));
+    const int64_t word = int16_t((input.*in.get)());
     StoreS64(base, frame + 80, word);
     *f1 = Fmuls(Single(double(word)), scale);
     in.set(base, *f1, frame);

@@ -195,7 +195,7 @@ struct MaterialRecord : View {
   uint32_t fault_816_address() const { return address + 816; }
 };
 
-// file; measure: PartModel
+// file; measure: PartModel, SceneInterior.+11632, ModelPoint::Find.r4
 struct PartModel : View {
   using View::View;
   static constexpr uint32_t kSize = 464;
@@ -240,6 +240,18 @@ struct PartModel : View {
   uint32_t replacement_texture() const { return guest::LoadU32(base, address + 460); }
   void set_replacement_texture(uint32_t v) const { guest::StoreU32(base, address + 460, v); }
   uint32_t replacement_texture_address() const { return address + 460; }
+  // the Model's +196 (models.toml), read by ModelPoint::Find
+  uint32_t model_196() const { return guest::LoadU32(base, address + 196); }
+  void set_model_196(uint32_t v) const { guest::StoreU32(base, address + 196, v); }
+  uint32_t model_196_address() const { return address + 196; }
+  // the Model's +260, read by ModelPoint::Find
+  uint32_t model_260() const { return guest::LoadU32(base, address + 260); }
+  void set_model_260(uint32_t v) const { guest::StoreU32(base, address + 260, v); }
+  uint32_t model_260_address() const { return address + 260; }
+  // the Model's: the part file's +8 (ModelPoint::Find)
+  uint32_t file_08() const { return guest::LoadU32(base, address + 408); }
+  void set_file_08(uint32_t v) const { guest::StoreU32(base, address + 408, v); }
+  uint32_t file_08_address() const { return address + 408; }
 };
 
 // file; measure: Color
@@ -271,7 +283,7 @@ struct PaintRgb : View {
   uint32_t alpha_address() const { return address + 12; }
 };
 
-// file; measure: -
+// file; measure: Color::HsvToRgb_8224AB50.r4
 struct HsvColor : View {
   using View::View;
   static constexpr uint32_t kSize = 16;

@@ -224,7 +224,9 @@ struct AiDriver : View {
   void set_slice_offset(float v) const { guest::StoreFloat(base, address + 156, v); }
   uint32_t slice_offset_address() const { return address + 156; }
   // its vehicle (Vehicle::Get)
-  View vehicle() const { return View(base, guest::LoadU32(base, address + 160)); }
+  template <typename T = Vehicle>
+  T vehicle() const { return T(base, guest::LoadU32(base, address + 160)); }
+  void set_vehicle(const View& v) const { guest::StoreU32(base, address + 160, v.address); }
   void set_vehicle(uint32_t v) const { guest::StoreU32(base, address + 160, v); }
   uint32_t vehicle_address() const { return address + 160; }
   // 500.0 none
@@ -813,7 +815,7 @@ struct AiProfile : View {
   uint32_t skill_source_address() const { return address + 120; }
 };
 
-// embedded; measure: CarInput, AiDriver::Drive.r4
+// embedded; measure: CarInput, AiDriver::Drive.r4, AiDriver::DriveCar.ret, Vehicle::ApplyInput.r4, new<20>@CarInputs::Create
 struct CarInput : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -841,22 +843,24 @@ struct CarInput : View {
   uint16_t camera() const { return guest::LoadU16(base, address + 12); }
   void set_camera(uint16_t v) const { guest::StoreU16(base, address + 12, v); }
   uint32_t camera_address() const { return address + 12; }
-  // from the pad: the player's settings byte +1
-  uint8_t setting_a() const { return guest::LoadU8(base, address + 14); }
-  void set_setting_a(uint8_t v) const { guest::StoreU8(base, address + 14, v); }
-  uint32_t setting_a_address() const { return address + 14; }
-  // the settings byte +2
-  uint8_t setting_b() const { return guest::LoadU8(base, address + 15); }
-  void set_setting_b(uint8_t v) const { guest::StoreU8(base, address + 15, v); }
-  uint32_t setting_b_address() const { return address + 15; }
-  // the settings byte +0
-  uint8_t setting_c() const { return guest::LoadU8(base, address + 16); }
-  void set_setting_c(uint8_t v) const { guest::StoreU8(base, address + 16, v); }
-  uint32_t setting_c_address() const { return address + 16; }
+  // from the pad: the player's settings byte +1; signed: the throttle's curve (Vehicle::ApplyInput)
+  uint8_t throttle_rate() const { return guest::LoadU8(base, address + 14); }
+  void set_throttle_rate(uint8_t v) const { guest::StoreU8(base, address + 14, v); }
+  uint32_t throttle_rate_address() const { return address + 14; }
+  // the settings byte +2; signed: the brake's curve
+  uint8_t brake_rate() const { return guest::LoadU8(base, address + 15); }
+  void set_brake_rate(uint8_t v) const { guest::StoreU8(base, address + 15, v); }
+  uint32_t brake_rate_address() const { return address + 15; }
+  // the settings byte +0; signed: the pad's or wheel's steering rate
+  uint8_t steering_rate() const { return guest::LoadU8(base, address + 16); }
+  void set_steering_rate(uint8_t v) const { guest::StoreU8(base, address + 16, v); }
+  uint32_t steering_rate_address() const { return address + 16; }
   // 0 the pad, 1 a wheel, 2 an AI driver
   uint8_t kind() const { return guest::LoadU8(base, address + 17); }
   void set_kind(uint8_t v) const { guest::StoreU8(base, address + 17, v); }
   uint32_t kind_address() const { return address + 17; }
+  // the player's three settings bytes (from the pad) (from CarInputRecord, car-sounds)
+  uint32_t settings_address() const { return address + 14; }
 };
 
 // file; measure: AiCorner.+0, AiDriver.+0, AiPath.+5164, AiCorner::Init.r4, sub_8213AB40.r4.+0, sub_8213BDF0.r4.+0, sub_8213BDF0.r5.+0, sub_8213BE80.r4.+0, sub_8213BE80.r5.+0, AiPath::JoinCornersShort.r4.+0, AiPath::JoinCornersShort.r5.+0, AiPath::SharesSections.r4
@@ -1071,7 +1075,9 @@ struct AiDriversGlobals {
   static void set_drivers(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C6074u, v); }
   static constexpr uint32_t drivers_address() { return 0x826C6074u; }
   // the race data (+20 the branch flags, +4 a word, +0xA3AF0 and +0xA3AF4)
-  static View race_data(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  template <typename T = RaceData>
+  static T race_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  static void set_race_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B2Cu, v.address); }
   static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
   static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
   // a word a racer: its input (probably)
@@ -1079,11 +1085,15 @@ struct AiDriversGlobals {
   static void set_inputs(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B30u, v); }
   static constexpr uint32_t inputs_address() { return 0x826C5B30u; }
   // +6100 read by AiPath::RaceAllowsSides, +2184 the skill entries
-  static View race_state(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D82E8u)); }
+  template <typename T = RaceProgress>
+  static T race_state(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D82E8u)); }
+  static void set_race_state(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D82E8u, v.address); }
   static void set_race_state(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D82E8u, v); }
   static constexpr uint32_t race_state_address() { return 0x826D82E8u; }
   // the race: +2308 its racers
-  static View race(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D82F4u)); }
+  template <typename T = RaceManager>
+  static T race(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D82F4u)); }
+  static void set_race(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D82F4u, v.address); }
   static void set_race(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D82F4u, v); }
   static constexpr uint32_t race_address() { return 0x826D82F4u; }
   // lists of words ending with 0, 16 bytes apart

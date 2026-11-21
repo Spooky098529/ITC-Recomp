@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: SceneModel
+// allocated; measure: SceneModel, ScenePools::SetUpB.ret
 struct SceneModel : View {
   using View::View;
   static constexpr uint32_t kSize = 5120;
@@ -254,7 +254,7 @@ struct SceneModel : View {
   uint32_t scene_address() const { return address + 5116; }
 };
 
-// embedded; measure: CarRecord, CarRecord::Copy.r4, sub_820D45B0.r3
+// embedded; measure: CarRecord, CarRecord::Copy.r4, sub_820D45B0.r3, WheelPoints.+4
 struct CarRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 3696;
@@ -342,7 +342,7 @@ struct SceneModelsCockpitRecord : View {
   uint32_t interior_record_address() const { return address + 24; }
 };
 
-// embedded; measure: sub_820D3900.r3
+// embedded; measure: sub_820D3900.r3, WheelPoints.+8944
 struct SceneModelsWheelsRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 156;
@@ -411,12 +411,12 @@ struct SceneModelsWheelsRecord : View {
   uint32_t brake_kind() const { return guest::LoadU32(base, address + 68); }
   void set_brake_kind(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
   uint32_t brake_kind_address() const { return address + 68; }
-  uint32_t unknown_72() const { return guest::LoadU32(base, address + 72); }
-  void set_unknown_72(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
-  uint32_t unknown_72_address() const { return address + 72; }
-  uint32_t unknown_76() const { return guest::LoadU32(base, address + 76); }
-  void set_unknown_76(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
-  uint32_t unknown_76_address() const { return address + 76; }
+  uint32_t front_index_add() const { return guest::LoadU32(base, address + 72); }
+  void set_front_index_add(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
+  uint32_t front_index_add_address() const { return address + 72; }
+  uint32_t rear_index_add() const { return guest::LoadU32(base, address + 76); }
+  void set_rear_index_add(uint32_t v) const { guest::StoreU32(base, address + 76, v); }
+  uint32_t rear_index_add_address() const { return address + 76; }
   uint32_t unknown_80() const { return guest::LoadU32(base, address + 80); }
   void set_unknown_80(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
   uint32_t unknown_80_address() const { return address + 80; }
@@ -479,6 +479,14 @@ struct SceneModelsWheelsRecord : View {
   float unknown_152() const { return guest::LoadFloat(base, address + 152); }
   void set_unknown_152(float v) const { guest::StoreFloat(base, address + 152, v); }
   uint32_t unknown_152_address() const { return address + 152; }
+  // +32 and +36 read as a doubleword (the brakes' draws) (from SecondSetWheelsRecord, second-set)
+  uint64_t rear_wheel_f36() const { return guest::LoadU64(base, address + 32); }
+  void set_rear_wheel_f36(uint64_t v) const { guest::StoreU64(base, address + 32, v); }
+  uint32_t rear_wheel_f36_address() const { return address + 32; }
+  // +40 and +44 read as a doubleword (from SecondSetWheelsRecord, second-set)
+  uint64_t rear_f40_44() const { return guest::LoadU64(base, address + 40); }
+  void set_rear_f40_44(uint64_t v) const { guest::StoreU64(base, address + 40, v); }
+  uint32_t rear_f40_44_address() const { return address + 40; }
 };
 
 // embedded; measure: sub_820D3B38.r3

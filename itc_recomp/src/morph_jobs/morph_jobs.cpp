@@ -7,6 +7,8 @@
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
 #include "native/buffers.h"
+#include "schema/app_states.h"
+#include "schema/framework.h"
 #include "schema/morph_jobs.h"
 
 namespace morph_jobs {
@@ -94,7 +96,9 @@ std::optional<uint32_t> MakeJob(uint8_t* base, Kind kind, uint32_t maker, uint32
   if (*job == 0) {
     return 0u;
   }
-  return ConstructJob(base, kind, *job, Load(base, maker + 4), record, frame, calls);
+  return ConstructJob(base, kind, *job,
+                      schema::MorphJobMaker(base, maker).worker_pool().address, record,
+                      frame, calls);
 }
 
 void DestroyJob(uint8_t* base, uint32_t job, uint32_t stack) {
@@ -188,8 +192,8 @@ TailCall WorkItemCall(uint8_t* base, uint64_t r3) {
   const schema::WorkItem i(base, uint32_t(r3));
   const uint64_t delegate = r3 + 24;
   // The delegate's vtable (app-states.toml's AppDelegateVtable): slot 1.
-  const uint32_t vtable = i.delegate_vtable();
-  return {Load(base, vtable + 4), delegate, 0, vtable};
+  const schema::AppDelegateVtable vtable(base, i.delegate_vtable());
+  return {vtable.invoke(), delegate, 0, vtable.address};
 }
 
 TailCall RunThunk(uint8_t* base, uint64_t r3) {

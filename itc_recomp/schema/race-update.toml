@@ -34,9 +34,11 @@ fields = [
   { name = "car_slot_count", offset = 16, type = "u32", note = "the car slots' count (7); Car::TickUpdate's r3 is this word's address" },
   { name = "car_slots", offset = 32, type = "bytes", count = 30016, note = "seven RaceCarSlots of 4,288 bytes, by vehicle index" },
   { name = "lights", offset = 30064, type = "bytes", count = 1076, note = "the light set (RaceLights)" },
-  { name = "screen_object", offset = 31152, type = "ptr", note = "the race's screen object (1024 x 576; 0 when not made)" },
-  { name = "screen_object_first", offset = 31156, type = "ptr", note = "split screen: player 1's screen object" },
-  { name = "screen_object_second", offset = 31160, type = "ptr", note = "split screen: player 2's screen object" },
+  { name = "screen_object", offset = 31152, type = "ptr", to = "ScreenObject", note = "the race's screen object (1024 x 576; 0 when not made)" },
+  { name = "screen_object_first", offset = 31156, type = "ptr", to = "ScreenObject", note = "split screen: player 1's screen object" },
+  { name = "screen_object_second", offset = 31160, type = "ptr", to = "ScreenObject", note = "split screen: player 2's screen object" },
+  { name = "fault_car_pick", offset = 0, type = "u16", note = "measure fault: Car::TickUpdate's halfword +0 of the car (the racer record, race-setup's Car: the paint pick), joined with the scene" },
+  { name = "fault_car_12", offset = 12, type = "u32", note = "measure fault: RaceScene::VaryCar's r3 is a car (the racer record, race-setup's Car), its word +12 (64 picks the +1580 byte), joined with the scene" },
 ]
 
 # One car slot (4,288 bytes, the scene's +32 + 4,288 v; RaceScene::RemakeCarModel's r5).
@@ -45,7 +47,7 @@ measure = "RaceScene::RemakeCarModel.r5"
 size = 4288
 origin = "embedded"
 fields = [
-  { name = "model", offset = 0, type = "ptr", note = "its pool 7 scene model (ScenePools::SetUpB's; 0 none)" },
+  { name = "model", offset = 0, type = "ptr", to = "SceneModel", note = "its pool 7 scene model (ScenePools::SetUpB's; 0 none)" },
   { name = "record", offset = 16, type = "bytes", count = 4244, note = "its scene model record (car-makers.toml's SceneModelRecord, from SceneModelRecord::FromCar)" },
   { name = "record_kind", offset = 16, type = "u32", note = "the record's +0: 3 traffic" },
   { name = "record_block", offset = 32, type = "u32", note = "the record's +16 (the model block): 0 or 7 on traffic sets the block's +592" },
@@ -79,16 +81,16 @@ fields = [
 ]
 
 [globals]
-race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data: +4 the course, +32 the mode, +48 the racer records (3,936 bytes), +0x59614 the human cars, +0x59620 the stages, +0x59AE8 the racer records' list, +0xA3AF0 the split mode (4 split screen)" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data: +4 the course, +32 the mode, +48 the racer records (3,936 bytes), +0x59614 the human cars, +0x59620 the stages, +0x59AE8 the racer records' list, +0xA3AF0 the split mode (4 split screen)" }
 scenery_configs = { address = 0x82602EA0, type = "bytes", count = 32, note = "the race's scenery configurations' two words, 8 bytes an entry (0 to 2 by mode, 3 courses 8 to 10)" }
 light_directions = { address = 0x8296B950, type = "bytes", count = 48, note = "the scene lights' directions, 16 bytes a kind 1 entry" }
 light_second = { address = 0x8296B980, type = "bytes", count = 48, note = "the kind 1 entries' +32" }
 light_third = { address = 0x8296B9B0, type = "bytes", count = 48, note = "the kind 1 entries' +48" }
 light_origin = { address = 0x8265ED00, type = "bytes", count = 16, note = "(0, 0, 0, 1) from RaceLights::Update" }
 camera_pass0 = { address = 0x826BAC00, type = "bytes", count = 592, note = "camera pass 0 (cameras.toml's CameraPass): +400 and +416 the two points Car::TickUpdate takes a direction of" }
-car_scene = { address = 0x826C2E44, type = "ptr", note = "the car scene (car-draw.toml's CarScene)" }
-racers = { address = 0x826D82F4, type = "ptr", note = "the racers' manager: +2308 the racers" }
-viewports = { address = 0x826C2CE8, type = "ptr", note = "the viewports (camera-modes.toml's Viewports): +8 nonzero in split screen" }
+car_scene = { address = 0x826C2E44, type = "ptr", to = "CarScene", note = "the car scene (car-draw.toml's CarScene)" }
+racers = { address = 0x826D82F4, type = "ptr", to = "RaceManager", note = "the racers' manager: +2308 the racers" }
+viewports = { address = 0x826C2CE8, type = "ptr", to = "Viewports", note = "the viewports (camera-modes.toml's Viewports): +8 nonzero in split screen" }
 input_records = { address = 0x826C5B30, type = "bytes", count = 28, note = "the vehicles' input records' pointers by vehicle index (+0 the flags: 0x8 brake, 0x100 high beams)" }
 followed = { address = 0x826C7824, type = "u32", note = "0 for player 2 followed (two human cars)" }
 wheel_load_scale = { address = 0x820021E8, type = "f32", note = "2.0 (probably): the wheels' load scale" }

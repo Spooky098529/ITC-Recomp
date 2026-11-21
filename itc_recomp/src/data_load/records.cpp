@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "schema/data_load.h"
+#include "schema/replay_snapshots.h"
 
 #include <bit>
 #include <cstddef>
@@ -53,8 +54,9 @@ uint32_t Part464Construct(uint8_t* base, uint32_t part) {
 
 uint32_t Member4080Construct(uint8_t* base, uint32_t member) {
   ITC_NATIVE_RUNNING("sub_82104690 Member4080::Member4080");
-  Part464Construct(base, member + 16);
-  Part464Construct(base, member + 480);
+  const schema::ReplayCollisionState state(base, member);
+  Part464Construct(base, state.shape_previous_address());
+  Part464Construct(base, state.shape_current_address());
   StoreAll(base, member, kMember4080Zero, FloatWord(G::zero(base)));
   return member;
 }
@@ -75,8 +77,9 @@ uint32_t Record5232Construct(uint8_t* base, uint32_t record) {
     }
   }
   StoreAll(base, record, kRecordZero, FloatWord(G::zero(base)));
-  Member1136Construct(base, record + 1136);
-  Member4080Construct(base, record + 4080);
+  const schema::ReplayRecord view(base, record);
+  Member1136Construct(base, view.physics_address());
+  Member4080Construct(base, view.collision_address());
   return record;
 }
 

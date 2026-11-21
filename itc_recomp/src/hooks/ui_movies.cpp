@@ -19,6 +19,7 @@
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 #include "lifted/sdk.h"
+#include "schema/ui_movies_game.h"
 
 ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "Run the UI movie library's functions (the movies the HUD and the menus are made "
@@ -233,7 +234,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8259EBE8) {
   const uint32_t quad = ctx.r3.u32, key = ctx.r4.u32;
   const double depth = ctx.f1.f64;
   const uint64_t lr = ctx.lr;
-  const schema::UiMovieDrawQuad q(base, quad);
+  const schema::UiMovieQuad q(base, quad);
   const bool textured = q.texture() != 0;
   guest_call::InFrame(ctx, base, 112, textured ? 0x8259EC24 : 0x8259EC1C, [&](uint32_t) {
     ctx.r3.u64 = quad;

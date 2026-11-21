@@ -17,11 +17,8 @@
 namespace input {
 
 // The manager, its logical pads and processors: schema/input.h's views
-// (itc_recomp/schema/input.toml). The physical pads and the listener lists
-// are other areas' types (model-animation.toml's PhysicalPad, app-states.toml's
-// PtrList) until those are switched.
-constexpr uint32_t kPhysicalPadBytes = 212;
-constexpr uint32_t kManagerListeners = 3920, kListenerListBytes = 12;
+// (itc_recomp/schema/input.toml). The physical pads are model-animation.toml's
+// PhysicalPad, the listener lists app-states.toml's PtrList.
 
 // --- The pads ---
 

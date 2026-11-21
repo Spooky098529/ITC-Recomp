@@ -38,14 +38,14 @@ struct Mapper {
   const Calls& calls;
   uint64_t r3;
 
-  bool Blocked() const { return int32_t(Load(base, entry + 4)) == 1; }
+  bool Blocked() const { return int32_t(Entry(base, entry).unread()) == 1; }
   // The slot's answer (r3 kept); whether its low byte is set. False without
   // a call when blocked.
   bool Ask(uint32_t slot, uint64_t action, uint32_t lr) {
     if (Blocked()) {
       return false;
     }
-    const uint32_t mapper = Load(base, entry + 0);
+    const uint32_t mapper = Entry(base, entry).mapper<schema::View>().address;
     r3 = calls.Call(Load(base, Load(base, mapper) + slot), frame, lr, mapper, action);
     return (r3 & 0xFF) != 0;
   }
@@ -80,7 +80,7 @@ uint64_t AnimateKindPage(uint8_t* base, uint32_t machine, uint32_t sp, const Cal
     const int64_t value = int32_t(Machine(base, machine).race_mode() * 40u);
     Store(base, frame + 80, uint32_t(uint64_t(value) >> 32));
     Store(base, frame + 84, uint32_t(value));
-    Store(base, node + 16, std::bit_cast<uint32_t>(float(double(value))));
+    Node(base, node).set_y(float(double(value)));
   };
   // The step's animation (12 or 13) finished and played.
   auto step = [&](const uint32_t (&lr)[2], uint64_t index) {
@@ -528,7 +528,7 @@ uint64_t EventPage(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp,
       calls.CallArgs(kSetText, frame, 0x8218B4E0, {m, 1, 3, 0, 0, 0, 0, 0});
       calls.CallArgs(kSetText, frame, 0x8218B4F4, {m, 1, 4, 1, 0, 0, 0, 0});
       const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-      Store(base, m + 40960, Load(base, save + 0x1F870) != 0 ? 0 : 1);
+      Store(base, m + 40960, Save(base, save).profile_option() != 0 ? 0 : 1);
       pages = G::pages(base);
       before = pages.page();
       if (int32_t(before) != 8) {

@@ -21,26 +21,7 @@
 # - "UiMovies::Find.ret.+0.+28.+636" (tuning-machine.toml) is one more
 #   UiMovieTexture.
 
-# A UI movie (known-data.md: "UI movie", about 41 KB) as UiMovies::Find's
-# answer gives it: the value of a {key, value} pair in the movie table
-# (options-screen.toml's UiMovieTableValue). The same object as the
-# measure's "UiMovie" (ui-movies.md's), to merge with it.
-[UiMovieObject]
-measure = "UiMovies::Find.ret.+0"
-size = 20048
-origin = "file"
-fields = [
-  { name = "live_scene", offset = 16, type = "u32", note = "the live scene (animated and drawn)" },
-  { name = "saved_scene", offset = 20, type = "u32", note = "the live pose saved at each update's start" },
-  { name = "file_scene", offset = 24, type = "u32", note = "the file's scene (for resets)" },
-  { name = "textures", offset = 28, type = "ptr", to = "UiMovieTextureTable", note = "the texture vector's data" },
-  { name = "texture_capacity", offset = 32, type = "u32", note = "512" },
-  { name = "texture_count", offset = 36, type = "u32" },
-  { name = "texts", offset = 40, type = "u32", note = "the text list's items (128 bytes each)" },
-  { name = "text_capacity", offset = 44, type = "u32" },
-  { name = "text_count", offset = 48, type = "u32" },
-  { name = "fault_location_menu", offset = 20044, type = "u32", note = "measure fault: LocationScreen::Page0's r31 is an image base, r31 + 20044 the global 0x82814E4C (the location's menu), not a field" },
-]
+# UiMovieObject: merged into ui-movies-game.toml's UiMovie at the integration (the same object).
 
 # A UI movie's texture table ([movie + 28]): pointers to its textures, one
 # a texture index n (+4n). The vinyl editor rewrites movie 13's, the
@@ -97,7 +78,7 @@ measures = [
   "UiMovies::Find.ret.+0.+28.+764", "UiMovies::Find.ret.+0.+28.+768",
   "UiMovies::Find.ret.+0.+28.+772", "UiMovies::Find.ret.+0.+28.+776",
   "UiMovies::Find.ret.+0.+28.+780", "UiMovies::Find.ret.+0.+28.+784",
-]
+  "UiMovies::Find.ret.+0.+28.+636"]
 size = 12
 origin = "embedded"
 fields = [

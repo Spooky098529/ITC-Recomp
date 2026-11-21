@@ -163,16 +163,6 @@ struct SceneryModelVtable : View {
   uint32_t draw_hook_address() const { return address + 4; }
 };
 
-// image; measure: Scene.+0
-struct SceneryRenderQueueVtable : View {
-  using View::View;
-  static constexpr uint32_t kSize = 20;
-  // slot 4: an entry handed to the queue (r4 the entry, r5 the sort key, f1 the depth)
-  uint32_t add() const { return guest::LoadU32(base, address + 16); }
-  void set_add(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t add_address() const { return address + 16; }
-};
-
 // allocated; measure: Recorder::RecordObject.ret
 struct RecordedObjectConstants : View {
   using View::View;
@@ -205,20 +195,6 @@ struct SceneryShapeStreams : View {
   uint32_t second_stride() const { return guest::LoadU32(base, address + 24); }
   void set_second_stride(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
   uint32_t second_stride_address() const { return address + 24; }
-};
-
-// embedded; measure: sub_825A1148.r3
-struct SceneryMaterialTrackSet : View {
-  using View::View;
-  static constexpr uint32_t kSize = 20;
-  // the part file's section (0: no animation)
-  uint32_t section() const { return guest::LoadU32(base, address + 0); }
-  void set_section(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t section_address() const { return address + 0; }
-  // 32 bytes a track: four floats and +20 the mask of those set
-  uint32_t values() const { return guest::LoadU32(base, address + 16); }
-  void set_values(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t values_address() const { return address + 16; }
 };
 
 // The image words docs/functions/scenery-lists.md's code uses.

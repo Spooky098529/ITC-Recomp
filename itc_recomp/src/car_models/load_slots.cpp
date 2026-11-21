@@ -6,20 +6,11 @@
 #include "guest.h"
 #include "hooks/last_error.h"
 #include "memory/heap.h"
+#include "schema/car_draw.h"
 #include "schema/car_models.h"
+#include "schema/scene_loaders.h"
 
 namespace car_models {
-
-namespace {
-
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
-uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
-}
-
-}  // namespace
 
 void LoadSlotReset(uint8_t* base, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820D0730 LoadSlot::Reset");
@@ -66,9 +57,9 @@ uint32_t LoadSlotLoadShared(uint8_t* base, uint32_t slot, uint32_t id, uint32_t 
                             uint32_t callback, const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_820D0860 LoadSlot::LoadShared");
   const schema::LoadSlot s(base, slot);
-  const uint32_t set = schema::CarModelsGlobals::scene<schema::View>(base).address;
-  const uint32_t capacity = Load(base, set + kSharedBufferSize);
-  const uint32_t buffer = Load(base, set + kSharedBuffer);
+  const auto scene = schema::CarModelsGlobals::scene(base);
+  const uint32_t capacity = scene.load_buffer_size();
+  const uint32_t buffer = scene.load_buffer();
   s.set_id(id);
   const uint32_t size = archive::AssetSize(base, id);
   s.set_size(size);
@@ -108,11 +99,12 @@ uint32_t LoadSlotLoad(uint8_t* base, uint32_t slot, uint32_t id, uint32_t contex
 
 void DeferRelease(uint8_t* base, uint32_t set, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
   ITC_NATIVE_RUNNING("sub_820C3F50 DeferRelease");
-  const int32_t count = int32_t((Load(base, set + 40) + Load(base, set + 12)) << 2);
-  const uint32_t records = Load(base, set + 52);
+  const schema::ScenePools pools(base, set);
+  const int32_t count = int32_t((pools.traffic_count() + pools.car_model_count()) << 2);
+  const uint32_t records = pools.deferred_releases().address;
   using Record = schema::CarModelsDeferredRelease;
   // [set + 52] read again for each store, as the original.
-  const auto record = [&](uint32_t at) { return Record(base, Load(base, set + 52) + at); };
+  const auto record = [&](uint32_t at) { return Record(base, pools.deferred_releases().address + at); };
   for (int32_t i = 0; i < count; i++) {
     if (Record(base, records + Record::kSize * uint32_t(i)).state() != 0) {
       continue;

@@ -6,6 +6,7 @@
 
 #include "ui_movies/ui_movies.h"
 
+#include "schema/ui_movies_game.h"
 #include "base/log.h"
 #include "car_physics/float_ops.h"
 #include "debug/frame_state_diff.h"
@@ -26,7 +27,7 @@ namespace {
 
 using G = schema::UiMoviesGlobals;
 using Context = schema::UiMovieDrawContext;
-using Quad = schema::UiMovieDrawQuad;
+using Quad = schema::UiMovieQuad;
 
 // fctiwz, as the translation does it: NaN gives INT_MIN, INT_MAX and above
 // INT_MAX, below INT_MIN INT_MIN.
@@ -204,7 +205,7 @@ uint32_t CopyDrawContext(uint8_t* base, uint32_t context, uint32_t parent) {
 
 uint32_t CopyQueuedText(uint8_t* base, uint32_t to, uint32_t from) {
   ITC_NATIVE_RUNNING("sub_8259E620 TextItem::CopyQueued");
-  const schema::UiMovieQueuedText t(base, to), f(base, from);
+  const schema::UiMovieTextItem t(base, to), f(base, from);
   t.set_node(f.node());
   matrix_math::Copy(base, t.matrix_address(), f.matrix_address());
   interpolation::BlendState_OnCopy(base, t.matrix_address(), f.matrix_address(), 0x8259E650);
@@ -245,7 +246,7 @@ bool QueueText(uint8_t* base, uint32_t context, uint32_t node, uint32_t layer, u
   if (c.text_list().address == 0) {
     return true;
   }
-  const schema::UiMovieQueuedText item(base, frame + 96);
+  const schema::UiMovieTextItem item(base, frame + 96);
   MakeTextItem(base, item.address);
   item.set_node(node);
   matrix_math::Copy(base, item.matrix_address(), c.matrix_address());
@@ -308,28 +309,28 @@ void QuadClip(uint8_t* base, uint32_t context, uint32_t quad) {
   const uint32_t c64 = c.clip_left();
   if (c64 == 0 && c.clip_top() == 0 && c.clip_bottom() == 0) {
     q.set_clipped(0);
-    q.set_clip_left(0);
-    q.set_clip_top(0);
-    q.set_clip_right(0);
-    q.set_clip_bottom(0);
+    q.set_clip_0(0);
+    q.set_clip_1(0);
+    q.set_clip_2(0);
+    q.set_clip_3(0);
     return;
   }
   const int16_t left = int16_t(c64);
   const int16_t right = int16_t(c.clip_right());
   const int16_t top = int16_t(c.clip_top());
   const int16_t bottom = int16_t(c.clip_bottom());
-  q.set_clip_left(uint16_t(left));
+  q.set_clip_0(uint16_t(left));
   q.set_clipped(1);
-  q.set_clip_right(uint16_t(right));
-  q.set_clip_top(uint16_t(top));
-  q.set_clip_bottom(uint16_t(bottom));
+  q.set_clip_2(uint16_t(right));
+  q.set_clip_1(uint16_t(top));
+  q.set_clip_3(uint16_t(bottom));
   if (left > right) {
-    q.set_clip_left(uint16_t(right));
-    q.set_clip_right(uint16_t(left));
+    q.set_clip_0(uint16_t(right));
+    q.set_clip_2(uint16_t(left));
   }
   if (top > bottom) {
-    q.set_clip_top(uint16_t(bottom));
-    q.set_clip_bottom(uint16_t(top));
+    q.set_clip_1(uint16_t(bottom));
+    q.set_clip_3(uint16_t(top));
   }
 }
 

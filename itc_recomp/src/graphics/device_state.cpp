@@ -11,7 +11,9 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "display/gamma.h"
+#include "schema/app_start_up.h"
 #include "schema/device_state.h"
+#include "schema/graphics_resources.h"
 
 #include <emmintrin.h>
 
@@ -295,13 +297,14 @@ void SetMipLevel(uint8_t* base, uint32_t device, uint32_t sampler, uint32_t valu
 // resource's address / 4 in bits 0-29, bit 30 clear, then -1. The
 // original's bit 31 comes from an uninitialized stack word; 0 here (the
 // list is in the command buffer, read by nothing since the emulated GPU
-// went). The resource (a buffer, a texture or a surface) is read and fenced
-// by offset: its flags (+0) and fence (+8) are graphics-resources.md's.
+// went). The resource (a buffer, a texture or a surface) is
+// graphics-resources' ResourceHeader: its common word (+0) and fence (+8).
 
 // Whether fencing `resource` would need the full list flushed.
 bool FenceNeedsFlush(uint8_t* base, uint32_t device, uint32_t resource) {
   const Device d(base, device);
-  return resource != 0 && d.fence() == 0 && (d.fence_mask() & Load(base, resource)) != 0 &&
+  return resource != 0 && d.fence() == 0 &&
+         (d.fence_mask() & schema::ResourceHeader(base, resource).common()) != 0 &&
          !(d.fence_list() < d.fence_list_end());
 }
 
@@ -310,12 +313,13 @@ void Fence(uint8_t* base, uint32_t device, uint32_t resource) {
     return;
   }
   const Device d(base, device);
+  const schema::ResourceHeader r(base, resource);
   const uint32_t position = d.fence();
   if (position != 0) {
-    Store(base, resource + 8, position);
+    r.set_fence(position);
     return;
   }
-  if ((d.fence_mask() & Load(base, resource)) == 0) {
+  if ((d.fence_mask() & r.common()) == 0) {
     return;
   }
   const uint32_t list = d.fence_list();
@@ -1205,16 +1209,17 @@ uint32_t VertexDeclarationFromFvf(uint8_t* base, uint32_t fvf, uint32_t declarat
                     kPointSize = 4, kTexCoord = 5, kColorUsage = 10;
   // The texture coordinates' table: a byte a format, then the types.
   constexpr uint32_t kTexCoordTable = Globals::tex_coord_table_address();
-  uint32_t at = declaration + 52;
+  uint32_t at = declaration + 52;  // the elements (app-start-up's VertexElement)
   uint32_t count = 0;   // the original's r8
   uint32_t offset = 0;  // the next element's offset (r9)
   auto element = [&](uint32_t type, uint32_t element_offset, uint8_t usage, uint8_t index) {
-    guest::StoreU16(base, at + 0, 0);
-    guest::StoreU16(base, at + 2, uint16_t(element_offset));
-    Store(base, at + 4, type);
-    guest::StoreU8(base, at + 8, 0);
-    guest::StoreU8(base, at + 9, usage);
-    guest::StoreU8(base, at + 10, index);
+    const schema::VertexElement e(base, at);
+    e.set_stream(0);
+    e.set_offset(uint16_t(element_offset));
+    e.set_element_type(type);
+    e.set_method(0);
+    e.set_usage(usage);
+    e.set_usage_index(index);
     at += 12;
   };
   const bool ubyte4 = (fvf & 0x1000) != 0;  // the last beta is UBYTE4 indices
@@ -1320,13 +1325,15 @@ uint32_t VertexDeclarationFromFvf(uint8_t* base, uint32_t fvf, uint32_t declarat
     formats >>= 2;
     offset = (offset + size) & 0xFFFF;
   }
-  // The end marker (D3DDECL_END): stream 0xFF, type unused.
+  // The end marker (D3DDECL_END): stream 0xFF, type unused; three words
+  // across VertexElement's fields, stored as the original's words.
   Store(base, at + 0, 0x00FF0000);
   Store(base, at + 4, 0xFFFFFFFFu);
   Store(base, at + 8, 0);
-  Store(base, declaration + 24, count);
-  Store(base, declaration + 28, 0);
-  Store(base, declaration + 48, 0);
+  const schema::VertexDeclaration decl(base, declaration);
+  decl.set_element_count(count);
+  decl.set_highest_stream(0);
+  decl.set_unknown_48(0);
   return (at - declaration - 52) / 12;
 }
 

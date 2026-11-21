@@ -232,64 +232,14 @@ measure = "UiMovie.+100"
 size = 12
 origin = "embedded"
 fields = [
-  { name = "items", offset = 0, type = "ptr", to = "UiMovieQueuedText" },
+  { name = "items", offset = 0, type = "ptr", to = "UiMovieTextItem" },
   { name = "capacity", offset = 4, type = "u32", note = "512" },
   { name = "count", offset = 8, type = "u32" },
 ]
 
-# A text queued for the game to draw (128 bytes; the text list's items, and
-# the one UiMovie::QueueText builds on its frame). The same object as
-# ui-movies-game.toml's UiMovieTextItem (same field names).
-[UiMovieQueuedText]
-measures = ["UiMovie.+100.+0", "sub_8259E620.r4"]
-size = 128
-origin = "embedded"
-fields = [
-  { name = "node", offset = 0, type = "u32", note = "the TXT node drawn" },
-  { name = "matrix", offset = 16, type = "bytes", count = 64, note = "the draw context's matrix" },
-  { name = "matrix_3", offset = 28, type = "f32" },
-  { name = "matrix_7", offset = 44, type = "f32" },
-  { name = "matrix_11", offset = 60, type = "f32" },
-  { name = "matrix_15", offset = 76, type = "f32" },
-  { name = "depth", offset = 80, type = "f32", note = "the layer times the float at 0x82071520" },
-  { name = "red", offset = 84, type = "f32", note = "the draw context's color (+84 to +96)" },
-  { name = "green", offset = 88, type = "f32" },
-  { name = "blue", offset = 92, type = "f32" },
-  { name = "alpha", offset = 96, type = "f32" },
-  { name = "clip_0", offset = 100, type = "u32", note = "the draw context's clip rectangle (+100 to +112)" },
-  { name = "clip_1", offset = 104, type = "u32" },
-  { name = "clip_2", offset = 108, type = "u32" },
-  { name = "clip_3", offset = 112, type = "u32" },
-]
+# UiMovieQueuedText: merged into ui-movies-game.toml's UiMovieTextItem at the integration (the same object).
 
-# A quad or primitive built on a drawer's frame for the recorders (116
-# bytes; made by MakeQuad). The same object as ui-movies-game.toml's
-# UiMovieQuad (same field names to +72).
-[UiMovieDrawQuad]
-measures = ["sub_8259DAD0.r3", "sub_8259E098.r3", "sub_8259EBE8.r3"]
-size = 116
-origin = "embedded"
-fields = [
-  { name = "matrix", offset = 0, type = "bytes", count = 64, note = "the identity when made" },
-  { name = "matrix_3", offset = 12, type = "f32" },
-  { name = "matrix_7", offset = 28, type = "f32" },
-  { name = "matrix_11", offset = 44, type = "f32" },
-  { name = "matrix_15", offset = 60, type = "f32" },
-  { name = "unknown_64", offset = 64, type = "u32", note = "0 when made" },
-  { name = "blend_mode", offset = 68, type = "u32", note = "0 to 4 (5 and up: no blend states)" },
-  { name = "unknown_72", offset = 72, type = "u32", note = "2 when made; the drawers set 0" },
-  { name = "vertex_count", offset = 80, type = "u32" },
-  { name = "texture", offset = 84, type = "u32", note = "0 untextured" },
-  { name = "positions", offset = 88, type = "ptr", to = "UiMovieQuadPosition", note = "16 bytes a vertex" },
-  { name = "colors", offset = 92, type = "ptr", to = "UiMovieQuadColor", note = "16 bytes a vertex" },
-  { name = "coords", offset = 96, type = "ptr", to = "UiMovieQuadCoord", note = "texture coordinates, 16 bytes a vertex" },
-  { name = "clipped", offset = 100, type = "u32" },
-  { name = "clip_left", offset = 104, type = "u16", note = "the clip rectangle (16-bit integers, sorted)" },
-  { name = "clip_top", offset = 106, type = "u16" },
-  { name = "clip_right", offset = 108, type = "u16" },
-  { name = "clip_bottom", offset = 110, type = "u16" },
-  { name = "texture_stage", offset = 112, type = "u32", note = "the draw context's scaled word" },
-]
+# UiMovieDrawQuad: merged into ui-movies-game.toml's UiMovieQuad at the integration (the same object).
 
 # A drawn quad's vertex position (16 bytes).
 [UiMovieQuadPosition]

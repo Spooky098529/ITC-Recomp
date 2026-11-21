@@ -20,7 +20,6 @@ namespace {
 
 constexpr uint32_t kNone = 0xFFFFFFFFu;
 constexpr uint64_t kAll = 0xFFFFFFFFFFFFFFFFull;
-constexpr uint32_t kCurrentCar = 0x19920;  // the save's current car index
 
 uint64_t PlayNamed(uint32_t movie, uint64_t named, uint32_t frame, uint32_t lr,
                    const Calls& calls, uint64_t r5 = 0, uint64_t r6 = 0) {
@@ -43,14 +42,14 @@ uint32_t Selection(uint8_t* base, uint32_t global) {
 }
 // MenuList::GetPreviousSelection (sub_8220BC28, the list's +20), inline.
 uint32_t PreviousSelection(uint8_t* base, uint32_t global) {
-  return Load(base, Load(base, global) + 20);
+  return MenuList(base, Load(base, global)).selection_before();
 }
 
 // Whether the selected garage car (the data's +44 + +48) is the save's
 // current one (+0x19920), compared signed.
 bool Current(uint8_t* base) {
   const ScreenData data = Data(base);
-  const uint32_t current = Load(base, data.save() + kCurrentCar);
+  const uint32_t current = data.save().selected_car();
   return int32_t(data.scroll() + data.selection()) == int32_t(current);
 }
 
@@ -86,9 +85,9 @@ uint64_t OptionHelpLine(uint8_t* base, uint32_t frame, uint32_t other, uint32_t 
   Store(base, frame + other + 12, 557);
   Store(base, frame + 108, 557);
   const ScreenData data = Data(base);
-  CopyGarageCar(base, car, data.save() + 6120,
+  CopyGarageCar(base, car, data.save().garage_address(),
                 data.scroll() + data.selection(), frame, calls);
-  const schema::CarSpec spec(base, car_specs::GetCarSpec(base, Load(base, car + 12)));
+  const schema::CarSpec spec(base, car_specs::GetCarSpec(base, schema::CarMakersCar(base, car).car_id()));
   const uint32_t table = spec.list_kind() == 1 ? frame + 96 : frame + other;
   return SetHelpLine(base, Load(base, table + (selection << 2)), frame, calls);
 }
@@ -115,8 +114,9 @@ uint64_t Done(uint64_t run) { return uint32_t(run) == 0 ? 1 : 0; }
 // The garage car record `steps` links from the head of the save's garage
 // list (a 32-bit count down to 0, as the originals walk it).
 uint32_t RecordAfter(uint8_t* base, uint32_t steps) {
-  const uint32_t garage = Data(base).save() + 6120;
-  uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204))));
+  const schema::CareerGarageList list(base, Save(base).garage_address());
+  const uint32_t garage = list.address;
+  uint32_t link = garage + 4 * uint32_t(int32_t(int16_t(list.head())));
   for (; steps != 0; steps--) {
     link = garage + 4 * uint32_t(int32_t(int16_t(guest::LoadU16(base, link))));
   }
@@ -132,15 +132,15 @@ uint64_t Transition2(uint8_t* base, uint32_t started, uint32_t sp, const Calls& 
   if (Load(base, started) == 0) {
     const uint32_t selection = Selection(base, G::list_address());
     const uint32_t previous = PreviousSelection(base, G::list_address());
-    const uint32_t scroll = Load(base, List(base) + 4);
-    const int32_t moved = int32_t(scroll - Load(base, List(base) + 8));
+    const uint32_t scroll = ListView(base).scroll();
+    const int32_t moved = int32_t(scroll - ListView(base).scroll_before());
     const uint32_t marker = ui_movies::FindNode(base, movie, 6, 0);
     FinishNamed(movie, uint64_t(previous) + 67, frame, 0x82194FB4, calls);
     PlayNamed(movie, uint64_t(selection) + 67, frame, 0x82194FD4, calls);
     LoopNamed(movie, uint64_t(selection) + 67, frame, 0x82194FE0, calls);
     if (moved != 0) {
       const uint32_t count =
-          uint32_t(int32_t(int16_t(guest::LoadU16(base, Data(base).save() + 6328))));
+          uint32_t(int32_t(int16_t(Save(base).garage_count())));
       const uint32_t row = ui_movies::FindNode(base, movie, 6, 9);
       FillRows(base, frame, calls);
       FinishNamed(movie, 72, frame, 0x8219501C, calls);
@@ -148,14 +148,14 @@ uint64_t Transition2(uint8_t* base, uint32_t started, uint32_t sp, const Calls& 
       FinishNamed(movie, 75, frame, 0x82195034, calls);
       FinishNamed(movie, 76, frame, 0x82195040, calls);
       // The current car's marker one row on, as the list scrolls.
-      const uint32_t current = Load(base, Data(base).save() + kCurrentCar);
-      if (Load(base, List(base) + 32) != 0) {
+      const uint32_t current = Save(base).selected_car();
+      if (ListView(base).wrapped() != 0) {
         // The row's y in 64 bits (the words zero-extended, as the original
         // adds them), through the frame's +80 (std, lfd, fcfid, frsp).
         const int64_t row_index = (moved > 0 ? 1 : -1) - int64_t(scroll) + int64_t(current);
         const int64_t y = row_index * 84 + 232;
         Store64(base, frame + 80, uint64_t(y));
-        Stfs(base, marker + 16, double(float(double(y))));
+        Node(base, marker).set_y(float(double(y)));
       }
       // The row scrolled in: the car at scroll + 4 (up) or scroll - 1
       // (down) in row 9, then the scroll's animations.
@@ -239,10 +239,10 @@ uint64_t Transition6(uint8_t* base, uint32_t started, uint32_t sp, const Calls& 
     FinishNamed(movie, 90, frame, 0x821947A8, calls);
     FinishNamed(movie, 91, frame, 0x821947B4, calls);
     const uint32_t list = List(base);
-    if (Load(base, list + 32) != 0) {
+    if (MenuList(base, list).wrapped() != 0) {
       SetActionMarker(base, action * 40, frame);
     } else {
-      const int32_t move = int32_t(Load(base, List(base) + 24));
+      const int32_t move = int32_t(ListView(base).move());
       if (move == 1) {
         PlayNamed(movie, 91, frame, 0x8219480C, calls);
       } else if (move == -1) {
@@ -263,7 +263,7 @@ uint64_t Transition7(uint8_t* base, uint32_t started, uint32_t sp, const Calls& 
   if (Load(base, started) == 0) {
     // Another car: the second list's selection and scroll.
     const uint32_t selection = Selection(base, G::list2_address());
-    const uint32_t scroll = Load(base, List2(base) + 4);
+    const uint32_t scroll = List2View(base).scroll();
     const uint32_t action = Selection(base, G::list_address());
     Data(base).set_selection(selection);
     Data(base).set_scroll(scroll);
@@ -277,7 +277,7 @@ uint64_t Transition7(uint8_t* base, uint32_t started, uint32_t sp, const Calls& 
     Memcpy(base, calls, frame + 160, record + 212, 1968, frame, 0x821952C4);
     ShowCarSpecs(base, frame + 160, frame, calls);
     const uint32_t mark = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 5);
-    Store(base, mark + 80, Current(base) ? 1 : 0);
+    Node(base, mark).set_visible(Current(base) ? 1 : 0);
     const uint32_t color = Current(base) ? 2 : 0;
     ui_movies::SetColor(base, ui_movies::FindNode(base, movie, 7, 5), color);
     ui_movies::SetColor(base, ui_movies::FindNode(base, movie, 7, 6), color);
@@ -386,7 +386,7 @@ uint64_t Transition14(uint8_t* base, uint32_t started, uint32_t sp, const Calls&
   if (Load(base, started) == 0) {
     const uint32_t option = Selection(base, G::list_address());
     const uint32_t previous = PreviousSelection(base, G::list_address());
-    const uint32_t marked = Load(base, List(base) + 32);
+    const uint32_t marked = ListView(base).wrapped();
     FinishNamed(movie, uint64_t(previous) + 2, frame, 0x82194918, calls);
     static constexpr uint32_t kLrs[4] = {0x82194958, 0x82194964, 0x82194980, 0x8219498C};
     static constexpr uint32_t kLoop[2] = {0x821949B0, 0x821949BC};
@@ -396,7 +396,7 @@ uint64_t Transition14(uint8_t* base, uint32_t started, uint32_t sp, const Calls&
     if (marked != 0) {
       SetOptionMarker(base, option * 40, frame);
     } else {
-      const int32_t move = int32_t(Load(base, List(base) + 24));
+      const int32_t move = int32_t(ListView(base).move());
       PlayNamed(movie, move > 0 ? 13 : 12, frame, 0x82194A18, calls);
     }
     OptionHelpLine(base, frame, 112, frame + 128, Selection(base, G::list_address()), calls);
@@ -414,8 +414,8 @@ uint64_t Transition16(uint8_t* base, uint32_t started, uint32_t sp, const Calls&
     PlayNamed(movie, 146, frame, 0x8219312C, calls);
     const uint32_t a = ui_movies::FindNode(base, movie, 3, 1);
     const uint32_t b = ui_movies::FindNode(base, movie, 3, 2);
-    Store(base, a + 108, 1);
-    Store(base, b + 108, 3);
+    Node(base, a).set_texture_entry(1);
+    Node(base, b).set_texture_entry(3);
     Store(base, started, 1);
   }
   return Done(Run(movie, frame, 0x82193170, calls));
@@ -429,8 +429,8 @@ uint64_t Transition17(uint8_t* base, uint32_t started, uint32_t sp, const Calls&
     PlayNamed(movie, 147, frame, 0x821961C4, calls);
     const uint32_t a = ui_movies::FindNode(base, movie, 3, 1);
     const uint32_t b = ui_movies::FindNode(base, movie, 3, 2);
-    Store(base, a + 108, 3);
-    Store(base, b + 108, 1);
+    Node(base, a).set_texture_entry(3);
+    Node(base, b).set_texture_entry(1);
     Data(base).set_action(2);
     SetUpActions(base, frame, calls);
     Store(base, started, 1);
@@ -471,7 +471,7 @@ uint64_t SetUpActions(uint8_t* base, uint32_t sp, const Calls& calls) {
   calls.CallArgs(kListInit, frame, 0x82195934, {List(base), 5, 5, 1, 154, 153, 155, 156});
   calls.Call(kListSetSelection, frame, 0x8219594C, List2(base),
              Data(base).selection());
-  Store(base, List2(base) + 4, Data(base).scroll());
+  List2View(base).set_scroll(Data(base).scroll());
   calls.Call(kListFit, frame, 0x82195968, List2(base), 1);
   calls.Call(kListSetSelection, frame, 0x82195978, List(base),
              Data(base).action());
@@ -490,18 +490,18 @@ uint64_t SetUpActions(uint8_t* base, uint32_t sp, const Calls& calls) {
   static constexpr uint32_t kPrompts[6] = {0, 0, 1, 1, kNone, kNone};
   SetPrompts(base, kPrompts, frame);
   const uint32_t mark = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 5);
-  Store(base, mark + 80, Current(base) ? 1 : 0);
-  Store(base, Load(base, Holder(base)) + 6052, 1);
+  Node(base, mark).set_visible(Current(base) ? 1 : 0);
+  Stage(base).set_reflection(1);
   ActionHelpLine(base, frame, Selection(base, G::list_address()), calls);
   // The list's arrows and the other-car buttons hidden with one car.
-  const uint32_t count = guest::LoadU16(base, Data(base).save() + 6328);
+  const uint32_t count = Save(base).garage_count();
   const uint32_t a = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 0);
   const uint32_t b = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 13);
   const uint32_t c = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 14);
   const uint32_t shown = count == 1 ? 0 : 1;
-  Store(base, a + 80, shown);
-  Store(base, b + 80, shown);
-  Store(base, c + 80, shown);
+  Node(base, a).set_visible(shown);
+  Node(base, b).set_visible(shown);
+  Node(base, c).set_visible(shown);
   return c;
 }
 
@@ -525,9 +525,9 @@ uint64_t SetUpOptions(uint8_t* base, uint32_t sp, const Calls& calls) {
   // The data's +80: the car's spec's byte +771 is 1 (its options 1 and 2
   // dimmed by Transition12).
   const ScreenData data = Data(base);
-  CopyGarageCar(base, frame + 144, data.save() + 6120,
+  CopyGarageCar(base, frame + 144, data.save().garage_address(),
                 data.scroll() + data.selection(), frame, calls);
-  const schema::CarSpec spec(base, car_specs::GetCarSpec(base, Load(base, frame + 156)));
+  const schema::CarSpec spec(base, car_specs::GetCarSpec(base, schema::CarMakersCar(base, frame + 144).car_id()));
   Data(base).set_toggles_shown(spec.list_kind() == 1 ? 1 : 0);
   return OptionHelpLine(base, frame, 128, frame + 144, Selection(base, G::list_address()), calls);
 }

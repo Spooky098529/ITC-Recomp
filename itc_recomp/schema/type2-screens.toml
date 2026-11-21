@@ -281,6 +281,7 @@ fields = [
 # StateMachine with its words after it; power-graph.toml's SpecSheetMachine
 # (sub_821B8F60.r3) is the same object.
 [SpecSheet]
+measures = ["sub_821B8F60.r3"]  # from SpecSheetMachine (power-graph), merged at the integration
 measure = "PowerGraphScreen"
 size = 9616
 origin = "embedded"

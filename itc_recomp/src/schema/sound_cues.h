@@ -635,7 +635,7 @@ struct AudioEngine : View {
   uint32_t matrix_5_address() const { return address + 96; }
 };
 
-// allocated; measure: new<196>@XACT3CreateEngine, AudioEngine.+8
+// allocated; measure: new<196>@XACT3CreateEngine, AudioEngine.+8, sub_8259D1F0.r3.+28.+8
 struct XactEngine : View {
   using View::View;
   static constexpr uint32_t kSize = 196;
@@ -791,7 +791,7 @@ struct XactEngine : View {
   uint32_t file_callback_1_address() const { return address + 192; }
 };
 
-// image; measure: AudioEngine.+8.+0
+// image; measure: AudioEngine.+8.+0, sub_8259D1F0.r3.+28.+8.+0
 struct XactEngineInterface : View {
   using View::View;
   static constexpr uint32_t kSize = 56;
@@ -989,7 +989,7 @@ struct WordVector : View {
   uint32_t end_address() const { return address + 12; }
 };
 
-// embedded; measure: AudioManager::LoadBank.r4, AudioManager::ReleaseBank.r4, AudioManager::IsBankLoading.r4, AudioManager::IsBankSlotEmpty.r4, AudioManager::GetSoundBank.r4, AudioManager::PlayCue.r4, Sound::Sound.r4, Sound::IsBank.r4
+// embedded; measure: AudioManager::LoadBank.r4, AudioManager::ReleaseBank.r4, AudioManager::IsBankLoading.r4, AudioManager::IsBankSlotEmpty.r4, AudioManager::GetSoundBank.r4, AudioManager::PlayCue.r4, Sound::Sound.r4, Sound::IsBank.r4, AudioManager::FindFreeBankSlot.r4, AudioManager::GetCueIndex.r4, AudioManager::IsBankLoaded.r4, AudioManager::PlayHandle.r4
 struct SoundCuesBankIndex : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -998,7 +998,7 @@ struct SoundCuesBankIndex : View {
   uint32_t index_address() const { return address + 0; }
 };
 
-// embedded; measure: AudioManager::PlayCue.r5, Sound::Sound.r5, Sound::IsCue.r4
+// embedded; measure: AudioManager::PlayCue.r5, Sound::Sound.r5, Sound::IsCue.r4, AudioManager::PlayHandle.r5
 struct SoundCuesCueIndex : View {
   using View::View;
   static constexpr uint32_t kSize = 4;

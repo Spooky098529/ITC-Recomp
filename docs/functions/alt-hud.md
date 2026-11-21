@@ -81,6 +81,15 @@ names the object (`AltHud`: +0 `shown`, +4 `tach_curve` with +104
 `slot2`, +256 `big_view`, +260 `player`), the holder's two words
 (`AltHudHolder`: `object`, `menu_list`) and the image words read
 (`AltHudGlobals`); `src/alt_hud/` reads them through those views.
+Its second pass (2026-11-21) reads other areas' objects through
+theirs too: the `Vehicle` (`car-physics.toml`: gear, nitrous, boost,
+car) with its `VehicleStatus` (`vehicle.toml`: the +6252 to +6260
+gauges), the racer's `Car` (`race-setup.toml`: car id, the five
+entries from +1832, +3892), the `CarInput` (`ai-drivers.toml`), the
+`MenuList` (`race-screens.toml`) and the `PlayerMapperEntry`
+(`racer-controllers.toml`). The UI movie nodes' words (+12, +28, +36,
++80, +100, +104, +108) and the car spec's block 2 +12 stay offsets: no
+schema type names them yet.
 
 Status:
 

@@ -7,6 +7,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/boot_mode.h"
 #include "schema/menu_helpers.h"
 #include "schema/power_graph_screen.h"
 #include "ui_movies/game.h"
@@ -30,11 +31,12 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 }  // namespace
 
 void Post(uint8_t* base, uint32_t mode, uint32_t id) {
-  const uint32_t ring = mode + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
+  // r4 is the mode's dispatcher (boot-mode.toml's ModeDispatcher).
+  const schema::ModeDispatcher dispatcher(base, mode);
+  const uint32_t count = dispatcher.ring_count() + 1;
+  const uint32_t end = dispatcher.ring_start() + count - 1;
+  dispatcher.set_ring_count(count);
+  const uint32_t slot = dispatcher.ring_address() + (end - (end / 50) * 50) * 12;
   StoreU32(base, slot + 0, id);
   StoreU32(base, slot + 4, 0);
   StoreU32(base, slot + 8, 0);

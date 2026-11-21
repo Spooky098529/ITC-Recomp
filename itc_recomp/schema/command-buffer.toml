@@ -140,7 +140,7 @@ measure = "Device::WriteFlushPackets.r4"
 size = 4
 origin = "gpu"
 fields = [
-  { name = "address", offset = 0, type = "u32" },
+  { name = "block_address", offset = 0, type = "u32", note = "the block's physical address (`address` would hide the view's own)" },
 ]
 
 [CommandFlushWords]

@@ -711,7 +711,7 @@ uint32_t Init(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls, 
   ITC_NATIVE_RUNNING("sub_82177378 RaceSounds::Init");
   const uint32_t frame = sp - kInitFrame;
   Store(base, frame, sp);
-  Sounds(base, machine).set_kind(guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 0xA3AF0));
+  Sounds(base, machine).set_kind(RaceStates::race_data(base).kind());
   uint64_t last = 0;
   for (uint32_t i = 0; i < kCarSoundCount; i++) {
     Store(base, Globals::slot_arrived_address() + 4 * i, 0);

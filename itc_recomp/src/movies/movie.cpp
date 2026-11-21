@@ -12,6 +12,7 @@
 #include "movies/player.h"
 #include "native/renderer.h"
 #include "native/state.h"
+#include "schema/device_shaders.h"
 #include "schema/movies.h"
 
 namespace movies::movie {
@@ -158,8 +159,8 @@ void RenderFrame(uint8_t* base, uint32_t movie) {
     return;
   }
   if (const Frame* frame = player->CurrentFrame()) {
-    native::Renderer_DrawMovie(base, guest::LoadU32(base, native::kDevicePointer), frame->width,
-                               frame->height, frame->y.data(), frame->u.data(),
+    native::Renderer_DrawMovie(base, schema::DeviceShadersGlobals::replay_device(base),
+                               frame->width, frame->height, frame->y.data(), frame->u.data(),
                                frame->v.data());
   }
   if (player->Ended()) {

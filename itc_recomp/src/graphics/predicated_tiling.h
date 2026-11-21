@@ -23,19 +23,7 @@
 
 namespace graphics::predicated_tiling {
 
-// The device's fields used here.
-constexpr uint32_t kPredicationSelect = 10800;  // the last SET_BIN_MASK's select
-constexpr uint32_t kPredicationHigh = 10804;
-constexpr uint32_t kTilingFlags = 10808;       // bit 1 the predicated tiling bit
-constexpr uint32_t kBinMask = 12448;           // -1 for none
-constexpr uint32_t kBinMaskHigh = 12452;
-constexpr uint32_t kPredicated = 12456;        // 1 while a tile's predication is set
-constexpr uint32_t kTileCount = 12488;
-constexpr uint32_t kTiles = 12492;             // 16 bytes a tile; 240 bytes copied
-constexpr uint32_t kTilingOptions = 12924;     // BeginTiling's flags
-constexpr uint32_t kDrawChain = 12976;
-constexpr uint32_t kThirdChain = 12996;
-constexpr uint32_t kSegmentChainCopy = 13036;  // the segment chain at the start (20 bytes)
+// The device's fields are schema::Device's (device-state.md).
 constexpr uint32_t kHeaderBytes = 256;
 
 // The worker's wake, the callback EndTiledSegments inserts (sub_822B6A78,
@@ -98,11 +86,7 @@ uint32_t EndTiledSegments(uint8_t* base, uint32_t device, uint32_t tiles, uint32
 // kernel's imports as the original's (the user's call for XAudio's,
 // 2026-10-29: host objects once every user is native).
 
-constexpr uint32_t kWorkerState = 10812;   // the workers' shared state
-constexpr uint32_t kLastWorkerCpu = 11208;  // the CPU of the last worker made
-constexpr uint32_t kWorkers = 11212;        // 56 bytes a CPU
-constexpr uint32_t kWorkerBytes = 56;
-constexpr uint32_t kDeviceOptions = 20440;  // bit 8: no workers; bits 24-29 their CPUs
+constexpr uint32_t kWorkerBytes = 56;  // a CPU's block (device +11212 + 56 x CPU)
 constexpr uint32_t kWorkerThread = 0x822B69A8;
 constexpr uint32_t kL2Area = 0x7F100000;    // the L2-locked area the workers' slices are in
 constexpr uint32_t kWorkerSlice = 0x8000;

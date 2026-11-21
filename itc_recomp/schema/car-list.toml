@@ -113,6 +113,7 @@ fields = [
 # set's own slots reach them.
 [PanelSet]
 measure = "PanelSet"
+measures = ["PanelScreen.+9644"]
 size = 1976
 origin = "embedded"
 vtable = 0x820110C8
@@ -274,6 +275,7 @@ fields = [
 # from the entry's HSV.
 [CarListColor]
 measure = "ColorPanel::SetSwatch.r5"
+measures = ["new<32>@PanelSetBase::SetUpColors"]
 size = 32
 origin = "allocated"
 fields = [
@@ -283,6 +285,8 @@ fields = [
   { name = "hue", offset = 16, type = "f32" },
   { name = "saturation", offset = 20, type = "f32", note = "0 to 1" },
   { name = "value", offset = 24, type = "f32", note = "0 to 1" },
+  { name = "red_green", offset = 0, type = "u64", note = "red and green read as one doubleword (Color::HsvToRgb's copy)" },
+  { name = "blue_unknown_12", offset = 8, type = "u64", note = "blue and +12 read as one doubleword (Color::HsvToRgb's copy)" },
 ]
 
 # The object PanelSetBase's +1892 points to (16 bytes; no writer of the
@@ -317,7 +321,7 @@ fields = [
 # The panel groups' and the D, E, F panels' base (vtable 0x82010974; built
 # on NodeBase).
 [PanelGroupBase]
-measure = "PanelGroupBase"
+measures = ["PanelGroupBase", "PanelGroup6B", "PanelGroup7B"]
 size = 36
 origin = "embedded"
 vtable = 0x82010974
@@ -345,10 +349,11 @@ fields = [
 # F, the tabs (144 bytes; Panel6F / Panel7F). Named animations are ids of
 # the group's UI movie; nodes are node sets and child indices.
 [TabPanel]
-measure = "TabPanel"
+measures = ["TabPanel", "PanelFBase", "Panel6F", "Panel7F"]
 size = 144
 origin = "embedded"
 fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82010B5C (NodeBase's) from PanelFBase, 0x82010974 from Panel6F and Panel7F" },
   { name = "group", offset = 4, type = "ptr", note = "its panel group" },
   { name = "tab", offset = 8, type = "u32" },
   { name = "tab0_enabled", offset = 12, type = "u32", note = "1 the tab's animation plays; set by step 0 from the lists' counts" },
@@ -381,7 +386,7 @@ fields = [
 
 # E, the car rows (160 bytes, PanelE).
 [RowPanel]
-measures = ["RowPanel", "MenuList.+1900"]
+measures = ["RowPanel", "MenuList.+1900", "PanelE", "PanelEBase"]
 size = 160
 origin = "embedded"
 fields = [
@@ -392,6 +397,9 @@ fields = [
   { name = "node", offset = 16, type = "u32" },
   { name = "row_nodes", offset = 20, type = "bytes", count = 40, note = "the rows' child indices" },
   { name = "spare_row_node", offset = 60, type = "u32", note = "the row SetRow fills for row -1 (scrolled in)" },
+  { name = "unknown_64", offset = 64, type = "u32", note = "5 in PanelE::PanelE" },
+  { name = "unknown_68", offset = 68, type = "u32", note = "15 in PanelE::PanelE" },
+  { name = "unknown_72", offset = 72, type = "u32", note = "16 in PanelE::PanelE" },
   { name = "show_anim", offset = 76, type = "u32" },
   { name = "show_anim_alt", offset = 80, type = "u32", note = "played instead with show_alt" },
   { name = "show_first_anim", offset = 84, type = "u32" },
@@ -407,6 +415,8 @@ fields = [
   { name = "text_maker", offset = 124, type = "u32", note = "a row's text child: string 1934 + the maker" },
   { name = "text_name", offset = 128, type = "u32", note = "string 1646 + the car's id" },
   { name = "text_third", offset = 132, type = "u32", note = "string 1718 + the car's id" },
+  { name = "unknown_136", offset = 136, type = "u32", note = "8 in PanelE::PanelE (after the texts' 5 to 7)" },
+  { name = "unknown_140", offset = 140, type = "u32", note = "-1 in PanelE::PanelE" },
   { name = "cursor", offset = 144, type = "u32", note = "the more-rows marker child" },
   { name = "arrows", offset = 148, type = "u32", note = "the up arrow's child, the down's after it" },
   { name = "show_alt", offset = 152, type = "u32", note = "show with show_anim_alt (ToTabs and PanelSet::Open set it)" },
@@ -415,10 +425,11 @@ fields = [
 
 # D, the colors (92 bytes; Panel6D / Panel7D).
 [ColorPanel]
-measure = "ColorPanel"
+measures = ["ColorPanel", "PanelDBase", "Panel6D", "Panel7D"]
 size = 92
 origin = "embedded"
 fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x82010B5C (NodeBase's) from PanelDBase, 0x82010974 from Panel6D and Panel7D" },
   { name = "group", offset = 4, type = "ptr", note = "its panel group" },
   { name = "node_set", offset = 8, type = "u32" },
   { name = "node", offset = 12, type = "u32" },
@@ -446,7 +457,7 @@ fields = [
 # (vtable 0x820111C0) and its classes Panel6C (0x82010980), Panel7C
 # (0x82010EE4) and Panel8C (type8-screens.md).
 [CarPanel]
-measures = ["CarPanel", "CarPanelBase", "Panel6C", "Panel7C"]
+measures = ["CarPanel", "CarPanelBase", "Panel6C", "Panel7C", "PanelCBase"]
 size = 320
 origin = "allocated"
 fields = [
@@ -478,7 +489,9 @@ fields = [
   { name = "text_name", offset = 136, type = "u32", note = "string 1646 + the car's id" },
   { name = "text_third", offset = 140, type = "u32", note = "string 1718 + the car's id" },
   { name = "texts", offset = 144, type = "u32", note = "two text children (SetTexts)" },
+  { name = "unknown_148", offset = 148, type = "u32", note = "-1 in PanelCBase::PanelCBase" },
   { name = "cursor", offset = 152, type = "u32" },
+  { name = "unknown_156", offset = 156, type = "u32", note = "-1 in PanelCBase::PanelCBase" },
   { name = "stats_children", offset = 160, type = "bytes", count = 88, note = "22 child indices of the stats node: CarPanel::SetStats uses +160 to +180 and +216 to +228, Panel6C::SetStats +160 to +244" },
   { name = "price_child", offset = 260, type = "u32" },
   { name = "price_text_a", offset = 264, type = "u32", note = "text 527 with the price" },
@@ -543,9 +556,9 @@ fields = [
 [globals]
 two_players = { address = 0x82815EAC, type = "u32", note = "0 in PanelSet, 1 in PanelSetPair" }
 fade_wait = { address = 0x82815EB0, type = "u32", note = "set with each fade, cleared by GroupPair::WaitForFade; a step doesn't move on while set" }
-power_graph = { address = 0x82815EBC, type = "ptr", note = "the power graph screen's record block (its record at +8)" }
+power_graph = { address = 0x82815EBC, type = "ptr", to = "PowerGraphScreenData", note = "the power graph screen's record block (its record at +8)" }
 pair_save_data = { address = 0x826C5B5C, type = "ptr", note = "the players' save data (sub_82105678's), 120,108 bytes each" }
-stand_holders = { address = 0x826D83E0, type = "ptr", note = "the stand's holders: three slots, by the player" }
+stand_holders = { address = 0x826D83E0, type = "ptr", to = "StandHolder", note = "the stand's holders: three slots, by the player" }
 stand_wait = { address = 0x826379B8, type = "u32", note = "the two-player stand's wait word" }
 fade_in_passes = { address = 0x82001BEC, type = "u32", note = "ScreenFades::FadeIn's pass count (5)" }
 fade_out_passes = { address = 0x82001BF0, type = "u32", note = "ScreenFades::FadeOut's (15)" }

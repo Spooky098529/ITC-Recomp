@@ -16,6 +16,7 @@
 #include "guest.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
+#include "schema/cameras.h"
 #include "schema/material_passes.h"
 
 namespace material_passes {
@@ -144,13 +145,13 @@ std::optional<uint32_t> ProjectorMatrices(uint8_t* base, const ProjectorArgs& a,
   matrix_math::Vec4Transform(base, f + 224, f + 112, f + 80);
   {
     FlushToZero ftz;
-    Stvx(base, f + 80, Dot3(Lvx(base, f + 224), Lvx(base, a.object + 464)));
+    Stvx(base, f + 80, Dot3(Lvx(base, f + 224), Lvx(base, schema::CameraPass(base, a.object).forward_x_address())));
   }
   const double facing = Lfs(base, f + 80);
   if (!(facing > zero)) {
     return 0;
   }
-  const uint32_t world = a.object + 16;
+  const uint32_t world = schema::CameraPass(base, a.object).view_address();
   for (uint32_t at : {316u, 332u, 348u, 364u, 252u, 268u, 284u, 300u, 380u, 396u, 412u, 428u,
                       108u}) {
     Stfs(base, f + at, one);

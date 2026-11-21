@@ -229,10 +229,10 @@ uint64_t RaceDialogUpdate(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& 
 // area, 2026-10-30), the three through their overrides. The last's r3.
 uint64_t RaceDialogSetText(uint8_t* base, uint64_t id, const uint64_t varargs[7], uint32_t sp,
                            const Calls& calls);
-// The replay list's header [0x828161F0] (+4 the replay kept for saving,
-// +8 the record's block, +12 the records, +20 their count) and the race's
-// replay [0x826C5B50] (0x13C8F0 bytes).
-constexpr uint32_t kReplayHeader = 0x828161F0;
+// The race's replay [0x826C5B50] (0x13C8F0 bytes, type10-mode.toml's
+// KeptReplay). The replay list's header [0x828161F0] is
+// schema::SaveInterfaceGlobals::save_buffers (save-interface.toml's
+// SaveBuffers).
 constexpr uint32_t kRaceReplay = 0x826C5B50;
 // sub_82219058 RaceDialog::AskSlot (r3 a slot, 0 a new one; r4 a 36-byte
 // replay record; r5 the replay), from a 144-byte frame: the data's +4 = the

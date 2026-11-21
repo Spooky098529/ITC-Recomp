@@ -20,6 +20,7 @@
 # global ([0x826C5C80]'s +0).
 [AudioManagerVtable]
 measure = "[826C5C80].+0"
+measures = ["sub_82119188.r3.+0"]
 size = 132
 origin = "image"
 fields = [
@@ -86,7 +87,8 @@ fields = [
 # made by AudioManager::Create sub_82119B38). "[826C5C80]" is the manager
 # reached through its global ([0x826C5C80]).
 [AudioManager]
-measures = ["AudioManager", "[826C5C80]"]
+measures = ["AudioManager", "[826C5C80]",
+            "sub_82119188.r3", "sub_82118930.r3", "sub_82119018.r3"]
 size = 1624
 origin = "allocated"
 vtable = 0x82008388
@@ -137,24 +139,9 @@ fields = [
   { name = "unknown_4", offset = 4, type = "u32" },
 ]
 
-# A bank index given by address (the manager's slots' r4: one slot of the
-# bank pairs' vector).
-[SoundBankIndex]
-measures = ["AudioManager::FindFreeBankSlot.r4", "AudioManager::GetCueIndex.r4", "AudioManager::IsBankLoaded.r4", "AudioManager::PlayHandle.r4"]
-size = 4
-origin = "embedded"
-fields = [
-  { name = "index", offset = 0, type = "u32" },
-]
+# SoundBankIndex: merged into sound-cues.toml's SoundCuesBankIndex at the integration (the same object).
 
-# A cue index given by address (AudioManager::PlayHandle's r5).
-[SoundCueIndex]
-measure = "AudioManager::PlayHandle.r5"
-size = 4
-origin = "embedded"
-fields = [
-  { name = "index", offset = 0, type = "u32" },
-]
+# SoundCueIndex: merged into sound-cues.toml's SoundCuesCueIndex at the integration (the same object).
 
 # A handle given by address (Sound::HasHandle's r4: compared with a Sound's +12).
 [SoundHandleWord]

@@ -18,6 +18,7 @@
 #include "hooks/command_buffer.h"
 #include "hooks/guest_call.h"
 #include "lifted/sdk.h"
+#include "schema/device_state.h"
 
 ITC_FLAG_BOOL(native_predicated_tiling, true, "ITC",
               "Run the graphics library's predicated tiling "
@@ -148,7 +149,7 @@ pt::WorkerLoopCalls hooks::PredicatedTilingWorkerLoopCalls(lifted::Regs& ctx, ui
     ctx.lr = 0x822B6A14;
     lifted::Enter(ctx, base, lifted::e822A0718);
     ctx.r3.u64 = device;
-    ctx.r4.u64 = device + 13444;
+    ctx.r4.u64 = schema::Device(base, device).front_buffer_header_address();
     ctx.r5.u64 = 0;
     ctx.lr = 0x822B6A24;
     lifted::Enter(ctx, base, game::Device::Swap);

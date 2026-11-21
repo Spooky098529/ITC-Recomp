@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: sub_82379338.r3, sub_82379350.r3
+// embedded; measure: sub_82379338.r3, sub_82379350.r3, SaveInterface, sub_820943B0.r3, sub_820943C8.r3
 struct AppInterface16 : View {
   using View::View;
   static constexpr uint32_t kSize = 116;
@@ -24,6 +24,12 @@ struct AppInterface16 : View {
   uint32_t movie() const { return guest::LoadU32(base, address + 112); }
   void set_movie(uint32_t v) const { guest::StoreU32(base, address + 112, v); }
   uint32_t movie_address() const { return address + 112; }
+  // app + 24: the framework's interface, read by the vtable's +8 users getter sub_820943C8 and +12 save-devices getter sub_820943B0 (save-interface's and system-services' reports)
+  template <typename T = AppFrameworkInterface>
+  T framework_interface() const { return T(base, guest::LoadU32(base, address + 8)); }
+  void set_framework_interface(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
+  void set_framework_interface(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t framework_interface_address() const { return address + 8; }
 };
 
 // embedded; measure: sub_82094368.r3
@@ -38,7 +44,7 @@ struct AppInterface8 : View {
   uint32_t framework_interface_address() const { return address + 16; }
 };
 
-// embedded; measure: App.+16, sub_82094368.r3.+16
+// embedded; measure: App.+16, sub_82094368.r3.+16, sub_820943B0.r3.+8, sub_820943C8.r3.+8
 struct AppFrameworkInterface : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -50,10 +56,10 @@ struct AppFrameworkInterface : View {
   uint32_t vtable_address() const { return address + 0; }
 };
 
-// image; measure: App.+16.+0, App.+20.+0, sub_82094368.r3.+16.+0
+// image; measure: App.+16.+0, App.+20.+0, sub_82094368.r3.+16.+0, sub_820943B0.r3.+8.+0, sub_820943C8.r3.+8.+0
 struct AppFrameworkInterfaceVtable : View {
   using View::View;
-  static constexpr uint32_t kSize = 20;
+  static constexpr uint32_t kSize = 44;
   // sub_820908E0: the frame driver (framework + 76)
   uint32_t slot_2_frame_driver() const { return guest::LoadU32(base, address + 8); }
   void set_slot_2_frame_driver(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
@@ -66,6 +72,14 @@ struct AppFrameworkInterfaceVtable : View {
   uint32_t slot_4_worker_pool() const { return guest::LoadU32(base, address + 16); }
   void set_slot_4_worker_pool(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
   uint32_t slot_4_worker_pool_address() const { return address + 16; }
+  // sub_82493700: the users (sub_820943C8 calls it)
+  uint32_t slot_9_users() const { return guest::LoadU32(base, address + 36); }
+  void set_slot_9_users(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
+  uint32_t slot_9_users_address() const { return address + 36; }
+  // sub_82090788: the save devices (sub_820943B0 calls it)
+  uint32_t slot_10_save_devices() const { return guest::LoadU32(base, address + 40); }
+  void set_slot_10_save_devices(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
+  uint32_t slot_10_save_devices_address() const { return address + 40; }
 };
 
 // embedded; measure: App::App.r4
@@ -219,7 +233,7 @@ struct VertexElement : View {
   uint32_t next_stream_address() const { return address + 12; }
 };
 
-// allocated; measure: new<?>@CreateVertexDeclaration
+// allocated; measure: new<?>@CreateVertexDeclaration, Device.+11552, Device::PatchVertexShader.r5
 struct VertexDeclaration : View {
   using View::View;
   static constexpr uint32_t kSize = 52;
@@ -247,6 +261,14 @@ struct VertexDeclaration : View {
   uint32_t unknown_48() const { return guest::LoadU32(base, address + 48); }
   void set_unknown_48(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
   uint32_t unknown_48_address() const { return address + 48; }
+  // the 12-byte elements from +52: element 0's +9 (Device::PatchVertexShader; probably the usage)
+  uint8_t element0_byte_9() const { return guest::LoadU8(base, address + 61); }
+  void set_element0_byte_9(uint8_t v) const { guest::StoreU8(base, address + 61, v); }
+  uint32_t element0_byte_9_address() const { return address + 61; }
+  // element 0's +10 (Device::PatchVertexShader; probably the usage index)
+  uint8_t element0_byte_10() const { return guest::LoadU8(base, address + 62); }
+  void set_element0_byte_10(uint8_t v) const { guest::StoreU8(base, address + 62, v); }
+  uint32_t element0_byte_10_address() const { return address + 62; }
 };
 
 // embedded; measure: GlobalMemoryStatus.r3

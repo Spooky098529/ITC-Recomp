@@ -92,23 +92,23 @@ uint64_t Transition3(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
   if (Machine(base, machine).transitions_set_up() == 0) {
     // The nodes' floats (f31 the zero, f30 0x82002228 then 0x82000C34, f29
     // 0x8200A134), each node's stores in the original's order.
-    const uint32_t zero = G::float_zero(base);
-    Store(base, ui_movies::FindNode(base, m, 20, 0) + 16, zero);
+    const float zero = std::bit_cast<float>(G::float_zero(base));
+    Node(base, ui_movies::FindNode(base, m, 20, 0)).set_y(zero);
     for (const uint32_t child : {2u, 3u, 4u}) {
-      const uint32_t node = ui_movies::FindNode(base, m, 11, child);
-      Store(base, node + 12, G::float_2228(base));
-      Store(base, node + 16, G::float_a134(base));
+      const Node node(base, ui_movies::FindNode(base, m, 11, child));
+      node.set_x(std::bit_cast<float>(G::float_2228(base)));
+      node.set_y(std::bit_cast<float>(G::float_a134(base)));
     }
-    uint32_t node = ui_movies::FindNode(base, m, 11, 0);
-    Store(base, node + 12, G::float_c34(base));
-    Store(base, node + 16, zero);
-    node = ui_movies::FindNode(base, m, 11, 1);
-    Store(base, node + 12, G::float_c34(base));
-    Store(base, node + 80, 1);
-    Store(base, node + 16, zero);
-    node = ui_movies::FindNode(base, m, 10, 0);
-    Store(base, node + 12, zero);
-    Store(base, node + 16, zero);
+    Node node(base, ui_movies::FindNode(base, m, 11, 0));
+    node.set_x(std::bit_cast<float>(G::float_c34(base)));
+    node.set_y(zero);
+    node = Node(base, ui_movies::FindNode(base, m, 11, 1));
+    node.set_x(std::bit_cast<float>(G::float_c34(base)));
+    node.set_visible(1);
+    node.set_y(zero);
+    node = Node(base, ui_movies::FindNode(base, m, 10, 0));
+    node.set_x(zero);
+    node.set_y(zero);
     // The badge's animation (11, 5, 4, 3 or 2) by the progress bits.
     const uint32_t bits = Machine(base, machine).progress_bits();
     uint64_t index;
@@ -142,7 +142,7 @@ uint64_t Transition3(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
   uint64_t r3 = 0;
   auto mark = [&](uint32_t node, uint32_t child) {
     r3 = ui_movies::Child(base, node, child);
-    Store(base, uint32_t(r3) + 80, 1);
+    Node(base, uint32_t(r3)).set_visible(1);
   };
   for (uint32_t k = 0; k < 9; k++) {
     const uint32_t node = ui_movies::FindNode(base, m, 10, k + 1);
@@ -196,7 +196,7 @@ uint64_t AskConfirm(uint8_t* base, uint32_t machine, uint32_t mode, uint32_t sp,
   calls.CallArgs(kSetText, frame, 0x8218AD5C, {m, 1, 4, 1, 0, 0, 0, 0});
   // The dialog's first cursor: yes when player 0's save +0x1F870 is set.
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  Store(base, m + 40960, Load(base, save + 0x1F870) != 0 ? 0 : 1);
+  Store(base, m + 40960, Save(base, save).profile_option() != 0 ? 0 : 1);
   const Pages pages = G::pages(base);
   const uint32_t page = pages.page();
   if (page != 8) {
@@ -282,10 +282,10 @@ uint64_t AnimateVariantPage(uint8_t* base, uint32_t machine, uint32_t sp, const 
   // The mapper's slot on `action`, unless the entry's +4 is 1; whether its
   // answer's low byte is set.
   auto ask = [&](uint32_t slot, uint64_t action, uint32_t lr) {
-    if (int32_t(Load(base, entry + 4)) == 1) {
+    if (int32_t(Entry(base, entry).unread()) == 1) {
       return false;
     }
-    const uint32_t mapper = Load(base, entry + 0);
+    const uint32_t mapper = Entry(base, entry).mapper<schema::View>().address;
     r3 = calls.Call(Load(base, Load(base, mapper) + slot), frame, lr, mapper, action);
     return (r3 & 0xFF) != 0;
   };

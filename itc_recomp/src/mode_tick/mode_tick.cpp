@@ -9,7 +9,10 @@
 #include "command_list/command_list.h"
 #include "helpers/compare_string.h"
 #include "hooks/last_error.h"
+#include "schema/command_list.h"
 #include "schema/mode_tick.h"
+#include "schema/race_states.h"
+#include "schema/scene_target.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <climits>
@@ -178,11 +181,12 @@ void WriteSlot(uint8_t* base, uint32_t slot, std::initializer_list<SlotWrite> wr
 // original's messages: no chunk open (on it or another list), and room
 // (the count not wrapping).
 bool ChunkFits(uint8_t* base, uint32_t list, uint32_t slots) {
-  if (guest::LoadU8(base, list + 52) != 0 || guest::LoadU32(base, command_list::kOpenChunks) != 0) {
+  const schema::CommandList commands(base, list);
+  if (commands.chunk_open() != 0 || schema::CommandListGlobals::open_chunks(base) != 0) {
     return false;
   }
-  const uint32_t used = guest::LoadU32(base, list + 12);
-  return used + slots >= used && used + slots < guest::LoadU32(base, list + 8);
+  const uint32_t used = commands.used();
+  return used + slots >= used && used + slots < commands.capacity();
 }
 
 }  // namespace
@@ -380,11 +384,6 @@ void SetAllChecks(uint8_t* base) {
   }
 }
 
-// The race data's (`[0x826C5B2C]`) stage list and the word +0xA3AF0 (the
-// human cars' arrangement: 6 is two).
-constexpr uint32_t kRaceStages = 0x59620;
-constexpr uint32_t kRaceHumans = 0xA3AF0;
-
 }  // namespace
 
 bool ModesSetChecks(uint8_t* base, uint32_t type, uint32_t frame) {
@@ -393,11 +392,12 @@ bool ModesSetChecks(uint8_t* base, uint32_t type, uint32_t frame) {
     case 1: {
       const uint32_t stage = frame + 80;
       if (!vehicle_accessors::StagesCopy(base, stage,
-                                         G::race_data(base) + kRaceStages,
+                                         G::race_data(base).stages_address(),
                                          0xFFFFFFFF)) {
         return false;
       }
-      const uint32_t humans = guest::LoadU32(base, G::race_data(base) + kRaceHumans);
+      // The race data's kind (6: two human cars).
+      const uint32_t humans = G::race_data(base).kind();
       if (humans == 0) {
         SetAllChecks(base);
       } else if (humans == 6) {
@@ -454,7 +454,7 @@ void ModesSetSceneTargetMode(uint8_t* base, uint32_t type) {
     case 12: mode = 4; break;
     default: break;  // 4, 9, 10, 11 and any other
   }
-  guest::StoreU32(base, G::scene_target(base) + 28, mode);
+  G::scene_target(base).set_mode(mode);
 }
 
 bool PresenceSetForMode(uint8_t* base, uint32_t pcr, uint32_t type) {

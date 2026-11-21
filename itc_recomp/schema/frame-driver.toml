@@ -132,7 +132,8 @@ fields = [
 # fault: the run loop and its vtable joined (+0 is the run loop's vtable
 # word, +4 and +8 are the vtable's slots).
 [FrameDriverRunLoopRef]
-measures = ["FrameDriver::Init.r4.+0", "Scene::Scene.r4.+0"]
+measures = ["FrameDriver::Init.r4.+0", "Scene::Scene.r4.+0",
+            "SaveDevices::SaveDevices.r4.+0", "sub_820998B8.r4.+0"]
 size = 12
 origin = "embedded"
 fields = [
@@ -144,6 +145,7 @@ fields = [
 # The run loop as the shutdown listener Scene::OnEvent5 gets it (r4).
 [FrameDriverRunLoop]
 measure = "Scene::OnEvent5.r4"
+measures = ["SaveDevices::OnEvent.r4"]
 size = 4
 origin = "embedded"
 fields = [
@@ -152,6 +154,7 @@ fields = [
 
 [FrameDriverRunLoopVtable]
 measure = "Scene::OnEvent5.r4.+0"
+measures = ["SaveDevices::OnEvent.r4.+0"]
 size = 20
 origin = "image"
 fields = [
@@ -162,6 +165,7 @@ fields = [
 # The event's word, by address (the run loop's listeners' r5).
 [FrameDriverEventWord]
 measure = "Scene::OnEvent5.r5"
+measures = ["SaveDevices::OnEvent.r5"]
 size = 4
 origin = "embedded"
 fields = [

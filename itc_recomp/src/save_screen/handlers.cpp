@@ -22,8 +22,9 @@ uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   const uint32_t list = uint32_t(f.Call(kVirtualAlloc, 0x821A2678, 0, 72, 4096, 4));
   G::set_list(base, list);
   if (list != 0) {
-    Store(base, list + 68, 0);
-    Store(base, list + 60, 0);
+    const schema::MenuList view(base, list);
+    view.set_enabled(0);
+    view.set_player(0);
   }
   const schema::SaveScreenData data(base, uint32_t(f.Call(kVirtualAlloc, 0x821A26A4, 0, 68, 4096, 4)));
   G::set_data(base, data);

@@ -11,6 +11,10 @@
 #include "guest.h"
 #include "race_setup/race_setup.h"
 #include "schema/car_list.h"
+#include "schema/career.h"
+#include "schema/race_setup.h"
+#include "schema/stand_models.h"
+#include "schema/tuning_screen.h"
 #include "type67_modes/type67_modes.h"
 #include "type67_screens/type67_screens.h"
 
@@ -25,6 +29,7 @@ using guest::StoreU32;
 using G = schema::CarListGlobals;
 using Base = schema::PanelSetBase;
 using Entry = schema::CarListEntry;
+using Stage = schema::GarageStage;  // stand-models.toml
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   StoreU32(base, sp - bytes, sp);
@@ -34,7 +39,7 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 // The stand's holder in slot `slot` ([0x826D83E0] read each time, as the
 // originals do).
 uint32_t Holder(uint8_t* base, uint32_t slot) {
-  return LoadU32(base, G::stand_holders(base).address + 4 * slot);
+  return LoadU32(base, G::stand_holders(base).stage_block_0_address() + 4 * slot);
 }
 
 // GarageStage::SetDrawWord's plain C++ (a leaf of its own: no guest calls).
@@ -76,17 +81,17 @@ uint64_t DrawAll(uint8_t* base, uint32_t sp, const Calls& calls) {
   for (uint32_t i = 0; i < 3; i++) {
     const uint32_t holder = Holder(base, i);
     const uint32_t stage = LoadU32(base, holder);
-    if (LoadU32(base, stage + 16) == 0) {
+    if (Stage(base, stage).model_claimed() == 0) {
       StoreU32(base, frame + 80 + 4 * i, 0);
     } else {
-      StoreU32(base, frame + 80 + 4 * i, LoadU32(base, stage + 6056));
+      StoreU32(base, frame + 80 + 4 * i, Stage(base, stage).draw_word());
       SetDrawWord(base, holder, 0, frame);
     }
   }
   // Each stage with a kept word drawn alone.
   for (uint32_t i = 0; i < 3; i++) {
     const uint32_t holder = Holder(base, i);
-    if (LoadU32(base, LoadU32(base, holder) + 16) == 0 ||
+    if (Stage(base, LoadU32(base, holder)).model_claimed() == 0 ||
         LoadU32(base, frame + 80 + 4 * i) == 0) {
       continue;
     }
@@ -100,7 +105,7 @@ uint64_t DrawAll(uint8_t* base, uint32_t sp, const Calls& calls) {
   for (uint32_t i = 0; i < 3; i++) {
     const uint32_t holder = Holder(base, i);
     r3 = holder;
-    if (LoadU32(base, LoadU32(base, holder) + 16) != 0) {
+    if (Stage(base, LoadU32(base, holder)).model_claimed() != 0) {
       r3 = SetDrawWord(base, holder, LoadU32(base, frame + 80 + 4 * i), frame);
     }
   }
@@ -148,14 +153,15 @@ uint64_t UpdateStand(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& cal
             // C++), copied in.
             const uint64_t save = SaveData(base, b, frame);
             const uint64_t from = garage_screen::CopyGarageCar(
-                base, frame + 7888, uint32_t(save + 6120), uint32_t(row), frame, calls);
+                base, frame + 7888, schema::CareerSave(base, uint32_t(save)).garage_address(),
+                uint32_t(row), frame, calls);
             CopyCar(base, car, uint32_t(from), frame, 0x8224C3B0, calls);
             plates = 1;
           } else {
             race_setup::SetModel(base, car, id);
           }
           type67_modes::GarageStageSetPlates(base, holder, plates);
-          StoreU32(base, frame + 7872, LoadU32(base, frame + 7872) | 1);
+          schema::Car(base, car).set_flags(schema::Car(base, car).flags() | 1);
           Refresh(base, car, frame, 0x8224C3E4, calls);
           r3 = calls.Call(kSetCar, frame, 0x8224C404, holder, car,
                           Base(base, b).tab() == 0 ? pick : 0xFFFFFFFFFFFFFFFFull);
@@ -197,7 +203,7 @@ uint64_t UpdateStand(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& cal
               const int32_t next = int16_t(guest::LoadU16(base, at));
               return uint64_t(uint32_t(next) << 2) + garage;
             };
-            uint64_t node = link(uint32_t(garage) + 204);
+            uint64_t node = link(schema::CareerGarageList(base, uint32_t(garage)).head_address());
             for (uint32_t n = uint32_t(row); n != 0; n--) {
               node = link(uint32_t(node));
             }
@@ -207,7 +213,7 @@ uint64_t UpdateStand(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& cal
             plates = 1;
           }
           type67_modes::GarageStageSetPlates(base, holder, plates);
-          StoreU32(base, frame + 3968, LoadU32(base, frame + 3968) | flag);
+          schema::Car(base, car).set_flags(schema::Car(base, car).flags() | flag);
           Refresh(base, car, frame, 0x8224C19C, calls);
           calls.Call(kSetCar, frame, 0x8224C1BC, holder, car,
                      Base(base, b).tab() == 0 ? pick : 0xFFFFFFFFFFFFFFFFull);

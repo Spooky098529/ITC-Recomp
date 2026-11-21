@@ -25,8 +25,7 @@
 
 namespace c_runtime {
 
-constexpr uint32_t kExitLock = 8;            // the lock number
-constexpr uint32_t kLockTable = 0x8266BD40;  // the C runtime's locks (c-runtime-core's)
+constexpr uint32_t kExitLock = 8;  // the lock number in c-runtime-core's lock_table
 
 // The host mutex in place of lock 8's critical section.
 std::recursive_mutex& ExitMutex();

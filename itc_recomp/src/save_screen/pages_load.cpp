@@ -18,10 +18,10 @@ uint64_t StoreSettings(uint8_t* base, uint32_t sp, const Calls& calls) {
     if (G::profile_read(base) == 997) {
       return 0;
     }
-    const uint32_t save = uint32_t(f.Call(kSaveDataOf, 0x821A2500, 0)) + 0x1F85C;
-    const uint32_t profile = Load(base, G::profile_reader(base) + 4);
-    Store(base, save + 20, Load(base, profile + 632) == 0 ? 1 : 0);
-    const uint32_t control = Load(base, profile + 672);
+    const schema::SaveData save(base, uint32_t(f.Call(kSaveDataOf, 0x821A2500, 0)));
+    const auto profile = G::profile_reader(base).settings();
+    save.set_profile_option(profile.setting15_value() == 0 ? 1 : 0);
+    const uint32_t control = profile.setting16_value();
     uint32_t word = 0;
     if (control == 0) {
       word = 2;
@@ -32,14 +32,15 @@ uint64_t StoreSettings(uint8_t* base, uint32_t sp, const Calls& calls) {
     } else {
       word = Load(base, f.frame + 80);  // the caller's leftover
     }
-    Store(base, save + 24, word);
-    const uint32_t block = save + 44, copy = f.frame + 96;
-    const bool first = int32_t(Load(base, profile + 712)) == 0;
+    save.set_camera_view(word);
+    // The options' +44 to +103 (no field yet: SaveData's 129160).
+    const uint32_t block = save.options_address() + 44, copy = f.frame + 96;
+    const bool first = int32_t(profile.setting17_value()) == 0;
     f.Call(kMemcpy, 0x821A2590, copy, block, 60);
     Store(base, f.frame + 104, first ? 13 : 9);
     Store(base, f.frame + 108, first ? 9 : 13);
     f.Call(kMemcpy, 0x821A25A8, block, copy, 60);
-    const bool second = int32_t(Load(base, profile + 752)) == 0;
+    const bool second = int32_t(profile.setting18_value()) == 0;
     f.Call(kMemcpy, 0x821A25D8, copy, block, 60);
     Store(base, f.frame + 100, second ? 14 : 7);
     Store(base, f.frame + 132, second ? 7 : 14);
@@ -143,7 +144,7 @@ uint64_t Page7(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     } else if (state == 3) {
       if (uint32_t(f.Call(kSlotPending, 0x821A36A4, 0)) == 0) {
         const uint64_t save = f.Call(kSaveDataOf, 0x821A36B0, f.r3);
-        f.Call(kMemcpy, 0x821A36C8, save, Load(base, G::save_buffers(base) + 0), kGameDataBytes);
+        f.Call(kMemcpy, 0x821A36C8, save, G::save_buffers(base).game_data(), kGameDataBytes);
         Go(base, 6, 2, 3);
         Message(base, 6, 1);
       }

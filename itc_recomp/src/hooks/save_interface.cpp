@@ -20,6 +20,7 @@
 #include "save_interface/save_interface.h"
 #include "save_interface/save_layer.h"
 #include "save_interface/slot_handlers.h"
+#include "schema/files_and_saves.h"
 #include "schema/save_interface.h"
 #include "lifted/sdk.h"
 
@@ -469,7 +470,8 @@ ITC_REGS_STEP(SaveSlotAllocBuffersSteps) {
   Prologue(base, ctx.r1.u32, uint32_t(ctx.lr), 112, 29, regs.data());
   const uint32_t slot = ctx.r3.u32;
   si::SlotAllocBuffers(base, slot, ctx.r4.u32);
-  ctx.r3.u64 = guest::LoadU32(base, slot + 84);  // the second operator new[]'s answer
+  // The second operator new[]'s answer.
+  ctx.r3.u64 = schema::SaveSlot(base, slot).open_failed();
 }
 
 ITC_REGS_STEP(SaveDevicesDeleteSteps) {

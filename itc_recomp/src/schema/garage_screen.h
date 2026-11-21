@@ -72,7 +72,9 @@ struct GarageScreenData : View {
   void set_weekday(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
   uint32_t weekday_address() const { return address + 32; }
   // player 0's save data (SaveData::Of)
-  uint32_t save() const { return guest::LoadU32(base, address + 36); }
+  template <typename T = SaveData>
+  T save() const { return T(base, guest::LoadU32(base, address + 36)); }
+  void set_save(const View& v) const { guest::StoreU32(base, address + 36, v.address); }
   void set_save(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
   uint32_t save_address() const { return address + 36; }
   // the selected row (+ scroll: the car's index in the garage)
@@ -308,11 +310,15 @@ struct GarageScreenGlobals {
   static void set_pages(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8420u, v); }
   static constexpr uint32_t pages_address() { return 0x826D8420u; }
   // a MenuList (72 bytes): the car list (page 0), the actions (page 1) or the view's options (page 3)
-  static View list(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D8424u)); }
+  template <typename T = MenuList>
+  static T list(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D8424u)); }
+  static void set_list(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D8424u, v.address); }
   static void set_list(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8424u, v); }
   static constexpr uint32_t list_address() { return 0x826D8424u; }
   // a MenuList (72 bytes): the car list beside the actions; Destroy doesn't free it
-  static View list2(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D8428u)); }
+  template <typename T = MenuList>
+  static T list2(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D8428u)); }
+  static void set_list2(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D8428u, v.address); }
   static void set_list2(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8428u, v); }
   static constexpr uint32_t list2_address() { return 0x826D8428u; }
   template <typename T = GarageScreenData>
@@ -321,15 +327,21 @@ struct GarageScreenGlobals {
   static void set_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D842Cu, v); }
   static constexpr uint32_t data_address() { return 0x826D842Cu; }
   // the stand scene's holder (StandScene::Create): +0 the garage stage's holder, whose +0 is the stage
-  static View stand_holder(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D83E0u)); }
+  template <typename T = StandHolder>
+  static T stand_holder(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D83E0u)); }
+  static void set_stand_holder(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D83E0u, v.address); }
   static void set_stand_holder(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D83E0u, v); }
   static constexpr uint32_t stand_holder_address() { return 0x826D83E0u; }
   // the license plate editor's data (76 bytes, type2-screens.md)
-  static View plate_editor(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D8438u)); }
+  template <typename T = PlateEditorData>
+  static T plate_editor(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D8438u)); }
+  static void set_plate_editor(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D8438u, v.address); }
   static void set_plate_editor(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8438u, v); }
   static constexpr uint32_t plate_editor_address() { return 0x826D8438u; }
   // the power graph screen's data (1,968 bytes, type2-screens.md)
-  static View spec_sheet(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D846Cu)); }
+  template <typename T = SpecSheetData>
+  static T spec_sheet(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D846Cu)); }
+  static void set_spec_sheet(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D846Cu, v.address); }
   static void set_spec_sheet(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D846Cu, v); }
   static constexpr uint32_t spec_sheet_address() { return 0x826D846Cu; }
   // Start's ScreenFades::FadeIn r3

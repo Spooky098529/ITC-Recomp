@@ -8,6 +8,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "schema/car_draw.h"
+#include "schema/race_states.h"
 
 #include <simde/x86/sse2.h>
 
@@ -21,7 +22,6 @@ namespace {
 
 using G = schema::CarDrawGlobals;
 
-constexpr uint32_t kRaceData = 0x826C5B2C;
 
 double Lfs(uint8_t* base, uint32_t address) {
   return double(guest::LoadFloat(base, address));
@@ -90,7 +90,7 @@ double LightKitBlinkLevel(uint8_t* base, uint64_t counter, double a, double b, d
   StoreU64(base, stack - 8, remainder);
   double t = Single(double(int64_t(LoadU64(base, stack - 8))));
   t = Single(t / length);
-  if (race == 1 && int32_t(guest::LoadU32(base, guest::LoadU32(base, kRaceData) + 32)) == 2) {
+  if (race == 1 && int32_t(schema::RaceStatesGlobals::race_data(base).mode()) == 2) {
     full = Lfs(base, 0x82002A10);
   }
   if (a > t) {

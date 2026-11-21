@@ -12,7 +12,18 @@
 #include "memory/heap.h"
 #include "race_screens/race_screens.h"
 #include "schema/car_physics.h"
+#include "schema/alt_hud.h"
+#include "schema/menu_sounds.h"
+#include "schema/race_event.h"
+#include "schema/race_hud_machine.h"
 #include "schema/race_hud_object.h"
+#include "schema/race_screens.h"
+#include "schema/race_screens_unseen.h"
+#include "schema/race_states.h"
+#include "schema/strings_and_font.h"
+#include "schema/ui_movies.h"
+#include "schema/ui_movies_game.h"
+#include "schema/vehicle.h"
 #include "menu_sounds/menu_sounds.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -116,8 +127,8 @@ uint64_t UpdateWarning(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& ca
   const uint32_t frame = sp - 96;
   guest::StoreU32(base, frame, sp);
   const Hud h(base, hud);
-  const uint32_t car = h.vehicle().address;
-  const uint32_t wrong_way = guest::LoadU32(base, car + 6168);
+  const schema::Vehicle car = h.vehicle();
+  const uint32_t wrong_way = schema::VehicleStatus(base, car.status_address()).wrong_way();
   if (wrong_way == 0) {
     if (h.warning_shown() == 0) {
       return hud;
@@ -172,13 +183,13 @@ uint64_t ShowItem(uint8_t* base, uint32_t hud, int32_t id, uint32_t sp, const Ca
   constexpr uint32_t kTagPic = 0x50494300;  // "PIC\0"
   constexpr uint32_t kTagTxt = 0x54585400;  // "TXT\0"
   const uint32_t shown = id == -1 ? 1 : 0;
-  uint32_t chunk = guest::LoadU32(base, RacersMovie(base, hud) + ui_movies::kMovieLive);
-  while (guest::LoadU32(base, chunk) != ui_movies::kTagTrm) {
-    const uint32_t tag = guest::LoadU32(base, chunk);
+  uint32_t chunk = schema::UiMovie(base, RacersMovie(base, hud)).live_scene();
+  while (schema::UiMovieChunk(base, chunk).tag() != ui_movies::kTagTrm) {
+    const uint32_t tag = schema::UiMovieChunk(base, chunk).tag();
     if (tag == kTagPrm || tag == kTagPic || tag == kTagTxt) {
       guest::StoreU32(base, chunk + 80, shown);
     }
-    chunk += guest::LoadU32(base, chunk + 4);
+    chunk += schema::UiMovieChunk(base, chunk).next();
   }
   if (id == -1) {
     return hud;
@@ -194,7 +205,7 @@ uint64_t ShowItem(uint8_t* base, uint32_t hud, int32_t id, uint32_t sp, const Ca
   calls.Call(kSetNodeText, frame, 0x82213724, RacersMovie(base, hud), name,
              uint64_t(int64_t(id) + 4650));
   const uint32_t item = data_tables::Item(base, uint32_t(id));
-  const int32_t kind = int8_t(guest::LoadU8(base, item + 34));
+  const int32_t kind = int8_t(schema::OpponentItem(base, item).category());
   guest::StoreU32(base, picture + 108, uint32_t(kind < 48 ? kind : id - 262));
   return item;
 }
@@ -202,7 +213,7 @@ uint64_t ShowItem(uint8_t* base, uint32_t hud, int32_t id, uint32_t sp, const Ca
 uint64_t UpdateItem(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82214238 RaceHud::UpdateItem");
   const Hud h(base, hud);
-  const uint32_t item = guest::LoadU32(base, G::race_progress(base).address + 7240);
+  const uint32_t item = G::race_progress(base).item_shown();
   if (h.item_shown() == item) {
     return hud;
   }
@@ -215,7 +226,7 @@ namespace {
 // The HUD's item picture: DataTables::Item(id)'s byte +34 (signed), or for
 // 48 and up id - 262 (the originals' word from the zero-extended id).
 uint32_t ItemPicture(uint8_t* base, uint32_t id) {
-  const int32_t kind = int8_t(guest::LoadU8(base, data_tables::Item(base, id) + 34));
+  const int32_t kind = int8_t(schema::OpponentItem(base, data_tables::Item(base, id)).category());
   return kind < 48 ? uint32_t(kind) : id - 262;
 }
 
@@ -425,20 +436,22 @@ uint64_t Make1004(uint8_t* base, uint32_t owner, uint32_t sp, const Calls& calls
   if (object != 0) {
     calls.Call(kMemset, frame, 0x82216A94, object, 0, 264);
   }
-  guest::StoreU32(base, owner + 0, object);
+  const schema::AltHudHolder holder(base, owner);
+  holder.set_object(object);
   const uint32_t list = uint32_t(calls.Call(kNew, frame, 0x82216AA8, 72));
   if (list != 0) {
-    guest::StoreU32(base, list + 68, 0);
-    guest::StoreU32(base, list + 60, 0);
+    const schema::MenuList menu(base, list);
+    menu.set_enabled(0u);
+    menu.set_player(0);
   }
-  guest::StoreU32(base, owner + 4, list);
+  holder.set_menu_list(list);
   guest::StoreU32(base, frame + 84, 159);
   guest::StoreU32(base, frame + 92, 158);
   const uint64_t r3 =
       calls.CallArgs(kMenuListInit, frame, 0x82216AF4, {list, 1, 1, 0, 154, 153, 155, 156});
-  object = guest::LoadU32(base, owner + 0);
-  guest::StoreU32(base, object + 0, 0);
-  guest::StoreU32(base, object + 256, 0);
+  const schema::AltHud alt = holder.object();
+  alt.set_shown(0);
+  alt.set_big_view(0);
   return r3;
 }
 
@@ -455,14 +468,21 @@ uint64_t ScreensInit(uint8_t* base, uint32_t holder, uint32_t kind, uint32_t sp,
       calls.Call(kMoviesOpen, frame, 0x82211E04, i, guest::LoadU32(base, 0x8200D158 + 4 * i));
     }
   }
-  static constexpr uint32_t kGlobals[7] = {0x826D84D0, 0x826D84E0, 0x826D8510, 0x826D8500,
-                                           0x82814E18, 0x82814E1C, 0x82814E10};
-  for (uint32_t i = 0; i < 7; i++) {
-    guest::StoreU32(base, holder + 1012 + 4 * i, guest::LoadU32(base, kGlobals[i]));
-  }
+  // The seven screens' globals copied to +1012 to +1036, in order.
+  using Screens = schema::RaceScreensGlobals;
+  using Unseen = schema::RaceScreensUnseenGlobals;
+  const schema::RaceScreens screens(base, holder);
+  screens.set_pause_menu(Screens::pause_screen(base).address);
+  screens.set_kind4_pause_menu(Unseen::pause4_screen(base).address);
+  screens.set_after_race_menu(Screens::after_screen(base).address);
+  screens.set_career_results(Screens::career_results(base).address);
+  screens.set_race_results(Unseen::race_results(base).address);
+  screens.set_split_results_screen(Unseen::split_results(base).address);
+  screens.set_kind6_menu(Unseen::kind6_menu(base).address);
+  // The race HUD at the holder's +16 (no field of RaceScreens yet).
   Init(base, holder + 16, frame);
-  const uint64_t r3 = Make1004(base, holder + 1004, frame, calls);
-  guest::StoreU32(base, holder + 8, 0);
+  const uint64_t r3 = Make1004(base, screens.alt_hud_address(), frame, calls);
+  screens.set_flags(0);
   return r3;
 }
 
@@ -471,8 +491,9 @@ uint64_t ScreensDestruct(uint8_t* base, uint32_t holder, uint32_t sp, const Call
   const uint32_t frame = sp - 96;
   guest::StoreU32(base, frame, sp);
   TearDown(base, holder + 16, frame, calls);
-  if (!alt_hud::Destroy(base, holder + 1004, frame, calls)) {
-    calls.Call(kAltHudDestroy, frame, 0x82211BBC, holder + 1004);
+  const uint32_t alt = schema::RaceScreens(base, holder).alt_hud_address();
+  if (!alt_hud::Destroy(base, alt, frame, calls)) {
+    calls.Call(kAltHudDestroy, frame, 0x82211BBC, alt);
   }
   // The jump reads no argument; r3 as Strings::Release leaves it (DeleteAll
   // hands it back when the movie table is empty).
@@ -541,12 +562,14 @@ uint64_t ScreensCreate(uint8_t* base, uint32_t kind, uint32_t sp, const Calls& c
 
 uint64_t DrawPauseMenu(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82211D08 RaceScreens::DrawPauseMenu");
-  return race_screens::PauseMenuDraw(base, guest::LoadU32(base, holder + 1012), sp, calls);
+  const uint32_t menu = schema::RaceScreens(base, holder).pause_menu().address;
+  return race_screens::PauseMenuDraw(base, menu, sp, calls);
 }
 
 uint64_t DrawAfterRaceMenu(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82211D10 RaceScreens::DrawAfterRaceMenu");
-  return race_screens::AfterRaceMenuDraw(base, guest::LoadU32(base, holder + 1020), sp, calls);
+  const uint32_t menu = schema::RaceScreens(base, holder).after_race_menu().address;
+  return race_screens::AfterRaceMenuDraw(base, menu, sp, calls);
 }
 
 uint64_t RunCountdown(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
@@ -587,9 +610,10 @@ uint64_t RunWarning(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls
   // bank 0, cue 10 at the frame's +84 and +80) says it's playing.
   guest::StoreU32(base, frame + 80, 10);
   guest::StoreU32(base, frame + 84, 0);
-  const uint32_t manager = guest::LoadU32(base, menu_sounds::kSoundManager);
-  const uint32_t playing = guest::LoadU32(base, guest::LoadU32(base, manager) + 56);
-  const uint64_t r3 = calls.Call(playing, frame, 0x82212A98, manager, frame + 84, frame + 80);
+  const schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
+  const uint32_t playing = manager.vtable().is_cue_playing();
+  const uint64_t r3 =
+      calls.Call(playing, frame, 0x82212A98, manager.address, frame + 84, frame + 80);
   if ((r3 & 0xFF) == 0) {
     menu_sounds::PlayMenuSound(base, 10, frame, sounds);
   }
@@ -657,9 +681,9 @@ uint64_t UpdateRacerBar(uint8_t* base, uint32_t hud, uint64_t index, uint64_t ra
         // playing.
         guest::StoreU32(base, frame + 84, 0);
         guest::StoreU32(base, frame + 80, 7);
-        const uint32_t manager = guest::LoadU32(base, menu_sounds::kSoundManager);
-        const uint32_t playing = guest::LoadU32(base, guest::LoadU32(base, manager) + 56);
-        r3 = calls.Call(playing, frame, 0x82214948, manager, frame + 84, frame + 80);
+        const schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
+        const uint32_t playing = manager.vtable().is_cue_playing();
+        r3 = calls.Call(playing, frame, 0x82214948, manager.address, frame + 84, frame + 80);
         if ((r3 & 0xFF) == 0) {
           r3 = menu_sounds::PlayMenuSound(base, 7, frame, sounds);
         }

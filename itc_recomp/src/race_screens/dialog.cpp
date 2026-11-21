@@ -2,12 +2,15 @@
 // (docs/functions/race-screens.md): see race_screens.h.
 
 #include "race_screens/race_screens.h"
+#include "race_screens/ui_node.h"
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
 #include "schema/menu_helpers.h"
 #include "schema/race_screens.h"
+#include "schema/save_interface.h"
+#include "schema/type10_mode.h"
 #include "replay_snapshots/replay_snapshots.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -19,8 +22,6 @@ namespace race_screens {
 namespace {
 
 constexpr uint64_t kNone = ~uint64_t(0);
-
-uint32_t Get(uint8_t* base, uint32_t global) { return guest::LoadU32(base, global); }
 
 using G = schema::RaceScreensGlobals;
 
@@ -333,9 +334,9 @@ std::optional<uint64_t> RaceDialogShowMessage(uint8_t* base, uint32_t step, uint
     // Modes 0 and 2: the type-0 node 0's +80 and node 2's child 0's +80.
     auto marks = [&](uint32_t lr, uint32_t node_word, uint32_t child_word) {
       PlayNamed(calls, frame, lr, movie, 13);
-      guest::StoreU32(base, ui_movies::FindNode(base, movie, 0, 0) + 80, node_word);
+      UiNode(base, ui_movies::FindNode(base, movie, 0, 0)).set_visible(node_word);
       const uint32_t node = ui_movies::FindNode(base, movie, 0, 2);
-      guest::StoreU32(base, ui_movies::Child(base, node, 0) + 80, child_word);
+      UiNode(base, ui_movies::Child(base, node, 0)).set_visible(child_word);
     };
     if (mode == 0) {
       marks(0x82218E54, 0, 1);
@@ -390,28 +391,37 @@ uint32_t ReplayCopyFrom(uint8_t* base, uint32_t replay, uint32_t from, uint32_t 
                         const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A66A8 Replay::CopyFrom");
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t d = replay, s = from;
-  CopyBytes(base, calls, frame, 0x821A66CC, d, s, 52);
-  CopyBytes(base, calls, frame, 0x821A66DC, d + 52, s + 52, 32);
-  CopyBytes(base, calls, frame, 0x821A66F0, d + 84, s + 84, 0x2B534);
-  CopyBytes(base, calls, frame, 0x821A6708, d + 0x2B588, s + 0x2B588, 80);
-  for (uint32_t k = 0; k < 4; k++) CopyWord(base, d + 0x2B5D8 + 4 * k, s + 0x2B5D8 + 4 * k);
-  CopyWord(base, d + 0x2B5E8, s + 0x2B5E8);
-  for (uint32_t k = 0; k < 5; k++) CopyWord(base, d + 0x2B5EC + 4 * k, s + 0x2B5EC + 4 * k);
-  CopyWord(base, d + 0x2B600, s + 0x2B600);
-  replay_snapshots::RaceSnapshotCopy(base, d + 0x2B610, s + 0x2B610);
-  CopyBytes(base, calls, frame, 0x821A67CC, d + 0x34E20, s + 0x34E20, 0x107AC4);
-  return d;
+  // Both are kept replays (type10-mode.toml's KeptReplay).
+  const schema::KeptReplay d(base, replay), s(base, from);
+  CopyBytes(base, calls, frame, 0x821A66CC, d.address, s.address, 52);
+  CopyBytes(base, calls, frame, 0x821A66DC, d.race_words_address(), s.race_words_address(), 32);
+  CopyBytes(base, calls, frame, 0x821A66F0, d.race_word_59610_address(),
+            s.race_word_59610_address(), 0x2B534);
+  CopyBytes(base, calls, frame, 0x821A6708, d.stage_address(), s.stage_address(), 80);
+  for (uint32_t k = 0; k < 4; k++) {
+    CopyWord(base, d.result_3916_address() + 4 * k, s.result_3916_address() + 4 * k);
+  }
+  CopyWord(base, d.race_word_A3AE0_address(), s.race_word_A3AE0_address());
+  for (uint32_t k = 0; k < 5; k++) {
+    CopyWord(base, d.race_words_A3AE4_address() + 4 * k, s.race_words_A3AE4_address() + 4 * k);
+  }
+  CopyWord(base, d.unfilled_address(), s.unfilled_address());
+  replay_snapshots::RaceSnapshotCopy(base, d.snapshot_address(), s.snapshot_address());
+  CopyBytes(base, calls, frame, 0x821A67CC, d.recording_address(), s.recording_address(),
+            0x107AC4);
+  return d.address;
 }
 
 uint32_t RaceDialogStoreReplay(uint8_t* base, uint32_t record, uint32_t replay, uint32_t sp,
                                const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82218FF8 RaceDialog::StoreReplay");
   const uint32_t frame = Frame(base, sp, 112);
-  CopyBytes(base, calls, frame, 0x8221902C, guest::LoadU32(base, Get(base, kReplayHeader) + 8),
-            record, 36);
-  return ReplayCopyFrom(base, guest::LoadU32(base, Get(base, kReplayHeader) + 4), replay, frame,
-                        calls);
+  // The save buffers' (save-interface.toml's SaveBuffers) replay record and
+  // replay, each read through [0x828161F0] again.
+  using SaveGlobals = schema::SaveInterfaceGlobals;
+  CopyBytes(base, calls, frame, 0x8221902C,
+            SaveGlobals::save_buffers(base).replay_record().address, record, 36);
+  return ReplayCopyFrom(base, SaveGlobals::save_buffers(base).replay(), replay, frame, calls);
 }
 
 uint32_t RaceDialogAskSlot(uint8_t* base, uint32_t slot, uint32_t record, uint32_t replay,

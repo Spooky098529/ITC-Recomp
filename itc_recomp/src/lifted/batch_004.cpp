@@ -7,6 +7,7 @@
 #include "lifted/names.h"
 #include "lifted/sdk.h"
 #include "schema/heap.h"
+#include "schema/movies.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -1617,7 +1618,7 @@ lifted::Result f820AE9F8(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r4,1
   r4 = uint64_t(int64_t(1));
   // lwz r11,28(r11)
-  r11 = guest::LoadU32(base, schema::MovieWrapperVtable(base, uint32_t(r11)).slot_7_address());
+  r11 = guest::LoadU32(base, schema::MovieWrapperVtable(base, uint32_t(r11)).deleting_destructor_address());
   // mtctr r11
   ctr = r11;
   // bctrl
@@ -1645,9 +1646,9 @@ loc_820AEA38:
   // stw r10,24(r11)
   guest::StoreU32(base, schema::Movie(base, uint32_t(r11) - 12).delegate_vtable_address(), uint32_t(r10));
   // stw r9,4(r11)
-  guest::StoreU32(base, schema::Movie(base, uint32_t(r11) - 12).command_vtable_16_address(), uint32_t(r9));
+  guest::StoreU32(base, schema::Movie(base, uint32_t(r11) - 12).command_vtable_4_address(), uint32_t(r9));
   // stw r8,4(r11)
-  guest::StoreU32(base, schema::Movie(base, uint32_t(r11) - 12).command_vtable_16_address(), uint32_t(r8));
+  guest::StoreU32(base, schema::Movie(base, uint32_t(r11) - 12).command_vtable_4_address(), uint32_t(r8));
   // stw r7,0(r11)
   guest::StoreU32(base, schema::Movie(base, uint32_t(r11) - 12).command_vtable_address(), uint32_t(r7));
   // addi r1,r1,96

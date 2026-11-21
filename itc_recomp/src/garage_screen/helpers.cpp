@@ -40,9 +40,9 @@ uint64_t SetCarRow(uint8_t* base, uint32_t node, uint32_t car, uint32_t sp, cons
   ITC_NATIVE_RUNNING("sub_82193180 GarageScreen::SetCarRow");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t pair = FindPair(base, kMovie, frame + 80);
-  const uint32_t id = Load(base, car + 12);
+  const uint32_t id = schema::CarMakersCar(base, car).car_id();
   const uint32_t movie = Load(base, pair);
-  Store(base, ui_movies::Child(base, node, 3) + 108, LogoFrame(id));
+  Node(base, ui_movies::Child(base, node, 3)).set_texture_entry(LogoFrame(id));
   const uint32_t maker = ui_movies::Child(base, node, 5);
   const schema::CarSpec spec(base, car_specs::GetCarSpec(base, id));
   calls.Call(kSetNodeText, frame, 0x82193248, movie, maker,
@@ -59,12 +59,12 @@ uint64_t FillRows(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t pair = FindPair(base, kMovie, frame + 80);
   uint64_t r3 = pair;
   const uint32_t movie = Load(base, pair);
-  const int32_t count = int16_t(guest::LoadU16(base, Data(base).save() + 6328));
+  const int32_t count = int16_t(Save(base).garage_count());
   for (int32_t i = 0; i < 4; i++) {
     if (i >= count) {
       continue;
     }
-    const uint32_t scroll = Load(base, List(base) + 4);
+    const uint32_t scroll = ListView(base).scroll();
     const uint32_t node = ui_movies::FindNode(base, movie, 6, uint32_t(i) + 5);
     const uint32_t record =
         GarageRecord(base, Data(base).save(), scroll + uint32_t(i));
@@ -88,19 +88,21 @@ uint32_t SetPrompts(uint8_t* base, const uint32_t args[6], uint32_t sp) {
   uint32_t r3 = 0;
   for (uint32_t k = 0; k < 3; k++) {
     const uint32_t prompt = ui_movies::FindNode(base, movie, 16, k);
-    const uint32_t first = ui_movies::FindNode(base, movie, 16, Load(base, prompt + 100));
-    r3 = ui_movies::FindNode(base, movie, 16, Load(base, prompt + 100) + 1);
+    // The group's first child index (the node's +100 read as a word).
+    const uint32_t first_child = Node(base, prompt).width_address();
+    const uint32_t first = ui_movies::FindNode(base, movie, 16, Load(base, first_child));
+    r3 = ui_movies::FindNode(base, movie, 16, Load(base, first_child) + 1);
     const uint32_t a = Load(base, frame + 88 + 4 * k);
     if (a != kNone) {
       const uint32_t b = Load(base, frame + 104 + 4 * k);
       if (b != kNone) {
-        Store(base, prompt + 80, 1);
-        Store(base, first + 108, a);
-        Store(base, r3 + 108, b);
+        Node(base, prompt).set_visible(1);
+        Node(base, first).set_texture_entry(a);
+        Node(base, r3).set_texture_entry(b);
         continue;
       }
     }
-    Store(base, prompt + 80, 0);
+    Node(base, prompt).set_visible(0);
   }
   return r3;
 }
@@ -118,7 +120,7 @@ uint64_t SetUpLists(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821956C0 GarageScreen::SetUpLists");
   const uint32_t frame = Frame(base, sp, 176);
   const uint32_t movie = FindMovie(base, kMovie, frame + 96);
-  const int32_t count = int16_t(guest::LoadU16(base, Data(base).save() + 6328));
+  const int32_t count = int16_t(Save(base).garage_count());
   const uint64_t n = uint64_t(int64_t(count));
   const uint64_t shown = count < 4 ? n : 4;
   // MenuList::Init over both lists: the accept (159) and back (158) actions
@@ -133,28 +135,28 @@ uint64_t SetUpLists(uint8_t* base, uint32_t sp, const Calls& calls) {
                  {List2(base), n, shown, 1, 162, 161, 153, 154});
   calls.Call(kListSetSelection, frame, 0x821957C0, List(base),
              Data(base).selection());
-  Store(base, List(base) + 4, Data(base).scroll());
+  ListView(base).set_scroll(Data(base).scroll());
   calls.Call(kListFit, frame, 0x821957DC, List(base), 1);
   for (int32_t i = 0; i < 4; i++) {
     const uint32_t row = ui_movies::FindNode(base, movie, 6, uint32_t(i) + 5);
-    Store(base, row + 80, i < count ? 1 : 0);
+    Node(base, row).set_visible(i < count ? 1 : 0);
   }
   const uint32_t more = ui_movies::FindNode(base, movie, 6, 1);
   if (count > 4) {
-    Store(base, more + 80, 1);
-    SetScrollArrows(base, Load(base, List(base) + 4), uint32_t(n), frame);
+    Node(base, more).set_visible(1);
+    SetScrollArrows(base, ListView(base).scroll(), uint32_t(n), frame);
   } else {
-    Store(base, more + 80, 0);
+    Node(base, more).set_visible(0);
   }
   FillRows(base, frame, calls);
   // The current car's marker: y = (the current car - the scroll) × 84 + 232
   // (a word, its 64-bit sign extension left at the frame's +96).
-  const uint32_t current = Load(base, Data(base).save() + 0x19920);
+  const uint32_t current = Save(base).selected_car();
   const uint32_t marker = ui_movies::FindNode(base, movie, 6, 0);
   const int32_t y = int32_t((current - Data(base).scroll()) * 84u + 232u);
   Store(base, frame + 96, y < 0 ? 0xFFFFFFFFu : 0);
   Store(base, frame + 100, uint32_t(y));
-  Store(base, marker + 16, std::bit_cast<uint32_t>(float(double(y))));
+  Node(base, marker).set_y(float(double(y)));
   static constexpr uint32_t kPrompts[6] = {0, 0, 1, 1, kNone, kNone};
   SetPrompts(base, kPrompts, frame);
   return SetHelpLine(base, 558, frame, calls);

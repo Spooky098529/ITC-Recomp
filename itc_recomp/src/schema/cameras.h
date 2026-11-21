@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: CameraPass, Camera
+// embedded; measure: CameraPass, Camera, Billboards.+0
 struct CameraPass : View {
   using View::View;
   static constexpr uint32_t kSize = 592;
@@ -840,7 +840,9 @@ struct CamerasGlobals {
   // the 21 camera passes (CameraPass), 592 bytes each
   static constexpr uint32_t passes_address() { return 0x826BAC00u; }
   // the viewports' 12-byte block (camera-modes.toml): +0 and +4 the two viewports, +8 whether both are in use
-  static View viewports(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C2CE8u)); }
+  template <typename T = Viewports>
+  static T viewports(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C2CE8u)); }
+  static void set_viewports(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C2CE8u, v.address); }
   static void set_viewports(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C2CE8u, v); }
   static constexpr uint32_t viewports_address() { return 0x826C2CE8u; }
   // (0, 1, 0, 1), made once by Viewport::Init

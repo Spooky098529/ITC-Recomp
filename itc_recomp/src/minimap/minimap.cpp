@@ -11,7 +11,15 @@
 #include "guest.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
+#include "schema/career.h"
+#include "schema/command_list.h"
 #include "schema/minimap.h"
+#include "schema/race_event.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
+#include "schema/race_world.h"
+#include "schema/scenery_lists.h"
+#include "schema/track_route.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace minimap {
@@ -62,11 +70,12 @@ void StoreIdentityRow(uint8_t* base, uint32_t address, uint32_t row) {
 
 uint32_t RaceFindPlayerEntry(uint8_t* base, uint32_t manager, uint32_t which) {
   ITC_NATIVE_RUNNING("sub_82170608 Race::FindPlayerEntry");
-  const int32_t count = int32_t(guest::LoadU32(base, manager + 2368));
+  const schema::RaceManager m(base, manager);
+  const int32_t count = int32_t(m.entry_count());
   const uint32_t flag = which != 0 ? 0x4 : 0x8;
   for (int32_t i = 0; i < count; i++) {
-    if ((Entry(base, manager + 4 + 28 * uint32_t(i)).flags() & flag) != 0) {
-      return manager + 4 + 28 * uint32_t(i);
+    if ((Entry(base, m.entries_address() + 28 * uint32_t(i)).flags() & flag) != 0) {
+      return m.entries_address() + 28 * uint32_t(i);
     }
   }
   return 0;
@@ -78,15 +87,18 @@ uint32_t RaceRacerVehicle(uint8_t* base, uint32_t racer) {
   if (manager == 0) {
     return 0;
   }
-  const uint32_t record = guest::LoadU32(base, (racer + 577) * 4 + manager);
-  return vehicle_accessors::VehicleGet(base, guest::LoadU32(base, record + 20));
+  // The racer's entry (the manager's racers, +2308).
+  const uint32_t entry =
+      guest::LoadU32(base, schema::RaceManager(base, manager).racers_address() + racer * 4);
+  return vehicle_accessors::VehicleGet(base, Entry(base, entry).vehicle_index());
 }
 
 void SetListPoint(uint8_t* base, uint32_t list, uint32_t out, uint32_t entry, uint32_t point,
                   uint32_t part) {
   ITC_NATIVE_RUNNING("sub_82147D18 SetList::Point");
   const uint32_t from =
-      guest::LoadU32(base, (entry + 132) * 4 + list) + ((point * 4 + part) << 4);
+      guest::LoadU32(base, schema::ModelList(base, list).point_groups_address() + entry * 4) +
+      ((point * 4 + part) << 4);
   const float x = guest::LoadFloat(base, from + 0);
   const float y = guest::LoadFloat(base, from + 4);
   const float z = guest::LoadFloat(base, from + 8);
@@ -102,28 +114,30 @@ std::optional<int32_t> RacerMarkerType(uint8_t* base, uint32_t entry, int32_t br
   ITC_NATIVE_RUNNING("sub_820F2D28 Minimap::RacerMarkerType");
   int32_t type;
   const Entry e(base, entry);
-  const uint32_t record = G::race_data(base) + 48 + 3936 * e.record();
+  const uint32_t record =
+      schema::RaceData(base, G::race_data(base)).racer_records_address() + 3936 * e.record();
   if ((e.flags() & 0x10) != 0) {
     type = 1;
-  } else if (int32_t id = int32_t(guest::LoadU32(base, record + 3912)); id == -1) {
+  } else if (int32_t id = int32_t(schema::Car(base, record).item_id()); id == -1) {
     type = 1;
   } else {
     // The id's three halfwords in player 0's save data.
     const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
     const uint32_t item = data_tables::RecordsItem(base, uint32_t(id));
-    const uint32_t counts = (uint32_t(id) + 8746) * 12 + save;
+    const schema::CareerItemRecord counts(
+        base, schema::CareerSave(base, save).item_records_address() + uint32_t(id) * 12);
     type = -1;
-    if (guest::LoadU16(base, counts + 2) != 0) {
+    if (counts.wins() != 0) {
       type = 4;
-      if (guest::LoadU16(base, item + 88) == 3) {
+      if (schema::OpponentItem(base, item).race_kind() == 3) {
         return std::nullopt;  // sub_820F2CA8, never seen in play
       }
     }
-    const int32_t second = LoadS16(base, counts + 2);
+    const int32_t second = int16_t(counts.wins());
     if (second == 0) {
       type = 3;
     }
-    const int32_t sum = int16_t(LoadS16(base, counts + 4) + LoadS16(base, counts + 0) + second);
+    const int32_t sum = int16_t(int16_t(counts.outcome3()) + int16_t(counts.losses()) + second);
     if (sum <= 0) {
       type = 2;
     }
@@ -135,8 +149,9 @@ std::optional<int32_t> RacerMarkerType(uint8_t* base, uint32_t entry, int32_t br
   if (type == 1) {
     return 1;
   }
-  const uint32_t sections = guest::LoadU32(base, G::route(base) + 12);
-  const int32_t own = guest::LoadU8(base, guest::LoadU32(base, sections + 4 * section) + 3);
+  const uint32_t sections = schema::TrackRouteFile(base, G::route(base)).sections();
+  const int32_t own =
+      schema::TrackRouteSection(base, guest::LoadU32(base, sections + 4 * section)).branch();
   // The branches the player's shows (the original's switch on branch - 1;
   // case 1 is sub_820F2E68 in the generated code), else only its own.
   auto shows = [&]() {
@@ -252,8 +267,9 @@ std::optional<uint32_t> RecordTransform(uint8_t* base, uint32_t pass, uint32_t p
                                         uint32_t product) {
   ITC_NATIVE_RUNNING("sub_8217AEA8 Primitive::RecordTransform");
   const uint32_t list = G::triangle_list(base);
-  const uint32_t used = guest::LoadU32(base, list + 12);
-  if (used + 5 < used || used + 5 >= guest::LoadU32(base, list + 8)) {
+  const schema::CommandList l(base, list);
+  const uint32_t used = l.used();
+  if (used + 5 < used || used + 5 >= l.capacity()) {
     return std::nullopt;
   }
   // The original's 1.0 stores before the multiply (overwritten by it).
@@ -292,10 +308,10 @@ std::optional<uint32_t> TriangleRecordFlat(uint8_t* base, uint32_t triangle, uin
   const uint32_t list = G::triangle_list(base);
   // The header, the transform's five, [13], the vertices' header and five,
   // and [15]: 14 slots, with no chunk open on any list.
-  const uint32_t used = guest::LoadU32(base, list + 12);
-  if (guest::LoadU8(base, list + 52) != 0 ||
-      guest::LoadU32(base, command_list::kOpenChunks) != 0 || used + 14 < used ||
-      used + 14 >= guest::LoadU32(base, list + 8)) {
+  const schema::CommandList l(base, list);
+  const uint32_t used = l.used();
+  if (l.chunk_open() != 0 || schema::CommandListGlobals::open_chunks(base) != 0 ||
+      used + 14 < used || used + 14 >= l.capacity()) {
     return std::nullopt;
   }
   command_list::OpenChunk(base, list);

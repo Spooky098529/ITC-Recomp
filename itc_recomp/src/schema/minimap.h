@@ -197,7 +197,7 @@ struct MinimapList80 : View {
   uint32_t data_address() const { return address + 336; }
 };
 
-// embedded; measure: Minimap, Race::FindPlayerEntry.ret
+// embedded; measure: Minimap, Race::FindPlayerEntry.ret, RaceManager::GiveVehicle.r4, RaceManager::EntryOfRecord.ret, Race.+2308
 struct MinimapRacerEntry : View {
   using View::View;
   static constexpr uint32_t kSize = 28;

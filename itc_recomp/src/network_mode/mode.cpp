@@ -12,6 +12,10 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "network_mode/internal.h"
+#include "schema/boot_mode.h"
+#include "schema/menu_sounds.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
 #include "guest.h"
 
 #include <bit>
@@ -195,13 +199,13 @@ constexpr uint32_t kStagesAddRacer = 0x820FFAB8;
 constexpr uint32_t kAddStage = 0x82101828;
 constexpr uint32_t kSetWord32 = 0x820FF968;
 constexpr uint32_t kPlaceRacers = 0x82102048;
-constexpr uint32_t kStageList = 0x59620;
 constexpr uint32_t kZero = 0x82000A34;
-// The sound manager's slots (bytes into its vtable).
-constexpr uint32_t kReleaseBankSlot = 20;
-constexpr uint32_t kIsBankLoadingSlot = 24;
-constexpr uint32_t kStopCueSlot = 52;
-constexpr uint32_t kIsCuePlayingSlot = 56;
+// The sound manager's slots (its vtable's fields).
+using SoundSlotFn = uint32_t (schema::AudioManagerVtable::*)() const;
+constexpr SoundSlotFn kReleaseBankSlot = &schema::AudioManagerVtable::release_bank;
+constexpr SoundSlotFn kIsBankLoadingSlot = &schema::AudioManagerVtable::is_bank_loading;
+constexpr SoundSlotFn kStopCueSlot = &schema::AudioManagerVtable::stop_cue;
+constexpr SoundSlotFn kIsCuePlayingSlot = &schema::AudioManagerVtable::is_cue_playing;
 
 // The machines by index (ModeType12::Machine's jump table); 2 none.
 constexpr uint32_t kNone = 0xFFFFFFFFu;
@@ -248,8 +252,9 @@ void SetDelegate(uint8_t* base, uint32_t mode, uint32_t slot, uint32_t function)
 
 // The answer (r3) cleared: +4 and its first byte.
 void ClearAnswer(uint8_t* base, uint32_t answer) {
-  Store(base, answer + 4, 0);
-  guest::StoreU8(base, answer, 0);
+  const schema::ModeAnswer a(base, answer);
+  a.set_next_type(0);
+  a.set_changed(0);
 }
 
 uint32_t BlockOf(uint8_t* base, uint32_t mode) { return Mode(base, mode).block().address; }
@@ -267,12 +272,12 @@ void Dispatch(const Calls& calls, uint32_t mode, uint32_t frame, uint32_t lr) {
   calls.Call(kDispatch, frame, lr, DispatcherOf(mode), mode);
 }
 
-// The sound manager's slot (bytes into its vtable) with r4 and r5; the
-// manager loaded again for each call, as the originals do.
-uint64_t SoundSlot(uint8_t* base, const Calls& calls, uint32_t slot, uint32_t frame, uint32_t lr,
-                   uint32_t r4, uint32_t r5 = 0) {
-  const uint32_t manager = G::sound_manager(base).address;
-  return calls.Call(Load(base, Load(base, manager) + slot), frame, lr, manager, r4, r5);
+// The sound manager's slot with r4 and r5; the manager loaded again for
+// each call, as the originals do.
+uint64_t SoundSlot(uint8_t* base, const Calls& calls, SoundSlotFn slot, uint32_t frame,
+                   uint32_t lr, uint32_t r4, uint32_t r5 = 0) {
+  const schema::AudioManager manager = G::sound_manager(base);
+  return calls.Call((manager.vtable().*slot)(), frame, lr, manager.address, r4, r5);
 }
 
 // The answer {byte 1, the frame's three bytes after it, `next`} at the
@@ -306,10 +311,10 @@ void SessionRelease(uint8_t* base, uint32_t session, uint32_t sp, const Calls& c
 // built at +96.
 void SetUpTimeAttack(uint8_t* base, uint32_t mode, uint32_t frame, const Calls& calls) {
   calls.Call(kResetGlobal, frame, 0x8227BB10);
-  Store(base, G::race_data(base).address + 0xA3AF0, 6);
-  Store(base, G::race_data(base).address + 0xA3AF4, 7);
+  G::race_data(base).set_kind(6);
+  G::race_data(base).set_race_mode(7);
   calls.Call(kRaceSetRoute, frame, 0x8227BB4C, G::ta_route(base), 48);
-  calls.Call(kStagesSetRoute, frame, 0x8227BB6C, G::race_data(base).address + kStageList,
+  calls.Call(kStagesSetRoute, frame, 0x8227BB6C, G::race_data(base).stages_address(),
              G::ta_route(base), 48, ~uint64_t(0));
   if (G::ta_has_kind(base) != 0) {
     const int32_t kind = int32_t(G::ta_kind(base));
@@ -318,11 +323,11 @@ void SetUpTimeAttack(uint8_t* base, uint32_t mode, uint32_t frame, const Calls& 
   const uint32_t car = frame + 96;
   calls.Call(kCarInit, frame, 0x8227BBB4, car);
   calls.Call(kMemcpy, frame, 0x8227BBCC, car, G::ta_car_address(), kTaCarBytes);
-  Store(base, car + 3892, G::ta_car_word(base));
+  schema::Car(base, car).set_unknown_3892(G::ta_car_word(base));
   calls.Call(kCarRefresh, frame, 0x8227BBE0, car);
   const double zero = double(std::bit_cast<float>(Load(base, kZero)));
   calls.Call(kAddRacer, frame, 0x8227BBF8, car, 0, 0, 0, &zero);
-  calls.Call(kStagesAddRacer, frame, 0x8227BC10, G::race_data(base).address + kStageList, 0, 2,
+  calls.Call(kStagesAddRacer, frame, 0x8227BC10, G::race_data(base).stages_address(), 0, 2,
              ~uint64_t(0));
   calls.Call(kAddStage, frame, 0x8227BC18, 1);
   calls.Call(kSetWord32, frame, 0x8227BC20, G::ta_kind(base));
@@ -528,8 +533,8 @@ void Teardown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
   }
   const Block block(base, BlockOf(base, mode));
   const uint32_t session = G::session(base).address;
-  Store(base, answer + 0, block.next_answer_hi());
-  Store(base, answer + 4, block.next_answer_mode());
+  schema::ModeAnswer(base, answer).set_word0(block.next_answer_hi());
+  schema::ModeAnswer(base, answer).set_next_type(block.next_answer_mode());
   if (session != 0 && block.session_made() != 0) {
     SessionFree(base, frame, calls);
   }

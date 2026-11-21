@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// image; measure: [826C5C80].+0
+// image; measure: [826C5C80].+0, sub_82119188.r3.+0
 struct AudioManagerVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 132;
@@ -185,7 +185,7 @@ struct SoundHandleList : View {
   uint32_t size_address() const { return address + 8; }
 };
 
-// allocated; measure: AudioManager, [826C5C80]
+// allocated; measure: AudioManager, [826C5C80], sub_82119188.r3, sub_82118930.r3, sub_82119018.r3
 struct AudioManager : View {
   using View::View;
   static constexpr uint32_t kSize = 1624;
@@ -311,24 +311,6 @@ struct AudioManagerSoundOwnerSlot0 : View {
   uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
   void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t unknown_4_address() const { return address + 4; }
-};
-
-// embedded; measure: AudioManager::FindFreeBankSlot.r4, AudioManager::GetCueIndex.r4, AudioManager::IsBankLoaded.r4, AudioManager::PlayHandle.r4
-struct SoundBankIndex : View {
-  using View::View;
-  static constexpr uint32_t kSize = 4;
-  uint32_t index() const { return guest::LoadU32(base, address + 0); }
-  void set_index(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t index_address() const { return address + 0; }
-};
-
-// embedded; measure: AudioManager::PlayHandle.r5
-struct SoundCueIndex : View {
-  using View::View;
-  static constexpr uint32_t kSize = 4;
-  uint32_t index() const { return guest::LoadU32(base, address + 0); }
-  void set_index(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t index_address() const { return address + 0; }
 };
 
 // embedded; measure: Sound::HasHandle.r4

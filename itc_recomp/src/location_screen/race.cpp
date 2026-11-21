@@ -7,14 +7,12 @@
 #include "guest.h"
 #include "race_event/race_event.h"
 #include "schema/location_screen.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace location_screen {
 
 namespace {
-
-// The race data's word Race::SetUp keeps its flags in (+0x59AE4).
-constexpr uint32_t kRaceFlags = 0x59AE4;
 
 using G = schema::LocationScreenGlobals;
 
@@ -51,8 +49,9 @@ uint64_t Page11(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& calls
   calls.Call(kEventQuery, frame, 0x82228194, save, 1);
   const uint64_t rival = uint64_t(int64_t(int16_t(guest::LoadU16(base, frame + 96))));
   const uint64_t r3 = calls.Call(kRaceSetUp, frame, 0x822281A0, save, rival);
-  const uint32_t flags = guest::LoadU32(base, kRaceData) + kRaceFlags;
-  guest::StoreU32(base, flags, guest::LoadU32(base, flags) | 16);
+  // The race data's flags (+0x59AE4, Race::SetUp's): 0x10 a rival race.
+  const schema::RaceData race = schema::RaceStatesGlobals::race_data(base);
+  race.set_flags(race.flags() | 16);
   Leave(base, machine);
   return r3;
 }

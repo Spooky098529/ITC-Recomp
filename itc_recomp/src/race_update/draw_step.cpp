@@ -6,7 +6,12 @@
 
 #include "base/log.h"
 #include "hooks/lifted_call.h"
+#include "schema/camera_modes.h"
+#include "schema/cameras.h"
+#include "schema/car_draw.h"
+#include "schema/race_states.h"
 #include "schema/race_update.h"
+#include "schema/screen_objects.h"
 
 #include <initializer_list>
 
@@ -17,10 +22,8 @@ namespace {
 using G = schema::RaceUpdateGlobals;
 
 constexpr uint32_t kCameraPasses = G::camera_pass0_address();  // 21 records of 592 bytes
-constexpr uint32_t kCameraPassBytes = 592;
+constexpr uint32_t kCameraPassBytes = schema::CameraPass::kSize;
 constexpr uint32_t kCameraPassesEnd = kCameraPasses + 12432;
-constexpr uint32_t kModeWord = 0xA3AF0;       // the race mode's word
-constexpr uint32_t kRaceDataFlags = 0x59AE4;  // the race data's flags (bit 0x80)
 
 constexpr uint32_t kCameraPassDisable = 0x820A0958;
 constexpr uint32_t kEnableForView = 0x820AA1A8;
@@ -34,7 +37,7 @@ constexpr uint32_t kScreenObjectRecord = 0x82130978;
 constexpr uint32_t kPostEffectsRecordAll = 0x82133960;
 
 // The race scene's k-th screen object (the race's, or split screen's two).
-schema::View ScreenObjectAt(const schema::RaceScene& scene, uint32_t k) {
+schema::ScreenObject ScreenObjectAt(const schema::RaceScene& scene, uint32_t k) {
   return k == 0 ? scene.screen_object() : k == 1 ? scene.screen_object_first()
                                                  : scene.screen_object_second();
 }
@@ -59,16 +62,18 @@ uint64_t RaceDrawStep(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t race) {
   // Whether the race's views are drawn: camera pass 0's +588, or with the
   // mode word 4 and the flags' bit 0x80 clear, pass 2's +1772 when pass 1's
   // +1180 is set (nothing drawn when it isn't).
-  const uint32_t mode = G::race_data(base).address;
+  const schema::RaceData mode = G::race_data(base);
+  const auto camera_pass = [&](uint32_t n) {
+    return schema::CameraPass(base, kCameraPasses + kCameraPassBytes * n);
+  };
   uint32_t drawn = 0;
-  if (int32_t(guest::LoadU32(base, mode + kModeWord)) == 4 &&
-      ((guest::LoadU32(base, mode + kRaceDataFlags) >> 7) & 1) == 0) {
-    if (guest::LoadU32(base, kCameraPasses + 1180) == 0) {
+  if (int32_t(mode.kind()) == 4 && ((mode.flags() >> 7) & 1) == 0) {
+    if (camera_pass(1).enabled() == 0) {
       return r3;
     }
-    drawn = guest::LoadU32(base, kCameraPasses + 1772);
+    drawn = camera_pass(2).enabled();
   } else {
-    drawn = guest::LoadU32(base, kCameraPasses + 588);
+    drawn = camera_pass(0).enabled();
   }
   if (drawn == 0) {
     return r3;
@@ -82,13 +87,12 @@ uint64_t RaceDrawStep(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t race) {
       continue;
     }
     r3 = call(kPostEffectsGet, {1 + 4 * k});
-    guest::StoreU32(base, ScreenObjectAt(scene, k).address + 88, uint32_t(r3));
+    ScreenObjectAt(scene, k).set_glow(uint32_t(r3));
     r3 = call(kPostEffectsGet, {2 + 4 * k});
-    guest::StoreU32(base, ScreenObjectAt(scene, k).address + 92, uint32_t(r3));
+    ScreenObjectAt(scene, k).set_second_effect(uint32_t(r3));
   }
   // The screen objects recorded when the HUD's +1860 is 0, 1 or 2.
-  const int32_t hud = int32_t(
-      guest::LoadU32(base, guest::LoadU32(base, G::viewports(base).address) + 1860));
+  const int32_t hud = int32_t(G::viewports(base).first().view_mode());
   if (hud == 0 || hud == 1 || hud == 2) {
     for (uint32_t k = 0; k < 3; k++) {
       r3 = ScreenObjectAt(scene, k).address;

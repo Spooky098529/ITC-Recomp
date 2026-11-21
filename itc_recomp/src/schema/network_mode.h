@@ -135,7 +135,7 @@ struct NetModeBlock : View {
   uint32_t session_made_address() const { return address + 135204; }
 };
 
-// embedded; measure: NetModeSelect, NetRanking, NetTaCourse, Type12Screen3, Type12Screen6, Type12Screen7, Type12Screen8, Type12Screen9, Type12Dialog10, Type12Dialog11, Type12Dialog12, Type12Dialog13, ModeType12::Machine.ret, sub_8225E418.r3
+// embedded; measure: NetModeSelect, NetRanking, NetTaCourse, Type12Screen3, Type12Screen6, Type12Screen7, Type12Screen8, Type12Screen9, Type12Dialog10, Type12Dialog11, Type12Dialog12, Type12Dialog13, ModeType12::Machine.ret, sub_8225E418.r3, sub_8226A660.r3, sub_82263D80.r3, sub_822657D8.r3, sub_82265930.r3, sub_82266028.r3, sub_822662F0.r3, sub_822663E0.r3, sub_82266548.r3, sub_82266658.r3, sub_822681D0.r3, sub_82268720.r3, sub_82269988.r3, sub_8226CB40.r3, sub_822702C0.r3, sub_82277178.r3, sub_822800C0.r3, sub_82282630.r3, sub_822659F0.ret, sub_822681D0.ret
 struct NetMachine : View {
   using View::View;
   static constexpr uint32_t kSize = 9732;
@@ -534,7 +534,9 @@ struct NetworkModeGlobals {
   static void set_fade_count1(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826A50DCu, v); }
   static constexpr uint32_t fade_count1_address() { return 0x826A50DCu; }
   // the sound manager
-  static View sound_manager(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C5C80u)); }
+  template <typename T = AudioManager>
+  static T sound_manager(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5C80u)); }
+  static void set_sound_manager(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5C80u, v.address); }
   static void set_sound_manager(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5C80u, v); }
   static constexpr uint32_t sound_manager_address() { return 0x826C5C80u; }
   // the sign-in watch's "not on Live" check (0x826BAB40 + 16): 0 turns it on
@@ -554,7 +556,9 @@ struct NetworkModeGlobals {
   static void set_session_state(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C6AA8u, v); }
   static constexpr uint32_t session_state_address() { return 0x826C6AA8u; }
   // the race data
-  static View race_data(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  template <typename T = RaceData>
+  static T race_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  static void set_race_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B2Cu, v.address); }
   static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
   static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
   // the time attack's route
@@ -697,7 +701,9 @@ struct NetworkModeGlobals {
   static void set_screen7_menu(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x82816164u, v); }
   static constexpr uint32_t screen7_menu_address() { return 0x82816164u; }
   // 8 bytes: +0, +4 0 from Create
-  static View screen7_data(uint8_t* base) { return View(base, guest::LoadU32(base, 0x82816168u)); }
+  template <typename T = NetScreen7Data>
+  static T screen7_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x82816168u)); }
+  static void set_screen7_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x82816168u, v.address); }
   static void set_screen7_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x82816168u, v); }
   static constexpr uint32_t screen7_data_address() { return 0x82816168u; }
   template <typename T = PageObject>

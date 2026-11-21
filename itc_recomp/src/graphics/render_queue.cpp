@@ -5,6 +5,7 @@
 
 #include "guest.h"
 #include "schema/device_shaders.h"
+#include "schema/model_animation.h"
 
 #include "base/log.h"
 #include "graphics/device_shaders.h"
@@ -99,8 +100,8 @@ uint32_t Init(uint8_t* base, uint32_t queue, uint32_t device, uint32_t sp, const
   ITC_NATIVE_RUNNING("sub_8258ED00 RenderQueue::Init");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t drawer = State(base, queue).drawer_address();
-  call(guest::LoadU32(base, guest::LoadU32(base, drawer)), frame, 0x8258ED2C, 2, drawer, device,
-       0);
+  call(guest::LoadU32(base, schema::PrimitiveDrawer(base, drawer).vtable()), frame, 0x8258ED2C, 2,
+       drawer, device, 0);
   for (uint32_t i = 0, offset = 0; offset < 16; i++, offset += 4) {
     const uint32_t at = offset + State(base, queue).render_target_0_address();
     guest::StoreU32(base, at, GetRenderTarget(base, device, i));

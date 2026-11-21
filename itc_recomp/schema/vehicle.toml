@@ -94,19 +94,7 @@ fields = [
   { name = "unknown_720", offset = 720, type = "u32", note = "Load's r5" },
 ]
 
-# A route position: a section of the course's route and a slice in it (also
-# met as one word, AiPath::NoteFixedSections' result). race-states.toml's
-# RoutePosition is the same object (to merge there: field names kept alike).
-[VehicleRoutePosition]
-measure = "RoutePosition"
-measures = ["AiPath::NoteFixedSections.ret"]
-size = 4
-origin = "embedded"
-fields = [
-  { name = "word", offset = 0, type = "u32", note = "section and slice read or written as one word" },
-  { name = "section", offset = 0, type = "u16", note = "signed" },
-  { name = "slice", offset = 2, type = "u16", note = "signed" },
-]
+# VehicleRoutePosition: merged into race-states.toml's RoutePosition at the integration (the same object).
 
 # The rigid body's position RigidBody::Position returns (a vector).
 [VehicleBodyPosition]
@@ -157,22 +145,7 @@ fields = [
   { name = "half_82", offset = 82, type = "u16" },
 ]
 
-# The car input record Vehicle::ApplyInput applies (ai-drivers.toml's CarInput).
-[VehicleCarInput]
-measure = "Vehicle::ApplyInput.r4"
-size = 20
-origin = "embedded"
-fields = [
-  { name = "flags", offset = 0, type = "u32", note = "0x02000000 digital steering, 0x20000000 the digital brake, 0x08000000 the digital throttle, 0x80000000 the handbrake ramp, 0x200 reverse, 0x1 and 0x2 the gear changes, 0x2000, 0x10000 the nitrous' toggle" },
-  { name = "throttle", offset = 4, type = "u16", note = "signed, out of 32,767" },
-  { name = "brake", offset = 6, type = "u16", note = "signed, out of 32,767" },
-  { name = "steering", offset = 8, type = "u16", note = "signed, out of 32,767" },
-  { name = "handbrake", offset = 10, type = "u16", note = "32,767 for the handbrake" },
-  { name = "throttle_rate", offset = 14, type = "u8", note = "signed: the throttle's curve" },
-  { name = "brake_rate", offset = 15, type = "u8", note = "signed: the brake's curve" },
-  { name = "steering_rate", offset = 16, type = "u8", note = "signed: the pad's or wheel's steering rate" },
-  { name = "kind", offset = 17, type = "u8", note = "0 the pad, 1 a wheel, 2 an AI driver" },
-]
+# VehicleCarInput: merged into ai-drivers.toml's CarInput at the integration (the same object).
 
 # The car object VehicleStatus::Update reads (the race's car record: the
 # Racers measure's fields at +1656 and on).

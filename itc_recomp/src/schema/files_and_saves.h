@@ -247,7 +247,7 @@ struct MovieSource : View {
   uint32_t block_list_address() const { return address + 132; }
 };
 
-// embedded; measure: -
+// embedded; measure: SaveInterface::SaveAt.ret
 struct XContentData : View {
   using View::View;
   static constexpr uint32_t kSize = 308;
@@ -263,7 +263,7 @@ struct XContentData : View {
   uint32_t file_name_address() const { return address + 264; }
 };
 
-// allocated; measure: SaveSlot::WriteFile.r4, SaveSlot::ReadFile.r4, SaveSlot::WaitEnumerate.r4, SaveSlot::Create.r4, SaveSlot::Delete.r4, SaveSlot::LoadStep.r4, SaveSlot::OpenItem.r4, SaveSlot::SaveStep.r4, SaveSlot::ShowDeviceSelector.r4, SaveSlot::WaitDeviceSelector.r4, sub_820A4508.r3, sub_820A5660.r3
+// allocated; measure: SaveSlot::WriteFile.r4, SaveSlot::ReadFile.r4, SaveSlot::WaitEnumerate.r4, SaveSlot::Create.r4, SaveSlot::Delete.r4, SaveSlot::LoadStep.r4, SaveSlot::OpenItem.r4, SaveSlot::SaveStep.r4, SaveSlot::ShowDeviceSelector.r4, SaveSlot::WaitDeviceSelector.r4, sub_820A4508.r3, sub_820A5660.r3, SaveSlot::CheckStep.r4, SaveSlot::DeleteStep.r4, SaveSlot::EnumerateStep.r4, SaveSlot::Failed.r4, SaveSlot::Ready.r4, SaveSlot::WaitClose.r4, SaveSlot::WaitForDevice.r4, SaveSlot::WaitForUser.r4, SlotArray.+0
 struct SaveSlot : View {
   using View::View;
   static constexpr uint32_t kSize = 1000;
@@ -418,27 +418,6 @@ struct ArchiveStreamerVtable : View {
   uint32_t on_init() const { return guest::LoadU32(base, address + 4); }
   void set_on_init(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t on_init_address() const { return address + 4; }
-};
-
-// allocated; measure: sub_8259D1F0.r3.+28.+8
-struct XactEngineRef : View {
-  using View::View;
-  static constexpr uint32_t kSize = 4;
-  template <typename T = XactEngineVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-};
-
-// image; measure: sub_8259D1F0.r3.+28.+8.+0
-struct XactEngineVtable : View {
-  using View::View;
-  static constexpr uint32_t kSize = 12;
-  // probably Initialize (with the settings file read into the audio engine's +0 and +4)
-  uint32_t initialize() const { return guest::LoadU32(base, address + 8); }
-  void set_initialize(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t initialize_address() const { return address + 8; }
 };
 
 }  // namespace schema

@@ -316,41 +316,7 @@ fields = [
   { name = "unknown_448", offset = 448, type = "u32", note = "the shape's halfword +112, as a word" },
 ]
 
-# A placed copy of the collision box (collision.toml's BoxShape, the
-# collision object's +36 or +40) as Part464::Save and Restore meet it: the
-# same object as BoxShape, filed apart by the measure (its measures belong
-# in BoxShape's; until then the names are BoxShape's).
-[ReplayPlacedBox]
-measures = ["Part464::Restore.r4", "Part464::Save.r4"]
-size = 496
-origin = "embedded"
-fields = [
-  { name = "car_float_16", offset = 16, type = "f32" },
-  { name = "car_float_20", offset = 20, type = "f32" },
-  { name = "car_float_24", offset = 24, type = "f32" },
-  { name = "friction", offset = 28, type = "f32" },
-  { name = "radius", offset = 32, type = "f32" },
-  { name = "center", offset = 48, type = "bytes", count = 16 },
-  { name = "axis0", offset = 64, type = "bytes", count = 16 },
-  { name = "axis1", offset = 80, type = "bytes", count = 16 },
-  { name = "axis2", offset = 96, type = "bytes", count = 16 },
-  { name = "unknown_112", offset = 112, type = "u16", note = "saved as a word (the record part's +448)" },
-  { name = "half_extent", offset = 128, type = "bytes", count = 16 },
-  { name = "inverse_half_extent", offset = 144, type = "bytes", count = 16 },
-  { name = "corners", offset = 176, type = "bytes", count = 128 },
-  { name = "face_px_distance", offset = 304, type = "f32" },
-  { name = "face_px_normal", offset = 320, type = "bytes", count = 16 },
-  { name = "face_py_distance", offset = 336, type = "f32" },
-  { name = "face_py_normal", offset = 352, type = "bytes", count = 16 },
-  { name = "face_pz_distance", offset = 368, type = "f32" },
-  { name = "face_pz_normal", offset = 384, type = "bytes", count = 16 },
-  { name = "face_nx_distance", offset = 400, type = "f32" },
-  { name = "face_nx_normal", offset = 416, type = "bytes", count = 16 },
-  { name = "face_ny_distance", offset = 432, type = "f32" },
-  { name = "face_ny_normal", offset = 448, type = "bytes", count = 16 },
-  { name = "face_nz_distance", offset = 464, type = "f32" },
-  { name = "face_nz_normal", offset = 480, type = "bytes", count = 16 },
-]
+# ReplayPlacedBox: merged into collision.toml's BoxShape at the integration (the same object).
 
 # A measure fault: the r4 of the six record copies (Record5232::CopyTrack,
 # BodyState::Copy, Member1136::Copy, Part464::Copy, Member4080::CopyShapes,

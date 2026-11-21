@@ -88,4 +88,4 @@ mode_checks = { address = 0x826BAB40, type = "bytes", count = 16, note = "the mo
 controllers = { address = 0x826BABA4, type = "bytes", count = 16, note = "the player-to-controller table: 4 words, 0 to 3 from Players::ResetControllers" }
 profile_read_asked = { address = 0x826C7938, type = "u32", note = "1 asks for the profile read" }
 title_menu_list = { address = 0x82814E30, type = "ptr", to = "MenuList", note = "the title screen's menu list" }
-title_screen = { address = 0x82814E34, type = "ptr", note = "the title screen object (title-screen.md)" }
+title_screen = { address = 0x82814E34, type = "ptr", to = "TitleScreenData", note = "the title screen object (title-screen.toml)" }

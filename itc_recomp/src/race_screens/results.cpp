@@ -6,7 +6,10 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/race_hud_machine.h"
 #include "schema/race_screens_unseen.h"
+#include "schema/race_states.h"
+#include "schema/tuning_screen.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -16,8 +19,6 @@ namespace race_screens {
 namespace {
 
 constexpr uint64_t kNone = ~uint64_t(0);
-
-uint32_t Get(uint8_t* base, uint32_t global) { return guest::LoadU32(base, global); }
 
 using Globals = schema::RaceScreensUnseenGlobals;
 
@@ -277,11 +278,11 @@ uint64_t SplitResultsMainPage(uint8_t* base, uint32_t sp, bool native_slots, con
   const uint32_t second = Entry(base, kControllerEntries + 4);
   // Stages::Copy of the current stage into the frame's +80 (its plain C++,
   // or the original through its adapter where it declines).
-  const uint32_t stages = Get(base, kRaceData) + 0x59620;
+  const uint32_t stages = Globals::race_data(base).stages_address();
   if (!vehicle_accessors::StagesCopy(base, frame + 80, stages, 0xFFFFFFFFu)) {
     calls.Call(kStagesCopy, frame, 0x8221FEC0, frame + 80, stages, kNone);
   }
-  if (int32_t(guest::LoadU32(base, Get(base, kRaceData) + 0xA3AF0)) == 6 &&
+  if (int32_t(Globals::race_data(base).kind()) == 6 &&
       int32_t(guest::LoadU32(base, frame + 80)) != 1) {
     // The network battle: once the other console's result came, 210 ticks
     // counted, then the screen closed (no sound).
@@ -336,7 +337,7 @@ uint64_t SplitResultsIntro(uint8_t* base, uint32_t step, uint32_t sp, const Call
     if (mode > 2) return;
     // The group -1 node 0's +80: 1 for modes 0 and 2, 0 for mode 1.
     const uint32_t node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 0);
-    guest::StoreU32(base, node + 80, mode == 1 ? 0 : 1);
+    schema::UiMovieNode(base, node).set_visible(mode == 1 ? 0 : 1);
     uint64_t named;
     if (mode == 2) {
       named = 5;
@@ -400,12 +401,12 @@ uint64_t SplitResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Cal
   const uint32_t frame = Frame(base, sp, 2816);
   // Stages::Copy of the current stage into the frame's +96 (its plain C++,
   // or the original through its adapter where it declines); its r3 the copy.
-  const uint32_t stages = Get(base, kRaceData) + 0x59620;
+  const uint32_t stages = Globals::race_data(base).stages_address();
   if (!vehicle_accessors::StagesCopy(base, frame + 96, stages, 0xFFFFFFFFu)) {
     calls.Call(kStagesCopy, frame, 0x8222010C, frame + 96, stages, kNone);
   }
   uint64_t r3 = frame + 96;
-  if (int32_t(guest::LoadU32(base, Get(base, kRaceData) + 0xA3AF0)) == 6 &&
+  if (int32_t(Globals::race_data(base).kind()) == 6 &&
       int32_t(guest::LoadU32(base, frame + 96)) != 1 &&
       int32_t(Globals::split_exchanged(base)) == 0) {
     // The network battle, its result not yet exchanged.
@@ -423,7 +424,7 @@ uint64_t SplitResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Cal
     const uint32_t packet = frame + (ticks == 0 ? 176 : 1456);
     guest::StoreU8(base, packet + 2, 23);
     guest::StoreU8(base, packet + 3, uint8_t(Globals::split_results(base).outcome()));
-    const uint32_t id = guest::LoadU32(base, Globals::net_players(base).address + 7244);
+    const uint32_t id = Globals::net_players(base).kind8_position();
     guest::StoreU8(base, packet + 8, uint8_t(id));
     guest::StoreU8(base, packet + 5, uint8_t(id >> 24));
     guest::StoreU16(base, packet + 6, uint16_t(id >> 8));
@@ -449,21 +450,22 @@ uint64_t SplitResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Cal
     if (int32_t(Globals::net_peer_mode(base)) == 0) {
       // The other console's answer: the last racer record's result and the
       // screen's outcome.
-      const uint32_t records = Get(base, kRaceData) + 0x59AE8;
-      const uint32_t count = guest::LoadU32(base, records + 0x49FE0);
+      const schema::RaceData race = Globals::race_data(base);
+      const uint32_t records = race.results_address();
+      const uint32_t count = race.results_count();
       const uint32_t record = vehicle_accessors::RacerRecordsAt(base, records, count - 1);
       r3 = record;
       switch (Globals::net_answer(base)) {
         case 0:
-          guest::StoreU32(base, record + 3924, 1);
+          schema::RacerResultsRecord(base, record).set_finish(1);
           Globals::split_results(base).set_outcome(1);
           break;
         case 1:
-          guest::StoreU32(base, record + 3924, 2);
+          schema::RacerResultsRecord(base, record).set_finish(2);
           Globals::split_results(base).set_outcome(0);
           break;
         default:
-          guest::StoreU32(base, record + 3920, 0);
+          schema::RacerResultsRecord(base, record).set_outcome(0);
           Globals::split_results(base).set_outcome(2);
           break;
       }

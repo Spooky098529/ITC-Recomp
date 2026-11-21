@@ -18,7 +18,17 @@
 #include "c_runtime/strings.h"
 #include "car_specs/car_specs.h"
 #include "race_setup/race_setup.h"
+#include "schema/car_list.h"
+#include "schema/car_makers.h"
+#include "schema/car_physics.h"
+#include "schema/command_list.h"
 #include "schema/power_graph.h"
+#include "schema/power_graph_screen.h"
+#include "schema/race_event.h"
+#include "schema/race_overlays.h"
+#include "schema/tuning_screen.h"
+#include "schema/ui_movies_game.h"
+#include "schema/vehicle.h"
 #include "strings_and_font/steps.h"
 #include "ui_movies/game.h"
 #include "vehicle/vehicle.h"
@@ -66,7 +76,7 @@ double ToSingle(int32_t value) {
 
 using strings_and_font::steps::Fctiwz;
 using G = schema::PowerGraphGlobals;
-using Sprite = schema::LineSprite;
+using Sprite = schema::OverlaySprite;
 
 }  // namespace
 
@@ -76,10 +86,11 @@ bool LineRecordFlat(uint8_t* base, uint32_t sprite, uint32_t pass, uint32_t key,
   const auto [list, queue] = calls.list_and_queue(frame);
   G::set_line_queue(base, queue);
   G::set_line_list(base, list);
-  const uint32_t used = guest::LoadU32(base, list + 12);
-  if (G::transform_list(base) != list || guest::LoadU8(base, list + 52) != 0 ||
-      guest::LoadU32(base, command_list::kOpenChunks) != 0 || used + kLineSlots < used ||
-      used + kLineSlots >= guest::LoadU32(base, list + 8)) {
+  const schema::CommandList l(base, list);
+  const uint32_t used = l.used();
+  if (G::transform_list(base) != list || l.chunk_open() != 0 ||
+      schema::CommandListGlobals::open_chunks(base) != 0 || used + kLineSlots < used ||
+      used + kLineSlots >= l.capacity()) {
     return false;
   }
   command_list::OpenChunk(base, list);
@@ -118,7 +129,7 @@ bool LineRecordFlat(uint8_t* base, uint32_t sprite, uint32_t pass, uint32_t key,
 }
 
 int32_t SegmentCount(uint8_t* base, uint32_t car) {
-  const double rev = Lfs(base, car + 1280);
+  const double rev = double(schema::CarData(base, car).rev_limit());
   return Fctiwz(double(float(std::fma(rev, Lfs(base, kCountScale), Lfs(base, kOne)))));
 }
 
@@ -167,12 +178,13 @@ void Draw(uint8_t* base, uint32_t frame, double x, double y, uint32_t car,
   }
 
   // The 32 points: torque (kgf·m) at +112, power (PS) at +240.
-  const double scale = Lfs(base, car + 1420);
+  const schema::CarData car_data(base, car);
+  const double scale = double(car_data.torque());
   const double to_kgfm = Lfs(base, kToKgfM);
   const double rpm_step = Lfs(base, kRpmStep);
   const double to_ps = Lfs(base, kToPs);
   for (int32_t i = 0; i < 32; i++) {
-    double torque = Lfs(base, car + 1292 + 4 * uint32_t(i));
+    double torque = Lfs(base, car_data.torque_curve_address() + 4 * uint32_t(i));
     torque = double(float(torque * scale));
     torque = double(float(torque * to_kgfm));
     Stfs(base, frame + 112 + 4 * uint32_t(i), torque);
@@ -249,7 +261,7 @@ void Draw(uint8_t* base, uint32_t frame, double x, double y, uint32_t car,
 }
 
 namespace {
-constexpr uint32_t kMovieTable = 0x826C5CCC;
+constexpr uint32_t kMovieTable = schema::UiMoviesGameGlobals::movie_table_pairs_address();
 constexpr uint32_t kShownAfter = 0x8200829C;  // 22.0
 constexpr uint32_t kNoTime = 0x82001BE0;      // AnimationTime's answer for none
 constexpr uint32_t kTuningX = 0x8200AD98;     // 1042.0
@@ -264,9 +276,10 @@ bool TuningScreenShowsGraph(uint8_t* base, uint32_t screen, uint32_t frame, uint
   *r3 = entry;
   const uint32_t movie = guest::LoadU32(base, entry);
   *movie_out = movie;
-  const int32_t state = int32_t(guest::LoadU32(base, screen + 9652));
-  const bool idle = guest::LoadU32(base, screen + 9656) == 0;
-  const uint8_t step = guest::LoadU8(base, screen + 9660);
+  const schema::TuningScreen s(base, screen);
+  const int32_t state = int32_t(s.state());
+  const bool idle = s.category() == 0;
+  const uint8_t step = s.item();
   if (state == 5) {
     *r3 = movie;
     auto time = [&] {
@@ -285,10 +298,10 @@ bool TuningScreenShowsGraph(uint8_t* base, uint32_t screen, uint32_t frame, uint
 
 TuningDraw TuningScreenDraw(uint8_t* base, uint32_t screen) {
   TuningDraw draw;
-  draw.r3 = guest::LoadU32(base, G::stand_holder(base));
+  draw.r3 = schema::StandHolder(base, G::stand_holder(base)).stage_block_0();
   draw.x = Lfs(base, kTuningX);
   draw.y = Lfs(base, kTuningY);
-  draw.car = screen + 18912;
+  draw.car = schema::TuningScreen(base, screen).car_data_address();
   return draw;
 }
 
@@ -308,7 +321,7 @@ bool CarListEntrySetUp(uint8_t* base, const front_end_car_draw::Calls& calls, ui
   const uint32_t car = frame + kEntryCar;
   const uint32_t data = frame + kEntryCarData;
   car_makers::GarageCarReset(base, calls, car, frame);
-  career::CarSetModelAndClass(base, car, guest::LoadU32(base, entry + 8432), frame);
+  career::CarSetModelAndClass(base, car, schema::CarListEntry(base, entry).car_id(), frame);
   car_physics::CarDataConstruct(base, data, frame - kCarDataFrame);
   double f1 = 0.0;
   car_makers::FromGarageCar(base, calls, car, data, frame, &f1);
@@ -317,7 +330,7 @@ bool CarListEntrySetUp(uint8_t* base, const front_end_car_draw::Calls& calls, ui
 
 TuningDraw CarListEntryDraw(uint8_t* base, uint32_t frame) {
   TuningDraw draw;
-  draw.r3 = guest::LoadU32(base, G::stand_holder(base));
+  draw.r3 = schema::StandHolder(base, G::stand_holder(base)).stage_block_0();
   draw.x = Lfs(base, kEntryX);
   draw.y = Lfs(base, kEntryY);
   draw.car = frame + kEntryCarData;
@@ -359,7 +372,7 @@ uint32_t SetFromCar(uint8_t* base, uint32_t car, uint32_t tab, uint32_t sp,
   ITC_NATIVE_RUNNING("sub_82250488 PowerGraph::SetFromCar");
   const uint32_t frame = sp - kSetFromCarFrame;
   guest::StoreU32(base, frame, sp);  // the back chain (stwu)
-  const uint32_t record = guest::LoadU32(base, kPowerGraphScreen) + 8;
+  const auto record = schema::PowerGraphScreenGlobals::data(base);
   const uint32_t object = frame + 3008, data = frame + 1152, curve = frame + 80;
   FlushOff();
   race_setup::CarInit(base, object);
@@ -382,32 +395,38 @@ uint32_t SetFromCar(uint8_t* base, uint32_t car, uint32_t tab, uint32_t sp,
   vehicle::PowerCurveFromEngine(base, curve, data + 1268, frame - 112);
   vehicle::PowerCurveShiftPeak(base, curve, 0, frame);
   FlushOff();
-  guest::StoreU32(base, record + 80, tab);
+  const schema::CarMakersCar head(base, car);
+  const schema::GarageCar garage_car(base, car);
+  const schema::CarData d(base, data);
+  const schema::CarSpecCopies s(base, spec);
+  const schema::PowerCurve c(base, curve);
+  record.set_tab(tab);
   for (uint32_t i = 0; i < 5; i++) {
-    guest::StoreU32(base, record + 60 + 4 * i, guest::LoadU32(base, car + 1568 + 4 * i));
+    guest::StoreU32(base, record.parts_address() + 4 * i,
+                    guest::LoadU32(base, head.setting_bytes_address() + 4 * i));
   }
-  guest::StoreU32(base, record + 0, Fctiwz32(Lfs(base, car + 1892)));
-  const double sum = double(float(Lfs(base, data + 400) + Lfs(base, data + 672)));
-  guest::StoreU32(base, record + 4,
-                  Fctiwz32(double(float(std::fma(sum, Lfs(base, kSumScale), Lfs(base, data))))));
-  guest::StoreU32(base, record + 8, guest::LoadU32(base, spec + 76));
-  guest::StoreU32(base, record + 12, guest::LoadU32(base, spec + 84));
-  guest::StoreU32(base, record + 16, guest::LoadU32(base, spec + 80));
-  guest::StoreU32(base, record + 20, guest::LoadU32(base, car + 12));
-  guest::StoreU32(base, record + 24, guest::LoadU8(base, spec + 129));
-  guest::StoreU32(base, record + 28, guest::LoadU8(base, spec + 130));
+  record.set_car_value(Fctiwz32(double(garage_car.racer_float())));
+  const double sum = double(float(double(schema::CarDataAxle(base, d.front_axle_address()).wheel_mass()) +
+                                  double(schema::CarDataAxle(base, d.rear_axle_address()).wheel_mass())));
+  record.set_rating(Fctiwz32(double(float(std::fma(sum, Lfs(base, kSumScale), double(d.mass()))))));
+  record.set_spec_word_0(s.unknown_76());
+  record.set_spec_word_1(s.unknown_84());
+  record.set_spec_word_2(s.unknown_80());
+  record.set_car_id(head.car_id());
+  record.set_spec_byte_0(s.spec_byte_129());
+  record.set_spec_byte_1(s.unknown_130());
   // The switch on s byte +68 (cases 0 and 4 the split-off sub_822505CC).
   static constexpr uint32_t kKinds[8] = {6, 2, 3, 4, 6, 0, 1, 5};
-  const uint8_t kind = guest::LoadU8(base, spec + 68);
+  const uint8_t kind = s.engine_type();
   if (kind <= 7) {
-    guest::StoreU32(base, record + 32, kKinds[kind]);
+    record.set_engine_class(kKinds[kind]);
   }
-  guest::StoreU32(base, record + 36, guest::LoadU8(base, spec + 69) != 0 ? 1 : 0);
-  guest::StoreU32(base, record + 40, guest::LoadU32(base, spec + 8));
-  guest::StoreU32(base, record + 44, Fctiwz32(Lfs(base, curve + 1056)));
-  guest::StoreU32(base, record + 48, Fctiwz32(Lfs(base, curve + 1060)));
-  Stfs(base, record + 52, double(float(Lfs(base, curve + 1048) * Lfs(base, kToKgfM))));
-  guest::StoreU32(base, record + 56, Fctiwz32(Lfs(base, curve + 1052)));
+  record.set_spec_flag(s.turbo() != 0 ? 1 : 0);
+  record.set_spec_word_3(s.displacement());
+  record.set_curve_value_0(Fctiwz32(double(c.most_power())));
+  record.set_curve_value_1(Fctiwz32(double(c.most_power_rpm())));
+  record.set_peak_torque(float(double(float(double(c.torque_scale()) * Lfs(base, kToKgfM)))));
+  record.set_peak_index(Fctiwz32(double(c.peak_rpm())));
   return curve;
 }
 

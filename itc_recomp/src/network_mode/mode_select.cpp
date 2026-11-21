@@ -17,6 +17,7 @@
 
 #include "base/log.h"
 #include "network_mode/internal.h"
+#include "schema/tuning_screen.h"
 #include "ui_movies/game.h"
 
 namespace network_mode {
@@ -465,7 +466,7 @@ uint32_t SelectSetCursorY(uint8_t* base, uint32_t y, uint32_t sp) {
   Store(base, frame + 84, y);
   const float value = float(double(int64_t(uint64_t(y))));
   const uint32_t node = ui_movies::FindNode(base, movie, 4, 0);
-  guest::StoreFloat(base, node + 16, value);
+  schema::UiMovieNode(base, node).set_y(value);
   return node;
 }
 

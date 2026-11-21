@@ -12,6 +12,8 @@
 #include "framework/run_loop.h"
 #include "graphics/video_output.h"
 #include "schema/frame_driver.h"
+#include "schema/framework.h"
+#include "schema/video_output.h"
 
 namespace frame_driver {
 
@@ -49,9 +51,10 @@ std::optional<bool> AddListener(uint8_t* base, uint32_t interface, uint32_t key,
                                 uint32_t delegate, uint32_t request,
                                 const app_states::AppCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820922B8 FrameDriver::AddListener");
-  Store(base, request + 0, 0);
-  Store(base, request + 4, schema::FrameDriverListenerKey(base, key).key());
-  Store(base, request + 8, calls.clone(delegate, 0x820922F0));
+  const schema::Request r(base, request);
+  r.set_type(0);
+  r.set_key(schema::FrameDriverListenerKey(base, key).key());
+  r.set_delegate(calls.clone(delegate, 0x820922F0));
   return framework::RequestsPushBack(base, DriverOfInterface(base, interface).requests_address(),
                                      request);
 }
@@ -78,7 +81,7 @@ uint32_t CallListener(uint8_t* base, uint32_t driver, uint64_t entry, uint32_t f
   const uint32_t interface = driver != 0 ? d.interface_address() : 0;
   const uint32_t device = d.device();
   const uint32_t delegate = Load(base, frame + 96 + 28);
-  const uint32_t target = app_states::VirtualTarget(base, delegate, 4);
+  const uint32_t target = schema::RunLoopDelegate(base, delegate).vtable().invoke();
   return calls.call(target, delegate, interface, uint64_t(device), 0x82091AD4);
 }
 
@@ -130,15 +133,14 @@ void SceneUpdate(uint8_t* base, uint32_t scene, const app_states::AppCalls& call
   const uint32_t queue = s.render_queue_address();
   calls.set_register(30, list);
   calls.set_register(31, queue);
-  calls.call(app_states::VirtualTarget(base, queue, 24), queue, std::nullopt, std::nullopt,
-             0x82098910);
-  calls.call(app_states::VirtualTarget(base, queue, 8), queue, std::nullopt, std::nullopt,
+  calls.call(s.render_queue_vtable().flip(), queue, std::nullopt, std::nullopt, 0x82098910);
+  calls.call(s.render_queue_vtable().clear_recording(), queue, std::nullopt, std::nullopt,
              0x82098924);
 }
 
 void VideoOutputBeginFrame(uint8_t* base, uint32_t video_output, const SetGpr& set_gpr) {
   ITC_NATIVE_RUNNING("sub_8258D958 VideoOutput::BeginFrame");
-  set_gpr(Load(base, video_output + graphics::video_output::kDevice), 32, 96);
+  set_gpr(schema::VideoOutput(base, video_output).device<schema::View>().address, 32, 96);
   G::set_vblank_count(base, 0);
 }
 
@@ -147,15 +149,17 @@ uint32_t SceneDraw(uint8_t* base, uint32_t scene, uint32_t interface, uint32_t d
   ITC_NATIVE_RUNNING("sub_82098940 Scene::Draw");
   calls.set_register(29, device);
   calls.set_register(30, scene);
-  const uint32_t target = app_states::VirtualTarget(base, interface, 12);
+  const uint32_t target =
+      schema::FrameDriverInterface(base, interface).vtable().get_video_output();
   const uint32_t video_output =
       target == kGetVideoOutput
           ? GetVideoOutput(interface)
           : calls.call(target, interface, std::nullopt, std::nullopt, 0x82098968);
   calls.set_register(31, video_output);
   VideoOutputBeginFrame(base, video_output, set_gpr);
-  const uint32_t queue = Scene(base, scene).render_queue_address();
-  calls.call(app_states::VirtualTarget(base, queue, 20), queue, uint64_t(device),
+  const Scene s(base, scene);
+  const uint32_t queue = s.render_queue_address();
+  calls.call(s.render_queue_vtable().replay(), queue, uint64_t(device),
              uint64_t(video_output), 0x82098994);
   return video_output;
 }
@@ -163,22 +167,22 @@ uint32_t SceneDraw(uint8_t* base, uint32_t scene, uint32_t interface, uint32_t d
 void VideoOutputUnbindAll(uint8_t* base, uint32_t video_output, const UnbindCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8258D9F8 VideoOutput::UnbindAll");
   constexpr uint64_t kTop = 0x8000000000000000ull;
-  const uint32_t device_at = video_output + graphics::video_output::kDevice;
+  const schema::VideoOutput vo(base, video_output);
   calls.set_register(29, video_output);
   calls.set_register(30, kTop);
   for (uint32_t stage = 0; stage < 16; stage++) {
     calls.set_register(31, stage);
-    calls.set_texture(Load(base, device_at), stage, kTop >> (stage + 20));
+    calls.set_texture(vo.device<schema::View>().address, stage, kTop >> (stage + 20));
   }
   for (uint32_t stream = 0; stream < 4; stream++) {
     calls.set_register(31, stream);
     const uint32_t shift = ((((95 - stream) * 21846u) >> 16) & 0xFFFF) + 20;
-    calls.set_stream_source(Load(base, device_at), stream, (shift & 0x40) ? 0 : kTop >> (shift & 0x3F));
+    calls.set_stream_source(vo.device<schema::View>().address, stream, (shift & 0x40) ? 0 : kTop >> (shift & 0x3F));
   }
   calls.set_register(31, 4);
-  calls.set_indices(Load(base, device_at));
-  calls.set_pixel_shader(Load(base, device_at));
-  calls.set_vertex_shader(Load(base, device_at));
+  calls.set_indices(vo.device<schema::View>().address);
+  calls.set_pixel_shader(vo.device<schema::View>().address);
+  calls.set_vertex_shader(vo.device<schema::View>().address);
 }
 
 }  // namespace frame_driver

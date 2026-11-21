@@ -26,10 +26,8 @@
 
 namespace std_list {
 
-// The list's (app-states.toml's PtrList); the nodes are schema/input.h's
-// PtrListNode.
-constexpr uint32_t kHead = 4;
-constexpr uint32_t kSize = 8;
+// The list is app-states.toml's PtrList (schema/app_states.h), the nodes
+// schema/input.h's PtrListNode.
 
 // Whether `count` nodes can be allocated natively (no bad_alloc path; a size
 // malloc takes, with a process heap).

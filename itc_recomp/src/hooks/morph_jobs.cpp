@@ -19,6 +19,7 @@
 #include "hooks/second_set.h"
 #include "memory/c_runtime_heap.h"
 #include "lifted/sdk.h"
+#include "schema/framework.h"
 
 ITC_FLAG_BOOL(native_morph_jobs, true, "ITC",
               "Run the morph jobs (docs/functions/morph-jobs.md: the pool makers' slot 1 "
@@ -85,7 +86,7 @@ mj::ConstructCalls MorphJobsConstructCalls(lifted::Regs& ctx, uint8_t* base) {
     ctx.r3.u64 = interface;
     ctx.r4.u64 = item;
     ctx.r5.u64 = 1;
-    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, interface) + 4);
+    const uint32_t function = schema::WorkerPoolInterface(base, interface).vtable().post();
     ctx.ctr.u64 = function;
     ctx.lr = lr;
     lifted::CallFromContext(ctx, base, function);

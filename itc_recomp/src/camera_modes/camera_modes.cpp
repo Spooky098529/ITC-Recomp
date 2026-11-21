@@ -17,6 +17,8 @@
 #include "track_zones/track_zones.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 #include "schema/camera_modes.h"
+#include "schema/race_hud_machine.h"
+#include "schema/race_states.h"
 
 namespace camera_modes {
 
@@ -35,7 +37,6 @@ constexpr uint32_t kTwoPi = G::two_pi_address();
 constexpr uint32_t kOverTwoPi = G::over_two_pi_address();
 constexpr uint32_t kRadiansPerDegree = G::radians_per_degree_address();
 
-int32_t LoadS32(uint8_t* base, uint32_t a) { return int32_t(guest::LoadU32(base, a)); }
 int32_t LoadS16(uint8_t* base, uint32_t a) { return int16_t(guest::LoadU16(base, a)); }
 
 schema::Viewport Viewport0(uint8_t* base) { return G::viewports(base).first(); }
@@ -63,8 +64,9 @@ uint32_t ToView4(uint8_t* base, uint32_t director) {
   if (viewports.split() != 0) {
     viewports.set_split(0);
     const uint32_t record =
-        vehicle_accessors::RacerRecordsAt(base, G::race_data(base) + 0x59AE8, 0xFFFFFFFFu);
-    const int32_t kind = LoadS32(base, record + 3924);
+        vehicle_accessors::RacerRecordsAt(
+            base, schema::RaceData(base, G::race_data(base)).results_address(), 0xFFFFFFFFu);
+    const int32_t kind = int32_t(schema::RacerResultsRecord(base, record).finish());
     d.set_followed(kind == 2 ? 1 : 0);
     d.set_followed_input(0);
     r3 = record;
@@ -88,10 +90,10 @@ void ToView3(uint8_t* base) {
 void ToView3IfCourse(uint8_t* base, uint32_t director) {
   ITC_NATIVE_RUNNING("sub_82153160 CameraDirector::ToView3IfCourse");
   const uint32_t race = G::race_data(base);
-  if (LoadS32(base, race + 0xA3AF0) != 1) {
+  if (int32_t(schema::RaceData(base, race).kind()) != 1) {
     return;
   }
-  const int32_t course = LoadS32(base, race + 4);
+  const int32_t course = int32_t(schema::RaceData(base, race).route_course());
   if (course == 8 || course == 9 || course == 10) {
     return;
   }

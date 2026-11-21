@@ -15,6 +15,10 @@
 #include "matrix_math/matrix_math.h"
 #include "models/model.h"
 #include "models/texture_provider.h"
+#include "schema/command_list.h"
+#include "schema/device_shaders.h"
+#include "schema/material_passes.h"
+#include "schema/models.h"
 #include "schema/scenery_lists.h"
 
 #include "base/float_mode.h"
@@ -31,6 +35,10 @@ namespace {
 
 using Fpscr = ::base::FloatMode;
 using G = schema::SceneryListsGlobals;
+// Other areas' views the draws read (models.md, material-passes.md).
+using ModelView = schema::Model;
+using Shape = schema::ModelShape;
+using Record = schema::MaterialRecord;
 
 // A call of the texture provider's slot `function` (args: the provider, the
 // slot, the index) from `frame` with `lr`: its plain C++ where it's the
@@ -115,20 +123,20 @@ void CopyWords(uint8_t* base, uint32_t to, uint32_t from, uint32_t words) {
 // The command list's checks before a recorder: its chunk open or none open
 // on any list, and room for `slots`.
 bool CanRecord(uint8_t* base, uint32_t list, uint32_t slots) {
-  if (guest::LoadU8(base, list + 52) == 0 &&
-      guest::LoadU32(base, command_list::kOpenChunks) != 0) {
+  const schema::CommandList l(base, list);
+  if (l.chunk_open() == 0 && schema::CommandListGlobals::open_chunks(base) != 0) {
     return false;
   }
-  const uint32_t used = guest::LoadU32(base, list + 12);
-  return used + slots >= used && used + slots < guest::LoadU32(base, list + 8);
+  const uint32_t used = l.used();
+  return used + slots >= used && used + slots < l.capacity();
 }
 
 // Command 36 and the chunk closed.
 void EndRecord(uint8_t* base, uint32_t list) {
-  const uint32_t slot = command_list::AllocateSlots(base, list, 1);
-  guest::StoreU32(base, slot + 4, 0);
-  guest::StoreU32(base, slot + 0, 36);
-  guest::StoreU32(base, slot + 8, 0);
+  const schema::ChunkCommand end(base, command_list::AllocateSlots(base, list, 1));
+  end.set_arg0(0);
+  end.set_id(36);
+  end.set_arg1(0);
   command_list::CloseChunk(base, list);
 }
 
@@ -190,7 +198,8 @@ uint32_t IsShapeVisible(uint8_t* base, uint32_t model, uint32_t view_projection,
   const simde__m128 c9 = Lo(v13, v0);
   const simde__m128 c7 = Lo(v11, v12);
   int32_t near = 0, across = 0, up = 0;
-  uint32_t corner = guest::LoadU32(base, model + 40) + shape * 544 + 96;
+  // The shape's +96 on: its eight corners (not a ModelShape field yet).
+  uint32_t corner = ModelView(base, model).shapes().address + shape * 544 + 96;
   for (int i = 0; i < 8; i++, corner += 16) {
     simde__m128 point;
     {
@@ -309,26 +318,28 @@ namespace {
 
 // A shape (544 bytes from the model's +40).
 uint32_t ShapeAt(uint8_t* base, uint32_t model, uint32_t shape) {
-  return shape * 544 + guest::LoadU32(base, model + 40);
+  return shape * 544 + ModelView(base, model).shapes().address;
 }
 
-// Whether RecordShapeDepth records material `material` (its +348 at
-// `at`): its +404 shares the mask (when not 0), and its +388 is 0 or the
-// byte is set.
-bool DepthRecords(uint8_t* base, uint32_t at, uint32_t mask, uint32_t with_flagged) {
-  if (mask != 0 && (guest::LoadU32(base, at + 56) & mask) == 0) {
+// Whether RecordShapeDepth records material `record`: its +404 shares the
+// mask (when not 0; not a MaterialRecord field yet), and its +388 is 0 or
+// the byte is set.
+bool DepthRecords(uint8_t* base, uint32_t record, uint32_t mask, uint32_t with_flagged) {
+  if (mask != 0 && (guest::LoadU32(base, record + 404) & mask) == 0) {
     return false;
   }
-  return guest::LoadU32(base, at + 40) == 0 || (with_flagged & 0xFF) != 0;
+  return schema::MaterialRecord(base, record).render_state_96() == 0 ||
+         (with_flagged & 0xFF) != 0;
 }
 
 // The first material of the group (as the original works it out).
 uint32_t FirstMaterial(uint8_t* base, uint32_t model, uint32_t shape, int32_t group) {
-  const uint32_t block = guest::LoadU32(base, ShapeAt(base, model, shape) + 396);
+  const schema::MaterialBlock block =
+      schema::ModelShape(base, ShapeAt(base, model, shape)).materials();
   if (group == 0) {
-    return block + 16;
+    return block.records_address();
   }
-  return (guest::LoadU32(base, block + 8) << 9) + block + 16;
+  return (block.group0_count() << 9) + block.records_address();
 }
 
 // The slots RecordShapeDepth takes (0 when it records nothing).
@@ -339,14 +350,14 @@ uint32_t RecordShapeDepthSlots(uint8_t* base, uint32_t model, uint32_t shape, in
   }
   const uint32_t at = ShapeAt(base, model, shape);
   uint32_t slots = 7;
-  if (guest::LoadU32(base, at + 428) == 1 &&
-      guest::LoadU32(base, guest::LoadU32(base, at + 408) + 20) != 0) {
+  if (Shape(base, at).skinned() == 1 &&
+      Shape(base, at).skin().object() != 0) {
     slots += 2;
   }
-  uint32_t material = FirstMaterial(base, model, shape, group) + 348;
+  uint32_t record = FirstMaterial(base, model, shape, group);
   for (int32_t i = 0; i < int32_t(models::MaterialCount(base, model, shape, group));
-       i++, material += 512) {
-    if (DepthRecords(base, material, mask, with_flagged)) {
+       i++, record += 512) {
+    if (DepthRecords(base, record, mask, with_flagged)) {
       slots += 7;
     }
   }
@@ -365,7 +376,7 @@ uint32_t RecordShapeDepthChecked(uint8_t* base, uint32_t model, uint32_t shape, 
   const uint32_t list = G::record_list(base);
   const uint32_t at = ShapeAt(base, model, shape);
   const uint32_t stream =
-      guest::LoadU32(base, at + 428) == 1 ? guest::LoadU32(base, at + 412) : at + 320;
+      Shape(base, at).skinned() == 1 ? Shape(base, at).skinned_stream1() : Shape(base, at).vertex_buffer1_address();
   command_list::OpenChunk(base, list);
   const uint32_t header = command_list::AllocateSlots(base, list, 1);
   Slot(base, header, 10, 1, 0);
@@ -378,36 +389,37 @@ uint32_t RecordShapeDepthChecked(uint8_t* base, uint32_t model, uint32_t shape, 
   guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 264));
   Slot(base, command_list::AllocateSlots(base, list, 1), 7, 1, 0x01012B01);
   CopyWords(base, command_list::AllocateSlots(base, list, 1), G::depth_constant_address(), 4);
-  if (guest::LoadU32(base, at + 428) == 1) {
-    const uint32_t indices = guest::LoadU32(base, at + 408);
-    if (guest::LoadU32(base, indices + 20) != 0) {
+  if (Shape(base, at).skinned() == 1) {
+    const uint32_t indices = Shape(base, at).skin().address;
+    if (schema::SkinBlock(base, indices).object() != 0) {
       Slot(base, command_list::AllocateSlots(base, list, 1), 22, 1, 0);
       slot = command_list::AllocateSlots(base, list, 1);
       guest::StoreU32(base, slot + 8, 1);
-      guest::StoreU32(base, slot + 4, guest::LoadU32(base, indices + 20));
+      guest::StoreU32(base, slot + 4, schema::SkinBlock(base, indices).object());
     }
   }
-  uint32_t material = FirstMaterial(base, model, shape, group) + 348;
+  uint32_t record = FirstMaterial(base, model, shape, group);
   for (int32_t i = 0; i < int32_t(models::MaterialCount(base, model, shape, group));
-       i++, material += 512) {
-    if (!DepthRecords(base, material, mask, with_flagged)) {
+       i++, record += 512) {
+    if (!DepthRecords(base, record, mask, with_flagged)) {
       continue;
     }
+    const schema::MaterialRecord r(base, record);
     Slot(base, command_list::AllocateSlots(base, list, 1), 1, 2, 0);
     slot = command_list::AllocateSlots(base, list, 1);
     guest::StoreU32(base, slot + 0, 100);
-    guest::StoreU32(base, slot + 4, guest::LoadU32(base, material - 236));
+    guest::StoreU32(base, slot + 4, r.render_state_100());
     slot = command_list::AllocateSlots(base, list, 1);
     guest::StoreU32(base, slot + 0, 56);
-    guest::StoreU32(base, slot + 4, guest::LoadU32(base, material - 4));
+    guest::StoreU32(base, slot + 4, r.cull_mode());
     Slot(base, command_list::AllocateSlots(base, list, 1), 12, 1, 0);
-    guest::StoreU32(base, command_list::AllocateSlots(base, list, 1), material + 4);
+    guest::StoreU32(base, command_list::AllocateSlots(base, list, 1), r.index_buffer_address());
     Slot(base, command_list::AllocateSlots(base, list, 1), 18, 1, 0);
     slot = command_list::AllocateSlots(base, list, 1);
     guest::StoreU16(base, slot + 4, 0);
     guest::StoreU16(base, slot + 6, 0);
-    guest::StoreU32(base, slot + 0, guest::LoadU32(base, material));
-    guest::StoreU32(base, slot + 8, guest::LoadU32(base, material - 8));
+    guest::StoreU32(base, slot + 0, r.primitive_type());
+    guest::StoreU32(base, slot + 8, r.draw_count());
   }
   EndRecord(base, list);
   return header;
@@ -441,7 +453,7 @@ std::optional<DepthDraw> DrawShapeDepth(uint8_t* base, uint32_t model, uint32_t 
     return std::nullopt;
   }
   DepthDraw draw;
-  if (guest::LoadU32(base, model + 28) == 0) {
+  if (ModelView(base, model).header().address == 0) {
     draw.r3 = model;
     return draw;
   }
@@ -498,14 +510,14 @@ std::optional<uint32_t> SceneryRecordShapeSlots(uint8_t* base, uint32_t model, u
   const uint32_t type = guest::LoadU32(base, at + 260);
   const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, at + 276) == 6;
   uint32_t slots = 2 + (short_streams ? 3 : 4) + 1 + 4 + 1 + 12 + 1 + 8 + 1;
-  if (guest::LoadU32(base, at + 428) == 1 &&
-      guest::LoadU32(base, guest::LoadU32(base, at + 408) + 20) != 0) {
+  if (Shape(base, at).skinned() == 1 &&
+      Shape(base, at).skin().object() != 0) {
     slots += 2;
   }
   uint32_t material = models::Material(base, model, shape, 0, group);
   for (int32_t i = 0; i < count; i++, material += 512) {
-    const int32_t textures = int32_t(guest::LoadU32(base, material + 128));
-    if (textures > 4 || int32_t(guest::LoadU32(base, material + 396)) != -1) {
+    const int32_t textures = int32_t(Record(base, material).texture_count());
+    if (textures > 4 || int32_t(Record(base, material).material_animation()) != -1) {
       return std::nullopt;
     }
     slots += (set_shaders != 0 ? 4 : 0) + 6 + 6 + 2 + (group == 0 ? 3 : 0) + 2 + 4;
@@ -514,7 +526,7 @@ std::optional<uint32_t> SceneryRecordShapeSlots(uint8_t* base, uint32_t model, u
     } else {
       slots += 5;
     }
-    const uint32_t flags = guest::LoadU32(base, material + 104);
+    const uint32_t flags = Record(base, material).flags();
     slots += ((flags & 2) != 0 ? 2 : 0) + ((flags & 4) != 0 ? 2 : 0);
     slots += (range != 0 ? 4 : 0) + (c76 != 0 ? 4 : 0);
   }
@@ -537,11 +549,11 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
   const schema::SceneryModel m(base, model);
   const uint32_t list = G::record_list(base);
   const uint32_t at = ShapeAt(base, model, shape);
-  uint32_t stream = at + 320;
-  uint32_t second = at + 352;
-  if (guest::LoadU32(base, at + 428) == 1) {
-    stream = guest::LoadU32(base, at + 412);
-    second = guest::LoadU32(base, at + 420);
+  uint32_t stream = Shape(base, at).vertex_buffer1_address();
+  uint32_t second = Shape(base, at).vertex_buffer2_address();
+  if (Shape(base, at).skinned() == 1) {
+    stream = Shape(base, at).skinned_stream1();
+    second = Shape(base, at).skinned_stream2();
   }
   command_list::OpenChunk(base, list);
   const uint32_t header = Take(base, list);
@@ -557,7 +569,7 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
   if (type != 9 && type != 10 && guest::LoadU32(base, at + 276) != 6) {
     Slot(base, Take(base, list), 11, 3, 0);
     slot = Take(base, list);
-    Slot(base, slot, 0, at + 288, 0);
+    Slot(base, slot, 0, Shape(base, at).vertex_buffer0_address(), 0);
     guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 248));
     slot = Take(base, list);
     Slot(base, slot, 1, stream, 0);
@@ -568,24 +580,24 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
   } else {
     Slot(base, Take(base, list), 11, 2, 0);
     slot = Take(base, list);
-    Slot(base, slot, 0, at + 288, 0);
+    Slot(base, slot, 0, Shape(base, at).vertex_buffer0_address(), 0);
     guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 248));
     slot = Take(base, list);
     Slot(base, slot, 1, stream, 0);
     guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 264));
   }
-  if (guest::LoadU32(base, at + 428) == 1) {
-    const uint32_t indices = guest::LoadU32(base, at + 408);
-    if (guest::LoadU32(base, indices + 20) != 0) {
+  if (Shape(base, at).skinned() == 1) {
+    const uint32_t indices = Shape(base, at).skin().address;
+    if (schema::SkinBlock(base, indices).object() != 0) {
       Slot(base, Take(base, list), 22, 1, 0);
       slot = Take(base, list);
       guest::StoreU32(base, slot + 8, 1);
-      guest::StoreU32(base, slot + 4, guest::LoadU32(base, indices + 20));
+      guest::StoreU32(base, slot + 4, schema::SkinBlock(base, indices).object());
     }
   }
   Slot(base, Take(base, list), 2, 4, 0);
   for (uint32_t k = 0; k < 4; k++) {
-    Slot(base, Take(base, list), k, 28, guest::LoadU32(base, at + 432));
+    Slot(base, Take(base, list), k, 28, guest::LoadU32(base, Shape(base, at).sampler_state_28_address()));
   }
   uint32_t material = models::Material(base, model, shape, 0, group);
   Slot(base, Take(base, list), 2, 12, 0);
@@ -605,38 +617,38 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
       for (uint32_t offset = 96; offset < 112; offset += 4) {
         guest::StoreFloat(base, frame + offset, float(one));
       }
-      guest::StoreU32(base, frame + 80, guest::LoadU32(base, material + 108));
+      guest::StoreU32(base, frame + 80, Record(base, material).blend_mode());
       // The shaders: the model's own pair, or the shared one.
       if (set_shaders != 0) {
-        const uint32_t pair = guest::LoadU32(base, material + 392);
+        const uint32_t pair = Record(base, material).shared_pair();
         if (pair == 0) {
           Slot(base, Take(base, list), 8, 1, 0);
           guest::StoreU32(base, Take(base, list),
-                          guest::LoadU32(base, (guest::LoadU32(base, material + 96) << 4) +
+                          guest::LoadU32(base, (Record(base, material).shader_pair() << 4) +
                                                    m.shader_pairs<schema::View>().address));
           Slot(base, Take(base, list), 9, 1, 0);
           guest::StoreU32(base, Take(base, list),
-                          guest::LoadU32(base, (guest::LoadU32(base, material + 96) << 4) +
+                          guest::LoadU32(base, (Record(base, material).shader_pair() << 4) +
                                                    m.shader_pairs<schema::View>().address + 4));
         } else {
           Slot(base, Take(base, list), 8, 1, 0);
           slot = Take(base, list);
           guest::StoreU32(base, slot,
                           models::SharedVertexShader(
-                              base, guest::LoadU32(base, material + 392) + pair_offset));
+                              base, Record(base, material).shared_pair() + pair_offset));
           Slot(base, Take(base, list), 9, 1, 0);
           slot = Take(base, list);
           guest::StoreU32(base, slot,
                           models::SharedPixelShader(
-                              base, guest::LoadU32(base, material + 392) + pair_offset));
+                              base, Record(base, material).shared_pair() + pair_offset));
         }
       }
       // Vertex c9-c13: the textures' colors, then the material's +0.
       Slot(base, Take(base, list), 7, 5, 0x00010905);
       const uint32_t vertex = Take(base, list, 5);
-      for (int32_t j = 0; j < int32_t(guest::LoadU32(base, material + 128)); j++) {
+      for (int32_t j = 0; j < int32_t(Record(base, material).texture_count()); j++) {
         const uint32_t out = vertex + 16 * uint32_t(j);
-        const int32_t index = int32_t(guest::LoadU32(base, material + 208 + 4 * uint32_t(j)));
+        const int32_t index = int32_t(guest::LoadU32(base, Record(base, material).color_index_address() + 4 * uint32_t(j)));
         double third;
         if (index != -1) {
           const uint32_t color = (uint32_t(index) << 4);
@@ -648,11 +660,11 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
           guest::StoreFloat(base, out + 4, float(zero));
           guest::StoreFloat(base, out + 8, float(zero));
           guest::StoreFloat(base, out + 12, float(one));
-          third = Lfs(base, material + 240 + 4 * uint32_t(j));
+          third = Lfs(base, Record(base, material).texture_float_address() + 4 * uint32_t(j));
         }
         guest::StoreFloat(base, frame + 96 + 4 * uint32_t(j), float(third));
       }
-      CopyWords(base, vertex + 64, material, 4);
+      CopyWords(base, vertex + 64, Record(base, material).color_r_address(), 4);
       // The model's per-draw hook (slot 1).
       {
         const uint32_t args[5] = {model, shape, uint32_t(i), vertex + 64, frame + 80};
@@ -667,12 +679,12 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
       const uint32_t colors_low2 = guest::LoadU32(base, frame + 100);
       const uint32_t colors_high = guest::LoadU32(base, frame + 104);
       const uint32_t colors_high2 = guest::LoadU32(base, frame + 108);
-      CopyWords(base, pixel + 0, material + 64, 4);
-      CopyFloat(base, frame + 112, material + 80);
+      CopyWords(base, pixel + 0, Record(base, material).pixel_c63_xy_address(), 4);
+      CopyFloat(base, frame + 112, Record(base, material).pixel_c64_x_address());
       CopyWords(base, pixel + 16, frame + 112, 4);
-      CopyWords(base, pixel + 32, material + 16, 4);
-      CopyFloat(base, pixel + 44, material + 88);
-      CopyWords(base, pixel + 48, material + 32, 4);
+      CopyWords(base, pixel + 32, Record(base, material).pixel_c65_r_address(), 4);
+      CopyFloat(base, pixel + 44, Record(base, material).pixel_c64_z_address());
+      CopyWords(base, pixel + 48, Record(base, material).pixel_c66_r_address(), 4);
       guest::StoreU32(base, pixel + 64, colors_low);
       guest::StoreU32(base, pixel + 68, colors_low2);
       guest::StoreU32(base, pixel + 72, colors_high);
@@ -685,7 +697,7 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
                       guest::LoadU32(base, (guest::LoadU32(base, frame + 80) << 2) +
                                                G::blend_states_address()));
       if (group == 0) {
-        if (guest::LoadU32(base, material + 388) != 0) {
+        if (Record(base, material).render_state_96() != 0) {
           Slot(base, Take(base, list), 1, 2, 0);
           slot = Take(base, list);
           guest::StoreU32(base, slot + 4, 1);
@@ -700,22 +712,22 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
           guest::StoreU32(base, slot + 0, 96);
           slot = Take(base, list);
           guest::StoreU32(base, slot + 0, 100);
-          guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 112));
+          guest::StoreU32(base, slot + 4, Record(base, material).render_state_100());
         }
       }
       Slot(base, Take(base, list), 1, 1, 0);
       slot = Take(base, list);
       guest::StoreU32(base, slot + 0, 56);
-      guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 344));
+      guest::StoreU32(base, slot + 4, Record(base, material).cull_mode());
       // The textures and their sampler states.
       const uint32_t provider = m.texture_provider<schema::View>().address;
-      if (provider != 0 && guest::LoadU32(base, material + 128) != 0) {
+      if (provider != 0 && Record(base, material).texture_count() != 0) {
         slot = Take(base, list);
         guest::StoreU32(base, slot + 0, 4);
         guest::StoreU32(base, slot + 8, 0);
-        guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 128));
-        for (int32_t k = 0; k < int32_t(guest::LoadU32(base, material + 128)); k++) {
-          const uint32_t id = material + 144 + 4 * uint32_t(k);
+        guest::StoreU32(base, slot + 4, Record(base, material).texture_count());
+        for (int32_t k = 0; k < int32_t(Record(base, material).texture_count()); k++) {
+          const uint32_t id = Record(base, material).xpr_index_address() + 4 * uint32_t(k);
           const uint32_t set = m.animations<schema::View>().address;
           uint32_t texture = 0;
           bool lookup = true;
@@ -734,7 +746,7 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
             const uint32_t from = m.texture_provider<schema::View>().address;
             const uint32_t args[3] = {from, first, second_word};
             texture = ProviderSlotCall(base, calls,
-                             guest::LoadU32(base, guest::LoadU32(base, from) + 20), args, frame, 0x821473D0);
+                             schema::TextureProvider(base, from).vtable().xpr_texture_5(), args, frame, 0x821473D0);
           }
           slot = Take(base, list);
           guest::StoreU32(base, slot + 4, texture);
@@ -743,17 +755,17 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
         slot = Take(base, list);
         guest::StoreU32(base, slot + 0, 2);
         guest::StoreU32(base, slot + 8, 0);
-        guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 128) * 3);
-        for (int32_t k = 0; k < int32_t(guest::LoadU32(base, material + 128)); k++) {
+        guest::StoreU32(base, slot + 4, Record(base, material).texture_count() * 3);
+        for (int32_t k = 0; k < int32_t(Record(base, material).texture_count()); k++) {
           const uint32_t sampler = uint32_t(k);
           slot = Take(base, list);
           guest::StoreU32(base, slot + 0, sampler);
           guest::StoreU32(base, slot + 4, 0);
-          guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 272 + 4 * sampler));
+          guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_0_address() + 4 * sampler));
           slot = Take(base, list);
           guest::StoreU32(base, slot + 0, sampler);
           guest::StoreU32(base, slot + 4, 4);
-          guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 304 + 4 * sampler));
+          guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_4_address() + 4 * sampler));
           slot = Take(base, list);
           guest::StoreU32(base, slot + 0, sampler);
           guest::StoreU32(base, slot + 4, 24);
@@ -771,14 +783,14 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
       for (const auto& [bit, function_slot, lr] :
            {std::tuple<uint32_t, uint32_t, uint32_t>{2, 24, 0x82147534},
             std::tuple<uint32_t, uint32_t, uint32_t>{4, 20, 0x82147590}}) {
-        if ((guest::LoadU32(base, material + 104) & bit) == 0) {
+        if ((Record(base, material).flags() & bit) == 0) {
           continue;
         }
         const uint32_t from = m.texture_provider<schema::View>().address;
-        const uint32_t args[3] = {from, guest::LoadU32(base, material + 124),
-                                  guest::LoadU32(base, material + 120)};
+        const uint32_t args[3] = {from, Record(base, material).environment_arg_1(),
+                                  Record(base, material).environment_arg_0()};
         const uint32_t texture = ProviderSlotCall(base, calls,
-                             guest::LoadU32(base, guest::LoadU32(base, from) + function_slot), args, frame, lr);
+                             guest::LoadU32(base, schema::TextureProvider(base, from).vtable().address + function_slot), args, frame, lr);
         Slot(base, Take(base, list), 4, 1, 0);
         slot = Take(base, list);
         guest::StoreU32(base, slot + 4, texture);
@@ -805,13 +817,13 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
       }
       // The draw.
       Slot(base, Take(base, list), 12, 1, 0);
-      guest::StoreU32(base, Take(base, list), material + 352);
+      guest::StoreU32(base, Take(base, list), Record(base, material).index_buffer_address());
       Slot(base, Take(base, list), 18, 1, 0);
       slot = Take(base, list);
       guest::StoreU16(base, slot + 4, 0);
       guest::StoreU16(base, slot + 6, 0);
-      guest::StoreU32(base, slot + 0, guest::LoadU32(base, material + 348));
-      guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 340));
+      guest::StoreU32(base, slot + 0, Record(base, material).primitive_type());
+      guest::StoreU32(base, slot + 8, Record(base, material).draw_count());
       // The constants put back.
       if (range != 0) {
         Slot(base, Take(base, list), 7, 1, 0x00015601);
@@ -1001,16 +1013,16 @@ std::optional<uint32_t> ModelRecordShapeSlots(uint8_t* base, uint32_t model, uin
   // The header, the declaration, the streams, the samplers' state 28 and
   // the end.
   uint32_t slots = 2 + (short_streams ? 3 : 4) + 5 + 1;
-  if (guest::LoadU32(base, at + 428) == 1 &&
-      guest::LoadU32(base, guest::LoadU32(base, at + 408) + 20) != 0) {
+  if (Shape(base, at).skinned() == 1 &&
+      Shape(base, at).skin().object() != 0) {
     slots += 2;
   }
   const int32_t count = int32_t(models::MaterialCount(base, model, shape, group));
-  const uint32_t provider = guest::LoadU32(base, model + 48);
+  const uint32_t provider = ModelView(base, model).texture_provider().address;
   uint32_t material = FirstMaterial(base, model, shape, group);
   for (int32_t i = 0; i < count; i++, material += 512) {
-    const int32_t textures = int32_t(guest::LoadU32(base, material + 128));
-    if (textures > 4 || int32_t(guest::LoadU32(base, material + 396)) != -1) {
+    const int32_t textures = int32_t(Record(base, material).texture_count());
+    if (textures > 4 || int32_t(Record(base, material).material_animation()) != -1) {
       return std::nullopt;
     }
     slots += (set_shaders != 0 ? 4 : 0) + 6 + 6 + 2 + (group == 0 ? 3 : 0) + 2 + 4;
@@ -1019,9 +1031,9 @@ std::optional<uint32_t> ModelRecordShapeSlots(uint8_t* base, uint32_t model, uin
     } else {
       slots += 5;
     }
-    const uint32_t flags = guest::LoadU32(base, material + 104);
-    const bool ids = int32_t(guest::LoadU32(base, material + 124)) != -1 &&
-                     int32_t(guest::LoadU32(base, material + 120)) != -1;
+    const uint32_t flags = Record(base, material).flags();
+    const bool ids = int32_t(Record(base, material).environment_arg_1()) != -1 &&
+                     int32_t(Record(base, material).environment_arg_0()) != -1;
     slots += ((flags & 2) != 0 && ids ? 2 : 0) + ((flags & 4) != 0 && ids ? 2 : 0);
     slots += (range != 0 ? 4 : 0) + (c76 != 0 ? 4 : 0);
   }
@@ -1044,11 +1056,11 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
   SaveRecordShapeArguments(base, frame, shape, group, set_shaders, c76, range);
   const uint32_t list = G::record_list(base);
   const uint32_t at = ShapeAt(base, model, shape);
-  uint32_t stream = at + 320;
-  uint32_t second = at + 352;
-  if (guest::LoadU32(base, at + 428) == 1) {
-    stream = guest::LoadU32(base, at + 412);
-    second = guest::LoadU32(base, at + 420);
+  uint32_t stream = Shape(base, at).vertex_buffer1_address();
+  uint32_t second = Shape(base, at).vertex_buffer2_address();
+  if (Shape(base, at).skinned() == 1) {
+    stream = Shape(base, at).skinned_stream1();
+    second = Shape(base, at).skinned_stream2();
   }
   command_list::OpenChunk(base, list);
   uint32_t header = Take(base, list);
@@ -1064,7 +1076,7 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
   uint32_t slot;
   Slot(base, Take(base, list), 11, short_streams ? 2 : 3, 0);
   slot = Take(base, list);
-  Slot(base, slot, 0, at + 288, 0);
+  Slot(base, slot, 0, Shape(base, at).vertex_buffer0_address(), 0);
   guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 248));
   slot = Take(base, list);
   Slot(base, slot, 1, stream, 0);
@@ -1074,18 +1086,18 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
     Slot(base, slot, 2, second, 0);
     guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 280));
   }
-  if (guest::LoadU32(base, at + 428) == 1) {
-    const uint32_t indices = guest::LoadU32(base, at + 408);
-    if (guest::LoadU32(base, indices + 20) != 0) {
+  if (Shape(base, at).skinned() == 1) {
+    const uint32_t indices = Shape(base, at).skin().address;
+    if (schema::SkinBlock(base, indices).object() != 0) {
       Slot(base, Take(base, list), 22, 1, 0);
       slot = Take(base, list);
       guest::StoreU32(base, slot + 8, 1);
-      guest::StoreU32(base, slot + 4, guest::LoadU32(base, indices + 20));
+      guest::StoreU32(base, slot + 4, schema::SkinBlock(base, indices).object());
     }
   }
   Slot(base, Take(base, list), 2, 4, 0);
   for (uint32_t k = 0; k < 4; k++) {
-    Slot(base, Take(base, list), k, 28, guest::LoadU32(base, at + 432));
+    Slot(base, Take(base, list), k, 28, guest::LoadU32(base, Shape(base, at).sampler_state_28_address()));
   }
   uint32_t material = FirstMaterial(base, model, shape, group);
   const double one = Lfs(base, G::one_address());
@@ -1098,56 +1110,56 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
       for (uint32_t offset = 96; offset < 112; offset += 4) {
         guest::StoreFloat(base, frame + offset, float(one));
       }
-      guest::StoreU32(base, frame + 80, guest::LoadU32(base, material + 108));
+      guest::StoreU32(base, frame + 80, Record(base, material).blend_mode());
       // The shaders: the model's own pair, or the shared one.
       if (set_shaders != 0) {
-        const uint32_t pair = guest::LoadU32(base, material + 392);
+        const uint32_t pair = Record(base, material).shared_pair();
         Slot(base, Take(base, list), 8, 1, 0);
         if (pair == 0) {
           guest::StoreU32(base, Take(base, list),
-                          guest::LoadU32(base, (guest::LoadU32(base, material + 96) << 4) +
-                                                   guest::LoadU32(base, model + 24)));
+                          guest::LoadU32(base, (Record(base, material).shader_pair() << 4) +
+                                                   ModelView(base, model).shader_pairs().address));
           Slot(base, Take(base, list), 9, 1, 0);
           guest::StoreU32(base, Take(base, list),
-                          guest::LoadU32(base, (guest::LoadU32(base, material + 96) << 4) +
-                                                   guest::LoadU32(base, model + 24) + 4));
+                          guest::LoadU32(base, (Record(base, material).shader_pair() << 4) +
+                                                   ModelView(base, model).shader_pairs().address + 4));
         } else {
           slot = Take(base, list);
           guest::StoreU32(base, slot,
-                          models::SharedVertexShader(base, guest::LoadU32(base, material + 392)));
+                          models::SharedVertexShader(base, Record(base, material).shared_pair()));
           Slot(base, Take(base, list), 9, 1, 0);
           slot = Take(base, list);
           guest::StoreU32(base, slot,
-                          models::SharedPixelShader(base, guest::LoadU32(base, material + 392)));
+                          models::SharedPixelShader(base, Record(base, material).shared_pair()));
         }
       }
       // Vertex c9-c13: the textures' colors, then the material's +0.
       Slot(base, Take(base, list), 7, 5, 0x00010905);
       const uint32_t vertex = Take(base, list, 5);
-      for (int32_t j = 0; j < int32_t(guest::LoadU32(base, material + 128)); j++) {
+      for (int32_t j = 0; j < int32_t(Record(base, material).texture_count()); j++) {
         const uint32_t out = vertex + 16 * uint32_t(j);
-        const int32_t index = int32_t(guest::LoadU32(base, material + 208 + 4 * uint32_t(j)));
+        const int32_t index = int32_t(guest::LoadU32(base, Record(base, material).color_index_address() + 4 * uint32_t(j)));
         double third;
         if (index != -1) {
           const uint32_t color = (uint32_t(index) << 4);
-          CopyFloat(base, out + 0, color + guest::LoadU32(base, model + 320));
-          CopyFloat(base, out + 4, color + guest::LoadU32(base, model + 320) + 4);
-          third = Lfs(base, color + guest::LoadU32(base, model + 320) + 8);
+          CopyFloat(base, out + 0, color + ModelView(base, model).float4_values());
+          CopyFloat(base, out + 4, color + ModelView(base, model).float4_values() + 4);
+          third = Lfs(base, color + ModelView(base, model).float4_values() + 8);
         } else {
           guest::StoreFloat(base, out + 0, float(zero));
           guest::StoreFloat(base, out + 4, float(zero));
           guest::StoreFloat(base, out + 8, float(zero));
           guest::StoreFloat(base, out + 12, float(one));
-          third = Lfs(base, material + 240 + 4 * uint32_t(j));
+          third = Lfs(base, Record(base, material).texture_float_address() + 4 * uint32_t(j));
         }
         guest::StoreFloat(base, frame + 96 + 4 * uint32_t(j), float(third));
       }
-      CopyWords(base, vertex + 64, material, 4);
+      CopyWords(base, vertex + 64, Record(base, material).color_r_address(), 4);
       // (The material animation, +396 not -1, was declined by the count.)
       // The model's per-draw hook (slot 1).
       {
         const uint32_t args[5] = {model, shape, uint32_t(i), vertex + 64, frame + 80};
-        calls.call(calls.user, guest::LoadU32(base, guest::LoadU32(base, model) + 4), args, 5,
+        calls.call(calls.user, ModelView(base, model).vtable().draw_hook(), args, 5,
                    frame, 0x82595A9C);
       }
       // Pixel c63-c67: the material's +64, +80 (its w as a float), +16 (w
@@ -1158,12 +1170,12 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
       for (uint32_t w = 0; w < 4; w++) {
         colors[w] = guest::LoadU32(base, frame + 96 + 4 * w);
       }
-      CopyWords(base, pixel + 0, material + 64, 4);
-      CopyWords(base, pixel + 16, material + 80, 4);
+      CopyWords(base, pixel + 0, Record(base, material).pixel_c63_xy_address(), 4);
+      CopyWords(base, pixel + 16, Record(base, material).pixel_c64_x_address(), 4);
       CopyFloat(base, pixel + 28, material + 92);
-      CopyWords(base, pixel + 32, material + 16, 4);
-      CopyFloat(base, pixel + 44, material + 88);
-      CopyWords(base, pixel + 48, material + 32, 4);
+      CopyWords(base, pixel + 32, Record(base, material).pixel_c65_r_address(), 4);
+      CopyFloat(base, pixel + 44, Record(base, material).pixel_c64_z_address());
+      CopyWords(base, pixel + 48, Record(base, material).pixel_c66_r_address(), 4);
       for (uint32_t w = 0; w < 4; w++) {
         guest::StoreU32(base, pixel + 64 + 4 * w, colors[w]);
       }
@@ -1175,33 +1187,33 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
                       guest::LoadU32(base, (guest::LoadU32(base, frame + 80) << 2) +
                                                G::model_blend_states_address()));
       if (group == 0) {
-        const bool flagged = guest::LoadU32(base, material + 388) != 0;
+        const bool flagged = Record(base, material).render_state_96() != 0;
         Slot(base, Take(base, list), 1, 2, 0);
         slot = Take(base, list);
         guest::StoreU32(base, slot + 4, flagged ? 1 : 0);
         guest::StoreU32(base, slot + 0, 96);
         slot = Take(base, list);
         guest::StoreU32(base, slot + 0, 100);
-        guest::StoreU32(base, slot + 4, flagged ? 64 : guest::LoadU32(base, material + 112));
+        guest::StoreU32(base, slot + 4, flagged ? 64 : Record(base, material).render_state_100());
       }
       Slot(base, Take(base, list), 1, 1, 0);
       slot = Take(base, list);
       guest::StoreU32(base, slot + 0, 56);
-      guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 344));
+      guest::StoreU32(base, slot + 4, Record(base, material).cull_mode());
       // The textures (the provider's slot 5) and their sampler states 0 and
       // 4.
-      if (guest::LoadU32(base, model + 48) != 0 && guest::LoadU32(base, material + 128) != 0) {
+      if (ModelView(base, model).texture_provider().address != 0 && Record(base, material).texture_count() != 0) {
         slot = Take(base, list);
         guest::StoreU32(base, slot + 0, 4);
         guest::StoreU32(base, slot + 8, 0);
-        guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 128));
-        for (int32_t k = 0; k < int32_t(guest::LoadU32(base, material + 128)); k++) {
-          const uint32_t from = guest::LoadU32(base, model + 48);
-          const uint32_t args[3] = {from, guest::LoadU32(base, material + 144 + 4 * uint32_t(k)),
-                                    guest::LoadU32(base, material + 176 + 4 * uint32_t(k))};
+        guest::StoreU32(base, slot + 4, Record(base, material).texture_count());
+        for (int32_t k = 0; k < int32_t(Record(base, material).texture_count()); k++) {
+          const uint32_t from = ModelView(base, model).texture_provider().address;
+          const uint32_t args[3] = {from, guest::LoadU32(base, Record(base, material).xpr_index_address() + 4 * uint32_t(k)),
+                                    guest::LoadU32(base, Record(base, material).texture_index_address() + 4 * uint32_t(k))};
           const uint32_t texture =
               ProviderSlotCall(base, calls,
-                             guest::LoadU32(base, guest::LoadU32(base, from) + 20), args, frame, 0x82595CBC);
+                             schema::TextureProvider(base, from).vtable().xpr_texture_5(), args, frame, 0x82595CBC);
           slot = Take(base, list);
           guest::StoreU32(base, slot + 4, texture);
           guest::StoreU32(base, slot + 0, uint32_t(k));
@@ -1209,17 +1221,17 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
         slot = Take(base, list);
         guest::StoreU32(base, slot + 0, 2);
         guest::StoreU32(base, slot + 8, 0);
-        guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 128) << 1);
-        for (int32_t k = 0; k < int32_t(guest::LoadU32(base, material + 128)); k++) {
+        guest::StoreU32(base, slot + 4, Record(base, material).texture_count() << 1);
+        for (int32_t k = 0; k < int32_t(Record(base, material).texture_count()); k++) {
           const uint32_t sampler = uint32_t(k);
           slot = Take(base, list);
           guest::StoreU32(base, slot + 0, sampler);
           guest::StoreU32(base, slot + 4, 0);
-          guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 272 + 4 * sampler));
+          guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_0_address() + 4 * sampler));
           slot = Take(base, list);
           guest::StoreU32(base, slot + 4, 4);
           guest::StoreU32(base, slot + 0, sampler);
-          guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 304 + 4 * sampler));
+          guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_4_address() + 4 * sampler));
         }
       } else {
         Slot(base, Take(base, list), 4, 4, 0);
@@ -1234,21 +1246,21 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
       for (const auto& [bit, function_slot, lr] :
            {std::tuple<uint32_t, uint32_t, uint32_t>{2, 24, 0x82595E18},
             std::tuple<uint32_t, uint32_t, uint32_t>{4, 20, 0x82595E88}}) {
-        if ((guest::LoadU32(base, material + 104) & bit) == 0) {
+        if ((Record(base, material).flags() & bit) == 0) {
           continue;
         }
-        const uint32_t first = guest::LoadU32(base, material + 124);
+        const uint32_t first = Record(base, material).environment_arg_1();
         if (int32_t(first) == -1) {
           continue;
         }
-        const uint32_t second_id = guest::LoadU32(base, material + 120);
+        const uint32_t second_id = Record(base, material).environment_arg_0();
         if (int32_t(second_id) == -1) {
           continue;
         }
-        const uint32_t from = guest::LoadU32(base, model + 48);
+        const uint32_t from = ModelView(base, model).texture_provider().address;
         const uint32_t args[3] = {from, first, second_id};
         const uint32_t texture = ProviderSlotCall(base, calls,
-                             guest::LoadU32(base, guest::LoadU32(base, from) + function_slot), args, frame, lr);
+                             guest::LoadU32(base, schema::TextureProvider(base, from).vtable().address + function_slot), args, frame, lr);
         Slot(base, Take(base, list), 4, 1, 0);
         slot = Take(base, list);
         guest::StoreU32(base, slot + 4, texture);
@@ -1273,13 +1285,13 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
       }
       // The draw.
       Slot(base, Take(base, list), 12, 1, 0);
-      guest::StoreU32(base, Take(base, list), material + 352);
+      guest::StoreU32(base, Take(base, list), Record(base, material).index_buffer_address());
       Slot(base, Take(base, list), 18, 1, 0);
       slot = Take(base, list);
       guest::StoreU16(base, slot + 4, 0);
       guest::StoreU16(base, slot + 6, 0);
-      guest::StoreU32(base, slot + 0, guest::LoadU32(base, material + 348));
-      guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 340));
+      guest::StoreU32(base, slot + 0, Record(base, material).primitive_type());
+      guest::StoreU32(base, slot + 8, Record(base, material).draw_count());
       // The constants put back (the addresses from the frame's +84 and +88).
       if (range != 0) {
         Slot(base, Take(base, list), 7, 1, 0x00015601);
@@ -1339,7 +1351,7 @@ std::optional<SceneryDraw> ModelDrawShape(uint8_t* base, const DrawCalls& calls,
     }
   }
   SceneryDraw draw;
-  if (guest::LoadU32(base, model + 28) == 0) {
+  if (ModelView(base, model).header().address == 0) {
     draw.r3 = model;
     return draw;
   }
@@ -1443,13 +1455,13 @@ enum class TextureSource {
 };
 
 TextureSource SourceOf(uint8_t* base, uint32_t model, uint32_t material) {
-  const uint32_t pair = guest::LoadU32(base, material + 392);
-  const int32_t textures = int32_t(guest::LoadU32(base, material + 128));
-  if ((guest::LoadU32(base, model + 48) == 0 || textures == 0) && pair == 0) {
+  const uint32_t pair = Record(base, material).shared_pair();
+  const int32_t textures = int32_t(Record(base, material).texture_count());
+  if ((ModelView(base, model).texture_provider().address == 0 || textures == 0) && pair == 0) {
     return TextureSource::kUntextured;
   }
-  const bool replaced = guest::LoadU32(base, model + 460) != 0 &&
-                        guest::LoadU32(base, material + 176) == guest::LoadU32(base, model + 436);
+  const bool replaced = ModelView(base, model).replacement_texture() != 0 &&
+                        Record(base, material).texture_index() == ModelView(base, model).replaced_texture_index();
   if (pair != 0) {
     switch (pair) {
       case 1000:
@@ -1465,15 +1477,15 @@ TextureSource SourceOf(uint8_t* base, uint32_t model, uint32_t material) {
         return TextureSource::kNone;
     }
   }
-  switch (int32_t(guest::LoadU32(base, material + 408))) {
+  switch (int32_t(Record(base, material).category())) {
     case 3:
-      return guest::LoadU32(base, model + 452) != 0 && textures == 1 ? TextureSource::kModel452
+      return ModelView(base, model).category3_texture() != 0 && textures == 1 ? TextureSource::kModel452
                                                                       : TextureSource::kProvider;
     case 5:
       return textures == 1 ? TextureSource::kRenderTarget : TextureSource::kProvider;
     default:
-      if (int32_t(guest::LoadU32(base, model + 432)) != 0 &&
-          guest::LoadU32(base, model + 456) != 0) {
+      if (int32_t(ModelView(base, model).use_override_texture()) != 0 &&
+          ModelView(base, model).override_texture() != 0) {
         return TextureSource::kFill456;
       }
       return replaced ? TextureSource::kFill460 : TextureSource::kProvider;
@@ -1482,11 +1494,11 @@ TextureSource SourceOf(uint8_t* base, uint32_t model, uint32_t material) {
 
 // Whether sampler 6 is set (the environment texture and its states).
 bool SetsSampler6(uint8_t* base, uint32_t material) {
-  if ((guest::LoadU32(base, material + 104) & 4) != 0 ||
-      guest::LoadU32(base, material + 392) == 0) {
+  if ((Record(base, material).flags() & 4) != 0 ||
+      Record(base, material).shared_pair() == 0) {
     return true;
   }
-  switch (int32_t(guest::LoadU32(base, material + 408))) {
+  switch (int32_t(Record(base, material).category())) {
     case 1:
     case 2:
     case 7:
@@ -1514,14 +1526,14 @@ std::optional<uint32_t> ModelRecordMaterialsSlots(uint8_t* base, uint32_t model,
   const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, at + 276) == 6;
   // The header, the declaration, the streams and the end.
   uint32_t slots = 2 + (short_streams ? 3 : 4) + 1;
-  if (guest::LoadU32(base, at + 428) == 1 &&
-      guest::LoadU32(base, guest::LoadU32(base, at + 408) + 20) != 0) {
+  if (Shape(base, at).skinned() == 1 &&
+      Shape(base, at).skin().object() != 0) {
     slots += 2;
   }
   const int32_t count = int32_t(models::MaterialCount(base, model, shape, group));
   uint32_t material = models::Material(base, model, shape, 0, group);
   for (int32_t i = 0; i < count; i++, material += 512) {
-    const int32_t textures = int32_t(guest::LoadU32(base, material + 128));
+    const int32_t textures = int32_t(Record(base, material).texture_count());
     if (textures > 4) {
       return std::nullopt;
     }
@@ -1563,22 +1575,22 @@ void TextureSamplerStates(uint8_t* base, uint32_t list, uint32_t material, int32
     slot = Take(base, list);
     guest::StoreU32(base, slot + 0, sampler);
     guest::StoreU32(base, slot + 4, 0);
-    guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 272 + 4 * sampler));
+    guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_0_address() + 4 * sampler));
     slot = Take(base, list);
     guest::StoreU32(base, slot + 4, 4);
     guest::StoreU32(base, slot + 0, sampler);
-    guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 304 + 4 * sampler));
+    guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_4_address() + 4 * sampler));
   }
 }
 
 // The provider's slot 5 for texture `k` (its ids at +144 and +176).
 uint32_t ProviderTexture(uint8_t* base, const DrawCalls& calls, uint32_t frame, uint32_t model,
                          uint32_t material, uint32_t k, uint32_t lr) {
-  const uint32_t provider = guest::LoadU32(base, model + 48);
-  const uint32_t args[3] = {provider, guest::LoadU32(base, material + 144 + 4 * k),
-                            guest::LoadU32(base, material + 176 + 4 * k)};
+  const uint32_t provider = ModelView(base, model).texture_provider().address;
+  const uint32_t args[3] = {provider, guest::LoadU32(base, Record(base, material).xpr_index_address() + 4 * k),
+                            guest::LoadU32(base, Record(base, material).texture_index_address() + 4 * k)};
   return ProviderSlotCall(base, calls,
-                             guest::LoadU32(base, guest::LoadU32(base, provider) + 20), args, frame, lr);
+                             schema::TextureProvider(base, provider).vtable().xpr_texture_5(), args, frame, lr);
 }
 
 void RecordMaterialTextures(uint8_t* base, const DrawCalls& calls, uint32_t frame,
@@ -1607,17 +1619,17 @@ void RecordMaterialTextures(uint8_t* base, const DrawCalls& calls, uint32_t fram
     slot = Take(base, list);
     guest::StoreU32(base, slot + 0, 4);
     guest::StoreU32(base, slot + 8, 0);
-    guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 128));
-    for (int32_t k = 0; k < int32_t(guest::LoadU32(base, material + 128)); k++) {
+    guest::StoreU32(base, slot + 4, Record(base, material).texture_count());
+    for (int32_t k = 0; k < int32_t(Record(base, material).texture_count()); k++) {
       const uint32_t texture = texture_of(uint32_t(k));
       slot = Take(base, list);
       guest::StoreU32(base, slot + 4, texture);
       guest::StoreU32(base, slot + 0, uint32_t(k));
     }
-    TextureSamplerStates(base, list, material, int32_t(guest::LoadU32(base, material + 128)));
+    TextureSamplerStates(base, list, material, int32_t(Record(base, material).texture_count()));
   };
   uint32_t provider_lr = 0x820CF71C;
-  switch (int32_t(guest::LoadU32(base, material + 408))) {
+  switch (int32_t(Record(base, material).category())) {
     case 0:
       provider_lr = 0x820CFCA4;
       break;
@@ -1642,10 +1654,10 @@ void RecordMaterialTextures(uint8_t* base, const DrawCalls& calls, uint32_t fram
     case TextureSource::kNone:
       break;
     case TextureSource::kModel444:
-      single([&] { return guest::LoadU32(base, model + 444); }, false);
+      single([&] { return ModelView(base, model).vinyl_sheet(); }, false);
       break;
     case TextureSource::kModel452:
-      single([&] { return guest::LoadU32(base, model + 452); }, false);
+      single([&] { return ModelView(base, model).category3_texture(); }, false);
       break;
     case TextureSource::kProvider1001:
       single([&] { return ProviderTexture(base, calls, frame, model, material, 0, 0x820D0250); },
@@ -1672,7 +1684,7 @@ void RecordMaterialTextures(uint8_t* base, const DrawCalls& calls, uint32_t fram
       guest::StoreU32(base, slot + 4, texture);
       slot = Take(base, list);
       guest::StoreU32(base, slot + 0, 1);
-      guest::StoreU32(base, slot + 4, guest::LoadU32(base, model + 444));
+      guest::StoreU32(base, slot + 4, ModelView(base, model).vinyl_sheet());
       // Two textures' states, whatever the count.
       slot = Take(base, list);
       guest::StoreU32(base, slot + 0, 2);
@@ -1682,27 +1694,27 @@ void RecordMaterialTextures(uint8_t* base, const DrawCalls& calls, uint32_t fram
         slot = Take(base, list);
         guest::StoreU32(base, slot + 0, k);
         guest::StoreU32(base, slot + 4, 0);
-        guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 272 + 4 * k));
+        guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_0_address() + 4 * k));
         slot = Take(base, list);
         guest::StoreU32(base, slot + 4, 4);
         guest::StoreU32(base, slot + 0, k);
-        guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 304 + 4 * k));
+        guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_4_address() + 4 * k));
       }
       break;
     }
     case TextureSource::kReplaced1003:
       each([&](uint32_t k) {
-        if (guest::LoadU32(base, material + 176 + 4 * k) == guest::LoadU32(base, model + 436)) {
-          return guest::LoadU32(base, model + 460);
+        if (guest::LoadU32(base, Record(base, material).texture_index_address() + 4 * k) == ModelView(base, model).replaced_texture_index()) {
+          return ModelView(base, model).replacement_texture();
         }
         return ProviderTexture(base, calls, frame, model, material, k, 0x820D0058);
       });
       break;
     case TextureSource::kFill456:
-      each([&](uint32_t) { return guest::LoadU32(base, model + 456); });
+      each([&](uint32_t) { return ModelView(base, model).override_texture(); });
       break;
     case TextureSource::kFill460:
-      each([&](uint32_t) { return guest::LoadU32(base, model + 460); });
+      each([&](uint32_t) { return ModelView(base, model).replacement_texture(); });
       break;
     case TextureSource::kProvider:
       each([&](uint32_t k) {
@@ -1717,11 +1729,11 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
                                      uint32_t set_shaders) {
   const uint32_t list = G::record_list(base);
   const uint32_t at = ShapeAt(base, model, shape);
-  uint32_t stream = at + 320;
-  uint32_t second = at + 352;
-  if (guest::LoadU32(base, at + 428) == 1) {
-    stream = guest::LoadU32(base, at + 412);
-    second = guest::LoadU32(base, at + 420);
+  uint32_t stream = Shape(base, at).vertex_buffer1_address();
+  uint32_t second = Shape(base, at).vertex_buffer2_address();
+  if (Shape(base, at).skinned() == 1) {
+    stream = Shape(base, at).skinned_stream1();
+    second = Shape(base, at).skinned_stream2();
   }
   command_list::OpenChunk(base, list);
   const uint32_t header = Take(base, list);
@@ -1737,7 +1749,7 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
   uint32_t slot;
   Slot(base, Take(base, list), 11, short_streams ? 2 : 3, 0);
   slot = Take(base, list);
-  Slot(base, slot, 0, at + 288, 0);
+  Slot(base, slot, 0, Shape(base, at).vertex_buffer0_address(), 0);
   guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 248));
   slot = Take(base, list);
   Slot(base, slot, 1, stream, 0);
@@ -1747,13 +1759,13 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
     Slot(base, slot, 2, second, 0);
     guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 280));
   }
-  if (guest::LoadU32(base, at + 428) == 1) {
-    const uint32_t indices = guest::LoadU32(base, at + 408);
-    if (guest::LoadU32(base, indices + 20) != 0) {
+  if (Shape(base, at).skinned() == 1) {
+    const uint32_t indices = Shape(base, at).skin().address;
+    if (schema::SkinBlock(base, indices).object() != 0) {
       Slot(base, Take(base, list), 22, 1, 0);
       slot = Take(base, list);
       guest::StoreU32(base, slot + 8, 1);
-      guest::StoreU32(base, slot + 4, guest::LoadU32(base, indices + 20));
+      guest::StoreU32(base, slot + 4, schema::SkinBlock(base, indices).object());
     }
   }
   uint32_t material = models::Material(base, model, shape, 0, group);
@@ -1766,21 +1778,21 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
       for (uint32_t offset = 96; offset < 112; offset += 4) {
         guest::StoreFloat(base, frame + offset, float(one));
       }
-      const uint32_t pair = guest::LoadU32(base, material + 392);
+      const uint32_t pair = Record(base, material).shared_pair();
       // The shaders: the model's own pair, or a shared one (1005 for every
       // material when the model's +440 is set, 1000's for 1004).
       if (set_shaders != 0) {
         Slot(base, Take(base, list), 8, 1, 0);
-        if (pair == 0 && guest::LoadU32(base, model + 440) == 0) {
+        if (pair == 0 && ModelView(base, model).force_pair_1005() == 0) {
           guest::StoreU32(base, Take(base, list),
-                          guest::LoadU32(base, (guest::LoadU32(base, material + 96) << 4) +
-                                                   guest::LoadU32(base, model + 24)));
+                          guest::LoadU32(base, (Record(base, material).shader_pair() << 4) +
+                                                   ModelView(base, model).shader_pairs().address));
           Slot(base, Take(base, list), 9, 1, 0);
           guest::StoreU32(base, Take(base, list),
-                          guest::LoadU32(base, (guest::LoadU32(base, material + 96) << 4) +
-                                                   guest::LoadU32(base, model + 24) + 4));
+                          guest::LoadU32(base, (Record(base, material).shader_pair() << 4) +
+                                                   ModelView(base, model).shader_pairs().address + 4));
         } else {
-          const uint32_t shared = guest::LoadU32(base, model + 440) != 0 ? 1005
+          const uint32_t shared = ModelView(base, model).force_pair_1005() != 0 ? 1005
                                   : pair == 1004                         ? 1000
                                                                          : pair;
           guest::StoreU32(base, Take(base, list), models::SharedVertexShader(base, shared));
@@ -1793,7 +1805,7 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
       slot = Take(base, list);
       guest::StoreU32(base, slot + 0, 0);
       guest::StoreU32(base, slot + 4,
-                      guest::LoadU32(base, (guest::LoadU32(base, material + 108) << 2) +
+                      guest::LoadU32(base, (Record(base, material).blend_mode() << 2) +
                                                guest::LoadU32(base, frame + 80)));
       // Vertex c9-c13: four colors (0, 0, 0, 1) and the textures' third
       // floats (+240) at the frame's +96, each texture's color from the
@@ -1807,27 +1819,27 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
         guest::StoreFloat(base, out + 4, float(zero));
         guest::StoreFloat(base, out + 8, float(zero));
         guest::StoreFloat(base, out + 12, float(one));
-        CopyFloat(base, frame + 96 + 4 * j, material + 240 + 4 * j);
+        CopyFloat(base, frame + 96 + 4 * j, Record(base, material).texture_float_address() + 4 * j);
       }
-      for (int32_t j = 0; j < int32_t(guest::LoadU32(base, material + 128)); j++) {
+      for (int32_t j = 0; j < int32_t(Record(base, material).texture_count()); j++) {
         const uint32_t out = vertex + 16 * uint32_t(j);
-        const int32_t index = int32_t(guest::LoadU32(base, material + 208 + 4 * uint32_t(j)));
+        const int32_t index = int32_t(guest::LoadU32(base, Record(base, material).color_index_address() + 4 * uint32_t(j)));
         double third;
         if (index != -1) {
           const uint32_t color = uint32_t(index) << 4;
-          CopyFloat(base, out + 0, color + guest::LoadU32(base, model + 320));
-          CopyFloat(base, out + 4, color + guest::LoadU32(base, model + 320) + 4);
-          third = Lfs(base, color + guest::LoadU32(base, model + 320) + 8);
+          CopyFloat(base, out + 0, color + ModelView(base, model).float4_values());
+          CopyFloat(base, out + 4, color + ModelView(base, model).float4_values() + 4);
+          third = Lfs(base, color + ModelView(base, model).float4_values() + 8);
         } else {
           guest::StoreFloat(base, out + 0, float(zero));
           guest::StoreFloat(base, out + 4, float(zero));
           guest::StoreFloat(base, out + 8, float(zero));
           guest::StoreFloat(base, out + 12, float(one));
-          third = Lfs(base, material + 240 + 4 * uint32_t(j));
+          third = Lfs(base, Record(base, material).texture_float_address() + 4 * uint32_t(j));
         }
         guest::StoreFloat(base, frame + 96 + 4 * uint32_t(j), float(third));
       }
-      CopyWords(base, vertex + 64, material, 4);
+      CopyWords(base, vertex + 64, Record(base, material).color_r_address(), 4);
       // Pixel c63-c67: the material's +64, +80, +16 (w the float at +88),
       // +32, then the frame's four floats (as words).
       Slot(base, Take(base, list), 7, 5, 0x01013F05);
@@ -1836,11 +1848,11 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
       for (uint32_t w = 0; w < 4; w++) {
         colors[w] = guest::LoadU32(base, frame + 96 + 4 * w);
       }
-      CopyWords(base, pixel + 0, material + 64, 4);
-      CopyWords(base, pixel + 16, material + 80, 4);
-      CopyWords(base, pixel + 32, material + 16, 4);
-      CopyFloat(base, pixel + 44, material + 88);
-      CopyWords(base, pixel + 48, material + 32, 4);
+      CopyWords(base, pixel + 0, Record(base, material).pixel_c63_xy_address(), 4);
+      CopyWords(base, pixel + 16, Record(base, material).pixel_c64_x_address(), 4);
+      CopyWords(base, pixel + 32, Record(base, material).pixel_c65_r_address(), 4);
+      CopyFloat(base, pixel + 44, Record(base, material).pixel_c64_z_address());
+      CopyWords(base, pixel + 48, Record(base, material).pixel_c66_r_address(), 4);
       for (uint32_t w = 0; w < 4; w++) {
         guest::StoreU32(base, pixel + 64 + 4 * w, colors[w]);
       }
@@ -1848,7 +1860,7 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
       if (group == 0) {
         Slot(base, Take(base, list), 1, 1, 0);
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 388) != 0 ? 1 : 0);
+        guest::StoreU32(base, slot + 4, Record(base, material).render_state_96() != 0 ? 1 : 0);
         guest::StoreU32(base, slot + 0, 96);
       }
       // 48 (0 when [0x826C5104] is set), 100 and 56 (the cull mode, 2 and 6
@@ -1859,10 +1871,10 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
       guest::StoreU32(base, slot + 0, 48);
       slot = Take(base, list);
       guest::StoreU32(base, slot + 0, 100);
-      guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 112));
+      guest::StoreU32(base, slot + 4, Record(base, material).render_state_100());
       slot = Take(base, list);
       guest::StoreU32(base, slot + 0, 56);
-      uint32_t cull = guest::LoadU32(base, material + 344);
+      uint32_t cull = Record(base, material).cull_mode();
       if (G::cull_swap(base) != 0 && (cull == 2 || cull == 6)) {
         cull = cull == 2 ? 6 : 2;
       }
@@ -1872,11 +1884,11 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
       if (SetsSampler6(base, material)) {
         uint32_t texture = G::sampler6_texture(base);
         if (texture == 0) {
-          const uint32_t provider = guest::LoadU32(base, model + 48);
-          const uint32_t args[3] = {provider, guest::LoadU32(base, material + 124),
-                                    guest::LoadU32(base, material + 120)};
+          const uint32_t provider = ModelView(base, model).texture_provider().address;
+          const uint32_t args[3] = {provider, Record(base, material).environment_arg_1(),
+                                    Record(base, material).environment_arg_0()};
           texture = ProviderSlotCall(base, calls,
-                             guest::LoadU32(base, guest::LoadU32(base, provider) + 24), args, frame, 0x820CFE74);
+                             schema::TextureProvider(base, provider).vtable().xpr_texture_6(), args, frame, 0x820CFE74);
         }
         Slot(base, Take(base, list), 4, 1, 0);
         slot = Take(base, list);
@@ -1889,13 +1901,13 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
       }
       // The draw.
       Slot(base, Take(base, list), 12, 1, 0);
-      guest::StoreU32(base, Take(base, list), material + 352);
+      guest::StoreU32(base, Take(base, list), Record(base, material).index_buffer_address());
       Slot(base, Take(base, list), 18, 1, 0);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 0, guest::LoadU32(base, material + 348));
+      guest::StoreU32(base, slot + 0, Record(base, material).primitive_type());
       guest::StoreU16(base, slot + 4, 0);
       guest::StoreU16(base, slot + 6, 0);
-      guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 340));
+      guest::StoreU32(base, slot + 8, Record(base, material).draw_count());
     }
   }
   EndRecord(base, list);

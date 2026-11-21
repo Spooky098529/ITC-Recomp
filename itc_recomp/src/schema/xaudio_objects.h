@@ -117,27 +117,6 @@ struct XAudioObjectDescriptor : View {
   uint32_t loop_end_callback_address() const { return address + 76; }
 };
 
-// allocated; measure: AudioRenderDriver::Create.r4, PcmCodec::Create.r4, Reverb::Create.r4, VolumeMeter::Create.r4, XAudioMatrix::Create.r4, XmaCodec::Create.r4, PacketLists::Alloc.r5, VolumeMeter::Init.r5, XAudioMatrix::Init.r5, XmaCodec::XmaCodec.r5, sub_825A50E0.r4, sub_825A5DB8.r4
-struct XAudioAllocator : View {
-  using View::View;
-  static constexpr uint32_t kSize = 4;
-  template <typename T = XAudioAllocatorVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-};
-
-// image; measure: AudioRenderDriver::Create.r4.+0, PcmCodec::Create.r4.+0, Reverb::Create.r4.+0, VolumeMeter::Create.r4.+0, XAudioMatrix::Create.r4.+0, XmaCodec::Create.r4.+0, PacketLists::Alloc.r5.+0, VolumeMeter::Init.r5.+0, XAudioMatrix::Init.r5.+0, XmaCodec::XmaCodec.r5.+0, sub_825A50E0.r4.+0, sub_825A5DB8.r4.+0
-struct XAudioAllocatorVtable : View {
-  using View::View;
-  static constexpr uint32_t kSize = 24;
-  // (the allocator, bytes): the block, 0 when out of memory
-  uint32_t allocate() const { return guest::LoadU32(base, address + 20); }
-  void set_allocate(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t allocate_address() const { return address + 20; }
-};
-
 // embedded; measure: AudioRenderDriver::Size.r4, PcmCodec::Size.r4, XmaCodec::Size.r4, Reverb::Size.r4, VolumeMeter::Size.r4, XAudioMatrix::Size.r4, sub_825A2360.r4, sub_825A5828.r4
 struct FactorySizeOut : View {
   using View::View;
@@ -156,7 +135,7 @@ struct FactoryObjectOut : View {
   uint32_t object_address() const { return address + 0; }
 };
 
-// embedded; measure: XAudioCodec::GetInfo.r4, XAudioMatrix::GetInfo.r4, VolumeMeter::GetInfo.r4
+// embedded; measure: XAudioCodec::GetInfo.r4, XAudioMatrix::GetInfo.r4, VolumeMeter::GetInfo.r4, sub_82461EF8.r4
 struct FactoryInfoOut : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -1025,7 +1004,7 @@ struct XmaCodec : View {
   uint32_t unknown_280_address() const { return address + 280; }
 };
 
-// embedded; measure: XAudioCodec, sub_82467450.ret
+// embedded; measure: XAudioCodec, sub_82467450.ret, XAudioSourceVoice.+76
 struct XAudioCodec : View {
   using View::View;
   static constexpr uint32_t kSize = 180;
@@ -1073,7 +1052,7 @@ struct XAudioCodec : View {
   uint32_t loop_end_callback_address() const { return address + 176; }
 };
 
-// allocated; measure: XAudioMatrix
+// allocated; measure: XAudioMatrix, XAudioVoice.+72.+4
 struct XAudioMatrix : View {
   using View::View;
   static constexpr uint32_t kSize = 28;
@@ -1187,7 +1166,7 @@ struct MatrixLevel : View {
   uint32_t level_address() const { return address + 4; }
 };
 
-// allocated; measure: VolumeMeter
+// allocated; measure: VolumeMeter, sub_825A5E28.r3
 struct VolumeMeter : View {
   using View::View;
   static constexpr uint32_t kSize = 52;
@@ -1238,19 +1217,23 @@ struct VolumeMeter : View {
   uint32_t filled() const { return guest::LoadU32(base, address + 44); }
   void set_filled(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
   uint32_t filled_address() const { return address + 44; }
-  template <typename T = XAudioAllocator>
+  template <typename T = XAudioBumpAllocator>
   T allocator() const { return T(base, guest::LoadU32(base, address + 48)); }
   void set_allocator(const View& v) const { guest::StoreU32(base, address + 48, v.address); }
   void set_allocator(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
   uint32_t allocator_address() const { return address + 48; }
 };
 
-// allocated; measure: VolumeMeter.+28, VolumeMeter.+32
+// allocated; measure: VolumeMeter.+28, VolumeMeter.+32, sub_825A5E28.r3.+28, sub_825A5E28.r3.+32, sub_825A5E28.r3.+36
 struct MeterHistory : View {
   using View::View;
   static constexpr uint32_t kSize = 32;
   // the first slot's 8 channels (Process's fold-downs write 6 and 7)
   uint32_t values_address() const { return address + 0; }
+  // channels x length floats (from XAudioMeterHistoryView, xaudio)
+  float first() const { return guest::LoadFloat(base, address + 0); }
+  void set_first(float v) const { guest::StoreFloat(base, address + 0, v); }
+  uint32_t first_address() const { return address + 0; }
 };
 
 // embedded; measure: I3dl2::ToNative.r5

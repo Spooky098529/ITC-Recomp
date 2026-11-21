@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/heap.h"
+#include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
 #include "schema/options_screen.h"
 #include "ui_movies/game.h"
@@ -68,10 +69,10 @@ void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
   const uint32_t end = d.message_start() + count - 1;
   d.set_message_count(count);
   // A message: three words (the id, 0, 0).
-  const uint32_t slot = d.messages_address() + (end - (end / 50) * 50) * 12;
-  StoreU32(base, slot + 8, 0);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 0, message);
+  const schema::ModeMessage slot(base, d.messages_address() + (end - (end / 50) * 50) * 12);
+  slot.set_arg1(0);
+  slot.set_arg0(0);
+  slot.set_id(message);
 }
 
 uint32_t FindMovie(uint8_t* base, uint32_t frame) {

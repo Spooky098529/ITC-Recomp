@@ -24,6 +24,8 @@
 #include "game_modes/game_modes.h"
 #include "cameras/cameras.h"
 #include "lifted/sdk.h"
+#include "schema/app_start_up.h"
+#include "schema/cameras.h"
 
 ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "Run the camera modes (docs/functions/camera-modes.md: the camera director's "
@@ -811,7 +813,7 @@ namespace {
 uint32_t VideoOutputFrom(lifted::Regs& ctx, uint8_t* base, uint32_t frame, uint32_t back) {
   const uint64_t stack = ctx.r1.u64;
   ctx.r1.u64 = frame;
-  ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
+  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app(base).address;
   ctx.lr = back;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
   const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
@@ -1497,9 +1499,9 @@ ITC_REGS_STEP(CameraModesStep8217BE98) {
         }
         return ctx.r3.u32;
       };
-      const uint32_t scene = slot(guest::LoadU32(base, 0x826BABA0), 32, 0x8217BEC8);
+      const uint32_t scene = slot(schema::AppStartUpGlobals::render_app(base).address, 32, 0x8217BEC8);
       answer.first = slot(scene, 8, 0x8217BED8);
-      const uint32_t again = slot(guest::LoadU32(base, 0x826BABA0), 32, 0x8217BEF4);
+      const uint32_t again = slot(schema::AppStartUpGlobals::render_app(base).address, 32, 0x8217BEF4);
       answer.second = slot(again, 4, 0x8217BF04);
     });
     return answer;
@@ -1511,7 +1513,7 @@ ITC_REGS_STEP(CameraModesStep8217BE98) {
     });
   };
   cm::GarageUpdate(base, ctx.r3.u32, frame, calls);
-  ctx.r3.u64 = 0x826BAC00;
+  ctx.r3.u64 = schema::CamerasGlobals::passes_address();
   ctx.lr = lr;
 }
 

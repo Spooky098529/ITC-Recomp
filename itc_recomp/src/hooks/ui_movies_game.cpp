@@ -175,9 +175,9 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AAA8) {
   NATIVE_OR_ORIGINAL(8211AAA8);
   const uint32_t movie = ctx.r3.u32;
   const uint32_t picture = ui_movies::FindNode(base, movie, ctx.r4.u32, ctx.r5.u32);
-  const uint32_t slot = ui_movies::PictureTextureSlot(base, movie, picture);
-  const uint32_t old = guest::LoadU32(base, slot);
-  guest::StoreU32(base, slot, ctx.r6.u32);
+  const schema::UiMovieWord slot(base, ui_movies::PictureTextureSlot(base, movie, picture));
+  const uint32_t old = slot.value();
+  slot.set_value(ctx.r6.u32);
   ctx.r3.u64 = old;
 }
 

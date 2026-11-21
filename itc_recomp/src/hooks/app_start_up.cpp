@@ -132,7 +132,8 @@ uint32_t VideoOutput(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t 
   ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app(base).address;
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
-  const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  const uint32_t slot7 =
+      guest::LoadU32(base, schema::AppInterface16(base, ctx.r3.u32).vtable() + 28);
   if (!hooks::DirectSlotCall(ctx, base, slot7)) {
     lifted::CallFromContext(ctx, base, slot7);
   }

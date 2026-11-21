@@ -9,6 +9,8 @@
 
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "schema/app_start_up.h"
+#include "schema/command_list.h"
 #include "schema/scene_target.h"
 
 #include <initializer_list>
@@ -33,14 +35,15 @@ void Store64(uint8_t* base, uint32_t address, uint64_t value) {
 
 // Whether the list has room for `slots` more (a record inside a chunk
 // already open: only the room).
-bool Room(uint8_t* base, uint32_t list, uint64_t slots) {
-  return uint64_t(Load(base, list + 12)) + slots < Load(base, list + 8);
+bool Room(uint8_t* base, uint32_t list_address, uint64_t slots) {
+  const schema::CommandList list(base, list_address);
+  return uint64_t(list.used()) + slots < list.capacity();
 }
 // Whether a record opening its own chunk may go on: no chunk open (on this
 // list or another), and room for `slots`.
 bool Ready(uint8_t* base, uint32_t list, uint64_t slots) {
-  return guest::LoadU8(base, list + 52) == 0 && Load(base, command_list::kOpenChunks) == 0 &&
-         Room(base, list, slots);
+  return schema::CommandList(base, list).chunk_open() == 0 &&
+         schema::CommandListGlobals::open_chunks(base) == 0 && Room(base, list, slots);
 }
 
 // --- The list's steps (room checked: none fails) ---
@@ -326,9 +329,9 @@ bool RecordPasses(uint8_t* base, uint32_t frame, uint32_t scene_address, uint32_
     {
       const uint32_t s = Slot(base, list);
       Store(base, s + 0, 0);
-      // The tiling block's tile count (+12) and tiles (+16).
-      Store(base, s + 4, Load(base, G::display_tiling(base) + 12));
-      Store(base, s + 8, G::display_tiling(base) + 16);
+      // The tiling block's tile count and tiles (the pointer loaded for each).
+      Store(base, s + 4, G::display_tiling(base).tile_count());
+      Store(base, s + 8, G::display_tiling(base).tiles_address());
     }
     Clear(base, list, zero);
     Slot3(base, list, 36, 0, 0);

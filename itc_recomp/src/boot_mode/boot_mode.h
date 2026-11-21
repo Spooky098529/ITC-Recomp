@@ -24,13 +24,11 @@ namespace boot_mode {
 // movie id ending the list.
 constexpr uint32_t kNoModeAsked = 13;
 constexpr uint32_t kEndOfList = 11;
-// The movie class (Movies::Set) and the movies' path table.
-constexpr uint32_t kMovieClass = 0x826C1CDC;
+// The movies' path table (no schema describes it). The movie class is
+// schema::MoviesGlobals::movie_class (movies.toml); the action mappers'
+// entries and the player's entry index schema::RacerControllersGlobals
+// (PlayerMapperEntry, racer-controllers.toml).
 constexpr uint32_t kMoviePaths = 0x82600BEC;
-// The action mappers' entries (8 bytes each: the mapper, blocked) and the
-// current player.
-constexpr uint32_t kActionMappers = 0x826BAB80;
-constexpr uint32_t kCurrentPlayer = 0x826BABA4;
 constexpr uint32_t kSkipAction = 152;
 
 // The boot mode's layout: schema::BootMode, BootMachine, ModeDispatcher (the

@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/files_and_saves.h"
 #include "schema/heap.h"
 
 #include "base/flags.h"
@@ -6039,7 +6040,7 @@ lifted::Result f820A4508(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // addi r11,r11,8592
   r11 = uint64_t(int64_t(int64_t(r11) + 8592));
   // lwz r3,80(r31)
-  r3 = guest::LoadU32(base, schema::SaveSlot(base, uint32_t(r31)).unknown_80_address());
+  r3 = guest::LoadU32(base, schema::SaveSlot(base, uint32_t(r31)).enumeration_buffer_address());
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // stw r11,0(r31)
@@ -6051,7 +6052,7 @@ lifted::Result f820A4508(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   { const lifted::Result o = lifted::entry::e825A70E8(base, LIFTED_ARGS(0x820A4538, r31)); r3 = o.r3; f1 = o.f1; }
 loc_820A4538:
   // lwz r3,84(r31)
-  r3 = guest::LoadU32(base, schema::SaveSlot(base, uint32_t(r31)).unknown_84_address());
+  r3 = guest::LoadU32(base, schema::SaveSlot(base, uint32_t(r31)).open_failed_address());
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x820a4548

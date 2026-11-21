@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// file; measure: TrackSet
+// file; measure: TrackSet, sub_825A1148.r3
 struct TrackSet : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -209,7 +209,7 @@ struct TrackValueBlock : View {
   uint32_t values_address() const { return address + 16; }
 };
 
-// file; measure: Skeleton, SkeletonBase, sub_82599BE0.r3, sub_8259B600.r3
+// file; measure: Skeleton, SkeletonBase, sub_82599BE0.r3, sub_8259B600.r3, PartsPoints.+0
 struct Skeleton : View {
   using View::View;
   static constexpr uint32_t kSize = 180;
@@ -364,7 +364,7 @@ struct SkeletonNodeEntry : View {
   uint32_t unknown_16_address() const { return address + 16; }
 };
 
-// file; measure: PrimitiveDrawer, sub_825A13D8.r3
+// file; measure: PrimitiveDrawer, sub_825A13D8.r3, sub_825A1810.r3
 struct PrimitiveDrawer : View {
   using View::View;
   static constexpr uint32_t kSize = 8;
@@ -380,7 +380,7 @@ struct PrimitiveDrawer : View {
   uint32_t declaration_address() const { return address + 4; }
 };
 
-// allocated; measure: new<4>@PrimitiveDrawer::PrimitiveDrawer
+// allocated; measure: new<4>@PrimitiveDrawer::PrimitiveDrawer, sub_825A1810.r3.+4
 struct PrimitiveDrawerDeclaration : View {
   using View::View;
   static constexpr uint32_t kSize = 4;

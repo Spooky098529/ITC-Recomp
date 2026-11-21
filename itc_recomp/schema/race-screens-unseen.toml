@@ -116,6 +116,11 @@ fields = [
   { name = "box_shown", offset = 348, type = "u32", note = "0 the question, 1 the message, 2 the waiting box, 3 none" },
   { name = "reset_request", offset = 352, type = "u32", note = "a request from sub_82211F18 (to page 7 with message 44)" },
   { name = "ranking_skipped", offset = 356, type = "u32" },
+  { name = "fault_replay_0", offset = 0, type = "u16", note = "measure fault: Kind6Menu::ShowReplay's r3 is a replay record (as AfterRaceMenu::ShowReplay's, race-screens.toml), joined with the menu" },
+  { name = "fault_replay_2", offset = 2, type = "u16", note = "measure fault: the replay record's +2 (ShowReplay)" },
+  { name = "fault_replay_6", offset = 6, type = "u16", note = "measure fault: the replay record's +6 (ShowReplay)" },
+  { name = "fault_replay_8", offset = 8, type = "u16", note = "measure fault: the replay record's +8 (ShowReplay)" },
+  { name = "fault_replay_10", offset = 10, type = "u16", note = "measure fault: the replay record's +10 (ShowReplay)" },
 ]
 
 # Kind 4's pause menu's screen ([0x826D84E0], 4 bytes).
@@ -205,7 +210,7 @@ fields = [
 pause4_screen = { address = 0x826D84E0, type = "ptr", to = "PauseMenu4", note = "kind 4's pause menu (the holder's +1016)" }
 pause4_data = { address = 0x826D84E4, type = "ptr", to = "PauseMenu4Data" }
 pause4_pages = { address = 0x826D84E8, type = "ptr", to = "PageObject" }
-pause4_list = { address = 0x826D84EC, type = "ptr", note = "a MenuList (72 bytes, race-screens.toml)" }
+pause4_list = { address = 0x826D84EC, type = "ptr", to = "MenuList", note = "a MenuList (72 bytes, race-screens.toml)" }
 pause4_items = { address = 0x8200CD08, type = "bytes", count = 48, note = "the items by kind: six words a kind, -1 ends them" }
 kind6_menu = { address = 0x82814E10, type = "ptr", to = "Kind6Menu" }
 kind6_answer = { address = 0x82814E14, type = "u32", note = "Kind6Menu's answer, 1 to 3 (0 to 2 also open it with its movies' poses reset)" }
@@ -213,10 +218,10 @@ race_results = { address = 0x82814E18, type = "ptr", to = "RaceResults" }
 split_results = { address = 0x82814E1C, type = "ptr", to = "SplitResults" }
 split_ticks = { address = 0x82814E20, type = "u32", note = "SplitResults' tick count" }
 split_exchanged = { address = 0x82814E24, type = "u32", note = "set once the other console's result came" }
-kind6_session = { address = 0x82816E3C, type = "ptr", note = "the network session (network-mode.toml's Session)" }
+kind6_session = { address = 0x82816E3C, type = "ptr", to = "Session", note = "the network session (network-mode.toml's Session)" }
 kind6_course = { address = 0x82816660, type = "u32", note = "the course, 0 to 7" }
 kind6_course_flag = { address = 0x82816680, type = "u32" }
-kind6_replays = { address = 0x828161F0, type = "ptr", note = "the replay list (+12 the 36-byte records, +20 their count)" }
+kind6_replays = { address = 0x828161F0, type = "ptr", to = "SaveBuffers", note = "the replay list (save-interface.toml's SaveBuffers: +12 the 36-byte records, +20 their count)" }
 kind6_results = { address = 0x826C6AD4, type = "ptr", note = "the leaderboard read's results (an XUSER_STATS_READ_RESULTS)" }
 kind6_read_spec = { address = 0x826C72F4, type = "u32", note = "the leaderboard read's view id" }
 kind6_stats_spec = { address = 0x826C6410, type = "bytes", count = 16, note = "a Kind6StatsSpec" }
@@ -226,4 +231,5 @@ net_peers = { address = 0x826C7308, type = "bytes", count = 12, note = "the netw
 net_peer_mode = { address = 0x826C7824, type = "u32", note = "set: the peer list used" }
 net_answer = { address = 0x826C6B0C, type = "u8", note = "the other console's answer, 255 none yet" }
 net_answer_word = { address = 0x826C6B04, type = "u32" }
-net_players = { address = 0x826D82E8, type = "ptr", note = "its +7244 is the id sent" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (race-states.toml): +60, +0x59620 the stages, +0x59AE8 the results records, +0xA3AF0 the kind" }
+net_players = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "the race's progress (race-states.toml): its +7244 is the id sent" }

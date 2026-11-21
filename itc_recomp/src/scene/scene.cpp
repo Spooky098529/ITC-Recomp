@@ -16,9 +16,16 @@
 #include "models/part_model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
+#include "schema/accessories.h"
 #include "schema/car_draw.h"
+#include "schema/car_models.h"
+#include "schema/material_passes.h"
+#include "schema/models.h"
 #include "schema/scene.h"
 #include "schema/scene_loaders.h"
+#include "schema/scene_models.h"
+#include "schema/second_set.h"
+#include "schema/vehicle_accessors.h"
 #include "scene_loaders/loads.h"
 #include "scene_loaders/pools.h"
 #include "scenery_lists/scenery_lists.h"
@@ -34,6 +41,14 @@ namespace scene {
 namespace {
 
 using Globals = schema::SceneGlobals;
+using schema::CarScene;
+using schema::LoadSlot;
+using schema::PoolList;
+using schema::PoolNode;
+using schema::ScenePools;
+
+// The accessories' set (sub_820F0E50).
+uint32_t AccessoriesSet(uint8_t* base) { return schema::AccessoriesGlobals::set(base).address; }
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -49,7 +64,6 @@ void Require(bool done, const char* what) {
 }
 
 constexpr uint32_t kFirstSetPools = 7;
-constexpr uint32_t kFirstSetLists = 56;
 constexpr uint32_t kDestroyAFrameBytes = 128;
 constexpr uint32_t kMaxNodes = 4096;
 
@@ -59,8 +73,9 @@ constexpr uint32_t kMaxNodes = 4096;
 
 void SetUpConstruct(uint8_t* base, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820D0D50 SceneSetUp::SceneSetUp");
-  Store(base, record + 36, 0);
-  Store(base, record + 40, 0);
+  const schema::CarSceneSetUpRecord set_up(base, record);
+  set_up.set_load_buffer(0);
+  set_up.set_load_buffer_size(0);
 }
 
 std::optional<uint32_t> FreePagesIn(uint8_t* base, uint32_t at) {
@@ -75,8 +90,8 @@ std::optional<uint32_t> FreePagesIn(uint8_t* base, uint32_t at) {
 
 void StartTeardownA(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820C3C80 ScenePools::StartTeardownA");
-  Store(base, Globals::first_set(base).address + 4, 4);
-  Store(base, Globals::first_set(base).address + 0, 2);
+  Globals::first_set(base).set_state(4);
+  Globals::first_set(base).set_teardown_count(2);
 }
 
 std::optional<uint64_t> StartTeardown(uint8_t* base,
@@ -85,21 +100,24 @@ std::optional<uint64_t> StartTeardown(uint8_t* base,
   if (Globals::scene(base).address == 0) {
     return std::nullopt;
   }
-  Store(base, Globals::scene(base).address + 0, 4);
-  Store(base, Globals::scene(base).address + 48, 2);
+  Globals::scene(base).set_state(4);
+  Globals::scene(base).set_teardown_count(2);
   StartTeardownA(base);
-  return release_all(Load(base, 0x826C5510));  // sub_820F0E50: the accessories' set
+  return release_all(AccessoriesSet(base));
 }
 
 std::optional<uint32_t> SetInteriorWord(uint8_t* base, uint32_t scene, uint32_t word) {
   ITC_NATIVE_RUNNING("sub_820C8950 CarScene::SetInteriorWord");
-  const int32_t count = int32_t(Load(base, scene + 5036));
+  const CarScene car_scene(base, scene);
+  const int32_t count = int32_t(car_scene.scene_models_count());
   std::optional<uint32_t> r3;
   for (int32_t i = 0; i < count; i++) {
-    const uint32_t model = vehicle_accessors::ListAt(base, scene + 5028, uint32_t(i));
+    const uint32_t model =
+        vehicle_accessors::ListAt(base, car_scene.scene_models_first_address(), uint32_t(i));
     r3 = model;
-    if (Load(base, model + 5072) != 0) {
-      Store(base, Load(base, model + 5068) + 11616, word);
+    const schema::SceneModel scene_model(base, model);
+    if (scene_model.interior_ready() != 0) {
+      schema::SceneInterior(base, scene_model.interior()).set_points_accessory_shown(word);
     }
   }
   return r3;
@@ -109,9 +127,14 @@ uint32_t LoadsDone(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall&
   ITC_NATIVE_RUNNING("sub_820C5798 CarScene::LoadsDone");
   const uint32_t frame = sp - 128;
   Store(base, frame, sp);  // the back chain, for the finishers' guest calls
-  static constexpr uint32_t kSlots[8] = {84, 132, 156, 268, 472, 964, 4156, 4764};
-  for (const uint32_t slot : kSlots) {
-    if (int32_t(Load(base, scene + slot)) == 2) {
+  const CarScene car_scene(base, scene);
+  const uint32_t states[8] = {
+      car_scene.asset141_state_address(),     car_scene.asset586_state_address(),
+      car_scene.asset_slot72_state_address(), car_scene.asset888_state_address(),
+      car_scene.glow_part_file_state_address(), car_scene.glow_textures_state_address(),
+      car_scene.asset109_state_address(),     car_scene.bundle3_state_address()};
+  for (const uint32_t state : states) {
+    if (int32_t(Load(base, state)) == 2) {
       return 0;
     }
   }
@@ -124,20 +147,21 @@ uint32_t LoadsDone(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall&
       {0x820E4140, 0x820C58E0}, {0x820DDA60, 0x820C5920}, {0x820E7328, 0x820C5940},
       {0x820E5A68, 0x820C5960}, {0, 0}};
   for (uint32_t pool = 0; pool < 8; pool++) {
-    const uint32_t list = scene + 4944 + 12 * pool;
-    for (int32_t i = 0; i < int32_t(Load(base, list + 8)); i++) {
+    const uint32_t list = car_scene.car_models_first_address() + PoolList::kSize * pool;
+    for (int32_t i = 0; i < int32_t(PoolList(base, list).count()); i++) {
       const uint32_t object = vehicle_accessors::ListAt(base, list, uint32_t(i));
-      if (int32_t(Load(base, object + 16)) != 3) {
+      if (int32_t(PoolNode(base, object).state()) != 3) {
         continue;
       }
       if (pool == 0) {
+        const schema::SceneCarModel car(base, object);
         if (int32_t(finish(kFinishers[0].function, frame, kFinishers[0].lr,
-                           Load(base, object + 24), uint32_t(i))) == 0 ||
-            int32_t(Load(base, Load(base, object + 24) + 4088)) == 2) {
+                           car.car_model().address, uint32_t(i))) == 0 ||
+            int32_t(car.car_model<schema::CarModel>().decals_state()) == 2) {
           return 0;
         }
       } else if (pool == 7) {
-        if (Load(base, object + 5040) != 0) {
+        if (schema::SceneModel(base, object).build_pending() != 0) {
           return 0;
         }
       } else if (int32_t(finish(kFinishers[pool].function, frame, kFinishers[pool].lr, object,
@@ -154,12 +178,13 @@ uint32_t LoadsDone(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall&
 
 bool DestroyAFreeable(uint8_t* base, uint32_t set) {
   for (uint32_t pool = 0; pool < kFirstSetPools; pool++) {
-    uint32_t node = Load(base, set + kFirstSetLists + 12 * pool);
+    uint32_t node =
+        PoolList(base, ScenePools(base, set).pools_address() + PoolList::kSize * pool).first().address;
     for (uint32_t n = 0; node != 0; n++) {
       if (n == kMaxNodes || !memory::IsPages(node)) {
         return false;
       }
-      node = Load(base, node + 8);
+      node = PoolNode(base, node).next().address;
     }
   }
   return true;
@@ -171,7 +196,7 @@ void DestroyA(uint8_t* base, uint32_t set, uint32_t sp,
   const uint32_t frame = sp - kDestroyAFrameBytes;
   Store(base, frame, sp);  // the back chain, for the destructors' guest calls
   for (uint32_t pool = 0; pool < kFirstSetPools; pool++) {
-    const uint32_t list = pool * 12 + set + kFirstSetLists;
+    const uint32_t list = ScenePools(base, set).pools_address() + PoolList::kSize * pool;
     for (;;) {
       const uint32_t object = vehicle_accessors::ListAt(base, list, 0);
       if (object == 0) {
@@ -278,8 +303,8 @@ bool AssetsConstruct(uint8_t* base, uint32_t assets) {
 
 bool AssetsResettable(uint8_t* base, uint32_t assets) {
   for (const uint32_t provider : kAssetsProviders) {
-    const uint32_t vtable = Load(base, assets + provider);
-    if (Load(base, vtable + 8) != scene_loaders::kTextureProviderClearAll) {
+    if (schema::TextureProvider(base, assets + provider).vtable().clear_all() !=
+        scene_loaders::kTextureProviderClearAll) {
       return false;
     }
   }
@@ -333,8 +358,7 @@ std::optional<uint32_t> AssetsReset(uint8_t* base, uint32_t assets) {
 
 bool AssetsDestructible(uint8_t* base, uint32_t assets) {
   for (const uint32_t provider : kAssetsProviders) {
-    const uint32_t storage = Load(base, assets + provider + models::kTextureProviderVector +
-                                            models::kVectorFirst);
+    const uint32_t storage = schema::TextureProvider(base, assets + provider).first().address;
     if (storage != 0 && !memory::IsHeapBlock(storage)) {
       return false;
     }
@@ -402,20 +426,23 @@ bool CarSceneConstruct(uint8_t* base, uint32_t scene) {
   if (!models::CanAllocatePointers(base, models::kTextureProviderSlots)) {
     return false;
   }
-  SetUpConstruct(base, scene + 4);
-  Require(AssetsConstruct(base, scene + kAssets), "SceneAssets::SceneAssets");
+  const CarScene car_scene(base, scene);
+  SetUpConstruct(base, car_scene.model_set_address());
+  Require(AssetsConstruct(base, car_scene.assets_address()), "SceneAssets::SceneAssets");
   for (uint32_t i = 0; i < 8; i++) {
-    vehicle_accessors::ListInit(base, scene + 4944 + 12 * i);
+    vehicle_accessors::ListInit(base, car_scene.car_models_first_address() + PoolList::kSize * i);
   }
-  const uint32_t one = Globals::one(base);  // 1.0, stored as lfs and stfs leave it
+  // 1.0, stored as lfs and stfs leave it: the float4s' w's from the pass
+  // description's light direction on.
+  const uint32_t one = Globals::one(base);
   for (uint32_t i = 0; i < 5; i++) {
-    Store(base, scene + 5180 + 16 * i, one);
+    Store(base, car_scene.pass_light_direction_w_address() + 16 * i, one);
   }
   for (uint32_t i = 0; i < 8; i++) {
-    Store(base, scene + 5260 + 16 * i, one);
+    Store(base, car_scene.car_light_factor_a_w_address() + 16 * i, one);
   }
   for (uint32_t i = 0; i < 9; i++) {
-    Store(base, scene + 5388 + 16 * i, one);
+    Store(base, car_scene.headlight_position_w_address() + 16 * i, one);
   }
   return true;
 }
@@ -424,7 +451,8 @@ void ListDeleteAll(uint8_t* base, uint32_t list, uint32_t sp, const DestroyCall&
   ITC_NATIVE_RUNNING("sub_82593FF8 List::DeleteAll");
   const uint32_t frame = sp - 96;
   Store(base, frame, sp);
-  for (uint32_t node = Load(base, list); node != 0; node = Load(base, list)) {
+  const schema::AccessorList nodes(base, list);
+  for (uint32_t node = nodes.first().address; node != 0; node = nodes.first().address) {
     destroy(node, 1, frame);
   }
 }
@@ -435,7 +463,7 @@ void ListDestruct(uint8_t* base, uint32_t list, uint32_t sp, const DestroyCall& 
 }
 
 bool CarSceneDestructible(uint8_t* base, uint32_t scene, uint32_t flags) {
-  return AssetsDestructible(base, scene + kAssets) &&
+  return AssetsDestructible(base, CarScene(base, scene).assets_address()) &&
          ((flags & 1) == 0 || memory::IsHeapBlock(scene));
 }
 
@@ -450,9 +478,11 @@ std::optional<uint32_t> CarSceneDestruct(uint8_t* base, uint32_t scene, uint32_t
   for (uint32_t i = 8; i-- > 0;) {
     // List::~List (sub_82594188) is a jump to DeleteAll: its frame below
     // ~CarScene's.
-    ListDestruct(base, scene + 4944 + 12 * i, frame, destroy);
+    ListDestruct(base, CarScene(base, scene).car_models_first_address() + PoolList::kSize * i,
+                 frame, destroy);
   }
-  Require(AssetsDestruct(base, scene + kAssets).has_value(), "SceneAssets::~SceneAssets");
+  Require(AssetsDestruct(base, CarScene(base, scene).assets_address()).has_value(),
+          "SceneAssets::~SceneAssets");
   if (flags & 1) {
     Require(memory::crt::OperatorDelete(scene), "operator delete");
   }
@@ -462,11 +492,12 @@ std::optional<uint32_t> CarSceneDestruct(uint8_t* base, uint32_t scene, uint32_t
 // --- The first set's update ---
 
 bool UpdateANative(uint8_t* base) {
-  const uint32_t set = Globals::first_set(base).address;
-  if (set == 0 || int32_t(Load(base, set + 4)) != 4 || Load(base, set + 0) != 0) {
+  const ScenePools pools = Globals::first_set(base);
+  const uint32_t set = pools.address;
+  if (set == 0 || int32_t(pools.state()) != 4 || pools.teardown_count() != 0) {
     return true;
   }
-  const uint32_t records = Load(base, set + 52);
+  const uint32_t records = pools.deferred_releases().address;
   return DestroyAFreeable(base, set) && records != 0 && memory::IsPages(records) &&
          memory::IsPages(set);
 }
@@ -479,38 +510,48 @@ std::optional<uint32_t> UpdateA(uint8_t* base, uint32_t sp, const DestroyCall& d
     return std::nullopt;
   }
   const uint32_t frame = sp - 128;
+  // The set's record at `at`, its [+52] read again each time.
+  auto record_at = [&](uint32_t at) {
+    return schema::CarModelsDeferredRelease(
+        base, ScenePools(base, set).deferred_releases().address + at);
+  };
   // The four words of a record cleared, [+52] read again for each.
   auto clear = [&](uint32_t at) {
-    for (uint32_t w = 0; w < 4; w++) {
-      Store(base, Load(base, set + 52) + at + 4 * w, 0);
-    }
+    record_at(at).set_first(0);
+    record_at(at).set_first_data(0);
+    record_at(at).set_second(0);
+    record_at(at).set_second_data(0);
   };
-  auto count = [&]() { return int32_t((Load(base, set + 40) + Load(base, set + 12)) << 2); };
+  auto count = [&]() {
+    const ScenePools pools(base, set);
+    return int32_t((pools.traffic_count() + pools.car_model_count()) << 2);
+  };
+  constexpr uint32_t kRecordBytes = schema::CarModelsDeferredRelease::kSize;
   std::optional<uint32_t> r3;
-  if (int32_t(Load(base, set + 4)) != 4) {
+  if (int32_t(ScenePools(base, set).state()) != 4) {
     const int32_t n = count();
     for (int32_t i = 0; i < n; i++) {
-      const uint32_t at = 20 * uint32_t(i);
-      const uint32_t record = Load(base, set + 52) + at;
-      const int32_t state = int32_t(Load(base, record + 16));
+      const uint32_t at = kRecordBytes * uint32_t(i);
+      const auto record = record_at(at);
+      const int32_t state = int32_t(record.state());
       if (state <= 0) {
         continue;
       }
-      Store(base, record + 16, uint32_t(state - 1));
-      const uint32_t again = Load(base, set + 52) + at;
-      r3 = again;
-      if (Load(base, again + 16) != 0) {
+      record.set_state(uint32_t(state - 1));
+      const auto again = record_at(at);
+      r3 = again.address;
+      if (again.state() != 0) {
         continue;
       }
-      texture_free(again, again + 4, frame);
-      const uint32_t second = Load(base, set + 52) + at;
-      r3 = texture_free(second + 8, second + 12, frame);
+      texture_free(again.address, again.first_data_address(), frame);
+      const auto second = record_at(at);
+      r3 = texture_free(second.second_address(), second.second_data_address(), frame);
       clear(at);
     }
     return r3;
   }
-  if (Load(base, set + 0) != 0) {
-    Store(base, set + 0, Load(base, set + 0) - 1);
+  if (ScenePools(base, set).teardown_count() != 0) {
+    ScenePools(base, set).set_teardown_count(ScenePools(base, set).teardown_count() - 1);
     return std::nullopt;
   }
   Store(base, frame, sp);
@@ -520,17 +561,18 @@ std::optional<uint32_t> UpdateA(uint8_t* base, uint32_t sp, const DestroyCall& d
   set = Globals::first_set(base).address;
   const int32_t n = count();
   for (int32_t i = 0; i < n; i++) {
-    const uint32_t at = 20 * uint32_t(i);
-    const uint32_t record = Load(base, set + 52) + at;
-    if (int32_t(Load(base, record + 16)) <= 0) {
+    const uint32_t at = kRecordBytes * uint32_t(i);
+    const auto record = record_at(at);
+    if (int32_t(record.state()) <= 0) {
       continue;
     }
-    texture_free(record, record + 4, frame);
-    const uint32_t second = Load(base, set + 52) + at;
-    texture_free(second + 8, second + 12, frame);
+    texture_free(record.address, record.first_data_address(), frame);
+    const auto second = record_at(at);
+    texture_free(second.second_address(), second.second_data_address(), frame);
     clear(at);
   }
-  Require(FreePagesIn(base, set + 52).has_value(), "FreePagesIn");
+  Require(FreePagesIn(base, ScenePools(base, set).deferred_releases_address()).has_value(),
+          "FreePagesIn");
   const uint32_t pages = Globals::first_set(base).address;
   Require(memory::IsPages(pages) && memory::FreePages(pages), "VirtualFree");
   Globals::set_first_set(base, uint32_t{0});
@@ -598,8 +640,8 @@ bool AssetsReleasable(uint8_t* base, uint32_t assets) {
     }
   }
   for (const uint32_t provider : kAssetsProviders) {
-    const uint32_t vtable = Load(base, assets + provider);
-    if (Load(base, vtable + 8) != scene_loaders::kTextureProviderClearAll) {
+    if (schema::TextureProvider(base, assets + provider).vtable().clear_all() !=
+        scene_loaders::kTextureProviderClearAll) {
       return false;
     }
   }
@@ -650,16 +692,17 @@ uint64_t Create(uint8_t* base, uint32_t sp) {
     Require(CarSceneConstruct(base, pages), "CarScene::CarScene");
     scene = Globals::scene(base).address;
   }
-  Store(base, scene + 0, 0);
+  CarScene(base, scene).set_state(0);
   Globals::set_queue_key_a(base, 167);
   Globals::set_queue_key_b(base, 270);
   scene_loaders::MakeA(base);
-  Store(base, Globals::scene(base).address + 5040, Globals::first_set(base).address);
-  InitLighting(base, Globals::scene(base).address + 5248, frame);
-  Require(AssetsReset(base, Globals::scene(base).address + kAssets).has_value(), "SceneAssets::Reset");
-  Store(base, Globals::scene(base).address + 5044, 0);
-  Store(base, Globals::scene(base).address + 5048, 0);
-  Store(base, Globals::scene(base).address + 5052, 0);
+  Globals::scene(base).set_first_set(Globals::first_set(base).address);
+  InitLighting(base, Globals::scene(base).car_light_factor_a_address(), frame);
+  Require(AssetsReset(base, Globals::scene(base).assets_address()).has_value(),
+          "SceneAssets::Reset");
+  Globals::scene(base).set_set_up_r5(0);
+  Globals::scene(base).set_blink_timers_held(0);
+  Globals::scene(base).set_lighting_fixed(0);
   material_passes::PaintPaletteInit(base, frame);
   accessories::SetCreate(base);
   const uint32_t x = Globals::accessories_scale(base);
@@ -667,7 +710,7 @@ uint64_t Create(uint8_t* base, uint32_t sp) {
   Store(base, frame + 84, x);
   Store(base, frame + 88, x);
   Store(base, frame + 92, Globals::one(base));  // 1.0
-  const uint32_t set = Load(base, accessories::kSet);  // sub_820F0E50
+  const uint32_t set = AccessoriesSet(base);
   accessories::SetScale(base, set, frame + 80);
   return set;
 }
@@ -675,41 +718,43 @@ uint64_t Create(uint8_t* base, uint32_t sp) {
 
 uint32_t LoadAssets(uint8_t* base, uint32_t scene, uint32_t pcr, const archive::LoadCall& load) {
   ITC_NATIVE_RUNNING("sub_820C8B40 CarScene::LoadAssets");
+  const CarScene car_scene(base, scene);
+  const schema::SceneAssets assets(base, car_scene.assets_address());
   uint32_t r3 = 0;
-  auto shared = [&](uint32_t offset, uint32_t id) {
-    r3 = car_models::LoadSlotLoadShared(base, scene + offset, id, scene, kOnFileLoaded, load);
+  auto shared = [&](uint32_t slot, uint32_t id) {
+    r3 = car_models::LoadSlotLoadShared(base, slot, id, scene, kOnFileLoaded, load);
   };
-  auto own = [&](uint32_t offset, uint32_t id) {
-    car_models::LoadSlotLoad(base, scene + offset, id, scene, kOnFileLoaded, pcr, load);
+  auto own = [&](uint32_t slot, uint32_t id) {
+    car_models::LoadSlotLoad(base, slot, id, scene, kOnFileLoaded, pcr, load);
   };
-  shared(112, 586);
-  if (Load(base, scene + 4) == 0 || Load(base, scene + 5044) != 0) {
-    shared(64, 141);
+  shared(assets.slot_586_address(), 586);
+  if (car_scene.model_set() == 0 || car_scene.set_up_r5() != 0) {
+    shared(assets.slot_141_address(), 141);
   }
-  shared(248, 888);
-  shared(316, 144);
-  shared(384, 145);
-  own(452, 142);
-  shared(944, 143);
-  shared(968, 146);
-  shared(1016, 106);
-  shared(1084, 107);
-  if (Load(base, scene + 4) == 0) {
-    own(4112, 108);
-    shared(4136, 109);
+  shared(assets.slot_888_address(), 888);
+  shared(assets.slot_144_address(), 144);
+  shared(assets.slot_145_address(), 145);
+  own(assets.glow_part_file_slot_address(), 142);
+  shared(assets.glow_textures_slot_address(), 143);
+  shared(assets.tga_slot_address(), 146);
+  shared(assets.slot_106_address(), 106);
+  shared(assets.slot_107_address(), 107);
+  if (car_scene.model_set() == 0) {
+    own(assets.slot_108_address(), 108);
+    shared(assets.slot_109_address(), 109);
   }
-  shared(4624, 105);
-  const bool set_a = Load(base, scene + 4) == 0;
+  shared(assets.slot_105_address(), 105);
+  const bool set_a = car_scene.model_set() == 0;
   for (uint32_t i = 0; i < 4; i++) {
-    own(1152 + 24 * i, (set_a ? 129 : 133) + i);
-    shared(3104 + 24 * i, 137 + i);
+    own(assets.part_file_slots_address() + LoadSlot::kSize * i, (set_a ? 129 : 133) + i);
+    shared(assets.part_texture_slots_address() + LoadSlot::kSize * i, 137 + i);
   }
   for (uint32_t i = 0; i < 19; i++) {
-    shared(3200 + 24 * i, 110 + i);
+    shared(assets.plate_tga_slots_address() + LoadSlot::kSize * i, 110 + i);
   }
-  const bool bundles_a = Load(base, scene + 4) == 0;
+  const bool bundles_a = car_scene.model_set() == 0;
   for (uint32_t i = 0; i < 4; i++) {
-    shared(4672 + 24 * i, (bundles_a ? 97 : 101) + i);
+    shared(assets.bundle_slots_address() + LoadSlot::kSize * i, (bundles_a ? 97 : 101) + i);
   }
   return r3;
 }
@@ -733,7 +778,7 @@ struct Branch {
 };
 
 std::optional<Branch> FindBranch(uint8_t* base, uint32_t assets, uint32_t request) {
-  auto is = [&](uint32_t slot) { return Load(base, assets + slot + 4) == request; };
+  auto is = [&](uint32_t slot) { return LoadSlot(base, assets + slot).request() == request; };
   if (is(0)) {
     return Branch{Kind::kXpr, 0, 24};
   }
@@ -783,7 +828,7 @@ uint32_t Release(uint8_t* base, uint32_t slot) {
 }  // namespace
 
 bool FileLoadedNative(uint8_t* base, uint32_t request, uint32_t scene) {
-  const uint32_t assets = scene + kAssets;
+  const uint32_t assets = CarScene(base, scene).assets_address();
   const auto branch = FindBranch(base, assets, request);
   if (!branch || branch->kind == Kind::kPart) {
     return true;
@@ -803,7 +848,7 @@ bool FileLoadedNative(uint8_t* base, uint32_t request, uint32_t scene) {
 std::optional<uint64_t> FileLoaded(uint8_t* base, uint32_t request, uint32_t data,
                                    uint32_t scene, uint32_t sp, const FileLoadedCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820C52A0 CarScene::OnFileLoaded");
-  const uint32_t assets = scene + kAssets;
+  const uint32_t assets = CarScene(base, scene).assets_address();
   const uint32_t frame = sp - 128;
   Store(base, frame + 156, data);
   const auto branch = FindBranch(base, assets, request);
@@ -823,7 +868,7 @@ std::optional<uint64_t> FileLoaded(uint8_t* base, uint32_t request, uint32_t dat
     case Kind::kXprProvider: {
       const uint32_t xpr = assets + branch->a, provider = assets + branch->b;
       xpr_create(xpr);
-      const uint32_t set = Load(base, Load(base, provider) + 16);
+      const uint32_t set = schema::TextureProvider(base, provider).vtable().set();
       if (set != kTextureProviderSet ||
           !scenery_lists::TextureProviderSet(base, provider, 0, xpr)) {
         calls.provider_set(provider, xpr);
@@ -831,19 +876,21 @@ std::optional<uint64_t> FileLoaded(uint8_t* base, uint32_t request, uint32_t dat
       break;
     }
     case Kind::kPart:
-      Store(base, slot + 20, 3);
+      LoadSlot(base, slot).set_state(3);
       return std::nullopt;
     case Kind::kTexture: {
       const uint32_t model = assets + branch->a;
-      const uint32_t file = Load(base, assets + branch->b + 16);
+      const uint32_t file = LoadSlot(base, assets + branch->b).buffer();
       if (!models::ModelLoad(base, model, file, data, calls.model_load)) {
         calls.model_load_original(model, file, data);
       }
       Release(base, assets + branch->b);
       uint64_t r3 = Release(base, slot);
-      Store(base, slot + 20, 3);
+      LoadSlot(base, slot).set_state(3);
       if (branch->slot == 880) {
-        const int32_t shapes = int32_t(Load(base, assets + 828));
+        const int32_t shapes = int32_t(
+            schema::PartModel(base, schema::SceneAssets(base, assets).glow_model_address())
+                .shape_count());
         const double one = double(std::bit_cast<float>(Globals::one(base)));
         for (int32_t i = 0; i < shapes; i++) {
           r3 = material_passes::ScaleBlended(base, model, uint32_t(i), one, frame);
@@ -853,7 +900,7 @@ std::optional<uint64_t> FileLoaded(uint8_t* base, uint32_t request, uint32_t dat
     }
     case Kind::kTga: {
       const uint32_t header = assets + branch->a, pixels = assets + branch->b;
-      const uint32_t size = Load(base, slot + 8);
+      const uint32_t size = LoadSlot(base, slot).size();
       if (!car_models::TgaCreateImage(base, header, size, frame + 156, pixels, frame)) {
         calls.tga_create(header, size, frame + 156, pixels);
       }
@@ -861,7 +908,7 @@ std::optional<uint64_t> FileLoaded(uint8_t* base, uint32_t request, uint32_t dat
     }
   }
   const uint32_t r3 = Release(base, slot);
-  Store(base, slot + 20, 3);
+  LoadSlot(base, slot).set_state(3);
   return r3;
 }
 
@@ -876,7 +923,7 @@ void DestroyB(uint8_t* base, uint32_t scene, uint32_t sp, const FinishCall& fini
   Store(base, frame, sp);  // the back chain, for the guest calls
   LoadsDone(base, scene, frame, finish);
   for (uint32_t pool = 0; pool < 8; pool++) {
-    const uint32_t list = (pool + 412) * 12 + scene;
+    const uint32_t list = CarScene(base, scene).car_models_first_address() + PoolList::kSize * pool;
     for (;;) {
       const uint32_t object = vehicle_accessors::ListAt(base, list, 0);
       if (object == 0) {
@@ -893,7 +940,8 @@ std::optional<uint64_t> UpdateModels(
     uint8_t* base, uint32_t scene, uint32_t sp,
     const std::function<uint64_t(uint32_t model, uint32_t frame)>& model_update) {
   ITC_NATIVE_RUNNING("sub_820C5A60 CarScene::UpdateModels");
-  const int32_t count = int32_t(Load(base, scene + 5036));
+  const CarScene car_scene(base, scene);
+  const int32_t count = int32_t(car_scene.scene_models_count());
   if (count <= 0) {
     return std::nullopt;
   }
@@ -901,9 +949,10 @@ std::optional<uint64_t> UpdateModels(
   Store(base, frame, sp);
   uint64_t r3 = 0;
   for (int32_t i = 0; i < count; i++) {
-    const uint32_t model = vehicle_accessors::ListAt(base, scene + 5028, uint32_t(i));
+    const uint32_t model =
+        vehicle_accessors::ListAt(base, car_scene.scene_models_first_address(), uint32_t(i));
     r3 = model;
-    if (int32_t(Load(base, model + 16)) == 3) {
+    if (int32_t(schema::SceneModel(base, model).state()) == 3) {
       r3 = model_update(model, frame);
     }
   }
@@ -917,19 +966,20 @@ uint64_t Update(uint8_t* base, uint32_t sp, uint64_t r3, const UpdateCalls& call
   const uint32_t scene = Globals::scene(base).address;
   r3 = scene;
   if (scene != 0) {
-    if (int32_t(Load(base, scene + 0)) != 4) {
+    const CarScene car_scene(base, scene);
+    if (int32_t(car_scene.state()) != 4) {
       r3 = calls.update_models(scene, frame);
       Globals::set_scene_ticks(base, 3);
-    } else if (Load(base, scene + 48) != 0) {
-      Store(base, scene + 48, Load(base, scene + 48) - 1);
+    } else if (car_scene.teardown_count() != 0) {
+      car_scene.set_teardown_count(car_scene.teardown_count() - 1);
     } else {
       DestroyB(base, scene, frame, calls.finish, calls.destroy, calls.free_object);
-      uint32_t current = Globals::scene(base).address;
-      if (Load(base, current + 40) == 0) {
-        Store(base, current + 5056, 0);
-        current = Globals::scene(base).address;
+      CarScene current = Globals::scene(base);
+      if (current.own_load_buffer() == 0) {
+        current.set_load_buffer(0);
+        current = Globals::scene(base);
       }
-      calls.release(current + kAssets, frame);
+      calls.release(current.assets_address(), frame);
       calls.destruct(Globals::scene(base).address, frame);
       r3 = calls.free_scene(Globals::scene(base).address, frame);
       Globals::set_scene(base, uint32_t{0});
@@ -937,7 +987,7 @@ uint64_t Update(uint8_t* base, uint32_t sp, uint64_t r3, const UpdateCalls& call
   }
   r3 = calls.update_a(r3, frame);
   if (Globals::scene(base).address == 0) {
-    const uint32_t set = Load(base, 0x826C5510);  // sub_820F0E50: the accessories' set
+    const uint32_t set = AccessoriesSet(base);
     r3 = set;
     if (set != 0) {
       r3 = calls.accessories_destroy(frame);

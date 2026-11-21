@@ -7,7 +7,10 @@
 #include "base/log.h"
 #include "save_interface/save_interface.h"
 #include "saves/saves.h"
+#include "schema/achievements.h"
+#include "schema/c_runtime_core.h"
 #include "schema/files_and_saves.h"
+#include "schema/save_interface.h"
 
 #include <string>
 #include <vector>
@@ -27,7 +30,11 @@ constexpr uint32_t kSavedGame = 1;  // the content type
 constexpr const char* kContentName = "SystemData.bin";
 constexpr const char* kSaveFile = "TXR_DATA_1";
 constexpr uint32_t kContentDataBytes = XContentData::kSize;
-constexpr uint32_t kOverlappedBytes = 28;
+// The XOVERLAPPED (achievements.toml's AchievementOverlapped) the content
+// steps finish, and the Win32 OVERLAPPED (c-runtime-core.toml's CrtOverlapped)
+// of the file steps.
+using XOverlapped = schema::AchievementOverlapped;
+constexpr uint32_t kOverlappedBytes = XOverlapped::kSize;
 
 // Win32 errors the steps' overlappeds hold.
 constexpr uint32_t kFileNotFound = 2;
@@ -49,19 +56,21 @@ void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
 // An overlapped finished: its status (a Win32 error, 0 for done) and
 // information.
 void Finish(uint8_t* base, uint32_t overlapped, uint32_t status, uint32_t information = 0) {
-  guest::StoreU32(base, overlapped, status);
-  guest::StoreU32(base, overlapped + 4, information);
+  const XOverlapped o(base, overlapped);
+  o.set_internal_low(status);
+  o.set_internal_high(information);
 }
 
 // What XGetOverlappedResult (sub_82295C98) answers without waiting: 996 while
 // pending, else the status (the information to `result` when given).
 uint32_t OverlappedResult(uint8_t* base, uint32_t overlapped, uint32_t result = 0) {
-  uint32_t status = guest::LoadU32(base, overlapped);
+  const XOverlapped o(base, overlapped);
+  uint32_t status = o.internal_low();
   if (status == kPending) {
     return kIncomplete;
   }
   if (result) {
-    guest::StoreU32(base, result, guest::LoadU32(base, overlapped + 4));
+    guest::StoreU32(base, result, o.internal_high());
   }
   return status;
 }
@@ -133,8 +142,10 @@ std::string SlotFileName(uint8_t* base, const SaveSlot& slot) {
 // The read and write steps' file overlapped (+472, 20 bytes cleared, its event
 // +488 none) done with `bytes`, and no file or event handle (+496, +492).
 void FinishFileStep(uint8_t* base, const SaveSlot& slot, uint32_t bytes) {
-  Clear(base, slot.file_overlapped_address(), 20);
-  Finish(base, slot.file_overlapped_address(), 0, bytes);
+  const schema::CrtOverlapped overlapped(base, slot.file_overlapped_address());
+  Clear(base, overlapped.address, schema::CrtOverlapped::kSize);
+  overlapped.set_internal(0);
+  overlapped.set_internal_high(bytes);
   slot.set_file_event(0);
   slot.set_file_handle(0xFFFFFFFF);
   slot.set_file_bytes(bytes);
@@ -165,7 +176,7 @@ uint32_t CheckDevice(uint8_t* base, uint32_t slot) {
 int32_t WaitDeviceSelector(uint8_t* base, uint32_t address) {
   ITC_NATIVE_RUNNING("sub_820A48B8 SaveSlot::WaitDeviceSelector");
   const SaveSlot slot(base, address);
-  if (guest::LoadU32(base, slot.device_selector_address()) == kPending) {
+  if (XOverlapped(base, slot.device_selector_address()).internal_low() == kPending) {
     return 4;
   }
   uint32_t result = OverlappedResult(base, slot.device_selector_address());
@@ -197,7 +208,7 @@ int32_t Enumerate(uint8_t* base, uint32_t owner, uint32_t address) {
   if (!slot.device()) {
     return -2;
   }
-  const uint32_t count = guest::LoadU32(base, owner + 68);
+  const uint32_t count = schema::SaveDevices(base, owner).saves_to_enumerate();
   slot.set_enumeration_buffer_size(count * kContentDataBytes);
   slot.set_enumerator(0);
   Clear(base, slot.enumeration_address(), kOverlappedBytes);
@@ -255,8 +266,9 @@ int32_t Create(uint8_t* base, uint32_t owner, uint32_t address, uint32_t mode) {
   if (mode == 3) {
     // XContentCalculateSize (game code, sub_82295C18's plain C++) of the
     // owner's +60 and +64.
-    const uint64_t size = save_interface::ContentSize(guest::LoadU32(base, owner + 60),
-                                                      guest::LoadU32(base, owner + 64));
+    const schema::SaveDevices devices(base, owner);
+    const uint64_t size = save_interface::ContentSize(devices.content_bytes(),
+                                                      devices.content_count());
     if (kFreeBytes < size) {
       return -10;
     }

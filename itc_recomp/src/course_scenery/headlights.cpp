@@ -23,7 +23,11 @@
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
+#include "schema/cameras.h"
+#include "schema/car_draw.h"
+#include "schema/car_scene_draw.h"
 #include "schema/course_scenery.h"
+#include "schema/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <initializer_list>
@@ -35,20 +39,16 @@ namespace {
 using namespace car_scene_draw::ops;
 
 constexpr uint32_t kFrame = 640;
-constexpr uint32_t kScene = 0x826C2E44;
-constexpr uint32_t kRenderApp = 0x826BABA0;  // the render manager
-constexpr uint32_t kCameraPasses = 0x826BAC00;
+using SceneGlobals = schema::CarSceneDrawGlobals;
 // The headlight slots: eight 16-byte vectors each.
-constexpr uint32_t kSlotsPosition = 0x8296B9E0;
-constexpr uint32_t kSlotsShape = 0x8296BA60;
-constexpr uint32_t kSlotsColor = 0x8296BAE0;
-constexpr uint32_t kSlotsColor2 = 0x8296BB60;
-constexpr uint32_t kSlotsDirection = 0x8296BBE0;
-constexpr uint32_t kSlotsBeam = 0x8296BC60;
-constexpr uint32_t kSceneLight = 0x8265ED00;  // the scene's +5328
-constexpr uint32_t kEyeCopy = 0x8265ECE0;     // the pass's eye
-constexpr uint32_t kNear = 0x82001FBC;
-constexpr uint32_t kFar = 0x82002FA8;
+constexpr uint32_t kSlotsPosition = SceneGlobals::headlight_positions_address();
+constexpr uint32_t kSlotsShape = SceneGlobals::headlight_shapes_address();
+constexpr uint32_t kSlotsColor = SceneGlobals::headlight_colors_a_address();
+constexpr uint32_t kSlotsColor2 = SceneGlobals::headlight_colors_b_address();
+constexpr uint32_t kSlotsDirection = SceneGlobals::headlight_directions_address();
+constexpr uint32_t kSlotsBeam = SceneGlobals::headlight_vectors_address();
+constexpr uint32_t kSceneLight = SceneGlobals::light_vector_address();  // the scene's +5328
+constexpr uint32_t kEyeCopy = SceneGlobals::view_eye_address();         // the pass's eye
 
 // The originals' callees (their wraps in src/debug/frame_state_diff.cpp and
 // src/hooks/vehicle_accessors.cpp, and the originals where the plain C++
@@ -120,7 +120,7 @@ class Recorder {
   // The render manager's slot 8 (return address x): its plain C++ called
   // directly where it's the game's (app_start_up::RenderManagerScene).
   uint32_t Scene(uint32_t x) {
-    const uint32_t manager = Load(base_, kRenderApp);
+    const uint32_t manager = SceneGlobals::render_manager(base_).address;
     const auto scene = app_start_up::RenderManagerScene(base_, manager);
     return scene ? *scene : uint32_t(VtableCall(manager, 8, x));
   }
@@ -161,7 +161,8 @@ uint64_t Recorder::Run(uint32_t description) {
   // The camera pass from the viewport, then CameraPass::Update from
   // FromViewport's frame (as its adapter).
   const schema::SceneryPassDesc desc(base_, description);
-  const uint32_t pass = desc.camera_pass() * 592u + kCameraPasses;
+  const uint32_t pass = desc.camera_pass() * schema::CameraPass::kSize +
+                        schema::CamerasGlobals::passes_address();
   desc.set_camera_pass_object(pass);
   cameras::FromViewport(base_, pass, desc.player(), desc.viewport_entry());
   {
@@ -173,8 +174,8 @@ uint64_t Recorder::Run(uint32_t description) {
   }
   uint64_t r3 = vehicle_accessors::VehicleGet(base_, 0);
   if (r3 != 0) {
-    const uint32_t scene0 = Load(base_, kScene);
-    const uint32_t lights = scene0 + 5248;  // the original's r31
+    // The scene (its +5248 the original's r31).
+    const schema::CarScene scene0 = SceneGlobals::scene(base_);
     const double zero = double(schema::CourseSceneryGlobals::zero(base_));  // f30
     const double one = double(schema::CourseSceneryGlobals::one(base_));    // f31
     for (uint32_t at : {96u, 100u, 104u, 108u, 80u, 84u, 88u, 92u}) {
@@ -184,28 +185,30 @@ uint64_t Recorder::Run(uint32_t description) {
       Copy16(base_, kSlotsColor + i, f + 96);
       Copy16(base_, kSlotsColor2 + i, f + 80);
     }
-    Copy16(base_, f + 208, lights + 128);
+    Copy16(base_, f + 208, scene0.headlight_position_lo_address());
     Stfs(base_, f + 128, zero);
     Stfs(base_, f + 136, zero);
     Stfs(base_, f + 140, zero);
     Stfs(base_, f + 132, one);
     Stfs(base_, f + 124, one);
     Stfs(base_, f + 156, one);
-    const int32_t count = int32_t(Load(base_, scene0 + 5036));
+    const int32_t count = int32_t(scene0.scene_models_count());
     const uint32_t limit = count < 8 ? uint32_t(count) : 8u;  // the original's r17
-    const double far_plane = Lfs(base_, kFar);  // f28
-    const double near_plane = Lfs(base_, kNear);  // f29
+    const double far_plane = double(SceneGlobals::headlight_far_plane(base_));  // f28
+    const double near_plane =
+        double(schema::CourseSceneryGlobals::headlight_near_plane(base_));  // f29
     uint32_t found = 0;  // r18
     for (uint32_t n = 0; n < limit; n++) {
-      const uint32_t list = Load(base_, kScene) + 5028;
+      const uint32_t list = SceneGlobals::scene(base_).scene_models_first_address();
       const uint32_t model = uint32_t(Wrapped(base_, kListAt, list, [&] {
         return uint64_t(vehicle_accessors::ListAt(base_, list, n));
       }));
       r3 = model;
-      if (model == 0 || int32_t(Load(base_, model + 16)) != 3 || Load(base_, model + 5048) == 0) {
+      const schema::SceneModel sm(base_, model);
+      if (model == 0 || int32_t(sm.state()) != 3 || sm.car_model<schema::View>().address == 0) {
         continue;
       }
-      const int32_t lit = int32_t(Load(base_, model + 32));
+      const int32_t lit = int32_t(sm.kind());
       if (lit != 2 && lit != 1) {
         continue;
       }
@@ -228,8 +231,8 @@ uint64_t Recorder::Run(uint32_t description) {
       // The car's matrix at +256; the eye (+112) = the scene's +5376
       // through it, then its last row cleared: the beam (+144) and up
       // (+128) turned by it.
-      if (!native::Buffers_Memcpy(base_, f + 256, model + 4304, 64, 0x820F36D0)) {
-        calls_.memcpy(f + 256, model + 4304, 64, f, 0x820F36D0);
+      if (!native::Buffers_Memcpy(base_, f + 256, sm.matrix_address(), 64, 0x820F36D0)) {
+        calls_.memcpy(f + 256, sm.matrix_address(), 64, f, 0x820F36D0);
       }
       FlushOff();
       Transform(f + 112, f + 256, f + 208);
@@ -245,7 +248,7 @@ uint64_t Recorder::Run(uint32_t description) {
       }
       {
         const simde__m128 v = Lvx(base_, f + 80);
-        Copy16(base_, f + 240, lights + 176);
+        Copy16(base_, f + 240, scene0.light_slot_vector_lo_address());
         FlushToZero flush;
         Stvx(base_, f + 96, Normalized(v, Dot3(v, v)));
       }
@@ -260,14 +263,16 @@ uint64_t Recorder::Run(uint32_t description) {
       }));
       Stfs(base_, f + 172, one);
       for (uint32_t i = 0; i < 12; i += 4) {
-        Stfs(base_, f + 160 + i, Fmuls(Lfs(base_, color + i), Lfs(base_, lights + 48 + i)));
+        Stfs(base_, f + 160 + i,
+             Fmuls(Lfs(base_, color + i), Lfs(base_, scene0.projector_a_x_address() + i)));
       }
       const uint32_t color2 = uint32_t(Wrapped(base_, kBeamColor, f + 432, [&] {
         return uint64_t(car_scene_draw::SceneModelBeamColor(base_, f + 432, model, f));
       }));
       r3 = color2;
       for (uint32_t i = 0; i < 12; i += 4) {
-        Stfs(base_, f + 176 + i, Fmuls(Lfs(base_, lights + 64 + i), Lfs(base_, color2 + i)));
+        Stfs(base_, f + 176 + i,
+             Fmuls(Lfs(base_, scene0.projector_b_x_address() + i), Lfs(base_, color2 + i)));
       }
       Stfs(base_, f + 188, one);
       // The slot's six vectors.
@@ -293,7 +298,7 @@ uint64_t Recorder::Run(uint32_t description) {
       }
       Stfs(base_, f + 204, one);
       const uint32_t out = f + 336, eye = f + 112, target = f + 192, up = f + 128;
-      const double fov = Lfs(base_, lights + 188);
+      const double fov = double(scene0.projector_fov());
       if (car_scene_draw::PerspectiveDeclines(base_, fov)) {
         Call(kBuild, {out, eye, target, up}, 0x820F3944, {fov, one, near_plane, far_plane});
       } else {
@@ -336,11 +341,12 @@ uint64_t Recorder::Run(uint32_t description) {
       const uint32_t queue = uint32_t(VtableCall(object, 2, x + 16));
       r3 = VtableCall(queue, 4, 0x820F3AFC, {chunk, second ? 371u : 150u}, {zero});
     }
-    Copy16Interleaved(base_, kSceneLight, lights + 80);
+    Copy16Interleaved(base_, kSceneLight, scene0.projector_c_lo_address());
   }
   schema::CourseSceneryGlobals::set_key_a(base_, desc.key_a());
   schema::CourseSceneryGlobals::set_key_b(base_, desc.key_b());
-  Copy16Interleaved(base_, kEyeCopy, desc.camera_pass_object() + 400);
+  Copy16Interleaved(base_, kEyeCopy,
+                    schema::CameraPass(base_, desc.camera_pass_object()).eye_xy_address());
   return r3;
 }
 

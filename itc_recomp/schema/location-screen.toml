@@ -128,31 +128,7 @@ fields = [
   { name = "message_start", offset = 808, type = "u32", note = "the ring's first slot" },
 ]
 
-# The type 5 mode (type5-mode.md) as FrontEndMode::NextMode (sub_8222FCA0,
-# its slot 13) gets it (r4): only its block.
-[LocationScreenMode]
-measure = "FrontEndMode::NextMode.r4"
-size = 852
-origin = "embedded"
-fields = [
-  { name = "block", offset = 848, type = "ptr", to = "LocationScreenModeBlock", note = "the 28,940-byte block (VirtualAlloc by ModeType5::Init)" },
-]
-
-# The type 5 mode's block (28,940 bytes at the mode's +848, ModeType5::Init;
-# type5-mode.md): three screen machines and the answer.
-[LocationScreenModeBlock]
-measure = "FrontEndMode::NextMode.r4.+848"
-size = 28940
-origin = "allocated"
-fields = [
-  { name = "car_settings", offset = 0, type = "bytes", count = 9640, note = "the car settings' machine (car-settings.md)" },
-  { name = "location_screen", offset = 9640, type = "bytes", count = 9640, note = "this screen's machine (LocationScreenMachine)" },
-  { name = "dialog", offset = 19280, type = "bytes", count = 9640, note = "the type 5 dialog's machine (type5-mode.md)" },
-  { name = "shown", offset = 28920, type = "u32", note = "the shown machine's id (3, 16 or 21; ModeType5::FindShown)" },
-  { name = "shown_initial", offset = 28924, type = "u32", note = "21 by ModeType5::Init (readers not looked for)" },
-  { name = "answer_word0", offset = 28928, type = "u32", note = "the next mode's 8-byte answer (ModeAnswer): its changed byte and three bytes" },
-  { name = "answer_next_type", offset = 28932, type = "u32", note = "the answer's next mode type (1 the race, 9 today's result, 4 the title, 12)" },
-]
+# LocationScreenMode: merged into type5-mode.toml's ModeType5 at the integration (the same object).
 
 # A screen picture (16 bytes, VirtualAlloc by OnPictureLoadedA and B; freed
 # by Picture::Free and FreePictures; known-data.md: "screen picture").

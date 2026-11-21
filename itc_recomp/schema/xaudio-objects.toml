@@ -82,24 +82,9 @@ fields = [
   { name = "loop_end_callback", offset = 76, type = "fn" },
 ]
 
-# The allocator the factory's create functions get (r4): its vtable's
-# slot +20 allocates.
-[XAudioAllocator]
-measures = ["AudioRenderDriver::Create.r4", "PcmCodec::Create.r4", "Reverb::Create.r4", "VolumeMeter::Create.r4", "XAudioMatrix::Create.r4", "XmaCodec::Create.r4", "PacketLists::Alloc.r5", "VolumeMeter::Init.r5", "XAudioMatrix::Init.r5", "XmaCodec::XmaCodec.r5", "sub_825A50E0.r4", "sub_825A5DB8.r4"]
-size = 4
-origin = "allocated"
-fields = [
-  { name = "vtable", offset = 0, type = "ptr", to = "XAudioAllocatorVtable" },
-]
+# XAudioAllocator: merged into xaudio-engine.toml's XAudioBumpAllocator at the integration (the same object).
 
-# The allocator's vtable.
-[XAudioAllocatorVtable]
-measures = ["AudioRenderDriver::Create.r4.+0", "PcmCodec::Create.r4.+0", "Reverb::Create.r4.+0", "VolumeMeter::Create.r4.+0", "XAudioMatrix::Create.r4.+0", "XmaCodec::Create.r4.+0", "PacketLists::Alloc.r5.+0", "VolumeMeter::Init.r5.+0", "XAudioMatrix::Init.r5.+0", "XmaCodec::XmaCodec.r5.+0", "sub_825A50E0.r4.+0", "sub_825A5DB8.r4.+0"]
-size = 24
-origin = "image"
-fields = [
-  { name = "allocate", offset = 20, type = "fn", note = "(the allocator, bytes): the block, 0 when out of memory" },
-]
+# XAudioAllocatorVtable: merged into xaudio-engine.toml's XAudioBumpAllocatorVtable at the integration (the same object).
 
 # The word a class's size function writes (its r4: the factory's).
 [FactorySizeOut]
@@ -121,7 +106,9 @@ fields = [
 
 # The info an object's slot +8 writes (a byte and a half-word).
 [FactoryInfoOut]
-measures = ["XAudioCodec::GetInfo.r4", "XAudioMatrix::GetInfo.r4", "VolumeMeter::GetInfo.r4"]
+# measures from XAudioEngineInfoOut (xaudio-engine), merged at the integration
+measures = ["XAudioCodec::GetInfo.r4", "XAudioMatrix::GetInfo.r4", "VolumeMeter::GetInfo.r4",
+  "sub_82461EF8.r4"]
 size = 4
 origin = "embedded"
 fields = [
@@ -465,7 +452,9 @@ fields = [
 # A codec's inner object (the codec's +4; XAudioCodec::Construct, Init,
 # Destruct): vtable, reference count, owner, then the codec base at +12.
 [XAudioCodec]
-measures = ["XAudioCodec", "sub_82467450.ret"]
+# measures from XAudioSourceCodec (xaudio), merged at the integration
+measures = ["XAudioCodec", "sub_82467450.ret",
+  "XAudioSourceVoice.+76"]
 size = 180
 origin = "embedded"
 fields = [
@@ -484,6 +473,8 @@ fields = [
 
 # The output matrix (28 + 12 x the entries; XAudioMatrix::Create).
 [XAudioMatrix]
+# measures from XAudioOutputMatrix (xaudio), merged at the integration
+measures = ["XAudioVoice.+72.+4"]
 measure = "XAudioMatrix"
 size = 28
 origin = "allocated"
@@ -549,6 +540,8 @@ fields = [
 
 # The volume meter (52 bytes; VolumeMeter::Create, Init, Process).
 [VolumeMeter]
+# measures from XAudioMeterView (xaudio), merged at the integration
+measures = ["sub_825A5E28.r3"]
 measure = "VolumeMeter"
 size = 52
 origin = "allocated"
@@ -566,16 +559,19 @@ fields = [
   { name = "rms", offset = 36, type = "u32", note = "channels x length floats" },
   { name = "unknown_40", offset = 40, type = "u32" },
   { name = "filled", offset = 44, type = "u32", note = "1 once the history has filled" },
-  { name = "allocator", offset = 48, type = "ptr", to = "XAudioAllocator" },
+  { name = "allocator", offset = 48, type = "ptr", to = "XAudioBumpAllocator" },
 ]
 
 # One of the meter's arrays (floats, by the slot and the channel).
 [MeterHistory]
-measures = ["VolumeMeter.+28", "VolumeMeter.+32"]
+# measures from XAudioMeterHistoryView (xaudio), merged at the integration
+measures = ["VolumeMeter.+28", "VolumeMeter.+32",
+  "sub_825A5E28.r3.+28", "sub_825A5E28.r3.+32", "sub_825A5E28.r3.+36"]
 size = 32
 origin = "allocated"
 fields = [
   { name = "values", offset = 0, type = "bytes", count = 32, note = "the first slot's 8 channels (Process's fold-downs write 6 and 7)" },
+  { name = "first", offset = 0, type = "f32", note = "channels x length floats (from XAudioMeterHistoryView, xaudio)" },
 ]
 
 # The reverb's native parameters (84 bytes: ReverbCore::Defaults,

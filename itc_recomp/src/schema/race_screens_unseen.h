@@ -307,6 +307,26 @@ struct Kind6Menu : View {
   uint32_t ranking_skipped() const { return guest::LoadU32(base, address + 356); }
   void set_ranking_skipped(uint32_t v) const { guest::StoreU32(base, address + 356, v); }
   uint32_t ranking_skipped_address() const { return address + 356; }
+  // measure fault: Kind6Menu::ShowReplay's r3 is a replay record (as AfterRaceMenu::ShowReplay's, race-screens.toml), joined with the menu
+  uint16_t fault_replay_0() const { return guest::LoadU16(base, address + 0); }
+  void set_fault_replay_0(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t fault_replay_0_address() const { return address + 0; }
+  // measure fault: the replay record's +2 (ShowReplay)
+  uint16_t fault_replay_2() const { return guest::LoadU16(base, address + 2); }
+  void set_fault_replay_2(uint16_t v) const { guest::StoreU16(base, address + 2, v); }
+  uint32_t fault_replay_2_address() const { return address + 2; }
+  // measure fault: the replay record's +6 (ShowReplay)
+  uint16_t fault_replay_6() const { return guest::LoadU16(base, address + 6); }
+  void set_fault_replay_6(uint16_t v) const { guest::StoreU16(base, address + 6, v); }
+  uint32_t fault_replay_6_address() const { return address + 6; }
+  // measure fault: the replay record's +8 (ShowReplay)
+  uint16_t fault_replay_8() const { return guest::LoadU16(base, address + 8); }
+  void set_fault_replay_8(uint16_t v) const { guest::StoreU16(base, address + 8, v); }
+  uint32_t fault_replay_8_address() const { return address + 8; }
+  // measure fault: the replay record's +10 (ShowReplay)
+  uint16_t fault_replay_10() const { return guest::LoadU16(base, address + 10); }
+  void set_fault_replay_10(uint16_t v) const { guest::StoreU16(base, address + 10, v); }
+  uint32_t fault_replay_10_address() const { return address + 10; }
 };
 
 // allocated; measure: PauseMenu4
@@ -512,7 +532,9 @@ struct RaceScreensUnseenGlobals {
   static void set_pause4_pages(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D84E8u, v); }
   static constexpr uint32_t pause4_pages_address() { return 0x826D84E8u; }
   // a MenuList (72 bytes, race-screens.toml)
-  static View pause4_list(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D84ECu)); }
+  template <typename T = MenuList>
+  static T pause4_list(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D84ECu)); }
+  static void set_pause4_list(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D84ECu, v.address); }
   static void set_pause4_list(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D84ECu, v); }
   static constexpr uint32_t pause4_list_address() { return 0x826D84ECu; }
   // the items by kind: six words a kind, -1 ends them
@@ -545,7 +567,9 @@ struct RaceScreensUnseenGlobals {
   static void set_split_exchanged(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x82814E24u, v); }
   static constexpr uint32_t split_exchanged_address() { return 0x82814E24u; }
   // the network session (network-mode.toml's Session)
-  static View kind6_session(uint8_t* base) { return View(base, guest::LoadU32(base, 0x82816E3Cu)); }
+  template <typename T = Session>
+  static T kind6_session(uint8_t* base) { return T(base, guest::LoadU32(base, 0x82816E3Cu)); }
+  static void set_kind6_session(uint8_t* base, const View& v) { guest::StoreU32(base, 0x82816E3Cu, v.address); }
   static void set_kind6_session(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x82816E3Cu, v); }
   static constexpr uint32_t kind6_session_address() { return 0x82816E3Cu; }
   // the course, 0 to 7
@@ -555,8 +579,10 @@ struct RaceScreensUnseenGlobals {
   static uint32_t kind6_course_flag(uint8_t* base) { return guest::LoadU32(base, 0x82816680u); }
   static void set_kind6_course_flag(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x82816680u, v); }
   static constexpr uint32_t kind6_course_flag_address() { return 0x82816680u; }
-  // the replay list (+12 the 36-byte records, +20 their count)
-  static View kind6_replays(uint8_t* base) { return View(base, guest::LoadU32(base, 0x828161F0u)); }
+  // the replay list (save-interface.toml's SaveBuffers: +12 the 36-byte records, +20 their count)
+  template <typename T = SaveBuffers>
+  static T kind6_replays(uint8_t* base) { return T(base, guest::LoadU32(base, 0x828161F0u)); }
+  static void set_kind6_replays(uint8_t* base, const View& v) { guest::StoreU32(base, 0x828161F0u, v.address); }
   static void set_kind6_replays(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x828161F0u, v); }
   static constexpr uint32_t kind6_replays_address() { return 0x828161F0u; }
   // the leaderboard read's results (an XUSER_STATS_READ_RESULTS)
@@ -588,8 +614,16 @@ struct RaceScreensUnseenGlobals {
   static uint32_t net_answer_word(uint8_t* base) { return guest::LoadU32(base, 0x826C6B04u); }
   static void set_net_answer_word(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C6B04u, v); }
   static constexpr uint32_t net_answer_word_address() { return 0x826C6B04u; }
-  // its +7244 is the id sent
-  static View net_players(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D82E8u)); }
+  // the race data (race-states.toml): +60, +0x59620 the stages, +0x59AE8 the results records, +0xA3AF0 the kind
+  template <typename T = RaceData>
+  static T race_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  static void set_race_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B2Cu, v.address); }
+  static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
+  static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
+  // the race's progress (race-states.toml): its +7244 is the id sent
+  template <typename T = RaceProgress>
+  static T net_players(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D82E8u)); }
+  static void set_net_players(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D82E8u, v.address); }
   static void set_net_players(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D82E8u, v); }
   static constexpr uint32_t net_players_address() { return 0x826D82E8u; }
 };

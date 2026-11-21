@@ -83,6 +83,14 @@ struct Movie : View {
   uint32_t state() const { return guest::LoadU32(base, address + 308); }
   void set_state(uint32_t v) const { guest::StoreU32(base, address + 308, v); }
   uint32_t state_address() const { return address + 308; }
+  // measure fault: strncpy's r3 is the movie + 48 (path), joined with the movie at +0
+  uint8_t fault_strncpy_0() const { return guest::LoadU8(base, address + 0); }
+  void set_fault_strncpy_0(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
+  uint32_t fault_strncpy_0_address() const { return address + 0; }
+  // measure fault: strncpy's second byte store (path's +1)
+  uint8_t fault_strncpy_1() const { return guest::LoadU8(base, address + 1); }
+  void set_fault_strncpy_1(uint8_t v) const { guest::StoreU8(base, address + 1, v); }
+  uint32_t fault_strncpy_1_address() const { return address + 1; }
 };
 
 // image; measure: [826C1CDC].+0, sub_820AE808.r3.+0, sub_820AE818.r3.+0

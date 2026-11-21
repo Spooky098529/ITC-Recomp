@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/command_list.h"
 #include "schema/heap.h"
 
 #include "base/flags.h"
@@ -2042,7 +2043,7 @@ lifted::Result f8258CE00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r30,0
   r30 = uint64_t(int64_t(0));
   // lwz r3,20(r31)
-  r3 = guest::LoadU32(base, schema::CommandList(base, uint32_t(r31)).unknown_20_address());
+  r3 = guest::LoadU32(base, schema::CommandList(base, uint32_t(r31)).allocation_address());
   // cmplwi cr6,r3,0
   cr6 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // stw r11,0(r31)
@@ -2053,14 +2054,14 @@ lifted::Result f8258CE00(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // (left out: dead in C++)
   { const lifted::Result o = lifted::entry::e825A71C0(base, LIFTED_ARGS(0x8258CE34, r31)); r3 = o.r3; f1 = o.f1; }
   // stw r30,20(r31)
-  guest::StoreU32(base, schema::CommandList(base, uint32_t(r31)).unknown_20_address(), uint32_t(r30));
+  guest::StoreU32(base, schema::CommandList(base, uint32_t(r31)).allocation_address(), uint32_t(r30));
 loc_8258CE38:
   // clrlwi r11,r29,31
   r11 = uint32_t(r29) & 0x1;
   // stw r30,24(r31)
-  guest::StoreU32(base, schema::CommandList(base, uint32_t(r31)).unknown_24_address(), uint32_t(r30));
+  guest::StoreU32(base, schema::CommandList(base, uint32_t(r31)).buffer0_address(), uint32_t(r30));
   // stw r30,28(r31)
-  guest::StoreU32(base, schema::CommandList(base, uint32_t(r31)).unknown_28_address(), uint32_t(r30));
+  guest::StoreU32(base, schema::CommandList(base, uint32_t(r31)).buffer1_address(), uint32_t(r30));
   // mr r3,r31
   r3 = r31;
   // cmplwi cr6,r11,0

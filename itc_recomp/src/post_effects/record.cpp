@@ -27,6 +27,8 @@
 #include "models/model.h"
 #include "native/buffers.h"
 #include "scene_target/scene_target.h"
+#include "schema/cameras.h"
+#include "schema/command_list.h"
 #include "schema/graphics_resources.h"
 #include "schema/post_effects.h"
 
@@ -110,16 +112,18 @@ class Recorder {
   }
   // Whether the record may go on natively: no chunk open, room for `slots`.
   bool Ready(uint32_t list, uint32_t slots) const {
-    const uint32_t used = Load(base_, list + 12);
-    return guest::LoadU8(base_, list + 52) == 0 &&
-           Load(base_, command_list::kOpenChunks) == 0 && used + slots >= used &&
-           used + slots < Load(base_, list + 8);
+    const schema::CommandList commands(base_, list);
+    const uint32_t used = commands.used();
+    return commands.chunk_open() == 0 &&
+           schema::CommandListGlobals::open_chunks(base_) == 0 && used + slots >= used &&
+           used + slots < commands.capacity();
   }
   // Whether the list has room for `slots` (a record inside a chunk already
   // open: only the room).
   bool Room(uint32_t list, uint64_t slots) const {
-    const uint64_t used = Load(base_, list + 12);
-    return used + slots < Load(base_, list + 8);
+    const schema::CommandList commands(base_, list);
+    const uint64_t used = commands.used();
+    return used + slots < commands.capacity();
   }
   // The chunk handed to the render queue (its slot 4: r4 = the chunk, r5 =
   // the key, f1); its r3.
@@ -304,12 +308,14 @@ std::optional<uint32_t> TargetFilterRecord(uint8_t* base, uint32_t stack, uint32
   const uint32_t flags = f.flags();
   uint32_t id;
   if ((flags & 1) != 0) {
-    if (Load(base, G::camera_passes_address() + 12 * 592 + 588) == 0) {
+    if (schema::CameraPass(base, G::camera_passes_address() + 12 * schema::CameraPass::kSize)
+            .enabled() == 0) {
       return filter;
     }
     id = 4;
   } else if ((flags & 2) != 0) {
-    if (Load(base, G::camera_passes_address() + 11 * 592 + 588) == 0) {
+    if (schema::CameraPass(base, G::camera_passes_address() + 11 * schema::CameraPass::kSize)
+            .enabled() == 0) {
       return filter;
     }
     id = 3;
@@ -392,14 +398,15 @@ std::optional<uint32_t> MotionBlurRecord(uint8_t* base, uint32_t stack, uint32_t
   // On a logic pass with its camera pass active: the pair moved on (+8144 =
   // +8080, +8080 = the pass's view-projection at +144).
   if (logic) {
-    const uint32_t pass = G::camera_passes_address() + mb.camera_pass() * 592;
-    if (Load(base, pass + 588) != 0) {
+    const schema::CameraPass pass(
+        base, G::camera_passes_address() + mb.camera_pass() * schema::CameraPass::kSize);
+    if (pass.enabled() != 0) {
       const uint32_t current = mb.view_projection_address();
       const uint32_t previous = mb.previous_view_projection_address();
       matrix_math::Copy(base, previous, current);
       interpolation::BlendState_OnCopy(base, previous, current, 0x821365E8);
-      matrix_math::Copy(base, current, pass + 144);
-      interpolation::BlendState_OnCopy(base, current, pass + 144, 0x821365F4);
+      matrix_math::Copy(base, current, pass.view_projection_address());
+      interpolation::BlendState_OnCopy(base, current, pass.view_projection_address(), 0x821365F4);
     }
   }
   // --- The blur's chunk ---
@@ -701,9 +708,10 @@ std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t g
   // --- The turn: the view's z axis (the camera pass's inverse view times
   // (0, 0, 1, 0)) with y 0, normalized, its angle to x by acos (from 2 pi
   // when its z is negative) ---
-  const uint32_t camera = G::camera_passes_address() + g.camera_pass() * 592;
+  const schema::CameraPass camera(
+      base, G::camera_passes_address() + g.camera_pass() * schema::CameraPass::kSize);
   double angle = zero;
-  if (Load(base, camera + 588) != 0) {
+  if (camera.enabled() != 0) {
     Stfs(base, frame + 156, one);
     Stfs(base, frame + 172, one);
     Stfs(base, frame + 188, one);
@@ -712,7 +720,7 @@ std::optional<uint32_t> GlowRecordStar(uint8_t* base, uint32_t stack, uint32_t g
     Stfs(base, frame + 132, zero);
     Stfs(base, frame + 136, one);
     Stfs(base, frame + 140, zero);
-    matrix_math::Inverse(base, frame + 144, camera + 16);
+    matrix_math::Inverse(base, frame + 144, camera.view_address());
     matrix_math::Vec4Transform(base, frame + 128, frame + 144, frame + 128);
     Stfs(base, frame + 132, zero);
     Stfs(base, frame + 96, one);

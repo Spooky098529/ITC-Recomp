@@ -34,6 +34,8 @@ fields = [
   { name = "doserrno", offset = 12, type = "u32", note = "_doserrno" },
   { name = "rand_seed", offset = 20, type = "u32", note = "rand's seed, 1 at first" },
   { name = "exception_actions", offset = 92, type = "u32", note = "the exception action table (0x8266BE60, _XcptActTab, unless copied)" },
+  { name = "exception_pointers", offset = 96, type = "u32", note = "raise saves it, clears it and puts it back around an FPE handler (_tpxcptinfoptrs, probably)" },
+  { name = "fpe_code", offset = 100, type = "u32", note = "raise saves it, sets 140 and puts it back around an FPE handler, which is given it (_tfpecode, probably)" },
   { name = "terminate_handler", offset = 108, type = "fn" },
 ]
 
@@ -103,6 +105,9 @@ fields = [
   { name = "room", offset = 4, type = "u32", note = "the room left (_cnt)" },
   { name = "buffer", offset = 8, type = "u32", note = "the buffer's base" },
   { name = "flags", offset = 12, type = "u32", note = "0x40 a string" },
+  { name = "file", offset = 16, type = "u32", note = "the file handle (_file)" },
+  { name = "buffer_size", offset = 24, type = "u32", note = "the buffer's size (_bufsiz)" },
+  { name = "temp_name", offset = 28, type = "u32", note = "a temporary file's name, freed at close (_tmpfname)" },
 ]
 
 # _fltout2's result (_strflt): the sign, the decimal exponent and the digits.
@@ -222,7 +227,8 @@ fields = [
 [CString]
 measures = ["strncmp.r3", "strncmp.r4", "strstr.r4", "strncpy.r4", "_stricmp.r3",
             "mbtowc.r4", "_cftof_l.r4", "strtoxl.r4", "_output_l.r4", "_fltout2.r5",
-            "new<861>@_output_l", "new<861>@_woutput_l", "[820734CC]", "[8266C024].+0"]
+            "new<861>@_output_l", "new<861>@_woutput_l", "[820734CC]", "[8266C024].+0",
+            "lstrcmpA.r3", "lstrcmpA.r4", "CompareStringA.r6"]
 size = 0
 origin = "embedded"
 fields = [

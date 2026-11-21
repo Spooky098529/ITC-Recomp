@@ -622,7 +622,9 @@ struct ModeTickGlobals {
   // four 8-byte entries: +4 blocked (action-mappers.md)
   static constexpr uint32_t action_mapper_entries_address() { return 0x826BAB80u; }
   // the race data: +0x59620 the stage list, +0xA3AF0 the human cars' arrangement (6 is two)
-  static uint32_t race_data(uint8_t* base) { return guest::LoadU32(base, 0x826C5B2Cu); }
+  template <typename T = RaceData>
+  static T race_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  static void set_race_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B2Cu, v.address); }
   static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
   static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
   // the boot movies' first id: 10 the UBI logo
@@ -630,7 +632,9 @@ struct ModeTickGlobals {
   static void set_boot_movie(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5BACu, v); }
   static constexpr uint32_t boot_movie_address() { return 0x826C5BACu; }
   // the 1024 x 576 target object: +28 its mode
-  static uint32_t scene_target(uint8_t* base) { return guest::LoadU32(base, 0x8266D08Cu); }
+  template <typename T = SceneTarget>
+  static T scene_target(uint8_t* base) { return T(base, guest::LoadU32(base, 0x8266D08Cu)); }
+  static void set_scene_target(uint8_t* base, const View& v) { guest::StoreU32(base, 0x8266D08Cu, v.address); }
   static void set_scene_target(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x8266D08Cu, v); }
   static constexpr uint32_t scene_target_address() { return 0x8266D08Cu; }
 };

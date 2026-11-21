@@ -49,8 +49,8 @@ fields = [
 ]
 
 [globals]
-scene = { address = 0x826D82D4, type = "ptr", note = "the race scene (31,168 bytes, RaceScene::Create; RaceScene::Destroy leaves the pointer)" }
-viewports = { address = 0x826C2CE8, type = "ptr", note = "the viewports (Viewports::Init): +8 nonzero in split screen" }
+scene = { address = 0x826D82D4, type = "ptr", to = "RaceScene", note = "the race scene (31,168 bytes, RaceScene::Create; RaceScene::Destroy leaves the pointer)" }
+viewports = { address = 0x826C2CE8, type = "ptr", to = "Viewports", note = "the viewports (Viewports::Init): +8 nonzero in split screen" }
 glow_params = { address = 0x82637CC0, type = "bytes", count = 1056, note = "24 RaceGlowParams: 3 a kind (0 to 7) and its index" }
 glow_params_other = { address = 0x82637C94, type = "bytes", count = 44, note = "the RaceGlowParams for kinds 8 and up (just before the table)" }
 filter_value = { address = 0x82002204, type = "f32", note = "the color filters' Set8120 value (0.05, probably)" }

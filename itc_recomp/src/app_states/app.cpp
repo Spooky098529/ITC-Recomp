@@ -9,6 +9,7 @@
 #include "base/log.h"
 #include "framework/run_loop.h"
 #include "schema/app_states.h"
+#include "schema/framework.h"
 
 namespace app_states {
 
@@ -123,12 +124,13 @@ void HandlerMapForEach(uint8_t* base, uint32_t result, uint64_t first, uint64_t 
     if (map == 0) {
       Trap("sub_82092BF0");
     }
-    if (node == Load(base, map + framework::kMapHead)) {
+    if (node == schema::HandlerMap(base, map).head().address) {
       Trap("sub_82092BF0");
     }
     const uint32_t object = Load(base, caller + 52) + Load(base, caller + 56);
-    Store(base, frame + 88, Load(base, node + framework::kNodeKey));
-    Store(base, frame + 92, Load(base, node + framework::kNodeDelegate));
+    const schema::HandlerMapNode entry(base, node);
+    Store(base, frame + 88, entry.key());
+    Store(base, frame + 92, entry.delegate().address);
     calls.call(Load(base, caller + 48), object, Load64(base, frame + 88), std::nullopt, 0x82092C98);
     framework::Iterator it{Load(base, frame + 80), Load(base, frame + 84)};
     if (framework::MapIncrement(base, it)) {
@@ -153,10 +155,13 @@ void ForEachMessage(uint8_t* base, uint32_t result, uint64_t first, uint64_t las
 void ForEachRequest(uint8_t* base, uint32_t result, uint64_t first, uint64_t last,
                     uint64_t functor, uint64_t adjust, uint32_t frame, const AppCalls& calls) {
   ITC_NATIVE_RUNNING("sub_82091C48 App::ForEachRequest");
-  ForEachIn(base, result, first, last, functor, adjust, frame, calls, framework::kRequestBytes,
+  ForEachIn(base, result, first, last, functor, adjust, frame, calls, schema::Request::kSize,
             [&](uint32_t cursor, uint32_t object, uint32_t function) {
-              calls.call(function, object, Load64(base, cursor),
-                         uint64_t(Load(base, cursor + 8)) << 32, 0x82091CA0);
+              const schema::Request request(base, cursor);
+              const uint32_t type = request.type();
+              const uint64_t type_and_key = (uint64_t(type) << 32) | request.key();
+              calls.call(function, object, type_and_key,
+                         uint64_t(request.delegate().address) << 32, 0x82091CA0);
             });
 }
 
@@ -242,9 +247,10 @@ std::optional<bool> AppAddRequest(uint8_t* base, uint32_t interface, uint32_t ty
       ITC_NATIVE_RUNNING("sub_82094A10 App::AddListener");
       break;
   }
-  Store(base, request + 0, type);
-  Store(base, request + 4, schema::AppHandlerKey(base, key).key());
-  Store(base, request + 8, calls.clone(delegate, clone_return));
+  const schema::Request r(base, request);
+  r.set_type(type);
+  r.set_key(schema::AppHandlerKey(base, key).key());
+  r.set_delegate(calls.clone(delegate, clone_return));
   return framework::RequestsPushBack(base, schema::AppInterface(base, interface).requests_address(),
                                      request);
 }
@@ -259,7 +265,7 @@ void WalkHandlers(uint8_t* base, uint32_t app, uint32_t map, uint32_t frame,
   Store(base, frame + 104, app);
   Store(base, frame + 80, map);
   Store(base, frame + 96, kRunHandler);
-  const uint32_t head = Load(base, map + framework::kMapHead);
+  const uint32_t head = schema::HandlerMap(base, map).head().address;
   const uint64_t functor = Load64(base, frame + 96);
   const uint64_t adjust = Load64(base, frame + 104);  // its low word as the stack holds it
   Store(base, frame + 96, map);
@@ -273,23 +279,25 @@ void WalkHandlers(uint8_t* base, uint32_t app, uint32_t map, uint32_t frame,
   });
 }
 
-// App::Update's walk of a vector (`vector`) with `function`: the words
-// stored as the original's; the range and functor handed to `walk`.
-template <typename Walk>
-void WalkVector(uint8_t* base, uint32_t app, uint32_t vector, uint32_t function, uint32_t frame,
+// App::Update's walk of a vector (`vec`, a MessageVector or a
+// RequestVector) with `function`: the words stored as the original's; the
+// range and functor handed to `walk`.
+template <typename Vector, typename Walk>
+void WalkVector(uint8_t* base, uint32_t app, Vector vec, uint32_t function, uint32_t frame,
                 Walk walk) {
+  const uint32_t vector = vec.address;
   Store(base, frame + 100, 0);
   Store(base, frame + 88, app);
   Store(base, frame + 96, function);
   const uint64_t functor_word = Load64(base, frame + 96);
   Store64(base, frame + 80, functor_word);
-  if (Load(base, vector + 4) > Load(base, vector + 8)) {
+  if (vec.first().address > vec.last().address) {
     Trap("sub_82093DC0");
   }
-  Store(base, frame + 100, Load(base, vector + 8));
-  const uint32_t first = Load(base, vector + 4);
+  Store(base, frame + 100, vec.last().address);
+  const uint32_t first = vec.first().address;
   Store(base, frame + 96, vector);
-  if (first > Load(base, vector + 8)) {
+  if (first > vec.last().address) {
     Trap("sub_82093DC0");
   }
   const uint64_t functor = Load64(base, frame + 80);
@@ -352,7 +360,7 @@ bool AppUpdate(uint8_t* base, uint32_t app, uint32_t frame, const AppCalls& call
   // The messages.
   const uint32_t messages = a.messages_address();
   calls.set_register(30, messages);
-  WalkVector(base, app, messages, kDeliverMessage, frame,
+  WalkVector(base, app, schema::MessageVector(base, messages), kDeliverMessage, frame,
              [&](uint64_t first, uint64_t last, uint64_t functor, uint64_t adjust) {
                calls.in_frame(128, 0x8209407C, [&](uint32_t inner) {
                  ForEachMessage(base, frame + 96, first, last, functor, adjust, inner, calls);
@@ -364,7 +372,7 @@ bool AppUpdate(uint8_t* base, uint32_t app, uint32_t frame, const AppCalls& call
   // The requests.
   const uint32_t requests = a.requests_address();
   calls.set_register(30, requests);
-  WalkVector(base, app, requests, kApplyRequest, frame,
+  WalkVector(base, app, schema::RequestVector(base, requests), kApplyRequest, frame,
              [&](uint64_t first, uint64_t last, uint64_t functor, uint64_t adjust) {
                calls.in_frame(128, 0x82094100, [&](uint32_t inner) {
                  ForEachRequest(base, frame + 96, first, last, functor, adjust, inner, calls);

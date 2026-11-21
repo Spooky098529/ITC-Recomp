@@ -11,6 +11,9 @@
 #include "racer_controllers/racer_controllers.h"
 #include "schema/car_physics.h"
 #include "schema/race_hud_object.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
+#include "schema/vehicle.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -44,24 +47,26 @@ uint64_t Tick(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, const Cal
   const uint32_t frame = sp - 128;
   guest::StoreU32(base, frame, sp);
   const Hud h(base, hud);
-  const uint32_t car = h.vehicle().address;
+  const schema::Vehicle vehicle = h.vehicle();
+  const uint32_t car = vehicle.address;
+  const schema::VehicleStatus status(base, vehicle.status_address());
   double f1 = double(Vehicle_GetSpeedKmh(base, car));
   const double speed = Single(f1 * LoadDouble(base, kFactor));
   guest::StoreU32(base, frame + 80, uint32_t(Fctiwz(speed)));
   SetSpeed(base, hud, guest::LoadU32(base, frame + 80), frame, &f1);
-  const int32_t int149 = Fctiwz(Lfs(base, car + 6252));
-  const int32_t int119 = Fctiwz(Lfs(base, car + 6256));
-  const double value = Lfs(base, car + 6260);
+  const int32_t int149 = Fctiwz(double(status.water_temperature()));
+  const int32_t int119 = Fctiwz(double(status.oil_temperature()));
+  const double value = double(status.engine_output());
   guest::StoreU32(base, frame + 80, uint32_t(int149));
   const uint32_t r6 = guest::LoadU32(base, frame + 80);
   guest::StoreU32(base, frame + 80, uint32_t(int119));
   const uint32_t r5 = guest::LoadU32(base, frame + 80);
   UpdateExtraGauges(base, hud, value, r5, r6, frame, calls);
-  SetGear(base, hud, int32_t(guest::LoadU32(base, car + 2252)), frame);
+  SetGear(base, hud, vehicle.gear(), frame);
   SetTach(base, hud, double(vehicle_accessors::VehicleFloat2224(base, car)), frame);
-  SetBar(base, hud, Lfs(base, car + 2420), frame);
-  SetBoost(base, hud, Lfs(base, car + 2944), frame);
-  const uint32_t extra = guest::LoadU32(base, guest::LoadU32(base, car + 5712) + 3892);
+  SetBar(base, hud, double(vehicle.nitrous_value()), frame);
+  SetBoost(base, hud, double(vehicle.boost()), frame);
+  const uint32_t extra = schema::Car(base, vehicle.car()).unknown_3892();
   const uint32_t node =
       ui_movies::FindNode(base, h.dashboard().address, kNone, 13);
   guest::StoreU32(base, node + 80, extra);
@@ -77,9 +82,9 @@ uint64_t TickTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls)
   guest::StoreU32(base, frame + 80, ai_drivers::TimeFromTicks(racers.ticks()));
   SetTime(base, hud, frame + 80, frame);
   const Racers racers2 = h.racers();
-  const uint32_t progress = G::race_progress(base).address;
+  const schema::RaceProgress progress = G::race_progress(base);
   const double start = double(racers2.start_distance());
-  double distance = Fsubs(Lfs(base, progress + 7156), start);
+  double distance = Fsubs(double(progress.race_length()), start);
   distance = Fmuls(distance, Lfs(base, 0x820029D8));
   double f1 = Single(distance * LoadDouble(base, kFactor));
   SetDistance(base, hud, frame, &f1);

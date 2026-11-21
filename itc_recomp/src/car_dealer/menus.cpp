@@ -67,8 +67,8 @@ uint64_t OpenListMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t first = ui_movies::FindNode(base, movie, 11, 0);
   const uint32_t picked = uint32_t(calls.Call(kListSelection, frame, 0x82184418, G::list_menu(base).address));
   if (picked <= 1) {
-    Store(base, second + 108, picked);
-    Store(base, first + 108, picked);
+    Node(base, second).set_texture_entry(picked);
+    Node(base, first).set_texture_entry(picked);
   }
   const uint64_t selection = calls.Call(kListSelection, frame, 0x82184440, G::list_menu(base).address);
   uint64_t text = selection + 550;
@@ -97,22 +97,22 @@ uint64_t OpenCarList(uint8_t* base, uint32_t sp, const Calls& calls) {
            162, 161, 153, 154);
   calls.Call(kListSetSelection, frame, 0x82184588, G::list_menu(base).address,
              G::data(base).car_selection());
-  Store(base, G::list_menu(base).address + 4, G::data(base).car_scroll());
+  G::list_menu(base).set_scroll(G::data(base).car_scroll());
   calls.Call(kListFit, frame, 0x821845A4, G::list_menu(base).address, 1);
   for (uint32_t i = 0; i < 4; i++) {
     const uint32_t card = ui_movies::FindNode(base, movie, 7, i + 5);
-    Store(base, card + 80, int32_t(i) < int32_t(n) ? 1 : 0);
+    Node(base, card).set_visible(int32_t(i) < int32_t(n) ? 1 : 0);
   }
   const uint32_t more = ui_movies::FindNode(base, movie, 7, 1);
   if (int32_t(n) > 4) {
-    Store(base, more + 80, 1);
-    SetScrollArrows(base, Load(base, G::list_menu(base).address + 4), n, frame);
+    Node(base, more).set_visible(1);
+    SetScrollArrows(base, G::list_menu(base).scroll(), n, frame);
   } else {
-    Store(base, more + 80, 0);
+    Node(base, more).set_visible(0);
   }
   calls.Call(kCarCardsFillAll, frame, 0x82184618);
   const uint64_t selection = calls.Call(kListSelection, frame, 0x82184620, G::list_menu(base).address);
-  const uint32_t index = (Load(base, G::list_menu(base).address + 4) + uint32_t(selection)) << 2;
+  const uint32_t index = (G::list_menu(base).scroll() + uint32_t(selection)) << 2;
   const Entry entry(base, Load(base, index + G::data(base).shown_list().address));
   return HelpLineSet(base, uint64_t(entry.car_id()) + 1862, frame, calls);
 }
@@ -124,7 +124,7 @@ uint64_t OpenCar(uint8_t* base, uint32_t sp, const Calls& calls) {
   InitList(base, calls, frame, 0x821846B4, G::list_menu(base).address, 2, 2, 154, 153, 155, 156);
   calls.Call(kListSetSelection, frame, 0x821846CC, G::color_menu(base).address,
              G::data(base).car_selection());
-  Store(base, G::color_menu(base).address + 4, G::data(base).car_scroll());
+  G::color_menu(base).set_scroll(G::data(base).car_scroll());
   calls.Call(kListFit, frame, 0x821846E8, G::color_menu(base).address, 1);
   const uint64_t selection = calls.Call(kListSelection, frame, 0x821846F0, G::list_menu(base).address);
   SetKindBar(base, selection * 40, frame);
@@ -135,8 +135,8 @@ uint64_t OpenCar(uint8_t* base, uint32_t sp, const Calls& calls) {
     ShowCarInfo(base, uint64_t(data.car_scroll()) + data.car_selection(), frame, calls);
   }
   const uint32_t shown = G::data(base).shown_list().count() == 1 ? 0 : 1;
-  Store(base, ui_movies::FindNode(base, movie, kAll, 23) + 80, shown);
-  Store(base, ui_movies::FindNode(base, movie, kAll, 24) + 80, shown);
+  Node(base, ui_movies::FindNode(base, movie, kAll, 23)).set_visible(shown);
+  Node(base, ui_movies::FindNode(base, movie, kAll, 24)).set_visible(shown);
   return calls.Call(kStageSetPlates, frame, 0x82184798, Stage(base), 0);
 }
 
@@ -158,11 +158,11 @@ uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
            over ? 9 : n, 154, 153, 155, 156);
   calls.Call(kListSetSelection, frame, 0x82184868, G::list_menu(base).address,
              G::data(base).color_selection());
-  Store(base, G::list_menu(base).address + 4, G::data(base).color_scroll());
+  G::list_menu(base).set_scroll(G::data(base).color_scroll());
   calls.Call(kListFit, frame, 0x82184884, G::list_menu(base).address, 1);
   const uint64_t selection = calls.Call(kListSelection, frame, 0x8218488C, G::list_menu(base).address);
   SetColorBar(base, uint64_t(uint32_t(selection) << 5) + 3, frame);
-  Store(base, ui_movies::FindNode(base, movie, kAll, 25) + 80, over ? 1 : 0);
+  Node(base, ui_movies::FindNode(base, movie, kAll, 25)).set_visible(over ? 1 : 0);
   // The old color records freed, from the last.
   while (Colors(base, G::data(base).colors_address()).count() != 0) {
     const Colors colors(base, G::data(base).colors_address());
@@ -178,14 +178,15 @@ uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
     const double unit = double(guest::LoadFloat(base, 0x82002200));
     SpecColor source(base, entry.color_records_address());
     for (uint32_t left = n; left != 0; left--, source.address += SpecColor::kSize) {
-      const uint32_t record = uint32_t(calls.Call(kVirtualAlloc, frame, 0x8218493C, 0, 32, 4096, 4));
+      const Swatch record(
+          base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x8218493C, 0, 32, 4096, 4)));
       const int64_t hue = int64_t(int32_t(source.hue()));
       StoreWide(base, frame + 96, hue);
-      guest::StoreFloat(base, record + 16, float(double(float(double(hue)))));
+      record.set_hue(float(double(float(double(hue)))));
       const int64_t saturation = source.saturation();
       StoreWide(base, frame + 104, saturation);
       const double s = double(float(double(saturation)));
-      guest::StoreFloat(base, record + 20, float(double(float(s * unit))));
+      record.set_saturation(float(double(float(s * unit))));
       const uint32_t kind = source.kind();
       const uint32_t add = Load(base, kind == 1 ? 0x82002FF4 : 0x82002FF8);
       int32_t value = int32_t(source.value() + add);
@@ -196,25 +197,28 @@ uint64_t OpenColors(uint8_t* base, uint32_t sp, const Calls& calls) {
       }
       StoreWide(base, kind == 1 ? frame + 112 : frame + 120, value);
       const double v = double(float(double(int64_t(value))));
-      guest::StoreFloat(base, record + 24, float(double(float(v * unit))));
-      calls.Call(kHsvToRgb, frame, 0x82184A00, frame + 128, record + 16);
+      record.set_value(float(double(float(v * unit))));
+      calls.Call(kHsvToRgb, frame, 0x82184A00, frame + 128, record.hue_address());
       const double red = double(float(double(guest::LoadFloat(base, frame + 128)) * scale));
       const double green = double(float(double(guest::LoadFloat(base, frame + 132)) * scale));
       const double blue = double(float(double(guest::LoadFloat(base, frame + 136)) * scale));
-      Store(base, record + 0, Fctiwz(red));
-      Store(base, record + 4, Fctiwz(green));
-      Store(base, record + 8, Fctiwz(blue));
+      record.set_red(Fctiwz(red));
+      record.set_green(Fctiwz(green));
+      record.set_blue(Fctiwz(blue));
       const Colors colors(base, G::data(base).colors_address());
       const uint32_t count = colors.count();
       colors.set_count(count + 1);
-      Store(base, (count << 2) + colors.address, record);
+      Store(base, (count << 2) + colors.address, record.address);
     }
   }
   // Sub-scene 26's swatches shown for those below n.
   const uint32_t swatches = ui_movies::FindNode(base, movie, 26, 1);
-  for (uint32_t i = 0; int32_t(i) < int32_t(Load(base, swatches + 104)); i++) {
-    const uint32_t swatch = ui_movies::FindNode(base, movie, 26, i + Load(base, swatches + 100));
-    Store(base, swatch + 80, int32_t(i) < int32_t(n) ? 1 : 0);
+  // The group's +104 and +100 read as words (its child count, first child).
+  const Node group(base, swatches);
+  for (uint32_t i = 0; int32_t(i) < int32_t(Load(base, group.height_address())); i++) {
+    const uint32_t swatch =
+        ui_movies::FindNode(base, movie, 26, i + Load(base, group.width_address()));
+    Node(base, swatch).set_visible(int32_t(i) < int32_t(n) ? 1 : 0);
   }
   ShowSwatches(base, frame);
   {

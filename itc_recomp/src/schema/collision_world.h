@@ -440,7 +440,9 @@ struct WallQuery : View {
   void set_time(float v) const { guest::StoreFloat(base, address + 4, v); }
   uint32_t time_address() const { return address + 4; }
   // the collision world's hit records (80 bytes each, car-physics.toml's CollisionHit; the measure's WallQuery.+8)
-  uint32_t hits() const { return guest::LoadU32(base, address + 8); }
+  template <typename T = CollisionHit>
+  T hits() const { return T(base, guest::LoadU32(base, address + 8)); }
+  void set_hits(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
   void set_hits(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t hits_address() const { return address + 8; }
   // the collision object's shape record
@@ -848,6 +850,24 @@ struct CollisionWorldGlobals {
   static constexpr uint32_t corner_margin_address() { return 0x82001FBCu; }
   // the order of a box's first 8 corners (bytes)
   static constexpr uint32_t corner_order_address() { return 0x82006900u; }
+  // the race data (race-states.toml): +4 the course route's index, +20 the branch flags, +24 the route bits, +48 the racer records, +0x59AE4 the stage flags, +0xA3AF4 the race mode
+  template <typename T = RaceData>
+  static T race_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  static void set_race_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B2Cu, v.address); }
+  static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
+  static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
+  // the race's progress (race-states.toml): +6100 read by WallQuery::ModeSkips for mode 5
+  template <typename T = RaceProgress>
+  static T race_progress(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D82E8u)); }
+  static void set_race_progress(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D82E8u, v.address); }
+  static void set_race_progress(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D82E8u, v); }
+  static constexpr uint32_t race_progress_address() { return 0x826D82E8u; }
+  // the racers' manager (race-world.toml): +2308 the racers, +2364 their count
+  template <typename T = RaceManager>
+  static T racers_manager(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D82F4u)); }
+  static void set_racers_manager(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D82F4u, v.address); }
+  static void set_racers_manager(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D82F4u, v); }
+  static constexpr uint32_t racers_manager_address() { return 0x826D82F4u; }
 };
 
 }  // namespace schema

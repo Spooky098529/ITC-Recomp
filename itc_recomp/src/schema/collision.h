@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: BoxShape, Shape, CollisionObject.+32, sub_820BAB48.r4, sub_820BAB48.ret, sub_820BB688.r3, sub_820BB688.r4, BoxShape::Place.r5, sub_822BE2C8.ret, sub_820911F8.ret, sub_820BA1D0.r3, sub_820B9C30.r3, sub_820BC560.r5
+// allocated; measure: BoxShape, Shape, CollisionObject.+32, sub_820BAB48.r4, sub_820BAB48.ret, sub_820BB688.r3, sub_820BB688.r4, BoxShape::Place.r5, sub_822BE2C8.ret, sub_820911F8.ret, sub_820BA1D0.r3, sub_820B9C30.r3, sub_820BC560.r5, Part464::Restore.r4, Part464::Save.r4, Vehicle.+344, WallQuery.+12.+0
 struct BoxShape : View {
   using View::View;
   static constexpr uint32_t kSize = 496;
@@ -243,6 +243,32 @@ struct BoxShape : View {
   float face_nz_normal_w() const { return guest::LoadFloat(base, address + 492); }
   void set_face_nz_normal_w(float v) const { guest::StoreFloat(base, address + 492, v); }
   uint32_t face_nz_normal_w_address() const { return address + 492; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t center_address() const { return address + 48; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t axis0_address() const { return address + 64; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t axis1_address() const { return address + 80; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t axis2_address() const { return address + 96; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t half_extent_address() const { return address + 128; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t inverse_half_extent_address() const { return address + 144; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t corners_address() const { return address + 176; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t face_px_normal_address() const { return address + 320; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t face_py_normal_address() const { return address + 352; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t face_pz_normal_address() const { return address + 384; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t face_nx_normal_address() const { return address + 416; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t face_ny_normal_address() const { return address + 448; }
+  // from ReplayPlacedBox (replay-snapshots)
+  uint32_t face_nz_normal_address() const { return address + 480; }
 };
 
 // image; measure: BoxShape.+0, CollisionObject.+32.+0, BoxShape::Place.r5.+0, sub_822BE2C8.ret.+0, sub_820911F8.ret.+0, sub_820BC560.r5.+0

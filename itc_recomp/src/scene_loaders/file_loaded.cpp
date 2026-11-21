@@ -16,8 +16,15 @@
 #include "models/part_model.h"
 #include "models/xpr.h"
 #include "native/buffers.h"
+#include "scene_loaders/loads.h"
+#include "scene_loaders/objects.h"
 #include "scene_loaders/pools.h"
+#include "schema/car_models.h"
+#include "schema/material_passes.h"
+#include "schema/model_animation.h"
+#include "schema/models.h"
 #include "schema/scene_loaders.h"
+#include "schema/stand_models.h"
 
 #include <bit>
 #include <cstdlib>
@@ -32,10 +39,6 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
 }
 
 using G = schema::SceneLoadersGlobals;
-
-// A load slot's buffer and state (LoadSlot's +16 and +20; car-models.md's).
-constexpr uint32_t kSlotBuffer = 16;
-constexpr uint32_t kSlotState = 20;
 
 // sprintf into the frame's +80, called with r5 to r7 = `args` (64-bit, as
 // the registers hold them; r8 to r10, which the calls don't set, as 0: only
@@ -121,13 +124,14 @@ void BindAndPose(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t frame
 // A part model's file arrived: Model::Load (its original where the plain
 // C++ declines), LoadSlot::ReleaseBuffer, the state 3. ReleaseBuffer's r3.
 uint32_t PartArrived(uint8_t* base, uint32_t slot, uint32_t model, const FileLoadedCalls& calls) {
-  const uint32_t file = Load(base, slot + kSlotBuffer);
+  const schema::LoadSlot s(base, slot);
+  const uint32_t file = s.buffer();
   if (!models::ModelLoad(base, model, file, 0, calls.model_load)) {
     calls.model_load_original(model, file);
   }
   const auto r3 = car_models::LoadSlotReleaseBuffer(base, slot);
   Require(r3.has_value(), "LoadSlot::ReleaseBuffer");
-  Store(base, slot + kSlotState, 3);
+  s.set_state(3);
   return *r3;
 }
 
@@ -161,8 +165,7 @@ std::optional<uint32_t> CockpitBindTextures(uint8_t* base, uint32_t cockpit, uin
   }
   const uint32_t frame = stack - kCockpitBindFrameBytes;
   const uint32_t number = c.texture_number();
-  // The car model's +32, the block (car-models.md's CarModel).
-  const int32_t block = int32_t(Load(base, Load(base, c.car_model_address()) + 32));
+  const int32_t block = int32_t(c.car_model<schema::CarModel>().block());
   const uint32_t name = Load(base, (uint32_t(block) << 2) + G::cockpit_names_address());
   const bool printed =
       number == 0
@@ -180,11 +183,12 @@ std::optional<uint32_t> CockpitBindTextures(uint8_t* base, uint32_t cockpit, uin
     c.set_texture(uint32_t(models::XprGetTexture(base, xpr, uint32_t(index))));
   }
   for (uint32_t i = 0; i < 6; i++) {
-    // The part model's +48 (its provider) and +452 (material-passes.md's PartModel).
+    // The part model's provider (the Model's +48) and category 3's texture.
     const uint32_t part = c.part_models_address() + 464 * i;
-    Store(base, part + 48, c.providers_address());
+    schema::Model(base, part).set_texture_provider(c.providers_address());
     if (block < 18) {
-      Store(base, part + 452, uint32_t(models::XprGetTexture(base, xpr, uint32_t(index))));
+      schema::PartModel(base, part).set_category3_texture(
+          uint32_t(models::XprGetTexture(base, xpr, uint32_t(index))));
     }
   }
   return 1;
@@ -192,31 +196,34 @@ std::optional<uint32_t> CockpitBindTextures(uint8_t* base, uint32_t cockpit, uin
 
 std::optional<uint32_t> TrafficBindTextures(uint8_t* base, uint32_t traffic, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820D7D38 TrafficCar::BindTextures");
-  if (Loading(base, traffic + 3764)) {
+  const schema::TrafficCar t(base, traffic);
+  if (Loading(base, t.file_state_address())) {
     return 0;
   }
   const uint32_t frame = stack - kTrafficBindFrameBytes;
-  const uint32_t xpr = traffic + 4016;
+  // TrafficLoads' first XPR (traffic +4016).
+  const uint32_t xpr = traffic + kTrafficLoads + kTrafficMembers.xprs[0];
   for (uint32_t i = 0; i < 6; i++) {
-    const uint32_t part = traffic + 4256 + 464 * i;
-    Store(base, part + 48, traffic + 4064);
-    models::PartModelSetVinylTextures(base, part, Load(base, traffic + 3728), 0);
-    const uint32_t number = Load(base, traffic + 192);
-    if (int32_t(number) <= 0 || int32_t(Load(base, traffic + 7056)) == -1) {
+    const uint32_t part = t.part_models_address() + 464 * i;
+    schema::Model(base, part).set_texture_provider(t.texture_provider_address());
+    models::PartModelSetVinylTextures(base, part, t.texture_word0(), 0);
+    const uint32_t number = t.texture_name_count();
+    if (int32_t(number) <= 0 || int32_t(t.xpr_record()) == -1) {
       continue;
     }
-    const uint32_t name = Load(base, (Load(base, traffic + 32) << 2) + G::traffic_names_address());
+    const uint32_t name = Load(base, (t.car_number() << 2) + G::traffic_names_address());
     if (!Print(base, frame, G::numbered_address(),
                {name, Constant(G::traffic_suffix_address()), number})) {
       return std::nullopt;
     }
     const int32_t index = XprFindByName(base, xpr, frame + 80);
-    Store(base, traffic + 7060, uint32_t(index));
+    t.set_xpr_record2(uint32_t(index));
     if (index == -1) {
       continue;
     }
-    Store(base, part + 460, uint32_t(models::XprGetTexture(base, xpr, uint32_t(index))));
-    Store(base, part + 436, Load(base, traffic + 7056));
+    const schema::PartModel pm(base, part);
+    pm.set_replacement_texture(uint32_t(models::XprGetTexture(base, xpr, uint32_t(index))));
+    pm.set_replaced_texture_index(t.xpr_record());
   }
   return 1;
 }
@@ -293,20 +300,22 @@ bool TrafficFileLoadedNative(uint8_t* base, uint32_t request, uint32_t traffic) 
   if (!native::Buffers_NativeMemcpy()) {
     return false;
   }
-  if (Load(base, traffic + 3748) != request) {
+  const schema::TrafficCar t(base, traffic);
+  if (schema::LoadSlot(base, t.file_slot_address()).request() != request) {
     return true;
   }
   uint32_t freed = 0;
-  return car_models::LoadSlotReleasable(base, traffic + 3744, &freed);
+  return car_models::LoadSlotReleasable(base, t.file_slot_address(), &freed);
 }
 
 std::optional<uint64_t> TrafficFileLoaded(uint8_t* base, uint32_t request, uint32_t traffic,
                                           uint32_t stack, const FileLoadedCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820D8430 TrafficCar::OnFileLoaded");
   const uint32_t f = stack - kTrafficLoadedFrameBytes;
+  const schema::TrafficCar t(base, traffic);
   // sprintf's call: r5 the name, r6 the suffix (r7 to r10, which the call
   // doesn't set, as 0: only dead frame words differ).
-  const uint32_t name = Load(base, (Load(base, traffic + 32) << 2) + G::traffic_names_address());
+  const uint32_t name = Load(base, (t.car_number() << 2) + G::traffic_names_address());
   const uint64_t args[6] = {name, Constant(G::traffic_file_suffix_address()), 0, 0, 0, 0};
   for (uint32_t i = 0; i < 6; i++) {
     Store(base, f + 32 + 8 * i, uint32_t(args[i] >> 32));
@@ -317,16 +326,16 @@ std::optional<uint64_t> TrafficFileLoaded(uint8_t* base, uint32_t request, uint3
                           &written)) {
     return std::nullopt;
   }
-  if (Load(base, traffic + 3748) != request) {
+  if (schema::LoadSlot(base, t.file_slot_address()).request() != request) {
     return uint64_t(uint32_t(written));
   }
-  const uint32_t file = Load(base, traffic + 3760);
+  const uint32_t file = t.file_buffer();
   const auto entry = [&](uint32_t index) {
     game_data::GetEntry(base, file, index, true);  // asked twice, as the original
     return game_data::GetEntry(base, file, index, true);
   };
-  const uint32_t xpr = traffic + 4016;
-  XprArrived(base, xpr, entry(0), traffic + 4064, calls);
+  const uint32_t xpr = traffic + kTrafficLoads + kTrafficMembers.xprs[0];
+  XprArrived(base, xpr, entry(0), t.texture_provider_address(), calls);
   // The plate: the struct's last 16 bytes into the frame's parameter area.
   Require(native::Buffers_Memcpy(base, f + 80, traffic + 3696, 16, 0x820D84E0), "memcpy");
   const uint32_t plate = traffic + 3664;
@@ -335,13 +344,15 @@ std::optional<uint64_t> TrafficFileLoaded(uint8_t* base, uint32_t request, uint3
       (uint64_t(Load(base, plate + 8)) << 32) | Load(base, plate + 12),
       (uint64_t(Load(base, plate + 16)) << 32) | Load(base, plate + 20),
       (uint64_t(Load(base, plate + 24)) << 32) | Load(base, plate + 28)};
-  Require(car_models::MakePlate(base, traffic + 7040, traffic + 7044, traffic + 7048,
-                                traffic + 7052, regs, f, calls.plate_release)
+  Require(car_models::MakePlate(base, t.texture2_word0_address(), t.texture2_word1_address(),
+                                t.texture2_word2_address(), t.texture2_word3_address(), regs, f,
+                                calls.plate_release)
               .has_value(),
           "MakePlate");
-  Store(base, traffic + 7056, uint32_t(XprFindByName(base, xpr, f + 240)));
+  t.set_xpr_record(uint32_t(XprFindByName(base, xpr, f + 240)));
   // The node file: the skeleton bound and posed, the tires' nodes found.
-  const uint32_t skeleton = traffic + 3776;
+  const uint32_t skeleton = t.skeleton_address();
+  const schema::Skeleton sk(base, skeleton);
   BindAndPose(base, skeleton, entry(1), f, calls);
   const int32_t nodes = int32_t(model_animation::SkeletonNodeCount(base, skeleton));
   static constexpr uint32_t kTireNames[4] = {
@@ -350,11 +361,11 @@ std::optional<uint64_t> TrafficFileLoaded(uint8_t* base, uint32_t request, uint3
   static constexpr uint32_t kTireReturns[4] = {0x820D85EC, 0x820D8630, 0x820D8674, 0x820D86B8};
   if (nodes > 0) {
     for (uint32_t n = 0; n < uint32_t(nodes); n++) {
-      const uint32_t node_name = Load(base, traffic + 3860) + 160 * n;
+      const uint32_t node_name = sk.node_records() + 160 * n;
       for (uint32_t k = 0; k < 4; k++) {
         if (SameName(base, kTireNames[k], node_name)) {
           const uint32_t to = traffic + 7136 + 64 * k;
-          const uint32_t from = Load(base, traffic + 3924) + 64 * n;
+          const uint32_t from = sk.matrices() + 64 * n;
           matrix_math::Copy(base, to, from);
           interpolation::BlendState_OnCopy(base, to, from, kTireReturns[k]);
         }
@@ -387,19 +398,19 @@ std::optional<uint64_t> TrafficFileLoaded(uint8_t* base, uint32_t request, uint3
     matrix_math::Vec4Transform(base, at, turn, at);
   }
   for (uint32_t k = 0; k < 4; k++) {
-    CopyWord(base, kZero, traffic + 7072 + 16 * k + 12);
+    CopyWord(base, G::zero_address(), traffic + 7072 + 16 * k + 12);
   }
   // The six part models.
   for (uint32_t i = 0; i < 6; i++) {
-    const uint32_t model = traffic + 4256 + 464 * i;
+    const uint32_t model = t.part_models_address() + 464 * i;
     const uint32_t part = entry(2 + i);
     if (!models::ModelLoad(base, model, part, 0, calls.model_load)) {
       calls.model_load_original(model, part);
     }
   }
-  const auto r3 = car_models::LoadSlotReleaseBuffer(base, traffic + 3744);
+  const auto r3 = car_models::LoadSlotReleaseBuffer(base, t.file_slot_address());
   Require(r3.has_value(), "LoadSlot::ReleaseBuffer");
-  Store(base, traffic + 3764, 3);
+  t.set_file_state(3);
   return *r3;
 }
 

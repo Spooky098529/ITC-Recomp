@@ -5,6 +5,7 @@
 
 #include "command_list/command_list.h"
 #include "schema/ui_movies.h"
+#include "schema/ui_movies_game.h"
 
 #include <initializer_list>
 #include <vector>
@@ -82,7 +83,7 @@ bool ChunksFit(uint8_t* base, uint32_t list, std::initializer_list<std::vector<u
 }
 
 std::optional<uint32_t> RecordQuad(uint8_t* base, uint32_t list, uint32_t quad, bool textured) {
-  const schema::UiMovieDrawQuad q(base, quad);
+  const schema::UiMovieQuad q(base, quad);
   const uint32_t clipped = q.clipped();
   const uint32_t mode = q.blend_mode();
   const uint32_t vertices = q.vertex_count();
@@ -104,10 +105,10 @@ std::optional<uint32_t> RecordQuad(uint8_t* base, uint32_t list, uint32_t quad, 
     // halfwords (+104..+110).
     Slot2(base, slot(), 31, 1);
     const uint32_t s = slot();
-    guest::StoreU16(base, s + 0, q.clip_left());
-    guest::StoreU16(base, s + 2, q.clip_top());
-    guest::StoreU16(base, s + 4, q.clip_right());
-    guest::StoreU16(base, s + 6, q.clip_bottom());
+    guest::StoreU16(base, s + 0, q.clip_0());
+    guest::StoreU16(base, s + 2, q.clip_1());
+    guest::StoreU16(base, s + 4, q.clip_2());
+    guest::StoreU16(base, s + 6, q.clip_3());
   } else {
     Slot3(base, slot(), 1, 1, 0);
     Slot2(base, slot(), 200, 0);

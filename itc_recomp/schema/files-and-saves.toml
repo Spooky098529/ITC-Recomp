@@ -196,6 +196,7 @@ fields = [
 # slot at +164, and one per enumerated save in the slot's buffer (+80). No
 # measure: reached through the slot's bytes and the buffer's index.
 [XContentData]
+measures = ["SaveInterface::SaveAt.ret"]
 size = 308
 origin = "embedded"
 fields = [
@@ -215,7 +216,8 @@ fields = [
 measures = ["SaveSlot::WriteFile.r4", "SaveSlot::ReadFile.r4", "SaveSlot::WaitEnumerate.r4",
             "SaveSlot::Create.r4", "SaveSlot::Delete.r4", "SaveSlot::LoadStep.r4",
             "SaveSlot::OpenItem.r4", "SaveSlot::SaveStep.r4", "SaveSlot::ShowDeviceSelector.r4",
-            "SaveSlot::WaitDeviceSelector.r4", "sub_820A4508.r3", "sub_820A5660.r3"]
+            "SaveSlot::WaitDeviceSelector.r4", "sub_820A4508.r3", "sub_820A5660.r3",
+            "SaveSlot::CheckStep.r4", "SaveSlot::DeleteStep.r4", "SaveSlot::EnumerateStep.r4", "SaveSlot::Failed.r4", "SaveSlot::Ready.r4", "SaveSlot::WaitClose.r4", "SaveSlot::WaitForDevice.r4", "SaveSlot::WaitForUser.r4", "SlotArray.+0"]
 size = 1000
 origin = "allocated"
 vtable = 0x82002190
@@ -281,21 +283,6 @@ fields = [
   { name = "on_init", offset = 4, type = "fn", note = "called at Archive::Init's end" },
 ]
 
-# The audio engine's start-up (sub_8259D1F0): the XACT engine
-# (XACT3CreateEngine's, at the audio engine's +8), probably, and its
-# vtable's Initialize.
-[XactEngineRef]
-measure = "sub_8259D1F0.r3.+28.+8"
-size = 4
-origin = "allocated"
-fields = [
-  { name = "vtable", offset = 0, type = "ptr", to = "XactEngineVtable" },
-]
+# XactEngineRef: merged into sound-cues.toml's XactEngine at the integration (the same object).
 
-[XactEngineVtable]
-measure = "sub_8259D1F0.r3.+28.+8.+0"
-size = 12
-origin = "image"
-fields = [
-  { name = "initialize", offset = 8, type = "fn", note = "probably Initialize (with the settings file read into the audio engine's +0 and +4)" },
-]
+# XactEngineVtable: merged into sound-cues.toml's XactEngineInterface at the integration (the same object).

@@ -80,11 +80,15 @@ struct RaceGlowParams : View {
 // The image words docs/functions/race-scene.md's code uses.
 struct RaceSceneGlobals {
   // the race scene (31,168 bytes, RaceScene::Create; RaceScene::Destroy leaves the pointer)
-  static View scene(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D82D4u)); }
+  template <typename T = RaceScene>
+  static T scene(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D82D4u)); }
+  static void set_scene(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D82D4u, v.address); }
   static void set_scene(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D82D4u, v); }
   static constexpr uint32_t scene_address() { return 0x826D82D4u; }
   // the viewports (Viewports::Init): +8 nonzero in split screen
-  static View viewports(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C2CE8u)); }
+  template <typename T = Viewports>
+  static T viewports(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C2CE8u)); }
+  static void set_viewports(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C2CE8u, v.address); }
   static void set_viewports(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C2CE8u, v); }
   static constexpr uint32_t viewports_address() { return 0x826C2CE8u; }
   // 24 RaceGlowParams: 3 a kind (0 to 7) and its index

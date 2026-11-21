@@ -8,6 +8,7 @@
 
 #include "base/log.h"
 #include "collision/collision.h"
+#include "schema/car_physics.h"
 #include "schema/collision_world.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -384,11 +385,11 @@ void TrackMeshColorAt(uint8_t* base, uint32_t out, uint32_t point, uint32_t tria
   // The three vertices A, B, C (the original's order) and their colors.
   uint32_t a, b, c;
   bool first_half = true;
-  const Triangle t(base, triangle);
-  if (t.vertex_3() != 0xFFFF) {
-    const uint32_t v2 = t.vertex_2() * 12 + vertices;
+  const Triangle tri(base, triangle);
+  if (tri.vertex_3() != 0xFFFF) {
+    const uint32_t v2 = tri.vertex_2() * 12 + vertices;
     const double pz = double(Point(base, point).z());
-    const uint32_t v0 = t.vertex_0() * 12 + vertices;
+    const uint32_t v0 = tri.vertex_0() * 12 + vertices;
     const double px = double(Point(base, point).x());
     const double v2z = double(Point(base, v2).z()), v2x = double(Point(base, v2).x());
     const double dz = Fsubs(pz, v2z);
@@ -399,13 +400,13 @@ void TrackMeshColorAt(uint8_t* base, uint32_t out, uint32_t point, uint32_t tria
     first_half = !(side < Lfs(base, kZero));
   }
   if (first_half) {
-    a = t.vertex_0();
-    b = t.vertex_1();
-    c = t.vertex_2();
+    a = tri.vertex_0();
+    b = tri.vertex_1();
+    c = tri.vertex_2();
   } else {
-    a = t.vertex_2();
-    b = t.vertex_3();
-    c = t.vertex_0();
+    a = tri.vertex_2();
+    b = tri.vertex_3();
+    c = tri.vertex_0();
   }
   const uint32_t ca = guest::LoadU16(base, colors + 2 * a);
   const uint32_t cb = guest::LoadU16(base, colors + 2 * b);
@@ -614,8 +615,9 @@ bool TrackCollisionGroundHits(uint8_t* base, uint32_t hits, uint32_t box, uint32
   const uint32_t f = frame;
   const int32_t room = int32_t(va::CollisionWorldWord60(base));
   *count = 0;
+  const schema::CollisionHit hit(base, hits);
   const double zero = Lfs(base, kZero);
-  Stfs(base, hits + 48, zero);
+  Stfs(base, hit.depth_address(), zero);
   // The lower corners in the order 0, 2, 1, 3; the lowest against its
   // track position's last height (the cache word of its place in that
   // order).
@@ -654,12 +656,12 @@ bool TrackCollisionGroundHits(uint8_t* base, uint32_t hits, uint32_t box, uint32
   if (!(depth > zero)) {
     return true;
   }
-  guest::StoreU32(base, hits + 60, 0);
-  vl::Vec4Copy(base, hits + 16, f + 240);
-  vl::Vec4Copy(base, hits + 32, f + 256);
-  Stfs(base, hits + 48, Fsubs(double(G::small_epsilon(base)), Lfs(base, f + 224)));
-  vl::Vec4Copy(base, hits + 0, corner);
-  guest::StoreU32(base, hits + 56, guest::LoadU32(base, f + 272));
+  hit.set_key(0);
+  vl::Vec4Copy(base, hit.normal_address(), f + 240);
+  vl::Vec4Copy(base, hit.push_address(), f + 256);
+  Stfs(base, hit.depth_address(), Fsubs(double(G::small_epsilon(base)), Lfs(base, f + 224)));
+  vl::Vec4Copy(base, hit.point_address(), corner);
+  hit.set_surface_bits(guest::LoadU32(base, f + 272));
   if (room > 0) {
     *count = 1;
   }

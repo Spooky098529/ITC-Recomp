@@ -88,7 +88,8 @@ fields = [
 measures = ["NetModeSelect", "NetRanking", "NetTaCourse", "Type12Screen3", "Type12Screen6",
             "Type12Screen7", "Type12Screen8", "Type12Screen9", "Type12Dialog10",
             "Type12Dialog11", "Type12Dialog12", "Type12Dialog13", "ModeType12::Machine.ret",
-            "sub_8225E418.r3"]
+            "sub_8225E418.r3",
+            "sub_8226A660.r3", "sub_82263D80.r3", "sub_822657D8.r3", "sub_82265930.r3", "sub_82266028.r3", "sub_822662F0.r3", "sub_822663E0.r3", "sub_82266548.r3", "sub_82266658.r3", "sub_822681D0.r3", "sub_82268720.r3", "sub_82269988.r3", "sub_8226CB40.r3", "sub_822702C0.r3", "sub_82277178.r3", "sub_822800C0.r3", "sub_82282630.r3", "sub_822659F0.ret", "sub_822681D0.ret"]
 size = 9732
 origin = "embedded"
 fields = [
@@ -252,12 +253,12 @@ fades_passes = { address = 0x82001BEC, type = "u32", note = "the fades' table wo
 fades_out = { address = 0x82001BF0, type = "u32", note = "the fades' table word FadeOut gets" }
 fade_count0 = { address = 0x826A50E4, type = "u32", note = "a fade's count (0 done)" }
 fade_count1 = { address = 0x826A50DC, type = "u32", note = "the other fade's count (0 done)" }
-sound_manager = { address = 0x826C5C80, type = "ptr", note = "the sound manager" }
+sound_manager = { address = 0x826C5C80, type = "ptr", to = "AudioManager", note = "the sound manager" }
 sign_in_live_check = { address = 0x826BAB50, type = "u32", note = "the sign-in watch's \"not on Live\" check (0x826BAB40 + 16): 0 turns it on" }
 title_flag = { address = 0x826364EC, type = "u32", note = "set by NextMode when leaving for the title with the session made here" }
 leaderboard_results = { address = 0x826C6AD4, type = "ptr", note = "the leaderboard read's results (operator delete[] by Session::Release)" }
 session_state = { address = 0x826C6AA8, type = "u32", note = "cleared by Session::Init (Session::IsActive reads it)" }
-race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data" }
 ta_route = { address = 0x82816660, type = "u32", note = "the time attack's route" }
 ta_has_kind = { address = 0x82816680, type = "u32", note = "set: ta_kind picks the race data's +0x59618 word" }
 ta_kind = { address = 0x82816684, type = "u32" }
@@ -287,7 +288,7 @@ screen6_menu = { address = 0x82816158, type = "ptr", to = "FrontEndMenu", note =
 screen6_word = { address = 0x8281615C, type = "u32", note = "0 from Create" }
 screen7_pages = { address = 0x82816160, type = "ptr", to = "PageObject" }
 screen7_menu = { address = 0x82816164, type = "ptr", to = "FrontEndMenu", note = "3 items" }
-screen7_data = { address = 0x82816168, type = "ptr", note = "8 bytes: +0, +4 0 from Create" }
+screen7_data = { address = 0x82816168, type = "ptr", to = "NetScreen7Data", note = "8 bytes: +0, +4 0 from Create" }
 dialog11_pages = { address = 0x82816188, type = "ptr", to = "PageObject" }
 dialog11_menu = { address = 0x8281618C, type = "ptr", to = "FrontEndMenu" }
 dialog13_pages = { address = 0x8281619C, type = "ptr", to = "PageObject" }

@@ -14,6 +14,8 @@
 #include "scene_loaders/model_point.h"
 #include "second_set/points.h"
 #include "schema/second_set.h"
+#include "schema/car_draw.h"
+#include "schema/model_animation.h"
 
 #include <cstdlib>
 
@@ -152,7 +154,7 @@ uint32_t PartsFindHeadlights(uint8_t* base, uint32_t group, uint32_t model, uint
   if (first.model() == 0) {
     return r3;
   }
-  const uint32_t entries = schema::SecondSetPointSkeleton(base, first.skeleton()).node_states();
+  const uint32_t entries = schema::Skeleton(base, first.skeleton()).node_states();
   CopyWord(base, first.node_index() * 144 + entries + 16, group + 3184);
   calls.flush = false;
   return ScaleRecords(base, group, 7, 10, kFive, sp, calls);
@@ -213,7 +215,7 @@ uint32_t PartsFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t stac
   Store(base, block + 2648, w37076);
   Store(base, block + 2644, Load(base, Load(base, car_loads + 24) + 6700));
   Store(base, block + 4580, Load(base, Load(base, car_loads + 24) + 6708));
-  if (schema::SecondSetSceneRef(base, scene).model_set() == 0) {
+  if (schema::CarScene(base, scene).model_set() == 0) {
     Store(base, block + 12112, w37076);
     Store(base, block + 18208, w37076);
     const uint32_t w37080 = Load(base, block + 37080);
@@ -238,7 +240,7 @@ uint32_t PartsFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t stac
     if (model == 0) {
       continue;
     }
-    const bool set_a = schema::SecondSetSceneRef(base, Load(base, scene_word)).model_set() == 0;
+    const bool set_a = schema::CarScene(base, Load(base, scene_word)).model_set() == 0;
     switch (kind) {
       case 0: r3 = PartsFindFrontBumper(base, block, model, sp, calls); break;
       case 1: shapes(2656, 1, model); break;

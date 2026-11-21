@@ -33,7 +33,8 @@ void Go(uint8_t* base, uint32_t unless, uint32_t running, uint32_t queued, uint3
 }
 
 bool Moving(uint8_t* base, uint32_t list) {
-  return Load(base, list + 24) != 0 || int32_t(Load(base, list + 4) - Load(base, list + 8)) != 0;
+  const MenuList menu(base, list);
+  return menu.move() != 0 || int32_t(menu.scroll() - menu.scroll_before()) != 0;
 }
 
 uint64_t Sound(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t id) {
@@ -47,7 +48,7 @@ uint64_t Page0(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 96);
   calls.Call(kListUpdate, frame, 0x82180FAC, G::list_menu(base).address);
   const uint32_t list = G::list_menu(base).address;
-  if (Load(base, list + 24) != 0) {
+  if (MenuList(base, list).move() != 0) {
     Go(base, 0, 2, kNone, 0);
     return Sound(calls, frame, 0x821810CC, 4);
   }
@@ -92,7 +93,7 @@ uint64_t Page1(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
     const uint32_t selection =
         uint32_t(calls.Call(kListSelection, frame, 0x82183480, G::list_menu(base).address));
     G::data(base).set_car_selection(selection);
-    G::data(base).set_car_scroll(Load(base, G::list_menu(base).address + 4));
+    G::data(base).set_car_scroll(G::list_menu(base).scroll());
     Go(base, 2, 9, 11, 2);
     return Sound(calls, frame, 0x821834DC, 0);
   }
@@ -232,7 +233,7 @@ uint64_t Page3(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
     const uint32_t selection =
         uint32_t(calls.Call(kListSelection, frame, 0x82181A6C, G::list_menu(base).address));
     G::data(base).set_color_selection(selection);
-    G::data(base).set_color_scroll(Load(base, G::list_menu(base).address + 4));
+    G::data(base).set_color_scroll(G::list_menu(base).scroll());
     const Pages pages = Keep(base, kNone);
     pages.set_queued_step(kNone);
     pages.set_next_page(kNone);

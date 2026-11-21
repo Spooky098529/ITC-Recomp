@@ -16,7 +16,8 @@
 # at 0x826BAC00 (CamerasGlobals::passes), made once at boot by CameraPasses::Init;
 # the measure's Camera is the passes met through the camera class's methods.
 [CameraPass]
-measures = ["CameraPass", "Camera"]
+measures = ["CameraPass", "Camera",
+            "Billboards.+0"]
 size = 592
 origin = "embedded"
 fields = [
@@ -372,7 +373,7 @@ render_target_7 = { address = 0x826BABF4, type = "u32" }
 render_target_6 = { address = 0x826BABF8, type = "u32" }
 render_target_5 = { address = 0x826BABFC, type = "u32" }
 passes = { address = 0x826BAC00, type = "bytes", count = 12432, note = "the 21 camera passes (CameraPass), 592 bytes each" }
-viewports = { address = 0x826C2CE8, type = "ptr", note = "the viewports' 12-byte block (camera-modes.toml): +0 and +4 the two viewports, +8 whether both are in use" }
+viewports = { address = 0x826C2CE8, type = "ptr", to = "Viewports", note = "the viewports' 12-byte block (camera-modes.toml): +0 and +4 the two viewports, +8 whether both are in use" }
 up_vector = { address = 0x826C2CF0, type = "bytes", count = 16, note = "(0, 1, 0, 1), made once by Viewport::Init" }
 side_vector = { address = 0x826C2D00, type = "bytes", count = 16, note = "(10, 0, 0, 1), made once by Viewport::Init" }
 origin_vector = { address = 0x826C2D10, type = "bytes", count = 16, note = "(0, 0, 0, 1), made once by Viewport::Init" }

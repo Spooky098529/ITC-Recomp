@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: Vehicle, Vehicle::UpdateDrivenAxle.ret
+// embedded; measure: Vehicle, Vehicle::UpdateDrivenAxle.ret, Vehicle::Get.ret
 struct Vehicle : View {
   using View::View;
   static constexpr uint32_t kSize = 6268;
@@ -909,7 +909,7 @@ struct SteerRecord : View {
   uint32_t ratio_c_address() const { return address + 32; }
 };
 
-// allocated; measure: RigidBody, CollisionObject.+16, CollisionPair.+20.+16
+// allocated; measure: RigidBody, CollisionObject.+16, CollisionPair.+20.+16, sub_820B68A0.r3
 struct RigidBody : View {
   using View::View;
   static constexpr uint32_t kSize = 528;
@@ -1055,7 +1055,7 @@ struct TireCoefficients : View {
   uint32_t e_address() const { return address + 12; }
 };
 
-// embedded; measure: CarData
+// embedded; measure: CarData, PowerGraph::Draw.r6
 struct CarData : View {
   using View::View;
   static constexpr uint32_t kSize = 1844;
@@ -1832,7 +1832,7 @@ struct CollisionPair : View {
   uint32_t object_owner_id_address() const { return address + 268; }
 };
 
-// allocated; measure: new<4294967295>@CollisionWorld::Create#4, CollisionWorld::NewContact.ret
+// allocated; measure: new<4294967295>@CollisionWorld::Create#4, CollisionWorld::NewContact.ret, Contact, CollisionObject.+240.+68
 struct CollisionContact : View {
   using View::View;
   static constexpr uint32_t kSize = 80;
@@ -1856,9 +1856,17 @@ struct CollisionContact : View {
   void set_next(const View& v) const { guest::StoreU32(base, address + 68, v.address); }
   void set_next(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
   uint32_t next_address() const { return address + 68; }
+  // from CollisionObjectContact (vehicle-accessors)
+  float push_direction_x() const { return guest::LoadFloat(base, address + 48); }
+  void set_push_direction_x(float v) const { guest::StoreFloat(base, address + 48, v); }
+  uint32_t push_direction_x_address() const { return address + 48; }
+  // from CollisionObjectContact (vehicle-accessors)
+  float push_direction_y() const { return guest::LoadFloat(base, address + 52); }
+  void set_push_direction_y(float v) const { guest::StoreFloat(base, address + 52, v); }
+  uint32_t push_direction_y_address() const { return address + 52; }
 };
 
-// allocated; measure: new<4294967295>@CollisionWorld::Create#3, new<4294967295>@CollisionWorld::SetQueryCapacity, CollisionRecords::Merge.r4, CollisionWorld::Create.r6
+// allocated; measure: new<4294967295>@CollisionWorld::Create#3, new<4294967295>@CollisionWorld::SetQueryCapacity, CollisionRecords::Merge.r4, CollisionWorld::Create.r6, WallQuery.+8
 struct CollisionHit : View {
   using View::View;
   static constexpr uint32_t kSize = 80;

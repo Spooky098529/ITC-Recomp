@@ -251,7 +251,7 @@ struct GarageStage : View {
   uint32_t rear_axle_zw_address() const { return address + 6200; }
 };
 
-// allocated; measure: TrafficCar
+// allocated; measure: TrafficCar, SceneModel.+5100.+16780
 struct TrafficCar : View {
   using View::View;
   static constexpr uint32_t kSize = 16780;

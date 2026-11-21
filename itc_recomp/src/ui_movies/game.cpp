@@ -14,6 +14,7 @@ namespace ui_movies {
 
 namespace {
 using schema::UiMovie;
+using schema::UiMovieAnimationLink;
 using schema::UiMovieAnimationList;
 using schema::UiMovieAnimationSlot;
 using Globals = schema::UiMoviesGameGlobals;
@@ -90,9 +91,9 @@ uint32_t PictureTextureSlot(uint8_t* base, uint32_t movie, uint32_t picture) {
 }
 
 uint32_t SwapTexture(uint8_t* base, uint32_t movie, uint32_t i, uint32_t texture) {
-  const uint32_t slot = UiMovie(base, movie).textures() + 4 * i;
-  const uint32_t old = guest::LoadU32(base, slot);
-  guest::StoreU32(base, slot, texture);
+  const schema::UiMovieWord slot(base, UiMovie(base, movie).textures() + 4 * i);
+  const uint32_t old = slot.value();
+  slot.set_value(texture);
   return old;
 }
 
@@ -151,7 +152,7 @@ uint32_t MakeQuad(uint8_t* base, uint32_t quad) {
 uint32_t MakeTextItem(uint8_t* base, uint32_t item) {
   const schema::UiMovieTextItem t(base, item);
   const uint32_t zero = Globals::zero(base);
-  t.set_unknown_80(zero);
+  t.set_depth(zero);
   t.set_node(0);
   t.set_red(zero);
   t.set_green(zero);
@@ -163,7 +164,7 @@ uint32_t MakeTextItem(uint8_t* base, uint32_t item) {
 
 uint32_t ClearTextItem(uint8_t* base, uint32_t item) {
   const schema::UiMovieTextItem t(base, item);
-  t.set_unknown_80(Globals::zero(base));
+  t.set_depth(Globals::zero(base));
   t.set_node(0);
   StoreIdentity(base, t.matrix_address());
   return t.matrix_address();
@@ -194,10 +195,11 @@ void InitAnimationLists(uint8_t* base, uint32_t movie) {
     const UiMovieAnimationList list(base, address);
     const uint32_t links = list.links_address();
     for (uint32_t k = 0; k < 32; k++) {
-      guest::StoreU16(base, links + 4 * k + 2, uint16_t(k));
-      guest::StoreU16(base, links + 4 * k, uint16_t(k + 1));
+      const UiMovieAnimationLink link(base, links + 4 * k);
+      link.set_slot(uint16_t(k));
+      link.set_next(uint16_t(k + 1));
     }
-    guest::StoreU16(base, links + 4 * 31, 0xFFFF);
+    UiMovieAnimationLink(base, links + 4 * 31).set_next(0xFFFF);
     list.set_free(0);
     list.set_unknown_130(0xFFFF);
     list.set_first(0xFFFF);
@@ -229,14 +231,14 @@ uint32_t CountOf(uint8_t* base, uint32_t list) {
 uint32_t LinkAt(uint8_t* base, uint32_t list, uint32_t steps) {
   uint32_t link = Link(list, UiMovieAnimationList(base, list).first());
   for (; steps != 0; steps--) {
-    link = Link(list, guest::LoadU16(base, link));
+    link = Link(list, UiMovieAnimationLink(base, link).next());
   }
   return link;
 }
 
 uint32_t SlotOf(uint8_t* base, uint32_t list, uint32_t link) {
   return UiMovieAnimationList(base, list).slots_address() +
-         40 * uint32_t(int32_t(int16_t(guest::LoadU16(base, link + 2))));
+         40 * uint32_t(int32_t(int16_t(UiMovieAnimationLink(base, link).slot())));
 }
 
 void LinkFree(uint8_t* base, uint32_t list, int32_t position) {
@@ -244,26 +246,27 @@ void LinkFree(uint8_t* base, uint32_t list, int32_t position) {
   const UiMovieAnimationList l(base, list);
   const uint32_t before = Before(base, list, uint32_t(position));
   const uint16_t free = l.free();
-  const uint32_t link = Link(list, free);
-  l.set_free(guest::LoadU16(base, link));
-  guest::StoreU16(base, link, free);
-  guest::StoreU16(base, link, guest::LoadU16(base, before));
-  guest::StoreU16(base, before, free);
+  const UiMovieAnimationLink link(base, Link(list, free));
+  l.set_free(link.next());
+  link.set_next(free);
+  link.set_next(UiMovieAnimationLink(base, before).next());
+  UiMovieAnimationLink(base, before).set_next(free);
   l.set_count(uint16_t(l.count() + 1));
 }
 
 void RemoveAt(uint8_t* base, uint32_t list, uint32_t position) {
   const uint32_t before = Before(base, list, position);
-  const uint16_t index = guest::LoadU16(base, before);
-  const uint32_t link = Link(list, index);
-  const uint16_t next = guest::LoadU16(base, link);
-  guest::StoreU16(base, link, index);
-  guest::StoreU16(base, before, next);
+  const UiMovieAnimationLink first(base, before);
+  const uint16_t index = first.next();
+  const UiMovieAnimationLink link(base, Link(list, index));
+  const uint16_t next = link.next();
+  link.set_next(index);
+  first.set_next(next);
   const UiMovieAnimationList l(base, list);
-  const uint16_t freed = guest::LoadU16(base, link);
+  const uint16_t freed = link.next();
   const uint16_t free = l.free();
   l.set_free(freed);
-  guest::StoreU16(base, link, free);
+  link.set_next(free);
   l.set_count(uint16_t(l.count() - 1));
 }
 
@@ -275,7 +278,7 @@ std::optional<uint32_t> FindSlot(uint8_t* base, uint32_t list, Match match) {
   uint32_t link = Link(list, UiMovieAnimationList(base, list).first());
   for (uint32_t i = 0; i < count; i++) {
     if (i != 0) {
-      link = Link(list, guest::LoadU16(base, link));
+      link = Link(list, UiMovieAnimationLink(base, link).next());
     }
     const uint32_t slot = SlotOf(base, list, link);
     if (match(slot)) {
@@ -520,7 +523,7 @@ uint32_t TextMapFindKey(uint8_t* base, uint32_t map, uint32_t key) {
 }
 
 uint32_t TextMapFind(uint8_t* base, uint32_t map, uint32_t key_address) {
-  return TextMapFindKey(base, map, guest::LoadU32(base, key_address));
+  return TextMapFindKey(base, map, schema::UiMovieWord(base, key_address).value());
 }
 
 void TextMapSetKey(uint8_t* base, uint32_t map, uint32_t key, uint32_t value) {
@@ -541,8 +544,8 @@ void TextMapSetKey(uint8_t* base, uint32_t map, uint32_t key, uint32_t value) {
 void TextMapSet(uint8_t* base, uint32_t map, uint32_t key_address, uint32_t value_address) {
   // Both read before any store, as the original's paths do (the found one
   // reads the value just before its only store).
-  TextMapSetKey(base, map, guest::LoadU32(base, key_address),
-                guest::LoadU32(base, value_address));
+  TextMapSetKey(base, map, schema::UiMovieWord(base, key_address).value(),
+                schema::UiMovieWord(base, value_address).value());
 }
 
 uint32_t PairsFindKey(uint8_t* base, uint32_t vector, uint32_t key) {
@@ -557,7 +560,7 @@ uint32_t PairsFindKey(uint8_t* base, uint32_t vector, uint32_t key) {
 }
 
 uint32_t PairsFind(uint8_t* base, uint32_t vector, uint32_t key_address) {
-  return PairsFindKey(base, vector, guest::LoadU32(base, key_address));
+  return PairsFindKey(base, vector, schema::UiMovieWord(base, key_address).value());
 }
 
 uint32_t IsLoaded(uint8_t* base, uint32_t id) {

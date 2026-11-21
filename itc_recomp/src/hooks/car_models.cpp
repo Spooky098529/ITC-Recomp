@@ -26,7 +26,9 @@
 #include "hooks/scene_loaders.h"
 #include "hooks/texture_compression.h"
 #include "native/buffers.h"
+#include "schema/accessories.h"
 #include "schema/car_models.h"
+#include "schema/models.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_BOOL(native_car_models, true, "ITC",
@@ -152,8 +154,8 @@ ITC_REGS_STEP(CarModelsInteriorLoad) {
                             ctx.r4.u64 = r4;
                             ctx.r5.u64 = r5;
                             ctx.lr = which == 0 ? 0x820D7A40 : 0x820D7A94;
-                            lifted::CallFromContext(ctx, base, 
-                                guest::LoadU32(base, guest::LoadU32(base, set) + 4));
+                            lifted::CallFromContext(
+                                ctx, base, schema::Accessories(base, set).vtable().acquire());
                             return ctx.r3.u32;
                           });
   });
@@ -232,7 +234,7 @@ void CarModelsFileLoaded(lifted::Regs& ctx, uint8_t* base, cm::FileLoadedSet set
       ctx.r4.u64 = 0;
       ctx.r5.u64 = xpr;
       ctx.lr = a ? 0x820D4DEC : 0x820D55C4;
-      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
+      lifted::CallFromContext(ctx, base, schema::TextureProvider(base, provider).vtable().set());
     };
     calls.plate_release = [&](uint32_t surface) {
       // From MakePlate's frame (944 bytes below this one).

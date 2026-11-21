@@ -14,6 +14,8 @@
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 #include "scenery_lists/scenery_lists.h"
+#include "schema/model_animation.h"
+#include "schema/models.h"
 #include "schema/scene_loaders.h"
 
 #include <array>
@@ -34,8 +36,7 @@ void Require(bool done, const char* what) {
 // Whether TextureProvider::~TextureProvider frees the provider's storage
 // natively (none, or a block the layer gave).
 bool ProviderDestructible(uint8_t* base, uint32_t provider) {
-  const uint32_t storage = guest::LoadU32(
-      base, provider + models::kTextureProviderVector + models::kVectorFirst);
+  const uint32_t storage = schema::TextureProvider(base, provider).first().address;
   return storage == 0 || memory::IsHeapBlock(storage);
 }
 
@@ -90,8 +91,8 @@ bool CarModelLoadsDestructible(uint8_t* base, uint32_t loads) {
 
 bool ProvidersClearAll(uint8_t* base, uint32_t loads, const MembersLayout& m) {
   for (uint32_t offset : m.providers) {
-    const uint32_t vtable = guest::LoadU32(base, loads + offset);
-    if (guest::LoadU32(base, vtable + 8) != kTextureProviderClearAll) {
+    if (schema::TextureProvider(base, loads + offset).vtable().clear_all() !=
+        kTextureProviderClearAll) {
       return false;
     }
   }
@@ -252,8 +253,8 @@ std::optional<uint32_t> WheelsLoadsReset(uint8_t* base, uint32_t loads) {
     nodes += models::ModelReleaseNodes(base, model);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    const uint32_t vtable = guest::LoadU32(base, l.providers_address() + 20 * i);
-    if (guest::LoadU32(base, vtable + 8) != kTextureProviderClearAll) {
+    if (schema::TextureProvider(base, l.providers_address() + 20 * i).vtable().clear_all() !=
+        kTextureProviderClearAll) {
       return std::nullopt;
     }
   }
@@ -324,7 +325,7 @@ std::optional<uint32_t> WheelsLoadsDestruct(uint8_t* base, uint32_t loads) {
 bool CarModelLoadsResettable(uint8_t* base, uint32_t loads) {
   // The skeleton's node values (Skeleton's +176).
   const uint32_t values =
-      guest::LoadU32(base, schema::CarModelLoads(base, loads).skeleton_address() + 176);
+      schema::Skeleton(base, schema::CarModelLoads(base, loads).skeleton_address()).node_values();
   if (values != 0 && !memory::IsHeapBlock(values)) {
     return false;
   }

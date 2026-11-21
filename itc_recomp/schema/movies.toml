@@ -45,6 +45,8 @@ fields = [
   { name = "delegate_function", offset = 44, type = "fn", note = "0, then 0x820AE7F8 (calls the movie's slot 8, Movie::Open)" },
   { name = "path", offset = 48, type = "bytes", count = 260, note = "the movie's path (strncpy'd by Movie::Play)" },
   { name = "state", offset = 308, type = "u32", note = "0 none, 1 loaded or ended, 2 playing, 3 paused" },
+  { name = "fault_strncpy_0", offset = 0, type = "u8", note = "measure fault: strncpy's r3 is the movie + 48 (path), joined with the movie at +0" },
+  { name = "fault_strncpy_1", offset = 1, type = "u8", note = "measure fault: strncpy's second byte store (path's +1)" },
 ]
 
 # The movie class's vtable (0x82002910 in the image). The measure's

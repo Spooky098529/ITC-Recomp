@@ -8,6 +8,7 @@
 
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "schema/command_list.h"
 #include "schema/frame_passes.h"
 
 namespace frame_passes {
@@ -96,9 +97,9 @@ bool Record(uint8_t* base, uint32_t passes, uint32_t frame, const RecordCalls& c
   // Declined (the original then) where a chunk is open, the list hasn't
   // room for every slot, or this's slots 5 and 6 aren't the recorders.
   const auto vtable = p.vtable();
-  if (guest::LoadU8(base, list + 52) != 0 ||
-      guest::LoadU32(base, command_list::kOpenChunks) != 0 ||
-      uint64_t(guest::LoadU32(base, list + 12)) + record::kSlots >= guest::LoadU32(base, list + 8) ||
+  const schema::CommandList l(base, list);
+  if (l.chunk_open() != 0 || schema::CommandListGlobals::open_chunks(base) != 0 ||
+      uint64_t(l.used()) + record::kSlots >= l.capacity() ||
       vtable.slot_5_record_constants() != kRecordConstants ||
       vtable.slot_6_record_samplers() != kRecordSamplers) {
     return false;

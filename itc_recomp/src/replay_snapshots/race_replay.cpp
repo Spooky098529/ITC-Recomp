@@ -12,6 +12,8 @@
 #include "hooks/vehicle.h"
 #include "native/buffers.h"
 #include "race_world/race_world.h"
+#include "schema/car_physics.h"
+#include "schema/race_world.h"
 #include "schema/replay_snapshots.h"
 #include "vehicle/vehicle.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -64,22 +66,24 @@ void Memcpy(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes, uint32_t 
 void RestoreHead(uint8_t* base, uint32_t manager, uint32_t head, uint32_t caller_entries,
                  uint32_t caller_traffic) {
   const Snapshot h(base, head);
+  const schema::RaceManager m(base, manager);
   for (uint32_t i = 0; i < 77; i++) {
-    Memcpy(base, manager + 4 + 28 * i, h.entries_address() + 28 * i, 28, caller_entries);
+    Memcpy(base, m.entries_address() + 28 * i, h.entries_address() + 28 * i, 28, caller_entries);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    Memcpy(base, manager + 2160 + 28 * i, h.traffic_entries_address() + 28 * i, 28,
+    Memcpy(base, m.traffic_entries_address() + 28 * i, h.traffic_entries_address() + 28 * i, 28,
            caller_traffic);
   }
   for (uint32_t i = 0; i < 7; i++) {
-    guest::StoreU32(base, manager + 2336 + 4 * i, guest::LoadU32(base, h.slot_0_address() + 4 * i));
+    guest::StoreU32(base, m.vehicle_slots_address() + 4 * i,
+                    guest::LoadU32(base, h.slot_0_address() + 4 * i));
   }
-  guest::StoreU32(base, manager + 2364, h.racer_count());
-  guest::StoreU32(base, manager + 2368, h.entry_count());
-  guest::StoreU32(base, manager + 2372, h.opponent_count());
-  guest::StoreU32(base, manager + 2376, h.traffic_listed());
-  guest::StoreU32(base, manager + 2380, h.traffic_count());
-  guest::StoreU32(base, manager + 2388, h.unknown_2288());
+  m.set_racer_count(h.racer_count());
+  m.set_entry_count(h.entry_count());
+  m.set_opponents_with_vehicle(h.opponent_count());
+  m.set_traffic_with_vehicle(h.traffic_listed());
+  m.set_traffic_allowed(h.traffic_count());
+  m.set_traffic_ticks(h.unknown_2288());
 }
 
 void ResetWorld(uint8_t* base, uint32_t frame, const ReplayCalls& calls) {
@@ -105,7 +109,7 @@ void Relink(uint8_t* base, uint32_t vehicle, uint32_t frame, const ReplayCalls& 
   if (!vehicle::VehicleLinkTrackPositions(base, vehicle, &r3)) {
     calls.callee(0x820C1D08, frame, vehicle);
   }
-  const uint32_t object = guest::LoadU32(base, vehicle + 340);
+  const uint32_t object = schema::Vehicle(base, vehicle).collision_object();
   if (!car_physics::CollisionObjectResetTransform(base, object, frame - 112)) {
     calls.callee(0x820B7998, frame, object);
   }
@@ -124,13 +128,14 @@ void PutBack(uint8_t* base, uint32_t block, bool place, uint32_t frame,
             .car_flags() == 0) {
       continue;
     }
-    const uint32_t vehicle = vehicle_accessors::VehicleGet(base, i);
+    const schema::Vehicle v(base, vehicle_accessors::VehicleGet(base, i));
+    const uint32_t vehicle = v.address;
     Record5232Restore(base, Snapshot(base, Recordings(base) + block).records_address() + offset,
                       vehicle);
-    if (place && ((guest::LoadU32(base, vehicle + 6148) & 0x81) == 0 ||
-                  guest::LoadU32(base, vehicle + 6152) != 0)) {
+    if (place && ((v.car_flags() & 0x81) == 0 || v.collision_flags() != 0)) {
+      // +6224: the status block's +64 (no field; car-physics.toml's).
       const uint32_t moving =
-          double(guest::LoadFloat(base, vehicle + 6224)) > zero ? 1 : 0;
+          double(guest::LoadFloat(base, v.status_address() + 64)) > zero ? 1 : 0;
       const double speed = double(Vehicle_GetSpeedKmh(base, vehicle));
       const uint32_t position = vehicle_accessors::VehicleIdentity(vehicle) + 4;
       if (!vehicle::VehiclePlaceOnRoute(base, vehicle, position, speed, zero, int32_t(moving),

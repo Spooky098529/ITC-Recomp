@@ -18,6 +18,13 @@
 #include "mode_tick/mode_tick.h"
 #include "race_event/race_event.h"
 #include "race_setup/race_setup.h"
+#include "schema/car_draw.h"
+#include "schema/career.h"
+#include "schema/garage_screen.h"
+#include "schema/race_event.h"
+#include "schema/race_hud_machine.h"
+#include "schema/race_states.h"
+#include "schema/scene_models.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -208,32 +215,35 @@ uint32_t Start(uint8_t* base, uint32_t sp, const Calls& calls) {
   // count at +0x19920; the slot's car (1,968 bytes each from +6120) +224
   // the spec's id.
   uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t garage = save + 6120;
-  uint32_t count = guest::LoadU32(base, save + 0x19920);
-  uint32_t entry =
-      (uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204)))) << 2) + garage;
+  const schema::CareerGarageList list(base, schema::SaveData(base, save).garage_address());
+  const uint32_t garage = list.address;
+  uint32_t count = schema::SaveData(base, save).selected_car();
+  uint32_t entry = (uint32_t(int32_t(int16_t(list.head()))) << 2) + garage;
   for (; count != 0; count--) {
     entry = (uint32_t(int32_t(int16_t(guest::LoadU16(base, entry)))) << 2) + garage;
   }
   const uint32_t slot = uint32_t(int32_t(int16_t(guest::LoadU16(base, entry + 2))));
-  const uint32_t spec = car_specs::GetCarSpec(base, guest::LoadU32(base, slot * 1968 + garage + 224));
-  Screen(base).set_special_car(guest::LoadU8(base, spec + 771) == 1 ? 1 : 0);
+  const schema::CarSpec spec(
+      base, car_specs::GetCarSpec(
+                base, schema::CareerAddedCar(base, slot * 1968 + list.cars_address()).car_id()));
+  Screen(base).set_special_car(spec.list_kind() == 1 ? 1 : 0);
   ResetMovie(base, frame, calls);
   save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t unlocks = save + 0x1C778;
-  const uint32_t race = guest::LoadU32(base, kRaceData);
-  const uint32_t record = vehicle_accessors::RacerRecordsAt(base, race + kRacerRecords, 0xFFFFFFFFu);
+  const schema::SaveData unlocks(base, save);
+  const schema::RaceData race = schema::RaceStatesGlobals::race_data(base);
+  const uint32_t record =
+      vehicle_accessors::RacerRecordsAt(base, race.results_address(), 0xFFFFFFFFu);
   const schema::PageObject pages = G::pages(base);
   uint32_t page, transition;
-  if (vehicle_accessors::StagesWord808(base, race + 0x59620) != 0 && record != 0 &&
+  if (vehicle_accessors::StagesWord808(base, race.stages_address()) != 0 && record != 0 &&
       Screen(base).item2_taken() == 0) {
     // After a race: page 12 through transition 23.
-    data_tables::Item(base, guest::LoadU32(base, record + 980));
+    data_tables::Item(base, schema::RacerResultsRecord(base, record).e1_item());
     Screen(base).set_entry_offset(0);
     Screen(base).set_entry_table(0);
     page = 12;
     transition = 23;
-  } else if (guest::LoadU32(base, unlocks + 768) != 0) {
+  } else if (unlocks.unlocks_shown_count() != 0) {
     // An unlock to show: page 13 through transition 25.
     page = 13;
     transition = 25;
@@ -278,7 +288,7 @@ uint32_t ShowOpponentSpecs(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t n9 = ui_movies::FindNode(base, movie, 12, 9);
   const uint32_t n10 = ui_movies::FindNode(base, movie, 12, 10);
   const uint32_t n11 = ui_movies::FindNode(base, movie, 12, 11);
-  SetNodeText(base, calls, frame, movie, n9, guest::LoadU8(base, spec + 769) + 1934);
+  SetNodeText(base, calls, frame, movie, n9, schema::CarSpec(base, spec).maker() + 1934);
   SetNodeText(base, calls, frame, movie, n10, id + 1646);
   return SetNodeText(base, calls, frame, movie, n11, id + 1718);
 }
@@ -370,7 +380,6 @@ uint32_t AnimId(uint8_t* base, uint32_t which) {
   return guest::LoadU32(base, ((location << 4) & 0xFFFFFFF0u) + G::locations_address() + 4 * which);
 }
 
-constexpr uint32_t kCarScene = 0x826C2E44;
 constexpr uint32_t kCarSceneUpdate = 0x820C9608;
 constexpr uint32_t kCarSceneDraw = 0x820C5DE8;
 constexpr uint32_t kSceneModelPollLoad = 0x820DA318;
@@ -387,7 +396,7 @@ uint64_t PollLoad(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& cal
     return 0;
   }
   const uint32_t evaluated = EvaluateView(base, frame, 0, 0, calls);
-  const uint32_t scene = guest::LoadU32(base, kCarScene);
+  const uint32_t scene = schema::CarDrawGlobals::scene(base).address;
   calls.Call(kCarSceneUpdate, frame, 0x82229350, evaluated);
   uint64_t r3 = calls.Call(kCarSceneDraw, frame, 0x8222935C, scene, 0);
   for (uint32_t i = 0; i < Screen(base).opponent_count(); i++) {
@@ -405,7 +414,7 @@ uint64_t PollLoad(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& cal
         guest::StoreU32(base, at + 4 * column, row == column ? 0x3F800000u : 0);
       }
     }
-    const uint32_t matrix = model + 4304;
+    const uint32_t matrix = schema::SceneModel(base, model).matrix_address();
     Copy(base, calls, frame, 0x82229404, matrix, frame + 176, 64);
     // The third animation's object at the opponent's time (0x82010780 + 4i).
     const uint32_t time = guest::LoadU32(base, G::opponent_times_address() + 4 * i);
@@ -418,8 +427,9 @@ uint64_t PollLoad(uint8_t* base, uint32_t sp, uint32_t machine, const Calls& cal
                                         calls.Call(kMemcpy, inner, 0x82150600, to, from, size);
                                       });
     }
-    if (!PoseCar(base, frame, model + 4288, i, calls)) {
-      calls.Call(0x82228588, frame, 0x82229430, model + 4288, i);
+    const uint32_t block = schema::SceneModel(base, model).draw_block_address();
+    if (!PoseCar(base, frame, block, i, calls)) {
+      calls.Call(0x82228588, frame, 0x82229430, block, i);
     }
     r3 = calls.Call(kSceneModelPollLoad, frame, 0x82229438, model);
     if (uint32_t(r3) == 0) {

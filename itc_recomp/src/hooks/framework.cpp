@@ -21,6 +21,7 @@
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
 #include "schema/framework.h"
+#include "schema/input.h"
 
 #include <optional>
 #include "lifted/sdk.h"
@@ -311,8 +312,11 @@ ITC_NATIVE_ENTRY_ALWAYS(820902C8) {
     };
     const fw::OnTickCalls calls{
         [&](uint32_t manager, uint32_t key) {
-          // InputManager::GetProcessor (the input manager's slot 1, input.md).
-          call(manager, [&] { return fw::VirtualTarget(base, manager, 4); }, key, 0x820902FC);
+          // InputManager::GetProcessor (the input manager's slot 1, input.md;
+          // input.toml's InputManager has no vtable type to name it).
+          call(manager,
+               [&] { return guest::LoadU32(base, schema::InputManager(base, manager).vtable() + 4); },
+               key, 0x820902FC);
         },
         [&](uint32_t app) {
           ctx.r3.u64 = app;

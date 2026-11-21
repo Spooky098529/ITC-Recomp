@@ -26,6 +26,11 @@
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 #include "schema/camera_modes.h"
+#include "schema/car_physics.h"
+#include "schema/minimap.h"
+#include "schema/race_event.h"
+#include "schema/race_states.h"
+#include "schema/race_world.h"
 
 namespace camera_modes {
 
@@ -162,7 +167,7 @@ void TargetTrack(uint8_t* base, uint32_t tracker, uint32_t vehicle, uint32_t fra
   CopyWords(base, t.last_rotation_address(), t.rotation_address(), 4);
   CopyDoublewords(base, t.last_rotation_address(), t.rotation_address(), 2);
   // The body's matrix on the stack; its fourth row the position.
-  const uint32_t body_matrix = vehicle_accessors::RigidBodyMatrix(Load(base, vehicle + 336));
+  const uint32_t body_matrix = vehicle_accessors::RigidBodyMatrix(schema::Vehicle(base, vehicle).body().address);
   CopyDoublewords(base, frame + 112, body_matrix, 8);
   CopyWord(base, t.position_address(), frame + 160);
   CopyWord(base, t.position_y_address(), frame + 164);
@@ -185,7 +190,7 @@ void TargetTrack(uint8_t* base, uint32_t tracker, uint32_t vehicle, uint32_t fra
   t.set_point_y(float(Fmuls(y, half)));
   t.set_point_z(float(Fmuls(z, half)));
   // The body's rotation (+80) into +192 and the turn at +64.
-  const uint32_t rotation = vehicle_accessors::RigidBodyField80(Load(base, vehicle + 336));
+  const uint32_t rotation = vehicle_accessors::RigidBodyField80(schema::Vehicle(base, vehicle).body().address);
   CopyDoublewords(base, frame + 96, rotation, 2);
   CopyWords(base, t.rotation_address(), frame + 96, 4);
   StoreIdentity(base, turn);
@@ -365,7 +370,7 @@ uint32_t IntroStepShot(uint8_t* base, uint32_t shot, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82152E78 IntroCamera::StepShot");
   const schema::IntroShot s(base, shot);
   StoreIdentity(base, frame + 80);
-  const uint32_t body_matrix = vehicle_accessors::RigidBodyMatrix(Load(base, s.vehicle() + 336));
+  const uint32_t body_matrix = vehicle_accessors::RigidBodyMatrix(schema::Vehicle(base, s.vehicle()).body().address);
   CopyDoublewords(base, frame + 176, body_matrix, 8);
   uint32_t viewport = s.viewport().address;
   const int32_t phase = int32_t(s.phase());
@@ -408,11 +413,11 @@ void IntroMakeShot(uint8_t* base, uint32_t shot, uint32_t viewport, uint32_t veh
   s.set_vehicle(vehicle);
   s.set_frames(0);
   s.set_phase(0);
-  const uint32_t spec = vehicle_accessors::ObjectRecord1888(Load(base, vehicle + 5712));
+  const uint32_t spec = vehicle_accessors::ObjectRecord1888(schema::Vehicle(base, vehicle).car());
   const double f0 = Lfs(base, 0x820029D8);
-  const uint32_t r10 = Load(base, spec + 80);
+  const uint32_t r10 = schema::CarSpecCopies(base, spec).unknown_80();
   const double angle = std::bit_cast<double>(Load64(base, 0x820093A8));
-  const uint32_t r11 = Load(base, spec + 76);
+  const uint32_t r11 = schema::CarSpecCopies(base, spec).unknown_76();
   StoreDoubleword(base, frame + 88, r10);
   StoreDoubleword(base, frame + 80, r11);
   const double f12 = Single(double(int64_t(r10)));
@@ -460,7 +465,7 @@ void IntroMakeShot(uint8_t* base, uint32_t shot, uint32_t viewport, uint32_t veh
   CopyWords(base, schema::Viewport(base, vp).base_up_address(), kUp, 4);
   vp = s.viewport().address;
   CopyWords(base, schema::Viewport(base, vp).base_look_address(), kOffset, 4);
-  const uint32_t r88 = Load(base, spec + 88);
+  const uint32_t r88 = schema::CarSpecCopies(base, spec).model_year();
   StoreDoubleword(base, frame + 88, r88);
   const double n = Single(double(int64_t(r88)));
   s.set_length(float(Fmuls(n, Lfs(base, 0x82002CCC))));
@@ -499,18 +504,18 @@ void IntroUpdate(uint8_t* base, uint32_t camera, uint32_t frame) {
   } else if (phase < 3) {
     // The orbit about the car (from its spec block's size) over the frames
     // since the shots ended, at 1/60 s a frame, t clamped to 0-1.
-    const uint32_t spec = vehicle_accessors::ObjectRecord1888(Load(base, cam.vehicle() + 5712));
+    const uint32_t spec = vehicle_accessors::ObjectRecord1888(schema::Vehicle(base, cam.vehicle()).car());
     const double c = Lfs(base, 0x82002CCC);
     const uint32_t frames = cam.frames();
-    const uint32_t r84 = Load(base, spec + 84);
+    const uint32_t r84 = schema::CarSpecCopies(base, spec).unknown_84();
     StoreDoubleword(base, f + 80, r84);
     const double f11 = Single(double(int64_t(r84)));
     const int32_t since = int32_t(frames - Load(base, kKept));
-    const uint32_t r80 = Load(base, spec + 80);
+    const uint32_t r80 = schema::CarSpecCopies(base, spec).unknown_80();
     StoreDoubleword(base, f + 240, r80);
     StoreDoubleword(base, f + 96, uint64_t(int64_t(since)));
     const double f12 = Single(double(int64_t(since)));
-    const uint32_t r76 = Load(base, spec + 76);
+    const uint32_t r76 = schema::CarSpecCopies(base, spec).unknown_76();
     StoreDoubleword(base, f + 96, r76);
     double t = Fmuls(f12, Lfs(base, 0x820029E8));
     const double zero = Lfs(base, kZero);
@@ -547,7 +552,7 @@ void IntroUpdate(uint8_t* base, uint32_t camera, uint32_t frame) {
     Stfs(base, f + 84, Fmuls(f7b, f28));
     Stfs(base, f + 88, Fmadds(tt, zero, f12c));
     const uint32_t body_matrix =
-        vehicle_accessors::RigidBodyMatrix(Load(base, cam.vehicle() + 336));
+        vehicle_accessors::RigidBodyMatrix(schema::Vehicle(base, cam.vehicle()).body().address);
     CopyDoublewords(base, f + 176, body_matrix, 8);
     CopyWords(base, f + 112, f + 176, 16);
     matrix_math::Vec4Transform(base, cam.viewport().eye_address(), f + 112, f + 80);
@@ -595,24 +600,24 @@ uint32_t IntroConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint3
   }
   uint32_t count = 0;
   Store(base, frame + 96, count);
-  const uint32_t stages = race + 0x59620;
-  const uint32_t stage = Load(base, stages + 804);
+  const uint32_t stages = schema::RaceData(base, race).stages_address();
+  const uint32_t stage = schema::RaceData(base, race).current_stage();
   if (!vehicle_accessors::StagesCopy(base, frame + 144, stages, stage)) {
     stages_copy(frame + 144, stages, stage);
   }
   for (int32_t s = 0; s < int32_t(Load(base, frame + 220)); s++) {
     const uint32_t racer = Load(base, frame + 188 + 8 * s);
     const uint32_t record = uint32_t(uint64_t(racer) * 3936) + G::race_data(base);
-    if (((Load(base, record + 3936) >> 1) & 1) == 0) {
+    if (((schema::RaceData(base, record).record0_flags() >> 1) & 1) == 0) {
       continue;
     }
     uint32_t found_vehicle = 0;
     bool kind_flag = false;
     for (int32_t n = 0; n < int32_t(track_collision::RaceRacerCount(base)); n++) {
-      const uint32_t entry = Load(base, G::racers_manager(base) + 2308 + 4 * uint32_t(n));
-      if (int32_t(racer) == int32_t(Load(base, entry + 24))) {
-        found_vehicle = vehicle_accessors::VehicleGet(base, Load(base, entry + 20));
-        kind_flag = (Load(base, entry + 0) & 0x400) != 0;
+      const uint32_t entry = Load(base, schema::RaceManager(base, G::racers_manager(base)).racers_address() + 4 * uint32_t(n));
+      if (int32_t(racer) == int32_t(schema::MinimapRacerEntry(base, entry).record())) {
+        found_vehicle = vehicle_accessors::VehicleGet(base, schema::MinimapRacerEntry(base, entry).vehicle_index());
+        kind_flag = (schema::MinimapRacerEntry(base, entry).flags() & 0x400) != 0;
         break;
       }
     }
@@ -620,9 +625,9 @@ uint32_t IntroConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint3
     uint32_t r11 = 0;
     bool front = false;
     if (kind_flag) {
-      const int32_t id = int32_t(Load(base, record + 3960));
+      const int32_t id = int32_t(schema::RaceData(base, record).record0_racer_id());
       if (id >= 0) {
-        const int32_t kind = LoadS16(base, data_tables::Item(base, uint32_t(id)) + 88);
+        const int32_t kind = int16_t(schema::OpponentItem(base, data_tables::Item(base, uint32_t(id))).race_kind());
         if (kind == 1 || kind == 3) {
           front = true;
           r11 = Load(base, frame + 96);
@@ -689,15 +694,15 @@ void DirectorRelease(uint8_t* base, uint32_t director, const std::function<void(
   ITC_NATIVE_RUNNING("sub_82153098 CameraDirector::Release");
   const schema::CameraDirector d(base, director);
   free_all();
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0) + 131072 - 1956;
-  const int32_t kind = int32_t(Load(base, G::race_data(base) + 0xA3AF0));
+  const schema::SaveData save(base, vehicle_accessors::SaveDataOf(base, 0));
+  const int32_t kind = int32_t(schema::RaceData(base, G::race_data(base)).kind());
   if (kind == 1 || kind == 2 || kind == 3) {
     uint32_t view = d.view();
     if (int32_t(view) == 4 || int32_t(view) == 5) {
       view = d.view_kept();
     }
     if (view < 3) {
-      Store(base, save + 24, view == 0 ? 2 : view == 1 ? 1 : 0);
+      save.set_camera_view(view == 0 ? 2 : view == 1 ? 1 : 0);
     }
     d.set_start_view(view);
   }
@@ -757,7 +762,7 @@ uint32_t CutsceneStep(uint8_t* base, uint32_t shot, uint32_t out, uint32_t frame
     return 4;
   }
   s.set_flags((s.flags() & 0xFFFFFFDAu) | 8);
-  const uint32_t body_matrix = vehicle_accessors::RigidBodyMatrix(Load(base, s.vehicle() + 336));
+  const uint32_t body_matrix = vehicle_accessors::RigidBodyMatrix(schema::Vehicle(base, s.vehicle()).body().address);
   CopyDoublewords(base, frame + 192, body_matrix, 8);
   CopyWords(base, frame + 80, frame + 192, 16);
   const double flip = Lfs(base, 0x82001BE0);

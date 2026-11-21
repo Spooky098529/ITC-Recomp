@@ -7,6 +7,8 @@
 #include "camera_modes/steps.h"
 #include "guest.h"
 #include "schema/car_list.h"
+#include "schema/power_graph_screen.h"
+#include "schema/tuning_screen.h"
 #include "type67_screens/type67_screens.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -33,6 +35,7 @@ using ColorList = schema::CarListColorList;
 using Color = schema::CarListColor;
 using Stats = schema::CarListStats;
 using CarVtable = schema::CarPanelVtable;
+using Node = schema::UiMovieNode;  // tuning-screen.toml
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   StoreU32(base, sp - bytes, sp);
@@ -125,7 +128,7 @@ uint64_t TabSetCursorY(uint8_t* base, uint32_t panel, uint64_t y, uint32_t sp) {
     return child;
   }
   const double value = FloatOf(base, frame, int64_t(int32_t(uint32_t(y))));
-  steps::Stfs(base, child + 16, value);
+  Node(base, child).set_y(float(value));
   return child;
 }
 
@@ -154,8 +157,8 @@ void SetTabWords(uint8_t* base, uint32_t a, uint32_t b, uint64_t tab) {
   if (t >= 3) {
     return;
   }
-  StoreU32(base, a + 108, t);
-  StoreU32(base, b + 108, t);
+  Node(base, a).set_texture_entry(t);
+  Node(base, b).set_texture_entry(t);
 }
 
 uint64_t TabSetTab(uint8_t* base, uint32_t panel, uint64_t tab, uint32_t sp, const Calls& calls) {
@@ -264,7 +267,7 @@ uint64_t RowSetRow(uint8_t* base, uint32_t panel, uint64_t row, uint32_t entry, 
     } else {
       frame_word = id == 71 ? 44 : -1;
     }
-    StoreU32(base, uint32_t(r3) + 108, uint32_t(frame_word));
+    Node(base, uint32_t(r3)).set_texture_entry(uint32_t(frame_word));
   }
   // The texts: SetNodeText(m, the child, string) with r6 to r10 unset (0).
   const uint32_t text0 = Row(base, panel).text_maker();
@@ -300,17 +303,17 @@ uint64_t RowFill(uint8_t* base, uint64_t panel_r3, uint32_t list, uint64_t scrol
     const uint32_t row = ui_movies::Child(
         base, node, LoadU32(base, Row(base, panel).row_nodes_address() + 4 * uint32_t(i)));
     if (i < count) {
-      StoreU32(base, row + 80, 1);
+      Node(base, row).set_visible(1);
       RowSetRow(base, panel, uint32_t(i), LoadU32(base, first + 4 * uint32_t(i)), frame, calls);
     } else {
-      StoreU32(base, row + 80, 0);
+      Node(base, row).set_visible(0);
     }
   }
   const uint32_t sub = Row(base, panel).node_set();
   const uint32_t cursor = int32_t(sub) >= 0
                               ? ui_movies::FindNode(base, m, sub, Row(base, panel).cursor())
                               : ui_movies::Child(base, node, Row(base, panel).cursor());
-  StoreU32(base, cursor + 80, count > int32_t(Row(base, panel).row_count()) ? 1 : 0);
+  Node(base, cursor).set_visible(count > int32_t(Row(base, panel).row_count()) ? 1 : 0);
   if (Row(base, panel).two_players() == 0) {
     const uint32_t entry =
         LoadU32(base, List(base, list).entries_address() + (uint32_t(scroll + item) << 2));
@@ -399,10 +402,10 @@ uint64_t RowSetArrows(uint8_t* base, uint64_t panel_r3, uint64_t scroll, uint64_
                              : ui_movies::Child(base, node, index);
   };
   const uint32_t up = arrow(0);
-  StoreU32(base, up + 80, uint32_t(scroll) != 0 ? 1 : 0);
+  Node(base, up).set_visible(uint32_t(scroll) != 0 ? 1 : 0);
   const uint32_t down = arrow(1);
-  StoreU32(base, down + 80,
-           Row(base, panel).row_count() + uint32_t(scroll) - uint32_t(count) != 0 ? 1 : 0);
+  Node(base, down).set_visible(
+      Row(base, panel).row_count() + uint32_t(scroll) - uint32_t(count) != 0 ? 1 : 0);
   return down;
 }
 
@@ -483,16 +486,16 @@ uint64_t ColorSetArrows(uint8_t* base, uint32_t panel, uint64_t up, uint64_t dow
   uint32_t node = ui_movies::FindNode(base, m, ColorP(base, panel).node_set(),
                                       ColorP(base, panel).arrows_node());
   // cmpw: the low words.
-  StoreU32(base, node + 80, uint32_t(up) == uint32_t(down) ? uint32_t(up) : 1);
+  Node(base, node).set_visible(uint32_t(up) == uint32_t(down) ? uint32_t(up) : 1);
   const uint32_t a = ColorP(base, panel).arrow_up_node();
   if (int32_t(a) >= 0) {
     node = ui_movies::FindNode(base, m, ColorP(base, panel).node_set(), a);
-    StoreU32(base, node + 80, uint32_t(up));
+    Node(base, node).set_visible(uint32_t(up));
   }
   const uint32_t b = ColorP(base, panel).arrow_down_node();
   if (int32_t(b) >= 0) {
     node = ui_movies::FindNode(base, m, ColorP(base, panel).node_set(), b);
-    StoreU32(base, node + 80, uint32_t(down));
+    Node(base, node).set_visible(uint32_t(down));
   }
   return node;
 }
@@ -505,9 +508,11 @@ uint64_t ColorShowSwatches(uint8_t* base, uint32_t panel, uint64_t count, uint32
       ui_movies::FindNode(base, m, ColorP(base, panel).node_set(), ColorP(base, panel).node());
   const uint32_t swatches = ui_movies::Child(base, node, ColorP(base, panel).swatches());
   uint32_t r3 = swatches;
-  for (int32_t i = 0; i < int32_t(LoadU32(base, swatches + 104)); i++) {
-    r3 = ui_movies::Child(base, node, uint32_t(i) + LoadU32(base, swatches + 100));
-    StoreU32(base, r3 + 80, i < int32_t(uint32_t(count)) ? 1 : 0);
+  // A group: its +104 the child count, +100 the first child (read as words).
+  for (int32_t i = 0; i < int32_t(std::bit_cast<uint32_t>(Node(base, swatches).height())); i++) {
+    r3 = ui_movies::Child(base, node,
+                          uint32_t(i) + std::bit_cast<uint32_t>(Node(base, swatches).width()));
+    Node(base, r3).set_visible(i < int32_t(uint32_t(count)) ? 1 : 0);
   }
   return r3;
 }
@@ -520,7 +525,7 @@ uint64_t ColorPlaceCursor(uint8_t* base, uint32_t panel, uint64_t item, uint32_t
       ui_movies::FindNode(base, m, ColorP(base, panel).node_set(), ColorP(base, panel).node());
   const double y = FloatOf(base, frame, int64_t(int32_t((uint32_t(item) << 5) + 8)));
   const uint32_t child = ui_movies::Child(base, node, ColorP(base, panel).cursor());
-  steps::Stfs(base, child + 16, y);
+  Node(base, child).set_y(float(y));
   return child;
 }
 
@@ -579,11 +584,12 @@ uint64_t ColorSetSwatch(uint8_t* base, uint32_t panel, uint64_t swatch, uint32_t
   const uint32_t node =
       ui_movies::FindNode(base, m, ColorP(base, panel).node_set(), ColorP(base, panel).node());
   const uint32_t swatches = ui_movies::Child(base, node, ColorP(base, panel).swatches());
-  const uint32_t at = ui_movies::Child(base, node, LoadU32(base, swatches + 100) + uint32_t(swatch));
+  const uint32_t at = ui_movies::Child(
+      base, node, std::bit_cast<uint32_t>(Node(base, swatches).width()) + uint32_t(swatch));
   const uint32_t child = ui_movies::Child(base, at, ColorP(base, panel).swatch_color());
-  StoreU32(base, child + 56, Color(base, color).red());
-  StoreU32(base, child + 60, Color(base, color).green());
-  StoreU32(base, child + 64, Color(base, color).blue());
+  Node(base, child).set_red(Color(base, color).red());
+  Node(base, child).set_green(Color(base, color).green());
+  Node(base, child).set_blue(Color(base, color).blue());
   return child;
 }
 
@@ -654,7 +660,7 @@ uint64_t CarPlaceCursor(uint8_t* base, uint64_t panel_r3, uint64_t action, uint3
       ui_movies::FindNode(base, m, Car(base, panel).node_set(), Car(base, panel).node());
   const double y = FloatOf(base, frame, int64_t(int32_t(uint32_t(action) * 40)));
   const uint32_t child = ui_movies::Child(base, node, Car(base, panel).cursor());
-  steps::Stfs(base, child + 16, y);
+  Node(base, child).set_y(float(y));
   return child;
 }
 
@@ -1250,32 +1256,32 @@ uint64_t CarPick(uint8_t* base, uint64_t panel_r3, uint64_t action, uint64_t bef
 uint64_t PowerGraphSetEntry(uint8_t* base, uint64_t entry_r3, uint64_t tab) {
   ITC_NATIVE_RUNNING("sub_82250368 PowerGraph::SetEntry");
   const uint32_t entry = uint32_t(entry_r3);
-  const uint32_t record = G::power_graph(base).address + 8;
-  StoreU32(base, record + 80, uint32_t(tab));
-  StoreU32(base, record + 0, 0);
-  StoreU32(base, record + 4, Entry(base, entry).unknown_712());
-  StoreU32(base, record + 8, Entry(base, entry).unknown_716());
-  StoreU32(base, record + 12, Entry(base, entry).unknown_724());
-  StoreU32(base, record + 16, Entry(base, entry).unknown_720());
-  StoreU32(base, record + 20, Entry(base, entry).car_id());
-  StoreU32(base, record + 24, Entry(base, entry).maker());
-  StoreU32(base, record + 28, Entry(base, entry).unknown_770());
+  const schema::PowerGraphScreenData data = G::power_graph(base);
+  data.set_tab(uint32_t(tab));
+  data.set_car_value(0);
+  data.set_rating(Entry(base, entry).unknown_712());
+  data.set_spec_word_0(Entry(base, entry).unknown_716());
+  data.set_spec_word_1(Entry(base, entry).unknown_724());
+  data.set_spec_word_2(Entry(base, entry).unknown_720());
+  data.set_car_id(Entry(base, entry).car_id());
+  data.set_spec_byte_0(Entry(base, entry).maker());
+  data.set_spec_byte_1(Entry(base, entry).unknown_770());
   // The switch on the byte +708 (its cases 0 and 4 the split piece
   // sub_822503F0); nothing above 7.
   static constexpr uint32_t kKinds[8] = {6, 2, 3, 4, 6, 0, 1, 5};
   const uint8_t kind = Entry(base, entry).unknown_708();
   if (kind <= 7) {
-    StoreU32(base, record + 32, kKinds[kind]);
+    data.set_engine_class(kKinds[kind]);
   }
-  StoreU32(base, record + 36, Entry(base, entry).turbo() != 0 ? 1 : 0);
-  StoreU32(base, record + 40, Entry(base, entry).displacement());
-  StoreU32(base, record + 44,
-           uint32_t(steps::Fctiwz(steps::Lfs(base, Entry(base, entry).unknown_652_address()))));
-  StoreU32(base, record + 48,
-           uint32_t(steps::Fctiwz(steps::Lfs(base, Entry(base, entry).unknown_656_address()))));
-  steps::Stfs(base, record + 52, steps::Lfs(base, Entry(base, entry).unknown_660_address()));
-  StoreU32(base, record + 56,
-           uint32_t(steps::Fctiwz(steps::Lfs(base, Entry(base, entry).unknown_664_address()))));
+  data.set_spec_flag(Entry(base, entry).turbo() != 0 ? 1 : 0);
+  data.set_spec_word_3(Entry(base, entry).displacement());
+  data.set_curve_value_0(
+      uint32_t(steps::Fctiwz(steps::Lfs(base, Entry(base, entry).unknown_652_address()))));
+  data.set_curve_value_1(
+      uint32_t(steps::Fctiwz(steps::Lfs(base, Entry(base, entry).unknown_656_address()))));
+  data.set_peak_torque(float(steps::Lfs(base, Entry(base, entry).unknown_660_address())));
+  data.set_peak_index(
+      uint32_t(steps::Fctiwz(steps::Lfs(base, Entry(base, entry).unknown_664_address()))));
   return entry_r3;
 }
 

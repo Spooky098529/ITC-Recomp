@@ -21,13 +21,31 @@
 
 #include <cstdint>
 
-#include "schema/car_sounds.h"  // CarSoundWaveBank (the effects' bank)
+#include "guest.h"
+#include "schema/ai_drivers.h"        // the float 0.1
+#include "schema/archive.h"           // ArchiveTocEntry
+#include "schema/boot_mode.h"         // the pad blocked words (the system UI)
+#include "schema/car_sounds.h"        // CarSound, CarSoundWaveBank (the effects' bank)
+#include "schema/career.h"            // CareerSave (the save data)
+#include "schema/menu_sounds.h"       // AudioManager (the sound manager)
+#include "schema/minimap.h"           // MinimapRacerEntry (the racers' entries)
+#include "schema/race_hud_machine.h"  // RacerResultsRecord
 #include "schema/race_sounds.h"
+#include "schema/race_states.h"       // RaceData, RaceProgress, the floats 0.0 and 1.0
+#include "schema/race_world.h"        // RaceManager
 
 namespace race_sounds {
 
-// The sound manager and its vtable's slots (bytes into it).
-constexpr uint32_t kSoundManager = 0x826C5C80;
+// The sound manager ([0x826C5C80], menu-sounds.toml's AudioManager) and its
+// vtable's slots (bytes into it; slots 30 to 32 aren't AudioManagerVtable's
+// fields yet).
+inline schema::AudioManager SoundManager(uint8_t* base) {
+  return schema::MenuSoundsGlobals::sound_manager(base);
+}
+// The manager's function at `slot`.
+inline uint32_t ManagerSlot(uint8_t* base, schema::AudioManager manager, uint32_t slot) {
+  return guest::LoadU32(base, manager.vtable().address + slot);
+}
 constexpr uint32_t kReleaseBankSlot = 20;              // 5
 constexpr uint32_t kIsBankLoadingSlot = 24;            // 6
 constexpr uint32_t kIsBankSlotEmptySlot = 32;          // 8
@@ -41,17 +59,24 @@ constexpr uint32_t kSetCategoryVolumeSlot = 120;       // 30
 constexpr uint32_t kPauseCategorySlot = 124;           // 31
 constexpr uint32_t kResumeCategorySlot = 128;          // 32
 
-// The car sounds' array (seven of 1,264 bytes; 0 before CarSounds::Init).
-constexpr uint32_t kCarSounds = 0x826C5C3C;
-constexpr uint32_t kCarSoundBytes = 1264;
+// The car sounds' array (seven of 1,264 bytes, car-sounds.toml's CarSound;
+// 0 before CarSounds::Init).
 constexpr uint32_t kCarSoundCount = 7;
+// Car sound i's address as the loops form it: 0 (each time) while the array
+// is 0.
+inline uint32_t CarSoundAt(uint8_t* base, uint32_t i) {
+  const uint32_t array = schema::CarSoundsGlobals::sounds(base).address;
+  return array == 0 ? 0 : array + schema::CarSound::kSize * i;
+}
 
-// The globals: "Music", the floats 0.0 and 0.1 (the volumes, the effects'
-// bank arrived word and the scene models' sound slots are
-// schema::RaceSoundsGlobals').
-constexpr uint32_t kMusicName = 0x82008348;
-constexpr uint32_t kZero = 0x82000A34;
-constexpr uint32_t kTenth = 0x82001FBC;
+// Other areas' globals: the race data and the race's progress
+// (race-states.toml), the racers' manager (race-world.toml), the floats 0.0
+// and 1.0 (race-states.toml's) and 0.1 (ai-drivers.toml's), "Music"
+// (menu-sounds.toml), the pad blocked words (boot-mode.toml), the music's
+// byte (car-sounds.toml). The volumes, the effects' bank arrived word and
+// the scene models' sound slots are schema::RaceSoundsGlobals'.
+using RaceStates = schema::RaceStatesGlobals;
+using CarSounds = schema::CarSoundsGlobals;
 
 // The machine (itc_recomp/schema/race-sounds.toml) and the area's globals.
 using Globals = schema::RaceSoundsGlobals;
@@ -80,24 +105,6 @@ constexpr uint32_t kEffectsBankId = 22889;          // Sound::Play (menu-sounds.
 constexpr uint32_t kRaceSoundsPauseCars = 0x82175C00;
 constexpr uint32_t kRaceSoundsResumeCars = 0x82175C58;
 constexpr uint32_t kCarSoundsInit = 0x8210FE00;
-
-// The cars' sound parameters' indexes (CarSounds::SetBanks).
-constexpr uint32_t kBankIndexI = 0x826C5C48;
-constexpr uint32_t kBankIndexJ = 0x826C5C64;
-// The racers' entries ([[0x826D82F4] + 2308 + 4n], +20 the vehicle's
-// index), the race's progress ([0x826D82E8]: +2184 the results' count, 972
-// bytes each from +2188, +4 the item), the race data ([0x826C5B2C]: +32
-// probably the course), the system UI's words, the float 1.0.
-constexpr uint32_t kRace = 0x826D82F4;
-constexpr uint32_t kProgress = 0x826D82E8;
-constexpr uint32_t kRaceData = 0x826C5B2C;
-constexpr uint32_t kSystemUi0 = 0x826C7960;
-constexpr uint32_t kSystemUi1 = 0x826C7964;
-constexpr uint32_t kOne = 0x82000A30;
-// The byte cleared with each fade (not read here), the word the after-race
-// music reads with race kind 6 (known-data.md).
-constexpr uint32_t kMusicStarted = 0x826C5C84;
-constexpr uint32_t kAfterRaceWord = 0x826C7824;
 
 // A guest function called from the frame at `r1`, with the first `set` of
 // r3 to r6 given (the others left as they are) and the link register `lr`

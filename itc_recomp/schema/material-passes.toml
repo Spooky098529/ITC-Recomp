@@ -83,6 +83,7 @@ fields = [
 # models the car's loading objects keep for their parts.
 [PartModel]
 measure = "PartModel"
+measures = ["SceneInterior.+11632", "ModelPoint::Find.r4"]
 size = 464
 origin = "file"
 vtable = 0x8200338C
@@ -98,6 +99,9 @@ fields = [
   { name = "category3_texture", offset = 452, type = "u32", note = "category 3's texture" },
   { name = "override_texture", offset = 456, type = "u32", note = "an override texture (with +432)" },
   { name = "replacement_texture", offset = 460, type = "u32", note = "the texture that replaces +436's index" },
+  { name = "model_196", offset = 196, type = "u32", note = "the Model's +196 (models.toml), read by ModelPoint::Find" },
+  { name = "model_260", offset = 260, type = "u32", note = "the Model's +260, read by ModelPoint::Find" },
+  { name = "file_08", offset = 408, type = "u32", note = "the Model's: the part file's +8 (ModelPoint::Find)" },
 ]
 
 # A color as RGB: Color::HsvToRgb's output (floats, +12 = 1.0) and
@@ -121,6 +125,7 @@ fields = [
 # (r4). The measure joins it with the car dealer's swatch (CarDealer::
 # OpenColors passes the swatch's +16), so it sees no access of its own.
 [HsvColor]
+measures = ["Color::HsvToRgb_8224AB50.r4"]
 size = 16
 origin = "file"
 fields = [

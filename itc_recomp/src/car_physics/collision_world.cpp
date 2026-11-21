@@ -11,6 +11,7 @@
 #include "collision/collision.h"
 #include "memory/c_runtime_heap.h"
 #include "schema/car_physics.h"
+#include "schema/collision.h"
 #include "track_collision/track_collision.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -164,11 +165,12 @@ void CollisionWorldResetSurfaces(uint8_t* base) {
 
 void CollisionShapeInit(uint8_t* base, uint32_t shape) {
   ITC_NATIVE_RUNNING("sub_820BAA78 CollisionShape::Init");
-  CopyWord(base, kZero, shape + 28);
-  guest::StoreU32(base, shape + 4, 0);
-  CopyWord(base, kZero, shape + 44);
-  guest::StoreU32(base, shape + 8, 0);
-  guest::StoreU32(base, shape + 0, 0);
+  const schema::CollisionShape record(base, shape);
+  CopyWord(base, kZero, record.bounds_min_w_address());
+  record.set_previous(0u);
+  CopyWord(base, kZero, record.bounds_max_w_address());
+  record.set_current(0u);
+  record.set_template_shape(0u);
 }
 
 void CollisionObjectConstruct(uint8_t* base, uint32_t object) {
@@ -217,7 +219,7 @@ bool CollisionObjectTranslate(uint8_t* base, uint32_t object, uint32_t offset, u
   ITC_NATIVE_RUNNING("sub_820B7B60 CollisionObject::Translate");
   // CollisionShape::Translate runs natively only on a box (its current
   // copy, the record's +8): else the original from the start.
-  if (!collision::IsBox(base, guest::LoadU32(base, schema::CollisionWorldObject(base, object).shape_record_address() + 8))) {
+  if (!collision::IsBox(base, schema::CollisionShape(base, schema::CollisionWorldObject(base, object).shape_record_address()).current().address)) {
     return false;
   }
   const uint32_t f = frame;
@@ -936,7 +938,7 @@ bool CollisionObjectRespond(uint8_t* base, uint32_t object, uint32_t hits, uint3
                             uint32_t flag, uint32_t frame, uint32_t* r3) {
   // CollisionObject::Translate runs natively only on a box (the record's
   // current copy): else the original from the start.
-  if (!collision::IsBox(base, guest::LoadU32(base, schema::CollisionWorldObject(base, object).shape_record_address() + 8))) {
+  if (!collision::IsBox(base, schema::CollisionShape(base, schema::CollisionWorldObject(base, object).shape_record_address()).current().address)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_820B81C8 CollisionObject::Respond");

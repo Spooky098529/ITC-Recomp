@@ -16,13 +16,9 @@ namespace location_screen {
 
 // The screen's globals (its page object, menus and the screen itself) are
 // schema::LocationScreenGlobals' (schema/location_screen.h).
-// The race data (a pointer) and its racer records' offset.
-constexpr uint32_t kRaceData = 0x826C5B2C;
-constexpr uint32_t kRacerRecords = 0x59AE8;
-// The save data's unlock list's count.
-constexpr uint32_t kUnlockCount = 0x1CA78;
-// The save data's item records (12 bytes each; +2 a halfword).
-constexpr uint32_t kItemRecords = 0x199F8;
+// The race data and its results records are schema::RaceData's
+// (schema/race_states.h), the save data's words schema::SaveData's
+// (schema/race_event.h).
 // The frames of the functions that copy an item (3,008 bytes) onto their
 // stack.
 constexpr uint32_t kItemFrame = 3120;

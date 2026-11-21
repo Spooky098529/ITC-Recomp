@@ -23,8 +23,11 @@
 # and sub_820911F8 return from a shape record (the current and previous
 # copies), and sub_820BC560's r5 (not read; it calls LowerCorner and Radius).
 [BoxShape]
+# measures from VehicleBox (vehicle-accessors), merged at the integration
+# measures from ReplayPlacedBox (replay-snapshots), merged at the integration
 measure = "BoxShape"
-measures = ["Shape", "CollisionObject.+32", "sub_820BAB48.r4", "sub_820BAB48.ret", "sub_820BB688.r3", "sub_820BB688.r4", "BoxShape::Place.r5", "sub_822BE2C8.ret", "sub_820911F8.ret", "sub_820BA1D0.r3", "sub_820B9C30.r3", "sub_820BC560.r5"]
+measures = ["Shape", "CollisionObject.+32", "sub_820BAB48.r4", "sub_820BAB48.ret", "sub_820BB688.r3", "sub_820BB688.r4", "BoxShape::Place.r5", "sub_822BE2C8.ret", "sub_820911F8.ret", "sub_820BA1D0.r3", "sub_820B9C30.r3", "sub_820BC560.r5", "Part464::Restore.r4", "Part464::Save.r4",
+  "Vehicle.+344", "WallQuery.+12.+0"]
 size = 496
 origin = "allocated"
 vtable = 0x82002B30
@@ -101,6 +104,19 @@ fields = [
   { name = "face_nz_normal_y", offset = 484, type = "f32" },
   { name = "face_nz_normal_z", offset = 488, type = "f32" },
   { name = "face_nz_normal_w", offset = 492, type = "f32" },
+  { name = "center", offset = 48, type = "bytes", count = 16, note = "from ReplayPlacedBox (replay-snapshots)" },
+  { name = "axis0", offset = 64, type = "bytes", count = 16, note = "from ReplayPlacedBox (replay-snapshots)" },
+  { name = "axis1", offset = 80, type = "bytes", count = 16, note = "from ReplayPlacedBox (replay-snapshots)" },
+  { name = "axis2", offset = 96, type = "bytes", count = 16, note = "from ReplayPlacedBox (replay-snapshots)" },
+  { name = "half_extent", offset = 128, type = "bytes", count = 16, note = "from ReplayPlacedBox (replay-snapshots)" },
+  { name = "inverse_half_extent", offset = 144, type = "bytes", count = 16, note = "from ReplayPlacedBox (replay-snapshots)" },
+  { name = "corners", offset = 176, type = "bytes", count = 128, note = "from ReplayPlacedBox (replay-snapshots)" },
+  { name = "face_px_normal", offset = 320, type = "bytes", count = 16, note = "from ReplayPlacedBox (replay-snapshots)" },
+  { name = "face_py_normal", offset = 352, type = "bytes", count = 16, note = "from ReplayPlacedBox (replay-snapshots)" },
+  { name = "face_pz_normal", offset = 384, type = "bytes", count = 16, note = "from ReplayPlacedBox (replay-snapshots)" },
+  { name = "face_nx_normal", offset = 416, type = "bytes", count = 16, note = "from ReplayPlacedBox (replay-snapshots)" },
+  { name = "face_ny_normal", offset = 448, type = "bytes", count = 16, note = "from ReplayPlacedBox (replay-snapshots)" },
+  { name = "face_nz_normal", offset = 480, type = "bytes", count = 16, note = "from ReplayPlacedBox (replay-snapshots)" },
 ]
 
 # The box's vtable (0x82002B30, in the image): its slots as read in play

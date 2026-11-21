@@ -8,6 +8,7 @@
 
 #include "guest.h"
 #include "schema/c_runtime.h"
+#include "schema/c_runtime_core.h"
 
 #include <algorithm>
 
@@ -18,16 +19,25 @@ std::recursive_mutex& ExitMutex() {
   return mutex;
 }
 
+namespace {
+
+// Lock 8's entry in the C runtime's lock table (c-runtime-core's).
+schema::CrtLockEntry ExitLockEntry(uint8_t* base) {
+  return schema::CrtLockEntry(base, schema::CRuntimeCoreGlobals::lock_table_address() + 8 * kExitLock);
+}
+
+}  // namespace
+
 uint32_t LockExit(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_825B3430 _lock");
   ExitMutex().lock();
-  return guest::LoadU32(base, kLockTable + 8 * kExitLock);
+  return ExitLockEntry(base).section();
 }
 
 uint32_t UnlockExit(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_825B32D0 _unlock");
   ExitMutex().unlock();
-  return guest::LoadU32(base, kLockTable + 8 * kExitLock);
+  return ExitLockEntry(base).section();
 }
 
 std::optional<uint32_t> OnExit(uint8_t* base, uint32_t function) {

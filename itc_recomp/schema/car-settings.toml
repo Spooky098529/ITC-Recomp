@@ -187,6 +187,7 @@ fields = [
 # same object as "CourseRecords::Of.ret" (type67-screens.md's).
 [CourseRecord]
 measure = "CourseRecord::Entry.r4"
+measures = ["CourseRecords::Of.ret"]
 size = 408
 origin = "embedded"
 fields = [

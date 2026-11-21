@@ -8,7 +8,10 @@
 #include "guest.h"
 #include "race_setup/race_setup.h"
 #include "race_world/race_world.h"
+#include "schema/car_makers.h"
 #include "schema/career.h"
+#include "schema/race_event.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <climits>
@@ -21,6 +24,7 @@ using schema::CareerEntry56;
 using schema::CareerGlobals;
 using schema::CareerSave;
 using schema::CareerStats;
+using schema::OpponentItem;
 
 namespace {
 
@@ -116,36 +120,39 @@ void RewardsPass(uint8_t* base, uint32_t save, uint32_t frame) {
 uint32_t AnyWonKind3Stage2(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82111818 Items::AnyWonKind3Stage2");
   return ItemsWon(base, true, [base](uint32_t item) {
-    return guest::LoadU16(base, item + 42) == 2 && guest::LoadU8(base, item + 36) == 1 &&
-           guest::LoadU8(base, item + 35) == 3;
+    const OpponentItem it(base, item);
+    return it.level() == 2 && it.location() == 1 && it.kind() == 3;
   });
 }
 
 uint32_t AllWonKind3(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821118B0 Items::AllWonKind3");
   return ItemsWon(base, false, [base](uint32_t item) {
-    return guest::LoadU16(base, item + 42) == 1 && guest::LoadU8(base, item + 35) == 3;
+    const OpponentItem it(base, item);
+    return it.level() == 1 && it.kind() == 3;
   });
 }
 
 uint32_t AllWonKind4Stage2(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82111940 Items::AllWonKind4Stage2");
   return ItemsWon(base, false, [base](uint32_t item) {
-    return guest::LoadU16(base, item + 42) == 2 && guest::LoadU8(base, item + 35) == 4;
+    const OpponentItem it(base, item);
+    return it.level() == 2 && it.kind() == 4;
   });
 }
 
 uint32_t AllWonKind4Stage3(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821119D0 Items::AllWonKind4Stage3");
   return ItemsWon(base, false, [base](uint32_t item) {
-    return guest::LoadU16(base, item + 42) == 3 && guest::LoadU8(base, item + 35) == 4;
+    const OpponentItem it(base, item);
+    return it.level() == 3 && it.kind() == 4;
   });
 }
 
 uint32_t AllWonKind5(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82111A60 Items::AllWonKind5");
   return ItemsWon(base, false,
-                  [base](uint32_t item) { return guest::LoadU8(base, item + 35) == 5; });
+                  [base](uint32_t item) { return OpponentItem(base, item).kind() == 5; });
 }
 
 void LocationsUnlock(uint8_t* base, uint32_t save, uint32_t bit) {
@@ -171,18 +178,17 @@ uint32_t ProgressAfterRace(uint8_t* base, uint32_t save, uint32_t sp) {
   const uint32_t frame = sp - kAfterRaceFrame;
   const CareerSave sv(base, save);
   const CareerStats stats(base, sv.stats_address());
-  const uint32_t totals = CareerGlobals::race_data(base).address + 0xA3AD0;
-  stats.set_day_total_4(guest::LoadU32(base, totals + 4) + stats.day_total_4());
-  stats.set_day_total_0(guest::LoadU32(base, totals + 0) + stats.day_total_0());
-  stats.set_day_total_8(guest::LoadU32(base, totals + 8) + stats.day_total_8());
-  stats.set_day_total_12(uint32_t(int32_t(guest::LoadU32(base, totals + 12)) / 50) +
+  const auto totals = CareerGlobals::race_data(base);
+  stats.set_day_total_4(totals.stat_1() + stats.day_total_4());
+  stats.set_day_total_0(totals.stat_0() + stats.day_total_0());
+  stats.set_day_total_8(totals.finish_count() + stats.day_total_8());
+  stats.set_day_total_12(uint32_t(int32_t(totals.stat_3()) / 50) +
                          stats.day_total_12());
   // The location: +6112 unless 48; else +6108 for a rival race (the race
   // data's flags +0x59AE4, 0x10), else 48.
   uint32_t location = sv.next_location();
   if (int32_t(location) == 48) {
-    const uint32_t flags =
-        guest::LoadU32(base, CareerGlobals::race_data(base).address + 0x59AE4);
+    const uint32_t flags = CareerGlobals::race_data(base).flags();
     location = (flags & 0x10) != 0 ? sv.location() : 48;
   }
   // The table-0 unlocks.
@@ -429,7 +435,8 @@ uint32_t CareerNextDay(uint8_t* base, uint32_t save, uint32_t sp, PickNextCall p
     }
     const uint32_t car =
         uint32_t(int32_t(int16_t(guest::LoadU16(base, node + 2)))) * 1968 + gl.cars_address();
-    guest::StoreU32(base, car + 1896, guest::LoadU32(base, car + 1896) + 1);
+    const schema::GarageCar gc(base, car);
+    gc.set_unknown_1896(gc.unknown_1896() + 1);
   }
   sv.set_unknown_109792(0);
   const uint32_t stats = sv.stats_address();

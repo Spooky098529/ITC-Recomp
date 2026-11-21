@@ -8,7 +8,9 @@
 #include "debug/pause_menu_log.h"
 #include "guest.h"
 #include "schema/menu_helpers.h"
+#include "schema/action_mappers.h"
 #include "schema/race_screens.h"
+#include "schema/racer_controllers.h"
 
 namespace race_screens {
 
@@ -20,11 +22,19 @@ schema::MenuList L(uint8_t* base, uint32_t list) { return schema::MenuList(base,
 
 schema::PageObject P(uint8_t* base, uint32_t pages) { return schema::PageObject(base, pages); }
 
+using Controllers = schema::RacerControllersGlobals;
+
+// A player's entry in the action mappers' table (racer-controllers.toml's
+// PlayerMapperEntry: +0 the mapper, +4 1 when it isn't read).
+schema::PlayerMapperEntry E(uint8_t* base, uint32_t entry) {
+  return schema::PlayerMapperEntry(base, entry);
+}
+
 // The list's player's entry in the action mappers' table.
 uint32_t EntryOf(uint8_t* base, uint32_t list) {
   const uint32_t index =
-      guest::LoadU32(base, L(base, list).player() * 4 + kControllerEntries);
-  return index * 8 + kMapperEntries;
+      guest::LoadU32(base, L(base, list).player() * 4 + Controllers::player_entries_address());
+  return index * 8 + Controllers::mapper_entries_address();
 }
 
 // A mapper's read slot (`offset` in its vtable) on `action`, as the
@@ -48,10 +58,10 @@ uint64_t ReadSlot(uint8_t* base, uint32_t mapper, uint32_t offset, uint32_t nati
 // (its low byte).
 bool FiredTry(uint8_t* base, uint32_t entry, uint32_t action, uint32_t frame, uint32_t lr,
               bool native_slots, const Calls& calls) {
-  if (S(guest::LoadU32(base, entry + 4)) == 1) {
+  if (S(E(base, entry).unread()) == 1) {
     return false;
   }
-  const uint32_t mapper = guest::LoadU32(base, entry);
+  const uint32_t mapper = E(base, entry).mapper().address;
   return (ReadSlot(base, mapper, 48, kFiredSlot, 12, action, frame, lr, native_slots, calls) &
           0xFF) != 0;
 }
@@ -61,10 +71,10 @@ uint32_t Pressed(uint8_t* base, uint32_t list, uint32_t action, uint32_t sp, uin
   const uint32_t frame = sp - 96;
   guest::StoreU32(base, frame, sp);
   const uint32_t entry = EntryOf(base, list);
-  if (S(guest::LoadU32(base, entry + 4)) == 1) {
+  if (S(E(base, entry).unread()) == 1) {
     return 0;
   }
-  const uint32_t mapper = guest::LoadU32(base, entry);
+  const uint32_t mapper = E(base, entry).mapper().address;
   const uint64_t r3 =
       ReadSlot(base, mapper, 40, kPressedSlot, 10, action, frame, lr, native_slots, calls);
   if ((r3 & 0xFF) == 0) {

@@ -30,8 +30,9 @@ using Calls = race_hud_object::Calls;
 // The globals (the stand's holder, the page object, the two menus, the
 // dealer's data) and the machine's words are schema::CarDealerGlobals and
 // schema::CarDealer (itc_recomp/schema/car-dealer.toml). The license plate
-// editor's data ([0x826D8438], another screen's: CheckLimits' words):
-constexpr uint32_t kLimits = 0x826D8438;
+// editor's data CheckLimits writes is schema::Type2ScreensGlobals::plate_data
+// (type2-screens.toml), the save data schema::CareerSave (career.toml) and the
+// menus schema::MenuList (race-screens.toml).
 
 // The callees by address.
 constexpr uint32_t kVirtualAlloc = 0x82295398;

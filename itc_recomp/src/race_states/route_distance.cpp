@@ -51,10 +51,10 @@ uint32_t Record(uint8_t* base, uint32_t section) {
 // The rows' test (case A and B): the record's byte +3 is `wanted` and its
 // kind (+2's low four bits) 0 or 5.
 bool Fits(uint8_t* base, uint32_t record, uint32_t wanted) {
-  if (guest::LoadU8(base, record + 3) != wanted) {
+  if (RouteSection(base, record).branch() != wanted) {
     return false;
   }
-  const uint32_t kind = guest::LoadU8(base, record + 2) & 0xF;
+  const uint32_t kind = RouteSection(base, record).kind() & 0xF;
   return kind == 0 || kind == 5;
 }
 
@@ -380,9 +380,9 @@ bool FirstRacer(uint8_t* base, uint32_t progress, uint32_t* position) {
   for (uint32_t i = 0; i < 4; i++) {
     const uint32_t entry =
         Slot(base, Progress(base, progress).slots_address() + Slot::kSize * i).entry().address;
-    if (entry != 0 && (Load(base, entry) & 0x4) != 0) {
-      const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
-      *position = va::VehicleIdentity(vehicle) + 4;
+    if (entry != 0 && (RacerEntry(base, entry).flags() & 0x4) != 0) {
+      const uint32_t vehicle = va::VehicleGet(base, RacerEntry(base, entry).vehicle_index());
+      *position = TrackPos(base, va::VehicleIdentity(vehicle)).route_position_address();
       return true;
     }
   }

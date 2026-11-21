@@ -16,6 +16,7 @@
 
 #include "guest.h"
 #include "schema/tuning_pages.h"
+#include "schema/ui_movies_game.h"
 #include "tuning_screen/tuning_screen.h"
 
 namespace tuning_pages {
@@ -34,7 +35,7 @@ inline schema::DecalImageKept DecalKeptAt(uint8_t* base, uint64_t images, uint32
 }
 // UI movie `movie`'s texture n: [[movie + 28] + 4n] (both loads, in order).
 inline schema::UiMovieTexture MovieTexture(uint8_t* base, uint32_t movie, uint32_t n) {
-  const schema::UiMovieTextureTable table = schema::UiMovieObject(base, movie).textures();
+  const schema::UiMovieTextureTable table = schema::UiMovie(base, movie).textures();
   return schema::UiMovieTexture(base, guest::LoadU32(base, table.slots_address() + n * 4));
 }
 

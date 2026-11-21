@@ -9,7 +9,10 @@
 #include "schema/car_draw.h"
 #include "schema/car_models.h"
 #include "schema/load_poll.h"
+#include "schema/material_passes.h"
+#include "schema/scene_loaders.h"
 #include "schema/scene_models.h"
+#include "schema/second_set.h"
 #include "scene_models/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -50,10 +53,11 @@ uint64_t ScenePartsApply(uint8_t* base, const ApplyCall& call, uint32_t parts, u
                          uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E08B0 SceneParts::Apply");
   const uint32_t frame = Frame(base, stack, 96);
-  if (int32_t(Load(base, Load(base, parts + 37284) + 4)) == 1) {
+  const schema::SceneParts p(base, parts);
+  if (int32_t(p.scene().model_set()) == 1) {
     return parts;
   }
-  Memcpy(base, call, parts + 108, record, 60, frame, 0x820E08E8);
+  Memcpy(base, call, p.record_address(), record, schema::PartsRecord::kSize, frame, 0x820E08E8);
   return call(kPartsBuild, {parts}, frame, 0x820E08F0);
 }
 
@@ -61,17 +65,22 @@ uint64_t SceneInteriorApply(uint8_t* base, const ApplyCall& call, uint32_t inter
                             uint32_t record, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E4258 SceneInterior::Apply");
   const uint32_t frame = Frame(base, stack, 112);
-  Memcpy(base, call, interior + 40, record, 120, frame, 0x820E4278);
-  Memcpy(base, call, Load(base, interior + 36) + 28, record, 120, frame, 0x820E428C);
-  const uint32_t part = Load(base, interior + 140);
+  const schema::SceneInterior in(base, interior);
+  constexpr uint32_t kBytes = schema::InteriorRecord::kSize;
+  Memcpy(base, call, in.record_address(), record, kBytes, frame, 0x820E4278);
+  Memcpy(base, call, in.first_set_interior().record_address(), record, kBytes, frame,
+         0x820E428C);
+  const uint32_t part = in.seat_model();
   if (part != 0) {
-    Store(base, interior + 9656, Load(base, interior + 11668) + part * 464 + 784);
+    // The scene's seat part models (+784, 464 bytes each).
+    in.set_points_seat_model(in.scene().address + part * schema::PartModel::kSize + 784);
   }
   for (uint32_t i = 0; i < 6; i++) {
-    const uint32_t car = Load(base, Load(base, interior + 24) + 24);
+    const uint32_t car = in.car_model().car_model().address;
     const uint32_t texture =
         uint32_t(call(kSelectedTexture, {car}, frame, 0x820E42C0));
-    Store(base, Load(base, interior + 11632 + 4 * i) + 452, texture);
+    schema::PartModel(base, Load(base, in.part_models_address() + 4 * i))
+        .set_category3_texture(texture);
   }
   return call(kSetGauges, {interior}, frame, 0x820E42DC);
 }
@@ -79,8 +88,8 @@ uint64_t SceneInteriorApply(uint8_t* base, const ApplyCall& call, uint32_t inter
 std::optional<uint64_t> SceneModelApplyRecord(uint8_t* base, const ApplyCall& call,
                                               uint32_t model, uint32_t stack) {
   const schema::SceneModel m(base, model);
-  // The scene's +4: 0 the front end.
-  if (Load(base, m.scene().address + 4) != 0) {
+  // 0 the front end.
+  if (m.scene().model_set() != 0) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_820DA758 SceneModel::ApplyRecord");
@@ -93,8 +102,7 @@ std::optional<uint64_t> SceneModelApplyRecord(uint8_t* base, const ApplyCall& ca
     m.set_interior_gauge1_kind(0);
     m.set_interior_gauge1_present(1);
   }
-  // The car model's +24: the first set's car model.
-  const uint32_t car = Load(base, m.car_model().address + 24);
+  const uint32_t car = m.car_model().car_model().address;
   call(kSetRecord, {car, m.car_record_address()}, frame, 0x820DA7B0);
   ScenePartsApply(base, call, m.parts().address, m.parts_record_address(), frame);
   r3 = SceneInteriorApply(base, call, m.interior(), m.interior_record_address(), frame);
@@ -116,10 +124,10 @@ uint64_t SceneModelReloadDecals(uint8_t* base, const ApplyCall& call, uint32_t m
   }
   m.set_ready(0);
   m.set_decals_reloaded(0);
-  // The car model's +24 (the first set's car model), read for each call.
-  call(kSetRecord, {Load(base, m.car_model().address + 24), m.car_record_address()}, frame,
+  // The first set's car model, read for each call.
+  call(kSetRecord, {m.car_model().car_model().address, m.car_record_address()}, frame,
        0x820D9D90);
-  return call(kReloadDecals, {Load(base, m.car_model().address + 24)}, frame, 0x820D9D9C);
+  return call(kReloadDecals, {m.car_model().car_model().address}, frame, 0x820D9D9C);
 }
 
 uint64_t SceneModelAddSecondWheels(uint8_t* base, const ApplyCall& call, uint32_t model,

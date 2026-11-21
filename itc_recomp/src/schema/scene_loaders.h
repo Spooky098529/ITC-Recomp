@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: ScenePools, new<140>@sub_820C3C40
+// allocated; measure: ScenePools, new<140>@sub_820C3C40, new<140>@ScenePools::MakeA, CarInterior.+3092, TrafficCar.+576
 struct ScenePools : View {
   using View::View;
   static constexpr uint32_t kSize = 140;
@@ -172,7 +172,7 @@ struct SceneLoadersName : View {
   uint32_t text_address() const { return address + 0; }
 };
 
-// allocated; measure: CarParts, SceneModel.+5060.+104
+// allocated; measure: CarParts, SceneModel.+5060.+104, CarParts::OnPartLoadedA.r6, CarParts::OnPartLoadedB.r6
 struct CarParts : View {
   using View::View;
   static constexpr uint32_t kSize = 106016;
@@ -401,7 +401,7 @@ struct Interior : View {
   uint32_t first_set_address() const { return address + 3092; }
 };
 
-// allocated; measure: Pool4Object
+// allocated; measure: Pool4Object, sub_820D69B8.r6
 struct Pool4Object : View {
   using View::View;
   static constexpr uint32_t kSize = 592;

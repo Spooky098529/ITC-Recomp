@@ -285,46 +285,6 @@ struct LocationScreenDispatcher : View {
   uint32_t message_start_address() const { return address + 808; }
 };
 
-// embedded; measure: FrontEndMode::NextMode.r4
-struct LocationScreenMode : View {
-  using View::View;
-  static constexpr uint32_t kSize = 852;
-  // the 28,940-byte block (VirtualAlloc by ModeType5::Init)
-  template <typename T = LocationScreenModeBlock>
-  T block() const { return T(base, guest::LoadU32(base, address + 848)); }
-  void set_block(const View& v) const { guest::StoreU32(base, address + 848, v.address); }
-  void set_block(uint32_t v) const { guest::StoreU32(base, address + 848, v); }
-  uint32_t block_address() const { return address + 848; }
-};
-
-// allocated; measure: FrontEndMode::NextMode.r4.+848
-struct LocationScreenModeBlock : View {
-  using View::View;
-  static constexpr uint32_t kSize = 28940;
-  // the car settings' machine (car-settings.md)
-  uint32_t car_settings_address() const { return address + 0; }
-  // this screen's machine (LocationScreenMachine)
-  uint32_t location_screen_address() const { return address + 9640; }
-  // the type 5 dialog's machine (type5-mode.md)
-  uint32_t dialog_address() const { return address + 19280; }
-  // the shown machine's id (3, 16 or 21; ModeType5::FindShown)
-  uint32_t shown() const { return guest::LoadU32(base, address + 28920); }
-  void set_shown(uint32_t v) const { guest::StoreU32(base, address + 28920, v); }
-  uint32_t shown_address() const { return address + 28920; }
-  // 21 by ModeType5::Init (readers not looked for)
-  uint32_t shown_initial() const { return guest::LoadU32(base, address + 28924); }
-  void set_shown_initial(uint32_t v) const { guest::StoreU32(base, address + 28924, v); }
-  uint32_t shown_initial_address() const { return address + 28924; }
-  // the next mode's 8-byte answer (ModeAnswer): its changed byte and three bytes
-  uint32_t answer_word0() const { return guest::LoadU32(base, address + 28928); }
-  void set_answer_word0(uint32_t v) const { guest::StoreU32(base, address + 28928, v); }
-  uint32_t answer_word0_address() const { return address + 28928; }
-  // the answer's next mode type (1 the race, 9 today's result, 4 the title, 12)
-  uint32_t answer_next_type() const { return guest::LoadU32(base, address + 28932); }
-  void set_answer_next_type(uint32_t v) const { guest::StoreU32(base, address + 28932, v); }
-  uint32_t answer_next_type_address() const { return address + 28932; }
-};
-
 // allocated; measure: Picture, LocationScreen.+8, new<16>@LocationScreen::OnPictureLoadedA, new<16>@LocationScreen::OnPictureLoadedB
 struct LocationScreenPicture : View {
   using View::View;

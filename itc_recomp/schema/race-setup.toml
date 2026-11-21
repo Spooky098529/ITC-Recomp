@@ -15,6 +15,8 @@
 # spec by Car::Refresh (car-specs.md). Other areas' views of it, split by the
 # measure: CarMakersCar, PhysicsCar, GarageCar (its first 1,884 bytes).
 [Car]
+# measures from AccessorRacerRecord (vehicle-accessors), merged at the integration
+measures = ["RacerRecord"]
 measure = "Car"
 size = 3936
 origin = "embedded"
@@ -196,6 +198,8 @@ fields = [
 # One of a car object's 32-byte decals (+96 six, +288 forty; known-data's
 # "car object"). The same layout as car-makers.toml's CarMakersCarDecal.
 [CarDecal]
+# measures from AccessorCarDecal (vehicle-accessors), merged at the integration
+measures = ["sub_820CC470.ret"]
 size = 32
 origin = "embedded"
 fields = [
@@ -413,5 +417,5 @@ torque_scale = { address = 0x8200222C, type = "f32", note = "Car::SetModel's las
 gear_scale = { address = 0x82002204, type = "f32", note = "Car::FromBuild's ratio factor (not read)" }
 traffic_start = { address = 0x8200692C, type = "f32", note = "the racers' start float (Racers::SetStart; not read)" }
 event_bits = { address = 0x82008114, type = "bytes", count = 28, note = "two halfword bits for each event % 7 (Race::SetUp; -1 none)" }
-race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data (+4 the route, +48 the racer records, +0x59620 the stage list, +0x59AE8 the 77 records)" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (race-states.toml; +4 the route, +48 the racer records, +0x59620 the stage list, +0x59AE8 the 77 records)" }
 event = { address = 0x826C6078, type = "ptr", to = "RaceEvent", note = "the race event (RaceEvent::Current)" }

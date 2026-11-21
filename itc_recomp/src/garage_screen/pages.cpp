@@ -28,14 +28,15 @@ uint64_t CarListPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   uint32_t list = List(base);
   uint32_t page;
   uint32_t sound;
-  if (Load(base, list + 24) == 0 && Load(base, list + 4) == Load(base, list + 8)) {
+  if (MenuList(base, list).move() == 0 &&
+      MenuList(base, list).scroll() == MenuList(base, list).scroll_before()) {
     const uint64_t accepted = calls.Call(kListAccepted, frame, 0x821940B8, list);
     list = List(base);
     if (uint32_t(accepted) != 0) {
       // Into the car's menu: the selected car, transition 4 then 5, page 1.
       const uint32_t selection = race_screens::ListSelection(base, list);
       Data(base).set_selection(selection);
-      Data(base).set_scroll(Load(base, List(base) + 4));
+      Data(base).set_scroll(ListView(base).scroll());
       ReloadStandCar(base, frame, calls);
       const PageObject pages = PagesOf(base);
       const uint32_t before = pages.page();
@@ -64,7 +65,7 @@ uint64_t CarListPage(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 void LeavePage(uint8_t* base, uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_82192C18 GarageScreen::LeavePage");
-  Store(base, Load(base, Holder(base)) + 6052, 1);
+  Stage(base).set_reflection(1);
   Post(base, mode, 22);
 }
 

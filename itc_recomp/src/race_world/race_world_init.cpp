@@ -12,6 +12,7 @@
 
 #include "race_world/race_world.h"
 
+#include "schema/race_states.h"
 #include "schema/race_world.h"
 
 #include "base/log.h"
@@ -320,8 +321,9 @@ uint32_t Init(uint8_t* base, uint32_t world, uint32_t frame, bool* replaced) {
   schema::RaceWorld(base, world).set_state(1);
   schema::RaceWorld(base, world).set_two_humans(0);
   const uint32_t race = guest::LoadU32(base, kRaceData);
-  if (int32_t(guest::LoadU32(base, race + 0xA3AF0)) == 6 &&
-      int32_t(vehicle_accessors::StagesWord76(base, race + 0x59620, 0xFFFFFFFF)) >= 2) {
+  if (int32_t(schema::RaceData(base, race).kind()) == 6 &&
+      int32_t(vehicle_accessors::StagesWord76(base, schema::RaceData(base, race).stages_address(),
+                                              0xFFFFFFFF)) >= 2) {
     schema::RaceWorld(base, world).set_two_humans(1);
   }
   auto at = [&](const Value& v) {

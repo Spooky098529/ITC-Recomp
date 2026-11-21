@@ -721,7 +721,7 @@ struct Type8ListScreen : View {
   void set_step_started(uint32_t v) const { guest::StoreU32(base, address + 9668, v); }
   uint32_t step_started_address() const { return address + 9668; }
   // the node table (+10360)
-  template <typename T = ListNodeTable>
+  template <typename T = PairedNodeTable>
   T node_table() const { return T(base, guest::LoadU32(base, address + 9672)); }
   void set_node_table(const View& v) const { guest::StoreU32(base, address + 9672, v.address); }
   void set_node_table(uint32_t v) const { guest::StoreU32(base, address + 9672, v); }
@@ -1015,7 +1015,7 @@ struct Type8ColorListScreen : View {
   void set_state(uint32_t v) const { guest::StoreU32(base, address + 9608, v); }
   uint32_t state_address() const { return address + 9608; }
   // the color node table (+10432)
-  template <typename T = ListColorNodeTable>
+  template <typename T = ColorNodeTable>
   T node_table() const { return T(base, guest::LoadU32(base, address + 9672)); }
   void set_node_table(const View& v) const { guest::StoreU32(base, address + 9672, v.address); }
   void set_node_table(uint32_t v) const { guest::StoreU32(base, address + 9672, v); }

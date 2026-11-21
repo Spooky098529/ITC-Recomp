@@ -24,6 +24,7 @@
 # +4288 car-draw.toml's CarDrawBlock.
 [SceneModel]
 measure = "SceneModel"
+measures = ["ScenePools::SetUpB.ret"]
 size = 5120
 origin = "allocated"
 vtable = 0x82004F90
@@ -100,7 +101,9 @@ fields = [
 # sub_820D45B0). The measure also files the 64-byte vinyl layer reset
 # (sub_820D0A20, r3 a layer) and CarRecord::ResetBytes' words at +0.
 [CarRecord]
-measures = ["CarRecord", "CarRecord::Copy.r4", "sub_820D45B0.r3"]
+# measures from SecondSetWheelCarRecord (second-set), merged at the integration
+measures = ["CarRecord", "CarRecord::Copy.r4", "sub_820D45B0.r3",
+  "WheelPoints.+4"]
 size = 3696
 origin = "embedded"
 fields = [
@@ -141,6 +144,8 @@ fields = [
 # The wheels' 156-byte record (the scene model record's +4036, the wheels'
 # +32; sub_820D3900; docs/known-data.md "car draw records").
 [SceneModelsWheelsRecord]
+# measures from SecondSetWheelsRecord (second-set), merged at the integration
+measures = ["WheelPoints.+8944"]
 measure = "sub_820D3900.r3"
 size = 156
 origin = "embedded"
@@ -165,8 +170,8 @@ fields = [
   { name = "rear_size_a", offset = 60, type = "f32" },
   { name = "rear_size_b", offset = 64, type = "f32" },
   { name = "brake_kind", offset = 68, type = "u32" },
-  { name = "unknown_72", offset = 72, type = "u32" },
-  { name = "unknown_76", offset = 76, type = "u32" },
+  { name = "front_index_add", offset = 72, type = "u32" },
+  { name = "rear_index_add", offset = 76, type = "u32" },
   { name = "unknown_80", offset = 80, type = "u32" },
   { name = "caliper_a", offset = 84, type = "u32", note = "the calipers" },
   { name = "caliper_texture", offset = 88, type = "u32", note = "the calipers' texture (probably)" },
@@ -186,6 +191,8 @@ fields = [
   { name = "unknown_144", offset = 144, type = "f32" },
   { name = "unknown_148", offset = 148, type = "f32" },
   { name = "unknown_152", offset = 152, type = "f32" },
+  { name = "rear_wheel_f36", offset = 32, type = "u64", note = "+32 and +36 read as a doubleword (the brakes' draws) (from SecondSetWheelsRecord, second-set)" },
+  { name = "rear_f40_44", offset = 40, type = "u64", note = "+40 and +44 read as a doubleword (from SecondSetWheelsRecord, second-set)" },
 ]
 
 # A tire's 12-byte size (the wheels record's +44 and +56; sub_820D3B38):

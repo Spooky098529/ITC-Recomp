@@ -49,7 +49,8 @@ fields = [
 # "Settings.+-31624" and "new<68>@Options::OnEnter.+4.+-31620" are this
 # block reached through the globals' base register (measure faults).
 [OptionsSettings]
-measures = ["Settings", "Settings.+-31624", "new<68>@Options::OnEnter.+4.+-31620"]
+measures = ["Settings", "Settings.+-31624", "new<68>@Options::OnEnter.+4.+-31620",
+            "Settings.+-31596"]
 size = 716
 origin = "allocated"
 fields = [

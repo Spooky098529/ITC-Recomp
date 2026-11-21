@@ -27,17 +27,12 @@ void CopySingle(uint8_t* base, uint32_t from, uint32_t to) {
   guest::StoreFloat(base, to, LoadSingle(base, from));
 }
 
-// The sound manager's function at `slot` (bytes into its vtable).
-uint32_t Slot(uint8_t* base, uint32_t manager, uint32_t slot) {
-  return Load(base, Load(base, manager) + slot);
-}
-
 // Slot `slot` of the manager ([0x826C5C80] loaded again) with r4 = `r4`
 // (and the first `set` registers).
 uint64_t CallSlot(uint8_t* base, const Calls& calls, uint32_t slot, uint32_t frame, uint32_t lr,
                   int set, uint64_t r4 = 0, uint64_t r5 = 0) {
-  const uint32_t manager = Load(base, kSoundManager);
-  return calls.Call(Slot(base, manager, slot), frame, lr, set, manager, r4, r5);
+  const schema::AudioManager manager = SoundManager(base);
+  return calls.Call(ManagerSlot(base, manager, slot), frame, lr, set, manager.address, r4, r5);
 }
 
 // The original's frame below `sp`: its back chain.
@@ -47,18 +42,11 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-// The car sound i's address as the loops pass it: 0 (each time) while the
-// array is 0.
-uint32_t CarSound(uint8_t* base, uint32_t i) {
-  const uint32_t array = Load(base, kCarSounds);
-  return array == 0 ? 0 : array + kCarSoundBytes * i;
-}
-
 // CarSound::PauseAll on each of the seven (the loop's bl at `lr`).
 uint64_t PauseEach(uint8_t* base, uint32_t frame, uint32_t lr, const Calls& calls) {
   uint64_t r3 = 0;
   for (uint32_t i = 0; i < kCarSoundCount; i++) {
-    r3 = calls.Call(kCarSoundPauseAll, frame, lr, 1, CarSound(base, i));
+    r3 = calls.Call(kCarSoundPauseAll, frame, lr, 1, CarSoundAt(base, i));
   }
   return r3;
 }
@@ -68,7 +56,7 @@ uint64_t PauseEach(uint8_t* base, uint32_t frame, uint32_t lr, const Calls& call
 uint64_t ResumeFirst(uint8_t* base, uint32_t frame, uint32_t lr, const Calls& calls) {
   uint64_t r3 = 0;
   for (uint32_t i = 0; i < kCarSoundCount; i++) {
-    r3 = calls.Call(kCarSoundResumeAll, frame, lr, 1, Load(base, kCarSounds));
+    r3 = calls.Call(kCarSoundResumeAll, frame, lr, 1, CarSounds::sounds(base).address);
   }
   return r3;
 }
@@ -77,7 +65,7 @@ uint64_t ResumeFirst(uint8_t* base, uint32_t frame, uint32_t lr, const Calls& ca
 // +80.
 uint64_t MusicCategory(uint8_t* base, uint32_t frame, uint32_t slot, uint32_t get_lr,
                        uint32_t lr, const Calls& calls) {
-  const uint64_t category = CallSlot(base, calls, kGetCategorySlot, frame, get_lr, 2, kMusicName);
+  const uint64_t category = CallSlot(base, calls, kGetCategorySlot, frame, get_lr, 2, schema::MenuSoundsGlobals::music_category_name_address());
   Store(base, frame + 80, uint32_t(category));
   return CallSlot(base, calls, slot, frame, lr, 2, frame + 80);
 }
@@ -88,41 +76,43 @@ uint64_t SetListener(uint8_t* base, uint64_t position, uint64_t front, uint64_t 
                      uint64_t velocity, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821758A0 RaceSounds::SetListener");
   const uint32_t frame = Frame(base, sp, 112);
-  uint32_t manager = Load(base, kSoundManager);
-  calls.Call(Slot(base, manager, kSetListenerOrientationSlot), frame, 0x821758CC, 4, manager,
+  schema::AudioManager manager = SoundManager(base);
+  calls.Call(manager.vtable().set_listener_orientation(), frame, 0x821758CC, 4, manager.address,
              front, top, velocity);
-  manager = Load(base, kSoundManager);
-  calls.Call(Slot(base, manager, kSetListenerPositionSlot), frame, 0x821758E4, 2, manager,
+  manager = SoundManager(base);
+  calls.Call(manager.vtable().set_listener_position(), frame, 0x821758E4, 2, manager.address,
              position);
-  manager = Load(base, kSoundManager);
-  return calls.Call(Slot(base, manager, kSetListenerVelocitySlot), frame, 0x821758FC, 2, manager,
-                    velocity);
+  manager = SoundManager(base);
+  return calls.Call(manager.vtable().set_listener_velocity(), frame, 0x821758FC, 2,
+                    manager.address, velocity);
 }
 
 uint64_t FadeMusic(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82175908 RaceSounds::FadeMusic");
   const uint32_t frame = Frame(base, sp, 112);
   const uint64_t category = CallSlot(base, calls, kGetCategorySlot, frame, 0x82175938, 2,
-                                     kMusicName);
+                                     schema::MenuSoundsGlobals::music_category_name_address());
   Store(base, frame + 80, uint32_t(category));
   const double kept = double(Globals::kept_music_volume(base));
-  const double zero = double(guest::LoadFloat(base, kZero));
+  const double zero = double(RaceStates::zero(base));
   if (kept == zero) {
     return 1;
   }
-  const uint32_t manager = Load(base, kSoundManager);
-  const double tenth = double(guest::LoadFloat(base, kTenth));
+  const schema::AudioManager manager = SoundManager(base);
+  const double tenth = double(schema::AiDriversGlobals::tenth(base));
   const double volume = double(Globals::music_volume(base));
   // fnmsubs: -(kept * tenth - volume), fused, rounded to single.
   const double faded = double(float(-std::fma(kept, tenth, -volume)));
   Globals::set_music_volume(base, float(faded));
   if (faded > zero) {
-    calls.Call(Slot(base, manager, kSetCategoryVolumeSlot), frame, 0x821759BC, 3, manager,
+    calls.Call(ManagerSlot(base, manager, kSetCategoryVolumeSlot), frame, 0x821759BC, 3,
+               manager.address,
                frame + 80, Globals::music_volume_address());
     return 0;
   }
   Globals::set_music_volume(base, float(zero));
-  calls.Call(Slot(base, manager, kSetCategoryVolumeSlot), frame, 0x82175994, 3, manager,
+  calls.Call(ManagerSlot(base, manager, kSetCategoryVolumeSlot), frame, 0x82175994, 3,
+             manager.address,
              frame + 80, Globals::music_volume_address());
   return 1;
 }
@@ -131,11 +121,12 @@ uint64_t RestoreMusicVolume(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821759C8 RaceSounds::RestoreMusicVolume");
   const uint32_t frame = Frame(base, sp, 112);
   const uint64_t category = CallSlot(base, calls, kGetCategorySlot, frame, 0x821759F8, 2,
-                                     kMusicName);
+                                     schema::MenuSoundsGlobals::music_category_name_address());
   Store(base, frame + 80, uint32_t(category));
-  const uint32_t manager = Load(base, kSoundManager);
+  const schema::AudioManager manager = SoundManager(base);
   CopySingle(base, Globals::kept_music_volume_address(), Globals::music_volume_address());
-  return calls.Call(Slot(base, manager, kSetCategoryVolumeSlot), frame, 0x82175A28, 3, manager,
+  return calls.Call(ManagerSlot(base, manager, kSetCategoryVolumeSlot), frame, 0x82175A28, 3,
+                    manager.address,
                     frame + 80, Globals::music_volume_address());
 }
 

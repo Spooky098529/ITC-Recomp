@@ -31,7 +31,7 @@ Slot SlotOf(uint8_t* base, uint32_t progress, uint32_t index) {
 // The slot `index`'s vehicle (its manager entry +48 + 536 i, its +20).
 uint32_t SlotVehicle(uint8_t* base, uint32_t progress, uint32_t index) {
   const uint32_t entry = SlotOf(base, progress, index).entry().address;
-  return va::VehicleGet(base, Load(base, entry + 20));
+  return va::VehicleGet(base, RacerEntry(base, entry).vehicle_index());
 }
 
 uint32_t Out(uint8_t* base, uint32_t out, uint32_t end, uint32_t reason) {
@@ -54,7 +54,7 @@ uint32_t CountHits(uint8_t* base, uint32_t out, uint32_t progress, uint32_t inde
   ITC_NATIVE_RUNNING("sub_82164F08 RaceProgress::CountHits");
   const Progress p(base, progress);
   const Slot slot = SlotOf(base, progress, index);
-  const uint32_t vehicle = va::VehicleGet(base, Load(base, slot.entry().address + 20));
+  const uint32_t vehicle = va::VehicleGet(base, slot.entry().vehicle_index());
   const uint32_t e = index * kEntryBytes;  // entry `index`'s offset from entry 0
   const uint32_t lap = p.lap_records_on() != 0 ? Load(base, p.e0_lap_record_address() + e) : 0;
   const double strength = Lfs(base, G::hit_strength_address());
@@ -65,8 +65,8 @@ uint32_t CountHits(uint8_t* base, uint32_t out, uint32_t progress, uint32_t inde
   const auto hit = [&](uint32_t bit, bool track, uint32_t counter, uint32_t copy) {
     const auto hold = [&] { return track ? slot.hold_1() : slot.hold_0(); };
     const auto set_hold = [&](uint32_t v) { track ? slot.set_hold_1(v) : slot.set_hold_0(v); };
-    if (Load(base, vehicle + 6152) & bit) {
-      if (!(Lfs(base, vehicle + 6160) < strength)) {
+    if (VehicleView(base, vehicle).collision_flags() & bit) {
+      if (!(Lfs(base, CarStatus(base, VehicleView(base, vehicle).status_address()).speed_kmh_address()) < strength)) {
         Store(base, p.e0_strong_hit_address() + e, 1);
       }
       if (hold() == 0) {
@@ -102,13 +102,14 @@ uint32_t Damage(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index, 
   const uint32_t vehicle = SlotVehicle(base, progress, index);
   const Progress p(base, progress);
   const uint32_t e = index * kEntryBytes;  // entry `index`'s offset from entry 0
-  if ((Load(base, vehicle + 6148) & 129) == 0) {
+  if ((VehicleView(base, vehicle).car_flags() & 129) == 0) {
     const uint32_t quarter = uint32_t(uint64_t(Load(base, p.e0_start_sp_address() + e)) * 25);
     if (int32_t(quarter) / 100 > int32_t(Load(base, p.e0_sp_address() + e))) {
       return Out(base, out, 0, 0);
     }
   }
-  const uint32_t contact = Load(base, Load(base, vehicle + 340) + 240);
+  const uint32_t contact =
+      schema::CollisionObject(base, VehicleView(base, vehicle).collision_object()).first_contact().address;
   Store(base, frame + 80, 0);
   if (contact != 0) {
     if (va::ContactObject(base, contact) != 0) {
@@ -154,14 +155,14 @@ uint32_t DrainSp(uint8_t* base, uint32_t out, uint32_t progress, uint32_t frame)
     for (int32_t a = 0; a < count(); a++) {
       const Slot slot_a = SlotOf(base, progress, uint32_t(a));
       const uint32_t sp_a = p.e0_sp_address() + kEntryBytes * uint32_t(a);
-      const uint32_t va_ = va::VehicleGet(base, Load(base, slot_a.entry().address + 20));
+      const uint32_t va_ = va::VehicleGet(base, slot_a.entry().vehicle_index());
       for (int32_t b = 0; b < count(); b++) {
         if (a == b) {
           continue;
         }
         const uint32_t ahead_b = p.e0_route_distance_address() + kEntryBytes * uint32_t(b);
         const uint32_t vb = va::VehicleGet(
-            base, Load(base, SlotOf(base, progress, uint32_t(b)).entry().address + 20));
+            base, SlotOf(base, progress, uint32_t(b)).entry().vehicle_index());
         if (int32_t(Load(base, p.e0_sp_address() + kEntryBytes * uint32_t(b))) <= 0) {
           continue;
         }
@@ -170,16 +171,16 @@ uint32_t DrainSp(uint8_t* base, uint32_t out, uint32_t progress, uint32_t frame)
         if (!(gap_a < gap_b)) {  // bge: !lt, as the translation
           continue;
         }
-        const uint32_t fa = Load(base, va_ + 6148);
+        const uint32_t fa = VehicleView(base, va_).car_flags();
         const bool human_a = (fa & 1) != 0;
         bool sides = false;
-        if (human_a && (Load(base, vb + 6148) & 0x2)) {
+        if (human_a && (VehicleView(base, vb).car_flags() & 0x2)) {
           sides = true;
-        } else if ((fa & 0x80) && (Load(base, vb + 6148) & 1)) {
+        } else if ((fa & 0x80) && (VehicleView(base, vb).car_flags() & 1)) {
           sides = true;
-        } else if (human_a && (Load(base, vb + 6148) & 0x80)) {
+        } else if (human_a && (VehicleView(base, vb).car_flags() & 0x80)) {
           sides = true;
-        } else if ((fa & 0x2) && (Load(base, vb + 6148) & 1)) {
+        } else if ((fa & 0x2) && (VehicleView(base, vb).car_flags() & 1)) {
           sides = true;
         }
         if (!sides) {
@@ -229,8 +230,7 @@ uint32_t DrainSp(uint8_t* base, uint32_t out, uint32_t progress, uint32_t frame)
       Store64(base, frame + 72,
               std::bit_cast<uint64_t>(
                   Lfs(base, p.e0_route_distance_address() + kEntryBytes * uint32_t(j))));
-      const uint32_t entry = SlotOf(base, progress, uint32_t(j)).entry().address;
-      const uint32_t flags = Load(base, entry);
+      const uint32_t flags = SlotOf(base, progress, uint32_t(j)).entry().flags();
       if (flags & 0x4) {
         first = int32_t(Load(base, at));
       } else if (flags & 0x8) {
@@ -238,8 +238,8 @@ uint32_t DrainSp(uint8_t* base, uint32_t out, uint32_t progress, uint32_t frame)
       }
       if (int32_t(Load(base, at)) <= 0) {
         outs++;
-        const uint32_t e = SlotOf(base, progress, uint32_t(j)).entry().address;
-        Store(base, e, Load(base, e) | 0x4000);
+        const RacerEntry e = SlotOf(base, progress, uint32_t(j)).entry();
+        e.set_flags(e.flags() | 0x4000);
       }
     }
     if (first == 0) {
@@ -315,7 +315,7 @@ uint32_t CheckFinish(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
         Store(base, frame + 80, Load(base, p.e0_time_address() + e));
         TickFraction(base, progress, index, frame + 80, frame - 112);
         Store(base, p.e0_time_address() + e, Load(base, frame + 80));
-        return Out(base, out, 1, (Load(base, vehicle + 6148) & 1) ? 1 : 2);
+        return Out(base, out, 1, (VehicleView(base, vehicle).car_flags() & 1) ? 1 : 2);
       }
     }
   }
@@ -331,14 +331,14 @@ namespace {
 // sp - 48, the distance (vmsum3fp128, fsqrts) added to `total`; then the
 // 16 bytes at sp - 48 copied to sp - 80 as the original's two doublewords.
 double WalkStep(uint8_t* base, uint32_t center, uint32_t sp, double total) {
-  const double c0 = Lfs(base, center + 0);
+  const double c0 = Lfs(base, RouteSlice(base, center).center_x_address());
   Stfs(base, sp - 48, c0);
   Stfs(base, sp - 64, Fsubs(Lfs(base, sp - 80), c0));
-  const double c1 = Lfs(base, center + 4);
+  const double c1 = Lfs(base, RouteSlice(base, center).center_y_address());
   const double p1 = Lfs(base, sp - 76);
   Stfs(base, sp - 44, c1);
   Stfs(base, sp - 60, Fsubs(p1, c1));
-  const double c2 = Lfs(base, center + 8);
+  const double c2 = Lfs(base, RouteSlice(base, center).center_z_address());
   const double p2 = Lfs(base, sp - 72);
   Stfs(base, sp - 40, c2);
   Stfs(base, sp - 56, Fsubs(p2, c2));
@@ -370,15 +370,15 @@ uint32_t MapToSection(uint8_t* base, uint32_t section, uint32_t position, uint32
   Store(base, sp - 44, 4);
   Store(base, sp - 40, 5);
   Store(base, sp - 36, 0xFFFFFFFF);
-  const uint32_t table = Load(base, file + 12);
+  const uint32_t table = RouteFile(base, file).sections();
   const uint32_t a = Load(base, table + ((target << 2) & 0x3FFFC));
   const uint32_t p = Load(base, table + ((at << 2) & 0x3FFFC));
-  const uint32_t kind_a = guest::LoadU8(base, a + 2) & 0xF;
+  const uint32_t kind_a = RouteSection(base, a).kind() & 0xF;
   bool same_shape = false;
   if (kind_a != 4) {
-    const uint32_t kind_p = guest::LoadU8(base, p + 2) & 0xF;
+    const uint32_t kind_p = RouteSection(base, p).kind() & 0xF;
     if (kind_p != 4 && kind_a != 1 && kind_p != 1) {
-      same_shape = guest::LoadU16(base, p) == guest::LoadU16(base, a);
+      same_shape = RouteSection(base, p).slice_count() == RouteSection(base, a).slice_count();
     }
   }
   if (same_shape) {
@@ -392,7 +392,7 @@ uint32_t MapToSection(uint8_t* base, uint32_t section, uint32_t position, uint32
       for (uint32_t m = 0, other = 3;;) {
         const int32_t theirs = Link(base, p, other);
         if (theirs != -1 && back == theirs) {
-          if (int16_t(pos.slice()) < S16(base, a)) {
+          if (int16_t(pos.slice()) < S16(base, RouteSection(base, a).slice_count_address())) {
             pos.set_section(uint16_t(target));
             return 1;
           }
@@ -414,44 +414,46 @@ uint32_t MapToSection(uint8_t* base, uint32_t section, uint32_t position, uint32
   // Else by the distance along the slices' centers: the position's from
   // its section's end back to its slice, then as far from the target's end.
   const double one = Lfs(base, kOne);
-  const uint32_t slices_p = guest::LoadU16(base, p);
+  const uint32_t slices_p = RouteSection(base, p).slice_count();
   const int32_t slice = int16_t(pos.slice());
   Stfs(base, sp - 36, one);
   Stfs(base, sp - 52, one);
   int32_t r11 = int16_t(uint16_t(slices_p - 1));
   double along = Lfs(base, kZero);
   double back = along;
-  const uint32_t centers_p = Load(base, table + ((at << 2) & 0x3FFFC)) + 124;
+  const uint32_t centers_p =
+      RouteSection(base, Load(base, table + ((at << 2) & 0x3FFFC))).slices_address();
   {
-    const uint32_t center = uint32_t(int64_t(r11) * 84) + centers_p;
-    Stfs(base, sp - 80, Lfs(base, center + 0));
-    Stfs(base, sp - 76, Lfs(base, center + 4));
-    Stfs(base, sp - 72, Lfs(base, center + 8));
+    const uint32_t center = uint32_t(int64_t(r11) * RouteSlice::kSize) + centers_p;
+    Stfs(base, sp - 80, Lfs(base, RouteSlice(base, center).center_x_address()));
+    Stfs(base, sp - 76, Lfs(base, RouteSlice(base, center).center_y_address()));
+    Stfs(base, sp - 72, Lfs(base, RouteSlice(base, center).center_z_address()));
   }
   if (r11 != slice) {
     Stfs(base, sp - 36, one);
     const int32_t stop = int16_t(uint16_t(slice));
     do {
       r11 = int16_t(uint16_t(r11 - 1));
-      along = WalkStep(base, uint32_t(int64_t(r11) * 84) + centers_p, sp, along);
+      along = WalkStep(base, uint32_t(int64_t(r11) * RouteSlice::kSize) + centers_p, sp, along);
     } while (r11 != stop);
   }
   guest::StoreU16(base, sp - 96, uint16_t(target));
-  const uint32_t slices_a = guest::LoadU16(base, a);
-  const uint32_t centers_a = Load(base, table + ((target << 2) & 0x3FFFC)) + 124;
+  const uint32_t slices_a = RouteSection(base, a).slice_count();
+  const uint32_t centers_a =
+      RouteSection(base, Load(base, table + ((target << 2) & 0x3FFFC))).slices_address();
   r11 = int16_t(uint16_t(slices_a - 1));
   guest::StoreU16(base, sp - 94, uint16_t(r11));
   {
-    const uint32_t center = uint32_t(int64_t(r11) * 84) + centers_a;
-    Stfs(base, sp - 80, Lfs(base, center + 0));
-    Stfs(base, sp - 76, Lfs(base, center + 4));
-    Stfs(base, sp - 72, Lfs(base, center + 8));
+    const uint32_t center = uint32_t(int64_t(r11) * RouteSlice::kSize) + centers_a;
+    Stfs(base, sp - 80, Lfs(base, RouteSlice(base, center).center_x_address()));
+    Stfs(base, sp - 76, Lfs(base, RouteSlice(base, center).center_y_address()));
+    Stfs(base, sp - 72, Lfs(base, RouteSlice(base, center).center_z_address()));
   }
   while (r11 != 0 && back < along) {  // bge: !lt, as the translation
     r11 = int16_t(uint16_t(r11 - 1));
     Stfs(base, sp - 36, one);
     guest::StoreU16(base, sp - 94, uint16_t(r11));
-    back = WalkStep(base, uint32_t(int64_t(r11) * 84) + centers_a, sp, back);
+    back = WalkStep(base, uint32_t(int64_t(r11) * RouteSlice::kSize) + centers_a, sp, back);
   }
   pos.set_word(Load(base, sp - 96));
   return 1;

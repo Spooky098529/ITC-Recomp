@@ -514,6 +514,8 @@ fields = [
 
 # A single sprite, laid out as the sprite list (known-data.md) up to its four corners.
 [OverlaySprite]
+# measures from LineSprite (power-graph), merged at the integration
+measures = ["Line::RecordFlat.r4"]
 measure = "Sprite"
 size = 144
 origin = "embedded"
@@ -523,6 +525,26 @@ fields = [
   { name = "blend_mode", offset = 68, type = "u32", note = "a render state mode, 0-5" },
   { name = "address_mode", offset = 72, type = "u32", note = "a render state mode, 0-3 (2 at ResetStyle2)" },
   { name = "corners", offset = 80, type = "bytes", count = 64, note = "four corners (x, y, z, w); 1.0 in the first two's w at ResetStyle2" },
+  { name = "end0_x", offset = 80, type = "f32", note = "from LineSprite (power-graph)" },
+  { name = "end0_y", offset = 84, type = "f32", note = "from LineSprite (power-graph)" },
+  { name = "end0_z", offset = 88, type = "f32", note = "from LineSprite (power-graph)" },
+  { name = "end1_x", offset = 96, type = "f32", note = "from LineSprite (power-graph)" },
+  { name = "end1_y", offset = 100, type = "f32", note = "from LineSprite (power-graph)" },
+  { name = "end1_z", offset = 104, type = "f32", note = "from LineSprite (power-graph)" },
+  { name = "end0_red", offset = 112, type = "u32", note = "0 to 255 (from LineSprite, power-graph)" },
+  { name = "end0_red_byte", offset = 115, type = "u8", note = "end0_red's low byte, as Line::RecordFlat reads it (from LineSprite, power-graph)" },
+  { name = "end0_green", offset = 116, type = "u32", note = "from LineSprite (power-graph)" },
+  { name = "end0_green_byte", offset = 119, type = "u8", note = "from LineSprite (power-graph)" },
+  { name = "end0_blue", offset = 120, type = "u32", note = "from LineSprite (power-graph)" },
+  { name = "end0_blue_byte", offset = 123, type = "u8", note = "from LineSprite (power-graph)" },
+  { name = "end0_alpha", offset = 124, type = "u32", note = "shifted into the vertex color's top byte (from LineSprite, power-graph)" },
+  { name = "end1_red", offset = 128, type = "u32", note = "from LineSprite (power-graph)" },
+  { name = "end1_red_byte", offset = 131, type = "u8", note = "from LineSprite (power-graph)" },
+  { name = "end1_green", offset = 132, type = "u32", note = "from LineSprite (power-graph)" },
+  { name = "end1_green_byte", offset = 135, type = "u8", note = "from LineSprite (power-graph)" },
+  { name = "end1_blue", offset = 136, type = "u32", note = "from LineSprite (power-graph)" },
+  { name = "end1_blue_byte", offset = 139, type = "u8", note = "from LineSprite (power-graph)" },
+  { name = "end1_alpha", offset = 140, type = "u32", note = "from LineSprite (power-graph)" },
 ]
 
 [globals]

@@ -9,6 +9,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "schema/model_animation.h"
+#include "schema/models.h"
 #include "xact/xact.h"
 
 #include <cstdlib>
@@ -29,6 +30,11 @@ using Key = schema::AnimationKey;
 using Skel = schema::Skeleton;
 using Cursor = schema::SkeletonCursor;
 using NodeEntry = schema::SkeletonNodeEntry;
+// models.md's types: the node file, its records, the node states and matrices.
+using NodeFile = schema::NodeFile;
+using NodeRecord = schema::SkeletonNodeRecord;
+using NodeState = schema::SkeletonNodeState;
+using NodeMatrix = schema::SkeletonMatrix;
 // malloc's largest size (memory/c_runtime_heap.cpp's kMaxSize).
 constexpr uint32_t kMaxAllocation = 0xFFFFF000;
 
@@ -400,7 +406,8 @@ uint32_t TrackSetAdvance32(uint8_t* base, uint32_t set, uint32_t index, double s
 
 uint32_t ModelAnimate(uint8_t* base, uint32_t model) {
   ITC_NATIVE_RUNNING("sub_82594B60 Model::Animate");
-  const uint32_t float4s = model + 304;
+  const schema::Model m(base, model);
+  const uint32_t float4s = m.track_set_float4_address();
   uint32_t count = TrackSetCount(base, float4s);
   const double one = Lfs(base, kOne);
   if (int32_t(count) > 0) {
@@ -412,7 +419,7 @@ uint32_t ModelAnimate(uint8_t* base, uint32_t model) {
       count = TrackSetCount(base, float4s);
     } while (int32_t(i) < int32_t(count));
   }
-  const uint32_t materials = model + 364;
+  const uint32_t materials = m.track_set_material_address();
   count = TrackSetCount(base, materials);
   if (int32_t(count) > 0) {
     uint32_t i = 0;
@@ -647,15 +654,24 @@ bool SkeletonBaseDestructible(uint8_t* base, uint32_t skeleton) {
 
 void NodeFileView(uint8_t* base, uint32_t view, uint32_t file) {
   ITC_NATIVE_RUNNING("sub_825A21A8 NodeFile::View");
-  Store(base, view + 0, file);
-  for (uint32_t k = 0; k < 7; k++) {
-    Store(base, view + 4 + 4 * k, Load(base, file + 16 + 4 * k) + file);
-  }
-  const uint32_t tail = Load(base, file + 44) + file;
-  Store(base, view + 32, tail);
-  Store(base, view + 36, tail + 16);
-  Store(base, view + 40, Load(base, file + 48) + file);
-  Store(base, view + 44, Load(base, file + 4) - Load(base, file + 8));
+  const schema::NodeFileView v(base, view);
+  const NodeFile f(base, file);
+  v.set_file(file);
+  // The file's seven offsets from +16 made pointers, one at a time.
+  v.set_node_records(f.node_records_offset() + file);
+  v.set_rest_translations(f.rest_translations_offset() + file);
+  v.set_rest_angles(f.rest_angles_offset() + file);
+  v.set_rest_scales(f.rest_scales_offset() + file);
+  v.set_unknown_20(f.unknown_32() + file);
+  v.set_matrices(f.matrices_offset() + file);
+  v.set_unknown_28(f.unknown_40() + file);
+  const uint32_t tail = f.tail_offset() + file;
+  v.set_tail(tail);
+  v.set_tail_16(tail + 16);
+  v.set_unknown_40(f.unknown_48() + file);
+  const uint32_t node_count = f.node_count();
+  const uint32_t bone_count = f.bone_count();
+  v.set_non_bone_count(node_count - bone_count);
 }
 
 namespace {
@@ -704,8 +720,8 @@ bool SkeletonSetUp(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t mat
   // The checks first: the sizes operator new[] takes (the counts are the
   // file's, which the view only points at), and Free's.
   const uint32_t count = instances > 0 ? uint32_t(instances) : 1;
-  const uint32_t nodes = Load(base, file + 4);
-  const uint32_t entries = Load(base, file + 8);
+  const uint32_t nodes = NodeFile(base, file).node_count();
+  const uint32_t entries = NodeFile(base, file).bone_count();
   if (count > kCursorLimit || !Allocatable(base, count * 20) ||
       (nodes != 0 && !Allocatable(base, ArrayBytes(nodes, 144, kNodeLimit))) ||
       (nodes != 0 && matrices == 0 && !Allocatable(base, ArrayBytes(nodes, 64, kMatrixLimit))) ||
@@ -727,11 +743,11 @@ bool SkeletonSetUp(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t mat
   NodeFileView(base, sk.node_file_address(), file);
   const double one = Lfs(base, kOne);
   // The node file's +4 the node count, +8 the bones, +12 the first bone.
-  const uint32_t node_count = Load(base, sk.node_file() + 4);
+  const uint32_t node_count = NodeFile(base, sk.node_file()).node_count();
   if (node_count != 0) {
     sk.set_node_states(CountedArray(base, node_count, 144, kNodeLimit, {12, 28, 44, 60}, one));
     if (matrices == 0) {
-      const uint32_t again = Load(base, sk.node_file() + 4);
+      const uint32_t again = NodeFile(base, sk.node_file()).node_count();
       const uint32_t array = CountedArray(base, again, 64, kMatrixLimit, {12, 28, 44, 60}, one);
       sk.set_own_matrices(array);
       sk.set_matrices(array);
@@ -739,20 +755,20 @@ bool SkeletonSetUp(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t mat
       sk.set_matrices(matrices);
     }
   }
-  const uint32_t entry_count = Load(base, sk.node_file() + 8);
+  const uint32_t entry_count = NodeFile(base, sk.node_file()).bone_count();
   if (entry_count != 0) {
     sk.set_bone_matrices(CountedArray(base, entry_count, 64, kMatrixLimit, {12, 28, 44}, one));
-    for (int32_t i = 0; i < int32_t(Load(base, sk.node_file() + 8)); i++) {
+    for (int32_t i = 0; i < int32_t(NodeFile(base, sk.node_file()).bone_count()); i++) {
       Store(base, sk.bone_matrices() + 64 * uint32_t(i) + 52, 1);
     }
   }
-  sk.set_bone_states(sk.node_states() + 144 * Load(base, sk.node_file() + 12));
+  sk.set_bone_states(sk.node_states() + 144 * NodeFile(base, sk.node_file()).first_bone());
   return true;
 }
 
 bool SkeletonBind(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t matrices) {
   ITC_NATIVE_RUNNING("sub_82599A20 Skeleton::Bind");
-  const uint32_t nodes = Load(base, file + 4);
+  const uint32_t nodes = NodeFile(base, file).node_count();
   const uint32_t values_bytes = nodes > 0x0FFFFFFFu ? 0xFFFFFFFFu : nodes * 16;
   const Skel sk(base, skeleton);
   if (!Deletable(sk.node_values()) ||
@@ -765,7 +781,7 @@ bool SkeletonBind(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t matr
     memory::crt::OperatorDeleteArray(values);
   }
   sk.set_node_values(0);
-  const uint32_t count = Load(base, sk.node_file() + 4);
+  const uint32_t count = NodeFile(base, sk.node_file()).node_count();
   if (count != 0) {
     sk.set_node_values(NewArray(base, values_bytes));
   }
@@ -845,7 +861,7 @@ uint32_t SkeletonNodeCount(uint8_t* base, uint32_t skeleton) {
   if (sk.node_values() == 0) {
     return 0;
   }
-  return Load(base, sk.node_file() + 4);
+  return NodeFile(base, sk.node_file()).node_count();
 }
 
 MatricesResult SkeletonUpdateNodeMatrices(uint8_t* base, uint32_t skeleton) {
@@ -853,8 +869,8 @@ MatricesResult SkeletonUpdateNodeMatrices(uint8_t* base, uint32_t skeleton) {
   // The node types the loop below takes, read first (the node file isn't
   // written here): 8 and 16 go to sub_8259B748 and sub_8259BE40.
   const Skel sk(base, skeleton);
-  for (int32_t i = 0; i < int32_t(Load(base, sk.node_file() + 4)); i++) {
-    const uint32_t type = Load(base, sk.node_records() + 160 * uint32_t(i) + 132);
+  for (int32_t i = 0; i < int32_t(NodeFile(base, sk.node_file()).node_count()); i++) {
+    const uint32_t type = NodeRecord(base, sk.node_records() + NodeRecord::kSize * uint32_t(i)).type();
     if (int32_t(type) > 4 && (type == 8 || type == 16)) {
       return MatricesResult::kOriginal;
     }
@@ -863,47 +879,45 @@ MatricesResult SkeletonUpdateNodeMatrices(uint8_t* base, uint32_t skeleton) {
   Multiply(base, root, root, sk.matrix_address(), 0x8259C3D4);
   uint32_t matrix = sk.matrices();
   const uint32_t records = sk.node_records();
-  if (int32_t(Load(base, sk.node_file() + 4)) > 0) {
-    uint32_t type_at = records + 132;
-    uint32_t row = matrix + 48;
+  if (int32_t(NodeFile(base, sk.node_file()).node_count()) > 0) {
+    uint32_t row = NodeMatrix(base, matrix).row3_xy_address();
     uint32_t record = 0;
     int32_t i = 0;
     do {
-      if (!(int32_t(Load(base, type_at)) > 4)) {
-        const uint32_t parent = Load(base, type_at - 4);
+      if (!(int32_t(NodeRecord(base, records + record).type()) > 4)) {
+        const uint32_t parent = uint32_t(NodeRecord(base, records + record).parent());
         if (int32_t(parent) != -1) {
           Multiply(base, matrix, matrix, (parent << 6) + sk.matrices(), 0x8259C42C);
         }
-        const uint32_t source = Load(base, record + sk.node_records() + 92);
+        const uint32_t source = NodeRecord(base, record + sk.node_records()).translation_node();
         if (int32_t(source) != -1) {
-          CopyRow(base, (source << 6) + sk.matrices() + 48, row);
+          CopyRow(base, NodeMatrix(base, (source << 6) + sk.matrices()).row3_xy_address(), row);
         }
       }
       i++;
-      record += 160;
-      type_at += 160;
+      record += NodeRecord::kSize;
       matrix += 64;
       row += 64;
-    } while (i < int32_t(Load(base, sk.node_file() + 4)));
+    } while (i < int32_t(NodeFile(base, sk.node_file()).node_count()));
   }
   const uint32_t file = sk.node_file();
   const uint32_t matrices = sk.matrices();
-  const uint32_t first = Load(base, file + 12);
+  const uint32_t first = NodeFile(base, file).first_bone();
   matrix = (first << 6) + matrices;
-  uint32_t bone = first * 160 + sk.node_records() + 128;
-  if (int32_t(Load(base, file + 8)) > 0) {
+  uint32_t bone = first * NodeRecord::kSize + sk.node_records();
+  if (int32_t(NodeFile(base, file).bone_count()) > 0) {
     int32_t i = 0;
     do {
-      if ((Load(base, bone + 4) & 0x80) != 0) {
-        const uint32_t parent = Load(base, bone + 0);
+      if ((NodeRecord(base, bone).type() & 0x80) != 0) {
+        const uint32_t parent = uint32_t(NodeRecord(base, bone).parent());
         if (int32_t(parent) != -1) {
           Multiply(base, matrix, matrix, (parent << 6) + sk.matrices(), 0x8259C528);
         }
       }
       i++;
-      bone += 160;
+      bone += NodeRecord::kSize;
       matrix += 64;
-    } while (i < int32_t(Load(base, sk.node_file() + 8)));
+    } while (i < int32_t(NodeFile(base, sk.node_file()).bone_count()));
   }
   return MatricesResult::kMultiplied;
 }
@@ -961,7 +975,7 @@ bool SkeletonResetPose(uint8_t* base, uint32_t skeleton) {
     return false;
   }
   uint32_t a = sk.rest_angles();
-  uint32_t node = sk.node_records() + 64;
+  uint32_t record = sk.node_records();
   uint32_t out = sk.node_states();
   uint32_t b = sk.rest_translations();
   uint32_t c = sk.rest_scales();
@@ -972,7 +986,8 @@ bool SkeletonResetPose(uint8_t* base, uint32_t skeleton) {
     for (uint32_t k = 0; k < 4; k++) Store(base, to + 4 * k, words[k]);
   };
   for (int32_t i = 0; i < int32_t(SkeletonNodeCount(base, skeleton)); i++) {
-    const bool extra = (Load(base, node + 68) & 0x40) != 0;
+    const NodeState state(base, out);
+    const bool extra = (NodeRecord(base, record).type() & 0x40) != 0;
     // The original loads +88's, +92's and the first half of +96's before
     // its first stores, then the rest.
     uint32_t bw[4], aw[4], cw[4];
@@ -980,16 +995,17 @@ bool SkeletonResetPose(uint8_t* base, uint32_t skeleton) {
     for (uint32_t k = 0; k < 4; k++) aw[k] = Load(base, a + 4 * k);
     cw[0] = Load(base, c + 0);
     cw[1] = Load(base, c + 4);
-    for (uint32_t k = 0; k < 4; k++) Store(base, out + 4 * k, bw[k]);
+    for (uint32_t k = 0; k < 4; k++) Store(base, state.translation_x_address() + 4 * k, bw[k]);
     cw[2] = Load(base, c + 8);
     cw[3] = Load(base, c + 12);
-    for (uint32_t k = 0; k < 4; k++) Store(base, out + 16 + 4 * k, aw[k]);
-    for (uint32_t k = 0; k < 4; k++) Store(base, out + 32 + 4 * k, cw[k]);
+    for (uint32_t k = 0; k < 4; k++) Store(base, state.angle_x_address() + 4 * k, aw[k]);
+    for (uint32_t k = 0; k < 4; k++) Store(base, state.scale_x_address() + 4 * k, cw[k]);
     if (extra) {
-      copy16(out + 48, node);
+      // The record's +64 (16 bytes, not in models.md's type) to the state's +48.
+      copy16(out + 48, record + 64);
     }
-    out += 144;
-    node += 160;
+    out += NodeState::kSize;
+    record += NodeRecord::kSize;
     a += 16;
     b += 16;
     c += 16;
@@ -1063,17 +1079,19 @@ bool SkeletonLocalMatrices(uint8_t* base, uint32_t skeleton, uint32_t stack) {
     const double inverse = G::inverse_two_pi(base);
     uint32_t record = 0;
     for (int32_t i = 0; i < count; i++) {
-      if (int32_t(Load(base, sk.node_records() + record + 132)) <= 4) {
+      if (int32_t(NodeRecord(base, sk.node_records() + record).type()) <= 4) {
         // The angles into [-pi, pi]: pi with each one's sign (its stored
         // bits ORed into 0x40490FDB), added, times 1 / (2 pi), truncated,
         // that many 2 pi taken off.
         // (An lfs then stfs of one word keeps its bits: CopyWord.)
-        const double a = Lfs(base, node + 16);
-        CopyWord(base, node + 16, frame + 80);
-        const double b = Lfs(base, node + 20);
-        CopyWord(base, node + 20, frame + 92);
-        const double c = Lfs(base, node + 24);
-        CopyWord(base, node + 24, frame + 96);
+        const NodeState state(base, node);
+        const NodeMatrix m(base, out);
+        const double a = state.angle_x();
+        CopyWord(base, state.angle_x_address(), frame + 80);
+        const double b = state.angle_y();
+        CopyWord(base, state.angle_y_address(), frame + 92);
+        const double c = state.angle_z();
+        CopyWord(base, state.angle_z_address(), frame + 96);
         const auto signed_pi = [&](uint32_t at) {
           return (Load(base, at) & 0x80000000u) | 0x40490FDBu;
         };
@@ -1095,37 +1113,38 @@ bool SkeletonLocalMatrices(uint8_t* base, uint32_t skeleton, uint32_t stack) {
         Store(base, frame + 88, uint32_t(kc));
         StoreDoubleword(base, frame + 120, uint64_t(kb64));
         const double a2 = Fnmsubs(double(float(double(ka))), two_pi, a);
-        Stfs(base, node + 16, a2);
+        state.set_angle_x(float(a2));
         const int64_t kc64 = int32_t(Load(base, frame + 88));
         StoreDoubleword(base, frame + 128, uint64_t(kc64));
         const double b2 = Fnmsubs(double(float(double(kb64))), two_pi, b);
-        Stfs(base, node + 20, b2);
+        state.set_angle_y(float(b2));
         const double c2 = Fnmsubs(double(float(double(kc64))), two_pi, c);
-        Stfs(base, node + 24, c2);
+        state.set_angle_z(float(c2));
         Copy64(base, frame + 144, out);
-        const uint32_t sx = Load(base, node + 32);
-        const uint32_t sy = Load(base, node + 36);
-        const uint32_t sz = Load(base, node + 40);
+        // The scale's words, as words.
+        const uint32_t sx = Load(base, state.scale_x_address());
+        const uint32_t sy = Load(base, state.scale_y_address());
+        const uint32_t sz = Load(base, state.scale_z_address());
         Stfs(base, frame + 96, a2);
-        Store(base, out + 0, sx);
-        Store(base, out + 20, sy);
-        Store(base, out + 40, sz);
+        Store(base, m.m00_address(), sx);
+        Store(base, m.m11_address(), sy);
+        Store(base, m.m22_address(), sz);
         matrix_math::RotateX(base, out, out, frame + 96, turn);
         Stfs(base, frame + 96, b2);
         matrix_math::RotateY(base, out, out, frame + 96, turn);
         Stfs(base, frame + 96, c2);
         matrix_math::RotateZ(base, out, out, frame + 96, turn);
         Multiply(base, out, out, file_matrix, 0x82599E70);
-        const uint32_t x = Load(base, node + 0);
-        const uint32_t y = Load(base, node + 4);
-        const uint32_t z = Load(base, node + 8);
-        Store(base, out + 48, x);
-        Store(base, out + 52, y);
-        Store(base, out + 56, z);
+        const uint32_t x = Load(base, state.translation_x_address());
+        const uint32_t y = Load(base, state.translation_y_address());
+        const uint32_t z = Load(base, state.translation_z_address());
+        Store(base, m.m30_address(), x);
+        Store(base, m.m31_address(), y);
+        Store(base, m.m32_address(), z);
       }
-      record += 160;
-      node += 144;
-      out += 64;
+      record += NodeRecord::kSize;
+      node += NodeState::kSize;
+      out += NodeMatrix::kSize;
       file_matrix += 64;
       count = int32_t(SkeletonNodeCount(base, skeleton));
     }
@@ -1133,32 +1152,34 @@ bool SkeletonLocalMatrices(uint8_t* base, uint32_t skeleton, uint32_t stack) {
   // The bones (+132 bit 0x80) from the file's first bone ([+80] +12), [+80]
   // + 8 of them: their 144-byte records from +140, no wrap or scale.
   const uint32_t file = sk.node_file();
-  const uint32_t first = Load(base, file + 12) << 6;
+  const uint32_t first = NodeFile(base, file).first_bone() << 6;
   out = sk.matrices() + first;
   file_matrix = first + sk.file_matrices();
   uint32_t bone = sk.bone_states();
-  for (int32_t k = 0; k < int32_t(Load(base, sk.node_file() + 8)); k++) {
-    const uint32_t index = Load(base, sk.node_file() + 12) + uint32_t(k);
-    if ((Load(base, index * 160 + sk.node_records() + 132) & 0x80) != 0) {
+  for (int32_t k = 0; k < int32_t(NodeFile(base, sk.node_file()).bone_count()); k++) {
+    const uint32_t index = NodeFile(base, sk.node_file()).first_bone() + uint32_t(k);
+    if ((NodeRecord(base, index * NodeRecord::kSize + sk.node_records()).type() & 0x80) != 0) {
       floats = true;
+      const NodeState state(base, bone);
+      const NodeMatrix m(base, out);
       StoreIdentity(base, frame + 144);
       Copy64(base, frame + 144, out);
-      CopyWord(base, bone + 16, frame + 108);
+      CopyWord(base, state.angle_x_address(), frame + 108);
       matrix_math::RotateX(base, out, out, frame + 108, turn);
-      CopyWord(base, bone + 20, frame + 108);
+      CopyWord(base, state.angle_y_address(), frame + 108);
       matrix_math::RotateY(base, out, out, frame + 108, turn);
-      CopyWord(base, bone + 24, frame + 108);
+      CopyWord(base, state.angle_z_address(), frame + 108);
       matrix_math::RotateZ(base, out, out, frame + 108, turn);
       Multiply(base, out, out, file_matrix, 0x82599FC8);
-      const uint32_t x = Load(base, bone + 0);
-      const uint32_t y = Load(base, bone + 4);
-      const uint32_t z = Load(base, bone + 8);
-      Store(base, out + 48, x);
-      Store(base, out + 52, y);
-      Store(base, out + 56, z);
+      const uint32_t x = Load(base, state.translation_x_address());
+      const uint32_t y = Load(base, state.translation_y_address());
+      const uint32_t z = Load(base, state.translation_z_address());
+      Store(base, m.m30_address(), x);
+      Store(base, m.m31_address(), y);
+      Store(base, m.m32_address(), z);
     }
-    bone += 144;
-    out += 64;
+    bone += NodeState::kSize;
+    out += NodeMatrix::kSize;
     file_matrix += 64;
   }
   return floats;

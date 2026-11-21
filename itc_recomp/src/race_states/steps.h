@@ -7,9 +7,15 @@
 
 #include "guest.h"
 #include "race_world/race_world.h"
+#include "schema/car_physics.h"
+#include "schema/collision_world.h"
 #include "schema/game_modes.h"
 #include "schema/minimap.h"
 #include "schema/race_states.h"
+#include "schema/race_world.h"
+#include "schema/track_route.h"
+#include "schema/vehicle.h"
+#include "schema/vehicle_accessors.h"
 
 #include <bit>
 #include <cmath>
@@ -20,6 +26,17 @@ namespace race_states::steps {
 constexpr uint32_t kEntryBytes = 972;  // a results entry (the progress's +2188 + 972 i)
 constexpr uint32_t kLapRecordBytes = 76;  // a results entry's lap record (+20 + 76 i)
 constexpr uint32_t kRecordBytes = 3936;  // a racer record (the race data's +48 + 3936 i)
+
+// Other areas' objects the steps reach.
+using RacerEntry = schema::MinimapRacerEntry;  // a racers' manager entry (minimap.toml)
+using Manager = schema::RaceManager;           // the racers' manager (race-world.toml)
+using VehicleView = schema::Vehicle;           // a vehicle (car-physics.toml)
+using CarStatus = schema::VehicleStatus;       // a vehicle's +6160 (vehicle.toml)
+using TrackPos = schema::TrackPosition;        // Vehicle::Identity's (collision-world.toml)
+using RouteFile = schema::TrackRouteFile;      // the route's file (track-route.toml)
+using RouteSection = schema::TrackRouteSection;
+using RouteLink = schema::TrackRouteLink;
+using RouteSlice = schema::TrackRouteSlice;
 
 inline uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -70,11 +87,12 @@ inline uint32_t FctidzWord(double value) {
 // low 16 bits (the originals' rlwinm by 2 into bits 14-29).
 inline uint32_t SectionRecord(uint8_t* base, uint32_t section) {
   const uint32_t file = schema::RaceStatesGlobals::route(base);
-  return Load(base, Load(base, file + 12) + ((section << 2) & 0x3FFFC));
+  return Load(base, RouteFile(base, file).sections() + ((section << 2) & 0x3FFFC));
 }
 // A section's link `link` (a signed halfword at +28 + 4 x link).
 inline int32_t Link(uint8_t* base, uint32_t record, uint32_t link) {
-  return S16(base, record + ((link + 7) << 2));
+  return S16(base,
+             RouteLink(base, RouteSection(base, record).links_address() + (link << 2)).section_address());
 }
 
 // A packed time unpacked as the originals do (rotations, subfic and

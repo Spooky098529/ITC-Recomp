@@ -138,6 +138,6 @@ fields = [
 [globals]
 stand_holder = { address = 0x826D83E0, type = "ptr", note = "the stand scene's holder (StandScene::Create): +0 the garage stage" }
 pages = { address = 0x826D83E8, type = "ptr", to = "PageObject", note = "6 pages (CarDealer::UpdatePage), 22 transitions (CarDealer::Update)" }
-list_menu = { address = 0x826D83EC, type = "ptr", note = "a menu list (72 bytes): the page's menu" }
-color_menu = { address = 0x826D83F0, type = "ptr", note = "a menu list (72 bytes): the car list's selection on page 2, the colors' on page 3" }
+list_menu = { address = 0x826D83EC, type = "ptr", to = "MenuList", note = "a menu list (72 bytes): the page's menu" }
+color_menu = { address = 0x826D83F0, type = "ptr", to = "MenuList", note = "a menu list (72 bytes): the car list's selection on page 2, the colors' on page 3" }
 data = { address = 0x826D83F4, type = "ptr", to = "CarDealerData" }

@@ -415,7 +415,7 @@ struct UiMovieTextureList : View {
 struct UiMovieDrawTextList : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
-  template <typename T = UiMovieQueuedText>
+  template <typename T = UiMovieTextItem>
   T items() const { return T(base, guest::LoadU32(base, address + 0)); }
   void set_items(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
   void set_items(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
@@ -427,137 +427,6 @@ struct UiMovieDrawTextList : View {
   uint32_t count() const { return guest::LoadU32(base, address + 8); }
   void set_count(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
   uint32_t count_address() const { return address + 8; }
-};
-
-// embedded; measure: UiMovie.+100.+0, sub_8259E620.r4
-struct UiMovieQueuedText : View {
-  using View::View;
-  static constexpr uint32_t kSize = 128;
-  // the TXT node drawn
-  uint32_t node() const { return guest::LoadU32(base, address + 0); }
-  void set_node(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t node_address() const { return address + 0; }
-  // the draw context's matrix
-  uint32_t matrix_address() const { return address + 16; }
-  float matrix_3() const { return guest::LoadFloat(base, address + 28); }
-  void set_matrix_3(float v) const { guest::StoreFloat(base, address + 28, v); }
-  uint32_t matrix_3_address() const { return address + 28; }
-  float matrix_7() const { return guest::LoadFloat(base, address + 44); }
-  void set_matrix_7(float v) const { guest::StoreFloat(base, address + 44, v); }
-  uint32_t matrix_7_address() const { return address + 44; }
-  float matrix_11() const { return guest::LoadFloat(base, address + 60); }
-  void set_matrix_11(float v) const { guest::StoreFloat(base, address + 60, v); }
-  uint32_t matrix_11_address() const { return address + 60; }
-  float matrix_15() const { return guest::LoadFloat(base, address + 76); }
-  void set_matrix_15(float v) const { guest::StoreFloat(base, address + 76, v); }
-  uint32_t matrix_15_address() const { return address + 76; }
-  // the layer times the float at 0x82071520
-  float depth() const { return guest::LoadFloat(base, address + 80); }
-  void set_depth(float v) const { guest::StoreFloat(base, address + 80, v); }
-  uint32_t depth_address() const { return address + 80; }
-  // the draw context's color (+84 to +96)
-  float red() const { return guest::LoadFloat(base, address + 84); }
-  void set_red(float v) const { guest::StoreFloat(base, address + 84, v); }
-  uint32_t red_address() const { return address + 84; }
-  float green() const { return guest::LoadFloat(base, address + 88); }
-  void set_green(float v) const { guest::StoreFloat(base, address + 88, v); }
-  uint32_t green_address() const { return address + 88; }
-  float blue() const { return guest::LoadFloat(base, address + 92); }
-  void set_blue(float v) const { guest::StoreFloat(base, address + 92, v); }
-  uint32_t blue_address() const { return address + 92; }
-  float alpha() const { return guest::LoadFloat(base, address + 96); }
-  void set_alpha(float v) const { guest::StoreFloat(base, address + 96, v); }
-  uint32_t alpha_address() const { return address + 96; }
-  // the draw context's clip rectangle (+100 to +112)
-  uint32_t clip_0() const { return guest::LoadU32(base, address + 100); }
-  void set_clip_0(uint32_t v) const { guest::StoreU32(base, address + 100, v); }
-  uint32_t clip_0_address() const { return address + 100; }
-  uint32_t clip_1() const { return guest::LoadU32(base, address + 104); }
-  void set_clip_1(uint32_t v) const { guest::StoreU32(base, address + 104, v); }
-  uint32_t clip_1_address() const { return address + 104; }
-  uint32_t clip_2() const { return guest::LoadU32(base, address + 108); }
-  void set_clip_2(uint32_t v) const { guest::StoreU32(base, address + 108, v); }
-  uint32_t clip_2_address() const { return address + 108; }
-  uint32_t clip_3() const { return guest::LoadU32(base, address + 112); }
-  void set_clip_3(uint32_t v) const { guest::StoreU32(base, address + 112, v); }
-  uint32_t clip_3_address() const { return address + 112; }
-};
-
-// embedded; measure: sub_8259DAD0.r3, sub_8259E098.r3, sub_8259EBE8.r3
-struct UiMovieDrawQuad : View {
-  using View::View;
-  static constexpr uint32_t kSize = 116;
-  // the identity when made
-  uint32_t matrix_address() const { return address + 0; }
-  float matrix_3() const { return guest::LoadFloat(base, address + 12); }
-  void set_matrix_3(float v) const { guest::StoreFloat(base, address + 12, v); }
-  uint32_t matrix_3_address() const { return address + 12; }
-  float matrix_7() const { return guest::LoadFloat(base, address + 28); }
-  void set_matrix_7(float v) const { guest::StoreFloat(base, address + 28, v); }
-  uint32_t matrix_7_address() const { return address + 28; }
-  float matrix_11() const { return guest::LoadFloat(base, address + 44); }
-  void set_matrix_11(float v) const { guest::StoreFloat(base, address + 44, v); }
-  uint32_t matrix_11_address() const { return address + 44; }
-  float matrix_15() const { return guest::LoadFloat(base, address + 60); }
-  void set_matrix_15(float v) const { guest::StoreFloat(base, address + 60, v); }
-  uint32_t matrix_15_address() const { return address + 60; }
-  // 0 when made
-  uint32_t unknown_64() const { return guest::LoadU32(base, address + 64); }
-  void set_unknown_64(uint32_t v) const { guest::StoreU32(base, address + 64, v); }
-  uint32_t unknown_64_address() const { return address + 64; }
-  // 0 to 4 (5 and up: no blend states)
-  uint32_t blend_mode() const { return guest::LoadU32(base, address + 68); }
-  void set_blend_mode(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
-  uint32_t blend_mode_address() const { return address + 68; }
-  // 2 when made; the drawers set 0
-  uint32_t unknown_72() const { return guest::LoadU32(base, address + 72); }
-  void set_unknown_72(uint32_t v) const { guest::StoreU32(base, address + 72, v); }
-  uint32_t unknown_72_address() const { return address + 72; }
-  uint32_t vertex_count() const { return guest::LoadU32(base, address + 80); }
-  void set_vertex_count(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
-  uint32_t vertex_count_address() const { return address + 80; }
-  // 0 untextured
-  uint32_t texture() const { return guest::LoadU32(base, address + 84); }
-  void set_texture(uint32_t v) const { guest::StoreU32(base, address + 84, v); }
-  uint32_t texture_address() const { return address + 84; }
-  // 16 bytes a vertex
-  template <typename T = UiMovieQuadPosition>
-  T positions() const { return T(base, guest::LoadU32(base, address + 88)); }
-  void set_positions(const View& v) const { guest::StoreU32(base, address + 88, v.address); }
-  void set_positions(uint32_t v) const { guest::StoreU32(base, address + 88, v); }
-  uint32_t positions_address() const { return address + 88; }
-  // 16 bytes a vertex
-  template <typename T = UiMovieQuadColor>
-  T colors() const { return T(base, guest::LoadU32(base, address + 92)); }
-  void set_colors(const View& v) const { guest::StoreU32(base, address + 92, v.address); }
-  void set_colors(uint32_t v) const { guest::StoreU32(base, address + 92, v); }
-  uint32_t colors_address() const { return address + 92; }
-  // texture coordinates, 16 bytes a vertex
-  template <typename T = UiMovieQuadCoord>
-  T coords() const { return T(base, guest::LoadU32(base, address + 96)); }
-  void set_coords(const View& v) const { guest::StoreU32(base, address + 96, v.address); }
-  void set_coords(uint32_t v) const { guest::StoreU32(base, address + 96, v); }
-  uint32_t coords_address() const { return address + 96; }
-  uint32_t clipped() const { return guest::LoadU32(base, address + 100); }
-  void set_clipped(uint32_t v) const { guest::StoreU32(base, address + 100, v); }
-  uint32_t clipped_address() const { return address + 100; }
-  // the clip rectangle (16-bit integers, sorted)
-  uint16_t clip_left() const { return guest::LoadU16(base, address + 104); }
-  void set_clip_left(uint16_t v) const { guest::StoreU16(base, address + 104, v); }
-  uint32_t clip_left_address() const { return address + 104; }
-  uint16_t clip_top() const { return guest::LoadU16(base, address + 106); }
-  void set_clip_top(uint16_t v) const { guest::StoreU16(base, address + 106, v); }
-  uint32_t clip_top_address() const { return address + 106; }
-  uint16_t clip_right() const { return guest::LoadU16(base, address + 108); }
-  void set_clip_right(uint16_t v) const { guest::StoreU16(base, address + 108, v); }
-  uint32_t clip_right_address() const { return address + 108; }
-  uint16_t clip_bottom() const { return guest::LoadU16(base, address + 110); }
-  void set_clip_bottom(uint16_t v) const { guest::StoreU16(base, address + 110, v); }
-  uint32_t clip_bottom_address() const { return address + 110; }
-  // the draw context's scaled word
-  uint32_t texture_stage() const { return guest::LoadU32(base, address + 112); }
-  void set_texture_stage(uint32_t v) const { guest::StoreU32(base, address + 112, v); }
-  uint32_t texture_stage_address() const { return address + 112; }
 };
 
 // embedded; measure: sub_8259DAD0.r3.+88, sub_8259E098.r3.+88

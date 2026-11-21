@@ -163,9 +163,9 @@ fields = [
 ]
 
 [globals]
-race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data: +4 the course, the racers' records 3,936 bytes each from +0, +0xA3AF4 the race mode" }
-race_progress = { address = 0x826D82E8, type = "ptr", note = "the race's progress: +2184 the HUD's racers, +7156 a distance, +7240 the item shown" }
-viewports = { address = 0x826C2CE8, type = "ptr", note = "the viewports (camera-modes.toml's Viewports): +0 viewport 0 (+1860 its view)" }
-track_zones = { address = 0x828161EC, type = "ptr", note = "the track zones' owner (track-zones.md)" }
-screens_holder = { address = 0x826D84F0, type = "ptr", note = "the in-race screens' holder (race-hud-machine.toml's RaceScreens)" }
-strings = { address = 0x826C5C34, type = "ptr", note = "the string table (Strings::Load and Release, 47)" }
+race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data (race-states.toml's RaceData; left untyped: alt_hud.cpp reads it without that header): +4 the course, the racers' records 3,936 bytes each from +0, +0xA3AF4 the race mode" }
+race_progress = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "the race's progress: +2184 the HUD's racers, +7156 a distance, +7240 the item shown" }
+viewports = { address = 0x826C2CE8, type = "ptr", to = "Viewports", note = "the viewports (camera-modes.toml's Viewports): +0 viewport 0 (+1860 its view)" }
+track_zones = { address = 0x828161EC, type = "ptr", to = "TrackZones", note = "the track zones' owner (track-zones.md)" }
+screens_holder = { address = 0x826D84F0, type = "ptr", to = "RaceScreens", note = "the in-race screens' holder (race-hud-machine.toml's RaceScreens)" }
+strings = { address = 0x826C5C34, type = "ptr", to = "Strings", note = "the string table (Strings::Load and Release, 47)" }

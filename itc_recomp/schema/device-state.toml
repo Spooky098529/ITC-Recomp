@@ -19,6 +19,7 @@
 
 [Device]
 measure = "Device"
+measures = ["BeginVertices.r3", "BeginIndexedVertices.r3", "EndVertices.r3", "sub_8229FC40.r3", "sub_822ADC08.r3", "sub_822ADE30.r3", "sub_822ADEF0.r3", "sub_822AE070.r3", "sub_822AE1D0.r3"]
 size = 20444
 origin = "gpu"
 fields = [
@@ -424,7 +425,8 @@ fields = [
 # cameras' CameraSurface is the same object): the bound render targets and
 # depth surface, the set saved at the tiling's start.
 [DeviceSurface]
-measures = ["Device.+12468", "Device.+12472", "Device.+12476", "Device.+12480", "Device.+12484", "Device::SetDepthStencilSurface.r4", "Device::SetRenderTarget.r5"]
+measures = ["Device.+12468", "Device.+12472", "Device.+12476", "Device.+12480", "Device.+12484", "Device::SetDepthStencilSurface.r4", "Device::SetRenderTarget.r5",
+            "sub_8229FC40.r3.+12200"]
 size = 48
 origin = "gpu"
 fields = [

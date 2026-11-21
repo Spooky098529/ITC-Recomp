@@ -14,7 +14,20 @@
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
 #include "post_effects/post_effects.h"
+#include "schema/ai_drivers.h"
+#include "schema/camera_modes.h"
+#include "schema/cameras.h"
+#include "schema/car_draw.h"
+#include "schema/car_physics.h"
+#include "schema/minimap.h"
+#include "schema/post_effects.h"
+#include "schema/race_hud_machine.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
 #include "schema/race_update.h"
+#include "schema/race_world.h"
+#include "schema/scene_models.h"
+#include "schema/screen_objects.h"
 #include "screen_objects/screen_objects.h"
 #include "track_collision/track_collision.h"
 #include "track_zones/track_zones.h"
@@ -37,7 +50,7 @@ int32_t Tens(int32_t a, int32_t b) { return int32_t(uint32_t(a) * 10u + uint32_t
 
 void VaryCar(uint8_t* base, uint32_t car, int32_t racer, int32_t vehicle, int32_t pick) {
   ITC_NATIVE_RUNNING("sub_8215B330 RaceScene::VaryCar");
-  const uint32_t bytes = car + 1568;
+  const schema::Car the_car(base, car);
   int32_t s = 0;
   switch (Rem(pick, 6)) {  // a negative remainder: the seed stays 0
     case 0: s = Tens(Tens(racer, vehicle), Rem(pick, 10)); break;
@@ -49,23 +62,23 @@ void VaryCar(uint8_t* base, uint32_t car, int32_t racer, int32_t vehicle, int32_
     default: break;
   }
   // Each byte stored, then added to the seed as a signed byte.
-  auto take = [&](uint32_t offset, int32_t value) {
+  auto take = [&](uint32_t at, int32_t value) {
     const int8_t b = int8_t(value);
-    guest::StoreU8(base, bytes + offset, uint8_t(b));
+    guest::StoreU8(base, at, uint8_t(b));
     s = int32_t(uint32_t(s) + uint32_t(int32_t(b)));
     return int32_t(b);
   };
-  if (int32_t(guest::LoadU32(base, car + 12)) == 64) {
-    take(12, Rem(s, 2));
+  if (int32_t(the_car.car_id()) == 64) {
+    take(the_car.model_flag_address(), Rem(s, 2));
   }
-  take(1, Rem(s, 14));
+  take(the_car.unknown_1569_address(), Rem(s, 14));
   int32_t value = Rem(s, 10);
-  int32_t last = take(5, value == 0 ? 10 : value);
-  for (uint32_t offset : {6u, 7u}) {
+  int32_t last = take(the_car.unknown_1573_address(), value == 0 ? 10 : value);
+  for (uint32_t at : {the_car.unknown_1574_address(), the_car.unknown_1575_address()}) {
     value = last == 10 ? Rem(s, 10) : Rem(s, 9) + 1;
-    last = take(offset, value == 0 ? 10 : value);
+    last = take(at, value == 0 ? 10 : value);
   }
-  guest::StoreU8(base, bytes + 8, uint8_t(Rem(s, 9) + 1));
+  the_car.set_unknown_1576(uint8_t(Rem(s, 9) + 1));
 }
 
 void UploadDirectional(uint8_t* base, uint32_t entry, uint32_t n, uint32_t stack) {
@@ -113,14 +126,14 @@ uint32_t LoadScenery(uint8_t* base, const course_scenery::Calls& calls, uint32_t
   guest::StoreU32(base, frame, stack);
   cs::Create(base);
   schema::RaceScene(base, scene).set_scenery(guest::LoadU32(base, cs::kCreated));
-  const uint32_t data = G::race_data(base).address;
-  const int32_t course = int32_t(guest::LoadU32(base, data + 4));
+  const schema::RaceData data = G::race_data(base);
+  const int32_t course = int32_t(data.route_course());
   const uint32_t index = course == 8 || course == 9 || course == 10
                              ? track_collision::TimesThreePlus(1, 0)
-                             : track_collision::TimesThreePlus(0, guest::LoadU32(base, data + 32));
+                             : track_collision::TimesThreePlus(0, data.mode());
   const uint32_t entry = G::scenery_configs_address() + (index << 3);
   const uint32_t config = frame + 80;
-  const uint32_t split = guest::LoadU32(base, G::race_data(base).address + 0xA3AF0);
+  const uint32_t split = G::race_data(base).kind();
   guest::StoreU32(base, config + 0, 1);
   guest::StoreU32(base, config + 8, 0);
   guest::StoreU32(base, config + 12, 0);
@@ -158,7 +171,7 @@ uint32_t RemakeCarModel(uint8_t* base, const GuestCall& call, uint32_t stack, ui
   call(kFromCar, {record, car, pick}, frame, 0x8215C15C);
   const uint32_t model = uint32_t(
       call(kSetUpB, {scene, 7, uint32_t(car_slot.pool_index()), record}, frame, 0x8215C170));
-  const uint32_t block = model + 4288;
+  const schema::CarDrawBlock block(base, schema::SceneModel(base, model).draw_block_address());
   // The identity as the original builds it in its frame (+80), copied to
   // the block's +16 and +336.
   const auto identity = [&] {
@@ -167,19 +180,19 @@ uint32_t RemakeCarModel(uint8_t* base, const GuestCall& call, uint32_t stack, ui
     }
   };
   car_slot.set_model(model);
-  guest::StoreU32(base, block + 8, 1);
+  block.set_drawn(1);
   identity();
-  if (!native::Buffers_Memcpy(base, block + 16, frame + 80, 64, 0x8215C1CC)) {
-    call(kMemcpy, {block + 16, frame + 80, 64}, frame, 0x8215C1CC);
+  if (!native::Buffers_Memcpy(base, block.world_address(), frame + 80, 64, 0x8215C1CC)) {
+    call(kMemcpy, {block.world_address(), frame + 80, 64}, frame, 0x8215C1CC);
   }
   identity();
-  if (!native::Buffers_Memcpy(base, block + 336, frame + 80, 64, 0x8215C210)) {
-    call(kMemcpy, {block + 336, frame + 80, 64}, frame, 0x8215C210);
+  if (!native::Buffers_Memcpy(base, block.wheel_s0_address(), frame + 80, 64, 0x8215C210)) {
+    call(kMemcpy, {block.wheel_s0_address(), frame + 80, 64}, frame, 0x8215C210);
   }
   if (int32_t(car_slot.record_kind()) == 3) {
     const int32_t kind = int32_t(car_slot.record_block());
     if (kind == 0 || kind == 7) {
-      guest::StoreU32(base, block + 592, 1);
+      block.set_rear_second_matrix(1);
     }
   }
   return 1;
@@ -230,7 +243,8 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
   namespace va = vehicle_accessors;
   using ops::Lfs;
   using ops::Stfs;
-  constexpr uint32_t kPass0 = G::camera_pass0_address(), kInputs = G::input_records_address();
+  constexpr uint32_t kInputs = G::input_records_address();
+  const schema::CameraPass pass0(base, G::camera_pass0_address());
   constexpr uint32_t kPollLoad = 0x820DA318, kReleaseB = 0x820C5C88, kStagesCopy = 0x820FFD88;
   const uint32_t f = stack - 976;
   guest::StoreU32(base, f, stack);
@@ -242,24 +256,24 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
   };
   const uint32_t scene = G::car_scene(base).address;
   // Pass 0's two points and their direction into the frame's +96.
-  Stfs(base, f + 112, Lfs(base, kPass0 + 400));
-  Stfs(base, f + 116, Lfs(base, kPass0 + 404));
-  Stfs(base, f + 120, Lfs(base, kPass0 + 408));
-  Stfs(base, f + 96, Lfs(base, kPass0 + 416));
-  Stfs(base, f + 100, Lfs(base, kPass0 + 420));
+  Stfs(base, f + 112, double(pass0.eye_x()));
+  Stfs(base, f + 116, double(pass0.eye_y()));
+  Stfs(base, f + 120, double(pass0.eye_z()));
+  Stfs(base, f + 96, double(pass0.target_x()));
+  Stfs(base, f + 100, double(pass0.target_y()));
   const double one = Lfs(base, G::one_address());
-  const double z424 = Lfs(base, kPass0 + 424);
+  const double z424 = double(pass0.target_z());
   Stfs(base, f + 124, one);
   Stfs(base, f + 104, z424);
   Stfs(base, f + 108, one);
   vector_library::Vec3Direction(base, f + 96, f + 96, f + 112);
   // The slots' seen flags and their blocks' +8 and +12.
   for (int32_t v = 0; v < int32_t(race_scene.car_slot_count()); v++) {
-    const uint32_t model = slot_at(uint32_t(v)).model().address;
+    const schema::SceneModel model = slot_at(uint32_t(v)).model();
     guest::StoreU32(base, f + 592 + 4 * uint32_t(v), 0);
-    if (model != 0) {
-      guest::StoreU32(base, model + 4296, 0);
-      guest::StoreU32(base, model + 4300, 0);
+    if (model.address != 0) {
+      model.set_draw_enabled(0);
+      model.set_cockpit_only(0);
     }
   }
   uint64_t r3 = track_collision::RaceRacerCount(base);
@@ -269,65 +283,64 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
     const double low = double(G::slip_low(base));
     const double high = double(G::slip_high(base));
     for (uint32_t j = 0; int32_t(j) < int32_t(r3);) {
-      const uint32_t racer = guest::LoadU32(base, G::racers(base).address + 2308 + 4 * j);
-      const uint32_t v = guest::LoadU32(base, racer + 20);
-      const uint32_t vehicle = va::VehicleGet(base, v);
-      const uint32_t flags = guest::LoadU32(base, racer + 0);
+      const schema::MinimapRacerEntry racer(
+          base, guest::LoadU32(base, G::racers(base).racers_address() + 4 * j));
+      const uint32_t v = racer.vehicle_index();
+      const schema::Vehicle vehicle(base, va::VehicleGet(base, v));
+      const uint32_t flags = racer.flags();
       const uint32_t slot = slot_at(v).address;
       guest::StoreU32(base, f + 592 + (v << 2), 1);
       if ((flags & 0x200) != 0 && v != 0) {
-        const uint32_t index = guest::LoadU32(base, racer + 24);
-        const uint32_t car = index * 3936 + G::race_data(base).address + 48;
+        const uint32_t index = racer.record();
+        const uint32_t car = index * 3936 + G::race_data(base).racer_records_address();
         uint64_t pick;
         if ((flags & 0x2) != 0) {
-          const uint32_t plus16 = guest::LoadU32(base, racer + 16);
+          const uint32_t plus16 = racer.traffic_number();
           const int32_t sum = int32_t(plus16 + v + j);
           pick = uint64_t(int64_t(sum / 2));  // srawi, addze: toward zero
           VaryCar(base, car, int32_t(j), int32_t(v), int32_t(plus16));
         } else {
-          pick = uint64_t(int64_t(int16_t(guest::LoadU16(base, car))));
+          pick = uint64_t(int64_t(int16_t(schema::Car(base, car).paint_pick())));
         }
         if (RemakeCarModel(base, call, f, scene, slot, car, pick) != 0) {
-          guest::StoreU32(base, racer, guest::LoadU32(base, racer) & ~0x200u);
+          racer.set_flags(racer.flags() & ~0x200u);
         }
       }
       const uint32_t model = schema::RaceCarSlot(base, slot).model().address;
       if (model != 0) {
-        const uint32_t block = model + 4288;
+        const schema::CarDrawBlock block(base, schema::SceneModel(base, model).draw_block_address());
         // The view: hidden (mode 2), the cockpit (mode 1) or drawn.
         bool hidden = false, cockpit = false;
-        if (guest::LoadU32(base, G::viewports(base).address + 8) == 0) {
-          const uint32_t vflags = guest::LoadU32(base, vehicle + 6148);
+        if (G::viewports(base).split() == 0) {
+          const uint32_t vflags = vehicle.car_flags();
           if ((vflags & 0x1) != 0 || (vflags & 0x80) != 0) {
-            const uint32_t stages = G::race_data(base).address + 0x59620;
+            const uint32_t stages = G::race_data(base).stages_address();
             if (!va::StagesCopy(base, f + 688, stages, 0xFFFFFFFFu)) {
               call(kStagesCopy, {f + 688, stages, 0xFFFFFFFFFFFFFFFFull}, f, 0x8215C9A0);
             }
-            const uint32_t data = G::race_data(base).address;
-            const int32_t mode = int32_t(guest::LoadU32(base, data + 0xA3AF0));
+            const schema::RaceData data = G::race_data(base);
+            const int32_t mode = int32_t(data.kind());
             if (mode == 6 && int32_t(guest::LoadU32(base, f + 688)) != 1) {
               const uint32_t mask = G::followed(base) == 0 ? 0x80 : 0x1;
-              const uint32_t now = guest::LoadU32(base, vehicle + 6148);
-              const int32_t view = int32_t(guest::LoadU32(
-                  base, guest::LoadU32(base, G::viewports(base).address) + 1860));
+              const uint32_t now = vehicle.car_flags();
+              const int32_t view = int32_t(G::viewports(base).first().view_mode());
               if (int32_t(mask & now) == int32_t(mask)) {
                 hidden = view == 2;
                 cockpit = view == 1;
               }
             } else {
-              const uint32_t viewports = G::viewports(base).address;
-              const uint32_t viewport =
-                  (guest::LoadU32(base, vehicle + 6148) & 0x1) != 0
-                      ? guest::LoadU32(base, viewports + 0)
-                      : guest::LoadU32(base, viewports + 4);
-              const int32_t view = int32_t(guest::LoadU32(base, viewport + 1860));
+              const schema::Viewports viewports = G::viewports(base);
+              const schema::Viewport viewport =
+                  (vehicle.car_flags() & 0x1) != 0 ? viewports.first() : viewports.second();
+              const int32_t view = int32_t(viewport.view_mode());
               hidden = view == 2;
               cockpit = view == 1;
               if (mode == 4) {
-                const uint32_t record = va::RacerRecordsAt(base, data + 0x59AE8, 0xFFFFFFFFu);
-                const int32_t who = int32_t(guest::LoadU32(base, record + 3924));
-                if ((who == 1 && (guest::LoadU32(base, vehicle + 6148) & 0x1) == 0) ||
-                    (who == 2 && (guest::LoadU32(base, vehicle + 6148) & 0x80) == 0)) {
+                const schema::RacerResultsRecord record(
+                    base, va::RacerRecordsAt(base, data.results_address(), 0xFFFFFFFFu));
+                const int32_t who = int32_t(record.finish());
+                if ((who == 1 && (vehicle.car_flags() & 0x1) == 0) ||
+                    (who == 2 && (vehicle.car_flags() & 0x80) == 0)) {
                   hidden = false;
                   cockpit = false;
                 }
@@ -336,41 +349,43 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
           }
         }
         if (hidden) {
-          guest::StoreU32(base, block + 8, 0);
-          Memcpy64(base, call, f, block + 16,
-                   va::RigidBodyMatrix(guest::LoadU32(base, vehicle + 336)), 0x8215CABC);
-          Store64(base, block, 1);
-          const uint32_t input = guest::LoadU32(base, kInputs + ((v << 2) & 0x3FC));
-          if ((guest::LoadU32(base, input) & 0x100) != 0) {
-            Store64(base, block, 65);
+          block.set_drawn(0);
+          Memcpy64(base, call, f, block.world_address(),
+                   va::RigidBodyMatrix(vehicle.body<schema::View>().address), 0x8215CABC);
+          block.set_head(1);
+          const schema::CarInput input(base, guest::LoadU32(base, kInputs + ((v << 2) & 0x3FC)));
+          if ((input.flags() & 0x100) != 0) {
+            block.set_head(65);
           }
         } else {
           if (cockpit) {
-            guest::StoreU32(base, block + 12, 1);
+            block.set_cockpit_only(1);
           }
-          guest::StoreU32(base, block + 8, 1);
-          const uint32_t input = guest::LoadU32(base, kInputs + ((v << 2) & 0x3FC));
-          Store64(base, block, 1);
-          if ((guest::LoadU32(base, input) & 0x8) != 0) {
-            Store64(base, block, 9);
+          block.set_drawn(1);
+          const schema::CarInput input(base, guest::LoadU32(base, kInputs + ((v << 2) & 0x3FC)));
+          block.set_head(1);
+          if ((input.flags() & 0x8) != 0) {
+            block.set_head(9);
           }
-          if (int32_t(guest::LoadU32(base, vehicle + 2252)) == -1) {
-            Store64(base, block, Load64(base, block) | 16);
+          if (vehicle.gear() == -1) {
+            block.set_head(block.head() | 16);
           }
-          if ((guest::LoadU32(base, input) & 0x100) != 0) {
-            Store64(base, block, Load64(base, block) | 64);
+          if ((input.flags() & 0x100) != 0) {
+            block.set_head(block.head() | 64);
           }
-          Stfs(base, block + 696, double(Vehicle_GetSpeedKmh(base, vehicle)));
-          Stfs(base, block + 700, double(va::VehicleFloat2224(base, vehicle)));
-          Stfs(base, block + 704, Lfs(base, vehicle + 2944));
-          Stfs(base, block + 712, Lfs(base, vehicle + 6260));
-          Stfs(base, block + 716, Lfs(base, vehicle + 6256));
-          Stfs(base, block + 720, Lfs(base, vehicle + 6252));
-          Memcpy64(base, call, f, block + 16,
-                   va::RigidBodyMatrix(guest::LoadU32(base, vehicle + 336)), 0x8215CB90);
+          block.set_speed(float(Vehicle_GetSpeedKmh(base, vehicle.address)));
+          block.set_unknown_700(float(va::VehicleFloat2224(base, vehicle.address)));
+          block.set_boost(vehicle.boost());
+          // +712 to +720 and the vehicle's +6252 to +6260: in neither type yet.
+          Stfs(base, block.address + 712, Lfs(base, vehicle.address + 6260));
+          Stfs(base, block.address + 716, Lfs(base, vehicle.address + 6256));
+          Stfs(base, block.address + 720, Lfs(base, vehicle.address + 6252));
+          Memcpy64(base, call, f, block.world_address(),
+                   va::RigidBodyMatrix(vehicle.body<schema::View>().address), 0x8215CB90);
           Stfs(base, f + 140, one);
           for (uint32_t k = 0; k < 4; k++) {
-            const uint32_t wheel = vehicle + 444 + 368 * k;
+            const schema::VehicleWheel wheel(
+                base, vehicle.wheels_address() + schema::VehicleWheel::kSize * k);
             IdentityCopy(base, f + 272, f + 528);
             // Stored between the identity and its copy in the original,
             // overwritten by the copy to +464 below.
@@ -378,38 +393,39 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
               Stfs(base, f + at, one);
             }
             // The wheel's slip level and its load's square.
-            const double slip = ops::Fabs(Lfs(base, wheel + 220));
+            const double slip = ops::Fabs(double(wheel.spin()));
             const uint32_t level = slip > high ? 2 : slip > low ? 1 : 0;
-            guest::StoreU32(base, block + 596 + 4 * k, level);
-            const uint32_t data = guest::LoadU32(base, vehicle + 272);
-            double t = ops::Fdivs(Lfs(base, wheel + 192), Lfs(base, data + 164));
+            guest::StoreU32(base, block.rim_looks_address() + 4 * k, level);
+            const schema::CarData data = vehicle.car_data();
+            double t = ops::Fdivs(double(wheel.brake_heat()), double(data.brake_heat_limit()));
             t = ops::Fmadds(t, scale, -one);
             t = t < zero ? zero : ops::Fmuls(t, t);
             IdentityCopy(base, f + 144, f + 464);
-            Stfs(base, block + 612 + 4 * k, t);
+            Stfs(base, block.brake_alphas_address() + 4 * k, t);
             // The wheel's spin: identity x RotateZ by its +0.
-            matrix_math::RotateZ(base, f + 464, f + 464, wheel, f - 80);
-            Multiply(base, block + 336 + 64 * k, f + 528, f + 464, 0x8215CD18);
+            matrix_math::RotateZ(base, f + 464, f + 464, wheel.angle_address(), f - 80);
+            Multiply(base, block.wheel_spins_address() + 64 * k, f + 528, f + 464, 0x8215CD18);
             // Its turn: RotateY (by +8, plus the steering for the front pair)
             // x its quaternion's matrix, then moved to its position.
             IdentityCopy(base, f + 336, f + 528);
             IdentityCopy(base, f + 400, f + 624);
-            va::QuaternionToMatrix(base, f + 624, wheel + 20);
+            va::QuaternionToMatrix(base, f + 624, wheel.quaternion_address());
             Multiply(base, f + 528, f + 624, f + 528, 0x8215CDE4);
             IdentityCopy(base, f + 208, f + 464);
-            const double steer = k == 0 || k == 1 ? Lfs(base, vehicle + 324) : zero;
-            Stfs(base, f + 80, ops::Fadds(Lfs(base, wheel + 8), steer));
+            const double steer = k == 0 || k == 1 ? double(vehicle.steering_smoothed()) : zero;
+            Stfs(base, f + 80, ops::Fadds(double(wheel.toe()), steer));
             matrix_math::RotateY(base, f + 464, f + 464, f + 80, f - 80);
             Multiply(base, f + 528, f + 464, f + 528, 0x8215CE84);
-            const uint32_t point = guest::LoadU32(base, vehicle + 272) + 96 * k;
-            const double y = ops::Fadds(Lfs(base, wheel - 28), Lfs(base, point + 884));
-            const double x = Lfs(base, point + 880);
-            const double z = Lfs(base, point + 888);
-            guest::StoreU32(base, block + 732, 1);
+            // The wheel's set-up record (96 bytes; +0 the axle's position).
+            const uint32_t point = vehicle.car_data().wheel_setups_address() + 96 * k;
+            const double y = ops::Fadds(double(wheel.travel()), Lfs(base, point + 4));
+            const double x = Lfs(base, point + 0);
+            const double z = Lfs(base, point + 8);
+            block.set_no_side_offset(1);
             Stfs(base, f + 128, x);
             Stfs(base, f + 132, y);
             Stfs(base, f + 136, z);
-            car_physics::MatrixMultiplyTranslation(base, block + 80 + 64 * k, f + 528, f + 128,
+            car_physics::MatrixMultiplyTranslation(base, block.wheel_turns_address() + 64 * k, f + 528, f + 128,
                                                    f - 192);
           }
         }
@@ -448,7 +464,6 @@ uint64_t TickUpdate(uint8_t* base, const GuestCall& call, uint32_t stack, uint32
 uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint32_t stack, uint32_t scene) {
   ITC_NATIVE_RUNNING("sub_8215D2B0 RaceScene::Update");
   constexpr uint32_t kStart = 0x8212EDF8, kStop = 0x8212EED0, kSetSpeed = 0x8212FCC8;
-  constexpr uint32_t kSplitMode = 0xA3AF0, kHumans = 0x59614;
   const uint32_t f = stack - 144;
   guest::StoreU32(base, f, stack);
   const schema::RaceScene race_scene(base, scene);
@@ -458,9 +473,8 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint32_t stack, uint32_
   post_effects::MarkUpdated(base);
   uint32_t first = 0;
   {
-    const uint32_t data = G::race_data(base).address;
-    if (int32_t(guest::LoadU32(base, data + kSplitMode)) == 6 &&
-        int32_t(guest::LoadU32(base, data + kHumans)) == 2) {
+    const schema::RaceData data = G::race_data(base);
+    if (int32_t(data.kind()) == 6 && int32_t(data.added_count()) == 2) {
       first = G::followed(base) == 0 ? 1 : 0;
     }
   }
@@ -470,44 +484,45 @@ uint64_t Update(uint8_t* base, const UpdateCalls& calls, uint32_t stack, uint32_
   const double per = double(G::speed_scale(base));  // 1/300
   // One followed car: its glow, its screen object started or stopped, and
   // the object's speed. `lrs`: the original's return addresses (the slot,
-  // Start, Stop, SetSpeed). `object_of`: the scene's screen object it drives.
-  using ObjectOf = schema::View (schema::RaceScene::*)() const;
-  auto follow = [&](uint32_t vehicle, ObjectOf object_of, uint32_t effect,
+  // Start, Stop, SetSpeed). `object_of`: the scene's screen object it drives
+  // (loaded again at each use, as the original).
+  auto follow = [&](uint32_t vehicle_address, auto object_of, uint32_t effect,
                     const uint32_t (&lrs)[4]) {
-    const double speed = double(Vehicle_GetSpeedKmh(base, vehicle));
-    const uint32_t glow = post_effects::Get(base, effect);
-    const uint32_t slot = guest::LoadU32(base, guest::LoadU32(base, glow) + 96);
-    calls.call_f1(slot, glow, speed, f, lrs[0]);
-    const uint8_t nitrous = guest::LoadU8(base, vehicle + 2424);
-    const uint32_t object = (race_scene.*object_of)().address;
-    if (nitrous != 0 && guest::LoadU8(base, object + 24) == 0) {
-      calls.call(kStart, {object}, f, lrs[1]);
+    const schema::Vehicle vehicle(base, vehicle_address);
+    const double speed = double(Vehicle_GetSpeedKmh(base, vehicle.address));
+    const schema::PostEffect glow(base, post_effects::Get(base, effect));
+    const uint32_t slot = glow.vtable().from_speed_setter();
+    calls.call_f1(slot, glow.address, speed, f, lrs[0]);
+    const uint8_t nitrous = vehicle.nitrous_on();
+    const schema::ScreenObject object = object_of();
+    if (nitrous != 0 && object.running() == 0) {
+      calls.call(kStart, {object.address}, f, lrs[1]);
     } else if (nitrous == 0) {
-      const uint32_t now = (race_scene.*object_of)().address;
-      if (guest::LoadU8(base, now + 24) != 0) {
-        calls.call(kStop, {now}, f, lrs[2]);
+      const schema::ScreenObject now = object_of();
+      if (now.running() != 0) {
+        calls.call(kStop, {now.address}, f, lrs[2]);
       }
     }
-    const double strength = ops::Fmuls(double(Vehicle_GetSpeedKmh(base, vehicle)), per);
-    const uint32_t target = (race_scene.*object_of)().address;
+    const double strength = ops::Fmuls(double(Vehicle_GetSpeedKmh(base, vehicle.address)), per);
+    const uint32_t target = object_of().address;
     if (screen_objects::SetSpeed(base, target, strength)) {
       r3 = target;
     } else {
       r3 = calls.call_f1(kSetSpeed, target, strength, f, lrs[3]);
     }
   };
-  if (int32_t(guest::LoadU32(base, G::race_data(base).address + kSplitMode)) == 4) {
+  const auto first_object = [&] { return race_scene.screen_object_first(); };
+  const auto second_object = [&] { return race_scene.screen_object_second(); };
+  const auto race_object = [&] { return race_scene.screen_object(); };
+  if (int32_t(G::race_data(base).kind()) == 4) {
     if (a != 0 && race_scene.screen_object_first().address != 0) {
-      follow(a, &schema::RaceScene::screen_object_first, 5,
-             {0x8215D398, 0x8215D3B8, 0x8215D3D8, 0x8215D3EC});
+      follow(a, first_object, 5, {0x8215D398, 0x8215D3B8, 0x8215D3D8, 0x8215D3EC});
     }
     if (b != 0 && race_scene.screen_object_second().address != 0) {
-      follow(b, &schema::RaceScene::screen_object_second, 9,
-             {0x8215D428, 0x8215D448, 0x8215D468, 0x8215D514});
+      follow(b, second_object, 9, {0x8215D428, 0x8215D448, 0x8215D468, 0x8215D514});
     }
   } else if (a != 0 && race_scene.screen_object().address != 0) {
-    follow(a, &schema::RaceScene::screen_object, 1,
-           {0x8215D4B8, 0x8215D4D8, 0x8215D4F8, 0x8215D514});
+    follow(a, race_object, 1, {0x8215D4B8, 0x8215D4D8, 0x8215D4F8, 0x8215D514});
   }
   return r3;
 }

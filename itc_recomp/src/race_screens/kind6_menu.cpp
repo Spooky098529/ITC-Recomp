@@ -8,7 +8,11 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
+#include "schema/network_mode.h"
+#include "schema/race_screens.h"
 #include "schema/race_screens_unseen.h"
+#include "schema/save_interface.h"
+#include "schema/tuning_screen.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -156,8 +160,8 @@ uint64_t Kind6ShowPanelA(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t a = ui_movies::FindNode(base, movie, 1, 4);
   const uint32_t b = ui_movies::FindNode(base, movie, 1, 5);
   if (a == 0 || b == 0) return b;
-  guest::StoreU32(base, a + 108, 0);
-  guest::StoreU32(base, b + 108, 0);
+  schema::UiMovieNode(base, a).set_texture_entry(0);
+  schema::UiMovieNode(base, b).set_texture_entry(0);
   constexpr uint32_t kLr[4] = {0x8221D0E4, 0x8221D0F4, 0x8221D104, 0x8221D114};
   uint64_t r3 = 0;
   for (uint32_t i = 0; i < 4; i++) r3 = Node(calls, kHideNode, frame, kLr[i], movie, 1, 6 + i);
@@ -195,13 +199,13 @@ uint64_t Kind6ShowCourse(uint8_t* base, uint32_t sp, const Calls& calls) {
   // Case 0 (sub_8221D2B4) and a course past 7 both take row 0.
   const uint32_t row = course <= 7 ? course : 0;
   for (uint32_t i = 0; i < 27; i++) {
-    guest::StoreU32(base, ui_movies::FindNode(base, movie, 9, i + 6) + 80, 0);
+    schema::UiMovieNode(base, ui_movies::FindNode(base, movie, 9, i + 6)).set_visible(0);
   }
   const uint32_t a = guest::LoadU32(base, frame + 80 + 4 * row);
   const uint32_t first = ui_movies::FindNode(base, movie, 9, a + 6);
   const uint32_t b = guest::LoadU32(base, frame + 112 + 4 * row);
-  guest::StoreU32(base, first + 80, 1);
-  guest::StoreU32(base, ui_movies::FindNode(base, movie, 9, b + 6) + 80, 1);
+  schema::UiMovieNode(base, first).set_visible(1);
+  schema::UiMovieNode(base, ui_movies::FindNode(base, movie, 9, b + 6)).set_visible(1);
   for (uint32_t i = 0; i < 19; i++) FinishNamed(calls, frame, 0x8221D364, movie, i + 47);
   constexpr uint32_t kRows[8] = {1, 0, 2, 3, 4, 7, 5, 6};
   for (uint32_t i = 0; i < 5; i++) guest::StoreU32(base, frame + 112 + 4 * i, kRows[i]);
@@ -225,7 +229,7 @@ uint64_t Kind6SetUpTexts(uint8_t* base, uint32_t screen_address, uint32_t sp,
     SetText(calls, frame, 0x8221E084, movie, 3, i + 5, guest::LoadU32(base, frame + 80 + 4 * i));
   }
   for (uint32_t i = 0; i < 5; i++) {
-    guest::StoreU32(base, ui_movies::FindNode(base, movie, kNone, i + 23) + 80, 0);
+    schema::UiMovieNode(base, ui_movies::FindNode(base, movie, kNone, i + 23)).set_visible(0);
   }
   Kind6ShowPanelA(base, frame, calls);
   // The course's name (case 0, sub_8221E0FC, merged: 395).
@@ -245,7 +249,7 @@ uint32_t Kind6SetCursorX(uint8_t* base, uint64_t value, uint32_t sp) {
   const uint32_t frame = Frame(base, sp, 112);
   const float x = ToFloat(base, frame + 80, value & 0xFFFFFFFFu);
   const uint32_t node = ui_movies::FindNode(base, Menu(base), 3, 0);
-  guest::StoreFloat(base, node + 16, x);
+  schema::UiMovieNode(base, node).set_y(x);
   return node;
 }
 
@@ -253,8 +257,10 @@ uint64_t Kind6ShowReplay(uint8_t* base, uint32_t record, uint32_t sp, const Call
   ITC_NATIVE_RUNNING("sub_8221CBD8 Kind6Menu::ShowReplay");
   const uint32_t frame = Frame(base, sp, 176);
   const uint32_t movie = Menu(base);
-  if (record == 0 || guest::LoadU32(base, record + 28) == 0) {
-    guest::StoreU32(base, ui_movies::FindNode(base, movie, 14, 0) + 80, 0);
+  // A replay record (save-interface.toml's SaveReplayRecord).
+  const schema::SaveReplayRecord replay(base, record);
+  if (record == 0 || replay.number() == 0) {
+    schema::UiMovieNode(base, ui_movies::FindNode(base, movie, 14, 0)).set_visible(0);
     constexpr uint32_t kTexts[7][2] = {{9, 0x8221CE38},  {10, 0x8221CE48}, {19, 0x8221CE58},
                                        {20, 0x8221CE68}, {21, 0x8221CE78}, {12, 0x8221CE88},
                                        {13, 0x8221CE98}};
@@ -264,57 +270,52 @@ uint64_t Kind6ShowReplay(uint8_t* base, uint32_t record, uint32_t sp, const Call
   }
   // The date and time: string 530 with the halfwords +0, +2, +6 and +8 in
   // r7 to r10 and +10 on the stack (the frame's +84).
-  guest::StoreU32(base, frame + 84, guest::LoadU16(base, record + 10));
-  SetText(calls, frame, 0x8221CC34, movie, 14, 9, 530, guest::LoadU16(base, record + 0),
-          guest::LoadU16(base, record + 2), guest::LoadU16(base, record + 6),
-          guest::LoadU16(base, record + 8));
-  SetText(calls, frame, 0x8221CC4C, movie, 14, 10,
-          uint64_t(guest::LoadU32(base, record + 20)) + 473);
-  SetText(calls, frame, 0x8221CC64, movie, 14, 19,
-          uint64_t(guest::LoadU32(base, record + 24)) + 1646);
-  SetText(calls, frame, 0x8221CC7C, movie, 14, 20,
-          uint64_t(guest::LoadU32(base, record + 24)) + 1790);
-  SetText(calls, frame, 0x8221CC94, movie, 14, 21,
-          uint64_t(guest::LoadU32(base, record + 24)) + 1718);
-  const uint32_t time = guest::LoadU32(base, record + 16);
+  guest::StoreU32(base, frame + 84, replay.minute());
+  SetText(calls, frame, 0x8221CC34, movie, 14, 9, 530, replay.year(), replay.month(), replay.day(),
+          replay.hour());
+  SetText(calls, frame, 0x8221CC4C, movie, 14, 10, uint64_t(replay.mode()) + 473);
+  SetText(calls, frame, 0x8221CC64, movie, 14, 19, uint64_t(replay.course()) + 1646);
+  SetText(calls, frame, 0x8221CC7C, movie, 14, 20, uint64_t(replay.course()) + 1790);
+  SetText(calls, frame, 0x8221CC94, movie, 14, 21, uint64_t(replay.course()) + 1718);
+  const uint32_t time = replay.time();
   SetText(calls, frame, 0x8221CCB8, movie, 14, 13, 528, (time >> 16) & 0x7FFF, (time >> 10) & 0x3F,
           time & 0x3FF);
   // The result by the kind (+20): 0 string 4650 + +32; 1 and 3 the place
   // (a table in the frame by +32, unchecked); 2 string 477; others none.
-  const uint32_t kind = guest::LoadU32(base, record + 20);
+  const uint32_t kind = replay.mode();
   if (kind <= 3) {
     uint64_t id;
     if (kind == 1 || kind == 3) {
       constexpr uint32_t kPlaces[8] = {395, 396, 397, 398, 401, 402, 404, 403};
       for (uint32_t i = 0; i < 8; i++) guest::StoreU32(base, frame + 96 + 4 * i, kPlaces[i]);
-      guest::StoreU32(base, ui_movies::FindNode(base, movie, 14, 17) + 108, 1);
-      const uint32_t index = guest::LoadU32(base, record + 32);
+      schema::UiMovieNode(base, ui_movies::FindNode(base, movie, 14, 17)).set_texture_entry(1);
+      const uint32_t index = replay.result();
       id = guest::LoadU32(base, (index << 2) + frame + 96);
     } else if (kind == 2) {
-      guest::StoreU32(base, ui_movies::FindNode(base, movie, 14, 17) + 108, 0);
+      schema::UiMovieNode(base, ui_movies::FindNode(base, movie, 14, 17)).set_texture_entry(0);
       id = 477;
     } else {
-      guest::StoreU32(base, ui_movies::FindNode(base, movie, 14, 17) + 108, 0);
-      id = uint64_t(guest::LoadU32(base, record + 32)) + 4650;
+      schema::UiMovieNode(base, ui_movies::FindNode(base, movie, 14, 17)).set_texture_entry(0);
+      id = uint64_t(replay.result()) + 4650;
     }
     SetText(calls, frame, 0x8221CD98, movie, 14, 12, id);
   }
-  guest::StoreU32(base, ui_movies::FindNode(base, movie, 14, 0) + 80, 1);
+  schema::UiMovieNode(base, ui_movies::FindNode(base, movie, 14, 0)).set_visible(1);
   const uint32_t tens = ui_movies::FindNode(base, movie, 14, 5);
   const uint32_t ones = ui_movies::FindNode(base, movie, 14, 6);
-  const int32_t count = int32_t(guest::LoadU32(base, record + 28));
-  guest::StoreU32(base, tens + 108, count < 10 ? 0 : uint32_t(count / 10));
-  const int32_t again = int32_t(guest::LoadU32(base, record + 28));
-  guest::StoreU32(base, ones + 108, uint32_t(again - (again / 10) * 10));
+  const int32_t count = int32_t(replay.number());
+  schema::UiMovieNode(base, tens).set_texture_entry(count < 10 ? 0 : uint32_t(count / 10));
+  const int32_t again = int32_t(replay.number());
+  schema::UiMovieNode(base, ones).set_texture_entry(uint32_t(again - (again / 10) * 10));
   return ones;
 }
 
 uint32_t Kind6ShowList(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221D4E8 Kind6Menu::ShowList");
   const uint32_t frame = Frame(base, sp, 160);
-  const uint32_t replays = Globals::kind6_replays(base).address;
-  const int32_t count = int32_t(guest::LoadU32(base, replays + 20));
-  const uint32_t records = guest::LoadU32(base, replays + 12);
+  const schema::SaveBuffers replays = Globals::kind6_replays(base);
+  const int32_t count = int32_t(replays.count());
+  const uint32_t records = replays.records().address;
   const uint32_t movie = Menu(base);
   const uint32_t scroll = Screen(base).slot_list_scroll();
   const int32_t shown = count < 9 ? count : 9;
@@ -322,10 +323,10 @@ uint32_t Kind6ShowList(uint8_t* base, uint32_t sp, const Calls& calls) {
   for (uint32_t i = 0; i < 9; i++) {
     calls.Call(kClearNodeText, frame, 0x8221D558, movie, ui_movies::Child(base, node, i + 5));
   }
-  uint32_t used = records + scroll * 36 + 28;
-  for (int32_t i = 0; i < shown; i++, used += 36) {
+  uint32_t at = records + scroll * 36;
+  for (int32_t i = 0; i < shown; i++, at += 36) {
     const uint32_t child = ui_movies::Child(base, node, uint32_t(i) + 5);
-    const uint32_t word = guest::LoadU32(base, used);
+    const uint32_t word = schema::SaveReplayRecord(base, at).number();
     SetNodeText(calls, frame, word == 0 ? 0x8221D5A4 : 0x8221D5B0, movie, child,
                 word == 0 ? 472 : 471, word);
   }
@@ -342,20 +343,20 @@ uint32_t Kind6ShowList(uint8_t* base, uint32_t sp, const Calls& calls) {
       up_shown = down_shown = 1;
     }
   }
-  guest::StoreU32(base, up + 80, up_shown);
+  schema::UiMovieNode(base, up).set_visible(up_shown);
   const uint32_t down = ui_movies::FindNode(base, movie, 14, 8);
-  guest::StoreU32(base, down + 80, down_shown);
+  schema::UiMovieNode(base, down).set_visible(down_shown);
   return down;
 }
 
 uint64_t Kind6SetUpList(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221DF70 Kind6Menu::SetUpList");
   const uint32_t frame = Frame(base, sp, 160);
-  const uint32_t replays = Globals::kind6_replays(base).address;
+  const schema::SaveBuffers replays = Globals::kind6_replays(base);
   const schema::Kind6Menu screen = Screen(base);
-  const uint32_t count = guest::LoadU32(base, replays + 20);
+  const uint32_t count = replays.count();
   const uint32_t movie = screen.menu_movie().address;
-  const uint32_t records = guest::LoadU32(base, replays + 12);
+  const uint32_t records = replays.records().address;
   const uint32_t shown = int32_t(count) < 9 ? count : 9;
   guest::StoreU32(base, frame + 92, 158);
   guest::StoreU32(base, frame + 84, 159);
@@ -364,7 +365,7 @@ uint64_t Kind6SetUpList(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t selection = ListSelection(base, Screen(base).slot_list_count_address());
   const uint32_t node = ui_movies::FindNode(base, movie, 14, 2);
   const float y = ToFloat(base, frame + 96, uint64_t(int64_t(int32_t(selection * 40))));
-  guest::StoreFloat(base, ui_movies::Child(base, node, 0) + 16, y);
+  schema::UiMovieNode(base, ui_movies::Child(base, node, 0)).set_y(y);
   Kind6ShowList(base, frame, calls);
   return Kind6ShowReplay(base, records + selection * 36, frame, calls);
 }
@@ -510,12 +511,13 @@ uint64_t Kind6MoveList(uint8_t* base, uint32_t step, uint32_t sp, const Calls& c
     const uint32_t movie = Menu(base);
     const uint32_t selection = ListSelection(base, list);
     // MenuList::GetPreviousSelection (sub_8220BC28): the list's +20.
-    const uint32_t previous = guest::LoadU32(base, list + kListSelectionBefore);
-    const uint32_t scroll = guest::LoadU32(base, list + kListScroll);
-    const uint32_t before = guest::LoadU32(base, list + kListScrollBefore);
-    const uint32_t wrapped = guest::LoadU32(base, list + kListWrapped);
+    const schema::MenuList slots(base, list);
+    const uint32_t previous = slots.selection_before();
+    const uint32_t scroll = slots.scroll();
+    const uint32_t before = slots.scroll_before();
+    const uint32_t wrapped = slots.wrapped();
     const int32_t scrolled = int32_t(scroll - before);
-    const uint32_t records = guest::LoadU32(base, Globals::kind6_replays(base).address + 12);
+    const uint32_t records = Globals::kind6_replays(base).records().address;
     FinishNamed(calls, frame, 0x8221DDEC, movie, uint64_t(previous) + 72);
     const uint64_t row = uint64_t(selection) + 72;
     PlayNamed(calls, frame, 0x8221DE0C, movie, row);
@@ -526,20 +528,20 @@ uint64_t Kind6MoveList(uint8_t* base, uint32_t step, uint32_t sp, const Calls& c
     const uint32_t node = ui_movies::FindNode(base, movie, 14, 2);
     if (int32_t(wrapped) != 0) {
       const float y = ToFloat(base, frame + 80, uint64_t(int64_t(int32_t(selection * 40))));
-      guest::StoreFloat(base, ui_movies::Child(base, node, 0) + 16, y);
+      schema::UiMovieNode(base, ui_movies::Child(base, node, 0)).set_y(y);
     } else {
       // A row scrolled in: the slot that comes in shown (its record's +28)
       // and the slide played (82 up, 83 down).
-      const int32_t move = int32_t(guest::LoadU32(base, list + kListMove));
+      const int32_t move = int32_t(slots.move());
       if (move < 0) {
         const uint32_t child = ui_movies::Child(base, node, 15);
         SetNodeText(calls, frame, 0x8221DEB4, movie, child, 471,
-                    guest::LoadU32(base, records + scroll * 36 + 28));
+                    schema::SaveReplayRecord(base, records + scroll * 36).number());
         PlayNamed(calls, frame, 0x8221DF00, movie, 82);
       } else if (move > 0) {
         const uint32_t child = ui_movies::Child(base, node, 14);
         SetNodeText(calls, frame, 0x8221DEE4, movie, child, 471,
-                    guest::LoadU32(base, records + scroll * 36 + 352));
+                    schema::SaveReplayRecord(base, records + (scroll + 9) * 36).number());
         PlayNamed(calls, frame, 0x8221DF00, movie, 83);
       }
     }
@@ -656,7 +658,7 @@ uint64_t Kind6OpenWaiting(uint8_t* base, uint32_t step, uint32_t sp, const Calls
     const uint32_t node = ui_movies::FindNode(base, movie, 0, 2);
     const uint32_t text = ui_movies::Child(base, node, 1);
     SetNodeText(calls, frame, 0x8221C978, movie, text, Screen(base).box_message());
-    guest::StoreU32(base, ui_movies::Child(base, node, 0) + 80, 0);
+    schema::UiMovieNode(base, ui_movies::Child(base, node, 0)).set_visible(0);
     PlayNamed(calls, frame, 0x8221C9A8, movie, 13);
     FinishNamed(calls, frame, 0x8221C9B4, movie, 0);
     PlayNamed(calls, frame, 0x8221C9D0, movie, 0);
@@ -889,7 +891,7 @@ uint64_t Kind6Draw(uint8_t* base, uint32_t screen_address, uint32_t sp, const Ca
     if (field != 0) r3 = Run(calls, frame, 0x8221F144, guest::LoadU32(base, field));
   }
   if (Screen(base).upload_request() != 0) {
-    guest::StoreU32(base, Globals::kind6_session(base).address + 236, 3);
+    Globals::kind6_session(base).set_upload_state(3);
     Screen(base).set_upload_request(0);
     const schema::Kind6Menu k = Screen(base);
     const uint32_t state = k.box_shown();

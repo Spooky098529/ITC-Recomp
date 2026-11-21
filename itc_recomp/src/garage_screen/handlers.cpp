@@ -36,15 +36,17 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
       uint32_t(calls.Call(kVirtualAlloc, frame, 0x82191CC8, 0, 72, kMemCommit, kReadWrite));
   G::set_list(base, list);
   if (list != 0) {
-    Store(base, list + 68, 0);
-    Store(base, list + 60, 0);
+    const MenuList l(base, list);
+    l.set_enabled(0);
+    l.set_player(0);
   }
   const uint32_t list2 =
       uint32_t(calls.Call(kVirtualAlloc, frame, 0x82191CF4, 0, 72, kMemCommit, kReadWrite));
   G::set_list2(base, list2);
   if (list2 != 0) {
-    Store(base, list2 + 68, 0);
-    Store(base, list2 + 60, 0);
+    const MenuList l(base, list2);
+    l.set_enabled(0);
+    l.set_player(0);
   }
   const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x82191D20, 0, ScreenData::kSize,
                                  kMemCommit, kReadWrite);
@@ -83,15 +85,15 @@ uint64_t WaitForLoad(uint8_t* base, uint64_t r3, uint32_t sp) {
 uint64_t ReadSave(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82191BB0 GarageScreen::ReadSave");
   Frame(base, sp, 96);
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  const SaveData save(base, vehicle_accessors::SaveDataOf(base, 0));
   const ScreenData data = Data(base);
   // The career's pick (20 bytes), the money, the weekday (signed) and the
   // day (at most 999).
   for (uint32_t i = 0; i < 5; i++) {
-    Store(base, data.pick_address() + 4 * i, Load(base, save + 8 + 4 * i));
+    Store(base, data.pick_address() + 4 * i, Load(base, save.pick_head_address() + 4 * i));
   }
-  const int32_t day = int32_t(Load(base, save + 6100));
-  Data(base).set_money(Load(base, save + 6116));
+  const int32_t day = int32_t(save.day());
+  Data(base).set_money(save.money());
   Data(base).set_weekday(uint32_t(day - (day / 7) * 7));
   Data(base).set_day(uint32_t(day > 999 ? 999 : day));
   const uint32_t again = vehicle_accessors::SaveDataOf(base, 0);
@@ -108,7 +110,7 @@ uint64_t SetHeader(uint8_t* base, uint32_t sp, const Calls& calls) {
   calls.Call(kSetNumberText, frame, 0x82192CEC, movie, 15, 9, Data(base).money());
   calls.CallArgs(kSetText, frame, 0x82192D08, {movie, 15, 13, 8, Data(base).day(), 0, 0, 0});
   const uint32_t node = ui_movies::FindNode(base, movie, 15, 11);
-  Store(base, node + 108, Data(base).weekday());
+  Node(base, node).set_texture_entry(Data(base).weekday());
   Data(base).set_stand_shown(0);
   Data(base).set_stand_model(0);
   Data(base).set_set_up(1);

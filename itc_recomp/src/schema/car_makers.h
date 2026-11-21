@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// embedded; measure: SceneModelRecord
+// embedded; measure: SceneModelRecord, SceneModelRecord::Copy.r4
 struct SceneModelRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 4244;
@@ -767,7 +767,7 @@ struct CarMakersCar : View {
   uint32_t unknown_3892_address() const { return address + 3892; }
 };
 
-// embedded; measure: -
+// embedded; measure: TuningScreen::GarageDecal.ret
 struct CarMakersCarDecal : View {
   using View::View;
   static constexpr uint32_t kSize = 32;
@@ -820,7 +820,7 @@ struct CarMakersCarChoice : View {
   uint32_t c_address() const { return address + 8; }
 };
 
-// embedded; measure: GarageCar
+// embedded; measure: GarageCar, sub_8218D708.r3
 struct GarageCar : View {
   using View::View;
   static constexpr uint32_t kSize = 1968;

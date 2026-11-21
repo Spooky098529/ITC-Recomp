@@ -7,6 +7,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/car_physics.h"
 #include "schema/collision.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -404,8 +405,8 @@ bool QuerySeparatedAfterMove(uint8_t* base, uint32_t query, uint32_t frame, uint
 double CollisionPairNextCheckTime(uint8_t* base, uint32_t pair, uint32_t frame, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_820BBB20 CollisionPair::NextCheckTime");
   // The pair's objects A (+16) and B (+20).
-  const auto object_a = [&] { return Object(base, guest::LoadU32(base, pair + 16)); };
-  const auto object_b = [&] { return Object(base, guest::LoadU32(base, pair + 20)); };
+  const auto object_a = [&] { return schema::CollisionPair(base, pair).a<Object>(); };
+  const auto object_b = [&] { return schema::CollisionPair(base, pair).b<Object>(); };
   const double step = double(G::step(base));
   const double clock = double(G::clock(base));
   const Object a = object_a();

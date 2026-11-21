@@ -35,6 +35,14 @@ struct ThreadData : View {
   uint32_t exception_actions() const { return guest::LoadU32(base, address + 92); }
   void set_exception_actions(uint32_t v) const { guest::StoreU32(base, address + 92, v); }
   uint32_t exception_actions_address() const { return address + 92; }
+  // raise saves it, clears it and puts it back around an FPE handler (_tpxcptinfoptrs, probably)
+  uint32_t exception_pointers() const { return guest::LoadU32(base, address + 96); }
+  void set_exception_pointers(uint32_t v) const { guest::StoreU32(base, address + 96, v); }
+  uint32_t exception_pointers_address() const { return address + 96; }
+  // raise saves it, sets 140 and puts it back around an FPE handler, which is given it (_tfpecode, probably)
+  uint32_t fpe_code() const { return guest::LoadU32(base, address + 100); }
+  void set_fpe_code(uint32_t v) const { guest::StoreU32(base, address + 100, v); }
+  uint32_t fpe_code_address() const { return address + 100; }
   uint32_t terminate_handler() const { return guest::LoadU32(base, address + 108); }
   void set_terminate_handler(uint32_t v) const { guest::StoreU32(base, address + 108, v); }
   uint32_t terminate_handler_address() const { return address + 108; }
@@ -160,6 +168,18 @@ struct Stream : View {
   uint32_t flags() const { return guest::LoadU32(base, address + 12); }
   void set_flags(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
   uint32_t flags_address() const { return address + 12; }
+  // the file handle (_file)
+  uint32_t file() const { return guest::LoadU32(base, address + 16); }
+  void set_file(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t file_address() const { return address + 16; }
+  // the buffer's size (_bufsiz)
+  uint32_t buffer_size() const { return guest::LoadU32(base, address + 24); }
+  void set_buffer_size(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
+  uint32_t buffer_size_address() const { return address + 24; }
+  // a temporary file's name, freed at close (_tmpfname)
+  uint32_t temp_name() const { return guest::LoadU32(base, address + 28); }
+  void set_temp_name(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
+  uint32_t temp_name_address() const { return address + 28; }
 };
 
 // embedded; measure: _fltout2.r4, _cftof2_l.r6, _fptostr.r6
@@ -320,7 +340,7 @@ struct ExitTable : View {
   uint32_t first_address() const { return address + 0; }
 };
 
-// embedded; measure: strncmp.r3, strncmp.r4, strstr.r4, strncpy.r4, _stricmp.r3, mbtowc.r4, _cftof_l.r4, strtoxl.r4, _output_l.r4, _fltout2.r5, new<861>@_output_l, new<861>@_woutput_l, [820734CC], [8266C024].+0
+// embedded; measure: strncmp.r3, strncmp.r4, strstr.r4, strncpy.r4, _stricmp.r3, mbtowc.r4, _cftof_l.r4, strtoxl.r4, _output_l.r4, _fltout2.r5, new<861>@_output_l, new<861>@_woutput_l, [820734CC], [8266C024].+0, lstrcmpA.r3, lstrcmpA.r4, CompareStringA.r6
 struct CString : View {
   using View::View;
   static constexpr uint32_t kSize = 0;

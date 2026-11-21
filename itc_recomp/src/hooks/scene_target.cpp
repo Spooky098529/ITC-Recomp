@@ -19,6 +19,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/scene_target.h"
 #include "scene_target/scene_target.h"
+#include "schema/app_start_up.h"
 #include "schema/scene_target.h"
 
 #include <optional>
@@ -99,7 +100,7 @@ void hooks::SceneTargetRecordPasses(lifted::Regs& ctx, uint8_t* base) {
         // queue), the queue's slot 4 (f1 = 0.0, the original's f30).
         calls.submit = [&](uint32_t chunk, uint32_t bucket, uint32_t lr1, uint32_t lr2,
                            uint32_t lr3) {
-          ctx.r3.u64 = guest::LoadU32(base, 0x826BABA0);
+          ctx.r3.u64 = schema::AppStartUpGlobals::render_app<schema::View>(base).address;
           vtable_call(32, lr1);
           vtable_call(8, lr2);
           ctx.fpscr.disableFlushMode();

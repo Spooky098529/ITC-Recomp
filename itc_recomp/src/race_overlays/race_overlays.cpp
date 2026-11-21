@@ -10,7 +10,17 @@
 #include "hooks/vehicle.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "schema/cameras.h"
+#include "schema/car_models.h"
+#include "schema/car_physics.h"
+#include "schema/collision_world.h"
+#include "schema/load_poll.h"
 #include "schema/race_overlays.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
+#include "schema/scene_models.h"
+#include "schema/vehicle.h"
+#include "schema/vehicle_accessors.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -29,10 +39,20 @@ using G = schema::RaceOverlaysGlobals;
 
 namespace {
 
-constexpr uint32_t kWheelBytes = 368;
+constexpr uint32_t kWheelBytes = schema::VehicleWheel::kSize;
 
 uint32_t Vehicle(uint8_t* base, uint32_t view) {
   return schema::OverlayView(base, view).vehicle();
+}
+
+// The vehicle's car data (constructed in place at its +3376).
+schema::CarData CarData(uint8_t* base, uint32_t view) {
+  return schema::CarData(base, schema::Vehicle(base, Vehicle(base, view)).car_data_block_address());
+}
+
+// The vehicle's status (embedded at its +6160).
+schema::VehicleStatus Status(uint8_t* base, uint32_t view) {
+  return schema::VehicleStatus(base, schema::Vehicle(base, Vehicle(base, view)).status_address());
 }
 
 }  // namespace
@@ -57,21 +77,22 @@ float SpeedKmh(uint8_t* base, uint32_t view) {
 
 float WheelSpin(uint8_t* base, uint32_t view, uint32_t wheel) {
   ITC_NATIVE_RUNNING("sub_821268F0 OverlayView::WheelSpin");
-  return guest::LoadFloat(base, Vehicle(base, view) + kWheelBytes * wheel + 664);
+  return schema::VehicleWheel(base, schema::Vehicle(base, Vehicle(base, view)).wheels_address() + kWheelBytes * wheel).spin();
 }
 
 float WheelValue512(uint8_t* base, uint32_t view, uint32_t wheel) {
   ITC_NATIVE_RUNNING("sub_82126908 OverlayView::WheelValue512");
-  return guest::LoadFloat(base, Vehicle(base, view) + kWheelBytes * wheel + 512);
+  return schema::VehicleWheel(base, schema::Vehicle(base, Vehicle(base, view)).wheels_address() + kWheelBytes * wheel)
+      .ground_distance();
 }
 
 float AxleValue3764(uint8_t* base, uint32_t view, uint32_t wheel) {
   ITC_NATIVE_RUNNING("sub_82126920 OverlayView::AxleValue3764");
   if (wheel < 2) {
-    return guest::LoadFloat(base, Vehicle(base, view) + 3764);
+    return schema::CarDataAxle(base, CarData(base, view).front_axle_address()).radius();
   }
   if (wheel < 4) {
-    return guest::LoadFloat(base, Vehicle(base, view) + 4036);
+    return schema::CarDataAxle(base, CarData(base, view).rear_axle_address()).radius();
   }
   return G::zero(base);
 }
@@ -80,9 +101,9 @@ float AxleValue3384(uint8_t* base, uint32_t view, uint32_t wheel) {
   ITC_NATIVE_RUNNING("sub_82126958 OverlayView::AxleValue3384");
   float value;
   if (wheel < 2) {
-    value = guest::LoadFloat(base, Vehicle(base, view) + 3384);
+    value = CarData(base, view).front_track();
   } else if (wheel < 4) {
-    value = guest::LoadFloat(base, Vehicle(base, view) + 3388);
+    value = CarData(base, view).rear_track();
   } else {
     value = G::zero(base);
   }
@@ -92,52 +113,54 @@ float AxleValue3384(uint8_t* base, uint32_t view, uint32_t wheel) {
 
 uint32_t WheelOnGround(uint8_t* base, uint32_t view, uint32_t wheel) {
   ITC_NATIVE_RUNNING("sub_82126998 OverlayView::WheelOnGround");
-  return guest::LoadU8(base, Vehicle(base, view) + kWheelBytes * wheel + 433);
+  return schema::VehicleWheel(base, schema::Vehicle(base, Vehicle(base, view)).wheels_address() + kWheelBytes * wheel)
+      .on_ground();
 }
 
 uint32_t VehicleByte2504(uint8_t* base, uint32_t view) {
   ITC_NATIVE_RUNNING("sub_82126A80 OverlayView::VehicleByte2504");
-  return guest::LoadU8(base, Vehicle(base, view) + 2504);
+  return schema::Vehicle(base, Vehicle(base, view)).backfire();
 }
 
 uint32_t VehicleWord2252(uint8_t* base, uint32_t view) {
   ITC_NATIVE_RUNNING("sub_82126AA0 OverlayView::VehicleWord2252");
-  return guest::LoadU32(base, Vehicle(base, view) + 2252);
+  return uint32_t(schema::Vehicle(base, Vehicle(base, view)).gear());
 }
 
 uint32_t VehicleWord340(uint8_t* base, uint32_t view) {
   ITC_NATIVE_RUNNING("sub_82126AB0 OverlayView::VehicleWord340");
-  return guest::LoadU32(base, Vehicle(base, view) + 340);
+  return schema::Vehicle(base, Vehicle(base, view)).collision_object();
 }
 
 float VehicleFloat6256(uint8_t* base, uint32_t view) {
   ITC_NATIVE_RUNNING("sub_82126AC0 OverlayView::VehicleFloat6256");
-  return guest::LoadFloat(base, Vehicle(base, view) + 6256);
+  return Status(base, view).oil_temperature();
 }
 
 float VehicleFloat6252(uint8_t* base, uint32_t view) {
   ITC_NATIVE_RUNNING("sub_82126AD0 OverlayView::VehicleFloat6252");
-  return guest::LoadFloat(base, Vehicle(base, view) + 6252);
+  return Status(base, view).water_temperature();
 }
 
 uint32_t RaceMode(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82126D18 RaceOverlays::RaceMode");
-  return guest::LoadU32(base, G::race_data(base) + 0xA3AF4);
+  return schema::RaceData(base, G::race_data(base)).race_mode();
 }
 
 uint32_t RacerFlags(uint8_t* base, uint32_t view) {
   ITC_NATIVE_RUNNING("sub_82127178 OverlayView::RacerFlags");
-  const uint32_t racer = guest::LoadU32(base, Vehicle(base, view) + 5712);
-  return guest::LoadU32(base, racer + 3888);
+  const uint32_t racer = schema::Vehicle(base, Vehicle(base, view)).car();
+  return schema::Car(base, racer).flags();
 }
 
 int32_t RacerId(uint8_t* base, uint32_t view) {
   ITC_NATIVE_RUNNING("sub_82126AE0 OverlayView::RacerId");
-  const uint32_t records = G::race_data(base);
-  const uint32_t racer = guest::LoadU32(base, Vehicle(base, view) + 5712);
+  const uint32_t records = schema::RaceData(base, G::race_data(base)).racer_records_address();
+  const uint32_t racer = schema::Vehicle(base, Vehicle(base, view)).car();
   for (uint32_t i = 0; i < 93; i++) {
-    if (records + 48 + 3936 * i == racer) {
-      return int32_t(guest::LoadU32(base, records + 3936 * i + 3960));
+    const schema::Car record(base, records + schema::Car::kSize * i);
+    if (record.address == racer) {
+      return int32_t(record.item_id());
     }
   }
   return -1;
@@ -924,16 +947,12 @@ namespace race_overlays {
 
 namespace {
 
-constexpr uint32_t kModelPoints = 5048;
-constexpr uint32_t kModelParts = 5060;
-
-// Whether the model's +5048, +5052, +5060 and +5064 are all set (the
-// original's checks, in its order).
+// Whether the scene model's car model, parts and their ready words are all
+// set (+5048, +5052, +5060 and +5064: the original's checks, in its order).
 bool ModelReady(uint8_t* base, uint32_t model) {
-  return guest::LoadU32(base, model + kModelPoints) != 0 &&
-         guest::LoadU32(base, model + 5052) != 0 &&
-         guest::LoadU32(base, model + kModelParts) != 0 &&
-         guest::LoadU32(base, model + 5064) != 0;
+  const schema::SceneModel m(base, model);
+  return m.car_model().address != 0 && m.car_model_ready() != 0 && m.parts().address != 0 &&
+         m.parts_ready() != 0;
 }
 
 }  // namespace
@@ -962,7 +981,7 @@ uint32_t ModelHasPoint(uint8_t* base, uint32_t model, int32_t index) {
   if (index < 4) {
     return 1;
   }
-  return ModelPartsHasPoint(base, guest::LoadU32(base, model + kModelParts), index);
+  return ModelPartsHasPoint(base, schema::SceneModel(base, model).parts().address, index);
 }
 
 uint32_t OverlayViewHasPoint(uint8_t* base, uint32_t view, int32_t index) {
@@ -1014,11 +1033,12 @@ uint32_t ModelPointPosition(uint8_t* base, uint32_t out, uint32_t model, int32_t
     return out;
   }
   if (index < 4) {
-    const uint32_t points = guest::LoadU32(base, guest::LoadU32(base, model + kModelPoints) + 24);
-    CopyDoublewords(base, points + 6976 + (uint32_t(index) << 4), out);
+    const schema::CarModel points =
+        schema::SceneModel(base, model).car_model().car_model();
+    CopyDoublewords(base, points.tire_positions_address() + (uint32_t(index) << 4), out);
     return out;
   }
-  return ModelPartsPointPosition(base, out, guest::LoadU32(base, model + kModelParts), index);
+  return ModelPartsPointPosition(base, out, schema::SceneModel(base, model).parts().address, index);
 }
 
 uint32_t OverlayViewPointPosition(uint8_t* base, uint32_t out, uint32_t view, int32_t index) {
@@ -2611,7 +2631,7 @@ namespace va = vehicle_accessors;
 namespace {
 
 uint32_t Body(uint8_t* base, uint32_t view) {
-  return guest::LoadU32(base, schema::OverlayView(base, view).vehicle() + 336);
+  return schema::Vehicle(base, schema::OverlayView(base, view).vehicle()).body().address;
 }
 
 }  // namespace
@@ -2630,7 +2650,8 @@ uint32_t WheelSurfaceMarks(uint8_t* base, uint32_t view, uint32_t wheel) {
   ITC_NATIVE_RUNNING("sub_821269B0 OverlayView::WheelSurfaceMarks");
   const uint32_t record = va::VehicleWheelContact(schema::OverlayView(base, view).vehicle(), wheel);
   // lha, then cmplwi: a negative surface compares as a large one.
-  const uint32_t surface = uint32_t(int32_t(int16_t(guest::LoadU16(base, record + 80))));
+  const uint32_t surface =
+      uint32_t(int32_t(int16_t(schema::TrackPosition(base, record).surface_kind())));
   if (surface == 0) {
     return 1;
   }
@@ -2686,13 +2707,13 @@ uint32_t IsBehindCamera(uint8_t* base, uint32_t overlays, uint32_t point) {
   const double py = guest::LoadFloat(base, point + 4);
   const double pz = guest::LoadFloat(base, point + 8);
   const simde__m128 from_eye =
-      VectorOf(bits(Difference(px, guest::LoadFloat(base, pass + 400))),
-               bits(Difference(py, guest::LoadFloat(base, pass + 404))),
-               bits(Difference(pz, guest::LoadFloat(base, pass + 408))), one);
+      VectorOf(bits(Difference(px, schema::CameraPass(base, pass).eye_x())),
+               bits(Difference(py, schema::CameraPass(base, pass).eye_y())),
+               bits(Difference(pz, schema::CameraPass(base, pass).eye_z())), one);
   const simde__m128 from_car =
-      VectorOf(bits(Difference(px, guest::LoadFloat(base, matrix + 48))),
-               bits(Difference(py, guest::LoadFloat(base, matrix + 52))),
-               bits(Difference(pz, guest::LoadFloat(base, matrix + 56))), one);
+      VectorOf(bits(Difference(px, schema::VectorLibMatrix(base, matrix).m30())),
+               bits(Difference(py, schema::VectorLibMatrix(base, matrix).m31())),
+               bits(Difference(pz, schema::VectorLibMatrix(base, matrix).m32())), one);
   const uint32_t csr = Fpscr::getcsr();
   const simde__m128 dot =
       Flushing(csr, csr | uint32_t(Fpscr::FlushMask), Dot3, from_car, from_eye);
@@ -2912,7 +2933,7 @@ void WorldPoint(uint8_t* base, uint32_t view, int32_t index, uint32_t frame,
 
 float VehicleFloat2508(uint8_t* base, uint32_t view) {
   ITC_NATIVE_RUNNING("sub_82126A90 OverlayView::VehicleFloat2508");
-  return guest::LoadFloat(base, schema::OverlayView(base, view).vehicle() + 2508);
+  return schema::Vehicle(base, schema::OverlayView(base, view).vehicle()).backfire_strength();
 }
 
 void LightSpriteShow(uint8_t* base, uint32_t sprite, uint32_t position) {

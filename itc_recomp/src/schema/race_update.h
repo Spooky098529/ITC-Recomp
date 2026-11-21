@@ -27,17 +27,31 @@ struct RaceScene : View {
   // the light set (RaceLights)
   uint32_t lights_address() const { return address + 30064; }
   // the race's screen object (1024 x 576; 0 when not made)
-  View screen_object() const { return View(base, guest::LoadU32(base, address + 31152)); }
+  template <typename T = ScreenObject>
+  T screen_object() const { return T(base, guest::LoadU32(base, address + 31152)); }
+  void set_screen_object(const View& v) const { guest::StoreU32(base, address + 31152, v.address); }
   void set_screen_object(uint32_t v) const { guest::StoreU32(base, address + 31152, v); }
   uint32_t screen_object_address() const { return address + 31152; }
   // split screen: player 1's screen object
-  View screen_object_first() const { return View(base, guest::LoadU32(base, address + 31156)); }
+  template <typename T = ScreenObject>
+  T screen_object_first() const { return T(base, guest::LoadU32(base, address + 31156)); }
+  void set_screen_object_first(const View& v) const { guest::StoreU32(base, address + 31156, v.address); }
   void set_screen_object_first(uint32_t v) const { guest::StoreU32(base, address + 31156, v); }
   uint32_t screen_object_first_address() const { return address + 31156; }
   // split screen: player 2's screen object
-  View screen_object_second() const { return View(base, guest::LoadU32(base, address + 31160)); }
+  template <typename T = ScreenObject>
+  T screen_object_second() const { return T(base, guest::LoadU32(base, address + 31160)); }
+  void set_screen_object_second(const View& v) const { guest::StoreU32(base, address + 31160, v.address); }
   void set_screen_object_second(uint32_t v) const { guest::StoreU32(base, address + 31160, v); }
   uint32_t screen_object_second_address() const { return address + 31160; }
+  // measure fault: Car::TickUpdate's halfword +0 of the car (the racer record, race-setup's Car: the paint pick), joined with the scene
+  uint16_t fault_car_pick() const { return guest::LoadU16(base, address + 0); }
+  void set_fault_car_pick(uint16_t v) const { guest::StoreU16(base, address + 0, v); }
+  uint32_t fault_car_pick_address() const { return address + 0; }
+  // measure fault: RaceScene::VaryCar's r3 is a car (the racer record, race-setup's Car), its word +12 (64 picks the +1580 byte), joined with the scene
+  uint32_t fault_car_12() const { return guest::LoadU32(base, address + 12); }
+  void set_fault_car_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t fault_car_12_address() const { return address + 12; }
 };
 
 // embedded; measure: RaceScene::RemakeCarModel.r5
@@ -45,7 +59,9 @@ struct RaceCarSlot : View {
   using View::View;
   static constexpr uint32_t kSize = 4288;
   // its pool 7 scene model (ScenePools::SetUpB's; 0 none)
-  View model() const { return View(base, guest::LoadU32(base, address + 0)); }
+  template <typename T = SceneModel>
+  T model() const { return T(base, guest::LoadU32(base, address + 0)); }
+  void set_model(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
   void set_model(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
   uint32_t model_address() const { return address + 0; }
   // its scene model record (car-makers.toml's SceneModelRecord, from SceneModelRecord::FromCar)
@@ -111,7 +127,9 @@ struct RaceLightEntry : View {
 // The image words docs/functions/race-update.md's code uses.
 struct RaceUpdateGlobals {
   // the race data: +4 the course, +32 the mode, +48 the racer records (3,936 bytes), +0x59614 the human cars, +0x59620 the stages, +0x59AE8 the racer records' list, +0xA3AF0 the split mode (4 split screen)
-  static View race_data(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  template <typename T = RaceData>
+  static T race_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  static void set_race_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B2Cu, v.address); }
   static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
   static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
   // the race's scenery configurations' two words, 8 bytes an entry (0 to 2 by mode, 3 courses 8 to 10)
@@ -127,15 +145,21 @@ struct RaceUpdateGlobals {
   // camera pass 0 (cameras.toml's CameraPass): +400 and +416 the two points Car::TickUpdate takes a direction of
   static constexpr uint32_t camera_pass0_address() { return 0x826BAC00u; }
   // the car scene (car-draw.toml's CarScene)
-  static View car_scene(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C2E44u)); }
+  template <typename T = CarScene>
+  static T car_scene(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C2E44u)); }
+  static void set_car_scene(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C2E44u, v.address); }
   static void set_car_scene(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C2E44u, v); }
   static constexpr uint32_t car_scene_address() { return 0x826C2E44u; }
   // the racers' manager: +2308 the racers
-  static View racers(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D82F4u)); }
+  template <typename T = RaceManager>
+  static T racers(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D82F4u)); }
+  static void set_racers(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D82F4u, v.address); }
   static void set_racers(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D82F4u, v); }
   static constexpr uint32_t racers_address() { return 0x826D82F4u; }
   // the viewports (camera-modes.toml's Viewports): +8 nonzero in split screen
-  static View viewports(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C2CE8u)); }
+  template <typename T = Viewports>
+  static T viewports(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C2CE8u)); }
+  static void set_viewports(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C2CE8u, v.address); }
   static void set_viewports(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C2CE8u, v); }
   static constexpr uint32_t viewports_address() { return 0x826C2CE8u; }
   // the vehicles' input records' pointers by vehicle index (+0 the flags: 0x8 brake, 0x100 high beams)

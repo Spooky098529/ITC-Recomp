@@ -15,6 +15,7 @@
 #include "models/xpr.h"
 #include "native/buffers.h"
 #include "scene_loaders/pools.h"
+#include "schema/accessories.h"
 #include "schema/car_models.h"
 
 #include <bit>
@@ -286,11 +287,11 @@ void FileLoaded(uint8_t* base, FileLoadedSet set, uint32_t request, uint32_t buf
     CopyWord(base, kZero, seat_l + 12);
     CopyWord(base, kZero, seat_r + 12);
   }
-  const uint32_t accessory = c.accessory_matrix<schema::View>().address;
-  if (accessory != 0) {
+  const schema::AccessoryMatrix accessory = c.accessory_matrix();
+  if (accessory.address != 0) {
     const uint32_t position = c.accessory_position_address();
-    Move8(base, accessory + 48, position);
-    Move8(base, accessory + 56, position + 8);
+    Move8(base, accessory.translation_xy_address(), position);
+    Move8(base, accessory.translation_zw_address(), position + 8);
     for (uint32_t w = 0; w < 3; w++) {
       scale(position + 4 * w);
     }

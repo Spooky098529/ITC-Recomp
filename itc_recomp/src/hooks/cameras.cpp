@@ -25,6 +25,7 @@
 #include "hooks/direct_slots.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "schema/app_start_up.h"
 #include "schema/cameras.h"
 
 #include <functional>
@@ -188,7 +189,7 @@ namespace {
 // slot 7, then that object's slot 3, as guest calls with the original's
 // return addresses. r3 = the video output after.
 uint32_t VideoOutputCall(lifted::Regs& ctx, uint8_t* base, uint32_t first, uint32_t second) {
-  ctx.r3.u64 = guest::LoadU32(base, 0x8266D088);
+  ctx.r3.u64 = schema::AppStartUpGlobals::scene_target_app(base).address;
   const uint32_t slot7 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
   ctx.lr = first;
   // Slot 7's plain C++ where it's the game's (hooks::DirectSlotCall).
@@ -490,7 +491,8 @@ ITC_FLAG_DECLARE(bool, log_recording_by_pass);
 
 namespace {
 
-constexpr uint32_t kScene = 0x826BABA0;
+// The render manager ([0x826BABA0], app-start-up.toml's render_app).
+using AppG = schema::AppStartUpGlobals;
 
 // A call through slot `slot` of r3's vtable, returning to `return_address`.
 // The render manager's slots 8 and 7 by their plain C++ where they're the
@@ -505,7 +507,7 @@ void VtableCall(lifted::Regs& ctx, uint8_t* base, uint32_t slot, uint32_t return
 }
 
 // A chunk recorded and handed to the render queue, as RecordViewport and
-// RecordClear do: the command list from the scene ([kScene]'s slot 8, then
+// RecordClear do: the command list from the scene ([0x826BABA0]'s slot 8, then
 // slot 1), `record(list)` (the plain C++: its first slot, or nullopt where
 // the original must run), the render queue (slot 8, then slot 2) and its
 // slot 4 (r4 = the chunk, r5 = the key, f1 = 0.0), the calls made from a
@@ -524,14 +526,14 @@ bool RecordAndSubmit(lifted::Regs& ctx, uint8_t* base, uint32_t frame_bytes,
   const uint64_t lr = ctx.lr;
   std::optional<uint32_t> chunk;
   guest_call::InFrame(ctx, base, frame_bytes, returns[0], [&](uint32_t) {
-    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    ctx.r3.u64 = AppG::render_app(base).address;
     VtableCall(ctx, base, 8, returns[0]);
     VtableCall(ctx, base, 1, returns[1]);
     chunk = record(ctx.r3.u32);
     if (!chunk) {
       return;
     }
-    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    ctx.r3.u64 = AppG::render_app(base).address;
     VtableCall(ctx, base, 8, returns[2]);
     VtableCall(ctx, base, 2, returns[3]);
     ctx.fpscr.disableFlushMode();
@@ -567,7 +569,7 @@ struct Route {
 // chunk, r5 = the key, f1 = 0.0).
 void Submit(lifted::Regs& ctx, uint8_t* base, const cameras::Submissions& subs, const Route& route) {
   for (uint32_t i = 0; i < subs.count; i++) {
-    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    ctx.r3.u64 = AppG::render_app(base).address;
     VtableCall(ctx, base, 8, route.get[i][0]);
     VtableCall(ctx, base, 2, route.get[i][1]);
     ctx.fpscr.disableFlushMode();
@@ -594,7 +596,7 @@ bool RecordPass(lifted::Regs& ctx, uint8_t* base, const uint32_t (&list_returns)
   const uint64_t lr = ctx.lr;
   bool done = false;
   guest_call::InFrame(ctx, base, 176, list_returns[0], [&](uint32_t) {
-    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    ctx.r3.u64 = AppG::render_app(base).address;
     VtableCall(ctx, base, 8, list_returns[0]);
     VtableCall(ctx, base, 1, list_returns[1]);
     const std::optional<cameras::Submissions> subs = record(ctx.r3.u32);

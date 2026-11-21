@@ -7,6 +7,9 @@
 #include "c_runtime/strings.h"
 #include "framework/framework.h"
 #include "guest.h"
+#include "schema/app_start_up.h"
+#include "schema/files_and_saves.h"
+#include "schema/framework.h"
 #include "schema/save_interface.h"
 
 namespace save_interface {
@@ -14,11 +17,10 @@ namespace save_interface {
 namespace {
 
 using G = schema::SaveInterfaceGlobals;
+// The save slot (files-and-saves.toml's SaveSlot).
+using schema::SaveSlot;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
 
 // A byte copy with its terminator, as the request setters' loops.
 void CopyBytes(uint8_t* base, uint32_t destination, uint32_t source) {
@@ -60,10 +62,12 @@ std::optional<uint32_t> Users(uint8_t* base) {
 }
 
 // The request setters' common part: the slot's base re-read from the
-// devices' +44 before every store, as the original does.
+// devices' +44 before every store, as the original does; `set_request` the
+// request word's setter (+968 the save's, +972 the load's).
 std::optional<uint64_t> RequestCommon(uint8_t* base, uint32_t devices, uint32_t slot,
                                       const Request& request, uint32_t thumbnail,
-                                      uint32_t thumbnail_size, uint32_t word) {
+                                      uint32_t thumbnail_size,
+                                      void (SaveSlot::*set_request)(uint32_t) const) {
   if (VirtualTarget(base, devices, 28) != kSlotState) {
     return std::nullopt;
   }
@@ -72,15 +76,15 @@ std::optional<uint64_t> RequestCommon(uint8_t* base, uint32_t devices, uint32_t 
   }
   const uint32_t offset = slot * 1000;
   const schema::SaveDevices d(base, devices);
-  const auto slots = [&] { return d.slots<schema::View>().address; };
-  CopyDisplayName(base, slots() + offset + 504, request.display_name);
-  CopyBytes(base, slots() + offset + 760, request.file_name);
-  CopyBytes(base, slots() + offset + 802, request.path);
-  Store(base, slots() + offset + 932, request.data);
-  Store(base, slots() + offset + 936, request.size);
-  Store(base, slots() + offset + 940, thumbnail);
-  Store(base, slots() + offset + 944, thumbnail_size);
-  Store(base, slots() + offset + word, 1);
+  const auto s = [&] { return SaveSlot(base, d.slots<schema::View>().address + offset); };
+  CopyDisplayName(base, s().display_name_address(), request.display_name);
+  CopyBytes(base, s().file_name_address(), request.file_name);
+  CopyBytes(base, s().file_path_address(), request.path);
+  s().set_data(request.data);
+  s().set_data_size(request.size);
+  s().set_thumbnail(thumbnail);
+  s().set_thumbnail_size(thumbnail_size);
+  (s().*set_request)(1);
   return 1;
 }
 
@@ -91,7 +95,8 @@ uint32_t VirtualTarget(uint8_t* base, uint32_t object, uint32_t offset) {
 }
 
 std::optional<uint32_t> AppDevices(uint8_t* base, uint32_t interface) {
-  const uint32_t object = Load(base, interface + 8);
+  const uint32_t object =
+      schema::AppInterface16(base, interface).framework_interface<schema::View>().address;
   if (VirtualTarget(base, object, 40) != kFrameworkDevices) {
     return std::nullopt;
   }
@@ -100,7 +105,8 @@ std::optional<uint32_t> AppDevices(uint8_t* base, uint32_t interface) {
 }
 
 std::optional<uint32_t> AppUsers(uint8_t* base, uint32_t interface) {
-  const uint32_t object = Load(base, interface + 8);
+  const uint32_t object =
+      schema::AppInterface16(base, interface).framework_interface<schema::View>().address;
   if (VirtualTarget(base, object, 36) != kFrameworkUsers) {
     return std::nullopt;
   }
@@ -136,42 +142,47 @@ uint32_t SlotAddress(uint8_t* base, uint32_t devices, uint32_t slot) {
 
 void SlotRequestDevice(uint8_t* base, uint32_t devices, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A5750 SaveSlot::RequestDevice");
-  Store(base, SlotAddress(base, devices, slot) + 960, 1);
+  SaveSlot(base, SlotAddress(base, devices, slot)).set_request_device_selector(1);
 }
 
 uint32_t SlotDevice(uint8_t* base, uint32_t devices, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A5768 SaveSlot::Device");
-  return Load(base, SlotAddress(base, devices, slot) + 36);
+  return SaveSlot(base, SlotAddress(base, devices, slot)).device();
 }
 
 uint64_t SlotFreeBytes(uint8_t* base, uint32_t devices, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A5780 SaveSlot::FreeBytes");
-  const uint32_t at = SlotAddress(base, devices, slot) + 40;
+  // Two word loads, as the original.
+  const uint32_t at = SaveSlot(base, SlotAddress(base, devices, slot)).device_free_bytes_address();
   return (uint64_t(Load(base, at)) << 32) | Load(base, at + 4);
 }
 
 uint32_t SlotSaveCount(uint8_t* base, uint32_t devices, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A5798 SaveSlot::SaveCount");
-  return Load(base, SlotAddress(base, devices, slot) + 984);
+  return SaveSlot(base, SlotAddress(base, devices, slot)).enumerated_saves();
 }
 
 uint64_t SlotSaveAt(uint8_t* base, uint32_t devices, uint32_t slot, uint64_t index) {
   ITC_NATIVE_RUNNING("sub_820A57B0 SaveSlot::SaveAt");
-  return uint64_t(Load(base, SlotAddress(base, devices, slot) + 80)) + index * 308;
+  return uint64_t(SaveSlot(base, SlotAddress(base, devices, slot)).enumeration_buffer()) +
+         index * schema::XContentData::kSize;
 }
 
 uint32_t SlotState(uint8_t* base, uint32_t devices, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A57F0 SaveSlot::State");
-  return Load(base, SlotAddress(base, devices, slot) + 988);
+  return SaveSlot(base, SlotAddress(base, devices, slot)).state();
 }
 
 uint64_t SlotPending(uint8_t* base, uint32_t devices, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_820A5808 SaveSlot::Pending");
-  const uint32_t at = SlotAddress(base, devices, slot);
+  const SaveSlot s(base, SlotAddress(base, devices, slot));
   uint64_t sum = 0;
-  for (uint32_t word = 960; word <= 980; word += 4) {
-    sum += Load(base, at + word);
-  }
+  sum += s.request_device_selector();
+  sum += s.request_enumeration();
+  sum += s.request_save();
+  sum += s.request_load();
+  sum += s.request_delete();
+  sum += s.failure_acknowledged();
   return sum;
 }
 
@@ -184,13 +195,13 @@ std::optional<uint64_t> SlotRequestSave(uint8_t* base, uint32_t devices, uint32_
                                         const Request& request) {
   ITC_NATIVE_RUNNING("sub_820A52E0 SaveSlot::RequestSave");
   return RequestCommon(base, devices, slot, request, request.thumbnail, request.thumbnail_size,
-                       968);
+                       &SaveSlot::set_request_save);
 }
 
 std::optional<uint64_t> SlotRequestLoad(uint8_t* base, uint32_t devices, uint32_t slot,
                                         const Request& request) {
   ITC_NATIVE_RUNNING("sub_820A53E8 SaveSlot::RequestLoad");
-  return RequestCommon(base, devices, slot, request, 0, 0, 972);
+  return RequestCommon(base, devices, slot, request, 0, 0, &SaveSlot::set_request_load);
 }
 
 void CopyDisplayName(uint8_t* base, uint32_t destination, uint32_t source) {
@@ -214,11 +225,13 @@ std::optional<uint32_t> Init(uint8_t* base, uint32_t interface) {
   if (VirtualTarget(base, interface, 12) != kAppDevices) {
     return std::nullopt;
   }
-  const uint32_t object = Load(base, interface + 8);
+  const uint32_t object =
+      schema::AppInterface16(base, interface).framework_interface<schema::View>().address;
   if (VirtualTarget(base, object, 40) != kFrameworkDevices) {
     return std::nullopt;
   }
-  if (VirtualTarget(base, Load(base, object + 88), 56) != kSetRootName) {
+  if (VirtualTarget(base, schema::FrameworkGetterSelf(base, object).word_88(), 56) !=
+      kSetRootName) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_8209FFB8 SaveInterface::Init");

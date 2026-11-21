@@ -29,7 +29,7 @@ constexpr uint32_t kKey = 683;
 // Line::RecordFlat's (below PowerGraph::Draw's).
 constexpr uint32_t kDrawFrame = 9648;
 constexpr uint32_t kLineFrame = 128;
-// The two sets of sprites in PowerGraph::Draw's frame (schema::LineSprite,
+// The two sets of sprites in PowerGraph::Draw's frame (schema::OverlaySprite,
 // 144 bytes each).
 constexpr uint32_t kTorqueSprites = 4976;
 constexpr uint32_t kPowerSprites = 368;
@@ -168,9 +168,8 @@ bool CarListCarSetUp(uint8_t* base, const front_end_car_draw::Calls& calls, uint
 // the frame `frame`, returning to `lr`.
 using SetFromCarCall = std::function<void(uint32_t function, uint64_t r3, uint64_t r4,
                                           uint64_t r5, uint32_t frame, uint32_t lr)>;
-// SetFromCar's frame (below its caller's r1) and its record's global.
+// SetFromCar's frame (below its caller's r1).
 constexpr uint32_t kSetFromCarFrame = 6960;
-constexpr uint32_t kPowerGraphScreen = 0x82815EBC;  // [it] + 8: the record
 // sub_82250488 PowerGraph::SetFromCar (r3 `car`, a garage car; r4 `tab`):
 // the power graph screen's record ([0x82815EBC] + 8) filled from the car,
 // as PowerGraph::SetEntry fills it from a car list entry. In its frame

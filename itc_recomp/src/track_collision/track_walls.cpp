@@ -8,6 +8,7 @@
 
 #include "base/log.h"
 #include "collision/collision.h"
+#include "schema/car_physics.h"
 #include "schema/collision_world.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -107,25 +108,25 @@ uint32_t WallQueryAddHit(uint8_t* base, uint32_t query, uint32_t surface) {
   const uint32_t room = va::CollisionWorldWord60(base);
   const uint32_t count = q.hit_count();
   const uint32_t index = int32_t(room) > int32_t(count) ? count : room - 1;
-  const uint32_t record = index * 80 + q.hits();
+  const schema::CollisionHit record(base, index * 80 + q.hits().address);
   if (int32_t(room) > int32_t(count)) {
     q.set_hit_count(count + 1);
   }
-  guest::StoreU32(base, record + 60, q.hit_wall());
-  CopyWord(base, q.time_address(), record + 64);
+  record.set_key(q.hit_wall());
+  CopyWord(base, q.time_address(), record.time_address());
   const double scale = double(G::hit_depth_scale(base));
-  Stfs(base, record + 48, Fmuls(double(q.hit_depth()), scale));
+  Stfs(base, record.depth_address(), Fmuls(double(q.hit_depth()), scale));
   const double depth2 = double(q.hit_depth_again());
-  guest::StoreU32(base, record + 56, surface);
-  Stfs(base, record + 52, Fmuls(depth2, scale));
+  record.set_surface_bits(surface);
+  Stfs(base, record.depth_2_address(), Fmuls(depth2, scale));
   for (uint32_t i = 0; i < 12; i += 4) {
-    CopyWord(base, q.hit_point_x_address() + i, record + 0 + i);
+    CopyWord(base, q.hit_point_x_address() + i, record.point_address() + i);
   }
   for (uint32_t i = 0; i < 12; i += 4) {
-    CopyWord(base, q.hit_normal_x_address() + i, record + 16 + i);
+    CopyWord(base, q.hit_normal_x_address() + i, record.normal_address() + i);
   }
   for (uint32_t i = 0; i < 12; i += 4) {
-    CopyWord(base, q.hit_push_x_address() + i, record + 32 + i);
+    CopyWord(base, q.hit_push_x_address() + i, record.push_address() + i);
   }
   return room;
 }

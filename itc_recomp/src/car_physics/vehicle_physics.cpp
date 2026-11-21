@@ -14,6 +14,7 @@
 #include "matrix_math/matrix_math.h"
 #include "memory/c_runtime_heap.h"
 #include "schema/car_physics.h"
+#include "schema/collision.h"
 #include "track_collision/track_collision.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -41,12 +42,13 @@ uint32_t World(uint8_t* base) {
 // the template lowered (+112 not 0.0) its stack copy native (the same
 // place both times).
 bool PlaceTwiceFits(uint8_t* base, uint32_t record, uint32_t place_frame) {
-  const uint32_t source = guest::LoadU32(base, record + 0);
-  if (!co::IsBox(base, source) || !co::IsBox(base, guest::LoadU32(base, record + 4)) ||
-      !co::IsBox(base, guest::LoadU32(base, record + 8))) {
+  const schema::CollisionShape shape(base, record);
+  const uint32_t source = shape.template_shape().address;
+  if (!co::IsBox(base, source) || !co::IsBox(base, shape.previous().address) ||
+      !co::IsBox(base, shape.current().address)) {
     return false;
   }
-  const bool lowered = Lfs(base, record + 112) != Lfs(base, kZero);
+  const bool lowered = Lfs(base, shape.bottom_lowering_address()) != Lfs(base, kZero);
   return !lowered || co::BoxCopyFits(place_frame + 80, source);
 }
 

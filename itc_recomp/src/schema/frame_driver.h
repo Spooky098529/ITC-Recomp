@@ -199,7 +199,7 @@ struct AppSceneInitBlock : View {
   uint32_t framework_interface_address() const { return address + 4; }
 };
 
-// embedded; measure: FrameDriver::Init.r4.+0, Scene::Scene.r4.+0
+// embedded; measure: FrameDriver::Init.r4.+0, Scene::Scene.r4.+0, SaveDevices::SaveDevices.r4.+0, sub_820998B8.r4.+0
 struct FrameDriverRunLoopRef : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -217,7 +217,7 @@ struct FrameDriverRunLoopRef : View {
   uint32_t add_tick_handler_address() const { return address + 8; }
 };
 
-// embedded; measure: Scene::OnEvent5.r4
+// embedded; measure: Scene::OnEvent5.r4, SaveDevices::OnEvent.r4
 struct FrameDriverRunLoop : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
@@ -229,7 +229,7 @@ struct FrameDriverRunLoop : View {
   uint32_t vtable_address() const { return address + 0; }
 };
 
-// image; measure: Scene::OnEvent5.r4.+0
+// image; measure: Scene::OnEvent5.r4.+0, SaveDevices::OnEvent.r4.+0
 struct FrameDriverRunLoopVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 20;
@@ -243,7 +243,7 @@ struct FrameDriverRunLoopVtable : View {
   uint32_t remove_tick_handler_address() const { return address + 16; }
 };
 
-// embedded; measure: Scene::OnEvent5.r5
+// embedded; measure: Scene::OnEvent5.r5, SaveDevices::OnEvent.r5
 struct FrameDriverEventWord : View {
   using View::View;
   static constexpr uint32_t kSize = 4;

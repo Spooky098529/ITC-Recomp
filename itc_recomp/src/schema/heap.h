@@ -175,7 +175,7 @@ struct D3DXBufferOut : View {
   uint32_t buffer_address() const { return address + 0; }
 };
 
-// embedded; measure: sub_825A67A8.r3, sub_825A67A8.r4
+// embedded; measure: sub_825A67A8.r3, sub_825A67A8.r4, sub_820919B8.r3, sub_820915F8.r3
 struct StdException : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -212,60 +212,6 @@ struct VtableObject : View {
   uint32_t vtable_address() const { return address + 0; }
 };
 
-// allocated; measure: sub_820908F8.ret
-struct Framework : View {
-  using View::View;
-  static constexpr uint32_t kSize = 64;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-  uint32_t vtable_4() const { return guest::LoadU32(base, address + 4); }
-  void set_vtable_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t vtable_4_address() const { return address + 4; }
-  uint32_t vtable_8() const { return guest::LoadU32(base, address + 8); }
-  void set_vtable_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t vtable_8_address() const { return address + 8; }
-  uint32_t vtable_12() const { return guest::LoadU32(base, address + 12); }
-  void set_vtable_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t vtable_12_address() const { return address + 12; }
-  uint32_t vtable_16() const { return guest::LoadU32(base, address + 16); }
-  void set_vtable_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t vtable_16_address() const { return address + 16; }
-  uint32_t vtable_20() const { return guest::LoadU32(base, address + 20); }
-  void set_vtable_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t vtable_20_address() const { return address + 20; }
-  uint32_t vtable_24() const { return guest::LoadU32(base, address + 24); }
-  void set_vtable_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
-  uint32_t vtable_24_address() const { return address + 24; }
-  uint32_t vtable_28() const { return guest::LoadU32(base, address + 28); }
-  void set_vtable_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t vtable_28_address() const { return address + 28; }
-  uint32_t vtable_32() const { return guest::LoadU32(base, address + 32); }
-  void set_vtable_32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
-  uint32_t vtable_32_address() const { return address + 32; }
-  uint32_t vtable_36() const { return guest::LoadU32(base, address + 36); }
-  void set_vtable_36(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
-  uint32_t vtable_36_address() const { return address + 36; }
-  uint32_t vtable_40() const { return guest::LoadU32(base, address + 40); }
-  void set_vtable_40(uint32_t v) const { guest::StoreU32(base, address + 40, v); }
-  uint32_t vtable_40_address() const { return address + 40; }
-  uint32_t vtable_44() const { return guest::LoadU32(base, address + 44); }
-  void set_vtable_44(uint32_t v) const { guest::StoreU32(base, address + 44, v); }
-  uint32_t vtable_44_address() const { return address + 44; }
-  uint32_t vtable_48() const { return guest::LoadU32(base, address + 48); }
-  void set_vtable_48(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
-  uint32_t vtable_48_address() const { return address + 48; }
-  uint32_t vtable_52() const { return guest::LoadU32(base, address + 52); }
-  void set_vtable_52(uint32_t v) const { guest::StoreU32(base, address + 52, v); }
-  uint32_t vtable_52_address() const { return address + 52; }
-  uint32_t vtable_56() const { return guest::LoadU32(base, address + 56); }
-  void set_vtable_56(uint32_t v) const { guest::StoreU32(base, address + 56, v); }
-  uint32_t vtable_56_address() const { return address + 56; }
-  uint32_t vtable_60() const { return guest::LoadU32(base, address + 60); }
-  void set_vtable_60(uint32_t v) const { guest::StoreU32(base, address + 60, v); }
-  uint32_t vtable_60_address() const { return address + 60; }
-};
-
 // allocated; measure: sub_82090D68.ret
 struct DualVtableObject : View {
   using View::View;
@@ -276,53 +222,6 @@ struct DualVtableObject : View {
   uint32_t vtable_4() const { return guest::LoadU32(base, address + 4); }
   void set_vtable_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t vtable_4_address() const { return address + 4; }
-};
-
-// embedded; measure: sub_82091070.r3
-struct DebugText : View {
-  using View::View;
-  static constexpr uint32_t kSize = 52;
-  static constexpr uint32_t kVtable = 0x82000BC8;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-  // an embedded DualVtableObject's (0x82000EB8)
-  uint32_t vtable_8() const { return guest::LoadU32(base, address + 8); }
-  void set_vtable_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t vtable_8_address() const { return address + 8; }
-  uint32_t vtable_12() const { return guest::LoadU32(base, address + 12); }
-  void set_vtable_12(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t vtable_12_address() const { return address + 12; }
-  // the functors' base 0x82000ABC
-  uint32_t vtable_32() const { return guest::LoadU32(base, address + 32); }
-  void set_vtable_32(uint32_t v) const { guest::StoreU32(base, address + 32, v); }
-  uint32_t vtable_32_address() const { return address + 32; }
-  // a block freed with operator delete[]
-  uint32_t unknown_48() const { return guest::LoadU32(base, address + 48); }
-  void set_unknown_48(uint32_t v) const { guest::StoreU32(base, address + 48, v); }
-  uint32_t unknown_48_address() const { return address + 48; }
-};
-
-// allocated; measure: sub_820A4508.r3, sub_820A5660.r3
-struct SaveSlot : View {
-  using View::View;
-  static constexpr uint32_t kSize = 1000;
-  static constexpr uint32_t kVtable = 0x82002190;
-  // the operator new[] block's count, 8 bytes before the first slot
-  uint32_t array_count() const { return guest::LoadU32(base, address + -8); }
-  void set_array_count(uint32_t v) const { guest::StoreU32(base, address + -8, v); }
-  uint32_t array_count_address() const { return address + -8; }
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-  // a block the destructor frees
-  uint32_t unknown_80() const { return guest::LoadU32(base, address + 80); }
-  void set_unknown_80(uint32_t v) const { guest::StoreU32(base, address + 80, v); }
-  uint32_t unknown_80_address() const { return address + 80; }
-  // a block the destructor frees
-  uint32_t unknown_84() const { return guest::LoadU32(base, address + 84); }
-  void set_unknown_84(uint32_t v) const { guest::StoreU32(base, address + 84, v); }
-  uint32_t unknown_84_address() const { return address + 84; }
 };
 
 // allocated; measure: sub_820A9010.r3
@@ -353,123 +252,6 @@ struct VectorHolderOwner : View {
   void set_holder(const View& v) const { guest::StoreU32(base, address + 4, v.address); }
   void set_holder(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
   uint32_t holder_address() const { return address + 4; }
-};
-
-// allocated; measure: sub_820AE9F8.r3
-struct Movie : View {
-  using View::View;
-  static constexpr uint32_t kSize = 40;
-  static constexpr uint32_t kVtable = 0x82002910;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-  // the 8-byte MovieWrapper, or 0
-  template <typename T = MovieWrapper>
-  T wrapper() const { return T(base, guest::LoadU32(base, address + 8)); }
-  void set_wrapper(const View& v) const { guest::StoreU32(base, address + 8, v.address); }
-  void set_wrapper(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t wrapper_address() const { return address + 8; }
-  // the command at +12's vtables (0x82000EB8 put back)
-  uint32_t command_vtable() const { return guest::LoadU32(base, address + 12); }
-  void set_command_vtable(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t command_vtable_address() const { return address + 12; }
-  uint32_t command_vtable_16() const { return guest::LoadU32(base, address + 16); }
-  void set_command_vtable_16(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t command_vtable_16_address() const { return address + 16; }
-  // the delegate's vtable (0x82000ABC put back)
-  uint32_t delegate_vtable() const { return guest::LoadU32(base, address + 36); }
-  void set_delegate_vtable(uint32_t v) const { guest::StoreU32(base, address + 36, v); }
-  uint32_t delegate_vtable_address() const { return address + 36; }
-};
-
-// allocated; measure: sub_820AE9F8.r3.+8
-struct MovieWrapper : View {
-  using View::View;
-  static constexpr uint32_t kSize = 4;
-  template <typename T = MovieWrapperVtable>
-  T vtable() const { return T(base, guest::LoadU32(base, address + 0)); }
-  void set_vtable(const View& v) const { guest::StoreU32(base, address + 0, v.address); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-};
-
-// image; measure: sub_820AE9F8.r3.+8.+0
-struct MovieWrapperVtable : View {
-  using View::View;
-  static constexpr uint32_t kSize = 32;
-  // called by the movie's destructor (probably the release)
-  uint32_t slot_7() const { return guest::LoadU32(base, address + 28); }
-  void set_slot_7(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t slot_7_address() const { return address + 28; }
-};
-
-// embedded; measure: sub_8258CE00.r3
-struct CommandList : View {
-  using View::View;
-  static constexpr uint32_t kSize = 32;
-  static constexpr uint32_t kVtable = 0x8206C080;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-  // a block freed with operator delete[]
-  uint32_t unknown_20() const { return guest::LoadU32(base, address + 20); }
-  void set_unknown_20(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t unknown_20_address() const { return address + 20; }
-  uint32_t unknown_24() const { return guest::LoadU32(base, address + 24); }
-  void set_unknown_24(uint32_t v) const { guest::StoreU32(base, address + 24, v); }
-  uint32_t unknown_24_address() const { return address + 24; }
-  uint32_t unknown_28() const { return guest::LoadU32(base, address + 28); }
-  void set_unknown_28(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
-  uint32_t unknown_28_address() const { return address + 28; }
-};
-
-// embedded; measure: sub_82594440.r3
-struct TextureProvider : View {
-  using View::View;
-  static constexpr uint32_t kSize = 20;
-  static constexpr uint32_t kVtable = 0x8206CCB4;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-  // the texture pointers' std::vector: first slot
-  uint32_t first() const { return guest::LoadU32(base, address + 8); }
-  void set_first(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t first_address() const { return address + 8; }
-  uint32_t last() const { return guest::LoadU32(base, address + 12); }
-  void set_last(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t last_address() const { return address + 12; }
-  // the end of its storage
-  uint32_t end() const { return guest::LoadU32(base, address + 16); }
-  void set_end(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
-  uint32_t end_address() const { return address + 16; }
-};
-
-// allocated; measure: sub_82599BE0.r3
-struct Skeleton : View {
-  using View::View;
-  static constexpr uint32_t kSize = 180;
-  static constexpr uint32_t kVtable = 0x8206CE50;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-  // the per-node float4s (freed with operator delete[])
-  uint32_t node_vectors() const { return guest::LoadU32(base, address + 176); }
-  void set_node_vectors(uint32_t v) const { guest::StoreU32(base, address + 176, v); }
-  uint32_t node_vectors_address() const { return address + 176; }
-};
-
-// allocated; measure: sub_825A13D8.r3
-struct PrimitiveDrawer : View {
-  using View::View;
-  static constexpr uint32_t kSize = 8;
-  static constexpr uint32_t kVtable = 0x820721D4;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-  // a block the destructor frees
-  uint32_t unknown_4() const { return guest::LoadU32(base, address + 4); }
-  void set_unknown_4(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t unknown_4_address() const { return address + 4; }
 };
 
 // allocated; measure: new<16>@sub_820A81C0#2

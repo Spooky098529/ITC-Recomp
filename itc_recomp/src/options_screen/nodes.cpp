@@ -9,7 +9,6 @@
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
-#include <bit>
 
 namespace options_screen {
 
@@ -19,6 +18,7 @@ using guest::LoadU32;
 using guest::StoreU32;
 using G = schema::OptionsScreenGlobals;
 using S = schema::OptionsSettings;
+using Node = schema::UiMovieNode;
 
 // A helper's frame (`bytes` below `sp`, its back chain) and `m`.
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
@@ -54,7 +54,7 @@ uint32_t ShowPicture(uint8_t* base, uint32_t shown, uint32_t sub_scene, int32_t 
   uint32_t node = 0;
   for (int32_t i = 0; i < count; i++) {
     node = ui_movies::FindNode(base, m, sub_scene, uint32_t(i) + 6);
-    StoreU32(base, node + 80, int32_t(shown) == i ? 1 : 0);
+    Node(base, node).set_visible(int32_t(shown) == i ? 1 : 0);
   }
   return node;
 }
@@ -68,7 +68,7 @@ uint32_t SetCategoryArrow(uint8_t* base, uint64_t value, uint32_t sp) {
   const int64_t word = int64_t(int32_t(uint32_t(value)));
   StoreWord(base, frame + 80, word);
   const uint32_t child = ui_movies::Child(base, node, 0);
-  StoreU32(base, child + 16, std::bit_cast<uint32_t>(float(double(word))));
+  Node(base, child).set_y(float(double(word)));
   return child;
 }
 
@@ -84,7 +84,7 @@ uint64_t ShowVolumeNumber(uint8_t* base, uint32_t node, uint64_t volume, uint32_
   uint32_t child = 0;
   for (int32_t i = 1; i <= 15; i++) {
     child = ui_movies::Child(base, node, uint32_t(i) + 3);
-    StoreU32(base, child + 80, i == int32_t(uint32_t(volume)) ? 1 : 0);
+    Node(base, child).set_visible(i == int32_t(uint32_t(volume)) ? 1 : 0);
   }
   return child;
 }
@@ -152,7 +152,7 @@ uint32_t ShowVolumeBar(uint8_t* base, uint32_t node, uint64_t volume, uint32_t s
   uint32_t child = 0;
   for (int32_t i = 1; i <= 15; i++) {
     child = ui_movies::Child(base, node, uint32_t(i) + 21);
-    StoreU32(base, child + 80, i <= int32_t(uint32_t(volume)) ? 1 : 0);
+    Node(base, child).set_visible(i <= int32_t(uint32_t(volume)) ? 1 : 0);
   }
   return child;
 }
@@ -216,21 +216,25 @@ uint64_t ShowHudValues(uint8_t* base, uint32_t sp) {
   StoreU32(base, frame + 112, o.ok_default());
   const uint32_t group = ui_movies::FindNode(base, m, 5, 2);
   uint64_t r3 = group;
-  for (int32_t i = 0; i < int32_t(LoadU32(base, group + 104)); i++) {
-    const uint32_t row = ui_movies::FindNode(base, m, 5, LoadU32(base, group + 100) + uint32_t(i));
-    const uint32_t left = ui_movies::FindNode(base, m, 5, LoadU32(base, row + 100));
+  const Node g(base, group);
+  for (int32_t i = 0; i < int32_t(LoadU32(base, g.height_address())); i++) {
+    const uint32_t row =
+        ui_movies::FindNode(base, m, 5, LoadU32(base, g.width_address()) + uint32_t(i));
+    const uint32_t left =
+        ui_movies::FindNode(base, m, 5, LoadU32(base, Node(base, row).width_address()));
     const uint32_t left_frame = ui_movies::Child(base, left, 0);
     const uint32_t left_shown = ui_movies::Child(base, left, 2);
-    const uint32_t right = ui_movies::FindNode(base, m, 5, LoadU32(base, row + 100) + 1);
+    const uint32_t right =
+        ui_movies::FindNode(base, m, 5, LoadU32(base, Node(base, row).width_address()) + 1);
     const uint32_t right_frame = ui_movies::Child(base, right, 0);
     const uint32_t right_shown = ui_movies::Child(base, right, 2);
     // The value as the frame holds it (rows past the five read the frame's
     // next words, as the original does).
     const uint32_t on = int32_t(LoadU32(base, frame + 96 + 4 * uint32_t(i))) == 1 ? 1 : 0;
-    StoreU32(base, left_frame + 108, on ^ 1);
-    StoreU32(base, left_shown + 80, on);
-    StoreU32(base, right_frame + 108, on);
-    StoreU32(base, right_shown + 80, on ^ 1);
+    Node(base, left_frame).set_texture_entry(on ^ 1);
+    Node(base, left_shown).set_visible(on);
+    Node(base, right_frame).set_texture_entry(on);
+    Node(base, right_shown).set_visible(on ^ 1);
     r3 = right_shown;
   }
   return r3;
@@ -252,7 +256,7 @@ uint32_t ShowList(uint8_t* base, uint32_t frame, uint32_t m, uint32_t sub_scene,
     const uint32_t text = ui_movies::Child(base, item, 0);
     calls.Call(kSetNodeText, frame, text_lr, m, text, names[i], 0);
     picture = ui_movies::Child(base, item, 1);
-    StoreU32(base, picture + 108, LoadU32(base, frame + values + 4 * i));
+    Node(base, picture).set_texture_entry(LoadU32(base, frame + values + 4 * i));
   }
   return picture;
 }

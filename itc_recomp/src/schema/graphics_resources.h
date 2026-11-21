@@ -177,7 +177,7 @@ struct SurfaceHeader : View {
   uint32_t edram_bytes_address() const { return address + 44; }
 };
 
-// allocated; measure: VertexBuffer, IndexBuffer, new<32>@Device::CreateVertexBuffer, new<32>@Device::CreateIndexBuffer
+// allocated; measure: VertexBuffer, IndexBuffer, new<32>@Device::CreateVertexBuffer, new<32>@Device::CreateIndexBuffer, Device.+12180
 struct BufferHeader : View {
   using View::View;
   static constexpr uint32_t kSize = 32;
@@ -200,6 +200,10 @@ struct BufferHeader : View {
   uint32_t size() const { return guest::LoadU32(base, address + 28); }
   void set_size(uint32_t v) const { guest::StoreU32(base, address + 28, v); }
   uint32_t size_address() const { return address + 28; }
+  // stored by Device::SetIndices on the bound index buffer (Device.+12180; single-commands' report); not read in detail
+  uint32_t unknown_8() const { return guest::LoadU32(base, address + 8); }
+  void set_unknown_8(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t unknown_8_address() const { return address + 8; }
 };
 
 // embedded; measure: Texture::LevelDesc.r5, Surface::GetDesc.r4

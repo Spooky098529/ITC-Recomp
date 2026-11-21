@@ -35,7 +35,9 @@
 # The first set of scene pools ([0x826C2E40], 140 bytes, ScenePools::MakeA;
 # filled by ScenePools::CreateA).
 [ScenePools]
-measures = ["ScenePools", "new<140>@sub_820C3C40"]
+# measures from CarModelsFirstSet (car-models), merged at the integration
+measures = ["ScenePools", "new<140>@sub_820C3C40",
+            "new<140>@ScenePools::MakeA", "CarInterior.+3092", "TrafficCar.+576"]
 size = 140
 origin = "allocated"
 fields = [
@@ -113,7 +115,8 @@ fields = [
 # The car parts (pool 1, 106,016 bytes, vtable 0x82005094; CarParts::CarParts
 # sub_820D7428). SceneModel.+5060.+104 is CarParts::ApplyPalette's r3.
 [CarParts]
-measures = ["CarParts", "SceneModel.+5060.+104"]
+measures = ["CarParts", "SceneModel.+5060.+104",
+            "CarParts::OnPartLoadedA.r6", "CarParts::OnPartLoadedB.r6"]
 size = 106016
 origin = "allocated"
 vtable = 0x82005094
@@ -210,6 +213,7 @@ fields = [
 # sub_820D6A70): one model.
 [Pool4Object]
 measure = "Pool4Object"
+measures = ["sub_820D69B8.r6"]
 size = 592
 origin = "allocated"
 vtable = 0x82005064

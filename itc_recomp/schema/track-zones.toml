@@ -49,6 +49,8 @@ fields = [
   { name = "leave_count", offset = 800, type = "u16" },
   { name = "leave_sections", offset = 804, type = "bytes", count = 256, note = "the leave list's 64 words: sections" },
   { name = "check_beside", offset = 1060, type = "u32", note = "1 to check the sections beside the ends (links 6 to 9)" },
+  { name = "fault_out_section", offset = 0, type = "u16", note = "measure fault: RouteRange::Advance's and ToNeighbor's r3 is an out position on the stack (section at +0), joined with the range; tools/type_map.py should split it" },
+  { name = "fault_out_slice", offset = 2, type = "u16", note = "measure fault: the out position's slice at +2 (Advance, ToNeighbor)" },
 ]
 
 # The track zones' owner ([0x828161EC], 1,199,156 bytes, TrackZones::):

@@ -13,7 +13,9 @@
 
 namespace graphics::command_buffer {
 
-// The device's fields used here.
+// The device's fields (schema::Device, itc_recomp/schema/device-state.toml).
+// This area's code reads them through the view; the constants stay for
+// src/graphics/predicated_tiling.cpp until it does too.
 constexpr uint32_t kWritePosition = 40;    // the last word written (pre-increment)
 constexpr uint32_t kSegmentEnd = 44;
 constexpr uint32_t kSoftEnd = 48;           // the end less 160: writers end the segment past it

@@ -7,7 +7,10 @@
 #include "camera_modes/steps.h"
 #include "guest.h"
 #include "schema/car_physics.h"
+#include "schema/race_event.h"
 #include "schema/race_hud_object.h"
+#include "schema/race_setup.h"
+#include "schema/camera_modes.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -209,14 +212,15 @@ uint32_t SetUpExtraGauges(uint8_t* base, uint32_t hud, uint32_t sp) {
   const uint32_t frame = sp - 144;
   Frame(base, sp, 144);
   const Hud h(base, hud);
-  const uint32_t car = h.vehicle().address;
-  uint32_t entry = guest::LoadU32(base, car + 5712) + 1824 + 8;
+  const schema::Vehicle car = h.vehicle();
+  // The car's five choices' third words (CarChoice.c), 12 bytes apart.
+  uint32_t entry = schema::Car(base, car.car()).choice0_a_address();
   guest::StoreU32(base, frame + 88, 0);
   h.set_part_fitted(0);
   guest::StoreU32(base, frame + 84, 0);
   guest::StoreU32(base, frame + 80, 0);
-  for (int k = 0; k < 5; k++, entry += 12) {
-    switch (int32_t(guest::LoadU32(base, entry))) {
+  for (int k = 0; k < 5; k++, entry += schema::CarChoice::kSize) {
+    switch (int32_t(schema::CarChoice(base, entry).c())) {
       case 1:
         h.set_part_fitted(1);
         break;
@@ -233,7 +237,7 @@ uint32_t SetUpExtraGauges(uint8_t* base, uint32_t hud, uint32_t sp) {
         break;
     }
   }
-  if (int32_t(guest::LoadU32(base, guest::LoadU32(base, car + 5712) + 12)) == 10) {
+  if (int32_t(schema::Car(base, car.car()).car_id()) == 10) {
     h.set_part_fitted(1);
   }
   guest::StoreU32(base, frame + 96, frame + 80);
@@ -262,13 +266,14 @@ uint32_t SetUpExtraGauges(uint8_t* base, uint32_t hud, uint32_t sp) {
 uint32_t ApplyOptions(uint8_t* base, uint32_t hud, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82212768 RaceHud::ApplyOptions");
   Frame(base, sp, 96);
-  const uint32_t options = vehicle_accessors::SaveDataOf(base, 0) + 0x20000 - 1956;
+  const schema::SaveData options(base, vehicle_accessors::SaveDataOf(base, 0));
   const Hud h(base, hud);
   const bool mirror = h.view_dashboard() != 0;
-  // The four options (+0 to +12), word by word.
-  for (uint32_t i = 0; i < 16; i += 4) {
-    guest::StoreU32(base, h.option_node3_address() + i, guest::LoadU32(base, options + i));
-  }
+  // The four HUD options (the save data's +0x1F85C to +0x1F868), word by word.
+  h.set_option_node3(options.hud_option_0());
+  h.set_option_node1(options.hud_option_1());
+  h.set_option_gauges(options.hud_option_2());
+  h.set_option_mirror(options.hud_option_3());
   if (mirror) {
     const uint32_t node = ui_movies::FindNode(base, Dashboard(base, hud), kNone, 4);
     guest::StoreU32(base, node + 80, h.option_mirror());
@@ -293,8 +298,8 @@ uint32_t UpdateView(uint8_t* base, uint32_t hud, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82212B68 RaceHud::UpdateView");
   Frame(base, sp, 112);
   const Hud h(base, hud);
-  const uint32_t viewport = guest::LoadU32(base, G::viewports(base).address);
-  h.set_view(guest::LoadU32(base, viewport + 1860));
+  const schema::Viewport viewport = G::viewports(base).first();
+  h.set_view(viewport.view_mode());
   const uint32_t full = ui_movies::FindNode(base, Dashboard(base, hud), kNone, 0);
   const uint32_t cockpit = ui_movies::FindNode(base, Dashboard(base, hud), kNone, 4);
   const uint32_t view = h.view();

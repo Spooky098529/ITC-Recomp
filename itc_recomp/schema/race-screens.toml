@@ -39,7 +39,9 @@ fields = [
 # MenuList::Init in save-data.md): the in-race screens' and about 50
 # front-end screens'.
 [MenuList]
-measures = ["MenuList", "new<72>@PauseMenu::Create", "new<72>@AfterRaceMenu::Create", "new<72>@RaceDialog::Create"]
+measures = ["MenuList", "new<72>@PauseMenu::Create", "new<72>@AfterRaceMenu::Create", "new<72>@RaceDialog::Create",
+            "new<72>@PauseMenu4::Create", "new<72>@SaveScreen::OnEnter", "new<72>@TitleScreen::Create", "new<72>@ReplayTheater::Create", "new<72>@PlateEditor::Create", "new<72>@BuildScreen::Create", "new<72>@BuildScreen::Create#2",
+            "new<72>@GarageScreen::Create", "new<72>@GarageScreen::Create#2", "new<72>@RaceScreens::Make1004", "new<72>@CarDealer::Create#2"]
 size = 72
 origin = "allocated"
 fields = [

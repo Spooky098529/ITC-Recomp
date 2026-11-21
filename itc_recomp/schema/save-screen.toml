@@ -86,8 +86,8 @@ pages = { address = 0x826D844C, type = "ptr", to = "PageObject", note = "the pag
 list = { address = 0x826D8450, type = "ptr", to = "MenuList", note = "the menu list (72 bytes)" }
 data = { address = 0x826D8454, type = "ptr", to = "SaveScreenData" }
 mode_type = { address = 0x826032DC, type = "u32", note = "the mode type (Modes::), which the end pages post by" }
-save_buffers = { address = 0x828161F0, type = "u32", note = "the save buffers' header (+0 the game data's buffer, +4 a replay's, +20 the replays' count)" }
+save_buffers = { address = 0x828161F0, type = "ptr", to = "SaveBuffers", note = "the save buffers' header (save-interface.toml's SaveBuffers: +0 the game data's buffer, +4 a replay's, +20 the replays' count)" }
 kept_replay = { address = 0x826C5B50, type = "u32", note = "the replay kept for the replay screen" }
 profile_read = { address = 0x826C6080, type = "u32", note = "the profile's read (997 while pending)" }
 profile_wanted = { address = 0x826C7958, type = "u32", note = "whether to read the profile" }
-profile_reader = { address = 0x826C6AD0, type = "u32", note = "the profile reader (its +4 the results)" }
+profile_reader = { address = 0x826C6AD0, type = "ptr", to = "SysProfileResults", note = "the profile read's results (system-services.toml's SysProfileResults: +4 the settings)" }

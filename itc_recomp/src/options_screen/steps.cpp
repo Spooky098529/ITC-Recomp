@@ -8,6 +8,7 @@
 #include "mode_tick/mode_tick.h"
 #include "native/buffers.h"
 #include "schema/menu_helpers.h"
+#include "schema/mode_tick.h"
 #include "ui_movies/game.h"
 
 namespace options_screen {
@@ -71,6 +72,7 @@ uint64_t Step(uint8_t* base, uint32_t step, uint32_t sp, uint32_t bytes, uint32_
 
 using G = schema::OptionsScreenGlobals;
 using S = schema::OptionsSettings;
+using MovieNode = schema::UiMovieNode;
 
 S Settings(uint8_t* base) { return G::settings(base); }
 schema::FrontEndMenu Menu(uint8_t* base) { return G::menu(base); }
@@ -328,9 +330,9 @@ uint64_t MoveCategoryCursor(uint8_t* base, uint32_t step, uint32_t sp, const Cal
   return Step(base, step, sp, 160, 0x821C2E18, calls, [&](const Movie& m, uint32_t frame) {
     const Cursor2 c = Cursors(base);
     const uint32_t title = ui_movies::FindNode(base, m.m, kMinusOne, 28);
-    StoreU32(base, title + 108, Category(base));
+    MovieNode(base, title).set_texture_entry(Category(base));
     const uint32_t title2 = ui_movies::FindNode(base, m.m, kMinusOne, 29);
-    StoreU32(base, title2 + 108, Category(base));
+    MovieNode(base, title2).set_texture_entry(Category(base));
     m.Finish(0x821C2CB4, kMinusOne64, 2);
     m.Play(0x821C2CD4, kMinusOne64, 2, 1);
     m.Finish(0x821C2CEC, 21, uint64_t(Menu(base).previous()) + 2);
@@ -708,8 +710,8 @@ uint64_t FadeIn(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
     StoreU32(base, step, 1);
   }
   const uint32_t run = uint32_t(m.Run(0x821C7144));
-  const uint32_t fades =
-      LoadU32(base, mode_tick::kFadeOutCounts) | LoadU32(base, mode_tick::kFadeInCounts);
+  using T = schema::ModeTickGlobals;
+  const uint32_t fades = T::fade_out_count_0(base) | T::fade_in_count_0(base);
   return run == 0 && fades == 0 ? 1 : 0;
 }
 

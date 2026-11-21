@@ -235,8 +235,8 @@ light_vector = { address = 0x8265ED00, type = "bytes", count = 16, note = "pixel
 bias_matrix = { address = 0x8265EED0, type = "bytes", count = 64, note = "the bias matrix the projectors and the fit end with" }
 render_manager = { address = 0x826BABA0, type = "ptr", note = "the render manager (app-start-up.md)" }
 viewports = { address = 0x826C2CE8, type = "ptr", note = "the viewports' pointer array (camera-modes.md): +4 v viewport v (+1860 its view mode)" }
-scene = { address = 0x826C2E44, type = "ptr", note = "the car scene (scene.md)" }
-race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data (+0xA3AF0 the race kind, +0x59614, +0x59620 the stages, +0x59AE4)" }
+scene = { address = 0x826C2E44, type = "ptr", to = "CarScene", note = "the car scene (scene.md)" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (+0xA3AF0 the race kind, +0x59614, +0x59620 the stages, +0x59AE4)" }
 second_human = { address = 0x826C7824, type = "u32", note = "the word Minimap::Draw reads for the human car (0x826C7820's +4)" }
 shared_texture = { address = 0x8296B8F0, type = "u32", note = "the shared assets' texture, or render target 1" }
 queue_key_group1 = { address = 0x8296B900, type = "u32", note = "the render queue's key for Model::Draw's group 1" }

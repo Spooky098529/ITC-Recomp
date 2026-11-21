@@ -21,6 +21,7 @@
 #include "scene_loaders/model_point.h"
 #include "scene_loaders/objects.h"
 #include "scene_loaders/pools.h"
+#include "schema/models.h"
 #include "schema/scene_loaders.h"
 #include "lifted/sdk.h"
 
@@ -361,7 +362,8 @@ sl::FileLoadedCalls MakeFileLoadedCalls(lifted::Regs& ctx, uint8_t* base,
     ctx.r4.u64 = 0;
     ctx.r5.u64 = xpr;
     ctx.lr = at.provider_set;
-    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
+    // The provider's vtable's slot 4, TextureProvider::Set (models.md).
+    lifted::CallFromContext(ctx, base, schema::TextureProvider(base, provider).vtable().set());
     return ctx.r3.u64;
   };
   calls.skeleton_bind = [&ctx, base, at](uint32_t skeleton, uint32_t file) {

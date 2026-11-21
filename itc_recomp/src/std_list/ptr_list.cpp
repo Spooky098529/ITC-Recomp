@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/app_states.h"
 #include "schema/input.h"
 
 #include <cstdlib>
@@ -13,13 +14,6 @@
 namespace std_list {
 
 namespace {
-
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
-uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
-}
 
 // A node allocated after CanAllocate said it could be.
 uint32_t NewNode(uint8_t* base) {
@@ -51,11 +45,12 @@ std::optional<uint32_t> AllocateNodes(uint8_t* base, uint32_t count) {
 
 bool IncSize(uint8_t* base, uint32_t list, uint32_t count) {
   ITC_NATIVE_RUNNING("sub_820958B8 PtrList::IncSize");
-  const uint32_t size = Load(base, list + kSize);
+  const schema::PtrList l(base, list);
+  const uint32_t size = l.size();
   if (0x3FFFFFFFu - size < count) {
     return false;
   }
-  Store(base, list + kSize, size + count);
+  l.set_size(size + count);
   return true;
 }
 
@@ -72,14 +67,15 @@ bool Construct(uint8_t* base, uint32_t list) {
   if (node.previous_address() != 0) {
     node.set_previous(node);
   }
-  Store(base, list + kHead, node.address);
-  Store(base, list + kSize, 0);
+  const schema::PtrList l(base, list);
+  l.set_head(node.address);
+  l.set_size(0);
   return true;
 }
 
 bool Insert(uint8_t* base, uint32_t list, uint32_t where, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_82095958 PtrList::Insert");
-  if (!CanAllocate(base, 1) || 0x3FFFFFFFu - Load(base, list + kSize) < 1) {
+  if (!CanAllocate(base, 1) || 0x3FFFFFFFu - schema::PtrList(base, list).size() < 1) {
     return false;
   }
   const schema::PtrListNode at(base, where);
@@ -101,13 +97,15 @@ bool Insert(uint8_t* base, uint32_t list, uint32_t where, uint32_t value) {
 }
 
 std::optional<uint32_t> Erase(uint8_t* base, uint32_t list, uint32_t iterator_list, uint32_t node) {
-  if (iterator_list == 0 || node == Load(base, iterator_list + kHead)) {
+  if (iterator_list == 0 ||
+      node == schema::PtrList(base, iterator_list).head<schema::PtrListNode>().address) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_82098E80 PtrList::Erase");
   const schema::PtrListNode n(base, node);
   const uint32_t next = n.next().address;
-  if (node != Load(base, list + kHead)) {
+  const schema::PtrList l(base, list);
+  if (node != l.head<schema::PtrListNode>().address) {
     const schema::PtrListNode before = n.previous();
     before.set_next(n.next());
     const schema::PtrListNode after = n.next();
@@ -115,7 +113,7 @@ std::optional<uint32_t> Erase(uint8_t* base, uint32_t list, uint32_t iterator_li
     if (!memory::crt::OperatorDelete(node)) {
       ITC_LOG_ERROR("PtrList::Erase: operator delete refused {:08X}", node);
     }
-    Store(base, list + kSize, Load(base, list + kSize) - 1);
+    l.set_size(l.size() - 1);
   }
   return next;
 }

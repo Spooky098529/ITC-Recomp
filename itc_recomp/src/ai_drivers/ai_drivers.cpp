@@ -17,6 +17,12 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "schema/ai_drivers.h"
+#include "schema/car_physics.h"
+#include "schema/collision_world.h"
+#include "schema/minimap.h"
+#include "schema/race_states.h"
+#include "schema/race_world.h"
+#include "schema/track_route.h"
 
 #include <cmath>
 #include <cstring>
@@ -34,16 +40,20 @@ using schema::AiProfile;
 using schema::AiSkill;
 using schema::AiSkillTrigger;
 using schema::CarInput;
+using schema::MinimapRacerEntry;
+using schema::RaceManager;
 using schema::RouteCorner;
 using schema::RouteCornerEntry;
 using schema::RouteSection;
 using schema::RouteSlice;
+using schema::TrackPosition;
+using schema::TrackRouteFile;
+using schema::Vehicle;
 using G = schema::AiDriversGlobals;
+using RG = schema::TrackRouteGlobals;
 
 namespace {
 
-constexpr uint32_t kRaceMode = 0xA3AF4;     // the race data's word: the mode
-constexpr uint32_t kRaceWord = 0xA3AF0;     // the race data's word AiSkill::Load reads
 // The path's normalizers (+5532): by lane (mode 1), by branch (mode 0).
 constexpr uint32_t kNormalizeByLane = 0x8213B428;
 constexpr uint32_t kNormalizeByBranch = 0x8213C908;
@@ -105,9 +115,9 @@ void ClearCarInput(uint8_t* base, uint32_t input) {
   CarInput(base, input).set_steering(0);
   CarInput(base, input).set_flags(0);
   CarInput(base, input).set_kind(0);
-  CarInput(base, input).set_setting_c(0);
-  CarInput(base, input).set_setting_b(0);
-  CarInput(base, input).set_setting_a(0);
+  CarInput(base, input).set_steering_rate(0);
+  CarInput(base, input).set_brake_rate(0);
+  CarInput(base, input).set_throttle_rate(0);
   CarInput(base, input).set_camera(0);
 }
 
@@ -227,7 +237,8 @@ uint32_t IsFree(uint8_t* base, uint32_t driver) {
   if (vehicle == 0) {
     return 0;
   }
-  if ((Load(base, vehicle + 6148) & 129) != 0 && (AiDriver(base, driver).flags() & 2) == 0) {
+  if ((Vehicle(base, vehicle).car_flags() & 129) != 0 &&
+      (AiDriver(base, driver).flags() & 2) == 0) {
     return 0;
   }
   const uint32_t state = AiDriver(base, driver).state();
@@ -339,12 +350,12 @@ void UpdateHalfWidth(uint8_t* base, uint32_t driver) {
 uint32_t TargetPoint(uint8_t* base, uint32_t path, double ahead, uint32_t out) {
   ITC_NATIVE_RUNNING("sub_8213B4D8 AiPath::TargetPoint");
   const int32_t count = LoadS16(base, AiPath(base, path).entry_count_address());
-  const uint32_t file = Load(base, track_route::kRoute);
+  const uint32_t file = RG::route_file(base).address;
   const int32_t k = LoadS16(base, AiPath(base, path).look_ahead_address());
   if (!(k + 1 < count)) {
     return 0;
   }
-  const double length = Lfs(base, file + 8);
+  const double length = Lfs(base, TrackRouteFile(base, file).slice_length_address());
   const int32_t k2 = LoadS16(base, AiPath(base, path).look_ahead_address());
   const int32_t at = LoadS16(base, AiPath(base, path).first_address()) + k2;
   const int32_t next = at + 1;
@@ -412,7 +423,7 @@ void LoadSkill(uint8_t* base, uint32_t skill) {
   } else {
     ResetSkill(base, skill);
     AiSkill(base, skill).set_throttle_cap(100);
-    if (Load(base, Load(base, G::race_data_address()) + kRaceWord) == 0) {
+    if (G::race_data(base).kind() == 0) {
       AiSkill(base, skill).set_speed_scale(uint16_t(-5));
     }
   }
@@ -428,7 +439,7 @@ double LimitSpeed(uint8_t* base, uint32_t driver, uint32_t speed, uint32_t curva
   const int32_t n = int32_t(Load(base, slices));
   double limit = Fmuls(Lfs(base, speed), f1);
   if (n > 0) {
-    const double length = Lfs(base, Load(base, track_route::kRoute) + 8);
+    const double length = Lfs(base, RG::route_file(base).slice_length_address());
     const double count = double(float(double(int64_t(n))));
     Stfs(base, frame + 80, Fmuls(length, count));
     f1 = SpeedOverDistance(base, driver, frame + 80);
@@ -541,12 +552,12 @@ uint32_t PreferredSections(uint8_t* base, uint32_t a, uint32_t b) {
 
 uint32_t RaceAllowsSides(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8213D318 AiPath::RaceAllowsSides");
-  const int32_t mode = int32_t(Load(base, Load(base, G::race_data_address()) + kRaceMode));
+  const int32_t mode = int32_t(G::race_data(base).race_mode());
   if (mode == 4 || mode == 7 || mode == 8) {
     return 1;
   }
   if (mode == 5) {
-    const int32_t state = int32_t(Load(base, Load(base, G::race_state_address()) + 6100));
+    const int32_t state = int32_t(G::race_state(base).stage_type());
     return state == 1 || state == 3 ? 1 : 0;
   }
   return 0;
@@ -817,7 +828,7 @@ void SetSkill(uint8_t* base, uint32_t driver, uint32_t word) {
   const int32_t skill = LoadS16(base, AiDriver(base, driver).skill_speed_address());
   Stfs(base, AiDriver(base, driver).cruise_speed_address(), double(float(double(int64_t(skill)))));
   if (vehicle != 0) {
-    StoreConstant(base, vehicle + 2432, kOne);
+    StoreConstant(base, Vehicle(base, vehicle).brake_efficiency_address(), kOne);
   }
 }
 
@@ -901,7 +912,7 @@ uint32_t NormalizeByLane(uint8_t* base, uint32_t entry, uint32_t position, uint3
   }
   const uint32_t file = Load(base, route);
   const uint32_t section = guest::LoadU16(base, position + 0);
-  const uint32_t table = Load(base, file + 12);
+  const uint32_t table = TrackRouteFile(base, file).sections();
   const int32_t slice = LoadS16(base, position + 2);
   const uint32_t record = Load(base, table + section * 4) + uint32_t(slice) * 84 + 124;
   AiPathEntry(base, entry).set_slice_record(record);
@@ -916,9 +927,10 @@ void UpdateLane(uint8_t* base, uint32_t driver, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82144EF8 AiDriver::UpdateLane");
   const uint32_t identity =
       vehicle_accessors::VehicleIdentity(AiDriver(base, driver).vehicle().address);
-  const uint32_t lane =
-      track_route::LaneAt(base, track_route::kRoute, identity + 16, identity + 4);
-  track_route::ClampPosition(base, frame + 80, Load(base, identity + 4));
+  const uint32_t lane = track_route::LaneAt(base, track_route::kRoute,
+                                            TrackPosition(base, identity).point_x_address(),
+                                            TrackPosition(base, identity).route_position_address());
+  track_route::ClampPosition(base, frame + 80, TrackPosition(base, identity).route_position());
   const uint32_t clamped = Load(base, frame + 80);
   AiDriver(base, driver).set_lane(uint16_t(lane));
   AiDriver(base, driver).set_route_position(clamped);
@@ -1127,9 +1139,9 @@ uint32_t WithinRoadAt(uint8_t* base, uint32_t path, uint32_t offset) {
   ITC_NATIVE_RUNNING("sub_8213C1A0 AiPath::WithinRoadAt");
   const uint32_t driver = AiPath(base, path).driver().address;
   const int32_t count = LoadS16(base, AiPath(base, path).entry_count_address());
-  const uint32_t file = Load(base, track_route::kRoute);
+  const uint32_t file = RG::route_file(base).address;
   const double reach = Lfs(base, AiDriver(base, driver).car_radius_address());
-  const double length = Lfs(base, file + 8);
+  const double length = Lfs(base, TrackRouteFile(base, file).slice_length_address());
   const int32_t k =
       int32_t(uint32_t(strings_and_font::steps::Fctiwz(Fdivs(reach, length))) + 1);
   if (!(k < count)) {
@@ -1173,7 +1185,7 @@ void ResetToMode1(uint8_t* base, uint32_t driver, uint32_t frame) {
   const uint32_t again = AiDriver(base, driver).vehicle().address;
   StoreConstant(base, AiDriver(base, driver).cruise_speed_address(), 0x82008948);
   if (again != 0) {
-    StoreConstant(base, again + 2432, kOne);
+    StoreConstant(base, Vehicle(base, again).brake_efficiency_address(), kOne);
   }
 }
 
@@ -1200,7 +1212,7 @@ uint32_t StartRace(uint8_t* base, uint32_t driver, uint32_t frame) {
   AiDriver(base, driver).set_flags(flags & ~1u);
   // The vehicle's flags read whatever the vehicle (+6148 of 0 without one),
   // as the original does.
-  const uint32_t free = (Load(base, vehicle + 6148) & 129) == 0 ? 1 : 0;
+  const uint32_t free = (Vehicle(base, vehicle).car_flags() & 129) == 0 ? 1 : 0;
   guest::StoreU32(base, frame + 80, free);
   SetFlag2(base, driver, frame + 80);
   const uint32_t set = AiDriver(base, driver).flags() | 4;
@@ -1231,11 +1243,11 @@ bool AllSettled(uint8_t* base, uint32_t frame, uint32_t* result) {
   if (table != 0) {
     const uint32_t copy = frame + 80;
     for (int32_t i = 0; i < count; i++) {
-      const uint32_t racer = Load(base, Load(base, G::race_address()) + 2308 + 4 * uint32_t(i));
-      if ((Load(base, racer + 0) & 0x10) == 0) {
+      const uint32_t racer = Load(base, G::race(base).racers_address() + 4 * uint32_t(i));
+      if ((MinimapRacerEntry(base, racer).flags() & 0x10) == 0) {
         continue;
       }
-      const int32_t index = int32_t(Load(base, racer + 20));
+      const int32_t index = int32_t(MinimapRacerEntry(base, racer).vehicle_index());
       if (index < 0) {
         continue;
       }
@@ -1386,7 +1398,7 @@ void LimitThrottle(uint8_t* base, uint32_t driver) {
   }
   const uint32_t vehicle = AiDriver(base, driver).vehicle().address;
   const double limit = Lfs(base, vehicle + 4660);
-  const double rpm = Lfs(base, vehicle + 2228);
+  const double rpm = Lfs(base, Vehicle(base, vehicle).rpm_address());
   if (rpm < Fmuls(limit, Lfs(base, 0x82002A34))) {
     return;
   }
@@ -1428,7 +1440,7 @@ void AdjustForOther(uint8_t* base, uint32_t driver, uint32_t record, uint32_t mo
   }
   double distance = Fneg(gap);
   if (Load(base, mode) != 0 && index > 1) {
-    const double length = Lfs(base, Load(base, track_route::kRoute) + 8);
+    const double length = Lfs(base, RG::route_file(base).slice_length_address());
     const double slices = double(float(double(int64_t(index - 1))));
     distance = Fmadds(slices, length, distance);
   }
@@ -1460,14 +1472,14 @@ uint64_t UpdateAgainstPlayer(uint8_t* base, uint32_t driver) {
   AiDriver(base, driver).set_passes_a(0);
   AiDriver(base, driver).set_passes_b(0);
   for (int32_t i = 0; i < count; i++) {
-    const uint32_t racer = Load(base, Load(base, G::race_address()) + 2308 + 4 * uint32_t(i));
-    const uint32_t index = Load(base, racer + 20);
+    const uint32_t racer = Load(base, G::race(base).racers_address() + 4 * uint32_t(i));
+    const uint32_t index = MinimapRacerEntry(base, racer).vehicle_index();
     if (int32_t(index) < 0 || AiDriver(base, driver).index() == index) {
       continue;
     }
     const uint32_t vehicle = vehicle_accessors::VehicleGet(base, index);
     r3 = vehicle;
-    if ((Load(base, vehicle + 6148) & 129) == 0) {
+    if ((Vehicle(base, vehicle).car_flags() & 129) == 0) {
       continue;
     }
     const uint32_t record = driver + index * 40 + 172;
@@ -1865,11 +1877,11 @@ uint32_t ResetAll(uint8_t* base, uint32_t frame) {
     return r3;
   }
   for (int32_t i = 0; i < count; i++) {
-    const uint32_t racer = Load(base, race + 2308 + 4 * uint32_t(i));
-    if ((Load(base, racer + 0) & 0x10) != 0) {
+    const uint32_t racer = Load(base, RaceManager(base, race).racers_address() + 4 * uint32_t(i));
+    if ((MinimapRacerEntry(base, racer).flags() & 0x10) != 0) {
       continue;
     }
-    const uint32_t index = Load(base, racer + 20);
+    const uint32_t index = MinimapRacerEntry(base, racer).vehicle_index();
     if (int32_t(index) < 0) {
       continue;
     }
@@ -1877,11 +1889,11 @@ uint32_t ResetAll(uint8_t* base, uint32_t frame) {
   }
   guest::StoreU32(base, frame + 80, mask);
   for (int32_t i = 0; i < count; i++) {
-    const uint32_t racer = Load(base, race + 2308 + 4 * uint32_t(i));
-    if ((Load(base, racer + 0) & 0x10) != 0) {
+    const uint32_t racer = Load(base, RaceManager(base, race).racers_address() + 4 * uint32_t(i));
+    if ((MinimapRacerEntry(base, racer).flags() & 0x10) != 0) {
       continue;
     }
-    const uint32_t index = Load(base, racer + 20);
+    const uint32_t index = MinimapRacerEntry(base, racer).vehicle_index();
     if (int32_t(index) < 0) {
       continue;
     }
@@ -1971,8 +1983,9 @@ uint32_t ClearAll(uint8_t* base, uint32_t frame) {
   }
   for (int32_t i = 0; i < count; i++) {
     const uint32_t table = Load(base, G::drivers_address());
-    const uint32_t racer = Load(base, Load(base, G::race_address()) + 2308 + 4 * uint32_t(i));
-    const uint32_t driver = Load(base, racer + 20) * AiDriver::kSize + table;
+    const uint32_t racer = Load(base, G::race(base).racers_address() + 4 * uint32_t(i));
+    const uint32_t driver =
+        MinimapRacerEntry(base, racer).vehicle_index() * AiDriver::kSize + table;
     ResetControl(base, driver, frame - 112);
     r3 = ClearPlan(base, driver);
   }
@@ -2154,7 +2167,7 @@ bool JoinCornerPair(uint8_t* base, uint32_t a, uint32_t b, uint32_t frame, uint3
     *r3 = JoinCornersByEntry(base, a, b, frame + 80);
     return true;
   }
-  const double length = Lfs(base, Load(base, track_route::kRoute) + 8);
+  const double length = Lfs(base, RG::route_file(base).slice_length_address());
   if (Fmuls(length, IntToFloat(gap)) > Lfs(base, G::hundred_address())) {
     return false;
   }
@@ -2178,7 +2191,7 @@ void AddCornersAt(uint8_t* base, uint32_t path, uint32_t entry, uint32_t frame, 
       return;
     }
   }
-  const uint32_t route = Load(base, track_route::kRoute);
+  const uint32_t route = RG::route_file(base).address;
   for (int32_t k = 0; k < n; k++, listed += 4) {
     if (have > 0) {
       const int32_t number = guest::LoadU16(base, listed + 0);
@@ -2197,8 +2210,8 @@ void AddCornersAt(uint8_t* base, uint32_t path, uint32_t entry, uint32_t frame, 
         continue;
       }
     }
-    const uint32_t data =
-        Load(base, (uint32_t(guest::LoadU16(base, listed + 0)) << 2) + Load(base, route + 16));
+    const uint32_t data = Load(base, (uint32_t(guest::LoadU16(base, listed + 0)) << 2) +
+                                         TrackRouteFile(base, route).corners());
     if (data == 0) {
       continue;
     }
@@ -2512,7 +2525,7 @@ uint64_t UpdateTargetSpeed(uint8_t* base, uint32_t driver, uint32_t scale, uint3
     from = driver + 12;
   } else {
     // The vehicle's flags read whatever the vehicle, as the original does.
-    const uint32_t state = Load(base, vehicle + 6148);
+    const uint32_t state = Vehicle(base, vehicle).car_flags();
     if ((state & 0x60000000u) != 0) {
       from = 0x82008930;  // 70.0
     } else if ((state & 0x1C000000u) != 0) {
@@ -2556,7 +2569,7 @@ uint64_t UpdateSpeed(uint8_t* base, uint32_t driver, uint32_t frame, double* f1,
 uint32_t SteerToTarget(uint8_t* base, uint32_t driver, double* f1) {
   ITC_NATIVE_RUNNING("sub_82138D78 AiDriver::SteerToTarget");
   const uint32_t path = driver + 512;
-  const uint32_t file = Load(base, track_route::kRoute);
+  const uint32_t file = RG::route_file(base).address;
   const uint32_t slow = IsSlow(base, path);
   const double speed = Lfs(base, AiDriver(base, driver).speed_kmh_address());
   double reach = Fmuls(speed, Lfs(base, slow == 0 ? 0x82008944 : 0x82008940));
@@ -2571,7 +2584,8 @@ uint32_t SteerToTarget(uint8_t* base, uint32_t driver, double* f1) {
   }
   const double ahead = Fadds(reach, more);
   *f1 = ahead;
-  int32_t slices = strings_and_font::steps::Fctiwz(Fdivs(ahead, Lfs(base, file + 8)));
+  int32_t slices = strings_and_font::steps::Fctiwz(
+      Fdivs(ahead, Lfs(base, TrackRouteFile(base, file).slice_length_address())));
   if (slices > 78) {
     slices = 78;
   }
@@ -2598,10 +2612,10 @@ uint32_t SteerToTarget(uint8_t* base, uint32_t driver, double* f1) {
   const double sin = c_runtime::Sin(Lfs(base, angle));
   *f1 = sin;
   const double s = double(float(sin));
-  const double across = Lfs(base, vehicle + 384);
+  const double across = Lfs(base, Vehicle(base, vehicle).ground_velocity_address());
   const double c = double(float(cos));
   const uint32_t now = AiDriver(base, driver).vehicle().address;
-  const double along = Lfs(base, vehicle + 392);
+  const double along = Lfs(base, Vehicle(base, vehicle).ground_velocity_address() + 8);
   const double turned = Lfs(base, angle);
   Stfs(base, AiDriver(base, driver).steer_shift_address(), Fmadds(along, c, Fmuls(s, across)));
   Stfs(base, AiDriver(base, driver).slide_angle_address(), Fadds(Lfs(base, now + 92), turned));
@@ -3142,7 +3156,7 @@ int32_t CompareBranches(uint8_t* base, uint32_t path, uint32_t a, uint32_t b, ui
   }
   const uint32_t driver = AiPath(base, path).driver().address;
   const uint32_t vehicle = AiDriver(base, driver).vehicle().address;
-  const uint32_t flag = vehicle == 0 ? 0 : (Load(base, vehicle + 6148) >> 2) & 1;
+  const uint32_t flag = vehicle == 0 ? 0 : (Vehicle(base, vehicle).car_flags() >> 2) & 1;
   if (flag == 0) {
     if (uint32_t(RouteSection(base, b).branch()) - 7 <= 1) {
       return -1;
@@ -3216,7 +3230,7 @@ uint32_t NormalizeByBranch(uint8_t* base, uint32_t path, uint32_t entry, uint32_
   const uint32_t file = Load(base, route);
   const uint32_t section = guest::LoadU16(base, position + 0);
   const int32_t slice = LoadS16(base, position + 2);
-  const uint32_t table = Load(base, file + 12);
+  const uint32_t table = TrackRouteFile(base, file).sections();
   const double zero = Lfs(base, kZero);
   const uint32_t record = Load(base, (section << 2) + table) + uint32_t(slice) * 84 + 124;
   AiPathEntry(base, entry).set_slice_record(record);
@@ -3293,9 +3307,9 @@ uint64_t MeasureOthers(uint8_t* base, uint32_t path, uint32_t out) {
                       0xFFFFFFFFu);
       return r3;
     }
-    const uint32_t file = Load(base, track_route::kRoute);
+    const uint32_t file = RG::route_file(base).address;
     const double gap = Lfs(base, AiOther(base, record).gap_address());
-    const double length = Lfs(base, file + 8);
+    const double length = Lfs(base, TrackRouteFile(base, file).slice_length_address());
     int32_t slot;
     if (gap > length) {
       CopyWord(base, AiDriver(base, other).road_offset_address(),
@@ -3595,14 +3609,14 @@ namespace {
 // The race's time in seconds: RaceTime::FromTicks on the race state's +6116,
 // minutes x 60 + seconds.
 int32_t RaceSeconds(uint8_t* base) {
-  const uint32_t time = TimeFromTicks(Load(base, Load(base, G::race_state_address()) + 6116));
+  const uint32_t time = TimeFromTicks(G::race_state(base).ticks());
   return int32_t(((time >> 16) & 0x7FFF) * 60 + ((time >> 10) & 0x3F));
 }
 // The race state's record (+2184 + 972 x i + 4) whose word matches the
 // driver's +500 object's halfword +0; 0 with none.
 uint32_t SkillEntry(uint8_t* base, uint32_t driver) {
   const uint32_t object = AiDriver(base, driver).profile().address;
-  const uint32_t list = Load(base, G::race_state_address()) + 2184;
+  const uint32_t list = G::race_state(base).results_address();
   if (object == 0) {
     return 0;
   }
@@ -3676,7 +3690,7 @@ uint32_t TriggerStarts(uint8_t* base, uint32_t driver, uint32_t trigger, double*
       if (vehicle == 0) {
         return 0;
       }
-      return (Load(base, vehicle + 6152) & 1) == 0 ? 0 : 1;
+      return (Vehicle(base, vehicle).collision_flags() & 1) == 0 ? 0 : 1;
     }
     case 11:
       return LoadS16(base, AiDriver(base, driver).passes_a_address()) > 0 ? 1 : 0;
@@ -4061,7 +4075,7 @@ uint64_t Drive(uint8_t* base, uint32_t driver, uint32_t input, uint32_t frame, d
     AiDriver(base, driver).set_handbrake(0);
     Stfs(base, AiDriver(base, driver).brake_address(), zero);
     Stfs(base, AiDriver(base, driver).throttle_address(), zero);
-  } else if (((Load(base, vehicle + 6148) >> 26) & 1) != 0) {
+  } else if (((Vehicle(base, vehicle).car_flags() >> 26) & 1) != 0) {
     Stfs(base, AiDriver(base, driver).steering_address(), zero);
     Stfs(base, AiDriver(base, driver).throttle_address(), zero);
     Stfs(base, AiDriver(base, driver).brake_address(), Lfs(base, kOne));
@@ -4410,7 +4424,7 @@ uint32_t PlanLine(uint8_t* base, uint32_t path, uint32_t frame) {
 
 namespace {
 // The race data's flags ([0x826C5B2C] + 20).
-uint32_t RaceFlags(uint8_t* base) { return Load(base, Load(base, G::race_data_address()) + 20); }
+uint32_t RaceFlags(uint8_t* base) { return G::race_data(base).branch_flags(); }
 // The flags the branch kinds need: 0x10, 0x4, 0x8 or 0x20.
 bool BranchFlags(uint32_t flags) {
   return (flags & 0x3C) != 0;
@@ -4444,11 +4458,11 @@ int32_t KindForBranch(uint32_t flags, uint32_t number) {
 // The branch number (byte +3) of the section of a vehicle identity's route
 // position (+4); false when the section is negative.
 bool BranchNumberAt(uint8_t* base, uint32_t identity, uint32_t* number) {
-  const uint32_t section = guest::LoadU16(base, identity + 4);
+  const uint32_t section = TrackPosition(base, identity).route_section();
   if (int16_t(section) < 0) {
     return false;
   }
-  const uint32_t table = Load(base, Load(base, track_route::kRoute) + 12);
+  const uint32_t table = RG::route_file(base).sections();
   *number = guest::LoadU8(base, Load(base, table + (section << 2)) + 3);
   return true;
 }
@@ -4520,7 +4534,7 @@ uint64_t FindSideSection(uint8_t* base, uint32_t path, uint32_t out, uint32_t po
   const uint32_t identity =
       vehicle_accessors::VehicleIdentity(Load(base, AiPath(base, path).driver().address + 160));
   const uint32_t position = frame + 80;
-  track_route::ClampPosition(base, position, Load(base, identity + 4));
+  track_route::ClampPosition(base, position, TrackPosition(base, identity).route_position());
   uint64_t r3 = position;
   const uint32_t section = guest::LoadU16(base, position + 0);
   if (int16_t(section) < 0) {
@@ -4607,13 +4621,13 @@ uint32_t FollowLeaderBranch(uint8_t* base, uint32_t path) {
         const int32_t count = int32_t(track_collision::RaceRacerCount(base));
         uint32_t found = 0;
         for (int32_t i = 0; i < count; i++) {
-          const uint32_t racer = Load(base, Load(base, G::race_address()) + 2308 + 4 * uint32_t(i));
-          const uint32_t index = Load(base, racer + 20);
+          const uint32_t racer = Load(base, G::race(base).racers_address() + 4 * uint32_t(i));
+          const uint32_t index = MinimapRacerEntry(base, racer).vehicle_index();
           if (int32_t(index) < 0) {
             continue;
           }
           const uint32_t vehicle = vehicle_accessors::VehicleGet(base, index);
-          if (vehicle != 0 && (Load(base, vehicle + 6148) & 0x81) != 0) {
+          if (vehicle != 0 && (Vehicle(base, vehicle).car_flags() & 0x81) != 0) {
             found = vehicle;
             break;
           }
@@ -4686,7 +4700,8 @@ uint64_t UpdateAll(uint8_t* base, uint32_t frame, DriverUpdate update, void* use
     return r3;
   }
   const auto index_of = [&](uint32_t i) {
-    return Load(base, Load(base, Load(base, G::race_address()) + 2308 + 4 * i) + 20);
+    return MinimapRacerEntry(base, Load(base, G::race(base).racers_address() + 4 * i))
+        .vehicle_index();
   };
   const auto driver_of = [&](uint32_t index) {
     return uint64_t(index) * AiDriver::kSize + Load(base, G::drivers_address());
@@ -4835,13 +4850,13 @@ void PlanReaction(uint8_t* base, uint32_t record, uint32_t skill, uint32_t rate,
 uint64_t ReactToOthers(uint8_t* base, uint32_t driver, uint32_t count, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_82145CA8 AiDriver::ReactToOthers");
   guest::StoreU32(base, frame + 84, AiDriver(base, driver).index());
-  const uint32_t file = Load(base, track_route::kRoute);
+  const uint32_t file = RG::route_file(base).address;
   const uint64_t skill = Of(base, frame + 84) + 6048;
   const uint32_t racers = track_collision::RaceRacerCount(base);
   uint64_t r3 = racers;
   const double speed = Lfs(base, AiDriver(base, driver).speed_kmh_address());
   double rate = Fmuls(Lfs(base, G::tick_address()), Lfs(base, G::per_kmh_address()));
-  const double length = Lfs(base, file + 8);
+  const double length = Lfs(base, TrackRouteFile(base, file).slice_length_address());
   const double zero = Lfs(base, kZero);
   rate = Fdivs(rate, length);
   Stfs(base, frame + 80, Fmuls(rate, speed));
@@ -4853,7 +4868,8 @@ uint64_t ReactToOthers(uint8_t* base, uint32_t driver, uint32_t count, uint32_t 
     uint32_t slot = driver + 452;
     for (uint32_t i = 0; i < racers; i++) {
       const uint32_t other =
-          Load(base, Load(base, Load(base, G::race_address()) + 2308 + 4 * i) + 20);
+          MinimapRacerEntry(base, Load(base, G::race(base).racers_address() + 4 * i))
+              .vehicle_index();
       guest::StoreU32(base, frame + 88, other);
       if (int32_t(AiDriver(base, driver).index()) == int32_t(other)) {
         continue;
@@ -4872,7 +4888,8 @@ uint64_t ReactToOthers(uint8_t* base, uint32_t driver, uint32_t count, uint32_t 
           if (state == 2) {
             const double gap = Lfs(base, AiOther(base, record).gap_address());
             if (gap < zero) {
-              const double slices = Fdivs(gap, Lfs(base, file + 8));
+              const double slices =
+                  Fdivs(gap, Lfs(base, TrackRouteFile(base, file).slice_length_address()));
               AiOther(base, record).set_action_flags(4);
               AiOther(base, record).set_ring_index(Truncated(Fneg(slices)));
             }
@@ -4881,7 +4898,8 @@ uint64_t ReactToOthers(uint8_t* base, uint32_t driver, uint32_t count, uint32_t 
             AiOther(base, record).set_action_flags(1);
             if (gap < far && gap > ten) {
               AiOther(base, record)
-                  .set_ring_index(Truncated(Fdivs(Fabs(gap), Lfs(base, file + 8))));
+                  .set_ring_index(Truncated(Fdivs(
+                      Fabs(gap), Lfs(base, TrackRouteFile(base, file).slice_length_address()))));
             } else {
               AiOther(base, record).set_ring_index(1);
             }
@@ -4892,7 +4910,7 @@ uint64_t ReactToOthers(uint8_t* base, uint32_t driver, uint32_t count, uint32_t 
       }
       if (react) {
         const uint32_t vehicle = AiDriver(base, driver).vehicle().address;
-        const uint32_t flag7 = vehicle != 0 ? (Load(base, vehicle + 6148) >> 2) & 1 : 0;
+        const uint32_t flag7 = vehicle != 0 ? (Vehicle(base, vehicle).car_flags() >> 2) & 1 : 0;
         const uint32_t flag6 = (AiDriver(base, driver).flags() >> 2) & 1;
         PlanReaction(base, record, uint32_t(skill), frame + 80, flag6, flag7);
         r3 = record64;
@@ -4944,7 +4962,7 @@ uint64_t ReactToOthers(uint8_t* base, uint32_t driver, uint32_t count, uint32_t 
 namespace {
 // The race's racer i's record ([0x826D82F4] + 2308).
 uint32_t RacerAt(uint8_t* base, uint32_t i) {
-  return Load(base, Load(base, G::race_address()) + 2308 + 4 * i);
+  return Load(base, G::race(base).racers_address() + 4 * i);
 }
 }  // namespace
 
@@ -4961,11 +4979,11 @@ uint64_t StartGroup(uint8_t* base, uint32_t frame) {
   }
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t racer = RacerAt(base, i);
-    const uint32_t flags = Load(base, racer + 0);
+    const uint32_t flags = MinimapRacerEntry(base, racer).flags();
     if ((flags & 0x10) == 0) {
       continue;
     }
-    const uint32_t index = Load(base, racer + 20);
+    const uint32_t index = MinimapRacerEntry(base, racer).vehicle_index();
     if (int32_t(index) < 0) {
       continue;
     }
@@ -4978,11 +4996,11 @@ uint64_t StartGroup(uint8_t* base, uint32_t frame) {
   guest::StoreU32(base, frame + 80, mask);
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t racer = RacerAt(base, i);
-    const uint32_t index = Load(base, racer + 20);
+    const uint32_t index = MinimapRacerEntry(base, racer).vehicle_index();
     if (int32_t(index) < 0) {
       continue;
     }
-    const uint32_t flags = Load(base, racer + 0);
+    const uint32_t flags = MinimapRacerEntry(base, racer).flags();
     const uint64_t driver = uint64_t(index) * AiDriver::kSize + Load(base, G::drivers_address());
     if ((flags & 0x10) == 0) {
       continue;
@@ -5019,10 +5037,10 @@ uint64_t StartRanked(uint8_t* base, uint32_t frame) {
   const uint32_t list = frame + 96;
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t racer = RacerAt(base, i);
-    if ((Load(base, racer + 0) & 0x10) == 0) {
+    if ((MinimapRacerEntry(base, racer).flags() & 0x10) == 0) {
       continue;
     }
-    const uint32_t index = Load(base, racer + 20);
+    const uint32_t index = MinimapRacerEntry(base, racer).vehicle_index();
     if (int32_t(index) < 0) {
       continue;
     }
@@ -5044,12 +5062,12 @@ uint64_t StartRanked(uint8_t* base, uint32_t frame) {
         const uint32_t next = list + 4 * j;
         const uint32_t a = Load(base, at) * AiDriver::kSize + table;
         const uint32_t b = Load(base, next) * AiDriver::kSize + table;
-        uint32_t flags = Load(base, AiDriver(base, a).vehicle().address + 6148) & 0x81;
+        uint32_t flags = AiDriver(base, a).vehicle().car_flags() & 0x81;
         r3 = flags;
         if (flags != 0) {
           continue;
         }
-        flags = Load(base, AiDriver(base, b).vehicle().address + 6148) & 0x81;
+        flags = AiDriver(base, b).vehicle().car_flags() & 0x81;
         r3 = flags;
         if (flags == 0 && Lfs(base, AiDriver(base, a).player_gap_address()) >
                               Lfs(base, AiDriver(base, b).player_gap_address())) {
@@ -5064,11 +5082,11 @@ uint64_t StartRanked(uint8_t* base, uint32_t frame) {
   }
   for (uint32_t i = 0; i < count; i++) {
     const uint32_t racer = RacerAt(base, i);
-    const uint32_t index = Load(base, racer + 20);
+    const uint32_t index = MinimapRacerEntry(base, racer).vehicle_index();
     if (int32_t(index) < 0) {
       continue;
     }
-    const uint32_t flags = Load(base, racer + 0);
+    const uint32_t flags = MinimapRacerEntry(base, racer).flags();
     const uint64_t driver = uint64_t(index) * AiDriver::kSize + table;
     r3 = driver;
     if ((flags & 0x10) != 0) {
@@ -5095,7 +5113,7 @@ namespace {
 // the section, then the slice): the section's record (the route file's +12
 // table) + 124 + 84 x the slice.
 uint32_t SliceRecordAt(uint8_t* base, uint32_t position) {
-  const uint32_t table = Load(base, Load(base, track_route::kRoute) + 12);
+  const uint32_t table = RG::route_file(base).sections();
   const uint32_t section = guest::LoadU16(base, position + 0);
   const int32_t slice = LoadS16(base, position + 2);
   return uint32_t(slice) * 84 + Load(base, table + (section << 2)) + 124;
@@ -5106,16 +5124,17 @@ uint64_t ReadVehicle(uint8_t* base, uint32_t driver, uint32_t slice) {
   ITC_NATIVE_RUNNING("sub_821467F0 AiDriver::ReadVehicle");
   const uint32_t identity =
       vehicle_accessors::VehicleIdentity(AiDriver(base, driver).vehicle().address);
-  const uint32_t body = Load(base, AiDriver(base, driver).vehicle().address + 336);
+  const uint32_t body = AiDriver(base, driver).vehicle().body().address;
   const uint32_t spin = vehicle_accessors::RigidBodyAngularVelocity(body);
   for (uint32_t i = 0; i < 16; i += 4) {  // two ld/std pairs: the bits
-    CopyWord(base, identity + 16 + i, driver + 80 + i);
+    CopyWord(base, TrackPosition(base, identity).point_x_address() + i, driver + 80 + i);
   }
   Stfs(base, AiDriver(base, driver).point_w_address(), Lfs(base, kOne));
   Stfs(base, AiDriver(base, driver).speed_kmh_address(),
        double(Vehicle_GetSpeedKmh(base, AiDriver(base, driver).vehicle().address)));
   const uint32_t vehicle = AiDriver(base, driver).vehicle().address;
-  const double yaw = Fmuls(Lfs(base, vehicle + 2356), Lfs(base, spin + 4));
+  const double yaw =
+      Fmuls(Lfs(base, Vehicle(base, vehicle).inverse_dt_address()), Lfs(base, spin + 4));
   StoreConstant(base, AiDriver(base, driver).speed_limit_address(), G::five_hundred_address());
   StoreConstant(base, AiDriver(base, driver).speed_limit_other_address(),
                 G::five_hundred_address());
@@ -5151,7 +5170,8 @@ uint64_t ReadVehicle(uint8_t* base, uint32_t driver, uint32_t slice) {
   } else {
     Stfs(base, AiDriver(base, driver).road_offset_address(), zero);
   }
-  const uint32_t record = SliceRecordAt(base, identity + 4);
+  const uint32_t record =
+      SliceRecordAt(base, TrackPosition(base, identity).route_position_address());
   if (record != 0) {
     const double dx = Fsubs(Lfs(base, AiDriver(base, driver).point_x_address()),
                             Lfs(base, RouteSlice(base, record).center_x_address()));
@@ -5172,7 +5192,8 @@ uint64_t ReadVehicleOwnSlice(uint8_t* base, uint32_t driver) {
   ITC_NATIVE_RUNNING("sub_821469D0 AiDriver::ReadVehicleOwnSlice");
   const uint32_t identity =
       vehicle_accessors::VehicleIdentity(AiDriver(base, driver).vehicle().address);
-  return ReadVehicle(base, driver, SliceRecordAt(base, identity + 4));
+  return ReadVehicle(base, driver,
+                     SliceRecordAt(base, TrackPosition(base, identity).route_position_address()));
 }
 
 // --- The path's branch masks ---
@@ -5197,12 +5218,12 @@ uint64_t BranchMasks(uint8_t* base, uint32_t path, uint32_t frame) {
     return uint64_t(int64_t(int32_t(BranchMasksFor(base, frame + 80))));
   }
   if (vehicle != 0) {
-    const uint32_t flags = Load(base, vehicle + 6148);
+    const uint32_t flags = Vehicle(base, vehicle).car_flags();
     if ((flags & 0x81) == 0) {
       if ((flags & 0x4) == 0) {
         return lists;
       }
-      const uint32_t other = Load(base, vehicle + 5712);
+      const uint32_t other = Vehicle(base, vehicle).car();
       if (other == 0) {
         return 0;
       }
@@ -5216,7 +5237,7 @@ uint64_t BranchMasks(uint8_t* base, uint32_t path, uint32_t frame) {
   if (RaceAllowsSides(base) == 0) {
     return lists;
   }
-  switch (Load(base, Load(base, G::race_data_address()) + 4)) {
+  switch (G::race_data(base).route_course()) {
     case 2:
     case 3:
       return lists + 16;
@@ -5235,7 +5256,7 @@ uint32_t KeepBranch(uint8_t* base, uint32_t path, uint32_t a, uint32_t b, uint32
                     uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_8213EAB0 AiPath::KeepBranch");
   const uint64_t masks = BranchMasks(base, path, frame - 96);
-  const uint32_t table = Load(base, Load(base, track_route::kRoute) + 12);
+  const uint32_t table = RG::route_file(base).sections();
   const uint32_t section_b = Load(base, table + (uint32_t(guest::LoadU16(base, b)) << 2));
   const uint32_t section_a = Load(base, table + (uint32_t(guest::LoadU16(base, a)) << 2));
   const int32_t prefer =
@@ -5264,7 +5285,7 @@ uint32_t LeftEntry(uint8_t* base, uint32_t path, uint32_t point, uint32_t entry,
       Fsubs(Lfs(base, point + 8), Lfs(base, RouteSlice(base, record).center_z_address()));
   const double dx =
       Fsubs(Lfs(base, point + 0), Lfs(base, RouteSlice(base, record).center_x_address()));
-  const double length = Lfs(base, Load(base, track_route::kRoute) + 8);
+  const double length = Lfs(base, RG::route_file(base).slice_length_address());
   const double along = Fmadds(Lfs(base, RouteSlice(base, record).forward_x_address()), dx,
                               Fmuls(Lfs(base, RouteSlice(base, record).forward_z_address()), dz));
   if (along > length) {
@@ -5401,8 +5422,8 @@ bool DropPassed(uint8_t* base, uint32_t path, uint32_t point, uint32_t frame, ui
 uint64_t Extend(uint8_t* base, uint32_t path, uint32_t point, uint32_t frame,
                 const PathCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8213ECF8 AiPath::Extend");
-  const uint32_t file = Load(base, track_route::kRoute);
-  const double length = Lfs(base, file + 8);
+  const uint32_t file = RG::route_file(base).address;
+  const double length = Lfs(base, TrackRouteFile(base, file).slice_length_address());
   const double slices = Fdivs(Lfs(base, G::other_gap_address()), length);
   Stfs(base, frame + 92, Fmuls(length, Lfs(base, G::hundredth_address())));
   Stfs(base, frame + 96, Fmuls(length, Lfs(base, G::tenth_address())));
@@ -5573,7 +5594,7 @@ bool UpdatePath(uint8_t* base, uint32_t path, uint32_t frame, const PathCalls& c
   ITC_NATIVE_RUNNING("sub_8213F530 AiPath::Update");
   *r3 = path;
   guest::StoreU32(base, frame + 80, 0);
-  const uint32_t file = Load(base, track_route::kRoute);
+  const uint32_t file = RG::route_file(base).address;
   const uint32_t driver = AiPath(base, path).driver().address;
   const uint32_t point = driver + 80;
   if (!(AiDriver(base, driver).lane() < 32768)) {
@@ -5586,7 +5607,8 @@ bool UpdatePath(uint8_t* base, uint32_t path, uint32_t frame, const PathCalls& c
   const int16_t entries = int16_t(AiPath(base, path).entry_count());
   const int32_t count = entries;
   const int32_t reach = strings_and_font::steps::Fctiwz(
-      Fdivs(Lfs(base, G::look_ahead_address()), Lfs(base, file + 8)));
+      Fdivs(Lfs(base, G::look_ahead_address()),
+            Lfs(base, TrackRouteFile(base, file).slice_length_address())));
   const int16_t look = int16_t(AiPath(base, path).look_ahead() - uint16_t(reach) + 1);
   AiPath(base, path).set_plan_count(uint16_t(look));
   if (look > count) {
@@ -5600,7 +5622,7 @@ bool UpdatePath(uint8_t* base, uint32_t path, uint32_t frame, const PathCalls& c
     return true;
   }
   const double speed = Fadds(Lfs(base, own + 100), Lfs(base, G::twenty_address()));
-  const double per = Fdivs(Lfs(base, Load(base, track_route::kRoute) + 8), speed);
+  const double per = Fdivs(Lfs(base, RG::route_file(base).slice_length_address()), speed);
   int32_t span = int32_t(uint32_t(LoadS16(base, AiPath(base, path).plan_count_address())) << 2);
   guest::StoreU32(base, frame + 80, uint32_t(span));
   Stfs(base, AiPath(base, path).largest_step_address(), Fmuls(per, Lfs(base, G::twelve_address())));
@@ -5659,13 +5681,14 @@ bool DriveCar(uint8_t* base, uint32_t input, uint32_t index, uint32_t flag, uint
   ITC_NATIVE_RUNNING("sub_8215F678 AiDriver::DriveCar");
   const uint32_t vehicle = vehicle_accessors::VehicleGet(base, index);
   const uint32_t identity = vehicle_accessors::VehicleIdentity(vehicle);
-  track_route::ClampPosition(base, frame + 88, Load(base, identity + 4));
+  track_route::ClampPosition(base, frame + 88, TrackPosition(base, identity).route_position());
   Vehicle_GetSpeedKmh(base, vehicle);  // not read (its f1 Drive's later)
-  if (guest::LoadU8(base, vehicle + 2249) == 0) {
-    guest::StoreU8(base, vehicle + 2249, 1);
+  if (Vehicle(base, vehicle).automatic() == 0) {
+    Vehicle(base, vehicle).set_automatic(1);
   }
-  if ((Load(base, vehicle + 6148) & 0x81) != 0 && guest::LoadU8(base, vehicle + 2424) != 0) {
-    guest::StoreU8(base, vehicle + 2424, 0);
+  if ((Vehicle(base, vehicle).car_flags() & 0x81) != 0 &&
+      Vehicle(base, vehicle).nitrous_on() != 0) {
+    Vehicle(base, vehicle).set_nitrous_on(0);
   }
   ClearCarInput(base, input);
   guest::StoreU32(base, frame + 84, flag);

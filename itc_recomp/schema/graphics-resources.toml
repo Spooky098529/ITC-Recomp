@@ -86,7 +86,8 @@ fields = [
 
 # A vertex or index buffer (32 bytes; docs/known-data.md, "buffer header").
 [BufferHeader]
-measures = ["VertexBuffer", "IndexBuffer", "new<32>@Device::CreateVertexBuffer", "new<32>@Device::CreateIndexBuffer"]
+measures = ["VertexBuffer", "IndexBuffer", "new<32>@Device::CreateVertexBuffer", "new<32>@Device::CreateIndexBuffer",
+            "Device.+12180"]
 size = 32
 origin = "allocated"
 fields = [
@@ -95,6 +96,7 @@ fields = [
   { name = "locked_base", offset = 20, type = "u32", note = "the data's locked range (0xFFFF0000 none)" },
   { name = "data", offset = 24, type = "u32", note = "the data's address (a vertex buffer's low 2 bits 3)" },
   { name = "size", offset = 28, type = "u32", note = "the bytes (a vertex buffer's in bits 2-25, with bits 28 and 1 set)" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "stored by Device::SetIndices on the bound index buffer (Device.+12180; single-commands' report); not read in detail" },
 ]
 
 # A level description (32 bytes, D3DSURFACE_DESC probably), filled by

@@ -29,14 +29,16 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
   const uint32_t list = alloc(72, 0x82180DD8);
   G::set_list_menu(base, list);
   if (list != 0) {
-    Store(base, list + 68, 0);
-    Store(base, list + 60, 0);
+    const MenuList menu(base, list);
+    menu.set_enabled(0);
+    menu.set_player(0);
   }
   const uint32_t colors = alloc(72, 0x82180E04);
   G::set_color_menu(base, colors);
   if (colors != 0) {
-    Store(base, colors + 68, 0);
-    Store(base, colors + 60, 0);
+    const MenuList menu(base, colors);
+    menu.set_enabled(0);
+    menu.set_player(0);
   }
   const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x82180E30, 0, 1196, 4096, 4);
   const Data data(base, uint32_t(r3));
@@ -126,12 +128,12 @@ uint64_t Leave(uint8_t* base, uint64_t r3, uint32_t mode, uint32_t sp, const Cal
 
 void CheckLimits(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821812B8 CarDealer::CheckLimits");
-  const uint32_t limits = Load(base, kLimits);
+  const schema::PlateEditorData limits = Type2G::plate_data(base);
   const Entry entry = SelectedEntry(base);
-  Store(base, limits + 48, 1);
+  limits.set_make_random(1);
   const bool within = entry.unknown_648() <= 2000 && entry.unknown_716() <= 4700 &&
                       entry.unknown_720() <= 2000 && entry.unknown_724() <= 1700;
-  Store(base, limits + 44, within ? 1 : 0);
+  limits.set_car_class(within ? 1 : 0);
 }
 
 uint64_t ReloadStandModel(uint8_t* base, uint32_t sp, const Calls& calls) {

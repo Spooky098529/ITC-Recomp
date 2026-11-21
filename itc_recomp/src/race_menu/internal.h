@@ -6,8 +6,14 @@
 
 #include "guest.h"
 #include "race_menu/race_menu.h"
+#include "schema/boot_mode.h"
+#include "schema/career.h"
+#include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
+#include "schema/race_event.h"
+#include "schema/racer_controllers.h"
 #include "schema/race_menu.h"
+#include "schema/tuning_screen.h"
 #include "ui_movies/game.h"
 
 namespace race_menu {
@@ -26,6 +32,15 @@ using Pages = schema::PageObject;
 using Menu = schema::FrontEndMenu;
 using Event = schema::RaceMenuEvent;
 using EventKind = schema::RaceMenuEventKind;
+// Other areas' views: player 0's save data (race-event.toml; its +0x199E0
+// through career.toml's CareerSave), a UI movie node (tuning-screen.toml),
+// a mode message (game-modes.toml).
+using Save = schema::SaveData;
+using CareerSave = schema::CareerSave;
+using Node = schema::UiMovieNode;
+using Message = schema::ModeMessage;
+// A player's mapper entry (racer-controllers.toml).
+using Entry = schema::PlayerMapperEntry;
 
 // The machine's event pairs (+9852) and kind pairs (+9980) by index.
 inline Event EventAt(uint8_t* base, uint32_t machine, uint32_t i) {
@@ -73,10 +88,10 @@ inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
   const uint32_t count = m.message_count() + 1;
   const uint32_t start = m.message_start();
   m.set_message_count(count);
-  const uint32_t slot = m.messages_address() + 12 * ((start + count - 1) % 50);
-  Store(base, slot + 0, id);
-  Store(base, slot + 4, 0);
-  Store(base, slot + 8, 0);
+  const Message slot(base, m.messages_address() + 12 * ((start + count - 1) % 50));
+  slot.set_id(id);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 }  // namespace race_menu

@@ -6,7 +6,11 @@
 #include "base/log.h"
 #include "car_scene_draw/ops.h"
 #include "guest.h"
+#include "schema/car_draw.h"
 #include "schema/front_end_car_draw.h"
+#include "schema/scene_models.h"
+#include "schema/stand_models.h"
+#include "schema/type6_type7_modes.h"
 #include "scene/scene.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -17,14 +21,15 @@ namespace {
 using namespace car_scene_draw::ops;
 
 using G = schema::FrontEndCarDrawGlobals;
+using Slot = schema::StandSlot;
+using Stage = schema::GarageStage;
+using Block = schema::CarDrawBlock;
 
 constexpr uint32_t kGarageCameraUpdate = 0x8217BE98;
 constexpr uint32_t kPoseCar = 0x8217CAB8;
 constexpr uint32_t kCarSceneUpdate = 0x820C9608;
 constexpr uint32_t kCarSceneDraw = 0x820C5DE8;
 constexpr uint32_t kFloorDraw = 0x820C8480;
-
-int32_t LoadS(uint8_t* base, uint32_t address) { return int32_t(Load(base, address)); }
 
 // A doubleword (ld, std) from `from` to `to`, as two words.
 void Copy2(uint8_t* base, uint32_t to, uint32_t from) {
@@ -38,53 +43,56 @@ void Copy2(uint8_t* base, uint32_t to, uint32_t from) {
 uint64_t GarageStageDraw(uint8_t* base, const Calls& calls, uint64_t r3, uint32_t turn,
                          const DrawCallees& callees, uint32_t stack) {
   const uint32_t holder = uint32_t(r3);
+  const Slot slot(base, holder);
   const uint32_t f = stack - 256;
   Store(base, f, stack);  // the back chain, as stwu
-  uint32_t stage = Load(base, holder);
-  if (LoadS(base, stage + 112) == 0) {
+  Stage stage = slot.stage();
+  if (int32_t(stage.camera_set_up()) == 0) {
     return r3;
   }
   ITC_NATIVE_RUNNING("sub_8217FE60 GarageStage::Draw");
-  const uint32_t preset = Load(base, stage + 6088);
+  const uint32_t preset = stage.waiting_preset();
   if (int32_t(preset) != -1) {
-    r3 = GarageStageApplyPreset(base, calls, stage + 5600, preset, stage, Load(base, stage + 8), f);
+    r3 = GarageStageApplyPreset(base, calls, stage.animations_address(), preset, stage.address,
+                                stage.model_index(), f);
   }
   if (int32_t(turn) != 0) {
     // The yaw less 0.5°, wrapped: below -π to π, above π to -π.
-    const uint32_t angles = Load(base, holder) + 80;
-    double yaw = Fsubs(Lfs(base, angles + 4), double(G::half_degree(base)));
+    const Stage angles = slot.stage();
+    double yaw = Fsubs(double(angles.yaw()), double(G::half_degree(base)));
     const double minus_pi = double(G::minus_pi(base));
     if (yaw < minus_pi) {
       yaw = double(G::pi(base));
     } else if (yaw > double(G::pi(base))) {
       yaw = minus_pi;
     }
-    Stfs(base, angles + 4, yaw);
+    angles.set_yaw(float(yaw));
   }
-  GarageAnimsRun(base, calls, Load(base, holder) + 5600, f);
+  GarageAnimsRun(base, calls, slot.stage().animations_address(), f);
   {
-    const uint64_t regs[1] = {Load(base, holder) + 112};
+    const uint64_t regs[1] = {slot.stage().camera_address()};
     calls.call(kGarageCameraUpdate, regs, 1, nullptr, 0, f, 0x8217FF04, nullptr);
   }
-  if (LoadS(base, Load(base, holder) + 6060) != 0) {
+  if (int32_t(slot.stage().dark()) != 0) {
     const double zero = double(G::zero(base));
     GarageStageSetLightKit(base, calls, holder, 3, 0, 0, zero, zero, zero, f);
   }
   GarageStageSyncPlates(base, calls, holder, f);
-  const uint32_t scene = Load(base, kScene);
+  const uint32_t scene = schema::CarDrawGlobals::scene(base).address;
   const uint32_t model =
-      vehicle_accessors::ScenePoolsGetB(base, scene, 7, Load(base, Load(base, holder) + 8));
-  const uint32_t b = model + 4288;
-  Store(base, b + 8, Load(base, Load(base, holder) + 6056));
-  Stfs(base, b + 640, Lfs(base, Load(base, holder) + 32));
-  stage = Load(base, holder);
-  Copy2(base, b + 656, stage + 48);
-  Copy2(base, b + 664, stage + 56);
-  stage = Load(base, holder);
-  Copy2(base, b + 672, stage + 48);
+      vehicle_accessors::ScenePoolsGetB(base, scene, 7, slot.stage().model_index());
+  const Block block(base, schema::SceneModel(base, model).draw_block_address());
+  const uint32_t b = block.address;
+  block.set_drawn(slot.stage().draw_word());
+  block.set_bonnet_angle(float(double(slot.stage().bonnet())));
+  stage = slot.stage();
+  Copy2(base, block.left_door_x_address(), stage.open_x_address());
+  Copy2(base, block.left_door_phi_address(), stage.open_z_address());
+  stage = slot.stage();
+  Copy2(base, block.right_door_x_address(), stage.open_x_address());
   const double one = double(G::one(base));
-  Copy2(base, b + 680, stage + 56);
-  stage = Load(base, holder);
+  Copy2(base, block.right_door_phi_address(), stage.open_z_address());
+  stage = slot.stage();
   for (const uint32_t at : {92u, 108u, 124u, 140u}) {
     Stfs(base, f + at, one);
   }
@@ -107,8 +115,8 @@ uint64_t GarageStageDraw(uint8_t* base, const Calls& calls, uint64_t r3, uint32_
     const uint64_t regs[1] = {r3_in};
     return calls.call(kCarSceneUpdate, regs, 1, nullptr, 0, f, lr, nullptr);
   };
-  if (LoadS(base, stage + 6052) != 0) {
-    GarageStageSetLights(base, stage + 4512, 0, f);
+  if (int32_t(stage.reflection()) != 0) {
+    GarageStageSetLights(base, stage.lights_address(), 0, f);
     pose(2, 0x8217FFE8);
     toggle_mirrored();
     r3 = set_interior_word(scene, 0);
@@ -117,20 +125,20 @@ uint64_t GarageStageDraw(uint8_t* base, const Calls& calls, uint64_t r3, uint32_
       const uint64_t regs[2] = {scene, f + 80};
       calls.call(kCarSceneDraw, regs, 2, nullptr, 0, f, 0x82180018, nullptr);
     }
-    Memcpy(base, calls, f + 144, b + 16, 64, f, 0x82180028);
-    const uint32_t word = Load(base, b + 8);
+    Memcpy(base, calls, f + 144, block.world_address(), 64, f, 0x82180028);
+    const uint32_t word = block.drawn();
     if (callees.floor_native) {
       FloorDraw(base, calls, scene, f + 144, word, callees.caller_r24, f);
     } else {
       const uint64_t regs[3] = {scene, f + 144, word};
       calls.call(kFloorDraw, regs, 3, nullptr, 0, f, 0x82180038, nullptr);
     }
-    GarageStageSetLights(base, Load(base, holder) + 4512, 0, f);
+    GarageStageSetLights(base, slot.stage().lights_address(), 0, f);
     pose(1, 0x8218005C);
     toggle_mirrored();
     r3 = set_interior_word(scene, 1);
   } else {
-    GarageStageSetLights(base, stage + 4512, 0, f);
+    GarageStageSetLights(base, stage.lights_address(), 0, f);
     r3 = pose(1, 0x82180094);
     r3 = update(r3, 0x82180098);
   }

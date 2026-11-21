@@ -12,16 +12,18 @@
 #include "models/xpr.h"
 #include "scene_loaders/objects.h"
 #include "scene_models/scene_models.h"
+#include "schema/accessories.h"
+#include "schema/car_models.h"
+#include "schema/material_passes.h"
+#include "schema/models.h"
 #include "schema/scene_loaders.h"
+#include "schema/stand_models.h"
 
 namespace scene_loaders {
 
 namespace {
 
 using G = schema::SceneLoadersGlobals;
-
-// A load slot's state (LoadSlot's +20; car-models.md's LoadSlot).
-constexpr uint32_t kSlotState = 20;
 
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
@@ -85,8 +87,8 @@ uint32_t CreateA(uint8_t* base, uint32_t set, uint32_t record, const CreateCalls
   uint32_t r3 = AllocPages(base, s.deferred_releases_address(), (pool0 + pool6) * 80);
   auto records = [&] { return int32_t((s.car_model_count() + s.traffic_count()) << 2); };
   for (int32_t i = 0; i < records(); i++) {
-    // A deferred release record's +16 (car-models.md's CarModelsDeferredRelease).
-    Store(base, Load(base, s.deferred_releases_address()) + 20 * uint32_t(i) + 16, 0);
+    schema::CarModelsDeferredRelease(base, s.deferred_releases().address + 20 * uint32_t(i))
+        .set_state(0);
   }
   // The counts in the set, by pool.
   const uint32_t counts[7] = {s.car_model_count_address(), s.car_parts_count_address(),
@@ -175,10 +177,12 @@ void PoolNodeDestruct(uint8_t* base, uint32_t node) {
 
 uint32_t CarModelIsLoaded(uint8_t* base, uint32_t car_model) {
   ITC_NATIVE_RUNNING("sub_820D3C28 CarModel::IsLoaded");
-  if (AnyLoading(base, car_model + 3972, 2)) {
+  const schema::CarModel cm(base, car_model);
+  // The two XPR2 slots' states.
+  if (AnyLoading(base, cm.body_xpr_state_address(), 2)) {
     return 0;
   }
-  return LoadS(base, car_model + 3748) == kSlotLoading ? 0 : 1;
+  return int32_t(cm.node_file_state()) == kSlotLoading ? 0 : 1;
 }
 
 uint32_t Pool4IsLoaded(uint8_t* base, uint32_t object) {
@@ -238,7 +242,8 @@ uint32_t PartsPart(uint8_t* base, uint32_t parts, int32_t kind, uint32_t base_sl
   } else {
     return 0;
   }
-  if (LoadS(base, p.slots_address() + kSlotBytes * slot + kSlotState) != kSlotArrived) {
+  if (int32_t(schema::LoadSlot(base, p.slots_address() + kSlotBytes * slot).state()) !=
+      kSlotArrived) {
     return 0;
   }
   return p.part_models_address() + kPartModelBytes * slot;
@@ -251,7 +256,10 @@ uint32_t PartsIsLoaded(uint8_t* base, uint32_t parts) {
   if (set > 1) {
     return 0;
   }
-  return AnyLoading(base, p.slots_address() + kSlotState, set == 0 ? kPartsCount : 17) ? 0 : 1;
+  return AnyLoading(base, schema::LoadSlot(base, p.slots_address()).state_address(),
+                    set == 0 ? kPartsCount : 17)
+             ? 0
+             : 1;
 }
 
 uint32_t PartWalkMaterials(uint8_t* base, uint32_t model) {
@@ -259,7 +267,7 @@ uint32_t PartWalkMaterials(uint8_t* base, uint32_t model) {
   if (model == 0) {
     return 0;
   }
-  const int32_t shapes = LoadS(base, model + 412);
+  const int32_t shapes = int32_t(schema::PartModel(base, model).shape_count());
   uint32_t r3 = model;
   for (int32_t shape = 0; shape < shapes; shape++) {
     const int32_t first = int32_t(models::MaterialCount(base, model, uint32_t(shape), 0));
@@ -281,7 +289,8 @@ uint32_t PartsWalkMaterials(uint8_t* base, uint32_t parts) {
   const uint32_t count = p.first_set().model_set() == 0 ? kPartsCount : 187;
   uint32_t r3 = parts;
   for (uint32_t i = 0; i < count; i++) {
-    if (LoadS(base, p.slots_address() + kSlotState + kSlotBytes * i) == kSlotArrived) {
+    if (int32_t(schema::LoadSlot(base, p.slots_address() + kSlotBytes * i).state()) ==
+        kSlotArrived) {
       r3 = PartWalkMaterials(base, p.part_models_address() + kPartModelBytes * i);
     }
   }
@@ -302,7 +311,8 @@ uint64_t PartsApplyPalette(uint8_t* base, uint32_t parts, uint64_t r3, uint32_t 
   const schema::CarParts p(base, parts);
   const uint32_t count = PartsWalkCount(base, parts);
   for (uint32_t i = 0; i < count; i++) {
-    if (LoadS(base, p.slots_address() + kSlotState + kSlotBytes * i) == kSlotArrived) {
+    if (int32_t(schema::LoadSlot(base, p.slots_address() + kSlotBytes * i).state()) ==
+        kSlotArrived) {
       r3 = material_passes::ApplyPalette(base, p.part_models_address() + kPartModelBytes * i,
                                          sp - 112);
     }
@@ -316,7 +326,8 @@ uint64_t PartsSetPaint(uint8_t* base, uint32_t parts, uint64_t r3, const uint64_
   const schema::CarParts p(base, parts);
   const uint32_t count = PartsWalkCount(base, parts);
   for (uint32_t i = 0; i < count; i++) {
-    if (LoadS(base, p.slots_address() + kSlotState + kSlotBytes * i) == kSlotArrived) {
+    if (int32_t(schema::LoadSlot(base, p.slots_address() + kSlotBytes * i).state()) ==
+        kSlotArrived) {
       r3 = material_passes::SetPaint(base, p.part_models_address() + kPartModelBytes * i, regs,
                                      sp - 160);
     }
@@ -370,24 +381,26 @@ uint64_t InteriorSetPaint(uint8_t* base, uint32_t interior, uint64_t r3, const u
 
 uint64_t TrafficApplyPalette(uint8_t* base, uint32_t traffic, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820D7BF8 TrafficCar::ApplyPalette");
-  return PaintSix(base, traffic + 4124, traffic + 4256, r3, nullptr, sp);
+  const schema::TrafficCar t(base, traffic);
+  return PaintSix(base, t.slot0_state_address(), t.part_models_address(), r3, nullptr, sp);
 }
 
 uint64_t CarModelSelectedTexture(uint8_t* base, uint32_t car_model) {
   ITC_NATIVE_RUNNING("sub_820D4588 CarModel::SelectedTexture");
-  const uint32_t offset = ((Load(base, car_model + 3712) + 1808) << 2);
-  const uint32_t index = Load(base, offset + car_model);
+  const schema::CarModel cm(base, car_model);
+  // The original's ((+3712 + 1808) << 2) + car_model: +7232's index.
+  const uint32_t index = Load(base, cm.xpr_indices_address() + (cm.selected_texture() << 2));
   if (int32_t(index) == -1) {
     return 0;
   }
-  return models::XprGetTexture(base, car_model + 4000, index);
+  return models::XprGetTexture(base, cm.xpr_objects_address(), index);
 }
 
 uint32_t AccessoriesAllLoaded(uint8_t* base, uint32_t set) {
   ITC_NATIVE_RUNNING("sub_820F07D8 Accessories::AllLoaded");
   for (uint32_t i = 0; i < 3; i++) {
-    const uint32_t entry = Load(base, set + 4 + 4 * i);
-    if (entry != 0 && Load(base, entry + 1096) == 0) {
+    const uint32_t entry = Load(base, schema::Accessories(base, set).entry_0_address() + 4 * i);
+    if (entry != 0 && schema::AccessoryEntry(base, entry).accessory_loaded() == 0) {
       return 0;
     }
   }
@@ -441,15 +454,17 @@ uint32_t NameMatches(uint8_t* base, uint32_t a, uint32_t b) {
 
 uint32_t XprCount(uint8_t* base, uint32_t xpr) {
   ITC_NATIVE_RUNNING("sub_82596F20 XPR::Count");
-  return Load(base, xpr + 16) == 0 ? 0 : Load(base, xpr + 20);
+  const schema::XPR x(base, xpr);
+  return x.records().address == 0 ? 0 : x.record_count();
 }
 
 uint32_t XprRecordName(uint8_t* base, uint32_t xpr, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82596F40 XPR::RecordName");
-  if (index >= Load(base, xpr + 20)) {
+  const schema::XPR x(base, xpr);
+  if (index >= x.record_count()) {
     return 0;
   }
-  return Load(base, Load(base, xpr + 16) + 16 * index + 12);
+  return schema::XprRecord(base, x.records().address + 16 * index).name();
 }
 
 int32_t XprFindByName(uint8_t* base, uint32_t xpr, uint32_t name) {

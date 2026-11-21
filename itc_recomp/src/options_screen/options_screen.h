@@ -15,7 +15,11 @@
 
 #include "race_hud_object/race_hud_object.h"
 #include "schema/menu_helpers.h"
+#include "schema/menu_sounds.h"
+#include "schema/options_load_save.h"
 #include "schema/options_screen.h"
+#include "schema/race_event.h"
+#include "schema/tuning_screen.h"
 
 #include <cstdint>
 
@@ -58,11 +62,10 @@ constexpr uint32_t kRestorePose = 0x82119B80;
 constexpr uint32_t kMenuSoundPlay = 0x821103F0;
 // Menu::Pressed, VirtualFree (outside the allocation layer) and
 // Options::ShowCareerInfo (never seen in play: the original) through the
-// function table; the sound manager [0x826C5C80].
+// function table (the sound manager is schema::MenuSoundsGlobals::sound_manager).
 constexpr uint32_t kMenuPressed = 0x821864C8;
 constexpr uint32_t kVirtualFree = 0x82295330;
 constexpr uint32_t kShowCareerInfo = 0x821C0EF0;
-constexpr uint32_t kSoundManagerGlobal = 0x826C5C80;
 // Through their overrides: Menu::Step, UiMovie::ResetPose, SetChildNameText,
 // SetNumberText, ClearText and the text scroll's reset (sub_8211C5F8); the
 // arrows never seen in play (Options::SetHudArrow, SetSoundArrow,

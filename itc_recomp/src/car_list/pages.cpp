@@ -11,6 +11,9 @@
 #include "power_graph/power_graph.h"
 #include "race_setup/race_setup.h"
 #include "schema/car_list.h"
+#include "schema/career.h"
+#include "schema/race_setup.h"
+#include "schema/tuning_screen.h"
 #include "tuning_pages/tuning_pages.h"
 #include "type67_modes/type67_modes.h"
 
@@ -38,6 +41,10 @@ using ColorList = schema::CarListColorList;
 using Color = schema::CarListColor;
 using BackObject = schema::CarListBackObject;
 using Word = schema::CarListStepWord;
+using Save = schema::CareerSave;               // career.toml
+using Garage = schema::CareerGarageList;       // career.toml
+using AddedCar = schema::CareerAddedCar;       // career.toml
+using RacerCar = schema::Car;                  // race-setup.toml
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   StoreU32(base, sp - bytes, sp);
@@ -384,7 +391,7 @@ uint64_t SetUpRows(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls
   // The count: the garage's (a halfword, sign-extended) for tab 2, else the
   // list's.
   const uint64_t count = Base(base, b).tab() == 2
-                             ? uint64_t(int64_t(int16_t(guest::LoadU16(base, save + 6328))))
+                             ? uint64_t(int64_t(int16_t(Save(base, save).garage_count())))
                              : uint64_t(Base(base, b).current_list().count());
   uint64_t shown = Base(base, b).rows_shown();
   static constexpr uint32_t kRows[4] = {154, 153, 155, 156};
@@ -441,9 +448,9 @@ uint64_t SetUpCarPage(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& ca
   if (Base(base, b).tab() == 2) {
     // The garage's car at the selection: its halfword links from +204 of
     // the garage (save data + 6120) walked selection + scroll times.
-    const uint32_t garage = uint32_t(SaveData(base, b, frame)) + 6120;
+    const uint32_t garage = Save(base, uint32_t(SaveData(base, b, frame))).garage_address();
     uint64_t steps = uint64_t(Base(base, b).scroll()) + uint64_t(Base(base, b).row());
-    int16_t node = int16_t(guest::LoadU16(base, garage + 204));
+    int16_t node = int16_t(Garage(base, garage).head());
     uint32_t at = garage + (uint32_t(int32_t(node)) << 2);
     while (steps != 0) {
       node = int16_t(guest::LoadU16(base, at));
@@ -451,7 +458,7 @@ uint64_t SetUpCarPage(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& ca
       at = garage + (uint32_t(int32_t(node)) << 2);
     }
     const int32_t slot = int16_t(guest::LoadU16(base, at + 2));
-    const uint32_t car = garage + uint32_t(slot * 1968) + 212;
+    const uint32_t car = Garage(base, garage).cars_address() + uint32_t(slot * 1968);
     calls.Call(kShowCarStats, frame, 0x8224C64C, Base(base, b).car_panel().address, car);
   } else {
     CarShowStats(base, Base(base, b).car_panel().address, entry(), frame, calls);
@@ -465,7 +472,7 @@ namespace {
 // +204 of the garage, each a node of the garage's (its +0 the next, its +2
 // the car's slot) as the originals' lha and rlwinm leave them.
 uint32_t GarageNode(uint8_t* base, uint32_t garage, uint32_t steps) {
-  int16_t node = int16_t(guest::LoadU16(base, garage + 204));
+  int16_t node = int16_t(Garage(base, garage).head());
   uint32_t at = garage + (uint32_t(int32_t(node)) << 2);
   while (steps != 0) {
     node = int16_t(guest::LoadU16(base, at));
@@ -475,10 +482,10 @@ uint32_t GarageNode(uint8_t* base, uint32_t garage, uint32_t steps) {
   return at;
 }
 
-// The garage's record (1,968 bytes from the garage) of the node's slot.
-uint32_t GarageRecord(uint8_t* base, uint32_t garage, uint32_t node) {
+// The garage's car (1,968 bytes from the list's cars) of the node's slot.
+uint32_t GarageCar(uint8_t* base, uint32_t garage, uint32_t node) {
   const int32_t slot = int16_t(guest::LoadU16(base, node + 2));
-  return garage + uint32_t(slot * 1968);
+  return Garage(base, garage).cars_address() + uint32_t(slot * 1968);
 }
 
 // memcpy(destination, source, 8432): c_runtime::Memcpy's copy, else the
@@ -527,7 +534,7 @@ uint64_t Build(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
   Base(base, b).set_list2_count(0);
   // The cars whose bit is set in the save data's words at +104740.
   for (uint32_t car = 0; car < 72; car++) {
-    const uint32_t word = LoadU32(base, save + ((((car >> 5) + 26185) << 2)));
+    const uint32_t word = LoadU32(base, Save(base, save).reward_cars_address() + ((car >> 5) << 2));
     if ((word & (1u << (car & 31))) == 0) {
       continue;
     }
@@ -552,16 +559,16 @@ uint64_t Build(uint8_t* base, uint64_t b_r3, uint32_t sp, const Calls& calls) {
   }
   // The garage's cars (the count a halfword, sign-extended, compared
   // unsigned) to list 2.
-  const uint32_t garage = save + 6120;
+  const uint32_t garage = Save(base, save).garage_address();
   const uint32_t list = Base(base, b).list2_address();
-  for (uint32_t i = 0; i < uint32_t(int32_t(int16_t(guest::LoadU16(base, save + 6328)))); i++) {
+  for (uint32_t i = 0; i < uint32_t(int32_t(int16_t(Save(base, save).garage_count()))); i++) {
     const uint32_t entry = memory::AllocPages(8448, 4096);
-    const uint32_t id = LoadU32(base, GarageRecord(base, garage, GarageNode(base, garage, i)) + 224);
+    const uint32_t id = AddedCar(base, GarageCar(base, garage, GarageNode(base, garage, i))).car_id();
     r3 = CopySpec(base, entry, car_specs::GetCarSpec(base, id), frame, 0x8224C914, calls);
     Entry(base, entry)
-        .set_car_id(LoadU32(base, GarageRecord(base, garage, GarageNode(base, garage, i)) + 224));
+        .set_car_id(AddedCar(base, GarageCar(base, garage, GarageNode(base, garage, i))).car_id());
     const int16_t color =
-        int16_t(guest::LoadU16(base, GarageRecord(base, garage, GarageNode(base, garage, i)) + 212));
+        int16_t(guest::LoadU16(base, GarageCar(base, garage, GarageNode(base, garage, i)) + 0));
     Entry(base, entry).set_color(uint32_t(int32_t(color)));
     const uint32_t count = List(base, list).count();
     List(base, list).set_count(count + 1);
@@ -599,7 +606,7 @@ uint64_t ShowStandCar(uint8_t* base, uint64_t b_r3, uint64_t color, uint32_t sp,
   const uint32_t car = frame + 80;
   race_setup::CarInit(base, car);
   race_setup::SetModel(base, car, id);
-  StoreU32(base, car + 3888, LoadU32(base, car + 3888) | flag);
+  RacerCar(base, car).set_flags(RacerCar(base, car).flags() | flag);
   // Flush-to-zero off, as Car::Refresh's plain C++ expects.
   using Fpscr = ::base::FloatMode;
   Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
@@ -607,9 +614,9 @@ uint64_t ShowStandCar(uint8_t* base, uint64_t b_r3, uint64_t color, uint32_t sp,
   if (!car_specs::CarRefresh(base, car, &refreshed)) {
     calls.Call(kCarRefresh, frame, 0x8224A53C, car);
   }
-  type67_modes::GarageStageSetPlates(base, LoadU32(base, G::stand_holders(base).address + 4 * slot),
-                                     0);
-  const uint32_t holder = LoadU32(base, G::stand_holders(base).address + 4 * slot);
+  type67_modes::GarageStageSetPlates(
+      base, LoadU32(base, G::stand_holders(base).stage_block_0_address() + 4 * slot), 0);
+  const uint32_t holder = LoadU32(base, G::stand_holders(base).stage_block_0_address() + 4 * slot);
   return calls.Call(kSetCarClass, frame, 0x8224A568, holder, car, pick);
 }
 
@@ -1217,7 +1224,7 @@ uint64_t Step9(uint8_t* base, uint64_t b_r3, uint32_t word, uint32_t sp, const C
   Base(base, b).set_stand_model_loaded(0);
   if (G::two_players(base) == 0) {
     // GarageStage::SetDrawWord(stage 0, 1): its plain C++.
-    const uint32_t holder = LoadU32(base, G::stand_holders(base).address);
+    const uint32_t holder = G::stand_holders(base).stage_block_0();
     front_end_car_draw::GarageStageSetDrawWord(base, holder, 1, frame);
   }
   return answer;

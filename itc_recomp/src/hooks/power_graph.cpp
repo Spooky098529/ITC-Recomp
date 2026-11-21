@@ -16,6 +16,7 @@
 #include "hooks/front_end_car_draw.h"
 #include "hooks/guest_call.h"
 #include "power_graph/power_graph.h"
+#include "schema/app_start_up.h"
 #include "lifted/sdk.h"
 
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
@@ -40,7 +41,7 @@ namespace {
 
 namespace pg = power_graph;
 
-constexpr uint32_t kRenderManager = 0x826BABA0;
+constexpr uint32_t kRenderManager = schema::AppStartUpGlobals::render_app_address();
 
 // A guest call made from the frame at `frame` (`bytes` long, its back chain
 // written as the original's stwu does), returning to `back`.

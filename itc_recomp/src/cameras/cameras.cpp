@@ -12,7 +12,11 @@
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "memory/heap.h"
+#include "schema/camera_modes.h"
 #include "schema/cameras.h"
+#include "schema/command_list.h"
+#include "schema/post_effects.h"
+#include "schema/video_output.h"
 
 #include "base/float_mode.h"
 #include <simde/x86/avx.h>
@@ -31,6 +35,15 @@ using Fpscr = ::base::FloatMode;
 // any camera (a pass or AppCameraCamera).
 using Cam = schema::CameraPass;
 using G = schema::CamerasGlobals;
+// Other areas' objects: the viewports (camera-modes.toml), the command list
+// (command-list.toml), the clear item (post-effects.toml), the video output
+// (video-output.toml).
+using Viewport = schema::Viewport;
+using Entry = schema::ViewportEntry;
+using List = schema::CommandList;
+using ListG = schema::CommandListGlobals;
+using ClearItem = schema::ClearItem;
+using VideoOutput = schema::VideoOutput;
 
 constexpr uint32_t kOne = 0x82000A30;       // the game's float 1.0
 constexpr uint32_t kHalf = 0x82001BE4;      // 0.5
@@ -600,8 +613,8 @@ uint32_t InitPass(uint8_t* base, uint32_t pass, uint32_t type, const PassInitCal
     bool field_of_view = true;
     uint32_t fov = constant(8116);
     if (type == 0) {
-      width = guest::LoadU32(base, calls.video_output(0) + 296);
-      height = guest::LoadU32(base, calls.video_output(1) + 300);
+      width = VideoOutput(base, calls.video_output(0)).display_width();
+      height = VideoOutput(base, calls.video_output(1)).display_height();
       settings_524 = constant(8144);
       far_548 = constant(8140);
       field_of_view = false;
@@ -704,12 +717,11 @@ void Disable(uint8_t* base, uint32_t pass) {
 
 uint32_t EnableForView(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820AA1A8 CameraPasses::EnableForView");
-  if (guest::LoadU32(base, G::viewports(base).address + 8) == 0) {
+  if (G::viewports(base).split() == 0) {
     for (uint32_t i : {0, 10, 11, 12, 19, 20}) {
       Enable(base, Pass(i));
     }
-    const uint32_t viewport = guest::LoadU32(base, G::viewports(base).address);
-    const uint32_t view_mode = guest::LoadU32(base, viewport + 1860);
+    const uint32_t view_mode = G::viewports(base).first().view_mode();
     if (view_mode == 2 || view_mode == 1) {
       Enable(base, Pass(3));
     }
@@ -754,17 +766,17 @@ bool ReleaseSurfaces(uint8_t* base, uint32_t pass,
 void FromViewport(uint8_t* base, uint32_t pass, uint32_t player, uint32_t entry) {
   ITC_NATIVE_RUNNING("sub_820AA4A8 CameraPass::FromViewport");
   const Cam p(base, pass);
-  const uint32_t at =
-      guest::LoadU32(base, G::viewports(base).address + (player << 2)) + entry * 80;
+  const Entry at(base, guest::LoadU32(base, G::viewports(base).first_address() + (player << 2)) +
+                          Entry::kSize * entry);
   for (uint32_t i = 0; i < 48; i += 8) {
-    const uint32_t high = guest::LoadU32(base, at + 16 + i);
-    const uint32_t low = guest::LoadU32(base, at + 20 + i);
+    const uint32_t high = guest::LoadU32(base, at.eye_x_address() + i);
+    const uint32_t low = guest::LoadU32(base, at.eye_y_address() + i);
     guest::StoreU32(base, p.eye_x_address() + i, high);
     guest::StoreU32(base, p.eye_y_address() + i, low);
   }
-  PassSetZoom(base, pass, Lfs(base, at + 68));
-  guest::StoreU32(base, p.far_address(), Through(guest::LoadU32(base, at + 72)));
-  guest::StoreU32(base, p.roll_address(), Through(guest::LoadU32(base, at + 64)));
+  PassSetZoom(base, pass, Lfs(base, at.zoom_address()));
+  guest::StoreU32(base, p.far_address(), Through(guest::LoadU32(base, at.far_address())));
+  guest::StoreU32(base, p.roll_address(), Through(guest::LoadU32(base, at.roll_address())));
 }
 
 void PassSetZoom(uint8_t* base, uint32_t pass, double zoom) {
@@ -780,13 +792,13 @@ void PassSetZoom(uint8_t* base, uint32_t pass, double zoom) {
 
 bool ReleaseViewports(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820AA430 Viewports::Release");
-  const uint32_t block = G::viewports(base).address;
-  if (!memory::IsPages(block) || !memory::IsPages(guest::LoadU32(base, block + 0)) ||
-      !memory::IsPages(guest::LoadU32(base, block + 4))) {
+  const schema::Viewports block = G::viewports(base);
+  if (!memory::IsPages(block.address) || !memory::IsPages(block.first().address) ||
+      !memory::IsPages(block.second().address)) {
     return false;
   }
   for (uint32_t i = 0; i < 8; i += 4) {
-    memory::FreePages(guest::LoadU32(base, G::viewports(base).address + i));
+    memory::FreePages(guest::LoadU32(base, G::viewports(base).first_address() + i));
   }
   memory::FreePages(G::viewports(base).address);
   G::set_viewports(base, 0);
@@ -798,18 +810,19 @@ void ViewportSetZoom(uint8_t* base, uint32_t viewport, double zoom) {
   const uint32_t size = guest::LoadU32(base, 0x82001EF0);
   const double half = Fmuls(double(float(double(int64_t(uint64_t(size))))), Lfs(base, kHalf));
   const double angle = double(float(c_runtime::Atan(half)));
-  Stfs(base, viewport + 68, zoom);
-  Stfs(base, viewport + 148, zoom);
+  auto entry = [&](uint32_t i) { return Entry(base, viewport + Entry::kSize * i); };
+  Stfs(base, entry(0).zoom_address(), zoom);
+  Stfs(base, entry(1).zoom_address(), zoom);
   const double fixed = Fmuls(angle, Lfs(base, 0x82002808));
-  for (uint32_t entry = 2; entry <= 7; entry++) {
-    Stfs(base, viewport + 80 * entry + 68, fixed);
+  for (uint32_t i = 2; i <= 7; i++) {
+    Stfs(base, entry(i).zoom_address(), fixed);
   }
-  for (uint32_t entry = 8; entry <= 17; entry++) {
-    Stfs(base, viewport + 80 * entry + 68, zoom);
+  for (uint32_t i = 8; i <= 17; i++) {
+    Stfs(base, entry(i).zoom_address(), zoom);
   }
-  const double inverse = Fdivs(Lfs(base, kOne), Lfs(base, viewport + 1856));
-  Stfs(base, viewport + 1508, Fmuls(inverse, Lfs(base, 0x82002800)));
-  Stfs(base, viewport + 1588, zoom);
+  const double inverse = Fdivs(Lfs(base, kOne), Lfs(base, Viewport(base, viewport).far_18_address()));
+  Stfs(base, entry(18).zoom_address(), Fmuls(inverse, Lfs(base, 0x82002800)));
+  Stfs(base, entry(19).zoom_address(), zoom);
 }
 
 void ViewportSetRoll(uint8_t* base, uint32_t viewport, double angle) {
@@ -825,18 +838,21 @@ void ViewportSetRoll(uint8_t* base, uint32_t viewport, double angle) {
     x = Fadds(x, two_pi);
   }
   x = Fsubs(x, pi);
-  Stfs(base, viewport + 64, x);
-  Stfs(base, viewport + 144, Fneg(x));
-  for (uint32_t entry = 2; entry <= 17; entry++) {
-    Stfs(base, viewport + 80 * entry + 64, x);
+  auto entry = [&](uint32_t i) { return Entry(base, viewport + Entry::kSize * i); };
+  Stfs(base, entry(0).roll_address(), x);
+  Stfs(base, entry(1).roll_address(), Fneg(x));
+  for (uint32_t i = 2; i <= 17; i++) {
+    Stfs(base, entry(i).roll_address(), x);
   }
-  Stfs(base, viewport + 1584, x);
+  Stfs(base, entry(19).roll_address(), x);
 }
 
 uint32_t ViewportUpdateEntries(uint8_t* base, uint32_t viewport) {
   ITC_NATIVE_RUNNING("sub_820AA550 Viewport::UpdateEntries");
   const uint32_t v = viewport;
-  auto entry = [&](uint32_t i) { return v + 80 * i; };
+  const Viewport vp(base, v);
+  auto entry = [&](uint32_t i) { return v + Entry::kSize * i; };
+  auto E = [&](uint32_t e) { return Entry(base, e); };
   // A word copied through a float register (lfs, stfs): its bits.
   auto copy = [&](uint32_t to, uint32_t from) {
     guest::StoreU32(base, to, Through(guest::LoadU32(base, from)));
@@ -848,22 +864,22 @@ uint32_t ViewportUpdateEntries(uint8_t* base, uint32_t viewport) {
   };
   // Entry 0's eye, target and up kept (eight bytes at a time).
   for (uint32_t i = 0; i < 48; i += 8) {
-    const uint32_t high = guest::LoadU32(base, v + 16 + i);
-    const uint32_t low = guest::LoadU32(base, v + 20 + i);
-    guest::StoreU32(base, v + 1760 + i, high);
-    guest::StoreU32(base, v + 1764 + i, low);
+    const uint32_t high = guest::LoadU32(base, E(v).eye_x_address() + i);
+    const uint32_t low = guest::LoadU32(base, E(v).eye_y_address() + i);
+    guest::StoreU32(base, vp.last_view_address() + i, high);
+    guest::StoreU32(base, vp.last_view_address() + 4 + i, low);
   }
-  copy4(v + 16, v + 1600);
-  copy4(v + 32, v + 1616);
-  copy4(v + 48, v + 1632);
+  copy4(E(v).eye_address(), vp.eye_address());
+  copy4(E(v).target_address(), vp.target_address());
+  copy4(E(v).up_address(), vp.up_address());
   // Entry 1: along the target's direction, y fixed, normalized, scaled and
   // put on the eye.
-  const uint32_t e1 = entry(1), t1 = e1 + 32;
-  const uint32_t from = guest::LoadU32(base, v + 1860) == 1 ? v + 1664 : v + 1616;
-  Stfs(base, t1, Fsubs(Lfs(base, from), Lfs(base, v + 1600)));
-  Stfs(base, t1 + 4, Fsubs(Lfs(base, from + 4), Lfs(base, v + 1604)));
-  Stfs(base, t1 + 8, Fsubs(Lfs(base, from + 8), Lfs(base, v + 1608)));
-  copy(e1 + 36, 0x82002804);
+  const uint32_t e1 = entry(1), t1 = E(e1).target_address();
+  const uint32_t from = vp.view_mode() == 1 ? vp.view1_target_address() : vp.target_address();
+  Stfs(base, t1, Fsubs(Lfs(base, from), Lfs(base, vp.eye_x_address())));
+  Stfs(base, t1 + 4, Fsubs(Lfs(base, from + 4), Lfs(base, vp.eye_y_address())));
+  Stfs(base, t1 + 8, Fsubs(Lfs(base, from + 8), Lfs(base, vp.eye_z_address())));
+  copy(E(e1).target_y_address(), 0x82002804);
   {
     FlushToZero flush;
     Stvx(base, t1, Normalize(Lvx(base, t1)));
@@ -873,75 +889,76 @@ uint32_t ViewportUpdateEntries(uint8_t* base, uint32_t viewport) {
     Stfs(base, t1 + i, Fmuls(Lfs(base, t1 + i), scale));
   }
   for (uint32_t i = 0; i < 12; i += 4) {
-    Stfs(base, t1 + i, Fadds(Lfs(base, t1 + i), Lfs(base, v + 1600 + i)));
+    Stfs(base, t1 + i, Fadds(Lfs(base, t1 + i), Lfs(base, vp.eye_address() + i)));
   }
-  copy4(e1 + 16, v + 1600);
-  copy4(e1 + 48, v + 1632);
+  copy4(E(e1).eye_address(), vp.eye_address());
+  copy4(E(e1).up_address(), vp.up_address());
   // The rest: one, zero.
   const uint32_t mode = Mode(base, 1);
   const double one = Lfs(base, kOne);
   const double zero = Lfs(base, 0x82000A34);
   auto up = [&](uint32_t e, double x, double y, double z, double w) {
-    Stfs(base, e + 48, x);
-    Stfs(base, e + 52, y);
-    Stfs(base, e + 56, z);
-    Stfs(base, e + 60, w);
+    Stfs(base, E(e).up_x_address(), x);
+    Stfs(base, E(e).up_y_address(), y);
+    Stfs(base, E(e).up_z_address(), z);
+    Stfs(base, E(e).up_w_address(), w);
   };
   const uint32_t e2 = entry(2);
   if (mode == 0) {
-    copy4(e2 + 16, v + 1648);
-    copy4(e2 + 32, v + 16);
+    copy4(E(e2).eye_address(), vp.look_address());
+    copy4(E(e2).target_address(), E(v).eye_address());
     up(e2, zero, one, zero, one);
   } else if (mode == 1) {
-    copy4(e2 + 16, v + 1648);
-    Stfs(base, e2 + 32, Fadds(Lfs(base, e2 + 16), one));
-    copy(e2 + 36, e2 + 20);
-    copy(e2 + 40, e2 + 24);
+    copy4(E(e2).eye_address(), vp.look_address());
+    Stfs(base, E(e2).target_x_address(), Fadds(Lfs(base, E(e2).eye_x_address()), one));
+    copy(E(e2).target_y_address(), E(e2).eye_y_address());
+    copy(E(e2).target_z_address(), E(e2).eye_z_address());
     up(e2, zero, one, zero, zero);
   }
   // An entry at `eye` looking one unit along an axis (0 x, 1 y, 2 z) one
   // way or the other.
   auto face = [&](uint32_t e, uint32_t eye, uint32_t axis, bool plus) {
-    copy4(e + 16, eye);
+    copy4(E(e).eye_address(), eye);
     for (uint32_t k = 0; k < 3; k++) {
       if (k == axis) {
-        const double c = Lfs(base, e + 16 + 4 * k);
-        Stfs(base, e + 32 + 4 * k, plus ? Fadds(c, one) : Fsubs(c, one));
+        const double c = Lfs(base, E(e).eye_address() + 4 * k);
+        Stfs(base, E(e).target_address() + 4 * k, plus ? Fadds(c, one) : Fsubs(c, one));
       } else {
-        copy(e + 32 + 4 * k, e + 16 + 4 * k);
+        copy(E(e).target_address() + 4 * k, E(e).eye_address() + 4 * k);
       }
     }
   };
-  face(entry(3), v + 1648, 0, false);
+  face(entry(3), vp.look_address(), 0, false);
   up(entry(3), zero, one, zero, zero);
-  face(entry(4), v + 1648, 1, true);
+  face(entry(4), vp.look_address(), 1, true);
   up(entry(4), zero, zero, scale, zero);
-  face(entry(5), v + 1648, 1, false);
+  face(entry(5), vp.look_address(), 1, false);
   up(entry(5), zero, zero, one, zero);
-  face(entry(6), v + 1648, 2, true);
+  face(entry(6), vp.look_address(), 2, true);
   up(entry(6), zero, one, zero, zero);
-  face(entry(7), v + 1648, 2, false);
+  face(entry(7), vp.look_address(), 2, false);
   up(entry(7), zero, one, zero, zero);
   for (uint32_t i = 8; i <= 16; i++) {
-    face(entry(i), v + 16, 2, false);
+    face(entry(i), E(v).eye_address(), 2, false);
     up(entry(i), zero, one, zero, one);
   }
   const uint32_t e17 = entry(17);
-  copy4(e17 + 16, v + 1600);
-  copy4(e17 + 32, v + 1616);
-  copy4(e17 + 48, v + 1632);
+  copy4(E(e17).eye_address(), vp.eye_address());
+  copy4(E(e17).target_address(), vp.target_address());
+  copy4(E(e17).up_address(), vp.up_address());
   const uint32_t e18 = entry(18);
-  const double height = Fmuls(Lfs(base, v + 1856), Lfs(base, kHalf));
-  copy(e18 + 16, v + 1648);
-  Stfs(base, e18 + 20, height);
-  copy(e18 + 24, v + 1656);
-  Stfs(base, e18 + 28, one);
-  copy(e18 + 32, v + 1648);
-  Stfs(base, e18 + 36, zero);
-  copy(e18 + 40, v + 1656);
-  Stfs(base, e18 + 44, one);
+  const Entry top(base, e18);
+  const double height = Fmuls(Lfs(base, vp.far_18_address()), Lfs(base, kHalf));
+  copy(top.eye_x_address(), vp.look_x_address());
+  Stfs(base, top.eye_y_address(), height);
+  copy(top.eye_z_address(), vp.look_z_address());
+  Stfs(base, top.eye_w_address(), one);
+  copy(top.target_x_address(), vp.look_x_address());
+  Stfs(base, top.target_y_address(), zero);
+  copy(top.target_z_address(), vp.look_z_address());
+  Stfs(base, top.target_w_address(), one);
   up(e18, zero, zero, one, one);
-  face(entry(19), v + 16, 2, false);
+  face(entry(19), E(v).eye_address(), 2, false);
   up(entry(19), zero, one, zero, one);
   return entry(16);
 }
@@ -954,7 +971,7 @@ uint32_t ViewportUpdate(uint8_t* base, uint32_t viewport) {
 uint32_t ViewportSet(uint8_t* base, uint32_t viewport, uint32_t eye, uint32_t target, uint32_t up,
                      uint32_t fourth) {
   ITC_NATIVE_RUNNING("sub_820AAE48 Viewport::Set");
-  uint32_t to = viewport + 1600;
+  uint32_t to = Viewport(base, viewport).eye_address();
   for (uint32_t from : {eye, target, up, fourth}) {
     for (uint32_t i = 0; i < 16; i += 8) {
       const uint32_t high = guest::LoadU32(base, from + i);
@@ -977,14 +994,15 @@ uint32_t ViewportLookAt(uint8_t* base, uint32_t viewport, uint32_t eye, uint32_t
       guest::StoreU32(base, to + i + 4, low);
     }
   };
-  copy16(viewport + 1600, eye);
-  copy16(viewport + 1616, target);
+  const Viewport vp(base, viewport);
+  copy16(vp.eye_address(), eye);
+  copy16(vp.target_address(), target);
   const uint32_t zero = Bits(Lfs(base, 0x82000A34)), one = Bits(Lfs(base, kOne));
-  guest::StoreU32(base, viewport + 1632, zero);
-  guest::StoreU32(base, viewport + 1636, one);
-  guest::StoreU32(base, viewport + 1640, zero);
-  guest::StoreU32(base, viewport + 1644, one);
-  copy16(viewport + 1648, target);
+  guest::StoreU32(base, vp.up_x_address(), zero);
+  guest::StoreU32(base, vp.up_y_address(), one);
+  guest::StoreU32(base, vp.up_z_address(), zero);
+  guest::StoreU32(base, vp.up_w_address(), one);
+  copy16(vp.look_address(), target);
   return ViewportUpdateEntries(base, viewport);
 }
 
@@ -992,11 +1010,11 @@ std::optional<uint32_t> RecordViewport(uint8_t* base, uint32_t list, uint32_t pa
   ITC_NATIVE_RUNNING("sub_820A0978 CameraPass::RecordViewport");
   // What the original's command list calls would print about: another chunk
   // open (OpenChunk), or the list full on any of its four allocations.
-  if (guest::LoadU8(base, list + 52) == 0 && guest::LoadU32(base, command_list::kOpenChunks) != 0) {
+  if (List(base, list).chunk_open() == 0 && ListG::open_chunks(base) != 0) {
     return std::nullopt;
   }
-  if (guest::LoadU32(base, list + 12) + 4 >= guest::LoadU32(base, list + 8) ||
-      guest::LoadU32(base, list + 12) + 4 < guest::LoadU32(base, list + 12)) {
+  const List l(base, list);
+  if (l.used() + 4 >= l.capacity() || l.used() + 4 < l.used()) {
     // (each allocation compares the count so far; the last one is the
     // largest unless the count wraps, which is left to the original too)
     return std::nullopt;
@@ -1033,11 +1051,11 @@ std::optional<uint32_t> RecordClear(uint8_t* base, uint32_t list, uint32_t flags
   // Another chunk open, or the list full on any allocation (1, 1, 18 and 1
   // slots: the last the largest unless the count wraps, left to the
   // original too).
-  if (guest::LoadU8(base, list + 52) == 0 && guest::LoadU32(base, command_list::kOpenChunks) != 0) {
+  if (List(base, list).chunk_open() == 0 && ListG::open_chunks(base) != 0) {
     return std::nullopt;
   }
-  const uint32_t used = guest::LoadU32(base, list + 12);
-  if (used + 21 >= guest::LoadU32(base, list + 8) || used + 21 < used) {
+  const uint32_t used = List(base, list).used();
+  if (used + 21 >= List(base, list).capacity() || used + 21 < used) {
     return std::nullopt;
   }
   command_list::OpenChunk(base, list);
@@ -1048,13 +1066,13 @@ std::optional<uint32_t> RecordClear(uint8_t* base, uint32_t list, uint32_t flags
   guest::StoreU32(base, s + 8, 0);
   guest::StoreU32(base, s + 0, 26);
   guest::StoreU32(base, s + 4, 1);
-  s = command_list::AllocateBytes(base, list, 280, false);
-  guest::StoreU32(base, s + 8, flags);
-  guest::StoreU32(base, s + 268, color);
-  guest::StoreU32(base, s + 276, 0);
-  guest::StoreU32(base, s + 4, 0);
-  guest::StoreU32(base, s + 0, 0);
-  Stfs(base, s + 272, double(float(double(int64_t(uint64_t(depth))))));
+  const ClearItem item(base, command_list::AllocateBytes(base, list, ClearItem::kSize, false));
+  item.set_flags(flags);
+  item.set_color(color);
+  item.set_stencil(0);
+  item.set_rects(0);
+  item.set_rect_count(0);
+  Stfs(base, item.depth_address(), double(float(double(int64_t(uint64_t(depth))))));
   s = command_list::AllocateSlots(base, list, 1);
   guest::StoreU32(base, s + 4, 0);
   guest::StoreU32(base, s + 0, 36);
@@ -1070,11 +1088,11 @@ namespace {
 // the capacity (each allocation's check; the last is the largest unless the
 // count wraps, which is left to the original too).
 bool Room(uint8_t* base, uint32_t list, uint32_t slots) {
-  if (guest::LoadU8(base, list + 52) == 0 && guest::LoadU32(base, command_list::kOpenChunks) != 0) {
+  if (List(base, list).chunk_open() == 0 && ListG::open_chunks(base) != 0) {
     return false;
   }
-  const uint32_t used = guest::LoadU32(base, list + 12);
-  return used + slots < guest::LoadU32(base, list + 8) && used + slots >= used;
+  const uint32_t used = List(base, list).used();
+  return used + slots < List(base, list).capacity() && used + slots >= used;
 }
 
 uint32_t Slot(uint8_t* base, uint32_t list) {
@@ -1110,13 +1128,13 @@ void Targets(uint8_t* base, uint32_t list, uint32_t pass, bool surfaces) {
 // Command 26 and its 280-byte item: the flags, the color, the depth.
 void Clear(uint8_t* base, uint32_t list, uint32_t flags, uint32_t color, double depth) {
   Command(base, list, 26, 1, 0);
-  const uint32_t s = command_list::AllocateBytes(base, list, 280, false);
-  guest::StoreU32(base, s + 8, flags);
-  guest::StoreU32(base, s + 268, color);
-  guest::StoreU32(base, s + 276, 0);
-  guest::StoreU32(base, s + 4, 0);
-  guest::StoreU32(base, s + 0, 0);
-  Stfs(base, s + 272, depth);
+  const ClearItem item(base, command_list::AllocateBytes(base, list, ClearItem::kSize, false));
+  item.set_flags(flags);
+  item.set_color(color);
+  item.set_stencil(0);
+  item.set_rects(0);
+  item.set_rect_count(0);
+  Stfs(base, item.depth_address(), depth);
 }
 // The second chunk: a header, command 7 (1, 0x01020001) with its 4-byte item
 // (`value`), command 36.
@@ -1383,25 +1401,27 @@ void ViewportInit(uint8_t* base, uint32_t viewport, double tangent, uint32_t fra
   ITC_NATIVE_RUNNING("sub_820AAFF0 Viewport::Init");
   constexpr uint32_t kZero = 0x82000A34;
   const uint32_t video = calls.video_output(frame);
-  const int32_t width = int32_t(guest::LoadU32(base, video + 296));
+  const int32_t width = int32_t(VideoOutput(base, video).display_width());
   const double scaled = Fmuls(double(float(double(int64_t(width)))), double(float(tangent)));
   ViewportSetZoom(base, viewport, Fmuls(scaled, Lfs(base, kHalf)));
   const double zero = Lfs(base, kZero);
   const double one = Lfs(base, kOne);
   ViewportSetRoll(base, viewport, zero);
   Stfs(base, Cam(base, Pass(0)).near_address(), one);
-  guest::StoreU32(base, viewport + 1860, 0);
+  const Viewport vp(base, viewport);
+  auto entry = [&](uint32_t i) { return Entry(base, viewport + Entry::kSize * i); };
+  vp.set_view_mode(0);
   // The entries' far planes: entry 0 from pass 0, 1 to 16 from passes 3 to
   // 18, 17 the float at 0x82002814, 18 and 19 from passes 19 and 20.
-  for (uint32_t entry = 0; entry < 20; entry++) {
-    const uint32_t from = entry == 17 ? 0x82002814
-                          : entry == 0 ? Cam(base, Pass(0)).far_address()
-                          : entry <= 16 ? Cam(base, Pass(entry + 2)).far_address()
-                                        : Cam(base, Pass(entry + 1)).far_address();
-    Stfs(base, viewport + 80 * entry + 72, Lfs(base, from));
+  for (uint32_t i = 0; i < 20; i++) {
+    const uint32_t from = i == 17 ? 0x82002814
+                          : i == 0 ? Cam(base, Pass(0)).far_address()
+                          : i <= 16 ? Cam(base, Pass(i + 2)).far_address()
+                                    : Cam(base, Pass(i + 1)).far_address();
+    Stfs(base, entry(i).far_address(), Lfs(base, from));
   }
-  for (uint32_t entry = 0; entry < 20; entry++) {
-    guest::StoreU32(base, viewport + 80 * entry, 0);
+  for (uint32_t i = 0; i < 20; i++) {
+    entry(i).set_unknown_0(0);
   }
   // The three vectors, each made once.
   constexpr uint32_t kOrigin = G::origin_vector_address(), kSide = G::side_vector_address(),
@@ -1435,21 +1455,21 @@ void ViewportInit(uint8_t* base, uint32_t viewport, double tangent, uint32_t fra
   const uint32_t vectors[3] = {kOrigin, kSide, kUp};
   for (uint32_t v = 0; v < 3; v++) {
     for (uint32_t k = 0; k < 4; k++) {
-      Stfs(base, viewport + 1680 + 16 * v + 4 * k, Lfs(base, vectors[v] + 4 * k));
+      Stfs(base, vp.base_eye_address() + 16 * v + 4 * k, Lfs(base, vectors[v] + 4 * k));
     }
   }
   for (uint32_t v = 0; v < 7; v++) {
-    Stfs(base, viewport + 1728 + 16 * v + 0, zero);
-    Stfs(base, viewport + 1728 + 16 * v + 4, zero);
-    Stfs(base, viewport + 1728 + 16 * v + 8, zero);
-    Stfs(base, viewport + 1728 + 16 * v + 12, one);
+    Stfs(base, vp.unknown_1728_address() + 16 * v + 0, zero);
+    Stfs(base, vp.unknown_1728_address() + 16 * v + 4, zero);
+    Stfs(base, vp.unknown_1728_address() + 16 * v + 8, zero);
+    Stfs(base, vp.unknown_1728_address() + 16 * v + 12, one);
   }
   const double far = Lfs(base, 0x82002810);
-  Stfs(base, viewport + 1864, Lfs(base, viewport + 68));
-  Stfs(base, viewport + 1868, Lfs(base, Cam(base, Pass(0)).near_address()));
-  Stfs(base, viewport + 1856, far);
-  Stfs(base, viewport + 1508, Lfs(base, 0x8200280C));
-  Stfs(base, viewport + 1512, far);
+  Stfs(base, vp.zoom_address(), Lfs(base, entry(0).zoom_address()));
+  Stfs(base, vp.near_address(), Lfs(base, Cam(base, Pass(0)).near_address()));
+  Stfs(base, vp.far_18_address(), far);
+  Stfs(base, entry(18).zoom_address(), Lfs(base, 0x8200280C));
+  Stfs(base, entry(18).far_address(), far);
 }
 
 std::optional<uint32_t> ViewportsInit(uint8_t* base, uint32_t frame, const ViewportCalls& calls) {
@@ -1463,17 +1483,17 @@ std::optional<uint32_t> ViewportsInit(uint8_t* base, uint32_t frame, const Viewp
                       &tangent)) {
     return std::nullopt;
   }
-  const uint32_t block = memory::AllocPages(12, 4096);
+  const schema::Viewports block(base, memory::AllocPages(schema::Viewports::kSize, 4096));
   G::set_viewports(base, block);
-  c_runtime::XMemSet(base, block, 0, 12);
+  c_runtime::XMemSet(base, block.address, 0, schema::Viewports::kSize);
   uint32_t viewport = 0;
   for (uint32_t i = 0; i < 2; i++) {
-    viewport = memory::AllocPages(1872, 4096);
-    guest::StoreU32(base, block + 4 * i, viewport);
-    c_runtime::XMemSet(base, viewport, 0, 1872);
+    viewport = memory::AllocPages(Viewport::kSize, 4096);
+    guest::StoreU32(base, block.first_address() + 4 * i, viewport);
+    c_runtime::XMemSet(base, viewport, 0, Viewport::kSize);
     ViewportInit(base, viewport, tangent, frame - kViewportInitFrame, calls);
   }
-  guest::StoreU32(base, block + 8, 0);
+  block.set_split(0);
   return viewport;
 }
 

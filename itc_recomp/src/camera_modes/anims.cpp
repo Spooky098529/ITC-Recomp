@@ -19,6 +19,7 @@
 #include "models/xpr.h"
 #include "ui_movies/game.h"
 #include "schema/camera_modes.h"
+#include "schema/game_modes.h"
 
 namespace camera_modes {
 
@@ -496,21 +497,22 @@ std::optional<int64_t> PathRequest(uint8_t* base, uint32_t buffer, uint32_t inde
   if (int32_t(index) == -1) {
     return std::nullopt;
   }
-  const int32_t state = int32_t(guest::LoadU32(base, buffer + 24));
+  const schema::CameraPathBuffer b(base, buffer);
+  const int32_t state = int32_t(b.state());
   if (state != 0 && state != 3) {
     return std::nullopt;
   }
   const uint32_t id = guest::LoadU32(base, guest::LoadU32(base, (index << 2) + kPathAssets));
   game_modes::Buffer28Free(base, buffer);
   game_modes::Buffer28Reset(base, buffer);
-  guest::StoreU32(base, buffer + 12, index);
+  b.set_index(index);
   ITC_NATIVE_RUNNING("sub_82152D80 CameraPath::Load");
-  guest::StoreU32(base, buffer + 24, 1);
+  b.set_state(1);
   const uint32_t data = VirtualAlloc(archive::AssetSize(base, id));
-  guest::StoreU32(base, buffer + 20, data);
+  b.set_block(data);
   const int64_t serial = load(id, data, kPathOnLoaded, buffer);
-  guest::StoreU32(base, buffer + 16, uint32_t(serial));
-  guest::StoreU32(base, buffer + 24, 2);
+  b.set_serial(uint32_t(serial));
+  b.set_state(2);
   return serial;
 }
 
@@ -523,10 +525,11 @@ void PathOnLoaded(uint8_t* base, uint32_t data, uint32_t buffer) {
   for (uint32_t i = 0, path = paths; i < file.path_count(); i++, path += schema::CameraPathRecord::kSize) {
     FixKeys(base, path, keys, curves);
   }
-  guest::StoreU32(base, buffer + 4, paths);
+  const schema::CameraPathBuffer b(base, buffer);
+  b.set_first_path(paths);
   const uint32_t count = file.path_count();
-  guest::StoreU32(base, buffer + 24, 3);
-  guest::StoreU32(base, buffer + 8, count * 20 + paths - 20);
+  b.set_state(3);
+  b.set_last_path(count * schema::CameraPathRecord::kSize + paths - schema::CameraPathRecord::kSize);
 }
 
 // --- The rival logo ---

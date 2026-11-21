@@ -12,7 +12,7 @@ namespace audio {
 
 uint64_t RenderDriverDestroy(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t driver) {
   ITC_NATIVE_RUNNING("sub_824658C8 AudioRenderDriver::Destroy");
-  constexpr uint32_t kVtable = 0x8204AAEC, kVtable4 = 0x8204AAD0, kBaseVtable4 = 0x8204A6B8;
+  constexpr uint32_t kVtable = schema::AudioRenderDriver::kVtable, kVtable4 = 0x8204AAD0, kBaseVtable4 = 0x8204A6B8;
   const uint32_t frame = lifted_call::PushFrame(base, sp, 96);
   const schema::AudioRenderDriver object(base, driver);
   const uint32_t handle = object.handle();

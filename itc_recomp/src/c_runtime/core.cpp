@@ -592,21 +592,21 @@ uint64_t RaiseException(uint8_t* base, uint32_t code, uint32_t flags, uint32_t c
   ITC_NATIVE_RUNNING("sub_825BA420 RaiseException");
   uint64_t result = 0;
   calls.in_frame(176, [&](uint32_t frame) {
-    const uint32_t record = frame + 80;
-    Store(base, record + 0, code);
-    Store(base, record + 4, flags & 1);
-    Store(base, record + 8, 0);
-    Store(base, record + 12, 0x825BA420);
+    const schema::ExceptionRecord record(base, frame + 80);
+    record.set_code(code);
+    record.set_flags(flags & 1);
+    record.set_record(0);
+    record.set_exception_address(0x825BA420);
     if (parameters == 0) {
-      Store(base, record + 16, 0);
+      record.set_parameter_count(0);
     } else {
       const uint32_t n = count > 15 ? 15 : count;
-      Store(base, record + 16, n);
+      record.set_parameter_count(n);
       if (n != 0) {
-        c_runtime::CopyForward(base, record + 20, parameters, 4 * n);
+        c_runtime::CopyForward(base, record.magic_address(), parameters, 4 * n);
       }
     }
-    result = calls.import(Import::kRtlRaiseException, {record});
+    result = calls.import(Import::kRtlRaiseException, {record.address});
   });
   return result;
 }
@@ -616,17 +616,17 @@ uint64_t CxxThrowException(uint8_t* base, uint32_t object, uint32_t throw_info,
   ITC_NATIVE_RUNNING("sub_825AD198 _CxxThrowException");
   uint64_t result = 0;
   calls.in_frame(144, [&](uint32_t frame) {
-    const uint32_t record = frame + 80;
-    if (!c_runtime::Memcpy(base, record, 0x8207275C, 32)) {
-      calls.guest(0x825A7410, {record, 0x8207275C, 32});
+    const schema::ExceptionRecord record(base, frame + 80);
+    if (!c_runtime::Memcpy(base, record.address, 0x8207275C, 32)) {
+      calls.guest(0x825A7410, {record.address, 0x8207275C, 32});
     }
-    Store(base, record + 24, object);
-    Store(base, record + 28, throw_info);
+    record.set_object(object);
+    record.set_throw_info(throw_info);
     if (throw_info != 0 && (schema::CxxThrowInfo(base, throw_info).attributes() & 8) != 0) {
-      Store(base, record + 20, 0x01994000);
+      record.set_magic(0x01994000);
     }
-    result = RaiseException(base, Load(base, record + 0), Load(base, record + 4),
-                            Load(base, record + 16), record + 20, calls);
+    result = RaiseException(base, record.code(), record.flags(), record.parameter_count(),
+                            record.magic_address(), calls);
   });
   return result;
 }
@@ -1835,7 +1835,7 @@ uint32_t Cftoe2(uint8_t* base, uint32_t buffer, uint32_t size, int32_t precision
       return;
     }
     if (g_format != 0) {
-      const uint32_t at = buffer + (Load(base, strflt + 0) == 45 ? 1 : 0);
+      const uint32_t at = buffer + (schema::FloatStrings(base, strflt).sign() == 45 ? 1 : 0);
       if (precision > 0) {
         uint32_t end = at;
         while (guest::LoadU8(base, end) != 0) {
@@ -1845,7 +1845,7 @@ uint32_t Cftoe2(uint8_t* base, uint32_t buffer, uint32_t size, int32_t precision
       }
     }
     uint32_t p = buffer;
-    if (int32_t(Load(base, strflt + 0)) == 45) {
+    if (int32_t(schema::FloatStrings(base, strflt).sign()) == 45) {
       guest::StoreU8(base, buffer, 45);
       p = buffer + 1;
     }
@@ -1866,8 +1866,9 @@ uint32_t Cftoe2(uint8_t* base, uint32_t buffer, uint32_t size, int32_t precision
       guest::StoreU8(base, e, 69);
     }
     uint32_t q = e + 1;
-    if (guest::LoadU8(base, Load(base, strflt + 12)) != 48) {
-      int32_t exponent = int32_t(Load(base, strflt + 4) - 1);
+    if (guest::LoadU8(base, schema::FloatStrings(base, strflt).mantissa().address) != 48) {
+      int32_t exponent =
+          int32_t(uint32_t(schema::FloatStrings(base, strflt).decimal_exponent()) - 1);
       if (exponent < 0) {
         exponent = int32_t(0u - uint32_t(exponent));
         guest::StoreU8(base, q, 45);
@@ -2378,15 +2379,16 @@ uint32_t Fltout2(uint8_t* base, uint64_t bits, uint32_t result, uint32_t buffer,
         guest::StoreU8(base, frame + 96 + i, out.bytes[i]);
       }
     }
-    Store(base, result + 8, uint32_t(out.result));
-    Store(base, result + 0, uint32_t(int32_t(int8_t(guest::LoadU8(base, frame + 98)))));
-    Store(base, result + 4, uint32_t(int32_t(int16_t(guest::LoadU16(base, frame + 96)))));
+    const schema::FloatStrings strings(base, result);
+    strings.set_flag(uint32_t(out.result));
+    strings.set_sign(uint32_t(int32_t(int8_t(guest::LoadU8(base, frame + 98)))));
+    strings.set_decimal_exponent(int32_t(int16_t(guest::LoadU16(base, frame + 96))));
     if (!c_runtime::StrcpyS(base, buffer, size, frame + 100)) {
       if (uint32_t(calls.guest(0x825A9DD8, {buffer, size, frame + 100})) != 0) {
         InvokeWatson(base, 0x825B64E8, calls);
       }
     }
-    Store(base, result + 12, buffer);
+    strings.set_mantissa(buffer);
   });
   return result;
 }
@@ -2408,7 +2410,8 @@ uint64_t FpToStrGuest(uint8_t* base, uint32_t buffer, uint32_t size, int32_t dig
   }
   c_runtime::GuestText text(base, buffer);
   std::vector<uint8_t> mantissa;
-  const uint32_t source = Load(base, result + 12);
+  const schema::FloatStrings strings(base, result);
+  const uint32_t source = strings.mantissa().address;
   uint32_t read = 0;
   const uint32_t whole = digits > 0 ? uint32_t(digits) : 0;
   while (digits >= 0 && read <= whole && read < (1u << 20)) {
@@ -2419,7 +2422,7 @@ uint64_t FpToStrGuest(uint8_t* base, uint32_t buffer, uint32_t size, int32_t dig
     }
     mantissa.push_back(c);
   }
-  const int32_t before = int32_t(Load(base, result + 4));
+  const int32_t before = strings.decimal_exponent();
   int32_t exponent = before;
   bool native = c_runtime::FpToStr(text, 0, size, digits, &exponent, mantissa) == 0 && text.ok();
   if (native) {
@@ -2431,7 +2434,7 @@ uint64_t FpToStrGuest(uint8_t* base, uint32_t buffer, uint32_t size, int32_t dig
     return calls.guest(0x825B61E8, {buffer, size, uint64_t(int64_t(digits)), result});
   }
   if (exponent != before) {
-    Store(base, result + 4, uint32_t(exponent));
+    strings.set_decimal_exponent(exponent);
   }
   return 0;
 }
@@ -2448,8 +2451,9 @@ uint64_t Cftof2Guest(uint8_t* base, uint32_t buffer, uint32_t size, int32_t prec
   if (native) {
     uint32_t words[3];
     const uint32_t point = c_runtime::DecimalPointAddress(base, words);
-    native = c_runtime::Cftof2(text, precision, int32_t(Load(base, result)),
-                               int32_t(Load(base, result + 4)), int8_t(g_format) != 0,
+    const schema::FloatStrings strings(base, result);
+    native = c_runtime::Cftof2(text, precision, int32_t(strings.sign()),
+                               strings.decimal_exponent(), int8_t(g_format) != 0,
                                guest::LoadU8(base, point));
     const uint32_t end = uint32_t(text.WrittenEnd());
     native = native && !c_runtime::MayShare(result, 8, buffer, end) &&
@@ -2479,7 +2483,7 @@ uint64_t Cftoe(uint8_t* base, uint32_t number, uint32_t buffer, uint32_t size, i
       r3 = 22;
       return;
     }
-    const uint32_t minus = Load(base, frame + 80) == 45 ? 1 : 0;
+    const uint32_t minus = schema::FloatStrings(base, frame + 80).sign() == 45 ? 1 : 0;
     const uint32_t point = precision > 0 ? 1 : 0;
     const uint32_t room = size == 0xFFFFFFFFu ? 0xFFFFFFFFu : size - minus - point;
     r3 = FpToStrGuest(base, buffer + minus + point, room, precision + 1, frame + 80, calls);
@@ -2505,8 +2509,9 @@ uint64_t Cftog(uint8_t* base, uint32_t number, uint32_t buffer, uint32_t size, i
       r3 = 22;
       return;
     }
-    const uint32_t minus = Load(base, frame + 80) == 45 ? 1 : 0;
-    const int32_t before = int32_t(Load(base, frame + 84) - 1);
+    const uint32_t minus = schema::FloatStrings(base, frame + 80).sign() == 45 ? 1 : 0;
+    const int32_t before =
+        int32_t(uint32_t(schema::FloatStrings(base, frame + 80).decimal_exponent()) - 1);
     const uint32_t digits = buffer + minus;
     const uint32_t room = size == 0xFFFFFFFFu ? 0xFFFFFFFFu : size - minus;
     r3 = FpToStrGuest(base, digits, room, precision, frame + 80, calls);
@@ -2514,7 +2519,8 @@ uint64_t Cftog(uint8_t* base, uint32_t number, uint32_t buffer, uint32_t size, i
       guest::StoreU8(base, buffer, 0);
       return;
     }
-    const int32_t exponent = int32_t(Load(base, frame + 84) - 1);
+    const int32_t exponent =
+        int32_t(uint32_t(schema::FloatStrings(base, frame + 80).decimal_exponent()) - 1);
     const bool carried = before < exponent;
     if (exponent < -4 || exponent >= precision) {
       r3 = Cftoe2(base, buffer, size, precision, caps, frame + 80, 1, calls);

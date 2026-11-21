@@ -9,6 +9,8 @@
 #include "graphics/resources.h"
 #include "guest.h"
 #include "schema/race_hud_object.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
 #include "scenery_lists/scenery_lists.h"
 #include "track_zones/track_zones.h"
 #include "ui_movies/game.h"
@@ -44,9 +46,12 @@ uint32_t SetUpGauges(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& call
   const uint32_t frame = sp - 480;
   Frame(base, sp, 480);
   const Hud h(base, hud);
-  const uint32_t record = h.player() * kRecordBytes + G::race_data(base).address;
-  const int32_t level = int32_t(guest::LoadU32(base, record + 1704));
-  const uint32_t index = guest::LoadU32(base, record + 60);
+  // The player's racer record: the race data's racer_records + 3,936 x it.
+  const uint32_t player = h.player();
+  const schema::RaceData data(base, G::race_data(base).address);
+  const schema::Car record(base, data.racer_records_address() + player * schema::Car::kSize);
+  const int32_t level = int32_t(record.engine_stage());
+  const uint32_t index = record.car_id();
   const uint32_t kind = level < 3 ? 0 : level < 7 ? 1 : 2;
   constexpr uint32_t kBoostCurve = 0x8200D348;
   Copy(base, calls, frame, 0x82213CF8, frame + 80, kBoostCurve - 336, 112);

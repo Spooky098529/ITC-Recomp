@@ -16,7 +16,10 @@
 #include "matrix_math/matrix_math.h"
 #include "models/xpr.h"
 #include "native/buffers.h"
+#include "schema/cameras.h"
 #include "schema/car_draw.h"
+#include "schema/load_poll.h"
+#include "schema/race_states.h"
 
 namespace car_draw {
 
@@ -26,9 +29,7 @@ using G = schema::CarDrawGlobals;
 using Points = schema::PartsPoints;
 using Block = schema::CarDrawBlock;
 
-constexpr uint32_t kRaceData = 0x826C5B2C;
-constexpr uint32_t kRaceMode = 0xA3AF4;
-constexpr uint32_t kCameraPasses = 0x826BAC00;
+constexpr uint32_t kCameraPasses = schema::CamerasGlobals::passes_address();
 constexpr uint32_t kOne = 0x82000A30;   // 1.0
 constexpr uint32_t kZero = 0x82000A34;  // 0.0
 constexpr uint32_t kPi = 0x82002240;
@@ -114,7 +115,7 @@ Left PartsDrawFrontBumperLights(uint8_t* base, const Calls& calls, uint32_t stac
                                 uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820DE1C8 PartsPoints::DrawFrontBumperLights");
   const uint32_t frame = Frame(base, stack, kPartsFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   auto draw = [&](uint32_t record, uint32_t lr) {
     return Part(base, calls, frame, group + record, vp, world, 0, caller_r24, r6, lr);
   };
@@ -137,7 +138,7 @@ Left PartsDrawRearBumperLights(uint8_t* base, const Calls& calls, uint32_t stack
                                uint32_t block, uint32_t pass, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820DE3C0 PartsPoints::DrawRearBumperLights");
   const uint32_t frame = Frame(base, stack, kPartsFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   auto draw = [&](uint32_t record, uint32_t lr) {
     return Part(base, calls, frame, group + record, vp, world, 0, caller_r24, block, lr);
   };
@@ -161,7 +162,7 @@ Left PartsDrawFenderLights(uint8_t* base, const Calls& calls, uint32_t stack, ui
                            uint32_t block, uint32_t pass, uint32_t r6, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820DEDD8 PartsPoints::DrawFenderLights");
   const uint32_t frame = Frame(base, stack, kPartsFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   auto draw = [&](uint32_t record, uint32_t lr) {
     return Part(base, calls, frame, group + record, vp, world, 0, caller_r24, r6, lr);
   };
@@ -192,7 +193,7 @@ Left PartsDrawDoorPanel(uint8_t* base, const Calls& calls, bool right, uint32_t 
   if (points.record0_model() == 0) {
     return left;
   }
-  const uint32_t vp = pass + 144, world = points.door_matrix_address();
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = points.door_matrix_address();
   left = Part(base, calls, frame, group + Record(6), vp, world, 0, caller_r24, block,
               right ? 0x820DE908 : 0x820DE720);
   if ((Bits(base, block) & (right ? 0x4u : 0x2u)) == 0) {
@@ -223,7 +224,7 @@ Left PartsDrawDoorWindows(uint8_t* base, const Calls& calls, bool first, uint32_
                                : Block(base, block).window_alpha_02_address();
   WindowAlpha(base, group + a, alpha, frame);
   WindowAlpha(base, group + b, alpha, frame);
-  const uint32_t vp = pass + 144, world = points.door_matrix_address();
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = points.door_matrix_address();
   Part(base, calls, frame, group + a, vp, world, 0, caller_r24, 0,
        first ? 0x820DE9AC : 0x820DE7C4);
   return Part(base, calls, frame, group + b, vp, world, 0, caller_r24, 0,
@@ -234,7 +235,7 @@ Left PartsDrawDoorsBody(uint8_t* base, const Calls& calls, uint32_t stack, uint3
                         uint32_t block, uint32_t pass, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820DEA88 PartsPoints::DrawDoorsBody");
   const uint32_t frame = Frame(base, stack, kPartsSmallFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   Left left = Part(base, calls, frame, group + Record(11), vp, world, 0, caller_r24, 0,
                    0x820DEAB8);
   const uint32_t k = Points(base, group).doors_parts_record().doors_body_kind();
@@ -251,7 +252,7 @@ Left PartsDrawDoorsWindows(uint8_t* base, const Calls& calls, uint32_t stack, ui
   const uint32_t frame = Frame(base, stack, kPartsFrame);
   WindowAlpha(base, group + Record(0), Block(base, block).window_alpha_01_address(), frame);
   WindowAlpha(base, group + Record(1), Block(base, block).window_alpha_01_address(), frame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   auto draw = [&](uint32_t record, uint32_t lr) {
     return Part(base, calls, frame, group + record, vp, world, 0, caller_r24, block, lr);
   };
@@ -275,7 +276,7 @@ Left PartsDrawFendersBody(uint8_t* base, const Calls& calls, uint32_t stack, uin
                           uint32_t block, uint32_t pass, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820DED88 PartsPoints::DrawFendersBody");
   const uint32_t frame = Frame(base, stack, kPartsSmallFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   Part(base, calls, frame, group + Record(5), vp, world, 0, caller_r24, 0, 0x820DEDB8);
   return Part(base, calls, frame, group + Record(6), vp, world, 0, caller_r24, 0, 0x820DEDD0);
 }
@@ -284,7 +285,7 @@ Left PartsDrawCabinWindow02(uint8_t* base, const Calls& calls, uint32_t stack, u
                             uint32_t block, uint32_t pass, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820DEF38 PartsPoints::DrawCabinWindow02");
   const uint32_t frame = Frame(base, stack, kPartsSmallFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   if (Bits(base, block) & 0x8) {
     Part(base, calls, frame, group + Record(0), vp, world, 0, caller_r24, 0, 0x820DEF74);
   }
@@ -297,7 +298,7 @@ Left PartsDrawCabinWindow01(uint8_t* base, const Calls& calls, uint32_t stack, u
   ITC_NATIVE_RUNNING("sub_820DEFA8 PartsPoints::DrawCabinWindow01");
   const uint32_t frame = Frame(base, stack, kPartsFrame);
   WindowAlpha(base, group + Record(2), Block(base, block).window_alpha_01_address(), frame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   Left left =
       Part(base, calls, frame, group + Record(2), vp, world, 0, caller_r24, vp, 0x820DEFF0);
   if (Bits(base, block) & 0x8) {
@@ -310,7 +311,7 @@ Left PartsDrawEngine(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
                      uint32_t block, uint32_t pass, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820DF070 PartsPoints::DrawEngine");
   const uint32_t frame = Frame(base, stack, kPartsSmallFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   Part(base, calls, frame, group + Record(0), vp, world, 0, caller_r24, 0, 0x820DF09C);
   return Part(base, calls, frame, group + Record(1), vp, world, 0, caller_r24, 0, 0x820DF0B4);
 }
@@ -327,7 +328,7 @@ bool PlateRace(uint8_t* base, uint32_t group, bool rear) {
       (rear ? points.record6_model() : points.record8_model()) == 0) {
     return false;
   }
-  const int32_t mode = int32_t(Load(base, Load(base, kRaceData) + kRaceMode));
+  const int32_t mode = int32_t(schema::RaceStatesGlobals::race_data(base).race_mode());
   return mode != 7 && mode != 8;
 }
 
@@ -342,7 +343,7 @@ Left PartsDrawFrontBumper(uint8_t* base, const Calls& calls, uint32_t stack, uin
                           uint32_t block, uint32_t pass, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820DF308 PartsPoints::DrawFrontBumper");
   const uint32_t frame = Frame(base, stack, kPartsSmallFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   Left left =
       Part(base, calls, frame, group + Record(7), vp, world, 0, caller_r24, 0, 0x820DF338);
   const Points points(base, group);
@@ -370,7 +371,7 @@ Left PartsDrawRearBumper(uint8_t* base, const Calls& calls, uint32_t stack, uint
                          uint32_t block, uint32_t pass, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820DF458 PartsPoints::DrawRearBumper");
   const uint32_t frame = Frame(base, stack, kPartsSmallFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address(), world = block + 16;
   Part(base, calls, frame, group + Record(5), vp, world, 0, caller_r24, 0, 0x820DF488);
   // Unlike the front's, with no plate model (+1444 0) this still writes
   // guest words 456 and 432, as the original.
@@ -452,7 +453,7 @@ Left PartsDrawBonnet(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
     copy(frame + 160, frame + 288, 0x820E0B10);
     world = frame + 160;
   }
-  return Part(base, calls, frame, group + Record(1), pass + 144, world, 0, caller_r24, 0,
+  return Part(base, calls, frame, group + Record(1), schema::CameraPass(base, pass).view_projection_address(), world, 0, caller_r24, 0,
               0x820E0B30);
 }
 
@@ -589,7 +590,7 @@ Left PartsDrawDoor(uint8_t* base, const Calls& calls, bool right, uint32_t stack
   NotedCopy(base, door, frame + 224, sites.copy_back);
   // The handle, the normal or scissor door, and the panel's design k (below
   // 11, signed). r28 is the pass here.
-  const uint32_t vp = pass + 144;
+  const uint32_t vp = schema::CameraPass(base, pass).view_projection_address();
   Part(base, calls, frame, group + Record(11), vp, door, 0, caller_r24, pass, sites.draws[0]);
   const bool lambo = int32_t(Load(base, points.door_car_record() + 3688)) != 0;
   left = Part(base, calls, frame, group + (lambo ? Record(13) : Record(12)), vp, door, 0,
@@ -668,7 +669,7 @@ Left PartsDrawHeadlightBody(uint8_t* base, const Calls& calls, uint32_t stack, u
   }
   NotedCopy(base, popup, product, 0x820E166C);
   // hlmg**_shape with it; r28 is the pass here.
-  return Part(base, calls, frame, group + Record(12), pass + 144, popup, 0, caller_r24, pass,
+  return Part(base, calls, frame, group + Record(12), schema::CameraPass(base, pass).view_projection_address(), popup, 0, caller_r24, pass,
               0x820E1684);
 }
 
@@ -688,17 +689,17 @@ Left PartsDrawShadowed(uint8_t* base, const Calls& calls, bool mirror, uint32_t 
   constexpr Sites kShadow{0x820E1288, 0x820E12FC, 0x820E1324, 0x820E1330, 0x820E136C};
   const Sites& sites = mirror ? kMirror : kShadow;
   const uint32_t frame = Frame(base, stack, kPartsShadowFrame);
-  Left left = Part(base, calls, frame, record, pass + 144, world, 0, caller_r24, world,
+  Left left = Part(base, calls, frame, record, schema::CameraPass(base, pass).view_projection_address(), world, 0, caller_r24, world,
                    sites.draw);
   const schema::CarScene scene = G::scene(base);
-  const uint32_t camera = kCameraPasses + scene.pass_parts_shadow_camera() * 592;
-  if (camera == 0 || int32_t(Load(base, camera + 588)) == 0) {
+  const uint32_t camera = kCameraPasses + scene.pass_parts_shadow_camera() * schema::CameraPass::kSize;
+  if (camera == 0 || int32_t(schema::CameraPass(base, camera).enabled()) == 0) {
     return left;
   }
   if ((scene.pass_mask() & 0x100) == 0) {
     return left;
   }
-  Memcpy(base, calls, frame + 144, camera + 144, 64, frame, sites.memcpy);
+  Memcpy(base, calls, frame + 144, schema::CameraPass(base, camera).view_projection_address(), 64, frame, sites.memcpy);
   const double one = Lfs(base, kOne);
   for (uint32_t at = 92; at < 144; at += 16) {
     Stfs(base, frame + at, one);
@@ -748,7 +749,7 @@ Left PartsDrawFrontEnd(uint8_t* base, const Calls& calls, uint32_t stack, uint32
   const Block view(base, block);
   uint32_t r24 = caller_r24;
   auto part = [&](uint32_t at, uint32_t lr) {
-    return Part(base, calls, frame, points + at, pass + 144, world, 0, r24, world, lr);
+    return Part(base, calls, frame, points + at, schema::CameraPass(base, pass).view_projection_address(), world, 0, r24, world, lr);
   };
   part(kCooling, 0x820E2480);
   PartsDrawEngine(base, calls, frame, points + kEngine, block, pass, r24);
@@ -815,8 +816,8 @@ Left PartsDrawRace(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t p
   // The scene's current camera pass (0 when disabled: its view-projection
   // read from address 144, as the original).
   const uint32_t index = G::scene(base).pass_camera();
-  uint32_t pass = kCameraPasses + index * 592;
-  if (pass == 0 || int32_t(Load(base, pass + 588)) == 0) {
+  uint32_t pass = kCameraPasses + index * schema::CameraPass::kSize;
+  if (pass == 0 || int32_t(schema::CameraPass(base, pass).enabled()) == 0) {
     pass = 0;
   }
   // r6 for the shadows (1 for kind 2; not read there).
@@ -826,7 +827,7 @@ Left PartsDrawRace(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t p
   const uint32_t world = block + 16;
   uint32_t r24 = caller_r24;
   auto part = [&](uint32_t at, uint32_t lr) {
-    return Part(base, calls, frame, points + at, pass + 144, world, 0, r24, world, lr);
+    return Part(base, calls, frame, points + at, schema::CameraPass(base, pass).view_projection_address(), world, 0, r24, world, lr);
   };
   part(kCooling, 0x820E27F4);
   PartsDrawEngine(base, calls, frame, points + kEngine, block, pass, r24);
@@ -870,12 +871,12 @@ Left ScenePartsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t 
                     uint32_t block, uint32_t caller_r24) {
   ITC_NATIVE_RUNNING("sub_820E2EE8 SceneParts::Draw");
   const uint32_t object = uint32_t(parts);
-  const uint32_t set = schema::CarScene(base, Load(base, object + 37284)).model_set();
+  const uint32_t set = schema::SceneParts(base, object).scene().model_set();
   if (set == 0) {
-    return PartsDrawFrontEnd(base, calls, stack, object + 176, block, caller_r24);
+    return PartsDrawFrontEnd(base, calls, stack, schema::SceneParts(base, object).points_address(), block, caller_r24);
   }
   if (set == 1) {
-    return PartsDrawRace(base, calls, stack, object + 176, block, caller_r24);
+    return PartsDrawRace(base, calls, stack, schema::SceneParts(base, object).points_address(), block, caller_r24);
   }
   Left left;
   left.r3 = parts;

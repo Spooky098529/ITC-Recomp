@@ -6,9 +6,15 @@
 
 #include "guest.h"
 #include "save_screen/save_screen.h"
+#include "schema/action_mappers.h"
 #include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
+#include "schema/race_event.h"
+#include "schema/race_screens.h"
+#include "schema/racer_controllers.h"
+#include "schema/save_interface.h"
 #include "schema/save_screen.h"
+#include "schema/system_services.h"
 #include "ui_movies/game.h"
 
 namespace save_screen {
@@ -47,7 +53,7 @@ struct Fn {
 
 // The screen's blocks, from their globals at the call: the data
 // (SaveScreenData), the page block (PageObject) and the menu list's address
-// (a MenuList, race-screens.toml's: its accesses stay offsets until then).
+// (a MenuList, race-screens.toml's; G::list(base) for its fields).
 inline schema::SaveScreenData Data(uint8_t* base) { return G::data(base); }
 inline schema::PageObject Pages(uint8_t* base) { return G::pages(base); }
 inline uint32_t List(uint8_t* base) { return Load(base, G::list_address()); }

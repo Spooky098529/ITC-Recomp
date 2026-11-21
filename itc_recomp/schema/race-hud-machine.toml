@@ -164,10 +164,10 @@ fields = [
 
 [globals]
 holder = { address = 0x826D84F0, type = "ptr", to = "RaceScreens", note = "the in-race screens' holder (PauseUpdate reads it in place of the machine's +9608)" }
-race_data = { address = 0x826C5B2C, type = "ptr", note = "the race data (the measure's Racers): +0xA3AF0 the race kind, +0xA3AF4 the race mode, +0x59620 the stages, +0x59AE8 the racer records" }
-racers_manager = { address = 0x826D82F4, type = "ptr", note = "the racers' manager (the measure's Race): +2308 the player's MinimapRacerEntry" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (the measure's Racers): +0xA3AF0 the race kind, +0xA3AF4 the race mode, +0x59620 the stages, +0x59AE8 the racer records" }
+racers_manager = { address = 0x826D82F4, type = "ptr", to = "RaceManager", note = "the racers' manager (the measure's Race): +2308 the player's MinimapRacerEntry" }
 race_progress = { address = 0x826D82E8, type = "ptr", note = "the race's progress: +2184 its results record (RacerResultsRecord)" }
-network_session = { address = 0x82816E3C, type = "ptr", note = "the network mode's session (0 in play): PauseUpdate's answer 9 with the mode 7 sets its +240" }
+network_session = { address = 0x82816E3C, type = "ptr", to = "Session", note = "the network mode's session (0 in play): PauseUpdate's answer 9 with the mode 7 sets its +240" }
 prize_distance_scale = { address = 0x82001FD8, type = "f32", note = "10.0 (AwardPrize: the route distance's factor)" }
 streak_factor_20 = { address = 0x820021E8, type = "f32", note = "AwardPrize's factor for a win streak of 20 and more (probably 2.0)" }
 streak_factor_15 = { address = 0x82002CF0, type = "f32", note = "for 15 and more" }

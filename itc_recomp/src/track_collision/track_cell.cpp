@@ -5,6 +5,7 @@
 
 #include "car_physics/float_ops.h"
 #include "schema/collision_world.h"
+#include "schema/track_route.h"
 #include "track_route/track_route.h"
 
 #include "base/log.h"
@@ -523,12 +524,13 @@ void TrackPositionInit(uint8_t* base, uint32_t position, uint32_t frame) {
   const uint32_t route_position = pos.route_position_address();
   track_route::Point(base, track_route::kRoute, pos.point_x_address(), route_position, frame - 112);
   // The cell from the route slice's record's word +32.
-  const uint32_t file = guest::LoadU32(base, track_route::kRoute);
+  const schema::TrackRouteFile file = schema::TrackRoute(base, track_route::kRoute).file();
   const uint32_t number = pos.route_section();
-  const uint32_t table = guest::LoadU32(base, file + 12);
-  const uint32_t section = guest::LoadU32(base, table + number * 4);
+  const uint32_t table = file.sections();
+  const schema::TrackRouteSection section(base, guest::LoadU32(base, table + number * 4));
   const int32_t slice = int16_t(pos.route_slice());
-  const uint32_t cell = guest::LoadU32(base, section + uint32_t(slice) * 84 + 156);
+  const uint32_t cell =
+      schema::TrackRouteSlice(base, section.slices_address() + uint32_t(slice) * 84).mesh_cell();
   pos.set_surface_kind(0);
   pos.set_flags(0);
   Position(base, position).set_section(uint16_t(cell >> 16));

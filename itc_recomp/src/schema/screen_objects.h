@@ -501,19 +501,6 @@ struct StdThrownObjectVtable : View {
   uint32_t slot2_address() const { return address + 8; }
 };
 
-// embedded; measure: sub_820919B8.r3, sub_820915F8.r3
-struct StdLogicError : View {
-  using View::View;
-  static constexpr uint32_t kSize = 8;
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-  // probably
-  uint32_t what() const { return guest::LoadU32(base, address + 4); }
-  void set_what(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t what_address() const { return address + 4; }
-};
-
 // embedded; measure: sub_820A9330.r3, sub_820A96D0.r3.+4
 struct StdWordVector : View {
   using View::View;
@@ -580,10 +567,6 @@ struct ScreenObjectsGlobals {
   static float zero(uint8_t* base) { return guest::LoadFloat(base, 0x82000A34u); }
   static void set_zero(uint8_t* base, float v) { guest::StoreFloat(base, 0x82000A34u, v); }
   static constexpr uint32_t zero_address() { return 0x82000A34u; }
-  // the video output's way in (its slot 7, then that object's slot 3; app-start-up.toml's scene_target_app)
-  static uint32_t video_app(uint8_t* base) { return guest::LoadU32(base, 0x8266D088u); }
-  static void set_video_app(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x8266D088u, v); }
-  static constexpr uint32_t video_app_address() { return 0x8266D088u; }
 };
 
 }  // namespace schema

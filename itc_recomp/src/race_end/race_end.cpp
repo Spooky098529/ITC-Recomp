@@ -7,8 +7,11 @@
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
 #include "network_mode/network_mode.h"
+#include "schema/boot_mode.h"
 #include "schema/game_modes.h"
 #include "schema/race_end.h"
+#include "schema/race_event.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace race_end {
@@ -16,6 +19,9 @@ namespace race_end {
 namespace {
 
 using G = schema::RaceEndGlobals;
+
+// The race data ([0x826C5B2C], race-states.toml's RaceData).
+schema::RaceData Race(uint8_t* base) { return schema::RaceData(base, G::race_data(base).address); }
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -33,15 +39,16 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 // type, byte +80 1; +81 to +83 left as the stack has them), then its 8
 // bytes stored at `answer` (one doubleword in the original).
 void Answer(uint8_t* base, uint32_t answer, uint32_t frame, uint32_t type) {
-  Store(base, frame + 84, type);
-  guest::StoreU8(base, frame + 80, 1);
-  const uint32_t w0 = Load(base, frame + 80), w1 = Load(base, frame + 84);
-  Store(base, answer, w0);
-  Store(base, answer + 4, w1);
+  const schema::ModeAnswer built(base, frame + 80), out(base, answer);
+  built.set_next_type(type);
+  built.set_changed(1);
+  const uint32_t w0 = built.word0(), w1 = built.next_type();
+  out.set_word0(w0);
+  out.set_next_type(w1);
 }
 
 // The race data's flags word.
-uint32_t FlagsAt(uint8_t* base) { return G::race_data(base).address + kFlags; }
+uint32_t FlagsAt(uint8_t* base) { return Race(base).flags_address(); }
 
 // The flag `bit` cleared (the word loaded again, as the original does).
 void ClearFlag(uint8_t* base, uint32_t at, uint32_t bit) { Store(base, at, Load(base, at) & ~bit); }
@@ -86,12 +93,13 @@ void MoviesAnswer(uint8_t* base, uint32_t answer, uint32_t frame, uint32_t save,
   G::set_boot_movies_skippable(base, 1);
   Store(base, G::boot_movie_ids_address() + 0, first);
   Store(base, G::boot_movie_ids_address() + 4, second);
-  Store(base, frame + 84, 3);
+  const schema::ModeAnswer built(base, frame + 80), out(base, answer);
+  built.set_next_type(3);
   G::set_boot_movies_next_mode(base, 9);
-  guest::StoreU8(base, frame + 80, 1);
-  const uint32_t w0 = Load(base, frame + 80), w1 = Load(base, frame + 84);
-  Store(base, answer, w0);
-  Store(base, answer + 4, w1);
+  built.set_changed(1);
+  const uint32_t w0 = built.word0(), w1 = built.next_type();
+  out.set_word0(w0);
+  out.set_next_type(w1);
   FadeIn(base);
   if (career::CheckUnlocksNative(base, frame)) {
     career::ProgressCheckUnlocks(base, save, frame);
@@ -105,18 +113,20 @@ void MoviesAnswer(uint8_t* base, uint32_t answer, uint32_t frame, uint32_t save,
 void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82150E00 RaceMode::ModeAfterRace");
   const uint32_t frame = Frame(base, sp, kModeAfterRaceFrame);
-  const uint32_t race = G::race_data(base).address;
-  Store(base, answer + 4, 0);
-  const uint32_t flags = Load(base, race + kFlags);
-  guest::StoreU8(base, answer, 0);
+  const schema::RaceData race = Race(base);
+  const schema::ModeAnswer out(base, answer);
+  out.set_next_type(0);
+  const uint32_t flags = race.flags();
+  out.set_changed(0);
   const auto title = [&] {
     // The title (4), the title's flag set.
-    Store(base, frame + 84, 4);
-    guest::StoreU8(base, frame + 80, 1);
-    const uint32_t w0 = Load(base, frame + 80), w1 = Load(base, frame + 84);
+    const schema::ModeAnswer built(base, frame + 80);
+    built.set_next_type(4);
+    built.set_changed(1);
+    const uint32_t w0 = built.word0(), w1 = built.next_type();
     G::set_title_flag(base, 1);
-    Store(base, answer, w0);
-    Store(base, answer + 4, w1);
+    out.set_word0(w0);
+    out.set_next_type(w1);
   };
   if (flags & 0x8000) {
     title();
@@ -127,7 +137,7 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
     Answer(base, answer, frame, 12);
     return;
   }
-  const int32_t kind = int32_t(Load(base, race + kKind));
+  const int32_t kind = int32_t(race.kind());
   switch (kind) {
     case 0:
       FadeIn(base);
@@ -143,7 +153,7 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
       Answer(base, answer, frame, 8);
       return;
     case 5: {
-      const bool network = int32_t(Load(base, race + kRaceMode)) == 7 && G::session(base).address != 0;
+      const bool network = int32_t(race.race_mode()) == 7 && G::session(base).address != 0;
       Answer(base, answer, frame, network ? 12 : 10);
       return;
     }
@@ -155,7 +165,8 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
   }
   // The career (kind 1, or any other).
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const int32_t race_mode = int32_t(Load(base, G::race_data(base).address + kRaceMode));
+  const schema::SaveData save_data(base, save);
+  const int32_t race_mode = int32_t(Race(base).race_mode());
   if (race_mode == 0 || race_mode == 1) {
     Answer(base, answer, frame, 2);
     return;
@@ -165,9 +176,9 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
           ? int32_t(career::ProgressAfterRace(base, save, frame))
           : int32_t(uint32_t(calls.guest.Call(kAfterRace, frame, 0x82150EB8, save)));
   if (stage == 6) {
-    if (Load(base, save + kUnlocksShown) != 0) {
+    if (save_data.unlocks_shown_count() != 0) {
       UnlocksAnswer(base, answer, frame, save, calls);
-      Store(base, save + kStageShown, 6);
+      save_data.set_movie_after_results(6);
     } else {
       MoviesAnswer(base, answer, frame, save, 6, 7, calls);
     }
@@ -178,8 +189,8 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
     return;
   }
   if (stage != -1) {
-    Store(base, save + kStageShown, uint32_t(stage));
-    if (Load(base, save + kUnlocksShown) != 0) {
+    save_data.set_movie_after_results(uint32_t(stage));
+    if (save_data.unlocks_shown_count() != 0) {
       UnlocksAnswer(base, answer, frame, save, calls);
     } else {
       Answer(base, answer, frame, 9);
@@ -192,8 +203,8 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
   if (now & 0x8) {
     Store(base, at, now & ~0x8u);
     uint32_t type = 9;
-    if (int32_t(Load(base, G::race_data(base).address + kKind)) == 1) {
-      const int32_t day = int32_t(Load(base, vehicle_accessors::SaveDataOf(base, 0) + 6100));
+    if (int32_t(Race(base).kind()) == 1) {
+      const int32_t day = int32_t(schema::SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).day());
       if (day <= 999 && day == 1) {
         type = 2;
       }
@@ -211,8 +222,9 @@ void ModeAfterRace(uint8_t* base, uint32_t answer, uint32_t sp, const Calls& cal
 void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82151EF0 RaceMode::NextMode");
   const uint32_t frame = Frame(base, sp, kNextModeFrame);
-  Store(base, answer + 4, 0);
-  guest::StoreU8(base, answer, 0);
+  const schema::ModeAnswer out(base, answer);
+  out.set_next_type(0);
+  out.set_changed(0);
   // The messages, as the original inlines GameMessages::Post: the count + 1
   // stored, then the message and two zero words at (start + count - 1) mod
   // 50 (unsigned).
@@ -241,11 +253,11 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
   }
   Calls inner = calls;
   inner.event = calls.event.Down(kNextModeFrame);
-  const uint32_t temporary = frame + 80;
-  ModeAfterRace(base, temporary, frame, inner);
-  const uint32_t w0 = Load(base, temporary), w1 = Load(base, temporary + 4);
-  Store(base, answer, w0);
-  Store(base, answer + 4, w1);
+  const schema::ModeAnswer temporary(base, frame + 80);
+  ModeAfterRace(base, temporary.address, frame, inner);
+  const uint32_t w0 = temporary.word0(), w1 = temporary.next_type();
+  out.set_word0(w0);
+  out.set_next_type(w1);
 }
 
 }  // namespace race_end

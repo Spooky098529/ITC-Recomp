@@ -12,18 +12,17 @@
 #include "base/log.h"
 #include "guest.h"
 #include "material_passes/material_passes.h"
+#include "schema/cameras.h"
 #include "schema/car_draw.h"
+#include "schema/second_set.h"
 
 namespace car_draw {
 
 namespace {
 
 constexpr uint32_t kOne = 0x82000A30;  // 1.0
-constexpr uint32_t kCameraPasses = 0x826BAC00;
+constexpr uint32_t kCameraPasses = schema::CamerasGlobals::passes_address();
 
-uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
-}
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
@@ -40,7 +39,7 @@ uint32_t Frame(uint8_t* base, uint32_t stack, uint32_t bytes) {
 // sets it before its first draw.
 Left Part(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t part, uint32_t block,
           uint32_t pass, uint32_t r24, uint32_t lr) {
-  return PartsDrawRecord(base, calls, frame, part, pass + 144, block + 16, 0, r24, block + 16,
+  return PartsDrawRecord(base, calls, frame, part, schema::CameraPass(base, pass).view_projection_address(), block + 16, 0, r24, block + 16,
                          lr);
 }
 
@@ -124,7 +123,7 @@ Left SceneCockpitDrawBody(uint8_t* base, const Calls& calls, uint32_t stack, uin
                           uint32_t block, uint32_t caller_r24, uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820DC350 SceneCockpit::DrawBody");
   const uint32_t frame = Frame(base, stack, kCockpitBodyFrame);
-  if (int32_t(schema::CarScene(base, Load(base, cockpit + 4316)).model_set()) == 1) {
+  if (int32_t(schema::SceneCockpit(base, cockpit).scene().model_set()) == 1) {
     // The record's ten matrices' w words 1.0 (from the frame's +128 + 64i),
     // stored as the original's stfs of the loaded float.
     const float one = guest::LoadFloat(base, kOne);
@@ -137,15 +136,15 @@ Left SceneCockpitDrawBody(uint8_t* base, const Calls& calls, uint32_t stack, uin
     // Only its writes of the per-object light slots 0 and 1 are kept.
     CarLightingGather(base, calls, frame, uint64_t(frame + 80), block + 16, 0);
   }
-  SceneInteriorDraw(base, calls, frame, Load(base, cockpit + 28), block, caller_r24,
+  SceneInteriorDraw(base, calls, frame, schema::SceneCockpit(base, cockpit).interior().address, block, caller_r24,
                     caller_r28);
-  return CockpitPointsDraw(base, calls, frame, cockpit + 192, block, caller_r24);
+  return CockpitPointsDraw(base, calls, frame, schema::SceneCockpit(base, cockpit).points_address(), block, caller_r24);
 }
 
 Left SceneCockpitDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t cockpit,
                       uint32_t block, uint32_t caller_r24, uint32_t caller_r28) {
   ITC_NATIVE_RUNNING("sub_820DC498 SceneCockpit::Draw");
-  const schema::CarScene scene(base, Load(base, uint32_t(cockpit) + 4316));
+  const schema::CarScene scene = schema::SceneCockpit(base, uint32_t(cockpit)).scene();
   if (scene.model_set() >= 2) {
     return Left{false, cockpit};
   }

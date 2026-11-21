@@ -9,7 +9,9 @@
 #include "command_list/command_list.h"
 #include "frame_driver/frame_driver.h"
 #include "graphics/video_output.h"
+#include "schema/command_list.h"
 #include "schema/frame_driver.h"
+#include "schema/framework.h"
 
 #include <bit>
 
@@ -103,37 +105,39 @@ using G = schema::FrameDriverGlobals;
 uint32_t CommandListInit(uint8_t* base, uint32_t list, uint32_t slots,
                          const SceneSetUpCalls& calls) {
   ITC_NATIVE_RUNNING("sub_8258CD28 CommandList::Init");
-  const uint32_t old = Load(base, list + 20);
+  const schema::CommandList l(base, list);
+  const uint32_t old = l.allocation();
   if (old != 0) {
     calls.operator_delete(old);
-    Store(base, list + 20, 0);
+    l.set_allocation(0);
   }
-  Store(base, list + 24, 0);
-  Store(base, list + 28, 0);
+  l.set_buffer0(0);
+  l.set_buffer1(0);
   if (slots & 1) {
     slots++;
   }
   const uint32_t bytes = slots > 0x0FFFFFFFu ? 0xFFFFFFFFu : slots << 4;
   const uint32_t memory = calls.operator_new(bytes);
   const uint32_t half = slots >> 1;
-  const uint32_t recorded = Load(base, list + 4) ^ 1;
+  const uint32_t recorded = l.buffer() ^ 1;
   const uint32_t second = (half << 4) + memory;
-  const uint32_t used = Load(base, list + 12);
-  Store(base, list + 8, half);
-  Store(base, list + 20, memory);
-  Store(base, list + 24, memory);
-  Store(base, list + 4, recorded);
-  Store(base, list + 28, second);
-  const uint32_t first_buffer = Load(base, list + ((recorded + 6) << 2));
-  Store(base, list + 16, used);
-  Store(base, list + 12, 0);
+  const uint32_t used = l.used();
+  l.set_capacity(half);
+  l.set_allocation(memory);
+  l.set_buffer0(memory);
+  l.set_buffer(recorded);
+  l.set_buffer1(second);
+  // buffer0 + 4 x the buffer: buffer0 or buffer1.
+  const uint32_t first_buffer = Load(base, l.buffer0_address() + 4 * recorded);
+  l.set_last_used(used);
+  l.set_used(0);
   const uint32_t back = recorded ^ 1;
-  Store(base, list + 4, back);
-  Store(base, list + 32, first_buffer);
-  const uint32_t back_buffer = Load(base, list + ((back + 6) << 2));
-  Store(base, list + 16, 0);
-  Store(base, list + 12, 0);
-  Store(base, list + 32, back_buffer);
+  l.set_buffer(back);
+  l.set_next_chunk(first_buffer);
+  const uint32_t back_buffer = Load(base, l.buffer0_address() + 4 * back);
+  l.set_last_used(0);
+  l.set_used(0);
+  l.set_next_chunk(back_buffer);
   return 1;
 }
 
@@ -263,27 +267,31 @@ uint32_t SceneConstruct(uint8_t* base, uint32_t scene, uint32_t block, uint32_t 
   G::set_scene_queue_2(base, queue);
   vo::UnlockDevice(base, video_output, frame + 80);
   // Scene::Draw as the frame driver's listener 1.
-  Store(base, frame + 92, scene);
-  Store(base, frame + 88, kDelegateVtable);
-  Store(base, frame + 96, 0x82098940);
-  Store(base, frame + 84, 1);
+  const schema::FrameDriverListenerKey key(base, frame + 84);
+  const schema::RunLoopDelegate draw(base, frame + 88);
+  const schema::RunLoopDelegate update(base, frame + 104);
+  const schema::RunLoopDelegate on_event(base, frame + 120);
+  draw.set_object(scene);
+  draw.set_vtable(kDelegateVtable);
+  draw.set_function(0x82098940);
+  key.set_key(1);
   const uint32_t listener_driver =
       calls.vcall(s.framework_interface().address, 4, 0, 0, 0x82098BB4);
-  calls.vcall(listener_driver, 4, frame + 84, frame + 88, 0x82098BCC);
+  calls.vcall(listener_driver, 4, key.address, draw.address, 0x82098BCC);
   // Scene::Update as tick handler 18; the first delegate destroyed.
-  Store(base, frame + 88, kFunctorBase);
-  Store(base, frame + 104, kDelegateVtable);
-  Store(base, frame + 108, scene);
-  Store(base, frame + 112, 0x820988C8);
-  Store(base, frame + 84, 18);
-  calls.vcall(init.run_loop().address, 8, frame + 84, frame + 104, 0x82098C18);
+  draw.set_vtable(kFunctorBase);
+  update.set_vtable(kDelegateVtable);
+  update.set_object(scene);
+  update.set_function(0x820988C8);
+  key.set_key(18);
+  calls.vcall(init.run_loop().address, 8, key.address, update.address, 0x82098C18);
   // Scene::OnEvent5 as the listener for event 5; the second destroyed.
-  Store(base, frame + 124, scene);
-  Store(base, frame + 104, kFunctorBase);
-  Store(base, frame + 120, kDelegateVtable);
-  Store(base, frame + 128, 0x820989A8);
-  Store(base, frame + 84, 5);
-  calls.vcall(init.run_loop().address, 4, frame + 84, frame + 120, 0x82098C64);
+  on_event.set_object(scene);
+  update.set_vtable(kFunctorBase);
+  on_event.set_vtable(kDelegateVtable);
+  on_event.set_function(0x820989A8);
+  key.set_key(5);
+  calls.vcall(init.run_loop().address, 4, key.address, on_event.address, 0x82098C64);
   return scene;
 }
 

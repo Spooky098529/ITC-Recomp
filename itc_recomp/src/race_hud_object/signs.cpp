@@ -7,6 +7,9 @@
 #include "guest.h"
 #include "schema/car_physics.h"
 #include "schema/race_hud_object.h"
+#include "schema/race_states.h"
+#include "schema/track_zones.h"
+#include "schema/vehicle.h"
 #include "track_zones/track_zones.h"
 #include "ui_movies/game.h"
 
@@ -102,13 +105,13 @@ uint64_t UpdateSign(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, con
   guest::StoreU32(base, frame, sp);
   Sign sign{base, hud, frame, calls, hud};
   const Hud h(base, hud);
-  const uint32_t car = h.vehicle().address;
+  const schema::Vehicle car = h.vehicle();
   bool on = false;
-  if (guest::LoadU32(base, car + 6168) == 0 && h.signs_on() != 0) {
+  if (schema::VehicleStatus(base, car.status_address()).wrong_way() == 0 && h.signs_on() != 0) {
     on = true;
   }
   const bool mode6 =
-      int32_t(guest::LoadU32(base, G::race_data(base).address + kRaceMode)) == 6;
+      int32_t(schema::RaceData(base, G::race_data(base).address).race_mode()) == 6;
   const bool special = flag != 0 || mode6;  // a value of 13's color
   const uint32_t zone = h.sign_zone();
   int32_t first = -1, second = -1, third = -1;  // the old zone's panels' values
@@ -219,7 +222,8 @@ uint64_t UpdateSigns(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, co
   ITC_NATIVE_RUNNING("sub_82214718 RaceHud::UpdateSigns");
   const uint32_t frame = sp - 112;
   guest::StoreU32(base, frame, sp);
-  const int32_t course = int32_t(guest::LoadU32(base, G::race_data(base).address + 4));
+  const schema::RaceData data(base, G::race_data(base).address);
+  const int32_t course = int32_t(data.route_course());
   if (course == 8 || course == 9 || course == 10) {
     return hud;
   }

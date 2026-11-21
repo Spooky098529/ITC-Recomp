@@ -68,12 +68,15 @@ fields = [
 # A list entry (12 bytes, the event's +156; RaceEvent::Alloc's).
 [RaceEventEntry]
 measure = "new<?>@RaceEvent::Alloc"
+measures = ["RaceEvent::Entry.ret"]
 size = 12
 origin = "allocated"
 fields = [
   { name = "item_id", offset = 0, type = "u32", note = "the opponent's item (its car build at the item's +160)" },
   { name = "start", offset = 4, type = "u32", note = "a start position (two halfwords, -1 -1 until placed: RaceEvent::PlaceEntry)" },
   { name = "flag", offset = 8, type = "u32", note = "1 open or found among the racers; 0 gives the racer flags 0x300" },
+  { name = "start_section", offset = 4, type = "u16", note = "start's high halfword: the start's route section (RaceManager::AddRacers)" },
+  { name = "start_slice", offset = 6, type = "u16", note = "start's low halfword: its slice" },
 ]
 
 # A race event group (12 bytes, the event's +36 + 12 x location).
@@ -270,6 +273,7 @@ fields = [
 # CareerSave is the same object).
 [SaveData]
 measure = "SaveData::Of.ret"
+measures = ["SaveData"]
 size = 129400
 origin = "allocated"
 fields = [
@@ -332,6 +336,7 @@ fields = [
   { name = "setting_3", offset = 129155, type = "u8" },
   { name = "setting_4", offset = 129156, type = "u8" },
   { name = "setting_5", offset = 129157, type = "u8" },
+  { name = "distance_total_2", offset = 6040, type = "f32", note = "the second distance total, beside +4908 (SaveData::AddDistance; race-world's report)" },
 ]
 
 # A car object's copies of its spec, from its +1888 (sub_820C4550's answer):

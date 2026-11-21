@@ -3,6 +3,8 @@
 
 #include "race_menu/race_menu.h"
 
+#include <bit>
+
 #include "base/log.h"
 #include "guest.h"
 #include "race_menu/internal.h"
@@ -12,12 +14,6 @@
 namespace race_menu {
 
 namespace {
-
-// Player 0's save data's words.
-constexpr uint32_t kSaveName = 8;          // 20 bytes
-constexpr uint32_t kSaveDay = 6100;
-constexpr uint32_t kSaveMoney = 6116;
-constexpr uint32_t kSaveProgress = 0x199E0;
 
 constexpr uint32_t kResetPose = 0x8211ABA8;
 constexpr uint32_t kFadeIn = 0x8209D038;     // ScreenFades::FadeIn, through its override
@@ -52,12 +48,15 @@ uint64_t Start(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& cal
   // (at most 999) and its weekday (the remainder of a signed division).
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   Machine(base, machine).set_save(save);
-  Machine(base, machine).set_progress_bits(Load(base, save + kSaveProgress));
-  const int32_t day = int32_t(Load(base, save + kSaveDay));
+  // The progress bits: the first word of the save's locations (0x199E0).
+  Machine(base, machine).set_progress_bits(Load(base, CareerSave(base, save).locations_address()));
+  const int32_t day = int32_t(Save(base, save).day());
+  // The name: the save's +8 to +27 (the pick's 20 bytes), a word at a time.
   for (uint32_t k = 0; k < 20; k += 4) {
-    Store(base, Machine(base, machine).player_name_address() + k, Load(base, save + kSaveName + k));
+    Store(base, Machine(base, machine).player_name_address() + k,
+          Load(base, Save(base, save).pick_head_address() + k));
   }
-  Machine(base, machine).set_money(Load(base, save + kSaveMoney));
+  Machine(base, machine).set_money(Save(base, save).money());
   Machine(base, machine).set_day(uint32_t(day > 999 ? 999 : day));
   Machine(base, machine).set_weekday(uint32_t(day - (day / 7) * 7));
 
@@ -71,20 +70,21 @@ uint64_t Start(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& cal
   // The nodes' floats (copied as words), each node's stores in the
   // original's order.
   const uint32_t zero = G::float_zero(base);
-  Store(base, ui_movies::FindNode(base, m, 19, 0) + 16, zero);
-  Store(base, ui_movies::FindNode(base, m, 20, 0) + 16, zero);
-  Store(base, ui_movies::FindNode(base, m, 8, 0) + 16, zero);
+  const float zero_f = std::bit_cast<float>(zero);
+  Node(base, ui_movies::FindNode(base, m, 19, 0)).set_y(zero_f);
+  Node(base, ui_movies::FindNode(base, m, 20, 0)).set_y(zero_f);
+  Node(base, ui_movies::FindNode(base, m, 8, 0)).set_y(zero_f);
   for (const uint32_t child : {2u, 3u, 4u}) {
-    const uint32_t node = ui_movies::FindNode(base, m, 11, child);
-    Store(base, node + 12, G::float_2228(base));
-    Store(base, node + 16, G::float_a134(base));
+    const Node node(base, ui_movies::FindNode(base, m, 11, child));
+    node.set_x(std::bit_cast<float>(G::float_2228(base)));
+    node.set_y(std::bit_cast<float>(G::float_a134(base)));
   }
-  uint32_t node = ui_movies::FindNode(base, m, 11, 0);
-  Store(base, node + 16, zero);
-  Store(base, node + 12, G::float_c34(base));
-  node = ui_movies::FindNode(base, m, 11, 1);
-  Store(base, node + 12, G::float_c34(base));
-  Store(base, node + 16, zero);
+  Node node(base, ui_movies::FindNode(base, m, 11, 0));
+  node.set_y(zero_f);
+  node.set_x(std::bit_cast<float>(G::float_c34(base)));
+  node = Node(base, ui_movies::FindNode(base, m, 11, 1));
+  node.set_x(std::bit_cast<float>(G::float_c34(base)));
+  node.set_y(zero_f);
 
   // The badges (11, 20) to (11, 23) hidden, then shown by the progress bits.
   static constexpr uint32_t kHideLr[] = {0x8218CBE8, 0x8218CBF8, 0x8218CC08, 0x8218CC18};
@@ -105,9 +105,9 @@ uint64_t Start(uint8_t* base, uint64_t machine_r3, uint32_t sp, const Calls& cal
   } else {
     calls.Call(kShowNode, frame, 0x8218CC64, m, 11, 22);
   }
-  node = ui_movies::FindNode(base, m, 10, 0);
-  Store(base, node + 12, zero);
-  Store(base, node + 16, zero);
+  node = Node(base, ui_movies::FindNode(base, m, 10, 0));
+  node.set_x(zero_f);
+  node.set_y(zero_f);
 
   // The page object on page 3, the menu.
   Pages pages = G::pages(base);

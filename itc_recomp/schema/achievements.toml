@@ -79,6 +79,6 @@ thresholds = { address = 0x82012074, type = "u32", note = "read as this + 4 x th
 course_targets = { address = 0x82012090, type = "s32", note = "the first of the 8 AchievementCourseTarget (its route)" }
 player_user = { address = 0x826BABA4, type = "u32", note = "player 0's controller's user" }
 user_counts = { address = 0x826C77DC, type = "u32", note = "the user table's (0x826C7670) +364: a word per signed-in slot, probably the network battles' wins" }
-progress = { address = 0x826D82E8, type = "ptr", note = "the race's progress (+6076 the route, +2204 the player's time)" }
+progress = { address = 0x826D82E8, type = "ptr", to = "RaceProgress", note = "the race's progress (race-states' RaceProgress: +6076 the route, +2204 the player's time)" }
 overlappeds = { address = 0x828161F8, type = "u32", note = "the first of the write's 27 AchievementOverlapped (its InternalLow)" }
 entries = { address = 0x828164F0, type = "u32", note = "the first of the write's 27 AchievementEntry (its user)" }

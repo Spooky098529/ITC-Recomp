@@ -76,6 +76,17 @@ game's `Semaphore`, `Event`, critical section and wait wrappers stay
 recompiled for their other callers (the archive loader's four semaphores
 and the rest): the core's shared sync.
 
+The schema (E5 step 2, `itc_recomp/schema/video-output.toml`, header
+`src/schema/video_output.h`): `VideoOutput` (308 bytes, with the
+presentation parameters at +16 as `params_*` fields),
+`VideoPresentParameters`, the sync wrappers `Event`, `Semaphore` and
+`ScopedLock`, `VideoOutputDeviceHolder` (`UnlockDevice`'s word), the
+never-seen device blocks and debug text objects, and the vblank words and
+`resolve_z` in `[globals]`. `src/graphics/video_output.cpp` and
+`src/hooks/video_mode.cpp` reach the video output through it; the
+device's thread word (+10760) and parameters copy (+13188) stay offsets
+until `device-state.toml`'s `Device` is switched to.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the

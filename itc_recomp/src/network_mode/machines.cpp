@@ -13,6 +13,7 @@
 
 #include "base/log.h"
 #include "network_mode/internal.h"
+#include "schema/system_services.h"
 #include "ui_movies/game.h"
 
 #include <initializer_list>
@@ -678,8 +679,9 @@ uint64_t Screen7Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls
                                   {&PageObject::set_unknown_20, kNone},
                                   {&PageObject::set_step_started, 0}});
   MenuCountFirst(base, Load(base, Load(base, frame + 88) + 0x6164), 3, 1);
-  const uint32_t data = Load(base, Load(base, frame + 92) + 0x6168);
-  Fields(base, data, {{0, 0}, {4, 0}});
+  const schema::NetScreen7Data data(base, Load(base, Load(base, frame + 92) + 0x6168));
+  data.set_unknown_0(0);
+  data.set_unknown_4(0);
   const uint32_t m = Load(base, sp + 20);
   using M = NetMachine;
   Apply(M(base, m), {{&M::set_unknown_9720, 0}, {&M::set_unknown_9656, 0},

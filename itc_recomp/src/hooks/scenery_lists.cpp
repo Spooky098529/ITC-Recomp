@@ -20,6 +20,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/models.h"
 #include "schema/scenery_lists.h"
+#include "schema/device_shaders.h"
 #include "scenery_lists/scenery_lists.h"
 
 #include <array>
@@ -337,7 +338,7 @@ ITC_REGS_STEP(SceneryListsDrawShapeDepth) {
     ctx.r3.u64 = queue;
     ctx.r5.u64 = draw->key;
     lifted::CallFromContext(
-        ctx, base, schema::SceneryRenderQueueVtable(base, guest::LoadU32(base, queue)).add());
+        ctx, base, schema::RenderQueueVtable(base, guest::LoadU32(base, queue)).add());
   });
   ctx.lr = lr;
 }
@@ -383,7 +384,7 @@ struct DrawContext {
     ctx.r3.u64 = queue;
     ctx.r5.u64 = key;
     const uint32_t function =
-        schema::SceneryRenderQueueVtable(base, guest::LoadU32(base, queue)).add();
+        schema::RenderQueueVtable(base, guest::LoadU32(base, queue)).add();
     lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();

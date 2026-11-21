@@ -3670,7 +3670,7 @@ struct NodeTable : View {
   uint32_t color_b_address() const { return address + 568; }
 };
 
-// embedded; measure: PairedNodeTable, sub_82247FE0.r3
+// embedded; measure: PairedNodeTable, sub_82247FE0.r3, Type6ListScreen.+9672, Type8ListScreen.+9672
 struct PairedNodeTable : View {
   using View::View;
   static constexpr uint32_t kSize = 460;
@@ -3739,9 +3739,11 @@ struct PairedNodeTable : View {
   uint32_t fourth_before() const { return guest::LoadU32(base, address + 456); }
   void set_fourth_before(uint32_t v) const { guest::StoreU32(base, address + 456, v); }
   uint32_t fourth_before_address() const { return address + 456; }
+  // four pairs (now, before) (from ListNodeTable, screen-constructors)
+  uint32_t pairs_address() const { return address + 428; }
 };
 
-// embedded; measure: ColorNodeTable, ColorListScreen.+10432, NodeTable::SetMarks.ret
+// embedded; measure: ColorNodeTable, ColorListScreen.+10432, NodeTable::SetMarks.ret, Type7ListScreen.+9672, Type8ColorListScreen.+9672
 struct ColorNodeTable : View {
   using View::View;
   static constexpr uint32_t kSize = 584;
@@ -3836,6 +3838,10 @@ struct ColorNodeTable : View {
   uint32_t color_a_address() const { return address + 552; }
   // the other children's color (three words copied)
   uint32_t color_b_address() const { return address + 568; }
+  // four pairs (now, before) (from ListColorNodeTable, screen-constructors)
+  uint32_t pairs_address() const { return address + 428; }
+  // two more pairs: mark bits (from ListColorNodeTable, screen-constructors)
+  uint32_t marks_address() const { return address + 460; }
 };
 
 // embedded; measure: NodeTable::SetPairs.r4, NodeScreen::ItemInfo.r5, Type6ListScreen::ItemInfo.r5, NodeListScreen::ItemInfo.r5
@@ -3894,7 +3900,7 @@ struct Type7ItemInfo : View {
   uint32_t bit_b_address() const { return address + 24; }
 };
 
-// allocated; measure: Type6Screens
+// allocated; measure: Type6Screens, Type6Mode::TearDown.r4.+848, Type6Mode::WaitForLoads.r4.+848
 struct Type6Screens : View {
   using View::View;
   static constexpr uint32_t kSize = 91272;
@@ -3964,9 +3970,21 @@ struct Type6Screens : View {
   uint32_t phase() const { return guest::LoadU32(base, address + 91264); }
   void set_phase(uint32_t v) const { guest::StoreU32(base, address + 91264, v); }
   uint32_t phase_address() const { return address + 91264; }
+  // a screen's loaded word (Type6Mode::TearDown, WaitForLoads)
+  uint32_t loaded_9612() const { return guest::LoadU32(base, address + 9612); }
+  void set_loaded_9612(uint32_t v) const { guest::StoreU32(base, address + 9612, v); }
+  uint32_t loaded_9612_address() const { return address + 9612; }
+  // a screen's loaded word
+  uint32_t loaded_19280() const { return guest::LoadU32(base, address + 19280); }
+  void set_loaded_19280(uint32_t v) const { guest::StoreU32(base, address + 19280, v); }
+  uint32_t loaded_19280_address() const { return address + 19280; }
+  // the next-mode answer's word (its byte the answer, type6-type7-modes' report)
+  uint32_t answer_word0() const { return guest::LoadU32(base, address + 91256); }
+  void set_answer_word0(uint32_t v) const { guest::StoreU32(base, address + 91256, v); }
+  uint32_t answer_word0_address() const { return address + 91256; }
 };
 
-// allocated; measure: Type7Screens
+// allocated; measure: Type7Screens, Type7Mode::TearDown.r4.+848, Type7Mode::WaitForLoads.r4.+848
 struct Type7Screens : View {
   using View::View;
   static constexpr uint32_t kSize = 71292;
@@ -4018,6 +4036,18 @@ struct Type7Screens : View {
   uint32_t phase() const { return guest::LoadU32(base, address + 71284); }
   void set_phase(uint32_t v) const { guest::StoreU32(base, address + 71284, v); }
   uint32_t phase_address() const { return address + 71284; }
+  // a screen's loaded word (Type7Mode::TearDown, WaitForLoads)
+  uint32_t loaded_9616() const { return guest::LoadU32(base, address + 9616); }
+  void set_loaded_9616(uint32_t v) const { guest::StoreU32(base, address + 9616, v); }
+  uint32_t loaded_9616_address() const { return address + 9616; }
+  // a screen's loaded word
+  uint32_t loaded_19272() const { return guest::LoadU32(base, address + 19272); }
+  void set_loaded_19272(uint32_t v) const { guest::StoreU32(base, address + 19272, v); }
+  uint32_t loaded_19272_address() const { return address + 19272; }
+  // the next-mode answer's word
+  uint32_t answer_word0() const { return guest::LoadU32(base, address + 71276); }
+  void set_answer_word0(uint32_t v) const { guest::StoreU32(base, address + 71276, v); }
+  uint32_t answer_word0_address() const { return address + 71276; }
 };
 
 // The image words docs/functions/type67-screens.md's code uses.

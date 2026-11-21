@@ -17,13 +17,9 @@ namespace race_loading {
 
 // The machine's words: schema::CourseSetup (itc_recomp/schema/race-loading.toml).
 
-// The dispatcher's ring (from the dispatcher, the handlers' r4): 50
-// messages of 12 bytes from +204, the count at +804 and the start at +808.
-constexpr uint32_t kRing = 204;
-constexpr uint32_t kRingCount = 600;  // from the ring
-constexpr uint32_t kRingStart = 604;  // from the ring
+// The dispatcher's ring: schema::ModeDispatcher (boot-mode.toml), 50
+// messages (schema::ModeMessage, game-modes.toml) from its ring_address().
 constexpr uint32_t kRingSlots = 50;
-constexpr uint32_t kRingMessageBytes = 12;
 
 // The fades' passes (words in the image: 5 and 15) and layer 0's alpha:
 // schema::RaceLoadingGlobals.
@@ -104,10 +100,9 @@ uint64_t WaitDraw(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                   const Calls& calls);
 
 // The globals the course's wait and end read: the course scenery's manager
-// (Scenery::IsLoaded's; course-scenery's), the collision mesh's and the
+// (Scenery::IsLoaded's; schema::CourseSceneryGlobals), the collision mesh's and the
 // route's load states and layer 0's fade counts (schema::RaceLoadingGlobals),
 // and the guest functions they call.
-constexpr uint32_t kSceneryManager = 0x826C5514;
 constexpr uint32_t kCarSceneUpdate = 0x820C9608;  // CarScene::Update, through its adapter
 
 // sub_821514A0 CourseSetup::WaitCourse ((3, 0); 112-byte frame): when

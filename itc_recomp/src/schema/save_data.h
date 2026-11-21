@@ -172,8 +172,10 @@ struct SaveDataGlobals {
   static void set_title_menu_list(uint8_t* base, const View& v) { guest::StoreU32(base, 0x82814E30u, v.address); }
   static void set_title_menu_list(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x82814E30u, v); }
   static constexpr uint32_t title_menu_list_address() { return 0x82814E30u; }
-  // the title screen object (title-screen.md)
-  static View title_screen(uint8_t* base) { return View(base, guest::LoadU32(base, 0x82814E34u)); }
+  // the title screen object (title-screen.toml)
+  template <typename T = TitleScreenData>
+  static T title_screen(uint8_t* base) { return T(base, guest::LoadU32(base, 0x82814E34u)); }
+  static void set_title_screen(uint8_t* base, const View& v) { guest::StoreU32(base, 0x82814E34u, v.address); }
   static void set_title_screen(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x82814E34u, v); }
   static constexpr uint32_t title_screen_address() { return 0x82814E34u; }
 };

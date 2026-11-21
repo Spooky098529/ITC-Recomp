@@ -251,8 +251,8 @@ uint64_t OnRaceEnd(uint8_t* base, uint64_t machine_r3, uint32_t frame, const Gue
       const uint32_t which = int32_t(m.progress().end_reason()) == 1 ? 0 : 1;
       const uint32_t identity = va::VehicleIdentity(va::VehicleGet(base, which));
       const schema::RaceProgress to = m.progress();
-      to.set_kind8_section(U16(base, identity + 4));
-      to.set_kind8_slice(U16(base, identity + 6));
+      to.set_kind8_section(U16(base, TrackPos(base, identity).route_section_address()));
+      to.set_kind8_slice(U16(base, TrackPos(base, identity).route_slice_address()));
     }
     if (kind >= 0) {
       const uint32_t words = frame + 112;

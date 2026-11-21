@@ -7,7 +7,13 @@
 #include "car_dealer/car_dealer.h"
 #include "guest.h"
 #include "schema/car_dealer.h"
+#include "schema/career.h"
+#include "schema/material_passes.h"
 #include "schema/menu_helpers.h"
+#include "schema/race_screens.h"
+#include "schema/race_setup.h"
+#include "schema/tuning_screen.h"
+#include "schema/type2_screens.h"
 #include "ui_movies/game.h"
 
 namespace car_dealer {
@@ -22,6 +28,12 @@ using Colors = schema::CarDealerColors;
 using Entry = schema::CarDealerEntry;
 using SpecColor = schema::CarDealerSpecColor;
 using Pages = schema::PageObject;
+using MenuList = schema::MenuList;
+using Save = schema::CareerSave;
+using GarageList = schema::CareerGarageList;
+using Type2G = schema::Type2ScreensGlobals;
+using Node = schema::UiMovieNode;
+using Swatch = schema::CarDealerSwatch;
 
 inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 inline void Store(uint8_t* base, uint32_t address, uint32_t value) {

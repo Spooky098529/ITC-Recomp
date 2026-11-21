@@ -8,7 +8,7 @@
 
 namespace schema {
 
-// allocated; measure: Career, Progress, Garage, Items, ItemRecords, memcpy_825A7410.ret
+// allocated; measure: Career, Progress, Garage, Items, ItemRecords, memcpy_825A7410.ret, PlayTime
 struct CareerSave : View {
   using View::View;
   static constexpr uint32_t kSize = 129400;
@@ -190,7 +190,7 @@ struct CareerPick : View {
   uint32_t second_set_address() const { return address + 18; }
 };
 
-// embedded; measure: Stats
+// embedded; measure: Stats, PlayTime::Add.r4
 struct CareerStats : View {
   using View::View;
   static constexpr uint32_t kSize = 6040;
@@ -371,6 +371,10 @@ struct CareerStats : View {
   uint32_t save_mode() const { return guest::LoadU32(base, address + 6104); }
   void set_save_mode(uint32_t v) const { guest::StoreU32(base, address + 6104, v); }
   uint32_t save_mode_address() const { return address + 6104; }
+  // measure fault: PlayTime::Add's load and store here are the save data's +6088 mark (save-interface's report), joined with the stats
+  uint32_t fault_6040() const { return guest::LoadU32(base, address + 6040); }
+  void set_fault_6040(uint32_t v) const { guest::StoreU32(base, address + 6040, v); }
+  uint32_t fault_6040_address() const { return address + 6040; }
 };
 
 // embedded; measure: Counter
@@ -799,8 +803,10 @@ struct CareerGlobals {
   static uint32_t play_time_frames(uint8_t* base) { return guest::LoadU32(base, 0x826C5B90u); }
   static void set_play_time_frames(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B90u, v); }
   static constexpr uint32_t play_time_frames_address() { return 0x826C5B90u; }
-  // the race data
-  static View race_data(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  // the race data (race-states.toml)
+  template <typename T = RaceData>
+  static T race_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  static void set_race_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B2Cu, v.address); }
   static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
   static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
 };

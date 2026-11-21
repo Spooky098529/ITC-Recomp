@@ -17,7 +17,6 @@
 
 namespace xaudio {
 
-constexpr uint32_t kStatsCopy = 0x82954F40;  // the counters' copies (TakeStats)
 constexpr uint32_t kStatCount = 7;
 
 // --- Leaves ---
@@ -55,7 +54,8 @@ uint64_t InterfaceAddRef(uint8_t* base, uint32_t iface);
 uint32_t ObjectInfo(uint8_t* base, uint32_t out);
 
 // XAudioEngine::TakeStats (sub_8245F678): the 7 statistics counters
-// (kStats) copied to kStatsCopy and cleared, one at a time; returns 0.
+// (kStats) copied to their copies (the schema's globals: stats_copy) and
+// cleared, one at a time; returns 0.
 uint32_t TakeStats(uint8_t* base);
 
 // XAudio::Free (sub_8245EF90): XMemFree (sub_82297790)'s plain C++ with
@@ -85,7 +85,6 @@ constexpr uint32_t kEngineVtable0 = 0x8204A6CC;  // the base's
 constexpr uint32_t kEngineVtable = 0x8204A6E0;
 constexpr uint32_t kFactoryVtable = 0x8204A6F4;
 constexpr uint32_t kDefaultClasses = 0x8204A7B0;  // the factory's class table
-constexpr uint32_t kDebugMonitor = 0x820007F0;    // the debug monitor's data
 constexpr uint32_t kStatsCallback = 0x8245F4E0;
 constexpr uint32_t kKeGetCurrentProcessType = 0x825DB934;
 constexpr uint32_t kBufferSize = 0x8245FA28;
@@ -124,8 +123,8 @@ uint32_t FactoryEntry(uint8_t* base, uint32_t factory, uint32_t descriptor, uint
 
 // XAudio::RegisterStats (sub_8245F588): the request (4 and the callback
 // kStatsCallback at the frame's +80) handed to the debug monitor's
-// ([[kDebugMonitor]]) slot +24 with 47, when there is one. `frame` is this
-// function's (96 bytes). Returns 0.
+// ([debug_monitor], the schema's globals) slot +24 with 47, when there is
+// one. `frame` is this function's (96 bytes). Returns 0.
 uint32_t RegisterStats(uint8_t* base, uint32_t frame, const GuestCall& call);
 
 // XAudio::SetUpProcessors (sub_8245A828): the 8 bytes at `out` from the
@@ -365,7 +364,6 @@ uint32_t WorkerThread(uint8_t* base, const Thread& thread, const GuestCall& call
 constexpr uint32_t kTerminateRegistration = 0x82954EB4;
 constexpr uint32_t kTerminateRoutine = 0x8245B0D0;
 constexpr uint32_t kTerminatePriority = 0x7D800000;
-constexpr uint32_t kThreadType = 0x820007FC;  // [it]: probably PsThreadObjectType
 constexpr uint32_t kMasterEntry = 0x8245BE08;
 constexpr uint32_t kWorkerEntry = 0x8245BED0;
 constexpr uint32_t kMixerCallback = 0x8245FBE0;
@@ -389,7 +387,8 @@ constexpr uint32_t kKeInitializeSemaphore = 0x825DBEB4;
 // registered; +304 = 0; SetUpProcessors (+2, the frame's +96); for each
 // processor byte with its low bits set, ExCreateThread (suspended, on that
 // hardware thread; MasterThread for 1, WorkerThread else),
-// ObReferenceObjectByHandle with [kThreadType], KeSetBasePriorityThread 15,
+// ObReferenceObjectByHandle with [thread_type] (the schema's globals),
+// KeSetBasePriorityThread 15,
 // KeResumeThread, ObDereferenceObject, +304 counted (E_OUTOFMEMORY when the
 // create fails), its handle at +308 + 4i (0 for the others); for each
 // nonzero byte two output buffers (BufferCreate, max(+0, 6) channels at

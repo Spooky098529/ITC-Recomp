@@ -142,8 +142,10 @@ struct SaveScreenGlobals {
   static uint32_t mode_type(uint8_t* base) { return guest::LoadU32(base, 0x826032DCu); }
   static void set_mode_type(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826032DCu, v); }
   static constexpr uint32_t mode_type_address() { return 0x826032DCu; }
-  // the save buffers' header (+0 the game data's buffer, +4 a replay's, +20 the replays' count)
-  static uint32_t save_buffers(uint8_t* base) { return guest::LoadU32(base, 0x828161F0u); }
+  // the save buffers' header (save-interface.toml's SaveBuffers: +0 the game data's buffer, +4 a replay's, +20 the replays' count)
+  template <typename T = SaveBuffers>
+  static T save_buffers(uint8_t* base) { return T(base, guest::LoadU32(base, 0x828161F0u)); }
+  static void set_save_buffers(uint8_t* base, const View& v) { guest::StoreU32(base, 0x828161F0u, v.address); }
   static void set_save_buffers(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x828161F0u, v); }
   static constexpr uint32_t save_buffers_address() { return 0x828161F0u; }
   // the replay kept for the replay screen
@@ -158,8 +160,10 @@ struct SaveScreenGlobals {
   static uint32_t profile_wanted(uint8_t* base) { return guest::LoadU32(base, 0x826C7958u); }
   static void set_profile_wanted(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C7958u, v); }
   static constexpr uint32_t profile_wanted_address() { return 0x826C7958u; }
-  // the profile reader (its +4 the results)
-  static uint32_t profile_reader(uint8_t* base) { return guest::LoadU32(base, 0x826C6AD0u); }
+  // the profile read's results (system-services.toml's SysProfileResults: +4 the settings)
+  template <typename T = SysProfileResults>
+  static T profile_reader(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C6AD0u)); }
+  static void set_profile_reader(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C6AD0u, v.address); }
   static void set_profile_reader(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C6AD0u, v); }
   static constexpr uint32_t profile_reader_address() { return 0x826C6AD0u; }
 };

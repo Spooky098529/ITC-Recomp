@@ -25,7 +25,6 @@ namespace vehicle {
 constexpr uint32_t kVehicles = 0x826C2E34;   // the seven vehicles' block
 constexpr uint32_t kVehicleBytes = 6272;
 constexpr uint32_t kVehiclesBytes = 7 * kVehicleBytes;  // 43,904
-constexpr uint32_t kStepSeconds = 0x82601838;  // 1/60, in .data
 
 // --- Leaves ---
 

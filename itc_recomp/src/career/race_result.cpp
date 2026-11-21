@@ -9,6 +9,9 @@
 #include "guest.h"
 #include "race_setup/race_setup.h"
 #include "schema/career.h"
+#include "schema/race_event.h"
+#include "schema/race_hud_machine.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <cstring>
@@ -19,12 +22,11 @@ using schema::CareerCounter;
 using schema::CareerGlobals;
 using schema::CareerSave;
 using schema::CareerStats;
+using schema::OpponentItem;
+using schema::RaceData;
+using schema::RacerResultsRecord;
 
 namespace {
-
-constexpr uint32_t kRaceMode = 0xA3AF4;       // the race data's mode
-constexpr uint32_t kRaceResults = 0x59AE8;    // its result records
-constexpr uint32_t kRaceStages = 0x59620;     // its stage list
 
 double Lfs(uint8_t* base, uint32_t address) { return double(guest::LoadFloat(base, address)); }
 void Stfs(uint8_t* base, uint32_t address, double value) {
@@ -86,19 +88,21 @@ bool AddRaceResultNative(uint8_t* base, uint32_t save, uint32_t race, uint32_t s
   if (frame >= 0xA0000000u) {
     return false;
   }
-  if (guest::LoadU32(base, race + kRaceMode) - 2 > 1) {
+  const RaceData rd(base, race);
+  if (rd.race_mode() - 2 > 1) {
     return true;
   }
   if (!ResultsPushNative(CareerStats(base, CareerSave(base, save).stats_address())
                              .results_address())) {
     return false;
   }
-  const uint32_t result = vehicle_accessors::RacerRecordsAt(base, race + kRaceResults, 0xFFFFFFFFu);
-  if (int32_t(guest::LoadU32(base, result + 3924)) != 1) {
+  const RacerResultsRecord rr(
+      base, vehicle_accessors::RacerRecordsAt(base, rd.results_address(), 0xFFFFFFFFu));
+  if (int32_t(rr.finish()) != 1) {
     return true;
   }
   for (uint32_t k = 0; k < 4; k++) {
-    const uint32_t id = guest::LoadU32(base, result + 8 + 972 * k);
+    const uint32_t id = guest::LoadU32(base, rr.e0_item_address() + 972 * k);
     if (int32_t(id) != -1 && !CanCopy(frame + 96, data_tables::Item(base, id), 3008)) {
       return false;
     }
@@ -109,68 +113,70 @@ bool AddRaceResultNative(uint8_t* base, uint32_t save, uint32_t race, uint32_t s
 uint32_t StatsAddRaceResult(uint8_t* base, uint32_t save, uint32_t race, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82115190 Stats::AddRaceResult");
   const uint32_t frame = sp - kAddRaceResultFrame;
-  const uint32_t result = vehicle_accessors::RacerRecordsAt(base, race + kRaceResults, 0xFFFFFFFFu);
+  const RaceData rd(base, race);
+  const uint32_t result = vehicle_accessors::RacerRecordsAt(base, rd.results_address(), 0xFFFFFFFFu);
+  const RacerResultsRecord rr(base, result);
   uint32_t r3 = result;
   const CareerSave sv(base, save);
   const uint32_t stats = sv.stats_address();
   const CareerStats st(base, stats);
   const CareerCounter week(base, st.week_address());
   const double zero = double(CareerGlobals::zero(base));
-  if (guest::LoadU32(base, race + kRaceMode) - 2 <= 1) {
-    week.set_week_808(guest::LoadU32(base, result + 808));
-    week.set_week_sum_812(week.week_sum_812() + guest::LoadU32(base, result + 812));
-    week.set_week_sum_816(week.week_sum_816() + guest::LoadU32(base, result + 816));
-    const double best = Lfs(base, result + 804);
+  if (rd.race_mode() - 2 <= 1) {
+    week.set_week_808(rr.e0_hard_hit());
+    week.set_week_sum_812(week.week_sum_812() + rr.e0_track_hits());
+    week.set_week_sum_816(week.week_sum_816() + rr.e0_car_hits());
+    const double best = double(rr.e0_top_speed());
     KeepLargest(base, week.week_best_804_address(), best);
     KeepLargest(base, st.best_804_address(), best);
-    RunningMeanMergeTwo(base, stats, LoadU64(base, result + 796), frame);
+    RunningMeanMergeTwo(base, stats, LoadU64(base, rr.e0_mean_speed_pair_address()), frame);
     MergeOne(base, frame, st.mean_812_address(),
-             IntToSingle(base, frame, int32_t(guest::LoadU32(base, result + 812))));
+             IntToSingle(base, frame, int32_t(rr.e0_track_hits())));
     MergeOne(base, frame, st.mean_816_address(),
-             IntToSingle(base, frame, int32_t(guest::LoadU32(base, result + 816))));
-    MergeOne(base, frame, st.mean_820_address(), Lfs(base, result + 820));
-    st.set_sum_820(float(double(float(Lfs(base, result + 820) + double(st.sum_820())))));
+             IntToSingle(base, frame, int32_t(rr.e0_car_hits())));
+    MergeOne(base, frame, st.mean_820_address(), double(rr.e0_distance()));
+    st.set_sum_820(float(double(float(double(rr.e0_distance()) + double(st.sum_820())))));
     MergeOne(base, frame, st.mean_won_address(),
-             guest::LoadU32(base, result + 784) != 0 ? double(CareerGlobals::hundred(base))
+             rr.e0_flag_ticks() != 0 ? double(CareerGlobals::hundred(base))
                                                      : zero);
-    const uint32_t most = guest::LoadU32(base, result + 16);
+    const uint32_t most = rr.e0_ticks();
     const uint32_t old = st.best_16();
     st.set_best_16(old < most ? most : old);
     ResultsPush(base, st.results_address(), race);
-    const uint32_t type = vehicle_accessors::StagesType(base, race + kRaceStages, 0xFFFFFFFFu);
+    const uint32_t type = vehicle_accessors::StagesType(base, rd.stages_address(), 0xFFFFFFFFu);
     r3 = type;
     if (type == 0) {
       double value = zero;
-      if (int32_t(guest::LoadU32(base, result + 3920)) != 3) {
-        const double count = IntToSingle(base, frame, int32_t(guest::LoadU32(base, result + 788)));
+      if (int32_t(rr.outcome()) != 3) {
+        const double count = IntToSingle(base, frame, int32_t(rr.e0_sp()));
         value = double(float(count * double(CareerGlobals::scale_788(base))));
       }
       MergeOne(base, frame, st.mean_788_address(), value);
       r3 = st.mean_788_address();
       const double scale = double(CareerGlobals::scale_828(base));
-      KeepLargest(base, st.best_828_address(), double(float(Lfs(base, result + 828) * scale)));
-      KeepLargest(base, st.best_828_2_address(), double(float(Lfs(base, result + 828) * scale)));
+      KeepLargest(base, st.best_828_address(), double(float(double(rr.e0_route_distance()) * scale)));
+      KeepLargest(base, st.best_828_2_address(), double(float(double(rr.e0_route_distance()) * scale)));
     }
   }
-  if (guest::LoadU32(base, race + kRaceMode) - 2 <= 1) {
+  if (rd.race_mode() - 2 <= 1) {
     for (uint32_t k = 0; k < 4; k++) {
-      const uint32_t id = guest::LoadU32(base, result + 8 + 972 * k);
+      const uint32_t id = guest::LoadU32(base, rr.e0_item_address() + 972 * k);
       if (int32_t(id) == -1) {
         continue;
       }
-      const int32_t outcome = int32_t(guest::LoadU32(base, result + 3924));
+      const int32_t outcome = int32_t(rr.finish());
       if (outcome == 1) {
         ItemRecordsAddWin(base, save, id, frame);
         c_runtime::Memcpy(base, frame + 96, data_tables::Item(base, id), 3008);
         r3 = frame + 96;
-        if (guest::LoadU8(base, frame + 96 + 35) == 5) {
+        if (OpponentItem(base, frame + 96).kind() == 5) {
           sv.set_kind5_won(1);
         }
       } else if (outcome == 3) {
         r3 = ItemRecordsAddOutcome3(base, save, id, frame);
       } else {
         r3 = ItemRecordsAddLoss(base, save, id, frame);
-        if (int32_t(guest::LoadU32(base, result + 3920)) == 3) {
+        if (int32_t(rr.outcome()) == 3) {
           const uint32_t mode = sv.mode();
           CountUp(base, CareerCounter(base, st.counter_address()).unknown_18_address());
           CountUp(base, st.by_mode_address() + 14 * mode + 8);

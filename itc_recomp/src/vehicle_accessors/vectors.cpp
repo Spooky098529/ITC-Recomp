@@ -3,6 +3,7 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "schema/vehicle_accessors.h"
 
 #include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
@@ -16,24 +17,12 @@ namespace {
 
 using Fpscr = ::base::FloatMode;
 
-constexpr uint32_t kOne = 0x82000A30;   // the game's float 1.0
-constexpr uint32_t kZero = 0x82000A34;  // the game's float 0.0
+using G = schema::VehicleAccessorsGlobals;  // one (1.0), zero (0.0)
+using V = schema::VectorLibVector;
+using M = schema::VectorLibMatrix;
 
-// lfs: a single from guest memory, widened.
-double Lfs(uint8_t* base, uint32_t address) {
-  return double(guest::LoadFloat(base, address));
-}
-
-// stfs of a result (always a single already).
-void Stfs(uint8_t* base, uint32_t address, double value) {
-  guest::StoreFloat(base, address, float(value));
-}
-
-// lfs then stfs of one word: its bits (the translated code's float to double
-// and back folds away, signaling NaNs included).
-void CopyWord(uint8_t* base, uint32_t from, uint32_t to) {
-  guest::StoreU32(base, to, guest::LoadU32(base, from));
-}
+// lfs then stfs of one word copies its bits (the translated code's float to
+// double and back folds away, signaling NaNs included): the *_bits fields.
 
 double Fmuls(double a, double b) {
   return double(float(a * b));
@@ -58,99 +47,112 @@ double Fsqrts(double a) {
 }
 
 // Vec3::Add's and Vec3::Sub's steps (the same loads and stores; `subtract`
-// picks fsubs); `b(offset)` loads b's component, at the original's point.
+// picks fsubs); `b(i)` loads b's component i (x, y, z), at the original's
+// point.
 template <typename LoadB>
 void AddOrSubSteps(uint8_t* base, uint32_t out, uint32_t a, LoadB b, bool subtract) {
   auto op = [subtract](double x, double y) { return subtract ? Fsubs(x, y) : Fadds(x, y); };
+  const V va(base, a);
+  const V vo(base, out);
   {
     const double bx = b(0);
-    const double ax = Lfs(base, a + 0);
-    Stfs(base, out + 0, op(ax, bx));
+    const double ax = double(va.x());
+    vo.set_x(float(op(ax, bx)));
   }
   {
-    const double by = b(4);
-    const double ay = Lfs(base, a + 4);
-    Stfs(base, out + 4, op(ay, by));
+    const double by = b(1);
+    const double ay = double(va.y());
+    vo.set_y(float(op(ay, by)));
   }
-  const double az = Lfs(base, a + 8);
-  const double bz = b(8);
-  const uint32_t one = guest::LoadU32(base, kOne);
+  const double az = double(va.z());
+  const double bz = b(2);
+  const uint32_t one = G::one_bits(base);
   const double z = op(az, bz);
-  guest::StoreU32(base, out + 12, one);
-  Stfs(base, out + 8, z);
+  vo.set_w_bits(one);
+  vo.set_z(float(z));
 }
 
 void AddOrSub(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, bool subtract) {
-  AddOrSubSteps(base, out, a, [base, b](uint32_t offset) { return Lfs(base, b + offset); },
-                subtract);
+  const V vb(base, b);
+  AddOrSubSteps(
+      base, out, a,
+      [vb](uint32_t i) { return double(i == 0 ? vb.x() : i == 1 ? vb.y() : vb.z()); },
+      subtract);
 }
 
 // The x, y, z of a - b or a + b with all loads first (the copies through a
 // temporary), stored with w 1.0.
 void AddOrSubCopy(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, bool subtract) {
   auto op = [subtract](double x, double y) { return subtract ? Fsubs(x, y) : Fadds(x, y); };
-  const double bx = Lfs(base, b + 0);
-  const double ax = Lfs(base, a + 0);
+  const V va(base, a);
+  const V vb(base, b);
+  const V vo(base, out);
+  const double bx = double(vb.x());
+  const double ax = double(va.x());
   const double x = op(ax, bx);
-  const double by = Lfs(base, b + 4);
-  const double ay = Lfs(base, a + 4);
+  const double by = double(vb.y());
+  const double ay = double(va.y());
   const double y = op(ay, by);
-  const double az = Lfs(base, a + 8);
-  const double bz = Lfs(base, b + 8);
+  const double az = double(va.z());
+  const double bz = double(vb.z());
   const double z = op(az, bz);
-  Stfs(base, out + 0, x);
-  Stfs(base, out + 4, y);
-  Stfs(base, out + 8, z);
-  CopyWord(base, kOne, out + 12);
+  vo.set_x(float(x));
+  vo.set_y(float(y));
+  vo.set_z(float(z));
+  vo.set_w_bits(G::one_bits(base));
 }
 
 // Matrix::Rotate's and Matrix::TransformPoint's steps (`translate` adds the
 // fourth row).
+// Locals are named by the matrix's fields (m<row><column>, rows of 16 bytes).
 void Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v, bool translate) {
-  const double vz = Lfs(base, v + 8);
-  const double m32 = Lfs(base, m + 32);
-  const double vy = Lfs(base, v + 4);
-  const double m20 = Lfs(base, m + 20);
-  const double m24 = Lfs(base, m + 24);
-  CopyWord(base, kZero, out + 12);
-  const double t11 = Fmuls(m32, vz);
-  const double t10 = Fmuls(m20, vy);
-  const double m16 = Lfs(base, m + 16);
-  const double t9 = Fmuls(m24, vy);
-  const double vx = Lfs(base, v + 0);
-  const double m4 = Lfs(base, m + 4);
-  const double m8 = Lfs(base, m + 8);
-  const double m0 = Lfs(base, m + 0);
-  const double m36 = Lfs(base, m + 36);
-  const double m40 = Lfs(base, m + 40);
-  double m48 = 0, m52 = 0, m56 = 0;
+  const M mat(base, m);
+  const V vv(base, v);
+  const V vo(base, out);
+  const double vz = double(vv.z());
+  const double m20 = double(mat.m20());
+  const double vy = double(vv.y());
+  const double m11 = double(mat.m11());
+  const double m12 = double(mat.m12());
+  vo.set_w_bits(G::zero_bits(base));
+  const double t11 = Fmuls(m20, vz);
+  const double t10 = Fmuls(m11, vy);
+  const double m10 = double(mat.m10());
+  const double t9 = Fmuls(m12, vy);
+  const double vx = double(vv.x());
+  const double m01 = double(mat.m01());
+  const double m02 = double(mat.m02());
+  const double m00 = double(mat.m00());
+  const double m21 = double(mat.m21());
+  const double m22 = double(mat.m22());
+  double m30 = 0, m31 = 0, m32 = 0;
   if (translate) {
-    m48 = Lfs(base, m + 48);
-    m52 = Lfs(base, m + 52);
-    m56 = Lfs(base, m + 56);
+    m30 = double(mat.m30());
+    m31 = double(mat.m31());
+    m32 = double(mat.m32());
   }
-  const double x0 = Fmadds(m16, vy, t11);
-  const double y0 = Fmadds(m4, vx, t10);
-  const double z0 = Fmadds(m8, vx, t9);
-  const double x = Fmadds(vx, m0, x0);
-  const double y = Fmadds(m36, vz, y0);
-  const double z = Fmadds(m40, vz, z0);
+  const double x0 = Fmadds(m10, vy, t11);
+  const double y0 = Fmadds(m01, vx, t10);
+  const double z0 = Fmadds(m02, vx, t9);
+  const double x = Fmadds(vx, m00, x0);
+  const double y = Fmadds(m21, vz, y0);
+  const double z = Fmadds(m22, vz, z0);
   if (translate) {
-    Stfs(base, out + 0, Fadds(x, m48));
-    Stfs(base, out + 4, Fadds(y, m52));
-    Stfs(base, out + 8, Fadds(z, m56));
+    vo.set_x(float(Fadds(x, m30)));
+    vo.set_y(float(Fadds(y, m31)));
+    vo.set_z(float(Fadds(z, m32)));
   } else {
-    Stfs(base, out + 0, x);
-    Stfs(base, out + 4, y);
-    Stfs(base, out + 8, z);
+    vo.set_x(float(x));
+    vo.set_y(float(y));
+    vo.set_z(float(z));
   }
 }
 
 // A guest vector as the translated code holds it (word 0 in the top lane).
 simde__m128 VectorAt(uint8_t* base, uint32_t address) {
-  return simde_mm_castsi128_ps(simde_mm_set_epi32(
-      int32_t(guest::LoadU32(base, address + 0)), int32_t(guest::LoadU32(base, address + 4)),
-      int32_t(guest::LoadU32(base, address + 8)), int32_t(guest::LoadU32(base, address + 12))));
+  const V v(base, address);
+  return simde_mm_castsi128_ps(simde_mm_set_epi32(int32_t(v.x_bits()), int32_t(v.y_bits()),
+                                                  int32_t(v.z_bits()), int32_t(v.w_bits())));
 }
 
 }  // namespace
@@ -162,14 +164,16 @@ float Sqrtf(double x) {
 
 void MatrixSetTranslation(uint8_t* base, uint32_t matrix, uint32_t vector) {
   ITC_NATIVE_RUNNING("sub_82293818 Matrix::SetTranslation");
-  const uint32_t x = guest::LoadU32(base, vector + 0);
-  const uint32_t y = guest::LoadU32(base, vector + 4);
-  const uint32_t z = guest::LoadU32(base, vector + 8);
-  const uint32_t one = guest::LoadU32(base, kOne);
-  guest::StoreU32(base, matrix + 48, x);
-  guest::StoreU32(base, matrix + 52, y);
-  guest::StoreU32(base, matrix + 56, z);
-  guest::StoreU32(base, matrix + 60, one);
+  const V v(base, vector);
+  const M m(base, matrix);
+  const uint32_t x = v.x_bits();
+  const uint32_t y = v.y_bits();
+  const uint32_t z = v.z_bits();
+  const uint32_t one = G::one_bits(base);
+  m.set_m30_bits(x);
+  m.set_m31_bits(y);
+  m.set_m32_bits(z);
+  m.set_m33_bits(one);
 }
 
 void MatrixRotate(uint8_t* base, uint32_t out, uint32_t matrix, uint32_t vector) {
@@ -194,43 +198,52 @@ void Vec3Sub(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
 
 void Vec4ScaleTo(uint8_t* base, uint32_t out, uint32_t v, double s) {
   ITC_NATIVE_RUNNING("sub_822940A8 Vec4::ScaleTo");
-  for (uint32_t i = 0; i < 16; i += 4) {
-    Stfs(base, out + i, Fmuls(Lfs(base, v + i), s));
-  }
+  const V vv(base, v);
+  const V vo(base, out);
+  vo.set_x(float(Fmuls(double(vv.x()), s)));
+  vo.set_y(float(Fmuls(double(vv.y()), s)));
+  vo.set_z(float(Fmuls(double(vv.z()), s)));
+  vo.set_w(float(Fmuls(double(vv.w()), s)));
 }
 
 void Vec4Copy(uint8_t* base, uint32_t out, uint32_t v) {
   ITC_NATIVE_RUNNING("sub_822940E0 Vec4::Copy");
-  for (uint32_t i = 0; i < 16; i += 4) {
-    CopyWord(base, v + i, out + i);
-  }
+  const V vv(base, v);
+  const V vo(base, out);
+  vo.set_x_bits(vv.x_bits());
+  vo.set_y_bits(vv.y_bits());
+  vo.set_z_bits(vv.z_bits());
+  vo.set_w_bits(vv.w_bits());
 }
 
 void Vec3CrossW1(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294108 Vec3::CrossW1");
+  const V va(base, a);
+  const V vb(base, b);
+  const V vo(base, out);
   {
-    const double by = Lfs(base, b + 4);
-    const double az = Lfs(base, a + 8);
+    const double by = double(vb.y());
+    const double az = double(va.z());
     const double t = Fmuls(az, by);
-    const double bz = Lfs(base, b + 8);
-    const double ay = Lfs(base, a + 4);
-    Stfs(base, out + 0, Fmsubs(bz, ay, t));
+    const double bz = double(vb.z());
+    const double ay = double(va.y());
+    vo.set_x(float(Fmsubs(bz, ay, t)));
   }
   {
-    const double ax = Lfs(base, a + 0);
-    const double bz = Lfs(base, b + 8);
+    const double ax = double(va.x());
+    const double bz = double(vb.z());
     const double t = Fmuls(bz, ax);
-    const double bx = Lfs(base, b + 0);
-    const double az = Lfs(base, a + 8);
-    Stfs(base, out + 4, Fmsubs(az, bx, t));
+    const double bx = double(vb.x());
+    const double az = double(va.z());
+    vo.set_y(float(Fmsubs(az, bx, t)));
   }
-  const double ay = Lfs(base, a + 4);
-  const double bx = Lfs(base, b + 0);
+  const double ay = double(va.y());
+  const double bx = double(vb.x());
   const double t = Fmuls(bx, ay);
-  const double by = Lfs(base, b + 4);
-  const double ax = Lfs(base, a + 0);
-  CopyWord(base, kOne, out + 12);
-  Stfs(base, out + 8, Fmsubs(ax, by, t));
+  const double by = double(vb.y());
+  const double ax = double(va.x());
+  vo.set_w_bits(G::one_bits(base));
+  vo.set_z(float(Fmsubs(ax, by, t)));
 }
 
 float Vec3Dot(uint8_t* base, uint32_t a, uint32_t b) {
@@ -251,45 +264,50 @@ float Vec3Dot(uint8_t* base, uint32_t a, uint32_t b) {
 
 float Vec3Normalize(uint8_t* base, uint32_t out, uint32_t v) {
   ITC_NATIVE_RUNNING("sub_822941B0 Vec3::Normalize");
-  const double y = Lfs(base, v + 4);
+  const V vv(base, v);
+  const V vo(base, out);
+  const double y = double(vv.y());
   const double y2 = Fmuls(y, y);
-  const double x = Lfs(base, v + 0);
-  const double z = Lfs(base, v + 8);
-  const uint32_t one_word = guest::LoadU32(base, kOne);
+  const double x = double(vv.x());
+  const double z = double(vv.z());
+  const uint32_t one_word = G::one_bits(base);
   const double one = double(std::bit_cast<float>(one_word));
   const double squared = Fmadds(z, z, Fmadds(x, x, y2));
   const double length = Fsqrts(squared);
   const double inverse = Fdivs(one, length);
-  Stfs(base, out + 0, Fmuls(inverse, x));
-  Stfs(base, out + 4, Fmuls(inverse, Lfs(base, v + 4)));
-  const double scaled_z = Fmuls(inverse, Lfs(base, v + 8));
-  guest::StoreU32(base, out + 12, one_word);
-  Stfs(base, out + 8, scaled_z);
+  vo.set_x(float(Fmuls(inverse, x)));
+  vo.set_y(float(Fmuls(inverse, double(vv.y()))));
+  const double scaled_z = Fmuls(inverse, double(vv.z()));
+  vo.set_w_bits(one_word);
+  vo.set_z(float(scaled_z));
   return float(length);
 }
 
 float Vec3Direction(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294200 Vec3::Direction");
-  const double bx = Lfs(base, b + 0);
-  const double ax = Lfs(base, a + 0);
-  Stfs(base, out + 0, Fsubs(ax, bx));
-  const double ay = Lfs(base, a + 4);
-  const double by = Lfs(base, b + 4);
+  const V va(base, a);
+  const V vb(base, b);
+  const V vo(base, out);
+  const double bx = double(vb.x());
+  const double ax = double(va.x());
+  vo.set_x(float(Fsubs(ax, bx)));
+  const double ay = double(va.y());
+  const double by = double(vb.y());
   const double y = Fsubs(ay, by);
-  Stfs(base, out + 4, y);
-  const double bz = Lfs(base, b + 8);
-  const double az = Lfs(base, a + 8);
+  vo.set_y(float(y));
+  const double bz = double(vb.z());
+  const double az = double(va.z());
   const double z = Fsubs(az, bz);
-  const double x = Lfs(base, out + 0);
-  const uint32_t one_word = guest::LoadU32(base, kOne);
-  guest::StoreU32(base, out + 12, one_word);
-  Stfs(base, out + 8, z);
+  const double x = double(vo.x());
+  const uint32_t one_word = G::one_bits(base);
+  vo.set_w_bits(one_word);
+  vo.set_z(float(z));
   const double squared = Fmadds(z, z, Fmadds(x, x, Fmuls(y, y)));
   const double length = Fsqrts(squared);
   const double inverse = Fdivs(double(std::bit_cast<float>(one_word)), length);
-  Stfs(base, out + 0, Fmuls(inverse, x));
-  Stfs(base, out + 4, Fmuls(inverse, y));
-  Stfs(base, out + 8, Fmuls(inverse, z));
+  vo.set_x(float(Fmuls(inverse, x)));
+  vo.set_y(float(Fmuls(inverse, y)));
+  vo.set_z(float(Fmuls(inverse, z)));
   return float(length);
 }
 
@@ -305,13 +323,13 @@ float Vec3NormalizeSelf(uint8_t* base, uint32_t v) {
 
 void Vec3Sum(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_822942A0 Vec3::Sum");
-  CopyWord(base, kZero, out + 12);
+  V(base, out).set_w_bits(G::zero_bits(base));
   Vec3Add(base, out, a, b);
 }
 
 void Vec3Difference(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_822942E0 Vec3::Difference");
-  CopyWord(base, kZero, out + 12);
+  V(base, out).set_w_bits(G::zero_bits(base));
   Vec3Sub(base, out, a, b);
 }
 
@@ -327,7 +345,7 @@ void Vec4ScaleBy(uint8_t* base, uint32_t v, double s) {
 
 float Vec4DivideBy(uint8_t* base, uint32_t v, double s) {
   ITC_NATIVE_RUNNING("sub_82294348 Vec4::DivideBy");
-  const double inverse = Fdivs(Lfs(base, kOne), s);
+  const double inverse = Fdivs(double(G::one(base)), s);
   Vec4ScaleTo(base, v, v, inverse);
   return float(inverse);
 }
@@ -344,64 +362,72 @@ void Vec3AddCopy(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
 
 void Vec4Scaled(uint8_t* base, uint32_t out, uint32_t v, double s) {
   ITC_NATIVE_RUNNING("sub_82294430 Vec4::Scaled");
-  CopyWord(base, kZero, out + 12);
+  V(base, out).set_w_bits(G::zero_bits(base));
   Vec4ScaleTo(base, out, v, s);
 }
 
 void Vec4ScaledFrom(uint8_t* base, uint32_t out, uint32_t v, double s) {
   ITC_NATIVE_RUNNING("sub_82294470 Vec4::ScaledFrom");
-  CopyWord(base, kZero, out + 12);
+  V(base, out).set_w_bits(G::zero_bits(base));
   Vec4ScaleTo(base, out, v, s);
 }
 
 void Vec3ScaledCopy(uint8_t* base, uint32_t out, uint32_t v, double s) {
   ITC_NATIVE_RUNNING("sub_822944B0 Vec3::ScaledCopy");
-  const double x = Fmuls(Lfs(base, v + 0), s);
-  const double y = Fmuls(Lfs(base, v + 4), s);
-  const double z = Fmuls(Lfs(base, v + 8), s);
-  Stfs(base, out + 0, x);
-  Stfs(base, out + 4, y);
-  Stfs(base, out + 8, z);
-  CopyWord(base, kOne, out + 12);
+  const V vv(base, v);
+  const V vo(base, out);
+  const double x = Fmuls(double(vv.x()), s);
+  const double y = Fmuls(double(vv.y()), s);
+  const double z = Fmuls(double(vv.z()), s);
+  vo.set_x(float(x));
+  vo.set_y(float(y));
+  vo.set_z(float(z));
+  vo.set_w_bits(G::one_bits(base));
 }
 
 void Vec3Cross(uint8_t* base, uint32_t out, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_82294518 Vec3::Cross");
-  const double az = Lfs(base, a + 8);
-  const double by = Lfs(base, b + 4);
-  const double bz = Lfs(base, b + 8);
+  const V va(base, a);
+  const V vb(base, b);
+  const V vo(base, out);
+  const double az = double(va.z());
+  const double by = double(vb.y());
+  const double bz = double(vb.z());
   const double t7 = Fmuls(by, az);
-  const double ax = Lfs(base, a + 0);
-  const double ay = Lfs(base, a + 4);
+  const double ax = double(va.x());
+  const double ay = double(va.y());
   const double t6 = Fmuls(ax, bz);
-  const double bx = Lfs(base, b + 0);
+  const double bx = double(vb.x());
   const double t5 = Fmuls(bx, ay);
-  const uint32_t zero = guest::LoadU32(base, kZero);
-  Stfs(base, out + 0, Fmsubs(bz, ay, t7));
-  Stfs(base, out + 4, Fmsubs(bx, az, t6));
-  Stfs(base, out + 8, Fmsubs(ax, by, t5));
-  guest::StoreU32(base, out + 12, zero);
+  const uint32_t zero = G::zero_bits(base);
+  vo.set_x(float(Fmsubs(bz, ay, t7)));
+  vo.set_y(float(Fmsubs(bx, az, t6)));
+  vo.set_z(float(Fmsubs(ax, by, t5)));
+  vo.set_w_bits(zero);
 }
 
 void Vec3Lerp(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, double t) {
   ITC_NATIVE_RUNNING("sub_82294568 Vec3::Lerp");
   // (a - b) x t, in a temporary (the original's two on its stack).
-  const double bx = Lfs(base, b + 0);
-  const double ax = Lfs(base, a + 0);
+  const V va(base, a);
+  const V vb(base, b);
+  const V vo(base, out);
+  const double bx = double(vb.x());
+  const double ax = double(va.x());
   const double dx = Fmuls(Fsubs(ax, bx), t);
-  const double by = Lfs(base, b + 4);
-  const double ay = Lfs(base, a + 4);
+  const double by = double(vb.y());
+  const double ay = double(va.y());
   const double dy = Fmuls(Fsubs(ay, by), t);
-  const double az = Lfs(base, a + 8);
-  const double bz = Lfs(base, b + 8);
+  const double az = double(va.z());
+  const double bz = double(vb.z());
   const double dz = Fmuls(Fsubs(az, bz), t);
   // Then out = a - that (Vec3::Sub's steps, a read again after each store).
-  CopyWord(base, kZero, out + 12);
-  Stfs(base, out + 0, Fsubs(Lfs(base, a + 0), dx));
-  Stfs(base, out + 4, Fsubs(Lfs(base, a + 4), dy));
-  const double z = Fsubs(Lfs(base, a + 8), dz);
-  CopyWord(base, kOne, out + 12);
-  Stfs(base, out + 8, z);
+  vo.set_w_bits(G::zero_bits(base));
+  vo.set_x(float(Fsubs(double(va.x()), dx)));
+  vo.set_y(float(Fsubs(double(va.y()), dy)));
+  const double z = Fsubs(double(va.z()), dz);
+  vo.set_w_bits(G::one_bits(base));
+  vo.set_z(float(z));
 }
 
 float Vec3DotOf(uint8_t* base, uint32_t a, uint32_t b) {
@@ -410,17 +436,17 @@ float Vec3DotOf(uint8_t* base, uint32_t a, uint32_t b) {
 }
 
 Vector LoadVector(uint8_t* base, uint32_t address) {
-  return {std::bit_cast<float>(guest::LoadU32(base, address + 0)),
-          std::bit_cast<float>(guest::LoadU32(base, address + 4)),
-          std::bit_cast<float>(guest::LoadU32(base, address + 8)),
-          std::bit_cast<float>(guest::LoadU32(base, address + 12))};
+  const V v(base, address);
+  return {std::bit_cast<float>(v.x_bits()), std::bit_cast<float>(v.y_bits()),
+          std::bit_cast<float>(v.z_bits()), std::bit_cast<float>(v.w_bits())};
 }
 
 void StoreVector(uint8_t* base, uint32_t address, const Vector& v) {
-  guest::StoreU32(base, address + 0, std::bit_cast<uint32_t>(v.x));
-  guest::StoreU32(base, address + 4, std::bit_cast<uint32_t>(v.y));
-  guest::StoreU32(base, address + 8, std::bit_cast<uint32_t>(v.z));
-  guest::StoreU32(base, address + 12, std::bit_cast<uint32_t>(v.w));
+  const V to(base, address);
+  to.set_x_bits(std::bit_cast<uint32_t>(v.x));
+  to.set_y_bits(std::bit_cast<uint32_t>(v.y));
+  to.set_z_bits(std::bit_cast<uint32_t>(v.z));
+  to.set_w_bits(std::bit_cast<uint32_t>(v.w));
 }
 
 Vector Sub(const Vector& a, const Vector& b) {
@@ -461,8 +487,7 @@ float Dot(const Vector& a, const Vector& b) {
 
 void AddValue(uint8_t* base, uint32_t out, uint32_t a, const Vector& b, bool subtract) {
   const float parts[3] = {b.x, b.y, b.z};
-  AddOrSubSteps(base, out, a, [&parts](uint32_t offset) { return double(parts[offset / 4]); },
-                subtract);
+  AddOrSubSteps(base, out, a, [&parts](uint32_t i) { return double(parts[i]); }, subtract);
 }
 
 }  // namespace vector_library

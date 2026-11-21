@@ -11,6 +11,10 @@
 #include "guest.h"
 #include "location_screen/internal.h"
 #include "race_event/race_event.h"
+#include "schema/career.h"
+#include "schema/race_event.h"
+#include "schema/race_hud_machine.h"
+#include "schema/race_states.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
@@ -21,8 +25,11 @@ using namespace detail;
 
 namespace {
 
-// An item's record in the save data: save + kItemRecords + 12 id.
-uint32_t Record(uint32_t save, int32_t id) { return uint32_t(id) * 12 + save + kItemRecords; }
+// An item's record in the save data (+0x199F8 + 12 id).
+schema::CareerItemRecord Record(uint8_t* base, uint32_t save, int32_t id) {
+  return schema::CareerItemRecord(
+      base, schema::SaveData(base, save).item_records_address() + uint32_t(id) * 12);
+}
 
 // Transition23 and Transition33 (with and without the fade): `lrs` the
 // return addresses of memcpy, FinishNamed and Run.
@@ -36,16 +43,17 @@ uint32_t ResultText(uint8_t* base, uint32_t sp, uint32_t step, const Calls& call
   const uint32_t movie = Movie(base, frame, kMenusMovie);
   if (guest::LoadU32(base, step) == 0) {
     const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-    const uint32_t records = guest::LoadU32(base, kRaceData) + kRacerRecords;
-    const uint32_t human = vehicle_accessors::RacerRecordsAt(base, records, 0xFFFFFFFFu);
+    const uint32_t records = schema::RaceStatesGlobals::race_data(base).results_address();
+    const schema::RacerResultsRecord human(
+        base, vehicle_accessors::RacerRecordsAt(base, records, 0xFFFFFFFFu));
     const uint32_t id =
-        guest::LoadU32(base, vehicle_accessors::RacerRecordsAt(base, records, 0) + 980);
+        schema::RacerResultsRecord(base, vehicle_accessors::RacerRecordsAt(base, records, 0))
+            .e1_item();
     Copy(base, calls, frame, lrs.copy, frame + 96, data_tables::Item(base, id), 3008);
-    const uint32_t owner =
-        guest::LoadU16(base, frame + 184) == 3 ? guest::LoadU32(base, human + 980) : id;
+    const uint32_t owner = guest::LoadU16(base, frame + 184) == 3 ? human.e1_item() : id;
     uint32_t k = 12;
-    if (int32_t(guest::LoadU32(base, human + 3924)) == 1) {
-      if (guest::LoadU16(base, Record(save, int32_t(owner)) + 2) != 1) {
+    if (int32_t(human.finish()) == 1) {
+      if (Record(base, save, int32_t(owner)).wins() != 1) {
         k = 11;
       } else {
         k = 10;
@@ -123,7 +131,7 @@ uint32_t Transition7(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
     const uint32_t entry = G::list_menu(base).cursor() * 12 + frame + 96;
     const uint32_t index = guest::LoadU32(base, entry + 8);
     const uint32_t table = guest::LoadU32(base, entry + 4);
-    const uint32_t e56 = data_tables::Entry56(base, table, index);
+    const schema::CareerEntry56 e56(base, data_tables::Entry56(base, table, index));
     const uint32_t location = Screen(base).location_index();
     guest::StoreU32(base, entry, 1);
     const uint32_t cursor = G::list_menu(base).cursor();
@@ -138,14 +146,13 @@ uint32_t Transition7(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
       guest::StoreU16(base, save + 6076, 0);
     }
     if (marked) {
-      career::ItemFlagsSet(base, save, guest::LoadU32(base, e56 + 48),
-                           guest::LoadU32(base, e56 + 52));
+      career::ItemFlagsSet(base, save, e56.unknown_48(), e56.unknown_52());
     }
     const uint32_t text = uint32_t(KindText(table, index));
     FinishNamed(calls, frame, 0x8222AF4C, movie,
                 G::list_menu(base).cursor() + 52);
     ui_movies::Play(base, movie, 0xFFFFFFFFu, 8, 0, 0, 0, 0);
-    SetText(base, calls, frame, movie, 4, 1, guest::LoadU32(base, e56 + 12) + 4650);
+    SetText(base, calls, frame, movie, 4, 1, e56.text() + 4650);
     SetText(base, calls, frame, movie, 4, 2, text);
     HideNode(base, movie, 4, 0);
     FinishNamed(calls, frame, 0x8222AFB4, movie, 5);
@@ -186,11 +193,10 @@ uint32_t ShowOpponentPictures(uint8_t* base, uint32_t sp, const Calls& calls) {
     Copy(base, calls, frame, 0x8222B2E4, frame + 128, item, 3008);
     ShowNode(base, movie, 14, i);
     const int32_t id = int16_t(guest::LoadU16(base, frame + 128));
-    const bool won = int16_t(guest::LoadU16(base, Record(save, id) + 2)) != 0;
+    const bool won = int16_t(Record(base, save, id).wins()) != 0;
     bool owned = false;
     uint32_t texture;
-    if (!won && guest::LoadU16(base, Record(save, id) + 4) == 0 &&
-        guest::LoadU16(base, Record(save, id)) == 0) {
+    if (!won && Record(base, save, id).outcome3() == 0 && Record(base, save, id).losses() == 0) {
       texture = 0;
     } else if (!won) {
       texture = 1;
@@ -218,7 +224,7 @@ uint32_t ShowOpponentPictures(uint8_t* base, uint32_t sp, const Calls& calls) {
       if (next == -1) {
         break;
       }
-      if (guest::LoadU16(base, Record(save, next) + 2) == 0) {
+      if (Record(base, save, next).wins() == 0) {
         r3 = ui_movies::SetNodeTexture(base, ui_movies::FindNode(base, movie, 14, child), 1);
         break;
       }

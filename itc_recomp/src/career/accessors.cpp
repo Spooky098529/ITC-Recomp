@@ -8,7 +8,10 @@
 #include "data_tables/data_tables.h"
 #include "guest.h"
 #include "race_world/race_world.h"
+#include "schema/car_makers.h"
 #include "schema/career.h"
+#include "schema/garage_screen.h"
+#include "schema/race_event.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
@@ -73,7 +76,9 @@ void ItemFlagsSet(uint8_t* base, uint32_t save, uint32_t zero, uint32_t id) {
 
 uint32_t CarSpecWord744(uint8_t* base, uint32_t car) {
   ITC_NATIVE_RUNNING("sub_821104B0 Car::SpecWord744");
-  return guest::LoadU32(base, car_specs::GetCarSpec(base, guest::LoadU32(base, car + 12)) + 744);
+  return schema::CarSpec(base,
+                         car_specs::GetCarSpec(base, schema::CarMakersCar(base, car).car_id()))
+      .price();
 }
 
 namespace {
@@ -205,9 +210,8 @@ uint32_t AnyWonKind3Stage1(uint8_t* base) {
   const uint32_t records =
       CareerSave(base, vehicle_accessors::SaveDataOf(base, 0)).item_records_address();
   for (uint32_t id = 0; id < 400; id++) {
-    const uint32_t item = data_tables::Item(base, id);
-    if (guest::LoadU16(base, item + 42) == 1 && guest::LoadU8(base, item + 36) == 0 &&
-        guest::LoadU8(base, item + 35) == 3 &&
+    const schema::OpponentItem item(base, data_tables::Item(base, id));
+    if (item.level() == 1 && item.location() == 0 && item.kind() == 3 &&
         schema::CareerItemRecord(base, records + 12 * id).wins() != 0) {
       return 1;
     }

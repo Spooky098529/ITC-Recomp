@@ -18,7 +18,9 @@
 #include "hooks/models.h"
 #include "hooks/scene_models.h"
 #include "scene/scene.h"
+#include "schema/accessories.h"
 #include "schema/car_draw.h"
+#include "schema/models.h"
 #include "schema/scene.h"
 
 #include <optional>
@@ -105,7 +107,7 @@ ITC_REGS_STEP(SceneStartTeardownA) {
 
 ITC_REGS_STEP(SceneStartTeardown) {
   // ReleaseAll runs only when the scene exists.
-  const uint32_t set = guest::LoadU32(base, accessories::kSet);
+  const uint32_t set = schema::AccessoriesGlobals::set(base).address;
   if (schema::SceneGlobals::scene(base).address != 0 &&
       (set == 0 || !ITC_FLAG(native_accessories) || !AccessoriesNativeLoads() ||
        !ModelsNativeLifetime() || !accessories::SetReleasable(base, set))) {
@@ -306,7 +308,7 @@ ITC_REGS_STEP(SceneOnFileLoaded) {
       ctx.r4.u64 = 0;
       ctx.r5.u64 = xpr;
       ctx.lr = 0x820C5340;
-      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
+      lifted::CallFromContext(ctx, base, schema::TextureProvider(base, provider).vtable().set());
       return ctx.r3.u64;
     };
     calls.tga_create = [&](uint32_t header, uint32_t size, uint32_t buffer_at, uint32_t pixels) {

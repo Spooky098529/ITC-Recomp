@@ -11,7 +11,10 @@
 #include "models/memory_blocks.h"
 #include "models/xpr.h"
 #include "race_overlays/race_overlays.h"
+#include "schema/boot_mode.h"
+#include "schema/camera_modes.h"
 #include "schema/game_modes.h"
+#include "schema/race_overlays.h"
 
 #include <cstdlib>
 
@@ -186,18 +189,19 @@ void StateMachineConstruct(uint8_t* base, uint32_t machine) {
 
 void ModeConstruct(uint8_t* base, uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_82106C20 Mode::Mode");
-  guest::StoreU32(base, mode + 0, kModeVtableIntermediate);
-  guest::StoreU32(base, mode + 4, 0);
-  const uint32_t delegate = mode + 8;
+  const schema::GameMode m(base, mode);
+  m.set_vtable(kModeVtableIntermediate);
+  m.set_delegate_ptr(0);
+  const uint32_t delegate = m.delegate_vtable_address();
   uint32_t pointer = 0;
   if (delegate != 0) {
     pointer = delegate;
-    guest::StoreU32(base, delegate, kDefaultDelegateVtable);
+    schema::ModeDelegate(base, delegate).set_vtable(kDefaultDelegateVtable);
   }
-  guest::StoreU32(base, mode + 4, pointer);
-  guest::StoreU32(base, mode + 32, kModeVtable32);
-  guest::StoreU32(base, mode + 0, kModeVtable);
-  guest::StoreU32(base, mode + 32, kModeVtable32);
+  m.set_delegate_ptr(pointer);
+  m.set_vtable32(kModeVtable32);
+  m.set_vtable(kModeVtable);
+  m.set_vtable32(kModeVtable32);
 }
 
 namespace {
@@ -215,8 +219,10 @@ void ForEachOverlay(uint8_t* base, uint32_t machine, Each each) {
   }
 }
 
-void StoreInOverlay(uint8_t* base, uint32_t slot, uint32_t offset, uint32_t value) {
-  guest::StoreU32(base, guest::LoadU32(base, slot) + offset, value);
+// The overlay in the slot (race-overlays.toml's CarOverlays), the slot read
+// again for each store.
+schema::CarOverlays OverlayIn(uint8_t* base, uint32_t slot) {
+  return schema::CarOverlays(base, guest::LoadU32(base, slot));
 }
 
 }  // namespace
@@ -224,25 +230,25 @@ void StoreInOverlay(uint8_t* base, uint32_t slot, uint32_t offset, uint32_t valu
 void OverlaysSetFlags(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_8215DD58 RaceOverlaysMachine::SetFlags");
   ForEachOverlay(base, machine, [&](uint32_t slot) {
-    StoreInOverlay(base, slot, 820, 1);
-    StoreInOverlay(base, slot, 824, 1);
+    OverlayIn(base, slot).set_unknown_820(1);
+    OverlayIn(base, slot).set_unknown_824(1);
   });
 }
 
 void OverlaysClearFlags(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_8215DD90 RaceOverlaysMachine::ClearFlags");
   ForEachOverlay(base, machine, [&](uint32_t slot) {
-    StoreInOverlay(base, slot, 820, 0);
-    StoreInOverlay(base, slot, 824, 0);
-    StoreInOverlay(base, slot, 828, 0);
+    OverlayIn(base, slot).set_unknown_820(0);
+    OverlayIn(base, slot).set_unknown_824(0);
+    OverlayIn(base, slot).set_unknown_828(0);
   });
 }
 
 void OverlaysSetFlag820(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_8215DDD0 RaceOverlaysMachine::SetFlag820");
   ForEachOverlay(base, machine, [&](uint32_t slot) {
-    StoreInOverlay(base, slot, 820, 1);
-    StoreInOverlay(base, slot, 824, 0);
+    OverlayIn(base, slot).set_unknown_820(1);
+    OverlayIn(base, slot).set_unknown_824(0);
   });
 }
 
@@ -250,9 +256,9 @@ void OverlaysReset(uint8_t* base, uint32_t machine,
                    const std::function<void(uint32_t overlay, uint32_t target)>& reset) {
   ITC_NATIVE_RUNNING("sub_8215DE10 RaceOverlaysMachine::ResetOverlays");
   ForEachOverlay(base, machine, [&](uint32_t slot) {
-    const uint32_t overlay = guest::LoadU32(base, slot);
-    reset(overlay, guest::LoadU32(base, guest::LoadU32(base, overlay) + 12));
-    StoreInOverlay(base, slot, 828, 1);
+    const schema::CarOverlays overlay = OverlayIn(base, slot);
+    reset(overlay.address, schema::OverlayVtable(base, overlay.vtable()).reset());
+    OverlayIn(base, slot).set_unknown_828(1);
   });
 }
 
@@ -262,14 +268,16 @@ constexpr uint32_t kMember67760Vtable = 0x820093C4;
 constexpr uint32_t kMember13360Vtable = 0x820093BC;
 constexpr uint32_t kMember43136Vtable = 0x82006B24;
 
-// The 1.0s the camera modes' objects start with: from +44 to +252 and +284
-// to +332, every 16 bytes (the w words of their matrices, probably).
-void StoreOnes(uint8_t* base, uint32_t object, uint32_t one) {
-  for (uint32_t offset = 44; offset <= 252; offset += 16) {
-    guest::StoreU32(base, object + offset, one);
+// The 1.0s the camera modes' objects start with, in their target tracker
+// (camera-modes.toml's CameraTarget, at +32 in every camera): from +12 to
+// +220 and +252 to +300, every 16 bytes (the w words of its vectors and
+// matrices; the camera's +44 to +252 and +284 to +332).
+void StoreOnes(uint8_t* base, uint32_t tracker, uint32_t one) {
+  for (uint32_t offset = 12; offset <= 220; offset += 16) {
+    guest::StoreU32(base, tracker + offset, one);
   }
-  for (uint32_t offset = 284; offset <= 332; offset += 16) {
-    guest::StoreU32(base, object + offset, one);
+  for (uint32_t offset = 252; offset <= 300; offset += 16) {
+    guest::StoreU32(base, tracker + offset, one);
   }
 }
 // 1.0 in .rdata, the w words' value, loaded as its bits.
@@ -281,59 +289,66 @@ void Member67760Construct(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82155D90 Member67760::Member67760");
   // The original loads the float and stores it back as a single (the same
   // bits for the constant 1.0).
+  const schema::IntroCamera c(base, object);
   const uint32_t one = LoadOne(base);
-  guest::StoreU32(base, object + 16, 0);
-  guest::StoreU32(base, object + 20, 0);
-  StoreOnes(base, object, one);
-  guest::StoreU32(base, object + 0, kMember67760Vtable);
-  guest::StoreU32(base, object + 748, 0);
-  guest::StoreU32(base, object + 752, 0);
-  guest::StoreU32(base, object + 756, 2);
+  c.set_vehicle(0);
+  c.set_viewport(0u);
+  StoreOnes(base, c.tracker_address(), one);
+  c.set_vtable(kMember67760Vtable);
+  c.set_shot(0);
+  c.set_frames(0);
+  c.set_phase(2);
+  // The shots' List16 (camera-modes.md): the 16 nodes' (next, previous)
+  // halfwords, then the list's head words after them.
+  const uint32_t shots = c.shots_address();
   for (uint32_t i = 0; i < 16; i++) {
-    guest::StoreU16(base, object + 352 + 4 * i + 2, uint16_t(i));
-    guest::StoreU16(base, object + 352 + 4 * i, uint16_t(i + 1));
+    guest::StoreU16(base, shots + 4 * i + 2, uint16_t(i));
+    guest::StoreU16(base, shots + 4 * i, uint16_t(i + 1));
   }
-  guest::StoreU16(base, object + 416, 0);
-  guest::StoreU16(base, object + 424, 0);
-  guest::StoreU16(base, object + 412, 0xFFFF);
-  guest::StoreU16(base, object + 420, 0xFFFF);
-  guest::StoreU16(base, object + 422, 0xFFFF);
-  guest::StoreU16(base, object + 418, 0xFFFF);
+  guest::StoreU16(base, shots + 64, 0);
+  guest::StoreU16(base, shots + 72, 0);
+  guest::StoreU16(base, shots + 60, 0xFFFF);
+  guest::StoreU16(base, shots + 68, 0xFFFF);
+  guest::StoreU16(base, shots + 70, 0xFFFF);
+  guest::StoreU16(base, shots + 66, 0xFFFF);
 }
 
 void Member13360Construct(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82155118 Member13360::Member13360");
+  const schema::TvCamera c(base, object);
   const uint32_t one = LoadOne(base);
-  guest::StoreU32(base, object + 16, 0);
-  guest::StoreU32(base, object + 20, 0);
-  StoreOnes(base, object, one);
-  guest::StoreU32(base, object + 0, kMember13360Vtable);
-  guest::StoreU32(base, object + 396, one);
-  guest::StoreU32(base, object + 412, one);
-  guest::StoreU32(base, object + 428, one);
+  c.set_vehicle(0);
+  c.set_viewport(0u);
+  StoreOnes(base, c.tracker_address(), one);
+  c.set_vtable(kMember13360Vtable);
+  // The 1.0's bits stored as a word, as the original's single store.
+  guest::StoreU32(base, c.eye_w_address(), one);
+  guest::StoreU32(base, c.target_w_address(), one);
+  guest::StoreU32(base, c.unknown_416_w_address(), one);
   for (uint32_t i = 0; i < 4; i++) {
     const schema::CameraPathBuffer buffer(base,
-                                          object + kBuffers28 + schema::CameraPathBuffer::kSize * i);
+                                          c.buffers_address() + schema::CameraPathBuffer::kSize * i);
     buffer.set_index(0xFFFFFFFF);
     buffer.set_vtable(schema::CameraPathBuffer::kVtable);
     buffer.set_serial(0xFFFFFFFF);
     buffer.set_block(0);
     buffer.set_state(0);
   }
-  const uint32_t inner = object + 43136;
-  guest::StoreU32(base, inner + 16, 0);
-  guest::StoreU32(base, inner + 20, 0);
-  guest::StoreU32(base, inner + 44, one);
-  guest::StoreU32(base, inner + 0, kMember43136Vtable);
-  StoreOnes(base, inner, one);
-  guest::StoreU32(base, inner + 364, one);
+  const schema::ChaseCamera inner(base, c.fallback_address());
+  inner.set_vehicle(0);
+  inner.set_viewport(0u);
+  guest::StoreU32(base, schema::CameraTarget(base, inner.tracker_address()).position_w_address(),
+                  one);
+  inner.set_vtable(kMember43136Vtable);
+  StoreOnes(base, inner.tracker_address(), one);
+  guest::StoreU32(base, inner.unknown_364_address(), one);
   const uint32_t word = G::tv_camera_range_count(base);
-  guest::StoreU32(base, object + 360, 0xFFFFFFFF);
-  guest::StoreU32(base, object + 448, 0);
-  guest::StoreU32(base, object + 452, word);
+  c.set_spot(0xFFFFFFFF);
+  c.set_paused(0);
+  c.set_range_count(word);
   // Each buffer reset (Buffer28::Reset; with no block yet, nothing freed).
   for (uint32_t i = 0; i < 4; i++) {
-    Buffer28Reset(base, object + kBuffers28 + schema::CameraPathBuffer::kSize * i);
+    Buffer28Reset(base, c.buffers_address() + schema::CameraPathBuffer::kSize * i);
   }
 }
 
@@ -373,7 +388,8 @@ uint32_t Buffer28Destroy(uint8_t* base, uint32_t buffer) {
 
 bool Buffers28Freeable(uint8_t* base, uint32_t object) {
   for (uint32_t i = 0; i < 4; i++) {
-    if (!Buffer28Freeable(base, object + kBuffers28 + schema::CameraPathBuffer::kSize * i)) {
+    if (!Buffer28Freeable(base, schema::TvCamera(base, object).buffers_address() +
+                                    schema::CameraPathBuffer::kSize * i)) {
       return false;
     }
   }
@@ -384,7 +400,8 @@ uint32_t Buffers28Destroy(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82106A00 Buffers28::~Buffers28");
   uint32_t r3 = 0;
   for (int32_t i = 3; i >= 0; i--) {
-    r3 = Buffer28Destroy(base, object + kBuffers28 + schema::CameraPathBuffer::kSize * uint32_t(i));
+    r3 = Buffer28Destroy(base, schema::TvCamera(base, object).buffers_address() +
+                                   schema::CameraPathBuffer::kSize * uint32_t(i));
   }
   return r3;
 }
@@ -403,8 +420,15 @@ void XprHolderConstruct(uint8_t* base, uint32_t object) {
 
 namespace {
 
+// The camera director's vtable (camera-modes.toml's CameraDirector has no
+// field at +0 yet).
 constexpr uint32_t kRaceModeMemberVtable = 0x82006B60;
-constexpr uint32_t kRaceModeMemberBuffers = 13360;
+
+// The XPR holder in the director's cutscene's rival logo (its +20).
+schema::XprHolder RivalLogoHolder(uint8_t* base, const schema::CameraDirector& d) {
+  const schema::Cutscene cutscene(base, d.cutscene_address());
+  return schema::XprHolder(base, schema::RivalLogo(base, cutscene.rival_logo_address()).holder_address());
+}
 
 }  // namespace
 
@@ -413,11 +437,11 @@ std::optional<uint32_t> RaceModeMemberDestruct(uint8_t* base, uint32_t member) {
   // What XPR::~XPR and the buffers' destructors would leave to the
   // originals, before anything changes: room for the XPR's two nodes, and
   // each buffer's block the layer's pages (or none).
-  if (!models::PendingFreesHaveRoom(base, 2) ||
-      !Buffers28Freeable(base, member + kRaceModeMemberBuffers)) {
+  const schema::CameraDirector d(base, member);
+  if (!models::PendingFreesHaveRoom(base, 2) || !Buffers28Freeable(base, d.tv_camera_address())) {
     return std::nullopt;
   }
-  const schema::XprHolder holder(base, member + kRaceModeMemberXprHolder);
+  const schema::XprHolder holder = RivalLogoHolder(base, d);
   guest::StoreU32(base, member + 0, kRaceModeMemberVtable);
   holder.set_record1_word0(0);
   holder.set_record1_word1(0);
@@ -429,7 +453,7 @@ std::optional<uint32_t> RaceModeMemberDestruct(uint8_t* base, uint32_t member) {
     ITC_LOG_ERROR("RaceModeMember::~RaceModeMember: XPR::~XPR refused after its checks");
     std::abort();
   }
-  return Buffers28Destroy(base, member + kRaceModeMemberBuffers);
+  return Buffers28Destroy(base, d.tv_camera_address());
 }
 
 namespace {
@@ -439,20 +463,21 @@ constexpr uint32_t kRecordVtable = 0x82006B34;
 constexpr uint32_t kRecord11856Vtable = 0x82006B2C;
 constexpr uint32_t kRecordBytes = 1104;
 
-// A 1,104-byte record of the member's: +16 and +20 = 0, the 1.0s, its
-// vtable, and 1.0 at +1100.
+// A 1,104-byte view camera of the director's (camera-modes.toml's
+// ViewCamera1 or ViewCamera2): +16 and +20 = 0, the 1.0s, its vtable, and
+// 1.0 at +1100 (the rotation's w).
+template <typename Camera>
 void RecordConstruct(uint8_t* base, uint32_t record, uint32_t vtable, uint32_t one) {
-  guest::StoreU32(base, record + 16, 0);
-  guest::StoreU32(base, record + 20, 0);
-  StoreOnes(base, record, one);
-  guest::StoreU32(base, record + 0, vtable);
-  guest::StoreU32(base, record + 1100, one);
+  const Camera c(base, record);
+  c.set_vehicle(0);
+  c.set_viewport(0u);
+  StoreOnes(base, c.tracker_address(), one);
+  c.set_vtable(vtable);
+  guest::StoreU32(base, c.rotation_w_address(), one);
 }
 
 // The race mode's +32 vtable (its +0 one is schema::RaceMode::kVtable).
 constexpr uint32_t kRaceModeVtable32 = 0x82006D28;
-// The dispatcher's place in every mode (boot-mode.toml's GameMode).
-constexpr uint32_t kModeDispatcher = 36;
 
 void MachineConstruct(uint8_t* base, uint32_t machine) {
   StateMachineConstruct(base, machine);
@@ -467,50 +492,57 @@ void MachineConstruct(uint8_t* base, uint32_t machine) {
 void ModeBaseConstruct(uint8_t* base, uint32_t mode, uint32_t vtable, uint32_t vtable32,
                        bool word848 = false) {
   ModeConstruct(base, mode);
-  const uint32_t dispatcher = mode + kModeDispatcher;
-  guest::StoreU32(base, dispatcher + 200, 0);
+  // The dispatcher at +36 (boot-mode.toml's GameMode, ModeDispatcher).
+  const schema::ModeDispatcher dispatcher(base,
+                                          schema::GameMode(base, mode).handlers_address());
+  dispatcher.set_handler_count(0);
   for (uint32_t i = 0; i < 50 * 3; i++) {
-    guest::StoreU32(base, dispatcher + 204 + 4 * i, 0);
+    guest::StoreU32(base, dispatcher.ring_address() + 4 * i, 0);
   }
-  guest::StoreU32(base, dispatcher + 804, 0);
-  guest::StoreU32(base, dispatcher + 808, 0);
+  dispatcher.set_ring_count(0);
+  dispatcher.set_ring_start(0);
   if (word848) {
     schema::GameModeType6(base, mode).set_word_848(0);
   }
-  guest::StoreU32(base, mode + 0, vtable);
-  guest::StoreU32(base, mode + 32, vtable32);
+  const schema::GameMode m(base, mode);
+  m.set_vtable(vtable);
+  m.set_vtable32(vtable32);
 }
 
 }  // namespace
 
 void Member56896Construct(uint8_t* base, uint32_t object) {
   ITC_NATIVE_RUNNING("sub_82106A50 Member56896::Member56896");
+  const schema::Cutscene c(base, object);
   const uint32_t one = LoadOne(base);
-  guest::StoreU32(base, object + 16, 0);
-  guest::StoreU32(base, object + 20, 0);
-  StoreOnes(base, object, one);
-  guest::StoreU32(base, object + 0, kMember56896Vtable);
-  XprHolderConstruct(base, object + 10780);
+  c.set_vehicle(0);
+  c.set_viewport(0u);
+  StoreOnes(base, c.tracker_address(), one);
+  c.set_vtable(kMember56896Vtable);
+  XprHolderConstruct(base, schema::RivalLogo(base, c.rival_logo_address()).holder_address());
 }
 
 void RaceModeMemberConstruct(uint8_t* base, uint32_t member) {
   ITC_NATIVE_RUNNING("sub_82107168 RaceModeMember::RaceModeMember");
-  MachineConstruct(base, member + 16);
+  const schema::CameraDirector d(base, member);
+  MachineConstruct(base, d.machine_address());
   guest::StoreU32(base, member + 0, kRaceModeMemberVtable);
   // The original loads the 1.0 once (f31) for all its stores.
   const uint32_t one = LoadOne(base);
-  RecordConstruct(base, member + 9648, kRecordVtable, one);
-  RecordConstruct(base, member + 9648 + kRecordBytes, kRecordVtable, one);
-  RecordConstruct(base, member + 11856, kRecord11856Vtable, one);
-  const uint32_t inner = member + 12976;
-  guest::StoreU32(base, inner + 16, 0);
-  guest::StoreU32(base, inner + 20, 0);
-  StoreOnes(base, inner, one);
-  guest::StoreU32(base, inner + 0, kMember43136Vtable);
-  guest::StoreU32(base, inner + 364, one);
-  Member13360Construct(base, member + kRaceModeMemberBuffers);
-  Member56896Construct(base, member + 56896);
-  Member67760Construct(base, member + 67760);
+  RecordConstruct<schema::ViewCamera2>(base, d.view2_camera_address(), kRecordVtable, one);
+  RecordConstruct<schema::ViewCamera2>(base, d.view2_camera2_address(), kRecordVtable, one);
+  RecordConstruct<schema::ViewCamera1>(base, d.view1_camera_address(), kRecord11856Vtable, one);
+  const schema::ChaseCamera inner(base, d.view0_camera_address());
+  inner.set_vehicle(0);
+  inner.set_viewport(0u);
+  StoreOnes(base, inner.tracker_address(), one);
+  inner.set_vtable(kMember43136Vtable);
+  guest::StoreU32(base, inner.unknown_364_address(), one);
+  Member13360Construct(base, d.tv_camera_address());
+  Member56896Construct(base, d.cutscene_address());
+  Member67760Construct(base, d.intro_camera_address());
+  // Not in CameraDirector yet (camera-modes.toml): the 1.0s at +69628, every
+  // 1,104 bytes, and the words at +77376 to +77388.
   for (uint32_t i = 0; i < 8; i++) {
     guest::StoreU32(base, member + 69628 + kRecordBytes * i, one);
   }

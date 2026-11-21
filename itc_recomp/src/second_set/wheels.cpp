@@ -13,6 +13,8 @@
 #include "second_set/morph.h"
 #include "second_set/points.h"
 #include "schema/second_set.h"
+#include "schema/scene_models.h"
+#include "schema/car_draw.h"
 
 namespace second_set {
 
@@ -215,10 +217,10 @@ uint64_t WheelsSetUpTire(uint8_t* base, uint32_t group, uint32_t model, uint32_t
           Record(base, g.tire_records_address() + R * (k + 1)).shape_index());
   }
   const bool front = int32_t(g.tire_front()) != 0;
-  schema::SecondSetWheelsRecord wheels = g.wheels_record();
+  schema::SceneModelsWheelsRecord wheels = g.wheels_record();
   // The record's index, value and float (its +44 or +56 size), or the
   // table's by the car (+1080 on for traffic, kind 3).
-  auto own_index = [&](const schema::SecondSetWheelsRecord& w) {
+  auto own_index = [&](const schema::SceneModelsWheelsRecord& w) {
     return front ? w.front_size_index() : w.rear_size_index();
   };
   uint32_t index, value;
@@ -315,7 +317,7 @@ uint64_t WheelsSetUpBrakes(uint8_t* base, uint32_t group, uint32_t model, uint32
       material_passes::SetTexture(base, model, g.wheels_record().caliper_texture(), -1, sp);
   // The original's epilogue turns the flush mode off either way.
   calls.flush = Flush::kOff;
-  const schema::SecondSetWheelsRecord wheels = g.wheels_record();
+  const schema::SceneModelsWheelsRecord wheels = g.wheels_record();
   if (int32_t(wheels.morph_each_draw()) != 0) {
     return r3;
   }
@@ -359,7 +361,7 @@ uint64_t WheelPointsSetUp(uint8_t* base, uint32_t block, uint32_t stack, WheelCa
   const double f12 = Lfs(base, b.rear_tire_out1_address());
   const double f11 = Lfs(base, b.rear_tire_out2_address());
   calls.flush = Flush::kOff;
-  const bool set_a = int32_t(G::scene<schema::SecondSetSceneRef>(base).model_set()) == 0;
+  const bool set_a = int32_t(G::scene<schema::CarScene>(base).model_set()) == 0;
   const uint32_t loading = b.car_model();
   const Points front(base, set_a ? b.rim_a_front_address() : b.rim_b_front_address());
   const Points rear(base, set_a ? b.rim_a_rear_address() : b.rim_b_rear_address());

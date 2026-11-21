@@ -9,6 +9,7 @@
 #include "camera_modes/steps.h"
 #include "guest.h"
 #include "schema/material_passes.h"
+#include "schema/models.h"
 
 namespace material_passes {
 
@@ -42,15 +43,18 @@ void Copy16(uint8_t* base, uint32_t from, SetXy set_xy, SetZw set_zw) {
 
 uint32_t MaterialTotal(uint8_t* base, uint32_t model, uint64_t shape) {
   ITC_NATIVE_RUNNING("sub_82594AC0 Model::MaterialTotal");
-  const uint32_t block = guest::LoadU32(base, uint32_t(shape * 544 + guest::LoadU32(base, model + 40)) + 396);
-  return guest::LoadU32(base, block);
+  const uint32_t shapes = schema::Model(base, model).shapes().address;
+  const uint32_t block =
+      schema::ModelShape(base, uint32_t(shape * schema::ModelShape::kSize + shapes)).materials().address;
+  return schema::MaterialBlock(base, block).record_count();
 }
 
 uint64_t MaterialAt(uint8_t* base, uint32_t model, uint64_t shape, uint64_t index) {
   ITC_NATIVE_RUNNING("sub_82594B00 Model::MaterialAt");
   const uint64_t offset = uint32_t(index << 9) & 0xFFFFFE00u;
+  const uint32_t shapes = schema::Model(base, model).shapes().address;
   const uint64_t block =
-      guest::LoadU32(base, uint32_t(shape * 544 + guest::LoadU32(base, model + 40)) + 396);
+      schema::ModelShape(base, uint32_t(shape * schema::ModelShape::kSize + shapes)).materials().address;
   return block + offset + 16;
 }
 

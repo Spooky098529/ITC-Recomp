@@ -14,7 +14,11 @@
 #include "data_tables/data_tables.h"
 #include "guest.h"
 #include "race_setup/race_setup.h"
+#include "schema/car_makers.h"
+#include "schema/career.h"
 #include "schema/race_event.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
 #include "strings_and_font/steps.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -30,6 +34,14 @@ using ItemV = schema::OpponentItem;
 using SaveV = schema::SaveData;
 using Spec = schema::CarSpecCopies;
 using Event = schema::RaceEvent;
+using Record = schema::CareerItemRecord;
+using GarageList = schema::CareerGarageList;
+using CarV = schema::CarMakersCar;
+using GarageCarV = schema::GarageCar;
+using Decal = schema::CarMakersCarDecal;
+using Tuning = schema::CarTuning;
+// A tuning word's getter (the tables kinds 41, 42 and the aero test walk).
+using TuningWord = uint32_t (Tuning::*)() const;
 
 int32_t S32(uint32_t v) { return int32_t(v); }
 int32_t LoadS32(uint8_t* base, uint32_t a) { return int32_t(guest::LoadU32(base, a)); }
@@ -38,9 +50,13 @@ int32_t LoadS8(uint8_t* base, uint32_t a) { return int8_t(guest::LoadU8(base, a)
 
 uint32_t Save(uint8_t* base) { return vehicle_accessors::SaveDataOf(base, 0); }
 uint32_t Item(uint8_t* base, uint32_t id) { return data_tables::Item(base, id); }
+// An item's record (save + 0x199F8 + 12 x id).
+Record ItemRecord(uint8_t* base, uint32_t save, uint32_t id) {
+  return Record(base, SaveV(base, save).item_records_address() + Record::kSize * id);
+}
 // An item's record's wins (save + 0x199FA + 12 x id).
 uint32_t Wins(uint8_t* base, uint32_t save, uint32_t id) {
-  return guest::LoadU16(base, SaveV(base, save).item_record_wins_address() + 12 * id);
+  return ItemRecord(base, save, id).wins();
 }
 
 // slw 1, n (n's low 6 bits), sign-extended to 64 bits (extsw).
@@ -87,20 +103,31 @@ uint32_t OneOf(uint8_t* base, uint32_t condition, int32_t value) {
   return 0;
 }
 
+// A garage list node's address (4-byte nodes {+0 the next, +2 the car's
+// slot}; CareerGarageList's nodes) and its car (a GarageCar, 1,968 bytes
+// apart from the list's +212).
+uint32_t GarageNode(const GarageList& list, int32_t index) {
+  return uint32_t(index) * 4 + list.nodes_address();
+}
+uint32_t GarageSlotCar(uint8_t* base, const GarageList& list, uint32_t node) {
+  return uint32_t(int64_t(LoadS16(base, node + 2)) * GarageCarV::kSize) + list.cars_address();
+}
 // The garage's selected car (the save data's +0x19920-th node of the list at
-// +6120 + 204, followed as the original does): the garage + 1,968 x its car
-// (the car record at +212, its id at +224, its tuning at +1860).
+// +6120 + 204, followed as the original does): a GarageCar (a car object's
+// head: its id at +12, its tuning at +1648).
 uint32_t GarageCar(uint8_t* base, uint32_t save) {
   const SaveV sv(base, save);
-  const uint32_t garage = sv.garage_address();
+  const GarageList list(base, sv.garage_address());
   uint32_t n = sv.selected_car();
-  uint32_t node = uint32_t(int16_t(sv.garage_head())) * 4 + garage;
+  uint32_t node = GarageNode(list, int16_t(sv.garage_head()));
   while (n != 0) {
-    node = uint32_t(LoadS16(base, node + 0)) * 4 + garage;
+    node = GarageNode(list, LoadS16(base, node + 0));
     n--;
   }
-  return uint32_t(int64_t(LoadS16(base, node + 2)) * 1968) + garage;
+  return GarageSlotCar(base, list, node);
 }
+// A car object's tuning (+1648, a CarTuning; CarMakersCar names no field there).
+constexpr uint32_t kCarTuning = 1648;
 uint32_t RaceData(uint8_t* base) { return G::race_data(base).address; }
 
 // The car's spec sheet: the garage car's (Params::GetCarSpec + 640) when
@@ -108,8 +135,8 @@ uint32_t RaceData(uint8_t* base) { return G::race_data(base).address; }
 // none.
 uint32_t CarSpec(uint8_t* base) {
   if (car_specs::Exists(base) != 0) {
-    const uint32_t car = GarageCar(base, Save(base));
-    const uint32_t spec = car_specs::GetCarSpec(base, guest::LoadU32(base, car + 224));
+    const CarV car(base, GarageCar(base, Save(base)));
+    const uint32_t spec = car_specs::GetCarSpec(base, car.car_id());
     return spec == 0 ? 0 : spec + 640;
   }
   const uint32_t race = RaceData(base);
@@ -118,11 +145,11 @@ uint32_t CarSpec(uint8_t* base) {
   }
   return vehicle_accessors::ObjectRecord1888(race + 48);
 }
-// The car's tuning: the garage car's +1860 when Params::Exists, else the
+// The car's tuning: the garage car's +1648 when Params::Exists, else the
 // race data's +1696 (its first racer's car +1648).
 uint32_t CarTuning(uint8_t* base) {
   if (car_specs::Exists(base) != 0) {
-    return GarageCar(base, Save(base)) + 1860;
+    return GarageCar(base, Save(base)) + kCarTuning;
   }
   return RaceData(base) + 1696;
 }
@@ -270,9 +297,9 @@ uint32_t Save4908(uint8_t* base, uint32_t c) {
 // An item's record's three halfwords summed, to 16 bits.
 int32_t RecordSum(uint8_t* base, uint32_t save, uint32_t id) {
   // (id + 8746) x 12 + the save data: the item's record.
-  const uint32_t record = SaveV(base, save).item_records_address() + 12 * id;
-  return int16_t(uint16_t(guest::LoadU16(base, record + 0) + LoadS16(base, record + 2) +
-                          LoadS16(base, record + 4)));
+  const Record record = ItemRecord(base, save, id);
+  return int16_t(uint16_t(record.losses() + int16_t(record.wins()) +
+                          int16_t(record.outcome3())));
 }
 
 uint32_t RacedAll(uint8_t* base, uint32_t c) {
@@ -322,7 +349,7 @@ uint32_t WinCount(uint8_t* base, uint32_t c) {
   }
   const uint32_t save = Save(base);
   const uint32_t id = uint32_t(cv.arg0());
-  return LoadS16(base, SaveV(base, save).item_record_wins_address() + 12 * id) >= cv.arg1() ? 1
+  return int16_t(ItemRecord(base, save, id).wins()) >= cv.arg1() ? 1
                                                                                             : 0;
 }
 
@@ -412,7 +439,7 @@ uint32_t RecordWord6(uint8_t* base, uint32_t c) {
   }
   const uint32_t save = Save(base);
   const uint32_t id = uint32_t(cv.arg0());
-  return LoadS16(base, SaveV(base, save).item_record_rival_wins_address() + 12 * id) >= cv.arg1()
+  return int16_t(ItemRecord(base, save, id).rival_wins()) >= cv.arg1()
              ? 1
              : 0;
 }
@@ -452,11 +479,11 @@ uint32_t CarIs(uint8_t* base, uint32_t c) {
   ITC_NATIVE_RUNNING("sub_82141060 EventCondition::CarIs");
   int32_t id;
   if (car_specs::Exists(base) != 0) {
-    id = LoadS32(base, GarageCar(base, Save(base)) + 224);
+    id = S32(CarV(base, GarageCar(base, Save(base))).car_id());
   } else {
     // The race data's first racer record (+48; sub_82106540 on it does
     // nothing), its +12.
-    id = LoadS32(base, RaceData(base) + 48 + 12);
+    id = S32(schema::RaceData(base, RaceData(base)).record0_place());
   }
   return OneOf(base, c, id);
 }
@@ -473,7 +500,7 @@ uint32_t CarSpec129(uint8_t* base, uint32_t c) {
 uint32_t Tuning4(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82141248 EventCondition::Tuning4");
   const uint32_t t = CarTuning(base);
-  return t != 0 && guest::LoadU32(base, t + 4) == 1 ? 1 : 0;
+  return t != 0 && Tuning(base, t).spec_flag() == 1 ? 1 : 0;
 }
 
 uint32_t EngineType7(uint8_t* base) {
@@ -508,11 +535,15 @@ uint32_t Spec92(uint8_t* base) {
 
 uint32_t CarFloat(uint8_t* base, uint32_t c) {
   ITC_NATIVE_RUNNING("sub_821415F0 EventCondition::CarFloat");
-  return FloatAtLeast(base, c, guest::LoadFloat(base, GarageCar(base, Save(base)) + 2104));
+  return FloatAtLeast(base, c, GarageCarV(base, GarageCar(base, Save(base))).racer_float());
 }
 
-// The tuning words kinds 41 and 42 test.
-constexpr uint32_t kParts[] = {8, 16, 24, 28, 32, 36, 40, 48, 56, 60, 68, 76};
+// The tuning words kinds 41 and 42 test (+8 to +76).
+constexpr TuningWord kParts[] = {
+    &Tuning::engine_stage,  &Tuning::power_part_a,  &Tuning::power_part_b,
+    &Tuning::nitrous,       &Tuning::drivetrain_32, &Tuning::drivetrain_36,
+    &Tuning::drivetrain_40, &Tuning::drivetrain_48, &Tuning::lsd_b,
+    &Tuning::body_level,    &Tuning::front_tire_grade, &Tuning::rear_tire_grade};
 
 uint32_t StockParts(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82141738 EventCondition::StockParts");
@@ -520,8 +551,9 @@ uint32_t StockParts(uint8_t* base) {
   if (t == 0) {
     return 0;
   }
-  for (uint32_t offset : kParts) {
-    if (guest::LoadU32(base, t + offset) != 0) {
+  const Tuning tuning(base, t);
+  for (TuningWord word : kParts) {
+    if ((tuning.*word)() != 0) {
       return 0;
     }
   }
@@ -538,49 +570,51 @@ uint32_t PartsAtLeast(uint8_t* base, uint32_t c) {
   if (a < 0) {
     return 0;
   }
-  for (uint32_t offset : kParts) {
-    if (LoadS32(base, t + offset) < a) {
+  const Tuning tuning(base, t);
+  for (TuningWord word : kParts) {
+    if (S32((tuning.*word)()) < a) {
       return 0;
     }
   }
   return 1;
 }
 
-uint32_t TuningAtLeast(uint8_t* base, uint32_t c, uint32_t offset) {
+uint32_t TuningAtLeast(uint8_t* base, uint32_t c, TuningWord word) {
   const uint32_t t = CarTuning(base);
   if (t == 0) {
     return 0;
   }
-  return EveryArgument(base, c, [&](int32_t a) { return LoadS32(base, t + offset) >= a; }) ? 1 : 0;
+  const Tuning tuning(base, t);
+  return EveryArgument(base, c, [&](int32_t a) { return S32((tuning.*word)()) >= a; }) ? 1 : 0;
 }
 uint32_t Tuning60(uint8_t* base, uint32_t c) {
   ITC_NATIVE_RUNNING("sub_82141990 EventCondition::Tuning60");
-  return TuningAtLeast(base, c, 60);
+  return TuningAtLeast(base, c, &Tuning::body_level);
 }
 uint32_t Tuning24(uint8_t* base, uint32_t c) {
   ITC_NATIVE_RUNNING("sub_82141A60 EventCondition::Tuning24");
-  return TuningAtLeast(base, c, 24);
+  return TuningAtLeast(base, c, &Tuning::power_part_b);
 }
 
-uint32_t TuningSet(uint8_t* base, uint32_t offset) {
+uint32_t TuningSet(uint8_t* base, TuningWord word) {
   const uint32_t t = CarTuning(base);
-  return t != 0 && guest::LoadU32(base, t + offset) != 0 ? 1 : 0;
+  return t != 0 && (Tuning(base, t).*word)() != 0 ? 1 : 0;
 }
 uint32_t Tuning128(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82141B30 EventCondition::Tuning128");
-  return TuningSet(base, 128);
+  return TuningSet(base, &Tuning::aero_8);
 }
 uint32_t Tuning148(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82141BD0 EventCondition::Tuning148");
-  return TuningSet(base, 148);
+  return TuningSet(base, &Tuning::exterior_item_3);
 }
 uint32_t Tuning144(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82141C70 EventCondition::Tuning144");
-  return TuningSet(base, 144);
+  return TuningSet(base, &Tuning::exterior_item_1);
 }
 uint32_t Tuning28(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82142070 EventCondition::Tuning28");
-  return TuningSet(base, 28);
+  return TuningSet(base, &Tuning::nitrous);
 }
 
 uint32_t AeroFitted(uint8_t* base) {
@@ -589,8 +623,11 @@ uint32_t AeroFitted(uint8_t* base) {
   if (t == 0) {
     return 0;
   }
-  for (uint32_t offset : {96u, 100u, 104u, 108u, 112u, 120u, 124u, 128u, 132u}) {
-    if (guest::LoadU32(base, t + offset) != 0) {
+  const Tuning tuning(base, t);
+  for (TuningWord word : {&Tuning::aero_0, &Tuning::aero_1, &Tuning::aero_2, &Tuning::aero_3,
+                          &Tuning::bonnet, &Tuning::aero_6, &Tuning::aero_7, &Tuning::aero_8,
+                          &Tuning::aero_9}) {
+    if ((tuning.*word)() != 0) {
       return 1;
     }
   }
@@ -602,12 +639,12 @@ uint32_t Tuning108(uint8_t* base) {
   uint32_t spec = 0;
   uint32_t t;
   if (car_specs::Exists(base) != 0) {
-    const uint32_t car = GarageCar(base, Save(base)) + 212;
-    const uint32_t sheet = car_specs::GetCarSpec(base, guest::LoadU32(base, car + 12));
+    const CarV car(base, GarageCar(base, Save(base)));
+    const uint32_t sheet = car_specs::GetCarSpec(base, car.car_id());
     if (sheet != 0) {
       spec = sheet + 640;
     }
-    t = car + 1648;
+    t = car.address + kCarTuning;
   } else {
     const uint32_t race = RaceData(base);
     if (race == 0) {
@@ -619,7 +656,7 @@ uint32_t Tuning108(uint8_t* base) {
   if (spec == 0 || t == 0) {
     return 0;
   }
-  const int32_t v = LoadS32(base, t + 108);
+  const int32_t v = S32(Tuning(base, t).aero_3());
   if (Spec(base, spec).spec_120() == 0) {
     return v != 0 ? 1 : 0;
   }
@@ -632,8 +669,10 @@ uint32_t Tuning64To76(uint8_t* base) {
   if (t == 0) {
     return 0;
   }
-  for (uint32_t offset : {64u, 68u, 72u, 76u}) {
-    if (guest::LoadU32(base, t + offset) != 0) {
+  const Tuning tuning(base, t);
+  for (TuningWord word : {&Tuning::front_tire_type, &Tuning::front_tire_grade,
+                          &Tuning::rear_tire_type, &Tuning::rear_tire_grade}) {
+    if ((tuning.*word)() != 0) {
       return 0;
     }
   }
@@ -643,7 +682,7 @@ uint32_t Tuning64To76(uint8_t* base) {
 uint32_t Tuning80Not88(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82141FC8 EventCondition::Tuning80Not88");
   const uint32_t t = CarTuning(base);
-  return t != 0 && guest::LoadU32(base, t + 80) != guest::LoadU32(base, t + 88) ? 1 : 0;
+  return t != 0 && Tuning(base, t).front_wheel() != Tuning(base, t).rear_wheel() ? 1 : 0;
 }
 
 uint32_t Tuning184(uint8_t* base) {
@@ -652,8 +691,10 @@ uint32_t Tuning184(uint8_t* base) {
   if (t == 0) {
     return 0;
   }
-  for (uint32_t k = 0; k < 5; k++) {
-    const int32_t v = LoadS32(base, t + 168 + 16 + 12 * k);
+  const Tuning tuning(base, t);
+  for (TuningWord word : {&Tuning::choice0_c, &Tuning::choice1_c, &Tuning::choice2_c,
+                          &Tuning::choice3_c, &Tuning::choice4_c}) {
+    const int32_t v = S32((tuning.*word)());
     if (v > 0 && v < 5) {
       return 1;
     }
@@ -663,13 +704,14 @@ uint32_t Tuning184(uint8_t* base) {
 
 uint32_t Decals(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821421D8 EventCondition::Decals");
-  const uint32_t at = GarageCar(base, Save(base)) + 308;
+  // The car's decals (+96): decal k's image, then decal k + 3's.
+  const uint32_t at = CarV(base, GarageCar(base, Save(base))).decals_address();
   if (at == 0) {
     return 0;
   }
   for (uint32_t k = 0; k < 3; k++) {
-    const uint32_t p = at + 120 + 32 * k;
-    if (LoadS32(base, p - 96) >= 0 || LoadS32(base, p) >= 0) {
+    if (S32(Decal(base, at + Decal::kSize * k).image()) >= 0 ||
+        S32(Decal(base, at + Decal::kSize * (k + 3)).image()) >= 0) {
       return 1;
     }
   }
@@ -682,30 +724,26 @@ uint32_t Tuning116(uint8_t* base) {
   if (t == 0) {
     return 0;
   }
-  const int32_t v = LoadS32(base, t + 116);
+  const int32_t v = S32(Tuning(base, t).bonnet_color_kind());
   return v == 1 || v == 2 ? 1 : 0;
 }
 
 uint32_t Car1588(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82142328 EventCondition::Car1588");
-  const uint32_t at = GarageCar(base, Save(base)) + 212 + 1588;
-  for (uint32_t k = 0; k < 3; k++) {
-    if (guest::LoadU32(base, at + 20 * k) != 0) {
-      return 1;
-    }
-  }
-  return 0;
+  const CarV car(base, GarageCar(base, Save(base)));
+  return car.layer0_a() != 0 || car.layer1_a() != 0 || car.layer2_a() != 0 ? 1 : 0;
 }
 
 uint32_t Sticker101(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_821423C0 EventCondition::Sticker101");
-  const uint32_t at = GarageCar(base, Save(base)) + 500;
+  // The forty decals after the first six (+288): eight runs of five.
+  const uint32_t at = CarV(base, GarageCar(base, Save(base))).decals_address() + Decal::kSize * 6;
   if (at == 0) {
     return 0;
   }
   for (uint32_t run = 0; run < 8; run++) {
     for (uint32_t k = 0; k < 5; k++) {
-      if (LoadS32(base, at + 24 + 160 * run + 32 * k) == 101) {
+      if (S32(Decal(base, at + Decal::kSize * (5 * run + k)).image()) == 101) {
         return 1;
       }
     }
@@ -715,7 +753,7 @@ uint32_t Sticker101(uint8_t* base) {
 
 uint32_t CarBytes(uint8_t* base, uint32_t c) {
   ITC_NATIVE_RUNNING("sub_82142558 EventCondition::CarBytes");
-  const uint32_t at = GarageCar(base, Save(base)) + 1780;
+  const uint32_t at = CarV(base, GarageCar(base, Save(base))).setting_bytes_address();
   const uint32_t value = uint32_t(Cond(base, c).arg0());
   if (at == 0 || value > 9) {
     return 0;
@@ -740,7 +778,9 @@ uint32_t CarBytes(uint8_t* base, uint32_t c) {
 
 uint32_t Setting88(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_82142648 EventCondition::Setting88");
-  const uint32_t at = GarageCar(base, Save(base)) + 228;
+  // The car's +16 (the original's base), then its bytes +88 and +89
+  // (CarMakersCar names no field there).
+  const uint32_t at = CarV(base, GarageCar(base, Save(base))).address + 16;
   if (at == 0) {
     return 0;
   }
@@ -756,17 +796,16 @@ uint32_t GarageCount(uint8_t* base, uint32_t c) {
 uint32_t SameCars(uint8_t* base, uint32_t c) {
   ITC_NATIVE_RUNNING("sub_821426D8 EventCondition::SameCars");
   const SaveV sv(base, Save(base));
-  const uint32_t garage = sv.garage_address();
+  const GarageList list(base, sv.garage_address());
   const int32_t count = int16_t(sv.garage_count());
-  const uint32_t head = uint32_t(int16_t(sv.garage_head())) * 4 + garage;
-  // The n-th car of the list, its id (+224).
+  const uint32_t head = GarageNode(list, int16_t(sv.garage_head()));
+  // The n-th car of the list, its id (+12).
   const auto id_at = [&](uint32_t n) {
     uint32_t node = head;
     for (; n != 0; n--) {
-      node = uint32_t(LoadS16(base, node + 0)) * 4 + garage;
+      node = GarageNode(list, LoadS16(base, node + 0));
     }
-    const uint32_t car = uint32_t(int64_t(LoadS16(base, node + 2)) * 1968) + garage;
-    return LoadS32(base, car + 224);
+    return S32(CarV(base, GarageSlotCar(base, list, node)).car_id());
   };
   int32_t most = 0;
   for (int32_t i = 0; i < count; i++) {

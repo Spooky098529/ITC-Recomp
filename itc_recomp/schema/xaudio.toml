@@ -1,0 +1,548 @@
+# The schema of docs/functions/xaudio.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# XAudio's engine and voices (the game's own copy of XAudio, translated):
+# the engine at [0x82954F08], the voices' base and the voice with outputs,
+# the source and submix voices, the output buffers, the descriptions and
+# formats the voices are made from, and the out words XAudio's functions
+# write. Names from docs/functions/xaudio.md, docs/known-data.md ("XAudio
+# voice", "XAudio source voice", "XAudio submix voice", "XAudio output
+# buffer", `0x82954F08`) and the hand port (src/xaudio/voices.h).
+#
+# Measure faults (tools/type_map.py), each kept as a field with its own
+# name and a note so every access fits:
+# - a voice's vtable taken for the voice itself (the voice's +0 "points to a
+#   voice"): its slot loads land on the voice (XAudioVoice's vt_* fields),
+#   and the same for the codec, the allocator, the output targets and
+#   matrices (their `.+0` types are the vtables);
+# - the voices' descriptions joined with the voices (XAudioVoice::BaseSize,
+#   OutputsSize, XAudioSourceVoice::Init and Size, XAudioSubmixVoice's
+#   Describe): the desc_* fields;
+# - XAudioEngine::Init's and Size's parameters and Barrier's 8-byte barrier
+#   joined with the engine (the params_* and barrier fields);
+# - XAudio::WaitForVoice's engine joined with the source voice description
+#   ("XAudio", the engine_* fields of XAudioSourceDescription);
+# - XAudioObject::Free's object (a voice: slot +12 of the voices' vtable)
+#   taken for the factory object (xaudio-objects.toml's XAudioObject): its
+#   +0 and +8 parts are described here (the voice's vtable and allocator).
+#
+# Types here other areas also describe (the lead merges them):
+# XAudioVoiceAllocator and its vtable are xaudio-engine.toml's
+# XAudioBumpAllocator (and xaudio-objects.toml's XAudioAllocator);
+# XAudioMeterView and XAudioMeterHistoryView are xaudio-objects.toml's
+# VolumeMeter and MeterHistory met through sub_825A5E28 (the meter's levels,
+# from the effects' code; lifted, not read in detail).
+
+# The voices' base (docs/known-data.md, "XAudio voice"; XAudioVoice::Construct
+# sub_82461500) and the voice with outputs over it (vtable 0x8204A998, +68
+# on). The source voice (148 bytes) and the submix voice (80) add their own
+# words after +76.
+[XAudioVoice]
+measures = ["XAudioVoice", "sub_8245FB00.r3"]
+size = 88
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8204A6CC then 0x8204AA00 (the base), 0x8204A998 (with outputs), 0x8204A720 source, 0x8204A870 submix; the root's 0x8204A6B8 once destroyed" },
+  { name = "desc_channels", offset = 1, type = "u8", note = "measure fault: XAudioVoice::BaseSize's r3 is the voice description (+1 its channels)" },
+  { name = "ref_count", offset = 4, type = "u32" },
+  { name = "allocator", offset = 8, type = "ptr", to = "XAudioBumpAllocator" },
+  { name = "type", offset = 12, type = "u8", note = "0 source, 1 submix, 2 mastering" },
+  { name = "vt_free", offset = 12, type = "u32", note = "measure fault: the vtable's slot +12 (XAudioObject::Free), read through the voice; also BaseSize's description +12 (the buffer)" },
+  { name = "node_next", offset = 16, type = "u32", note = "the voice's node in its stage's list (the stage's +8 says 16)" },
+  { name = "node_prev", offset = 20, type = "u32" },
+  { name = "active_next", offset = 24, type = "u32", note = "the voice's node in the active list (+40 of its stage)" },
+  { name = "desc_output_count", offset = 24, type = "u8", note = "measure fault: OutputsSize's r3 is the voice description (+24 the outputs)" },
+  { name = "desc_output_channels", offset = 25, type = "u8", note = "measure fault: OutputsSize's description (+25 the outputs' channels)" },
+  { name = "active_prev", offset = 28, type = "u32" },
+  { name = "buffer", offset = 32, type = "u32", note = "the output buffer's interface (the buffer + 8)" },
+  { name = "effects", offset = 36, type = "u32", note = "the effect entries (XAudioEffectEntry, 8 bytes each)" },
+  { name = "output_uses", offset = 40, type = "u32", note = "how many voices output to this one while playing" },
+  { name = "callback", offset = 44, type = "fn", note = "called every pass with a pointer to its context" },
+  { name = "callback_context", offset = 48, type = "u32" },
+  { name = "format", offset = 52, type = "u32", note = "the voice's format (8 bytes, XAudioVoiceFormat): its first word" },
+  { name = "format_type", offset = 52, type = "u8" },
+  { name = "channels", offset = 53, type = "u8" },
+  { name = "rate", offset = 56, type = "u32", note = "48,000" },
+  { name = "effect_count", offset = 60, type = "u8" },
+  { name = "vt_stop", offset = 60, type = "u32", note = "measure fault: the vtable's slot +60 (stop), read through the voice" },
+  { name = "flags", offset = 61, type = "u8", note = "bit 0 playing, bit 2 stopping (the tail), bit 6 a start pending" },
+  { name = "tail", offset = 62, type = "u16", note = "the effects' tail in passes (the largest effect's)" },
+  { name = "tail_left", offset = 64, type = "u16", note = "passes left of the tail while stopping" },
+  { name = "output_slots", offset = 68, type = "u8", note = "the outputs allowed (the description's +24)" },
+  { name = "output_count", offset = 69, type = "u8", note = "the outputs set" },
+  { name = "outputs", offset = 72, type = "ptr", to = "XAudioOutputSlot", note = "12 bytes an output; also the vtable's slot +72 (the input buffer) read through the voice" },
+  { name = "stage", offset = 76, type = "u8", note = "a submix voice's stage (its list in the engine's +124)" },
+  { name = "vt_activate", offset = 76, type = "u32", note = "measure fault: the vtable's slot +76 (join the active list), read through the voice" },
+  { name = "vt_deactivate", offset = 80, type = "u32", note = "measure fault: the vtable's slot +80, read through the voice" },
+  { name = "vt_pass", offset = 84, type = "u32", note = "measure fault: the vtable's slot +84 (the voice's pass), read through the voice" },
+]
+
+# The voices' vtable as XAudioObject::Free (slot +12) meets it.
+[XAudioVoiceVtable]
+measure = "XAudioObject.+0"
+size = 4
+origin = "image"
+fields = [
+  { name = "deleting_destructor", offset = 0, type = "fn" },
+]
+
+# A source voice (148 bytes, vtable 0x8204A720; XAudioSourceVoice::XAudioSourceVoice
+# sub_8245E6A8): the voice with outputs, then the codec, the source format,
+# the volume and the category.
+[XAudioSourceVoice]
+measures = ["XAudioSourceVoice", "XAudioSourceVoice::XAudioSourceVoice.ret"]
+size = 148
+origin = "allocated"
+vtable = 0x8204A720
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "XAudioSourceVoiceVtable" },
+  { name = "desc_category", offset = 56, type = "u8", note = "measure fault: XAudioSourceVoice::Init's r4 is its description (+56 the category)" },
+  { name = "desc_codec_byte", offset = 59, type = "u8", note = "measure fault: the description's +59 (the codec description's +68)" },
+  { name = "desc_codec_float", offset = 60, type = "f32", note = "measure fault: the description's +60 (the codec description's +64)" },
+  { name = "flags", offset = 61, type = "u8", note = "the voice's flags (XAudioVoice)" },
+  { name = "desc_codec_flag", offset = 64, type = "u8", note = "measure fault: the description's +64 (the codec description's +69)" },
+  { name = "codec", offset = 76, type = "ptr", to = "XAudioCodec", note = "the codec's effect entry (8 bytes): +76 the object, PCM or XMA by the format's id" },
+  { name = "desc_codec_word_a", offset = 80, type = "u32", note = "measure fault: the description's +80 (the codec description's +72)" },
+  { name = "format", offset = 84, type = "bytes", count = 56, note = "the 56-byte source format (also the description's +84 and +88 by the measure's join)" },
+  { name = "format_id", offset = 88, type = "u32" },
+  { name = "volume", offset = 140, type = "f32", note = "1.0 at first" },
+  { name = "category", offset = 144, type = "u8", note = "0 or 1 (the engine's category volumes)" },
+]
+
+# The source voice's vtable (0x8204A720; docs/functions/xaudio.md's intro).
+[XAudioSourceVoiceVtable]
+measures = ["XAudioSourceVoice.+0", "XAudioSourceVoice::XAudioSourceVoice.ret.+0"]
+size = 96
+origin = "image"
+fields = [
+  { name = "free", offset = 12, type = "fn", note = "XAudioObject::Free" },
+  { name = "apply_volume", offset = 92, type = "fn" },
+]
+
+# XAudioSourceCodec: merged into xaudio-objects.toml's XAudioCodec at the integration (the same object).
+
+# The codec's outer vtable, as the source voice calls it.
+[XAudioSourceCodecVtable]
+measure = "XAudioSourceVoice.+76.+0"
+size = 100
+origin = "image"
+fields = [
+  { name = "release", offset = 4, type = "fn" },
+  { name = "submit_packet", offset = 28, type = "fn" },
+  { name = "reset", offset = 32, type = "fn" },
+  { name = "get_state", offset = 44, type = "fn", note = "bit 0 playing, bit 2 done" },
+  { name = "stop", offset = 52, type = "fn" },
+  { name = "set_volume", offset = 88, type = "fn" },
+  { name = "set_frequency_ratio", offset = 96, type = "fn" },
+]
+
+# A submix voice (80 bytes, vtable 0x8204A870; XAudioSubmixVoice::XAudioSubmixVoice
+# sub_8245F298): the voice with outputs, then its stage.
+[XAudioSubmixVoice]
+measures = ["XAudioSubmixVoice", "XAudioSubmixVoice::XAudioSubmixVoice.ret"]
+size = 80
+origin = "allocated"
+vtable = 0x8204A870
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "XAudioSubmixVoiceVtable" },
+  { name = "desc_channels", offset = 1, type = "u8", note = "measure fault: XAudioSubmixVoice::Describe's r3 is its description (+1 the channels)" },
+  { name = "desc_output_count", offset = 8, type = "u8", note = "measure fault: the description's +8" },
+  { name = "desc_output_channels", offset = 9, type = "u8", note = "measure fault: the description's +9" },
+  { name = "desc_effect_chain", offset = 12, type = "u32", note = "measure fault: the description's +12" },
+  { name = "desc_output_voices", offset = 16, type = "u32", note = "measure fault: the description's +16" },
+  { name = "desc_callback", offset = 20, type = "u32", note = "measure fault: the description's +20" },
+  { name = "desc_callback_context", offset = 24, type = "u32", note = "measure fault: the description's +24" },
+  { name = "buffer", offset = 32, type = "u32", note = "the output buffer's interface (the buffer + 8)" },
+  { name = "flags", offset = 61, type = "u8", note = "the voice's flags (XAudioVoice)" },
+  { name = "stage", offset = 76, type = "u8", note = "its stage: the list in the engine's +124" },
+]
+
+# The submix voice's vtable (0x8204A870).
+[XAudioSubmixVoiceVtable]
+measure = "XAudioSubmixVoice::XAudioSubmixVoice.ret.+0"
+size = 16
+origin = "image"
+fields = [
+  { name = "free", offset = 12, type = "fn", note = "XAudioObject::Free" },
+]
+
+# The source voice's description (the game's: the car sounds', XACT's): the
+# 56-byte source format, then the voice's settings (XAudioSourceVoice::Describe
+# and the codec's description in SourceSize and SourceInit read them).
+[XAudioSourceDescription]
+measure = "XAudio"
+size = 92
+origin = "embedded"
+fields = [
+  { name = "format", offset = 0, type = "bytes", count = 56, note = "the source format (+0 its type: 0-3 PCM, 4 XMA; +12 + 8i an XMA stream's channels)" },
+  { name = "format_type", offset = 0, type = "u8" },
+  { name = "format_channels", offset = 4, type = "u8", note = "the channels, or an XMA format's stream count" },
+  { name = "category", offset = 56, type = "u8" },
+  { name = "output_count", offset = 57, type = "u8", note = "1 when 0" },
+  { name = "output_channels", offset = 58, type = "u8", note = "6 when 0" },
+  { name = "codec_byte", offset = 59, type = "u8", note = "the codec description's +68" },
+  { name = "codec_float", offset = 60, type = "f32", note = "the codec description's +64" },
+  { name = "codec_flag", offset = 64, type = "u8", note = "the codec description's +69" },
+  { name = "effect_chain", offset = 68, type = "ptr", to = "XAudioEffectChain" },
+  { name = "output_voices", offset = 72, type = "ptr", to = "XAudioOutputList" },
+  { name = "callback", offset = 76, type = "fn" },
+  { name = "codec_word_a", offset = 80, type = "u32", note = "the codec description's +72" },
+  { name = "codec_word_b", offset = 84, type = "u32", note = "the codec description's +76" },
+  { name = "callback_context", offset = 88, type = "u32", note = "also the codec description's +4" },
+  { name = "engine_working_voices", offset = 144, type = "u32", note = "measure fault: XAudio::WaitForVoice's engine (+144 the voices the mixer works on)" },
+  { name = "engine_mixer_thread", offset = 300, type = "u32", note = "measure fault: WaitForVoice's engine (+300 the mixer's thread)" },
+]
+
+# The submix voice's description (XAudioSubmixVoice::Describe's r4).
+[XAudioSubmixDescription]
+measure = "XAudioSubmixVoice::XAudioSubmixVoice.r4"
+size = 28
+origin = "embedded"
+fields = [
+  { name = "channels", offset = 1, type = "u8" },
+  { name = "output_count", offset = 8, type = "u8", note = "1 when 0" },
+  { name = "output_channels", offset = 9, type = "u8", note = "6 when 0" },
+  { name = "stage", offset = 10, type = "u8" },
+  { name = "effect_chain", offset = 12, type = "ptr", to = "XAudioEffectChain" },
+  { name = "output_voices", offset = 16, type = "ptr", to = "XAudioOutputList" },
+  { name = "callback", offset = 20, type = "fn" },
+  { name = "callback_context", offset = 24, type = "u32" },
+]
+
+# The 32-byte voice description both voices are made from (the source's
+# and the submix's Describe write it; InitBase and InitOutputs read it).
+[XAudioVoiceDescription]
+measures = ["XAudioSubmixVoice::Describe.r4", "XAudioSourceVoice::Describe.r4", "XAudioVoice::InitBase.r4", "XAudioVoice::InitOutputs.r4"]
+size = 32
+origin = "embedded"
+fields = [
+  { name = "format", offset = 0, type = "u32", note = "the voice format (8 bytes, XAudioVoiceFormat): its first word" },
+  { name = "format_type", offset = 0, type = "u8", note = "0" },
+  { name = "channels", offset = 1, type = "u8" },
+  { name = "rate", offset = 4, type = "u32", note = "48,000" },
+  { name = "effect_chain", offset = 8, type = "ptr", to = "XAudioEffectChain" },
+  { name = "buffer", offset = 12, type = "u32", note = "an output buffer's interface to share (the source's: the engine's first), 0 for the voice's own" },
+  { name = "callback", offset = 16, type = "fn" },
+  { name = "callback_context", offset = 20, type = "u32" },
+  { name = "output_count", offset = 24, type = "u8" },
+  { name = "output_channels", offset = 25, type = "u8" },
+  { name = "output_voices", offset = 28, type = "ptr", to = "XAudioOutputList" },
+]
+
+# A voice format (8 bytes): a voice's +52, the descriptions' +0.
+[XAudioVoiceFormat]
+measures = ["XAudio::SourceOutputFormat.r4", "XAudioVoice::GetFormat.r4", "XAudioVoice::SetFormatWords.r4", "XAudioSubmixVoice::SetFormat.r4"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "head", offset = 0, type = "u32", note = "the first word (copied as a word)" },
+  { name = "type", offset = 0, type = "u8", note = "0" },
+  { name = "channels", offset = 1, type = "u8" },
+  { name = "rate", offset = 4, type = "u32", note = "48,000" },
+]
+
+# An effect chain: a count and the effects' class ids (4 bytes each).
+[XAudioEffectChain]
+measures = ["XAudioVoice::CreateEffects.r4", "XAudioVoice::InitBase.r4.+8"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "count", offset = 0, type = "u8" },
+  { name = "ids", offset = 4, type = "u32", note = "the class ids, a word each" },
+]
+
+# The output voices to set (XAudioVoice::SetOutputVoices's r4): a count and
+# 8-byte entries (+0 the target voice, 0 the mastering voice; +4 its matrix
+# levels, 0 the default).
+[XAudioOutputList]
+measure = "XAudioVoice::SetOutputVoices_82460BF0.r4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "count", offset = 0, type = "u8" },
+  { name = "entries", offset = 4, type = "u32" },
+]
+
+# The output matrices to set (XAudioVoice::SetOutputMatrices's r4): a count
+# and 8-byte entries (XAudioOutputMatrixEntry).
+[XAudioOutputMatrices]
+measure = "XAudioVoice::SetOutputMatrices.r4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "count", offset = 0, type = "u8" },
+  { name = "entries", offset = 4, type = "u32" },
+]
+
+# One of them: the output's index and its levels.
+[XAudioOutputMatrixEntry]
+measure = "XAudioVoice::SetOutputMatrices.r4.+4"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "output", offset = 0, type = "u8" },
+  { name = "levels", offset = 4, type = "u32" },
+]
+
+# A matrix's levels (XAudio::DefaultMatrix writes one): a count and the
+# entries' table.
+[XAudioMatrixLevels]
+measure = "XAudio::DefaultMatrix.r5"
+size = 8
+origin = "embedded"
+fields = [
+  { name = "count", offset = 0, type = "u8" },
+  { name = "table", offset = 4, type = "u32", note = "in the default matrices at 0x8204A7B8" },
+]
+
+# An effect entry (8 bytes, a voice's +36; the source voice's codec at +76).
+[XAudioEffectEntry]
+measures = ["XAudioVoice::CreateObject.r4", "XAudioVoice::ProcessEffect.r4"]
+size = 8
+origin = "embedded"
+fields = [
+  { name = "object", offset = 0, type = "ptr", to = "XAudioEffectObject" },
+  { name = "index", offset = 4, type = "u8", note = "the effect's index (255 for a codec or matrix)" },
+  { name = "enabled", offset = 5, type = "u8", note = "bit 0" },
+  { name = "flags", offset = 6, type = "u8", note = "the object's info byte (4 a codec, 6 a matrix or the reverb, 1 the meter): how the pass hands it the buffers" },
+]
+
+# The effect's object as CreateObject and ProcessEffect meet it (a factory
+# object, xaudio-objects.toml's XAudioObject).
+[XAudioEffectObject]
+measures = ["XAudioVoice::CreateObject.r4.+0", "XAudioVoice::ProcessEffect.r4.+0"]
+size = 28
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "vt_info", offset = 8, type = "u32", note = "measure fault: the vtable's slot +8 (the info), read through the object" },
+  { name = "vt_process", offset = 24, type = "u32", note = "measure fault: the vtable's slot +24 (the pass), read through the object" },
+]
+
+# An output slot (12 bytes, the voice's +72).
+[XAudioOutputSlot]
+measure = "XAudioVoice.+72"
+size = 12
+origin = "allocated"
+fields = [
+  { name = "target", offset = 0, type = "ptr", to = "XAudioOutputTarget", note = "the voice output to (AddRef'd)" },
+  { name = "matrix", offset = 4, type = "ptr", to = "XAudioMatrix", note = "the matrix object (the factory's class 1)" },
+]
+
+# An output's target voice as SetOutput meets it.
+[XAudioOutputTarget]
+measure = "XAudioVoice.+72.+0"
+size = 68
+origin = "allocated"
+fields = [
+  { name = "vtable", offset = 0, type = "u32" },
+  { name = "vt_get_output_format", offset = 64, type = "u32", note = "measure fault: the vtable's slot +64, read through the voice" },
+]
+
+# XAudioOutputMatrix: merged into xaudio-objects.toml's XAudioMatrix at the integration (the same object).
+
+[XAudioOutputMatrixVtable]
+measure = "XAudioVoice.+72.+4.+0"
+size = 44
+origin = "image"
+fields = [
+  { name = "process", offset = 24, type = "fn", note = "the pass: mixes the voice's buffer into the target's" },
+  { name = "set_levels", offset = 40, type = "fn" },
+]
+
+# XAudioVoiceAllocator: merged into xaudio-engine.toml's XAudioBumpAllocator at the integration (the same object).
+
+[XAudioVoiceAllocatorVtable]
+measures = ["XAudioVoice.+8.+0", "XAudioObject.+8.+0", "XAudioBuffer::XAudioBuffer.r5.+0", "XAudioBuffer::Create.r4.+0"]
+size = 24
+origin = "image"
+fields = [
+  { name = "add_ref", offset = 0, type = "fn" },
+  { name = "release", offset = 4, type = "fn" },
+  { name = "alloc", offset = 20, type = "fn" },
+]
+
+# The word an allocator is written to (XAudio::DefaultAllocator's out,
+# GetAllocator's in and out).
+[XAudioAllocatorOut]
+measures = ["XAudio::DefaultAllocator.r5", "XAudio::GetAllocator.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "allocator", offset = 0, type = "ptr", to = "XAudioBumpAllocator" },
+]
+
+# XAudio's engine (372 bytes at [0x82954F08]; docs/known-data.md, `0x82954F08`;
+# XAudioEngine::XAudioEngine sub_8245C098, xaudio-engine.md).
+[XAudioEngine]
+measure = "XAudioEngine"
+size = 372
+origin = "allocated"
+vtable = 0x8204A6CC
+fields = [
+  { name = "vtable", offset = 0, type = "u32", note = "0x8204A6CC then 0x8204A6E0" },
+  { name = "barrier", offset = 0, type = "u64", note = "measure fault: XAudioEngine::Barrier's r4 is a stage barrier (8 bytes, a byte a processor; the engine's +356 or +364)" },
+  { name = "params_channels", offset = 0, type = "u8", note = "measure fault: XAudioEngine::Init's and Size's r4 are the init parameters (+0 the output channels)" },
+  { name = "params_stages", offset = 1, type = "u8", note = "measure fault: the parameters' +1 (the submix stage count)" },
+  { name = "params_processors", offset = 2, type = "u8", note = "measure fault: the parameters' +2 (the processors' mask)" },
+  { name = "ref_count", offset = 4, type = "u32", note = "also the parameters' +4 (Init, Size)" },
+  { name = "allocator", offset = 8, type = "ptr", to = "XAudioBumpAllocator" },
+  { name = "mix_buffers", offset = 12, type = "bytes", count = 48, note = "two output buffers' interfaces a processor (+12 + 8i)" },
+  { name = "factory", offset = 60, type = "u32", note = "the object factory's interface (the factory + 8)" },
+  { name = "mastering_voice", offset = 64, type = "ptr", to = "XAudioVoice", note = "every voice's default output" },
+  { name = "pending_next", offset = 68, type = "u32", note = "the voices whose start is pending: a list head" },
+  { name = "pending_prev", offset = 72, type = "u32" },
+  { name = "pending_node_offset", offset = 76, type = "u32", note = "the node's offset in the voice" },
+  { name = "source_stage", offset = 80, type = "bytes", count = 44, note = "the source voices' stage (44 bytes, xaudio-engine.toml's XAudioStage)" },
+  { name = "source_next", offset = 80, type = "u32" },
+  { name = "source_prev", offset = 84, type = "u32" },
+  { name = "source_node_offset", offset = 88, type = "u32" },
+  { name = "source_list_a_next", offset = 92, type = "u32" },
+  { name = "source_list_a_prev", offset = 96, type = "u32" },
+  { name = "source_list_a_offset", offset = 100, type = "u32" },
+  { name = "source_list_b_next", offset = 104, type = "u32" },
+  { name = "source_list_b_prev", offset = 108, type = "u32" },
+  { name = "source_list_b_offset", offset = 112, type = "u32" },
+  { name = "source_to_mix", offset = 116, type = "u32", note = "the list to mix (+92 or +104)" },
+  { name = "source_mixed", offset = 120, type = "u32", note = "the list mixed (the active list)" },
+  { name = "submix_stages", offset = 124, type = "u32", note = "the submix stages (44 bytes each, past a count word)" },
+  { name = "submix_stage_count", offset = 128, type = "u8" },
+  { name = "category_volumes", offset = 132, type = "f32", note = "the two categories' volumes (+132, +136)" },
+  { name = "category_volume_1", offset = 136, type = "f32" },
+  { name = "changed_categories", offset = 140, type = "u32", note = "a bit a category whose volume changed" },
+  { name = "working_voices", offset = 144, type = "bytes", count = 24, note = "the six voices the mixer is working on" },
+  { name = "callbacks", offset = 168, type = "bytes", count = 128, note = "the processing callbacks: 2 stages x 8 slots of 8 bytes (the function, its context)" },
+  { name = "current_voice", offset = 296, type = "u32", note = "the voice being processed" },
+  { name = "mixer_thread", offset = 300, type = "u32", note = "the mixer's thread during a mix ([r13 + 256])" },
+  { name = "processor_count", offset = 304, type = "u32" },
+  { name = "processor_threads", offset = 308, type = "bytes", count = 24, note = "the processor threads' handles (+308 + 4i)" },
+  { name = "workers", offset = 332, type = "bytes", count = 24, note = "+332 + 4 x the processor: its worker thread" },
+  { name = "stage_barriers", offset = 356, type = "bytes", count = 16, note = "two 8-byte barriers (a byte a processor)" },
+]
+
+# An output buffer (36 bytes, vtable 0x8204A8CC; XAudioBuffer::XAudioBuffer
+# sub_8245F750).
+[XAudioBuffer]
+measures = ["XAudioBuffer", "XAudioBuffer::XAudioBuffer.ret"]
+size = 36
+origin = "allocated"
+vtable = 0x8204A8CC
+fields = [
+  { name = "vtable", offset = 0, type = "ptr", to = "XAudioBufferVtable" },
+  { name = "desc_kind", offset = 0, type = "u8", note = "measure fault: XAudioBuffer::Size's r3 is the buffer description (+0 its kind)" },
+  { name = "ref_count", offset = 4, type = "u32" },
+  { name = "desc_channels", offset = 5, type = "u8", note = "measure fault: the description's +5" },
+  { name = "kind", offset = 8, type = "u8", note = "0 samples of its own, else external samples" },
+  { name = "desc_rate", offset = 8, type = "u32", note = "measure fault: the description's +8" },
+  { name = "capacity_format", offset = 12, type = "u32", note = "the format it was made for (8 bytes): its first word" },
+  { name = "capacity_channels", offset = 13, type = "u8" },
+  { name = "capacity_rate", offset = 16, type = "u32" },
+  { name = "current", offset = 20, type = "u32", note = "the format in use (12 bytes with the rate and the samples, GetFormat's): its first word" },
+  { name = "current_type", offset = 20, type = "u8" },
+  { name = "current_channels", offset = 21, type = "u8", note = "the channels in use" },
+  { name = "current_rate", offset = 24, type = "u32", note = "48,000" },
+  { name = "samples", offset = 28, type = "u32", note = "256 frames at the rate x the channels, floats, 128-byte aligned" },
+  { name = "extra", offset = 32, type = "u32", note = "the description's +16 (not read further)" },
+]
+
+[XAudioBufferVtable]
+measure = "XAudioBuffer::XAudioBuffer.ret.+0"
+size = 24
+origin = "image"
+fields = [
+  { name = "get_interface", offset = 20, type = "fn" },
+]
+
+# The 20-byte description a buffer is made from (BufferCreate's, at a frame).
+[XAudioBufferDescription]
+measure = "XAudioBuffer::XAudioBuffer.r4"
+size = 20
+origin = "embedded"
+fields = [
+  { name = "kind", offset = 0, type = "u8", note = "0 samples of its own" },
+  { name = "format", offset = 4, type = "u32", note = "the voice format (8 bytes): its first word" },
+  { name = "channels", offset = 5, type = "u8" },
+  { name = "rate", offset = 8, type = "u32" },
+  { name = "samples", offset = 12, type = "u32", note = "external samples (kind not 0)" },
+  { name = "extra", offset = 16, type = "u32", note = "to the buffer's +32" },
+]
+
+# XAudioVoiceSizeOut: merged into xaudio-engine.toml's XAudioSizeOut at the integration (the same object).
+
+# A voice out word (the voices' create functions').
+[XAudioVoiceOut]
+measures = ["XAudioCreateSourceVoice.r4", "XAudioCreateSubmixVoice.r4", "XAudioVoice::CreateSource.r5", "XAudioVoice::CreateSubmix.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "voice", offset = 0, type = "u32" },
+]
+
+# A word out (GetCallbackContext's).
+[XAudioWordOut]
+measure = "XAudioVoice::GetCallbackContext.r4"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u32" },
+]
+
+# A byte out (the type, a voice's state, an effect's enabled bit).
+[XAudioByteOut]
+measures = ["XAudioVoice::GetType.r4", "XAudioSourceVoice::GetState.r4", "XAudioSubmixVoice::GetState.r4", "XAudioVoice::GetEffectEnabled.r5"]
+size = 1
+origin = "embedded"
+fields = [
+  { name = "value", offset = 0, type = "u8" },
+]
+
+# The buffer word a pass hands on (ProcessEffect's and MixToOutputs's
+# in and out: the output buffer's samples).
+[XAudioBufferInOut]
+measures = ["XAudioVoice::MixToOutputs.r4", "XAudioVoice::ProcessEffect.r5"]
+size = 4
+origin = "embedded"
+fields = [
+  { name = "buffer", offset = 0, type = "u32" },
+]
+
+# XAudioMeterView: merged into xaudio-objects.toml's VolumeMeter at the integration (the same object).
+
+# XAudioMeterHistoryView: merged into xaudio-objects.toml's MeterHistory at the integration (the same object).
+
+[XAudioMeterLevelsOut]
+measure = "sub_825A5E28.r6"
+size = 4
+origin = "embedded"
+fields = [
+  { name = "levels", offset = 0, type = "ptr", to = "XAudioMeterLevels" },
+]
+
+# The meter's levels sub_825A5E28 writes (not read in detail).
+[XAudioMeterLevels]
+measure = "sub_825A5E28.r6.+0"
+size = 104
+origin = "embedded"
+fields = [
+  { name = "channels", offset = 0, type = "u32", note = "probably (written last)" },
+  { name = "history_slot", offset = 4, type = "u32", note = "the meter's +24" },
+  { name = "threshold_counts", offset = 8, type = "bytes", count = 32, note = "8 floats (probably, as the meter's +28)" },
+  { name = "peaks", offset = 40, type = "bytes", count = 32, note = "8 floats (probably)" },
+  { name = "rms", offset = 72, type = "bytes", count = 32, note = "8 floats (probably)" },
+]
+
+[globals]
+engine = { address = 0x82954F08, type = "ptr", to = "XAudioEngine" }
+spin_lock = { address = 0x82954F10, type = "u32", note = "the voice lists' spin lock (the kernel's)" }
+spin_depth = { address = 0x82954F14, type = "u32", note = "its depth (a recursive lock over the kernel's)" }
+spin_owner = { address = 0x82954F18, type = "u32", note = "the owning thread (r13)" }
+spin_irql = { address = 0x82954F1C, type = "u8", note = "the IRQL KeRaiseIrqlToDpcLevel saved" }
+api_lock_object = { address = 0x8264D514, type = "u32", note = "+0 0x8204A868 (set at exit)" }
+api_lock = { address = 0x8264D518, type = "bytes", count = 28, note = "the API lock: a kernel critical section" }
+api_lock_recursion = { address = 0x8264D52C, type = "u32", note = "the critical section's recursion count (the object's +24)" }
+default_matrices = { address = 0x8204A7B8, type = "bytes", count = 192, note = "the default output matrices' levels" }
+default_output = { address = 0x8204A9F4, type = "bytes", count = 8, note = "{0, 0}: the mastering voice with its default matrix" }
+one = { address = 0x82000A30, type = "f32", note = "1.0" }

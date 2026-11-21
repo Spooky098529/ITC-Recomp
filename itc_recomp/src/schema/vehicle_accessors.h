@@ -120,7 +120,7 @@ struct CollisionObject : View {
   void set_unknown_236(uint32_t v) const { guest::StoreU32(base, address + 236, v); }
   uint32_t unknown_236_address() const { return address + 236; }
   // its contacts, linked by their +68
-  template <typename T = CollisionObjectContact>
+  template <typename T = CollisionContact>
   T first_contact() const { return T(base, guest::LoadU32(base, address + 240)); }
   void set_first_contact(const View& v) const { guest::StoreU32(base, address + 240, v.address); }
   void set_first_contact(uint32_t v) const { guest::StoreU32(base, address + 240, v); }
@@ -187,40 +187,6 @@ struct CollisionObject : View {
   float push_out_w() const { return guest::LoadFloat(base, address + 316); }
   void set_push_out_w(float v) const { guest::StoreFloat(base, address + 316, v); }
   uint32_t push_out_w_address() const { return address + 316; }
-};
-
-// allocated; measure: Contact, CollisionObject.+240.+68
-struct CollisionObjectContact : View {
-  using View::View;
-  static constexpr uint32_t kSize = 80;
-  // the other object (Contact::Object when the top byte of the flags is 0, sub_820B8CE0 when not)
-  uint32_t other() const { return guest::LoadU32(base, address + 0); }
-  void set_other(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t other_address() const { return address + 0; }
-  // matched against masks
-  uint32_t flags() const { return guest::LoadU32(base, address + 4); }
-  void set_flags(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t flags_address() const { return address + 4; }
-  // Contact::Position's address
-  uint32_t position_address() const { return address + 16; }
-  // the hit's normal
-  uint32_t normal_address() const { return address + 32; }
-  uint32_t push_direction_address() const { return address + 48; }
-  float push_direction_x() const { return guest::LoadFloat(base, address + 48); }
-  void set_push_direction_x(float v) const { guest::StoreFloat(base, address + 48, v); }
-  uint32_t push_direction_x_address() const { return address + 48; }
-  float push_direction_y() const { return guest::LoadFloat(base, address + 52); }
-  void set_push_direction_y(float v) const { guest::StoreFloat(base, address + 52, v); }
-  uint32_t push_direction_y_address() const { return address + 52; }
-  // the approach speed into the surface (Contact::Strength)
-  float strength() const { return guest::LoadFloat(base, address + 64); }
-  void set_strength(float v) const { guest::StoreFloat(base, address + 64, v); }
-  uint32_t strength_address() const { return address + 64; }
-  template <typename T = CollisionObjectContact>
-  T next() const { return T(base, guest::LoadU32(base, address + 68)); }
-  void set_next(const View& v) const { guest::StoreU32(base, address + 68, v.address); }
-  void set_next(uint32_t v) const { guest::StoreU32(base, address + 68, v); }
-  uint32_t next_address() const { return address + 68; }
 };
 
 // embedded; measure: CollisionRecords, sub_820B7D78.r3
@@ -342,55 +308,6 @@ struct RaceStage : View {
   uint32_t slot_count_address() const { return address + 76; }
 };
 
-// embedded; measure: sub_820FFD48.r3
-struct AccessorStageRoute : View {
-  using View::View;
-  static constexpr uint32_t kSize = 16;
-  // a course route's index
-  uint32_t course() const { return guest::LoadU32(base, address + 0); }
-  void set_course(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t course_address() const { return address + 0; }
-  uint32_t location() const { return guest::LoadU32(base, address + 4); }
-  void set_location(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
-  uint32_t location_address() const { return address + 4; }
-  // section and slice
-  uint32_t first_position() const { return guest::LoadU32(base, address + 8); }
-  void set_first_position(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
-  uint32_t first_position_address() const { return address + 8; }
-  // section and slice (the finish)
-  uint32_t last_position() const { return guest::LoadU32(base, address + 12); }
-  void set_last_position(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
-  uint32_t last_position_address() const { return address + 12; }
-};
-
-// embedded; measure: RacerRecord
-struct AccessorRacerRecord : View {
-  using View::View;
-  static constexpr uint32_t kSize = 3936;
-  // -1 after RacerRecord::Init
-  uint16_t start_section() const { return guest::LoadU16(base, address + 3904); }
-  void set_start_section(uint16_t v) const { guest::StoreU16(base, address + 3904, v); }
-  uint32_t start_section_address() const { return address + 3904; }
-  // -1 after RacerRecord::Init
-  uint16_t start_slice() const { return guest::LoadU16(base, address + 3906); }
-  void set_start_slice(uint16_t v) const { guest::StoreU16(base, address + 3906, v); }
-  uint32_t start_slice_address() const { return address + 3906; }
-  // the data tables' item (-1 none); Racers::IndexOf's id
-  uint32_t item_id() const { return guest::LoadU32(base, address + 3912); }
-  void set_item_id(uint32_t v) const { guest::StoreU32(base, address + 3912, v); }
-  uint32_t item_id_address() const { return address + 3912; }
-  // the event's entry (-1 none)
-  uint32_t entry_index() const { return guest::LoadU32(base, address + 3916); }
-  void set_entry_index(uint32_t v) const { guest::StoreU32(base, address + 3916, v); }
-  uint32_t entry_index_address() const { return address + 3916; }
-  float racer_value() const { return guest::LoadFloat(base, address + 3920); }
-  void set_racer_value(float v) const { guest::StoreFloat(base, address + 3920, v); }
-  uint32_t racer_value_address() const { return address + 3920; }
-  uint32_t racer_word() const { return guest::LoadU32(base, address + 3924); }
-  void set_racer_word(uint32_t v) const { guest::StoreU32(base, address + 3924, v); }
-  uint32_t racer_word_address() const { return address + 3924; }
-};
-
 // embedded; measure: RacerRecords, RacerRecords::At.r3
 struct RacerRecordArray : View {
   using View::View;
@@ -469,40 +386,6 @@ struct AccessorListNode : View {
   uint32_t fault_5072() const { return guest::LoadU32(base, address + 5072); }
   void set_fault_5072(uint32_t v) const { guest::StoreU32(base, address + 5072, v); }
   uint32_t fault_5072_address() const { return address + 5072; }
-};
-
-// embedded; measure: Vehicle.+344, WallQuery.+12.+0
-struct VehicleBox : View {
-  using View::View;
-  static constexpr uint32_t kSize = 116;
-  // 0x82002B30 (a box)
-  uint32_t vtable() const { return guest::LoadU32(base, address + 0); }
-  void set_vtable(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t vtable_address() const { return address + 0; }
-  // set from the car data's +1792 and +1796 (sub_820B9660)
-  float car_float_16() const { return guest::LoadFloat(base, address + 16); }
-  void set_car_float_16(float v) const { guest::StoreFloat(base, address + 16, v); }
-  uint32_t car_float_16_address() const { return address + 16; }
-  // sub_820B9658
-  float car_float_20() const { return guest::LoadFloat(base, address + 20); }
-  void set_car_float_20(float v) const { guest::StoreFloat(base, address + 20, v); }
-  uint32_t car_float_20_address() const { return address + 20; }
-  // sub_820B9678
-  float car_float_24() const { return guest::LoadFloat(base, address + 24); }
-  void set_car_float_24(float v) const { guest::StoreFloat(base, address + 24, v); }
-  uint32_t car_float_24_address() const { return address + 24; }
-  // sub_820B9670 sets it, sub_820B9668 reads it
-  float friction() const { return guest::LoadFloat(base, address + 28); }
-  void set_friction(float v) const { guest::StoreFloat(base, address + 28, v); }
-  uint32_t friction_address() const { return address + 28; }
-  // sub_820B99B0, sub_820B99B8
-  uint16_t unknown_112() const { return guest::LoadU16(base, address + 112); }
-  void set_unknown_112(uint16_t v) const { guest::StoreU16(base, address + 112, v); }
-  uint32_t unknown_112_address() const { return address + 112; }
-  // sub_820B99C0, sub_820B99C8, sub_820C0450
-  uint16_t unknown_114() const { return guest::LoadU16(base, address + 114); }
-  void set_unknown_114(uint16_t v) const { guest::StoreU16(base, address + 114, v); }
-  uint32_t unknown_114_address() const { return address + 114; }
 };
 
 // embedded; measure: Vec3, Vec4, Vec3::Add.r4, Vec3::Add.r5, Vec3::Sub.r4, Vec3::Sub.r5, Vec3::Cross.r4, Vec3::Cross.r5, Vec3::CrossW1.r4, Vec3::CrossW1.r5, Vec3::Direction.r4, Vec3::Direction.r5, Vec3::Normalize.r4, Vec4::Copy.r4, Vec4::ScaleTo.r4, Matrix::SetTranslation.r4, Matrix::TransformPoint.r5, Quaternion::ToMatrix3.r4, sub_82293CD8.r4, sub_82293CD8.ret, sub_82294360.r3, sub_822943C8.r3, sub_82294470.r3, sub_822944B0.r3
@@ -631,33 +514,6 @@ struct AccessorPairs : View {
   uint16_t pair4_second() const { return guest::LoadU16(base, address + 18); }
   void set_pair4_second(uint16_t v) const { guest::StoreU16(base, address + 18, v); }
   uint32_t pair4_second_address() const { return address + 18; }
-};
-
-// embedded; measure: sub_820CC470.ret
-struct AccessorCarDecal : View {
-  using View::View;
-  static constexpr uint32_t kSize = 24;
-  float angle() const { return guest::LoadFloat(base, address + 16); }
-  void set_angle(float v) const { guest::StoreFloat(base, address + 16, v); }
-  uint32_t angle_address() const { return address + 16; }
-  // sub_820CC470's r4
-  uint32_t packed() const { return guest::LoadU32(base, address + 20); }
-  void set_packed(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
-  uint32_t packed_address() const { return address + 20; }
-};
-
-// embedded; measure: sub_820B68A0.r3
-struct AccessorRigidBody : View {
-  using View::View;
-  static constexpr uint32_t kSize = 52;
-  // set: immovable
-  uint8_t fixed() const { return guest::LoadU8(base, address + 0); }
-  void set_fixed(uint8_t v) const { guest::StoreU8(base, address + 0, v); }
-  uint32_t fixed_address() const { return address + 0; }
-  // sub_820B68A0's answer when not fixed
-  float float_48() const { return guest::LoadFloat(base, address + 48); }
-  void set_float_48(float v) const { guest::StoreFloat(base, address + 48, v); }
-  uint32_t float_48_address() const { return address + 48; }
 };
 
 // embedded; measure: sub_820B9680.r3, sub_82293F68.r4, sub_82293FD0.r4

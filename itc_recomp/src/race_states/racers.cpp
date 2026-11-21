@@ -29,7 +29,7 @@ uint32_t Stages(uint8_t* base) {
 }
 // The racers' list's entry j (the manager's +2308).
 uint32_t Racer(uint8_t* base, uint32_t j) {
-  return Load(base, G::racers_manager(base) + 2308 + 4 * j);
+  return Load(base, Manager(base, G::racers_manager(base)).racers_address() + 4 * j);
 }
 // The first racer record (from the race data's +48, its count +0x59610)
 // flagged 0x1 (the player's): its index, or -1 with none.
@@ -45,7 +45,7 @@ int32_t PlayerRecord(uint8_t* base) {
 }
 // A racer's entry is in the current stage and isn't the player's.
 bool OtherInStage(uint8_t* base, uint32_t entry) {
-  const uint32_t record = Load(base, entry + 24);
+  const uint32_t record = RacerEntry(base, entry).record();
   if (va::StagesHasRacer(base, Stages(base), record, 0xFFFFFFFF) == 0) {
     return false;
   }
@@ -56,9 +56,11 @@ bool OtherInStage(uint8_t* base, uint32_t entry) {
 // the signed slice.
 uint32_t SliceCenter(uint8_t* base, uint32_t position) {
   const uint32_t file = G::route(base);
+  const schema::RoutePosition at(base, position);
   const uint32_t record =
-      Load(base, Load(base, file + 12) + (uint32_t(guest::LoadU16(base, position)) << 2));
-  return uint32_t(int64_t(S16(base, position + 2)) * 84) + record + 124;
+      Load(base, RouteFile(base, file).sections() + (uint32_t(at.section()) << 2));
+  return uint32_t(int64_t(S16(base, at.slice_address())) * RouteSlice::kSize) +
+         RouteSection(base, record).slices_address();
 }
 
 }  // namespace
@@ -69,8 +71,8 @@ uint32_t RacersNear(uint8_t* base, uint32_t frame) {
   const int32_t player = PlayerRecord(base);
   if (player >= 0) {
     const uint32_t entry = race_world::EntryOfRecord(base, uint32_t(player));
-    const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
-    player_section = S16(base, va::VehicleIdentity(vehicle) + 4);
+    const uint32_t vehicle = va::VehicleGet(base, RacerEntry(base, entry).vehicle_index());
+    player_section = S16(base, TrackPos(base, va::VehicleIdentity(vehicle)).route_section_address());
   }
   for (uint32_t k = 0; k < 10; k++) {
     Store(base, frame + 80 + 4 * k, k);
@@ -81,12 +83,12 @@ uint32_t RacersNear(uint8_t* base, uint32_t frame) {
     if (!OtherInStage(base, entry)) {
       continue;
     }
-    const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
-    const uint32_t identity = va::VehicleIdentity(vehicle);
+    const uint32_t vehicle = va::VehicleGet(base, RacerEntry(base, entry).vehicle_index());
+    const TrackPos identity(base, va::VehicleIdentity(vehicle));
     const uint32_t file = G::route(base);
-    const uint32_t record =
-        Load(base, Load(base, file + 12) + (uint32_t(guest::LoadU16(base, identity + 4)) << 2));
-    if (player_section == S16(base, identity + 4)) {
+    const uint32_t record = Load(base, RouteFile(base, file).sections() +
+                                           (uint32_t(identity.route_section()) << 2));
+    if (player_section == S16(base, identity.route_section_address())) {
       continue;
     }
     bool linked = false;
@@ -115,21 +117,21 @@ uint32_t RacersClose(uint8_t* base, uint32_t frame) {
   const int32_t player = PlayerRecord(base);
   if (player >= 0) {
     const uint32_t entry = race_world::EntryOfRecord(base, uint32_t(player));
-    const uint32_t center = SliceCenter(base, entry + 8);
-    Stfs(base, frame + 96, Lfs(base, center + 0));
-    Stfs(base, frame + 100, Lfs(base, center + 4));
-    Stfs(base, frame + 104, Lfs(base, center + 8));
+    const RouteSlice center(base, SliceCenter(base, RacerEntry(base, entry).position_address()));
+    Stfs(base, frame + 96, Lfs(base, center.center_x_address()));
+    Stfs(base, frame + 100, Lfs(base, center.center_y_address()));
+    Stfs(base, frame + 104, Lfs(base, center.center_z_address()));
   }
   for (int32_t j = 0; j < int32_t(track_collision::RaceRacerCount(base)); j++) {
     const uint32_t entry = Racer(base, uint32_t(j));
-    va::VehicleGet(base, Load(base, entry + 20));
+    va::VehicleGet(base, RacerEntry(base, entry).vehicle_index());
     if (!OtherInStage(base, entry)) {
       continue;
     }
-    const uint32_t center = SliceCenter(base, entry + 8);
-    Stfs(base, frame + 80, Fsubs(Lfs(base, frame + 96), Lfs(base, center + 0)));
-    Stfs(base, frame + 84, Fsubs(Lfs(base, frame + 100), Lfs(base, center + 4)));
-    Stfs(base, frame + 88, Fsubs(Lfs(base, frame + 104), Lfs(base, center + 8)));
+    const RouteSlice center(base, SliceCenter(base, RacerEntry(base, entry).position_address()));
+    Stfs(base, frame + 80, Fsubs(Lfs(base, frame + 96), Lfs(base, center.center_x_address())));
+    Stfs(base, frame + 84, Fsubs(Lfs(base, frame + 100), Lfs(base, center.center_y_address())));
+    Stfs(base, frame + 88, Fsubs(Lfs(base, frame + 104), Lfs(base, center.center_z_address())));
     const uint32_t vector = (frame + 80) & ~0xFu;
     const float dot = vl::Vec3Dot(base, vector, vector);
     const uint32_t result = (frame + 112) & ~0xFu;
@@ -149,8 +151,10 @@ uint32_t RacersStill(uint8_t* base, uint32_t count) {
   const int32_t racers = int32_t(track_collision::RaceRacerCount(base));
   bool moved = false;
   for (int32_t j = 0; j < racers; j++) {
-    const uint32_t vehicle = va::VehicleGet(base, Load(base, Racer(base, uint32_t(j)) + 20));
-    if (Load(base, Load(base, vehicle + 340) + 240) != 0 || (Load(base, vehicle + 6152) & 7)) {
+    const VehicleView vehicle(
+        base, va::VehicleGet(base, RacerEntry(base, Racer(base, uint32_t(j))).vehicle_index()));
+    if (schema::CollisionObject(base, vehicle.collision_object()).first_contact().address != 0 ||
+        (vehicle.collision_flags() & 7)) {
       moved = true;
       break;
     }

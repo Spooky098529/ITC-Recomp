@@ -27,7 +27,7 @@ measures = [
   "CarInterior.+24",
   "Wheels.+24",
   "SceneWheels.+192.+24",
-]
+  "List::At.ret.+24", "Cockpit.+24", "CarParts.+5328", "TrafficCar.+24"]
 size = 7264
 origin = "allocated"
 vtable = 0x82004F94
@@ -89,7 +89,7 @@ fields = [
   { name = "accessory_matrix", offset = 7200, type = "ptr", to = "AccessoryMatrix", note = "the acce_null node's matrix (in the skeleton's)" },
   { name = "accessory_position", offset = 7216, type = "bytes", count = 16, note = "+7228 1.0 from the constructor" },
   { name = "xpr_indices", offset = 7232, type = "bytes", count = 24, note = "six indices into the body XPR (-1 none)" },
-  { name = "first_set", offset = 7256, type = "ptr", to = "CarModelsFirstSet", note = "the first set of scene pools ([0x826C2E40], scene-loaders.md): its +8 the model set (0 a, 1 b)" },
+  { name = "first_set", offset = 7256, type = "ptr", to = "ScenePools", note = "the first set of scene pools ([0x826C2E40], scene-loaders.md): its +8 the model set (0 a, 1 b)" },
 ]
 
 # A vinyl layer or sticker record (64 bytes; docs/known-data.md "vinyl
@@ -146,23 +146,16 @@ fields = [
   { name = "cockpit_body_state", offset = 420, type = "u32", note = "2 loading" },
   { name = "cockpit_part_slots", offset = 536, type = "bytes", count = 144, note = "the cockpit's six parts' LoadSlots" },
   { name = "cockpit", offset = 3088, type = "u32", note = "the interior's: nonzero the cockpit set (c)" },
-  { name = "first_set", offset = 3092, type = "ptr", to = "CarModelsFirstSet", note = "the interior's" },
+  { name = "first_set", offset = 3092, type = "ptr", to = "ScenePools", note = "the interior's" },
 ]
 
-# The first set of scene pools ([0x826C2E40]; scene-loaders.md's ScenePools)
-# as the interior, the car model and the wheels read it.
-[CarModelsFirstSet]
-measure = "CarInterior.+3092"
-size = 12
-origin = "allocated"
-fields = [
-  { name = "model_set", offset = 8, type = "u32", note = "0 set a, 1 set b" },
-]
+# CarModelsFirstSet: merged into scene-loaders.toml's ScenePools at the integration (the same object).
 
 # A second set car model (SceneCarModel, second-set.md) as the measure puts
 # it at SceneWheels::SetUp's +192 (the scene wheels' +24 in the code).
 [CarModelsSceneCarModel]
 measure = "SceneWheels.+192"
+measures = ["SceneCockpit.+24", "SceneInterior::Link.r4", "ScenePool4.+24"]
 size = 28
 origin = "allocated"
 fields = [
@@ -382,6 +375,7 @@ fields = [
 # +32) and the load buffer.
 [CarSceneSetUpRecord]
 measure = "CarScene::SetUp.r4"
+measures = ["SceneSetUp"]
 size = 48
 origin = "embedded"
 fields = [
@@ -449,13 +443,14 @@ fields = [
   { name = "rear_caliper_model", offset = 2800, type = "bytes", count = 464 },
   { name = "rear_caliper_model_provider", offset = 2848, type = "u32" },
   { name = "traffic", offset = 3264, type = "ptr", to = "CarModelsTrafficIndex", note = "the traffic record (+0 its index)" },
-  { name = "first_set", offset = 3268, type = "ptr", to = "CarModelsFirstSet", note = "the first set of scene pools ([0x826C2E40]): its +8 picks rims (0) or brakes" },
+  { name = "first_set", offset = 3268, type = "ptr", to = "ScenePools", note = "the first set of scene pools ([0x826C2E40]): its +8 picks rims (0) or brakes" },
 ]
 
 # A deferred release record (20 bytes; DeferRelease): the first set's +52
 # array, 4 x (+40 + +12) of them (ScenePools::CreateA, scene-loaders.md).
 [CarModelsDeferredRelease]
 measure = "ScenePools.+52"
+measures = ["new<140>@ScenePools::MakeA.+52"]
 size = 20
 origin = "allocated"
 fields = [

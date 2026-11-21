@@ -14,10 +14,10 @@ namespace save_data {
 
 // The save data's parts.
 constexpr uint32_t kSaveDataBytes = 0x1F978;
-constexpr uint32_t kStats = 48;            // the stats record, 6,044 bytes
-constexpr uint32_t kStatsBytes = 6044;
+constexpr uint32_t kStatsBytes = 6044;     // what Stats::Reset clears
 constexpr uint32_t kProgressBytes = 0x1D52C;  // what Progress::Clear clears
-constexpr uint32_t kUnlocks = 0x1ACE4;     // BitSet400
+// The parts' fields are the schema's (career.toml's CareerSave and
+// CareerStats, race-event.toml's SaveData, race-screens.toml's MenuList).
 // The image words the code uses (the play time's frame counter, the float
 // 0.0, the default tables, the controllers, the title's list) are
 // schema::SaveDataGlobals' (itc_recomp/schema/save-data.toml); the address

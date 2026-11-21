@@ -67,7 +67,7 @@ uint64_t Page12(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     }
   }
   f.Call(kMenuListCancelled, 0x821A3C18, List(base));
-  if (Load(base, List(base) + 24) != 0) {
+  if (G::list(base).move() != 0) {
     f.Call(kMenuSoundPlay, 0x821A3C30, 4);
     Go(base, 12, 1, kNone);
   }
@@ -136,7 +136,7 @@ uint64_t Page14(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
       Message(base, 9, 1);
       f.Call(kRequest980, 0x821A6AD8, 0);
     } else if (built == 7) {
-      if (int32_t(Load(base, G::save_buffers(base) + 20)) == 0) {
+      if (int32_t(G::save_buffers(base).count()) == 0) {
         Go(base, 13, 2, 4);
         Message(base, 4, 1);
       } else {
@@ -160,7 +160,7 @@ uint64_t Page14(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
       return f.r3;
     }
     f.Call(kReplayCopyFrom, 0x821A68C4, G::kept_replay(base),
-           Load(base, G::save_buffers(base) + 4));
+           G::save_buffers(base).replay());
     Go(base, 13, 2, 4);
     Message(base, 8, 1);
     Data(base).set_answer(1);
@@ -188,19 +188,23 @@ uint64_t Page15(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
 uint64_t Page24(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821A4AC0 SaveScreen::Page24");
   Fn f(base, sp, 128, calls, mode);
+  using Controllers = schema::SaveInterfaceGlobals;
+  using Entries = schema::RacerControllersGlobals;
   uint32_t entries[4];
   for (uint32_t i = 0; i < 4; i++) {
-    entries[i] = kMapperEntries + 8 * Load(base, kControllers + 4 * i);
+    entries[i] = Entries::mapper_entries_address() +
+                 schema::PlayerMapperEntry::kSize * Load(base, Controllers::controllers_address() + 4 * i);
   }
   // The mapper's slot 10 (ActionMapper::Pressed) for `action`, unless the
   // entry's +4 is 1.
   auto pressed = [&](uint32_t entry, uint32_t action, uint32_t lr) {
-    if (int32_t(Load(base, entry + 4)) == 1) {
+    const schema::PlayerMapperEntry e(base, entry);
+    if (int32_t(e.unread()) == 1) {
       return false;
     }
-    const uint32_t mapper = Load(base, entry);
-    const uint32_t slot = Load(base, Load(base, mapper) + 40);
-    return (f.Call(slot, lr, mapper, action) & 0xFF) != 0;
+    const auto mapper = e.mapper();
+    const uint32_t slot = Load(base, mapper.vtable() + 40);
+    return (f.Call(slot, lr, mapper.address, action) & 0xFF) != 0;
   };
   int32_t player = -1;
   if (pressed(entries[0], 159, 0x821A4B34) || pressed(entries[0], 158, 0x821A4B60)) {

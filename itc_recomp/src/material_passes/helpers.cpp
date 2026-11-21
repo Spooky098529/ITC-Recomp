@@ -8,6 +8,7 @@
 #include "camera_modes/steps.h"
 #include "guest.h"
 #include "schema/material_passes.h"
+#include "schema/matrix_math.h"
 
 namespace material_passes {
 
@@ -66,15 +67,16 @@ bool TransposeRotation(uint8_t* base, uint32_t out, uint32_t m, uint32_t sp) {
   }
   // out's upper 3x3 = m's transposed, each word through lfs and stfs.
   const schema::MaterialPassesMatrix from(base, m);
-  Stfs(base, out + 0, double(from.m00()));
-  Stfs(base, out + 4, double(from.m10()));
-  Stfs(base, out + 8, double(from.m20()));
-  Stfs(base, out + 16, double(from.m01()));
-  Stfs(base, out + 20, double(from.m11()));
-  Stfs(base, out + 24, double(from.m21()));
-  Stfs(base, out + 32, double(from.m02()));
-  Stfs(base, out + 36, double(from.m12()));
-  Stfs(base, out + 40, double(from.m22()));
+  const schema::Matrix to(base, out);
+  Stfs(base, to.m00_address(), double(from.m00()));
+  Stfs(base, to.m01_address(), double(from.m10()));
+  Stfs(base, to.m02_address(), double(from.m20()));
+  Stfs(base, to.m10_address(), double(from.m01()));
+  Stfs(base, to.m11_address(), double(from.m11()));
+  Stfs(base, to.m12_address(), double(from.m21()));
+  Stfs(base, to.m20_address(), double(from.m02()));
+  Stfs(base, to.m21_address(), double(from.m12()));
+  Stfs(base, to.m22_address(), double(from.m22()));
   return true;
 }
 

@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/files_and_saves.h"
 #include "schema/save_interface.h"
 #include "user/network.h"
 
@@ -13,7 +14,6 @@ namespace save_interface {
 
 namespace {
 
-uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
@@ -49,8 +49,9 @@ bool CanAllocBuffers(uint8_t* base, uint32_t saves) {
 
 void SlotAllocBuffers(uint8_t* base, uint32_t slot, uint32_t saves) {
   ITC_NATIVE_RUNNING("sub_820A4560 SaveSlot::AllocBuffers");
-  Store(base, slot + 80, NewArray(base, saves * kSaveRecordBytes, "SaveSlot::AllocBuffers"));
-  Store(base, slot + 84, NewArray(base, saves * 4, "SaveSlot::AllocBuffers"));
+  const schema::SaveSlot s(base, slot);
+  s.set_enumeration_buffer(NewArray(base, saves * kSaveRecordBytes, "SaveSlot::AllocBuffers"));
+  s.set_open_failed(NewArray(base, saves * 4, "SaveSlot::AllocBuffers"));
 }
 
 std::optional<uint32_t> SaveDevicesConstruct(
@@ -94,17 +95,22 @@ std::optional<uint32_t> SaveDevicesConstruct(
     block_of_slots.set_count(kSlotCount);
     slots = block_of_slots.slots_address();
     for (uint32_t i = 0; i < kSlotCount; i++) {
-      const uint32_t slot = slots + kSlotBytes * i;
-      Store(base, slot + 36, 0);
-      Store(base, slot + 0, kSaveSlotVtable);
-      for (uint32_t at = 960; at <= 984; at += 4) {
-        Store(base, slot + at, 0);
-      }
-      Store64(base, slot + 40, 0);
-      Store(base, slot + 988, 3);
-      Store(base, slot + 96, 0);
-      Store(base, slot + 948, 0);
-      Store(base, slot + 992, 0);
+      const schema::SaveSlot slot(base, slots + kSlotBytes * i);
+      slot.set_device(0);
+      slot.set_vtable(kSaveSlotVtable);
+      slot.set_request_device_selector(0);
+      slot.set_request_enumeration(0);
+      slot.set_request_save(0);
+      slot.set_request_load(0);
+      slot.set_request_delete(0);
+      slot.set_failure_acknowledged(0);
+      slot.set_enumerated_saves(0);
+      // Two word stores, as the original.
+      Store64(base, slot.device_free_bytes_address(), 0);
+      slot.set_state(3);
+      slot.set_enumeration_step(0);
+      slot.set_step(0);
+      slot.set_failure_reason(0);
     }
   }
   d.set_slots(slots);
@@ -168,8 +174,8 @@ uint32_t SlotArrayReset(uint8_t* base, uint32_t holder,
   if (slots == 0) {
     return holder;
   }
-  uint32_t r3 = slots - 8;
-  if (Load(base, r3) != 0) {
+  uint32_t r3 = schema::SaveSlot(base, slots).array_count_address();
+  if (schema::SaveSlot(base, slots).array_count() != 0) {
     r3 = destroy(slots);
   } else if (!memory::crt::OperatorDeleteArray(r3)) {
     ITC_LOG_ERROR("SlotArray::Reset: operator delete[] refused {:08X}", r3);

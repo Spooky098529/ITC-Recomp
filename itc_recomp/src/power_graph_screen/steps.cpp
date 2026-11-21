@@ -11,6 +11,7 @@
 #include "guest.h"
 #include "schema/menu_helpers.h"
 #include "schema/power_graph_screen.h"
+#include "schema/tuning_screen.h"
 #include "ui_movies/game.h"
 
 #include <bit>
@@ -26,6 +27,7 @@ using guest::StoreU32;
 using G = schema::PowerGraphScreenGlobals;
 using Data = schema::PowerGraphScreenData;
 using Member = schema::PowerGraphScreen67;
+using Node = schema::UiMovieNode;  // tuning-screen.toml
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   const uint32_t frame = sp - bytes;
@@ -79,7 +81,7 @@ uint64_t SetPartIcon(uint8_t* base, uint32_t value, uint32_t sp) {
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = FindMovie(base, frame);
   const uint32_t node = ui_movies::FindNode(base, movie, 3, 0);
-  StoreU32(base, node + 108, value);
+  Node(base, node).set_texture_entry(value);
   return node;
 }
 
@@ -90,15 +92,16 @@ uint64_t SetPartRow2(uint8_t* base, uint32_t values, uint32_t sp) {
   const uint32_t group = ui_movies::FindNode(base, movie, 3, 2);
   uint32_t r3 = group;
   // The children's count re-read each time (a child's stores could reach it).
-  for (int32_t i = 0; i < int32_t(LoadU32(base, group + 104)); i++) {
-    const uint32_t first = LoadU32(base, group + 100);
+  // A group's first child index (+100) and child count (+104), read as words.
+  for (int32_t i = 0; i < int32_t(LoadU32(base, Node(base, group).height_address())); i++) {
+    const uint32_t first = LoadU32(base, Node(base, group).width_address());
     const uint32_t value = LoadU32(base, values + 4 * uint32_t(i));
     r3 = ui_movies::FindNode(base, movie, 3, first + uint32_t(i));
     if (int32_t(value) != 10) {
-      StoreU32(base, r3 + 108, value);
-      StoreU32(base, r3 + 80, 1);
+      Node(base, r3).set_texture_entry(value);
+      Node(base, r3).set_visible(1);
     } else {
-      StoreU32(base, r3 + 80, 0);
+      Node(base, r3).set_visible(0);
     }
   }
   return r3;
@@ -111,14 +114,14 @@ uint64_t SetPartRow1(uint8_t* base, uint32_t values, uint32_t sp) {
   const uint32_t group = ui_movies::FindNode(base, movie, 3, 1);
   uint32_t r3 = group;
   for (uint32_t i = 0; i < 7; i++) {
-    const uint32_t first = LoadU32(base, group + 100);
+    const uint32_t first = LoadU32(base, Node(base, group).width_address());
     const uint32_t value = LoadU32(base, values + 4 * i);
     r3 = ui_movies::FindNode(base, movie, 3, i + first);
     if (int32_t(value) < 37) {
-      StoreU32(base, r3 + 108, value);
-      StoreU32(base, r3 + 80, 1);
+      Node(base, r3).set_texture_entry(value);
+      Node(base, r3).set_visible(1);
     } else {
-      StoreU32(base, r3 + 80, 0);
+      Node(base, r3).set_visible(0);
     }
   }
   return r3;
@@ -224,9 +227,9 @@ uint64_t SetTexts(uint8_t* base, uint64_t member, uint32_t sp, const Calls& call
   const uint32_t node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 3);
   const uint32_t tab = G::data(base).tab();
   if (tab <= 5) {
-    StoreU32(base, node + 80, tab == 2 || tab == 5 ? 1 : 0);
+    Node(base, node).set_visible(tab == 2 || tab == 5 ? 1 : 0);
   }
-  if (LoadU32(base, node + 80) == 0) {
+  if (Node(base, node).visible() == 0) {
     return node;
   }
   (void)member;

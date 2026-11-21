@@ -19,15 +19,17 @@
 #include "base/log.h"
 #include "game_modes/game_modes.h"
 #include "guest.h"
-#include "schema/game_modes.h"
 #include "schema/race_flow.h"
+#include "schema/race_states.h"
+#include "schema/racer_controllers.h"
 
 namespace race_flow {
 
 namespace {
 
 using G = schema::RaceFlowGlobals;
-using Machine = schema::StateMachine;
+using Flow = schema::RaceFlow;
+using RaceData = schema::RaceData;
 
 // A value: a constant, or an offset from the machine or the frame.
 struct Value {
@@ -619,15 +621,16 @@ constexpr Step kSteps[] = {
 
 uint32_t Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced) {
   ITC_NATIVE_RUNNING("sub_82160AE0 RaceFlow::Init");
-  Machine(base, machine).set_state(1);
-  guest::StoreU32(base, machine + kFlags, 0);
+  const Flow flow(base, machine);
+  flow.set_state(1);
+  flow.set_flags(0);
   const uint32_t race = G::race_data(base);
-  if (guest::LoadU32(base, race + kRaceKind) == 6) {
-    guest::StoreU32(base, machine + kPlayers, 0);
-    guest::StoreU32(base, machine + kPlayers + 4, 0);
+  if (RaceData(base, race).kind() == 6) {
+    flow.set_player_a(0);
+    flow.set_player_b(0);
   } else {
-    guest::StoreU32(base, machine + kPlayers, 0);
-    guest::StoreU32(base, machine + kPlayers + 4, 1);
+    flow.set_player_a(0);
+    flow.set_player_b(1);
   }
   auto at = [&](const Value& v) {
     switch (v.base) {

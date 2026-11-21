@@ -9,7 +9,13 @@
 #include "car_physics/float_ops.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/car_physics.h"
+#include "schema/collision.h"
+#include "schema/race_states.h"
+#include "schema/race_world.h"
 #include "schema/replay_snapshots.h"
+#include "schema/type10_mode.h"
+#include "schema/vehicle_accessors.h"
 #include "vehicle/vehicle.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -83,210 +89,212 @@ void Memcpy(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes, uint32_t 
 
 void Record5232RestoreTrack(uint8_t* base, uint32_t record, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_82104310 Record5232::RestoreTrack");
-  const uint32_t to = vehicle;
+  const schema::Vehicle to(base, vehicle);
   const Record r(base, record);
-  Word(base, to + 6148, r.car_flags_address());
-  Word(base, to + 6152, r.collision_flags_address());
-  Memcpy(base, to + 6160, r.status_address(), 112, 0x82104344);
+  Word(base, to.car_flags_address(), r.car_flags_address());
+  Word(base, to.collision_flags_address(), r.collision_flags_address());
+  Memcpy(base, to.status_address(), r.status_address(), 112, 0x82104344);
   for (uint32_t i = 0; i < 5; i++) {
-    TrackPosition(base, to + 5232 + 96 * i, r.track_positions_address() + 96 * i);
+    TrackPosition(base, to.own_track_position_address() + 96 * i,
+        r.track_positions_address() + 96 * i);
   }
 }
 
 void BodyStateRestore(uint8_t* base, uint32_t state, uint32_t body) {
   ITC_NATIVE_RUNNING("sub_821031A0 BodyState::Restore");
-  const uint32_t to = body;
+  const schema::RigidBody to(base, body);
   const Body s(base, state);
-  Byte(base, to + 0, s.fixed_address());
-  FloatWord(base, to + 4, s.mass_address());
-  FloatWord(base, to + 8, s.inverse_mass_address());
-  Vec4(base, to + 16, s.center_of_mass_address());
-  Vec4(base, to + 32, s.velocity_address());
-  FloatWord(base, to + 48, s.speed_cap_address());
-  Vec4(base, to + 64, s.force_address());
-  Dword(base, to + 80, s.orientation_address());
-  Dword(base, to + 88, s.orientation_address() + 8);
-  Vec4(base, to + 96, s.angular_velocity_address());
-  FloatWord(base, to + 112, s.spin_cap_address());
-  Vec4(base, to + 128, s.torque_address());
-  Vec4(base, to + 144, s.velocity_direction_address());
-  FloatWord(base, to + 160, s.speed_address());
-  FloatWord(base, to + 164, s.linear_damping_address());
-  Vec4(base, to + 176, s.momentum_address());
-  Vec4(base, to + 192, s.center_of_mass_offset_address());
-  Vec4(base, to + 208, s.origin_address());
-  Matrix(base, to + 224, s.orientation_matrix_address());
-  Matrix(base, to + 288, s.matrix_address());
-  Vec4(base, to + 352, s.inertia_address());
-  Vec4(base, to + 368, s.inverse_inertia_address());
-  FloatWord(base, to + 384, s.angular_damping_address());
-  Vec4(base, to + 400, s.angular_momentum_address());
-  Matrix(base, to + 416, s.world_inverse_inertia_address());
-  Vec4(base, to + 480, s.gravity_address());
-  Vec4(base, to + 496, s.weight_address());
-  FloatWord(base, to + 512, s.effective_mass_address());
+  Byte(base, to.fixed_address(), s.fixed_address());
+  FloatWord(base, to.mass_address(), s.mass_address());
+  FloatWord(base, to.inverse_mass_address(), s.inverse_mass_address());
+  Vec4(base, to.center_of_mass_address(), s.center_of_mass_address());
+  Vec4(base, to.velocity_address(), s.velocity_address());
+  FloatWord(base, to.speed_cap_address(), s.speed_cap_address());
+  Vec4(base, to.force_address(), s.force_address());
+  Dword(base, to.orientation_address(), s.orientation_address());
+  Dword(base, to.orientation_address() + 8, s.orientation_address() + 8);
+  Vec4(base, to.angular_velocity_address(), s.angular_velocity_address());
+  FloatWord(base, to.spin_cap_address(), s.spin_cap_address());
+  Vec4(base, to.torque_address(), s.torque_address());
+  Vec4(base, to.velocity_direction_address(), s.velocity_direction_address());
+  FloatWord(base, to.speed_address(), s.speed_address());
+  FloatWord(base, to.linear_damping_address(), s.linear_damping_address());
+  Vec4(base, to.momentum_address(), s.momentum_address());
+  Vec4(base, to.center_of_mass_offset_address(), s.center_of_mass_offset_address());
+  Vec4(base, to.origin_address(), s.origin_address());
+  Matrix(base, to.orientation_matrix_address(), s.orientation_matrix_address());
+  Matrix(base, to.matrix_address(), s.matrix_address());
+  Vec4(base, to.inertia_address(), s.inertia_address());
+  Vec4(base, to.inverse_inertia_address(), s.inverse_inertia_address());
+  FloatWord(base, to.angular_damping_address(), s.angular_damping_address());
+  Vec4(base, to.angular_momentum_address(), s.angular_momentum_address());
+  Matrix(base, to.world_inverse_inertia_address(), s.world_inverse_inertia_address());
+  Vec4(base, to.gravity_address(), s.gravity_address());
+  Vec4(base, to.weight_address(), s.weight_address());
+  FloatWord(base, to.effective_mass_address(), s.effective_mass_address());
 }
 
 void Member1136Restore(uint8_t* base, uint32_t part, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_82102C60 Member1136::Restore");
-  const uint32_t to = vehicle;
+  const schema::Vehicle to(base, vehicle);
   const Physics p(base, part);
   for (uint32_t i = 0; i < 3; i++) {
-    Vec4(base, to + 16 * i, p.body_row0_address() + 16 * i);
+    Vec4(base, to.body_row1_address() * i, p.body_row0_address() + 16 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    FloatWord(base, to + 48 + 4 * i, p.speed_address() + 4 * i);
+    FloatWord(base, to.speed_address() + 4 * i, p.speed_address() + 4 * i);
   }
-  Vec4(base, to + 64, p.angular_velocity_address());
+  Vec4(base, to.angular_velocity_address(), p.angular_velocity_address());
   for (uint32_t i = 0; i < 4; i++) {
-    FloatWord(base, to + 80 + 4 * i, p.unknown_80_address() + 4 * i);
+    FloatWord(base, to.unknown_80_address() + 4 * i, p.unknown_80_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    Vec4(base, to + 96 + 16 * i, p.ground_up_address() + 16 * i);
+    Vec4(base, to.ground_up_address() + 16 * i, p.ground_up_address() + 16 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    Matrix(base, to + 144 + 64 * i, p.ground_matrix_address() + 64 * i);
+    Matrix(base, to.ground_matrix_address() + 64 * i, p.ground_matrix_address() + 64 * i);
   }
-  Byte(base, to + 276, p.speed_sensitive_steering_address());
+  Byte(base, to.speed_sensitive_steering_address(), p.speed_sensitive_steering_address());
   for (uint32_t i = 0; i < 14; i++) {
-    FloatWord(base, to + 280 + 4 * i, p.steering_input_address() + 4 * i);
+    FloatWord(base, to.steering_input_address() + 4 * i, p.steering_input_address() + 4 * i);
   }
-  Word(base, to + 348, p.wheels_on_ground_address());
+  Word(base, to.wheels_on_ground_address(), p.wheels_on_ground_address());
   for (uint32_t i = 0; i < 4; i++) {
-    Vec4(base, to + 352 + 16 * i, p.unknown_336_address() + 16 * i);
+    Vec4(base, to.unknown_352_address() + 16 * i, p.unknown_336_address() + 16 * i);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    Wheel(base, to + 416 + 368 * i, p.wheel_0_address() + 368 * i);
+    Wheel(base, to.wheels_address() + 368 * i, p.wheel_0_address() + 368 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    WheelRecord2(base, to + 1888 + 128 * i, p.front_axle_address() + 128 * i);
+    WheelRecord2(base, to.front_axle_address() + 128 * i, p.front_axle_address() + 128 * i);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    Word(base, to + 2176 + 4 * i, p.wheel_by_load_0_address() + 4 * i);
+    Word(base, to.wheels_by_load_address() + 4 * i, p.wheel_by_load_0_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    FloatWord(base, to + 2192 + 4 * i, p.driven_axle_spin_address() + 4 * i);
+    FloatWord(base, to.driven_axle_spin_address() + 4 * i, p.driven_axle_spin_address() + 4 * i);
   }
-  Memcpy(base, to + 2204, p.drivetrain_block_address(), 144, 0x82102E4C);
+  Memcpy(base, to.unknown_2204_address(), p.drivetrain_block_address(), 144, 0x82102E4C);
   for (uint32_t i = 0; i < 5; i++) {
-    FloatWord(base, to + 2348 + 4 * i, p.direction_address() + 4 * i);
+    FloatWord(base, to.direction_address() + 4 * i, p.direction_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    Word(base, to + 2368 + 4 * i, p.substep_count_address() + 4 * i);
+    Word(base, to.substep_count_address() + 4 * i, p.substep_count_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 8; i++) {
-    Byte(base, to + 2380 + i, p.unknown_2332_address() + i);
+    Byte(base, to.unknown_2380_address() + i, p.unknown_2332_address() + i);
   }
-  FloatWord(base, to + 2388, p.value2388_address());
-  Word(base, to + 2392, p.traction_counter_address());
-  FloatWord(base, to + 2396, p.traction_limit_address());
+  FloatWord(base, to.value2388_address(), p.value2388_address());
+  Word(base, to.traction_counter_address(), p.traction_counter_address());
+  FloatWord(base, to.traction_limit_address(), p.traction_limit_address());
   for (uint32_t i = 0; i < 2; i++) {
-    Byte(base, to + 2400 + i, p.traction_active_address() + i);
+    Byte(base, to.traction_active_address() + i, p.traction_active_address() + i);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    FloatWord(base, to + 2404 + 4 * i, p.drag_scale_address() + 4 * i);
+    FloatWord(base, to.drag_scale_address() + 4 * i, p.drag_scale_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    FloatWord(base, to + 2428 + 4 * i, p.oil_factor_address() + 4 * i);
+    FloatWord(base, to.oil_factor_address() + 4 * i, p.oil_factor_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    FloatWord(base, to + 2416 + 4 * i, p.nitrous_factor_address() + 4 * i);
+    FloatWord(base, to.nitrous_factor_address() + 4 * i, p.nitrous_factor_address() + 4 * i);
   }
-  Byte(base, to + 2424, p.nitrous_on_address());
-  FloatWord(base, to + 2440, p.speed_squared_address());
+  Byte(base, to.nitrous_on_address(), p.nitrous_on_address());
+  FloatWord(base, to.speed_squared_address(), p.speed_squared_address());
   for (uint32_t i = 0; i < 2; i++) {
-    Byte(base, to + 2444 + i, p.unknown_2396_address() + i);
+    Byte(base, to.unknown_2444_address() + i, p.unknown_2396_address() + i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    FloatWord(base, to + 2448 + 4 * i, p.unknown_2400_address() + 4 * i);
+    FloatWord(base, to.unknown_2448_address() + 4 * i, p.unknown_2400_address() + 4 * i);
   }
-  Byte(base, to + 2456, p.unknown_2408_address());
+  Byte(base, to.unknown_2456_address(), p.unknown_2408_address());
   for (uint32_t i = 0; i < 2; i++) {
-    Vec4(base, to + 2464 + 16 * i, p.body_force_address() + 16 * i);
+    Vec4(base, to.body_force_address() + 16 * i, p.body_force_address() + 16 * i);
   }
-  Word(base, to + 2496, p.tire_wear_mode_address());
-  FloatWord(base, to + 2500, p.backfire_charge_address());
-  Byte(base, to + 2504, p.backfire_address());
-  FloatWord(base, to + 2508, p.backfire_strength_address());
-  Byte(base, to + 2512, p.unknown_2464_address());
+  Word(base, to.tire_wear_mode_address(), p.tire_wear_mode_address());
+  FloatWord(base, to.backfire_charge_address(), p.backfire_charge_address());
+  Byte(base, to.backfire_address(), p.backfire_address());
+  FloatWord(base, to.backfire_strength_address(), p.backfire_strength_address());
+  Byte(base, to.unknown_2512_address(), p.unknown_2464_address());
   for (uint32_t i = 0; i < 2; i++) {
-    FloatWord(base, to + 2516 + 4 * i, p.throttle_used_address() + 4 * i);
+    FloatWord(base, to.throttle_used_address() + 4 * i, p.throttle_used_address() + 4 * i);
   }
-  Word(base, to + 2524, p.unknown_2476_address());
+  Word(base, to.unknown_2524_address(), p.unknown_2476_address());
   for (uint32_t i = 0; i < 6; i++) {
-    Vec4(base, to + 2528 + 16 * i, p.axis_address() + 16 * i);
+    Vec4(base, to.axis_address() + 16 * i, p.axis_address() + 16 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    Byte(base, to + 2624 + i, p.unknown_2576_address() + i);
+    Byte(base, to.unknown_2624_address() + i, p.unknown_2576_address() + i);
   }
   for (uint32_t i = 0; i < 9; i++) {
-    FloatWord(base, to + 2628 + 4 * i, p.unknown_2580_address() + 4 * i);
+    FloatWord(base, to.unknown_2628_address() + 4 * i, p.unknown_2580_address() + 4 * i);
   }
-  Byte(base, to + 2664, p.surfaces_on_address());
-  FloatWord(base, to + 2924, p.unknown_2620_address());
-  Byte(base, to + 2928, p.at_rest_address());
+  Byte(base, to.surfaces_on_address(), p.surfaces_on_address());
+  FloatWord(base, to.unknown_2924_address(), p.unknown_2620_address());
+  Byte(base, to.at_rest_address(), p.at_rest_address());
   for (uint32_t i = 0; i < 4; i++) {
-    FloatWord(base, to + 2932 + 4 * i, p.unknown_2628_address() + 4 * i);
+    FloatWord(base, to.unknown_2932_address() + 4 * i, p.unknown_2628_address() + 4 * i);
   }
-  Byte(base, to + 2948, p.wastegate_open_address());
+  Byte(base, to.wastegate_open_address(), p.wastegate_open_address());
   for (uint32_t i = 0; i < 2; i++) {
-    FloatWord(base, to + 2952 + 4 * i, p.wastegate_address() + 4 * i);
+    FloatWord(base, to.wastegate_address() + 4 * i, p.wastegate_address() + 4 * i);
   }
-  Byte(base, to + 2960, p.blow_off_open_address());
+  Byte(base, to.blow_off_open_address(), p.blow_off_open_address());
   for (uint32_t i = 0; i < 5; i++) {
-    FloatWord(base, to + 2964 + 4 * i, p.blow_off_address() + 4 * i);
+    FloatWord(base, to.blow_off_address() + 4 * i, p.blow_off_address() + 4 * i);
   }
-  Word(base, to + 2984, p.track_position_address());
+  Word(base, to.track_position_address(), p.track_position_address());
   for (uint32_t i = 0; i < 2; i++) {
-    Memcpy(base, to + 2988 + 60 * i, p.steer_block_a_address() + 60 * i, 60, 0x821030D8);
+    Memcpy(base, to.steer_record_address() + 60 * i,
+        p.steer_block_a_address() + 60 * i, 60, 0x821030D8);
   }
   for (uint32_t i = 0; i < 6; i++) {
-    FloatWord(base, to + 3108 + 4 * i, p.steering_result_address() + 4 * i);
+    FloatWord(base, to.steering_result_address() + 4 * i, p.steering_result_address() + 4 * i);
   }
-  Byte(base, to + 3132, p.upright_address());
+  Byte(base, to.upright_address(), p.upright_address());
   for (uint32_t i = 0; i < 5; i++) {
-    FloatWord(base, to + 3136 + 4 * i, p.unknown_2832_address() + 4 * i);
+    FloatWord(base, to.unknown_3136_address() + 4 * i, p.unknown_2832_address() + 4 * i);
   }
-  Word(base, to + 3156, p.step_count_address());
+  Word(base, to.step_count_address(), p.step_count_address());
   for (uint32_t i = 0; i < 4; i++) {
-    Vec4(base, to + 3168 + 16 * i, p.unknown_2864_address() + 16 * i);
+    Vec4(base, to.unknown_3168_address() + 16 * i, p.unknown_2864_address() + 16 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    FloatWord(base, to + 3232 + 4 * i, p.brake_fade_address() + 4 * i);
+    FloatWord(base, to.brake_fade_address() + 4 * i, p.brake_fade_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    Byte(base, to + 3240 + i, p.backfire_latch_address() + i);
+    Byte(base, to.backfire_latch_address() + i, p.backfire_latch_address() + i);
   }
 }
 
 void Part464Restore(uint8_t* base, uint32_t part, uint32_t shape) {
   ITC_NATIVE_RUNNING("sub_82102AA8 Part464::Restore");
-  const uint32_t to = shape;
+  const schema::BoxShape to(base, shape);
   const Shape p(base, part);
   for (uint32_t i = 0; i < 5; i++) {
-    FloatWord(base, to + 16 + 4 * i, p.car_float_16_address() + 4 * i);
+    FloatWord(base, to.car_float_16_address() + 4 * i, p.car_float_16_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    Vec4(base, to + 48 + 16 * i, p.center_address() + 16 * i);
+    Vec4(base, to.center_address() + 16 * i, p.center_address() + 16 * i);
   }
-  WordToHalf(base, to + 112, p.unknown_448_address());
-  Vec4(base, to + 128, p.half_extent_address());
-  Vec4(base, to + 144, p.inverse_half_extent_address());
+  WordToHalf(base, to.unknown_112_address(), p.unknown_448_address());
+  Vec4(base, to.half_extent_address(), p.half_extent_address());
+  Vec4(base, to.inverse_half_extent_address(), p.inverse_half_extent_address());
   for (uint32_t i = 0; i < 8; i++) {
-    Vec4(base, to + 176 + 16 * i, p.corners_address() + 16 * i);
+    Vec4(base, to.corners_address() + 16 * i, p.corners_address() + 16 * i);
   }
-  FloatWord(base, to + 304, p.face_px_distance_address());
-  Vec4(base, to + 320, p.face_px_normal_address());
-  FloatWord(base, to + 336, p.face_py_distance_address());
-  Vec4(base, to + 352, p.face_py_normal_address());
-  FloatWord(base, to + 368, p.face_pz_distance_address());
-  Vec4(base, to + 384, p.face_pz_normal_address());
-  FloatWord(base, to + 400, p.face_nx_distance_address());
-  Vec4(base, to + 416, p.face_nx_normal_address());
-  FloatWord(base, to + 432, p.face_ny_distance_address());
-  Vec4(base, to + 448, p.face_ny_normal_address());
-  FloatWord(base, to + 464, p.face_nz_distance_address());
-  Vec4(base, to + 480, p.face_nz_normal_address());
+  FloatWord(base, to.face_px_distance_address(), p.face_px_distance_address());
+  Vec4(base, to.face_px_normal_address(), p.face_px_normal_address());
+  FloatWord(base, to.face_py_distance_address(), p.face_py_distance_address());
+  Vec4(base, to.face_py_normal_address(), p.face_py_normal_address());
+  FloatWord(base, to.face_pz_distance_address(), p.face_pz_distance_address());
+  Vec4(base, to.face_pz_normal_address(), p.face_pz_normal_address());
+  FloatWord(base, to.face_nx_distance_address(), p.face_nx_distance_address());
+  Vec4(base, to.face_nx_normal_address(), p.face_nx_normal_address());
+  FloatWord(base, to.face_ny_distance_address(), p.face_ny_distance_address());
+  Vec4(base, to.face_ny_normal_address(), p.face_ny_normal_address());
+  FloatWord(base, to.face_nz_distance_address(), p.face_nz_distance_address());
+  Vec4(base, to.face_nz_normal_address(), p.face_nz_normal_address());
 }
 
 uint32_t Member4080Restore(uint8_t* base, uint32_t part, uint32_t object) {
@@ -295,246 +303,249 @@ uint32_t Member4080Restore(uint8_t* base, uint32_t part, uint32_t object) {
   if (c.has_object() == 0 || object == 0) {
     return part;
   }
-  const uint32_t to = object;
-  Vec4(base, to + 48, c.box_min_address());
-  Vec4(base, to + 64, c.box_max_address());
-  Matrix(base, to + 80, c.motion_address());
+  const schema::CollisionObject to(base, object);
+  Vec4(base, to.address + 48, c.box_min_address());
+  Vec4(base, to.address + 64, c.box_max_address());
+  Matrix(base, to.address + 80, c.motion_address());
   // The shape (+20) and the second placed copy (+40) are read before the
   // stores, the first copy (+36) after them, as the original.
-  const uint32_t shape = guest::LoadU32(base, to + 20);
-  const uint32_t second = guest::LoadU32(base, to + 40);
-  FloatWord(base, to + 144, c.lowest_travel_address());
-  const uint32_t first = guest::LoadU32(base, to + 36);
-  guest::StoreU32(base, to + 32, shape);
+  const uint32_t shape = to.shape().address;
+  const uint32_t second = to.shape_current();
+  FloatWord(base, to.lowest_travel_address(), c.lowest_travel_address());
+  const uint32_t first = to.shape_previous();
+  to.set_shape_template(shape);
   Part464Restore(base, c.shape_previous_address(), first);
   Part464Restore(base, c.shape_current_address(), second);
-  Vec4(base, to + 160, c.push_address());
-  Vec4(base, to + 176, c.pair_torque_address());
-  Word(base, to + 192, c.push_count_address());
-  Vec4(base, to + 208, c.push_scale_address());
-  FloatWord(base, to + 224, c.torque_scale_address());
-  Word(base, to + 288, c.moved_address());
-  Vec4(base, to + 304, c.push_out_address());
-  return to + 304;
+  Vec4(base, to.push_x_address(), c.push_address());
+  Vec4(base, to.pair_torque_x_address(), c.pair_torque_address());
+  Word(base, to.push_count_address(), c.push_count_address());
+  Vec4(base, to.push_scale_x_address(), c.push_scale_address());
+  FloatWord(base, to.torque_scale_address(), c.torque_scale_address());
+  Word(base, to.moved_address(), c.moved_address());
+  Vec4(base, to.push_out_x_address(), c.push_out_address());
+  return to.push_out_x_address();
 }
 
 uint32_t Record5232Restore(uint8_t* base, uint32_t record, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_821044D8 Record5232::Restore");
   const Record r(base, record);
   Record5232RestoreTrack(base, record, vehicle);
-  BodyStateRestore(base, r.body_address(), guest::LoadU32(base, vehicle + 336));
+  BodyStateRestore(base, r.body_address(), schema::Vehicle(base, vehicle).body().address);
   Member1136Restore(base, r.physics_address(), vehicle);
-  return Member4080Restore(base, r.collision_address(), guest::LoadU32(base, vehicle + 340));
+  return Member4080Restore(base, r.collision_address(),
+                          schema::Vehicle(base, vehicle).collision_object());
 }
 
 // --- The saves ---
 
 void Record5232SaveTrack(uint8_t* base, uint32_t record, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_82104380 Record5232::SaveTrack");
-  const uint32_t from = vehicle;
+  const schema::Vehicle from(base, vehicle);
   const Record r(base, record);
-  Word(base, r.car_flags_address(), from + 6148);
-  Word(base, r.collision_flags_address(), from + 6152);
-  Memcpy(base, r.status_address(), from + 6160, 112, 0x821043B4);
+  Word(base, r.car_flags_address(), from.car_flags_address());
+  Word(base, r.collision_flags_address(), from.collision_flags_address());
+  Memcpy(base, r.status_address(), from.status_address(), 112, 0x821043B4);
   for (uint32_t i = 0; i < 5; i++) {
-    TrackPosition(base, r.track_positions_address() + 96 * i, from + 5232 + 96 * i);
+    TrackPosition(base, r.track_positions_address() + 96 * i,
+        from.own_track_position_address() + 96 * i);
   }
 }
 
 void BodyStateSave(uint8_t* base, uint32_t state, uint32_t body) {
   ITC_NATIVE_RUNNING("sub_821039F0 BodyState::Save");
-  const uint32_t from = body;
+  const schema::RigidBody from(base, body);
   const Body s(base, state);
-  Byte(base, s.fixed_address(), from + 0);
-  FloatWord(base, s.mass_address(), from + 4);
-  FloatWord(base, s.inverse_mass_address(), from + 8);
-  Vec4(base, s.center_of_mass_address(), from + 16);
-  Vec4(base, s.velocity_address(), from + 32);
-  FloatWord(base, s.speed_cap_address(), from + 48);
-  Vec4(base, s.force_address(), from + 64);
-  Dword(base, s.orientation_address(), from + 80);
-  Dword(base, s.orientation_address() + 8, from + 88);
-  Vec4(base, s.angular_velocity_address(), from + 96);
-  FloatWord(base, s.spin_cap_address(), from + 112);
-  Vec4(base, s.torque_address(), from + 128);
-  Vec4(base, s.velocity_direction_address(), from + 144);
-  FloatWord(base, s.speed_address(), from + 160);
-  FloatWord(base, s.linear_damping_address(), from + 164);
-  Vec4(base, s.momentum_address(), from + 176);
-  Vec4(base, s.center_of_mass_offset_address(), from + 192);
-  Vec4(base, s.origin_address(), from + 208);
-  Matrix(base, s.orientation_matrix_address(), from + 224);
-  Matrix(base, s.matrix_address(), from + 288);
-  Vec4(base, s.inertia_address(), from + 352);
-  Vec4(base, s.inverse_inertia_address(), from + 368);
-  FloatWord(base, s.angular_damping_address(), from + 384);
-  Vec4(base, s.angular_momentum_address(), from + 400);
-  Matrix(base, s.world_inverse_inertia_address(), from + 416);
-  Vec4(base, s.gravity_address(), from + 480);
-  Vec4(base, s.weight_address(), from + 496);
-  FloatWord(base, s.effective_mass_address(), from + 512);
+  Byte(base, s.fixed_address(), from.fixed_address());
+  FloatWord(base, s.mass_address(), from.mass_address());
+  FloatWord(base, s.inverse_mass_address(), from.inverse_mass_address());
+  Vec4(base, s.center_of_mass_address(), from.center_of_mass_address());
+  Vec4(base, s.velocity_address(), from.velocity_address());
+  FloatWord(base, s.speed_cap_address(), from.speed_cap_address());
+  Vec4(base, s.force_address(), from.force_address());
+  Dword(base, s.orientation_address(), from.orientation_address());
+  Dword(base, s.orientation_address() + 8, from.orientation_address() + 8);
+  Vec4(base, s.angular_velocity_address(), from.angular_velocity_address());
+  FloatWord(base, s.spin_cap_address(), from.spin_cap_address());
+  Vec4(base, s.torque_address(), from.torque_address());
+  Vec4(base, s.velocity_direction_address(), from.velocity_direction_address());
+  FloatWord(base, s.speed_address(), from.speed_address());
+  FloatWord(base, s.linear_damping_address(), from.linear_damping_address());
+  Vec4(base, s.momentum_address(), from.momentum_address());
+  Vec4(base, s.center_of_mass_offset_address(), from.center_of_mass_offset_address());
+  Vec4(base, s.origin_address(), from.origin_address());
+  Matrix(base, s.orientation_matrix_address(), from.orientation_matrix_address());
+  Matrix(base, s.matrix_address(), from.matrix_address());
+  Vec4(base, s.inertia_address(), from.inertia_address());
+  Vec4(base, s.inverse_inertia_address(), from.inverse_inertia_address());
+  FloatWord(base, s.angular_damping_address(), from.angular_damping_address());
+  Vec4(base, s.angular_momentum_address(), from.angular_momentum_address());
+  Matrix(base, s.world_inverse_inertia_address(), from.world_inverse_inertia_address());
+  Vec4(base, s.gravity_address(), from.gravity_address());
+  Vec4(base, s.weight_address(), from.weight_address());
+  FloatWord(base, s.effective_mass_address(), from.effective_mass_address());
 }
 
 void Member1136Save(uint8_t* base, uint32_t part, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_821034B8 Member1136::Save");
-  const uint32_t from = vehicle;
+  const schema::Vehicle from(base, vehicle);
   const Physics p(base, part);
   for (uint32_t i = 0; i < 3; i++) {
-    Vec4(base, p.body_row0_address() + 16 * i, from + 16 * i);
+    Vec4(base, p.body_row0_address() + 16 * i, from.body_row1_address() * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    FloatWord(base, p.speed_address() + 4 * i, from + 48 + 4 * i);
+    FloatWord(base, p.speed_address() + 4 * i, from.speed_address() + 4 * i);
   }
-  Vec4(base, p.angular_velocity_address(), from + 64);
+  Vec4(base, p.angular_velocity_address(), from.angular_velocity_address());
   for (uint32_t i = 0; i < 4; i++) {
-    FloatWord(base, p.unknown_80_address() + 4 * i, from + 80 + 4 * i);
+    FloatWord(base, p.unknown_80_address() + 4 * i, from.unknown_80_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    Vec4(base, p.ground_up_address() + 16 * i, from + 96 + 16 * i);
+    Vec4(base, p.ground_up_address() + 16 * i, from.ground_up_address() + 16 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    Matrix(base, p.ground_matrix_address() + 64 * i, from + 144 + 64 * i);
+    Matrix(base, p.ground_matrix_address() + 64 * i, from.ground_matrix_address() + 64 * i);
   }
-  Byte(base, p.speed_sensitive_steering_address(), from + 276);
+  Byte(base, p.speed_sensitive_steering_address(), from.speed_sensitive_steering_address());
   for (uint32_t i = 0; i < 14; i++) {
-    FloatWord(base, p.steering_input_address() + 4 * i, from + 280 + 4 * i);
+    FloatWord(base, p.steering_input_address() + 4 * i, from.steering_input_address() + 4 * i);
   }
-  Word(base, p.wheels_on_ground_address(), from + 348);
+  Word(base, p.wheels_on_ground_address(), from.wheels_on_ground_address());
   for (uint32_t i = 0; i < 4; i++) {
-    Vec4(base, p.unknown_336_address() + 16 * i, from + 352 + 16 * i);
+    Vec4(base, p.unknown_336_address() + 16 * i, from.unknown_352_address() + 16 * i);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    Wheel(base, p.wheel_0_address() + 368 * i, from + 416 + 368 * i);
+    Wheel(base, p.wheel_0_address() + 368 * i, from.wheels_address() + 368 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    WheelRecord2(base, p.front_axle_address() + 128 * i, from + 1888 + 128 * i);
+    WheelRecord2(base, p.front_axle_address() + 128 * i, from.front_axle_address() + 128 * i);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    Word(base, p.wheel_by_load_0_address() + 4 * i, from + 2176 + 4 * i);
+    Word(base, p.wheel_by_load_0_address() + 4 * i, from.wheels_by_load_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    FloatWord(base, p.driven_axle_spin_address() + 4 * i, from + 2192 + 4 * i);
+    FloatWord(base, p.driven_axle_spin_address() + 4 * i, from.driven_axle_spin_address() + 4 * i);
   }
-  Memcpy(base, p.drivetrain_block_address(), from + 2204, 144, 0x8210369C);
+  Memcpy(base, p.drivetrain_block_address(), from.unknown_2204_address(), 144, 0x8210369C);
   for (uint32_t i = 0; i < 5; i++) {
-    FloatWord(base, p.direction_address() + 4 * i, from + 2348 + 4 * i);
+    FloatWord(base, p.direction_address() + 4 * i, from.direction_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    Word(base, p.substep_count_address() + 4 * i, from + 2368 + 4 * i);
+    Word(base, p.substep_count_address() + 4 * i, from.substep_count_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 8; i++) {
-    Byte(base, p.unknown_2332_address() + i, from + 2380 + i);
+    Byte(base, p.unknown_2332_address() + i, from.unknown_2380_address() + i);
   }
-  FloatWord(base, p.value2388_address(), from + 2388);
-  Word(base, p.traction_counter_address(), from + 2392);
-  FloatWord(base, p.traction_limit_address(), from + 2396);
+  FloatWord(base, p.value2388_address(), from.value2388_address());
+  Word(base, p.traction_counter_address(), from.traction_counter_address());
+  FloatWord(base, p.traction_limit_address(), from.traction_limit_address());
   for (uint32_t i = 0; i < 2; i++) {
-    Byte(base, p.traction_active_address() + i, from + 2400 + i);
+    Byte(base, p.traction_active_address() + i, from.traction_active_address() + i);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    FloatWord(base, p.drag_scale_address() + 4 * i, from + 2404 + 4 * i);
+    FloatWord(base, p.drag_scale_address() + 4 * i, from.drag_scale_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    FloatWord(base, p.oil_factor_address() + 4 * i, from + 2428 + 4 * i);
+    FloatWord(base, p.oil_factor_address() + 4 * i, from.oil_factor_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    FloatWord(base, p.nitrous_factor_address() + 4 * i, from + 2416 + 4 * i);
+    FloatWord(base, p.nitrous_factor_address() + 4 * i, from.nitrous_factor_address() + 4 * i);
   }
-  Byte(base, p.nitrous_on_address(), from + 2424);
-  FloatWord(base, p.speed_squared_address(), from + 2440);
+  Byte(base, p.nitrous_on_address(), from.nitrous_on_address());
+  FloatWord(base, p.speed_squared_address(), from.speed_squared_address());
   for (uint32_t i = 0; i < 2; i++) {
-    Byte(base, p.unknown_2396_address() + i, from + 2444 + i);
+    Byte(base, p.unknown_2396_address() + i, from.unknown_2444_address() + i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    FloatWord(base, p.unknown_2400_address() + 4 * i, from + 2448 + 4 * i);
+    FloatWord(base, p.unknown_2400_address() + 4 * i, from.unknown_2448_address() + 4 * i);
   }
-  Byte(base, p.unknown_2408_address(), from + 2456);
+  Byte(base, p.unknown_2408_address(), from.unknown_2456_address());
   for (uint32_t i = 0; i < 2; i++) {
-    Vec4(base, p.body_force_address() + 16 * i, from + 2464 + 16 * i);
+    Vec4(base, p.body_force_address() + 16 * i, from.body_force_address() + 16 * i);
   }
-  Word(base, p.tire_wear_mode_address(), from + 2496);
-  FloatWord(base, p.backfire_charge_address(), from + 2500);
-  Byte(base, p.backfire_address(), from + 2504);
-  FloatWord(base, p.backfire_strength_address(), from + 2508);
-  Byte(base, p.unknown_2464_address(), from + 2512);
+  Word(base, p.tire_wear_mode_address(), from.tire_wear_mode_address());
+  FloatWord(base, p.backfire_charge_address(), from.backfire_charge_address());
+  Byte(base, p.backfire_address(), from.backfire_address());
+  FloatWord(base, p.backfire_strength_address(), from.backfire_strength_address());
+  Byte(base, p.unknown_2464_address(), from.unknown_2512_address());
   for (uint32_t i = 0; i < 2; i++) {
-    FloatWord(base, p.throttle_used_address() + 4 * i, from + 2516 + 4 * i);
+    FloatWord(base, p.throttle_used_address() + 4 * i, from.throttle_used_address() + 4 * i);
   }
-  Word(base, p.unknown_2476_address(), from + 2524);
+  Word(base, p.unknown_2476_address(), from.unknown_2524_address());
   for (uint32_t i = 0; i < 6; i++) {
-    Vec4(base, p.axis_address() + 16 * i, from + 2528 + 16 * i);
+    Vec4(base, p.axis_address() + 16 * i, from.axis_address() + 16 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    Byte(base, p.unknown_2576_address() + i, from + 2624 + i);
+    Byte(base, p.unknown_2576_address() + i, from.unknown_2624_address() + i);
   }
   for (uint32_t i = 0; i < 9; i++) {
-    FloatWord(base, p.unknown_2580_address() + 4 * i, from + 2628 + 4 * i);
+    FloatWord(base, p.unknown_2580_address() + 4 * i, from.unknown_2628_address() + 4 * i);
   }
-  Byte(base, p.surfaces_on_address(), from + 2664);
-  FloatWord(base, p.unknown_2620_address(), from + 2924);
-  Byte(base, p.at_rest_address(), from + 2928);
+  Byte(base, p.surfaces_on_address(), from.surfaces_on_address());
+  FloatWord(base, p.unknown_2620_address(), from.unknown_2924_address());
+  Byte(base, p.at_rest_address(), from.at_rest_address());
   for (uint32_t i = 0; i < 4; i++) {
-    FloatWord(base, p.unknown_2628_address() + 4 * i, from + 2932 + 4 * i);
+    FloatWord(base, p.unknown_2628_address() + 4 * i, from.unknown_2932_address() + 4 * i);
   }
-  Byte(base, p.wastegate_open_address(), from + 2948);
+  Byte(base, p.wastegate_open_address(), from.wastegate_open_address());
   for (uint32_t i = 0; i < 2; i++) {
-    FloatWord(base, p.wastegate_address() + 4 * i, from + 2952 + 4 * i);
+    FloatWord(base, p.wastegate_address() + 4 * i, from.wastegate_address() + 4 * i);
   }
-  Byte(base, p.blow_off_open_address(), from + 2960);
+  Byte(base, p.blow_off_open_address(), from.blow_off_open_address());
   for (uint32_t i = 0; i < 5; i++) {
-    FloatWord(base, p.blow_off_address() + 4 * i, from + 2964 + 4 * i);
+    FloatWord(base, p.blow_off_address() + 4 * i, from.blow_off_address() + 4 * i);
   }
-  Word(base, p.track_position_address(), from + 2984);
+  Word(base, p.track_position_address(), from.track_position_address());
   for (uint32_t i = 0; i < 2; i++) {
-    Memcpy(base, p.steer_block_a_address() + 60 * i, from + 2988 + 60 * i, 60, 0x82103928);
+    Memcpy(base, p.steer_block_a_address() + 60 * i,
+        from.steer_record_address() + 60 * i, 60, 0x82103928);
   }
   for (uint32_t i = 0; i < 6; i++) {
-    FloatWord(base, p.steering_result_address() + 4 * i, from + 3108 + 4 * i);
+    FloatWord(base, p.steering_result_address() + 4 * i, from.steering_result_address() + 4 * i);
   }
-  Byte(base, p.upright_address(), from + 3132);
+  Byte(base, p.upright_address(), from.upright_address());
   for (uint32_t i = 0; i < 5; i++) {
-    FloatWord(base, p.unknown_2832_address() + 4 * i, from + 3136 + 4 * i);
+    FloatWord(base, p.unknown_2832_address() + 4 * i, from.unknown_3136_address() + 4 * i);
   }
-  Word(base, p.step_count_address(), from + 3156);
+  Word(base, p.step_count_address(), from.step_count_address());
   for (uint32_t i = 0; i < 4; i++) {
-    Vec4(base, p.unknown_2864_address() + 16 * i, from + 3168 + 16 * i);
+    Vec4(base, p.unknown_2864_address() + 16 * i, from.unknown_3168_address() + 16 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    FloatWord(base, p.brake_fade_address() + 4 * i, from + 3232 + 4 * i);
+    FloatWord(base, p.brake_fade_address() + 4 * i, from.brake_fade_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    Byte(base, p.backfire_latch_address() + i, from + 3240 + i);
+    Byte(base, p.backfire_latch_address() + i, from.backfire_latch_address() + i);
   }
 }
 
 void Part464Save(uint8_t* base, uint32_t part, uint32_t shape) {
   ITC_NATIVE_RUNNING("sub_82103300 Part464::Save");
-  const uint32_t from = shape;
+  const schema::BoxShape from(base, shape);
   const Shape p(base, part);
   for (uint32_t i = 0; i < 5; i++) {
-    FloatWord(base, p.car_float_16_address() + 4 * i, from + 16 + 4 * i);
+    FloatWord(base, p.car_float_16_address() + 4 * i, from.car_float_16_address() + 4 * i);
   }
   for (uint32_t i = 0; i < 4; i++) {
-    Vec4(base, p.center_address() + 16 * i, from + 48 + 16 * i);
+    Vec4(base, p.center_address() + 16 * i, from.center_address() + 16 * i);
   }
-  HalfToWord(base, p.unknown_448_address(), from + 112);
-  Vec4(base, p.half_extent_address(), from + 128);
-  Vec4(base, p.inverse_half_extent_address(), from + 144);
+  HalfToWord(base, p.unknown_448_address(), from.unknown_112_address());
+  Vec4(base, p.half_extent_address(), from.half_extent_address());
+  Vec4(base, p.inverse_half_extent_address(), from.inverse_half_extent_address());
   for (uint32_t i = 0; i < 8; i++) {
-    Vec4(base, p.corners_address() + 16 * i, from + 176 + 16 * i);
+    Vec4(base, p.corners_address() + 16 * i, from.corners_address() + 16 * i);
   }
-  FloatWord(base, p.face_px_distance_address(), from + 304);
-  Vec4(base, p.face_px_normal_address(), from + 320);
-  FloatWord(base, p.face_py_distance_address(), from + 336);
-  Vec4(base, p.face_py_normal_address(), from + 352);
-  FloatWord(base, p.face_pz_distance_address(), from + 368);
-  Vec4(base, p.face_pz_normal_address(), from + 384);
-  FloatWord(base, p.face_nx_distance_address(), from + 400);
-  Vec4(base, p.face_nx_normal_address(), from + 416);
-  FloatWord(base, p.face_ny_distance_address(), from + 432);
-  Vec4(base, p.face_ny_normal_address(), from + 448);
-  FloatWord(base, p.face_nz_distance_address(), from + 464);
-  Vec4(base, p.face_nz_normal_address(), from + 480);
+  FloatWord(base, p.face_px_distance_address(), from.face_px_distance_address());
+  Vec4(base, p.face_px_normal_address(), from.face_px_normal_address());
+  FloatWord(base, p.face_py_distance_address(), from.face_py_distance_address());
+  Vec4(base, p.face_py_normal_address(), from.face_py_normal_address());
+  FloatWord(base, p.face_pz_distance_address(), from.face_pz_distance_address());
+  Vec4(base, p.face_pz_normal_address(), from.face_pz_normal_address());
+  FloatWord(base, p.face_nx_distance_address(), from.face_nx_distance_address());
+  Vec4(base, p.face_nx_normal_address(), from.face_nx_normal_address());
+  FloatWord(base, p.face_ny_distance_address(), from.face_ny_distance_address());
+  Vec4(base, p.face_ny_normal_address(), from.face_ny_normal_address());
+  FloatWord(base, p.face_nz_distance_address(), from.face_nz_distance_address());
+  Vec4(base, p.face_nz_normal_address(), from.face_nz_normal_address());
 }
 
 uint32_t Member4080Save(uint8_t* base, uint32_t part, uint32_t object) {
@@ -544,23 +555,23 @@ uint32_t Member4080Save(uint8_t* base, uint32_t part, uint32_t object) {
     c.set_has_object(0);
     return part;
   }
-  const uint32_t from = object;
+  const schema::CollisionObject from(base, object);
   c.set_has_object(1);
-  Vec4(base, c.box_min_address(), from + 48);
-  Vec4(base, c.box_max_address(), from + 64);
-  Matrix(base, c.motion_address(), from + 80);
-  FloatWord(base, c.lowest_travel_address(), from + 144);
-  const uint32_t second = guest::LoadU32(base, from + 40);
-  const uint32_t first = guest::LoadU32(base, from + 36);
+  Vec4(base, c.box_min_address(), from.address + 48);
+  Vec4(base, c.box_max_address(), from.address + 64);
+  Matrix(base, c.motion_address(), from.address + 80);
+  FloatWord(base, c.lowest_travel_address(), from.lowest_travel_address());
+  const uint32_t second = from.shape_current();
+  const uint32_t first = from.shape_previous();
   Part464Save(base, c.shape_previous_address(), first);
   Part464Save(base, c.shape_current_address(), second);
-  Vec4(base, c.push_address(), from + 160);
-  Vec4(base, c.pair_torque_address(), from + 176);
-  Word(base, c.push_count_address(), from + 192);
-  Vec4(base, c.push_scale_address(), from + 208);
-  FloatWord(base, c.torque_scale_address(), from + 224);
-  Word(base, c.moved_address(), from + 288);
-  Vec4(base, c.push_out_address(), from + 304);
+  Vec4(base, c.push_address(), from.push_x_address());
+  Vec4(base, c.pair_torque_address(), from.pair_torque_x_address());
+  Word(base, c.push_count_address(), from.push_count_address());
+  Vec4(base, c.push_scale_address(), from.push_scale_x_address());
+  FloatWord(base, c.torque_scale_address(), from.torque_scale_address());
+  Word(base, c.moved_address(), from.moved_address());
+  Vec4(base, c.push_out_address(), from.push_out_x_address());
   return c.push_out_address();
 }
 
@@ -568,9 +579,10 @@ uint32_t Record5232Save(uint8_t* base, uint32_t record, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_82104538 Record5232::Save");
   const Record r(base, record);
   Record5232SaveTrack(base, record, vehicle);
-  BodyStateSave(base, r.body_address(), guest::LoadU32(base, vehicle + 336));
+  BodyStateSave(base, r.body_address(), schema::Vehicle(base, vehicle).body().address);
   Member1136Save(base, r.physics_address(), vehicle);
-  return Member4080Save(base, r.collision_address(), guest::LoadU32(base, vehicle + 340));
+  return Member4080Save(base, r.collision_address(),
+                          schema::Vehicle(base, vehicle).collision_object());
 }
 
 uint32_t RaceSnapshotSave(uint8_t* base, uint32_t block) {
@@ -579,27 +591,29 @@ uint32_t RaceSnapshotSave(uint8_t* base, uint32_t block) {
   b.set_unknown_2292(0);
   for (uint32_t i = 0; i < 7; i++) {
     const uint32_t vehicle = vehicle_accessors::VehicleGet(base, i);
-    if (guest::LoadU32(base, vehicle + 6148) != 0) {
+    if (schema::Vehicle(base, vehicle).car_flags() != 0) {
       Record5232Save(base, b.records_address() + Record::kSize * i, vehicle);
     }
   }
   // The manager's entries and counts into the block's head.
-  const uint32_t manager = G::racers_manager(base);
+  const schema::RaceManager manager(base, G::racers_manager(base));
   for (uint32_t i = 0; i < 77; i++) {
-    Memcpy(base, b.entries_address() + 28 * i, manager + 4 + 28 * i, 28, 0x82104B28);
+    Memcpy(base, b.entries_address() + 28 * i, manager.entries_address() + 28 * i, 28,
+           0x82104B28);
   }
   for (uint32_t i = 0; i < 3; i++) {
-    Memcpy(base, b.traffic_entries_address() + 28 * i, manager + 2160 + 28 * i, 28, 0x82104B54);
+    Memcpy(base, b.traffic_entries_address() + 28 * i,
+           manager.traffic_entries_address() + 28 * i, 28, 0x82104B54);
   }
   for (uint32_t i = 0; i < 7; i++) {
-    Word(base, b.slot_0_address() + 4 * i, manager + 2336 + 4 * i);
+    Word(base, b.slot_0_address() + 4 * i, manager.vehicle_slots_address() + 4 * i);
   }
-  Word(base, b.racer_count_address(), manager + 2364);
-  Word(base, b.entry_count_address(), manager + 2368);
-  Word(base, b.opponent_count_address(), manager + 2372);
-  Word(base, b.traffic_listed_address(), manager + 2376);
-  Word(base, b.traffic_count_address(), manager + 2380);
-  Word(base, b.unknown_2288_address(), manager + 2388);
+  Word(base, b.racer_count_address(), manager.racer_count_address());
+  Word(base, b.entry_count_address(), manager.entry_count_address());
+  Word(base, b.opponent_count_address(), manager.opponents_with_vehicle_address());
+  Word(base, b.traffic_listed_address(), manager.traffic_with_vehicle_address());
+  Word(base, b.traffic_count_address(), manager.traffic_allowed_address());
+  Word(base, b.unknown_2288_address(), manager.traffic_ticks_address());
   return b.traffic_entries_address() + 28 * 2;  // the last memcpy's r3
 }
 
@@ -761,7 +775,8 @@ uint32_t Member1136Copy(uint8_t* base, uint32_t out, uint32_t record) {
   }
   Word(base, o.track_position_address(), p.track_position_address());
   for (uint32_t i = 0; i < 2; i++) {
-    Memcpy(base, o.steer_block_a_address() + 60 * i, p.steer_block_a_address() + 60 * i, 60, 0x82104108);
+    Memcpy(base, o.steer_block_a_address() + 60 * i,
+        p.steer_block_a_address() + 60 * i, 60, 0x82104108);
   }
   for (uint32_t i = 0; i < 6; i++) {
     FloatWord(base, o.steering_result_address() + 4 * i, p.steering_result_address() + 4 * i);
@@ -872,77 +887,81 @@ uint32_t ReplayKeep(uint8_t* base, uint32_t replay, uint32_t race, uint32_t reco
                     uint32_t save, uint32_t from_stage, uint32_t frame,
                     const StagesCopyOriginal& stages_copy) {
   ITC_NATIVE_RUNNING("sub_82104F68 Replay::Keep");
-  const uint32_t r = replay, d = race;
-  Memcpy(base, r + 52, d + 4, 32, 0x82104FB0);
+  const schema::KeptReplay r(base, replay);
+  const schema::RaceData d(base, race);
+  Memcpy(base, r.race_words_address(), d.route_address(), 32, 0x82104FB0);
   // The car count and the three words after it (stored 84, 92, 96, 88).
-  Word(base, r + 84, d + 0x59610);
-  Word(base, r + 92, d + 0x59618);
-  Word(base, r + 96, d + 0x5961C);
-  Word(base, r + 88, d + 0x59614);
-  Word(base, r + 0x2B5E8, d + 0xA3AE0);
+  Word(base, r.race_word_59610_address(), d.car_count_address());
+  Word(base, r.race_word_59618_address(), d.word_59618_address());
+  Word(base, r.race_word_5961C_address(), d.word_5961c_address());
+  Word(base, r.race_word_59614_address(), d.added_count_address());
+  Word(base, r.race_word_A3AE0_address(), d.random_10_address());
   // The 93 racer records' entries (their source through the empty
-  // sub_82106540: nothing done).
+  // sub_82106540: nothing done). The kept replay names entry 0's words, so
+  // entry k is a view 1,908 * k bytes on; the race data's racer records
+  // (3,936 bytes from +48) stay offsets.
   for (uint32_t k = 0; k < 93; k++) {
-    const uint32_t record = d + 48 + 3936 * k;
-    const uint32_t entry = r + 100 + 1908 * k;
-    Memcpy(base, entry + 8, record, 1884, 0x8210502C);
-    guest::StoreU16(base, entry + 1892, guest::LoadU16(base, record + 3904));
-    guest::StoreU16(base, entry + 1894, guest::LoadU16(base, record + 3906));
-    FloatWord(base, entry + 1896, record + 3908);
-    Word(base, entry + 1900, record + 3912);
-    FloatWord(base, entry + 1904, record + 3920);
-    Word(base, entry + 0, record + 3888);
-    Word(base, entry + 4, record + 3892);
+    const uint32_t record = d.racer_records_address() + 3936 * k;
+    const schema::KeptReplay entry(base, replay + 1908 * k);
+    Memcpy(base, entry.racer_flags_address() + 8, record, 1884, 0x8210502C);
+    guest::StoreU16(base, entry.racer_start_position_address(),
+                    guest::LoadU16(base, record + 3904));
+    guest::StoreU16(base, entry.racer_half_1894_address(), guest::LoadU16(base, record + 3906));
+    FloatWord(base, entry.racer_word_3908_address(), record + 3908);
+    Word(base, entry.racer_id_address(), record + 3912);
+    FloatWord(base, entry.racer_word_3920_address(), record + 3920);
+    Word(base, entry.racer_flags_address(), record + 3888);
+    Word(base, entry.racer_word_3892_address(), record + 3892);
   }
   // The stage: the last (-1), or the list's current - 1 with `from_stage`,
   // into the frame's +80, then to +0x2B588.
-  const uint32_t stages = d + 0x59620;
-  const uint32_t stage =
-      from_stage != 0 ? guest::LoadU32(base, stages + 804) - 1 : 0xFFFFFFFFu;
-  if (!vehicle_accessors::StagesCopy(base, frame + 80, stages, stage)) {
-    stages_copy(frame + 80, stages, stage, frame);
+  const schema::Stages stages(base, d.stages_address());
+  const uint32_t stage = from_stage != 0 ? stages.current() - 1 : 0xFFFFFFFFu;
+  if (!vehicle_accessors::StagesCopy(base, frame + 80, stages.address, stage)) {
+    stages_copy(frame + 80, stages.address, stage, frame);
   }
-  Memcpy(base, r + 0x2B588, frame + 80, 80, 0x821050B4);
+  Memcpy(base, r.stage_address(), frame + 80, 80, 0x821050B4);
   // The last kept result's +3916 to +3928.
   const uint32_t last = vehicle_accessors::RacerRecordsAt(
-      base, G::race_data(base) + 0x59AE8, 0xFFFFFFFFu);
+      base, schema::RaceData(base, G::race_data(base)).results_address(), 0xFFFFFFFFu);
   for (uint32_t i = 0; i < 4; i++) {
-    Word(base, r + 0x2B5D8 + 4 * i, last + 3916 + 4 * i);
+    Word(base, r.result_3916_address() + 4 * i, last + 3916 + 4 * i);
   }
   for (uint32_t i = 0; i < 5; i++) {
-    Word(base, r + 0x2B5EC + 4 * i, d + 0xA3AE4 + 4 * i);
+    Word(base, r.race_words_A3AE4_address() + 4 * i, d.replay_word_address() + 4 * i);
   }
-  RaceSnapshotCopy(base, r + 0x2B610, recordings + 0x20F590);
-  Memcpy(base, r + 0x34E20, recordings, 0x107AC4, 0x82105160);
+  RaceSnapshotCopy(base, r.snapshot_address(), recordings + 0x20F590);
+  Memcpy(base, r.recording_address(), recordings, 0x107AC4, 0x82105160);
   {
-    const uint32_t w0 = guest::LoadU32(base, r + 52);
-    const uint32_t w1 = guest::LoadU32(base, r + 76);
-    const uint32_t w2 = guest::LoadU32(base, r + 80);
-    guest::StoreU32(base, r + 0, w0);
-    guest::StoreU32(base, r + 4, w1);
-    guest::StoreU32(base, r + 8, w2);
+    const uint32_t w0 = guest::LoadU32(base, r.race_words_address());
+    const uint32_t w1 = guest::LoadU32(base, r.race_words_address() + 24);
+    const uint32_t w2 = guest::LoadU32(base, r.race_words_address() + 28);
+    r.set_race_word_4(w0);
+    r.set_race_word_28(w1);
+    r.set_race_word_32(w2);
   }
   // The four racers the stage lists: their entries' +20.
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t racer = guest::LoadU32(base, r + 0x2B5B4 + 8 * i);
-    guest::StoreU32(base, r + 12 + 4 * i, guest::LoadU32(base, r + 1908 * racer + 120));
+    const uint32_t racer = guest::LoadU32(base, r.stage_word_44_address() + 8 * i);
+    guest::StoreU32(base, r.racer_record_words_address() + 4 * i,
+                    guest::LoadU32(base, r.racer_flags_address() + 1908 * racer + 20));
   }
-  Word(base, r + 28, r + 0x2B588);
+  Word(base, r.stage_word_0_address(), r.stage_address());
   if (save != 0) {
     for (uint32_t i = 0; i < 5; i++) {
-      Word(base, r + 32 + 4 * i, save + 8 + 4 * i);
+      Word(base, r.save_pick_address() + 4 * i, save + 8 + 4 * i);
     }
   } else {
-    guest::StoreU8(base, r + 32, 0);
-    guest::StoreU32(base, r + 36, 6);
-    guest::StoreU16(base, r + 40, 0);
-    guest::StoreU8(base, r + 42, 1);
-    guest::StoreU32(base, r + 44, 6);
-    guest::StoreU16(base, r + 48, 0);
-    guest::StoreU8(base, r + 50, 1);
+    r.set_save_pick_flag(0);
+    r.set_save_pick_4(6);
+    r.set_save_pick_8(0);
+    r.set_save_pick_10(1);
+    r.set_save_pick_12(6);
+    r.set_save_pick_16(0);
+    r.set_save_pick_18(1);
   }
-  guest::StoreU32(base, r + 0x2B600, 0);
-  return r + 0x34E20;  // the last memcpy's r3
+  r.set_unfilled(0);
+  return r.recording_address();  // the last memcpy's r3
 }
 
 }  // namespace replay_snapshots

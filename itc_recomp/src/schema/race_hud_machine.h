@@ -354,11 +354,15 @@ struct RaceHudMachineGlobals {
   static void set_holder(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D84F0u, v); }
   static constexpr uint32_t holder_address() { return 0x826D84F0u; }
   // the race data (the measure's Racers): +0xA3AF0 the race kind, +0xA3AF4 the race mode, +0x59620 the stages, +0x59AE8 the racer records
-  static View race_data(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  template <typename T = RaceData>
+  static T race_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  static void set_race_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B2Cu, v.address); }
   static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
   static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
   // the racers' manager (the measure's Race): +2308 the player's MinimapRacerEntry
-  static View racers_manager(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D82F4u)); }
+  template <typename T = RaceManager>
+  static T racers_manager(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D82F4u)); }
+  static void set_racers_manager(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D82F4u, v.address); }
   static void set_racers_manager(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D82F4u, v); }
   static constexpr uint32_t racers_manager_address() { return 0x826D82F4u; }
   // the race's progress: +2184 its results record (RacerResultsRecord)
@@ -366,7 +370,9 @@ struct RaceHudMachineGlobals {
   static void set_race_progress(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D82E8u, v); }
   static constexpr uint32_t race_progress_address() { return 0x826D82E8u; }
   // the network mode's session (0 in play): PauseUpdate's answer 9 with the mode 7 sets its +240
-  static View network_session(uint8_t* base) { return View(base, guest::LoadU32(base, 0x82816E3Cu)); }
+  template <typename T = Session>
+  static T network_session(uint8_t* base) { return T(base, guest::LoadU32(base, 0x82816E3Cu)); }
+  static void set_network_session(uint8_t* base, const View& v) { guest::StoreU32(base, 0x82816E3Cu, v.address); }
   static void set_network_session(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x82816E3Cu, v); }
   static constexpr uint32_t network_session_address() { return 0x82816E3Cu; }
   // 10.0 (AwardPrize: the route distance's factor)

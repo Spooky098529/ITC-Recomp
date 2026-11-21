@@ -38,9 +38,6 @@ using Calls = race_hud_object::Calls;
 constexpr uint32_t kMovie = 3;
 constexpr uint32_t kAsset = 22554;
 
-// The current mode's type (2 or 5 post Close's message).
-constexpr uint32_t kModeType = 0x826032DC;
-
 // The callees by address.
 constexpr uint32_t kVirtualAlloc = 0x82295398;
 constexpr uint32_t kVirtualFree = 0x82295330;

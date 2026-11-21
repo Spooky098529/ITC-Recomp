@@ -171,9 +171,10 @@ struct CommandWritePosition : View {
 struct CommandFlushAddress : View {
   using View::View;
   static constexpr uint32_t kSize = 4;
-  uint32_t address() const { return guest::LoadU32(base, address + 0); }
-  void set_address(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
-  uint32_t address_address() const { return address + 0; }
+  // the block's physical address (`address` would hide the view's own)
+  uint32_t block_address() const { return guest::LoadU32(base, address + 0); }
+  void set_block_address(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t block_address_address() const { return address + 0; }
 };
 
 // gpu; measure: Device::WriteFlushPackets.r5

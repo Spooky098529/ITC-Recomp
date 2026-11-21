@@ -6,6 +6,7 @@
 #include "lifted/functions.h"
 #include "lifted/names.h"
 #include "lifted/sdk.h"
+#include "schema/framework.h"
 #include "schema/heap.h"
 
 #include "base/flags.h"
@@ -1683,7 +1684,7 @@ lifted::Result f82091070(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // stw r11,-12160(r10)
   guest::StoreU32(base, uint32_t(r10) + -12160, uint32_t(r11));
   // lwz r3,48(r31)
-  r3 = guest::LoadU32(base, schema::DebugText(base, uint32_t(r31)).unknown_48_address());
+  r3 = guest::LoadU32(base, schema::DebugText(base, uint32_t(r31)).font_data_address());
   // cmplwi r3,0
   cr0 = lifted::Compare<uint32_t>(uint32_t(r3), 0, so);
   // beq 0x820910b8
@@ -1694,7 +1695,7 @@ lifted::Result f82091070(uint8_t* base, uint64_t r1, uint64_t r13, uint64_t r3, 
   // li r11,0
   r11 = uint64_t(int64_t(0));
   // stw r11,48(r31)
-  guest::StoreU32(base, schema::DebugText(base, uint32_t(r31)).unknown_48_address(), uint32_t(r11));
+  guest::StoreU32(base, schema::DebugText(base, uint32_t(r31)).font_data_address(), uint32_t(r11));
 loc_820910B8:
   // lis r10,-32256
   r10 = uint64_t(int64_t(-2113929216));
@@ -1719,13 +1720,13 @@ loc_820910B8:
   // addi r6,r6,3400
   r6 = uint64_t(int64_t(int64_t(r6) + 3400));
   // stw r10,24(r11)
-  guest::StoreU32(base, schema::DebugText(base, uint32_t(r11) - 8).vtable_32_address(), uint32_t(r10));
+  guest::StoreU32(base, schema::DebugText(base, uint32_t(r11) - 8).job_delegate_vtable_address(), uint32_t(r10));
   // stw r9,4(r11)
-  guest::StoreU32(base, schema::DebugText(base, uint32_t(r11) - 8).vtable_12_address(), uint32_t(r9));
+  guest::StoreU32(base, schema::DebugText(base, uint32_t(r11) - 8).job_vtable_4_address(), uint32_t(r9));
   // stw r8,4(r11)
-  guest::StoreU32(base, schema::DebugText(base, uint32_t(r11) - 8).vtable_12_address(), uint32_t(r8));
+  guest::StoreU32(base, schema::DebugText(base, uint32_t(r11) - 8).job_vtable_4_address(), uint32_t(r8));
   // stw r7,0(r11)
-  guest::StoreU32(base, schema::DebugText(base, uint32_t(r11) - 8).vtable_8_address(), uint32_t(r7));
+  guest::StoreU32(base, schema::DebugText(base, uint32_t(r11) - 8).job_vtable_address(), uint32_t(r7));
   // stw r6,0(r31)
   guest::StoreU32(base, schema::DebugText(base, uint32_t(r31)).vtable_address(), uint32_t(r6));
   // addi r1,r1,96

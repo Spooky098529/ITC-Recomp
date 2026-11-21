@@ -267,17 +267,7 @@ fields = [
   { name = "slot2", offset = 8, type = "fn" },
 ]
 
-# A logic_error-like exception (probably): sub_820919B8 makes it (+0 its
-# vtable, +4 a word from the image, a std::string from +8),
-# sub_820915F8 destroys it.
-[StdLogicError]
-measures = ["sub_820919B8.r3", "sub_820915F8.r3"]
-size = 8
-origin = "embedded"
-fields = [
-  { name = "vtable", offset = 0, type = "u32" },
-  { name = "what", offset = 4, type = "u32", note = "probably" },
-]
+# StdLogicError: merged into heap.toml's StdException at the integration (the same object).
 
 # A vector of words (sub_820A9330: an element by index, with its checks).
 [StdWordVector]
@@ -317,4 +307,3 @@ degree = { address = 0x82002948, type = "f32", note = "pi / 180 (BuildRings)" }
 ring_step = { address = 0x82008810, type = "f32", note = "0.035 (BuildRings: the radius step)" }
 one = { address = 0x82000A30, type = "f32", note = "1.0 (SetSpeed's clamp)" }
 zero = { address = 0x82000A34, type = "f32", note = "0.0 (SetSpeed's clamp)" }
-video_app = { address = 0x8266D088, type = "u32", note = "the video output's way in (its slot 7, then that object's slot 3; app-start-up.toml's scene_target_app)" }

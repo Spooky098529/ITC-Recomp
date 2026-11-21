@@ -517,7 +517,7 @@ struct TextureSlot : View {
   uint32_t texture_address() const { return address + 0; }
 };
 
-// image; measure: TextureProvider.+0, Model.+80
+// image; measure: TextureProvider.+0, Model.+80, SceneAssets.+144, SceneAssets.+164, SceneAssets.+232, SceneAssets.+300, SceneAssets.+368, SceneAssets.+1000, SceneAssets.+1068, SceneAssets.+4800, CarScene::OnFileLoaded.r6.+296, CarScene::OnFileLoaded.r6.+364, CarScene::OnFileLoaded.r6.+432, CarScene::OnFileLoaded.r6.+1064, CarScene::OnFileLoaded.r6.+1132, CarModelLoads.+320, Cockpit.+496, WheelsLoads.+2048, TrafficCar.+4064, TrafficCar::OnFileLoaded.r6.+4064
 struct TextureProviderVtable : View {
   using View::View;
   static constexpr uint32_t kSize = 44;
@@ -658,7 +658,7 @@ struct MemoryBlock : View {
   uint32_t attributes_address() const { return address + -4084; }
 };
 
-// allocated; measure: new<?>@sub_8258E138
+// allocated; measure: new<?>@sub_8258E138, new<?>@Memory::AllocPhysicalEx, [8296BD58].+0.+8
 struct MemoryBlockHeader : View {
   using View::View;
   static constexpr uint32_t kSize = 4096;
@@ -695,7 +695,7 @@ struct PendingFreesList : View {
   uint32_t size_address() const { return address + 8; }
 };
 
-// allocated; measure: new<12>@PendingFrees::Insert, PendingFrees::Insert.r4
+// allocated; measure: new<12>@PendingFrees::Insert, PendingFrees::Insert.r4, [8296BD58], [8296BD58].+0, [8296BD58].+0.+4
 struct PendingFreesNode : View {
   using View::View;
   static constexpr uint32_t kSize = 12;
@@ -941,7 +941,7 @@ struct SkeletonNodeState : View {
   uint32_t scale_z_address() const { return address + 40; }
 };
 
-// allocated; measure: Skeleton.+148
+// allocated; measure: Skeleton.+148, Cockpit::OnFileLoaded.r6.+3472
 struct SkeletonMatrix : View {
   using View::View;
   static constexpr uint32_t kSize = 64;

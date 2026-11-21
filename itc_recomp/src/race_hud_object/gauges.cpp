@@ -180,9 +180,9 @@ uint32_t SetBar(uint8_t* base, uint32_t hud, double value, uint32_t sp) {
 void ResetBar(uint8_t* base, uint32_t hud) {
   ITC_NATIVE_RUNNING("sub_82212668 RaceHud::ResetBar");
   const Hud h(base, hud);
-  const uint32_t car = h.vehicle().address;
-  h.set_bar_max(float(Lfs(base, car + 2420)));
-  const double value = Lfs(base, car + 2420);
+  const schema::Vehicle car = h.vehicle();
+  h.set_bar_max(float(double(car.nitrous_value())));
+  const double value = double(car.nitrous_value());
   const double zero = Lfs(base, kZero);
   h.set_bar_value(float(value));
   h.set_bar_min(float(zero));
@@ -207,7 +207,7 @@ uint32_t Touching(uint8_t* base, uint32_t player, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82215820 RaceHud::Touching");
   Frame(base, sp, 96);
   const uint32_t vehicle = vehicle_accessors::VehicleGet(base, player);
-  const uint32_t object = guest::LoadU32(base, vehicle + 340);
+  const uint32_t object = schema::Vehicle(base, vehicle).collision_object();
   if (object == 0) {
     return 0;
   }

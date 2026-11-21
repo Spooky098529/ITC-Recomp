@@ -20,7 +20,10 @@
 # docs/functions/scene.md's layout, docs/known-data.md's "scene pass
 # description" and "car scene (the draw's reads)").
 [CarScene]
-measures = ["CarScene", "Car.+5116"]
+# measures from SecondSetSceneRef (second-set), merged at the integration
+measures = ["CarScene", "Car.+5116",
+            "CarScene::OnFileLoaded.r6", "VirtualFree.ret",
+  "PartsPoints.+37088"]
 size = 5536
 origin = "allocated"
 fields = [
@@ -143,6 +146,42 @@ fields = [
   { name = "cone_b_hi", offset = 5512, type = "u64" },
   { name = "cone_b_w", offset = 5516, type = "f32" },
   { name = "lighting_end", offset = 5520, type = "f32", note = "InitLighting's last float (0x8200256C), read by CarLighting::Gather" },
+  { name = "fault_lighting_0", offset = 0, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +0, the scene's +5248" },
+  { name = "fault_lighting_8", offset = 8, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +8, the scene's +5256" },
+  { name = "fault_lighting_16", offset = 16, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +16, the scene's +5264" },
+  { name = "fault_lighting_24", offset = 24, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +24, the scene's +5272" },
+  { name = "fault_lighting_32", offset = 32, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +32, the scene's +5280" },
+  { name = "fault_lighting_40", offset = 40, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +40, the scene's +5288" },
+  { name = "fault_lighting_48", offset = 48, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +48, the scene's +5296" },
+  { name = "fault_lighting_56", offset = 56, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +56, the scene's +5304" },
+  { name = "fault_lighting_64", offset = 64, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +64, the scene's +5312" },
+  { name = "fault_lighting_72", offset = 72, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +72, the scene's +5320" },
+  { name = "fault_lighting_80", offset = 80, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +80, the scene's +5328" },
+  { name = "fault_lighting_88", offset = 88, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +88, the scene's +5336" },
+  { name = "fault_lighting_96", offset = 96, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +96, the scene's +5344" },
+  { name = "fault_lighting_104", offset = 104, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +104, the scene's +5352" },
+  { name = "fault_lighting_112", offset = 112, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +112, the scene's +5360" },
+  { name = "fault_lighting_120", offset = 120, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +120, the scene's +5368" },
+  { name = "fault_lighting_128", offset = 128, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +128, the scene's +5376" },
+  { name = "fault_lighting_136", offset = 136, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +136, the scene's +5384" },
+  { name = "fault_lighting_144", offset = 144, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +144, the scene's +5392" },
+  { name = "fault_lighting_152", offset = 152, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +152, the scene's +5400" },
+  { name = "fault_lighting_160", offset = 160, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +160, the scene's +5408" },
+  { name = "fault_lighting_168", offset = 168, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +168, the scene's +5416" },
+  { name = "fault_lighting_176", offset = 176, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +176, the scene's +5424" },
+  { name = "fault_lighting_184", offset = 184, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +184, the scene's +5432" },
+  { name = "fault_lighting_192", offset = 192, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +192, the scene's +5440" },
+  { name = "fault_lighting_200", offset = 200, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +200, the scene's +5448" },
+  { name = "fault_lighting_208", offset = 208, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +208, the scene's +5456" },
+  { name = "fault_lighting_216", offset = 216, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +216, the scene's +5464" },
+  { name = "fault_lighting_224", offset = 224, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +224, the scene's +5472" },
+  { name = "fault_lighting_232", offset = 232, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +232, the scene's +5480" },
+  { name = "fault_lighting_240", offset = 240, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +240, the scene's +5488" },
+  { name = "fault_lighting_248", offset = 248, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +248, the scene's +5496" },
+  { name = "fault_lighting_256", offset = 256, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +256, the scene's +5504" },
+  { name = "fault_lighting_264", offset = 264, type = "u64", note = "measure fault: CarScene::InitLighting's r3 is the scene + 5248 (the lighting block, car_light_factor_a on), joined with the scene at +0; this is the block's +264, the scene's +5512" },
+  { name = "fault_lighting_272", offset = 272, type = "u32", note = "measure fault: InitLighting's last float, the scene's +5520 (lighting_end)" },
+  { name = "assets", offset = 64, type = "bytes", count = 4880, note = "the SceneAssets (scene.toml) at +64: CarScene::OnFileLoaded's r6 reaches its slots' requests and states through the scene (scene's report)" },
 ]
 
 # A 240-byte point record (PointRecord, second-set.md): one part's point of
@@ -240,7 +279,8 @@ fields = [
 
 # The parts object's 60-byte record (SceneParts +108).
 [PartsRecord]
-measures = ["PartsPoints.+37080", "PartsPoints.+5520", "PartsPoints.+6084"]
+measures = ["PartsPoints.+37080", "PartsPoints.+5520", "PartsPoints.+6084",
+            "sub_820D3558.r3"]
 size = 60
 origin = "embedded"
 fields = [
@@ -248,6 +288,17 @@ fields = [
   { name = "door_panel_kind", offset = 28, type = "u32", note = "the door panels' and windows' record (7 + it, 3 + it)" },
   { name = "headlight_color", offset = 32, type = "u32", note = "the headlights' color table sub-index" },
   { name = "unknown_56", offset = 56, type = "u32", note = "handed to the front end's and race's draws as r24's word (not read in detail)" },
+  { name = "unknown_0", offset = 0, type = "u32", note = "sub_820D3558's store (it writes all 15 words; not read in detail)" },
+  { name = "unknown_4", offset = 4, type = "u32", note = "sub_820D3558's store (it writes all 15 words; not read in detail)" },
+  { name = "unknown_8", offset = 8, type = "u32", note = "sub_820D3558's store (it writes all 15 words; not read in detail)" },
+  { name = "unknown_16", offset = 16, type = "u32", note = "sub_820D3558's store (it writes all 15 words; not read in detail)" },
+  { name = "unknown_20", offset = 20, type = "u32", note = "sub_820D3558's store (it writes all 15 words; not read in detail)" },
+  { name = "unknown_24", offset = 24, type = "u32", note = "sub_820D3558's store (it writes all 15 words; not read in detail)" },
+  { name = "unknown_36", offset = 36, type = "u32", note = "sub_820D3558's store (it writes all 15 words; not read in detail)" },
+  { name = "unknown_40", offset = 40, type = "u32", note = "sub_820D3558's store (it writes all 15 words; not read in detail)" },
+  { name = "unknown_44", offset = 44, type = "u32", note = "sub_820D3558's store (it writes all 15 words; not read in detail)" },
+  { name = "unknown_48", offset = 48, type = "u32", note = "sub_820D3558's store (it writes all 15 words; not read in detail)" },
+  { name = "unknown_52", offset = 52, type = "u32", note = "sub_820D3558's store (it writes all 15 words; not read in detail)" },
 ]
 
 # The light kit's point block (SceneLights +96) or one of its three groups
@@ -278,7 +329,8 @@ fields = [
 
 # The light kit's 52-byte record (pool 4's, the scene model's record +4224).
 [LightKitRecord]
-measures = ["LightPoints.+0", "BlinkTimers.+0"]
+measures = ["LightPoints.+0", "BlinkTimers.+0",
+            "sub_820D34E0.r3"]
 size = 52
 origin = "embedded"
 fields = [
@@ -326,7 +378,8 @@ fields = [
 # The interior's 120-byte record (SceneInterior +40; the point block's
 # groups' +0).
 [InteriorRecord]
-measures = ["InteriorDials.+0", "InteriorPoints.+0", "InteriorPoints.+10464", "Dash.+0"]
+measures = ["InteriorDials.+0", "InteriorPoints.+0", "InteriorPoints.+10464", "Dash.+0",
+            "sub_820D3840.r3"]
 size = 120
 origin = "embedded"
 fields = [
@@ -351,6 +404,15 @@ fields = [
   { name = "seat_model", offset = 100, type = "u32", note = "0 the stock seats, else the aftermarket seat model (the scene's +784 + 464 x it)" },
   { name = "roll_cage", offset = 104, type = "u32", note = "1 record 0, 2 record 1, else none" },
   { name = "strut_bar", offset = 108, type = "u32", note = "0 record 2, else 3 (probably the strut tower bar)" },
+  { name = "unknown_16", offset = 16, type = "u32", note = "sub_820D3840's store (gauge 0's third word; not read in detail)" },
+  { name = "unknown_28", offset = 28, type = "u32", note = "sub_820D3840's store (gauge 1's third word)" },
+  { name = "unknown_40", offset = 40, type = "u32", note = "sub_820D3840's store (gauge 2's third word)" },
+  { name = "unknown_52", offset = 52, type = "u32", note = "sub_820D3840's store (gauge 3's third word)" },
+  { name = "unknown_64", offset = 64, type = "u32", note = "sub_820D3840's store (gauge 4's third word)" },
+  { name = "unknown_76", offset = 76, type = "u32", note = "sub_820D3840's store (gauge 5's third word)" },
+  { name = "unknown_88", offset = 88, type = "u32", note = "sub_820D3840's store (gauge 6's third word)" },
+  { name = "accessory", offset = 112, type = "u32", note = "sub_820D3840's store: the accessory word (scene-models' report)" },
+  { name = "unknown_116", offset = 116, type = "u32", note = "sub_820D3840's store" },
 ]
 
 # The interior's dials (its point block +240; SceneInterior +400): records at
@@ -410,6 +472,7 @@ fields = [
 # gets it in r4 (or r5): the same object as second-set.toml's
 # SceneModelBlock (to merge, the measures with it).
 [CarDrawBlock]
+# measures from SceneModelBlock (second-set), merged at the integration
 measures = [
   "CockpitPoints::DrawCabinWindow.r4",
   "InteriorDials::DrawDigitalSpeed.r4",
@@ -429,7 +492,7 @@ measures = [
   "TrafficPoints::DrawHeadlights.r4",
   "WheelPoints::DrawRimAMorphed.r5",
   "WheelPoints::DrawRimB.r5",
-]
+  "SceneModelBlock"]
 size = 736
 origin = "embedded"
 fields = [
@@ -470,6 +533,27 @@ fields = [
   { name = "identity_world", offset = 724, type = "u32", note = "set: the light kit's world the identity in the front end" },
   { name = "word_728", offset = 728, type = "u32", note = "0: the front end's parts take one path (not read in detail)" },
   { name = "no_side_offset", offset = 732, type = "u32", note = "set: the wheels' sides not moved by the group's side float4s" },
+  { name = "world_row0_w", offset = 28, type = "f32", note = "1.0 (the constructor) (from SceneModelBlock, second-set)" },
+  { name = "world_row1_w", offset = 44, type = "f32", note = "from SceneModelBlock (second-set)" },
+  { name = "world_row2_w", offset = 60, type = "f32", note = "from SceneModelBlock (second-set)" },
+  { name = "world_row3_w", offset = 76, type = "f32", note = "from SceneModelBlock (second-set)" },
+  { name = "wheel_turns", offset = 80, type = "bytes", count = 256, note = "the wheels' turns R_0 to R_3, 64 bytes each (from SceneModelBlock, second-set)" },
+  { name = "wheel_r0_row0_w", offset = 92, type = "f32", note = "1.0 (the constructor; every row's w of the eight matrices) (from SceneModelBlock, second-set)" },
+  { name = "wheel_r0_row1_w", offset = 108, type = "f32", note = "from SceneModelBlock (second-set)" },
+  { name = "wheel_r0_row2_w", offset = 124, type = "f32", note = "from SceneModelBlock (second-set)" },
+  { name = "wheel_r0_row3_w", offset = 140, type = "f32", note = "from SceneModelBlock (second-set)" },
+  { name = "wheel_spins", offset = 336, type = "bytes", count = 256, note = "the wheels' spins S_0 to S_3, 64 bytes each (from SceneModelBlock, second-set)" },
+  { name = "wheel_s0_row0_w", offset = 348, type = "f32", note = "from SceneModelBlock (second-set)" },
+  { name = "wheel_s0_row1_w", offset = 364, type = "f32", note = "from SceneModelBlock (second-set)" },
+  { name = "wheel_s0_row2_w", offset = 380, type = "f32", note = "from SceneModelBlock (second-set)" },
+  { name = "wheel_s0_row3_w", offset = 396, type = "f32", note = "from SceneModelBlock (second-set)" },
+  { name = "rim_looks", offset = 596, type = "bytes", count = 16, note = "four words (2 from Reset): set b's rims' records (from SceneModelBlock, second-set)" },
+  { name = "brake_alphas", offset = 612, type = "bytes", count = 16, note = "four floats (0.0 from Reset): record 10's alpha on the brakes (from SceneModelBlock, second-set)" },
+  { name = "left_door_x", offset = 656, type = "f32", note = "the left door's float4 (0.0 from Reset; w 1.0 from the constructor, then 0.0) (from SceneModelBlock, second-set)" },
+  { name = "left_door_w", offset = 668, type = "f32", note = "from SceneModelBlock (second-set)" },
+  { name = "right_door_x", offset = 672, type = "f32", note = "the right door's float4 (from SceneModelBlock, second-set)" },
+  { name = "right_door_w", offset = 684, type = "f32", note = "from SceneModelBlock (second-set)" },
+  { name = "unknown_700", offset = 700, type = "f32", note = "0.0 from Reset (from SceneModelBlock, second-set)" },
 ]
 
 # CarLighting::Gather's out record (r3): ten words, then ten matrices.

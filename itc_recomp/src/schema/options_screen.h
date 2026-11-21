@@ -49,7 +49,7 @@ struct OptionsDispatcher : View {
   uint32_t message_start_address() const { return address + 808; }
 };
 
-// allocated; measure: Settings, Settings.+-31624, new<68>@Options::OnEnter.+4.+-31620
+// allocated; measure: Settings, Settings.+-31624, new<68>@Options::OnEnter.+4.+-31620, Settings.+-31596
 struct OptionsSettings : View {
   using View::View;
   static constexpr uint32_t kSize = 716;

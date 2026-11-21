@@ -64,7 +64,7 @@ uint64_t Page0(uint8_t* base, uint64_t mode, uint32_t sp, const Calls& calls) {
     }
   }
   f.Call(kMenuListCancelled, 0x821A2AAC, List(base));
-  if (Load(base, List(base) + 24) != 0) {
+  if (G::list(base).move() != 0) {
     f.Call(kMenuSoundPlay, 0x821A2AC4, 4);
     Go(base, 0, 1, kNone);
   }

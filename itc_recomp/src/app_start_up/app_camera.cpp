@@ -8,6 +8,7 @@
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
 #include "schema/cameras.h"
+#include "schema/video_output.h"
 
 namespace app_start_up {
 
@@ -191,8 +192,8 @@ std::optional<uint32_t> AppCameraConstruct(uint8_t* base, uint32_t object, uint3
   a.set_unknown_332(10);
   a.set_unknown_336(10);
   a.set_unknown_344(2);
-  // The block's +4 interface: its slot 1's object's slot 3 (the screen: its
-  // +296 and +300).
+  // The block's +4 interface: its slot 1's object's slot 3 (the screen: the
+  // video output, video-output.toml's).
   const uint32_t service = calls.virtual_call(b.service().address, 4, frame, {}, {}, {}, 0x820A8D08);
   const uint32_t screen = calls.virtual_call(service, 12, frame, {}, {}, {}, 0x820A8D18);
   Store(base, frame + 92, kOne);
@@ -207,8 +208,8 @@ std::optional<uint32_t> AppCameraConstruct(uint8_t* base, uint32_t object, uint3
   Copy16(base, camera.position_x_address(), frame + 80);
   Copy16(base, a.camera().angles_x_address(), frame + 96);
   // The camera's slot 0 (the screen's size), then slot 1 again (45.0).
-  calls.virtual_call(a.camera().address, 0, frame, Load(base, screen + 296),
-                     Load(base, screen + 300), kZero, 0x820A8D98);
+  calls.virtual_call(a.camera().address, 0, frame, schema::VideoOutput(base, screen).display_width(),
+                     schema::VideoOutput(base, screen).display_height(), kZero, 0x820A8D98);
   calls.virtual_call(a.camera().address, 4, frame, {}, {}, kFortyFive, 0x820A8DB0);
   // Three handlers (key 0 each) on the block's +0 interface: slots 4, 3 and
   // 1 with member delegates on the frame (+112, +128, +144), the word before

@@ -25,6 +25,7 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 
 using G = schema::OptionsScreenGlobals;
 using S = schema::OptionsSettings;
+using MovieNode = schema::UiMovieNode;
 
 S Settings(uint8_t* base) { return G::settings(base); }
 schema::FrontEndMenu Menu(uint8_t* base) { return G::menu(base); }
@@ -93,8 +94,9 @@ uint64_t Setting(uint8_t* base, uint32_t (S::*field)() const) {
 // the arguments' addresses (r5 0 where the original leaves it unset).
 uint64_t Slot(uint8_t* base, const Calls& calls, uint32_t slot, uint32_t frame, uint32_t lr,
               uint64_t r4, uint64_t r5 = 0) {
-  const uint32_t manager = LoadU32(base, kSoundManagerGlobal);
-  return calls.Call(LoadU32(base, LoadU32(base, manager) + slot), frame, lr, manager, r4, r5);
+  const schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
+  return calls.Call(LoadU32(base, manager.vtable().address + slot), frame, lr, manager.address, r4,
+                    r5);
 }
 
 constexpr uint32_t kReleaseBank = 20;    // slot 5
@@ -525,11 +527,11 @@ uint64_t SetUpCategoryPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   menu.set_left_right_steps(0);
   // The category under the cursor's frame on nodes 28 and 29.
   const uint32_t first = ui_movies::FindNode(base, t.m, kMinusOne, 28);
-  StoreU32(base, first + 108,
-           Category(base, Settings(base).context(), Menu(base).cursor()));
+  MovieNode(base, first).set_texture_entry(
+      Category(base, Settings(base).context(), Menu(base).cursor()));
   const uint32_t second = ui_movies::FindNode(base, t.m, kMinusOne, 29);
-  StoreU32(base, second + 108,
-           Category(base, Settings(base).context(), Menu(base).cursor()));
+  MovieNode(base, second).set_texture_entry(
+      Category(base, Settings(base).context(), Menu(base).cursor()));
   // The items' names, then the help line.
   for (uint32_t i = 0; i < 7; i++) {
     const uint32_t category = Category(base, Settings(base).context(), i);
@@ -563,11 +565,14 @@ uint64_t SetUpHudPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   t.OkDefault(base, ui_movies::FindNode(base, t.m, 5, 1), 0x821C4EE0, 0x821C4EFC);
   // Each item's two choices (strings 0 and 1).
   const uint32_t items = ui_movies::FindNode(base, t.m, 5, 2);
-  for (int32_t i = 0; i < int32_t(LoadU32(base, items + 104)); i++) {
-    const uint32_t item = ui_movies::FindNode(base, t.m, 5, LoadU32(base, items + 100) + i);
-    const uint32_t left = ui_movies::FindNode(base, t.m, 5, LoadU32(base, item + 100));
+  for (int32_t i = 0; i < int32_t(LoadU32(base, MovieNode(base, items).height_address())); i++) {
+    const uint32_t first = LoadU32(base, MovieNode(base, items).width_address());
+    const uint32_t item = ui_movies::FindNode(base, t.m, 5, first + i);
+    const uint32_t left =
+        ui_movies::FindNode(base, t.m, 5, LoadU32(base, MovieNode(base, item).width_address()));
     t.Node(0x821C4F5C, ui_movies::Child(base, left, 1), 0);
-    const uint32_t right = ui_movies::FindNode(base, t.m, 5, LoadU32(base, item + 100) + 1);
+    const uint32_t right =
+        ui_movies::FindNode(base, t.m, 5, LoadU32(base, MovieNode(base, item).width_address()) + 1);
     t.Node(0x821C4F88, ui_movies::Child(base, right, 1), 1);
   }
   t.Text(0x821C4FAC, 2, 0, 989);
@@ -598,7 +603,7 @@ uint64_t SetUpSoundPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   // The music track's row when it's unlocked.
   menu.set_wraps(1);
   menu.set_last_item(tracks ? 3 : 2);
-  StoreU32(base, track + 80, tracks ? 1 : 0);
+  MovieNode(base, track).set_visible(tracks ? 1 : 0);
   const S o = Settings(base);
   CopyWords(base, o.edit_music_volume_address(), o.current_music_volume_address(), 2);
   Settings(base).set_music_track(0);

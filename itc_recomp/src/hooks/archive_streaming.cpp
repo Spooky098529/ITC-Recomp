@@ -21,6 +21,9 @@
 #include "game_data/game_data.h"
 #include "hooks/app_start_up.h"
 #include "hooks/archive.h"
+#include "schema/archive.h"
+#include "schema/c_runtime_core.h"
+#include "schema/files_and_saves.h"
 
 #include "base/log.h"
 
@@ -33,24 +36,27 @@ using guest_call::InFrame;
 
 namespace {
 
-// The loop's objects (0x826C0000 - 21832, - 21912, - 21872) and the flag that
-// asks for r29 (0x826A0000 + 20744).
-constexpr uint32_t kWork = 0x826BAAB8;      // r27: waited at the top
-constexpr uint32_t kRequestDone = 0x826BAA68;  // r28: signaled once a request, then waited
-constexpr uint32_t kIdle = 0x826BAA90;      // r29
-constexpr uint32_t kIdleWanted = 0x826A5108;
-// The read's overlapped (0x826A0000 + 20716), as ReadFileEx's completion left
-// it: status +0, bytes +4, offset +8/+12.
-constexpr uint32_t kOverlapped = 0x826A50EC;
+using G = schema::ArchiveGlobals;
+
+// The loop's objects (0x826C0000 - 21832, - 21912, - 21872).
+constexpr uint32_t kWork = G::work_semaphore_address();  // r27: waited at the top
+constexpr uint32_t kRequestDone = G::request_done_semaphore_address();  // r28: signaled once a request, then waited
+constexpr uint32_t kIdle = G::idle_semaphore_address();  // r29
 constexpr uint32_t kFirstCrsId = 23011;
 constexpr uint32_t kFrame = 128;
 
+// The read's overlapped (0x826A0000 + 20716), as ReadFileEx's completion left
+// it: status +0, bytes +4, offset +8/+12.
+schema::CrtOverlapped Overlapped(uint8_t* base) {
+  return schema::CrtOverlapped(base, G::overlapped_address());
+}
+
 // The archives' handles, as Archive::Init keeps them: BUILD.DAT, BUILD_CRS.DAT.
-constexpr uint32_t kArchiveHandles[2] = {0x82600A9C, 0x82600AA0};
+uint32_t ArchiveHandleAddress(bool crs) { return G::archive_handles_address() + (crs ? 4 : 0); }
 
 // An archive's handle (ours, from Archive::Init), or nothing.
 std::optional<uint32_t> Archive(uint8_t* base, bool crs) {
-  uint32_t handle = guest::LoadU32(base, kArchiveHandles[crs]);
+  uint32_t handle = guest::LoadU32(base, ArchiveHandleAddress(crs));
   if (!game_data::IsHandle(handle)) {
     ITC_LOG_ERROR("archive streaming: {} isn't open", crs ? "BUILD_CRS.DAT" : "BUILD.DAT");
     return std::nullopt;
@@ -61,12 +67,14 @@ std::optional<uint32_t> Archive(uint8_t* base, bool crs) {
 // An archive request's read (sub_8209DD00's job): +16 the id, +56 the byte
 // offset, +60 the sectors (2,048 bytes), +76 the buffer. False if it fails.
 bool ReadRequest(uint8_t* base, uint32_t request) {
-  const uint32_t id = guest::LoadU32(base, request + 16);
-  const uint32_t offset = guest::LoadU32(base, request + 56);
-  const uint32_t bytes = guest::LoadU32(base, request + 60) << 11;
-  const uint32_t buffer = guest::LoadU32(base, request + 76);
-  guest::StoreU32(base, kOverlapped + 8, offset);
-  guest::StoreU32(base, kOverlapped + 12, 0);
+  const schema::ArchiveRequestSlot slot(base, request);
+  const uint32_t id = slot.id();
+  const uint32_t offset = slot.read_offset();
+  const uint32_t bytes = slot.sectors() << 11;
+  const uint32_t buffer = slot.data();
+  const schema::CrtOverlapped overlapped = Overlapped(base);
+  overlapped.set_offset(offset);
+  overlapped.set_offset_high(0);
   auto archive = Archive(base, id >= kFirstCrsId);
   if (!archive) {
     return false;
@@ -86,8 +94,8 @@ bool ReadRequest(uint8_t* base, uint32_t request) {
     return false;
   }
   // A read past the end gives fewer bytes, as ReadFileEx did.
-  guest::StoreU32(base, kOverlapped, 0);
-  guest::StoreU32(base, kOverlapped + 4, total);
+  overlapped.set_internal(0);
+  overlapped.set_internal_high(total);
   return true;
 }
 
@@ -165,13 +173,13 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E210) {
     call(return_address, [&] { lifted::Enter(ctx, base, lifted::e8209AC78); });
   };
   // The TOCs' sizes: the entry counts built into the image, plus a header.
-  const uint32_t toc_size[2] = {(guest::LoadU32(base, 0x82600AA8) + 1) << 4,
-                                (guest::LoadU32(base, 0x82600AB8) + 1) << 4};
-  guest::StoreU32(base, 0x826A5124, toc_size[0]);
-  guest::StoreU32(base, 0x826A5100, object);
-  guest::StoreU32(base, 0x826A512C, toc_size[1]);
-  // The loader thread's parameters.
-  constexpr uint32_t kThread = 0x82600B50;
+  const uint32_t toc_size[2] = {(G::build_toc_count(base) + 1) << 4,
+                                (G::crs_toc_count(base) + 1) << 4};
+  G::set_build_toc_size(base, toc_size[0]);
+  G::set_streaming(base, object);
+  G::set_crs_toc_size(base, toc_size[1]);
+  // The loader thread's parameters (no type of their own: a bytes field).
+  constexpr uint32_t kThread = G::loader_thread_address();
   guest::StoreU32(base, kThread + 8, 0);
   guest::StoreU32(base, kThread + 12, 0);
   guest::StoreU8(base, kThread + 16, 0);
@@ -179,27 +187,28 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E210) {
   guest::StoreU8(base, kThread + 18, 0);
   guest::StoreU32(base, kThread + 20, stale);
   guest::StoreU32(base, kThread + 28, 0x8209E118);
-  guest::StoreU32(base, 0x826A5104, 0);  // the request serials
+  G::set_serial(base, 0);  // the request serials
   for (uint32_t i = 0; i < 960; i++) {    // the request slots, free
-    guest::StoreU32(base, 0x826A5170 + 92 * i, 0xFFFFFFFF);
+    schema::ArchiveRequestSlot(base, G::slots_address() + schema::ArchiveRequestSlot::kSize * i)
+        .set_serial(0xFFFFFFFF);
   }
   const uint32_t toc[2] = {allocate(toc_size[0], 4096, 0x8209E2D8),
                            allocate(toc_size[1], 4096, 0x8209E2F4)};
-  guest::StoreU32(base, 0x826A5120, toc[0]);
-  guest::StoreU32(base, 0x826A5130, extra_size);
-  guest::StoreU32(base, 0x826A5128, toc[1]);
-  guest::StoreU32(base, 0x826A5134, 0);
+  G::set_build_toc(base, toc[0]);
+  G::set_load_buffer_size(base, extra_size);
+  G::set_crs_toc(base, toc[1]);
+  G::set_load_buffer(base, 0);
   if (extra_size) {
-    guest::StoreU32(base, 0x826A5134, allocate(extra_size, 0x801000, 0x8209E32C));
+    G::set_load_buffer(base, allocate(extra_size, 0x801000, 0x8209E32C));
   }
-  guest::StoreU32(base, 0x826A511C, 0);
-  guest::StoreU32(base, 0x82600AA4, 0xFFFFFFFF);
-  guest::StoreU32(base, 0x826A510C, 5242880);  // half the staging ring
-  guest::StoreU32(base, 0x826A5110, 0);
+  G::set_staging_in_use(base, 0);
+  G::set_callback_serial(base, 0xFFFFFFFF);
+  G::set_staging_half_size(base, 5242880);  // half the staging ring
+  G::set_staging_count(base, 0);
   const uint32_t staging = allocate(10485760, 4096, 0x8209E37C);
-  guest::StoreU32(base, 0x826A5114, staging);
-  guest::StoreU32(base, 0x826A5118, staging + 5242880);
-  guest::StoreU32(base, kIdleWanted, 0);
+  G::set_staging_halves(base, staging);
+  G::set_staging_half_1(base, staging + 5242880);
+  G::set_idle_wanted(base, 0);
   for (auto [object_address, return_address] :
        {std::pair{kRequestDone, 0x8209E3A8u}, std::pair{kWork, 0x8209E3B8u},
         std::pair{kIdle, 0x8209E3C8u}}) {
@@ -219,7 +228,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E210) {
   }
   for (int crs = 0; crs < 2; crs++) {
     auto handle = OpenImagePath(base, crs ? 0x82001DF0 : 0x82001E14);
-    guest::StoreU32(base, kArchiveHandles[crs], handle.value_or(0xFFFFFFFF));
+    guest::StoreU32(base, ArchiveHandleAddress(crs), handle.value_or(0xFFFFFFFF));
     if (!handle) {
       report_error(crs ? 0x8209E4CC : 0x8209E494);
     }
@@ -229,7 +238,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E210) {
   ctx.r3.u64 = object;
   ctx.r4.u64 = kThread;
   ctx.r5.u64 = 1;
-  lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, object) + 4));
+  lifted::CallFromContext(ctx, base, schema::ArchiveStreamer(base, object).vtable().on_init());
 }
 
 // The loader thread's loop (no direct callers; never returns). Each time work
@@ -275,7 +284,8 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E118) {
     wait(kWork, 0x8209E148);
     uint32_t request = next(0);
     while (request) {
-      const int32_t state = int32_t(guest::LoadU32(base, request + 52));
+      const schema::ArchiveRequestSlot slot(base, request);
+      const int32_t state = int32_t(slot.state());
       if (state > 0 && state <= 2) {
         signal(kRequestDone, 0x8209E194);
       } else if (state == 5) {
@@ -286,21 +296,21 @@ ITC_NATIVE_ENTRY_ALWAYS(8209E118) {
         ctx.r3.u64 = request;
         call(0x8209E17C, [&] { lifted::Enter(ctx, base, lifted::entry::e8209DFA8); });
       }
-      if (uint32_t chained = guest::LoadU32(base, request + 84)) {
-        ctx.r3.u64 = guest::LoadU32(base, chained + 88);
-        ctx.r4.u64 = guest::LoadU32(base, chained + 76);
-        ctx.r5.u64 = guest::LoadU32(base, chained + 72);
+      if (const auto chained = slot.chained(); chained.address) {
+        ctx.r3.u64 = chained.unpack_destination();
+        ctx.r4.u64 = chained.data();
+        ctx.r5.u64 = chained.read_unpacked_size();
         call(0x8209E1B4, [&] { lifted::Enter(ctx, base, game::Ucl::Unpack); });
       }
-      if (int32_t(guest::LoadU32(base, request + 52)) == 5) {
+      if (int32_t(slot.state()) == 5) {
         // The read is done: what the APC's routine (sub_8209D808) did.
         signal(kRequestDone, 0x8209E1D4);
       }
       wait(kRequestDone, 0x8209E1DC);
       request = next(request);
     }
-    if (guest::LoadU32(base, kIdleWanted)) {
-      guest::StoreU32(base, kIdleWanted, 0);
+    if (G::idle_wanted(base)) {
+      G::set_idle_wanted(base, 0);
       signal(kIdle, 0x8209E208);
     }
   }

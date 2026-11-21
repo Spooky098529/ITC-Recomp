@@ -1,0 +1,28 @@
+# The schema of docs/functions/xact.md's objects (docs/e5-native.md, step 2):
+# seeded by tools/schema_seed.py from the measure, then edited by hand.
+# Field types: u8 u16 u32 u64 s8 s16 s32 f32 f64, ptr (with `to`), fn
+# (a function's address), bytes (with `count`). `measure` is the type's
+# name in tools/type_map.py's tables.
+#
+# XACT, the sound library linked into the game (translated, the user's
+# call): its cues, sound banks and wave banks are mostly other areas'
+# (xact-tracks, xact-waves); this file holds the wave entry.
+
+# A wave entry (36 bytes, inside a wave or a voice): which wave of which
+# wave bank, and a copy of the bank's 24-byte entry (+12 to +36) made by
+# XACTWaveEntry::Set (sub_825CED98).
+[XACTWaveEntry]
+measure = "XACTWaveEntry"
+size = 36
+origin = "file"
+fields = [
+  { name = "valid", offset = 0, type = "u32", note = "0 from the constructor, 1 once Set" },
+  { name = "index", offset = 4, type = "u16", note = "the wave's index in its bank" },
+  { name = "bank", offset = 8, type = "u32", note = "the XACTWaveBank (vtable 0x82075AE8)" },
+  { name = "flags_duration", offset = 12, type = "u32", note = "the bank entry's first word: the duration in samples is >> 4" },
+  { name = "format", offset = 16, type = "u32", note = "bits 0-1 the tag (0 PCM, 1 XMA), 2-4 the channels, 5-22 the rate, bit 31 16-bit samples" },
+  { name = "play_offset", offset = 20, type = "u32", note = "the play region's start, in bytes" },
+  { name = "play_length", offset = 24, type = "u32", note = "the play region's length, in bytes" },
+  { name = "loop_start", offset = 28, type = "u32", note = "the loop region's start, in samples" },
+  { name = "loop_length", offset = 32, type = "u32", note = "the loop region's length, in samples; 0 for no loop" },
+]

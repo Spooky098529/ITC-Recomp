@@ -10,6 +10,10 @@
 #include "guest.h"
 #include "scene_models/scene_models.h"
 #include "schema/car_makers.h"
+#include "schema/car_scene_draw.h"
+#include "schema/car_specs.h"
+#include "schema/race_event.h"
+#include "schema/scene_models.h"
 #include "strings_and_font/steps.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -123,7 +127,7 @@ uint32_t SetPaint(uint8_t* base, uint32_t record, uint32_t car, uint32_t pick, u
     rec.set_paint1_value(float(Fmuls(Convert(base, c.paint_value(), s16), f0)));
     const int32_t six = int16_t(c.paint_kind());
     if (six == 0) {
-      const double zero = Lfs(base, kZero);
+      const double zero = Lfs(base, schema::CarSceneDrawGlobals::zero_address());
       rec.set_paint2_hue(float(zero));
       rec.set_paint2_saturation(float(zero));
       CopyFloat(base, G::value72_address(), rec.paint2_value_address());
@@ -177,10 +181,11 @@ uint32_t SetWheels(uint8_t* base, uint32_t record, uint32_t car, uint32_t stack)
   rec.set_rear_wheel(c.rear_wheel_number() - 1);
   rec.set_wheel_extra(c.power_train4());
   rec.set_caliper_texture(c.power_train3());
+  // The car's spec copies (race-event's CarSpecCopies, sub_820C4550's answer).
   uint32_t block2 = vehicle_accessors::ObjectRecord1888(car);
-  if (Load(base, block2 + 236) != 0) {
+  if (schema::CarSpecCopies(base, block2).wheel_236() != 0) {
     block2 = vehicle_accessors::ObjectRecord1888(car);
-    rec.set_caliper_texture(Load(base, block2 + 236));
+    rec.set_caliper_texture(schema::CarSpecCopies(base, block2).wheel_236());
   }
   using strings_and_font::steps::Fctiwz;
   rec.set_front_size(uint32_t(Fctiwz(double(c.front_tire_80()))));
@@ -237,13 +242,14 @@ void ResetBytes(uint8_t* base, uint32_t at) {
 uint32_t SetBytes(uint8_t* base, uint32_t record, uint32_t bytes, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_8215B0E0 CarRecord::SetBytes");
   Store(base, stack - 112, stack);
-  const uint32_t at = record + 3632;
+  const schema::CarRecord car_record(base, record);
+  const uint32_t at = car_record.plate_address();
   ResetBytes(base, at);
   Store(base, at, 0);
   for (uint32_t i = 1; i <= 11; i++) {
-    Store(base, record + 3632 + 4 * i, uint32_t(int32_t(int8_t(guest::LoadU8(base, bytes + i)))));
+    Store(base, at + 4 * i, uint32_t(int32_t(int8_t(guest::LoadU8(base, bytes + i)))));
   }
-  Store(base, record + 3684, uint32_t(int32_t(int8_t(guest::LoadU8(base, bytes + 0)))));
+  car_record.set_unknown_3684(uint32_t(int32_t(int8_t(guest::LoadU8(base, bytes + 0)))));
   return at;
 }
 
@@ -302,12 +308,12 @@ uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t
       rec.set_interior_seats(0);
     }
     bool second = false;
-    if (int32_t(Load(base, vehicle_accessors::ObjectRecord1888(car) + 232)) == 1) {
+    if (int32_t(schema::CarSpecCopies(base, vehicle_accessors::ObjectRecord1888(car)).unknown_232()) == 1) {
       rec.set_interior_seats(1);
       second = true;
     } else {
       // The same word read again, as the original does.
-      if (int32_t(Load(base, vehicle_accessors::ObjectRecord1888(car) + 232)) == 1) {
+      if (int32_t(schema::CarSpecCopies(base, vehicle_accessors::ObjectRecord1888(car)).unknown_232()) == 1) {
         both = true;
         rec.set_interior_seats(2);
       }
@@ -373,7 +379,7 @@ uint32_t FromCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t
       }
       const uint32_t entry = uint32_t((uint64_t(rec.block() << 1) + k_less) * 24) +
                              G::aero_kits_address();
-      const uint32_t kit_flags = Load(base, kit + 24);
+      const uint32_t kit_flags = schema::AeroPartRecord(base, kit).flags();
       front_end_car_draw::Memcpy(base, calls, parts_copy, entry, 24, frame, 0x8215BBDC);
       auto word = [&](uint32_t at) { return Load(base, frame + at); };
       if (int32_t(word(80)) != -1) {

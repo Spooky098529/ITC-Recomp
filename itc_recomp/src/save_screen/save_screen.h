@@ -81,11 +81,6 @@ constexpr uint32_t kSaveDataOf = 0x82105620;
 
 // The game data's bytes (Page7's copy).
 constexpr uint32_t kGameDataBytes = 0x1F978;
-// The players' controllers and their action mappers' entries (8 bytes: +0
-// the mapper, +4 1 when the controller isn't read).
-constexpr uint32_t kControllers = 0x826BABA4;
-constexpr uint32_t kMapperEntries = 0x826BAB80;
-
 // --- The state machine Inits (inits.cpp): each adds the machine's
 // transitions through StateMachine::Add's plain C++, as the original builds
 // them in its frame (the step tables in init_tables.h, from

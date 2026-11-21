@@ -18,6 +18,7 @@
 #include "models/texture_provider.h"
 #include "native/buffers.h"
 #include "schema/accessories.h"
+#include "schema/material_passes.h"
 
 #include <cstring>
 
@@ -35,6 +36,7 @@ using schema::AccessoryMatrix;
 using schema::AccessoryNodeLocal;
 using schema::AccessoryNodeRecord;
 using schema::AccessorySkeleton;
+using schema::MaterialRecord;
 
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
@@ -668,9 +670,10 @@ uint64_t AccessorySetTexture(
       for (int32_t m = 0; m < int32_t(materials); m++) {
         const uint32_t material = models::Material(base, accessory, s, uint32_t(m), group);
         r3 = material;
+        const MaterialRecord record(base, material);
         for (uint32_t k = 0; k < 8; k++) {
-          Store(base, material + 176 + 4 * k, index);
-          Store(base, material + 144 + 4 * k, 0);
+          Store(base, record.texture_index_address() + 4 * k, index);
+          Store(base, record.xpr_index_address() + 4 * k, 0);
         }
       }
     }

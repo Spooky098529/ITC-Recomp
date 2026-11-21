@@ -903,6 +903,53 @@ struct SceneryPassDesc : View {
   uint32_t mask_address() const { return address + 32; }
 };
 
+// image; measure: -
+struct SceneryPassEntry : View {
+  using View::View;
+  static constexpr uint32_t kSize = 24;
+  // the viewport ([[0x826C2CE8] + 4 x it])
+  uint32_t player() const { return guest::LoadU32(base, address + 0); }
+  void set_player(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t player_address() const { return address + 0; }
+  // the viewport's 80-byte entry
+  uint32_t viewport_entry() const { return guest::LoadU32(base, address + 4); }
+  void set_viewport_entry(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t viewport_entry_address() const { return address + 4; }
+  // the camera pass's number (0x826BAC00 + 592 x it)
+  uint32_t camera_pass() const { return guest::LoadU32(base, address + 8); }
+  void set_camera_pass(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t camera_pass_address() const { return address + 8; }
+  uint32_t key_a() const { return guest::LoadU32(base, address + 12); }
+  void set_key_a(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t key_a_address() const { return address + 12; }
+  uint32_t key_b() const { return guest::LoadU32(base, address + 16); }
+  void set_key_b(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t key_b_address() const { return address + 16; }
+  uint32_t mask() const { return guest::LoadU32(base, address + 20); }
+  void set_mask(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t mask_address() const { return address + 20; }
+};
+
+// image; measure: -
+struct SceneryViewMask : View {
+  using View::View;
+  static constexpr uint32_t kSize = 16;
+  // the view (also the viewport's player for CameraPass::FromViewport)
+  uint32_t view() const { return guest::LoadU32(base, address + 0); }
+  void set_view(uint32_t v) const { guest::StoreU32(base, address + 0, v); }
+  uint32_t view_address() const { return address + 0; }
+  uint32_t viewport_entry() const { return guest::LoadU32(base, address + 4); }
+  void set_viewport_entry(uint32_t v) const { guest::StoreU32(base, address + 4, v); }
+  uint32_t viewport_entry_address() const { return address + 4; }
+  // the camera pass's number
+  uint32_t camera_pass() const { return guest::LoadU32(base, address + 8); }
+  void set_camera_pass(uint32_t v) const { guest::StoreU32(base, address + 8, v); }
+  uint32_t camera_pass_address() const { return address + 8; }
+  uint32_t bits() const { return guest::LoadU32(base, address + 12); }
+  void set_bits(uint32_t v) const { guest::StoreU32(base, address + 12, v); }
+  uint32_t bits_address() const { return address + 12; }
+};
+
 // stack; measure: Lights::FindNearest.r4
 struct NearestLight : View {
   using View::View;
@@ -1073,6 +1120,22 @@ struct CourseSceneryGlobals {
   static uint32_t other_key(uint8_t* base) { return guest::LoadU32(base, 0x8296B8F8u); }
   static void set_other_key(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x8296B8F8u, v); }
   static constexpr uint32_t other_key_address() { return 0x8296B8F8u; }
+  // Scenery::Draw's 20 SceneryPassEntry records
+  static constexpr uint32_t pass_table_address() { return 0x82603060u; }
+  // the 14 SceneryViewMask records
+  static constexpr uint32_t view_masks_address() { return 0x82602F80u; }
+  // the course set's model's draw range, x (also material-passes' projector_depth_bias)
+  static float range_x(uint8_t* base) { return guest::LoadFloat(base, 0x82001FCCu); }
+  static void set_range_x(uint8_t* base, float v) { guest::StoreFloat(base, 0x82001FCCu, v); }
+  static constexpr uint32_t range_x_address() { return 0x82001FCCu; }
+  // the course set's model's draw range, y (also scenery-lists' point_range_far)
+  static float range_y(uint8_t* base) { return guest::LoadFloat(base, 0x82006804u); }
+  static void set_range_y(uint8_t* base, float v) { guest::StoreFloat(base, 0x82006804u, v); }
+  static constexpr uint32_t range_y_address() { return 0x82006804u; }
+  // 0.1, the headlight projectors' near plane
+  static float headlight_near_plane(uint8_t* base) { return guest::LoadFloat(base, 0x82001FBCu); }
+  static void set_headlight_near_plane(uint8_t* base, float v) { guest::StoreFloat(base, 0x82001FBCu, v); }
+  static constexpr uint32_t headlight_near_plane_address() { return 0x82001FBCu; }
 };
 
 }  // namespace schema

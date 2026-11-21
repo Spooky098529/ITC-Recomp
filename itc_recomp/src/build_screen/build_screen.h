@@ -31,26 +31,13 @@ using Calls = race_hud_object::Calls;
 // [0x826D8440] and [0x826D8444], the screen data [0x826D8448]):
 // schema::BuildScreenGlobals (schema/build_screen.h).
 
-// The screen data's fields.
-constexpr uint32_t kGroups = 36;            // 56 groups of 3,252 bytes
+// The screen data, its groups, build lists and builds:
+// schema::BuildScreenData, BuildGroup, BuildSlotList and BuildRecord
+// (schema/type2_screens.h); the menu lists schema::MenuList
+// (schema/race_screens.h). The groups: 56 of 3,252 bytes from the data's
+// `groups`.
 constexpr uint32_t kGroupBytes = 3252;
 constexpr uint32_t kGroupCount = 56;
-constexpr uint32_t kShownGroups = 0x318C4;  // pointers to the groups shown
-constexpr uint32_t kShownCount = 0x319A4;
-constexpr uint32_t kBuilds = 0x319A8;       // the build list shown (+1608 its count)
-constexpr uint32_t kBuildCount = 0x31FF0;   // a halfword
-constexpr uint32_t kCategory = 0x32634;
-constexpr uint32_t kGroupSelection = 0x32638, kGroupScroll = 0x3263C;
-constexpr uint32_t kBuildSelection = 0x32640, kBuildScroll = 0x32644;
-constexpr uint32_t kStandSelection = 0x32648, kStandScroll = 0x3264C;
-constexpr uint32_t kNumber = 0x32654;       // ShowNumber's (probably a percentage)
-constexpr uint32_t kOpened = 0x32658;       // BuildScreen::Open plays 81 when 0
-constexpr uint32_t kCarShown = 0x3265C;     // 1 on the stand's level
-
-// A build list's fields (16-bit links: +0 a node's next, +2 its slot).
-constexpr uint32_t kListFree = 1600, kListHead = 1604, kListCount = 1608, kListSlots = 1612;
-// A group's fields.
-constexpr uint32_t kGroupCategory = 4, kGroupMark = 32, kGroupList_ = 40, kGroupBuildCount = 1648;
 
 // Movie 6: its id at `frame` + 80, then UiMovies::Find (rows.cpp).
 constexpr uint32_t kMovieId = 6;
@@ -254,9 +241,9 @@ uint64_t OpenDetails(uint8_t* base, uint32_t step, uint32_t sp, const Calls& cal
 // its adapter would run it, else a guest call. Its r3.
 using ReloadCall =
     std::function<uint64_t(uint32_t holder, uint32_t block, uint32_t frame, uint32_t lr)>;
-constexpr uint32_t kStandHolder = 0x826D83E0;  // [[it]] the stand's holder
-constexpr uint32_t kStandBuild = 0x32664, kStandMade = 0x32660;
-constexpr uint32_t kCarBuilds = 0x2C7B4;       // 52-byte entries: +0 a car build
+// [[it]] the stand's holder (schema::BuildScreenGlobals::stand_holder;
+// kept for type2_screens/'s code).
+constexpr uint32_t kStandHolder = 0x826D83E0;
 // sub_8219D6F0 BuildScreen::PutOnStand: the screen's +0x32664 = `index`,
 // +0x32660 = 0, GarageStage::ReloadModel(holder, CarModels::BlockOf(the
 // car build's +2788)), GarageStage::SetDark(holder, `flag` 0), node (-1,

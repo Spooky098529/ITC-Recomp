@@ -26,15 +26,12 @@
 
 #include "base/log.h"
 #include "lifted/sdk.h"
+#include "schema/app_states.h"
 #include "schema/input.h"
+#include "schema/model_animation.h"
 
 namespace input_hooks {
 namespace {
-
-// The physical pads (model-animation.toml's PhysicalPad) and the listener
-// lists (app-states.toml's PtrList) by offset until those types are switched.
-constexpr uint32_t kPhysicalPadBytes = 212;
-constexpr uint32_t kListenerSlotBytes = 12;
 
 // The devices' vtable slot 1 (their values' address) for the two kinds bound
 // in every race (see "Step 0 results" in docs/pause-menu-fix.md), done here;
@@ -49,16 +46,20 @@ constexpr uint32_t kReturnFromDeviceValues = 0x82591970;
 constexpr uint32_t kReturnFromProcessor = 0x8209916C;
 constexpr uint32_t kReturnFromListener = 0x820991C8;
 
+// A motor: model-animation.toml's PhysicalPadRecord (+0 the speed, +4 held,
+// +8 the ticks left).
 void LoadMotor(uint8_t* base, uint32_t address, input::PadMotor& motor) {
-  motor.speed = guest::LoadFloat(base, address + 0);
-  motor.held = int32_t(guest::LoadU32(base, address + 4));
-  motor.ticks_left = int32_t(guest::LoadU32(base, address + 8));
+  const schema::PhysicalPadRecord r(base, address);
+  motor.speed = r.unknown_0();
+  motor.held = int32_t(r.unknown_4());
+  motor.ticks_left = int32_t(r.unknown_8());
 }
 
 void StoreMotor(uint8_t* base, uint32_t address, const input::PadMotor& motor) {
-  guest::StoreFloat(base, address + 0, motor.speed);
-  guest::StoreU32(base, address + 4, uint32_t(motor.held));
-  guest::StoreU32(base, address + 8, uint32_t(motor.ticks_left));
+  const schema::PhysicalPadRecord r(base, address);
+  r.set_unknown_0(motor.speed);
+  r.set_unknown_4(uint32_t(motor.held));
+  r.set_unknown_8(uint32_t(motor.ticks_left));
 }
 
 void StoreGamepad(uint8_t* base, uint32_t address, const input::XInputGamepad& gamepad) {
@@ -73,18 +74,20 @@ void StoreGamepad(uint8_t* base, uint32_t address, const input::XInputGamepad& g
 
 // A physical pad (212 bytes): the fields PhysicalPad_Read touches, in and out.
 void ReadPhysicalPad(uint8_t* base, uint32_t address, uint32_t user) {
+  const schema::PhysicalPad g(base, address);
   input::PhysicalPad pad;
-  pad.flags = guest::LoadU32(base, address + 4);
-  LoadMotor(base, address + 168, pad.motors[0]);
-  LoadMotor(base, address + 180, pad.motors[1]);
+  pad.flags = g.unknown_4();
+  LoadMotor(base, g.record_a_address(), pad.motors[0]);
+  LoadMotor(base, g.record_b_address(), pad.motors[1]);
   bool caps_read = input::PhysicalPad_Read(pad, user);
-  guest::StoreU32(base, address + 4, pad.flags);
+  g.set_unknown_4(pad.flags);
   for (int i = 0; i < input::kPadValues; i++) {
-    guest::StoreFloat(base, address + 8 + 4 * i, pad.values[i]);
+    guest::StoreFloat(base, g.values_address() + 4 * i, pad.values[i]);
   }
-  StoreMotor(base, address + 168, pad.motors[0]);
-  StoreMotor(base, address + 180, pad.motors[1]);
+  StoreMotor(base, g.record_a_address(), pad.motors[0]);
+  StoreMotor(base, g.record_b_address(), pad.motors[1]);
   if (caps_read) {
+    // The XInput capabilities at +192: no field in PhysicalPad yet.
     uint32_t caps = address + 192;
     guest::StoreU8(base, caps + 0, pad.caps.type);
     guest::StoreU8(base, caps + 1, pad.caps.sub_type);
@@ -100,7 +103,7 @@ uint32_t DeviceValues(lifted::Regs& ctx, uint8_t* base, uint32_t device) {
   // Its vtable: its first word (a logical or a physical pad's).
   uint32_t function = schema::InputDeviceVtable(base, guest::LoadU32(base, device)).values();
   if (function == kPhysicalPadValues) {
-    return device + 8;
+    return schema::PhysicalPad(base, device).values_address();
   }
   if (function == kLogicalPadValues) {
     return schema::LogicalPad(base, device).values_address();
@@ -211,7 +214,7 @@ ITC_REGS_STEP(InputUpdate_Run) {
 
   const schema::InputManager m(base, manager);
   for (uint32_t i = 0; i < 4; i++) {
-    ReadPhysicalPad(base, m.physical_pads_address() + kPhysicalPadBytes * i, i);
+    ReadPhysicalPad(base, m.physical_pads_address() + schema::PhysicalPad::kSize * i, i);
   }
   for (uint32_t j = 0; j < 5; j++) {
     BuildLogicalPad(ctx, base, m.logical_pads_address() + schema::LogicalPad::kSize * j);
@@ -221,14 +224,13 @@ ITC_REGS_STEP(InputUpdate_Run) {
                   m.logical_pads_address() + schema::LogicalPad::kSize * j, kReturnFromProcessor);
   }
   for (uint32_t j = 0; j < 5; j++) {
-    // A PtrList {+4 head, +8 size} (app-states.toml's, by offset until
-    // switched); only the head's previous node's object is updated (the
-    // last listener, the only one in play).
-    uint32_t list = m.listener_lists_address() + kListenerSlotBytes * j;
-    if (!guest::LoadU32(base, list + 8)) {
+    // A PtrList (app-states.toml's); only the head's previous node's object
+    // is updated (the last listener, the only one in play).
+    const schema::PtrList list(base, m.listener_lists_address() + schema::PtrList::kSize * j);
+    if (!list.size()) {
       continue;
     }
-    const schema::PtrListNode head(base, guest::LoadU32(base, list + 4));
+    const auto head = list.head<schema::PtrListNode>();
     const schema::PtrListNode node = head.previous();
     if (node.address == head.address) {
       // An empty list with a count; the game traps here (twi 31).

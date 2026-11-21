@@ -27,11 +27,11 @@ uint64_t SetScrollArrows(uint8_t* base, uint32_t scroll, uint32_t count, uint32_
   // Up shown past the first row; down shown at the first row, else unless
   // the last four rows show (compared for equality, as the original).
   if (scroll == 0) {
-    Store(base, up + 80, 0);
-    Store(base, down + 80, 1);
+    Node(base, up).set_visible(0);
+    Node(base, down).set_visible(1);
   } else {
-    Store(base, up + 80, 1);
-    Store(base, down + 80, scroll + 4 != count ? 1 : 0);
+    Node(base, up).set_visible(1);
+    Node(base, down).set_visible(scroll + 4 != count ? 1 : 0);
   }
   return down;
 }
@@ -42,7 +42,7 @@ uint64_t SetActionMarker(uint8_t* base, uint32_t action, uint32_t sp) {
   const uint32_t movie = FindMovie(base, kMovie, frame + 80);
   const double y = IntToFloat(base, frame + 80, action);
   const uint32_t node = ui_movies::FindNode(base, movie, 7, 0);
-  Stfs(base, node + 16, y);
+  Node(base, node).set_y(float(y));
   return node;
 }
 
@@ -53,7 +53,7 @@ uint64_t SetOptionMarker(uint8_t* base, uint32_t option, uint32_t sp) {
   const uint32_t node = ui_movies::FindNode(base, movie, 2, 1);
   const double y = IntToFloat(base, frame + 80, option);
   const uint32_t child = ui_movies::Child(base, node, 0);
-  Stfs(base, child + 16, y);
+  Node(base, child).set_y(float(y));
   return child;
 }
 

@@ -19,7 +19,6 @@ namespace xaudio {
 
 constexpr uint32_t kEngine = 0x82954F08;         // the engine's pointer
 constexpr uint32_t kStats = 0x82954F24;          // the statistics counters
-constexpr uint32_t kDefaultMatrices = 0x8204A7B8;  // the default output matrices
 constexpr uint32_t kRootVtable = 0x8204A6B8;     // the voices' root vtable
 constexpr uint32_t kSampleRate = 48000;
 
@@ -279,7 +278,6 @@ std::optional<uint32_t> GetAllocator(uint8_t* base, uint32_t attributes, uint32_
 // --- The voices with outputs (lock-free) ---
 
 constexpr uint32_t kOutputsVtable = 0x8204A998;  // the voice with outputs'
-constexpr uint32_t kDefaultOutput = 0x8204A9F4;  // {0, 0}: the mastering voice, its default matrix
 
 // XAudioVoice::ConstructOutputs (sub_82460738): VoiceConstruct, then the
 // vtable 0x8204A998. Returns the voice.
@@ -443,8 +441,6 @@ uint32_t SubmixPass(uint8_t* base, uint32_t voice, uint32_t frame, const GuestCa
 // the imports' guest addresses (the thunks the original's `bl` reaches),
 // which the adapters' callers run as those imports.
 
-constexpr uint32_t kSpinLock = 0x82954F10;
-constexpr uint32_t kApiLockObject = 0x8264D514;
 constexpr uint32_t kApiLock = 0x8264D518;
 constexpr uint32_t kKeRaiseIrqlToDpcLevel = 0x825DBE44;
 constexpr uint32_t kKeAcquireSpinLockAtRaisedIrql = 0x825DB9A4;

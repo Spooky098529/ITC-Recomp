@@ -554,7 +554,7 @@ struct CarSettingsData : View {
   uint32_t unknown_760_address() const { return address + 760; }
 };
 
-// embedded; measure: CourseRecord::Entry.r4
+// embedded; measure: CourseRecord::Entry.r4, CourseRecords::Of.ret
 struct CourseRecord : View {
   using View::View;
   static constexpr uint32_t kSize = 408;

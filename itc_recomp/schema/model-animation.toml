@@ -21,6 +21,7 @@
 # A track set (20 bytes, model +304, +324, +344, +364, +384): the section it
 # views and the values it animates, one a track.
 [TrackSet]
+measures = ["sub_825A1148.r3"]  # from SceneryMaterialTrackSet (scenery-lists), merged at the integration
 measure = "TrackSet"
 size = 20
 origin = "file"
@@ -147,7 +148,9 @@ fields = [
 # (vtable 0x8206CE60, 164 bytes) and the skeleton (vtable 0x8206CE50) are
 # one object here.
 [Skeleton]
-measures = ["Skeleton", "SkeletonBase", "sub_82599BE0.r3", "sub_8259B600.r3"]
+# measures from SecondSetPointSkeleton (second-set), merged at the integration
+measures = ["Skeleton", "SkeletonBase", "sub_82599BE0.r3", "sub_8259B600.r3",
+  "PartsPoints.+0"]
 size = 180
 origin = "file"
 vtable = 0x8206CE50
@@ -209,7 +212,8 @@ fields = [
 
 # The primitive drawer (8 bytes, vtable 0x820721D4).
 [PrimitiveDrawer]
-measures = ["PrimitiveDrawer", "sub_825A13D8.r3"]
+measures = ["PrimitiveDrawer", "sub_825A13D8.r3",
+            "sub_825A1810.r3"]
 size = 8
 origin = "file"
 vtable = 0x820721D4
@@ -221,6 +225,7 @@ fields = [
 # The primitive drawer's 4-byte block: its vertex declaration.
 [PrimitiveDrawerDeclaration]
 measure = "new<4>@PrimitiveDrawer::PrimitiveDrawer"
+measures = ["sub_825A1810.r3.+4"]
 size = 4
 origin = "allocated"
 fields = [

@@ -15,6 +15,11 @@
 # makers, all lifted and never seen in play): other areas' classes, given
 # their names from the docs where the vtable is known; their own areas
 # extend or move them when described there.
+# Moved to their owners at E5 step 2's integration: Framework and
+# DebugText (framework.toml), SaveSlot (files-and-saves.toml), CommandList
+# (command-list.toml), Skeleton and PrimitiveDrawer (model-animation.toml),
+# TextureProvider (models.toml), Movie, MovieWrapper and
+# MovieWrapperVtable (movies.toml).
 
 # The process heap (1,412 bytes seen; made at boot by sub_82297C08).
 [ProcessHeap]
@@ -105,7 +110,9 @@ fields = [
 # std::exception (std::bad_alloc's base), as its copy constructor
 # sub_825A67A8 reads the source (r4) and writes the copy (r3).
 [StdException]
-measures = ["sub_825A67A8.r3", "sub_825A67A8.r4"]
+# measures from StdLogicError (screen-objects), merged at the integration
+measures = ["sub_825A67A8.r3", "sub_825A67A8.r4",
+  "sub_820919B8.r3", "sub_820915F8.r3"]
 size = 12
 origin = "embedded"
 fields = [
@@ -145,31 +152,6 @@ fields = [
   { name = "vtable", offset = 0, type = "u32" },
 ]
 
-# The framework (framework.md): sixteen vtables at +0 to +60, put back to
-# the base classes' by its destructor sub_820905E0.
-[Framework]
-measure = "sub_820908F8.ret"
-size = 64
-origin = "allocated"
-fields = [
-  { name = "vtable", offset = 0, type = "u32" },
-  { name = "vtable_4", offset = 4, type = "u32" },
-  { name = "vtable_8", offset = 8, type = "u32" },
-  { name = "vtable_12", offset = 12, type = "u32" },
-  { name = "vtable_16", offset = 16, type = "u32" },
-  { name = "vtable_20", offset = 20, type = "u32" },
-  { name = "vtable_24", offset = 24, type = "u32" },
-  { name = "vtable_28", offset = 28, type = "u32" },
-  { name = "vtable_32", offset = 32, type = "u32" },
-  { name = "vtable_36", offset = 36, type = "u32" },
-  { name = "vtable_40", offset = 40, type = "u32" },
-  { name = "vtable_44", offset = 44, type = "u32" },
-  { name = "vtable_48", offset = 48, type = "u32" },
-  { name = "vtable_52", offset = 52, type = "u32" },
-  { name = "vtable_56", offset = 56, type = "u32" },
-  { name = "vtable_60", offset = 60, type = "u32" },
-]
-
 # An 8-byte object with two vtables (0x82000EB8, then 0x82000BA8 and
 # 0x82000AB4 at +4), deleted by sub_82090D68; the same pair is embedded in
 # the debug text (+8) and the movie (+12).
@@ -180,36 +162,6 @@ origin = "allocated"
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
   { name = "vtable_4", offset = 4, type = "u32" },
-]
-
-# The debug text (52 bytes at framework + 92, framework.md; vtable
-# 0x82000BC8), as its deleting destructor sub_82091070 reads it.
-[DebugText]
-measure = "sub_82091070.r3"
-size = 52
-origin = "embedded"
-vtable = 0x82000BC8
-fields = [
-  { name = "vtable", offset = 0, type = "u32" },
-  { name = "vtable_8", offset = 8, type = "u32", note = "an embedded DualVtableObject's (0x82000EB8)" },
-  { name = "vtable_12", offset = 12, type = "u32" },
-  { name = "vtable_32", offset = 32, type = "u32", note = "the functors' base 0x82000ABC" },
-  { name = "unknown_48", offset = 48, type = "u32", note = "a block freed with operator delete[]" },
-]
-
-# One save slot (1,000 bytes, vtable 0x82002190, save-interface.md), as its
-# deleting destructors read it: sub_820A4508 one slot, sub_820A5660 the
-# operator new[] array of four.
-[SaveSlot]
-measures = ["sub_820A4508.r3", "sub_820A5660.r3"]
-size = 1000
-origin = "allocated"
-vtable = 0x82002190
-fields = [
-  { name = "array_count", offset = -8, type = "u32", note = "the operator new[] block's count, 8 bytes before the first slot" },
-  { name = "vtable", offset = 0, type = "u32" },
-  { name = "unknown_80", offset = 80, type = "u32", note = "a block the destructor frees" },
-  { name = "unknown_84", offset = 84, type = "u32", note = "a block the destructor frees" },
 ]
 
 # An object holding a std::vector at +4 (begin, end, end of storage), freed
@@ -233,90 +185,6 @@ vtable = 0x82002780
 fields = [
   { name = "vtable", offset = 0, type = "u32" },
   { name = "holder", offset = 4, type = "ptr", to = "VectorHolder" },
-]
-
-# The movie class (movies.md, vtable 0x82002910), as its deleting
-# destructor sub_820AE9F8 reads it.
-[Movie]
-measure = "sub_820AE9F8.r3"
-size = 40
-origin = "allocated"
-vtable = 0x82002910
-fields = [
-  { name = "vtable", offset = 0, type = "u32" },
-  { name = "wrapper", offset = 8, type = "ptr", to = "MovieWrapper", note = "the 8-byte MovieWrapper, or 0" },
-  { name = "command_vtable", offset = 12, type = "u32", note = "the command at +12's vtables (0x82000EB8 put back)" },
-  { name = "command_vtable_16", offset = 16, type = "u32" },
-  { name = "delegate_vtable", offset = 36, type = "u32", note = "the delegate's vtable (0x82000ABC put back)" },
-]
-
-# The movie library's wrapper (vtable 0x8206CC90, movies.md).
-[MovieWrapper]
-measure = "sub_820AE9F8.r3.+8"
-size = 4
-origin = "allocated"
-fields = [
-  { name = "vtable", offset = 0, type = "ptr", to = "MovieWrapperVtable" },
-]
-
-[MovieWrapperVtable]
-measure = "sub_820AE9F8.r3.+8.+0"
-size = 32
-origin = "image"
-fields = [
-  { name = "slot_7", offset = 28, type = "fn", note = "called by the movie's destructor (probably the release)" },
-]
-
-# The graphics library's command list (command-list.md, vtable 0x8206C080),
-# as its deleting destructor sub_8258CE00 reads it.
-[CommandList]
-measure = "sub_8258CE00.r3"
-size = 32
-origin = "embedded"
-vtable = 0x8206C080
-fields = [
-  { name = "vtable", offset = 0, type = "u32" },
-  { name = "unknown_20", offset = 20, type = "u32", note = "a block freed with operator delete[]" },
-  { name = "unknown_24", offset = 24, type = "u32" },
-  { name = "unknown_28", offset = 28, type = "u32" },
-]
-
-# A texture provider (known-data.md; 20 bytes, vtable 0x8206CCB4), as its
-# deleting destructor sub_82594440 reads it.
-[TextureProvider]
-measure = "sub_82594440.r3"
-size = 20
-origin = "embedded"
-vtable = 0x8206CCB4
-fields = [
-  { name = "vtable", offset = 0, type = "u32" },
-  { name = "first", offset = 8, type = "u32", note = "the texture pointers' std::vector: first slot" },
-  { name = "last", offset = 12, type = "u32" },
-  { name = "end", offset = 16, type = "u32", note = "the end of its storage" },
-]
-
-# A skeleton (model-animation.md, vtable 0x8206CE50), as its deleting
-# destructor sub_82599BE0 reads it.
-[Skeleton]
-measure = "sub_82599BE0.r3"
-size = 180
-origin = "allocated"
-vtable = 0x8206CE50
-fields = [
-  { name = "vtable", offset = 0, type = "u32" },
-  { name = "node_vectors", offset = 176, type = "u32", note = "the per-node float4s (freed with operator delete[])" },
-]
-
-# The primitive drawer (model-animation.md, vtable 0x820721D4), as its
-# deleting destructor sub_825A13D8 reads it.
-[PrimitiveDrawer]
-measure = "sub_825A13D8.r3"
-size = 8
-origin = "allocated"
-vtable = 0x820721D4
-fields = [
-  { name = "vtable", offset = 0, type = "u32" },
-  { name = "unknown_4", offset = 4, type = "u32", note = "a block the destructor frees" },
 ]
 
 # The objects sub_820A81C0 makes (not read, never seen in play): items with

@@ -13,7 +13,12 @@
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
 #include "guest.h"
+#include "schema/network_mode.h"
+#include "schema/race_hud_machine.h"
+#include "schema/race_states.h"
 #include "schema/race_screens_unseen.h"
+#include "schema/save_interface.h"
+#include "schema/tuning_screen.h"
 #include "memory/c_runtime_heap.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -55,7 +60,8 @@ using Globals = schema::RaceScreensUnseenGlobals;
 
 // The screen [0x82814E10], read again at each use.
 schema::Kind6Menu Screen(uint8_t* base) { return Globals::kind6_menu(base); }
-uint32_t Session(uint8_t* base) { return Globals::kind6_session(base).address; }
+schema::Session SessionView(uint8_t* base) { return Globals::kind6_session(base); }
+uint32_t Session(uint8_t* base) { return SessionView(base).address; }
 
 uint64_t LoadU64(uint8_t* base, uint32_t address) {
   return (uint64_t(guest::LoadU32(base, address)) << 32) | guest::LoadU32(base, address + 4);
@@ -96,7 +102,7 @@ uint64_t Kind6Rank(uint8_t* base) {
   uint32_t rank = 0;
   if (count != 0) {
     const uint32_t rows = guest::LoadU32(base, view + 12);
-    const uint64_t xuid = LoadU64(base, Session(base) + 168);
+    const uint64_t xuid = LoadU64(base, SessionView(base).xuid_address());
     for (uint32_t i = 0; i < count; i++) {
       if (LoadU64(base, rows + 48 * i) == xuid) {
         rank = guest::LoadU32(base, rows + 48 * i + 8);
@@ -151,8 +157,8 @@ uint64_t Kind6NetState(uint8_t* base, uint64_t state, uint32_t sp, const Calls& 
     case 4112: {
       const uint64_t r3 = calls.Call(kNetSetState, frame, 0x822927D8, 4112);
       const uint32_t session = Session(base);
-      Globals::set_kind6_read_spec(base, guest::LoadU32(base, session + 188));
-      guest::StoreU32(base, session + 180, 0);
+      Globals::set_kind6_read_spec(base, schema::Session(base, session).view_id());
+      schema::Session(base, session).set_read_state(0);
       return r3;
     }
     default:
@@ -182,7 +188,7 @@ uint64_t Kind6LeaderboardRead(uint8_t* base, uint32_t session, uint32_t sp, cons
   // Not signed in to Xbox Live (XUserGetSigninState of the player's
   // controller isn't 2 for any user today): the read's state 4.
   if (user::SigninState(Get(base, kControllerEntries)) != 2) {
-    guest::StoreU32(base, session + 180, 4);
+    schema::Session(base, session).set_read_state(4);
   }
   // The old results freed (operator delete[]).
   const uint32_t results = Results(base);
@@ -197,52 +203,49 @@ uint64_t Kind6LeaderboardRead(uint8_t* base, uint32_t session, uint32_t sp, cons
   // buffer into [0x826C6AD4] and XEnumerate: answered as no Live (the
   // user's call, 2026-11-14): the read failed, no buffer, the state 4. The
   // original's r3 there isn't read by its callers.
-  guest::StoreU32(base, session + 180, 4);
+  schema::Session(base, session).set_read_state(4);
   return 0;
 }
 
 uint64_t Kind6SaveReplay(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221D678 Kind6Menu::SaveReplay");
   const uint32_t frame = Frame(base, sp, 176);
-  const uint32_t race = Get(base, kRaceData);
+  const schema::RaceData race = Globals::race_data(base);
   const uint32_t selection = ListSelection(base, Screen(base).slot_list_count_address());
-  const uint32_t records = race + 0x59AE8;
+  const uint32_t records = race.results_address();
   // The slot: the list's scroll (+4) and selection.
   const uint32_t slot = Screen(base).slot_list_scroll() + selection;
   vehicle_accessors::RacerRecordsAt(base, records, kNone);
   // The 36-byte record in the frame: cleared, the date and time
   // (GetLocalTime), +24 the race data's +60, +16 the last result's time.
   const uint32_t record = frame + 80;
+  const schema::SaveReplayRecord built(base, record);
   for (uint32_t k = 0; k < 36; k += 4) guest::StoreU32(base, record + k, 0);
   const uint32_t replay = Get(base, kRaceReplay);
   calls.Call(kGetLocalTime, frame, 0x8221D6E8, record);
-  guest::StoreU32(base, record + 24, guest::LoadU32(base, race + 60));
-  guest::StoreU32(base, record + 16,
-                  ai_drivers::TimeFromTicks(guest::LoadU32(
-                      base, vehicle_accessors::RacerRecordsAt(base, records, kNone) + 3932)));
+  built.set_course(race.record0_place());
+  built.set_time(ai_drivers::TimeFromTicks(
+      schema::RacerResultsRecord(base, vehicle_accessors::RacerRecordsAt(base, records, kNone)).ticks()));
   // By the race kind: +20 the kind's index, +32 a value of the last result.
-  switch (int32_t(guest::LoadU32(base, race + 0xA3AF0))) {
+  switch (int32_t(race.kind())) {
     case 1:
-      guest::StoreU32(base, record + 32,
-                      guest::LoadU32(base, vehicle_accessors::RacerRecordsAt(base, records, kNone) +
-                                               980));
-      guest::StoreU32(base, record + 20, 0);
+      built.set_result(
+          schema::RacerResultsRecord(base, vehicle_accessors::RacerRecordsAt(base, records, kNone)).e1_item());
+      built.set_mode(0);
       break;
     case 2:
-      guest::StoreU32(base, record + 32,
-                      guest::LoadU32(base, vehicle_accessors::RacerRecordsAt(base, records, kNone) +
-                                               3892));
-      guest::StoreU32(base, record + 20, 1);
+      built.set_result(
+          schema::RacerResultsRecord(base, vehicle_accessors::RacerRecordsAt(base, records, kNone)).route());
+      built.set_mode(1);
       break;
     case 4:
-      guest::StoreU32(base, record + 32, 0);
-      guest::StoreU32(base, record + 20, 2);
+      built.set_result(0);
+      built.set_mode(2);
       break;
     case 6:
-      guest::StoreU32(base, record + 32,
-                      guest::LoadU32(base, vehicle_accessors::RacerRecordsAt(base, records, kNone) +
-                                               3892));
-      guest::StoreU32(base, record + 20, 3);
+      built.set_result(
+          schema::RacerResultsRecord(base, vehicle_accessors::RacerRecordsAt(base, records, kNone)).route());
+      built.set_mode(3);
       break;
     default:
       break;
@@ -261,15 +264,15 @@ uint64_t Kind6ShowPanelB(uint8_t* base, uint32_t sp, const Calls& calls) {
   uint32_t a = ui_movies::FindNode(base, movie, 1, 4);
   uint32_t b = ui_movies::FindNode(base, movie, 1, 5);
   if (a == 0 || b == 0) return b;
-  guest::StoreU32(base, a + 108, 0);
-  guest::StoreU32(base, b + 108, 0);
+  schema::UiMovieNode(base, a).set_texture_entry(0);
+  schema::UiMovieNode(base, b).set_texture_entry(0);
   calls.Call(kShowNode, frame, 0x8221CF34, movie, 1, 6);
   calls.Call(kShowNode, frame, 0x8221CF44, movie, 1, 7);
   a = ui_movies::FindNode(base, movie, 1, 6);
   b = ui_movies::FindNode(base, movie, 1, 7);
   if (a == 0 || b == 0) return b;
-  guest::StoreU32(base, a + 108, 1);
-  guest::StoreU32(base, b + 108, 1);
+  schema::UiMovieNode(base, a).set_texture_entry(1);
+  schema::UiMovieNode(base, b).set_texture_entry(1);
   calls.Call(kHideNode, frame, 0x8221CF98, movie, 1, 8);
   return calls.Call(kHideNode, frame, 0x8221CFA8, movie, 1, 9);
 }
@@ -305,11 +308,11 @@ uint64_t Kind6ShowTimeOnly(uint8_t* base, uint32_t sp, const Calls& calls) {
   uint64_t r3 = 0;
   for (uint32_t i = 0; i < 5; i++) {
     const uint32_t node = ui_movies::FindNode(base, movie, kNone, i + 23);
-    guest::StoreU32(base, node + 80, 1);
+    schema::UiMovieNode(base, node).set_visible(1);
     NodeText(calls, frame, 0x8221D47C, movie, ui_movies::Child(base, node, 0), 533);
     NodeText(calls, frame, 0x8221D498, movie, ui_movies::Child(base, node, 1), 534);
     const uint32_t mark = ui_movies::Child(base, ui_movies::Child(base, node, 2), 0);
-    guest::StoreU32(base, mark + 108, 0);
+    schema::UiMovieNode(base, mark).set_texture_entry(0);
     r3 = NodeText(calls, frame, 0x8221D4D4, movie, ui_movies::Child(base, node, 6), 531);
   }
   return r3;
@@ -381,7 +384,7 @@ uint64_t Kind6ShowRanking(uint8_t* base, uint32_t sp, const Calls& calls) {
     if ((rank == 0 && slot <= 1) || (rank == 1 && slot == 0)) continue;
     if (row >= total()) return r3;
     const uint32_t node = ui_movies::FindNode(base, movie, kNone, slot + 23);
-    guest::StoreU32(base, node + 80, 1);
+    schema::UiMovieNode(base, node).set_visible(1);
     const uint32_t child0 = ui_movies::Child(base, node, 0);
     r3 = child0;
     const uint32_t place = Results(base) != 0 ? guest::LoadU32(base, entry() + 8) : kNone;
@@ -402,7 +405,7 @@ uint64_t Kind6ShowRanking(uint8_t* base, uint32_t sp, const Calls& calls) {
     guest::StoreU32(base, frame + 80, 0);
     guest::StoreU32(base, frame + 84, 0);
     guest::StoreU32(base, frame + 88, 0);
-    guest::StoreU32(base, mark + 108, logo);
+    schema::UiMovieNode(base, mark).set_texture_entry(logo);
     r3 = Kind6RankingTime(base, uint64_t(int64_t(row)), frame + 80, frame + 84, frame + 88);
     const uint32_t mins = guest::LoadU32(base, frame + 80);
     const uint32_t secs = guest::LoadU32(base, frame + 84);
@@ -454,7 +457,7 @@ uint64_t Kind6AnswerPage(uint8_t* base) {
   uint32_t answer = 3;
   if (cursor <= 1 || cursor == 3) {
     answer = cursor == 0 ? 1 : (cursor == 1 ? 2 : 3);
-    guest::StoreU32(base, Session(base) + 240, cursor == 3 ? 1 : 0);
+    SessionView(base).set_screen3_after_race(cursor == 3 ? 1 : 0);
   }
   Globals::set_kind6_answer(base, answer);
   return answer;
@@ -534,10 +537,11 @@ uint64_t Kind6CheckRecordPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221E510 Kind6Menu::CheckRecordPage");
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t session = Session(base);
-  if (LoadU64(base, session + 208) > LoadU64(base, session + 200)) {
+  const schema::Session times(base, session);
+  if (LoadU64(base, times.best_time_address()) > LoadU64(base, times.race_time_address())) {
     Kind6NetState(base, 4111, frame, calls);
-    guest::StoreU32(base, Session(base) + 160, 1);
-    guest::StoreU32(base, Session(base) + 236, 0);
+    SessionView(base).set_unknown_160(1);
+    SessionView(base).set_upload_state(0);
     GoA(base, 8);
     Screen(base).set_rows_shown(1);
   } else {
@@ -564,7 +568,7 @@ uint64_t Kind6RankingReadPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     Screen(base).set_read_started(1);
     session = Session(base);
   }
-  const uint32_t state = guest::LoadU32(base, session + 180);
+  const uint32_t state = schema::Session(base, session).read_state();
   if (state <= 1) return 0;
   if (state == 2) {
     if (int32_t(Screen(base).input_on()) == 0) GoB(base, 0, 6);
@@ -584,16 +588,16 @@ uint64_t Kind6UploadPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221E5E8 Kind6Menu::UploadPage");
   const uint32_t frame = Frame(base, sp, 128);
   uint32_t session = Session(base);
-  if (int32_t(guest::LoadU32(base, session + 224)) != 0 &&
-      int32_t(guest::LoadU32(base, session + 236)) == 1) {
+  if (int32_t(schema::Session(base, session).unknown_224()) != 0 &&
+      int32_t(schema::Session(base, session).upload_state()) == 1) {
     const uint32_t rank = uint32_t(Kind6Rank(base));
     session = Session(base);
     if (rank > 19) {
-      guest::StoreU32(base, session + 236, 3);
+      schema::Session(base, session).set_upload_state(3);
       Screen(base).set_rows_shown(1);
       GoA(base, 9);
       GoB(base, 0, 6);
-    } else if (int32_t(guest::LoadU32(base, session + 228)) != 0) {
+    } else if (int32_t(schema::Session(base, session).privilege()) != 0) {
       GoA(base, 11);
       Screen(base).set_rows_shown(1);
       Screen(base).set_box_message(48);
@@ -606,14 +610,14 @@ uint64_t Kind6UploadPage(uint8_t* base, uint32_t sp, const Calls& calls) {
       Screen(base).set_message_which(3);
       Screen(base).set_box_message(49);
       GoB(base, 3, 6, 2);
-      guest::StoreU32(base, Session(base) + 236, 2);
+      SessionView(base).set_upload_state(2);
       Kind6ShowPanelA(base, frame, calls);
     }
     Kind6ShowRanking(base, frame, calls);
     session = Session(base);
   }
-  if (int32_t(guest::LoadU32(base, session + 232)) != 0) {
-    guest::StoreU32(base, session + 236, 3);
+  if (int32_t(schema::Session(base, session).unknown_232()) != 0) {
+    schema::Session(base, session).set_upload_state(3);
     Screen(base).set_rows_shown(0);
     Screen(base).set_message_which(1);
     Screen(base).set_box_message(57);
@@ -637,7 +641,7 @@ uint64_t Kind6MenuBackPage(uint8_t* base, uint32_t sp, const Calls& calls) {
 uint64_t Kind6UploadResultPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221D908 Kind6Menu::UploadResultPage");
   const uint32_t frame = Frame(base, sp, 96);
-  const int32_t state = int32_t(guest::LoadU32(base, Session(base) + 236));
+  const int32_t state = int32_t(SessionView(base).upload_state());
   if (state == 0) {
     GoA(base, 14);
     GoB(base, 4, 6);
@@ -655,13 +659,13 @@ uint64_t Kind6RankingPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8221BE90 Kind6Menu::RankingPage");
   const uint32_t frame = Frame(base, sp, 128);
   uint32_t session = Session(base);
-  if (int32_t(guest::LoadU32(base, session + 144)) == 0 && int32_t(Screen(base).read_started()) == 0) {
+  if (int32_t(schema::Session(base, session).read_started()) == 0 && int32_t(Screen(base).read_started()) == 0) {
     Kind6NetState(base, 4112, frame, calls);
     Kind6LeaderboardRead(base, session, frame, calls);
     Screen(base).set_read_started(1);
     session = Session(base);
   }
-  const uint32_t state = guest::LoadU32(base, session + 180);
+  const uint32_t state = schema::Session(base, session).read_state();
   if (state < 2) return 0;
   if (state == 2) {
     GoA(base, 6);
@@ -673,7 +677,7 @@ uint64_t Kind6RankingPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     Screen(base).set_read_started(0);
   } else if (state == 3) {
     Kind6NetState(base, 4111, frame, calls);
-    guest::StoreU32(base, Session(base) + 160, 1);
+    SessionView(base).set_unknown_160(1);
     GoA(base, 8);
     Screen(base).set_rows_shown(1);
     Screen(base).set_read_started(0);
@@ -726,7 +730,7 @@ uint64_t Kind6QuestionPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     Screen(base).set_read_started(0);
     GoA(base, 9);
     GoB(base, 0, 1);
-    guest::StoreU32(base, Session(base) + 236, 3);
+    SessionView(base).set_upload_state(3);
     Screen(base).set_ranking_skipped(1);
   }
   if (int32_t(Screen(base).question_menu_moved()) != 0) {
@@ -743,7 +747,7 @@ uint64_t Kind6QuestionAnswerPage(uint8_t* base, uint32_t sp) {
   if (answer == 1) {
     GoB(base, 1, 0);
   } else if (answer == 2) {
-    guest::StoreU32(base, Session(base) + 236, 2);
+    SessionView(base).set_upload_state(2);
     GoA(base, 10);
     GoB(base, 5, 5);
   }

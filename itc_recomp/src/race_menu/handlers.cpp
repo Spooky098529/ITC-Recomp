@@ -14,8 +14,6 @@ namespace {
 constexpr uint32_t kMemCommit = 4096;
 constexpr uint32_t kReadWrite = 4;
 constexpr uint32_t kMemRelease = 0x8000;
-// Player 0's save's answer to the question.
-constexpr uint32_t kSaveAnswer = 0x1F870;
 
 }  // namespace
 
@@ -130,7 +128,8 @@ uint64_t OnAnswer(uint8_t* base, uint32_t machine, bool yes, uint32_t sp) {
   const Machine m(base, machine);
   m.set_answered(1);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  Store(base, save + kSaveAnswer, yes ? 1 : 0);
+  // The answer, in the save's options +20 (0x1F870).
+  Save(base, save).set_profile_option(yes ? 1 : 0);
   m.set_answered_no(yes ? 0 : 1);
   return save;
 }
@@ -233,15 +232,16 @@ uint64_t Destroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   uint32_t state;
   if (m.day() == 2) {
     // The boot movies: movie 1, then the mode after them.
-    const uint32_t list = G::boot_movie_list_address();
+    using Boot = schema::BootModeGlobals;
+    const uint32_t ids = Boot::movie_ids_address();
     for (uint32_t k = 0; k < 5; k++) {
-      Store(base, list + 4 * k, 11);
+      Store(base, ids + 4 * k, 11);
     }
-    Store(base, list + 20, 13);
-    Store(base, list + 28, 0);
-    Store(base, list + 24, 1);
-    Store(base, list + 0, 1);
-    Store(base, list + 20, m.race_set_up() == 1 ? 1 : 5);
+    Boot::set_next_type(base, 13);
+    Boot::set_movie_index(base, 0);
+    Boot::set_skippable(base, 1);
+    Store(base, ids + 0, 1);
+    Boot::set_next_type(base, m.race_set_up() == 1 ? 1 : 5);
     state = 20;
   } else {
     state = m.race_set_up() == 1 ? 11 : 12;

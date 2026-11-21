@@ -9,6 +9,7 @@
 #include "car_specs/car_specs.h"
 #include "guest.h"
 #include "race_overlays/race_overlays.h"
+#include "schema/garage_screen.h"
 #include "schema/race_setup.h"
 #include "scene_models/scene_models.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -241,24 +242,25 @@ uint32_t SetModel(uint8_t* base, uint32_t car, uint32_t id) {
   if (car_specs::Exists(base) == 0) {
     return 0;
   }
-  const uint32_t spec = car_specs::GetCarSpec(base, c.car_id());
-  TuningReset(base, c.tuning_address(), guest::LoadU8(base, spec + 709) != 0 ? 1 : 0);
-  CopyFloat(base, c.final_drive_address(), spec + 372);
+  const schema::CarSpec spec(base, car_specs::GetCarSpec(base, c.car_id()));
+  TuningReset(base, c.tuning_address(), spec.turbo() != 0 ? 1 : 0);
+  CopyFloat(base, c.final_drive_address(), spec.final_drive_address());
+  // The ratios from the spec's +388 (gear_ratios + 4).
   for (uint32_t i = 0; i < 8; i++) {
-    CopyFloat(base, c.gear_ratio_0_address() + 4 * i, spec + 388 + 4 * i);
+    CopyFloat(base, c.gear_ratio_0_address() + 4 * i, spec.gear_ratios_address() + 4 + 4 * i);
   }
-  c.set_setting_76(uint8_t(guest::LoadU32(base, spec + 632)));
-  c.set_setting_77(uint8_t(guest::LoadU32(base, spec + 636)));
-  c.set_setting_74(uint8_t(guest::LoadU32(base, spec + 800)));
-  c.set_setting_75(uint8_t(guest::LoadU32(base, spec + 808)));
-  c.set_setting_72(uint8_t(guest::LoadU32(base, spec + 796)));
+  c.set_setting_76(uint8_t(spec.unknown_632()));
+  c.set_setting_77(uint8_t(spec.unknown_636()));
+  c.set_setting_74(uint8_t(spec.unknown_800()));
+  c.set_setting_75(uint8_t(spec.unknown_808()));
+  c.set_setting_72(uint8_t(spec.unknown_796()));
   // +72 again (the original's; +73 is left as it was).
-  c.set_setting_72(uint8_t(guest::LoadU32(base, spec + 804)));
-  const uint32_t drive = guest::LoadU32(base, spec + 356);
+  c.set_setting_72(uint8_t(spec.unknown_804()));
+  const uint32_t drive = spec.drive_type();
   if (drive != 0 && drive != 1) {
     c.set_split_drive(1);
     namespace ops = car_physics::ops;
-    double share = ops::Fsubs(ops::Lfs(base, G::one_address()), ops::Lfs(base, spec + 364));
+    double share = ops::Fsubs(ops::Lfs(base, G::one_address()), ops::Lfs(base, spec.front_torque_share_address()));
     share = ops::Fmuls(share, ops::Lfs(base, G::hundred_address()));
     share = ops::Fmuls(share, ops::Lfs(base, G::twenty_address()));
     share = ops::Fmuls(share, ops::Lfs(base, G::torque_scale_address()));
@@ -267,28 +269,28 @@ uint32_t SetModel(uint8_t* base, uint32_t car, uint32_t id) {
   } else {
     c.set_split_drive(0);
   }
-  c.set_nitrous(guest::LoadU32(base, spec + 772));
-  c.set_exterior_item_3(guest::LoadU32(base, spec + 776));
-  c.set_drivetrain_36(guest::LoadU32(base, spec + 784));
-  c.set_drivetrain_32(guest::LoadU32(base, spec + 780));
-  c.set_lsd_a(guest::LoadU32(base, spec + 788));
-  c.set_lsd_b(guest::LoadU32(base, spec + 792));
-  CopyEntries1588(base, car, spec + 812, false);
-  c.set_front_tire_grade(guest::LoadU32(base, spec + 888));
-  c.set_front_tire_type(guest::LoadU32(base, spec + 884));
-  c.set_rear_tire_grade(guest::LoadU32(base, spec + 896));
-  c.set_rear_tire_type(guest::LoadU32(base, spec + 892));
+  c.set_nitrous(spec.unknown_772());
+  c.set_exterior_item_3(spec.unknown_776());
+  c.set_drivetrain_36(spec.unknown_784());
+  c.set_drivetrain_32(spec.unknown_780());
+  c.set_lsd_a(spec.unknown_788());
+  c.set_lsd_b(spec.unknown_792());
+  CopyEntries1588(base, car, spec.unknown_812_address(), false);
+  c.set_front_tire_grade(spec.unknown_888());
+  c.set_front_tire_type(spec.unknown_884());
+  c.set_rear_tire_grade(spec.unknown_896());
+  c.set_rear_tire_type(spec.unknown_892());
   for (uint32_t i = 0; i < 5; i++) {
     const schema::CarChoice to(base, c.choice0_a_address() + 12 * i);
-    const uint32_t from = spec + 900 + 8 * i;
+    const uint32_t from = spec.unknown_900_address() + 8 * i;
     to.set_c(guest::LoadU32(base, from));
     const int32_t next = int32_t(guest::LoadU32(base, from + 4));
     to.set_a(uint32_t(next / 3 + 1));
     const int32_t again = int32_t(guest::LoadU32(base, from + 4));
     to.set_b(uint32_t(again - (again / 3) * 3));
   }
-  if (guest::LoadU32(base, spec + 648) <= 2000 && guest::LoadU32(base, spec + 716) <= 4700 &&
-      guest::LoadU32(base, spec + 720) <= 2000 && guest::LoadU32(base, spec + 724) <= 1700) {
+  if (spec.displacement() <= 2000 && spec.unknown_716() <= 4700 && spec.unknown_720() <= 2000 &&
+      spec.unknown_724() <= 1700) {
     c.set_unknown_1571(0);
     c.set_unknown_1570(5);
   } else {

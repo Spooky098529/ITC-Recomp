@@ -86,7 +86,8 @@ fields = [
 # The measure joins Minimap::Scaling's out matrix with them (both its
 # functions' r3).
 [MinimapRacerEntry]
-measures = ["Minimap", "Race::FindPlayerEntry.ret"]
+measures = ["Minimap", "Race::FindPlayerEntry.ret",
+            "RaceManager::GiveVehicle.r4", "RaceManager::EntryOfRecord.ret", "Race.+2308"]
 size = 28
 origin = "embedded"
 fields = [

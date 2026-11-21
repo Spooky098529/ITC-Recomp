@@ -21,7 +21,11 @@
 #include "matrix_math/matrix_math.h"
 #include "model_animation/model_animation.h"
 #include "scenery_lists/scenery_lists.h"
+#include "schema/camera_modes.h"
+#include "schema/cameras.h"
 #include "schema/course_scenery.h"
+#include "schema/models.h"
+#include "schema/scenery_lists.h"
 #include "sprites/billboards.h"
 
 #include <initializer_list>
@@ -34,18 +38,12 @@ namespace {
 using namespace car_scene_draw::ops;
 
 constexpr uint32_t kFrame = 640;
-constexpr uint32_t kCameraPasses = 0x826BAC00;
-constexpr uint32_t kViewCopy = 0x8265ECA0;  // also the original's r24 throughout
-constexpr uint32_t kViewports = 0x826C2CE8;
+// The view copy, also the original's r24 throughout.
+constexpr uint32_t kViewCopy = schema::SceneryListsGlobals::view_address();
 // The pass table: 20 entries of six words (the player, the viewport entry,
 // the camera pass, the two keys, the mask): 0 to 2 the course set's model,
 // 3 to 5 its list at +528, 6 to 15 and 16 to 18 the areas, 16 to 18 the
 // set's lists and light groups, 19 the minimap.
-constexpr uint32_t kPassTable = 0x82603060;
-constexpr uint32_t kRangeX = 0x82001FCC;
-constexpr uint32_t kRangeY = 0x82006804;
-constexpr uint32_t kClearColor = kCameraPasses + 11812;  // pass 19's +564
-constexpr uint32_t kClearDepth = kCameraPasses + 11820;  // its +572
 constexpr uint32_t kProviderClearAll = 0x82594328;
 constexpr uint32_t kProviderSet = 0x82594718;
 constexpr uint32_t kModelAnimate = 0x82594B60;
@@ -59,6 +57,19 @@ bool ShadowPass(int32_t type) { return type == 10 || type == 13 || type == 16; }
 using Manager = schema::Scenery;
 using VisibleArea = schema::SceneryVisibleArea;
 using G = schema::CourseSceneryGlobals;
+using Pass = schema::CameraPass;
+using Entry = schema::SceneryPassEntry;
+using Desc = schema::SceneryPassDesc;
+using Shape = schema::SceneryModel;
+
+// The camera pass `index` (592 bytes each from 0x826BAC00).
+Pass PassAt(uint8_t* base, uint32_t index) {
+  return Pass(base, index * Pass::kSize + schema::CamerasGlobals::passes_address());
+}
+// The pass table's entry `entry` (G::pass_table).
+Entry EntryAt(uint8_t* base, uint32_t entry) {
+  return Entry(base, G::pass_table_address() + Entry::kSize * entry);
+}
 
 }  // namespace
 
@@ -69,6 +80,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   const uint32_t f = stack - kFrame;
   Store(base, f, stack);  // the back chain, as stwu
   const uint32_t description = f + 80;
+  const Desc desc(base, description);
   const Manager m(base, manager);
   const uint32_t provider = m.texture_provider_address();  // r27
   const schema::CourseSet s = m.course_set();              // r15
@@ -100,16 +112,15 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       guest_call(function, {provider, slot, textures}, lr);
     }
   };
-  auto pass_of = [&](uint32_t index) { return index * 592u + kCameraPasses; };
-  // The description's +12 to +32 from table entry `entry`.
+  // The description's +12 to +32 from table entry `entry`, word by word.
   auto describe = [&](uint32_t entry) {
-    const uint32_t at = kPassTable + 24 * entry;
+    const uint32_t at = EntryAt(base, entry).address;
     for (uint32_t i = 0; i < 6; i++) {
-      Store(base, description + 12 + 4 * i, Load(base, at + 4 * i));
+      Store(base, desc.player_address() + 4 * i, Load(base, at + 4 * i));
     }
   };
   auto enabled = [&](uint32_t entry) {
-    return Load(base, pass_of(Load(base, kPassTable + 24 * entry + 8)) + 588) != 0;
+    return PassAt(base, EntryAt(base, entry).camera_pass()).enabled() != 0;
   };
   auto copy = [&](uint32_t to, uint32_t from, uint32_t lr) {
     matrix_math::Copy(base, to, from);
@@ -162,13 +173,13 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   // The course set's model (+96) with the eye's translation, +196's 0x10.
   if ((m.mask() & 0x10) != 0) {
     const double zero = double(G::zero(base));  // f30
-    const double range_y = Lfs(base, kRangeY);  // f28
-    const double range_x = Lfs(base, kRangeX);  // f29
+    const double range_y = double(G::range_y(base));  // f28
+    const double range_x = double(G::range_x(base));  // f29
     for (uint32_t entry = 0; entry < 3; entry++) {
       if (!enabled(entry)) {
         continue;
       }
-      const uint32_t pass = pass_of(Load(base, kPassTable + 24 * entry + 8));
+      const Pass pass = PassAt(base, EntryAt(base, entry).camera_pass());
       for (uint32_t at : {220u, 236u, 252u, 268u, 348u, 364u, 380u, 396u}) {
         Stfs(base, f + at, one);
       }
@@ -180,16 +191,16 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       headlights();
       const uint32_t world = f + 208, view_projection = f + 336;
       identity(world);
-      Stfs(base, f + 256, Lfs(base, pass + 400));
-      Stfs(base, f + 260, Lfs(base, pass + 404));
-      Stfs(base, f + 264, Lfs(base, pass + 408));
-      copy(view_projection, pass + 144, 0x820F628C);
+      Stfs(base, f + 256, double(pass.eye_x()));
+      Stfs(base, f + 260, double(pass.eye_y()));
+      Stfs(base, f + 264, double(pass.eye_z()));
+      copy(view_projection, pass.view_projection_address(), 0x820F628C);
       provider_set(1, 0x820F62A8);
-      G::set_key_a(base, Load(base, f + 104));
-      G::set_key_b(base, Load(base, f + 108));
-      copy(kViewCopy, pass + 16, 0x820F62C4);
-      Store(base, model + 48, provider);
-      for (uint32_t i = 0; int32_t(i) < int32_t(Load(base, model + 412)); i++) {
+      G::set_key_a(base, desc.key_a());
+      G::set_key_b(base, desc.key_b());
+      copy(kViewCopy, pass.view_address(), 0x820F62C4);
+      schema::Model(base, model).set_texture_provider(provider);
+      for (uint32_t i = 0; int32_t(i) < int32_t(schema::Model(base, model).shape_count()); i++) {
         const uint32_t range = f + 192;
         Stfs(base, range + 0, range_x);
         Stfs(base, range + 4, range_y);
@@ -218,7 +229,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       if (!enabled(entry)) {
         continue;
       }
-      const uint32_t pass = pass_of(Load(base, kPassTable + 24 * entry + 8));
+      const Pass pass = PassAt(base, EntryAt(base, entry).camera_pass());
       for (uint32_t at : {284u, 300u, 316u, 332u, 412u, 428u, 444u, 460u}) {
         Stfs(base, f + at, one);
       }
@@ -230,21 +241,24 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       headlights();
       const uint32_t world = f + 272, view_projection = f + 400;
       identity(world);
-      copy(view_projection, pass + 144, 0x820F6424);
+      copy(view_projection, pass.view_projection_address(), 0x820F6424);
       provider_set(1, 0x820F6440);
-      G::set_key_a(base, Load(base, f + 104));
-      G::set_key_b(base, Load(base, f + 108));
-      copy(kViewCopy, pass + 16, 0x820F645C);
-      const uint32_t row = kPassTable + 24 * entry;
-      for (uint32_t i = 0; int32_t(i) < int32_t(Load(base, list)); i++) {
+      G::set_key_a(base, desc.key_a());
+      G::set_key_b(base, desc.key_b());
+      copy(kViewCopy, pass.view_address(), 0x820F645C);
+      const Entry row = EntryAt(base, entry);
+      for (uint32_t i = 0; int32_t(i) < int32_t(schema::ModelList(base, list).count()); i++) {
         const uint32_t model = ListModel(base, list + 4, i);
         scenery_lists::ResetDrawState(base, model);
-        const uint32_t viewport = Load(base, Load(base, kViewports) + 4 * Load(base, row)) +
-                                  80 * Load(base, row + 4);
-        if (Lfs(base, Load(base, model + 40) + 236) > Lfs(base, viewport + 72)) {
+        const schema::ViewportEntry viewport(
+            base, Load(base, schema::CamerasGlobals::viewports(base).first_address() +
+                                 4 * row.player()) +
+                      schema::ViewportEntry::kSize * row.viewport_entry());
+        // The model's first shape's +236 (not in models.toml's ModelShape).
+        if (Lfs(base, Shape(base, model).shapes().address + 236) > double(viewport.far())) {
           continue;
         }
-        Store(base, model + 48, provider);
+        Shape(base, model).set_texture_provider(provider);
         const uint32_t frame = f - scenery_lists::kSceneryDrawShapeFrame;
         const uint32_t chain = Load(base, frame);
         Store(base, frame, f);
@@ -272,7 +286,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
           continue;
         }
         describe(entry);
-        steps.set_r24(Load(base, description + 20) * 592u + kCameraPasses);
+        steps.set_r24(PassAt(base, desc.camera_pass()).address);
         DrawArea(base, draws, calls, f, manager, description, area, VisibleArea::kSize * a);
         steps.set_r24(kViewCopy);
         FlushOff();
@@ -296,8 +310,8 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   // passes, +196's 0x400.
   if ((m.mask() & 0x400) != 0) {
     for (uint32_t entry = 16; entry < 19; entry++) {
-      const uint32_t pass = pass_of(Load(base, kPassTable + 24 * entry + 8));
-      if (Load(base, pass + 588) == 0 || ShadowPass(int32_t(Load(base, pass + 584)))) {
+      const Pass pass = PassAt(base, EntryAt(base, entry).camera_pass());
+      if (pass.enabled() == 0 || ShadowPass(int32_t(pass.type()))) {
         continue;
       }
       const uint32_t lights = s.light_groups().address;  // r31
@@ -306,7 +320,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
       }
       describe(entry);
       headlights();
-      scenery_lists::SetBillboardPass(base, description, Load(base, f + 88), Load(base, f + 108));
+      scenery_lists::SetBillboardPass(base, description, desc.camera_pass_object(), desc.key_b());
       for (uint32_t i = 0; i < __builtin_bswap32(schema::SceneryDataFile(base, lights).count());
            i++) {
         const uint32_t animations = s.texture_animations().address;
@@ -320,7 +334,7 @@ void Draw(uint8_t* base, const scenery_lists::DrawCalls& draws,
   // The minimap's pass (entry 19): its clear, the headlights, the minimap
   // (inside its per-frame wrap).
   if (enabled(19)) {
-    steps.record_clear(f, 103, 49, Load(base, kClearColor), Load(base, kClearDepth));
+    steps.record_clear(f, 103, 49, PassAt(base, 19).clear_color(), PassAt(base, 19).clear_depth());
     FlushOff();
     describe(19);
     headlights();

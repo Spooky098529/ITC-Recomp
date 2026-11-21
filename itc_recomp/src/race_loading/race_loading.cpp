@@ -9,7 +9,13 @@
 #include "course_scenery/course_scenery.h"
 #include "data_tables/data_tables.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/boot_mode.h"
+#include "schema/car_draw.h"
+#include "schema/course_scenery.h"
+#include "schema/game_modes.h"
 #include "schema/race_loading.h"
+#include "schema/scene.h"
+#include "schema/ui_movies_game.h"
 #include "scene/scene.h"
 #include "strings_and_font/strings_and_font.h"
 
@@ -37,14 +43,15 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 // the count + 1 stored, then the message's word and two zero words at (start
 // + count - 1) mod 50 (unsigned).
 void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
-  const uint32_t ring = dispatcher + kRing;
-  const uint32_t count = Load(base, ring + kRingCount) + 1;
-  const uint32_t at = Load(base, ring + kRingStart) + count - 1;
-  Store(base, ring + kRingCount, count);
-  const uint32_t slot = ring + (at % kRingSlots) * kRingMessageBytes;
-  Store(base, slot, message);
-  Store(base, slot + 4, 0);
-  Store(base, slot + 8, 0);
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t at = d.ring_start() + count - 1;
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(
+      base, d.ring_address() + (at % kRingSlots) * schema::ModeMessage::kSize);
+  slot.set_id(message);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 // The course scenery's calls (course_scenery::Calls) through these.
@@ -64,7 +71,8 @@ course_scenery::Calls SceneryCalls(const Calls& calls) {
 // Scenery::IsLoaded([0x826C5514]) from the handler's frame.
 uint32_t SceneryLoaded(uint8_t* base, uint32_t frame, const Calls& calls) {
   return course_scenery::SceneryIsLoaded(base, SceneryCalls(calls), frame,
-                                         Load(base, kSceneryManager), calls.native_queue);
+                                         schema::CourseSceneryGlobals::manager(base).address,
+                                         calls.native_queue);
 }
 
 }  // namespace
@@ -94,7 +102,7 @@ uint64_t EndTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t 
   uint64_t r3 = SceneryLoaded(base, frame, calls);
   if (r3 != 0) {
     r3 = scene::LoadsDone(
-        base, Load(base, scene::kScene), frame,
+        base, schema::SceneGlobals::scene(base).address, frame,
         [&](uint32_t function, uint32_t at, uint32_t lr, uint32_t f3, uint32_t f4) {
           return calls.Call(function, at, lr, 2, f3, f4);
         });
@@ -166,7 +174,7 @@ void SetFrames(uint8_t* base, uint32_t movie, uint32_t other, uint32_t text) {
   ITC_NATIVE_RUNNING("sub_82290B30 UiMovie::SetFrames");
   constexpr uint32_t kTrm = 0x54524D00, kTxt = 0x54585400, kPrm = 0x50524D00,
                      kPic = 0x50494300;
-  uint32_t chunk = Load(base, movie + 16);
+  uint32_t chunk = schema::UiMovie(base, movie).live_scene();
   for (uint32_t tag = Chunk(base, chunk).tag(); tag != kTrm; tag = Chunk(base, chunk).tag()) {
     if (tag == kTxt) {
       Chunk(base, chunk).set_frame(text);
