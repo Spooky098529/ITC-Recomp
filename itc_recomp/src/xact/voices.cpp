@@ -10,6 +10,8 @@
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
 #include "schema/xact_waves.h"
+#include "schema/xaudio.h"
+#include "schema/xaudio_objects.h"
 
 #include <initializer_list>
 
@@ -71,7 +73,7 @@ uint32_t VoiceInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t
   if (int32_t(r3) < 0) {
     return r3;
   }
-  v.set_channels(guest::LoadU8(base, description + 4));
+  v.set_channels(schema::XAudioSourceDescription(base, description).format_channels());
   if (reverb == 0) {
     return r3;
   }
@@ -127,11 +129,12 @@ uint32_t VoiceGetState(uint8_t* base, uint32_t voice, uint32_t out, uint32_t fra
                        const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825C9DB8 XACTVoice::GetState");
   const uint32_t source = Voice(base, voice).source_voice();
-  SetRegs(call, Args({source, frame + 80}));
+  const schema::XAudioByteOut state(base, frame + 80);  // XAudio's state byte
+  SetRegs(call, Args({source, state.address}));
   xa::FrameBelow(base, frame, kApiFrame);
-  const uint32_t r3 = xa::ApiGetState(base, source, frame + 80, 0, 0, 0, call);
+  const uint32_t r3 = xa::ApiGetState(base, source, state.address, 0, 0, 0, call);
   if (int32_t(r3) >= 0) {
-    Store(base, out, ~uint32_t(guest::LoadU8(base, frame + 80)) & 1);
+    Store(base, out, ~uint32_t(state.value()) & 1);
   }
   return r3;
 }
@@ -185,19 +188,22 @@ uint32_t VoiceFlushPackets(uint8_t* base, uint32_t voice, uint32_t sp, const Gue
 uint32_t VoiceSubmitPacket(uint8_t* base, uint32_t voice, uint32_t packet, uint32_t flag,
                            uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825C9E08 XACTVoice::SubmitPacket");
-  const uint32_t to = frame + 80;
-  Store(base, to + 0, Load(base, packet + 0));
-  Store(base, to + 4, Load(base, packet + 4));
+  // XAudio's 32-byte region packet (the codec's slot +36) on the stack.
+  const schema::XAudioRegionPacket to(base, frame + 80);
+  to.set_data(Load(base, packet + 0));
+  to.set_size(Load(base, packet + 4));
   const uint32_t loops = Load(base, packet + 8);
-  Store(base, to + 8, loops == 255 ? 0xFFFFFFFFu : loops);
-  for (uint32_t i = 0; i < 5; i++) {
-    Store(base, to + 12 + 4 * i, Load(base, packet + 20 + 4 * i));
-  }
+  to.set_loop_count(loops == 255 ? 0xFFFFFFFFu : loops);
+  to.set_loop_start(Load(base, packet + 20));
+  to.set_loop_end(Load(base, packet + 24));
+  to.set_play_begin(Load(base, packet + 28));
+  to.set_play_end(Load(base, packet + 32));
+  to.set_context(Load(base, packet + 36));
   const uint32_t source = Voice(base, voice).source_voice();
   const uint32_t r5 = NotZero(flag);
-  SetRegs(call, Args({source, to, r5}));
+  SetRegs(call, Args({source, to.address, r5}));
   xa::FrameBelow(base, frame, kCodec36Frame);
-  return xa::ApiCodec36(base, source, to, r5, 0, 0, call);
+  return xa::ApiCodec36(base, source, to.address, r5, 0, 0, call);
 }
 
 uint32_t VoiceDeletingDestruct(uint8_t* base, uint32_t voice, uint32_t flags, uint32_t frame,

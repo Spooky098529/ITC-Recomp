@@ -28,8 +28,7 @@ using Calls = race_hud_object::Calls;
 
 // The machines' words: the views of schema/type2_screens.h (Type2Hub,
 // SpecSheet, BuildScreen, PlateEditor). Screen::LeaveToHub's machine, any
-// of the four, keeps its state word as an offset.
-constexpr uint32_t kMachineState = 9604;
+// of the four, is reached as a StateMachine (game-modes.toml).
 
 // The license plate editor's globals (the page object, the menu list and
 // the data): schema::Type2ScreensGlobals' plate_*. Its movie:

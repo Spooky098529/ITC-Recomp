@@ -211,15 +211,16 @@ void ApplyTrack(uint8_t* base, uint32_t node, uint32_t track, double t, uint32_t
   const double zero = double(G::zero(base));
   // The stand-in first key at frame + 112 (+0 kind 0, +4 zero, +8 0, +12 and
   // +16 zero), written whether or not it's used.
-  const uint32_t stand_in = frame + 112;
-  guest::StoreU32(base, stand_in, 0);
-  guest::StoreU32(base, stand_in + 4, FloatBits(zero));
-  guest::StoreU32(base, stand_in + 12, FloatBits(zero));
-  guest::StoreU32(base, stand_in + 16, FloatBits(zero));
-  guest::StoreU32(base, stand_in + 8, 0);
+  const KeyView stand_in_key(base, frame + 112);
+  const uint32_t stand_in = stand_in_key.address;
+  stand_in_key.set_kind(0);
+  guest::StoreU32(base, stand_in_key.time_address(), FloatBits(zero));
+  guest::StoreU32(base, stand_in_key.tangent_in_address(), FloatBits(zero));
+  guest::StoreU32(base, stand_in_key.tangent_out_address(), FloatBits(zero));
+  stand_in_key.set_int_value(0);
   uint32_t target = descriptor.node_offset() + node;
   if (descriptor.indirect() != 0) {
-    target += VertexOffset(guest::LoadU32(base, node + 112), the_track.vertex());
+    target += VertexOffset(schema::UiMovieNode(base, node).unknown_112(), the_track.vertex());
   }
   const bool sets = descriptor.sets() != 0;
   if (k0 == 0) {
@@ -229,9 +230,9 @@ void ApplyTrack(uint8_t* base, uint32_t node, uint32_t track, double t, uint32_t
     if (sets) {
       const uint32_t type = descriptor.type();
       if (type == 0) {
-        guest::StoreU32(base, stand_in + 8, FloatBits(LoadFloat(base, target)));
+        stand_in_key.set_int_value(FloatBits(LoadFloat(base, target)));
       } else if (type < 3) {
-        guest::StoreU32(base, stand_in + 8, guest::LoadU32(base, target));
+        stand_in_key.set_int_value(guest::LoadU32(base, target));
       }
     }
   }

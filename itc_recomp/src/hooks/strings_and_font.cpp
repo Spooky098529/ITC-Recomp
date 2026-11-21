@@ -33,6 +33,7 @@
 #include "hooks/strings_and_font.h"
 #include "strings_and_font/strings_and_font.h"
 #include "lifted/sdk.h"
+#include "schema/device_shaders.h"
 #include "schema/strings_and_font.h"
 
 ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
@@ -248,13 +249,13 @@ bool DrawPass(lifted::Regs& ctx, uint8_t* base, uint32_t font, uint32_t text) {
   if (result.chunk != 0) {
     guest_call::InFrame(ctx, base, 192, 0x8210A3F0, [&](uint32_t) {
       const schema::FontDrawParams params = schema::Font(base, font).params();
-      const uint32_t queue = schema::Font(base, font).render_queue<schema::View>().address;
+      const schema::RenderQueue queue = schema::Font(base, font).render_queue();
       ctx.fpscr.disableFlushMode();
       ctx.f1.f64 = double(schema::StringsAndFontGlobals::zero(base));
-      ctx.r3.u64 = queue;
+      ctx.r3.u64 = queue.address;
       ctx.r4.u64 = result.chunk;
       ctx.r5.s64 = int64_t(int32_t(params.layer())) + 1;
-      lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+      lifted::CallFromContext(ctx, base, queue.vtable().add());
     });
   }
   schema::StringsAndFontGlobals::set_chunk(base, 0);

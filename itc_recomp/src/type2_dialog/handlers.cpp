@@ -141,9 +141,9 @@ uint64_t OnEnter(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   menu.set_cursor(0);
   menu.set_previous(0);
   menu.set_moved(0);
-  menu.set_unknown_40(0);
-  menu.set_unknown_48(0);
-  menu.set_unknown_52(0);
+  menu.set_wrapped(0);
+  menu.set_visible_row(0);
+  menu.set_previous_row(0);
   menu.set_side(0);
   menu.set_player(0);
   menu.set_up_down_locked(0);

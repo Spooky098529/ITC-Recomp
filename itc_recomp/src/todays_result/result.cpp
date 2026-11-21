@@ -36,8 +36,6 @@ void Store64(uint8_t* base, uint32_t at, uint64_t value) {
   Store(base, at + 4, uint32_t(value));
 }
 
-int32_t Half(uint8_t* base, uint32_t at) { return int16_t(guest::LoadU16(base, at)); }
-
 // A count over another as the originals take its percentage: both
 // converted from their 64-bit words at the frame's `first` and `second`
 // (stored there first, as the original), rounded to floats, divided and
@@ -122,56 +120,60 @@ uint64_t ResultWaitForMovie(uint8_t* base, uint64_t r3, uint32_t sp) {
 uint64_t ReadDay(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225A520 TodaysResult::ReadDay");
   const uint32_t frame = Frame(base, sp, kReadDayFrame);
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  int32_t day = int32_t(Load(base, save + 6100));
+  const schema::SaveData save(base, vehicle_accessors::SaveDataOf(base, 0));
+  int32_t day = int32_t(save.day());
   // The stats record (6,044 bytes from the save's +48) at the frame's +4944,
   // and its day block (4,840 bytes from its +24) at +96.
-  const uint32_t stats = frame + 4944, block = frame + 96;
-  calls.Call(kMemcpy, frame, 0x8225A55C, stats, save + 48, 6044);
-  calls.Call(kMemcpy, frame, 0x8225A56C, block, stats + 24, 4840);
-  Data(base).set_mode(Load(base, save + 6104));
+  const schema::CareerStats stats(base, frame + 4944);
+  const schema::CareerCounter block(base, frame + 96), career(base, stats.counter_address());
+  calls.Call(kMemcpy, frame, 0x8225A55C, stats.address,
+             schema::CareerSave(base, save.address).stats_address(), 6044);
+  calls.Call(kMemcpy, frame, 0x8225A56C, block.address, stats.day_address(), 4840);
+  Data(base).set_mode(save.mode());
   Data(base).set_weekday(uint32_t(day - (day / 7) * 7));
   if (day > 999) {
     day = 999;
   }
   Data(base).set_day(uint32_t(day));
   // The day's wins, losses and outcome 3.
-  const int32_t wins = Half(base, block + 12);
+  const int32_t wins = int16_t(block.wins());
   Data(base).set_day_wins(uint32_t(wins));
-  Data(base).set_day_losses(uint32_t(Half(base, block + 14)));
-  Data(base).set_day_outcome3(uint32_t(Half(base, block + 16)));
+  Data(base).set_day_losses(uint32_t(int32_t(int16_t(block.losses()))));
+  Data(base).set_day_outcome3(uint32_t(int32_t(int16_t(block.outcome3()))));
   const float zero = G::zero(base);
   const double hundred = double(G::hundred(base));
   if (wins == 0) {
     Data(base).set_day_win_rate(float(double(zero)));
   } else {
-    const int32_t races = Half(base, block + 22);
+    const int32_t races = int16_t(block.races());
     const float rate = Percent(base, frame + 88, frame + 80, wins, races, hundred);
     Data(base).set_day_win_rate(rate);
   }
-  const uint64_t streak = calls.Call(kWinStreak, frame, 0x8225A630, block);
+  const uint64_t streak = calls.Call(kWinStreak, frame, 0x8225A630, block.address);
   Data(base).set_day_win_streak(uint32_t(int32_t(int16_t(uint16_t(streak)))));
-  const uint64_t word = calls.Call(kWord4832, frame, 0x8225A648, block);
+  const uint64_t word = calls.Call(kWord4832, frame, 0x8225A648, block.address);
   Data(base).set_day_word_4832(uint32_t(word));
   // The career's.
-  const int32_t career_wins = Half(base, stats + 12);
+  const int32_t career_wins = int16_t(career.wins());
   Data(base).set_career_wins(uint32_t(career_wins));
-  Data(base).set_career_losses(uint32_t(Half(base, stats + 14)));
-  Data(base).set_career_outcome3(uint32_t(Half(base, stats + 16)));
+  Data(base).set_career_losses(uint32_t(int32_t(int16_t(career.losses()))));
+  Data(base).set_career_outcome3(uint32_t(int32_t(int16_t(career.outcome3()))));
   if (career_wins == 0) {
     Data(base).set_career_win_rate(float(double(zero)));
   } else {
-    const int32_t races = Half(base, stats + 22);
+    const int32_t races = int16_t(career.races());
     const float rate = Percent(base, frame + 80, frame + 88, career_wins, races, hundred);
     Data(base).set_career_win_rate(rate);
   }
-  Data(base).set_best_win_streak(uint32_t(Half(base, stats + 5968)));
-  Data(base).set_money(Load(base, save + 6116));
+  Data(base).set_best_win_streak(uint32_t(int32_t(int16_t(stats.best_win_streak()))));
+  Data(base).set_money(save.money());
   const uint64_t r3 =
       calls.Call(kCareerNextDay, frame, 0x8225A6E4, vehicle_accessors::SaveDataOf(base, 0));
+  // The save's 20-byte pick copied word by word.
   const uint32_t pick = Data(base).pick_address();
+  const uint32_t save_pick = schema::CareerSave(base, save.address).pick_address();
   for (uint32_t k = 0; k < 5; k++) {
-    Store(base, pick + 4 * k, Load(base, save + 8 + 4 * k));
+    Store(base, pick + 4 * k, Load(base, save_pick + 4 * k));
   }
   return r3;
 }
@@ -217,12 +219,12 @@ uint64_t SetUpMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t movie = FindMovie(base, frame + 80, kResultMovie);
   SetTexts(base, frame, calls);
   Data(base).set_ready(1);
-  Store(base, ui_movies::FindNode(base, movie, 1, 1) + 80, 0);
-  Store(base, ui_movies::FindNode(base, movie, 1, 2) + 80, 0);
+  Node(base, ui_movies::FindNode(base, movie, 1, 1)).set_visible(0);
+  Node(base, ui_movies::FindNode(base, movie, 1, 2)).set_visible(0);
   const uint32_t fourth = ui_movies::FindNode(base, movie, 1, 4);
   const uint32_t fifth = ui_movies::FindNode(base, movie, 1, 5);
-  Store(base, fourth + 108, 0);
-  Store(base, fifth + 108, 0);
+  Node(base, fourth).set_texture_entry(0);
+  Node(base, fifth).set_texture_entry(0);
   return fifth;
 }
 
@@ -324,7 +326,7 @@ uint64_t ResultQueueMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225A720 TodaysResult::QueueMovie");
   const uint32_t frame = Frame(base, sp, 96);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t movie = save + kQueuedMovie;
+  const uint32_t movie = schema::SaveData(base, save).movie_after_results_address();
   for (uint32_t k = 0; k < 5; k++) {
     Store(base, G::boot_movie_ids_address() + 4 * k, 11);
   }
@@ -348,7 +350,7 @@ uint64_t ResultLeavePage(uint8_t* base, uint32_t dispatcher, uint32_t sp, const 
   Post(base, dispatcher, 5);
   uint64_t r3 = vehicle_accessors::SaveDataOf(base, 0);
   uint32_t queued = 0;
-  if (Load(base, uint32_t(r3) + kQueuedMovie) != kNone) {
+  if (schema::SaveData(base, uint32_t(r3)).movie_after_results() != kNone) {
     r3 = ResultQueueMovie(base, frame, calls);
     queued = 1;
   }

@@ -11,6 +11,9 @@
 #include "base/log.h"
 #include "camera_modes/steps.h"
 #include "guest.h"
+#include "schema/race_event.h"
+#include "schema/career.h"
+#include "schema/car_makers.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -79,7 +82,7 @@ uint64_t SetStateTexts(uint8_t* base, const GuestCall& call, uint32_t screen, ui
     if (time(1007) == none && time(62) == none && TS(base, screen).command_first_run() == 0) {
       for (uint32_t i = 0; i < 10; i++) {
         const uint32_t tab = ui_movies::Child(base, ui_movies::FindNode(base, movie, 1, 9), i + 5);
-        Store(base, tab + 80, 0);
+        UiNode(base, tab).set_visible(0);
       }
       const uint32_t table = frame + 96;
       Store(base, table, 376);
@@ -88,7 +91,7 @@ uint64_t SetStateTexts(uint8_t* base, const GuestCall& call, uint32_t screen, ui
       }
       for (uint32_t j = 0; j < 4; j++) {
         const uint32_t tab = ui_movies::Child(base, ui_movies::FindNode(base, movie, 1, 9), j + 5);
-        Store(base, tab + 80, 1);
+        UiNode(base, tab).set_visible(1);
         const uint32_t k = TS(base, screen).part_group() - TS(base, screen).tabs_row() + j;
         const uint64_t id = Load(base, table + 4 * k);
         call(kSetNodeText, {movie, tab, id, 0, 0, 0, 0, 0}, frame, 0x821F1F70);
@@ -138,7 +141,7 @@ uint64_t FillRow(uint8_t* base, uint64_t r3, uint32_t frame, uint32_t movie, uin
   }
   const uint64_t group = TS(base, screen).part_group();
   const uint32_t word = uint32_t(group * 38 + index() + 6964) * 4 + screen;
-  Store(base, owned + 80, Load(base, word) != 0 ? 1 : 0);
+  UiNode(base, owned).set_visible(Load(base, word) != 0 ? 1 : 0);
   const uint64_t marks_index = index();
   const uint64_t marks_r3 =
       ShowPartMarks(base, r3, row, TS(base, screen).part_group(), marks_index, frame);
@@ -158,10 +161,11 @@ struct CarSlot {
   int16_t slot;
 };
 CarSlot SelectedCarSlot(uint8_t* base, uint32_t screen) {
-  const uint32_t save = TS(base, screen).save_data().address;
-  const uint32_t list = save + 6120;
-  uint32_t count = Load(base, save + 0x19920);
-  uint32_t at = uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 204)))) * 4 + list;
+  const schema::SaveData save(base, TS(base, screen).save_data().address);
+  const uint32_t list = save.garage_address();
+  uint32_t count = save.selected_car();
+  uint32_t at =
+      uint32_t(int32_t(int16_t(schema::CareerGarageList(base, list).head()))) * 4 + list;
   while (count != 0) {
     at = uint32_t(int32_t(int16_t(guest::LoadU16(base, at)))) * 4 + list;
     count--;
@@ -170,7 +174,7 @@ CarSlot SelectedCarSlot(uint8_t* base, uint32_t screen) {
 }
 // Its spec id: the word at list + 1,968 × slot + 224.
 uint32_t CarId(uint8_t* base, const CarSlot& car) {
-  return Load(base, uint32_t(int32_t(car.slot) * 1968) + car.list + 224);
+  return schema::CarMakersCar(base, uint32_t(int32_t(car.slot) * 1968) + car.list + 212).car_id();
 }
 
 }  // namespace

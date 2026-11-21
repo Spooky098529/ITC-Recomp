@@ -13,6 +13,7 @@
 #include "base/log.h"
 #include "camera_modes/steps.h"
 #include "guest.h"
+#include "schema/ui_movies_game.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -58,7 +59,7 @@ struct Movie13 {
   }
   // UiMovie::ShowNode and HideNode (sub_8211AC00, sub_8211AC48).
   void Shown(uint32_t sub_scene, uint32_t child, uint32_t shown) {
-    Store(base, Node(sub_scene, child) + 80, shown);
+    UiNode(base, Node(sub_scene, child)).set_visible(shown);
   }
   // UiMovie::SetNodeTexture (sub_8211A708).
   void Texture(uint32_t sub_scene, uint32_t child, uint32_t texture) {
@@ -96,7 +97,7 @@ struct Movie13 {
     Shown(1, 0, 1);
     Shown(1, 1, 1);
     // (1, 2)'s +68 = 0.0 (lfs, stfs).
-    steps::Stfs(base, Node(1, 2) + 68, steps::Lfs(base, 0x82000A34));
+    steps::Stfs(base, UiNode(base, Node(1, 2)).alpha_address(), steps::Lfs(base, 0x82000A34));
     Shown(1, 10, 0);
     Texture(1, 4, 0);
     Texture(1, 5, 0);
@@ -137,7 +138,7 @@ struct Movie13 {
     Shown(1, 10, 1);
     Texture(1, 4, 0);
     Texture(1, 5, 1);
-    steps::Stfs(base, Node(1, 3) + 12, steps::Lfs(base, 0x82008650));
+    steps::Stfs(base, UiNode(base, Node(1, 3)).x_address(), steps::Lfs(base, 0x82008650));
   }
 
   // State 28: a layer's settings, on sub-scene 26 (+30724 0) or 25 (1).
@@ -184,7 +185,7 @@ struct Movie13 {
     }
     const uint32_t first = ChildOf(Node(11, 1), 0);
     const int32_t pick = int32_t(TS(base, screen).edit_cursor());
-    Store(base, first + 80, pick >= 0 && pick <= 4 ? 1 : 0);
+    UiNode(base, first).set_visible(pick >= 0 && pick <= 4 ? 1 : 0);
     // 816 not used.
     static constexpr uint32_t kHelp[7] = {812, 813, 814, 815, 817, 818, 819};
     const uint32_t which = TS(base, screen).edit_cursor();
@@ -216,7 +217,8 @@ struct Movie13 {
       static constexpr uint32_t kFrom[2][3] = {{10076, 10112, 10148}, {10832, 10868, 10904}};
       for (uint32_t i = 0; i < 3; i++) {
         const uint32_t value = Word(kFrom[set][i]);
-        Store(base, Load(base, Load(base, movie + 28) + kSlots[set][i]), value);
+        const uint32_t textures = Load(base, schema::UiMovie(base, movie).textures_address());
+        Store(base, Load(base, textures + kSlots[set][i]), value);
       }
     }
     Text(9, 4, 4, 0, 0x82207E94);

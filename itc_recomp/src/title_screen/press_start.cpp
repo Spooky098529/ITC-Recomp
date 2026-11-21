@@ -3,6 +3,9 @@
 // (docs/functions/title-screen.md): see title_screen.h.
 
 #include "base/log.h"
+#include "schema/action_mappers.h"
+#include "schema/racer_controllers.h"
+#include "schema/save_screen.h"
 #include "title_screen/internal.h"
 
 namespace title_screen {
@@ -63,11 +66,14 @@ uint64_t PressStart(uint8_t* base, uint32_t sp, const Calls& calls) {
   static constexpr uint32_t kLrs[4] = {0x82222230, 0x82222264, 0x82222298, 0x822222CC};
   uint64_t r3 = 120;
   for (uint32_t p = 0; p < 4; p++) {
-    if (int32_t(Load(base, entries[p] + 4)) == 1) {
+    // The player's mapper entry (racer-controllers' PlayerMapperEntry).
+    const schema::PlayerMapperEntry entry(base, entries[p]);
+    if (int32_t(entry.unread()) == 1) {
       continue;
     }
-    const uint32_t mapper = Load(base, entries[p]);
-    r3 = calls.Call(Load(base, Load(base, mapper) + kPressedSlot), frame, kLrs[p], mapper, 152);
+    const schema::ActionMapper mapper = entry.mapper();
+    r3 = calls.Call(Load(base, mapper.vtable() + kPressedSlot), frame, kLrs[p], mapper.address,
+                    152);
     if ((r3 & 0xFF) == 0) {
       continue;
     }
@@ -90,8 +96,8 @@ uint64_t PressStart(uint8_t* base, uint32_t sp, const Calls& calls) {
 
 uint64_t ScreenOnControllerPicked(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_822219E0 TitleScreen::OnControllerPicked");
-  // The controller pick's count (the save screen's third block, +52).
-  const uint32_t count = Load(base, G::pick_block(base) + 52);
+  // The controller pick (the save screen's data, save-screen's SaveScreenData).
+  const uint32_t count = G::pick_block(base).controller_pick();
   if (count == 0) {
     const auto pages = G::pages(base);
     const uint32_t old = pages.page();

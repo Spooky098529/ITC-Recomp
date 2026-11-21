@@ -32,7 +32,7 @@ constexpr uint32_t kFinishAll = 0x8211DFF8;
 // Movie 16: its id at the frame's +80, then UiMovies::Find.
 uint32_t DialogMovie(uint8_t* base, uint32_t frame) {
   StoreU32(base, frame + 80, kDialogMovie);
-  return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  return schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
 }
 
 uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
@@ -56,14 +56,14 @@ menu_helpers::Calls Menus(const Calls& calls) {
 // A message (`message`, 0, 0) queued in a dispatcher's ring (+204), as the
 // pages do it inline.
 void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
-  const uint32_t ring = dispatcher + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
-  StoreU32(base, slot + 0, message);
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t end = d.ring_start() + count - 1;
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(base, d.ring_address() + (end - (end / 50) * 50) * 12);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
+  slot.set_id(message);
 }
 
 // The page left for a step: the previous page (+9648) kept unless the page
@@ -122,7 +122,7 @@ uint64_t DialogOpenConfirm(uint8_t* base, uint32_t dialog, bool type7, uint32_t 
   StoreU32(base, frame + 80, kDialogMovie);
   d.set_movie(kDialogMovie);
   const uint32_t movie =
-      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
   const uint64_t r3 = ui_movies::ResetPose(base, movie);
   ResetConfirm(base, d, movie);
   if (!type7) {
@@ -142,7 +142,7 @@ std::optional<uint64_t> DialogDrawWaiting(uint8_t* base, uint32_t dialog, uint32
   d.set_reopen(0);
   d.set_movie(kDialogMovie);
   const uint32_t movie =
-      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
   const uint64_t r3 = ui_movies::ResetPose(base, movie);
   ResetConfirm(base, d, movie);
   return r3;
@@ -219,7 +219,7 @@ uint64_t DialogNoticeStep(uint8_t* base, uint32_t dialog, bool close, uint32_t s
   StoreU32(base, frame, sp);
   StoreU32(base, frame + 80, 19);
   const uint32_t movie =
-      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
   const Dialog d(base, dialog);
   if (d.step_started() == 0) {
     menu_sounds::PlayMenuSound(base, 5, frame, Sounds(calls));
@@ -292,7 +292,7 @@ uint64_t DialogUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, bool type
   const uint32_t frame = sp - 160;
   StoreU32(base, frame + 80, dialog.movie());
   const uint32_t movie =
-      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
   const uint32_t step = dialog.step();
   // The steps' table: OpenConfirmStep, CloseConfirmStep, OpenNoticeStep,
   // CloseNoticeStep, MoveCursorStep.

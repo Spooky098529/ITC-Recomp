@@ -19,6 +19,8 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/race_screens.h"
+#include "schema/tuning_screen.h"
 #include "schema/type67_screens.h"
 #include "mode_tick/mode_tick.h"
 #include "race_screens/race_screens.h"
@@ -73,7 +75,8 @@ void Replay(uint8_t* base, const Calls& calls, uint32_t screen, uint32_t movie, 
 // UiMovie::ShowNode or HideNode(movie, sub_scene, child): the node's +80.
 void SetShown(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child,
               uint32_t shown) {
-  StoreU32(base, ui_movies::FindNode(base, movie, sub_scene, child) + 80, shown);
+  schema::UiMovieNode(base, ui_movies::FindNode(base, movie, sub_scene, child))
+      .set_visible(shown);
 }
 
 // UiMovie::Run(movie, 0) as a guest call: 1 when it answers 0, else 0.
@@ -100,7 +103,7 @@ uint64_t ListMoved(uint8_t* base, uint64_t r3, uint32_t list_at, uint32_t index,
   const uint32_t list = screen + list_at;
   const uint32_t s = race_screens::ListSelection(base, list);
   // MenuList::GetPreviousSelection (sub_8220BC28): +20.
-  const uint32_t p = LoadU32(base, list + 20);
+  const uint32_t p = schema::MenuList(base, list).selection_before();
   const int32_t d = int32_t(s - p);
   if (CLS(base, screen).step_started() == 0) {
     if (table) {
@@ -159,7 +162,8 @@ uint64_t UpdateToggle(uint8_t* base, uint64_t r3, uint32_t frame, uint32_t lr_up
 
 // Whether a list moved: its move word (+24) or its scroll (+4 against +8).
 bool Moved(uint8_t* base, uint32_t list) {
-  return LoadU32(base, list + 24) != 0 || LoadU32(base, list + 4) - LoadU32(base, list + 8) != 0;
+  const schema::MenuList menu(base, list);
+  return menu.move() != 0 || menu.scroll() - menu.scroll_before() != 0;
 }
 
 // The cursors' child +16 = `r4` × 40 as a float (the product left in the
@@ -175,7 +179,7 @@ uint64_t PlaceCursor(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t node_at,
   StoreU32(base, frame + 80, uint32_t(uint64_t(product) >> 32));
   StoreU32(base, frame + 84, uint32_t(uint64_t(product)));
   const uint32_t child = ui_movies::Child(base, node, LoadU32(base, screen + child_at));
-  StoreU32(base, child + 16, std::bit_cast<uint32_t>(float(double(product))));
+  schema::UiMovieNode(base, child).set_y(float(double(product)));
   return child;
 }
 
@@ -474,7 +478,7 @@ uint64_t ColorListScreenShowPartNodes(uint8_t* base, uint64_t r3, uint64_t hide,
   const uint32_t child = CLS(base, screen).part_child();
   if (int32_t(child) < 0) return result;
   const uint32_t node = ui_movies::FindNode(base, movie, CLS(base, screen).text_sub_scene(), child);
-  StoreU32(base, node + 80, hiding ? 0 : 1);
+  schema::UiMovieNode(base, node).set_visible(hiding ? 0 : 1);
   return node;
 }
 
@@ -679,8 +683,9 @@ uint64_t ColorListScreenStep7(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   const uint32_t items = screen + 10144;
   const uint32_t s = race_screens::ListSelection(base, items);
   // MenuList::GetPreviousSelection (sub_8220BC28): +20.
-  const uint32_t p = LoadU32(base, items + 20);
-  const int32_t scrolled = int32_t(LoadU32(base, items + 4) - LoadU32(base, items + 8));
+  const schema::MenuList menu(base, items);
+  const uint32_t p = menu.selection_before();
+  const int32_t scrolled = int32_t(menu.scroll() - menu.scroll_before());
   const uint32_t cursor = CLS(base, screen).course_list_wrapped();
   const int32_t moved = int32_t(s - p);
   ColorNodeTableRefresh(base, r3 + 10432, 0, frame, calls);

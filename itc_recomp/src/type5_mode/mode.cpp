@@ -5,7 +5,9 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/boot_mode.h"
 #include "schema/game_modes.h"
+#include "schema/location_screen.h"
 #include "schema/type5_mode.h"
 
 namespace type5_mode {
@@ -70,8 +72,9 @@ void StoreAnswer(const Block& block, uint64_t value) {
 
 // The answer (r3) cleared: +4 and its first byte.
 void ClearAnswer(uint8_t* base, uint32_t answer) {
-  StoreU32(base, answer + 4, 0);
-  guest::StoreU8(base, answer, 0);
+  const schema::ModeAnswer a(base, answer);
+  a.set_next_type(0);
+  a.set_changed(0);
 }
 
 // Posts the message (id, 0, 0) on the mode's ring (50 slots of 12 bytes),
@@ -302,9 +305,8 @@ void ForceExit(uint8_t* base, uint32_t object, uint32_t number, uint32_t sp) {
 
 void Resume(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8222FC38 ModeType5::Resume");
-  // The parking area's screen's restart word (location-screen.toml's
-  // LocationScreen +900).
-  StoreU32(base, G::location_screen<schema::View>(base).address + 900, 1);
+  // The parking area's screen's restart word (location-screen.toml's).
+  G::location_screen<schema::LocationScreen>(base).set_restart(1);
 }
 
 uint64_t Slot14Thunk(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp, uint32_t lr,

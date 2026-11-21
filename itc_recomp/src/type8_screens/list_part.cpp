@@ -21,6 +21,8 @@
 #include "guest.h"
 #include "race_screens/race_screens.h"
 #include "save_data/save_data.h"
+#include "schema/tuning_screen.h"
+#include "schema/type67_screens.h"
 #include "schema/type8_screens.h"
 #include "screen_constructors/screen_constructors.h"
 #include "type67_screens/list_pages.h"
@@ -34,6 +36,7 @@ using guest::StoreU32;
 
 namespace ts = type67_screens;
 namespace rs = race_screens;
+using G = schema::Type8ScreensGlobals;
 
 namespace part_detail {
 
@@ -185,7 +188,7 @@ uint64_t PlayerBlockConstruct(uint8_t* base, uint64_t r3, uint64_t player) {
   ITC_NATIVE_RUNNING("sub_822542B8 Type8PlayerBlock::Type8PlayerBlock");
   const uint32_t b = uint32_t(r3), p4 = uint32_t(player) << 2, p8 = uint32_t(player) << 3;
   const schema::Type8PlayerBlock blk(base, b);
-  constexpr uint32_t t = 0x82011458;
+  constexpr uint32_t t = G::player_block_ids_address() + 40;  // 0x82011458
   blk.set_menu_block(0);
   blk.set_menu_player(0);
   blk.set_setting_block(0);
@@ -219,7 +222,7 @@ uint64_t PlayerBlockSetUp(uint8_t* base, uint64_t r3, uint64_t id, uint32_t sp,
   ITC_NATIVE_RUNNING("sub_822545D0 Type8PlayerBlock::SetUp");
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 160);
   const schema::Type8PlayerBlock blk(base, b);
-  const uint32_t pad = LoadU32(base, kPadPlayers + (blk.player() << 2));
+  const uint32_t pad = LoadU32(base, G::pad_players_address() + (blk.player() << 2));
   InitList(base, blk.menu_address(), {2, 2, 1, 154, 153, 155, 156, 159, 158}, frame, 0x8225462C,
            calls);
   blk.set_menu_player(pad);
@@ -299,9 +302,9 @@ uint64_t PlayerBlockPlaceCursor(uint8_t* base, uint64_t r3, uint64_t id, uint64_
   const bool first = int32_t(uint32_t(selection)) == 0;
   const uint32_t off = first ? blk.cursor_child_a() : blk.cursor_child_b();
   const uint32_t on = first ? blk.cursor_child_b() : blk.cursor_child_a();
-  StoreU32(base, ui_movies::Child(base, node, off) + 108, 0);
+  schema::UiMovieNode(base, ui_movies::Child(base, node, off)).set_texture_entry(0);
   const uint32_t child = ui_movies::Child(base, node, on);
-  StoreU32(base, child + 108, 1);
+  schema::UiMovieNode(base, child).set_texture_entry(1);
   return child;
 }
 
@@ -550,7 +553,8 @@ uint64_t PartInnerStep1(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
 
 uint64_t PartInnerPage1(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82253108 Type8PartInner::Page1");
-  if ((LoadU32(base, ts::kFadeCountA) | LoadU32(base, ts::kFadeCountB)) != 0) {
+  if ((schema::Type67ScreensGlobals::fade_out_count(base) |
+       schema::Type67ScreensGlobals::fade_in_count(base)) != 0) {
     return 0;
   }
   const schema::Type8PartInner in(base, uint32_t(r3));

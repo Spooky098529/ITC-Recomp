@@ -15,6 +15,7 @@
 #include "second_set/points.h"
 #include "schema/second_set.h"
 #include "schema/car_draw.h"
+#include "schema/car_models.h"
 #include "schema/model_animation.h"
 
 #include <cstdlib>
@@ -89,7 +90,7 @@ uint32_t PartsFindFrontBumper(uint8_t* base, uint32_t group, uint32_t model, uin
   const uint32_t r3 = ScaleRecords(base, group, 3, 5, kFive, sp, calls);
   const schema::SecondSetPlateModel found(base, Record(base, group + 8 * R).model());
   if (found) {
-    found.set_texture(Load(base, group + 2644));
+    found.set_texture(schema::PartsPoints(base, group).front_plate_texture());
   }
   return r3;
 }
@@ -103,7 +104,7 @@ uint32_t PartsFindRearBumper(uint8_t* base, uint32_t group, uint32_t model, uint
   const uint32_t r3 = ScaleRecords(base, group, 2, 4, kFive, sp, calls);
   const schema::SecondSetPlateModel found(base, Record(base, group + 6 * R).model());
   if (found) {
-    found.set_texture(Load(base, group + 1684));
+    found.set_texture(schema::PartsPoints(base, group).rear_plate_texture());
   }
   return r3;
 }
@@ -155,7 +156,8 @@ uint32_t PartsFindHeadlights(uint8_t* base, uint32_t group, uint32_t model, uint
     return r3;
   }
   const uint32_t entries = schema::Skeleton(base, first.skeleton()).node_states();
-  CopyWord(base, first.node_index() * 144 + entries + 16, group + 3184);
+  CopyWord(base, first.node_index() * 144 + entries + 16,
+           schema::PartsPoints(base, group).headlights_popup_max_address());
   calls.flush = false;
   return ScaleRecords(base, group, 7, 10, kFive, sp, calls);
 }
@@ -208,25 +210,26 @@ uint32_t PartsFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t stac
                    FindCalls& calls) {
   ITC_NATIVE_RUNNING("sub_820E0258 PartsPoints::Find");
   const uint32_t sp = stack - 176;
-  const uint32_t scene_word = block + 37088;
-  const uint32_t w37076 = Load(base, block + 37076);
-  const uint32_t car_loads = Load(base, block + 37084);
-  const uint32_t scene = Load(base, scene_word);
-  Store(base, block + 2648, w37076);
-  Store(base, block + 2644, Load(base, Load(base, car_loads + 24) + 6700));
-  Store(base, block + 4580, Load(base, Load(base, car_loads + 24) + 6708));
-  if (schema::CarScene(base, scene).model_set() == 0) {
-    Store(base, block + 12112, w37076);
-    Store(base, block + 18208, w37076);
-    const uint32_t w37080 = Load(base, block + 37080);
-    const uint32_t w37092 = Load(base, block + 37092);
-    Store(base, block + 12116, w37080);
-    Store(base, block + 12032, w37092);
-    Store(base, block + 18212, w37080);
-    Store(base, block + 18128, w37092);
+  const schema::PartsPoints b(base, block);
+  const uint32_t w37076 = b.car_record();
+  const schema::CarModel car_loads(base, b.car_model());
+  const schema::CarScene scene = b.scene();
+  b.set_front_car_record(w37076);
+  b.set_front_plate_texture(car_loads.linked_car_model().plate_texture_a());
+  b.set_block_rear_plate_texture(car_loads.linked_car_model().plate_texture_b());
+  if (scene.model_set() == 0) {
+    b.set_block_left_door_car_record(w37076);
+    b.set_block_right_door_car_record(w37076);
+    const uint32_t w37080 = b.parts_record().address;
+    const uint32_t w37092 = b.skeleton();
+    b.set_block_left_door_parts_record(w37080);
+    b.set_block_left_door_skeleton(w37092);
+    b.set_block_right_door_parts_record(w37080);
+    b.set_block_right_door_skeleton(w37092);
   } else {
-    const uint32_t w37080 = Load(base, block + 37080);
-    Store(base, block + 23744, w37080);
+    const uint32_t w37080 = b.parts_record().address;
+    b.set_block_doors_parts_record(w37080);
+    // The shadows' group's (+36096) +960.
     Store(base, block + 37056, w37080);
   }
   uint32_t r3 = block;
@@ -240,7 +243,7 @@ uint32_t PartsFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t stac
     if (model == 0) {
       continue;
     }
-    const bool set_a = schema::CarScene(base, Load(base, scene_word)).model_set() == 0;
+    const bool set_a = b.scene().model_set() == 0;
     switch (kind) {
       case 0: r3 = PartsFindFrontBumper(base, block, model, sp, calls); break;
       case 1: shapes(2656, 1, model); break;
@@ -343,14 +346,14 @@ uint32_t InteriorFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t s
   auto records = [&](uint32_t group) {
     return schema::SecondSetInteriorPoints(base, group).group_records_address();
   };
-  const uint32_t record = b.record<schema::View>().address;
+  const schema::InteriorRecord record = b.record();
   const uint32_t w11440 = b.seat_position_source();
   b.set_dials_record(record);
   b.set_seat_position(w11440);
   b.set_meters_record(record);
   b.set_steering_record(record);
   b.set_seats_record(record);
-  const uint32_t index = Load(base, record + 100);
+  const uint32_t index = record.seat_model();
   if (index != 0) {
     b.set_seat_model(index * 464 + G::scene<schema::View>(base).address + 784);
   }

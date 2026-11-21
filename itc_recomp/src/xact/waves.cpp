@@ -14,6 +14,7 @@
 #include "graphics/video_output.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/xact_tracks.h"
 #include "schema/xact_waves.h"
 
 #include <initializer_list>
@@ -24,12 +25,13 @@ namespace {
 
 namespace xa = xaudio;
 using Wave = schema::XACTWave;
+using Track = schema::XACTTrack;
+using Event = schema::XACTEvent;  // the wave's owner (the play-wave event)
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
-double LoadF(uint8_t* base, uint32_t address) { return double(guest::LoadFloat(base, address)); }
 // A single-precision step's result, as the register holds it.
 double Single(double value) { return double(float(value)); }
 
@@ -110,9 +112,10 @@ uint32_t InMemoryWaveConstruct(uint8_t* base, uint32_t wave, uint32_t engine, ui
 
 std::optional<CategoryVolume> TrackGetVolume(uint8_t* base, uint32_t track) {
   ITC_NATIVE_RUNNING("sub_825D0268 XACTTrack::GetVolume");
-  const double f31 = LoadF(base, track + 40);
-  const double f30 = LoadF(base, track + 56);
-  const auto volume = SoundGetVolume(base, Load(base, track + 20));
+  const Track t(base, track);
+  const double f31 = double(t.volume());
+  const double f30 = double(t.rpc_volume());
+  const auto volume = SoundGetVolume(base, t.sound());
   if (!volume) {
     return std::nullopt;
   }
@@ -122,9 +125,10 @@ std::optional<CategoryVolume> TrackGetVolume(uint8_t* base, uint32_t track) {
 
 CategoryVolume TrackGetPitch(uint8_t* base, uint32_t track) {
   ITC_NATIVE_RUNNING("sub_825D02B0 XACTTrack::GetPitch");
-  const double f31 = LoadF(base, track + 44);
-  const uint32_t sound = Load(base, track + 20);
-  const double f30 = LoadF(base, track + 60);
+  const Track t(base, track);
+  const double f31 = double(t.pitch());
+  const uint32_t sound = t.sound();
+  const double f30 = double(t.rpc_pitch());
   const double pitch = SoundGetPitch(base, sound);
   const double f0 = Single(f30 + f31);
   return CategoryVolume{Single(f0 + pitch), sound};
@@ -204,9 +208,15 @@ namespace {
 
 constexpr uint32_t kRequestCommitFrame = 112;
 
-// The wave's owner's cue: [[[[owner + 44] + 16] + 20] + 48].
+// The wave's owner's track: [[owner + 44] + 16] (the instance's track).
+Track TrackOf(uint8_t* base, uint32_t owner) {
+  return Event(base, owner).instance().track();
+}
+
+// The wave's owner's cue: the track's sound's +48 (the sound isn't in the
+// schema yet).
 uint32_t CueOf(uint8_t* base, uint32_t owner) {
-  return Load(base, Load(base, Load(base, Load(base, owner + 44) + 16) + 20) + 48);
+  return Load(base, TrackOf(base, owner).sound() + 48);
 }
 
 // A guest call from `frame` (the caller's own frame).
@@ -799,7 +809,7 @@ uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint3
   uint32_t category_flag = 0;  // r21
   if (owner != 0) {
     const uint32_t record =
-        Load(base, Load(base, Load(base, Load(base, owner + 44) + 16) + 20) + 28);
+        Load(base, TrackOf(base, owner).sound() + 28);
     const uint32_t engine = w.engine();
     const uint32_t index = guest::LoadU16(base, record + 1);
     SetRegs(call, Args({engine, index}));
@@ -859,7 +869,7 @@ uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint3
   Store(base, frame + 88, 0);
   MoveFloat(base, frame + 84, schema::XactWavesGlobals::one_address());
   if (const uint32_t now_owner = w.owner(); now_owner != 0) {
-    const uint32_t sound = Load(base, Load(base, Load(base, now_owner + 44) + 16) + 20);
+    const uint32_t sound = TrackOf(base, now_owner).sound();
     const uint32_t record = Load(base, sound + 28);
     if ((guest::LoadU8(base, record) & 0x10) != 0) {
       reverb = 1;
@@ -971,7 +981,7 @@ uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint3
     return submitted;
   }
   {
-    const uint32_t track = Load(base, Load(base, w.owner() + 44) + 16);
+    const uint32_t track = TrackOf(base, w.owner()).address;
     SetRegs(call, Args({track}));
     const auto volume = TrackGetVolume(base, track);
     if (!volume) {
@@ -986,7 +996,7 @@ uint64_t InMemoryWavePrepare(uint8_t* base, uint32_t wave, uint32_t count, uint3
     CallAt(call, xa::Method(base, now_voice, 4), 0x825D3EEC, regs, frame);
   }
   {
-    const uint32_t track = Load(base, Load(base, w.owner() + 44) + 16);
+    const uint32_t track = TrackOf(base, w.owner()).address;
     SetRegs(call, Args({track}));
     const CategoryVolume pitch = TrackGetPitch(base, track);
     const uint32_t now_voice = w.voice().address;

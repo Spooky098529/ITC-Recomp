@@ -89,7 +89,7 @@ struct Menu {
   }
   // UiMovie::ShowNode and HideNode (sub_8211AC00, sub_8211AC48).
   void Shown(uint32_t sub_scene, uint32_t child, uint32_t shown) {
-    Store(base, Node(sub_scene, child) + 80, shown);
+    UiNode(base, Node(sub_scene, child)).set_visible(shown);
   }
   // UiMovie::SetNodeColor (sub_8211A5B8): the node's color.
   void Color(uint32_t sub_scene, uint32_t child, uint32_t color) {
@@ -136,7 +136,7 @@ struct Menu {
   // Children 5 to 14 of node (sub_scene, 0) hidden, the node found for each.
   void HideChildren(uint32_t sub_scene, uint32_t child) {
     for (uint32_t i = 0; i < 10; i++) {
-      Store(base, ChildOf(Node(sub_scene, child), i + 5) + 80, 0);
+      UiNode(base, ChildOf(Node(sub_scene, child), i + 5)).set_visible(0);
     }
   }
 
@@ -145,7 +145,7 @@ struct Menu {
     if (!NamedIs(1007, kTabsAt) && !NamedIs(62, kAtEnd)) {
       return;
     }
-    Store(base, ChildOf(Node(1, 9), 0) + 16, Scaled(int32_t(TS(base, screen).tabs_row())));
+    Store(base, UiNode(base, ChildOf(Node(1, 9), 0)).y_address(), Scaled(int32_t(TS(base, screen).tabs_row())));
     HideChildren(1, 9);
     const uint32_t table = frame + 96;
     Store(base, table, 376);
@@ -154,7 +154,7 @@ struct Menu {
     }
     for (uint32_t j = 0; j < 4; j++) {
       const uint32_t tab = ChildOf(Node(1, 9), j + 5);
-      Store(base, tab + 80, 1);
+      UiNode(base, tab).set_visible(1);
       const uint32_t k = TS(base, screen).part_group() - TS(base, screen).tabs_row() + j;
       NodeText(tab, Load(base, table + 4 * k), 0, 0x821D8AF0);
     }
@@ -168,7 +168,7 @@ struct Menu {
         int32_t(TS(base, screen).command_end_after_setup()) != 1) {
       return;
     }
-    Store(base, Node(27, 0) + 16, Scaled(int32_t(TS(base, screen).wheel_part_cursor())));
+    Store(base, UiNode(base, Node(27, 0)).y_address(), Scaled(int32_t(TS(base, screen).wheel_part_cursor())));
     Hide27(false);
     for (uint32_t n = 5; n < 8; n++) {
       Shown(27, n, 1);
@@ -196,7 +196,7 @@ struct Menu {
     const uint32_t bar = Node(27, 0);
     const int64_t at = aero ? int64_t(int32_t(TS(base, screen).list_scroll_row()))
                             : int64_t(uint32_t(TS(base, screen).item()));
-    Store(base, bar + 16, Scaled(at));
+    Store(base, UiNode(base, bar).y_address(), Scaled(at));
     if (int32_t(TS(base, screen).category()) != 2) {
       Hide27(true);
       for (uint32_t n = 5; int32_t(n - 5) < int32_t(uint32_t(TS(base, screen).item_count())); n++) {
@@ -257,7 +257,7 @@ struct Menu {
         !NamedIs(973, kAtEnd) && int32_t(TS(base, screen).command_end_after_setup()) != 1) {
       return;
     }
-    Store(base, Node(27, 0) + 16, Scaled(int32_t(TS(base, screen).category())));
+    Store(base, UiNode(base, Node(27, 0)).y_address(), Scaled(int32_t(TS(base, screen).category())));
     Hide27(true);
     for (uint32_t n = 5; n < 12; n++) {
       Shown(27, n, 1);
@@ -272,14 +272,14 @@ struct Menu {
     if (!NamedIs(61, kAtEnd) && int32_t(TS(base, screen).command_end_now()) != 1) {
       return;
     }
-    Store(base, ChildOf(Node(1, 9), 0) + 16, Scaled(int32_t(TS(base, screen).size_cursor())));
+    Store(base, UiNode(base, ChildOf(Node(1, 9), 0)).y_address(), Scaled(int32_t(TS(base, screen).size_cursor())));
     HideChildren(1, 9);
     const uint32_t first = ChildOf(Node(1, 9), 5);
-    Store(base, first + 80, 1);
+    UiNode(base, first).set_visible(1);
     NodeText(first, 376, 0, 0x821D922C);
     for (uint32_t i = 1; int32_t(i) < int32_t(TS(base, screen).size_last() + 1); i++) {
       const uint32_t row = ChildOf(Node(1, 9), i + 5);
-      Store(base, row + 80, 1);
+      UiNode(base, row).set_visible(1);
       NodeText(row, 454, i, 0x821D9270);
     }
     AnimateNamed([&] { return uint64_t(TS(base, screen).size_cursor()) + 20; },
@@ -295,7 +295,7 @@ struct Menu {
     if (!NamedIs(143, kAtEnd)) {
       return;
     }
-    Store(base, ChildOf(Node(2, 0), 0) + 16, Scaled(int32_t(TS(base, screen).interior_slot())));
+    Store(base, UiNode(base, ChildOf(Node(2, 0), 0)).y_address(), Scaled(int32_t(TS(base, screen).interior_slot())));
     HideChildren(2, 0);
     const uint32_t node = Node(2, 0);
     struct Row {
@@ -336,7 +336,7 @@ struct Menu {
     }
     const uint32_t bar = ChildOf(Node(2, 0), 0);
     const uint32_t pick = TS(base, screen).interior_page_mode();
-    Store(base, bar + 16,
+    Store(base, UiNode(base, bar).y_address(),
           int32_t(pick) == 4 ? steps::Bits(steps::Lfs(base, kFarRow)) : Scaled(int32_t(pick)));
     HideChildren(2, 0);
     const uint32_t node = Node(2, 0);
@@ -375,7 +375,7 @@ struct Menu {
     Text(27, 5, 243, 0x821D98E4);
     Shown(27, 6, 1);
     Text(27, 6, 244, 0x821D9908);
-    Store(base, Node(27, 0) + 16, Scaled(int32_t(TS(base, screen).interior_mode())));
+    Store(base, UiNode(base, Node(27, 0)).y_address(), Scaled(int32_t(TS(base, screen).interior_mode())));
     Animate27([&] { return uint64_t(TS(base, screen).interior_mode()) + 2; },
               {0x821D995C, 0x821D9980, 0x821D9994});
   }

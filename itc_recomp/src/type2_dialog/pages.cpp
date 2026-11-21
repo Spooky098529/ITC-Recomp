@@ -7,6 +7,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/boot_mode.h"
 #include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
 #include "schema/type2_dialog.h"
@@ -15,7 +16,6 @@ namespace type2_dialog {
 
 namespace {
 
-using guest::LoadU32;
 using guest::StoreU32;
 using G = schema::Type2DialogGlobals;
 using Machine = schema::StateMachine;
@@ -52,18 +52,19 @@ bool TakeInput(uint8_t* base, uint32_t showing) {
 }  // namespace
 
 void Post(uint8_t* base, uint32_t mode, uint32_t id, bool id_last) {
-  const uint32_t ring = mode + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
+  const schema::ModeDispatcher dispatcher(base, mode);
+  const uint32_t count = dispatcher.ring_count() + 1;
+  const uint32_t end = dispatcher.ring_start() + count - 1;
+  dispatcher.set_ring_count(count);
+  const schema::ModeMessage slot(
+      base, dispatcher.ring_address() + (end - (end / 50) * 50) * schema::ModeMessage::kSize);
   if (!id_last) {
-    StoreU32(base, slot + 0, id);
+    slot.set_id(id);
   }
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
   if (id_last) {
-    StoreU32(base, slot + 0, id);
+    slot.set_id(id);
   }
 }
 

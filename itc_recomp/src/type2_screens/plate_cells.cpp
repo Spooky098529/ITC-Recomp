@@ -25,32 +25,32 @@ uint32_t ShowCells(uint8_t* base, uint32_t frame, uint32_t scene, uint32_t per_r
                    bool up_any, uint32_t (schema::PlateEditorData::*rows)() const,
                    const Calls& calls) {
   const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
-  const int32_t scroll = int32_t(Load(base, Globals::plate_list(base).address + 4));
+  const int32_t scroll = int32_t(Globals::plate_list(base).scroll());
   const uint32_t a = ui_movies::FindNode(base, movie, scene, 0);
   const uint32_t b = ui_movies::FindNode(base, movie, scene, 2);
   int32_t k = int32_t(uint32_t(scroll) * per_row);
-  for (int32_t i = 0; i < int32_t(Load(base, a + 104)); i++, k++) {
-    const uint32_t cell = ui_movies::FindNode(base, movie, scene, Load(base, a + 100) + uint32_t(i));
-    const uint32_t other = ui_movies::FindNode(base, movie, scene, Load(base, b + 100) + uint32_t(i));
+  for (int32_t i = 0; i < int32_t(ChildCount(base, a)); i++, k++) {
+    const uint32_t cell = ui_movies::FindNode(base, movie, scene, FirstChild(base, a) + uint32_t(i));
+    const uint32_t other = ui_movies::FindNode(base, movie, scene, FirstChild(base, b) + uint32_t(i));
     if (k < limit) {
       if (set_first) {
         calls.Call(kSetNodeText, frame, lr, movie, cell, uint32_t(k) + first_string);
       }
-      Store(base, cell + 80, 1);
-      Store(base, other + 80, 1);
+      Node(base, cell).set_visible(1);
+      Node(base, other).set_visible(1);
       if (!set_first) {
         calls.Call(kSetNodeText, frame, lr, movie, cell, uint32_t(k) + first_string);
       }
     } else {
-      Store(base, cell + 80, 0);
-      Store(base, other + 80, 0);
+      Node(base, cell).set_visible(0);
+      Node(base, other).set_visible(0);
     }
   }
   const uint32_t up = ui_movies::FindNode(base, movie, kAll, 8);
   const uint32_t down = ui_movies::FindNode(base, movie, kAll, 9);
-  Store(base, up + 80, (up_any ? scroll != 0 : scroll > 0) ? 1 : 0);
+  Node(base, up).set_visible((up_any ? scroll != 0 : scroll > 0) ? 1 : 0);
   const int32_t last = int32_t((Globals::plate_data(base).*rows)() - 3);
-  Store(base, down + 80, (up_any ? scroll != last : scroll < last) ? 1 : 0);
+  Node(base, down).set_visible((up_any ? scroll != last : scroll < last) ? 1 : 0);
   return down;
 }
 
@@ -91,8 +91,8 @@ uint32_t PlateShowDigitCells(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
   const uint32_t parent = ui_movies::FindNode(base, movie, 4, 0);
-  for (int32_t i = 0; i < int32_t(Load(base, parent + 104)); i++) {
-    const uint32_t child = Load(base, parent + 100) + uint32_t(i);
+  for (int32_t i = 0; i < int32_t(ChildCount(base, parent)); i++) {
+    const uint32_t child = FirstChild(base, parent) + uint32_t(i);
     if (i < 10) {
       const uint64_t args[8] = {movie, 4, child, 8, uint64_t(i), 0, 0, 0};
       calls.CallArgs(kSetText, frame, 0x821993C4, args);
@@ -102,8 +102,8 @@ uint32_t PlateShowDigitCells(uint8_t* base, uint32_t sp, const Calls& calls) {
   }
   const uint32_t up = ui_movies::FindNode(base, movie, kAll, 8);
   const uint32_t down = ui_movies::FindNode(base, movie, kAll, 9);
-  Store(base, up + 80, 0);
-  Store(base, down + 80, 0);
+  Node(base, up).set_visible(0);
+  Node(base, down).set_visible(0);
   return down;
 }
 
@@ -116,8 +116,8 @@ uint32_t PlateShowCharLine(uint8_t* base, uint32_t kind, uint32_t sp) {
     return parent;
   }
   uint32_t r3 = parent;
-  for (int32_t i = 0; i < int32_t(Load(base, parent + 104)); i++) {
-    const uint32_t child = ui_movies::FindNode(base, movie, 4, Load(base, parent + 100) + uint32_t(i));
+  for (int32_t i = 0; i < int32_t(ChildCount(base, parent)); i++) {
+    const uint32_t child = ui_movies::FindNode(base, movie, 4, FirstChild(base, parent) + uint32_t(i));
     const bool marked = kind == 0 ? i == 0 : kind == 1 ? i == 10 : (i == 10 || i == 0);
     ui_movies::SetColor(base, child, marked ? 2 : 0);
     r3 = movie;

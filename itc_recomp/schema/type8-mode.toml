@@ -82,7 +82,7 @@ page_table = { address = 0x82814E94, type = "bytes", count = 32, note = "Type8Sc
 page_table_guard = { address = 0x82814EB4, type = "u32", note = "bit 0: page_table built" }
 stand_table = { address = 0x82636FDC, type = "bytes", count = 24, note = "two Type8StandEntry, one a player" }
 garage_cars = { address = 0x82814EB8, type = "bytes", count = 3944, note = "the two players' garage cars (car-makers.toml's GarageCarSlot, 1,972 bytes each)" }
-stand_holder = { address = 0x826D83E0, type = "ptr", note = "the stand scene's holder (StandScene::Create): +4 and +8 the two players' garage stages' holders" }
+stand_holder = { address = 0x826D83E0, type = "ptr", to = "StandHolder", note = "the stand scene's holder (StandScene::Create): +4 and +8 the two players' garage stages' holders" }
 mode_before = { address = 0x826032E0, type = "u32", note = "the game mode before (1 the race)" }
 fade_in_passes = { address = 0x82001BEC, type = "u32", note = "the passes word ScreenFades::FadeIn is given" }
 fade_out_passes = { address = 0x82001BF0, type = "u32", note = "the passes word ScreenFades::FadeOut is given" }

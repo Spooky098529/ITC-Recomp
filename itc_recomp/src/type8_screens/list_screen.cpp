@@ -22,7 +22,13 @@
 #include "race_screens/race_screens.h"
 #include "race_setup/race_setup.h"
 #include "save_data/save_data.h"
+#include "schema/app_start_up.h"
+#include "schema/car_makers.h"
+#include "schema/menu_sounds.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
 #include "schema/screen_constructors.h"
+#include "schema/tuning_screen.h"
 #include "schema/type8_screens.h"
 #include "schema/type67_screens.h"
 #include "screen_constructors/screen_constructors.h"
@@ -49,8 +55,8 @@ constexpr uint32_t kNone = 0xFFFFFFFFu;
 constexpr uint64_t kMinusOne = ~uint64_t(0);
 // The course names' string ids (6 a row, rows overlapping) and the item
 // infos (16 bytes each).
-constexpr uint32_t kCourseTexts = 0x82010D70;
-constexpr uint32_t kItemInfos = 0x82010D90;
+constexpr uint32_t kCourseTexts = G::course_texts_address();
+constexpr uint32_t kItemInfos = G::course_infos_address();
 
 uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
                     uint32_t lr) {
@@ -63,7 +69,7 @@ uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int s
 uint64_t SetShown(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child,
                   uint32_t shown) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  StoreU32(base, node + 80, shown);
+  schema::UiMovieNode(base, node).set_visible(shown);
   return node;
 }
 
@@ -88,7 +94,6 @@ uint32_t KindText(uint8_t* base, uint32_t screen) {
 constexpr uint32_t kResetGlobal = 0x821021A8, kStagesSetRoute = 0x82101E90,
                    kRaceSetRoute = 0x82101D38, kMemcpy = 0x825A7410, kCarRefresh = 0x820C4998,
                    kAddRacer = 0x821017C0, kPlaceRacers = 0x82102048;
-constexpr uint32_t kZero = 0x82000A34;
 constexpr uint32_t kSetUpRaceFrame = 4096;
 constexpr uint32_t kGarageCarBytes = 1972;
 
@@ -150,8 +155,8 @@ uint64_t ListScreen8Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   ls.set_part(uint32_t(r3 + kListScreenPart));
   // The node table's words through [+9672], read again where the original
   // reads it again.
-  auto table = [&] { return ls.node_table().address; };
-  uint32_t t = table();
+  auto table = [&] { return ls.node_table(); };
+  schema::PairedNodeTable t = table();
   ls.set_opening_anim_c(143);
   ls.set_course_in_anim(144);
   ls.set_course_out_anim(145);
@@ -173,9 +178,9 @@ uint64_t ListScreen8Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   ls.set_opening_anim_b(4);
   ls.set_part_node_set(6);
   ls.set_part_node(1);
-  StoreU32(base, t + 8, 10);
+  t.set_node_set_a(10);
   t = table();
-  StoreU32(base, t + 12, 9);
+  t.set_node_set_b(9);
   ls.set_unknown_9716(10);
   ls.set_selection_array(0x82637020);
   ls.set_selection_node_set(15);
@@ -187,15 +192,14 @@ uint64_t ListScreen8Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   ls.set_arrow_on_frame(0);
   ls.set_arrow_off_frame(1);
   ls.set_marker_node(0);
-  for (uint32_t i = 0; i < 4; i++) StoreU32(base, table() + 296 + 4 * i, 6 + i);
+  for (uint32_t i = 0; i < 4; i++) StoreU32(base, table().children_address() + 4 * i, 6 + i);
   ls.set_unknown_9788(1);
   ls.set_selection_entries(2);
   for (uint32_t i = 0; i < 27; i++) {
-    const uint32_t at = table() + 16 + 4 * i;
-    StoreU32(base, at + 140, 1 + i);
-    StoreU32(base, table() + 16 + 4 * i, 8 + i);
+    StoreU32(base, table().item_nodes_address() + 4 * i, 1 + i);
+    StoreU32(base, table().item_anims_address() + 4 * i, 8 + i);
   }
-  for (uint32_t i = 0; i < 8; i++) StoreU32(base, table() + 124 + 4 * i, 39 + i);
+  for (uint32_t i = 0; i < 8; i++) StoreU32(base, table().more_anims_address() + 4 * i, 39 + i);
   for (uint32_t i = 0; i < 6; i++) StoreU32(base, ls.course_anims_address() + 4 * i, 107 + i);
   t = table();
   ls.set_icons_node_set(2);
@@ -205,8 +209,8 @@ uint64_t ListScreen8Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   ls.set_kind_anim0(68);
   ls.set_kind_anim1(69);
   ls.set_kind_anim2(70);
-  StoreU32(base, t + 420, 6);
-  StoreU32(base, table() + 424, 55);
+  t.set_extra_node_base(6);
+  table().set_text_node_base(55);
   ls.set_show_part_nodes(1);
   ls.set_unknown_9928(130);
   ls.set_unknown_9932(129);
@@ -302,14 +306,14 @@ uint64_t ListScreen8ShowMarks(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
   const uint32_t which = uint32_t(r4);
   uint32_t node = ui_movies::FindNode(base, movie, kNone, 7);
   if (int32_t(which) < 0) {
-    StoreU32(base, node + 80, 0);
+    schema::UiMovieNode(base, node).set_visible(0);
     return node;
   }
-  StoreU32(base, node + 80, 1);
+  schema::UiMovieNode(base, node).set_visible(1);
   node = ui_movies::FindNode(base, movie, kNone, 17);
-  StoreU32(base, node + 80, which != 0 ? 1 : 0);
+  schema::UiMovieNode(base, node).set_visible(which != 0 ? 1 : 0);
   node = ui_movies::FindNode(base, movie, kNone, 18);
-  StoreU32(base, node + 80, which != 2 ? 1 : 0);
+  schema::UiMovieNode(base, node).set_visible(which != 2 ? 1 : 0);
   return node;
 }
 
@@ -345,9 +349,9 @@ uint64_t ListScreen8SetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Ca
   // &cue 2 and, when it answers a nonzero byte, its StopCue (slot 13); then
   // slot 14 for bank 1's cue 0 and, when it isn't playing, Sound::Play.
   auto slot = [&](uint32_t offset, uint32_t bank, uint32_t cue, uint32_t lr) {
-    const uint32_t manager = LoadU32(base, menu_sounds::kSoundManager);
-    const uint64_t args[6] = {manager, bank, cue, 0, 0, 0};
-    return calls.call_set(LoadU32(base, LoadU32(base, manager) + offset), args, 3, frame, lr);
+    const schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
+    const uint64_t args[6] = {manager.address, bank, cue, 0, 0, 0};
+    return calls.call_set(LoadU32(base, manager.vtable().address + offset), args, 3, frame, lr);
   };
   StoreU32(base, frame + 96, 2);
   StoreU32(base, frame + 100, 1);
@@ -373,13 +377,13 @@ uint64_t ListScreen8SetUpRace(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
   namespace rsu = race_setup;
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, kSetUpRaceFrame);
   const schema::Type8ListScreen ls(base, s);
-  auto data = [base] { return LoadU32(base, rsu::kRaceData); };
+  auto data = [base] { return schema::RaceSetupGlobals::race_data(base).address; };
   if (!rsu::RaceDataResetGlobal(base, frame - 112)) {
     pg::Call1(calls, kResetGlobal, r3, frame, 0x8223F794);
   }
   rsu::StagesClear(base, data() + rsu::kStageList);
-  StoreU32(base, data() + 0xA3AF0, 4);
-  StoreU32(base, data() + 0xA3AF4, 5);
+  schema::RaceData(base, data()).set_kind(4);
+  schema::RaceData(base, data()).set_race_mode(5);
   vehicle_accessors::RaceDataSetWord32(base, rs::ListSelection(base, ls.kind_list_address()));
   // The course: the course list's +4 plus its selection, 0 to 7 (the
   // switch's cases each answer their own index; case 0 is the merged piece
@@ -406,14 +410,14 @@ uint64_t ListScreen8SetUpRace(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t 
   // The two players' racer records at the frame's +80: the garage cars,
   // each one's +3892 whether its player's first menu (the list part's
   // blocks' +84) is at its first item.
-  const double zero = double(std::bit_cast<float>(LoadU32(base, kZero)));
+  const double zero = double(std::bit_cast<float>(schema::AppStartUpGlobals::float_zero(base)));
   const uint32_t record = frame + 80;
   for (uint32_t player = 0; player < 2; player++) {
     const uint32_t car = G::garage_cars_address() + kGarageCarBytes * player;
     const uint32_t menu = s + 10864 + (player == 0 ? 124 : 356);
     const uint32_t first = rs::ListSelection(base, menu) == 0 ? 1 : 0;
     rsu::RacerRecordInit(base, record);
-    rsu::SetModel(base, record, LoadU32(base, car + 12));
+    rsu::SetModel(base, record, schema::CarMakersCar(base, car).car_id());
     StoreU32(base, frame + 3972, first);
     if (!native::Buffers_Memcpy(base, record, car, 1884, 0x8223F8F4)) {
       const uint64_t args[6] = {record, car, 1884, 0, 0, 0};
@@ -469,7 +473,7 @@ uint64_t ListBaseUpdate(uint8_t* base, uint64_t r3, std::optional<uint64_t> r5, 
   const uint32_t frame = part_detail::Frame(base, sp, 160);
   const uint32_t step = schema::Type8ListScreen(base, uint32_t(r3)).step();
   // r4 the guard's word as loaded (the original keeps it there).
-  const uint32_t guard = LoadU32(base, kListBaseStepGuard);
+  const uint32_t guard = G::list_base_step_guard(base);
   static constexpr uint32_t kEntries[6] = {0x82258158, 0x82258648, 0x82258BE0,
                                            0x82258438, 0x822580E0, 0x82258578};
   if (pg::BuildTable(base, frame, kListBaseStepGuard, kListBaseSteps, kEntries, 6)) {
@@ -630,7 +634,8 @@ uint64_t ListBasePage6(uint8_t* base, uint64_t r3) {
 
 uint64_t ListBasePage8(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82257900 Type8ListBase::Page8");
-  if ((LoadU32(base, ts::kFadeCountA) | LoadU32(base, ts::kFadeCountB)) != 0) return r3;
+  if ((schema::Type67ScreensGlobals::fade_out_count(base) |
+       schema::Type67ScreensGlobals::fade_in_count(base)) != 0) return r3;
   pg::ToPage(base, uint32_t(r3), 9);
   return r3;
 }
@@ -845,28 +850,29 @@ uint64_t ListBaseDimList(uint8_t* base, uint64_t r3, uint64_t dim, uint32_t sp,
 
 uint64_t PairedNodeTableClear(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82248A20 PairedNodeTable::Clear");
-  const uint32_t t = uint32_t(r3), frame = part_detail::Frame(base, sp, 128);
-  StoreU32(base, frame + 80, LoadU32(base, t + 4));
+  const uint32_t frame = part_detail::Frame(base, sp, 128);
+  const schema::PairedNodeTable t(base, uint32_t(r3));
+  StoreU32(base, frame + 80, t.movie());
   const uint32_t found = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
   const uint32_t movie = LoadU32(base, found);
   uint64_t result = found;
   // The third pair's named animation, [+124 + 4 × +444].
-  const uint32_t third = LoadU32(base, t + 444);
+  const uint32_t third = t.third();
   if (int32_t(third) >= 0) {
-    const uint32_t named = LoadU32(base, t + ((third + 31) << 2));
+    const uint32_t named = LoadU32(base, t.more_anims_address() + (third << 2));
     if (int32_t(named) >= 0) result = calls.call(kFinishNamed, frame, 0x82248A74, movie, named);
   }
   // The first pair's item and the second's (unless the same), shown off
   // and their named animations ([+16 + 4i], read before) finished.
-  const uint32_t first = LoadU32(base, t + 428);
+  const uint32_t first = t.item();
   if (int32_t(first) >= 0) {
-    const uint32_t named = LoadU32(base, t + ((first + 4) << 2));
+    const uint32_t named = LoadU32(base, t.item_anims_address() + (first << 2));
     result = ts::NodeTableShowNode(base, r3, first, 0, 0, frame);
     if (int32_t(named) >= 0) result = calls.call(kFinishNamed, frame, 0x82248AB4, movie, named);
   }
-  const uint32_t now = LoadU32(base, t + 428), second = LoadU32(base, t + 436);
+  const uint32_t now = t.item(), second = t.second();
   if (second != now && int32_t(second) >= 0) {
-    const uint32_t named = LoadU32(base, t + ((second + 4) << 2));
+    const uint32_t named = LoadU32(base, t.item_anims_address() + (second << 2));
     result = ts::NodeTableShowNode(base, r3, second, 0, 0, frame);
     if (int32_t(named) >= 0) result = calls.call(kFinishNamed, frame, 0x82248B00, movie, named);
   }

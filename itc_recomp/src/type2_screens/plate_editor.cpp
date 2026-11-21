@@ -20,16 +20,16 @@ void Post(uint8_t* base, uint32_t mode, uint32_t id) {
   const uint32_t count = ring.message_count() + 1;
   const uint32_t start = ring.message_start();
   ring.set_message_count(count);
-  const uint32_t slot = ring.messages_address() + 12 * ((start + count - 1) % 50);
-  Store(base, slot + 0, id);
-  Store(base, slot + 4, 0);
-  Store(base, slot + 8, 0);
+  const schema::ModeMessage slot(base, ring.messages_address() + 12 * ((start + count - 1) % 50));
+  slot.set_id(id);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 void LeaveToHub(uint8_t* base, uint32_t machine, uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_821D6A20 Screen::LeaveToHub");
   Post(base, mode, 6);
-  Store(base, machine + kMachineState, 9);
+  schema::StateMachine(base, machine).set_state(9);
 }
 
 uint64_t PlateCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls) {
@@ -48,8 +48,8 @@ uint64_t PlateCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
   const uint32_t list = uint32_t(calls.Call(kVirtualAlloc, frame, 0x82198280, 0, 72, 4096, 4));
   Globals::set_plate_list(base, list);
   if (list != 0) {
-    Store(base, list + 68, 0);
-    Store(base, list + 60, 0);
+    MenuList(base, list).set_enabled(0u);
+    MenuList(base, list).set_player(0);
   }
   const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x821982AC, 0, 76, 4096, 4);
   const uint32_t data = uint32_t(r3);
@@ -191,7 +191,7 @@ uint32_t PlateShowRegion(uint8_t* base, uint32_t region, uint32_t sp) {
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
   const uint32_t node = ui_movies::FindNode(base, movie, 2, 0);
-  Store(base, node + 108, region);
+  Node(base, node).set_texture_entry(region);
   return node;
 }
 
@@ -201,15 +201,15 @@ uint32_t PlateShowDigits(uint8_t* base, uint32_t digits, uint32_t sp) {
   const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
   const uint32_t parent = ui_movies::FindNode(base, movie, 2, 2);
   uint32_t r3 = parent;
-  for (int32_t i = 0; i < int32_t(Load(base, parent + 104)); i++) {
-    const uint32_t first = Load(base, parent + 100);
+  for (int32_t i = 0; i < int32_t(ChildCount(base, parent)); i++) {
+    const uint32_t first = FirstChild(base, parent);
     const uint32_t digit = Load(base, digits + 4 * uint32_t(i));
     r3 = ui_movies::FindNode(base, movie, 2, first + uint32_t(i));
     if (digit != 10) {
-      Store(base, r3 + 108, digit);
-      Store(base, r3 + 80, 1);
+      Node(base, r3).set_texture_entry(digit);
+      Node(base, r3).set_visible(1);
     } else {
-      Store(base, r3 + 80, 0);
+      Node(base, r3).set_visible(0);
     }
   }
   return r3;
@@ -222,14 +222,14 @@ uint32_t PlateShowChars(uint8_t* base, uint32_t chars, uint32_t sp) {
   const uint32_t parent = ui_movies::FindNode(base, movie, 2, 1);
   uint32_t r3 = parent;
   for (uint32_t i = 0; i < 7; i++) {
-    const uint32_t first = Load(base, parent + 100);
+    const uint32_t first = FirstChild(base, parent);
     const uint32_t c = Load(base, chars + 4 * i);
     r3 = ui_movies::FindNode(base, movie, 2, i + first);
     if (int32_t(c) < 37) {
-      Store(base, r3 + 108, c);
-      Store(base, r3 + 80, 1);
+      Node(base, r3).set_texture_entry(c);
+      Node(base, r3).set_visible(1);
     } else {
-      Store(base, r3 + 80, 0);
+      Node(base, r3).set_visible(0);
     }
   }
   return r3;
@@ -241,9 +241,9 @@ uint32_t PlateMarkField(uint8_t* base, uint32_t field, uint32_t sp) {
   const uint32_t movie = FindMovie(base, kPlateMovie, frame + 80);
   const uint32_t parent = ui_movies::FindNode(base, movie, 1, 0);
   uint32_t r3 = parent;
-  for (int32_t i = 0; i < int32_t(Load(base, parent + 104)); i++) {
-    r3 = ui_movies::FindNode(base, movie, 1, Load(base, parent + 100) + uint32_t(i));
-    Store(base, r3 + 80, i == int32_t(field) ? 1 : 0);
+  for (int32_t i = 0; i < int32_t(ChildCount(base, parent)); i++) {
+    r3 = ui_movies::FindNode(base, movie, 1, FirstChild(base, parent) + uint32_t(i));
+    Node(base, r3).set_visible(i == int32_t(field) ? 1 : 0);
   }
   return r3;
 }

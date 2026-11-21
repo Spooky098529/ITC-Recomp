@@ -17,6 +17,7 @@
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
 #include "schema/menu_helpers.h"
+#include "schema/race_event.h"
 #include "schema/tuning_machine.h"
 #include "tuning_screen/tuning_screen.h"
 #include "ui_movies/game.h"
@@ -72,14 +73,14 @@ uint64_t Start(uint8_t* base, const tuning_screen::StandCalls& stand, const Call
   double data_f1 = 0.0;
   car_makers::TuningScreenSetUpCarData(base, stand.calls, s, frame, &data_f1);
   *f1 = data_f1;
-  const uint32_t curve = frame + 96;
-  vehicle::PowerCurveFromEngine(base, curve, s + 20180, frame - 112);
-  vehicle::PowerCurveShiftPeak(base, curve, 0, frame);
+  const schema::StagePowerCurve curve(base, frame + 96);
+  vehicle::PowerCurveFromEngine(base, curve.address, s + 20180, frame - 112);
+  vehicle::PowerCurveShiftPeak(base, curve.address, 0, frame);
   // The stats (as SetCarStats): the displacement, the weight, the power
   // (words by fctiwz, stfiwx) and the torque shown (a float).
   const int32_t displacement = steps::Fctiwz(steps::Lfs(base, sc.car_displacement_address()));
-  const int32_t power = steps::Fctiwz(steps::Lfs(base, curve + 1056));
-  const double torque = steps::Lfs(base, curve + 1048);
+  const int32_t power = steps::Fctiwz(steps::Lfs(base, curve.shifted_peak_power_address()));
+  const double torque = steps::Lfs(base, curve.torque_scale_address());
   const double two = steps::Lfs(base, G::axle_factor_address());
   sc.set_stat_displacement(uint32_t(displacement));
   const double rear = steps::Lfs(base, sc.car_rear_weight_address());

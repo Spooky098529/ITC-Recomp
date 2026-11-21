@@ -8,6 +8,8 @@
 #include "base/log.h"
 #include "graphics/device_state.h"
 #include "helpers/debug_output.h"
+#include "schema/device_shaders.h"
+#include "schema/model_animation.h"
 #include "schema/single_commands.h"
 
 #include <cstdint>
@@ -16,9 +18,7 @@ namespace graphics::single_commands {
 
 namespace {
 
-constexpr uint32_t kDevice = 0x8296BD90;
-constexpr uint32_t kDrawer = 0x82970BB8;
-constexpr uint32_t kDrawerState = 0x82970BBC;
+using Globals = schema::DeviceShadersGlobals;
 
 // A frame of `bytes` below `sp`, with its back chain.
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
@@ -33,7 +33,7 @@ uint32_t InlineVertices(uint8_t* base, uint32_t slot) {
   ITC_NATIVE_RUNNING("sub_8258E8E8 Single::InlineVertices");
   const schema::Single single(base, slot);
   const uint32_t count = single.argument0();
-  const uint32_t state = guest::LoadU32(base, kDrawerState);
+  const uint32_t state = Globals::replay_drawer_state(base);
   guest::StoreU32(base, state + 12, single.data_address());
   guest::StoreU32(base, state + 16, count);
   return uint32_t(count * 24u + 15u) >> 4;
@@ -46,13 +46,13 @@ uint32_t SetUpDrawer(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall&
   const uint32_t vertex_shader = single.argument1();
   const uint32_t pixel_shader = single.argument2();
   const uint32_t type = single.argument0();
-  const uint32_t state = guest::LoadU32(base, kDrawerState);
-  const uint32_t drawer = guest::LoadU32(base, kDrawer);
-  const uint32_t device = guest::LoadU32(base, kDevice);
+  const uint32_t state = Globals::replay_drawer_state(base);
+  const uint32_t drawer = Globals::replay_drawer(base);
+  const uint32_t device = Globals::replay_device(base);
   guest::StoreU32(base, state + 0, type);
   guest::StoreU32(base, state + 4, vertex_shader);
   guest::StoreU32(base, state + 8, pixel_shader);
-  const uint32_t set_shaders = guest::LoadU32(base, guest::LoadU32(base, drawer) + 8);
+  const uint32_t set_shaders = guest::LoadU32(base, schema::PrimitiveDrawer(base, drawer).vtable() + 8);
   call(set_shaders, frame, 0x8258E9A4, {drawer, device, vertex_shader, pixel_shader});
   return 0;
 }
@@ -71,7 +71,7 @@ uint32_t SetShaderConstants(uint8_t* base, uint32_t slot, uint32_t sp, const Gue
   // in play) a guest call, the pixel shader's its plain C++.
   auto set_bools = [&](uint32_t values, uint32_t count) {
     const uint32_t first = single.first_register();
-    const uint32_t device = guest::LoadU32(base, kDevice);
+    const uint32_t device = Globals::replay_device(base);
     if (vertex) {
       call(0x822A8418, frame, 0x8258F250, {device, first, values, count});
     } else {
@@ -82,7 +82,7 @@ uint32_t SetShaderConstants(uint8_t* base, uint32_t slot, uint32_t sp, const Gue
     case 0: {  // the loop constants (sub_822A84C8, sub_822A8518): not seen in play
       const uint32_t count = single.register_count();
       const uint32_t first = single.first_register();
-      const uint32_t device = guest::LoadU32(base, kDevice);
+      const uint32_t device = Globals::replay_device(base);
       call(vertex ? 0x822A84C8 : 0x822A8518, frame, vertex ? 0x8258F160 : 0x8258F2BC,
            {device, first, data, count});
       break;
@@ -90,7 +90,7 @@ uint32_t SetShaderConstants(uint8_t* base, uint32_t slot, uint32_t sp, const Gue
     case 1: {  // the floats, with the dirty mask of the 4-register blocks
       const uint32_t first = single.first_register();
       const uint32_t count = single.register_count();
-      const uint32_t device = guest::LoadU32(base, kDevice);
+      const uint32_t device = Globals::replay_device(base);
       const uint32_t last_block = uint32_t(first + count - 1) >> 2;
       const uint32_t first_block = first >> 2;
       uint32_t shift = (last_block - first_block) & 0x7F;
@@ -136,21 +136,21 @@ uint32_t SetShaderConstants(uint8_t* base, uint32_t slot, uint32_t sp, const Gue
 uint32_t DrawerDraw(uint8_t* base, uint32_t sp, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8258F5C0 Single::DrawerDraw");
   const uint32_t frame = Frame(base, sp, 112);
-  if (guest::LoadU32(base, guest::LoadU32(base, kDrawerState) + 16) == 0) {
+  if (guest::LoadU32(base, Globals::replay_drawer_state(base) + 16) == 0) {
     return 0;
   }
-  const uint32_t viewport = device_state::GetViewportEnable(base, guest::LoadU32(base, kDevice));
+  const uint32_t viewport = device_state::GetViewportEnable(base, Globals::replay_device(base));
   {
-    const uint32_t state = guest::LoadU32(base, kDrawerState);
-    const uint32_t device = guest::LoadU32(base, kDevice);
+    const uint32_t state = Globals::replay_drawer_state(base);
+    const uint32_t device = Globals::replay_device(base);
     const uint32_t on = int32_t(guest::LoadU32(base, state + 4)) == 1 ? 0 : 1;
     device_state::SetViewportEnable(base, device, on);
   }
   {
-    const uint32_t drawer = guest::LoadU32(base, kDrawer);
-    const uint32_t state = guest::LoadU32(base, kDrawerState);
-    const uint32_t device = guest::LoadU32(base, kDevice);
-    const uint32_t vtable = guest::LoadU32(base, drawer);
+    const uint32_t drawer = Globals::replay_drawer(base);
+    const uint32_t state = Globals::replay_drawer_state(base);
+    const uint32_t device = Globals::replay_device(base);
+    const uint32_t vtable = schema::PrimitiveDrawer(base, drawer).vtable();
     const uint32_t count = guest::LoadU32(base, state + 16);
     const uint32_t vertices = guest::LoadU32(base, state + 12);
     const uint32_t type = guest::LoadU32(base, state + 0);
@@ -158,19 +158,19 @@ uint32_t DrawerDraw(uint8_t* base, uint32_t sp, const GuestCall& call) {
     call(draw, frame, 0x8258F640, {drawer, device, type, vertices, count});
   }
   {
-    const uint32_t device = guest::LoadU32(base, kDevice);
+    const uint32_t device = Globals::replay_device(base);
     if (!device_state::SetStreamSource(base, device, 0, 0, 0, 0, 4096)) {
       call(0x822A3758, frame, 0x8258F65C, {device, 0, 0, 0, 0, 4096});
     }
   }
   {
-    const uint32_t device = guest::LoadU32(base, kDevice);
+    const uint32_t device = Globals::replay_device(base);
     constexpr uint64_t kStage0 = 1ull << 43;
     if (!device_state::SetTexture(base, device, 0, 0, kStage0)) {
       call(0x822A6008, frame, 0x8258F674, {device, 0, 0, kStage0});
     }
   }
-  device_state::SetViewportEnable(base, guest::LoadU32(base, kDevice), viewport);
+  device_state::SetViewportEnable(base, Globals::replay_device(base), viewport);
   return 0;
 }
 
@@ -178,7 +178,7 @@ uint32_t Callback(uint8_t* base, uint32_t slot, uint32_t sp, const GuestCall& ca
   ITC_NATIVE_RUNNING("sub_8258E9B8 Single::Callback");
   const uint32_t frame = Frame(base, sp, 96);
   const uint32_t object = schema::Single(base, slot).argument0();
-  const uint32_t device = guest::LoadU32(base, kDevice);
+  const uint32_t device = Globals::replay_device(base);
   const uint32_t function = schema::SingleCallbackObject(base, object).vtable().call();
   call(function, frame, 0x8258E9E0, {object, device});
   return 0;

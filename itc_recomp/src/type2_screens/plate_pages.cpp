@@ -40,10 +40,10 @@ uint32_t Selection(uint8_t* base) { return race_screens::ListSelection(base, Lis
 // The list moving: +24 or +28 set, or (`scroll` too) +4 not +8.
 bool Moving(uint8_t* base, bool scroll) {
   const uint32_t list = List(base);
-  if (Load(base, list + 24) != 0 || Load(base, list + 28) != 0) {
+  if (MenuList(base, list).move() != 0 || MenuList(base, list).side() != 0) {
     return true;
   }
-  return scroll && Load(base, list + 4) != Load(base, list + 8);
+  return scroll && MenuList(base, list).scroll() != MenuList(base, list).scroll_before();
 }
 
 }  // namespace
@@ -57,7 +57,7 @@ uint64_t PlateRegionPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls&
     Sound(calls, frame, 0x82199F0C, 0);
     const uint32_t selection = Selection(base);
     r3 = selection;
-    const uint32_t row = Load(base, List(base) + 4) + selection;
+    const uint32_t row = MenuList(base, List(base)).scroll() + selection;
     Data(base).set_region(uint8_t(row * 3 + Data(base).column()));
     PagesGo(base, Pages(base).address, 1, 5, 6);
     return r3;
@@ -73,7 +73,7 @@ uint64_t PlateRegionPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls&
   if (uint32_t(r3) != 0) {
     Sound(calls, frame, 0x8219A00C, 0);
     const uint32_t selection = Selection(base);
-    const uint32_t row = Load(base, List(base) + 4) + selection;
+    const uint32_t row = MenuList(base, List(base)).scroll() + selection;
     Data(base).set_region(uint8_t(row * 3 + Data(base).column()));
     r3 = PlateFinishRegionAnim(base, frame, calls);
     PagesGo(base, Pages(base).address, kNone, 19, kNone);
@@ -149,7 +149,7 @@ uint64_t PlateCharsPage(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& 
   // The character at the data's +56 (byte +9 on) from the list's scroll,
   // the selection and the column.
   auto set_char = [&](uint32_t selection) {
-    const uint32_t scroll = Load(base, List(base) + 4);
+    const uint32_t scroll = MenuList(base, List(base)).scroll();
     const schema::PlateEditorData data = Data(base);
     guest::StoreU8(base, data.edited() + data.chars_address(),
                    uint8_t((scroll + selection) * 10 + data.column()));

@@ -6,6 +6,7 @@
 #include "c_runtime/strings.h"
 #include "command_list/command_list.h"
 #include "guest.h"
+#include "schema/command_list.h"
 #include "schema/strings_and_font.h"
 #include "strings_and_font/steps.h"
 
@@ -551,7 +552,8 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
   if (FontCountGlyphs(base, font, kCounts, text) == 0) {
     return {DrawPassResult::kNothing, 0};
   }
-  const uint32_t list = Font(base, font).command_list<schema::View>().address;
+  const schema::CommandList list_view = Font(base, font).command_list();
+  const uint32_t list = list_view.address;
   // What the original would do differently: rotated text (sub_821097F0),
   // or its command list calls printing a message (another chunk open, the
   // list full: the slots counted at most, as clipping only lowers the
@@ -559,8 +561,7 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
   if (FontRotated(base, font)) {
     return {DrawPassResult::kOriginal, 0};
   }
-  if (guest::LoadU8(base, list + 52) == 0 &&
-      guest::LoadU32(base, command_list::kOpenChunks) != 0) {
+  if (list_view.chunk_open() == 0 && schema::CommandListGlobals::open_chunks(base) != 0) {
     return {DrawPassResult::kOriginal, 0};
   }
   uint64_t slots = 19 + 3;
@@ -570,7 +571,7 @@ DrawPassResult FontDrawPass(uint8_t* base, uint32_t font, uint32_t text) {
       slots += 1 + ((vertices * 24 + 15) >> 4) + 4;
     }
   }
-  if (uint64_t(guest::LoadU32(base, list + 12)) + slots >= guest::LoadU32(base, list + 8)) {
+  if (uint64_t(list_view.used()) + slots >= list_view.capacity()) {
     return {DrawPassResult::kOriginal, 0};
   }
   ITC_NATIVE_RUNNING("sub_82109EF0 Font::DrawPass");

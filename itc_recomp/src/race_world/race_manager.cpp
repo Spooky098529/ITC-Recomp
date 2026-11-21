@@ -65,8 +65,9 @@ uint32_t LoadS16(uint8_t* base, uint32_t address) {
 }
 // The halfwords of a route position copied (lhz, sth twice).
 void CopyPosition(uint8_t* base, uint32_t from, uint32_t to) {
-  guest::StoreU16(base, to, guest::LoadU16(base, from));
-  guest::StoreU16(base, to + 2, guest::LoadU16(base, from + 2));
+  const schema::TrackRoutePosition source(base, from), target(base, to);
+  target.set_section(source.section());
+  target.set_slice(source.slice());
 }
 // A section's record in the route's table (the halfword at `at`, shifted).
 uint32_t SectionRecord(uint8_t* base, uint32_t file, uint32_t section) {

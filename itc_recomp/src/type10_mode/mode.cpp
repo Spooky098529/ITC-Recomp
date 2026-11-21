@@ -25,17 +25,13 @@ using Interface32 = schema::ModeType10Interface32;
 uint64_t Load64(uint8_t* base, uint32_t at) {
   return (uint64_t(Load(base, at)) << 32) | Load(base, at + 4);
 }
-void Store64(uint8_t* base, uint32_t at, uint64_t value) {
-  Store(base, at, uint32_t(value >> 32));
-  Store(base, at + 4, uint32_t(value));
-}
 
 // The mode's delegate (+8, its holder +4) to `function`: the function and
 // adjustment from the doubleword at `slot` (function, 0) written first, as
 // the originals build them there. The holder 0 when the delegate's address
 // wraps to 0 (never: kept as the originals test it).
 // The delegate's words from the doubleword at `slot` (function, then
-// adjustment: two word stores, as Store64).
+// adjustment: two word stores).
 void FillDelegate(uint8_t* base, const Mode& m, uint32_t slot) {
   const uint32_t delegate = m.delegate_vtable_address();
   uint32_t holder = 0;
@@ -58,8 +54,16 @@ void SetDelegate(uint8_t* base, uint32_t mode, uint32_t slot, uint32_t function)
 
 // The answer (r3) cleared: +4 and its first byte.
 void ClearAnswer(uint8_t* base, uint32_t answer) {
-  Store(base, answer + 4, 0);
-  guest::StoreU8(base, answer, 0);
+  const schema::ModeAnswer a(base, answer);
+  a.set_next_type(0);
+  a.set_changed(0);
+}
+
+// The answer's 8 bytes = `value` (two word stores: word0, then next_type).
+void StoreAnswer(uint8_t* base, uint32_t answer, uint64_t value) {
+  const schema::ModeAnswer a(base, answer);
+  a.set_word0(uint32_t(value >> 32));
+  a.set_next_type(uint32_t(value));
 }
 
 // The machine the block's +19280 names: 0 the theater, 1 the save screen,
@@ -171,13 +175,13 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
   if (shown_state() == 11) {
     Store(base, frame + 84, 1);
     guest::StoreU8(base, frame + 80, 1);
-    Store64(base, answer, Load64(base, frame + 80));
+    StoreAnswer(base, answer, Load64(base, frame + 80));
   } else if (shown_state() == 14) {
     guest::StoreU8(base, frame + 80, 1);
     Store(base, frame + 84, 4);
     const uint64_t next = Load64(base, frame + 80);
     G::set_entered(base, 0);
-    Store64(base, answer, next);
+    StoreAnswer(base, answer, next);
   }
 }
 
@@ -235,8 +239,9 @@ void NextModeAnswer(uint8_t* base, uint32_t answer, uint32_t mode) {
   const Block block = Mode(base, mode).block();
   const uint32_t first = block.answer_word0();
   const uint32_t second = block.answer_next_type();
-  Store(base, answer + 0, first);
-  Store(base, answer + 4, second);
+  const schema::ModeAnswer a(base, answer);
+  a.set_word0(first);
+  a.set_next_type(second);
 }
 
 uint32_t OnList(uint8_t* base) {

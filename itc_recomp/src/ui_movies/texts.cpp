@@ -8,6 +8,8 @@
 
 #include "base/log.h"
 #include "debug/frame_state_diff.h"
+#include "schema/strings_and_font.h"
+#include "schema/tuning_screen.h"
 #include "schema/ui_movies.h"
 #include "schema/ui_movies_game.h"
 #include "strings_and_font/steps.h"
@@ -56,7 +58,7 @@ double ScrollOffset(uint8_t* base, uint32_t movie, uint32_t params) {
   const double start = Single(-std::fma(scale_less_one, origin, -x));
   const uint32_t text = TextString(base, movie, id);
   const double width = strings_and_font::FontTextWidth(
-      base, guest::LoadU32(base, strings_and_font::kFont), params, text);
+      base, guest::LoadU32(base, schema::StringsAndFontGlobals::font_address()), params, text);
   const schema::UiMovieText record(
       base,
       schema::UiMovieWord(
@@ -97,7 +99,7 @@ void DrawTextsItem(uint8_t* base, uint32_t frame, uint32_t movie, bool draw_only
                f29 = Lfs(base, kF29), f30 = Lfs(base, kF30), f31 = Lfs(base, kF31);
   const schema::UiMovieTextItem item(base, frame + kDrawTextsItem);
   const schema::UiMovieTextParams p(base, frame + kDrawTextsParams);
-  const uint32_t node = item.node();
+  const schema::UiMovieNode n(base, item.node());
   // The item's matrix (+16) to +304, the origin (0, 0, 0, f31) at +96, the
   // item's color (+84) at +240 and its clip rectangle (+100) at +256; the
   // origin transformed in place.
@@ -114,24 +116,24 @@ void DrawTextsItem(uint8_t* base, uint32_t frame, uint32_t movie, bool draw_only
                             guest::LoadU32(base, frame + 264), guest::LoadU32(base, frame + 268)};
   const double scale_x = Lfs(base, frame + 304);
   const double scale_y = Lfs(base, frame + 324);
-  Stfs(base, node + 32, scale_y);
-  Stfs(base, node + 28, scale_x);
+  Stfs(base, n.scale_y_address(), scale_y);
+  Stfs(base, n.scale_x_address(), scale_x);
   for (uint32_t k = 0; k < 4; k++) {
-    guest::StoreU32(base, node + 40 + 4 * k, clip[k]);
+    guest::StoreU32(base, n.clip_0_address() + 4 * k, clip[k]);
   }
   // The draw parameters: the position, the color and alpha, the layout.
   const double item_alpha = Lfs(base, frame + 252);
   const double red_scale = Lfs(base, frame + 240);
   p.set_x(uint32_t(Fctiwz(Lfs(base, frame + 96))));
-  const double alpha = Single(Lfs(base, node + 68) * item_alpha);
-  const int64_t red = int32_t(guest::LoadU32(base, node + 56));
-  const int64_t green = int32_t(guest::LoadU32(base, node + 60));
-  const int64_t blue = int32_t(guest::LoadU32(base, node + 64));
+  const double alpha = Single(Lfs(base, n.alpha_address()) * item_alpha);
+  const int64_t red = int32_t(n.red());
+  const int64_t green = int32_t(n.green());
+  const int64_t blue = int32_t(n.blue());
   p.set_y(uint32_t(Fctiwz(Lfs(base, frame + 100))));
   StoreU64(base, frame + 288, uint64_t(red));
   StoreU64(base, frame + 272, uint64_t(green));
   StoreU64(base, frame + 280, uint64_t(blue));
-  const int32_t text_x = Fctiwz(Lfs(base, node + 100));
+  const int32_t text_x = Fctiwz(Lfs(base, n.width_address()));
   double r = ToSingle(red), g = ToSingle(green), b = ToSingle(blue);
   r = Single(r * f29);
   g = Single(g * f29);
@@ -140,32 +142,32 @@ void DrawTextsItem(uint8_t* base, uint32_t frame, uint32_t movie, bool draw_only
   g = Single(g * Lfs(base, frame + 244));
   b = Single(b * Lfs(base, frame + 248));
   p.set_gap(uint32_t(text_x));
-  p.set_unknown_72(uint32_t(Fctiwz(Lfs(base, node + 104))));
-  p.set_unknown_76(guest::LoadU32(base, node + 124));
+  p.set_unknown_72(uint32_t(Fctiwz(Lfs(base, n.height_address()))));
+  p.set_unknown_76(n.texture_right());
   r = Single(r * f28);
   g = Single(g * f28);
   b = Single(b * f28);
-  p.set_unknown_80(guest::LoadU32(base, node + 128));
+  p.set_unknown_80(n.texture_bottom());
   const int64_t red_byte = Fctidz(r);
-  p.set_unknown_84(uint32_t(Fctiwz(Lfs(base, node + 116))));
+  p.set_unknown_84(uint32_t(Fctiwz(Lfs(base, n.texture_left_address()))));
   const int64_t green_byte = Fctidz(g);
-  p.set_unknown_88(uint32_t(Fctiwz(Lfs(base, node + 120))));
+  p.set_unknown_88(uint32_t(Fctiwz(Lfs(base, n.texture_top_address()))));
   const int64_t blue_byte = Fctidz(b);
   guest::StoreU32(base, frame + 84, uint32_t(red_byte));
-  p.set_origin_x(guest::LoadU32(base, node + 20));
-  p.set_origin_y(guest::LoadU32(base, node + 24));
+  p.set_origin_x(n.pivot_x());
+  p.set_origin_y(n.pivot_y());
   Stfs(base, p.alpha_address(), alpha);
   guest::StoreU32(base, frame + 80, uint32_t(green_byte));
   p.set_red(uint8_t(red_byte));
   guest::StoreU32(base, frame + 88, uint32_t(blue_byte));
   p.set_green(uint8_t(green_byte));
   p.set_blue(uint8_t(blue_byte));
-  Stfs(base, p.scale_x_address(), Lfs(base, node + 28));
-  Stfs(base, p.scale_y_address(), Lfs(base, node + 32));
-  const double angle = Lfs(base, node + 36);
+  Stfs(base, p.scale_x_address(), Lfs(base, n.scale_x_address()));
+  Stfs(base, p.scale_y_address(), Lfs(base, n.scale_y_address()));
+  const double angle = Lfs(base, n.rotation_address());
   p.set_unknown_64(24);
   Stfs(base, p.angle_address(), angle);
-  const uint32_t layer = guest::LoadU32(base, node + 72);
+  const uint32_t layer = n.layer_offset();
   Stfs(base, p.glyph_scale_x_address(), f31);
   p.set_unknown_92(128);
   Stfs(base, p.glyph_scale_y_address(), f31);
@@ -174,16 +176,16 @@ void DrawTextsItem(uint8_t* base, uint32_t frame, uint32_t movie, bool draw_only
   p.set_unknown_94(128);
   p.set_layer(layer);
   for (uint32_t k = 0; k < 4; k++) {
-    guest::StoreU32(base, p.clip_0_address() + 4 * k, guest::LoadU32(base, node + 40 + 4 * k));
+    guest::StoreU32(base, p.clip_0_address() + 4 * k, guest::LoadU32(base, n.clip_0_address() + 4 * k));
   }
   Stfs(base, p.unknown_96_address(), f27);
   Stfs(base, p.unknown_100_address(), f27);
   p.set_unknown_112(0);
-  p.set_text_id(guest::LoadU32(base, node + 108));
+  p.set_text_id(n.texture_entry());
   // The alignment from the node's flags (+76): bit 0 left (0), bit 1 (1),
   // bit 3 (3), else 2; bit 4 (with none of the others) also sets the glyph
   // scales to f26.
-  const uint32_t flags = guest::LoadU32(base, node + 76);
+  const uint32_t flags = n.unknown_76();
   uint32_t alignment = 2;
   if (flags & 0x1) {
     alignment = 0;
@@ -199,15 +201,15 @@ void DrawTextsItem(uint8_t* base, uint32_t frame, uint32_t movie, bool draw_only
   }
   p.set_alignment(alignment);
   // A scrolling text's x, its counter stepped unless only drawing.
-  if (TextField(base, movie, guest::LoadU32(base, node + 108), 4) != 0) {
+  if (TextField(base, movie, n.texture_entry(), 4) != 0) {
     const double x = ScrollOffset(base, movie, p.address);
     p.set_x(uint32_t(Fctiwz(x)));
     if (!draw_only) {
-      AdvanceTextScroll(base, movie, guest::LoadU32(base, node + 108));
+      AdvanceTextScroll(base, movie, n.texture_entry());
     }
   }
   // The text's page, formatted into the buffer.
-  const uint32_t id = guest::LoadU32(base, node + 108);
+  const uint32_t id = n.texture_entry();
   const uint32_t skip = TextField(base, movie, id, 24);
   const uint32_t page = TextField(base, movie, id, 20);
   const uint32_t text = TextString(base, movie, id);

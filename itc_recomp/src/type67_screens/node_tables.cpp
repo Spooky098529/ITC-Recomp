@@ -9,6 +9,7 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/tuning_screen.h"
 #include "schema/type67_screens.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -45,7 +46,7 @@ uint32_t MovieOf(uint8_t* base, uint32_t table, uint32_t frame, uint32_t* found)
 uint32_t SetShown(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child,
                   uint32_t shown) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  StoreU32(base, node + 80, shown);
+  schema::UiMovieNode(base, node).set_visible(shown);
   return node;
 }
 
@@ -210,7 +211,7 @@ uint64_t NodeTableShowNode(uint8_t* base, uint64_t r3, uint32_t item, uint32_t o
       if (int32_t(child) < 0) continue;
       const uint32_t value = ((1u << j) & mask) != 0 ? 1 : 0;
       const uint32_t at_child = ui_movies::Child(base, shown, child);
-      StoreU32(base, at_child + 80, value);
+      schema::UiMovieNode(base, at_child).set_visible(value);
       result = at_child;
     }
   } else {
@@ -239,7 +240,7 @@ uint64_t NodeTableSetMarks(uint8_t* base, uint64_t r3, uint32_t item, uint32_t m
     if (int32_t(child) < 0) continue;
     const uint32_t value = ((1u << j) & mask) != 0 ? 1 : 0;
     const uint32_t at_child = ui_movies::Child(base, parent, child);
-    StoreU32(base, at_child + 80, value);
+    schema::UiMovieNode(base, at_child).set_visible(value);
     result = at_child;
   }
   return result;
@@ -263,9 +264,9 @@ static uint64_t Colors(uint8_t* base, uint64_t r3, uint32_t item, std::optional<
     if (int32_t(child) < 0) continue;
     const uint32_t at_child = ui_movies::Child(base, parent, child);
     const uint32_t color = k && int32_t(j) == int32_t(*k) ? t + 552 : t + 568;
-    StoreU32(base, at_child + 56, LoadU32(base, color));
-    StoreU32(base, at_child + 60, LoadU32(base, color + 4));
-    StoreU32(base, at_child + 64, LoadU32(base, color + 8));
+    schema::UiMovieNode(base, at_child).set_red(LoadU32(base, color));
+    schema::UiMovieNode(base, at_child).set_green(LoadU32(base, color + 4));
+    schema::UiMovieNode(base, at_child).set_blue(LoadU32(base, color + 8));
     result = at_child;
   }
   return result;

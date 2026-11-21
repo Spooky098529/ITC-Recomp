@@ -42,7 +42,8 @@ uint32_t FixUpScene(uint8_t* base, uint32_t scene, uint32_t file) {
   ITC_NATIVE_RUNNING("sub_8259D688 FixUpScene");
   uint32_t entry = scene + 128;
   for (uint32_t i = 0; i < guest::LoadU32(base, scene + 124); i++, entry += 8) {
-    const uint32_t first = guest::LoadU32(base, scene + 116);
+    const uint32_t first =
+        guest::LoadU32(base, schema::UiMovieNode(base, scene).texture_left_address());
     const uint32_t value = guest::LoadU32(base, entry);
     if (i >= first && i < first + guest::LoadU32(base, scene + 120)) {
       guest::StoreU32(base, entry, FileAnimation(base, file, value));
@@ -50,7 +51,7 @@ uint32_t FixUpScene(uint8_t* base, uint32_t scene, uint32_t file) {
       guest::StoreU32(base, entry, value + scene);
     }
     const uint32_t child = guest::LoadU32(base, entry);
-    if (guest::LoadU32(base, child) == kTagSce) {
+    if (schema::UiMovieNode(base, child).tag() == kTagSce) {
       FixUpScene(base, child, file);
     }
   }

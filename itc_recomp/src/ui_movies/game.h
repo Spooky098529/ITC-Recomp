@@ -11,6 +11,7 @@
 
 #include "archive/archive.h"
 #include "guest.h"
+#include "schema/ui_movies_game.h"
 #include "strings_and_font/strings_and_font.h"
 
 #include <array>
@@ -223,7 +224,7 @@ uint32_t PlayNamed(uint8_t* base, uint32_t movie, uint32_t named, uint32_t chain
 // The maps of {key, value} word pairs. A movie's texts (+0x9BCC): 128 pairs
 // in place, the count at +1024. The movie table (0x826C5CCC) and the like:
 // +0 the pairs, +4 the capacity, +8 the count.
-constexpr uint32_t kMovieTable = 0x826C5CCC;
+constexpr uint32_t kMovieTable = schema::UiMoviesGameGlobals::movie_table_pairs_address();
 //
 // sub_8211B310 (TextMap::Find): the value's address for the key at
 // `key_address`, or 0x826C5CD8 when it's not there.

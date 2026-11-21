@@ -12,6 +12,8 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/race_screens.h"
+#include "schema/tuning_screen.h"
 #include "schema/type67_screens.h"
 #include "race_screens/race_screens.h"
 #include "ui_movies/game.h"
@@ -48,7 +50,7 @@ uint32_t MovieOf(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t* found
 uint32_t SetNodeWord(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child,
                      uint32_t value) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  StoreU32(base, node + 108, value);
+  schema::UiMovieNode(base, node).set_texture_entry(value);
   return node;
 }
 
@@ -56,7 +58,7 @@ uint32_t SetNodeWord(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t
 uint32_t SetShown(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child,
                   uint32_t shown) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  StoreU32(base, node + 80, shown);
+  schema::UiMovieNode(base, node).set_visible(shown);
   return node;
 }
 
@@ -93,9 +95,10 @@ uint64_t ListScreenDeletingDestruct(uint8_t* base, uint64_t r3, uint64_t flags, 
 
 uint64_t NodeListScreenItemInfo(uint8_t* base, uint64_t r3, uint32_t info) {
   ITC_NATIVE_RUNNING("sub_82256FE8 NodeListScreen::ItemInfo");
-  StoreU32(base, info + 0, kNone);
-  StoreU32(base, info + 4, kNone);
-  StoreU32(base, info + 8, kNone);
+  const schema::Type6ItemInfo item_info(base, info);
+  item_info.set_third(kNone);
+  item_info.set_item(kNone);
+  item_info.set_second(kNone);
   return r3;
 }
 
@@ -111,7 +114,8 @@ uint64_t NodeListScreenLoadItem(uint8_t* base, uint64_t r3, uint64_t r4, uint32_
   for (uint32_t i = 0; i < 2; i++) {
     // The original's (1 << i) != 0, ANDed with the info's +12 word.
     const uint32_t bit = (i & 0x20) != 0 ? 0 : 1u << (i & 0x1F);
-    StoreU32(base, screen + 9700 + 4 * i, (bit != 0 ? 1u : 0u) & LoadU32(base, info + 12));
+    StoreU32(base, screen + 9700 + 4 * i,
+             (bit != 0 ? 1u : 0u) & schema::Type6ItemInfo(base, info).fourth());
   }
   return result;
 }
@@ -125,7 +129,7 @@ uint64_t ColorListScreenLoadItem(uint8_t* base, uint64_t r3, uint64_t r4, uint64
   const uint64_t result = ColorNodeTableSet(base, r3 + 10432, info);
   const int32_t index = int32_t(uint32_t(r5));
   uint32_t value = kNone;
-  if (index >= 0 && index < int32_t(LoadU32(base, info + 8))) {
+  if (index >= 0 && index < int32_t(schema::Type7ItemInfo(base, info).color_count())) {
     value = LoadU32(base, (uint32_t(r5) << 2) + (frame + 100));
   }
   CLS(base, screen).set_table_color_child(value);
@@ -143,7 +147,7 @@ uint64_t ListScreenShowSelection(uint8_t* base, uint64_t r3, uint64_t r4, uint32
   const uint32_t list = uint32_t(r4);
   const uint32_t selection = race_screens::ListSelection(base, list);
   // MenuList::GetPreviousSelection (sub_8220BC28): +20.
-  const uint32_t previous = LoadU32(base, list + 20);
+  const uint32_t previous = schema::MenuList(base, list).selection_before();
   uint64_t result = previous;
   const uint32_t named = LS(base, screen).selection_anim();
   if (int32_t(named) >= 0) {
@@ -278,7 +282,7 @@ uint64_t ListScreenSetArrows(uint8_t* base, uint64_t r3, uint32_t which, uint32_
   };
   if (int32_t(frame_word()) < 0) return movie;
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  StoreU32(base, node + 108, frame_word());
+  schema::UiMovieNode(base, node).set_texture_entry(frame_word());
   return node;
 }
 
@@ -291,7 +295,7 @@ uint64_t ListScreenOnToggleMoved(uint8_t* base, uint64_t r3, uint64_t r4, uint32
   const uint32_t list = uint32_t(r4);
   const uint32_t selection = race_screens::ListSelection(base, list);
   // MenuList::GetPreviousSelection (sub_8220BC28), read and unused.
-  (void)LoadU32(base, list + 20);
+  (void)schema::MenuList(base, list).selection_before();
   const bool first = int32_t(selection) == 0;
   // The node finished, then the one played and looped.
   const uint32_t off = first ? 9896 : 9892, on = first ? 9892 : 9896;

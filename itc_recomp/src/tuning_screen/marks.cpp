@@ -56,12 +56,12 @@ uint64_t ShowPartMarks(uint8_t* base, uint64_t r3, uint32_t row, uint64_t group,
   // Child 5 always, then 4 for the front wheel's, 3 for the rear's.
   auto mark = [&](uint32_t second) -> uint64_t {
     const uint32_t first = ui_movies::Child(base, row, 5);
-    Store(base, first + 80, 1);
+    UiNode(base, first).set_visible(1);
     if (second == 0) {
       return first;
     }
     const uint32_t other = ui_movies::Child(base, row, second);
-    Store(base, other + 80, 1);
+    UiNode(base, other).set_visible(1);
     return other;
   };
   if (which == 0) {

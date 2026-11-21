@@ -7,11 +7,15 @@
 #include "base/log.h"
 #include "car_models/vinyl.h"
 #include "guest.h"
+#include "schema/tuning_screen.h"
 #include "tuning_screen/tuning_screen.h"
 
 namespace tuning_pages {
 
 namespace {
+
+// The screen (tuning-screen.toml's TuningScreen).
+schema::TuningScreen Screen(uint8_t* base, uint32_t s) { return schema::TuningScreen(base, s); }
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -110,7 +114,7 @@ uint64_t LoadDecalImages(uint8_t* base, const tuning_screen::GuestCall& call, ui
   const uint32_t frame = Frame(base, sp, 128);
   const uint64_t images = screen + 10048;
   uint64_t r3 = 0;
-  if (int32_t(Load(base, s + 9656)) != 5 || guest::LoadU8(base, s + 9660) != 6) {
+  if (int32_t(Screen(base, s).category()) != 5 || Screen(base, s).item() != 6) {
     // The stickers: images 383 to 581 into entries 0 to 198, 22604 into 199.
     for (uint64_t i = 0; i < 199; i++) {
       LoadImage(base, call, images, i + 383, i, frame);
@@ -120,7 +124,7 @@ uint64_t LoadDecalImages(uint8_t* base, const tuning_screen::GuestCall& call, ui
   // The vinyls. Entries 0 to 11: the first group's three layer ids
   // (+31168), four times over.
   for (uint64_t i = 0; i < 12; i++) {
-    const uint64_t id = uint64_t(Load(base, s + 31168 + 4 * uint32_t(i % 3))) + 163;
+    const uint64_t id = uint64_t(Load(base, Screen(base, s).layer_ids_0_address() + 4 * uint32_t(i % 3))) + 163;
     r3 = RequestImage(base, call, images, id, i, frame);
   }
   // Entries 12 to 20: the first group's list window (163 + (k mod 5)).
@@ -130,7 +134,7 @@ uint64_t LoadDecalImages(uint8_t* base, const tuning_screen::GuestCall& call, ui
   }
   // Entries 21 to 32: the second group's layer ids (+31180), four times.
   for (uint64_t i = 21; i < 33; i++) {
-    const uint64_t id = uint64_t(Load(base, s + 31180 + 4 * uint32_t((i - 21) % 3))) + 189;
+    const uint64_t id = uint64_t(Load(base, Screen(base, s).layer_ids_1_address() + 4 * uint32_t((i - 21) % 3))) + 189;
     r3 = RequestImage(base, call, images, id, i, frame);
   }
   // Entries 33 to 41 (189 + (k mod 194)) and 42 to 50 (189 + k + 43).

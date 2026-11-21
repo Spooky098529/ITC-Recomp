@@ -70,7 +70,7 @@ uint32_t UpdateListDots(uint8_t* base, uint32_t screen, uint32_t sp) {
     const uint32_t node = ui_movies::FindNode(base, movie, 1, 6);
     const uint32_t first = ui_movies::Child(base, node, i);
     const uint32_t second = ui_movies::Child(base, node, i);
-    Store(base, first + 80, 0);
+    UiNode(base, first).set_visible(0);
     const int32_t n = last();
     uint32_t size = 0;
     if (n >= 0 && n <= 2) {
@@ -80,20 +80,20 @@ uint32_t UpdateListDots(uint8_t* base, uint32_t screen, uint32_t sp) {
     } else if (n >= 6 && n <= 7) {
       size = 1;
     }
-    Store(base, second + 108, size);
+    UiNode(base, second).set_texture_entry(size);
     r3 = second;
   }
   if (int32_t(uint32_t(last()) + 1) > 0) {
     for (uint32_t j = 0; int32_t(j) < int32_t(uint32_t(last()) + 1); j++) {
       r3 = ui_movies::Child(base, ui_movies::FindNode(base, movie, 1, 6), j);
-      Store(base, r3 + 80, 1);
+      UiNode(base, r3).set_visible(1);
     }
   }
   const int32_t n = last();
   if (n >= 0 && n <= 2) {
     const uint32_t node = ui_movies::FindNode(base, movie, 1, 6);
     r3 = ui_movies::Child(base, node, TS(base, screen).list_cursor());
-    Store(base, r3 + 108, 4);
+    UiNode(base, r3).set_texture_entry(4);
     return r3;
   }
   // h dots each side of the cursor, wrapped over the n + 1 entries; 4 at
@@ -110,7 +110,7 @@ uint32_t UpdateListDots(uint8_t* base, uint32_t screen, uint32_t sp) {
       index += count;
     }
     r3 = ui_movies::Child(base, node, index);
-    Store(base, r3 + 108, uint32_t(4 - (j > h ? j - h : h - j)));
+    UiNode(base, r3).set_texture_entry(uint32_t(4 - (j > h ? j - h : h - j)));
   }
   return r3;
 }
@@ -245,11 +245,9 @@ uint32_t LayOutItems(uint8_t* base, uint32_t screen, uint32_t sp) {
       steps::Stfs(base, UiNode(base, node).y_address(),
                   steps::Fadds(steps::Fmadds(y, s, oy), add_y));
     }
-    Store(base, node + 20,
-          uint32_t(steps::Fctiwz(
+    UiNode(base, node).set_pivot_x(uint32_t(steps::Fctiwz(
               steps::Fmuls(steps::Lfs(base, UiNode(base, looked).width_address()), half))));
-    Store(base, node + 24,
-          uint32_t(steps::Fctiwz(
+    UiNode(base, node).set_pivot_y(uint32_t(steps::Fctiwz(
               steps::Fmuls(steps::Lfs(base, UiNode(base, looked).height_address()), half))));
     steps::Stfs(base, UiNode(base, node).rotation_address(), steps::Lfs(base, record + 8));
     for (const uint32_t field : {28u, 32u}) {

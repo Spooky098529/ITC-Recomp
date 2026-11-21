@@ -53,6 +53,21 @@ fields = [
   { name = "y_max", offset = 12, type = "s32" },
 ]
 
+# A placed sticker's record (24 bytes): the tuning screen's +32360 + 120 x
+# area + 24 x slot, its edited copy at +30832 (edited_x to edited_word) and
+# the backup at +33512. PlaceStickerNode draws one on movie 14.
+[StickerRecord]
+size = 24
+origin = "embedded"
+fields = [
+  { name = "x", offset = 0, type = "s32", note = "times the layout's position scale, plus its origin" },
+  { name = "y", offset = 4, type = "s32" },
+  { name = "angle", offset = 8, type = "f32", note = "degrees (0.0 to 359.0): the node's rotation" },
+  { name = "scale", offset = 12, type = "f32", note = "times the layout's size: the node's scale" },
+  { name = "flip", offset = 16, type = "u32", note = "copied into the node's flip_x" },
+  { name = "word", offset = 20, type = "u32", note = "0 at the reset" },
+]
+
 [globals]
 groups = { address = 0x8200B5E8, type = "bytes", count = 72, note = "six StickerGroup records" }
 second_node = { address = 0x8200B630, type = "bytes", count = 244, note = "61 words: 1 when sticker i is drawn on its slot's second node (read for any i below 61, negative too)" }

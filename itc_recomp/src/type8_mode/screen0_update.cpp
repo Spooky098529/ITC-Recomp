@@ -25,7 +25,12 @@
 #include "mode_tick/mode_tick.h"
 #include "race_screens/race_screens.h"
 #include "race_setup/race_setup.h"
+#include "schema/car_makers.h"
 #include "schema/menu_helpers.h"
+#include "schema/race_screens.h"
+#include "schema/stand_models.h"
+#include "schema/tuning_screen.h"
+#include "schema/type6_type7_modes.h"
 #include "schema/type8_mode.h"
 #include "type67_screens/list_pages.h"
 #include "type8_screens/part_helpers.h"
@@ -45,6 +50,7 @@ namespace rs = race_screens;
 using S = schema::Type8Screen0;
 using Stand = schema::Type8StandBlock;
 using StandEntry = schema::Type8StandEntry;
+using GarageSlot = schema::GarageCarSlot;
 using Pages = schema::PageObject;
 using G = schema::Type8ModeGlobals;
 
@@ -152,7 +158,7 @@ uint64_t Screen0MenuPage(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
       pages.set_page(kMinusOne);
       pages.set_step(2);
     }
-  } else if (LoadU32(base, list + 24) != 0) {  // the MenuList's move
+  } else if (schema::MenuList(base, list).move() != 0) {
     pg::PlaySound(base, 4, frame, calls);
     SavePage(pages, 0, true);
     moved = true;
@@ -230,7 +236,7 @@ uint64_t Screen0CursorStep(uint8_t* base, uint64_t r3, uint32_t sp, const Screen
   if (pages.step_started() == 0) {
     const uint32_t list = s.menu_list_address();
     const uint32_t selection = rs::ListSelection(base, list);
-    const uint32_t previous = LoadU32(base, list + 20);  // GetPreviousSelection
+    const uint32_t previous = schema::MenuList(base, list).selection_before();  // GetPreviousSelection
     const int32_t moved = int32_t(selection - previous);
     Named(calls, kFinishNamed, movie, uint64_t(previous) + 2, frame, 0x8223C394);
     Named(calls, kFinishNamed, movie, 12, frame, 0x8223C3A0);
@@ -278,7 +284,8 @@ uint64_t Screen0UpdateStand(uint8_t* base, uint64_t r3, uint32_t sp, const Scree
   const uint32_t frame = Frame(base, sp, 4096);
   const uint32_t movie = MovieAt(base, frame, 24);
   const auto slot_of = [base](const StandEntry& entry) {
-    return LoadU32(base, G::stand_holder(base).address + (entry.stage_index() << 2));
+    return LoadU32(base,
+                   G::stand_holder(base).stage_block_0_address() + (entry.stage_index() << 2));
   };
   const auto stand_of = [&](uint32_t p) {
     return Stand(base, s.stand_0_address() + Stand::kSize * p);
@@ -290,12 +297,14 @@ uint64_t Screen0UpdateStand(uint8_t* base, uint64_t r3, uint32_t sp, const Scree
   for (uint32_t p = 0; p < 2; p++) {
     const Stand stand = stand_of(p);
     const StandEntry entry = entry_of(p);
-    const uint32_t car = kGarageCars + 1972 * p;
+    const GarageSlot garage(base, kGarageCars + GarageSlot::kSize * p);
+    const uint32_t car = schema::GarageCar(base, garage.car_address()).car_head_address();
+    const schema::CarMakersCar head(base, car);
     const uint32_t slot = slot_of(entry);
     if (stand.model_made() != 0 || reloaded) {
       continue;
     }
-    const uint32_t block = car_makers::BlockOf(LoadU32(base, car + 12));
+    const uint32_t block = car_makers::BlockOf(head.car_id());
     const uint64_t answer = calls.call(kReloadModel, frame, 0x8223B894, slot,
                                        uint64_t(int64_t(int32_t(block))));
     reloaded = true;
@@ -318,9 +327,9 @@ uint64_t Screen0UpdateStand(uint8_t* base, uint64_t r3, uint32_t sp, const Scree
       calls.call(kRefresh, frame, 0x8223B8D4, object, 0);
     }
     FlushOff();
-    const uint32_t plates = LoadU32(base, car + 1968);
+    const uint32_t plates = garage.unknown_1968();  // the plates
     type67_modes::GarageStageSetPlates(base, slot_of(entry), plates);
-    const int64_t halfword = int16_t(guest::LoadU16(base, car));
+    const int64_t halfword = int16_t(head.paint_pick());
     const uint64_t args[6] = {slot_of(entry), object, uint64_t(halfword), 0, 0, 0};
     calls.call_set(kSetCar, args, 3, frame, 0x8223B908);
   }
@@ -337,7 +346,7 @@ uint64_t Screen0UpdateStand(uint8_t* base, uint64_t r3, uint32_t sp, const Scree
         Play(calls, movie, b.loaded_anim(), 0, frame, 0x8223B990);
         b.set_loading_shown(0);
       }
-      StoreU32(base, LoadU32(base, slot) + 6052, 0);
+      schema::StandSlot(base, slot).stage().set_reflection(0);
       calls.call(kCommand, frame, 0x8223B9A8, slot, entry.command());
       draw = 1;
     } else if (b.loading_shown() == 0) {
@@ -474,9 +483,10 @@ uint64_t Screen0Show(uint8_t* base, uint64_t r3, uint32_t sp, const ScreenCalls&
     Named(calls, kFinishNamed, movie, stand.loaded_anim(), frame, 0x8223BFAC);
   }
   for (uint32_t i = 0; i < 2; i++) {
-    const uint32_t car = kGarageCars + 1972 * i;
-    const uint32_t spec = car_specs::GetCarSpec(base, LoadU32(base, car + 12));
-    Screen0CarCard(base, i, LoadU32(base, car + 12), guest::LoadU8(base, spec + 769), frame,
+    const GarageSlot garage(base, kGarageCars + GarageSlot::kSize * i);
+    const schema::CarMakersCar head(base, garage.car_address());
+    const uint32_t spec = car_specs::GetCarSpec(base, head.car_id());
+    Screen0CarCard(base, i, head.car_id(), guest::LoadU8(base, spec + 769), frame,
                    calls);
   }
   // The music: the sound manager's IsCuePlaying (slot 14) for bank 1's cue

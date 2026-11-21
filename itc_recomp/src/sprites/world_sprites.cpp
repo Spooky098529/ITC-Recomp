@@ -3,6 +3,9 @@
 #include "sprites/world_sprites.h"
 
 #include "guest.h"
+#include "schema/cameras.h"
+#include "schema/device_shaders.h"
+#include "schema/race_overlays.h"
 #include "schema/sprites.h"
 
 #include "base/log.h"
@@ -90,11 +93,14 @@ Opened OpenAndRecordStates(uint8_t* base, const Recorder& r, uint32_t object, ui
   r.Put(96, 0);
   r.Put(60, 1);
   r.Put(48, 0);
-  const uint32_t blend = guest::LoadU32(base, object + 72);
+  // The object (a sprite or a sprite list) is laid out as race-overlays'
+  // OverlaySprite up to its corners.
+  const schema::OverlaySprite o(base, object);
+  const uint32_t blend = o.address_mode();
   if (blend < 3) {
     r.Put(56, blend == 0 ? 0 : blend == 1 ? 2 : 6);
   }
-  switch (guest::LoadU32(base, object + 68)) {
+  switch (o.blend_mode()) {
     case 0:
       r.Put(72, 1);
       r.Put(76, 0);
@@ -120,7 +126,8 @@ Opened OpenAndRecordStates(uint8_t* base, const Recorder& r, uint32_t object, ui
   r.Put(0, 16, 1);
   r.Put(7, 4, 0x10004);
   const uint32_t constants = uint32_t(r.Call(kAllocateConstants, {r.List(), 64, 0}));
-  r.Call(kMultiply, {constants, object, camera + 144});
+  r.Call(kMultiply,
+         {constants, object, schema::CameraPass(base, camera).view_projection_address()});
   return {header, constants};
 }
 
@@ -147,7 +154,7 @@ uint64_t CloseAndSubmit(uint8_t* base, const Recorder& r, const Opened& opened, 
   r.Put(48, 1);
   r.Call(kCloseChunk, {r.List()});
   const uint32_t queue = G::render_queue(base);
-  const uint32_t submit = guest::LoadU32(base, guest::LoadU32(base, queue) + 16);
+  const uint32_t submit = schema::RenderQueue(base, queue).vtable().add();
   const double key = -double(guest::LoadFloat(base, opened.constants + 56));
   return r.Call(submit, {queue, opened.header, layer}, key);
 }
@@ -205,7 +212,7 @@ uint64_t SpriteRecord(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t sprite,
       OpenAndRecordStates(base, r, sprite, guest::LoadU32(base, sprite + 224), camera);
   const uint32_t vertices = QuadStates(r);
   // The corners copied to the frame's +80, then read from there.
-  Copy64(base, frame + 80, sprite + 80);
+  Copy64(base, frame + 80, schema::OverlaySprite(base, sprite).corners_address());
   const double u0 = double(guest::LoadFloat(base, sprite + 208));
   const double v0 = double(guest::LoadFloat(base, sprite + 212));
   const double u1 = double(guest::LoadFloat(base, sprite + 216));
@@ -233,7 +240,7 @@ uint64_t SpriteListRecord(uint8_t* base, uint32_t sp, uint64_t r13, uint32_t lis
   const double zero = double(G::zero(base));
   const double one = double(G::one(base));
   for (uint32_t i = 0; i < count; i++) {
-    const uint32_t corners = list + 80 + 64 * i;
+    const uint32_t corners = schema::OverlaySprite(base, list).corners_address() + 64 * i;
     const uint32_t vertices = QuadStates(r);
     // The colors to the frame's +80, the corners to its +144.
     Copy64(base, frame + 80, corners + 32000);

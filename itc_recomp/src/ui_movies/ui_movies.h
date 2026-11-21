@@ -12,6 +12,7 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "schema/tuning_screen.h"
 #include "schema/ui_movies.h"
 #include "c_runtime/exit.h"
 
@@ -24,11 +25,6 @@ namespace ui_movies {
 
 // A node's or an animation's 8-byte entries start at +128 (nodes) or +64
 // (animations); each kind of entry starts at an index the object holds.
-inline uint32_t Entry(uint8_t* base, uint32_t object, uint32_t first_entry,
-                      uint32_t index_field, uint32_t i) {
-  const uint32_t index = guest::LoadU32(base, object + index_field) + i;
-  return guest::LoadU32(base, object + first_entry + 8 * index);
-}
 
 // sub_825A6508: a node track list's track i (16 bytes from +16).
 inline uint32_t NodeTrack(uint32_t list, uint32_t i) {
@@ -77,17 +73,22 @@ inline uint32_t PrimitiveTexture(uint32_t primitive, uint32_t i) {
 // sub_8259D628: a primitive's vertex i (32 bytes after its [+112] texture
 // entries).
 inline uint32_t PrimitiveVertex(uint8_t* base, uint32_t primitive, uint32_t i) {
-  return primitive + VertexOffset(guest::LoadU32(base, primitive + 112), i);
+  return primitive + VertexOffset(schema::UiMovieNode(base, primitive).unknown_112(), i);
 }
 // sub_8259D648: a picture's texture entry i (16 bytes from +144).
 inline uint32_t PictureTexture(uint32_t picture, uint32_t i) { return picture + 16 * (i + 9); }
 // sub_8259D658 (UiMovie::Child): a node's child i (from index [+108]).
 inline uint32_t Child(uint8_t* base, uint32_t node, uint32_t i) {
-  return Entry(base, node, 128, 108, i);
+  const uint32_t index = schema::UiMovieNode(base, node).texture_entry() + i;
+  return guest::LoadU32(base, node + 128 + 8 * index);
 }
 // sub_8259D670: a scene's animation i (from index [+116]).
 inline uint32_t SceneAnimation(uint8_t* base, uint32_t scene, uint32_t i) {
-  return Entry(base, scene, 128, 116, i);
+  // The index is the word at +116 (UiMovieNode's texture_left, a scene's
+  // animations).
+  const uint32_t index =
+      guest::LoadU32(base, schema::UiMovieNode(base, scene).texture_left_address()) + i;
+  return guest::LoadU32(base, scene + 128 + 8 * index);
 }
 
 // Tags, as the words read from guest memory.

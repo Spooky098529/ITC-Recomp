@@ -15,6 +15,7 @@
 #include "schema/race_world.h"
 #include "schema/track_route.h"
 #include "schema/vehicle.h"
+#include "schema/vehicle_accessors.h"
 
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
@@ -423,10 +424,11 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
   const uint32_t car = va::VehicleGet(base, E(base, player).vehicle_index());
   const uint32_t position = schema::TrackPosition(base, va::VehicleIdentity(car)).route_position();
   Store(base, frame + 84, position);
-  const uint32_t at = va::RigidBodyPosition(schema::Vehicle(base, car).body().address);
-  for (uint32_t w = 0; w < 4; w++) {
-    Store(base, frame + 160 + 4 * w, Load(base, at + 4 * w));
-  }
+  const schema::VectorLibVector at(base, va::RigidBodyPosition(schema::Vehicle(base, car).body().address));
+  Store(base, frame + 160, at.x_bits());
+  Store(base, frame + 164, at.y_bits());
+  Store(base, frame + 168, at.z_bits());
+  Store(base, frame + 172, at.w_bits());
   for (uint32_t w = 0; w < 4; w++) {
     Store(base, frame + 176 + 4 * w, Load(base, StatusOf(base, car).heading_address() + 4 * w));
   }
@@ -595,10 +597,11 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
       for (int32_t i = 0;;) {
         const uint32_t listed = Load(base, M(base, global).racers_address() + 4 * uint32_t(i));
         const uint32_t body = schema::Vehicle(base, va::VehicleGet(base, E(base, listed).vehicle_index())).body().address;
-        const uint32_t point = va::RigidBodyPosition(body);
-        for (uint32_t w = 0; w < 4; w++) {
-          Store(base, frame + 96 + 4 * w, Load(base, point + 4 * w));
-        }
+        const schema::VectorLibVector point(base, va::RigidBodyPosition(body));
+        Store(base, frame + 96, point.x_bits());
+        Store(base, frame + 100, point.y_bits());
+        Store(base, frame + 104, point.z_bits());
+        Store(base, frame + 108, point.w_bits());
         Stfs(base, frame + 100, zero);
         if (double(vl::Vec3Direction(base, frame + 256, frame + 128, frame + 96)) < too_near) {
           return;
@@ -703,7 +706,7 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
   const uint32_t identity = va::VehicleIdentity(vehicle);
   const uint32_t body = schema::Vehicle(base, vehicle).body().address;
   Store(base, frame + 88, schema::TrackPosition(base, identity).route_position());
-  const uint32_t at = va::RigidBodyPosition(body);
+  const schema::VectorLibVector at(base, va::RigidBodyPosition(body));
   const uint32_t racers = M(base, manager).opponents_with_vehicle();
   const uint32_t player_section = guest::LoadU16(base, frame + 88);
   const uint32_t race_flags = RD(base, Load(base, kRaceData)).branch_flags();
@@ -713,10 +716,10 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
   uint32_t flag20 = (race_flags >> 5) & 1;
   const uint32_t player_record = Load(base, (player_section << 2) + table);
   const bool four = racers == 4;
-  uint32_t hi[2] = {Load(base, at + 8), Load(base, at + 12)};
+  uint32_t hi[2] = {at.z_bits(), at.w_bits()};
   Store(base, frame + 80, flag20);
   Store(base, frame + 92, Section(base, player_record).branch());
-  uint32_t lo[2] = {Load(base, at + 0), Load(base, at + 4)};
+  uint32_t lo[2] = {at.x_bits(), at.y_bits()};
   uint32_t flag10 = (race_flags >> 4) & 1;
   // The player's position (RigidBody::Position) at + 96.
   Store(base, frame + 96, lo[0]);

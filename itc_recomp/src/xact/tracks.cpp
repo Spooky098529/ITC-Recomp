@@ -10,6 +10,7 @@
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
 #include "schema/xact_tracks.h"
+#include "schema/xact_waves.h"
 #include "xact/xact.h"
 
 #include <initializer_list>
@@ -28,6 +29,7 @@ using PlayWaveV = schema::XACTPlayWaveEvent;
 using WaveVariationV = schema::XACTWaveVariationEvent;
 using EventRecordV = schema::XACTEventRecord;
 using G = schema::XactTracksGlobals;
+using WaveV = schema::XACTWave;
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -79,7 +81,7 @@ uint32_t WaveOf(uint8_t* base, uint32_t event, uint32_t return_address, uint32_t
 uint32_t WaveSetVolumeFrom(uint8_t* base, uint32_t wave, double volume, uint32_t sp,
                            uint32_t return_address, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D1CC8 XACTWave::SetVolume");
-  const uint32_t voice = Load(base, wave + 44);
+  const uint32_t voice = WaveV(base, wave).voice().address;
   if (voice == 0) {
     return 0;
   }
@@ -266,7 +268,7 @@ void PlayWaveSetQueued(uint8_t* base, uint32_t event, uint32_t queued) {
   const uint32_t wave = PlayWaveV(base, event).wave();
   flags = uint8_t((flags & ~0x20) | (queued != 0 ? 0x20 : 0));
   EventV(base, event).set_flags(flags);
-  const uint32_t prepared = Load(base, wave + 60);
+  const uint32_t prepared = WaveV(base, wave).prepared();
   flags = uint8_t((flags & ~0x40) | (prepared == 0 ? 0x40 : 0));
   EventV(base, event).set_flags(flags);
 }
@@ -313,7 +315,7 @@ uint32_t PlayWaveGetWaveBank(uint8_t* base, uint32_t event, uint32_t frame,
   if (WaveOf(base, event, 0x825D84E4, frame, call) == 0) {
     return 0;
   }
-  return Load(base, WaveOf(base, event, 0x825D8500, frame, call) + 36);
+  return WaveV(base, WaveOf(base, event, 0x825D8500, frame, call)).wave_bank();
 }
 
 uint32_t PlayWaveIsPrepared(uint8_t* base, uint32_t event, uint32_t frame,
@@ -323,7 +325,7 @@ uint32_t PlayWaveIsPrepared(uint8_t* base, uint32_t event, uint32_t frame,
     return 0;
   }
   const uint32_t wave = WaveOf(base, event, 0x825D76E0, frame, call);
-  return int32_t(Load(base, wave + 40)) >= 2 ? 1 : 0;
+  return int32_t(WaveV(base, wave).state()) >= 2 ? 1 : 0;
 }
 
 uint32_t PlayWaveIsPlaying(uint8_t* base, uint32_t event, uint32_t frame,
@@ -332,10 +334,10 @@ uint32_t PlayWaveIsPlaying(uint8_t* base, uint32_t event, uint32_t frame,
   if (WaveOf(base, event, 0x825D772C, frame, call) == 0) {
     return 0;
   }
-  if (int32_t(Load(base, WaveOf(base, event, 0x825D7748, frame, call) + 40)) < 3) {
+  if (int32_t(WaveV(base, WaveOf(base, event, 0x825D7748, frame, call)).state()) < 3) {
     return 0;
   }
-  return int32_t(Load(base, WaveOf(base, event, 0x825D7768, frame, call) + 40)) > 5 ? 0 : 1;
+  return int32_t(WaveV(base, WaveOf(base, event, 0x825D7768, frame, call)).state()) > 5 ? 0 : 1;
 }
 
 uint32_t PlayWaveIsBusy(uint8_t* base, uint32_t event, uint32_t frame, const GuestCall& call) {
@@ -713,8 +715,8 @@ uint32_t PlayWavePrepare(uint8_t* base, uint32_t event, uint32_t offset, bool na
       }
       const uint32_t linked = Load(base, frame + 80);
       const uint32_t list = bank + 240;
-      Store(base, linked + 4, list);
-      Store(base, linked + 8, Load(base, list + 8));
+      WaveV(base, linked).set_node_next(list);
+      WaveV(base, linked).set_node_previous(Load(base, list + 8));
       Store(base, Load(base, list + 8) + 4, linked);
       Store(base, list + 8, linked);
       return r30;

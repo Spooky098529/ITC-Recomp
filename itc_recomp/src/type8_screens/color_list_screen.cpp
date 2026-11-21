@@ -18,6 +18,11 @@
 #include "native/buffers.h"
 #include "race_screens/race_screens.h"
 #include "race_setup/race_setup.h"
+#include "schema/app_start_up.h"
+#include "schema/car_makers.h"
+#include "schema/menu_sounds.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
 #include "schema/screen_constructors.h"
 #include "schema/type8_screens.h"
 #include "schema/type67_screens.h"
@@ -43,13 +48,13 @@ constexpr uint32_t kNone = 0xFFFFFFFFu;
 constexpr uint32_t kMemcpy = 0x825A7410;
 // The item records (28 bytes each: +8 a count, +12 and +16 the details'
 // indexes, +20 and +24 the colors' bits).
-constexpr uint32_t kItemRecords = 0x82010BE0;
+constexpr uint32_t kItemRecords = G::color_item_records_address();
 constexpr uint32_t kRecordBytes = 28;
 // The item texts' string ids (3 a row, rows overlapping), the details'
 // string ids by index and the labels' (3).
-constexpr uint32_t kItemTexts = 0x82010B90;
-constexpr uint32_t kDetailTexts = 0x82010BB4;
-constexpr uint32_t kLabelTexts = 0x82010BD4;
+constexpr uint32_t kItemTexts = G::color_item_texts_address();
+constexpr uint32_t kDetailTexts = G::color_detail_texts_address();
+constexpr uint32_t kLabelTexts = G::color_label_texts_address();
 constexpr uint32_t kClearText = 0x8211C470;
 
 uint64_t ClearText(const Calls& calls, uint32_t movie, uint32_t sub_scene, uint32_t child,
@@ -62,7 +67,6 @@ uint64_t ClearText(const Calls& calls, uint32_t movie, uint32_t sub_scene, uint3
 constexpr uint32_t kResetGlobal = 0x821021A8, kStagesSetRoute = 0x82101E90,
                    kRaceSetRoute = 0x82101D38, kCarRefresh = 0x820C4998,
                    kAddRacer = 0x821017C0, kPlaceRacers = 0x82102048;
-constexpr uint32_t kZero = 0x82000A34;
 constexpr uint32_t kSetUpRaceFrame = 4112;
 constexpr uint32_t kGarageCarBytes = 1972;
 
@@ -143,7 +147,7 @@ uint64_t ColorList8Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   cl.set_table_grid_a7(81);
   cl.set_table_node_base_a(5);
   // The node table's address, loaded here (its +296 store uses it).
-  const uint32_t table = cl.node_table().address;
+  const schema::ColorNodeTable table = cl.node_table();
   cl.set_table_grid_b7(69);
   cl.set_selection_node(3);
   cl.set_table_node_base_b(20);
@@ -155,9 +159,9 @@ uint64_t ColorList8Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   cl.set_arrow_on_frame(0);
   cl.set_arrow_off_frame(1);
   cl.set_marker_node(0);
-  StoreU32(base, table + 296, 6);
+  StoreU32(base, table.children_address(), 6);
   for (uint32_t i = 1; i < 4; i++) {
-    StoreU32(base, cl.node_table().address + 296 + 4 * i, 6 + i);  // +300 to +308: 7 to 9
+    StoreU32(base, cl.node_table().children_address() + 4 * i, 6 + i);  // +300 to +308: 7 to 9
   }
   cl.set_selection_entries(2);
   cl.set_unknown_9788(1);
@@ -325,9 +329,9 @@ uint64_t ColorList8SetUpMenus(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   // &cue 2 and, when it answers a nonzero byte, its StopCue (slot 13); then
   // slot 14 for bank 1's cue 0 and, when it isn't playing, Sound::Play.
   auto slot = [&](uint32_t offset, uint32_t bank, uint32_t cue, uint32_t lr) {
-    const uint32_t manager = LoadU32(base, menu_sounds::kSoundManager);
-    const uint64_t args[6] = {manager, bank, cue, 0, 0, 0};
-    return calls.call_set(LoadU32(base, LoadU32(base, manager) + offset), args, 3, frame, lr);
+    const schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
+    const uint64_t args[6] = {manager.address, bank, cue, 0, 0, 0};
+    return calls.call_set(LoadU32(base, manager.vtable().address + offset), args, 3, frame, lr);
   };
   StoreU32(base, frame + 96, 2);
   StoreU32(base, frame + 100, 1);
@@ -354,13 +358,13 @@ uint64_t ColorList8SetUpRace(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t s
   namespace rs = race_screens;
   const uint32_t s = uint32_t(r3), frame = part_detail::Frame(base, sp, kSetUpRaceFrame);
   const schema::Type8ColorListScreen cl(base, s);
-  auto data = [base] { return LoadU32(base, rsu::kRaceData); };
+  auto data = [base] { return schema::RaceSetupGlobals::race_data(base).address; };
   if (!rsu::RaceDataResetGlobal(base, frame - 112)) {
     pg::Call1(calls, kResetGlobal, r3, frame, 0x8223E780);
   }
   rsu::StagesClear(base, data() + rsu::kStageList);
-  StoreU32(base, data() + 0xA3AF0, 4);
-  StoreU32(base, data() + 0xA3AF4, 5);
+  schema::RaceData(base, data()).set_kind(4);
+  schema::RaceData(base, data()).set_race_mode(5);
   vehicle_accessors::RaceDataSetWord32(base, rs::ListSelection(base, cl.kind_list_address()));
   // The route base by the item list's +4 plus its selection (the
   // recompiled switch; cases 0 and 9 to 15 are the merged switch piece
@@ -388,7 +392,7 @@ uint64_t ColorList8SetUpRace(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t s
   // The two players' racer records at the frame's +80: the garage cars,
   // each one's +3892 the list part's slot 11 (IsFirstChoice), its stage
   // word slot 12's (ThirdChoice).
-  const double zero = double(std::bit_cast<float>(LoadU32(base, kZero)));
+  const double zero = double(std::bit_cast<float>(schema::AppStartUpGlobals::float_zero(base)));
   const uint32_t record = frame + 80;
   const uint64_t part = r3 + kColorListPart;
   for (uint32_t player = 0; player < 2; player++) {
@@ -398,7 +402,7 @@ uint64_t ColorList8SetUpRace(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t s
     const uint32_t third =
         uint32_t(ts::Slot(base, part, 48, player, frame, 0x8223E8EC, calls));
     rsu::RacerRecordInit(base, record);
-    rsu::SetModel(base, record, LoadU32(base, car + 12));
+    rsu::SetModel(base, record, schema::CarMakersCar(base, car).car_id());
     StoreU32(base, frame + 3972, first);
     if (!native::Buffers_Memcpy(base, record, car, 1884, 0x8223E918)) {
       const uint64_t args[6] = {record, car, 1884, 0, 0, 0};

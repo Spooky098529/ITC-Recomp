@@ -69,11 +69,11 @@ void CopyWords(uint8_t* base, uint32_t to, uint32_t from, uint32_t count) {
 // (+204: 50 slots of 12 bytes, the count at +600, the start at +604), with
 // no overflow check, as the handlers do it inline.
 uint32_t RingSlot(uint8_t* base, uint32_t dispatcher) {
-  const uint32_t ring = dispatcher + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  return ring + (end - (end / 50) * 50) * 12;
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t end = d.ring_start() + count - 1;
+  d.set_ring_count(count);
+  return d.ring_address() + (end - (end / 50) * 50) * 12;
 }
 
 constexpr uint32_t kMinusOne = 0xFFFFFFFF;
@@ -84,7 +84,7 @@ constexpr uint32_t kMinusOne = 0xFFFFFFFF;
 
 uint64_t GarageStageSetPlates(uint8_t* base, uint64_t r3, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_82178DE8 GarageStage::SetPlates");
-  StoreU32(base, LoadU32(base, uint32_t(r3)) + 6092, value);
+  schema::StandSlot(base, uint32_t(r3)).stage().set_plates_shown(value);
   return r3;
 }
 
@@ -187,11 +187,12 @@ std::optional<uint64_t> StandSlotFree(uint8_t* base, uint64_t r3) {
     ITC_NATIVE_RUNNING("sub_821800B0 StandSlot::Free");
     return r3;
   }
-  if (!memory::IsPages(block) || !PresetsArePages(base, block + 112)) {
+  const uint32_t camera = schema::GarageStage(base, block).camera_address();
+  if (!memory::IsPages(block) || !PresetsArePages(base, camera)) {
     return std::nullopt;
   }
   ITC_NATIVE_RUNNING("sub_821800B0 StandSlot::Free");
-  FreePresets(base, block + 112);
+  FreePresets(base, camera);
   const uint64_t freed = Free(slot.stage<schema::View>().address);
   slot.set_stage(0u);
   return freed;
@@ -279,9 +280,10 @@ uint64_t ControllerOptionsLeave(uint8_t* base, uint64_t r3, uint32_t dispatcher)
       return r3;
   }
   const uint32_t slot = RingSlot(base, dispatcher);
-  StoreU32(base, slot + 8, 0);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 0, message);
+  const schema::ModeMessage queued(base, slot);
+  queued.set_arg1(0);
+  queued.set_arg0(0);
+  queued.set_id(message);
   return r3;
 }
 
@@ -294,8 +296,8 @@ uint64_t ControllerOptionsStepSliders(uint8_t* base) {
     return 0;
   }
   // The sliders (-10 to 10) at +272 to +280: no change at a bound.
-  const uint32_t settings = G::controller_settings<schema::View>(base).address;
-  const uint32_t field = settings + 272 + 4 * cursor;
+  const schema::OptionsSettings settings = G::controller_settings(base);
+  const uint32_t field = settings.edit_p1_slider_0_address() + 4 * cursor;
   const int32_t value = int32_t(LoadU32(base, field));
   if (side == -1 ? value <= -10 : value >= 10) {
     return 0;
@@ -313,11 +315,17 @@ uint64_t ControllerOptionsStepSide(uint8_t* base, uint32_t offset, uint32_t last
   const schema::FrontEndMenu menu = G::controller_menu(base);
   const uint32_t side = uint32_t(menu.side());
   const uint32_t cursor = menu.cursor();
-  StoreU32(base, G::controller_settings<schema::View>(base).address + offset, 0);
+  // The side word (+672 the buttons', +680 the analog's), the settings'
+  // pointer loaded for each store.
+  const auto set_side = [&](uint32_t v) {
+    const schema::OptionsSettings settings = G::controller_settings(base);
+    offset == 672 ? settings.set_p1_buttons_side(v) : settings.set_p1_analog_side(v);
+  };
+  set_side(0);
   if (side != kMinusOne && side != 1) {
     return 0;
   }
-  StoreU32(base, G::controller_settings<schema::View>(base).address + offset, side);
+  set_side(side);
   return cursor == last ? 0 : 1;
 }
 
@@ -327,7 +335,7 @@ uint64_t ControllerOptionsSetMarkY(uint8_t* base, uint64_t y, uint32_t sp) {
   StoreU32(base, frame, sp);
   StoreU32(base, frame + 80, 7);
   const uint32_t movie =
-      LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+      schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
   const uint32_t node = ui_movies::FindNode(base, movie, 8, 5);
   const uint32_t child = ui_movies::Child(base, ui_movies::Child(base, node, 0), 0);
   // The int's doubleword stored over the key for the conversion (std, lfd,
@@ -335,7 +343,7 @@ uint64_t ControllerOptionsSetMarkY(uint8_t* base, uint64_t y, uint32_t sp) {
   const int64_t value = int32_t(uint32_t(y));
   StoreU32(base, frame + 80, uint32_t(uint64_t(value) >> 32));
   StoreU32(base, frame + 84, uint32_t(uint64_t(value)));
-  guest::StoreFloat(base, child + 16, float(double(value)));
+  schema::UiMovieNode(base, child).set_y(float(double(value)));
   return child;
 }
 
@@ -343,8 +351,9 @@ uint64_t ControllerOptionsSetMarkY(uint8_t* base, uint64_t y, uint32_t sp) {
 
 uint64_t PanelScreenInitWords(uint8_t* base, uint64_t r3) {
   ITC_NATIVE_RUNNING("sub_82230740 PanelScreen::InitWords");
-  StoreU32(base, uint32_t(r3) + 11672, 4);
-  StoreU32(base, uint32_t(r3) + 11680, 9);
+  const schema::PanelScreen screen(base, uint32_t(r3));
+  screen.set_set_unknown_1920(4);
+  screen.set_set_unknown_1928(9);
   return r3;
 }
 

@@ -7,6 +7,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/boot_mode.h"
+#include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
 #include "schema/type5_mode.h"
 #include "ui_movies/game.h"
@@ -42,14 +44,14 @@ constexpr uint32_t kStepTable[10] = {0x822261E0, 0x822262B8, 0x821878B0, 0x82226
 // Posts the message (id, 0, 0) on the dispatcher's ring (+204), the id
 // stored first.
 void Post(uint8_t* base, uint32_t dispatcher, uint32_t id) {
-  const uint32_t ring = dispatcher + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
-  StoreU32(base, slot + 0, id);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t end = d.ring_start() + count - 1;
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(base, d.ring_address() + (end - (end / 50) * 50) * 12);
+  slot.set_id(id);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 }  // namespace

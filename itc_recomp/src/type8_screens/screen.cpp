@@ -12,6 +12,8 @@
 #include "mode_tick/mode_tick.h"
 #include "save_data/save_data.h"
 #include "schema/car_list.h"
+#include "schema/car_makers.h"
+#include "schema/career.h"
 #include "schema/type8_screens.h"
 #include "screen_constructors/screen_constructors.h"
 
@@ -21,7 +23,6 @@ namespace {
 
 using guest::LoadU16;
 using guest::LoadU32;
-using guest::StoreU16;
 using guest::StoreU32;
 
 namespace ts = type67_screens;
@@ -138,7 +139,7 @@ uint64_t PickCar(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
     const uint32_t car = G::garage_cars_address() + kGarageCarBytes * player;
     const uint32_t step = list.scroll() + list.row();
     const uint32_t entries = list.current_list().address;
-    const uint32_t id = LoadU32(base, LoadU32(base, entries + (step << 2)) + 8432);
+    const uint32_t id = schema::CarListEntry(base, LoadU32(base, entries + (step << 2))).car_id();
     // GarageCar::Reset sets r4 before reading it: only r3 passed.
     const uint64_t reset[6] = {car, 0, 0, 0, 0, 0};
     calls.call_set(kGarageCarReset, reset, 1, frame, 0x82238CD4);
@@ -147,28 +148,31 @@ uint64_t PickCar(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
       const uint32_t index = list.color_scroll() + list.color();
       career::CarSetModelAndClass(base, car, id, frame);
       const uint16_t half = uint16_t(index);
-      if (LoadU16(base, car + 4) == 0xFFFF) {
-        StoreU16(base, car + 4, half);
+      const schema::CarMakersCar head(base, car);
+      if (head.body_class() == 0xFFFF) {
+        head.set_body_class(half);
       }
-      const uint16_t old = LoadU16(base, car + 0);
-      StoreU16(base, car + 0, half);
-      StoreU32(base, car + kCarBytes, 0);
-      StoreU16(base, car + 2, old);
+      const uint16_t old = head.paint_pick();
+      head.set_paint_pick(half);
+      schema::GarageCarSlot(base, car).set_unknown_1968(0);
+      head.set_unknown_2(old);
     } else if (tab == 2) {
       // The player's half of the two-player save block: its garage's car
       // `step` links on from the first.
-      const uint32_t garage = save_data::TwoPlayerBlock(base) + kHalfBytes * player + 6120;
-      uint32_t node = garage + (uint32_t(int32_t(int16_t(LoadU16(base, garage + 204)))) << 2);
+      const schema::CareerGarageList garage_list(
+          base, save_data::TwoPlayerBlock(base) + kHalfBytes * player + 6120);
+      const uint32_t garage = garage_list.address;
+      uint32_t node = garage + (uint32_t(int32_t(int16_t(garage_list.head()))) << 2);
       for (uint32_t n = step; n != 0; n--) {
         node = garage + (uint32_t(int32_t(int16_t(LoadU16(base, node)))) << 2);
       }
       const uint32_t slot = uint32_t(int32_t(int16_t(LoadU16(base, node + 2))));
-      const uint32_t from = slot * kCarBytes + garage + 212;
+      const uint32_t from = slot * kCarBytes + garage_list.cars_address();
       if (!c_runtime::Memcpy(base, car, from, kCarBytes)) {
         const uint64_t args[6] = {car, from, kCarBytes, 0, 0, 0};
         calls.call_set(kMemcpy, args, 3, frame, 0x82238D38);
       }
-      StoreU32(base, car + kCarBytes, 1);
+      schema::GarageCarSlot(base, car).set_unknown_1968(1);
     }
   }
   const uint32_t passes = G::fade_out_passes(base);

@@ -13,6 +13,9 @@
 #include "car_specs/car_specs.h"
 #include "front_end_car_draw/front_end_car_draw.h"
 #include "guest.h"
+#include "schema/race_event.h"
+#include "schema/career.h"
+#include "schema/car_makers.h"
 #include "race_setup/race_setup.h"
 #include "stand_models/stand_models.h"
 #include "type67_modes/type67_modes.h"
@@ -61,9 +64,10 @@ uint32_t Holder(uint8_t* base) {
 // [+0x19920] steps from the head halfword +204): the list + 1,968 x slot (its
 // fields at + 212 on).
 uint32_t GarageCarOf(uint8_t* base, uint32_t save) {
-  const uint32_t nodes = save + 6120;
-  uint32_t n = Load(base, save + 0x19920);
-  uint32_t node = uint32_t(int32_t(int16_t(guest::LoadU16(base, nodes + 204)))) * 4 + nodes;
+  const uint32_t nodes = schema::SaveData(base, save).garage_address();
+  uint32_t n = schema::SaveData(base, save).selected_car();
+  uint32_t node =
+      uint32_t(int32_t(int16_t(schema::CareerGarageList(base, nodes).head()))) * 4 + nodes;
   while (n != 0) {
     node = uint32_t(int32_t(int16_t(guest::LoadU16(base, node)))) * 4 + nodes;
     n--;
@@ -99,7 +103,8 @@ void MakeCar(uint8_t* base, const front_end_car_draw::Calls& calls, uint32_t car
   race_setup::CarInit(base, car);
   front_end_car_draw::Memcpy(base, calls, car, garage, 1884, frame, memcpy_lr);
   if (flags != 0) {
-    Store(base, car + 3888, Load(base, car + 3888) | flags);
+    const schema::CarMakersCar made(base, car);
+    made.set_flags(made.flags() | flags);
   }
   uint32_t refreshed = 0;
   if (!car_specs::CarRefresh(base, car, &refreshed)) {
@@ -206,7 +211,7 @@ uint64_t PickCameraPreset(uint8_t* base, const StandCalls& stand, uint64_t r3, u
       if (p == 0) {
         pick(16);
       } else if (p == 1) {
-        const int32_t id = int32_t(Load(base, c + 224));
+        const int32_t id = int32_t(schema::CarMakersCar(base, c + 212).car_id());
         pick(id == 14 || id == 15 ? 16 : 17);
       } else if (p == 2) {
         pick(18);
@@ -414,7 +419,7 @@ uint64_t ApplyDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, uint32
     const uint32_t g = GarageCarOf(base, TS(base, s).save_data().address) + 212;
     const uint32_t car = frame + 144;
     MakeCar(base, stand.calls, car, g, 1, frame, 0x822043D0, 0x822043E4);
-    const uint64_t pick = uint64_t(int64_t(int16_t(guest::LoadU16(base, g))));
+    const uint64_t pick = uint64_t(int64_t(int16_t(schema::CarMakersCar(base, g).paint_pick())));
     double f1 = 0.0;
     r3 = car_makers::GarageStageSetCar(base, stand.calls, stand.call, Holder(base), car, pick,
                                        frame, &f1);
@@ -507,7 +512,7 @@ uint64_t ApplyAreaDecals(uint8_t* base, const StandCalls& stand, uint64_t r3, ui
     const uint32_t g = GarageCarOf(base, TS(base, s).save_data().address) + 212;
     const uint32_t car = frame + 176;
     MakeCar(base, stand.calls, car, g, 1, frame, 0x821F7CBC, 0x821F7CD0);
-    const uint64_t pick = uint64_t(int64_t(int16_t(guest::LoadU16(base, g))));
+    const uint64_t pick = uint64_t(int64_t(int16_t(schema::CarMakersCar(base, g).paint_pick())));
     double f1 = 0.0;
     r3 = car_makers::GarageStageSetCar(base, stand.calls, stand.call, Holder(base), car, pick,
                                        frame, &f1);
@@ -1341,9 +1346,11 @@ uint64_t UpdateStand(uint8_t* base, const StandCalls& stand,
                      const front_end_car_draw::DrawCallees& draw, load_poll::Calls* paint_poll,
                      uint32_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821D9F10 TuningScreen::UpdateStand");
-  constexpr uint32_t kBonnetOpen = 0x826D84A0;   // the three stand animations' open states
-  constexpr uint32_t kRoofOpen = 0x826D849C;
-  constexpr uint32_t kDoorsOpen = 0x826D8498;
+  // The three stand animations' open states.
+  using Globals = schema::TuningScreenGlobals;
+  constexpr uint32_t kBonnetOpen = Globals::bonnet_open_address();
+  constexpr uint32_t kRoofOpen = Globals::roof_open_address();
+  constexpr uint32_t kDoorsOpen = Globals::doors_open_address();
   const uint32_t frame = Frame(base, sp, 144);
   const uint32_t s = screen;
   const uint32_t c = GarageCarOf(base, TS(base, s).save_data().address);
@@ -1373,7 +1380,7 @@ uint64_t UpdateStand(uint8_t* base, const StandCalls& stand,
   // (2) The same for item 1 on cars 14 and 15 (the flag left alone on others).
   {
     const bool page = int32_t(TS(base, s).category()) == 0 && item() == 1 && in({5, 9, 10, 11});
-    const int32_t id = int32_t(Load(base, c + 224));
+    const int32_t id = int32_t(schema::CarMakersCar(base, c + 212).car_id());
     if (id == 14 || id == 15) {
       toggle(page, kRoofOpen, 2);
     }

@@ -45,7 +45,7 @@ void Context::State7() {
   // The bonnet's rows (sub-scene 30's child 1's children 5 to 14) hidden.
   for (uint32_t row = 0; row < 10; row++) {
     if (bonnet()) {
-      guest::StoreU32(base, ChildOf(Node(30, 1), row + 5) + 80, 0);
+      UiNode(base, ChildOf(Node(30, 1), row + 5)).set_visible(0);
     }
   }
   // The rows' texts: the bonnet's two (r10 the item byte, left from the
@@ -55,10 +55,10 @@ void Context::State7() {
     const uint32_t r10 = Item();
     const uint32_t parent = Node(30, 1);
     const uint32_t first = ChildOf(parent, 5);
-    guest::StoreU32(base, first + 80, 1);
+    UiNode(base, first).set_visible(1);
     NodeText(first, 376, 0x821E5D08, 0, r10);
     const uint32_t second = ChildOf(parent, 6);
-    guest::StoreU32(base, second + 80, 1);
+    UiNode(base, second).set_visible(1);
     NodeText(second, 380, 0x821E5D5C, 0, r10);
   } else if (Category() == 1 && Item() == 3) {
     const uint32_t node = ChildOf(Node(32, 2), 1);
@@ -72,8 +72,8 @@ void Context::State7() {
   for (uint32_t n = 26; n < 36; n++) {
     if (bonnet()) {
       const uint32_t node = Node(30, 0);
-      guest::StoreU32(base, ChildOf(node, n - 11) + 80, 0);
-      guest::StoreU32(base, ChildOf(node, n) + 80, 0);
+      UiNode(base, ChildOf(node, n - 11)).set_visible(0);
+      UiNode(base, ChildOf(node, n)).set_visible(0);
     }
   }
   if (bonnet() && uint32_t(TS(base, screen).color_rows()) != 0) {
@@ -83,7 +83,7 @@ void Context::State7() {
       const uint32_t flag = ChildOf(node, 38 + 2 * row);
       UiNode(base, mark).set_visible(1);
       guest::StoreU32(base, flag + 108, GetChoiceFlag(base, screen, row) != 0 ? 0 : 1);
-      guest::StoreU32(base, ChildOf(node, row + 26) + 80, 1);
+      UiNode(base, ChildOf(node, row + 26)).set_visible(1);
     }
   }
 
@@ -103,7 +103,7 @@ void Context::State7() {
     // before its test), then by the type 1 to 4 the first ones shown with
     // their child 2's color.
     for (uint32_t k = 1; k <= 6; k++) {
-      guest::StoreU32(base, ChildOf(Node(32, 3), k) + 80, 0);
+      UiNode(base, ChildOf(Node(32, 3), k)).set_visible(0);
     }
     struct Swatch {
       uint32_t r, g, b, lr;
@@ -258,8 +258,8 @@ void Context::State8() {
       continue;
     }
     const uint32_t node = Node(sub, 0);
-    guest::StoreU32(base, ChildOf(node, n - 11) + 80, 0);
-    guest::StoreU32(base, ChildOf(node, n) + 80, 0);
+    UiNode(base, ChildOf(node, n - 11)).set_visible(0);
+    UiNode(base, ChildOf(node, n)).set_visible(0);
   }
   if (const uint32_t sub = marks_scene();
       sub != 0 && uint32_t(TS(base, screen).option_count()) != 0) {
@@ -269,7 +269,7 @@ void Context::State8() {
       const uint32_t flag = ChildOf(node, 38 + 2 * r);
       UiNode(base, mark).set_visible(1);
       guest::StoreU32(base, flag + 108, GetChoiceFlag(base, screen, r) != 0 ? 0 : 1);
-      guest::StoreU32(base, ChildOf(node, r + 26) + 80, 1);
+      UiNode(base, ChildOf(node, r + 26)).set_visible(1);
     }
   }
 

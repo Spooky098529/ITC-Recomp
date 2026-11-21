@@ -168,9 +168,9 @@ uint32_t RecordBillboardState(uint8_t* base, const car_scene_draw::SceneDrawCall
       Store(base, f + 96 + 16 * row + 4 * col, row == col ? 0x3F800000u : 0u);
     }
   }
-  const uint32_t pass = Pass(base, set).camera_pass().address;
-  if (!native::Buffers_Memcpy(base, f + 224, pass + 16, 64, kMemcpyReturn)) {
-    calls.memcpy(f + 224, pass + 16, 64, f, kMemcpyReturn);
+  const uint32_t view = Pass(base, set).camera_pass().view_address();
+  if (!native::Buffers_Memcpy(base, f + 224, view, 64, kMemcpyReturn)) {
+    calls.memcpy(f + 224, view, 64, f, kMemcpyReturn);
   }
   FlushOff();
 
@@ -184,7 +184,8 @@ uint32_t RecordBillboardState(uint8_t* base, const car_scene_draw::SceneDrawCall
   for (uint32_t at : {172u, 188u, 204u, 220u}) {
     Stfs(base, f + at, one);
   }
-  const uint32_t projection = Pass(base, set).camera_pass().address + 80;  // read again, as the original
+  const uint32_t projection =
+      Pass(base, set).camera_pass().projection_address();  // read again, as the original
   matrix_math::Multiply(base, f + 160, f + 224, projection);
   interpolation::BlendState_OnMultiply(base, f + 160, f + 224, projection, kMultiplyReturn1);
   matrix_math::Multiply(base, matrix, f + 96, f + 160);

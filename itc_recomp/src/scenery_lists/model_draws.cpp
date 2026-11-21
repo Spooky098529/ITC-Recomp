@@ -20,6 +20,7 @@
 #include "schema/material_passes.h"
 #include "schema/models.h"
 #include "schema/scenery_lists.h"
+#include "schema/sprites.h"
 
 #include "base/float_mode.h"
 #include <simde/x86/sse4.1.h>
@@ -248,9 +249,9 @@ std::optional<uint32_t> RecordObject(uint8_t* base, uint32_t view_projection, ui
   }
   command_list::OpenChunk(base, list);
   const uint32_t header = command_list::AllocateSlots(base, list, 1);
-  guest::StoreU32(base, header + 0, 7);
-  guest::StoreU32(base, header + 4, 9);
-  guest::StoreU32(base, header + 8, 0x00010009);
+  schema::ChunkCommand(base, header).set_id(7);
+  schema::ChunkCommand(base, header).set_arg0(9);
+  schema::ChunkCommand(base, header).set_arg1(0x00010009);
   const uint32_t constants = command_list::AllocateSlots(base, list, 9);
   matrix_math::Multiply(base, constants, world, view_projection);
   interpolation::BlendState_OnMultiply(base, constants, world, view_projection,
@@ -270,9 +271,9 @@ std::optional<uint32_t> RecordSceneLights(uint8_t* base) {
   }
   command_list::OpenChunk(base, list);
   const uint32_t header = command_list::AllocateSlots(base, list, 1);
-  guest::StoreU32(base, header + 0, 7);
-  guest::StoreU32(base, header + 4, 63);
-  guest::StoreU32(base, header + 8, 0x0101003F);
+  schema::ChunkCommand(base, header).set_id(7);
+  schema::ChunkCommand(base, header).set_arg0(63);
+  schema::ChunkCommand(base, header).set_arg1(0x0101003F);
   const uint32_t constants = command_list::AllocateSlots(base, list, 63);
   matrix_math::Copy(base, constants, G::view_address());
   interpolation::BlendState_OnCopy(base, constants, G::view_address(), kLightsCopyReturn);
@@ -364,10 +365,13 @@ uint32_t RecordShapeDepthSlots(uint8_t* base, uint32_t model, uint32_t shape, in
   return slots;
 }
 
+// One slot's three words (device-shaders' ChunkCommand: a command's id and
+// arguments, or a payload row's), in this order.
 void Slot(uint8_t* base, uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2) {
-  guest::StoreU32(base, slot + 0, w0);
-  guest::StoreU32(base, slot + 4, w1);
-  guest::StoreU32(base, slot + 8, w2);
+  const schema::ChunkCommand c(base, slot);
+  c.set_id(w0);
+  c.set_arg0(w1);
+  c.set_arg1(w2);
 }
 
 // RecordShapeDepth's recording, its room checked.
@@ -382,11 +386,11 @@ uint32_t RecordShapeDepthChecked(uint8_t* base, uint32_t model, uint32_t shape, 
   Slot(base, header, 10, 1, 0);
   const uint32_t declaration = command_list::AllocateSlots(base, list, 1);
   guest::StoreU32(base, declaration,
-                  DepthVertexDeclaration(base, int32_t(guest::LoadU32(base, at + 260))));
+                  DepthVertexDeclaration(base, int32_t(guest::LoadU32(base, Shape(base, at).stream1_address() + 4))));
   Slot(base, command_list::AllocateSlots(base, list, 1), 11, 1, 0);
   uint32_t slot = command_list::AllocateSlots(base, list, 1);
   Slot(base, slot, 1, stream, 0);
-  guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 264));
+  guest::StoreU32(base, slot + 12, guest::LoadU32(base, Shape(base, at).stream1_address() + 8));
   Slot(base, command_list::AllocateSlots(base, list, 1), 7, 1, 0x01012B01);
   CopyWords(base, command_list::AllocateSlots(base, list, 1), G::depth_constant_address(), 4);
   if (Shape(base, at).skinned() == 1) {
@@ -394,8 +398,8 @@ uint32_t RecordShapeDepthChecked(uint8_t* base, uint32_t model, uint32_t shape, 
     if (schema::SkinBlock(base, indices).object() != 0) {
       Slot(base, command_list::AllocateSlots(base, list, 1), 22, 1, 0);
       slot = command_list::AllocateSlots(base, list, 1);
-      guest::StoreU32(base, slot + 8, 1);
-      guest::StoreU32(base, slot + 4, schema::SkinBlock(base, indices).object());
+      schema::ChunkCommand(base, slot).set_arg1(1);
+      schema::ChunkCommand(base, slot).set_arg0(schema::SkinBlock(base, indices).object());
     }
   }
   uint32_t record = FirstMaterial(base, model, shape, group);
@@ -407,19 +411,19 @@ uint32_t RecordShapeDepthChecked(uint8_t* base, uint32_t model, uint32_t shape, 
     const schema::MaterialRecord r(base, record);
     Slot(base, command_list::AllocateSlots(base, list, 1), 1, 2, 0);
     slot = command_list::AllocateSlots(base, list, 1);
-    guest::StoreU32(base, slot + 0, 100);
-    guest::StoreU32(base, slot + 4, r.render_state_100());
+    schema::ChunkCommand(base, slot).set_id(100);
+    schema::ChunkCommand(base, slot).set_arg0(r.render_state_100());
     slot = command_list::AllocateSlots(base, list, 1);
-    guest::StoreU32(base, slot + 0, 56);
-    guest::StoreU32(base, slot + 4, r.cull_mode());
+    schema::ChunkCommand(base, slot).set_id(56);
+    schema::ChunkCommand(base, slot).set_arg0(r.cull_mode());
     Slot(base, command_list::AllocateSlots(base, list, 1), 12, 1, 0);
     guest::StoreU32(base, command_list::AllocateSlots(base, list, 1), r.index_buffer_address());
     Slot(base, command_list::AllocateSlots(base, list, 1), 18, 1, 0);
     slot = command_list::AllocateSlots(base, list, 1);
     guest::StoreU16(base, slot + 4, 0);
     guest::StoreU16(base, slot + 6, 0);
-    guest::StoreU32(base, slot + 0, r.primitive_type());
-    guest::StoreU32(base, slot + 8, r.draw_count());
+    schema::ChunkCommand(base, slot).set_id(r.primitive_type());
+    schema::ChunkCommand(base, slot).set_arg1(r.draw_count());
   }
   EndRecord(base, list);
   return header;
@@ -477,10 +481,10 @@ std::optional<DepthDraw> DrawShapeDepth(uint8_t* base, uint32_t model, uint32_t 
     draw.r3 = list;
     return draw;
   }
-  guest::StoreU32(base, entry + 4, *constants);
+  schema::ChunkItem(base, entry).set_link(*constants);
   guest::StoreU16(base, entry + 2, 3);
   guest::StoreU16(base, entry + 18, 4);
-  guest::StoreU32(base, entry + 20,
+  schema::ChunkItem(base, entry + 16).set_link(
                   RecordShapeDepthChecked(base, model, shape, which, mask, with_flagged));
   draw.submit = true;
   draw.entry = entry;
@@ -502,13 +506,13 @@ std::optional<uint32_t> SceneryRecordShapeSlots(uint8_t* base, uint32_t model, u
     return 0;
   }
   const uint32_t at = ShapeAt(base, model, shape);
-  if (!models::VertexDeclaration(base, guest::LoadU32(base, at + 244),
-                                 int32_t(guest::LoadU32(base, at + 260)),
-                                 guest::LoadU32(base, at + 276))) {
+  if (!models::VertexDeclaration(base, guest::LoadU32(base, Shape(base, at).stream0_address() + 4),
+                                 int32_t(guest::LoadU32(base, Shape(base, at).stream1_address() + 4)),
+                                 guest::LoadU32(base, Shape(base, at).stream2_address() + 4))) {
     return std::nullopt;
   }
-  const uint32_t type = guest::LoadU32(base, at + 260);
-  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, at + 276) == 6;
+  const uint32_t type = guest::LoadU32(base, Shape(base, at).stream1_address() + 4);
+  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, Shape(base, at).stream2_address() + 4) == 6;
   uint32_t slots = 2 + (short_streams ? 3 : 4) + 1 + 4 + 1 + 12 + 1 + 8 + 1;
   if (Shape(base, at).skinned() == 1 &&
       Shape(base, at).skin().object() != 0) {
@@ -561,38 +565,38 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
   Slot(base, header, 10, 1, 0);
   const uint32_t declaration = Take(base, list);
   guest::StoreU32(base, declaration,
-                  *models::VertexDeclaration(base, guest::LoadU32(base, at + 244),
-                                             int32_t(guest::LoadU32(base, at + 260)),
-                                             guest::LoadU32(base, at + 276)));
-  const uint32_t type = guest::LoadU32(base, at + 260);
+                  *models::VertexDeclaration(base, guest::LoadU32(base, Shape(base, at).stream0_address() + 4),
+                                             int32_t(guest::LoadU32(base, Shape(base, at).stream1_address() + 4)),
+                                             guest::LoadU32(base, Shape(base, at).stream2_address() + 4)));
+  const uint32_t type = guest::LoadU32(base, Shape(base, at).stream1_address() + 4);
   uint32_t slot;
-  if (type != 9 && type != 10 && guest::LoadU32(base, at + 276) != 6) {
+  if (type != 9 && type != 10 && guest::LoadU32(base, Shape(base, at).stream2_address() + 4) != 6) {
     Slot(base, Take(base, list), 11, 3, 0);
     slot = Take(base, list);
     Slot(base, slot, 0, Shape(base, at).vertex_buffer0_address(), 0);
-    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 248));
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, Shape(base, at).stream0_address() + 8));
     slot = Take(base, list);
     Slot(base, slot, 1, stream, 0);
-    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 264));
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, Shape(base, at).stream1_address() + 8));
     slot = Take(base, list);
     Slot(base, slot, 2, second, 0);
-    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 280));
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, Shape(base, at).stream2_address() + 8));
   } else {
     Slot(base, Take(base, list), 11, 2, 0);
     slot = Take(base, list);
     Slot(base, slot, 0, Shape(base, at).vertex_buffer0_address(), 0);
-    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 248));
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, Shape(base, at).stream0_address() + 8));
     slot = Take(base, list);
     Slot(base, slot, 1, stream, 0);
-    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 264));
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, Shape(base, at).stream1_address() + 8));
   }
   if (Shape(base, at).skinned() == 1) {
     const uint32_t indices = Shape(base, at).skin().address;
     if (schema::SkinBlock(base, indices).object() != 0) {
       Slot(base, Take(base, list), 22, 1, 0);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 8, 1);
-      guest::StoreU32(base, slot + 4, schema::SkinBlock(base, indices).object());
+      schema::ChunkCommand(base, slot).set_arg1(1);
+      schema::ChunkCommand(base, slot).set_arg0(schema::SkinBlock(base, indices).object());
     }
   }
   Slot(base, Take(base, list), 2, 4, 0);
@@ -624,12 +628,12 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
         if (pair == 0) {
           Slot(base, Take(base, list), 8, 1, 0);
           guest::StoreU32(base, Take(base, list),
-                          guest::LoadU32(base, (Record(base, material).shader_pair() << 4) +
-                                                   m.shader_pairs<schema::View>().address));
+                          schema::ModelShaderPair(base, (Record(base, material).shader_pair() << 4) +
+                                                   m.shader_pairs<schema::View>().address).vertex_shader());
           Slot(base, Take(base, list), 9, 1, 0);
           guest::StoreU32(base, Take(base, list),
-                          guest::LoadU32(base, (Record(base, material).shader_pair() << 4) +
-                                                   m.shader_pairs<schema::View>().address + 4));
+                          schema::ModelShaderPair(base, (Record(base, material).shader_pair() << 4) +
+                                                   m.shader_pairs<schema::View>().address).pixel_shader());
         } else {
           Slot(base, Take(base, list), 8, 1, 0);
           slot = Take(base, list);
@@ -692,54 +696,54 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
       // The blend (render state 3) and, for group 0, 96 and 100.
       Slot(base, Take(base, list), 3, 1, 0);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 0, 0);
-      guest::StoreU32(base, slot + 4,
+      schema::ChunkCommand(base, slot).set_id(0);
+      schema::ChunkCommand(base, slot).set_arg0(
                       guest::LoadU32(base, (guest::LoadU32(base, frame + 80) << 2) +
                                                G::blend_states_address()));
       if (group == 0) {
         if (Record(base, material).render_state_96() != 0) {
           Slot(base, Take(base, list), 1, 2, 0);
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 4, 1);
-          guest::StoreU32(base, slot + 0, 96);
+          schema::ChunkCommand(base, slot).set_arg0(1);
+          schema::ChunkCommand(base, slot).set_id(96);
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 0, 100);
-          guest::StoreU32(base, slot + 4, 64);
+          schema::ChunkCommand(base, slot).set_id(100);
+          schema::ChunkCommand(base, slot).set_arg0(64);
         } else {
           Slot(base, Take(base, list), 1, 2, 0);
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 4, 0);
-          guest::StoreU32(base, slot + 0, 96);
+          schema::ChunkCommand(base, slot).set_arg0(0);
+          schema::ChunkCommand(base, slot).set_id(96);
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 0, 100);
-          guest::StoreU32(base, slot + 4, Record(base, material).render_state_100());
+          schema::ChunkCommand(base, slot).set_id(100);
+          schema::ChunkCommand(base, slot).set_arg0(Record(base, material).render_state_100());
         }
       }
       Slot(base, Take(base, list), 1, 1, 0);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 0, 56);
-      guest::StoreU32(base, slot + 4, Record(base, material).cull_mode());
+      schema::ChunkCommand(base, slot).set_id(56);
+      schema::ChunkCommand(base, slot).set_arg0(Record(base, material).cull_mode());
       // The textures and their sampler states.
       const uint32_t provider = m.texture_provider<schema::View>().address;
       if (provider != 0 && Record(base, material).texture_count() != 0) {
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 0, 4);
-        guest::StoreU32(base, slot + 8, 0);
-        guest::StoreU32(base, slot + 4, Record(base, material).texture_count());
+        schema::ChunkCommand(base, slot).set_id(4);
+        schema::ChunkCommand(base, slot).set_arg1(0);
+        schema::ChunkCommand(base, slot).set_arg0(Record(base, material).texture_count());
         for (int32_t k = 0; k < int32_t(Record(base, material).texture_count()); k++) {
           const uint32_t id = Record(base, material).xpr_index_address() + 4 * uint32_t(k);
           const uint32_t set = m.animations<schema::View>().address;
           uint32_t texture = 0;
           bool lookup = true;
           uint32_t first = guest::LoadU32(base, id);
-          uint32_t second_word = guest::LoadU32(base, id + 32);
+          uint32_t second_word = guest::LoadU32(base, Record(base, material).texture_index_address() + 4 * uint32_t(k));
           if (set != 0 && guest::LoadU32(base, id) == 0) {
-            const uint32_t entry = AnimationCurrentFrame(base, set, guest::LoadU32(base, id + 32));
+            const uint32_t entry = AnimationCurrentFrame(base, set, guest::LoadU32(base, Record(base, material).texture_index_address() + 4 * uint32_t(k)));
             if (entry == 0) {
               lookup = false;
             } else {
-              second_word = guest::LoadU32(base, entry + 4);
-              first = guest::LoadU32(base, entry + 0);
+              second_word = schema::AnimationFrameEntry(base, entry).texture_id();
+              first = schema::AnimationFrameEntry(base, entry).unknown_0();
             }
           }
           if (lookup) {
@@ -749,34 +753,34 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
                              schema::TextureProvider(base, from).vtable().xpr_texture_5(), args, frame, 0x821473D0);
           }
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 4, texture);
-          guest::StoreU32(base, slot + 0, uint32_t(k));
+          schema::ChunkCommand(base, slot).set_arg0(texture);
+          schema::ChunkCommand(base, slot).set_id(uint32_t(k));
         }
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 0, 2);
-        guest::StoreU32(base, slot + 8, 0);
-        guest::StoreU32(base, slot + 4, Record(base, material).texture_count() * 3);
+        schema::ChunkCommand(base, slot).set_id(2);
+        schema::ChunkCommand(base, slot).set_arg1(0);
+        schema::ChunkCommand(base, slot).set_arg0(Record(base, material).texture_count() * 3);
         for (int32_t k = 0; k < int32_t(Record(base, material).texture_count()); k++) {
           const uint32_t sampler = uint32_t(k);
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 0, sampler);
-          guest::StoreU32(base, slot + 4, 0);
-          guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_0_address() + 4 * sampler));
+          schema::ChunkCommand(base, slot).set_id(sampler);
+          schema::ChunkCommand(base, slot).set_arg0(0);
+          schema::ChunkCommand(base, slot).set_arg1(guest::LoadU32(base, Record(base, material).sampler_state_0_address() + 4 * sampler));
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 0, sampler);
-          guest::StoreU32(base, slot + 4, 4);
-          guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_4_address() + 4 * sampler));
+          schema::ChunkCommand(base, slot).set_id(sampler);
+          schema::ChunkCommand(base, slot).set_arg0(4);
+          schema::ChunkCommand(base, slot).set_arg1(guest::LoadU32(base, Record(base, material).sampler_state_4_address() + 4 * sampler));
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 0, sampler);
-          guest::StoreU32(base, slot + 4, 24);
-          guest::StoreU32(base, slot + 8, m.sampler_state_24());
+          schema::ChunkCommand(base, slot).set_id(sampler);
+          schema::ChunkCommand(base, slot).set_arg0(24);
+          schema::ChunkCommand(base, slot).set_arg1(m.sampler_state_24());
         }
       } else {
         Slot(base, Take(base, list), 4, 4, 0);
         for (uint32_t k = 0; k < 4; k++) {
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 0, k);
-          guest::StoreU32(base, slot + 4, 0);
+          schema::ChunkCommand(base, slot).set_id(k);
+          schema::ChunkCommand(base, slot).set_arg0(0);
         }
       }
       // The environment textures.
@@ -790,11 +794,12 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
         const uint32_t args[3] = {from, Record(base, material).environment_arg_1(),
                                   Record(base, material).environment_arg_0()};
         const uint32_t texture = ProviderSlotCall(base, calls,
-                             guest::LoadU32(base, schema::TextureProvider(base, from).vtable().address + function_slot), args, frame, lr);
+                             (function_slot == 24 ? schema::TextureProvider(base, from).vtable().xpr_texture_6()
+                                                 : schema::TextureProvider(base, from).vtable().xpr_texture_5()), args, frame, lr);
         Slot(base, Take(base, list), 4, 1, 0);
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 4, texture);
-        guest::StoreU32(base, slot + 0, 6);
+        schema::ChunkCommand(base, slot).set_arg0(texture);
+        schema::ChunkCommand(base, slot).set_id(6);
       }
       // Vertex c86 from the range and pixel c76.
       if (range != 0) {
@@ -822,8 +827,8 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
       slot = Take(base, list);
       guest::StoreU16(base, slot + 4, 0);
       guest::StoreU16(base, slot + 6, 0);
-      guest::StoreU32(base, slot + 0, Record(base, material).primitive_type());
-      guest::StoreU32(base, slot + 8, Record(base, material).draw_count());
+      schema::ChunkCommand(base, slot).set_id(Record(base, material).primitive_type());
+      schema::ChunkCommand(base, slot).set_arg1(Record(base, material).draw_count());
       // The constants put back.
       if (range != 0) {
         Slot(base, Take(base, list), 7, 1, 0x00015601);
@@ -844,13 +849,13 @@ uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t fram
   Slot(base, Take(base, list), 2, 8, 0);
   for (uint32_t k = 0; k < 4; k++) {
     slot = Take(base, list);
-    guest::StoreU32(base, slot + 0, k);
-    guest::StoreU32(base, slot + 8, 1);
-    guest::StoreU32(base, slot + 4, 16);
+    schema::ChunkCommand(base, slot).set_id(k);
+    schema::ChunkCommand(base, slot).set_arg1(1);
+    schema::ChunkCommand(base, slot).set_arg0(16);
     slot = Take(base, list);
-    guest::StoreU32(base, slot + 8, 1);
-    guest::StoreU32(base, slot + 0, k);
-    guest::StoreU32(base, slot + 4, 20);
+    schema::ChunkCommand(base, slot).set_arg1(1);
+    schema::ChunkCommand(base, slot).set_id(k);
+    schema::ChunkCommand(base, slot).set_arg0(20);
   }
   EndRecord(base, list);
   return header;
@@ -954,11 +959,11 @@ std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& call
       continue;
     }
     guest::StoreU16(base, g.entry + 2, 3);
-    guest::StoreU32(base, g.entry + 4, *constants);
+    schema::ChunkItem(base, g.entry).set_link(*constants);
     guest::StoreU16(base, g.entry + 18, 3);
-    guest::StoreU32(base, g.entry + 20, *lights);
+    schema::ChunkItem(base, g.entry + 16).set_link(*lights);
     guest::StoreU16(base, g.entry + 34, 4);
-    guest::StoreU32(base, g.entry + 36,
+    schema::ChunkItem(base, g.entry + 32).set_link(
                     RecordShapeChecked(base, calls, record_frame, model, shape, g.group, 1, c76,
                                        range, pair_offset));
     const double depth =
@@ -979,9 +984,9 @@ std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& call
     return draw;
   }
   guest::StoreU16(base, entry + 2, 3);
-  guest::StoreU32(base, entry + 4, *constants);
+  schema::ChunkItem(base, entry).set_link(*constants);
   guest::StoreU16(base, entry + 18, 4);
-  guest::StoreU32(base, entry + 20, RecordShapeDepthChecked(base, model, shape, 0, 0, 0));
+  schema::ChunkItem(base, entry + 16).set_link(RecordShapeDepthChecked(base, model, shape, 0, 0, 0));
   draw.r3 = calls.submit(calls.user, entry, G::scenery_depth_key(base),
                          -Lfs(base, schema::RecordedObjectConstants(base, *constants)
                                         .depth_address()),
@@ -1003,13 +1008,13 @@ std::optional<uint32_t> ModelRecordShapeSlots(uint8_t* base, uint32_t model, uin
     return 0;
   }
   const uint32_t at = ShapeAt(base, model, shape);
-  if (!models::VertexDeclaration(base, guest::LoadU32(base, at + 244),
-                                 int32_t(guest::LoadU32(base, at + 260)),
-                                 guest::LoadU32(base, at + 276))) {
+  if (!models::VertexDeclaration(base, guest::LoadU32(base, Shape(base, at).stream0_address() + 4),
+                                 int32_t(guest::LoadU32(base, Shape(base, at).stream1_address() + 4)),
+                                 guest::LoadU32(base, Shape(base, at).stream2_address() + 4))) {
     return std::nullopt;
   }
-  const uint32_t type = guest::LoadU32(base, at + 260);
-  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, at + 276) == 6;
+  const uint32_t type = guest::LoadU32(base, Shape(base, at).stream1_address() + 4);
+  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, Shape(base, at).stream2_address() + 4) == 6;
   // The header, the declaration, the streams, the samplers' state 28 and
   // the end.
   uint32_t slots = 2 + (short_streams ? 3 : 4) + 5 + 1;
@@ -1068,31 +1073,31 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
   Slot(base, header, 10, 1, 0);
   const uint32_t declaration = Take(base, list);
   guest::StoreU32(base, declaration,
-                  *models::VertexDeclaration(base, guest::LoadU32(base, at + 244),
-                                             int32_t(guest::LoadU32(base, at + 260)),
-                                             guest::LoadU32(base, at + 276)));
-  const uint32_t type = guest::LoadU32(base, at + 260);
-  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, at + 276) == 6;
+                  *models::VertexDeclaration(base, guest::LoadU32(base, Shape(base, at).stream0_address() + 4),
+                                             int32_t(guest::LoadU32(base, Shape(base, at).stream1_address() + 4)),
+                                             guest::LoadU32(base, Shape(base, at).stream2_address() + 4)));
+  const uint32_t type = guest::LoadU32(base, Shape(base, at).stream1_address() + 4);
+  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, Shape(base, at).stream2_address() + 4) == 6;
   uint32_t slot;
   Slot(base, Take(base, list), 11, short_streams ? 2 : 3, 0);
   slot = Take(base, list);
   Slot(base, slot, 0, Shape(base, at).vertex_buffer0_address(), 0);
-  guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 248));
+  guest::StoreU32(base, slot + 12, guest::LoadU32(base, Shape(base, at).stream0_address() + 8));
   slot = Take(base, list);
   Slot(base, slot, 1, stream, 0);
-  guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 264));
+  guest::StoreU32(base, slot + 12, guest::LoadU32(base, Shape(base, at).stream1_address() + 8));
   if (!short_streams) {
     slot = Take(base, list);
     Slot(base, slot, 2, second, 0);
-    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 280));
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, Shape(base, at).stream2_address() + 8));
   }
   if (Shape(base, at).skinned() == 1) {
     const uint32_t indices = Shape(base, at).skin().address;
     if (schema::SkinBlock(base, indices).object() != 0) {
       Slot(base, Take(base, list), 22, 1, 0);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 8, 1);
-      guest::StoreU32(base, slot + 4, schema::SkinBlock(base, indices).object());
+      schema::ChunkCommand(base, slot).set_arg1(1);
+      schema::ChunkCommand(base, slot).set_arg0(schema::SkinBlock(base, indices).object());
     }
   }
   Slot(base, Take(base, list), 2, 4, 0);
@@ -1117,12 +1122,12 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
         Slot(base, Take(base, list), 8, 1, 0);
         if (pair == 0) {
           guest::StoreU32(base, Take(base, list),
-                          guest::LoadU32(base, (Record(base, material).shader_pair() << 4) +
-                                                   ModelView(base, model).shader_pairs().address));
+                          schema::ModelShaderPair(base, (Record(base, material).shader_pair() << 4) +
+                                                   ModelView(base, model).shader_pairs().address).vertex_shader());
           Slot(base, Take(base, list), 9, 1, 0);
           guest::StoreU32(base, Take(base, list),
-                          guest::LoadU32(base, (Record(base, material).shader_pair() << 4) +
-                                                   ModelView(base, model).shader_pairs().address + 4));
+                          schema::ModelShaderPair(base, (Record(base, material).shader_pair() << 4) +
+                                                   ModelView(base, model).shader_pairs().address).pixel_shader());
         } else {
           slot = Take(base, list);
           guest::StoreU32(base, slot,
@@ -1182,31 +1187,31 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
       // The blend (render state 3) and, for group 0, 96 and 100.
       Slot(base, Take(base, list), 3, 1, 0);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 0, 0);
-      guest::StoreU32(base, slot + 4,
+      schema::ChunkCommand(base, slot).set_id(0);
+      schema::ChunkCommand(base, slot).set_arg0(
                       guest::LoadU32(base, (guest::LoadU32(base, frame + 80) << 2) +
                                                G::model_blend_states_address()));
       if (group == 0) {
         const bool flagged = Record(base, material).render_state_96() != 0;
         Slot(base, Take(base, list), 1, 2, 0);
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 4, flagged ? 1 : 0);
-        guest::StoreU32(base, slot + 0, 96);
+        schema::ChunkCommand(base, slot).set_arg0(flagged ? 1 : 0);
+        schema::ChunkCommand(base, slot).set_id(96);
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 0, 100);
-        guest::StoreU32(base, slot + 4, flagged ? 64 : Record(base, material).render_state_100());
+        schema::ChunkCommand(base, slot).set_id(100);
+        schema::ChunkCommand(base, slot).set_arg0(flagged ? 64 : Record(base, material).render_state_100());
       }
       Slot(base, Take(base, list), 1, 1, 0);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 0, 56);
-      guest::StoreU32(base, slot + 4, Record(base, material).cull_mode());
+      schema::ChunkCommand(base, slot).set_id(56);
+      schema::ChunkCommand(base, slot).set_arg0(Record(base, material).cull_mode());
       // The textures (the provider's slot 5) and their sampler states 0 and
       // 4.
       if (ModelView(base, model).texture_provider().address != 0 && Record(base, material).texture_count() != 0) {
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 0, 4);
-        guest::StoreU32(base, slot + 8, 0);
-        guest::StoreU32(base, slot + 4, Record(base, material).texture_count());
+        schema::ChunkCommand(base, slot).set_id(4);
+        schema::ChunkCommand(base, slot).set_arg1(0);
+        schema::ChunkCommand(base, slot).set_arg0(Record(base, material).texture_count());
         for (int32_t k = 0; k < int32_t(Record(base, material).texture_count()); k++) {
           const uint32_t from = ModelView(base, model).texture_provider().address;
           const uint32_t args[3] = {from, guest::LoadU32(base, Record(base, material).xpr_index_address() + 4 * uint32_t(k)),
@@ -1215,30 +1220,30 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
               ProviderSlotCall(base, calls,
                              schema::TextureProvider(base, from).vtable().xpr_texture_5(), args, frame, 0x82595CBC);
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 4, texture);
-          guest::StoreU32(base, slot + 0, uint32_t(k));
+          schema::ChunkCommand(base, slot).set_arg0(texture);
+          schema::ChunkCommand(base, slot).set_id(uint32_t(k));
         }
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 0, 2);
-        guest::StoreU32(base, slot + 8, 0);
-        guest::StoreU32(base, slot + 4, Record(base, material).texture_count() << 1);
+        schema::ChunkCommand(base, slot).set_id(2);
+        schema::ChunkCommand(base, slot).set_arg1(0);
+        schema::ChunkCommand(base, slot).set_arg0(Record(base, material).texture_count() << 1);
         for (int32_t k = 0; k < int32_t(Record(base, material).texture_count()); k++) {
           const uint32_t sampler = uint32_t(k);
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 0, sampler);
-          guest::StoreU32(base, slot + 4, 0);
-          guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_0_address() + 4 * sampler));
+          schema::ChunkCommand(base, slot).set_id(sampler);
+          schema::ChunkCommand(base, slot).set_arg0(0);
+          schema::ChunkCommand(base, slot).set_arg1(guest::LoadU32(base, Record(base, material).sampler_state_0_address() + 4 * sampler));
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 4, 4);
-          guest::StoreU32(base, slot + 0, sampler);
-          guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_4_address() + 4 * sampler));
+          schema::ChunkCommand(base, slot).set_arg0(4);
+          schema::ChunkCommand(base, slot).set_id(sampler);
+          schema::ChunkCommand(base, slot).set_arg1(guest::LoadU32(base, Record(base, material).sampler_state_4_address() + 4 * sampler));
         }
       } else {
         Slot(base, Take(base, list), 4, 4, 0);
         for (uint32_t k = 0; k < 4; k++) {
           slot = Take(base, list);
-          guest::StoreU32(base, slot + 0, k);
-          guest::StoreU32(base, slot + 4, 0);
+          schema::ChunkCommand(base, slot).set_id(k);
+          schema::ChunkCommand(base, slot).set_arg0(0);
         }
       }
       // The environment textures (the provider's slots 6 and 5, by +104's
@@ -1260,11 +1265,12 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
         const uint32_t from = ModelView(base, model).texture_provider().address;
         const uint32_t args[3] = {from, first, second_id};
         const uint32_t texture = ProviderSlotCall(base, calls,
-                             guest::LoadU32(base, schema::TextureProvider(base, from).vtable().address + function_slot), args, frame, lr);
+                             (function_slot == 24 ? schema::TextureProvider(base, from).vtable().xpr_texture_6()
+                                                 : schema::TextureProvider(base, from).vtable().xpr_texture_5()), args, frame, lr);
         Slot(base, Take(base, list), 4, 1, 0);
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 4, texture);
-        guest::StoreU32(base, slot + 0, 6);
+        schema::ChunkCommand(base, slot).set_arg0(texture);
+        schema::ChunkCommand(base, slot).set_id(6);
       }
       // Vertex c86 from the range (through the frame's +112) and pixel c76.
       if (range != 0) {
@@ -1290,8 +1296,8 @@ uint32_t ModelRecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t
       slot = Take(base, list);
       guest::StoreU16(base, slot + 4, 0);
       guest::StoreU16(base, slot + 6, 0);
-      guest::StoreU32(base, slot + 0, Record(base, material).primitive_type());
-      guest::StoreU32(base, slot + 8, Record(base, material).draw_count());
+      schema::ChunkCommand(base, slot).set_id(Record(base, material).primitive_type());
+      schema::ChunkCommand(base, slot).set_arg1(Record(base, material).draw_count());
       // The constants put back (the addresses from the frame's +84 and +88).
       if (range != 0) {
         Slot(base, Take(base, list), 7, 1, 0x00015601);
@@ -1396,11 +1402,11 @@ std::optional<SceneryDraw> ModelDrawShape(uint8_t* base, const DrawCalls& calls,
       continue;
     }
     guest::StoreU16(base, g.entry + 2, 3);
-    guest::StoreU32(base, g.entry + 4, *constants);
+    schema::ChunkItem(base, g.entry).set_link(*constants);
     guest::StoreU16(base, g.entry + 18, 3);
-    guest::StoreU32(base, g.entry + 20, *lights);
+    schema::ChunkItem(base, g.entry + 16).set_link(*lights);
     guest::StoreU16(base, g.entry + 34, 4);
-    guest::StoreU32(base, g.entry + 36,
+    schema::ChunkItem(base, g.entry + 32).set_link(
                     ModelRecordShapeChecked(base, calls, record_frame, model, shape, g.group, 1,
                                             c76, range));
     const double depth =
@@ -1421,9 +1427,9 @@ std::optional<SceneryDraw> ModelDrawShape(uint8_t* base, const DrawCalls& calls,
     return draw;
   }
   guest::StoreU16(base, entry + 2, 3);
-  guest::StoreU32(base, entry + 4, *constants);
+  schema::ChunkItem(base, entry).set_link(*constants);
   guest::StoreU16(base, entry + 18, 4);
-  guest::StoreU32(base, entry + 20, RecordShapeDepthChecked(base, model, shape, 0, 0, 0));
+  schema::ChunkItem(base, entry + 16).set_link(RecordShapeDepthChecked(base, model, shape, 0, 0, 0));
   draw.r3 = calls.submit(calls.user, entry, G::scenery_depth_key(base),
                          -Lfs(base, schema::RecordedObjectConstants(base, *constants)
                                         .depth_address()),
@@ -1517,13 +1523,13 @@ std::optional<uint32_t> ModelRecordMaterialsSlots(uint8_t* base, uint32_t model,
     return 0;
   }
   const uint32_t at = ShapeAt(base, model, shape);
-  if (!models::VertexDeclaration(base, guest::LoadU32(base, at + 244),
-                                 int32_t(guest::LoadU32(base, at + 260)),
-                                 guest::LoadU32(base, at + 276))) {
+  if (!models::VertexDeclaration(base, guest::LoadU32(base, Shape(base, at).stream0_address() + 4),
+                                 int32_t(guest::LoadU32(base, Shape(base, at).stream1_address() + 4)),
+                                 guest::LoadU32(base, Shape(base, at).stream2_address() + 4))) {
     return std::nullopt;
   }
-  const uint32_t type = guest::LoadU32(base, at + 260);
-  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, at + 276) == 6;
+  const uint32_t type = guest::LoadU32(base, Shape(base, at).stream1_address() + 4);
+  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, Shape(base, at).stream2_address() + 4) == 6;
   // The header, the declaration, the streams and the end.
   uint32_t slots = 2 + (short_streams ? 3 : 4) + 1;
   if (Shape(base, at).skinned() == 1 &&
@@ -1567,19 +1573,19 @@ std::optional<uint32_t> ModelRecordMaterialsSlots(uint8_t* base, uint32_t model,
 // The two sampler states (0 and 4) of `count` textures.
 void TextureSamplerStates(uint8_t* base, uint32_t list, uint32_t material, int32_t count) {
   uint32_t slot = Take(base, list);
-  guest::StoreU32(base, slot + 0, 2);
-  guest::StoreU32(base, slot + 8, 0);
-  guest::StoreU32(base, slot + 4, uint32_t(count) << 1);
+  schema::ChunkCommand(base, slot).set_id(2);
+  schema::ChunkCommand(base, slot).set_arg1(0);
+  schema::ChunkCommand(base, slot).set_arg0(uint32_t(count) << 1);
   for (int32_t k = 0; k < count; k++) {
     const uint32_t sampler = uint32_t(k);
     slot = Take(base, list);
-    guest::StoreU32(base, slot + 0, sampler);
-    guest::StoreU32(base, slot + 4, 0);
-    guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_0_address() + 4 * sampler));
+    schema::ChunkCommand(base, slot).set_id(sampler);
+    schema::ChunkCommand(base, slot).set_arg0(0);
+    schema::ChunkCommand(base, slot).set_arg1(guest::LoadU32(base, Record(base, material).sampler_state_0_address() + 4 * sampler));
     slot = Take(base, list);
-    guest::StoreU32(base, slot + 4, 4);
-    guest::StoreU32(base, slot + 0, sampler);
-    guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_4_address() + 4 * sampler));
+    schema::ChunkCommand(base, slot).set_arg0(4);
+    schema::ChunkCommand(base, slot).set_id(sampler);
+    schema::ChunkCommand(base, slot).set_arg1(guest::LoadU32(base, Record(base, material).sampler_state_4_address() + 4 * sampler));
   }
 }
 
@@ -1609,22 +1615,22 @@ void RecordMaterialTextures(uint8_t* base, const DrawCalls& calls, uint32_t fram
       texture = texture_of();
     }
     slot = Take(base, list);
-    guest::StoreU32(base, slot + 0, 0);
-    guest::StoreU32(base, slot + 4, texture);
+    schema::ChunkCommand(base, slot).set_id(0);
+    schema::ChunkCommand(base, slot).set_arg0(texture);
     TextureSamplerStates(base, list, material, 1);
   };
   // Every texture from `texture_of(k)` (called before its slot), then the
   // states.
   auto each = [&](auto texture_of) {
     slot = Take(base, list);
-    guest::StoreU32(base, slot + 0, 4);
-    guest::StoreU32(base, slot + 8, 0);
-    guest::StoreU32(base, slot + 4, Record(base, material).texture_count());
+    schema::ChunkCommand(base, slot).set_id(4);
+    schema::ChunkCommand(base, slot).set_arg1(0);
+    schema::ChunkCommand(base, slot).set_arg0(Record(base, material).texture_count());
     for (int32_t k = 0; k < int32_t(Record(base, material).texture_count()); k++) {
       const uint32_t texture = texture_of(uint32_t(k));
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 4, texture);
-      guest::StoreU32(base, slot + 0, uint32_t(k));
+      schema::ChunkCommand(base, slot).set_arg0(texture);
+      schema::ChunkCommand(base, slot).set_id(uint32_t(k));
     }
     TextureSamplerStates(base, list, material, int32_t(Record(base, material).texture_count()));
   };
@@ -1647,8 +1653,8 @@ void RecordMaterialTextures(uint8_t* base, const DrawCalls& calls, uint32_t fram
       Slot(base, Take(base, list), 4, 4, 0);
       for (uint32_t k = 0; k < 4; k++) {
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 0, k);
-        guest::StoreU32(base, slot + 4, 0);
+        schema::ChunkCommand(base, slot).set_id(k);
+        schema::ChunkCommand(base, slot).set_arg0(0);
       }
       break;
     case TextureSource::kNone:
@@ -1680,25 +1686,25 @@ void RecordMaterialTextures(uint8_t* base, const DrawCalls& calls, uint32_t fram
           ProviderTexture(base, calls, frame, model, material, 0, 0x820D017C);
       Slot(base, Take(base, list), 4, 2, 0);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 0, 0);
-      guest::StoreU32(base, slot + 4, texture);
+      schema::ChunkCommand(base, slot).set_id(0);
+      schema::ChunkCommand(base, slot).set_arg0(texture);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 0, 1);
-      guest::StoreU32(base, slot + 4, ModelView(base, model).vinyl_sheet());
+      schema::ChunkCommand(base, slot).set_id(1);
+      schema::ChunkCommand(base, slot).set_arg0(ModelView(base, model).vinyl_sheet());
       // Two textures' states, whatever the count.
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 0, 2);
-      guest::StoreU32(base, slot + 4, 4);
-      guest::StoreU32(base, slot + 8, 0);
+      schema::ChunkCommand(base, slot).set_id(2);
+      schema::ChunkCommand(base, slot).set_arg0(4);
+      schema::ChunkCommand(base, slot).set_arg1(0);
       for (uint32_t k = 0; k < 2; k++) {
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 0, k);
-        guest::StoreU32(base, slot + 4, 0);
-        guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_0_address() + 4 * k));
+        schema::ChunkCommand(base, slot).set_id(k);
+        schema::ChunkCommand(base, slot).set_arg0(0);
+        schema::ChunkCommand(base, slot).set_arg1(guest::LoadU32(base, Record(base, material).sampler_state_0_address() + 4 * k));
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 4, 4);
-        guest::StoreU32(base, slot + 0, k);
-        guest::StoreU32(base, slot + 8, guest::LoadU32(base, Record(base, material).sampler_state_4_address() + 4 * k));
+        schema::ChunkCommand(base, slot).set_arg0(4);
+        schema::ChunkCommand(base, slot).set_id(k);
+        schema::ChunkCommand(base, slot).set_arg1(guest::LoadU32(base, Record(base, material).sampler_state_4_address() + 4 * k));
       }
       break;
     }
@@ -1741,31 +1747,31 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
   Slot(base, header, 10, 1, 0);
   const uint32_t declaration = Take(base, list);
   guest::StoreU32(base, declaration,
-                  *models::VertexDeclaration(base, guest::LoadU32(base, at + 244),
-                                             int32_t(guest::LoadU32(base, at + 260)),
-                                             guest::LoadU32(base, at + 276)));
-  const uint32_t type = guest::LoadU32(base, at + 260);
-  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, at + 276) == 6;
+                  *models::VertexDeclaration(base, guest::LoadU32(base, Shape(base, at).stream0_address() + 4),
+                                             int32_t(guest::LoadU32(base, Shape(base, at).stream1_address() + 4)),
+                                             guest::LoadU32(base, Shape(base, at).stream2_address() + 4)));
+  const uint32_t type = guest::LoadU32(base, Shape(base, at).stream1_address() + 4);
+  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, Shape(base, at).stream2_address() + 4) == 6;
   uint32_t slot;
   Slot(base, Take(base, list), 11, short_streams ? 2 : 3, 0);
   slot = Take(base, list);
   Slot(base, slot, 0, Shape(base, at).vertex_buffer0_address(), 0);
-  guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 248));
+  guest::StoreU32(base, slot + 12, guest::LoadU32(base, Shape(base, at).stream0_address() + 8));
   slot = Take(base, list);
   Slot(base, slot, 1, stream, 0);
-  guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 264));
+  guest::StoreU32(base, slot + 12, guest::LoadU32(base, Shape(base, at).stream1_address() + 8));
   if (!short_streams) {
     slot = Take(base, list);
     Slot(base, slot, 2, second, 0);
-    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 280));
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, Shape(base, at).stream2_address() + 8));
   }
   if (Shape(base, at).skinned() == 1) {
     const uint32_t indices = Shape(base, at).skin().address;
     if (schema::SkinBlock(base, indices).object() != 0) {
       Slot(base, Take(base, list), 22, 1, 0);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 8, 1);
-      guest::StoreU32(base, slot + 4, schema::SkinBlock(base, indices).object());
+      schema::ChunkCommand(base, slot).set_arg1(1);
+      schema::ChunkCommand(base, slot).set_arg0(schema::SkinBlock(base, indices).object());
     }
   }
   uint32_t material = models::Material(base, model, shape, 0, group);
@@ -1785,12 +1791,12 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
         Slot(base, Take(base, list), 8, 1, 0);
         if (pair == 0 && ModelView(base, model).force_pair_1005() == 0) {
           guest::StoreU32(base, Take(base, list),
-                          guest::LoadU32(base, (Record(base, material).shader_pair() << 4) +
-                                                   ModelView(base, model).shader_pairs().address));
+                          schema::ModelShaderPair(base, (Record(base, material).shader_pair() << 4) +
+                                                   ModelView(base, model).shader_pairs().address).vertex_shader());
           Slot(base, Take(base, list), 9, 1, 0);
           guest::StoreU32(base, Take(base, list),
-                          guest::LoadU32(base, (Record(base, material).shader_pair() << 4) +
-                                                   ModelView(base, model).shader_pairs().address + 4));
+                          schema::ModelShaderPair(base, (Record(base, material).shader_pair() << 4) +
+                                                   ModelView(base, model).shader_pairs().address).pixel_shader());
         } else {
           const uint32_t shared = ModelView(base, model).force_pair_1005() != 0 ? 1005
                                   : pair == 1004                         ? 1000
@@ -1803,8 +1809,8 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
       // The blend (render state 3, the table at the frame's +80).
       Slot(base, Take(base, list), 3, 1, 0);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 0, 0);
-      guest::StoreU32(base, slot + 4,
+      schema::ChunkCommand(base, slot).set_id(0);
+      schema::ChunkCommand(base, slot).set_arg0(
                       guest::LoadU32(base, (Record(base, material).blend_mode() << 2) +
                                                guest::LoadU32(base, frame + 80)));
       // Vertex c9-c13: four colors (0, 0, 0, 1) and the textures' third
@@ -1860,25 +1866,25 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
       if (group == 0) {
         Slot(base, Take(base, list), 1, 1, 0);
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 4, Record(base, material).render_state_96() != 0 ? 1 : 0);
-        guest::StoreU32(base, slot + 0, 96);
+        schema::ChunkCommand(base, slot).set_arg0(Record(base, material).render_state_96() != 0 ? 1 : 0);
+        schema::ChunkCommand(base, slot).set_id(96);
       }
       // 48 (0 when [0x826C5104] is set), 100 and 56 (the cull mode, 2 and 6
       // swapped when [0x826C5100] is set).
       Slot(base, Take(base, list), 1, 3, 0);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 4, G::render_state_48_off(base) != 0 ? 0 : 1);
-      guest::StoreU32(base, slot + 0, 48);
+      schema::ChunkCommand(base, slot).set_arg0(G::render_state_48_off(base) != 0 ? 0 : 1);
+      schema::ChunkCommand(base, slot).set_id(48);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 0, 100);
-      guest::StoreU32(base, slot + 4, Record(base, material).render_state_100());
+      schema::ChunkCommand(base, slot).set_id(100);
+      schema::ChunkCommand(base, slot).set_arg0(Record(base, material).render_state_100());
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 0, 56);
+      schema::ChunkCommand(base, slot).set_id(56);
       uint32_t cull = Record(base, material).cull_mode();
       if (G::cull_swap(base) != 0 && (cull == 2 || cull == 6)) {
         cull = cull == 2 ? 6 : 2;
       }
-      guest::StoreU32(base, slot + 4, cull);
+      schema::ChunkCommand(base, slot).set_arg0(cull);
       RecordMaterialTextures(base, calls, frame, list, model, material);
       // Sampler 6 and its states 16, 20 and 36.
       if (SetsSampler6(base, material)) {
@@ -1892,8 +1898,8 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
         }
         Slot(base, Take(base, list), 4, 1, 0);
         slot = Take(base, list);
-        guest::StoreU32(base, slot + 0, 6);
-        guest::StoreU32(base, slot + 4, texture);
+        schema::ChunkCommand(base, slot).set_id(6);
+        schema::ChunkCommand(base, slot).set_arg0(texture);
         Slot(base, Take(base, list), 2, 3, 0);
         Slot(base, Take(base, list), 6, 16, 4);
         Slot(base, Take(base, list), 6, 20, 4);
@@ -1904,10 +1910,10 @@ uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint
       guest::StoreU32(base, Take(base, list), Record(base, material).index_buffer_address());
       Slot(base, Take(base, list), 18, 1, 0);
       slot = Take(base, list);
-      guest::StoreU32(base, slot + 0, Record(base, material).primitive_type());
+      schema::ChunkCommand(base, slot).set_id(Record(base, material).primitive_type());
       guest::StoreU16(base, slot + 4, 0);
       guest::StoreU16(base, slot + 6, 0);
-      guest::StoreU32(base, slot + 8, Record(base, material).draw_count());
+      schema::ChunkCommand(base, slot).set_arg1(Record(base, material).draw_count());
     }
   }
   EndRecord(base, list);

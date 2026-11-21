@@ -45,7 +45,13 @@ Shared with other files, without rows here: `Vehicle::Get`
 position) and `Stages::Copy` (`sub_820FFD88`) (`vehicle-accessors.md`);
 `memcpy` (`sub_825A7410`, `c-runtime.md`); operator new and delete
 (`sub_825A6880`, `sub_825A70E8`, `heap.md`). The route's sections table
-(`[0x826C5B10]` + 12, `track-route.md`) is read directly. `List64::Insert`
+(`[0x826C5B10]` + 12, `track-route.md`) is read directly, through
+track-route's views (`TrackRouteFile`, `TrackRouteSection`,
+`TrackRouteLink`); the car's track position through collision-world's
+`TrackPosition`, the racers' entries through race-world's `RaceManager`
+and minimap's `MinimapRacerEntry`, and the race data through
+race-states' `RaceData` and vehicle-accessors' `Stages` and `RaceStage`
+(E5 step 2's second pass). `List64::Insert`
 (`sub_820FE330`) is also called by `sub_82148428` (a list of models, a
 lead), and `List16::Link` (`sub_821531C0`) by `sub_82154378`,
 `sub_821543E8` and `sub_82154458` (the camera modes' area; `List16::Insert32`, `Insert608` and `Insert20` in `camera-modes.md` since 2026-10-30).

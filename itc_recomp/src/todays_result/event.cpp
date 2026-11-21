@@ -44,11 +44,20 @@ uint32_t ImagesLoaded(uint8_t* base, const List& list) {
   return 1;
 }
 
-// The movie's +28 object's +36 and +32 put back from the data's +400 and
-// +404 (Unload's and Leave's).
+// The movie's texture words 9 and 8 (its textures' vector data, the
+// movie's +28, at +36 and +32).
+uint32_t Texture9(uint8_t* base, uint32_t movie) {
+  return schema::UiMovie(base, movie).textures() + 36;
+}
+uint32_t Texture8(uint8_t* base, uint32_t movie) {
+  return schema::UiMovie(base, movie).textures() + 32;
+}
+
+// The movie's texture words 9 and 8 put back from the data's +400 and +404
+// (Unload's and Leave's).
 void PutBackImages(uint8_t* base, uint32_t movie) {
-  Store(base, Load(base, movie + 28) + 36, Data(base).movie_object_36());
-  Store(base, Load(base, movie + 28) + 32, Data(base).movie_object_32());
+  Store(base, Texture9(base, movie), Data(base).movie_object_36());
+  Store(base, Texture8(base, movie), Data(base).movie_object_32());
 }
 
 }  // namespace
@@ -66,10 +75,12 @@ uint32_t ImagesLoadedB(uint8_t* base, uint32_t data) {
 uint64_t MarkImages(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8225BAB8 TodaysEvent::MarkImages");
   const uint32_t frame = Frame(base, sp, 160);
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  uint64_t r3 = save;
-  const uint32_t unlocks = save + kUnlocks;
-  for (uint32_t k = 0; k < Load(base, unlocks + 768); k++) {
+  const Save save(base, vehicle_accessors::SaveDataOf(base, 0));
+  uint64_t r3 = save.address;
+  // The unlocks just made: 12-byte entries (+0 shown, +4 the table, +8 the
+  // entry).
+  const uint32_t unlocks = save.unlocks_shown_address();
+  for (uint32_t k = 0; k < save.unlocks_shown_count(); k++) {
     const uint32_t unlock = unlocks + 12 * k;
     const uint32_t table = Load(base, unlock + 4);
     uint32_t entry = Load(base, unlock + 8);
@@ -227,8 +238,9 @@ uint32_t NextUnlockEntry(uint8_t* base, uint32_t sp) {
       return 0;
     }
   }
-  const uint32_t unlocks = vehicle_accessors::SaveDataOf(base, 0) + kUnlocks;
-  const uint32_t count = Load(base, unlocks + 768);
+  const Save save(base, vehicle_accessors::SaveDataOf(base, 0));
+  const uint32_t unlocks = save.unlocks_shown_address();
+  const uint32_t count = save.unlocks_shown_count();
   for (uint32_t k = 0; k < count; k++) {
     const uint32_t unlock = unlocks + 12 * k;
     if (Load(base, unlock + 0) == 0) {
@@ -240,7 +252,7 @@ uint32_t NextUnlockEntry(uint8_t* base, uint32_t sp) {
       return 1;
     }
   }
-  Store(base, vehicle_accessors::SaveDataOf(base, 0) + kUnlockCount, 0);
+  Save(base, vehicle_accessors::SaveDataOf(base, 0)).set_unlocks_shown_count(0);
   return 2;
 }
 
@@ -248,19 +260,21 @@ uint64_t SetUpTexts(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225C648 TodaysEvent::SetUpTexts");
   const uint32_t frame = Frame(base, sp, 128);
   const uint32_t movie = FindMovie(base, frame + 80, kEventMovie);
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const int32_t day = int32_t(Load(base, save + 6100));
-  calls.Call(kSetChildNameText, frame, 0x8225C698, movie, 8, 6, save + 8);
-  calls.Call(kSetNumberText, frame, 0x8225C6AC, movie, 8, 9, Load(base, save + 6116));
+  const Save save(base, vehicle_accessors::SaveDataOf(base, 0));
+  const int32_t day = int32_t(save.day());
+  calls.Call(kSetChildNameText, frame, 0x8225C698, movie, 8, 6,
+             schema::CareerSave(base, save.address).pick_address());
+  calls.Call(kSetNumberText, frame, 0x8225C6AC, movie, 8, 9, save.money());
   // SetText's varargs past the day 0 (the user's call of 2026-10-30).
   const uint64_t args[8] = {movie, 8, 13, 8, uint64_t(uint32_t(day > 999 ? 999 : day)), 0, 0, 0};
   calls.CallArgs(kSetText, frame, 0x8225C6D0, args);
-  Store(base, ui_movies::FindNode(base, movie, 8, 11) + 108, uint32_t(day - (day / 7) * 7));
-  Store(base, ui_movies::FindNode(base, movie, 10, 6) + 80, 0);
-  Store(base, ui_movies::FindNode(base, movie, 10, 8) + 80, 0);
-  Store(base, ui_movies::FindNode(base, movie, 10, 7) + 80, 0);
+  Node(base, ui_movies::FindNode(base, movie, 8, 11))
+      .set_texture_entry(uint32_t(day - (day / 7) * 7));
+  Node(base, ui_movies::FindNode(base, movie, 10, 6)).set_visible(0);
+  Node(base, ui_movies::FindNode(base, movie, 10, 8)).set_visible(0);
+  Node(base, ui_movies::FindNode(base, movie, 10, 7)).set_visible(0);
   const uint32_t last = ui_movies::FindNode(base, movie, 10, 9);
-  Store(base, last + 80, 0);
+  Node(base, last).set_visible(0);
   Data(base).set_ready(1);
   return last;
 }
@@ -273,8 +287,8 @@ uint64_t EventStart(uint8_t* base, uint32_t sp, const Calls& calls) {
   Store(base, frame + 84, 1);
   calls.Call(kSoundPlay, frame, 0x8225C9BC, frame + 84, frame + 80);
   const uint32_t movie = FindMovie(base, frame + 84, kEventMovie);
-  Data(base).set_movie_object_36(Load(base, Load(base, movie + 28) + 36));
-  Data(base).set_movie_object_32(Load(base, Load(base, movie + 28) + 32));
+  Data(base).set_movie_object_36(Load(base, Texture9(base, movie)));
+  Data(base).set_movie_object_32(Load(base, Texture8(base, movie)));
   SetUpTexts(base, frame, calls);
   const uint32_t answer = NextUnlockEntry(base, frame);
   if (answer == 2) {
@@ -320,14 +334,14 @@ uint64_t EventUnloaded(uint8_t* base, uint32_t machine, uint32_t dispatcher, uin
   uint32_t manager = G::sound_manager(base);
   Store(base, frame + 80, 2);
   Store(base, frame + 84, 1);
-  uint64_t r3 = calls.Call(Load(base, Load(base, manager) + 56), frame, 0x8225C2BC, manager,
-                           frame + 84, frame + 80);
+  uint64_t r3 = calls.Call(schema::AudioManager(base, manager).vtable().is_cue_playing(), frame,
+                           0x8225C2BC, manager, frame + 84, frame + 80);
   if ((r3 & 0xFF) != 0) {
     manager = G::sound_manager(base);
     Store(base, frame + 88, 2);
     Store(base, frame + 92, 1);
-    r3 = calls.Call(Load(base, Load(base, manager) + 52), frame, 0x8225C2E8, manager,
-                    frame + 92, frame + 88);
+    r3 = calls.Call(schema::AudioManager(base, manager).vtable().stop_cue(), frame, 0x8225C2E8,
+                    manager, frame + 92, frame + 88);
   }
   Post(base, dispatcher, 6);
   Machine(base, machine).set_state(9);
@@ -492,7 +506,7 @@ uint64_t EventPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   if (uint32_t(revealed) != 0) {
     const uint64_t more = calls.Call(kHasMoreText, frame, 0x8225C548, movie, 0, 2);
     const uint32_t node = ui_movies::FindNode(base, movie, 0, 0);
-    Store(base, node + 80, uint32_t(more) != 0 ? 1 : 0);
+    Node(base, node).set_visible(uint32_t(more) != 0 ? 1 : 0);
     return node;
   }
   const uint32_t answer = NextUnlockEntry(base, frame);
@@ -527,7 +541,7 @@ uint64_t QueueEventMovies(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8225B9B8 TodaysEvent::QueueEventMovies");
   const uint32_t frame = Frame(base, sp, 96);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t queued = save + kQueuedMovie;
+  const uint32_t queued = Save(base, save).movie_after_results_address();
   const uint32_t ids = G::boot_movie_ids_address();
   for (uint32_t k = 0; k < 5; k++) {
     Store(base, ids + 4 * k, 11);
@@ -582,8 +596,8 @@ uint64_t ShowImages(uint8_t* base, uint32_t index, uint32_t sp) {
     }
     return 0u;
   };
-  Store(base, Load(base, movie + 28) + 36, texture(List(base, EventData(base).images_a_address())));
-  Store(base, Load(base, movie + 28) + 32, texture(List(base, EventData(base).images_b_address())));
+  Store(base, Texture9(base, movie), texture(List(base, EventData(base).images_a_address())));
+  Store(base, Texture8(base, movie), texture(List(base, EventData(base).images_b_address())));
   return pair;
 }
 
@@ -602,7 +616,7 @@ uint64_t ShowUnlock(uint8_t* base, uint32_t sp, const Calls& calls) {
   ShowImages(base, Load(base, record + 16), frame);
   const uint64_t more = calls.Call(kHasMoreText, frame, 0x8225CAE0, movie, 0, 2);
   const uint32_t node = ui_movies::FindNode(base, movie, 0, 0);
-  Store(base, node + 80, uint32_t(more) != 0 ? 1 : 0);
+  Node(base, node).set_visible(uint32_t(more) != 0 ? 1 : 0);
   return node;
 }
 

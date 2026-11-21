@@ -45,11 +45,12 @@ uint64_t Create(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls
   pages.set_step_started(0);
   pages.set_unknown_20(kNone);
   pages.set_step(kNone);
-  const uint32_t list = uint32_t(calls.Call(kVirtualAlloc, frame, 0x82289478, 0, 72, 0x1000, 4));
+  const schema::MenuList list(
+      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x82289478, 0, 72, 0x1000, 4)));
   G::set_list(base, list);
-  if (list != 0) {
-    Store(base, list + 68, 0);
-    Store(base, list + 60, 0);
+  if (list.address != 0) {
+    list.set_enabled(0u);
+    list.set_player(0);
   }
   const uint64_t r3 = calls.Call(kVirtualAlloc, frame, 0x822894A4, 0, 16, 0x1000, 4);
   const schema::ReplayTheaterData data(base, uint32_t(r3));
@@ -334,7 +335,7 @@ uint64_t Destroy(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& call
   const uint32_t frame = Frame(base, sp, 128);
   Machine(base, machine).set_state(Data(base).replay_loaded() != 0 ? 11 : 14);
   calls.Call(kVirtualFree, frame, 0x82289530, Pages(base).address, 0, kMemRelease);
-  calls.Call(kVirtualFree, frame, 0x82289544, List(base), 0, kMemRelease);
+  calls.Call(kVirtualFree, frame, 0x82289544, List(base).address, 0, kMemRelease);
   const uint64_t r3 =
       calls.Call(kVirtualFree, frame, 0x82289554, Data(base).address, 0, kMemRelease);
   G::set_pages(base, 0u);

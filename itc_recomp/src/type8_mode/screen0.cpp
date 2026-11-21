@@ -15,8 +15,10 @@
 #include "guest.h"
 #include "race_screens/race_screens.h"
 #include "save_data/save_data.h"
+#include "schema/boot_mode.h"
 #include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
+#include "schema/race_screens.h"
 #include "schema/type8_mode.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -60,19 +62,20 @@ uint32_t MovieAt(uint8_t* base, uint32_t frame, uint32_t id) {
 // A message (`message`, 0, 0) posted in the dispatcher's ring (+204), the
 // words in the original's order (`id_last`: +8, +4, then the id).
 void Post(uint8_t* base, uint32_t dispatcher, uint32_t message, bool id_last = false) {
-  const uint32_t ring = dispatcher + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t end = d.ring_start() + count - 1;
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(
+      base, d.ring_address() + (end - (end / 50) * 50) * schema::ModeMessage::kSize);
   if (id_last) {
-    StoreU32(base, slot + 8, 0);
-    StoreU32(base, slot + 4, 0);
-    StoreU32(base, slot + 0, message);
+    slot.set_arg1(0);
+    slot.set_arg0(0);
+    slot.set_id(message);
   } else {
-    StoreU32(base, slot + 0, message);
-    StoreU32(base, slot + 4, 0);
-    StoreU32(base, slot + 8, 0);
+    slot.set_id(message);
+    slot.set_arg0(0);
+    slot.set_arg1(0);
   }
 }
 
@@ -96,9 +99,9 @@ uint64_t Screen0Construct(uint8_t* base, uint64_t r3, uint32_t sp) {
   Frame(base, sp, 96);
   boot_mode::ScreenMachineConstruct(base, s.machine_address());
   s.set_vtable(S::kVtable);
-  // The MenuList's +68 (enabled) and +60 (player), left for its area.
-  StoreU32(base, s.menu_list_address() + 68, 0);
-  StoreU32(base, s.menu_list_address() + 60, 0);
+  const schema::MenuList list(base, s.menu_list_address());
+  list.set_enabled(0u);
+  list.set_player(0);
   for (const uint32_t at : {s.stand_0_address(), s.stand_1_address()}) {
     const Stand block(base, at);
     block.set_loading_shown(0);

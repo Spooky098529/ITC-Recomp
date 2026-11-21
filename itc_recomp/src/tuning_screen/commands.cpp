@@ -15,6 +15,8 @@
 #include "base/log.h"
 #include "camera_modes/steps.h"
 #include "guest.h"
+#include "schema/tuning_pages.h"
+#include "schema/ui_movies_game.h"
 #include "tuning_pages/tuning_pages.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -520,23 +522,25 @@ uint64_t Command21(uint8_t* base, const GuestCall& call, uint64_t r3, uint32_t s
     const int32_t set = int32_t(TS(base, s).editor_page());
     if (set == 0 || set == 1) {
       const uint32_t c = TS(base, s).order_position();
-      const uint32_t images = TS(base, s).decal_images_address();
+      const uint32_t images =
+          schema::DecalImages(base, TS(base, s).decal_images_address()).entries_address();
       const uint32_t shift = (set == 0 ? 5 : 26) + up;
-      const uint32_t e1 = images + 36 * (c + shift + 1);
-      const uint32_t e2 = images + 36 * (c + shift);
-      const uint32_t h1 = Load(base, e1 + 28);
-      const uint32_t h2 = Load(base, e2 + 28);
-      const uint32_t d1 = Load(base, e1 + 32);
-      Store(base, e1 + 28, h2);
-      Store(base, e1 + 32, Load(base, e2 + 32));
-      Store(base, e2 + 28, h1);
-      Store(base, e2 + 32, d1);
+      const schema::DecalImageEntry e1(base, images + 36 * (c + shift + 1));
+      const schema::DecalImageEntry e2(base, images + 36 * (c + shift));
+      const uint32_t h1 = e1.texture_header();
+      const uint32_t h2 = e2.texture_header();
+      const uint32_t d1 = e1.texture_data();
+      e1.set_texture_header(h2);
+      e1.set_texture_data(e2.texture_data());
+      e2.set_texture_header(h1);
+      e2.set_texture_data(d1);
       const uint32_t slot = set == 0 ? 764 : 776;
       const uint32_t from = set == 0 ? 10292 : 11048;
       for (uint32_t k = 0; k < 3; k++) {
         const uint32_t entry = MovieEntry(base, frame, 13);
         const uint32_t value = word(from + 36 * k);
-        Store(base, Load(base, Load(base, Load(base, entry) + 28) + slot + 4 * k), value);
+        const schema::UiMovie movie13(base, Load(base, entry));
+        Store(base, Load(base, Load(base, movie13.textures_address()) + slot + 4 * k), value);
       }
     }
     Command20(base, call, s, frame, TS(base, s).vinyl_animation_a(),
@@ -718,9 +722,9 @@ void SliderPair(uint8_t* base, uint32_t movie, uint32_t frame, uint32_t screen,
                 uint32_t scale, uint32_t length = 0) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
   const uint32_t one = ui_movies::Child(base, node, first);
-  Store(base, one + 12, Slider(base, frame, screen, a, scale, length));
+  Store(base, UiNode(base, one).x_address(), Slider(base, frame, screen, a, scale, length));
   const uint32_t two = ui_movies::Child(base, node, first + 1);
-  Store(base, two + 12, Slider(base, frame, screen, b, scale, length));
+  Store(base, UiNode(base, two).x_address(), Slider(base, frame, screen, b, scale, length));
 }
 
 // The named animation from `named` (read again for each call) restarted
@@ -747,8 +751,8 @@ uint64_t Command10(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   {
     const uint32_t node = ui_movies::FindNode(base, movie, 21, 5);
     const bool second = TS(base, screen).paint_choice() != 0;
-    Store(base, ui_movies::Child(base, node, 4) + 68, Load(base, second ? kDim : kOne));
-    Store(base, ui_movies::Child(base, node, 5) + 68, Load(base, second ? kOne : kDim));
+    Store(base, UiNode(base, ui_movies::Child(base, node, 4)).alpha_address(), Load(base, second ? kDim : kOne));
+    Store(base, UiNode(base, ui_movies::Child(base, node, 5)).alpha_address(), Load(base, second ? kOne : kDim));
   }
   // The three sliders (nodes (21, 2 to 4)'s children 10 and 11).
   SliderPair(base, movie, frame, screen, 21, 2, 10, 30444, 30476, kHue);
@@ -757,19 +761,19 @@ uint64_t Command10(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
   const int32_t kind = int32_t(TS(base, screen).paint_row());
   if (kind == 0) {
     const uint32_t row = ui_movies::Child(base, ui_movies::FindNode(base, movie, 21, 1), 1);
-    Store(base, row + 68, Load(base, kZero));
+    Store(base, UiNode(base, row).alpha_address(), Load(base, kZero));
     Looped(call, frame, movie, 212, 0x821F39A8, 0x821F39C4, 0x821F39D0);
   } else if (kind == 4) {
-    Store(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 21, 1), 1) + 68,
+    Store(base, UiNode(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 21, 1), 1)).alpha_address(),
           Load(base, kOne));
     for (uint32_t child = 2; child <= 4; child++) {
       const uint32_t node = ui_movies::FindNode(base, movie, 21, child);
-      Store(base, ui_movies::Child(base, ui_movies::Child(base, node, 5), 1) + 68,
+      Store(base, UiNode(base, ui_movies::Child(base, ui_movies::Child(base, node, 5), 1)).alpha_address(),
             Load(base, kZero));
     }
     {
       const uint32_t node = ui_movies::FindNode(base, movie, 21, 5);
-      Store(base, ui_movies::Child(base, ui_movies::Child(base, node, 3), 0) + 68,
+      Store(base, UiNode(base, ui_movies::Child(base, ui_movies::Child(base, node, 3), 0)).alpha_address(),
             Load(base, kZero));
     }
     if (TS(base, screen).paint_buttons() == 0) {
@@ -799,7 +803,7 @@ uint64_t Command13(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
     PlayNamed(call, frame, 0x821EA51C, movie, 238, 1);
     FinishNamed(call, frame, 0x821EA528, movie, 248);
     PlayNamed(call, frame, 0x821EA544, movie, 248, 1);
-    Store(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 23, 1), 1) + 68,
+    Store(base, UiNode(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 23, 1), 1)).alpha_address(),
           Load(base, kZero));
     ClearFlags(base, screen);
   }
@@ -839,7 +843,7 @@ uint64_t Command14(uint8_t* base, const GuestCall& call, uint32_t screen, uint32
     PlayNamed(call, frame, 0x821EB00C, movie, 987, 1);
     FinishNamed(call, frame, 0x821EB018, movie, 320);
     PlayNamed(call, frame, 0x821EB034, movie, 320, 1);
-    Store(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 24, 1), 1) + 68,
+    Store(base, UiNode(base, ui_movies::Child(base, ui_movies::FindNode(base, movie, 24, 1), 1)).alpha_address(),
           Load(base, kZero));
     ClearFlags(base, screen);
   }

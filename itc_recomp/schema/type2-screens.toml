@@ -352,11 +352,11 @@ hub_menu = { address = 0x826D8414, type = "ptr", to = "FrontEndMenu", note = "it
 hub_data = { address = 0x826D8418, type = "ptr", to = "Type2HubData" }
 hub_counter = { address = 0x826D841C, type = "u32", note = "Type2Hub::WaitForLoad's counter" }
 plate_pages = { address = 0x826D8430, type = "ptr", to = "PageObject", note = "pages 0 the region, 1 the number, 2 the characters, 3 a confirmation, 4 leaving; 20 transitions" }
-plate_list = { address = 0x826D8434, type = "ptr", note = "a MenuList (72 bytes, race-screens.toml)" }
+plate_list = { address = 0x826D8434, type = "ptr", to = "MenuList", note = "a MenuList (72 bytes, race-screens.toml)" }
 plate_data = { address = 0x826D8438, type = "ptr", to = "PlateEditorData" }
 build_pages = { address = 0x826D843C, type = "ptr", to = "PageObject", note = "the build screen's transition machine: pages 0 to 3 the levels, 4 leaving" }
-build_list = { address = 0x826D8440, type = "ptr", note = "the level's MenuList (72 bytes)" }
-build_group_list = { address = 0x826D8444, type = "ptr", note = "the groups' MenuList (72 bytes)" }
+build_list = { address = 0x826D8440, type = "ptr", to = "MenuList", note = "the level's MenuList (72 bytes)" }
+build_group_list = { address = 0x826D8444, type = "ptr", to = "MenuList", note = "the groups' MenuList (72 bytes)" }
 build_screen = { address = 0x826D8448, type = "ptr", to = "BuildScreenData" }
 sheet_pages = { address = 0x826D8464, type = "ptr", to = "PageObject", note = "two pages" }
 sheet_menu = { address = 0x826D8468, type = "ptr", to = "FrontEndMenu" }

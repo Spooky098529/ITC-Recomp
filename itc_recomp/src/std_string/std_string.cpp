@@ -1,6 +1,7 @@
 #include "std_string/std_string.h"
 
 #include "guest.h"
+#include "schema/file_layer.h"
 #include "schema/std_string.h"
 
 #include "base/log.h"
@@ -428,7 +429,7 @@ std::optional<uint32_t> ReplaceAll(uint8_t* base, uint32_t string, uint32_t patt
 
 std::optional<int32_t> InitGlobalString8265EE7C(uint8_t* base, const c_runtime::AtexitCall& call) {
   ITC_NATIVE_RUNNING("sub_825DA540 (the string at 0x8265EE7C's static set-up)");
-  if (!AssignText(base, 0x8265EE7C, 0x8206CC74, 9)) {
+  if (!AssignText(base, schema::FileLayerGlobals::prefix_string_address(), 0x8206CC74, 9)) {
     return std::nullopt;
   }
   return c_runtime::AtexitFrom(base, 0x825DB328, call);
@@ -436,7 +437,7 @@ std::optional<int32_t> InitGlobalString8265EE7C(uint8_t* base, const c_runtime::
 
 std::optional<int32_t> InitGlobalString8265EE98(uint8_t* base, const c_runtime::AtexitCall& call) {
   ITC_NATIVE_RUNNING("sub_825DA580 (the string at 0x8265EE98's static set-up)");
-  if (!AssignText(base, 0x8265EE98, 0x8206CC80, 13)) {
+  if (!AssignText(base, schema::FileLayerGlobals::project_string_address(), 0x8206CC80, 13)) {
     return std::nullopt;
   }
   return c_runtime::AtexitFrom(base, 0x825DB380, call);

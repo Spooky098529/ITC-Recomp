@@ -25,6 +25,9 @@
 #include "hooks/strings_and_font.h"
 #include "memory/c_runtime_heap.h"
 #include "hooks/ui_movies_game.h"
+#include "schema/app_start_up.h"
+#include "schema/strings_and_font.h"
+#include "schema/tuning_screen.h"
 #include "schema/ui_movies_game.h"
 #include "strings_and_font/strings_and_font.h"
 #include "ui_movies/game.h"
@@ -156,7 +159,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AC00) {
   
   NATIVE_OR_ORIGINAL(8211AC00);
   const uint32_t node = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  guest::StoreU32(base, node + 80, 1);
+  schema::UiMovieNode(base, node).set_visible(1);
   ctx.r3.u64 = node;
 }
 
@@ -164,7 +167,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AC48) {
   
   NATIVE_OR_ORIGINAL(8211AC48);
   const uint32_t node = ui_movies::FindNode(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  guest::StoreU32(base, node + 80, 0);
+  schema::UiMovieNode(base, node).set_visible(0);
   ctx.r3.u64 = node;
 }
 
@@ -334,7 +337,7 @@ ITC_NATIVE_ENTRY_ALWAYS(8211AD00) {
     return;  // a harness's (the race HUD object's)
   }
   NATIVE_OR_ORIGINAL(8211AD00);
-  constexpr uint32_t kScene = 0x826BABA0;
+  constexpr uint32_t kScene = schema::AppStartUpGlobals::render_app_address();
   ui_movies::ClearScreenFlag(base);
   const uint64_t lr = ctx.lr;
   uint32_t list = 0, renderer = 0;
@@ -525,7 +528,7 @@ ITC_REGS_STEP(DrawTexts) {
       }
       ui_movies::DrawTextsItem(base, frame, movie, draw_only);
       // Text::Draw (its adapter: the render queue's guest call).
-      ctx.r3.u64 = guest::LoadU32(base, strings_and_font::kStrings);
+      ctx.r3.u64 = guest::LoadU32(base, schema::StringsAndFontGlobals::strings_address());
       ctx.r4.u64 = frame + ui_movies::kDrawTextsParams;
       ctx.r5.u64 = frame + ui_movies::kDrawTextsBuffer;
       ctx.lr = 0x8211D190;

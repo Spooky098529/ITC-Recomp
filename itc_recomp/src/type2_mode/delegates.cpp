@@ -9,7 +9,9 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/boot_mode.h"
 #include "schema/game_modes.h"
+#include "schema/options_screen.h"
 #include "schema/type2_mode.h"
 #include "type2_dialog/type2_dialog.h"
 
@@ -32,8 +34,9 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
 }
 
 void ClearAnswer(uint8_t* base, uint32_t answer) {
-  StoreU32(base, answer + 4, 0);
-  guest::StoreU8(base, answer + 0, 0);
+  const schema::ModeAnswer a(base, answer);
+  a.set_next_type(0);
+  a.set_changed(0);
 }
 
 // The mode's ring's next slot (its count +840, the start +844), the count
@@ -102,8 +105,9 @@ void TearDown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
   }
   const Block from = Mode(base, mode).block();
   const uint32_t w0 = from.answer_word0(), w1 = from.answer_next_type();
-  StoreU32(base, answer + 0, w0);
-  StoreU32(base, answer + 4, w1);
+  const schema::ModeAnswer to(base, answer);
+  to.set_word0(w0);
+  to.set_next_type(w1);
 }
 
 void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
@@ -307,7 +311,7 @@ uint32_t Interrupt(uint8_t* base, uint32_t object, uint32_t sp) {
   }
   bool post = false;
   if (int32_t(block.save_screen_state()) == 5 ||
-      LoadU32(base, G::options_settings(base) + 712) == 0) {
+      G::options_settings(base).save_page_closed() == 0) {
     post = true;
   } else if (int32_t(G::dialog_status(base)) == 3) {
     return 1;

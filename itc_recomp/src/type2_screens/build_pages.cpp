@@ -48,7 +48,7 @@ uint32_t Entry(uint8_t* base) {
 // bctrl from `frame` returning to `lr`: whether its low byte is set.
 bool Fired(uint8_t* base, uint32_t entry, uint32_t action, uint32_t frame, uint32_t lr,
            const Calls& calls) {
-  const uint32_t mapper = Load(base, entry + 0);
+  const uint32_t mapper = schema::PlayerMapperEntry(base, entry).mapper<schema::View>().address;
   const uint32_t function = Load(base, Load(base, mapper) + 48);
   return (calls.Call(function, frame, lr, mapper, action) & 0xFF) != 0;
 }
@@ -75,7 +75,7 @@ uint32_t Jump(uint8_t* base, uint32_t sp, uint32_t back, uint32_t forward, bool 
   const uint32_t entry = Entry(base);
   const uint32_t movie = FindMovie(base, kBuildMovie, frame + 80);
   const uint32_t selection = race_screens::ListSelection(base, List(base));
-  const uint32_t scroll = Load(base, List(base) + 4);
+  const uint32_t scroll = MenuList(base, List(base)).scroll();
   const uint32_t position = scroll + selection;
   const uint32_t count =
       groups ? Screen(base).shown_group_count()
@@ -88,7 +88,7 @@ uint32_t Jump(uint8_t* base, uint32_t sp, uint32_t back, uint32_t forward, bool 
     calls.Call(kListFit, frame, lrs.fit, List(base), 0);
     return 1;
   };
-  if (S(Load(base, entry + 4)) != 1 && Fired(base, entry, back, frame, lrs.back, calls)) {
+  if (S(schema::PlayerMapperEntry(base, entry).unread()) != 1 && Fired(base, entry, back, frame, lrs.back, calls)) {
     for (uint32_t i = position - 1; S(i) >= 0; i--) {
       if (hit(i)) {
         return found(i);
@@ -101,7 +101,7 @@ uint32_t Jump(uint8_t* base, uint32_t sp, uint32_t back, uint32_t forward, bool 
     }
     return 0;
   }
-  if (S(Load(base, entry + 4)) == 1 || !Fired(base, entry, forward, frame, lrs.forward, calls)) {
+  if (S(schema::PlayerMapperEntry(base, entry).unread()) == 1 || !Fired(base, entry, forward, frame, lrs.forward, calls)) {
     return 0;
   }
   for (uint32_t i = position + 1; S(i) < S(count); i++) {
@@ -145,7 +145,7 @@ uint64_t ListCall(const Calls& calls, uint32_t function, uint32_t list, uint32_t
 }
 // The list not moving: +24 0 and its scroll (+4) its scroll before (+8).
 bool Still(uint8_t* base, uint32_t list) {
-  return Load(base, list + 24) == 0 && Load(base, list + 4) == Load(base, list + 8);
+  return MenuList(base, list).move() == 0 && MenuList(base, list).scroll() == MenuList(base, list).scroll_before();
 }
 
 // BuildsPage and BuildPage: level `level`, the jumps given, the
@@ -167,7 +167,7 @@ uint64_t LevelPageRun(uint8_t* base, uint32_t sp, const LevelPage& p, JumpA jump
     PagesGo(base, Globals::build_pages(base).address, p.level, p.moving, kNone);
     return Sound(calls, frame, p.sound_lr, 4);
   }
-  if (Load(base, Globals::build_group_list(base).address + 24) != 0) {
+  if (Globals::build_group_list(base).move() != 0) {
     PagesGo(base, Globals::build_pages(base).address, p.level, p.group_moving, kNone);
     return Sound(calls, frame, p.sound_lr, 4);
   }
@@ -248,7 +248,7 @@ uint64_t BuildGroupsPage(uint8_t* base, uint32_t sp, const Calls& calls) {
     PagesGo(base, Globals::build_pages(base).address, 4, 5, kNone);
     return r3;
   }
-  if (Load(base, List(base) + 28) == 0) {
+  if (MenuList(base, List(base)).side() == 0) {
     return r3;
   }
   r3 = Sound(calls, frame, 0x8219EFD0, 4);
@@ -276,7 +276,7 @@ uint64_t BuildBuildPage(uint8_t* base, uint32_t sp, const Calls& calls) {
       [&](uint32_t) {
         // The selected build seen: its saved flags = its flags.
         const uint32_t list = List(base);
-        const uint32_t position = race_screens::ListSelection(base, list) + Load(base, list + 4);
+        const uint32_t position = race_screens::ListSelection(base, list) + MenuList(base, list).scroll();
         const schema::BuildRecord build(base, BuildAt(base, position));
         build.set_saved_flags(build.flags());
       },

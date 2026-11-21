@@ -9,6 +9,7 @@
 #include "scene/scene.h"
 #include "second_set/point_groups.h"
 #include "second_set/points.h"
+#include "schema/car_draw.h"
 #include "schema/second_set.h"
 
 namespace second_set {
@@ -52,7 +53,7 @@ uint32_t PartsInitLeftDoor(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DF5B8 PartsPoints::InitLeftDoor");
   const uint32_t sp = stack - 112;
   Construct(base, group, 25, sp);
-  MatrixWs(base, group + 6016);
+  MatrixWs(base, schema::PartsPoints(base, group).door_matrix_address());
   PartsResetLeftDoor(base, group, sp);
   return group;
 }
@@ -61,7 +62,7 @@ uint32_t PartsInitRightDoor(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DF610 PartsPoints::InitRightDoor");
   const uint32_t sp = stack - 112;
   Construct(base, group, 25, sp);
-  MatrixWs(base, group + 6016);
+  MatrixWs(base, schema::PartsPoints(base, group).door_matrix_address());
   PartsResetRightDoor(base, group, sp);
   return group;
 }
@@ -70,7 +71,7 @@ uint32_t PartsInitHeadlights(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E1388 PartsPoints::InitHeadlights");
   const uint32_t sp = stack - 112;
   Construct(base, group, 13, sp);
-  MatrixWs(base, group + 3120);
+  MatrixWs(base, schema::PartsPoints(base, group).headlights_popup_matrix_address());
   PartsResetHeadlights(base, group, sp);
   return group;
 }
@@ -124,9 +125,10 @@ uint32_t PartsPointsConstruct(uint8_t* base, uint32_t block, uint32_t stack) {
 uint32_t PartsPointsReset(uint8_t* base, uint32_t block, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E00F0 PartsPoints::Reset");
   const uint32_t sp = stack - 112;
-  Store(base, block + 37088, schema::SecondSetGlobals::scene<schema::View>(base).address);
-  Store(base, block + 37076, 0);
-  Store(base, block + 37092, 0);
+  const schema::PartsPoints b(base, block);
+  b.set_scene(schema::SecondSetGlobals::scene<schema::View>(base));
+  b.set_car_record(0u);
+  b.set_skeleton(0u);
   PartsResetFrontBumper(base, block + 0, sp);
   ClearAndName(base, block + 2656, 0x82602620, sp);
   PartsResetRearBumper(base, block + 2896, sp);
@@ -257,7 +259,7 @@ uint32_t TrafficPointsConstruct(uint8_t* base, uint32_t block, uint32_t stack) {
 uint32_t TrafficPointsReset(uint8_t* base, uint32_t block, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E5880 TrafficPoints::Reset");
   const uint32_t sp = stack - 96;
-  Store(base, block + 0, 0);
+  schema::TrafficPoints(base, block).set_word_0(0u);
   TrafficResetBody(base, block + 16, sp);
   TrafficResetHeadlights(base, block + 1472, sp);
   return TrafficResetTailLights(base, block + 3152, sp);

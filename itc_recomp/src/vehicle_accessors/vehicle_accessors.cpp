@@ -5,10 +5,14 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "schema/vehicle_accessors.h"
+#include "schema/car_draw.h"
 #include "schema/car_physics.h"
 #include "schema/collision.h"
+#include "schema/collision_world.h"
+#include "schema/race_hud_machine.h"
 #include "schema/race_setup.h"
 #include "schema/race_states.h"
+#include "schema/scene_loaders.h"
 #include "vehicle_accessors/vectors.h"
 
 #include <bit>
@@ -33,6 +37,12 @@ using ListNode = schema::AccessorListNode;
 using Box = schema::BoxShape;
 using Pair = schema::AccessorPair;
 using Matrix = schema::VectorLibMatrix;
+using VectorView = schema::VectorLibVector;
+using Body = schema::RigidBody;
+using Vehicle = schema::Vehicle;
+using Wheel = schema::VehicleWheel;
+using Axle = schema::CarDataAxle;
+using World = schema::CollisionWorld;
 
 constexpr uint32_t kVehicleBytes = 6272;
 constexpr uint32_t kRecordBytes = RacerRecord::kSize;
@@ -53,10 +63,6 @@ uint32_t Stage(uint8_t* base, uint32_t stages, uint32_t stage) {
 
 namespace vl = vector_library;
 
-double Lfs(uint8_t* base, uint32_t address) {
-  return double(guest::LoadFloat(base, address));
-}
-
 // The rotation of `v` by the matrix at `m` (Matrix::Rotate's arithmetic),
 // w 0.0.
 vl::Vector Rotate(uint8_t* base, uint32_t m, const vl::Vector& v) {
@@ -72,8 +78,9 @@ vl::Vector Rotate(uint8_t* base, uint32_t m, const vl::Vector& v) {
 
 // RigidBody::PointVelocity's value: +32 + +96 x (point - +16).
 vl::Vector PointVelocityCross(uint8_t* base, uint32_t body, uint32_t point) {
-  const vl::Vector d = vl::Sub(vl::LoadVector(base, point), vl::LoadVector(base, body + 16));
-  return vl::Cross(vl::LoadVector(base, body + 96), d);
+  const Body b(base, body);
+  const vl::Vector d = vl::Sub(vl::LoadVector(base, point), vl::LoadVector(base, b.center_of_mass_address()));
+  return vl::Cross(vl::LoadVector(base, b.angular_velocity_address()), d);
 }
 
 }  // namespace
@@ -89,17 +96,17 @@ uint32_t VehicleGet(uint8_t* base, uint32_t index) {
 
 uint32_t VehicleWheelContact(uint32_t vehicle, uint32_t wheel) {
   ITC_NATIVE_RUNNING("sub_820C0170 Vehicle::WheelContact");
-  return vehicle + 5328 + 96 * wheel;
+  return Vehicle(nullptr, vehicle).wheel_track_positions_address() + schema::TrackPosition::kSize * wheel;
 }
 
 uint32_t RigidBodyPosition(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B67D8 RigidBody::Position");
-  return body + 208;
+  return Body(nullptr, body).origin_address();
 }
 
 uint32_t RigidBodyMatrix(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6930 RigidBody::Matrix");
-  return body + 288;
+  return Body(nullptr, body).matrix_address();
 }
 
 uint32_t ContactObject(uint8_t* base, uint32_t contact) {
@@ -161,95 +168,102 @@ uint32_t DebugSwitchOff() {
 
 uint32_t RigidBodyIsFixed(uint8_t* base, uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6638 RigidBody::IsFixed");
-  return guest::LoadU8(base, body);
+  return Body(base, body).fixed();
 }
 
 void RigidBodySetGravity(uint8_t* base, uint32_t body, uint32_t vector) {
   ITC_NATIVE_RUNNING("sub_820B6640 RigidBody::SetGravity");
-  vl::Vec4Copy(base, body + 480, vector);
-  const double mass = Lfs(base, body + 4);
-  vl::StoreVector(base, body + 496, vl::Scale(vl::LoadVector(base, vector), mass));
+  const Body b(base, body);
+  vl::Vec4Copy(base, b.gravity_address(), vector);
+  const double mass = double(b.mass());
+  vl::StoreVector(base, b.weight_address(), vl::Scale(vl::LoadVector(base, vector), mass));
 }
 
 void RigidBodySetMass(uint8_t* base, uint32_t body, double mass) {
   ITC_NATIVE_RUNNING("sub_820B6698 RigidBody::SetMass");
-  const uint8_t fixed = guest::LoadU8(base, body);
-  guest::StoreFloat(base, body + 4, float(mass));
-  guest::StoreFloat(base, body + 8, float(double(G::one(base)) / mass));
+  const Body b(base, body);
+  const uint8_t fixed = b.fixed();
+  b.set_mass(float(mass));
+  b.set_inverse_mass(float(double(G::one(base)) / mass));
   if (fixed != 0) {
-    guest::StoreU32(base, body + 8, G::zero_bits(base));
+    guest::StoreU32(base, b.inverse_mass_address(), G::zero_bits(base));
   }
-  vl::StoreVector(base, body + 496, vl::Scale(vl::LoadVector(base, body + 480), mass));
+  vl::StoreVector(base, b.weight_address(), vl::Scale(vl::LoadVector(base, b.gravity_address()), mass));
 }
 
 float RigidBodyMass(uint8_t* base, uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6708 RigidBody::Mass");
-  return guest::LoadFloat(base, body + 4);
+  return Body(base, body).mass();
 }
 
 void RigidBodySetCenterOfMass(uint8_t* base, uint32_t body, uint32_t offset) {
   ITC_NATIVE_RUNNING("sub_820B67E0 RigidBody::SetCenterOfMass");
-  vl::Vec4Copy(base, body + 192, offset);
-  const vl::Vector rotated = Rotate(base, body + 224, vl::LoadVector(base, body + 192));
-  const vl::Vector center = vl::Add(vl::LoadVector(base, body + 208), rotated);
+  const Body b(base, body);
+  vl::Vec4Copy(base, b.center_of_mass_offset_address(), offset);
+  const vl::Vector rotated =
+      Rotate(base, b.orientation_matrix_address(), vl::LoadVector(base, b.center_of_mass_offset_address()));
+  const vl::Vector center = vl::Add(vl::LoadVector(base, b.origin_address()), rotated);
   // Matrix::SetTranslation on the matrix at +224, then +16 = its fourth
   // row's x, y, z with w 0.0.
-  guest::StoreFloat(base, body + 272, center.x);
-  guest::StoreFloat(base, body + 276, center.y);
-  guest::StoreFloat(base, body + 280, center.z);
-  guest::StoreU32(base, body + 284, G::one_bits(base));
-  for (uint32_t i = 0; i < 12; i += 4) {
-    guest::StoreU32(base, body + 16 + i, guest::LoadU32(base, body + 272 + i));
-  }
-  guest::StoreU32(base, body + 28, G::zero_bits(base));
+  const Matrix orientation(base, b.orientation_matrix_address());
+  orientation.set_m30(center.x);
+  orientation.set_m31(center.y);
+  orientation.set_m32(center.z);
+  orientation.set_m33_bits(G::one_bits(base));
+  const VectorView center_of_mass(base, b.center_of_mass_address());
+  center_of_mass.set_x_bits(orientation.m30_bits());
+  center_of_mass.set_y_bits(orientation.m31_bits());
+  center_of_mass.set_z_bits(orientation.m32_bits());
+  center_of_mass.set_w_bits(G::zero_bits(base));
 }
 
 uint32_t RigidBodyField80(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6880 RigidBody::Field80");
-  return body + 80;
+  return Body(nullptr, body).orientation_address();
 }
 
 uint32_t RigidBodyVelocity(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6888 RigidBody::Velocity");
-  return body + 32;
+  return Body(nullptr, body).velocity_address();
 }
 
 uint32_t RigidBodyField144(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6890 RigidBody::Field144");
-  return body + 144;
+  return Body(nullptr, body).velocity_direction_address();
 }
 
 uint32_t RigidBodyForce(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820988C0 RigidBody::Force");
-  return body + 64;
+  return Body(nullptr, body).force_address();
 }
 
 uint32_t RigidBodyTorque(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_82379328 RigidBody::Torque");
-  return body + 128;
+  return Body(nullptr, body).torque_address();
 }
 
 uint32_t RigidBodyField160(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6898 RigidBody::Field160");
-  return body + 160;
+  return Body(nullptr, body).speed_address();
 }
 
 uint32_t RigidBodyOrientation(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6928 RigidBody::Orientation");
-  return body + 224;
+  return Body(nullptr, body).orientation_matrix_address();
 }
 
 uint32_t RigidBodyAngularVelocity(uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B6948 RigidBody::AngularVelocity");
-  return body + 96;
+  return Body(nullptr, body).angular_velocity_address();
 }
 
 float RigidBodyFloat48(uint8_t* base, uint32_t body) {
   ITC_NATIVE_RUNNING("sub_820B68A0 RigidBody::Float48");
-  if (guest::LoadU8(base, body) != 0) {
+  const Body b(base, body);
+  if (b.fixed() != 0) {
     return G::zero(base);
   }
-  return guest::LoadFloat(base, body + 48);
+  return b.speed_cap();
 }
 
 void RigidBodyPointVelocity(uint8_t* base, uint32_t out, uint32_t body, uint32_t point) {
@@ -257,31 +271,32 @@ void RigidBodyPointVelocity(uint8_t* base, uint32_t out, uint32_t body, uint32_t
   const vl::Vector spin = PointVelocityCross(base, body, point);
   // Vec3::Sum: out's w = 0.0, then Vec3::Add's steps.
   schema::VectorLibVector(base, out).set_w_bits(G::zero_bits(base));
-  vl::AddValue(base, out, body + 32, spin, false);
+  vl::AddValue(base, out, Body(base, body).velocity_address(), spin, false);
 }
 
 void RigidBodySetFloat112(uint8_t* base, uint32_t body, double value) {
   ITC_NATIVE_RUNNING("sub_820B6950 RigidBody::SetFloat112");
-  guest::StoreFloat(base, body + 112, float(value));
+  Body(base, body).set_spin_cap(float(value));
 }
 
 void RigidBodyAddForce(uint8_t* base, uint32_t body, uint32_t vector) {
   ITC_NATIVE_RUNNING("sub_820B6958 RigidBody::AddForce");
-  vl::Vec3AddTo(base, body + 64, vector);
+  vl::Vec3AddTo(base, Body(base, body).force_address(), vector);
 }
 
 void RigidBodyAddTorque(uint8_t* base, uint32_t body, uint32_t vector) {
   ITC_NATIVE_RUNNING("sub_820B6960 RigidBody::AddTorque");
-  vl::Vec3AddTo(base, body + 128, vector);
+  vl::Vec3AddTo(base, Body(base, body).torque_address(), vector);
 }
 
 namespace {
 
 // AddForceAt's and AddTorqueAt's torque: +128 += (point - +16) x force.
 void AddTorqueOf(uint8_t* base, uint32_t body, uint32_t force, uint32_t point) {
-  const vl::Vector d = vl::Sub(vl::LoadVector(base, point), vl::LoadVector(base, body + 16));
+  const Body b(base, body);
+  const vl::Vector d = vl::Sub(vl::LoadVector(base, point), vl::LoadVector(base, b.center_of_mass_address()));
   const vl::Vector torque = vl::Cross(d, vl::LoadVector(base, force));
-  vl::AddValue(base, body + 128, body + 128, torque, false);
+  vl::AddValue(base, b.torque_address(), b.torque_address(), torque, false);
 }
 
 }  // namespace
@@ -289,7 +304,7 @@ void AddTorqueOf(uint8_t* base, uint32_t body, uint32_t force, uint32_t point) {
 void RigidBodyAddForceAt(uint8_t* base, uint32_t body, uint32_t force, uint32_t point) {
   ITC_NATIVE_RUNNING("sub_820B6968 RigidBody::AddForceAt");
   AddTorqueOf(base, body, force, point);
-  vl::Vec3AddTo(base, body + 64, force);
+  vl::Vec3AddTo(base, Body(base, body).force_address(), force);
 }
 
 void RigidBodyAddTorqueAt(uint8_t* base, uint32_t body, uint32_t force, uint32_t point) {
@@ -299,22 +314,21 @@ void RigidBodyAddTorqueAt(uint8_t* base, uint32_t body, uint32_t force, uint32_t
 
 float VehicleWheelSlip(uint8_t* base, uint32_t vehicle, uint32_t wheel, double threshold) {
   ITC_NATIVE_RUNNING("sub_820C0180 Vehicle::WheelSlip");
-  const uint32_t at = vehicle + 368 * wheel;
-  const uint32_t record = at + 416;
-  if (guest::LoadU8(base, at + 433) == 0) {
+  const Vehicle v(base, vehicle);
+  const Wheel record(base, v.wheels_address() + Wheel::kSize * wheel);
+  if (record.on_ground() == 0) {
     return G::zero(base);
   }
   // The wheel's spin times its radius (probably), along the first axis.
-  const uint32_t wheel_data = guest::LoadU32(base, vehicle + 4 * (wheel + 540));
-  const float rolled =
-      float(Lfs(base, wheel_data + 52) * Lfs(base, record + 248));
+  const Axle axle(base, guest::LoadU32(base, v.wheel_axle_data_address() + 4 * wheel));
+  const float rolled = float(double(axle.radius()) * double(record.spin()));
   const vl::Vector zero_rolled = {rolled, 0.0f, 0.0f, 0.0f};
   // The body's velocity at the wheel (RigidBody::PointVelocity).
-  const uint32_t body = guest::LoadU32(base, vehicle + 336);
-  const vl::Vector velocity =
-      vl::Add(vl::LoadVector(base, body + 32), PointVelocityCross(base, body, at + 480));
-  const vl::Vector along = {vl::Dot(velocity, vl::LoadVector(base, record + 144)), 0.0f,
-                            vl::Dot(velocity, vl::LoadVector(base, record + 128)), 0.0f};
+  const Body body = v.body();
+  const vl::Vector velocity = vl::Add(vl::LoadVector(base, body.velocity_address()),
+                                      PointVelocityCross(base, body.address, record.mount_point_address()));
+  const vl::Vector along = {vl::Dot(velocity, vl::LoadVector(base, record.forward_axis_address())), 0.0f,
+                            vl::Dot(velocity, vl::LoadVector(base, record.side_axis_address())), 0.0f};
   const vl::Vector slip = vl::Sub(along, zero_rolled);
   const double length = double(float(std::sqrt(double(vl::Dot(slip, slip)))));
   const double least = double(float(threshold * double(G::slip_scale(base))));
@@ -338,27 +352,27 @@ float VehicleMaxWheelSlip(uint8_t* base, uint32_t vehicle, double threshold) {
 
 float VehicleFloat2224(uint8_t* base, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820C0140 Vehicle::Float2224");
-  return guest::LoadFloat(base, vehicle + 2224);
+  return Vehicle(base, vehicle).unknown_2224();
 }
 
 float VehicleSpeed(uint8_t* base, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820C0148 Vehicle::Speed");
-  return guest::LoadFloat(base, vehicle + 48);
+  return Vehicle(base, vehicle).speed();
 }
 
 float VehicleDistancePerFrame(uint8_t* base, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820C0150 Vehicle::GetDistancePerFrame");
-  return float(Lfs(base, vehicle + 48) * double(G::frame_seconds(base)));
+  return float(double(Vehicle(base, vehicle).speed()) * double(G::frame_seconds(base)));
 }
 
 uint32_t VehicleIdentity(uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820C0168 Vehicle::Identity");
-  return vehicle + 5232;
+  return Vehicle(nullptr, vehicle).own_track_position_address();
 }
 
 uint32_t VehicleSetObjectHalf114(uint8_t* base, uint32_t vehicle, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_820C0450 Vehicle::SetObjectHalf114");
-  const uint32_t object = guest::LoadU32(base, vehicle + 344);
+  const uint32_t object = Vehicle(base, vehicle).box();
   if (object != 0) {
     ObjectSetHalf114(base, object, value & 0xFFFF);
   }
@@ -435,9 +449,11 @@ void QuaternionToMatrix(uint8_t* base, uint32_t out, uint32_t quaternion) {
 
 void VehicleSpeedRecord(uint8_t* base, uint32_t out, uint32_t vehicle) {
   ITC_NATIVE_RUNNING("sub_820C0590 Vehicle::SpeedRecord");
-  guest::StoreFloat(base, out, float(Lfs(base, vehicle + 48) * double(G::kmh_scale(base))));
-  guest::StoreU16(base, out + 4, guest::LoadU16(base, vehicle + 5236));
-  guest::StoreU16(base, out + 6, guest::LoadU16(base, vehicle + 5238));
+  const Vehicle v(base, vehicle);
+  const schema::TrackPosition own(base, v.own_track_position_address());
+  guest::StoreFloat(base, out, float(double(v.speed()) * double(G::kmh_scale(base))));
+  guest::StoreU16(base, out + 4, own.route_section());
+  guest::StoreU16(base, out + 6, own.route_slice());
 }
 
 void CollisionObjectLink(uint8_t* base, uint32_t object, uint32_t head) {
@@ -562,34 +578,34 @@ void CollisionSetGlobal7C(uint8_t* base, uint32_t value) {
 
 void CollisionWorldSetCallback(uint8_t* base, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_820B8788 CollisionWorld::SetCallback");
-  guest::StoreU32(base, G::collision_world(base) + 8, value);
+  World(base, G::collision_world(base)).set_ground_callback(value);
 }
 
 uint32_t CollisionWorldNewContact(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820B8A48 CollisionWorld::NewContact");
-  const uint32_t world = G::collision_world(base);
-  if (!(guest::LoadU32(base, world + 52) < guest::LoadU32(base, world + 44))) {
+  const World world(base, G::collision_world(base));
+  if (!(world.contacts_used() < world.contact_capacity())) {
     return 0;
   }
-  const uint32_t used = guest::LoadU32(base, world + 52);
-  const uint32_t contact = used * 80 + guest::LoadU32(base, world + 48);
-  guest::StoreU32(base, world + 52, used + 1);
+  const uint32_t used = world.contacts_used();
+  const uint32_t contact = used * Contact::kSize + world.contacts<schema::View>().address;
+  world.set_contacts_used(used + 1);
   return contact;
 }
 
 uint32_t CollisionWorldWord60(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820B8C90 CollisionWorld::Word60");
-  return guest::LoadU32(base, G::collision_world(base) + 60);
+  return World(base, G::collision_world(base)).query_count();
 }
 
 uint32_t CollisionWorldWord64(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820B8CA0 CollisionWorld::Word64");
-  return guest::LoadU32(base, G::collision_world(base) + 64);
+  return World(base, G::collision_world(base)).hits<schema::View>().address;
 }
 
 uint32_t CollisionWorldWord68(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_820B8CB0 CollisionWorld::Word68");
-  return guest::LoadU32(base, G::collision_world(base) + 68);
+  return World(base, G::collision_world(base)).merged_hits<schema::View>().address;
 }
 
 void Object344SetFloat20(uint8_t* base, uint32_t object, double value) {
@@ -659,20 +675,20 @@ uint32_t ContactNext(uint8_t* base, uint32_t contact, uint32_t mask) {
 void RaceDataSetWord59618(uint8_t* base, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_820FF918 RaceData::SetWord59618");
   if (value != 0) {
-    guest::StoreU32(base, G::race_data(base) + 0x59618, value);
+    schema::RaceData(base, G::race_data(base)).set_word_59618(value);
   }
 }
 
 void RaceDataSetWord5961C(uint8_t* base, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_820FF938 RaceData::SetWord5961C");
   if (value != 0) {
-    guest::StoreU32(base, G::race_data(base) + 0x5961C, value);
+    schema::RaceData(base, G::race_data(base)).set_word_5961c(value);
   }
 }
 
 void RaceDataSetWord32(uint8_t* base, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_820FF968 RaceData::SetWord32");
-  guest::StoreU32(base, G::race_data(base) + 32, value);
+  schema::RaceData(base, G::race_data(base)).set_mode(value);
 }
 
 uint32_t StagesHasNext(uint8_t* base, uint32_t stages) {
@@ -758,9 +774,11 @@ bool StagesCopy(uint8_t* base, uint32_t out, uint32_t stages, uint32_t stage) {
 
 void EntriesAdd(uint8_t* base, uint32_t list, uint32_t a, uint32_t b) {
   ITC_NATIVE_RUNNING("sub_820FFDD8 Entries::Add");
-  guest::StoreU32(base, list + 972 * guest::LoadU32(base, list) + 4, a);
-  guest::StoreU32(base, list + 972 * guest::LoadU32(base, list) + 8, b);
-  guest::StoreU32(base, list, guest::LoadU32(base, list) + 1);
+  // The results record's entries are 972 bytes apart.
+  const schema::RacerResultsRecord results(base, list);
+  guest::StoreU32(base, results.e0_record_index_address() + 972 * results.count(), a);
+  guest::StoreU32(base, results.e0_item_address() + 972 * results.count(), b);
+  results.set_count(results.count() + 1);
 }
 
 bool RacerRecordsAdd(uint8_t* base, uint32_t records, uint32_t record, uint32_t* added) {
@@ -868,30 +886,31 @@ uint32_t GetInUse(uint8_t* base, uint32_t list, uint32_t index) {
 
 int32_t ScenePoolsClaimA(uint8_t* base, uint32_t scene, uint32_t pool) {
   ITC_NATIVE_RUNNING("sub_820C42C8 ScenePools::ClaimA");
-  return Claim(base, scene + 12 * pool + 56);
+  return Claim(base, schema::ScenePools(base, scene).pools_address() + 12 * pool);
 }
 
 int32_t ScenePoolsClaimB(uint8_t* base, uint32_t scene, uint32_t pool) {
   ITC_NATIVE_RUNNING("sub_820C5AB0 ScenePools::ClaimB");
-  return Claim(base, scene + 12 * (pool + 412));
+  return Claim(base, schema::CarScene(base, scene).car_models_first_address() + 12 * pool);
 }
 
 uint32_t ScenePoolsGetA(uint8_t* base, uint32_t scene, uint32_t pool, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_820C4420 ScenePools::GetA");
-  return GetInUse(base, scene + 12 * pool + 56, index);
+  return GetInUse(base, schema::ScenePools(base, scene).pools_address() + 12 * pool, index);
 }
 
 uint32_t ScenePoolsGetB(uint8_t* base, uint32_t scene, uint32_t pool, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_820C5C20 ScenePools::GetB");
-  return GetInUse(base, scene + 12 * (pool + 412), index);
+  return GetInUse(base, schema::CarScene(base, scene).car_models_first_address() + 12 * pool, index);
 }
 
 uint32_t ScenePoolsFindModel(uint8_t* base, uint32_t scene, uint32_t kind, uint32_t n) {
   ITC_NATIVE_RUNNING("sub_820C5D70 ScenePools::FindModel");
-  const int32_t count = int32_t(guest::LoadU32(base, scene + 5036));
+  const schema::CarScene car_scene(base, scene);
+  const int32_t count = int32_t(car_scene.scene_models_count());
   int32_t found = 0;
   for (int32_t i = 0; i < count; i++) {
-    const ListNode object(base, ListAt(base, scene + 5028, uint32_t(i)));
+    const ListNode object(base, ListAt(base, car_scene.scene_models_first_address(), uint32_t(i)));
     if (int32_t(object.state()) != 3 || object.kind() != kind) {
       continue;
     }

@@ -1312,6 +1312,18 @@ struct TuningScreenGlobals {
   static void set_stand_holder(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D83E0u, v.address); }
   static void set_stand_holder(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D83E0u, v); }
   static constexpr uint32_t stand_holder_address() { return 0x826D83E0u; }
+  // the stand's doors animation open (1) or closed (0); UpdateStandAnimations toggles it with GarageStage::Command 4 and 5
+  static uint32_t doors_open(uint8_t* base) { return guest::LoadU32(base, 0x826D8498u); }
+  static void set_doors_open(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8498u, v); }
+  static constexpr uint32_t doors_open_address() { return 0x826D8498u; }
+  // the stand's roof animation open state; toggled with GarageStage::Command 2 and 3
+  static uint32_t roof_open(uint8_t* base) { return guest::LoadU32(base, 0x826D849Cu); }
+  static void set_roof_open(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D849Cu, v); }
+  static constexpr uint32_t roof_open_address() { return 0x826D849Cu; }
+  // the stand's bonnet animation open state; toggled with GarageStage::Command 2 and 3
+  static uint32_t bonnet_open(uint8_t* base) { return guest::LoadU32(base, 0x826D84A0u); }
+  static void set_bonnet_open(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D84A0u, v); }
+  static constexpr uint32_t bonnet_open_address() { return 0x826D84A0u; }
 };
 
 }  // namespace schema

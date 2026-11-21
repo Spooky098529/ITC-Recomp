@@ -155,8 +155,8 @@ void Context::State5() {
       continue;
     }
     const uint32_t node = Node(sub_scene, 0);
-    guest::StoreU32(base, ChildOf(node, n - 11) + 80, 0);
-    guest::StoreU32(base, ChildOf(node, n) + 80, 0);
+    UiNode(base, ChildOf(node, n - 11)).set_visible(0);
+    UiNode(base, ChildOf(node, n)).set_visible(0);
   }
 
   // A row's marks: child 15 + row shown, child 38 + 2 row's +108 0 when
@@ -167,7 +167,7 @@ void Context::State5() {
     const uint32_t flag = ChildOf(node, 38 + 2 * row);
     UiNode(base, shown).set_visible(1);
     guest::StoreU32(base, flag + 108, GetChoiceFlag(base, screen, choice()) != 0 ? 0 : 1);
-    guest::StoreU32(base, ChildOf(node, row + 26) + 80, 1);
+    UiNode(base, ChildOf(node, row + 26)).set_visible(1);
   };
   // The eight levels from +25100: the current choice's marker (child 2 of
   // sub-scene 28's child 0) placed by its row and shown on the first eight.
@@ -182,13 +182,13 @@ void Context::State5() {
       guest::StoreU32(base, frame + 84, uint32_t(row));
       const double at =
           steps::Fmuls(steps::Single(double(row)), steps::Lfs(base, kMarkerScale));
-      steps::Stfs(base, marker + 16, at);
+      steps::Stfs(base, UiNode(base, marker).y_address(), at);
     }
     {
       const uint64_t choice = GetCurrentChoice(base, screen);
       const uint64_t row = uint64_t(TS(base, screen).list_scroll_row()) -
                            uint64_t(uint32_t(TS(base, screen).level())) + choice;
-      guest::StoreU32(base, marker + 80, int32_t(uint32_t(row)) > 7 ? 0 : 1);
+      UiNode(base, marker).set_visible(int32_t(uint32_t(row)) > 7 ? 0 : 1);
     }
     for (uint32_t row = 0; row < 8; row++) {
       marks(28, row, [&] { return relative() + row; });

@@ -5,7 +5,10 @@
 #include <cstdint>
 
 #include "guest.h"
+#include "schema/boot_mode.h"
+#include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
+#include "schema/race_screens.h"
 #include "schema/title_screen.h"
 #include "title_screen/title_screen.h"
 #include "ui_movies/game.h"
@@ -43,9 +46,9 @@ inline uint32_t FindMovie(uint8_t* base, uint32_t id, uint32_t key) {
 // The title's words ([0x82814E34], loaded at each call).
 inline schema::TitleScreenData Words(uint8_t* base) { return G::data(base); }
 
-// The menu list's address ([0x82814E30]; race-screens' MenuList, its fields
-// still offsets here).
-inline uint32_t ListAddress(uint8_t* base) { return G::list<schema::View>(base).address; }
+// The menu list ([0x82814E30], race-screens' MenuList; loaded at each call).
+inline schema::MenuList MenuListOf(uint8_t* base) { return G::list(base); }
+inline uint32_t ListAddress(uint8_t* base) { return G::list(base).address; }
 
 // Menu4's menu reset (TitleScreen::Create, SetUpMenu4): first item 0, last
 // 1, wrapping, the rest cleared, in the originals' order.
@@ -66,17 +69,18 @@ inline void ResetMenu(const schema::FrontEndMenu& menu) {
   menu.set_shoulders_step(0);
 }
 
-// Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
-// start +604, 50 slots of 12 bytes), as the handlers do inline.
+// Posts the message (id, 0, 0) on the dispatcher's ring (`mode`, the
+// handlers' r4: boot-mode's ModeDispatcher, the mode's +36; its count,
+// start, 50 slots of 12 bytes), as the handlers do inline.
 inline void Post(uint8_t* base, uint32_t mode, uint32_t id) {
-  const uint32_t ring = mode + 204;
-  const uint32_t count = Load(base, ring + 600) + 1;
-  const uint32_t start = Load(base, ring + 604);
-  Store(base, ring + 600, count);
-  const uint32_t slot = ring + 12 * ((start + count - 1) % 50);
-  Store(base, slot + 0, id);
-  Store(base, slot + 4, 0);
-  Store(base, slot + 8, 0);
+  const schema::ModeDispatcher d(base, mode);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t start = d.ring_start();
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(base, d.ring_address() + 12 * ((start + count - 1) % 50));
+  slot.set_id(id);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 }  // namespace title_screen

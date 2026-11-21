@@ -4,6 +4,9 @@
 #include "ui_movies/ui_movies.h"
 
 #include "command_list/command_list.h"
+#include "schema/command_list.h"
+#include "schema/device_shaders.h"
+#include "schema/device_state.h"
 #include "schema/ui_movies.h"
 #include "schema/ui_movies_game.h"
 
@@ -14,25 +17,30 @@ namespace ui_movies {
 
 namespace {
 
-// One command slot's words, as the original stores them (+8 only where it
+// One command slot's words (device-shaders.toml's ChunkCommand: the id,
+// the handler's r4 and r5), as the original stores them (+8 only where it
 // does).
 void Slot3(uint8_t* base, uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2) {
-  guest::StoreU32(base, slot + 0, w0);
-  guest::StoreU32(base, slot + 4, w1);
-  guest::StoreU32(base, slot + 8, w2);
+  const schema::ChunkCommand command(base, slot);
+  command.set_id(w0);
+  command.set_arg0(w1);
+  command.set_arg1(w2);
 }
 void Slot2(uint8_t* base, uint32_t slot, uint32_t w0, uint32_t w1) {
-  guest::StoreU32(base, slot + 0, w0);
-  guest::StoreU32(base, slot + 4, w1);
+  const schema::ChunkCommand command(base, slot);
+  command.set_id(w0);
+  command.set_arg0(w1);
 }
 
-// The chunk's first slot: halfword +2 = 5 and +4 = 0 (its first halfword
-// left as it was).
+// The chunk's first slot (device-shaders.toml's ChunkItem): the kind's low
+// halfword (+2) = 5, inline last, and +4 = 0 (its first halfword left as it
+// was).
 uint32_t OpenWithHeader(uint8_t* base, uint32_t list) {
   command_list::OpenChunk(base, list);
   const uint32_t chunk = command_list::AllocateSlots(base, list, 1);
-  guest::StoreU16(base, chunk + 2, 5);
-  guest::StoreU32(base, chunk + 4, 0);
+  const schema::ChunkItem item(base, chunk);
+  guest::StoreU16(base, item.kind_address() + 2, 5);
+  item.set_link(0);
   return chunk;
 }
 
@@ -58,10 +66,11 @@ uint32_t BlendSlotCount(uint32_t mode) {
 }  // namespace
 
 bool ChunksFit(uint8_t* base, uint32_t list, std::initializer_list<std::vector<uint32_t>> chunks) {
-  bool open = guest::LoadU8(base, list + 52) != 0;
-  uint32_t open_chunks = guest::LoadU32(base, command_list::kOpenChunks);
-  uint32_t used = guest::LoadU32(base, list + 12);
-  const uint32_t limit = guest::LoadU32(base, list + 8);
+  const schema::CommandList l(base, list);
+  bool open = l.chunk_open() != 0;
+  uint32_t open_chunks = schema::CommandListGlobals::open_chunks(base);
+  uint32_t used = l.used();
+  const uint32_t limit = l.capacity();
   for (const std::vector<uint32_t>& allocations : chunks) {
     if (!open) {
       if (open_chunks != 0) {
@@ -104,11 +113,13 @@ std::optional<uint32_t> RecordQuad(uint8_t* base, uint32_t list, uint32_t quad, 
     // Command 31 (the clip rectangle on) and the rectangle's four
     // halfwords (+104..+110).
     Slot2(base, slot(), 31, 1);
-    const uint32_t s = slot();
-    guest::StoreU16(base, s + 0, q.clip_0());
-    guest::StoreU16(base, s + 2, q.clip_1());
-    guest::StoreU16(base, s + 4, q.clip_2());
-    guest::StoreU16(base, s + 6, q.clip_3());
+    // The payload as device-state.toml's ReplayCommand (SetScissorRects'
+    // left, top, right, bottom).
+    const schema::ReplayCommand rect(base, slot());
+    rect.set_arg0_high(q.clip_0());
+    rect.set_arg0_low(q.clip_1());
+    rect.set_arg1_high(q.clip_2());
+    rect.set_arg1_low(q.clip_3());
   } else {
     Slot3(base, slot(), 1, 1, 0);
     Slot2(base, slot(), 200, 0);
@@ -146,10 +157,10 @@ std::optional<uint32_t> RecordQuad(uint8_t* base, uint32_t list, uint32_t quad, 
   for (uint32_t i = 0; i < q.vertex_count(); i++) {
     // Vertex i as the block's first (24 bytes each).
     const schema::CommandListVertices at(base, v + 24 * i);
-    const schema::UiMovieQuadPosition position(base, q.positions().address + 16 * i);
-    const schema::UiMovieQuadColor color(base, q.colors().address + 16 * i);
+    const schema::UiMovieQuadPosition position(base, q.positions() + 16 * i);
+    const schema::UiMovieQuadColor color(base, q.colors() + 16 * i);
     if (textured) {
-      const schema::UiMovieQuadCoord uv(base, q.coords().address + 16 * i);
+      const schema::UiMovieQuadCoord uv(base, q.coords() + 16 * i);
       at.set_v0_u(uv.u());
       at.set_v0_v(uv.v());
     }
@@ -172,11 +183,12 @@ uint32_t RecordClipReset(uint8_t* base, uint32_t list) {
   const uint32_t chunk = OpenWithHeader(base, list);
   auto slot = [&] { return command_list::AllocateSlots(base, list, 1); };
   Slot3(base, slot(), 31, 1, 0);
-  const uint32_t s = slot();
-  const uint16_t rectangle[4] = {0, 0, 1280, 720};
-  for (uint32_t i = 0; i < 4; i++) {
-    guest::StoreU16(base, s + 2 * i, rectangle[i]);
-  }
+  // The payload as device-state.toml's ReplayCommand (SetScissorRects').
+  const schema::ReplayCommand rect(base, slot());
+  rect.set_arg0_high(0);
+  rect.set_arg0_low(0);
+  rect.set_arg1_high(1280);
+  rect.set_arg1_low(720);
   Slot3(base, slot(), 36, 0, 0);
   command_list::CloseChunk(base, list);
   return chunk;

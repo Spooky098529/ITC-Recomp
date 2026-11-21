@@ -518,15 +518,18 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
   }
   const uint32_t movie = ctx.r3.u32;
   const bool draw_only = ctx.r4.s32 != 0;
-  const uint32_t queue = movie + ui_movies::kMovieQueue;
-  const uint32_t looping = movie + ui_movies::kMovieLooping;
+  const schema::UiMovie m(base, movie);
+  const uint32_t queue = m.queue_address();
+  const uint32_t looping = m.looping_address();
   const uint64_t lr = ctx.lr;
   bool playing = false;
   ctx.fpscr.disableFlushMode();
   guest_call::InFrame(ctx, base, ui_movies::kUpdateFrame, 0x8211D330, [&](uint32_t frame) {
     const uint32_t local = frame + ui_movies::kUpdateLocal;
-    auto word = [&](uint32_t address) { return guest::LoadU32(base, address); };
-    auto count = [&](uint32_t list) { return int32_t(int16_t(guest::LoadU16(base, list + 136))); };
+    auto count = [&](uint32_t list) {
+      return int32_t(int16_t(schema::UiMovieAnimationList(base, list).count()));
+    };
+    auto slot_of = [&](uint32_t slot) { return schema::UiMovieAnimationSlot(base, slot); };
     // UiMovie::RestorePose(movie, live, rest, 0, 0).
     auto restore_pose = [&](uint32_t live, uint32_t rest, uint32_t return_address) {
       ctx.r3.u64 = movie;
@@ -540,11 +543,11 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
     // UiMovie::ApplyAnimation on a slot (+12 the tree, +16 the animation,
     // +20 the time); its r3.
     auto apply = [&](uint32_t slot, uint64_t loop, uint32_t return_address) {
-      ctx.r3.u64 = word(slot + 12);
-      ctx.r4.u64 = word(slot + 16);
+      ctx.r3.u64 = slot_of(slot).scene();
+      ctx.r4.u64 = slot_of(slot).animation();
       ctx.r6.u64 = loop;
       ctx.fpscr.disableFlushMode();
-      ctx.f1.f64 = double(guest::LoadFloat(base, slot + 20));
+      ctx.f1.f64 = double(guest::LoadFloat(base, slot_of(slot).time_address()));
       ctx.lr = return_address;
       lifted::Enter(ctx, base, game::UiMovie::ApplyAnimation);
       ctx.fpscr.disableFlushMode();
@@ -561,26 +564,26 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
     // The drawing: UiMovie::Draw, DrawTexts, and sub_8259DAC0 with 678 and
     // 148.
     auto draw = [&](uint64_t texts_r5, const uint32_t (&returns)[4]) {
-      ctx.r3.u64 = movie + 64;
-      ctx.r4.u64 = word(movie + ui_movies::kMovieLive);
-      ctx.r5.u64 = movie + ui_movies::kMovieTextures;
-      ctx.r6.u64 = movie + 40;
+      ctx.r3.u64 = m.draw_context_address();
+      ctx.r4.u64 = m.live_scene();
+      ctx.r5.u64 = m.textures_address();
+      ctx.r6.u64 = m.text_items_address();
       ctx.r7.s64 = -1;
       ctx.lr = returns[0];
       lifted::Enter(ctx, base, game::UiMovie::Draw_8259FA00);
       ctx.r3.u64 = movie;
-      ctx.r4.u64 = movie + 40;
+      ctx.r4.u64 = m.text_items_address();
       ctx.r5.u64 = texts_r5;
       ctx.lr = returns[1];
       lifted::Enter(ctx, base, game::UiMovie::DrawTexts);
       for (uint32_t k = 0; k < 2; k++) {
-        ctx.r3.u64 = movie + 64;
+        ctx.r3.u64 = m.draw_context_address();
         ctx.r4.u64 = k == 0 ? 678 : 148;
         ctx.lr = returns[2 + k];
         lifted::Enter(ctx, base, lifted::entry::e8259DAC0);
       }
     };
-    restore_pose(word(movie + ui_movies::kMovieSaved), word(movie + ui_movies::kMovieLive),
+    restore_pose(m.saved_scene(), m.live_scene(),
                  0x8211D330);
     ui_movies::UpdateBegin(base, local);
     if (draw_only) {
@@ -589,8 +592,8 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
       const int32_t queued = count(queue);
       for (int32_t i = 0; i < queued; i++) {
         const uint32_t slot = ui_movies::SlotOf(base, queue, ui_movies::LinkAt(base, queue, i));
-        apply(slot, word(slot + 28), 0x8211D3E4);
-        if (int32_t(word(slot + 24)) == 0) {
+        apply(slot, slot_of(slot).reversed(), 0x8211D3E4);
+        if (int32_t(slot_of(slot).chained()) == 0) {
           break;
         }
       }
@@ -599,7 +602,7 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
               0x8211D468);
       }
       draw(1, {0x8211D498, 0x8211D4A8, 0x8211D4B4, 0x8211D4C0});
-      restore_pose(word(movie + ui_movies::kMovieLive), word(movie + ui_movies::kMovieSaved),
+      restore_pose(m.live_scene(), m.saved_scene(),
                    0x8211D4D8);
       playing = true;
       return;
@@ -614,18 +617,18 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
       int32_t applied = 0;
       for (int32_t i = 0; i < queued; i++) {
         const uint32_t slot = ui_movies::SlotOf(base, queue, ui_movies::LinkAt(base, queue, i));
-        const int32_t result = apply(slot, word(slot + 28), 0x8211D578);
+        const int32_t result = apply(slot, slot_of(slot).reversed(), 0x8211D578);
         applied++;
-        if (int32_t(word(slot + 36)) == 0) {
+        if (int32_t(slot_of(slot).paused()) == 0) {
           ui_movies::StepQueuedTime(base, slot);
         }
         if (result != 0) {
           playing = true;
         }
-        if (int32_t(word(slot + 24)) == 0) {
+        if (int32_t(slot_of(slot).chained()) == 0) {
           break;
         }
-        if (result == 0 && int32_t(word(slot + 32)) != 0) {
+        if (result == 0 && int32_t(slot_of(slot).keep_end()) != 0) {
           keep(slot, 0x8211D608);
           ctx.r3.u64 = queue;
           ctx.r4.u64 = uint32_t(i);
@@ -638,7 +641,7 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
       }
       // A chain that has finished: the slots applied moved to the local
       // list.
-      if (!playing && guest::LoadU16(base, queue + 136) != 0 && applied != 0) {
+      if (!playing && schema::UiMovieAnimationList(base, queue).count() != 0 && applied != 0) {
         do {
           const uint32_t link = ui_movies::LinkAt(base, queue, 0);
           keep(ui_movies::SlotOf(base, queue, link), 0x8211D674);
@@ -651,27 +654,27 @@ void ui_movies_hooks::Update(lifted::Regs& ctx, uint8_t* base) {
     for (uint32_t i = 0; i < uint32_t(count(looping)); i++) {
       const uint32_t slot = ui_movies::SlotOf(base, looping, ui_movies::LinkAt(base, looping, i));
       apply(slot, 0, 0x8211D720);
-      if (int32_t(word(slot + 36)) == 0) {
+      if (int32_t(slot_of(slot).paused()) == 0) {
         ui_movies::StepLoopingTime(base, slot);
       }
     }
     draw(0, {0x8211D78C, 0x8211D79C, 0x8211D7A8, 0x8211D7B4});
-    restore_pose(word(movie + ui_movies::kMovieLive), word(movie + ui_movies::kMovieSaved),
+    restore_pose(m.live_scene(), m.saved_scene(),
                  0x8211D7CC);
     // The slots moved off the queue: applied once more, after the drawing,
     // and dropped; the pose saved again.
     int32_t kept = count(local);
     if (kept != 0) {
       do {
-        const uint16_t first = guest::LoadU16(base, local + 132);
+        const uint16_t first = schema::UiMovieAnimationList(base, local).first();
         const uint32_t link = local + (uint32_t(int32_t(int16_t(first))) << 2);
         apply(ui_movies::SlotOf(base, local, link), 0, 0x8211D810);
         kept--;
         ui_movies::UnlinkLocalFirst(base, local, link, first);
       } while (kept != 0);
-      restore_pose(word(movie + ui_movies::kMovieSaved), word(movie + ui_movies::kMovieLive),
+      restore_pose(m.saved_scene(), m.live_scene(),
                    0x8211D858);
-      if (guest::LoadU16(base, queue + 136) != 0) {
+      if (schema::UiMovieAnimationList(base, queue).count() != 0) {
         playing = true;
       }
     }

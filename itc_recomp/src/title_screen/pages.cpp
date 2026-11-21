@@ -63,13 +63,13 @@ uint64_t MainMenu(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls,
     Store(base, frame + 80 + 4 * k, kMainStrings[k]);
   }
   calls.Call(kListUpdate, frame, 0x822227C4, ListAddress(base));
-  const uint32_t list = ListAddress(base);
+  const schema::MenuList list = MenuListOf(base);
   uint32_t sound = 0;
-  if (Load(base, list + 24) != 0) {
+  if (list.move() != 0) {
     Through(base, 7, 2);
     sound = 4;
   } else {
-    const uint64_t accepted = calls.Call(kListAccepted, frame, 0x82222814, list);
+    const uint64_t accepted = calls.Call(kListAccepted, frame, 0x82222814, list.address);
     if (uint32_t(accepted) == 0) {
       return accepted;
     }
@@ -136,12 +136,12 @@ uint64_t CareerMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
     Store(base, frame + 80 + 4 * k, kCareerStrings[k]);
   }
   calls.Call(kListUpdate, frame, 0x82221B58, ListAddress(base));
-  const uint32_t list = ListAddress(base);
+  const schema::MenuList list = MenuListOf(base);
   uint32_t sound = 0;
-  if (Load(base, list + 24) != 0) {
+  if (list.move() != 0) {
     Through(base, 13, 3);
     sound = 4;
-  } else if (uint32_t(calls.Call(kListAccepted, frame, 0x82221B94, list)) == 0) {
+  } else if (uint32_t(calls.Call(kListAccepted, frame, 0x82221B94, list.address)) == 0) {
     const uint64_t cancelled = calls.Call(kListCancelled, frame, 0x82221CA0, ListAddress(base));
     if (uint32_t(cancelled) == 0) {
       return cancelled;

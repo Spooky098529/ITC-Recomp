@@ -122,7 +122,8 @@ uint64_t HubUpdate(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const uint32_t car = frame + 160;
   calls.Call(kMemcpy, frame, 0x82190AC8, car, SelectedGarageCar(base, save) + 212, 1968);
-  const uint64_t block = calls.Call(kBlockOf, frame, 0x82190AD0, Load(base, car + 12));
+  const uint64_t block =
+      calls.Call(kBlockOf, frame, 0x82190AD0, schema::CarMakersCar(base, car).car_id());
   r3 = calls.Call(kReloadModel, frame, 0x82190ADC, holder, block);
   Data(base).set_stand_model(uint32_t(r3));
   if (Data(base).stand_model() == 0) {

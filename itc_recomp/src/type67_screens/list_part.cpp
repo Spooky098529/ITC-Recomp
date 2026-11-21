@@ -14,6 +14,8 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/race_event.h"
+#include "schema/race_screens.h"
 #include "schema/type67_screens.h"
 #include "menu_sounds/menu_sounds.h"
 #include "race_screens/race_screens.h"
@@ -35,8 +37,6 @@ constexpr uint32_t kListUpdate = 0x8220C1E0;
 constexpr uint32_t kListAccepted = 0x8220BD50;
 constexpr uint32_t kListCancelled = 0x8220BDE0;
 constexpr uint32_t kListInit = 0x8220BAC0;
-// Player 0's options' +20 in the save data.
-constexpr uint32_t kOptionsWord = 0x1F870;
 
 uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   StoreU32(base, sp - bytes, sp);
@@ -284,8 +284,8 @@ uint64_t ListPartInnerOpen(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
     const uint64_t args[8] = {list, 2, 2, 1, 154, 153, 155, 156};
     calls.call8(kListInit, args, frame, 0x82252B80);
   }
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  const uint32_t selection = LoadU32(base, save + kOptionsWord) == 0 ? 1 : 0;
+  const schema::SaveData save(base, vehicle_accessors::SaveDataOf(base, 0));
+  const uint32_t selection = save.profile_option() == 0 ? 1 : 0;
   race_screens::ListSetSelection(base, uint32_t(list), selection);
   Inner(base, inner).set_prompt_state(0);
   Inner(base, inner).set_leave_asked(0);
@@ -468,7 +468,7 @@ uint64_t ListPartInnerStep2(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp
   if (int32_t(Inner(base, inner).step_started()) == 0) {
     const uint32_t list = inner + 40;
     // MenuList::GetPreviousSelection (sub_8220BC28): +20.
-    const uint32_t previous = LoadU32(base, list + 20);
+    const uint32_t previous = schema::MenuList(base, list).selection_before();
     calls.call(kFinishNamed, frame, 0x82252D98, movie,
                LoadU32(base, kListPartNamed + (previous << 2)));
     const uint32_t selection = race_screens::ListSelection(base, list);

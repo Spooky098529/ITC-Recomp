@@ -40,7 +40,7 @@ uint32_t Cell(uint8_t* base, uint32_t first, uint32_t per) {
 // A node's +68 = the highlight float, through a single's double as the
 // original's lfs and stfs.
 void Highlight(uint8_t* base, uint32_t node) {
-  guest::StoreFloat(base, node + 68, float(double(guest::LoadFloat(base, kHighlight))));
+  Node(base, node).set_alpha(float(double(guest::LoadFloat(base, kHighlight))));
 }
 // The plate's bytes from `from` (the data's digits or chars) as `count`
 // words at `to`.
@@ -212,7 +212,7 @@ uint64_t PlateTransition19(uint8_t* base, uint32_t step, uint32_t sp, const Call
       nodes[i] = ui_movies::FindNode(base, movie, kAll, children[i]);
     }
     for (const uint32_t node : nodes) {
-      Store(base, node + 80, 0);
+      Node(base, node).set_visible(0);
     }
     Store(base, step, 1);
   }

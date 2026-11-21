@@ -7,6 +7,8 @@
 #include "car_physics/float_ops.h"
 #include "debug/frame_state_diff.h"
 #include "graphics/resources.h"
+#include "schema/graphics_resources.h"
+#include "schema/tuning_screen.h"
 #include "schema/ui_movies_game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -71,16 +73,20 @@ void EffectBegin(uint8_t* base, uint32_t frame) {
 
 double EffectQuad(uint8_t* base, uint32_t frame, uint32_t primitive, uint32_t texture) {
   const schema::UiMovieQuad quad(base, frame + kEffectQuad);
+  // The primitive node: its +116 is the vertex count (UiMovieNode's
+  // texture_left word, read as an integer).
+  const schema::UiMovieNode prim(base, primitive);
+  const schema::LevelDesc desc(base, frame + kDesc);
   graphics::TextureLevelDesc(base, texture, 0, frame + kDesc);
   quad.set_texture(texture);
   quad.set_positions(frame + kPositions);
   quad.set_colors(frame + kColors);
   quad.set_coords(frame + kCoords);
-  quad.set_vertex_count(guest::LoadU32(base, primitive + 116));
+  quad.set_vertex_count(guest::LoadU32(base, prim.texture_left_address()));
   const double zero = Lfs(base, schema::UiMoviesGameGlobals::zero_address());
-  if (guest::LoadU32(base, primitive + 116) != 0) {
-    const uint32_t width = guest::LoadU32(base, frame + kDesc + 24);
-    const uint32_t height = guest::LoadU32(base, frame + kDesc + 28);
+  if (guest::LoadU32(base, prim.texture_left_address()) != 0) {
+    const uint32_t width = desc.width();
+    const uint32_t height = desc.height();
     StoreU64(base, frame + 88, width);
     StoreU64(base, frame + 80, height);
     const double alpha_scale = Lfs(base, kAlphaScale);
@@ -93,9 +99,9 @@ double EffectQuad(uint8_t* base, uint32_t frame, uint32_t primitive, uint32_t te
       const uint32_t p = frame + kPositions + 16 * k;
       const uint32_t t = frame + kCoords + 16 * k;
       const uint32_t c = frame + kColors + 16 * k;
-      const double x_offset = Lfs(base, primitive + 12);
+      const double x_offset = Lfs(base, prim.x_address());
       Stfs(base, p + 0, Fadds(Lfs(base, vertex + 0), x_offset));
-      const double y_offset = Lfs(base, primitive + 16);
+      const double y_offset = Lfs(base, prim.y_address());
       Stfs(base, p + 4, Fadds(Lfs(base, vertex + 4), y_offset));
       Stfs(base, p + 8, zero);
       Stfs(base, p + 12, one);
@@ -107,17 +113,17 @@ double EffectQuad(uint8_t* base, uint32_t frame, uint32_t primitive, uint32_t te
       const int32_t v = int32_t(guest::LoadU32(base, vertex + 28));
       StoreU64(base, frame + 88, uint64_t(int64_t(v)));
       Stfs(base, t + 4, Fdivs(ToFloat(v), h));
-      guest::StoreU32(base, c + 0, guest::LoadU32(base, primitive + 56));
-      guest::StoreU32(base, c + 4, guest::LoadU32(base, primitive + 60));
-      guest::StoreU32(base, c + 8, guest::LoadU32(base, primitive + 64));
+      guest::StoreU32(base, c + 0, prim.red());
+      guest::StoreU32(base, c + 4, prim.green());
+      guest::StoreU32(base, c + 8, prim.blue());
       guest::StoreU32(base, c + 12,
-                      uint32_t(Fctiwz(Fmuls(Lfs(base, primitive + 68), alpha_scale))));
+                      uint32_t(Fctiwz(Fmuls(Lfs(base, prim.alpha_address()), alpha_scale))));
       quad.set_clipped(0);
       quad.set_clip_0(0);
       quad.set_clip_1(0);
       quad.set_clip_2(0);
       quad.set_clip_3(0);
-    } while (k < guest::LoadU32(base, primitive + 116));
+    } while (k < guest::LoadU32(base, prim.texture_left_address()));
   }
   quad.set_unknown_72(0);
   quad.set_blend_mode(4);

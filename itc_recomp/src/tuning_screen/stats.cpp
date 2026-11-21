@@ -13,6 +13,8 @@
 #include "car_makers/car_makers.h"
 #include "front_end_car_draw/front_end_car_draw.h"
 #include "guest.h"
+#include "schema/car_physics.h"
+#include "schema/vehicle.h"
 #include "vehicle/vehicle.h"
 
 #include <bit>
@@ -81,10 +83,11 @@ uint64_t SetCarStats(uint8_t* base, const front_end_car_draw::Calls& calls, uint
   vehicle::PowerCurveFromEngine(base, curve, TS(base, s).car_data_address() + 1268, frame - 112);
   vehicle::PowerCurveShiftPeak(base, curve, 0, frame);
 
-  const int64_t displacement = Fctiwz(Lfs(base, TS(base, s).car_data_address() + 1288));
+  const schema::CarData car_data(base, TS(base, s).car_data_address());
+  const int64_t displacement = Fctiwz(Lfs(base, car_data.displacement_address()));
   const uint32_t drive = TS(base, s).spec_byte_130();
-  const int64_t power = Fctiwz(Lfs(base, curve + 1056));
-  const double torque = Lfs(base, curve + 1048);
+  const int64_t power = Fctiwz(Lfs(base, schema::PowerCurve(base, curve).most_power_address()));
+  const double torque = Lfs(base, schema::PowerCurve(base, curve).torque_scale_address());
   TS(base, s).set_stat_displacement(uint32_t(displacement));
   const double two = Lfs(base, kTwo);
   const double rear = Lfs(base, TS(base, s).car_data_address() + 672);

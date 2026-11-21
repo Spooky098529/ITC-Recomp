@@ -126,14 +126,14 @@ uint64_t BuildCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& 
   const uint32_t list = uint32_t(Alloc(calls, frame, 0x8219BDF0, 72));
   Globals::set_build_list(base, list);
   if (list != 0) {
-    Store(base, list + 68, 0);
-    Store(base, list + 60, 0);
+    MenuList(base, list).set_enabled(0u);
+    MenuList(base, list).set_player(0);
   }
   const uint32_t groups = uint32_t(Alloc(calls, frame, 0x8219BE1C, 72));
   Globals::set_build_group_list(base, groups);
   if (groups != 0) {
-    Store(base, groups + 68, 0);
-    Store(base, groups + 60, 0);
+    MenuList(base, groups).set_enabled(0u);
+    MenuList(base, groups).set_player(0);
   }
   const uint64_t r3 = Alloc(calls, frame, 0x8219BE4C, schema::BuildScreenData::kSize);
   const uint32_t screen = uint32_t(r3);
@@ -211,7 +211,8 @@ uint32_t BuildSaveBuildStates(uint8_t* base, uint32_t sp) {
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   for (uint32_t i = 0; i < 400; i++) {
     const uint32_t build = Globals::build_screen(base).builds_address() + schema::BuildRecord::kSize * i;
-    Store(base, save + 0x19A00 + 12 * i, schema::BuildRecord(base, build).saved_flags());
+    Store(base, SaveData(base, save).item_record_word_address() + 12 * i,
+          schema::BuildRecord(base, build).saved_flags());
   }
   return save;
 }
@@ -230,7 +231,7 @@ uint64_t BuildDetailsPage(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 96);
   calls.Call(kListUpdate, frame, 0x8219B97C, Globals::build_list(base).address);
   const uint32_t list = Globals::build_list(base).address;
-  if (Load(base, list + 24) != 0 || Load(base, list + 4) != Load(base, list + 8)) {
+  if (MenuList(base, list).move() != 0 || MenuList(base, list).scroll() != MenuList(base, list).scroll_before()) {
     PagesGo(base, Globals::build_pages(base).address, 3, 19, kNone);
     return calls.Call(kMenuSoundPlay, frame, 0x8219BA38, 4);
   }

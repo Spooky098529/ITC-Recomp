@@ -5,6 +5,8 @@
 #include "app_states/containers.h"
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/car_sounds.h"
+#include "schema/menu_sounds.h"
 #include "schema/sound_cues.h"
 
 #include <bit>
@@ -18,8 +20,9 @@ using G = schema::SoundCuesGlobals;
 constexpr uint32_t kZero = G::float_zero_address();  // the game's float 0.0
 constexpr uint32_t kOne = G::float_one_address();    // the game's float 1.0
 
-constexpr uint32_t kListener = 1456;  // the manager's listener
-constexpr uint32_t kBanks = 1516;     // the manager's bank vector (begin, end)
+// The manager's listener: AudioManager (menu-sounds.toml) has no field
+// for it yet.
+constexpr uint32_t kListener = 1456;
 
 // A float moved as lfs and stfs move it (single to double and back).
 void CopyFloat(uint8_t* base, uint32_t to, uint32_t from) {
@@ -34,15 +37,16 @@ void CopyVector3(uint8_t* base, uint32_t to, uint32_t from) {
   CopyFloat(base, to + 8, v.z_address());
 }
 
-// The bank slot's word for the index at `index_address`, from the vector
-// at `vector` (begin, end); false where the original traps.
-bool BankSlot(uint8_t* base, uint32_t vector, uint32_t index_address, uint32_t* pair) {
-  const uint32_t begin = guest::LoadU32(base, vector);
+// The bank slot's word for the index at `index_address`, from the
+// manager's bank vector (begin, end); false where the original traps.
+bool BankSlot(uint8_t* base, const schema::AudioManager& manager, uint32_t index_address,
+              uint32_t* pair) {
+  const uint32_t begin = manager.bank_pairs_first();
   const uint32_t index = schema::SoundCuesBankIndex(base, index_address).index();
   if (begin == 0) {
     return false;
   }
-  const uint32_t count = uint32_t(int32_t(guest::LoadU32(base, vector + 4) - begin) >> 2);
+  const uint32_t count = uint32_t(int32_t(manager.bank_pairs_end() - begin) >> 2);
   if (index >= count) {
     return false;
   }
@@ -123,7 +127,7 @@ uint32_t BankPairIsLoading(uint8_t* base, uint32_t pair) {
 bool ManagerReleaseBank(uint8_t* base, uint32_t manager, uint32_t index_address, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_82118190 AudioManager::ReleaseBank");
   uint32_t pair = 0;
-  if (!BankSlot(base, manager + kBanks, index_address, &pair)) {
+  if (!BankSlot(base, schema::AudioManager(base, manager), index_address, &pair)) {
     return false;
   }
   *r3 = manager;
@@ -138,7 +142,7 @@ bool ManagerIsBankLoading(uint8_t* base, uint32_t manager, uint32_t index_addres
                           uint32_t* result) {
   ITC_NATIVE_RUNNING("sub_82118200 AudioManager::IsBankLoading");
   uint32_t pair = 0;
-  if (!BankSlot(base, manager + kBanks, index_address, &pair)) {
+  if (!BankSlot(base, schema::AudioManager(base, manager), index_address, &pair)) {
     return false;
   }
   *result = pair == 0 ? 0 : BankPairIsLoading(base, pair);
@@ -149,7 +153,7 @@ bool ManagerIsBankSlotEmpty(uint8_t* base, uint32_t manager, uint32_t index_addr
                             uint32_t* result) {
   ITC_NATIVE_RUNNING("sub_821182E0 AudioManager::IsBankSlotEmpty");
   uint32_t pair = 0;
-  if (!BankSlot(base, manager + kBanks, index_address, &pair)) {
+  if (!BankSlot(base, schema::AudioManager(base, manager), index_address, &pair)) {
     return false;
   }
   *result = pair == 0 ? 1 : 0;
@@ -160,7 +164,8 @@ bool ManagerGetSoundBank(uint8_t* base, uint32_t interface, uint32_t index_addre
                          uint32_t* result) {
   ITC_NATIVE_RUNNING("sub_82118400 AudioManager::GetSoundBank");
   uint32_t pair = 0;
-  if (!BankSlot(base, interface + kBanks - 8, index_address, &pair)) {
+  // The interface is the manager's +8.
+  if (!BankSlot(base, schema::AudioManager(base, interface - 8), index_address, &pair)) {
     return false;
   }
   *result = BankPairSoundBank(base, pair);
@@ -310,7 +315,7 @@ bool SoundBankHolderDelete(uint8_t* base, uint32_t slot, uint32_t* r3) {
 uint32_t ManagerIsCuePlaying(uint8_t* base, uint32_t manager, uint32_t bank_address,
                              uint32_t cue_address) {
   ITC_NATIVE_RUNNING("sub_82118B58 AudioManager::IsCuePlaying");
-  const uint32_t end = guest::LoadU32(base, manager + 1528 + 4);
+  const uint32_t end = schema::AudioManager(base, manager).sounds_head();
   for (uint32_t node = schema::SoundListNode(base, end).next().address; node != end;
        node = schema::SoundListNode(base, node).next().address) {
     const uint32_t sound = schema::SoundListNode(base, node).sound().address;
@@ -346,14 +351,15 @@ uint32_t X3DAudioInitialize(uint8_t* base, uint32_t speaker_mask, double speed_o
   if ((speaker_mask & 8) != 0) {
     lfe = (speaker_mask & 1) + ((speaker_mask >> 1) & 1) + ((speaker_mask >> 2) & 1);
   }
-  guest::StoreU32(base, handle + 4, lfe);
+  const schema::X3DAudioHandle h(base, handle);
+  h.set_lfe_speaker(lfe);
   const uint32_t count = speaker_mask == 0 ? 1 : uint32_t(std::popcount(speaker_mask));
   const float speed = float(speed_of_sound);
-  guest::StoreFloat(base, handle + 8, speed);
-  guest::StoreU32(base, handle + 0, count);
+  h.set_speed_of_sound(speed);
+  h.set_speaker_count(count);
   // The float whose bits are one less (lfs widens it; stfs narrows it back).
   const float below = std::bit_cast<float>(std::bit_cast<uint32_t>(speed) - 1);
-  guest::StoreFloat(base, handle + 12, float(double(below)));
+  h.set_doppler_limit(float(double(below)));
   return 0;
 }
 

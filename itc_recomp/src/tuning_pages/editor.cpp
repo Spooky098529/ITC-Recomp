@@ -5,11 +5,15 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/tuning_screen.h"
 #include "tuning_screen/tuning_screen.h"
 
 namespace tuning_pages {
 
 namespace {
+
+// The screen (tuning-screen.toml's TuningScreen).
+schema::TuningScreen Screen(uint8_t* base, uint32_t s) { return schema::TuningScreen(base, s); }
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -18,18 +22,18 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
 
 // The vinyls: category 5's item 6.
 bool Vinyls(uint8_t* base, uint32_t screen) {
-  return int32_t(Load(base, screen + 9656)) == 5 && guest::LoadU8(base, screen + 9660) == 6;
+  return int32_t(Screen(base, screen).category()) == 5 && Screen(base, screen).item() == 6;
 }
 
 }  // namespace
 
 void SetUpVinylBusyIcon(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_821FE560 TuningScreen::SetUpVinylBusyIcon");
-  Store(base, screen + 10016, 0);
-  Store(base, screen + 10020, 13);
-  Store(base, screen + 10024, 155);
-  Store(base, screen + 10028, 154);
-  Store(base, screen + 10032, 156);
+  Screen(base, screen).set_busy_shown(0);
+  Screen(base, screen).set_busy_movie(13);
+  Screen(base, screen).set_busy_animation_0(155);
+  Screen(base, screen).set_busy_animation_1(154);
+  Screen(base, screen).set_busy_animation_2(156);
 }
 
 uint32_t AllLoaded(uint8_t* base, uint32_t images) {
@@ -48,7 +52,7 @@ void KeepListTextures(uint8_t* base, uint32_t screen) {
   if (!Vinyls(base, screen)) {
     return;
   }
-  const uint32_t images = screen + 10048;
+  const uint32_t images = Screen(base, screen).decal_images_address();
   // Entries 12 to 20 (the first list's window) into kept 6 to 14.
   for (uint32_t j = 0; j < 9; j++) {
     const schema::DecalImageEntry entry = DecalEntryAt(base, images, 12 + j);
@@ -61,20 +65,20 @@ void KeepListTextures(uint8_t* base, uint32_t screen) {
 void SetEditorLimits(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_821FE420 TuningScreen::SetEditorLimits");
   if (!Vinyls(base, screen)) {
-    Store(base, screen + 30788, 4);
-    Store(base, screen + 30784, 5);
-    Store(base, screen + 30792, 4);
-    Store(base, screen + 30796, 198);
+    Screen(base, screen).set_last_layer(4);
+    Screen(base, screen).set_last_page(5);
+    Screen(base, screen).set_order_last_position(4);
+    Screen(base, screen).set_image_last_index(198);
     return;
   }
-  const int32_t set = int32_t(Load(base, screen + 30724));
-  Store(base, screen + 30788, 2);
-  Store(base, screen + 30784, 1);
-  Store(base, screen + 30792, 2);
+  const int32_t set = int32_t(Screen(base, screen).editor_page());
+  Screen(base, screen).set_last_layer(2);
+  Screen(base, screen).set_last_page(1);
+  Screen(base, screen).set_order_last_position(2);
   if (set == 0) {
-    Store(base, screen + 30796, 4);
+    Screen(base, screen).set_image_last_index(4);
   } else if (set == 1) {
-    Store(base, screen + 30796, 193);
+    Screen(base, screen).set_image_last_index(193);
   }
 }
 

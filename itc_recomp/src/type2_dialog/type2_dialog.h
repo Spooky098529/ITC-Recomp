@@ -47,9 +47,10 @@ constexpr uint32_t kMenuStep = 0x82186568;
 constexpr uint32_t kMenuPressed = 0x821864C8;
 constexpr uint32_t kMenuSoundPlay = 0x821103F0;
 
-// Posts the message (id, 0, 0) on `mode`'s ring (+204: its count +600,
-// start +604, 50 slots of 12 bytes), the words in the order `order` names
-// (0: id, +4, +8; 1: +4, +8, id), as the handlers do inline.
+// Posts the message (id, 0, 0) on `mode`'s ring (`mode` the handlers' r4, a
+// schema::ModeDispatcher: its ring of 50 ModeMessages, ring_count and
+// ring_start), the words id, arg0, arg1, or with `id_last` arg0, arg1, id,
+// as the handlers do inline.
 void Post(uint8_t* base, uint32_t mode, uint32_t id, bool id_last = false);
 
 // --- The steps (steps.cpp; r3 the started word's address, the page

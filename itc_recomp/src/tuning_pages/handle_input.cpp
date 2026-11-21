@@ -13,10 +13,14 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/tuning_screen.h"
 
 namespace tuning_pages {
 
 namespace {
+
+// The screen (tuning-screen.toml's TuningScreen).
+schema::TuningScreen Screen(uint8_t* base, uint32_t s) { return schema::TuningScreen(base, s); }
 
 constexpr uint32_t kFrameBytes = 112;
 
@@ -59,10 +63,10 @@ uint64_t HandleInput(uint8_t* base, const tuning_screen::GuestCall& call, uint64
   const uint64_t images = screen + 10048;
   uint64_t r3 = flags.native_heap ? UpdateImages(base, call, images, frame)
                                   : call(0x821FE628, {images}, frame, 0x821E6974);
-  if (guest::LoadU32(base, s + 9728) == 0) {
+  if (Screen(base, s).pages_enabled() == 0) {
     return r3;
   }
-  const uint32_t state = guest::LoadU32(base, guest::LoadU32(base, s + 10036));
+  const uint32_t state = guest::LoadU32(base, Screen(base, s).queue().address);
   if (state > 62) {
     return r3;
   }
@@ -72,8 +76,8 @@ uint64_t HandleInput(uint8_t* base, const tuning_screen::GuestCall& call, uint64
   }
   switch (state) {
     case 0:  // the piece sub_821E69B8: TUNING SHOP MAIN, category 0
-      guest::StoreU32(base, s + 9652, 3);
-      guest::StoreU32(base, s + 9656, 0);
+      Screen(base, s).set_state(3);
+      Screen(base, s).set_category(0);
       return r3;
     case 3: return InputCategories(base, call, s, frame, flags);
     case 4: return InputItems(base, call, screen, frame, flags);

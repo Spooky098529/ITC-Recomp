@@ -389,6 +389,21 @@ fields = [
   { name = "entry_car_id", offset = 8432, type = "u32", note = "a car list entry's car id (the record's +20)" },
 ]
 
+# The mode's car (the globals type6_car and type7_car, 1,984 bytes in the
+# image): a garage car (car-makers.toml's GarageCar, its first 1,884 bytes a
+# CarMakersCar), then the mode's four words. No measure: reached by the
+# globals' addresses.
+[Type67Car]
+size = 1984
+origin = "image"
+fields = [
+  { name = "garage_car", offset = 0, type = "bytes", count = 1968, note = "a garage car (GarageCar)" },
+  { name = "model_made", offset = 1968, type = "u32", note = "the stand's model made for it (GarageStage::ReloadModel's answer); 0 from Show" },
+  { name = "source", offset = 1972, type = "u32", note = "where from: -1 none (made again), 0 stock, 2 the garage" },
+  { name = "garage_index", offset = 1976, type = "u32", note = "the garage list position it came from (the save's selected_car)" },
+  { name = "paint_word", offset = 1980, type = "u32", note = "the garage car's first halfword (its paint pick), sign-extended; 0 for a stock car" },
+]
+
 [globals]
 mode_type = { address = 0x826032DC, type = "u32", note = "the current mode's type (ControllerOptions::Leave posts by it)" }
 controller_page = { address = 0x826D848C, type = "ptr", to = "PageObject", note = "the controller pages' page object (28 bytes, ControllerOptions::OnEnter)" }

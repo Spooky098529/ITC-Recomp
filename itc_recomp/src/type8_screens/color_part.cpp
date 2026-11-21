@@ -10,12 +10,18 @@
 #include "base/log.h"
 #include "guest.h"
 #include "race_screens/race_screens.h"
+#include "schema/app_start_up.h"
+#include "schema/tuning_screen.h"
+#include "schema/type67_screens.h"
 #include "schema/type8_screens.h"
+#include "schema/ui_movies_game.h"
 #include "screen_constructors/screen_constructors.h"
 #include "type67_screens/list_pages.h"
 #include "type8_screens/part_helpers.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
+
+#include <bit>
 
 namespace type8_screens {
 
@@ -24,13 +30,12 @@ using guest::StoreU32;
 
 namespace ts = type67_screens;
 namespace rs = race_screens;
+using G = schema::Type8ScreensGlobals;
 using namespace part_detail;
 
 namespace {
 
 constexpr uint32_t kClearNodeText = 0x8211CC50;
-// The float word PlaceCursorB copies into the nodes' +68 (0.0).
-constexpr uint32_t kZero = 0x82000A34;
 
 // The block of the player (0 → +40, 1 → +404, else 0) in the inner part.
 uint32_t BlockOf(uint32_t inner, uint64_t player) {
@@ -47,7 +52,7 @@ uint64_t ColorBlockConstruct(uint8_t* base, uint64_t r3, uint64_t player) {
   const uint32_t b = uint32_t(r3), p = uint32_t(player);
   const schema::Type8ColorBlock blk(base, b);
   const uint32_t p4 = p << 2, p8 = p << 3, p12 = p * 12;
-  constexpr uint32_t t = 0x82011388;
+  constexpr uint32_t t = G::color_block_ids_address() + 64;  // 0x82011388
   blk.set_menu_block(0);
   blk.set_menu_player(0);
   blk.set_third_block(0);
@@ -139,10 +144,10 @@ uint64_t ColorBlockPlaceCursorA(uint8_t* base, uint64_t r3, uint64_t id, uint64_
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 112);
   const schema::Type8ColorBlock blk(base, b);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(id));
-  uint32_t node = ui_movies::Child(base, LoadU32(base, movie + 16), blk.node_set());
+  uint32_t node = ui_movies::Child(base, schema::UiMovie(base, movie).live_scene(), blk.node_set());
   node = ui_movies::Child(base, node, blk.count_node());
   node = ui_movies::Child(base, node, blk.cursor_a_child());
-  StoreU32(base, node + 80, uint32_t(shown) == 0 ? 1 : 0);
+  schema::UiMovieNode(base, node).set_visible(uint32_t(shown) == 0 ? 1 : 0);
   return node;
 }
 
@@ -151,16 +156,16 @@ uint64_t ColorBlockPlaceCursorB(uint8_t* base, uint64_t r3, uint64_t id, uint32_
   const uint32_t b = uint32_t(r3), frame = Frame(base, sp, 144);
   const schema::Type8ColorBlock blk(base, b);
   const uint32_t movie = MovieAt(base, frame + 80, uint32_t(id));
-  uint32_t node = ui_movies::Child(base, LoadU32(base, movie + 16), blk.node_set());
+  uint32_t node = ui_movies::Child(base, schema::UiMovie(base, movie).live_scene(), blk.node_set());
   node = ui_movies::Child(base, node, blk.cursor_node());
-  const uint32_t zero = LoadU32(base, kZero);
+  const uint32_t zero = schema::AppStartUpGlobals::float_zero(base);
   uint32_t last = 0;
   for (uint32_t i = 0; i < 2; i++) {
     const uint32_t a =
         ui_movies::Child(base, node, i == 0 ? blk.slider_child_a() : blk.slider_child_b());
     last = ui_movies::Child(base, node, i == 0 ? blk.slider_frame_a() : blk.slider_frame_b());
-    StoreU32(base, a + 68, zero);
-    StoreU32(base, last + 108, 1);
+    schema::UiMovieNode(base, a).set_alpha(std::bit_cast<float>(zero));
+    schema::UiMovieNode(base, last).set_texture_entry(1);
   }
   return last;
 }
@@ -176,9 +181,9 @@ uint64_t ColorBlockPlaceCursorC(uint8_t* base, uint64_t r3, uint64_t id, uint64_
   const bool first = int32_t(uint32_t(selection)) == 0;
   const uint32_t off = first ? blk.cursor_child_a() : blk.cursor_child_b();
   const uint32_t on = first ? blk.cursor_child_b() : blk.cursor_child_a();
-  StoreU32(base, ui_movies::Child(base, node, off) + 108, 0);
+  schema::UiMovieNode(base, ui_movies::Child(base, node, off)).set_texture_entry(0);
   const uint32_t child = ui_movies::Child(base, node, on);
-  StoreU32(base, child + 108, 1);
+  schema::UiMovieNode(base, child).set_texture_entry(1);
   return child;
 }
 

@@ -318,16 +318,22 @@ struct TrackZonesGlobals {
   static constexpr uint32_t slice_count_address() { return 0x82603274u; }
   // the 70 zones' vtables (.rdata, 12 bytes each)
   static constexpr uint32_t zone_vtables_address() { return 0x82011AF0u; }
-  // the course's route (a pointer; +12 its sections table)
-  static uint32_t route(uint8_t* base) { return guest::LoadU32(base, 0x826C5B10u); }
+  // the course's route (track-route.toml's TrackRoute, embedded): its file, +12 the sections table
+  template <typename T = TrackRouteFile>
+  static T route(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B10u)); }
+  static void set_route(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B10u, v.address); }
   static void set_route(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B10u, v); }
   static constexpr uint32_t route_address() { return 0x826C5B10u; }
-  // the race data (a pointer): +0x59614 a word, +0x59620 the stages, +0xA3AF0 the mode
-  static uint32_t race_data(uint8_t* base) { return guest::LoadU32(base, 0x826C5B2Cu); }
+  // the race data (race-states.toml): +0x59614 the racers added, +0x59620 the stages, +0xA3AF0 the kind
+  template <typename T = RaceData>
+  static T race_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  static void set_race_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B2Cu, v.address); }
   static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
   static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
-  // the racers' manager (a pointer): +2308 the racers' records
-  static uint32_t racers_manager(uint8_t* base) { return guest::LoadU32(base, 0x826D82F4u); }
+  // the racers' manager (race-world.toml): +2308 the racers' entries
+  template <typename T = RaceManager>
+  static T racers_manager(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D82F4u)); }
+  static void set_racers_manager(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D82F4u, v.address); }
   static void set_racers_manager(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D82F4u, v); }
   static constexpr uint32_t racers_manager_address() { return 0x826D82F4u; }
   // 0 for player 2's vehicle in mode 6 (TrackZones::Create)

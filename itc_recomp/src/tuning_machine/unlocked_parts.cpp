@@ -8,6 +8,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/career.h"
+#include "schema/tuning_screen.h"
 #include "tuning_screen/tuning_screen.h"
 
 namespace tuning_machine {
@@ -19,68 +21,71 @@ inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
 
-constexpr uint32_t kUnlockedBits = 0x19930;  // the save data's unlocked bitset
-
 }  // namespace
 
 void LoadUnlockedParts(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_821CFFC8 TuningScreen::LoadUnlockedParts");
-  const uint32_t s = screen;
-  // Bit n of the save's bitset (word n >> 5's 1 << (n & 31)): 1 or 0.
+  const schema::TuningScreen ts(base, screen);
+  // Bit n of the save's unlock set (+0x19930; word n >> 5's 1 << (n & 31)):
+  // 1 or 0, the save's pointer read again for each bit.
   auto bit = [&](uint32_t n) {
-    const uint32_t set = Load(base, s + tuning_screen::kSaveData) + kUnlockedBits;
+    const uint32_t set = schema::CareerSave(base, ts.save_data().address).unlock_set_address();
     return (Load(base, set + (n >> 5) * 4) >> (n & 31)) & 1;
   };
-  auto set = [&](uint32_t offset, uint32_t value) { Store(base, s + offset, value); };
-  // `count` words from s + `from`, word k bit `first` + k.
+  // The part tables (the screen's +34104): offsets below are from them,
+  // the screen's own in the comments.
+  const uint32_t tables = ts.part_tables_address();
+  // `count` words from `from`, word k bit `first` + k.
   auto words = [&](uint32_t from, uint32_t count, uint32_t first) {
     for (uint32_t k = 0; k < count; k++) {
-      set(from + 4 * k, bit(first + k));
+      Store(base, from + 4 * k, bit(first + k));
     }
   };
-  // The power items 0 and 1 of the part set [+33900] (read at each word):
-  // 1 and 3 from one half of the bits, 0, 2 and 4 the other, other sets
-  // nothing written.
+  // The power items 0 and 1 of the part set (the price class, read at
+  // each word): 1 and 3 from one half of the bits, 0, 2 and 4 the other,
+  // other sets nothing written. +34104 + 40v + 4i, +34584 + 28v + 4j.
   for (uint32_t i = 0; i < 10; i++) {
-    const uint32_t v = Load(base, s + 33900);
-    const uint32_t at = (v * 10 + i + 8526) * 4;
+    const uint32_t v = ts.price_class();
+    const uint32_t at = tables + v * 40 + i * 4;
     if (v == 1 || v == 3) {
-      set(at, bit(i));
+      Store(base, at, bit(i));
     } else if (v == 0 || v == 2 || v == 4) {
-      set(at, bit(i + 10));
+      Store(base, at, bit(i + 10));
     }
   }
   for (uint32_t j = 20; j < 27; j++) {
-    const uint32_t v = Load(base, s + 33900);
-    const uint32_t at = (v * 7 + j + 8646) * 4;
+    const uint32_t v = ts.price_class();
+    const uint32_t at = tables + 480 + v * 28 + j * 4;
     if (v == 1 || v == 3) {
-      set(at, bit(j));
+      Store(base, at, bit(j));
     } else if (v == 0 || v == 2 || v == 4) {
-      set(at, bit(j + 7));
+      Store(base, at, bit(j + 7));
     }
   }
-  words(34992, 7, 34);
-  words(35084, 7, 41);
-  words(35200, 7, 48);
-  words(35288, 7, 55);
-  words(35376, 7, 62);
-  words(35464, 7, 69);
-  for (uint32_t j = 0; j < 10; j++) {
-    set(35568 + 4 * j, bit(j < 4 ? 76 + j : j < 7 ? 77 + j : 78 + j));
+  words(tables + 888, 7, 34);   // +34992
+  words(tables + 980, 7, 41);   // +35084
+  words(tables + 1096, 7, 48);  // +35200
+  words(tables + 1184, 7, 55);  // +35288
+  words(tables + 1272, 7, 62);  // +35376
+  words(tables + 1360, 7, 69);  // +35464
+  for (uint32_t j = 0; j < 10; j++) {  // +35568
+    Store(base, tables + 1464 + 4 * j, bit(j < 4 ? 76 + j : j < 7 ? 77 + j : 78 + j));
   }
-  words(35680, 7, 88);
-  // The tires: tire 0 from bit 95, tire i (1 to 4) unlocked when any of
-  // bits 95 + i, 99 + i and 103 + i is set (tested in that order).
-  set(35800, bit(95));
+  words(tables + 1576, 7, 88);  // +35680
+  // The tires (+35800): tire 0 from bit 95, tire i (1 to 4) unlocked when
+  // any of bits 95 + i, 99 + i and 103 + i is set (tested in that order).
+  const uint32_t tires = tables + 1696;
+  Store(base, tires, bit(95));
   for (uint32_t i = 1; i < 5; i++) {
-    set(35800 + 4 * i, (bit(95 + i) != 0 || bit(99 + i) != 0 || bit(103 + i) != 0) ? 1 : 0);
+    Store(base, tires + 4 * i,
+          (bit(95 + i) != 0 || bit(99 + i) != 0 || bit(103 + i) != 0) ? 1 : 0);
   }
-  // +25164: cleared, then set from bit 187 (word 5's 1 << 27).
-  set(25164, 0);
+  // Aero item 9: cleared, then set from bit 187 (word 5's 1 << 27).
+  ts.set_aero_available_9(0);
   if (bit(187) != 0) {
-    set(25164, 1);
+    ts.set_aero_available_9(1);
   }
-  words(36576, 3, 186);
+  words(tables + 2472, 3, 186);  // +36576
 }
 
 }  // namespace tuning_machine

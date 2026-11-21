@@ -12,6 +12,7 @@
 #include "guest.h"
 #include "menu_helpers/menu_helpers.h"
 #include "menu_sounds/menu_sounds.h"
+#include "schema/boot_mode.h"
 #include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
 #include "schema/type8_mode.h"
@@ -62,21 +63,22 @@ menu_helpers::Calls Menus(const Calls& calls) {
   return {const_cast<Calls*>(&calls), &MenuThunk};
 }
 
-// The dispatcher's ring (+204)'s next record, its count raised.
-uint32_t NextRecord(uint8_t* base, uint32_t dispatcher) {
-  const uint32_t ring = dispatcher + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  return ring + (end - (end / 50) * 50) * 12;
+// The dispatcher's ring's next record, its count raised.
+schema::ModeMessage NextRecord(uint8_t* base, uint32_t dispatcher) {
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t end = d.ring_start() + count - 1;
+  d.set_ring_count(count);
+  return schema::ModeMessage(
+      base, d.ring_address() + (end - (end / 50) * 50) * schema::ModeMessage::kSize);
 }
 
 // A message (`message`, 0, 0) posted, the id first.
 void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
-  const uint32_t slot = NextRecord(base, dispatcher);
-  StoreU32(base, slot + 0, message);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
+  const schema::ModeMessage slot = NextRecord(base, dispatcher);
+  slot.set_id(message);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 // The confirm's reopen OpenConfirm and DrawWaiting share after ResetPose
@@ -322,10 +324,10 @@ uint64_t DialogConfirmPage(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint
     answer = menu_sounds::PlayMenuSound(base, 0, frame, Sounds(calls));
     ToStep(base, dialog, 1, 0, 0);
     const bool yes = int32_t(Menu(base, menu).cursor()) == 0;
-    const uint32_t slot = NextRecord(base, dispatcher);
-    StoreU32(base, slot + 4, 0);
-    StoreU32(base, slot + 8, 0);
-    StoreU32(base, slot + 0, yes ? 9 : 10);
+    const schema::ModeMessage slot = NextRecord(base, dispatcher);
+    slot.set_arg0(0);
+    slot.set_arg1(0);
+    slot.set_id(yes ? 9 : 10);
     return answer;
   }
   answer = menu_helpers::Pressed(base, menu, 158, frame, calls.native_action_slots, Menus(calls));

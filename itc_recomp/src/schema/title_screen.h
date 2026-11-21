@@ -397,12 +397,16 @@ struct TitleScreenGlobals {
   static uint32_t pad_blocked1(uint8_t* base) { return guest::LoadU32(base, 0x826C7964u); }
   static void set_pad_blocked1(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C7964u, v); }
   static constexpr uint32_t pad_blocked1_address() { return 0x826C7964u; }
-  // the save screen's third block (+52 the controller pick's count)
-  static uint32_t pick_block(uint8_t* base) { return guest::LoadU32(base, 0x826D8454u); }
+  // the save screen's data (save-screen.toml's; +52 the controller pick OnControllerPicked reads)
+  template <typename T = SaveScreenData>
+  static T pick_block(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D8454u)); }
+  static void set_pick_block(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D8454u, v.address); }
   static void set_pick_block(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8454u, v); }
   static constexpr uint32_t pick_block_address() { return 0x826D8454u; }
-  // the options' settings (+712 read by Interrupt)
-  static uint32_t options_settings(uint8_t* base) { return guest::LoadU32(base, 0x826D8478u); }
+  // the options' settings (options-screen.toml's; +712 read by Interrupt)
+  template <typename T = OptionsSettings>
+  static T options_settings(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D8478u)); }
+  static void set_options_settings(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D8478u, v.address); }
   static void set_options_settings(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8478u, v); }
   static constexpr uint32_t options_settings_address() { return 0x826D8478u; }
   // the passes word ScreenFades::FadeIn gets

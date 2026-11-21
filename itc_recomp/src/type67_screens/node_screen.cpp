@@ -20,6 +20,9 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/car_settings.h"
+#include "schema/race_screens.h"
+#include "schema/tuning_screen.h"
 #include "schema/type67_screens.h"
 #include "mode_tick/mode_tick.h"
 #include "race_screens/race_screens.h"
@@ -74,13 +77,16 @@ uint64_t PlayLoop(uint8_t* base, const Calls& calls, uint32_t screen, uint32_t m
 
 // The record's i-th entry (CourseRecords::Of's record): the chain from the
 // halfword +44 walked i times (each node's first halfword the next, words
-// from the record), the node's second halfword the entry, 28 bytes each.
-uint32_t RecordEntry(uint8_t* base, uint32_t record, uint32_t i) {
-  uint32_t node = record + (uint32_t(int32_t(int16_t(LoadU16(base, record + 44)))) << 2);
+// from the record), the node's second halfword the entry, 28 bytes each
+// from the record's +52.
+schema::CourseRecordEntry RecordEntry(uint8_t* base, uint32_t record, uint32_t i) {
+  const schema::CourseRecord r(base, record);
+  uint32_t node = record + (uint32_t(int32_t(int16_t(r.first()))) << 2);
   for (uint32_t k = 0; k < i; k++) {
     node = record + (uint32_t(int32_t(int16_t(LoadU16(base, node)))) << 2);
   }
-  return record + uint32_t(int32_t(int16_t(LoadU16(base, node + 2))) * 28);
+  return schema::CourseRecordEntry(
+      base, r.entries_address() + uint32_t(int32_t(int16_t(LoadU16(base, node + 2))) * 28));
 }
 
 }  // namespace
@@ -309,10 +315,11 @@ uint64_t NodeScreenStep2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& c
   const uint32_t list = screen + 10132;
   const uint32_t s = race_screens::ListSelection(base, list);
   // MenuList::GetPreviousSelection (sub_8220BC28): +20.
-  const uint32_t p = LoadU32(base, list + 20);
+  const schema::MenuList menu(base, list);
+  const uint32_t p = menu.selection_before();
   const int32_t moved = int32_t(s - p);
   const uint32_t wrapped = NS(base, screen).course_list_wrapped();
-  const int32_t scrolled = int32_t(LoadU32(base, list + 4) - LoadU32(base, list + 8));
+  const int32_t scrolled = int32_t(menu.scroll() - menu.scroll_before());
   // The items' named animations, [+10352 + 4i].
   const uint32_t was = ((p + 2588) << 2) + screen;
   Finish(calls, movie, LoadU32(base, was), frame, 0x822597C8);
@@ -341,7 +348,7 @@ uint64_t NodeScreenStep2(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& c
     StoreU32(base, frame + 80, uint32_t(uint64_t(product) >> 32));
     StoreU32(base, frame + 84, uint32_t(uint64_t(product)));
     const uint32_t child = ui_movies::Child(base, node, NS(base, screen).cursor_child());
-    StoreU32(base, child + 16, std::bit_cast<uint32_t>(float(double(product))));
+    schema::UiMovieNode(base, child).set_y(float(double(product)));
   }
   if (scrolled != 0) {
     Finish(calls, movie, NS(base, screen).scroll_down_anim(), frame, 0x822598D8);
@@ -387,7 +394,7 @@ uint64_t NodeScreenOnToggleMoved(uint8_t* base, uint64_t r3, uint32_t sp, const 
   const uint32_t toggle = screen + 10204;
   const uint32_t selection = race_screens::ListSelection(base, toggle);
   // MenuList::GetPreviousSelection (sub_8220BC28), read and unused.
-  (void)LoadU32(base, toggle + 20);
+  (void)schema::MenuList(base, toggle).selection_before();
   const bool first = selection == 0;
   // The node finished, then the one finished, played and looped.
   const uint32_t off = first ? 10328 : 10324, on = first ? 10324 : 10328;
@@ -422,7 +429,7 @@ uint64_t NodeScreenSetArrows(uint8_t* base, uint64_t r3, uint32_t which, uint32_
   };
   if (int32_t(frame_word()) < 0) return movie;
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  StoreU32(base, node + 108, frame_word());
+  schema::UiMovieNode(base, node).set_texture_entry(frame_word());
   return node;
 }
 
@@ -457,7 +464,7 @@ uint64_t NodeScreenShowRecords(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t
   const uint32_t record = uint32_t(save_data::CourseRecordsOf(base, records, frame + 88));
   for (uint32_t i = 0; i < 10; i++) {
     const uint32_t texts = screen + 10416 + 4 * i;
-    const uint32_t count = uint32_t(int32_t(int16_t(LoadU16(base, record + 48))));
+    const uint32_t count = uint32_t(int32_t(int16_t(schema::CourseRecord(base, record).count())));
     calls.set_r4(kNone);
     if (i >= count) {
       for (const uint32_t at : {0u, 40u, 80u}) {
@@ -470,11 +477,12 @@ uint64_t NodeScreenShowRecords(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t
     // The time: minutes (the first halfword's low 15 bits), seconds (6
     // bits) and thousandths (10 bits) of the entry's +72, or 59, 59, 999
     // past 59 minutes.
-    const uint32_t entry = RecordEntry(base, record, i);
-    const uint32_t minutes = LoadU16(base, entry + 72) & 0x7FFF;
+    const schema::CourseRecordEntry entry = RecordEntry(base, record, i);
+    // The time's first halfword (no halfword field: the time is a word).
+    const uint32_t minutes = LoadU16(base, entry.time_address()) & 0x7FFF;
     uint64_t time[4] = {59, 59, 999, 0};
     if (minutes <= 59) {
-      const uint32_t word = LoadU32(base, entry + 72);
+      const uint32_t word = entry.time();
       time[0] = minutes;
       time[1] = (word >> 10) & 0x3F;
       time[2] = word & 0x3FF;
@@ -482,10 +490,10 @@ uint64_t NodeScreenShowRecords(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t
     calls.set_text_args(frame, 0x82259584, movie, kNone, LoadU32(base, texts), 528, time);
     calls.set_r4(kNone);
     calls.set_text(frame, 0x822595D0, movie, kNone, LoadU32(base, texts + 40),
-                   LoadU32(base, RecordEntry(base, record, i) + 52) + 1646);
+                   RecordEntry(base, record, i).unknown_0() + 1646);
     calls.set_r4(kNone);
     calls.set_text(frame, 0x8225961C, movie, kNone, LoadU32(base, texts + 80),
-                   LoadU32(base, RecordEntry(base, record, i) + 52) + 1718);
+                   RecordEntry(base, record, i).unknown_0() + 1718);
   }
   // UiMovie::SetNodeTexture(m, -1, +10544, the course): the lookup, then the
   // texture.

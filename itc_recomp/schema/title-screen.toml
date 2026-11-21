@@ -198,8 +198,8 @@ sound_manager = { address = 0x826C5C80, type = "u32", note = "the sound manager 
 profile_read = { address = 0x826C7938, type = "u32", note = "1 when a player's controller changes (the profile read asked for)" }
 pad_blocked0 = { address = 0x826C7960, type = "u32", note = "the pad blocked (known-data.md): either word set" }
 pad_blocked1 = { address = 0x826C7964, type = "u32" }
-pick_block = { address = 0x826D8454, type = "u32", note = "the save screen's third block (+52 the controller pick's count)" }
-options_settings = { address = 0x826D8478, type = "u32", note = "the options' settings (+712 read by Interrupt)" }
+pick_block = { address = 0x826D8454, type = "ptr", to = "SaveScreenData", note = "the save screen's data (save-screen.toml's; +52 the controller pick OnControllerPicked reads)" }
+options_settings = { address = 0x826D8478, type = "ptr", to = "OptionsSettings", note = "the options' settings (options-screen.toml's; +712 read by Interrupt)" }
 fades_passes = { address = 0x82001BEC, type = "u32", note = "the passes word ScreenFades::FadeIn gets" }
 menu4_wrap_up = { address = 0x82001FB0, type = "u32", note = "the cursor's position MoveMenu4Cursor copies when the menu wraps up" }
 menu4_wrap_down = { address = 0x82000A34, type = "u32", note = "its position when the menu wraps down" }

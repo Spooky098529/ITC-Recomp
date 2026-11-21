@@ -11,11 +11,19 @@
 #include "memory/heap.h"
 #include "mode_tick/mode_tick.h"
 #include "native/buffers.h"
+#include "schema/tuning_screen.h"
 #include "tuning_screen/tuning_screen.h"
 
 namespace tuning_pages {
 
 namespace {
+
+// The screen (tuning-screen.toml's TuningScreen).
+schema::TuningScreen Screen(uint8_t* base, uint32_t s) { return schema::TuningScreen(base, s); }
+// The screen's command queue (tuning-screen.toml's TuningCommandQueue).
+schema::TuningCommandQueue CommandQueue(uint8_t* base, uint32_t q) {
+  return schema::TuningCommandQueue(base, q);
+}
 
 using G = schema::TuningPagesGlobals;
 
@@ -159,7 +167,7 @@ uint64_t BindVinylTextures(uint8_t* base, uint64_t screen, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82203D40 TuningScreen::BindVinylTextures");
   const uint32_t s = uint32_t(screen);
   const uint32_t frame = Frame(base, sp, 112);
-  if (int32_t(Load(base, s + 9656)) != 5 || guest::LoadU8(base, s + 9660) != 6) {
+  if (int32_t(Screen(base, s).category()) != 5 || Screen(base, s).item() != 6) {
     return screen;
   }
   const uint32_t entry = tuning_screen::MovieEntry(base, frame, 13);
@@ -171,7 +179,7 @@ uint64_t BindVinylTextures(uint8_t* base, uint64_t screen, uint32_t sp) {
       {36, 161}, {37, 162}, {38, 163}, {39, 164}, {40, 165}, {27, 194}, {28, 195}, {29, 196}};
   for (const auto& pair : kPairs) {
     SetMovieTexture(base, movie, pair[1],
-                    DecalEntryAt(base, s + 10048, pair[0]).texture_header());
+                    DecalEntryAt(base, Screen(base, s).decal_images_address(), pair[0]).texture_header());
   }
   return entry;
 }
@@ -229,45 +237,45 @@ uint64_t EnterEditor(uint8_t* base, uint64_t screen, uint32_t sp) {
   if ((G::fade_out_counts(base) | G::fade_in_counts(base)) != 0) {
     return screen;
   }
-  if (AllLoaded(base, s + 10048) == 0) {
+  if (AllLoaded(base, Screen(base, s).decal_images_address()) == 0) {
     return 0;
   }
   const uint32_t passes = G::fade_in_passes(base);
   mode_tick::ScreenFadesFadeIn(base, passes, 0, 0, 0, 0);
-  if (int32_t(Load(base, s + 9656)) != 5) {
+  if (int32_t(Screen(base, s).category()) != 5) {
     return passes;
   }
-  const uint32_t item = guest::LoadU8(base, s + 9660);
+  const uint32_t item = Screen(base, s).item();
   if (item != 6 && item != 7) {
     return passes;
   }
   BindVinylTextures(base, screen, frame);
   KeepListTextures(base, s);
   // Push(4): the history's word at the byte +10008, then the byte stepped.
-  Store(base, (guest::LoadU8(base, s + 10008) + 2439) * 4 + s, 4);
-  const uint8_t depth = uint8_t(guest::LoadU8(base, s + 10008) + 1);
-  uint32_t queue = Load(base, s + 10036);
-  const uint32_t state = Load(base, s + 9652);
-  guest::StoreU8(base, s + 10008, depth);
-  Store(base, queue + 20, 0xFFFFFFFFu);
-  Store(base, queue + 12, 0xFFFFFFFFu);
-  Store(base, queue + 24, 0);
-  Store(base, queue + 4, state);
-  Store(base, queue + 0, state);
-  Store(base, queue + 8, state);
+  Store(base, (Screen(base, s).history_depth() + 2439) * 4 + s, 4);
+  const uint8_t depth = uint8_t(Screen(base, s).history_depth() + 1);
+  uint32_t queue = Screen(base, s).queue().address;
+  const uint32_t state = Screen(base, s).state();
+  Screen(base, s).set_history_depth(depth);
+  CommandQueue(base, queue).set_step(0xFFFFFFFFu);
+  CommandQueue(base, queue).set_current(0xFFFFFFFFu);
+  CommandQueue(base, queue).set_started(0);
+  CommandQueue(base, queue).set_resume(state);
+  CommandQueue(base, queue).set_page(state);
+  CommandQueue(base, queue).set_previous_page(state);
   const bool vinyls =
-      int32_t(Load(base, s + 9656)) == 5 && guest::LoadU8(base, s + 9660) == 6;
+      int32_t(Screen(base, s).category()) == 5 && Screen(base, s).item() == 6;
   const uint32_t next = vinyls ? 23 : 38;
-  queue = Load(base, s + 10036);
-  Store(base, s + 9652, next);
-  const uint32_t current = Load(base, queue + 0);
+  queue = Screen(base, s).queue().address;
+  Screen(base, s).set_state(next);
+  const uint32_t current = CommandQueue(base, queue).page();
   if (int32_t(current) != int32_t(next)) {
-    Store(base, queue + 8, current);
+    CommandQueue(base, queue).set_previous_page(current);
   }
-  Store(base, queue + 16, 0xFFFFFFFFu);
-  Store(base, queue + 4, next);
-  Store(base, queue + 0, 0xFFFFFFFFu);
-  Store(base, queue + 12, vinyls ? 15 : 32);
+  CommandQueue(base, queue).set_next(0xFFFFFFFFu);
+  CommandQueue(base, queue).set_resume(next);
+  CommandQueue(base, queue).set_page(0xFFFFFFFFu);
+  CommandQueue(base, queue).set_current(vinyls ? 15 : 32);
   if (vinyls) {
     SetUpVinylBusyIcon(base, s);
   }

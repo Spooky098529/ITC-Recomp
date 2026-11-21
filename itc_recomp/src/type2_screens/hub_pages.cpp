@@ -73,15 +73,15 @@ uint64_t ToMenu(uint8_t* base, uint32_t frame) {
 void HubFillPlayerRecord(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8218DA48 Type2Hub::FillPlayerRecord");
   const uint32_t frame = Frame(base, sp, 6176);
-  const uint32_t record = Globals::record_screen(base) + 8;
+  const schema::UserInfoData record = schema::UserInfoGlobals::data(base);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const uint32_t stats = save + 48;
   calls.Call(kMemcpy, frame, 0x8218DA84, frame + 96, stats, 6044);
   const auto half = [&](uint32_t at) { return int32_t(int16_t(guest::LoadU16(base, frame + at))); };
   const int32_t a = half(108), b = half(110), c = half(112), d = half(118);
-  Store(base, record + 0, uint32_t(a));
-  Store(base, record + 4, uint32_t(b));
-  Store(base, record + 8, uint32_t(c));
+  record.set_count_12(uint32_t(a));
+  record.set_count_14(uint32_t(b));
+  record.set_count_16(uint32_t(c));
   float ratio;
   if (d != 0) {
     // The original's stack words for fcfid (+88 a, +80 d, as doublewords).
@@ -97,17 +97,18 @@ void HubFillPlayerRecord(uint8_t* base, uint32_t sp, const Calls& calls) {
   const int32_t e = half(6064);
   const uint32_t r9 = Load(base, frame + 6120);
   const float f12 = guest::LoadFloat(base, frame + 6088);
-  guest::StoreFloat(base, record + 12, ratio);
-  guest::StoreFloat(base, record + 20, guest::LoadFloat(base, frame + 6072));
-  Store(base, record + 16, uint32_t(e));
-  guest::StoreFloat(base, record + 24, guest::LoadFloat(base, frame + 6000));
-  Store(base, record + 32, r9);
-  Store(base, record + 28, uint32_t(TruncateWord(double(f12))));
+  record.set_ratio(ratio);
+  record.set_distance_5976(guest::LoadFloat(base, frame + 6072));
+  record.set_stats_5968(uint32_t(e));
+  record.set_distance_5904(guest::LoadFloat(base, frame + 6000));
+  record.set_stats_6024(r9);
+  record.set_distance_5992(TruncateWord(double(f12)));
   const uint32_t time = uint32_t(calls.Call(kPlayTimeAdd, frame, 0x8218DB2C, frame + 80, stats));
-  Store(base, record + 36, Load(base, time + 0));
-  Store(base, record + 40, Load(base, time + 4));
-  Store(base, record + 44, uint32_t(int32_t(int16_t(guest::LoadU16(base, save + 6328)))));
-  Store(base, record + 48, Load(base, save + 0x1991C));
+  const schema::PlayTimeAnswer answer(base, time);
+  record.set_play_hours(answer.hours());
+  record.set_play_time_word(answer.time_word());
+  record.set_garage_count(uint32_t(int32_t(int16_t(SaveData(base, save).garage_count()))));
+  record.set_save_1991C(Load(base, save + 0x1991C));  // not in SaveData yet
 }
 
 uint64_t HubNoticePage(uint8_t* base, uint32_t sp, const Calls& calls) {
@@ -123,7 +124,7 @@ uint64_t HubNoticePage(uint8_t* base, uint32_t sp, const Calls& calls) {
   if (uint32_t(r3) != 0) {
     const uint32_t more = uint32_t(calls.Call(kHasMoreText, frame, 0x8218EA48, movie, 0, 2));
     const uint32_t node = ui_movies::FindNode(base, movie, 0, 0);
-    Store(base, node + 80, more != 0 ? 1 : 0);
+    Node(base, node).set_visible(more != 0 ? 1 : 0);
     return node;
   }
   const uint32_t next = HubNextNotice(base, frame);

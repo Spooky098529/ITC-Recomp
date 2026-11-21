@@ -15,6 +15,8 @@
 #include "base/flags.h"
 #include "hooks/save_interface.h"
 #include "schema/system_services.h"
+#include "schema/save_interface.h"
+#include "schema/files_and_saves.h"
 #include "user/network.h"
 #include "lifted/sdk.h"
 
@@ -102,14 +104,18 @@ ITC_NATIVE_ENTRY_ALWAYS(820A4610) {
     hooks::SaveDevicesUpdateSteps(ctx, base);
     return;
   }
-  const uint32_t devices = ctx.r3.u32;
-  if (!guest::LoadU32(base, devices + 56)) {
+  // The save devices (save-interface.toml's SaveDevices) and their slots
+  // (files-and-saves.toml's SaveSlot).
+  const schema::SaveDevices devices(base, ctx.r3.u32);
+  if (!devices.listener()) {
     return;
   }
-  auto slot = [&](uint32_t i) { return guest::LoadU32(base, devices + 44) + 1000 * i; };
-  auto count = [&] { return int32_t(guest::LoadU32(base, devices + 48)); };
+  auto slot = [&](uint32_t i) {
+    return schema::SaveSlot(base, devices.slots<schema::View>().address + 1000 * i);
+  };
+  auto count = [&] { return int32_t(devices.slot_count()); };
   InFrame(ctx, base, 144, 0x820A4640, [&](uint32_t) {
-    const uint32_t source = guest::LoadU32(base, devices + 12);
+    const uint32_t source = devices.device_list();
     ctx.r3.u64 = source;  // r4 as the caller left it
     CallAt(ctx, base, Method(base, source, 4), 0x820A4640);
     const uint32_t list = ctx.r3.u32;
@@ -117,28 +123,34 @@ ITC_NATIVE_ENTRY_ALWAYS(820A4610) {
       ctx.r3.u64 = list;
       ctx.r4.u64 = uint32_t(i);
       CallAt(ctx, base, Method(base, list, 8), 0x820A4674);
-      guest::StoreU32(base, slot(i) + 956, ctx.r3.u32);
+      slot(i).set_user(ctx.r3.u32);
     }
     ctx.r3.u64 = 0;  // XNotifyGetNext's answer: nothing
     for (int32_t i = 0; i < count(); i++) {
-      const int32_t state = int32_t(guest::LoadU32(base, slot(i) + 956));
+      const int32_t state = int32_t(slot(i).user());
       if (state < 0 || state > 3) {
-        ctx.r3.u64 = devices;
+        ctx.r3.u64 = devices.address;
         ctx.r4.u64 = uint32_t(i);
-        CallAt(ctx, base, Method(base, devices, 28), 0x820A4758);
+        CallAt(ctx, base, Method(base, devices.address, 28), 0x820A4758);
         if (ctx.r3.u32 < 5) {
-          for (uint32_t offset : {36, 988, 984, 960, 964, 968, 972}) {
-            guest::StoreU32(base, slot(i) + offset, 0);
-          }
+          // +36, +988, +984, +960, +964, +968, +972, in the original's order.
+          slot(i).set_device(0);
+          slot(i).set_state(0);
+          slot(i).set_enumerated_saves(0);
+          slot(i).set_request_device_selector(0);
+          slot(i).set_request_enumeration(0);
+          slot(i).set_request_save(0);
+          slot(i).set_request_load(0);
         }
       }
-      const uint32_t s = slot(i);
+      const schema::SaveSlot s = slot(i);
+      // The handlers' table from +76 (wait_for_user), by the slot's state.
       const uint32_t handler =
-          guest::LoadU32(base, devices + 4 * (guest::LoadU32(base, s + 988) + 19));
-      ctx.r3.u64 = devices;
-      ctx.r4.u64 = s;
+          guest::LoadU32(base, devices.wait_for_user_address() + 4 * s.state());
+      ctx.r3.u64 = devices.address;
+      ctx.r4.u64 = s.address;
       CallAt(ctx, base, handler, 0x820A47D8);
-      guest::StoreU32(base, slot(i) + 988, ctx.r3.u32);
+      slot(i).set_state(ctx.r3.u32);
     }
   });
 }

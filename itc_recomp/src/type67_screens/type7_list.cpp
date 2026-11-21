@@ -19,6 +19,12 @@
 #include "car_list/car_list.h"
 #include "car_specs/car_specs.h"
 #include "guest.h"
+#include "schema/boot_mode.h"
+#include "schema/menu_sounds.h"
+#include "schema/race_event.h"
+#include "schema/race_setup.h"
+#include "schema/race_states.h"
+#include "schema/tuning_screen.h"
 #include "schema/type67_screens.h"
 #include "menu_sounds/menu_sounds.h"
 #include "native/buffers.h"
@@ -48,15 +54,10 @@ constexpr uint32_t kItemTexts = 0x82637054;
 constexpr uint32_t kTitleTexts = 0x82637194;
 constexpr uint32_t kItemRecords = 0x82637098;
 constexpr uint32_t kDetailTexts = 0x82637078;
-// The race set-up's guest fallbacks and the float 0.0 Race::AddRacer gets.
+// The race set-up's guest fallbacks.
 constexpr uint32_t kResetGlobal = 0x821021A8, kRaceSetRoute = 0x82101D38,
                    kCarRefresh = 0x820C4998, kAddRacer = 0x821017C0, kPlaceRacers = 0x82102048;
-constexpr uint32_t kZero = 0x82000A34;
 constexpr uint32_t kSetUpRaceFrame = 4064;
-// The race data's words SetUpRace sets.
-constexpr uint32_t kRaceWordA = 0xA3AF0, kRaceWordB = 0xA3AF4;
-// Player 0's save data word the list part's answer goes to.
-constexpr uint32_t kSaveAnswer = 0x1F870;
 
 uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
                     uint32_t lr) {
@@ -143,14 +144,14 @@ uint64_t Type7ListScreenSetDetails(uint8_t* base, uint64_t r3, uint64_t r4, uint
   StoreU32(base, frame + 96, T7LS(base, screen).movie());
   const uint32_t movie =
       LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 96));
-  const uint32_t record = uint32_t(r4 * 28) + kItemRecords;
-  const uint32_t count = LoadU32(base, record + 8);
+  const schema::Type7ItemInfo record(base, uint32_t(r4 * 28) + kItemRecords);
+  const uint32_t count = record.color_count();
   InitList(base, calls, screen + 10216, frame, 0x82243384,
            {count, 2, 1, 154, 153, 155, 156, 159, 158});
   uint64_t result = 0;
   for (int32_t i = 0; i < 2; i++) {
     if (i < int32_t(count)) {
-      const uint32_t index = LoadU32(base, record + 12 + 4 * uint32_t(i));
+      const uint32_t index = LoadU32(base, record.detail_a_address() + 4 * uint32_t(i));
       result = calls.set_text(frame, 0x822433B8, movie, 9, uint32_t(5 + i),
                               LoadU32(base, (index << 2) + kDetailTexts));
     } else {
@@ -166,9 +167,9 @@ uint64_t Type7ListScreenShowMarks(uint8_t* base, uint64_t r3, uint64_t r4, uint3
   const uint32_t movie = MovieOf(base, uint32_t(r3), frame);
   const uint32_t which = uint32_t(r4);
   uint32_t node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 18);
-  StoreU32(base, node + 80, which != 0 ? 1 : 0);
+  schema::UiMovieNode(base, node).set_visible(which != 0 ? 1 : 0);
   node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 19);
-  StoreU32(base, node + 80, which + 3 - 9 != 0 ? 1 : 0);
+  schema::UiMovieNode(base, node).set_visible(which + 3 - 9 != 0 ? 1 : 0);
   return node;
 }
 
@@ -208,16 +209,16 @@ uint64_t Type7ListScreenBack(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t s
   T7LS(base, uint32_t(r3)).set_state(9);
   // r6 as the post leaves it (the ring's start plus its count before, 64-bit),
   // passed on to the slot below.
-  const uint64_t r6 = uint64_t(LoadU32(base, dispatcher + 204 + 604)) +
-                      uint64_t(LoadU32(base, dispatcher + 204 + 600));
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint64_t r6 = uint64_t(d.ring_start()) + uint64_t(d.ring_count());
   Post(base, dispatcher, 5);
   // The music: bank 1's cue 0 stopped (the sound manager's slot 13), bank 1's
   // cue 2 played (Sound::Play), the indexes in the frame.
   StoreU32(base, frame + 80, 0);
   StoreU32(base, frame + 84, 1);
-  const uint32_t manager = LoadU32(base, menu_sounds::kSoundManager);
-  const uint64_t args[6] = {manager, frame + 84, frame + 80, r6, 0, 0};
-  calls.call_set(LoadU32(base, LoadU32(base, manager) + 52), args, 6, frame, 0x82243558);
+  const auto manager = schema::MenuSoundsGlobals::sound_manager(base);
+  const uint64_t args[6] = {manager.address, frame + 84, frame + 80, r6, 0, 0};
+  calls.call_set(manager.vtable().stop_cue(), args, 6, frame, 0x82243558);
   StoreU32(base, frame + 92, 1);
   StoreU32(base, frame + 88, 2);
   return menu_sounds::PlaySound(base, frame + 92, frame + 88, frame,
@@ -228,14 +229,14 @@ uint64_t Type7ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const
   ITC_NATIVE_RUNNING("sub_82243018 Type7ListScreen::SetUpRace");
   namespace rs = race_setup;
   const uint32_t screen = uint32_t(r3), frame = Frame(base, sp, kSetUpRaceFrame);
-  auto data = [base] { return LoadU32(base, rs::kRaceData); };
+  auto data = [base] { return schema::RaceStatesGlobals::race_data(base).address; };
   if (!rs::RaceDataResetGlobal(base, frame - 112)) {
     Call1(calls, kResetGlobal, r3, frame, 0x8224302C);
   }
   rs::StagesClear(base, data() + rs::kStageList);
   vehicle_accessors::RaceDataSetWord32(base, race_screens::ListSelection(base, screen + 10360));
-  StoreU32(base, data() + kRaceWordA, 3);
-  StoreU32(base, data() + kRaceWordB, 6);
+  schema::RaceStatesGlobals::race_data(base).set_kind(3);
+  schema::RaceStatesGlobals::race_data(base).set_race_mode(6);
   // The route (the merged switch piece Type7ListScreen::AddRacers
   // sub_822430BC is its case 0): by the item list's +4 plus its selection,
   // 0 to 14 (else 0), the color list's selection plus 0, 2, 4, 8 or 10, or
@@ -282,7 +283,7 @@ uint64_t Type7ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const
   // The player's racer record at the frame's +80: the type 7 car.
   const uint32_t record = frame + 80;
   rs::RacerRecordInit(base, record);
-  rs::SetModel(base, record, LoadU32(base, kType7Car + 12));
+  rs::SetModel(base, record, schema::Car(base, kType7Car).car_id());
   StoreU32(base, frame + 3972, answer);
   if (!native::Buffers_Memcpy(base, record, kType7Car, 1884, 0x822431CC)) {
     const uint64_t args[6] = {record, kType7Car, 1884, 0, 0, 0};
@@ -292,7 +293,7 @@ uint64_t Type7ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const
   if (!car_specs::CarRefresh(base, record, &refreshed)) {
     Call1(calls, kCarRefresh, record, frame, 0x822431D4);
   }
-  const double zero = double(std::bit_cast<float>(LoadU32(base, kZero)));
+  const double zero = double(std::bit_cast<float>(schema::MenuSoundsGlobals::zero(base)));
   if (rs::AddRacerNative(base, record)) {
     rs::AddRacer(base, record, 0, zero, 0);
   } else {
@@ -300,7 +301,7 @@ uint64_t Type7ListScreenSetUpRace(uint8_t* base, uint64_t r3, uint32_t sp, const
     calls.call_f1(kAddRacer, args, zero, frame, 0x822431EC);
   }
   rs::StagesAddRacer(base, data() + rs::kStageList, 0, 2, -1);
-  StoreU32(base, vehicle_accessors::SaveDataOf(base, 0) + kSaveAnswer, answer);
+  schema::SaveData(base, vehicle_accessors::SaveDataOf(base, 0)).set_profile_option(answer);
   rs::AddStage(base, 4);
   uint64_t result;
   if (rs::PlaceRacersNative(base, frame - 128)) {

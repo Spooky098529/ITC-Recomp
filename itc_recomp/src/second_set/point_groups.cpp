@@ -9,6 +9,7 @@
 #include "material_passes/material_passes.h"
 #include "native/buffers.h"
 #include "second_set/points.h"
+#include "schema/car_draw.h"
 #include "schema/second_set.h"
 
 #include <bit>
@@ -69,16 +70,18 @@ constexpr uint32_t kFive = schema::SecondSetGlobals::five_address();  // 5.0
 
 uint32_t PartsResetFrontBumper(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DE0E0 PartsPoints::ResetFrontBumper");
-  Store(base, group + 2648, 0);
-  Store(base, group + 2644, 0);
-  Store(base, group + 2640, 1);
+  const schema::PartsPoints g(base, group);
+  g.set_front_car_record(0u);
+  g.set_front_plate_texture(0u);
+  g.set_front_plate_set(1u);
   return NameRecords(base, group, 0x826025F4, 11, 0, stack - 112);
 }
 
 uint32_t PartsResetRearBumper(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DE2C8 PartsPoints::ResetRearBumper");
-  Store(base, group + 1680, 1);
-  Store(base, group + 1684, 0);
+  const schema::PartsPoints g(base, group);
+  g.set_rear_plate_set(1u);
+  g.set_rear_plate_texture(0u);
   return NameRecords(base, group, 0x82602624, 7, 0, stack - 112);
 }
 
@@ -94,7 +97,7 @@ uint32_t PartsResetBonnet(uint8_t* base, uint32_t group, uint32_t stack) {
 
 uint32_t PartsResetLeftDoor(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DE600 PartsPoints::ResetLeftDoor");
-  Store(base, group + 6080, 0);
+  schema::PartsPoints(base, group).set_door_car_record(0u);
   return NameRecords(base, group, 0x82602658, 25, 2, stack - 128);
 }
 
@@ -122,11 +125,12 @@ uint32_t PartsResetHeadlights(uint8_t* base, uint32_t group, uint32_t stack) {
   const uint32_t sp = stack - 192;
   NameRecords(base, group, 0x82602788, 13, 7, sp);
   Identity(base, sp + 80);
-  if (!native::Buffers_Memcpy(base, group + 3120, sp + 80, 64, 0x820DF7E8)) {
+  const uint32_t popup = schema::PartsPoints(base, group).headlights_popup_matrix_address();
+  if (!native::Buffers_Memcpy(base, popup, sp + 80, 64, 0x820DF7E8)) {
     ITC_LOG_ERROR("Second set: ResetHeadlights' memcpy refused after its checks");
     std::abort();
   }
-  return group + 3120;
+  return popup;
 }
 
 uint32_t PartsResetTailLights(uint8_t* base, uint32_t group, uint32_t stack) {
@@ -156,7 +160,7 @@ uint32_t PartsResetMufflers(uint8_t* base, uint32_t group, uint32_t stack) {
 
 uint32_t PartsResetShadows(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DF128 PartsPoints::ResetShadows");
-  Store(base, group + 960, 0);
+  schema::PartsPoints(base, group).set_shadows_word_960(0u);
   return NameRecords(base, group, 0x82602844, 4, 0, stack - 112);
 }
 
@@ -262,19 +266,19 @@ uint32_t InteriorResetRollCage(uint8_t* base, uint32_t group, uint32_t stack) {
 
 uint32_t LightsResetFront(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DC748 LightPoints::ResetFront");
-  Store(base, group + 0, 0);
+  schema::LightPoints(base, group).set_record(0u);
   return NameRecords(base, group + 16, 0x820055F0, 18, 0, stack - 112);
 }
 
 uint32_t LightsResetSides(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DC7A0 LightPoints::ResetSides");
-  Store(base, group + 0, 0);
+  schema::LightPoints(base, group).set_record(0u);
   return NameRecords(base, group + 16, 0x82005638, 18, 0, stack - 112);
 }
 
 uint32_t LightsResetRear(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820DC7F8 LightPoints::ResetRear");
-  Store(base, group + 0, 0);
+  schema::LightPoints(base, group).set_record(0u);
   return NameRecords(base, group + 16, 0x82005680, 18, 0, stack - 112);
 }
 

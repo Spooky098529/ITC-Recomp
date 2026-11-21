@@ -18,7 +18,6 @@ namespace {
 
 constexpr uint32_t kMemRelease = 0x8000;
 constexpr uint32_t kNone = 0xFFFFFFFFu;
-constexpr uint32_t kNotices = 0x1C778;  // player 0's first notice list
 
 uint64_t Alloc(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t bytes) {
   return calls.Call(kVirtualAlloc, frame, lr, 0, bytes, 4096, 4);
@@ -31,8 +30,8 @@ uint32_t HubMarkNoticeImages(uint8_t* base, uint32_t sp) {
   const uint32_t frame = Frame(base, sp, 160);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   uint32_t r3 = save;
-  const uint32_t list = save + kNotices;
-  for (uint32_t i = 0; i < Load(base, list + 768); i++) {
+  const uint32_t list = SaveData(base, save).unlocks_shown_address();
+  for (uint32_t i = 0; i < SaveData(base, save).unlocks_shown_count(); i++) {
     const uint32_t notice = list + 12 * i;
     const uint32_t table = Load(base, notice + 4);
     uint32_t entry = Load(base, notice + 8);
@@ -40,12 +39,12 @@ uint32_t HubMarkNoticeImages(uint8_t* base, uint32_t sp) {
     for (;;) {
       r3 = data_tables::Entry56(base, table, entry);
       const uint32_t bits = Globals::hub_data(base).image_bits_address();
-      const int32_t image = int32_t(Load(base, r3 + 16));
+      const int32_t image = int32_t(schema::CareerEntry56(base, r3).image());
       if (image >= 0) {
         const uint32_t word = bits + 4 * uint32_t(image >> 5);
         Store(base, word, (1u << (image & 31)) | Load(base, word));
       }
-      const uint32_t next = Load(base, r3 + 8);
+      const uint32_t next = schema::CareerEntry56(base, r3).next_page();
       if (next == 0) {
         break;
       }
@@ -203,10 +202,10 @@ uint32_t HubOpenMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t frame = Frame(base, sp, 2064);
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   uint32_t block = 0;
-  if (guest::LoadU16(base, save + 6328) != 0) {
+  if (SaveData(base, save).garage_count() != 0) {
     calls.Call(kMemcpy, frame, 0x8218E3D4, frame + 80, SelectedGarageCar(base, save) + 212,
                1968);
-    block = car_makers::BlockOf(Load(base, frame + 92));
+    block = car_makers::BlockOf(schema::CarMakersCar(base, frame + 80).car_id());
   }
   // GarageStage::MakeModel by its plain C++ (its adapter went, B7 loop,
   // 2026-11-13), ScenePools::SetUpB under it through `calls`.

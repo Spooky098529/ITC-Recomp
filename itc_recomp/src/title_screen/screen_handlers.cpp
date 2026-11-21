@@ -38,12 +38,13 @@ uint64_t ScreenCreate(uint8_t* base, uint32_t machine, uint32_t sp, const Calls&
   pages.set_step_started(0);
   pages.set_unknown_20(kNone);
   pages.set_step(kNone);
-  // The menu list (race-screens' MenuList, left as offsets for now).
-  const uint32_t list = uint32_t(calls.Call(kVirtualAlloc, frame, 0x82221E00, 0, 72, 0x1000, 4));
+  // The menu list (race-screens' MenuList).
+  const schema::MenuList list(
+      base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x82221E00, 0, 72, 0x1000, 4)));
   G::set_list(base, list);
-  if (list != 0) {
-    Store(base, list + 68, 0);
-    Store(base, list + 60, 0);
+  if (list.address != 0) {
+    list.set_enabled(0u);
+    list.set_player(0);
   }
   const schema::FrontEndMenu menu(
       base, uint32_t(calls.Call(kVirtualAlloc, frame, 0x82221E2C, 0, 68, 0x1000, 4)));

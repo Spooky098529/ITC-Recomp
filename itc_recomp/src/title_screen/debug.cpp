@@ -4,6 +4,8 @@
 // (the empty sub_82106540) are left out.
 
 #include "base/log.h"
+#include "schema/action_mappers.h"
+#include "schema/racer_controllers.h"
 #include "title_screen/internal.h"
 
 namespace title_screen {
@@ -54,12 +56,14 @@ namespace {
 uint64_t DebugPage(uint8_t* base, uint32_t which, uint64_t r3, uint32_t sp, const Calls& calls) {
   const DebugPageSpec& spec = kPages[which];
   const uint32_t frame = Frame(base, sp, 96);
-  const uint32_t entry = G::mapper_entries_address() + (Load(base, G::controllers_address()) << 3);
-  if (int32_t(Load(base, entry + 4)) == 1) {
+  // Player 0's mapper entry (racer-controllers' PlayerMapperEntry).
+  const schema::PlayerMapperEntry entry(
+      base, G::mapper_entries_address() + (Load(base, G::controllers_address()) << 3));
+  if (int32_t(entry.unread()) == 1) {
     return r3;
   }
-  const uint32_t mapper = Load(base, entry);
-  r3 = calls.Call(Load(base, Load(base, mapper) + kPressedSlot), frame, spec.lr, mapper, 159);
+  const schema::ActionMapper mapper = entry.mapper();
+  r3 = calls.Call(Load(base, mapper.vtable() + kPressedSlot), frame, spec.lr, mapper.address, 159);
   if ((r3 & 0xFF) != 0) {
     G::load_block(base).set_transition(spec.transition);
     G::load_block(base).set_page(kNone);

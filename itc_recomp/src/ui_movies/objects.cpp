@@ -6,6 +6,11 @@
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "schema/graphics_resources.h"
+#include "schema/strings_and_font.h"
+#include "schema/tuning_pages.h"
+#include "schema/tuning_screen.h"
+#include "schema/ui_movies.h"
 #include "schema/ui_movies_game.h"
 #include "std_string/std_string.h"
 #include "strings_and_font/strings_and_font.h"
@@ -18,6 +23,9 @@
 namespace ui_movies {
 
 namespace {
+
+using schema::UiMovieNode;
+using StringsGlobals = schema::StringsAndFontGlobals;
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -376,10 +384,10 @@ uint32_t AddNamedAnimations(uint8_t* base, uint32_t stack, uint32_t movie, uint3
   const uint32_t frame = stack - kFrame;
   const uint32_t name = frame + 96, copy = frame + 128;
   uint32_t r3 = movie;
-  for (uint32_t i = 0; i < Load(base, scene + 112); i++) {
+  for (uint32_t i = 0; i < UiMovieNode(base, scene).unknown_112(); i++) {  // the children
     const uint32_t child = Child(base, scene, i);
     r3 = child;
-    if (Load(base, child) == kTagSce) {
+    if (UiMovieNode(base, child).tag() == kTagSce) {
       r3 = AddNamedAnimations(base, frame, movie, child);
     }
   }
@@ -391,7 +399,8 @@ uint32_t AddNamedAnimations(uint8_t* base, uint32_t stack, uint32_t movie, uint3
     return end - text;
   };
   auto require = [&](bool done, const char* what) { Require(done, what, name); };
-  for (uint32_t i = 0; i < Load(base, scene + 120); i++) {
+  // The animation count: the scene's +120 (UiMovieNode's texture_top word).
+  for (uint32_t i = 0; i < Load(base, UiMovieNode(base, scene).texture_top_address()); i++) {
     const uint32_t animation = SceneAnimation(base, scene, i);
     std_string::Construct(base, name);
     require(std_string::Append(base, name, scene + 84, length(scene + 84)), "append");
@@ -401,15 +410,16 @@ uint32_t AddNamedAnimations(uint8_t* base, uint32_t stack, uint32_t movie, uint3
     require(std_string::ConstructFrom(base, copy, name, 0, 0xFFFFFFFFu), "string(const string&)");
     const UiMovie m(base, movie);
     const uint32_t used = m.named_count();
-    Store(base, copy + 28, scene);
-    Store(base, copy + 32, animation);
+    const schema::UiMovieNamedAnimation copied(base, copy);
+    copied.set_scene(scene);
+    copied.set_animation(animation);
     m.set_named_count(used + 1);
     const schema::UiMovieNamedAnimation entry = NamedEntry(base, movie, used);
     {
       ITC_NATIVE_RUNNING("sub_8211E318 (a named animation copied)");
       require(std_string::AssignFrom(base, entry.name_address(), copy, 0, 0xFFFFFFFFu), "assign");
-      entry.set_scene(Load(base, copy + 28));
-      entry.set_animation(Load(base, copy + 32));
+      entry.set_scene(copied.scene());
+      entry.set_animation(copied.animation());
     }
     require(std_string::Tidy(base, copy, true, 0), "_Tidy");
     const auto block = StringBlock(base, name);
@@ -431,7 +441,7 @@ void Zero(uint8_t* base, uint32_t address, uint32_t bytes) {
 template <typename Change>
 std::optional<uint32_t> ChangeText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
                                    uint32_t child, Change change) {
-  const uint32_t id_address = FindNode(base, movie, sub_scene, child) + 108;
+  const uint32_t id_address = UiMovieNode(base, FindNode(base, movie, sub_scene, child)).texture_entry_address();
   const auto record = GetText(base, movie, id_address);
   if (!record) {
     return std::nullopt;
@@ -445,7 +455,7 @@ std::optional<uint32_t> ChangeText(uint8_t* base, uint32_t movie, uint32_t sub_s
 template <typename Change>
 std::optional<uint32_t> ChangeNodeText(uint8_t* base, uint32_t movie, uint32_t node,
                                        Change change) {
-  const uint32_t id_address = node + 108;
+  const uint32_t id_address = UiMovieNode(base, node).texture_entry_address();
   const auto record = GetText(base, movie, id_address);
   if (!record) {
     return std::nullopt;
@@ -480,9 +490,8 @@ std::optional<uint32_t> SetText(uint8_t* base, const strings_and_font::FormatCal
                                 uint32_t stack, uint32_t movie, uint32_t sub_scene,
                                 uint32_t child, uint32_t id, const uint64_t varargs[4]) {
   constexpr uint32_t kTagTxt = 0x54585400;  // "TXT\0"
-  constexpr uint32_t kStringTable = 0x826C5C34;
   const uint32_t node = FindNode(base, movie, sub_scene, child);
-  if (Load(base, node) != kTagTxt) {
+  if (UiMovieNode(base, node).tag() != kTagTxt) {
     return std::nullopt;
   }
   const uint32_t args = stack + 48;
@@ -490,7 +499,7 @@ std::optional<uint32_t> SetText(uint8_t* base, const strings_and_font::FormatCal
     Store(base, args + 8 * i, uint32_t(varargs[i] >> 32));
     Store(base, args + 8 * i + 4, uint32_t(varargs[i]));
   }
-  const uint32_t id_address = node + 108;
+  const uint32_t id_address = UiMovieNode(base, node).texture_entry_address();
   const auto record = GetText(base, movie, id_address);
   if (!record) {
     return std::nullopt;
@@ -498,7 +507,7 @@ std::optional<uint32_t> SetText(uint8_t* base, const strings_and_font::FormatCal
   ITC_NATIVE_RUNNING("sub_8211C1F8 UiMovie::SetText");
   Zero(base, UiMovieText(base, *record).buffer().address, 4096);
   UiMovieText(base, *record).set_page(0);
-  strings_and_font::StringsFormatV(base, calls, stack - 128, Load(base, kStringTable),
+  strings_and_font::StringsFormatV(base, calls, stack - 128, Load(base, StringsGlobals::strings_address()),
                                    UiMovieText(base, *record).buffer().address, id & 0xFFFF, args);
   TextMapSetKey(base, UiMovie(base, movie).texts_address(), Load(base, id_address), *record);
   return UiMovie(base, movie).texts_address();
@@ -508,8 +517,7 @@ std::optional<uint32_t> SetNodeText(uint8_t* base, const strings_and_font::Forma
                                     uint32_t stack, uint32_t movie, uint32_t node, uint32_t id,
                                     const uint64_t varargs[5]) {
   constexpr uint32_t kTagTxt = 0x54585400;  // "TXT\0"
-  constexpr uint32_t kStringTable = 0x826C5C34;
-  if (Load(base, node) != kTagTxt) {
+  if (UiMovieNode(base, node).tag() != kTagTxt) {
     return std::nullopt;
   }
   const uint32_t args = stack + 40;
@@ -517,7 +525,7 @@ std::optional<uint32_t> SetNodeText(uint8_t* base, const strings_and_font::Forma
     Store(base, args + 8 * i, uint32_t(varargs[i] >> 32));
     Store(base, args + 8 * i + 4, uint32_t(varargs[i]));
   }
-  const uint32_t id_address = node + 108;
+  const uint32_t id_address = UiMovieNode(base, node).texture_entry_address();
   const auto record = GetText(base, movie, id_address);
   if (!record) {
     return std::nullopt;
@@ -525,7 +533,7 @@ std::optional<uint32_t> SetNodeText(uint8_t* base, const strings_and_font::Forma
   ITC_NATIVE_RUNNING("sub_8211C7E8 UiMovie::SetNodeText");
   Zero(base, UiMovieText(base, *record).buffer().address, 4096);
   UiMovieText(base, *record).set_page(0);
-  strings_and_font::StringsFormatV(base, calls, stack - 128, Load(base, kStringTable),
+  strings_and_font::StringsFormatV(base, calls, stack - 128, Load(base, StringsGlobals::strings_address()),
                                    UiMovieText(base, *record).buffer().address, id & 0xFFFF, args);
   TextMapSetKey(base, UiMovie(base, movie).texts_address(), Load(base, id_address), *record);
   return UiMovie(base, movie).texts_address();
@@ -538,11 +546,10 @@ namespace {
 // leftovers in the originals, passed 0 (dead frame words).
 void FormatNumber(uint8_t* base, const strings_and_font::FormatCalls& calls, uint32_t stack,
                   uint32_t record, uint64_t value) {
-  constexpr uint32_t kStringTable = 0x826C5C34;
   Zero(base, UiMovieText(base, record).buffer().address, 4096);
   const bool zero = uint32_t(value) == 0;
   const uint64_t varargs[5] = {zero ? 0 : value, 0, 0, 0, 0};
-  strings_and_font::StringsFormat(base, calls, stack - 128, Load(base, kStringTable),
+  strings_and_font::StringsFormat(base, calls, stack - 128, Load(base, StringsGlobals::strings_address()),
                                   UiMovieText(base, record).buffer().address, zero ? 8 : 9,
                                   varargs);
 }
@@ -570,11 +577,10 @@ std::optional<uint32_t> SetNodeNumberText(uint8_t* base,
 std::optional<uint32_t> SetNodeTextV(uint8_t* base, const strings_and_font::FormatCalls& calls,
                                      uint32_t stack, uint32_t movie, uint32_t node, uint32_t id,
                                      uint32_t args) {
-  constexpr uint32_t kStringTable = 0x826C5C34;
   return ChangeNodeText(base, movie, node, [&](uint32_t record) {
     ITC_NATIVE_RUNNING("sub_8211CBD8 UiMovie::SetNodeTextV");
     Zero(base, UiMovieText(base, record).buffer().address, 4096);
-    strings_and_font::StringsFormatV(base, calls, stack - 144, Load(base, kStringTable),
+    strings_and_font::StringsFormatV(base, calls, stack - 144, Load(base, StringsGlobals::strings_address()),
                                      UiMovieText(base, record).buffer().address, id & 0xFFFF, args);
   });
 }
@@ -583,14 +589,13 @@ std::optional<uint32_t> SetNodeCharText(uint8_t* base, const strings_and_font::F
                                         uint32_t stack, uint32_t movie, uint32_t node,
                                         uint32_t text) {
   constexpr uint32_t kCharsToText = 0x82108A70;  // the 8-bit string's conversion
-  constexpr uint32_t kFont = 0x826C5C00;
-  if (Load(base, node) != kTxtTag) {
+  if (UiMovieNode(base, node).tag() != kTxtTag) {
     return std::nullopt;
   }
   return ChangeNodeText(base, movie, node, [&](uint32_t record) {
     ITC_NATIVE_RUNNING("sub_8211C8A0 UiMovie::SetNodeCharText");
     Zero(base, UiMovieText(base, record).buffer().address, 4096);
-    calls.call(calls.user, kCharsToText, Load(base, kFont),
+    calls.call(calls.user, kCharsToText, Load(base, StringsGlobals::font_address()),
                UiMovieText(base, record).buffer().address, text, stack - 128, 0x8211C908);
   });
 }
@@ -688,7 +693,7 @@ std::optional<uint32_t> ResetTextScroll(uint8_t* base, uint32_t movie, uint32_t 
 
 std::optional<uint32_t> SetFirstLine(uint8_t* base, uint32_t movie, uint32_t sub_scene,
                                      uint32_t child, uint32_t line) {
-  if (Load(base, FindNode(base, movie, sub_scene, child)) != kTxtTag) {
+  if (UiMovieNode(base, FindNode(base, movie, sub_scene, child)).tag() != kTxtTag) {
     return std::nullopt;
   }
   return ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {
@@ -700,10 +705,10 @@ std::optional<uint32_t> SetFirstLine(uint8_t* base, uint32_t movie, uint32_t sub
 std::optional<uint32_t> FirstLine(uint8_t* base, uint32_t movie, uint32_t sub_scene,
                                   uint32_t child) {
   const uint32_t node = FindNode(base, movie, sub_scene, child);
-  if (Load(base, node) != kTxtTag) {
+  if (UiMovieNode(base, node).tag() != kTxtTag) {
     return std::nullopt;
   }
-  const auto record = GetText(base, movie, node + 108);
+  const auto record = GetText(base, movie, UiMovieNode(base, node).texture_entry_address());
   if (!record) {
     return std::nullopt;
   }
@@ -727,7 +732,7 @@ uint32_t CountLines(uint8_t* base, uint32_t text) {
 
 std::optional<uint32_t> LineCount(uint8_t* base, uint32_t stack, uint32_t movie,
                                   uint32_t sub_scene, uint32_t child) {
-  const uint32_t id_address = FindNode(base, movie, sub_scene, child) + 108;
+  const uint32_t id_address = UiMovieNode(base, FindNode(base, movie, sub_scene, child)).texture_entry_address();
   if (Load(base, id_address) == 0) {
     ITC_NATIVE_RUNNING("sub_8211C680 UiMovie::LineCount");
     return 0;
@@ -789,7 +794,7 @@ std::optional<uint32_t> RevealText(uint8_t* base, uint32_t movie, uint32_t sub_s
 
 std::optional<uint32_t> HasMoreText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
                                     uint32_t child) {
-  const uint32_t id_address = FindNode(base, movie, sub_scene, child) + 108;
+  const uint32_t id_address = UiMovieNode(base, FindNode(base, movie, sub_scene, child)).texture_entry_address();
   const auto record = GetText(base, movie, id_address);
   if (!record) {
     return std::nullopt;
@@ -832,9 +837,9 @@ uint32_t UnloadMovie(uint8_t* base, uint32_t movie, uint32_t frame, const Unload
     textures.set_count(count);
     const uint32_t entry = schema::UiMovieWord(base, textures.words() + (count << 2)).value();
     if (entry != 0) {
-      Store(base, entry + 0, 0);
-      Store(base, entry + 4, 0);
-      Store(base, entry + 8, 0);
+      schema::UiMovieTexture(base, entry).set_texture(0);
+      Store(base, entry + 4, 0);  // the width
+      Store(base, entry + 8, 0);  // the height
       calls.free(entry);
     }
   }
@@ -876,7 +881,7 @@ uint32_t OnLoaded(uint8_t* base, uint32_t archive, uint32_t movie, uint32_t fram
   CheckXmd(base, archive);
   const uint32_t file = XmdEntry(base, archive, 0);
   const uint32_t end = FindChunk(base, file, kTagTrm);
-  const uint32_t size = Load(base, end + 4) - file + end;
+  const uint32_t size = schema::UiMovieChunk(base, end).next() - file + end;
   // The three file copies (+0, +4, +8) and their scenes (+16, +20, +24), by
   // index.
   const UiMovie m(base, movie);
@@ -911,17 +916,19 @@ uint32_t OnLoaded(uint8_t* base, uint32_t archive, uint32_t movie, uint32_t fram
     calls.xpr_create(m.texture_set(), XmdEntry(base, archive, 1));
     for (uint32_t i = 0; i < textures; i++) {
       const uint32_t entry = calls.make(1, 12);
+      const schema::UiMovieTexture record(base, entry);
       if (entry != 0) {
-        Store(base, entry + 0, 0);
-        Store(base, entry + 4, 0);
-        Store(base, entry + 8, 0);
+        record.set_texture(0);
+        Store(base, entry + 4, 0);  // the width
+        Store(base, entry + 8, 0);  // the height
       }
       Store(base, frame + 80, entry);
       const uint32_t texture = uint32_t(calls.get_texture(m.texture_set(), i));
-      Store(base, entry + 0, texture);
-      calls.level_desc(texture, frame + 96);
-      Store(base, entry + 4, Load(base, frame + 120));
-      Store(base, entry + 8, Load(base, frame + 124));
+      record.set_texture(texture);
+      const schema::LevelDesc desc(base, frame + 96);
+      calls.level_desc(texture, desc.address);
+      Store(base, entry + 4, desc.width());
+      Store(base, entry + 8, desc.height());
       calls.append(m.textures_address(), frame + 80);
     }
   }

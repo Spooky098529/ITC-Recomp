@@ -26,14 +26,14 @@ constexpr uint32_t kMinusOne = 0xFFFFFFFF;
 // A message (`message`, 0, 0) queued in a dispatcher's ring (+204), as the
 // handlers do it inline.
 void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
-  const uint32_t ring = dispatcher + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
-  StoreU32(base, slot + 0, message);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t end = d.ring_start() + count - 1;
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(base, d.ring_address() + (end - (end / 50) * 50) * 12);
+  slot.set_id(message);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 // A vtable slot of `object` called from the frame at `frame` (returning to
@@ -108,16 +108,17 @@ uint64_t Screen0Leave(uint8_t* base, uint32_t screen, uint32_t dispatcher, bool 
 
 uint64_t ListScreenInit(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_822515A0 ListScreen::Init");
-  const uint32_t screen = uint32_t(r3), frame = sp - 112;
-  StoreU32(base, screen + 9648, 0);
-  StoreU32(base, screen + 9664, kMinusOne);
-  StoreU32(base, screen + 9656, kMinusOne);
-  StoreU32(base, screen + 9644, 0);
-  StoreU32(base, screen + 9652, 0);
-  StoreU32(base, screen + 9668, 0);
-  Slot(base, r3, 16, frame, 0x822515E8, calls);
-  const uint64_t result = Slot(base, r3, 20, frame, 0x822515FC, calls);
-  StoreU32(base, screen + 9608, 0);
+  const schema::ListScreen screen(base, uint32_t(r3));
+  const uint32_t frame = sp - 112;
+  screen.set_next_page(0);
+  screen.set_unknown_9664(kMinusOne);
+  screen.set_step(kMinusOne);
+  screen.set_page(0);
+  screen.set_previous_page(0);
+  screen.set_step_started(0);
+  Slot(base, r3, 16, frame, 0x822515E8, calls);  // ListScreenVtable slot4
+  const uint64_t result = Slot(base, r3, 20, frame, 0x822515FC, calls);  // slot5
+  screen.set_state(0);
   return result;
 }
 
@@ -130,18 +131,19 @@ uint64_t PanelScreenInit(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& c
 
 uint64_t NodeScreenInit(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_82259128 NodeScreen::Init");
-  const uint32_t screen = uint32_t(r3), frame = sp - 112;
-  StoreU32(base, screen + 10100, 15);
-  StoreU32(base, screen + 4, 15);
-  StoreU32(base, screen + 10108, 2);
-  StoreU32(base, screen + 10104, 2);
-  StoreU32(base, screen + 10112, 2);
-  StoreU32(base, screen + 10124, kMinusOne);
-  StoreU32(base, screen + 10116, kMinusOne);
-  StoreU32(base, screen + 10128, 0);
-  Slot(base, r3, 28, frame, 0x82259180, calls);
-  const uint64_t result = Slot(base, r3, 32, frame, 0x82259194, calls);
-  StoreU32(base, screen + 10064, 0);
+  const schema::NodeScreen screen(base, uint32_t(r3));
+  const uint32_t frame = sp - 112;
+  screen.set_movie(15);
+  screen.set_table_movie(15);
+  screen.set_next_page(2);
+  screen.set_page(2);
+  screen.set_previous_page(2);
+  screen.set_unknown_10124(kMinusOne);
+  screen.set_step(kMinusOne);
+  screen.set_step_started(0);
+  Slot(base, r3, 28, frame, 0x82259180, calls);  // NodeScreenVtable slot7
+  const uint64_t result = Slot(base, r3, 32, frame, 0x82259194, calls);  // slot8
+  screen.set_state(0);
   return result;
 }
 

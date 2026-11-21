@@ -17,6 +17,8 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/race_screens.h"
+#include "schema/tuning_screen.h"
 #include "schema/type67_screens.h"
 #include "menu_sounds/menu_sounds.h"
 #include "mode_tick/mode_tick.h"
@@ -214,7 +216,8 @@ uint64_t TitledListScreenPage2(uint8_t* base, uint64_t r3, uint32_t sp, const Ca
   Call1(calls, race_screens::kListUpdate, list, frame, 0x82257164);
   const uint32_t items = uint32_t(list);
   if (T6LS(base, screen).course_list_move() != 0 ||
-      LoadU32(base, items + 4) - LoadU32(base, items + 8) != 0) {
+      schema::MenuList(base, items).scroll() - schema::MenuList(base, items).scroll_before() !=
+          0) {
     // The item list moved.
     PlaySound(base, 4, frame, calls);
     Slot(base, r3, 8, T6LS(base, screen).course_list_scroll(), frame, 0x8225729C, calls);
@@ -403,8 +406,9 @@ uint64_t TitledListScreenOnItemMoved(uint8_t* base, uint64_t r3, uint32_t sp,
   const uint32_t list = screen + 10216;
   const uint32_t selection = race_screens::ListSelection(base, list);
   // MenuList::GetPreviousSelection (sub_8220BC28): +20.
-  const uint32_t previous = LoadU32(base, list + 20);
-  const uint32_t scroll_now = LoadU32(base, list + 4), scroll_before = LoadU32(base, list + 8);
+  const schema::MenuList menu(base, list);
+  const uint32_t previous = menu.selection_before();
+  const uint32_t scroll_now = menu.scroll(), scroll_before = menu.scroll_before();
   const uint32_t cursor = T6LS(base, screen).course_list_wrapped();
   const int32_t moved = int32_t(selection - previous);
   const int32_t scrolled = int32_t(scroll_now - scroll_before);
@@ -435,7 +439,7 @@ uint64_t TitledListScreenOnItemMoved(uint8_t* base, uint64_t r3, uint32_t sp,
     StoreU32(base, frame + 80, uint32_t(uint64_t(product) >> 32));
     StoreU32(base, frame + 84, uint32_t(uint64_t(product)));
     const uint32_t child = ui_movies::Child(base, node, T6LS(base, screen).item_cursor_child());
-    StoreU32(base, child + 16, std::bit_cast<uint32_t>(float(double(product))));
+    schema::UiMovieNode(base, child).set_y(float(double(product)));
   }
   if (scrolled != 0) {
     calls.call(kFinishNamed, frame, 0x82257CE8, movie, T6LS(base, screen).scroll_down_anim());

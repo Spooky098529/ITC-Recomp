@@ -113,12 +113,11 @@ uint32_t ShowTireMarks(uint8_t* base, uint32_t screen, uint32_t sp) {
            int32_t(TS(base, screen).category()) == 3;
   };
   uint32_t r3 = child(30, 2);
-  Store(base, r3 + 80, 1);
+  UiNode(base, r3).set_visible(1);
   if (tire_state(true)) {
     if (uint32_t(TS(base, screen).item()) == 0) {
       r3 = child(30, 1);
-      Store(base, r3 + 80,
-            int32_t(TS(base, screen).tire_front_choice()) ==
+      UiNode(base, r3).set_visible(int32_t(TS(base, screen).tire_front_choice()) ==
                     int32_t(TS(base, screen).tire_rear_choice())
                 ? 0
                 : 1);
@@ -127,12 +126,12 @@ uint32_t ShowTireMarks(uint8_t* base, uint32_t screen, uint32_t sp) {
                                int32_t(TS(base, screen).tire_rear_option()) ||
                            int32_t(TS(base, screen).tire_front_choice()) !=
                                int32_t(TS(base, screen).tire_rear_choice());
-      Store(base, r3 + 80, differs ? 1 : 0);
+      UiNode(base, r3).set_visible(differs ? 1 : 0);
     } else {
       r3 = child(30, 1);
-      Store(base, r3 + 80, 0);
+      UiNode(base, r3).set_visible(0);
       r3 = child(33, 1);
-      Store(base, r3 + 80, 0);
+      UiNode(base, r3).set_visible(0);
     }
   } else {
     r3 = HideTireMarks(base, frame);
@@ -143,16 +142,14 @@ uint32_t ShowTireMarks(uint8_t* base, uint32_t screen, uint32_t sp) {
   if (uint32_t(TS(base, screen).item()) == 0) {
     const uint32_t a = ui_movies::FindNode(base, movie, 30, 0);
     r3 = ui_movies::Child(base, a, 2);
-    Store(base, r3 + 80, 0);
+    UiNode(base, r3).set_visible(0);
     r3 = ui_movies::Child(base, a, 1);
-    Store(base, r3 + 80, 0);
+    UiNode(base, r3).set_visible(0);
   }
   const uint32_t item = uint32_t(TS(base, screen).item());
   if (item == 0) {
     r3 = child(33, 2);
-    Store(
-        base, r3 + 80,
-        int32_t(uint32_t(TS(base, screen).level())) == int32_t(TS(base, screen).tire_front_choice())
+    UiNode(base, r3).set_visible(int32_t(uint32_t(TS(base, screen).level())) == int32_t(TS(base, screen).tire_front_choice())
             ? 1
             : 0);
     r3 = child(33, 1);
@@ -164,7 +161,7 @@ uint32_t ShowTireMarks(uint8_t* base, uint32_t screen, uint32_t sp) {
                   int32_t(TS(base, screen).tire_rear_option()) ||
               int32_t(TS(base, screen).tire_front_choice()) != rear;
     }
-    Store(base, r3 + 80, shown ? 1 : 0);
+    UiNode(base, r3).set_visible(shown ? 1 : 0);
   } else if (item == 1 || item == 2) {
     const uint32_t node = child(33, 2);
     r3 = GetCurrentChoice(base, screen);

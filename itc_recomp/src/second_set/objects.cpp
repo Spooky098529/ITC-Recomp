@@ -251,7 +251,9 @@ uint64_t ReleaseB(uint8_t* base, uint32_t set, uint32_t pool, uint32_t index, ui
     return calls.release_b(set, pool, index, stack, lr);
   }
   const uint32_t sp = stack - 112;
-  const uint32_t object = vehicle_accessors::ListAt(base, (pool + 412) * 12 + set, index);
+  // The scene's second set lists, 12 bytes a pool.
+  const uint32_t list = schema::CarScene(base, set).car_models_first_address() + 12 * pool;
+  const uint32_t object = vehicle_accessors::ListAt(base, list, index);
   if (schema::PoolNode(base, object).state() != 3) {
     return object;
   }

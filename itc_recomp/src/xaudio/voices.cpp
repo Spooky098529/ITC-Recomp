@@ -503,7 +503,7 @@ uint32_t BaseSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t fr
     guest::StoreU32(base, local + 8, kSampleRate);
     // BufferSize can't refuse a rate of 48,000.
     r3 = *BufferSize(base, local, frame + 80);
-    size = guest::LoadU32(base, frame + 80);
+    size = schema::XAudioSizeOut(base, frame + 80).size();
   }
   uint32_t effects = 0;
   const schema::XAudioEffectChain chain = d.effect_chain();
@@ -518,7 +518,7 @@ uint32_t BaseSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t fr
         return r3;
       }
       effects++;
-      size += guest::LoadU32(base, frame + 80);
+      size += schema::FactorySizeOut(base, frame + 80).size();
     }
   }
   schema::XAudioSizeOut(base, out).set_size((effects << 3) + size);
@@ -677,8 +677,9 @@ uint32_t OutputsSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t
   for (uint32_t i = 0; i < 16; i += 4) {
     guest::StoreU32(base, local + i, 0);
   }
-  guest::StoreU8(base, local + 8, d.output_channels());
-  guest::StoreU8(base, local, 1);
+  const schema::XAudioObjectDescriptor o(base, local);
+  o.set_matrix_entries(d.output_channels());
+  guest::StoreU8(base, o.class_id_address(), 1);  // a byte store into the class id's word
   const uint32_t factory = G::engine(base).factory();
   uint32_t function = 0;
   const uint32_t object = FactorySizeThunk(base, factory, &function);
@@ -688,7 +689,8 @@ uint32_t OutputsSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t
   }
   const uint32_t count = d.output_count();
   schema::XAudioSizeOut(base, out)
-      .set_size(count * guest::LoadU32(base, frame + 80) + guest::LoadU32(base, frame + 84) +
+      .set_size(count * schema::FactorySizeOut(base, frame + 80).size() +
+                schema::XAudioSizeOut(base, frame + 84).size() +
                 count * 12);
   return r3;
 }
@@ -834,10 +836,11 @@ uint32_t CreateObject(uint8_t* base, uint32_t voice, uint32_t entry, uint32_t de
   if (int32_t(r3) < 0) {
     return r3;
   }
-  const uint16_t size = guest::LoadU16(base, frame + 82);
+  const schema::FactoryInfoOut info(base, frame + 80);
+  const uint16_t size = info.info_halfword();
   e.set_index(uint8_t(flag));
   e.set_enabled(1);
-  e.set_flags(guest::LoadU8(base, frame + 80));
+  e.set_flags(info.info_byte());
   if (size > v.tail()) {
     v.set_tail(size);
   }
@@ -913,14 +916,15 @@ void CodecDescription(uint8_t* base, uint32_t description, uint32_t local,
   for (uint32_t i = 0; i < 80; i += 4) {
     guest::StoreU32(base, local + i, 0);
   }
-  guest::StoreU8(base, local, 0);
-  guest::StoreU32(base, local + 4, d.callback_context());
-  Copy(base, local + 8, d.format_address(), 56, return_address, sp, call);
-  CopyFloat(base, local + 64, d.codec_float_address());
-  guest::StoreU8(base, local + 68, d.codec_byte());
-  guest::StoreU8(base, local + 69, d.codec_flag());
-  guest::StoreU32(base, local + 72, d.codec_word_a());
-  guest::StoreU32(base, local + 76, d.codec_word_b());
+  const schema::XAudioObjectDescriptor o(base, local);
+  guest::StoreU8(base, o.class_id_address(), 0);  // a byte store into the class id's word
+  o.set_owner(d.callback_context());
+  Copy(base, o.format_type_address(), d.format_address(), 56, return_address, sp, call);
+  CopyFloat(base, o.xma_block_scale_address(), d.codec_float_address());
+  o.set_packet_count(d.codec_byte());
+  o.set_converter_flags(d.codec_flag());
+  o.set_packet_done_callback(d.codec_word_a());
+  o.set_loop_end_callback(d.codec_word_b());
 }
 
 }  // namespace
@@ -940,7 +944,8 @@ uint32_t SourceSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t 
   const uint32_t r3 = call(function, 0x8245E184, At(frame, Args({object, frame + 128, frame + 84})));
   if (int32_t(r3) >= 0) {
     schema::XAudioSizeOut(base, out)
-        .set_size(guest::LoadU32(base, frame + 84) + guest::LoadU32(base, frame + 80));
+        .set_size(schema::FactorySizeOut(base, frame + 84).size() +
+                  schema::XAudioSizeOut(base, frame + 80).size());
   }
   return 0;
 }
@@ -1042,9 +1047,10 @@ uint32_t InitOutputs(uint8_t* base, uint32_t voice, uint32_t description, uint32
     for (uint32_t i = 0; i < 16; i += 4) {
       guest::StoreU32(base, local + i, 0);
     }
-    guest::StoreU8(base, local + 8, d.output_channels());
-    guest::StoreU32(base, local + 4, voice);
-    guest::StoreU8(base, local, 1);
+    const schema::XAudioObjectDescriptor o(base, local);
+    o.set_matrix_entries(d.output_channels());
+    o.set_owner(voice);
+    guest::StoreU8(base, o.class_id_address(), 1);  // a byte store into the class id's word
     const uint32_t below = Below(base, frame, 128);
     for (uint32_t i = 0; i < v.output_slots(); i++) {
       if (int32_t(r3) < 0) {
@@ -1274,8 +1280,8 @@ uint32_t Activate(uint8_t* base, uint32_t voice, uint32_t thread, uint32_t frame
     return 0;
   }
   SpinTake(base, thread, call);
-  const uint32_t list = guest::LoadU32(base, lists + 40);
-  LinkAtEnd(base, list, voice + guest::LoadU32(base, list + 8));
+  const schema::XAudioList list = schema::XAudioStage(base, lists).mixed();
+  LinkAtEnd(base, list.address, voice + list.node_offset());
   SpinRelease(base, thread, call);
   return 0;
 }
@@ -1315,7 +1321,7 @@ uint32_t StartLater(uint8_t* base, uint32_t voice, uint32_t thread, const GuestC
     const Engine engine = G::engine(base);
     SpinTake(base, thread, call);
     const uint32_t list = engine.pending_next_address();
-    LinkAtEnd(base, list, voice + guest::LoadU32(base, list + 8));
+    LinkAtEnd(base, list, voice + schema::XAudioList(base, list).node_offset());
     SpinRelease(base, thread, call);
   }
   SpinRelease(base, thread, call);
@@ -1502,7 +1508,7 @@ uint32_t SourceConstruct(uint8_t* base, uint32_t voice, uint32_t allocator, uint
   CopyFloat(base, s.volume_address(), G::one_address());
   const uint32_t list = G::engine(base).source_stage_address();
   SpinTake(base, thread.r13, call);
-  LinkAtEnd(base, list, voice + guest::LoadU32(base, list + 8));
+  LinkAtEnd(base, list, voice + schema::XAudioStage(base, list).voices_node_offset());
   SpinRelease(base, thread.r13, call);
   return voice;
 }
@@ -1518,7 +1524,7 @@ uint32_t SubmixConstruct(uint8_t* base, uint32_t voice, uint32_t description,
   m.set_stage(stage);
   const uint32_t list = 44 * stage + G::engine(base).submix_stages();
   SpinTake(base, thread.r13, call);
-  LinkAtEnd(base, list, voice + guest::LoadU32(base, list + 8));
+  LinkAtEnd(base, list, voice + schema::XAudioStage(base, list).voices_node_offset());
   SpinRelease(base, thread.r13, call);
   return voice;
 }
@@ -1592,7 +1598,7 @@ uint32_t SubmixDestroy(uint8_t* base, uint32_t voice, const Thread& thread,
   StopOrTail(base, voice, 1, thread.r13, thread.mixer, thread.processor, call);
   const uint32_t list = 44 * m.stage() + G::engine(base).submix_stages();
   SpinTake(base, thread.r13, call);
-  Unlink(base, voice + guest::LoadU32(base, list + 8));
+  Unlink(base, voice + schema::XAudioStage(base, list).voices_node_offset());
   SpinRelease(base, thread.r13, call);
   SetRegs(call, Args({voice}));
   return OutputsDestroy(base, voice, thread, call);

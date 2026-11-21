@@ -21,7 +21,7 @@ uint32_t FindChunk(uint8_t* base, uint32_t chunk, uint32_t tag) {
 
 uint32_t FileScene(uint8_t* base, uint32_t file) {
   const uint32_t scene = file + schema::UiMovieFile(base, file).scene_offset();
-  return guest::LoadU32(base, scene) == kTagSce ? scene : 0;
+  return schema::UiMovieNode(base, scene).tag() == kTagSce ? scene : 0;
 }
 
 uint32_t XmdEntry(uint8_t* base, uint32_t file, uint32_t i) {
@@ -84,12 +84,15 @@ uint32_t RestorePose(uint8_t* base, uint32_t movie, uint32_t live, uint32_t rest
   uint32_t result = movie;
   // The floats copied through registers (lfs, stfs) are stored unchanged by
   // the translated code, so every field is copied as a word.
-  for (int32_t i = int32_t(guest::LoadU32(base, range + 100) + guest::LoadU32(base, range + 104) - 1);
-       i >= int32_t(guest::LoadU32(base, range + 100)); i--) {
+  // The group's first child index (+100) and count (+104), read as words.
+  const schema::UiMovieNode r(base, range);
+  for (int32_t i = int32_t(guest::LoadU32(base, r.width_address()) +
+                           guest::LoadU32(base, r.height_address()) - 1);
+       i >= int32_t(guest::LoadU32(base, r.width_address())); i--) {
     const uint32_t to = Child(base, live, uint32_t(i));
     const uint32_t from = Child(base, rest, uint32_t(i));
     result = from;
-    const uint32_t tag = guest::LoadU32(base, to);
+    const uint32_t tag = schema::UiMovieNode(base, to).tag();
     if (tag != kTagGrp && tag != kTagPic && tag != kTagPrm && tag != kTagSce && tag != kTagTfm &&
         tag != kTagTxt) {
       continue;

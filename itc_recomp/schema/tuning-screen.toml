@@ -444,3 +444,6 @@ fields = [
 
 [globals]
 stand_holder = { address = 0x826D83E0, type = "ptr", to = "StandHolder", note = "the stand scene's holder (StandScene::Create): +0 the block holding the garage stage" }
+doors_open = { address = 0x826D8498, type = "u32", note = "the stand's doors animation open (1) or closed (0); UpdateStandAnimations toggles it with GarageStage::Command 4 and 5" }
+roof_open = { address = 0x826D849C, type = "u32", note = "the stand's roof animation open state; toggled with GarageStage::Command 2 and 3" }
+bonnet_open = { address = 0x826D84A0, type = "u32", note = "the stand's bonnet animation open state; toggled with GarageStage::Command 2 and 3" }

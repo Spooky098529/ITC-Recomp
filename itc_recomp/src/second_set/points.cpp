@@ -8,6 +8,7 @@
 #include "guest.h"
 #include "native/buffers.h"
 #include "scene_loaders/pools.h"
+#include "schema/models.h"
 #include "schema/second_set.h"
 
 #include <bit>
@@ -122,7 +123,7 @@ uint32_t ModelPointFindShape(uint8_t* base, uint32_t record, uint32_t model, uin
     if (int32_t(index) == -1) {
       continue;
     }
-    const uint32_t shape = index * 544 + m.shapes<schema::View>().address;
+    const uint32_t shape = index * schema::ModelShape::kSize + m.shapes().address;
     if (scene_loaders::NameMatches(base, shape, r.shape_name_address()) != 0) {
       r.set_model(model);
       r.set_shape(shape);

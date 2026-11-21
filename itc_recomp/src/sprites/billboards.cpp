@@ -44,12 +44,6 @@ constexpr uint32_t kRingRoom = 4096;
 constexpr uint32_t kVertexBytes = 28;
 constexpr uint32_t kLightBytes = 48;  // a BillboardLight
 
-// Camera pass fields.
-constexpr uint32_t kView = 16;  // its columns' x, y and z are the quad's axes
-constexpr uint32_t kEye = 400;
-constexpr uint32_t kLookAt = 416;
-constexpr uint32_t kDrawDistance = 548;
-
 // The command list slots' return addresses in the original.
 constexpr uint32_t kBeginCall = 0x8209C754, kHandleCall = 0x8209C77C;
 constexpr uint32_t kDrawCall = 0x8209CBDC, kDrawArgsCall = 0x8209CBFC;
@@ -153,20 +147,19 @@ uint32_t BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
         total -= 4;
         continue;
       }
-      const uint32_t pass = schema::BillboardPass(base, set).camera_pass().address;
-      const float dx = Load(base, pass + kEye) - light.x();
-      const float dy = Load(base, pass + kEye + 4) - light.y();
-      const float dz = Load(base, pass + kEye + 8) - light.z();
-      float distance = Load(base, pass + kDrawDistance);
+      const schema::CameraPass pass = schema::BillboardPass(base, set).camera_pass();
+      const float dx = pass.eye_x() - light.x();
+      const float dy = pass.eye_y() - light.y();
+      const float dz = pass.eye_z() - light.z();
+      float distance = pass.init_far();  // the draw distance
       if (!(distance < farthest)) {
         distance = farthest;
       }
       distance = distance * distance;
       const simde__m128 offset = Vector(dx, dy, dz, one);
       const simde__m128 to_light = Vector(-dx, zero, -dz, offset_w);
-      const simde__m128 look = Vector(Load(base, pass + kLookAt) - Load(base, pass + kEye), zero,
-                                      Load(base, pass + kLookAt + 8) - Load(base, pass + kEye + 8),
-                                      one);
+      const simde__m128 look = Vector(pass.target_x() - pass.eye_x(), zero,
+                                      pass.target_z() - pass.eye_z(), one);
       Fpscr::setcsr(flushing);
       const float distance_squared = Word0(simde_mm_dp_ps(offset, offset, 0xEF));
       const simde__m128 to_light_squared = simde_mm_dp_ps(to_light, to_light, 0xEF);
@@ -181,18 +174,20 @@ uint32_t BuildBillboardVertices(uint8_t* base, uint32_t set, uint32_t material,
       }
 
       // The quad's axes: the view's columns times the light's width, its
-      // height and the forward scale.
+      // height and the forward scale (its columns' x, y and z are the
+      // quad's axes).
+      const uint32_t view = pass.view_address();
       const float width = light.width() * size_scale;
       const float height = light.height() * size_scale;
-      const float rx = Load(base, pass + kView + 0) * width;
-      const float ry = Load(base, pass + kView + 16) * width;
-      const float rz = Load(base, pass + kView + 32) * width;
-      const float ux = Load(base, pass + kView + 4) * height;
-      const float uy = Load(base, pass + kView + 20) * height;
-      const float uz = Load(base, pass + kView + 36) * height;
-      const float fx = Load(base, pass + kView + 8) * forward;
-      const float fy = Load(base, pass + kView + 24) * forward;
-      const float fz = Load(base, pass + kView + 40) * forward;
+      const float rx = Load(base, view + 0) * width;
+      const float ry = Load(base, view + 16) * width;
+      const float rz = Load(base, view + 32) * width;
+      const float ux = Load(base, view + 4) * height;
+      const float uy = Load(base, view + 20) * height;
+      const float uz = Load(base, view + 36) * height;
+      const float fx = Load(base, view + 8) * forward;
+      const float fy = Load(base, view + 24) * forward;
+      const float fz = Load(base, view + 40) * forward;
       const uint32_t r = ToInteger(light.red());
       const uint32_t g = ToInteger(light.green());
       const uint32_t b = ToInteger(light.blue());

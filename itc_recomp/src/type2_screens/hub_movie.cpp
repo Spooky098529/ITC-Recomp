@@ -128,9 +128,9 @@ uint32_t HubShowNoticeImage(uint8_t* base, uint32_t image, uint32_t sp) {
   static constexpr struct {
     uint32_t (schema::Type2HubData::*images)() const;
     uint32_t (schema::Type2HubData::*count)() const;
-    uint32_t field;
-  } kLists[2] = {{&schema::Type2HubData::images_address, &schema::Type2HubData::image_count, 36},
-                 {&schema::Type2HubData::images2_address, &schema::Type2HubData::image2_count, 32}};
+    uint32_t slot;  // the movie's texture word
+  } kLists[2] = {{&schema::Type2HubData::images_address, &schema::Type2HubData::image_count, 9},
+                 {&schema::Type2HubData::images2_address, &schema::Type2HubData::image2_count, 8}};
   for (const auto& list : kLists) {
     const schema::Type2HubData data = Data(base);
     const uint32_t count = (data.*list.count)();
@@ -142,7 +142,7 @@ uint32_t HubShowNoticeImage(uint8_t* base, uint32_t image, uint32_t sp) {
         break;
       }
     }
-    Store(base, Load(base, movie + 28) + list.field, texture);
+    Store(base, MovieTextureSlot(base, movie, list.slot), texture);
   }
   return pair;
 }
@@ -153,12 +153,12 @@ uint32_t HubShowNotice(uint8_t* base, uint32_t sp, const Calls& calls) {
   const uint32_t movie = FindMovie(base, kHubMovie, frame + 80);
   const uint32_t entry =
       data_tables::Entry56(base, Data(base).notice_table(), Data(base).notice_entry());
-  SetText(calls, frame, 0x8219042C, movie, 0, 1, Load(base, entry + 12) + 4650);
+  SetText(calls, frame, 0x8219042C, movie, 0, 1, schema::CareerEntry56(base, entry).text() + 4650);
   SetText(calls, frame, 0x82190448, movie, 0, 2, Data(base).notice_entry() + 6683);
-  HubShowNoticeImage(base, Load(base, entry + 16), frame);
+  HubShowNoticeImage(base, schema::CareerEntry56(base, entry).image(), frame);
   const uint32_t more = uint32_t(calls.Call(kHasMoreText, frame, 0x82190460, movie, 0, 2));
   const uint32_t node = ui_movies::FindNode(base, movie, 0, 0);
-  Store(base, node + 80, more != 0 ? 1 : 0);
+  Node(base, node).set_visible(more != 0 ? 1 : 0);
   return node;
 }
 
@@ -186,8 +186,9 @@ uint64_t HubFillMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
   static constexpr uint32_t kPrompts[6] = {0, 0, 6, 2, 7, 3};
   HubSetPrompts(base, kPrompts, frame);
   const uint32_t car = SelectedGarageCar(base, vehicle_accessors::SaveDataOf(base, 0));
-  const uint64_t r3 = calls.Call(kGetCarSpec, frame, 0x8218FCA0, Load(base, car + 224));
-  const bool second = guest::LoadU8(base, uint32_t(r3) + 771) == 1;
+  const uint64_t r3 =
+      calls.Call(kGetCarSpec, frame, 0x8218FCA0, schema::CarMakersCar(base, car + 212).car_id());
+  const bool second = schema::CarSpec(base, uint32_t(r3)).list_kind() == 1;
   Data(base).set_car_refused(second ? 1 : 0);
   return r3;
 }
@@ -256,13 +257,13 @@ uint64_t HubTransition2(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
     const uint32_t way = Globals::hub_menu(base).moved();
     if (way == 1) {
       if (cursor == 7) {
-        Store(base, ui_movies::FindNode(base, movie, 11, 0) + 16, Load(base, kWrapLast));
+        Store(base, Node(base, ui_movies::FindNode(base, movie, 11, 0)).y_address(), Load(base, kWrapLast));
       } else {
         Play(calls, frame, 0x8218EFDC, movie, 11, 13);
       }
     } else if (way == kNone) {
       if (cursor == 0) {
-        Store(base, ui_movies::FindNode(base, movie, 11, 0) + 16, Load(base, kZero));
+        Store(base, Node(base, ui_movies::FindNode(base, movie, 11, 0)).y_address(), Load(base, kZero));
       } else {
         Play(calls, frame, 0x8218EFDC, movie, 11, 12);
       }

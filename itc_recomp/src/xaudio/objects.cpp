@@ -11,6 +11,7 @@
 #include "c_runtime/strings.h"
 #include "guest.h"
 #include "helpers/clock.h"
+#include "schema/xaudio_engine.h"
 #include "schema/xaudio_objects.h"
 #include "xaudio/engine.h"
 #include "xaudio/resampler.h"
@@ -57,6 +58,8 @@ using schema::XAudioPacket;
 using schema::XAudioRegionPacket;
 using schema::XaudioObjectsGlobals;
 using schema::XmaCodec;
+using schema::XAudioBufferFormatOut;
+using schema::XAudioBumpAllocator;
 
 namespace {
 
@@ -87,7 +90,8 @@ uint32_t Below(uint8_t* base, uint32_t frame, uint32_t bytes) {
 // The allocator's slot +20 (allocate `bytes`): its r3 in full.
 uint64_t Allocate(uint8_t* base, uint32_t allocator, uint64_t bytes, uint32_t return_address,
                   uint32_t sp, const GuestCall& call) {
-  call(Method(base, allocator, 20), return_address, At(sp, Args({allocator, bytes})));
+  call(XAudioBumpAllocator(base, allocator).vtable().allocate(), return_address,
+       At(sp, Args({allocator, bytes})));
   return LastCallR3();
 }
 
@@ -1458,14 +1462,14 @@ uint64_t MatrixMix(uint8_t* base, uint32_t matrix, uint32_t source, uint32_t tar
   if (entries != 0) {
     for (uint32_t i = 0; i < m.entries_set(); i++) {
       const MatrixEntry entry(base, m.entries().address + MatrixEntry::kSize * i);
-      const uint32_t target_samples = guest::LoadU32(base, frame + 104);
+      const uint32_t target_samples = XAudioBufferFormatOut(base, target_format).samples();
       const uint32_t target_channels = guest::LoadU8(base, frame + 97);
       const uint32_t source_channels = guest::LoadU8(base, frame + 113);
       const uint32_t out_channel = entry.output_channel();
       const double goal = double(entry.target_level());
       const uint32_t in_channel = entry.input_channel();
       const uint32_t out = (out_channel << 10) + target_samples;
-      const uint32_t in = (in_channel << 10) + guest::LoadU32(base, frame + 120);
+      const uint32_t in = (in_channel << 10) + XAudioBufferFormatOut(base, source_format).samples();
       if (out_channel >= target_channels) {
         continue;
       }
@@ -1508,8 +1512,8 @@ uint64_t MatrixMix(uint8_t* base, uint32_t matrix, uint32_t source, uint32_t tar
   } else if (source != target && guest::LoadU8(base, frame + 97) != 0) {
     uint32_t offset = 0;
     for (uint32_t i = 0; i < guest::LoadU8(base, frame + 97); i++, offset += 1024) {
-      const uint32_t out = offset + guest::LoadU32(base, frame + 104);
-      const uint32_t in = offset + guest::LoadU32(base, frame + 120);
+      const uint32_t out = offset + XAudioBufferFormatOut(base, target_format).samples();
+      const uint32_t in = offset + XAudioBufferFormatOut(base, source_format).samples();
       const bool overwrite = m.overwrite() != 0;
       if (i >= guest::LoadU8(base, frame + 113)) {
         if (overwrite) {
@@ -1572,7 +1576,7 @@ uint64_t MeterProcess(uint8_t* base, uint32_t meter, uint32_t buffer, uint32_t f
       const uint32_t index =
           uint32_t(int64_t(int32_t(slot)) * int64_t(int32_t(m.channels()))) + c;
       if (c < channels) {
-        const uint32_t samples = guest::LoadU32(base, frame + 88);
+        const uint32_t samples = XAudioBufferFormatOut(base, frame + 80).samples();
         for (uint32_t k = 0; k < 256; k++) {
           const uint32_t at = (sample & 0xFFFF) * 4 + samples;
           const double x = LoadSingle(base, at);
@@ -1596,7 +1600,7 @@ uint64_t MeterProcess(uint8_t* base, uint32_t meter, uint32_t buffer, uint32_t f
     }
   }
   if (m.channels() == 8 && channels == 6) {
-    const uint32_t samples = guest::LoadU32(base, frame + 88);
+    const uint32_t samples = XAudioBufferFormatOut(base, frame + 80).samples();
     double peak_left = counted, peak_right = counted, sum_left = counted;
     const double side = LoadSingle(base, 0x82001BE4);
     const double center = LoadSingle(base, 0x8200295C);
@@ -2081,7 +2085,7 @@ uint64_t ReverbProcess(uint8_t* base, uint32_t reverb, uint32_t input, uint32_t 
   }
   guest::StoreU8(base, frame + 104, 0);
   guest::StoreU8(base, frame + 105, 6);
-  guest::StoreU32(base, frame + 108, 48000);
+  XAudioBufferFormatOut(base, frame + 104).set_sample_rate(48000);
   uint64_t cleared;
   if (const auto result = BufferClearThunk(base, output, frame + 104, 3)) {
     cleared = uint64_t(int64_t(int32_t(*result)));
@@ -2102,10 +2106,10 @@ uint64_t ReverbProcess(uint8_t* base, uint32_t reverb, uint32_t input, uint32_t 
   const Reverb r(base, reverb);
   const uint32_t core = r.core_vtable_address();
   ReverbSetStereo(base, r.core_vtable().base_offset() + reverb + 16, channels == 1 ? 1 : 0);
-  const uint32_t in = guest::LoadU32(base, frame + 128);
+  const uint32_t in = XAudioBufferFormatOut(base, frame + 120).samples();
   guest::StoreU32(base, frame + 80, in);
   guest::StoreU32(base, frame + 84, in + 1024);
-  const uint32_t out = guest::LoadU32(base, frame + 112);
+  const uint32_t out = XAudioBufferFormatOut(base, frame + 104).samples();
   guest::StoreU32(base, frame + 144, out);
   guest::StoreU32(base, frame + 148, out + 1024);
   guest::StoreU32(base, frame + 152, out + 2048);
@@ -2212,7 +2216,7 @@ uint64_t PcmCodecProcess(uint8_t* base, uint32_t codec, uint64_t iface, uint32_t
       return r29;
     }
   } else {
-    converter.set_output(guest::LoadU32(base, frame + 88));
+    converter.set_output(XAudioBufferFormatOut(base, format).samples());
     converter.set_output_frames(256);
     converter.set_frames_written(0);
     const uint8_t state = c.state();

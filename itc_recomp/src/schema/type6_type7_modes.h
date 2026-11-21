@@ -784,6 +784,30 @@ struct PowerGraphSource : View {
   uint32_t entry_car_id_address() const { return address + 8432; }
 };
 
+// image; measure: -
+struct Type67Car : View {
+  using View::View;
+  static constexpr uint32_t kSize = 1984;
+  // a garage car (GarageCar)
+  uint32_t garage_car_address() const { return address + 0; }
+  // the stand's model made for it (GarageStage::ReloadModel's answer); 0 from Show
+  uint32_t model_made() const { return guest::LoadU32(base, address + 1968); }
+  void set_model_made(uint32_t v) const { guest::StoreU32(base, address + 1968, v); }
+  uint32_t model_made_address() const { return address + 1968; }
+  // where from: -1 none (made again), 0 stock, 2 the garage
+  uint32_t source() const { return guest::LoadU32(base, address + 1972); }
+  void set_source(uint32_t v) const { guest::StoreU32(base, address + 1972, v); }
+  uint32_t source_address() const { return address + 1972; }
+  // the garage list position it came from (the save's selected_car)
+  uint32_t garage_index() const { return guest::LoadU32(base, address + 1976); }
+  void set_garage_index(uint32_t v) const { guest::StoreU32(base, address + 1976, v); }
+  uint32_t garage_index_address() const { return address + 1976; }
+  // the garage car's first halfword (its paint pick), sign-extended; 0 for a stock car
+  uint32_t paint_word() const { return guest::LoadU32(base, address + 1980); }
+  void set_paint_word(uint32_t v) const { guest::StoreU32(base, address + 1980, v); }
+  uint32_t paint_word_address() const { return address + 1980; }
+};
+
 // The image words docs/functions/type6-type7-modes.md's code uses.
 struct Type6Type7ModesGlobals {
   // the current mode's type (ControllerOptions::Leave posts by it)

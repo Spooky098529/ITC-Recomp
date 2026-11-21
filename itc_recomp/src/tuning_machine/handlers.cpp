@@ -6,8 +6,11 @@
 #include "base/log.h"
 #include "tuning_pages/tuning_pages.h"
 #include "guest.h"
+#include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
 #include "schema/tuning_machine.h"
+#include "schema/tuning_pages.h"
+#include "schema/ui_movies_game.h"
 #include "ui_movies/game.h"
 
 namespace tuning_machine {
@@ -21,6 +24,7 @@ constexpr uint32_t kMemRelease = 0x8000;
 
 using G = schema::TuningMachineGlobals;
 using Screen = schema::TuningMachineScreen;
+using TextureTable = schema::UiMovieTextureTable;
 
 inline uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 inline void Store(uint8_t* base, uint32_t address, uint32_t value) {
@@ -48,10 +52,10 @@ void Post(uint8_t* base, uint32_t mode, uint32_t id) {
   const uint32_t count = m.message_count() + 1;
   const uint32_t start = m.message_start();
   m.set_message_count(count);
-  const uint32_t slot = m.messages_address() + 12 * ((start + count - 1) % 50);
-  Store(base, slot + 0, id);
-  Store(base, slot + 4, 0);
-  Store(base, slot + 8, 0);
+  const schema::ModeMessage slot(base, m.messages_address() + 12 * ((start + count - 1) % 50));
+  slot.set_id(id);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 // A front-end menu's first words, as Create writes them (+44, +56 and +60
@@ -86,14 +90,20 @@ void ZeroRecord16(uint8_t* base, uint32_t record) {
 
 void ResetImages(uint8_t* base, uint32_t images) {
   ITC_NATIVE_RUNNING("sub_821FE590 DecalImages::Reset");
+  const schema::DecalImages im(base, images);
   for (uint32_t i = 0; i < 200; i++) {
-    const uint32_t entry = images + 36 * i;
-    for (uint32_t k = 4; k < 36; k += 4) {
-      Store(base, entry + k, 0);
-    }
-    Store(base, entry + 0, kNone);
+    const schema::DecalImageEntry entry(base, im.entries_address() + 36 * i);
+    entry.set_handle(0);
+    entry.set_state(0);
+    entry.set_file(0);
+    entry.set_file_size(0);
+    entry.set_to_make(0);
+    entry.set_requested(0);
+    entry.set_texture_header(0);
+    entry.set_texture_data(0);
+    entry.set_asset_id(kNone);
   }
-  Store(base, images + 8852, 0);
+  im.set_unknown_8852(0);
 }
 
 uint64_t Create(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls) {
@@ -342,20 +352,24 @@ uint64_t Destroy(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls,
 
 uint32_t SavePlaceholders14(uint8_t* base, uint32_t images, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_821F8950 DecalImages::SavePlaceholders14");
+  const schema::DecalImages im(base, images);
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t pair = FindPair(base, kStickerMovie, frame + 80);
-  const uint32_t movie = Load(base, pair);
-  Store(base, images + 8844, Load(base, Load(base, Load(base, movie + 28) + 640)));
-  Store(base, images + 8848, Load(base, Load(base, Load(base, movie + 28) + 636)));
+  const schema::UiMovie movie(base, Load(base, pair));
+  // Its texture table's (the movie's +28) textures 160 and 159.
+  im.set_sticker_placeholder_0(TextureTable(base, movie.textures()).texture_160().texture());
+  im.set_sticker_placeholder_1(TextureTable(base, movie.textures()).texture_159().texture());
   return pair;
 }
 
 uint32_t SavePlaceholders(uint8_t* base, uint32_t images, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82208130 DecalImages::SavePlaceholders");
+  const schema::DecalImages im(base, images);
   const uint32_t frame = Frame(base, sp, 112);
-  const uint32_t movie = Load(base, FindPair(base, kVinylMovie, frame + 80));
-  Store(base, images + 8836, Load(base, Load(base, Load(base, movie + 28) + 724)));
-  Store(base, images + 8840, Load(base, Load(base, Load(base, movie + 28) + 700)));
+  const schema::UiMovie movie(base, Load(base, FindPair(base, kVinylMovie, frame + 80)));
+  // Its texture table's (the movie's +28) textures 181 and 175.
+  im.set_vinyl_placeholder_0(TextureTable(base, movie.textures()).texture_181().texture());
+  im.set_vinyl_placeholder_1(TextureTable(base, movie.textures()).texture_175().texture());
   return SavePlaceholders14(base, images, frame);
 }
 

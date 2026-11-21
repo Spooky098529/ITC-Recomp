@@ -338,7 +338,7 @@ ITC_REGS_STEP(SceneryListsDrawShapeDepth) {
     ctx.r3.u64 = queue;
     ctx.r5.u64 = draw->key;
     lifted::CallFromContext(
-        ctx, base, schema::RenderQueueVtable(base, guest::LoadU32(base, queue)).add());
+        ctx, base, schema::RenderQueue(base, queue).vtable().add());
   });
   ctx.lr = lr;
 }
@@ -384,7 +384,7 @@ struct DrawContext {
     ctx.r3.u64 = queue;
     ctx.r5.u64 = key;
     const uint32_t function =
-        schema::RenderQueueVtable(base, guest::LoadU32(base, queue)).add();
+        schema::RenderQueue(base, queue).vtable().add();
     lifted::CallFromContext(ctx, base, function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();

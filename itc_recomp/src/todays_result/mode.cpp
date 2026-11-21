@@ -2,7 +2,9 @@
 // its block (docs/functions/todays-result.md): see todays_result.h.
 
 #include "base/log.h"
+#include "schema/boot_mode.h"
 #include "schema/game_modes.h"
+#include "schema/race_event.h"
 #include "todays_result/internal.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -59,10 +61,11 @@ void SetDelegate(uint8_t* base, uint32_t mode, uint32_t slot, uint32_t function)
   Delegate(base, mode, slot);
 }
 
-// The answer (r3) cleared: +4 and its first byte.
+// The answer (r3) cleared: its next type, then its changed byte.
 void ClearAnswer(uint8_t* base, uint32_t answer) {
-  Store(base, answer + 4, 0);
-  guest::StoreU8(base, answer, 0);
+  const schema::ModeAnswer a(base, answer);
+  a.set_next_type(0);
+  a.set_changed(0);
 }
 
 // The machine of index `index` (0 today's event, 27 today's result), 0 for
@@ -105,11 +108,11 @@ void FindShown(uint8_t* base, uint32_t block) {
 uint32_t Kind(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8225BA48 TodaysEvent::Kind");
   Frame(base, sp, 96);
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  if (Load(base, save + kUnlockCount) == 0) {
+  const schema::SaveData save(base, vehicle_accessors::SaveDataOf(base, 0));
+  if (save.unlocks_shown_count() == 0) {
     return 0;
   }
-  const int32_t movie = int32_t(Load(base, save + kQueuedMovie));
+  const int32_t movie = int32_t(save.movie_after_results());
   if (movie < 2) {
     return 0;
   }
@@ -167,14 +170,14 @@ void WaitForLoads(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
   if (block.result_loaded() != 0 && block.event_loaded() != 0) {
     const uint32_t shown = block.shown();
     if (shown == 0) {
-      PostRing(base, m.ring_address(), 8);
+      PostMode(m, 8);
     } else if (shown == kResultIndex) {
-      PostRing(base, m.ring_address(), 6);
+      PostMode(m, 6);
     }
     SetDelegate(base, mode, frame + 80, kNextModeThunk);
     calls.Call(kLoadingFinish, frame, 0x8225DA0C, ~uint64_t(0));
   }
-  PostRing(base, m.ring_address(), 1);
+  PostMode(m, 1);
   Dispatch(base, calls, mode, frame, 0x8225DA5C);
 }
 
@@ -192,10 +195,10 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
     SetDelegate(base, mode, frame + 80, kSlot11Thunk);
   }
   if (shown_state() == 10) {
-    PostRing(base, m.ring_address(), 4);
+    PostMode(m, 4);
   }
-  PostRing(base, m.ring_address(), 1);
-  PostRing(base, m.ring_address(), 0);
+  PostMode(m, 1);
+  PostMode(m, 0);
   Dispatch(base, calls, mode, frame, 0x8225DDE8);
   // The answer (byte 1, the next mode) built over the frame's doubleword
   // at +80 (its other three bytes as they are).
@@ -207,9 +210,10 @@ void NextMode(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const 
   } else {
     return;
   }
-  Store(base, frame + 84, next);
-  guest::StoreU8(base, frame + 80, 1);
-  Store64(base, answer, Load64(base, frame + 80));
+  const schema::ModeAnswer built(base, frame + 80);
+  built.set_next_type(next);
+  built.set_changed(1);
+  Store64(base, answer, Load64(base, built.address));
 }
 
 void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
@@ -218,7 +222,7 @@ void LeaveScreen(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, con
   ClearAnswer(base, answer);
   const Mode m(base, mode);
   FindShown(base, m.block().address);
-  PostRing(base, m.ring_address(), 3);
+  PostMode(m, 3);
   Dispatch(base, calls, mode, frame, 0x8225DBEC);
   SetDelegate(base, mode, frame + 80, kSlot10Thunk);
 }
@@ -234,7 +238,7 @@ void WaitForShown(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp,
   if (int32_t(Machine(base, machine).loaded()) == 1) {
     SetDelegate(base, mode, frame + 80, kNextModeThunk);
   }
-  PostRing(base, m.ring_address(), 1);
+  PostMode(m, 1);
   Dispatch(base, calls, mode, frame, 0x8225DB54);
 }
 
@@ -243,7 +247,7 @@ void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const C
   const uint32_t frame = Frame(base, sp, 128);
   ClearAnswer(base, answer);
   const Mode m(base, mode);
-  PostRing(base, m.ring_address(), 4);
+  PostMode(m, 4);
   Dispatch(base, calls, mode, frame, 0x8225DEEC);
   const Block block = m.block();
   for (uint32_t index = 0; index < 47; index++) {

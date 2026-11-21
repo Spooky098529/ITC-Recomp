@@ -10,6 +10,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/car_makers.h"
 
 namespace tuning_screen {
 
@@ -234,7 +235,7 @@ uint64_t AeroPartValue(uint8_t* base, uint32_t screen, uint64_t type, uint64_t i
   for (const Pointer& pointer : kPointers) {
     guest::StoreU32(base, frame + pointer.offset, frame + pointer.target);
   }
-  const uint32_t id = guest::LoadU32(base, SelectedGarageCar(base, screen) + 224);
+  const uint32_t id = schema::CarMakersCar(base, SelectedGarageCar(base, screen) + 212).car_id();
   if (id > 22 || kGroups[id] == 0) {
     return ~uint64_t(0);
   }

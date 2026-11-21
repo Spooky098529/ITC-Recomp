@@ -51,8 +51,8 @@ struct Page {
     return child;
   }
   // UiMovie::HideNode (sub_8211AC48) and ShowNode (sub_8211AC00).
-  void Hide(uint32_t sub_scene, uint32_t child) { Store(base, Node(sub_scene, child) + 80, 0); }
-  void Show(uint32_t sub_scene, uint32_t child) { Store(base, Node(sub_scene, child) + 80, 1); }
+  void Hide(uint32_t sub_scene, uint32_t child) { UiNode(base, Node(sub_scene, child)).set_visible(0); }
+  void Show(uint32_t sub_scene, uint32_t child) { UiNode(base, Node(sub_scene, child)).set_visible(1); }
   // UiMovie::SetNodeTexture (sub_8211A708).
   void Texture(uint32_t sub_scene, uint32_t child, uint32_t texture) {
     r3 = ui_movies::SetNodeTexture(base, Node(sub_scene, child), texture);

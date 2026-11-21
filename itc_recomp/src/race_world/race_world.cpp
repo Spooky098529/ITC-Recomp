@@ -13,6 +13,7 @@
 #include "schema/race_event.h"
 #include "schema/race_world.h"
 #include "schema/track_route.h"
+#include "schema/vehicle_accessors.h"
 
 #include "car_physics/float_ops.h"
 
@@ -537,8 +538,9 @@ void JumpSections(uint8_t* base, uint32_t entry, uint32_t player, uint32_t branc
     const int32_t slice = S16(guest::LoadU16(base, frame + 82));
     Stfs(base, at + 12, Lfs(base, kOne));
     track_route::SlicePoint(base, at, 0, uint32_t(section), uint32_t(slice));
-    const double dx = Fsubs(Lfs(base, at + 0), Lfs(base, player + 0));
-    const double dz = Fsubs(Lfs(base, at + 8), Lfs(base, player + 8));
+    const schema::VectorLibVector p(base, player);
+    const double dx = Fsubs(Lfs(base, at + 0), double(p.x()));
+    const double dz = Fsubs(Lfs(base, at + 8), double(p.z()));
     if (Fmadds(dz, dz, Fmuls(dx, dx)) < Lfs(base, kJumpDistance)) {
       return;
     }

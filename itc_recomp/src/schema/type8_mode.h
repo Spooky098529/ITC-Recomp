@@ -140,7 +140,9 @@ struct Type8ModeGlobals {
   // the two players' garage cars (car-makers.toml's GarageCarSlot, 1,972 bytes each)
   static constexpr uint32_t garage_cars_address() { return 0x82814EB8u; }
   // the stand scene's holder (StandScene::Create): +4 and +8 the two players' garage stages' holders
-  static View stand_holder(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D83E0u)); }
+  template <typename T = StandHolder>
+  static T stand_holder(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D83E0u)); }
+  static void set_stand_holder(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D83E0u, v.address); }
   static void set_stand_holder(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D83E0u, v); }
   static constexpr uint32_t stand_holder_address() { return 0x826D83E0u; }
   // the game mode before (1 the race)

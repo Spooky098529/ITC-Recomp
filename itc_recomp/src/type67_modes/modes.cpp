@@ -15,6 +15,10 @@
 #include "memory/heap.h"
 #include "menu_sounds/menu_sounds.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/boot_mode.h"
+#include "schema/game_modes.h"
+#include "schema/menu_sounds.h"
+#include "schema/strings_and_font.h"
 
 namespace type67_modes {
 
@@ -57,14 +61,16 @@ void Queue(uint8_t* base, const ModeView& m, uint32_t message) {
   const uint32_t end = m.ring_start() + count - 1;
   m.set_ring_count(count);
   const uint32_t slot = m.ring_address() + (end - (end / 50) * 50) * 12;
-  StoreU32(base, slot + 0, message);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
+  const schema::ModeMessage queued(base, slot);
+  queued.set_id(message);
+  queued.set_arg0(0);
+  queued.set_arg1(0);
 }
 
 void ClearAnswer(uint8_t* base, uint32_t answer) {
-  StoreU32(base, answer + 4, 0);
-  guest::StoreU8(base, answer + 0, 0);
+  const schema::ModeAnswer a(base, answer);
+  a.set_next_type(0);
+  a.set_changed(0);
 }
 
 // The delegate (mode +4 = mode +8 when that isn't 0) given a member functor:
@@ -90,15 +96,15 @@ uint64_t SoundThunk(void* user, uint32_t function, const uint64_t args[4], int s
 // What differs between the two WaitForLoads.
 struct LoadsLayout {
   uint32_t phase;
-  uint32_t loaded[8];  // the members' loaded words (0: none)
+  uint32_t loaded[8];  // the members' machines, whose loaded words are read (0: none)
   uint32_t message;    // the loaded message
   uint32_t run_lr, slot_lr, finish_lr, draw_lr, dispatch_lr;
 };
 constexpr LoadsLayout kType6Loads = {
-    91264, {29044, 62304, 91224, 19280, 50560, 9612, 40464, 71944}, 34,
+    91264, {19436, 52696, 81616, 9672, 40952, 4, 30856, 62336}, 34,
     0x82235F64, 0x82235FF4, 0x82236004, 0x8223602C, 0x822360F0};
 constexpr LoadsLayout kType7Loads = {
-    71284, {61604, 51964, 29040, 19272, 40220, 9616, 0, 0}, 28,
+    71284, {51996, 42356, 19432, 9664, 30612, 8, 0, 0}, 28,
     0x82246414, 0x82246484, 0x82246494, 0x822464BC, 0x82246580};
 
 }  // namespace
@@ -134,7 +140,7 @@ void ModeNextMode(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint
   StoreU32(base, frame + 80, layout.leaving);
   SetDelegate(base, m, frame);
   G::set_leaving_flag(base, 0);
-  StoreU32(base, m.block() + layout.phase, 4);
+  BlockView(base, m.block(), m.type7).set_phase(4);
 }
 
 uint64_t ModeWaitForLoads(uint8_t* base, bool type7, uint64_t r3, uint64_t r4, uint32_t sp,
@@ -151,26 +157,26 @@ uint64_t ModeWaitForLoads(uint8_t* base, bool type7, uint64_t r3, uint64_t r4, u
   const uint32_t answer = uint32_t(r3), mode = uint32_t(r4);
   const ModeView m(base, mode, type7);
   ClearAnswer(base, answer);
-  StoreU32(base, m.block() + layout.phase, 1);
+  BlockView(base, m.block(), type7).set_phase(1);
   calls.call(kLoadingRun, frame, layout.run_lr, ~uint64_t(0), r4);
   const uint32_t block = m.block();
   uint32_t loaded = 0xFFFFFFFF;
   for (const uint32_t at : layout.loaded) {
-    if (at != 0) loaded &= LoadU32(base, block + at);
+    if (at != 0) loaded &= schema::ScreenMachine(base, block + at).loaded();
   }
   uint32_t message = 1;
   if ((loaded & 1) != 0) {
     // The music's bank loading (the sound manager's slot 6 on bank 1).
     StoreU32(base, frame + 80, 1);
-    const uint32_t manager = LoadU32(base, menu_sounds::kSoundManager);
-    const uint64_t args[4] = {manager, frame + 80, 0, 0};
-    const uint64_t loading =
-        calls.call_set(LoadU32(base, LoadU32(base, manager) + 24), args, 2, frame, layout.slot_lr);
+    const schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
+    const uint64_t args[4] = {manager.address, frame + 80, 0, 0};
+    const uint64_t loading = calls.call_set(manager.vtable().is_bank_loading(), args, 2, frame,
+                                            layout.slot_lr);
     if ((loading & 0xFF) == 0) {
       calls.call(kLoadingFinish, frame, layout.finish_lr, ~uint64_t(0), frame + 80);
       front_end_car_draw::GarageStageSetDrawWord(
-          base, LoadU32(base, G::stand_holder<schema::View>(base).address), 0, frame);
-      const uint64_t draw[4] = {LoadU32(base, G::stand_holder<schema::View>(base).address), 0, 0, 0};
+          base, G::stand_holder(base).stage_block_0(), 0, frame);
+      const uint64_t draw[4] = {G::stand_holder(base).stage_block_0(), 0, 0, 0};
       calls.call_set(kGarageStageDraw, draw, 3, frame, layout.draw_lr);
       StoreU32(base, frame + 88, 1);
       StoreU32(base, frame + 84, 2);
@@ -178,7 +184,7 @@ uint64_t ModeWaitForLoads(uint8_t* base, bool type7, uint64_t r3, uint64_t r4, u
                              {const_cast<Calls*>(&calls), &SoundThunk});
       const uint32_t now = m.block();
       StoreU32(base, frame + 92, 0);
-      StoreU32(base, now + layout.phase, 3);
+      BlockView(base, now, type7).set_phase(3);
       StoreU32(base, frame + 88, kNextModeThunk);
       uint32_t delegate = m.delegate_vtable_address();
       if (int32_t(delegate) != 0) {
@@ -197,9 +203,10 @@ uint64_t ModeWaitForLoads(uint8_t* base, bool type7, uint64_t r3, uint64_t r4, u
   const uint32_t end = m.ring_start() + count - 1;
   m.set_ring_count(count);
   const uint32_t slot = m.ring_address() + (end - (end / 50) * 50) * 12;
-  StoreU32(base, slot + 8, 0);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 0, message);
+  const schema::ModeMessage queued(base, slot);
+  queued.set_arg1(0);
+  queued.set_arg0(0);
+  queued.set_id(message);
   calls.call(kDispatch, frame, layout.dispatch_lr, m.handlers_address(), 0);
   return r3;
 }
@@ -222,17 +229,17 @@ void ModeLeaving(uint8_t* base, const ModeLayout& layout, uint32_t answer, uint3
     }
   }
   if (State(base, block, layout.list) == 6) {
-    StoreU32(base, block + layout.phase, 5);
+    BlockView(base, block, m.type7).set_phase(5);
     StoreU32(base, frame + 80, layout.tear_down);
-    StoreU32(base, layout.car, 0xFFFFFFFF);
+    schema::Type67Car(base, m.type7 ? kType7Car : kType6Car).set_source(0xFFFFFFFF);
   } else if (State(base, block, layout.list) == 11) {
-    StoreU32(base, m.block() + layout.phase, 5);
+    BlockView(base, m.block(), m.type7).set_phase(5);
     guest::StoreU8(base, frame + 80, 1);
     StoreU32(base, frame + 84, 1);
     const uint32_t high = LoadU32(base, frame + 80), low = LoadU32(base, frame + 84);
-    const uint32_t to = m.block() + layout.answer;
-    StoreU32(base, to, high);
-    StoreU32(base, to + 4, low);
+    const BlockView to(base, m.block(), m.type7);
+    to.set_answer_word0(high);
+    to.set_answer_word(low);
     StoreU32(base, frame + 80, layout.tear_down);
   } else {
     return;
@@ -253,9 +260,9 @@ uint64_t ModeTearDown(uint8_t* base, bool type7, uint64_t r3, uint32_t mode, uin
   const uint32_t answer = uint32_t(r3);
   const ModeView m(base, mode, type7);
   ClearAnswer(base, answer);
-  if (int32_t(LoadU32(base, m.block() + layout.phase)) == 5 &&
+  if (int32_t(BlockView(base, m.block(), type7).phase()) == 5 &&
       StandScenePollTeardown(base, frame, calls) != 0) {
-    StoreU32(base, m.block() + layout.phase, 6);
+    BlockView(base, m.block(), type7).set_phase(6);
     // Bank 1's cues 0 and 2: when playing (the sound manager's slot 14),
     // stopped (slot 13); the indexes built in the frame.
     const uint32_t lr = type7 ? 0x82246114 : 0x82235C94;  // the first slot call's return
@@ -264,30 +271,30 @@ uint64_t ModeTearDown(uint8_t* base, bool type7, uint64_t r3, uint32_t mode, uin
     };
     const Cue cues[2] = {{0, 80, 88, lr, lr + 0x2C}, {2, 96, 104, lr + 0x54, lr + 0x80}};
     for (const Cue& c : cues) {
-      const uint32_t manager = LoadU32(base, menu_sounds::kSoundManager);
+      const schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
       StoreU32(base, frame + c.playing, c.cue);
       StoreU32(base, frame + c.playing + 4, 1);
-      const uint64_t ask[4] = {manager, frame + c.playing + 4, frame + c.playing, 0};
-      const uint64_t playing = calls.call_set(LoadU32(base, LoadU32(base, manager) + 56), ask, 3,
-                                              frame, c.playing_lr);
+      const uint64_t ask[4] = {manager.address, frame + c.playing + 4, frame + c.playing, 0};
+      const uint64_t playing =
+          calls.call_set(manager.vtable().is_cue_playing(), ask, 3, frame, c.playing_lr);
       if ((playing & 0xFF) == 0) {
         if (c.cue == 0) continue;
         break;
       }
-      const uint32_t now = LoadU32(base, menu_sounds::kSoundManager);
+      const schema::AudioManager now = schema::MenuSoundsGlobals::sound_manager(base);
       StoreU32(base, frame + c.stop, 0 + c.cue);
       StoreU32(base, frame + c.stop + 4, 1);
-      const uint64_t stop[4] = {now, frame + c.stop + 4, frame + c.stop, 0};
-      calls.call_set(LoadU32(base, LoadU32(base, now) + 52), stop, 3, frame, c.stop_lr);
+      const uint64_t stop[4] = {now.address, frame + c.stop + 4, frame + c.stop, 0};
+      calls.call_set(now.vtable().stop_cue(), stop, 3, frame, c.stop_lr);
     }
   }
-  const uint32_t block = m.block();
-  if (int32_t(LoadU32(base, block + layout.phase)) == 6 &&
-      LoadU32(base, block + layout.phase + 4) == 0) {
-    const uint32_t from = block + layout.answer;
-    const uint32_t high = LoadU32(base, from), low = LoadU32(base, from + 4);
-    StoreU32(base, answer + 0, high);
-    StoreU32(base, answer + 4, low);
+  const BlockView block(base, m.block(), type7);
+  // The word after the phase (+91268, +71288) isn't in type67-screens.toml.
+  if (int32_t(block.phase()) == 6 && LoadU32(base, block.phase_address() + 4) == 0) {
+    const uint32_t high = block.answer_word0(), low = block.answer_word();
+    const schema::ModeAnswer to(base, answer);
+    to.set_word0(high);
+    to.set_next_type(low);
   }
   if (type7) {
     Queue(base, m, 1);  // queued without a dispatch
@@ -420,7 +427,8 @@ uint64_t ModeInit(uint8_t* base, bool type7, uint32_t mode, uint32_t sp,
     return calls.call(target, regs, set, frame, lr);
   };
   call(0x8211AD00, l.lr_start, {mode});
-  call(0x8210A8D0, l.lr_strings, {LoadU32(base, 0x826C5C34), 3});
+  call(0x8210A8D0, l.lr_strings,
+       {schema::StringsAndFontGlobals::strings<schema::View>(base).address, 3});
   call(0x82180B00, l.lr_stand, {1});
   const uint32_t pages = memory::AllocPages(l.block_bytes, 4096);
   m.set_block(pages);
@@ -474,16 +482,18 @@ uint64_t ModeInit(uint8_t* base, bool type7, uint32_t mode, uint32_t sp,
     for (size_t i = 0; i < l.word_after_count; i++) {
       StoreWords(base, m.block(), l.words_after[i]);
     }
-    StoreU32(base, m.block() + l.answer, w0);
-    StoreU32(base, m.block() + l.answer + 4, w1);
-    StoreU32(base, m.block() + l.answer + 8, 0);
-    StoreU32(base, m.block() + l.answer + 12, 0);
+    // The answer's doubleword, then the phase and the word after it (not in
+    // type67-screens.toml).
+    BlockView(base, m.block(), type7).set_answer_word0(w0);
+    BlockView(base, m.block(), type7).set_answer_word(w1);
+    BlockView(base, m.block(), type7).set_phase(0);
+    StoreU32(base, BlockView(base, m.block(), type7).phase_address() + 4, 0);
   }
   {
     const uint64_t args[6] = {1, 0, 0xFFFFFFFFFFFFFFFFull};
     calls.call(0x822478D0, args, 3, frame, l.lr_show);
   }
-  const uint32_t passes = LoadU32(base, 0x82001BEC);
+  const uint32_t passes = schema::Type67ScreensGlobals::fade_in_passes(base);
   mode_tick::ScreenFadesFadeIn(base, passes, 0, 0, 0, 0);
   // The delegate's member functor, built at the frame's +80.
   StoreU32(base, frame + 84, 0);
@@ -518,7 +528,9 @@ std::optional<uint64_t> StandModeRelease(uint8_t* base, uint32_t mode, uint32_t 
   }
   memory::FreePages(m.block());
   m.set_block(0);
-  const uint64_t r3 = calls.call(kStringsRelease, frame, 0x8224607C, LoadU32(base, 0x826C5C34), 3);
+  const uint64_t r3 = calls.call(kStringsRelease, frame, 0x8224607C,
+                                 schema::StringsAndFontGlobals::strings<schema::View>(base).address,
+                                 3);
   return calls.call(kDeleteAllJump, frame, 0x82246080, r3, 0);
 }
 

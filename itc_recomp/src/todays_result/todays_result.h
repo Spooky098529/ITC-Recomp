@@ -39,10 +39,9 @@ using Calls = race_hud_object::Calls;
 // The shown machine's index of today's result (+19280: 27, today's event 0).
 constexpr uint32_t kResultIndex = 27;
 
-// The save data's fields Kind reads: the unlocks just made's count and the
-// movie queued (-1 none).
-constexpr uint32_t kUnlockCount = 0x1CA78;
-constexpr uint32_t kQueuedMovie = 0x1D524;
+// The save data's fields (the unlocks just made, their count, the movie
+// queued) are race-event's SaveData's (schema/race_event.h), its stats
+// record and pick career's CareerSave, CareerStats and CareerCounter.
 
 // The callees by address.
 constexpr uint32_t kVirtualAlloc = 0x82295398;
@@ -89,9 +88,6 @@ constexpr uint32_t kResultMovie = 27;
 constexpr uint32_t kResultAsset = 22578;
 constexpr uint32_t kEventMovie = 0;
 constexpr uint32_t kEventAsset = 22545;
-// The save's unlocks just made: 12-byte entries (+0 shown, +4 the table,
-// +8 the entry) from +0x1C778, their count at kUnlockCount.
-constexpr uint32_t kUnlocks = 0x1C778;
 // The images' assets: 22696 + i and 22741 + i.
 constexpr uint32_t kImageAssetA = 22696;
 constexpr uint32_t kImageAssetB = 22741;

@@ -6,7 +6,9 @@
 #include "c_runtime/strings.h"
 #include "helpers/clock.h"
 #include "memory/c_runtime_heap.h"
+#include "schema/sound_cues.h"
 #include "schema/xact.h"
+#include "schema/xact_tracks.h"
 
 #include <bit>
 #include <cstring>
@@ -17,8 +19,8 @@ namespace xact {
 
 namespace {
 
-constexpr uint32_t kOne = 0x82000A30;   // the game's float 1.0
-constexpr uint32_t kZero = 0x82000A34;  // the game's float 0.0
+constexpr uint32_t kOne = schema::XactTracksGlobals::one_address();    // the game's float 1.0
+constexpr uint32_t kZero = schema::XactTracksGlobals::zero_address();  // the game's float 0.0
 
 // The vtables the constructors write.
 constexpr uint32_t kVariableVtable = 0x820753A4;
@@ -163,11 +165,12 @@ uint32_t NodePoolFreeChunks(uint8_t* base, uint32_t pool) {
 void EngineAddCue(uint8_t* base, uint32_t engine, uint32_t cue) {
   ITC_NATIVE_RUNNING("sub_825C1518 XACTEngine::AddCue");
   const uint32_t node = cue != 0 ? cue + 12 : 0;
-  const uint32_t list = engine + 28;
+  const schema::XactEngine e(base, engine);
+  const uint32_t list = e.cues_address();
   guest::StoreU32(base, node + 4, list);
-  guest::StoreU32(base, node + 8, guest::LoadU32(base, list + 8));
-  guest::StoreU32(base, guest::LoadU32(base, list + 8) + 4, node);
-  guest::StoreU32(base, list + 8, node);
+  guest::StoreU32(base, node + 8, e.cues_previous());
+  guest::StoreU32(base, e.cues_previous() + 4, node);
+  e.set_cues_previous(node);
 }
 
 void GlobalSettingsBaseConstruct(uint8_t* base, uint32_t settings, uint32_t engine) {
@@ -579,9 +582,10 @@ std::optional<uint32_t> SoundBankForgetWaveBank(uint8_t* base, uint32_t bank,
 }
 
 std::optional<uint32_t> EngineForgetWaveBank(uint8_t* base, uint32_t engine, uint32_t wave_bank) {
-  const uint32_t end = engine + 44;
+  const schema::XactEngine e(base, engine);
+  const uint32_t end = e.sound_banks_address();
   auto bank_of = [](uint32_t node) { return node != 0 ? node - 12 : 0; };
-  for (uint32_t node = guest::LoadU32(base, engine + 48); node != end;
+  for (uint32_t node = e.sound_banks_next(); node != end;
        node = guest::LoadU32(base, node + 4)) {
     const uint32_t bank = bank_of(node);
     if (guest::LoadU32(base, bank + 244) != 0 && !SlotIs(base, bank, 64, kGetHeader)) {
@@ -590,7 +594,7 @@ std::optional<uint32_t> EngineForgetWaveBank(uint8_t* base, uint32_t engine, uin
   }
   ITC_NATIVE_RUNNING("sub_825C0408 XACTEngine::ForgetWaveBank");
   uint32_t r3 = engine;
-  for (uint32_t node = guest::LoadU32(base, engine + 48); node != end;
+  for (uint32_t node = e.sound_banks_next(); node != end;
        node = guest::LoadU32(base, node + 4)) {
     r3 = ForgetWaveBank(base, bank_of(node), wave_bank);
   }
@@ -942,7 +946,7 @@ bool ParentSlots(uint8_t* base, uint32_t settings) {
 
 // The settings at the engine's +124 (0 for none).
 uint32_t EngineSettings(uint8_t* base, uint32_t engine) {
-  return guest::LoadU32(base, engine + 124);
+  return schema::XactEngine(base, engine).global_settings();
 }
 
 // A category's record and parent once RecordSlots and ParentSlots hold.
@@ -1251,10 +1255,11 @@ constexpr uint32_t kWaveBankAddListener = 0x825C8690;  // its +4 interface's slo
 }  // namespace
 
 std::optional<uint32_t> EngineFindWaveBank(uint8_t* base, uint32_t engine, uint32_t name) {
-  const uint32_t end = engine + 56;
+  const schema::XactEngine e(base, engine);
+  const uint32_t end = e.wave_banks_address();
   // Every prepared bank's slot +24 first (the walk changes nothing, but
   // the decline comes before any work).
-  for (uint32_t node = guest::LoadU32(base, engine + 60); node != end;
+  for (uint32_t node = e.wave_banks_next(); node != end;
        node = guest::LoadU32(base, node + 4)) {
     const uint32_t bank = node != 0 ? node - 8 : 0;
     if (guest::LoadU32(base, bank + 252) != 0 && !SlotIs(base, bank, 24, kWaveBankGetName)) {
@@ -1262,7 +1267,7 @@ std::optional<uint32_t> EngineFindWaveBank(uint8_t* base, uint32_t engine, uint3
     }
   }
   ITC_NATIVE_RUNNING("sub_825C0360 XACTEngine::FindWaveBank");
-  for (uint32_t node = guest::LoadU32(base, engine + 60); node != end;
+  for (uint32_t node = e.wave_banks_next(); node != end;
        node = guest::LoadU32(base, node + 4)) {
     const uint32_t bank = node != 0 ? node - 8 : 0;
     if (guest::LoadU32(base, bank + 252) == 0) {
@@ -1649,7 +1654,7 @@ std::optional<uint32_t> WaveBankGetWaveRegion(uint8_t* base, uint32_t bank, uint
   // entry), then read through the accessor functions.
   WaveEntryConstruct(base, accessor);
   if (!WaveEntrySet(base, accessor, index, bank) ||
-      ((guest::LoadU32(base, accessor + 16) & 3) == 1 &&
+      ((schema::XACTWaveEntry(base, accessor).format() & 3) == 1 &&
        !SlotIs(base, bank, 20, kGetSeekTable))) {
     return std::nullopt;
   }

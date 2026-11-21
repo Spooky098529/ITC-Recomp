@@ -63,6 +63,35 @@ struct StickerMoveBounds : View {
   uint32_t y_max_address() const { return address + 12; }
 };
 
+// embedded; measure: -
+struct StickerRecord : View {
+  using View::View;
+  static constexpr uint32_t kSize = 24;
+  // times the layout's position scale, plus its origin
+  int32_t x() const { return int32_t(guest::LoadU32(base, address + 0)); }
+  void set_x(int32_t v) const { guest::StoreU32(base, address + 0, uint32_t(v)); }
+  uint32_t x_address() const { return address + 0; }
+  int32_t y() const { return int32_t(guest::LoadU32(base, address + 4)); }
+  void set_y(int32_t v) const { guest::StoreU32(base, address + 4, uint32_t(v)); }
+  uint32_t y_address() const { return address + 4; }
+  // degrees (0.0 to 359.0): the node's rotation
+  float angle() const { return guest::LoadFloat(base, address + 8); }
+  void set_angle(float v) const { guest::StoreFloat(base, address + 8, v); }
+  uint32_t angle_address() const { return address + 8; }
+  // times the layout's size: the node's scale
+  float scale() const { return guest::LoadFloat(base, address + 12); }
+  void set_scale(float v) const { guest::StoreFloat(base, address + 12, v); }
+  uint32_t scale_address() const { return address + 12; }
+  // copied into the node's flip_x
+  uint32_t flip() const { return guest::LoadU32(base, address + 16); }
+  void set_flip(uint32_t v) const { guest::StoreU32(base, address + 16, v); }
+  uint32_t flip_address() const { return address + 16; }
+  // 0 at the reset
+  uint32_t word() const { return guest::LoadU32(base, address + 20); }
+  void set_word(uint32_t v) const { guest::StoreU32(base, address + 20, v); }
+  uint32_t word_address() const { return address + 20; }
+};
+
 // The image words docs/functions/sticker-editor.md's code uses.
 struct StickerEditorGlobals {
   // six StickerGroup records

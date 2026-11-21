@@ -17,6 +17,7 @@
 #include "hooks/title_screen_native.h"
 
 #include "guest.h"
+#include "schema/boot_mode.h"
 #include "schema/title_screen.h"
 
 #include "base/flags.h"
@@ -128,7 +129,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82107C58) {
   
   if (ITC_FLAG(log_boot_modes)) {
     ITC_LOG_INFO("boot modes: movie wait, this {:08X} +9608 {}", ctx.r3.u32,
-                 guest::LoadU32(base, ctx.r3.u32 + 9608));
+                 schema::BootMachine(base, ctx.r3.u32).movie_started());
   }
   g_in_movie_wait = ITC_FLAG(skip_intro);
   if (hooks::BootModeNative()) {

@@ -3,6 +3,7 @@
 
 #include "guest.h"
 #include "hooks/native_entry.h"
+#include "schema/device_shaders.h"
 #include "schema/sprites.h"
 #include "lifted/originals.h"
 
@@ -104,7 +105,7 @@ bool RecordScreenRect(lifted::Regs& ctx, uint8_t* base) {
     ctx.r4.u64 = *chunk;
     ctx.r5.u64 = layer;
     ctx.f1.f64 = double(G::zero(base));
-    lifted::CallFromContext(ctx, base, guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+    lifted::CallFromContext(ctx, base, schema::RenderQueue(base, queue).vtable().add());
   });
   ctx.lr = lr;
   return true;

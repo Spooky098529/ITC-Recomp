@@ -14,8 +14,15 @@
 #include "car_specs/car_specs.h"
 #include "debug/pause_menu_log.h"
 #include "guest.h"
+#include "schema/race_event.h"
+#include "schema/career.h"
+#include "schema/car_specs.h"
+#include "schema/car_makers.h"
 #include "native/buffers.h"
+#include "schema/action_mappers.h"
 #include "schema/menu_helpers.h"
+#include "schema/mode_tick.h"
+#include "schema/racer_controllers.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -69,8 +76,11 @@ void StepWith9724(uint8_t* base, uint32_t screen) {
 }
 
 // The player's action mapper entry (0x826BAB80 + 8 × [0x826BABA4]).
-constexpr uint32_t kMapperEntries = 0x826BAB80;
-constexpr uint32_t kControllerEntries = 0x826BABA4;
+uint32_t PlayerMappers(uint8_t* base) {
+  return schema::ModeTickGlobals::player0_user(base) * 8 +
+         schema::RacerControllersGlobals::mapper_entries_address();
+}
+using MapperEntry = schema::PlayerMapperEntry;
 constexpr uint32_t kPressedSlot = 0x8210BF40;  // ActionMapper::Pressed
 
 // The mapper's slot 10 (+40) on `action`, as the original's bctrl from
@@ -79,7 +89,7 @@ constexpr uint32_t kPressedSlot = 0x8210BF40;  // ActionMapper::Pressed
 // adapter does), else the slot through `call`. Its r3.
 uint64_t PressedSlot(uint8_t* base, const GuestCall& call, uint32_t mapper, uint64_t action,
                      uint32_t frame, uint32_t lr, bool native_slots) {
-  const uint32_t function = Load(base, Load(base, mapper) + 40);
+  const uint32_t function = Load(base, schema::ActionMapper(base, mapper).vtable() + 40);
   if (native_slots && function == kPressedSlot) {
     const uint32_t id = uint32_t(action);
     const uint32_t r3 = action_mappers::Pressed(base, mapper, id);
@@ -97,7 +107,7 @@ constexpr uint32_t kHeldSlot = 0x8210BE70;  // ActionMapper::Held
 // `lr`. Its r3.
 uint64_t HeldSlot(uint8_t* base, const GuestCall& call, uint32_t mapper, uint64_t action,
                   uint32_t frame, uint32_t lr, bool native_slots) {
-  const uint32_t function = Load(base, Load(base, mapper) + 32);
+  const uint32_t function = Load(base, schema::ActionMapper(base, mapper).vtable() + 32);
   if (native_slots && function == kHeldSlot) {
     const uint32_t id = uint32_t(action);
     const uint32_t r3 = action_mappers::Held(base, mapper, id);
@@ -108,7 +118,8 @@ uint64_t HeldSlot(uint8_t* base, const GuestCall& call, uint32_t mapper, uint64_
 }
 uint64_t Slot11(uint8_t* base, const GuestCall& call, uint32_t mapper, uint64_t action,
                 uint32_t frame, uint32_t lr) {
-  return call(Load(base, Load(base, mapper) + 44), {mapper, action}, frame, lr);
+  return call(Load(base, schema::ActionMapper(base, mapper).vtable() + 44), {mapper, action}, frame,
+              lr);
 }
 
 }  // namespace
@@ -117,7 +128,7 @@ uint64_t MoveCategory(uint8_t* base, const GuestCall& call, uint32_t screen, uin
                       bool native_slots) {
   ITC_NATIVE_RUNNING("sub_821D07D8 TuningScreen::MoveCategory");
   const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t mappers = Load(base, kControllerEntries) * 8 + kMapperEntries;
+  const uint32_t mappers = PlayerMappers(base);
   const uint32_t entry = MovieEntry(base, frame, kMovieId);
   const uint32_t menu = TS(base, screen).category_menu().address;
   const uint32_t movie = Load(base, entry);
@@ -154,8 +165,9 @@ uint64_t MoveCategory(uint8_t* base, const GuestCall& call, uint32_t screen, uin
   // finished; else action 158 asked (its answer not used). The entry's +4
   // and +0 read again on each try.
   uint64_t r3 = entry;
-  if (int32_t(Load(base, mappers + 4)) != 1) {
-    r3 = PressedSlot(base, call, Load(base, mappers), 159, frame, 0x821D09D0, native_slots);
+  if (int32_t(MapperEntry(base, mappers).unread()) != 1) {
+    r3 = PressedSlot(base, call, MapperEntry(base, mappers).mapper().address, 159, frame,
+                     0x821D09D0, native_slots);
     if ((r3 & 0xFF) != 0) {
       for (uint64_t k = 0; k < 10; k++) {
         finish(k + 2, 0x821D09EC);
@@ -164,8 +176,9 @@ uint64_t MoveCategory(uint8_t* base, const GuestCall& call, uint32_t screen, uin
       return finish(13, 0x821D0A18);
     }
   }
-  if (int32_t(Load(base, mappers + 4)) != 1) {
-    r3 = PressedSlot(base, call, Load(base, mappers), 158, frame, 0x821D0A40, native_slots);
+  if (int32_t(MapperEntry(base, mappers).unread()) != 1) {
+    r3 = PressedSlot(base, call, MapperEntry(base, mappers).mapper().address, 158, frame,
+                     0x821D0A40, native_slots);
   }
   return r3;
 }
@@ -188,9 +201,9 @@ uint64_t MarkPick(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_
           Scaled(base, frame, Unsigned8(base, screen + field)));
     const uint32_t node = ui_movies::FindNode(base, movie, n, 0);
     const uint32_t a = ui_movies::Child(base, node, Byte(base, screen + field) + 15);
-    Store(base, a + 16, Scaled(base, frame, Unsigned8(base, screen + field)));
+    Store(base, UiNode(base, a).y_address(), Scaled(base, frame, Unsigned8(base, screen + field)));
     const uint32_t b = ui_movies::Child(base, node, Byte(base, screen + field) + 26);
-    Store(base, b + 16, Scaled(base, frame, Unsigned8(base, screen + field)));
+    Store(base, UiNode(base, b).y_address(), Scaled(base, frame, Unsigned8(base, screen + field)));
   };
   auto restart = [&](uint64_t named, uint32_t finish_lr, uint32_t play_lr, uint32_t chained) {
     FinishNamed(call, frame, finish_lr, movie, named);
@@ -233,13 +246,13 @@ uint64_t MarkPick(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_
     }
     const uint32_t node = ui_movies::FindNode(base, movie, 28, 0);
     if (int32_t(Load(base, k_at)) == 3) {
-      Store(base, ui_movies::Child(base, node, 17) + 16, far);
-      Store(base, ui_movies::Child(base, node, 28) + 16, far);
+      Store(base, UiNode(base, ui_movies::Child(base, node, 17)).y_address(), far);
+      Store(base, UiNode(base, ui_movies::Child(base, node, 28)).y_address(), far);
     } else {
       const uint32_t a = ui_movies::Child(base, node, Load(base, k_at) + 15);
-      Store(base, a + 16, Scaled(base, frame, Signed(base, k_at)));
+      Store(base, UiNode(base, a).y_address(), Scaled(base, frame, Signed(base, k_at)));
       const uint32_t b = ui_movies::Child(base, node, Load(base, k_at) + 26);
-      Store(base, b + 16, Scaled(base, frame, Signed(base, k_at)));
+      Store(base, UiNode(base, b).y_address(), Scaled(base, frame, Signed(base, k_at)));
     }
     marked = true;
   }
@@ -335,23 +348,23 @@ void TirePictures(uint8_t* base, uint32_t screen, uint32_t frame, uint32_t movie
           Scaled(base, frame, Signed(base, screen + front)));
     if (match) {
       if (clear) {
-        Store(base, ui_movies::Child(base, node, 11) + 80, 0);
-        Store(base, ui_movies::Child(base, node, 10) + 80, 0);
-        Store(base, ui_movies::Child(base, node, 1) + 80, 0);
+        UiNode(base, ui_movies::Child(base, node, 11)).set_visible(0);
+        UiNode(base, ui_movies::Child(base, node, 10)).set_visible(0);
+        UiNode(base, ui_movies::Child(base, node, 1)).set_visible(0);
       }
       return;
     }
-    Store(base, ui_movies::Child(base, node, 11) + 80, 1);
+    UiNode(base, ui_movies::Child(base, node, 11)).set_visible(1);
     const uint32_t again = ui_movies::FindNode(base, movie, n, 0);
     const uint32_t back = ui_movies::Child(base, again, 1);
-    Store(base, back + 16, Scaled(base, frame, Signed(base, screen + rear)));
-    Store(base, ui_movies::Child(base, again, 5) + 80, 1);
+    Store(base, UiNode(base, back).y_address(), Scaled(base, frame, Signed(base, screen + rear)));
+    UiNode(base, ui_movies::Child(base, again, 5)).set_visible(1);
   } else if (item == 1 || item == 2) {
     const uint32_t node = ui_movies::FindNode(base, movie, n, 0);
     const uint32_t picture = ui_movies::Child(base, node, 2);
-    Store(base, picture + 16,
+    Store(base, UiNode(base, picture).y_address(),
           Scaled(base, frame, Signed(base, screen + (item == 1 ? front : rear))));
-    Store(base, ui_movies::Child(base, node, item == 1 ? 11 : 10) + 80, 1);
+    UiNode(base, ui_movies::Child(base, node, item == 1 ? 11 : 10)).set_visible(1);
   }
 }
 
@@ -575,13 +588,13 @@ uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint3
   ITC_NATIVE_RUNNING("sub_822036E8 TuningScreen::UpdateItems");
   const uint32_t screen = uint32_t(r3_in);
   const uint32_t frame = Frame(base, sp, 128);
-  const uint32_t mappers = Load(base, kControllerEntries) * 8 + kMapperEntries;
+  const uint32_t mappers = PlayerMappers(base);
   const uint32_t entry = MovieEntry(base, frame, 13);
   const int32_t state = int32_t(TS(base, screen).state());
   const uint32_t movie = Load(base, entry);
   uint64_t r3 = entry;
-  auto asks = [&] { return int32_t(Load(base, mappers + 4)) != 1; };
-  auto mapper = [&] { return Load(base, mappers); };
+  auto asks = [&] { return int32_t(MapperEntry(base, mappers).unread()) != 1; };
+  auto mapper = [&] { return MapperEntry(base, mappers).mapper().address; };
   if (state == 27) {
     // HighlightItem (sub_82203400, its plain C++) on +30756,
     // r4 0 with 164 held, 1 with slot 11's 164.
@@ -676,8 +689,7 @@ uint64_t UpdateItems(uint8_t* base, const GuestCall& call, uint64_t r3_in, uint3
                                               steps::Lfs(base, second ? 0x8200CAE8u : 0x8200CAF0u)));
   }
   const double half = steps::Lfs(base, 0x82001BE4);
-  Store(base, node + 20,
-        uint32_t(steps::Fctiwz(
+  UiNode(base, node).set_pivot_x(uint32_t(steps::Fctiwz(
             steps::Fmuls(steps::Lfs(base, UiNode(base, looked).width_address()), half))));
   const double height = steps::Fmuls(steps::Lfs(base, UiNode(base, looked).height_address()), half);
   steps::Stfs(base, UiNode(base, node).rotation_address(), zero);
@@ -703,16 +715,17 @@ constexpr uint32_t kGet82 = 0x820CBC90;  // AeroParts::Get82(out, parts, level)
 // it.
 uint64_t AeroText(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_t frame,
                   bool native_specs) {
-  const uint32_t save = TS(base, screen).save_data().address;
-  const uint32_t list = save + 6120;
-  uint32_t count = Load(base, save + 0x19920);
-  uint32_t at = uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 204)))) * 4 + list;
+  const schema::SaveData save(base, TS(base, screen).save_data().address);
+  const uint32_t list = save.garage_address();
+  uint32_t count = save.selected_car();
+  uint32_t at =
+      uint32_t(int32_t(int16_t(schema::CareerGarageList(base, list).head()))) * 4 + list;
   while (count != 0) {
     at = uint32_t(int32_t(int16_t(guest::LoadU16(base, at)))) * 4 + list;
     count--;
   }
   const int32_t slot = int16_t(guest::LoadU16(base, at + 2));
-  const uint32_t car = Load(base, uint32_t(slot * 1968) + list + 224);
+  const uint32_t car = schema::CarMakersCar(base, uint32_t(slot * 1968) + list + 212).car_id();
   const uint32_t parts_out = frame + 176, parts = frame + 96;
   uint32_t parts_at = parts_out;
   if (native_specs) {
@@ -742,11 +755,11 @@ uint64_t AeroText(uint8_t* base, const GuestCall& call, uint32_t screen, uint32_
   };
   const uint32_t kit77 = get(kGet77, frame + 144, uint32_t(TS(base, screen).type()), 0x821D2E80,
                              car_specs::AeroPart77);
-  const uint32_t a = Load(base, kit77 + 24);
+  const uint32_t a = schema::AeroPartRecord(base, kit77).flags();
   const uint32_t kit82 = get(kGet82, frame + 224, TS(base, screen).aero9_type(), 0x821D2EA0,
                              car_specs::AeroPart82);
   const bool none = TS(base, screen).aero9_type() == 0;
-  const uint32_t b = Load(base, kit82 + 24);
+  const uint32_t b = schema::AeroPartRecord(base, kit82).flags();
   if (none || (b & 2) != 0) {
     return (a & 1) != 0 ? 629 : 630;
   }

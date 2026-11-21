@@ -12,6 +12,12 @@
 #include "car_specs/car_specs.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/car_makers.h"
+#include "schema/car_specs.h"
+#include "schema/career.h"
+#include "schema/garage_screen.h"
+#include "schema/race_event.h"
+#include "schema/tuning_screen.h"
 #include "tuning_pages/tuning_pages.h"
 #include "tuning_screen/tuning_screen.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -56,162 +62,170 @@ constexpr uint32_t kMemcpy = 0x825A7410;        // memcpy(to, from, bytes)
 constexpr uint32_t kGetCarParts = 0x820C9E00;   // Params::GetCarParts(out, car)
 constexpr uint32_t kCountBodyKits = 0x820CBD20; // CountBodyKits(parts)
 
+// The screen (tuning-screen.toml) and the selected garage car's car data
+// (its +212; car-makers.toml's CarMakersCar, the head of a GarageCar).
+using Screen = schema::TuningScreen;
+using Car = schema::CarMakersCar;
+
 }  // namespace
 
 void LoadInteriorSlots(uint8_t* base, uint32_t screen) {
   ITC_NATIVE_RUNNING("sub_821DE280 TuningScreen::LoadInteriorSlots");
-  const uint32_t car = tuning_screen::SelectedGarageCar(base, screen);
-  if (int32_t(Load(base, car + 224)) == 10) {
-    Store(base, screen + 25192, 0);
+  const Car car(base, tuning_screen::SelectedGarageCar(base, screen) + 212);
+  if (int32_t(car.car_id()) == 10) {
+    Screen(base, screen).set_interior_slot_available_4(0);
   }
 }
 
 uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1) {
   ITC_NATIVE_RUNNING("sub_821DA4B0 TuningScreen::LoadCurrentChoices");
-  const uint32_t s = screen;
+  const Screen ts(base, screen);
   const uint32_t frame = Frame(base, uint32_t(r1), kLoadCurrentChoicesFrame);
-  const uint32_t c = tuning_screen::SelectedGarageCar(base, s) + 212;
-  auto at = [&](uint32_t offset) { return Load(base, c + offset); };
-  auto set = [&](uint32_t offset, uint32_t value) { Store(base, s + offset, value); };
+  const Car car(base, tuning_screen::SelectedGarageCar(base, screen) + 212);
+  // The garage car's words CarMakersCar doesn't name (car-makers.toml).
+  auto at = [&](uint32_t offset) { return Load(base, car.address + offset); };
+  const uint32_t tables = ts.part_tables_address();  // the screen's +34104
   // The power and power train tables' rows by the part set (read again
-  // after the first store, as the original).
-  set((Load(base, s + tuning_screen::kPartSet) + 8576) * 4, at(1656));
-  set((Load(base, s + tuning_screen::kPartSet) + 8701) * 4, at(1664));
-  set(35020, at(1672));
-  set(35024, at(1668));
-  set(35140, at(1676));
-  set(35228, at(1680));
-  set(35316, at(1684));
-  set(35404, at(1688));
-  set(35492, at(1696));
+  // after the first store, as the original): +34304 and +34804.
+  Store(base, tables + 200 + ts.price_class() * 4, car.engine_stage());
+  Store(base, tables + 700 + ts.price_class() * 4, car.power_part());
+  ts.set_power2_level(at(1672));
+  ts.set_power2_type(car.cooling());
+  ts.set_power3_level(at(1676));
+  ts.set_train0_level(at(1680));
+  ts.set_train1_level(at(1684));
+  ts.set_train2_level(at(1688));
+  ts.set_train3_level(car.power_train4());
   // The gear set: 0 3, 4 1, 5 4, 6 2, others 0.
-  switch (int32_t(at(1692))) {
-    case 0: set(35496, 3); break;
-    case 4: set(35496, 1); break;
-    case 5: set(35496, 4); break;
-    case 6: set(35496, 2); break;
-    default: set(35496, 0); break;
+  switch (int32_t(car.power_train3())) {
+    case 0: ts.set_train3_type(3); break;
+    case 4: ts.set_train3_type(1); break;
+    case 5: ts.set_train3_type(4); break;
+    case 6: ts.set_train3_type(2); break;
+    default: ts.set_train3_type(0); break;
   }
   {
     const uint32_t low = at(1704);
     if (int32_t(low) == 0) {
-      set(35608, 0);
+      ts.set_train4_level(0);
     } else {
-      set(35608, at(1700) * 3 + low);
+      ts.set_train4_level(at(1700) * 3 + low);
     }
   }
-  set(35708, at(1708));
-  set(35820, 0);
-  set(35824, 0);
-  set(35948, at(1716));
-  if (int32_t(at(1716)) == 0) {
-    set(35952, 0);
+  ts.set_body_choice(car.body_level());
+  ts.set_tire_both_choice(0);
+  Store(base, tables + 1720, 0);  // +35824
+  ts.set_tire_front_choice(car.front_tire_grade());
+  if (int32_t(car.front_tire_grade()) == 0) {
+    ts.set_tire_front_option(0);
   } else {
-    set(35952, at(1712) - 1);
+    ts.set_tire_front_option(at(1712) - 1);
   }
-  set(36076, at(1724));
-  if (int32_t(at(1724)) == 0) {
-    set(36080, 0);
+  ts.set_tire_rear_choice(car.rear_tire_grade());
+  if (int32_t(car.rear_tire_grade()) == 0) {
+    ts.set_tire_rear_option(0);
   } else {
-    set(36080, at(1720) - 1);
+    ts.set_tire_rear_option(at(1720) - 1);
   }
   {
-    const bool plain = int32_t(Load(base, s + 25172)) == 0;
-    set(36164, at(1744));
-    set(36208, at(1748));
-    set(36252, at(1752));
-    const int32_t v = int32_t(at(1756));
+    const bool plain = int32_t(ts.aero3_type_remap()) == 0;
+    ts.set_aero0_type(car.aero_item0());
+    ts.set_aero1_type(car.aero_item1());
+    ts.set_aero2_type(car.aero_item2());
+    const int32_t v = int32_t(car.aero_item3());
     if (plain) {
-      set(36300, uint32_t(v));
+      ts.set_aero3_type(uint32_t(v));
     } else if (v == 0) {
-      set(36300, 0);
+      ts.set_aero3_type(0);
     } else if (v > 0 && v < 11) {
-      set(36300, uint32_t(v + 1));
+      ts.set_aero3_type(uint32_t(v + 1));
     } else {
-      set(36300, 1);
+      ts.set_aero3_type(1);
     }
   }
-  set(36368, at(1760));
-  switch (int32_t(at(1764))) {
+  ts.set_aero4_type(car.bonnet());
+  switch (int32_t(car.bonnet_color_kind())) {
     case 0:
-      set(36372, 0);
-      set(36376, 0);
+      ts.set_aero4_color_kind(0);
+      ts.set_aero4_color(0);
       break;
     case 1:
-      set(36376, 0);
-      set(36372, 1);
+      ts.set_aero4_color(0);
+      ts.set_aero4_color_kind(1);
       break;
     case 2:
-      set(36376, 1);
-      set(36372, 1);
+      ts.set_aero4_color(1);
+      ts.set_aero4_color_kind(1);
       break;
     default: break;
   }
-  set(36436, at(1768));
-  set(36472, at(1772));
-  set(36508, at(1776));
-  set(36544, at(1780));
-  set(36588, at(1784));
-  set(27836, at(1728));
-  set(27848, at(1732));
-  set(27840, at(1736));
-  set(27852, at(1740));
-  set(36612, at(1792));
-  set(36636, uint32_t(int32_t(int8_t(guest::LoadU8(base, c + 1568)))));
-  set(36668, at(1796));
+  ts.set_aero5_type(car.aero_item6());
+  ts.set_aero6_type(car.aero_item7());
+  ts.set_aero7_type(car.aero_item8());
+  ts.set_aero8_type(car.aero_item9());
+  ts.set_aero9_type(car.aero_kit());
+  ts.set_saved_wheel_front(at(1728));
+  ts.set_saved_wheel_4(at(1732));
+  ts.set_saved_wheel_rear(at(1736));
+  ts.set_saved_wheel_5(at(1740));
+  ts.set_exterior1_choice(car.exterior_item1());
+  ts.set_exterior2_choice(uint32_t(int32_t(int8_t(guest::LoadU8(base, car.setting_bytes_address())))));
+  ts.set_exterior3_choice(at(1796));
   // The paint and lights: the car's own words when its paint is -2, else
-  // the car spec's entry for it.
-  const int32_t paint = int16_t(guest::LoadU16(base, c + 0));
+  // the car spec's paint slot for it.
+  const int32_t paint = int16_t(car.paint_pick());
   if (paint == -2) {
-    set(30476, guest::LoadU16(base, c + 8));
-    set(30480, guest::LoadU8(base, c + 10));
-    set(30484, guest::LoadU8(base, c + 11));
-    set(30488, uint32_t(int32_t(int16_t(guest::LoadU16(base, c + 6)))));
+    ts.set_saved_paint_0(car.paint_hue());
+    ts.set_saved_paint_1(car.paint_saturation());
+    ts.set_saved_paint_2(car.paint_value());
+    ts.set_saved_paint_3(uint32_t(int32_t(int16_t(car.paint_kind()))));
   } else {
-    const uint32_t spec = car_specs::GetCarSpec(base, at(12));
-    const uint32_t entry = spec + uint32_t(paint) * 20;
-    set(30476, guest::LoadU16(base, entry + 8120));
-    set(30480, guest::LoadU8(base, entry + 8122));
-    set(30484, guest::LoadU8(base, entry + 8123));
-    set(30488, guest::LoadU16(base, entry + 8116));
+    const schema::CarSpec spec(base, car_specs::GetCarSpec(base, car.car_id()));
+    const schema::CarPaintSlot slot(base, spec.paints_address() + 8 + uint32_t(paint) * 20);
+    ts.set_saved_paint_0(slot.hue0());
+    ts.set_saved_paint_1(slot.saturation0());
+    ts.set_saved_paint_2(slot.value0());
+    ts.set_saved_paint_3(slot.type());
   }
-  // The three vinyl layers (car c + 1588 + 20i, screen s + 30660 + 4i, w).
+  // The three vinyl layers (the car's 20-byte layers from +1588, the
+  // screen's light kit words a = +30580 + 4i and b = +30660 + 4i).
   const double degrees = double(guest::LoadFloat(base, kDegrees));
   auto angle = [&](uint32_t field) {
     const double value = double(float(double(guest::LoadFloat(base, field)) * degrees));
     return uint32_t(TruncateWord(value));
   };
   for (uint32_t i = 0; i < 3; i++) {
-    const uint32_t e = c + 1588 + 20 * i;
-    const uint32_t w = s + 30660 + 4 * i;
+    const uint32_t e = car.layer0_a_address() + 20 * i;
+    const uint32_t a = ts.light_kit_a_address() + 4 * i;
+    const uint32_t b = ts.light_kit_b_address() + 4 * i;
     const int32_t kind = int32_t(Load(base, e));
     if (kind == 0) {
-      Store(base, w - 80, 0);
-      Store(base, w + 0, 0);
-      Store(base, w - 64, 180);
-      Store(base, w - 48, 180);
-      Store(base, w - 32, 180);
-      Store(base, w + 16, 0);
-      Store(base, w + 32, 180);
+      Store(base, a + 0, 0);
+      Store(base, b + 0, 0);
+      Store(base, a + 16, 180);
+      Store(base, a + 32, 180);
+      Store(base, a + 48, 180);
+      Store(base, b + 16, 0);
+      Store(base, b + 32, 180);
     } else if (kind == 1) {
-      Store(base, w - 80, 1);
-      Store(base, w + 0, 0);
-      Store(base, w - 64, angle(e + 8));
-      Store(base, w - 48, angle(e + 12));
+      Store(base, a + 0, 1);
+      Store(base, b + 0, 0);
+      Store(base, a + 16, angle(e + 8));
+      Store(base, a + 32, angle(e + 12));
       const double value = double(float(double(guest::LoadFloat(base, e + 16)) * degrees));
-      Store(base, w + 16, 0);
-      Store(base, w + 32, 180);
-      Store(base, w - 32, uint32_t(TruncateWord(value)));
+      Store(base, b + 16, 0);
+      Store(base, b + 32, 180);
+      Store(base, a + 48, uint32_t(TruncateWord(value)));
     } else if (kind >= 2 && kind <= 11) {
-      Store(base, w - 80, 0);
-      Store(base, w + 0, 1);
-      Store(base, w - 64, 180);
-      Store(base, w - 48, 180);
-      Store(base, w - 32, 180);
-      Store(base, w - 16, 0);
-      Store(base, w + 16, Load(base, e) - 2);
-      Store(base, w + 32, angle(e + 16));
-      Store(base, w + 48, Load(base, e + 4));
+      Store(base, a + 0, 0);
+      Store(base, b + 0, 1);
+      Store(base, a + 16, 180);
+      Store(base, a + 32, 180);
+      Store(base, a + 48, 180);
+      Store(base, a + 64, 0);
+      Store(base, b + 16, Load(base, e) - 2);
+      Store(base, b + 32, angle(e + 16));
+      Store(base, b + 48, Load(base, e + 4));
     }
   }
   // The mirror table in the frame (+80 to +108), indexed unchecked by the
@@ -222,20 +236,24 @@ uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1) {
     for (const auto& [offset, value] : kTable) {
       Store(base, frame + offset, value);
     }
-    for (const uint32_t field : {30644u, 30648u, 30652u, 30656u, 30708u, 30712u, 30716u, 30720u}) {
-      set(field, Load(base, frame + 80 + at(1592) * 4));
+    const uint32_t a = ts.light_kit_a_address(), b = ts.light_kit_b_address();
+    // +30644 to +30656, +30708 to +30720.
+    for (const uint32_t field : {a + 64, a + 68, a + 72, a + 76, b + 48,
+                                 ts.unknown_30712_address(), ts.unknown_30716_address(),
+                                 ts.unknown_30720_address()}) {
+      Store(base, field, Load(base, frame + 80 + car.layer0_b() * 4));
     }
   }
   // The neon: v 0 0; 1 and 2 by w 0 to 3: 3, 1, 0, 2; 3 by w 0 to 2: 2, 0,
   // 1; 4 by w 0 to 3: 2, 0, 1, 3; others nothing.
-  set(36708, at(1800));
+  ts.set_interior0_choice(car.interior_item0());
   {
-    const uint32_t v = at(1800);
+    const uint32_t v = car.interior_item0();
     int64_t value = -1;
     if (v == 0) {
       value = 0;
     } else if (v <= 4) {
-      const uint32_t w = at(1804);
+      const uint32_t w = car.interior_item1();
       if (v <= 2) {
         static constexpr int64_t kValues[4] = {3, 1, 0, 2};
         value = w < 4 ? kValues[w] : -1;
@@ -248,48 +266,49 @@ uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1) {
       }
     }
     if (value >= 0) {
-      set(36712, uint32_t(value));
+      ts.set_interior0_level(uint32_t(value));
     }
   }
-  set(36752, at(1808));
-  set(36796, at(1812));
+  ts.set_interior1_choice(car.interior_item2());
+  ts.set_interior2_choice(car.interior_item3());
   {
-    const uint32_t u = at(1816);
+    const uint32_t u = car.accessory();
     if (u < 4) {
-      set(33616, 3 - u);
+      ts.set_interior_choice(3 - u);
     }
-    const int32_t x = int32_t(Load(base, s + 33616));
+    const int32_t x = int32_t(ts.interior_choice());
     if (x == 0) {
-      set(33620, 0);
+      ts.set_interior_choice_word(0);
     } else {
-      const uint32_t v = at(1820);
+      const uint32_t v = car.accessory_variant();
       if (x == 1 && int32_t(v) == 3) {
-        set(33620, 4);
+        ts.set_interior_choice_word(4);
       } else if (x == 1 && int32_t(v) == 4) {
-        set(33620, 3);
+        ts.set_interior_choice_word(3);
       } else {
-        set(33620, v);
+        ts.set_interior_choice_word(v);
       }
     }
   }
-  // The five sticker layers (car c + 1824 + 12i, screen +33800 + 4i), the
-  // tens from the frame's table (+80 to +92: 3, 2, 1, 0) indexed unchecked
-  // by the layer's +8 - 1 (reading the mirror table's words past it).
+  // The five sticker layers (the car's choices from +1824, the screen's
+  // choice codes +33800 + 4i), the tens from the frame's table (+80 to
+  // +92: 3, 2, 1, 0) indexed unchecked by the layer's +8 - 1 (reading the
+  // mirror table's words past it).
   Store(base, frame + 80, 3);
   Store(base, frame + 84, 2);
   Store(base, frame + 88, 1);
   Store(base, frame + 92, 0);
   for (uint32_t i = 0; i < 5; i++) {
-    const uint32_t e = c + 1824 + 12 * i;
-    const uint32_t layer = s + 33800 + 4 * i;
-    const uint32_t v = Load(base, e + 8);
+    const schema::CarMakersCarChoice choice(base, car.choice0_a_address() + 12 * i);
+    const uint32_t layer = ts.choice_code_0_address() + 4 * i;
+    const uint32_t v = choice.c();
     if (int32_t(v) == 0) {
       Store(base, layer, 0xFFFFFFFFu);
       continue;
     }
     auto tens = [&] { return Load(base, frame + 76 + v * 4) * 10; };
-    const int32_t kind = int32_t(Load(base, e + 0));
-    const uint32_t unit = Load(base, e + 4);
+    const int32_t kind = int32_t(choice.a());
+    const uint32_t unit = choice.b();
     if (kind == 1) {
       if (unit == 0) {
         Store(base, layer, tens() + 1);
@@ -313,45 +332,46 @@ uint64_t LoadCurrentChoices(uint8_t* base, uint32_t screen, uint64_t r1) {
 uint64_t SetUp(uint8_t* base, uint64_t r3, uint64_t r1, bool native_specs, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_821E1B48 TuningScreen::SetUp");
   const uint32_t s = uint32_t(r3);
+  const Screen ts(base, s);
   const uint32_t frame = Frame(base, uint32_t(r1), kSetUpFrame);
   const uint32_t car = frame + 176;
   // The save, the career's pick (s +8 to +27), the money and the day (at
   // most 999; its weekday by signed division).
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  Store(base, s + tuning_screen::kSaveData, save);
+  const schema::CareerSave save(base, vehicle_accessors::SaveDataOf(base, 0));
+  ts.set_save_data(save.address);
   for (uint32_t i = 0; i < 5; i++) {
-    Store(base, s + 20792 + 4 * i, Load(base, save + 8 + 4 * i));
+    Store(base, ts.career_pick_address() + 4 * i, Load(base, save.pick_address() + 4 * i));
   }
-  Store(base, s + 25116, Load(base, save + 6116));
-  const int32_t day = int32_t(Load(base, save + 6100));
-  Store(base, s + 25092, uint32_t(day > 999 ? 999 : day));
-  Store(base, s + 25096, uint32_t(day - day / 7 * 7));
+  ts.set_money(save.money());
+  const int32_t day = int32_t(save.day());
+  ts.set_day(uint32_t(day > 999 ? 999 : day));
+  ts.set_weekday(uint32_t(day - day / 7 * 7));
   // The selected garage car in the frame's car object.
-  const uint32_t garage = tuning_screen::SelectedGarageCar(base, s) + 212;
+  const Car garage(base, tuning_screen::SelectedGarageCar(base, s) + 212);
   calls.Call(kCarInit, frame, 0x821E1C08, car);
-  if (!native::Buffers_Memcpy(base, car, garage, 1884, 0x821E1C18)) {
-    calls.Call(kMemcpy, frame, 0x821E1C18, car, garage, 1884);
+  if (!native::Buffers_Memcpy(base, car, garage.address, 1884, 0x821E1C18)) {
+    calls.Call(kMemcpy, frame, 0x821E1C18, car, garage.address, 1884);
   }
   calls.Call(kCarRefresh, frame, 0x821E1C20, car);
-  const uint32_t p = vehicle_accessors::ObjectRecord1888(car);
-  Store(base, s + 20784, guest::LoadU8(base, p + 69));
-  Store(base, s + 20788, guest::LoadU8(base, p + 130));
+  const schema::CarSpecCopies p(base, vehicle_accessors::ObjectRecord1888(car));
+  ts.set_spec_byte_69(p.turbo());
+  ts.set_spec_byte_130(p.unknown_130());
   // The price class.
   uint32_t set = 0;
-  if (int32_t(Load(base, garage + 12)) == 8) {
+  if (int32_t(garage.car_id()) == 8) {
     set = 4;
   } else {
-    const uint32_t kind = guest::LoadU8(base, p + 69);
+    const uint32_t kind = p.turbo();
     if (kind == 1) {
-      set = guest::LoadU8(base, p + 68) == 7 ? 2 : 0;
+      set = p.engine_type() == 7 ? 2 : 0;
     } else if (kind == 0) {
-      set = guest::LoadU8(base, p + 68) == 7 ? 3 : 1;
+      set = p.engine_type() == 7 ? 3 : 1;
     }
   }
-  Store(base, s + tuning_screen::kPartSet, set);
+  ts.set_price_class(set);
   // The car's parts (the selected car found again) copied to frame + 80;
   // the body kits counted.
-  const uint32_t id = Load(base, tuning_screen::SelectedGarageCar(base, s) + 224);
+  const uint32_t id = Car(base, tuning_screen::SelectedGarageCar(base, s) + 212).car_id();
   const uint32_t parts_out = frame + 128, parts = frame + 80;
   uint32_t parts_at = parts_out;
   if (native_specs) {
@@ -368,16 +388,18 @@ uint64_t SetUp(uint8_t* base, uint64_t r3, uint64_t r1, bool native_specs, const
   }
   const uint32_t kits = native_specs ? car_specs::CountBodyKits(base, parts)
                                      : uint32_t(calls.Call(kCountBodyKits, frame, 0x821E1D20, parts));
-  Store(base, s + 25168, int32_t(kits) == 1 ? 0 : 1);
-  for (uint32_t offset = 25176; offset <= 25192; offset += 4) {
-    Store(base, s + offset, 1);
-  }
+  ts.set_aero9_third_type(int32_t(kits) == 1 ? 0 : 1);
+  ts.set_interior_slot_available_0(1);
+  ts.set_interior_slot_available_1(1);
+  ts.set_interior_slot_available_2(1);
+  ts.set_interior_slot_available_3(1);
+  ts.set_interior_slot_available_4(1);
   LoadInteriorSlots(base, s);
-  Store(base, s + 25172, Load(base, p + 120) != 0 ? 1 : 0);
+  ts.set_aero3_type_remap(p.spec_120() != 0 ? 1 : 0);
   LoadCurrentChoices(base, s, (r1 & 0xFFFFFFFF00000000ull) | frame);
   // The aero items available, then set by the body kit.
   for (uint32_t item = 0; item < 10; item++) {
-    Store(base, s + 25128 + 4 * item, 1);
+    Store(base, ts.aero_available_0_address() + 4 * item, 1);
   }
   const tuning_screen::GuestCall call = [&calls](uint32_t function,
                                                  std::initializer_list<uint64_t> args,

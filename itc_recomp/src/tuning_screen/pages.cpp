@@ -9,6 +9,8 @@
 #include "base/log.h"
 #include "camera_modes/steps.h"
 #include "guest.h"
+#include "schema/game_modes.h"
+#include "schema/ui_movies_game.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -46,10 +48,11 @@ void PostDialogMessage(uint8_t* base, uint32_t dispatcher, uint32_t event) {
   const uint32_t count = d.message_count() + 1;
   const uint32_t index = d.message_first() + count - 1;
   d.set_message_count(count);
-  const uint32_t record = d.messages_address() + (index - (index / 50) * 50) * 12;
-  Store(base, record + 8, 0);
-  Store(base, record + 4, 0);
-  Store(base, record + 0, event);
+  const schema::ModeMessage record(base,
+                                   d.messages_address() + (index - (index / 50) * 50) * 12);
+  record.set_arg1(0);
+  record.set_arg0(0);
+  record.set_id(event);
 }
 
 // The two dialogs' texts on movie 16: string `title` into (-1, 0), 2 into
@@ -73,7 +76,8 @@ namespace {
 void CopySetWords(uint8_t* base, uint32_t screen, uint32_t movie, int32_t set) {
   auto copy = [&](uint32_t from, uint32_t to) {
     for (uint32_t k = 0; k < 6; k++) {
-      const uint32_t at = Load(base, Load(base, movie + 28) + to + 4 * k);
+      const uint32_t textures = Load(base, schema::UiMovie(base, movie).textures_address());
+      const uint32_t at = Load(base, textures + to + 4 * k);
       Store(base, at, Load(base, screen + from + 36 * k));
     }
   };

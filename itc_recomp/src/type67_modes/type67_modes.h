@@ -217,7 +217,7 @@ struct ModeLayout {
   uint32_t leave_message;
   uint32_t leaving;    // the Leaving function (the delegate's after NextMode)
   uint32_t tear_down;  // the TearDown function (after Leaving)
-  uint32_t car;        // the mode's car's +1972 word (-1: made again)
+  uint32_t car;        // the mode's car's +1972 word (Type67Car::source; the code uses the view)
   uint32_t next_lr, leaving_lr;  // the Dispatch calls' return addresses
   const MachineAt* next_checks;  // NextMode's, any in state 10
   uint32_t next_count;

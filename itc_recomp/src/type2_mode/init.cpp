@@ -9,6 +9,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/race_event.h"
+#include "schema/race_states.h"
 #include "schema/type2_mode.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -85,8 +87,9 @@ uint64_t Init(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
     StoreU32(base, m.handlers_address() + (count << 2), block() + offset);
   }
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
-  int32_t day = int32_t(LoadU32(base, save + 6100));
-  const int32_t garage_count = int16_t(guest::LoadU16(base, save + 6328));
+  const schema::SaveData save_data(base, save);
+  int32_t day = int32_t(save_data.day());
+  const int32_t garage_count = int16_t(save_data.garage_count());
   if (day > 999) {
     day = 999;
   }
@@ -95,7 +98,7 @@ uint64_t Init(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   }
   uint32_t before = G::mode_before(base);
   if (before != 4) {
-    const int32_t again = int32_t(LoadU32(base, save + 6100));
+    const int32_t again = int32_t(save_data.day());
     if (again <= 999 && again == 1) {
       calls.Call(kCareerNextDay, frame, 0x821975C4, save);
       before = G::mode_before(base);
@@ -105,7 +108,7 @@ uint64_t Init(uint8_t* base, uint32_t mode, uint32_t sp, const Calls& calls) {
   if (garage_count <= 0) {
     first = 4;
   } else if (before == 1) {
-    const uint32_t race_mode = LoadU32(base, G::race_data(base) + 0xA3AF4);
+    const uint32_t race_mode = G::race_data(base).race_mode();
     if (race_mode == 0 || race_mode == 1) {
       first = 3;
     }

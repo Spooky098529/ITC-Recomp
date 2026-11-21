@@ -5,6 +5,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/material_passes.h"
+#include "schema/tuning_screen.h"
 #include "strings_and_font/steps.h"
 #include "tuning_screen/tuning_screen.h"
 #include "ui_movies/game.h"
@@ -16,6 +18,9 @@
 namespace tuning_pages {
 
 namespace {
+
+// The screen (tuning-screen.toml's TuningScreen).
+schema::TuningScreen Screen(uint8_t* base, uint32_t s) { return schema::TuningScreen(base, s); }
 
 using G = schema::TuningPagesGlobals;
 
@@ -43,13 +48,13 @@ uint32_t ShowPricePanel(uint8_t* base, uint32_t screen, uint32_t sp) {
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = Load(base, tuning_screen::MovieEntry(base, frame, 2));
   uint32_t node = ui_movies::FindNode(base, movie, kAll, 19);
-  Store(base, node + 80, 1);
-  const int32_t state = int32_t(Load(base, screen + 9652));
-  const bool hide = state == 16 ? int32_t(Load(base, screen + 25204)) == 0
+  schema::UiMovieNode(base, node).set_visible(1);
+  const int32_t state = int32_t(Screen(base, screen).state());
+  const bool hide = state == 16 ? int32_t(Screen(base, screen).part_group()) == 0
                                 : state == 9 || state == 10 || state == 11 || state == 14;
   if (hide) {
     node = ui_movies::FindNode(base, movie, kAll, 19);
-    Store(base, node + 80, 0);
+    schema::UiMovieNode(base, node).set_visible(0);
   }
   return node;
 }
@@ -61,9 +66,9 @@ uint32_t SetBrandLogo(uint8_t* base, uint32_t screen, uint32_t sp) {
   const uint32_t frame = Frame(base, sp, 112);
   const uint32_t movie = Load(base, tuning_screen::MovieEntry(base, frame, 2));
   const uint32_t child = ui_movies::Child(base, ui_movies::FindNode(base, movie, kAll, 17), 0);
-  const uint32_t brand = Load(base, screen + 25204) - 1;
+  const uint32_t brand = Screen(base, screen).part_group() - 1;
   if (brand <= 15) {
-    Store(base, child + 108, kPictures[brand]);
+    schema::UiMovieNode(base, child).set_texture_entry(kPictures[brand]);
   }
   return child;
 }
@@ -71,11 +76,13 @@ uint32_t SetBrandLogo(uint8_t* base, uint32_t screen, uint32_t sp) {
 void HsvToRgb(uint8_t* base, uint32_t out, uint32_t in, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8224AB50 Color::HsvToRgb");
   namespace steps = strings_and_font::steps;
-  const double s = Lfs(base, in + 4);
+  const schema::HsvColor hsv(base, in);  // material-passes.toml's
+  const schema::PaintRgb rgb(base, out);
+  const double s = double(hsv.saturation());
   if (s == Lfs(base, 0x82000A34)) {
-    Stfs(base, out + 0, Lfs(base, in + 8));
-    Stfs(base, out + 4, Lfs(base, in + 8));
-    Stfs(base, out + 8, Lfs(base, in + 8));
+    rgb.set_red(float(double(hsv.value())));
+    rgb.set_green(float(double(hsv.value())));
+    rgb.set_blue(float(double(hsv.value())));
     return;
   }
   // The 16 input bytes copied below the stack pointer and read back.
@@ -105,22 +112,22 @@ void HsvToRgb(uint8_t* base, uint32_t out, uint32_t in, uint32_t sp) {
   q = double(float(q * v));
   t = double(float(t * v));
   switch (sector) {
-    case 0: Stfs(base, out + 4, t); Stfs(base, out + 8, p); Stfs(base, out + 0, v); break;
-    case 1: Stfs(base, out + 0, q); Stfs(base, out + 4, v); Stfs(base, out + 8, p); break;
-    case 2: Stfs(base, out + 0, p); Stfs(base, out + 4, v); Stfs(base, out + 8, t); break;
-    case 3: Stfs(base, out + 0, p); Stfs(base, out + 4, q); Stfs(base, out + 8, v); break;
-    case 4: Stfs(base, out + 0, t); Stfs(base, out + 4, p); Stfs(base, out + 8, v); break;
-    case 5: Stfs(base, out + 4, p); Stfs(base, out + 8, q); Stfs(base, out + 0, v); break;
+    case 0: rgb.set_green(float(t)); rgb.set_blue(float(p)); rgb.set_red(float(v)); break;
+    case 1: rgb.set_red(float(q)); rgb.set_green(float(v)); rgb.set_blue(float(p)); break;
+    case 2: rgb.set_red(float(p)); rgb.set_green(float(v)); rgb.set_blue(float(t)); break;
+    case 3: rgb.set_red(float(p)); rgb.set_green(float(q)); rgb.set_blue(float(v)); break;
+    case 4: rgb.set_red(float(t)); rgb.set_green(float(p)); rgb.set_blue(float(v)); break;
+    case 5: rgb.set_green(float(p)); rgb.set_blue(float(q)); rgb.set_red(float(v)); break;
     default: return;
   }
-  Stfs(base, out + 12, one);
+  rgb.set_alpha(float(one));
 }
 
 
 uint32_t IsSlotAvailable(uint8_t* base, uint32_t screen, uint64_t slot) {
   ITC_NATIVE_RUNNING("sub_821CE188 TuningScreen::IsSlotAvailable");
-  if (int32_t(Load(base, screen + 9656)) == 6 && guest::LoadU8(base, screen + 9660) == 3 &&
-      int32_t(Load(base, screen + 33540)) == 1) {
+  if (int32_t(Screen(base, screen).category()) == 6 && Screen(base, screen).item() == 3 &&
+      int32_t(Screen(base, screen).interior_mode()) == 1) {
     return Load(base, uint32_t((slot + 6294) << 2) + screen);
   }
   return 1;
@@ -194,8 +201,8 @@ uint32_t SetPaintGradients(uint8_t* base, uint32_t screen, uint32_t sp) {
   Store(base, frame + 100, one);
   const double scale = double(G::byte_scale(base));
   // The value bar: h, s 1.0, v × the scale.
-  const double v = ThroughFrame(base, frame + 80, Load(base, screen + 30452));
-  const double h = ThroughFrame(base, frame + 88, Load(base, screen + 30444));
+  const double v = ThroughFrame(base, frame + 80, Screen(base, screen).paint_value());
+  const double h = ThroughFrame(base, frame + 88, Screen(base, screen).paint_hue());
   Stfs(base, frame + 104, Fmuls(v, scale));
   Stfs(base, frame + 96, h);
   HsvToRgb(base, frame + 112, frame + 96, frame);
@@ -209,8 +216,8 @@ uint32_t SetPaintGradients(uint8_t* base, uint32_t screen, uint32_t sp) {
   Store(base, frame + 104, one);
   VertexColor(base, a[3], rgb[0], rgb[1], rgb[2]);
   // The saturation bar: h, s × the scale, v 1.0.
-  const double s = ThroughFrame(base, frame + 88, Load(base, screen + 30448));
-  const double h2 = ThroughFrame(base, frame + 80, Load(base, screen + 30444));
+  const double s = ThroughFrame(base, frame + 88, Screen(base, screen).paint_saturation());
+  const double h2 = ThroughFrame(base, frame + 80, Screen(base, screen).paint_hue());
   Stfs(base, frame + 96, h2);
   Stfs(base, frame + 100, Fmuls(s, scale));
   HsvToRgb(base, frame + 112, frame + 96, frame);

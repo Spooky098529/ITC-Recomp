@@ -714,7 +714,9 @@ struct Type2ScreensGlobals {
   static void set_plate_pages(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8430u, v); }
   static constexpr uint32_t plate_pages_address() { return 0x826D8430u; }
   // a MenuList (72 bytes, race-screens.toml)
-  static View plate_list(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D8434u)); }
+  template <typename T = MenuList>
+  static T plate_list(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D8434u)); }
+  static void set_plate_list(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D8434u, v.address); }
   static void set_plate_list(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8434u, v); }
   static constexpr uint32_t plate_list_address() { return 0x826D8434u; }
   template <typename T = PlateEditorData>
@@ -729,11 +731,15 @@ struct Type2ScreensGlobals {
   static void set_build_pages(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D843Cu, v); }
   static constexpr uint32_t build_pages_address() { return 0x826D843Cu; }
   // the level's MenuList (72 bytes)
-  static View build_list(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D8440u)); }
+  template <typename T = MenuList>
+  static T build_list(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D8440u)); }
+  static void set_build_list(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D8440u, v.address); }
   static void set_build_list(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8440u, v); }
   static constexpr uint32_t build_list_address() { return 0x826D8440u; }
   // the groups' MenuList (72 bytes)
-  static View build_group_list(uint8_t* base) { return View(base, guest::LoadU32(base, 0x826D8444u)); }
+  template <typename T = MenuList>
+  static T build_group_list(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D8444u)); }
+  static void set_build_group_list(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D8444u, v.address); }
   static void set_build_group_list(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8444u, v); }
   static constexpr uint32_t build_group_list_address() { return 0x826D8444u; }
   template <typename T = BuildScreenData>

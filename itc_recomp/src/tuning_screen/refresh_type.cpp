@@ -23,6 +23,10 @@
 #include "car_specs/car_specs.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "schema/car_makers.h"
+#include "schema/car_specs.h"
+#include "schema/career.h"
+#include "schema/race_event.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -132,8 +136,8 @@ void Context::State6() {
       continue;
     }
     const uint32_t node = Node(28, 0);
-    guest::StoreU32(base, ChildOf(node, n - 11) + 80, 0);
-    guest::StoreU32(base, ChildOf(node, n) + 80, 0);
+    UiNode(base, ChildOf(node, n - 11)).set_visible(0);
+    UiNode(base, ChildOf(node, n)).set_visible(0);
   }
   if (in28()) {
     for (uint32_t row = 0; int32_t(row) < int32_t(uint32_t(TS(base, screen).type_count())); row++) {
@@ -142,7 +146,7 @@ void Context::State6() {
       const uint32_t flag = ChildOf(node, 38 + 2 * row);
       UiNode(base, mark).set_visible(1);
       guest::StoreU32(base, flag + 108, GetChoiceFlag(base, screen, row) != 0 ? 0 : 1);
-      guest::StoreU32(base, ChildOf(node, row + 26) + 80, 1);
+      UiNode(base, ChildOf(node, row + 26)).set_visible(1);
     }
   }
 
@@ -263,16 +267,18 @@ void Context::State6() {
 // and the type -1; else 629 or 630 by bit 0 of 77's +24, or with +36588 set
 // and bit 1 of 82's +24 clear, by its bit 2.
 uint64_t Context::SpoilerHelp() const {
-  const uint32_t save = TS(base, screen).save_data().address;
-  const uint32_t list = save + 6120;
-  uint32_t count = guest::LoadU32(base, save + 0x19920);
-  uint32_t at = uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 204)))) * 4 + list;
+  const schema::SaveData save(base, TS(base, screen).save_data().address);
+  const uint32_t list = save.garage_address();
+  uint32_t count = save.selected_car();
+  uint32_t at =
+      uint32_t(int32_t(int16_t(schema::CareerGarageList(base, list).head()))) * 4 + list;
   while (count != 0) {
     at = uint32_t(int32_t(int16_t(guest::LoadU16(base, at)))) * 4 + list;
     count--;
   }
   const int32_t slot = int16_t(guest::LoadU16(base, at + 2));
-  const uint32_t car = guest::LoadU32(base, uint32_t(int64_t(slot) * 1968) + list + 224);
+  const uint32_t car =
+      schema::CarMakersCar(base, uint32_t(int64_t(slot) * 1968) + list + 212).car_id();
   const uint32_t parts_out = frame + 176, parts = frame + 96;
   uint32_t words[9];
   car_specs::GetCarParts(base, car, words);
@@ -309,10 +315,10 @@ uint64_t Context::SpoilerHelp() const {
     return uint32_t(Call(function, {out, parts, level}, lr));
   };
   const uint32_t kit77 = get(kGet77, frame + 144, uint64_t(type), 0x821E5B70, car_specs::AeroPart77);
-  const uint32_t a = guest::LoadU32(base, kit77 + 24);
+  const uint32_t a = schema::AeroPartRecord(base, kit77).flags();
   const uint32_t kit82 =
       get(kGet82, frame + 224, TS(base, screen).aero9_type(), 0x821E5B90, car_specs::AeroPart82);
-  const uint32_t b = guest::LoadU32(base, kit82 + 24);
+  const uint32_t b = schema::AeroPartRecord(base, kit82).flags();
   if (TS(base, screen).aero9_type() == 0) {
     if (int32_t(type) == -1) {
       return 865;

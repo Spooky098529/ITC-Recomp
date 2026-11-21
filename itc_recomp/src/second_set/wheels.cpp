@@ -15,6 +15,7 @@
 #include "schema/second_set.h"
 #include "schema/scene_models.h"
 #include "schema/car_draw.h"
+#include "schema/car_models.h"
 
 namespace second_set {
 
@@ -43,7 +44,12 @@ constexpr uint32_t kTireTable = G::tire_table_address();    // 24 bytes an entry
 constexpr uint32_t kIndexTable = G::index_table_address();  // 44 bytes an entry
 constexpr uint32_t kOne = G::one_address();                 // 1.0
 constexpr uint32_t kNinth = G::brake_step_address();        // 1/9
-constexpr uint32_t kMatrixOffset = 6976;  // the car model's loading object's matrix
+
+// The first set's car model (car-models' CarModel) behind a second set's
+// car model (its +24): +32 its car record, +6976 its matrix.
+schema::CarModel FirstSetCarModel(uint8_t* base, uint32_t car_model) {
+  return schema::SceneCarModel(base, car_model).car_model<schema::CarModel>();
+}
 
 void Left(WheelCalls& calls, Flush flush) {
   if (flush != Flush::kUnchanged) {
@@ -189,10 +195,10 @@ void GroupWords(uint8_t* base, uint32_t block, uint32_t front, uint32_t rear) {
   const Points r(base, rear);
   const uint32_t loading = b.car_model();
   if (loading != 0) {
-    f.set_car_record(Load(base, loading + 24) + 32);
-    f.set_matrix(Load(base, loading + 24) + kMatrixOffset);
-    r.set_car_record(Load(base, loading + 24) + 32);
-    r.set_matrix(Load(base, loading + 24) + kMatrixOffset);
+    f.set_car_record(FirstSetCarModel(base, loading).record_address());
+    f.set_matrix(FirstSetCarModel(base, loading).tire_positions_address());
+    r.set_car_record(FirstSetCarModel(base, loading).record_address());
+    r.set_matrix(FirstSetCarModel(base, loading).tire_positions_address());
   } else {
     const uint32_t a = b.car_record().address;
     const uint32_t m = b.wheels_record().address;
@@ -371,8 +377,8 @@ uint64_t WheelPointsSetUp(uint8_t* base, uint32_t block, uint32_t stack, WheelCa
   Stfs(base, rear.float_20_address(), f11);
   uint32_t matrix;
   if (loading != 0) {
-    front.set_matrix(Load(base, loading + 24) + kMatrixOffset);
-    matrix = Load(base, loading + 24) + kMatrixOffset;
+    front.set_matrix(FirstSetCarModel(base, loading).tire_positions_address());
+    matrix = FirstSetCarModel(base, loading).tire_positions_address();
   } else {
     matrix = b.wheels_record().address;
     front.set_matrix(matrix);

@@ -7,6 +7,8 @@
 #include "lifted/entries.h"
 #include "hooks/native_entry.h"
 #include "guest_call.h"
+#include "schema/device_state.h"
+#include "schema/movies.h"
 #include "schema/video_output.h"
 
 #include <algorithm>
@@ -17,9 +19,6 @@
 using guest_call::InFrame;
 
 namespace {
-
-// The device's copy of the presentation parameters (+0 width, +4 height).
-constexpr uint32_t kDeviceParameters = 13188;
 
 constexpr uint32_t kOutOfMemory = 0x8007000E;
 
@@ -178,13 +177,16 @@ ITC_NATIVE_ENTRY_ALWAYS(8258D568) {
 ITC_NATIVE_ENTRY_ALWAYS(82482B18) {
   
   const uint32_t object = ctx.r3.u32;
-  const uint32_t device = guest::LoadU32(base, object + 56);
-  const float width = float(guest::LoadU32(base, device + kDeviceParameters));
-  const float height = float(guest::LoadU32(base, device + kDeviceParameters + 4));
-  guest::StoreFloat(base, object + 132, width);
-  guest::StoreFloat(base, object + 136, height);
+  const schema::MovieLib82482B18R3 self(base, object);
+  // The device's copy of the presentation parameters (+0 width, +4 height).
+  const schema::VideoPresentParameters parameters(
+      base, schema::Device(base, self.unknown_56()).presentation_parameters_address());
+  const float width = float(parameters.width());
+  const float height = float(parameters.height());
+  self.set_unknown_132(width);
+  self.set_unknown_136(height);
   const float display_aspect = display::kWidescreen ? kAspect16x9 : kAspect4x3;
-  guest::StoreFloat(base, object + 140, display_aspect / (width / height));
+  self.set_unknown_140(display_aspect / (width / height));
   uint32_t result = kOutOfMemory;
   InFrame(ctx, base, 192, 0x82482BE4, [&](uint32_t) {
     ctx.r3.u64 = 12;
@@ -194,7 +196,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82482B18) {
     ctx.lr = 0x82482BE4;
     lifted::Enter(ctx, base, game::Device::CreateIndexBuffer);  // probably CreateIndexBuffer
     const uint32_t indices = ctx.r3.u32;
-    guest::StoreU32(base, object + 60, indices);
+    self.set_unknown_60(indices);
     if (!indices) {
       return;
     }
@@ -208,7 +210,7 @@ ITC_NATIVE_ENTRY_ALWAYS(82482B18) {
     for (uint16_t i = 0; i < 6; i++) {
       guest::StoreU16(base, data + 2 * i, i);
     }
-    ctx.r3.u64 = guest::LoadU32(base, object + 60);
+    ctx.r3.u64 = self.unknown_60();
     ctx.lr = 0x82482C44;
     lifted::Enter(ctx, base, game::IndexBuffer::Unlock);  // probably Unlock
     ctx.r3.u64 = 120;
@@ -216,21 +218,21 @@ ITC_NATIVE_ENTRY_ALWAYS(82482B18) {
     ctx.r5.u64 = 0;
     ctx.lr = 0x82482C54;
     lifted::Enter(ctx, base, game::Device::CreateVertexBuffer);  // probably CreateVertexBuffer
-    guest::StoreU32(base, object + 64, ctx.r3.u32);
+    self.set_unknown_64(ctx.r3.u32);
     if (!ctx.r3.u32) {
       return;
     }
     ctx.r3.u64 = 0x8264D550;  // the declaration's elements
     ctx.lr = 0x82482C6C;
     lifted::Enter(ctx, base, game::CreateVertexDeclaration);  // probably CreateVertexDeclaration
-    guest::StoreU32(base, object + 68, ctx.r3.u32);
+    self.set_unknown_68(ctx.r3.u32);
     if (!ctx.r3.u32) {
       return;
     }
-    const uint32_t vtable = guest::LoadU32(base, object);
+    const uint32_t vtable = self.unknown_0();
     ctx.r3.u64 = object;
     ctx.lr = 0x82482C8C;
-    lifted::CallFromContext(ctx, base, guest::LoadU32(base, vtable + 96));
+    lifted::CallFromContext(ctx, base, schema::MovieLib82482B18R3At0(base, vtable).unknown_96());
     result = ctx.r3.u32;
   });
   ctx.r3.u64 = result;

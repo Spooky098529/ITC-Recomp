@@ -196,7 +196,7 @@ fields = [
 track_zones = { address = 0x828161EC, type = "ptr", to = "TrackZones", note = "the track zones' owner (0 when none)" }
 slice_count = { address = 0x82603274, type = "u32", note = "the slices counted along a route range's path (RouteRange::OnPath)" }
 zone_vtables = { address = 0x82011AF0, type = "bytes", count = 840, note = "the 70 zones' vtables (.rdata, 12 bytes each)" }
-route = { address = 0x826C5B10, type = "u32", note = "the course's route (a pointer; +12 its sections table)" }
-race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (a pointer): +0x59614 a word, +0x59620 the stages, +0xA3AF0 the mode" }
-racers_manager = { address = 0x826D82F4, type = "u32", note = "the racers' manager (a pointer): +2308 the racers' records" }
+route = { address = 0x826C5B10, type = "ptr", to = "TrackRouteFile", note = "the course's route (track-route.toml's TrackRoute, embedded): its file, +12 the sections table" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (race-states.toml): +0x59614 the racers added, +0x59620 the stages, +0xA3AF0 the kind" }
+racers_manager = { address = 0x826D82F4, type = "ptr", to = "RaceManager", note = "the racers' manager (race-world.toml): +2308 the racers' entries" }
 human_flag = { address = 0x826C7824, type = "u32", note = "0 for player 2's vehicle in mode 6 (TrackZones::Create)" }

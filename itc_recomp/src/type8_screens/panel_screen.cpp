@@ -7,6 +7,8 @@
 #include "base/log.h"
 #include "guest.h"
 #include "mode_tick/mode_tick.h"
+#include "schema/tuning_screen.h"
+#include "schema/type67_screens.h"
 #include "schema/type8_screens.h"
 #include "ui_movies/game.h"
 
@@ -104,8 +106,8 @@ uint64_t Leave(uint8_t* base, uint64_t r3, uint64_t r4) {
   ITC_NATIVE_RUNNING("sub_82238B10 Type8PanelScreen::Leave");
   const uint32_t screen = uint32_t(r3);
   const schema::Type8PanelScreen s(base, screen);
-  if ((LoadU32(base, type67_screens::kFadeCountA) | LoadU32(base, type67_screens::kFadeCountB)) !=
-      0) {
+  if ((schema::Type67ScreensGlobals::fade_out_count(base) |
+       schema::Type67ScreensGlobals::fade_in_count(base)) != 0) {
     return r3;
   }
   uint32_t message = 4;
@@ -133,7 +135,7 @@ uint64_t ShowPlayerNodes(uint8_t* base, uint64_t r3, uint64_t first, uint64_t se
   uint64_t result = 0;
   auto shown = [&](uint32_t sub_scene, uint32_t c, uint32_t on) {
     const uint32_t found = ui_movies::FindNode(base, m, sub_scene, c);
-    StoreU32(base, found + 80, on);
+    schema::UiMovieNode(base, found).set_visible(on);
     result = found;
   };
   auto texture = [&](uint32_t sub_scene, uint32_t c, uint32_t t) {
@@ -204,7 +206,7 @@ uint64_t UpdateOpening(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
   }
   const uint32_t m = uint32_t(ts::PanelGroupMovie(base, s.group_address(), frame));
   result = ui_movies::IsNamedActive(base, m, s.open_anim());
-  if (uint32_t(result) != 0 || LoadU32(base, ts::kFadeWait) != 0) {
+  if (uint32_t(result) != 0 || schema::Type67ScreensGlobals::fade_wait(base) != 0) {
     return result;
   }
   if (G::mode_before(base) == 1) {

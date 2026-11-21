@@ -40,7 +40,7 @@ using G = schema::Type6Type7ModesGlobals;
 // The movie with id `id`: the id at the frame's +80, then UiMovies::Find.
 uint32_t MovieAt(uint8_t* base, uint32_t frame, uint32_t id) {
   StoreU32(base, frame + 80, id);
-  return LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  return schema::UiMovieWord(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80)).value();
 }
 
 // UiMovie::SetText with r7 to r10 0 (the user's call for its unset varargs,
@@ -61,19 +61,19 @@ uint32_t SetText(uint8_t* base, const strings_and_font::FormatCalls& calls, uint
 // A message (`message`, 0, 0) queued in a dispatcher's ring (+204), as the
 // handlers do it inline.
 void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
-  const uint32_t ring = dispatcher + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
-  StoreU32(base, slot + 0, message);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t end = d.ring_start() + count - 1;
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(base, d.ring_address() + (end - (end / 50) * 50) * 12);
+  slot.set_id(message);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
 }
 
 void Show(uint8_t* base, uint32_t movie, uint32_t child, uint32_t value,
           uint32_t sub_scene = 3) {
-  StoreU32(base, ui_movies::FindNode(base, movie, sub_scene, child) + 80, value);
+  schema::UiMovieNode(base, ui_movies::FindNode(base, movie, sub_scene, child)).set_visible(value);
 }
 
 uint32_t Texture(uint8_t* base, uint32_t movie, uint32_t child, uint32_t texture,
@@ -85,7 +85,7 @@ uint32_t Texture(uint8_t* base, uint32_t movie, uint32_t child, uint32_t texture
 // UiMovie::HideNode's work: the node's +80 = 0; the node (its r3).
 uint32_t Hide(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  StoreU32(base, node + 80, 0);
+  schema::UiMovieNode(base, node).set_visible(0);
   return node;
 }
 
@@ -145,7 +145,8 @@ void FlushOff() {
 // [save +0x19920] times through the halfword links (each node 4 bytes at
 // `garage` + 4 x its index, sign-extended), as the originals' loops do.
 uint32_t GarageNode(uint8_t* base, uint32_t garage, uint32_t steps) {
-  uint32_t node = garage + (uint32_t(int32_t(int16_t(guest::LoadU16(base, garage + 204)))) << 2);
+  uint32_t node =
+      garage + (uint32_t(int32_t(int16_t(schema::CareerGarageList(base, garage).head()))) << 2);
   while (steps != 0) {
     node = garage + (uint32_t(int32_t(int16_t(guest::LoadU16(base, node)))) << 2);
     steps--;
@@ -209,7 +210,7 @@ uint64_t Type6Screen0ShowPage(uint8_t* base, uint32_t page, uint32_t sp) {
     default: {
       Show(base, movie, 4, 0);
       const uint32_t node = ui_movies::FindNode(base, movie, 3, 5);
-      StoreU32(base, node + 80, 0);
+      schema::UiMovieNode(base, node).set_visible(0);
       return node;
     }
   }
@@ -259,7 +260,7 @@ uint64_t Screen0PlaceCursor(uint8_t* base, bool type7, uint64_t item, uint32_t s
   StoreU32(base, frame + 80, uint32_t(uint64_t(value) >> 32));
   StoreU32(base, frame + 84, uint32_t(value));
   const uint32_t child = ui_movies::Child(base, node, 0);
-  guest::StoreFloat(base, child + 16, float(double(value)));
+  schema::UiMovieNode(base, child).set_y(float(double(value)));
   return child;
 }
 
@@ -298,12 +299,12 @@ uint64_t Screen0FadeOutStep(uint8_t* base, bool type7, uint32_t screen, uint32_t
   const uint32_t movie = MovieAt(base, frame, 22);
   const schema::PageObject page = Screen0View(base, screen, type7).pages();
   if (page.step_started() == 0) {
-    mode_tick::ScreenFadesFadeOut(base, LoadU32(base, 0x82001BF0), 0, 0, 0, 0);
+    mode_tick::ScreenFadesFadeOut(base, schema::Type67ScreensGlobals::fade_out_passes(base), 0, 0, 0, 0);
     page.set_step_started(1);
   }
   calls.call(kRun, frame, type7 ? 0x822447D4 : 0x82234364, movie, 0);
-  const bool done = (LoadU32(base, mode_tick::kFadeOutCounts) |
-                     LoadU32(base, mode_tick::kFadeInCounts)) == 0;
+  const bool done = (schema::Type67ScreensGlobals::fade_out_count(base) |
+                     schema::Type67ScreensGlobals::fade_in_count(base)) == 0;
   if (done) {
     calls.call(kFinishAll, frame, type7 ? 0x822447FC : 0x8223438C, movie, 0);
   }
@@ -380,7 +381,7 @@ uint64_t Screen0OpeningStep(uint8_t* base, bool type7, uint32_t screen, uint32_t
       PlayNamed(calls, frame, 0x82234C9C, movie, 0, 1);
       calls.call(kLoopNamed, frame, 0x82234CA8, movie, 0);
     }
-    mode_tick::ScreenFadesFadeIn(base, LoadU32(base, 0x82001BEC), 0, 0, 0, 0);
+    mode_tick::ScreenFadesFadeIn(base, schema::Type67ScreensGlobals::fade_in_passes(base), 0, 0, 0, 0);
     Screen0PlaceCursor(base, type7, item(), frame);
     ShowPageOf(base, type7, 0, frame);
     Screen0ShowHelp(base, type7, item(), frame, format);
@@ -472,8 +473,7 @@ uint64_t Screen0CursorStep(uint8_t* base, bool type7, uint32_t screen, uint32_t 
 
 uint64_t Type6Screen0QuitPage(uint8_t* base, uint64_t r3, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82234BF0 Type6Screen0::QuitPage");
-  constexpr uint32_t kSaveScreenData = 0x826D8454;
-  const uint32_t word = LoadU32(base, LoadU32(base, kSaveScreenData) + 56);
+  const uint32_t word = schema::SaveScreenGlobals::data(base).prompts();
   if (word == 0) {
     return Type6Screen0ShowPage(base, 4, sp);  // a tail call
   }
@@ -499,8 +499,8 @@ uint64_t Type6Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher,
   screen.set_state(9);
   // r6 as the post leaves it (the ring's start plus its count, 64-bit),
   // passed on to the slot below.
-  const uint64_t r6 = uint64_t(LoadU32(base, dispatcher + 204 + 604)) +
-                      uint64_t(LoadU32(base, dispatcher + 204 + 600));
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint64_t r6 = uint64_t(d.ring_start()) + uint64_t(d.ring_count());
   static constexpr uint32_t kMessages[4] = {14, 16, 18, 26};
   Post(base, dispatcher, kMessages[item]);
   if (item != 0) {
@@ -510,9 +510,9 @@ uint64_t Type6Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher,
   // 1's cue 0 played (Sound::Play), the indexes in the frame.
   StoreU32(base, frame + 84, 1);
   StoreU32(base, frame + 80, 2);
-  const uint32_t manager = LoadU32(base, menu_sounds::kSoundManager);
-  const uint64_t args[6] = {manager, frame + 84, frame + 80, r6, 0, 0};
-  calls.call_set(LoadU32(base, LoadU32(base, manager) + 52), args, 6, frame, 0x822342C0);
+  const schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
+  const uint64_t args[6] = {manager.address, frame + 84, frame + 80, r6, 0, 0};
+  calls.call_set(manager.vtable().stop_cue(), args, 6, frame, 0x822342C0);
   StoreU32(base, frame + 92, 1);
   StoreU32(base, frame + 88, 0);
   return menu_sounds::PlaySound(base, frame + 92, frame + 88, frame, Sounds(calls));
@@ -561,8 +561,8 @@ uint64_t Type7Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher,
   screen.set_state(9);
   // r6 as the post leaves it (the ring's start plus its count, 64-bit),
   // passed on to the slot below.
-  const uint64_t r6 = uint64_t(LoadU32(base, dispatcher + 204 + 604)) +
-                      uint64_t(LoadU32(base, dispatcher + 204 + 600));
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint64_t r6 = uint64_t(d.ring_start()) + uint64_t(d.ring_count());
   Post(base, dispatcher, item == 0 ? 13 : item == 1 ? 15 : 23);
   if (item != 0) {
     return r3;
@@ -571,9 +571,9 @@ uint64_t Type7Screen0ChosenPage(uint8_t* base, uint64_t r3, uint32_t dispatcher,
   // 1's cue 0 played (Sound::Play), the indexes in the frame.
   StoreU32(base, frame + 84, 1);
   StoreU32(base, frame + 80, 2);
-  const uint32_t manager = LoadU32(base, menu_sounds::kSoundManager);
-  const uint64_t args[4] = {manager, frame + 84, frame + 80, r6};
-  calls.call_set(LoadU32(base, LoadU32(base, manager) + 52), args, 4, frame, 0x82244730);
+  const schema::AudioManager manager = schema::MenuSoundsGlobals::sound_manager(base);
+  const uint64_t args[4] = {manager.address, frame + 84, frame + 80, r6};
+  calls.call_set(manager.vtable().stop_cue(), args, 4, frame, 0x82244730);
   StoreU32(base, frame + 92, 1);
   StoreU32(base, frame + 88, 0);
   return menu_sounds::PlaySound(base, frame + 92, frame + 88, frame,
@@ -590,7 +590,7 @@ uint64_t Screen0OpenMovie(uint8_t* base, bool type7, uint32_t sp, const Calls& c
   const uint32_t lr = type7 ? 0x82243E9C : 0x82233904;
   calls.open(22, type7 ? 22569 : 22564, frame, lr);
   const uint32_t block = car_makers::BlockOf(0);
-  const uint32_t holder = LoadU32(base, G::stand_holder<schema::View>(base).address);
+  const uint32_t holder = G::stand_holder(base).stage_block_0();
   // GarageStage::MakeModel by its plain C++ (its adapter went, B7 loop,
   // 2026-11-13), ScenePools::SetUpB under it through call_set.
   const stand_models::GuestCall call = [&](uint32_t function,
@@ -604,7 +604,7 @@ uint64_t Screen0OpenMovie(uint8_t* base, bool type7, uint32_t sp, const Calls& c
     return calls.call_set(function, regs, set, r1, call_lr);
   };
   stand_models::MakeModel(base, call, holder, block, 1, frame);
-  return calls.call(kCommand, frame, lr + 0x30, LoadU32(base, G::stand_holder<schema::View>(base).address), 14);
+  return calls.call(kCommand, frame, lr + 0x30, G::stand_holder(base).stage_block_0(), 14);
 }
 
 uint64_t Screen0SetUpCar(uint8_t* base, bool type7, uint64_t r4, uint32_t sp, const Calls& calls) {
@@ -618,35 +618,38 @@ uint64_t Screen0SetUpCar(uint8_t* base, bool type7, uint64_t r4, uint32_t sp, co
   const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
   const uint32_t car = type7 ? kType7Car : kType6Car;
   uint32_t message = type7 ? 5 : 6;
-  if (LoadU32(base, car + 1972) == 0xFFFFFFFF) {
+  if (schema::Type67Car(base, car).source() == 0xFFFFFFFF) {
     calls.call(kGarageCarReset, frame, type7 ? 0x82244418 : 0x82233EB8, car, r4);
-    if (guest::LoadU16(base, save + 6328) == 0) {
+    const schema::CareerSave saved(base, save);
+    if (saved.garage_count() == 0) {
       message = type7 ? 17 : 20;
     } else {
-      const uint32_t garage = save + 6120, steps = save + 0x19920;
-      const int32_t slot = int16_t(guest::LoadU16(base, GarageNode(base, garage, LoadU32(base, steps)) + 2));
-      const uint32_t from = uint32_t(slot) * 1968 + garage + 212;
+      const uint32_t garage = saved.garage_address();
+      const schema::CareerGarageList list(base, garage);
+      const int32_t slot = int16_t(guest::LoadU16(base, GarageNode(base, garage, saved.selected_car()) + 2));
+      const uint32_t from = uint32_t(slot) * 1968 + list.cars_address();
       if (!c_runtime::Memcpy(base, car, from, 1968)) {
         const uint64_t args[4] = {car, from, 1968, 0};
         calls.call_set(kMemcpy, args, 3, frame, type7 ? 0x82244478 : 0x82233F18);
       }
-      StoreU32(base, car + 1972, 2);
-      StoreU32(base, car + 1976, LoadU32(base, steps));
+      schema::Type67Car(base, car).set_source(2);
+      schema::Type67Car(base, car).set_garage_index(saved.selected_car());
       const int32_t again =
-          int16_t(guest::LoadU16(base, GarageNode(base, garage, LoadU32(base, steps)) + 2));
-      StoreU32(base, car + 1980,
+          int16_t(guest::LoadU16(base, GarageNode(base, garage, saved.selected_car()) + 2));
+      schema::Type67Car(base, car).set_paint_word(
                uint32_t(int32_t(int16_t(
-                   guest::LoadU16(base, uint32_t(again) * 1968 + garage + 212)))));
+                   schema::CarMakersCar(base, uint32_t(again) * 1968 + list.cars_address())
+                       .paint_pick()))));
     }
   }
-  const uint32_t ring = dispatcher + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
-  StoreU32(base, slot + 8, 0);
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 0, message);
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t end = d.ring_start() + count - 1;
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(base, d.ring_address() + (end - (end / 50) * 50) * 12);
+  slot.set_arg1(0);
+  slot.set_arg0(0);
+  slot.set_id(message);
   mode_tick::ScreenFadesFadeOut(base, 1, 0, 0, 0, 0);
   return 1;  // FadeOut leaves its r3, the passes
 }
@@ -984,8 +987,9 @@ uint64_t Screen0ShowCarInfo(uint8_t* base, bool type7, uint32_t sp, const Calls&
       calls.call_set(0x825A7410, args, 3, frame, 0x82244174);
     }
   } else {
-    race_setup::SetModel(base, car, LoadU32(base, from + 12));
-    StoreU32(base, car + 3888, LoadU32(base, car + 3888) | 1);
+    race_setup::SetModel(base, car, schema::CarMakersCar(base, from).car_id());
+    const schema::CarMakersCar object(base, car);
+    object.set_flags(object.flags() | 1);
   }
   FlushOff();
   uint32_t refreshed = 0;
@@ -996,9 +1000,10 @@ uint64_t Screen0ShowCarInfo(uint8_t* base, bool type7, uint32_t sp, const Calls&
   const uint32_t block2 = vehicle_accessors::ObjectRecord1888(car);
   const uint32_t first = type7 ? 12 : 10;
   SetText(base, format, frame, movie, 0xFFFFFFFF, first, guest::LoadU8(base, block2 + 129) + 1934);
-  SetText(base, format, frame, movie, 0xFFFFFFFF, first + 1, LoadU32(base, from + 12) + 1646);
+  SetText(base, format, frame, movie, 0xFFFFFFFF, first + 1,
+          schema::CarMakersCar(base, from).car_id() + 1646);
   return SetText(base, format, frame, movie, 0xFFFFFFFF, first + 2,
-                 LoadU32(base, from + 12) + 1718);
+                 schema::CarMakersCar(base, from).car_id() + 1718);
 }
 
 uint64_t Screen0Show(uint8_t* base, bool type7, uint64_t r3, uint32_t sp, const Calls& calls,
@@ -1012,38 +1017,43 @@ uint64_t Screen0Show(uint8_t* base, bool type7, uint64_t r3, uint32_t sp, const 
   const uint32_t frame = sp - kShowFrame;
   StoreU32(base, frame, sp);  // the back chain, for the guest calls
   const uint32_t car = type7 ? kType7Car : kType6Car;
-  StoreU32(base, car + 1968, 0);
+  schema::Type67Car(base, car).set_model_made(0);
   screen.words().set_loading_shown(0);
-  if (LoadU32(base, car + 1972) == 0xFFFFFFFF) {
+  if (schema::Type67Car(base, car).source() == 0xFFFFFFFF) {
     const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
     calls.call(kGarageCarReset, frame, type7 ? 0x82244224 : 0x82233CCC, car, 0);
     uint32_t word = 0;  // +1980
-    if (guest::LoadU16(base, save + 6328) == 0) {
+    const schema::CareerSave saved(base, save);
+    if (saved.garage_count() == 0) {
       FlushOff();
       career::CarSetModelAndClass(base, car, 0, frame);
-      if (guest::LoadU16(base, car + 4) == 0xFFFF) {
-        guest::StoreU16(base, car + 4, 0);
+      // The garage car's head (car-makers' CarMakersCar).
+      const schema::CarMakersCar head(base, car);
+      if (head.body_class() == 0xFFFF) {
+        head.set_body_class(0);
       }
-      guest::StoreU16(base, car + 2, guest::LoadU16(base, car + 0));
-      guest::StoreU16(base, car + 0, 0);
-      StoreU32(base, car + 1972, 0);
-      StoreU32(base, car + 1976, 0);
+      head.set_unknown_2(head.paint_pick());
+      head.set_paint_pick(0);
+      schema::Type67Car(base, car).set_source(0);
+      schema::Type67Car(base, car).set_garage_index(0);
     } else {
-      const uint32_t garage = save + 6120, steps = save + 0x19920;
+      const uint32_t garage = saved.garage_address();
+      const schema::CareerGarageList list(base, garage);
       const int32_t slot =
-          int16_t(guest::LoadU16(base, GarageNode(base, garage, LoadU32(base, steps)) + 2));
-      const uint32_t source = uint32_t(slot) * 1968 + garage + 212;
+          int16_t(guest::LoadU16(base, GarageNode(base, garage, saved.selected_car()) + 2));
+      const uint32_t source = uint32_t(slot) * 1968 + list.cars_address();
       if (!c_runtime::Memcpy(base, car, source, 1968)) {
         const uint64_t args[4] = {car, source, 1968, 0};
         calls.call_set(kMemcpy, args, 3, frame, type7 ? 0x822442B8 : 0x82233D60);
       }
-      StoreU32(base, car + 1972, 2);
-      StoreU32(base, car + 1976, LoadU32(base, steps));
+      schema::Type67Car(base, car).set_source(2);
+      schema::Type67Car(base, car).set_garage_index(saved.selected_car());
       const int32_t again =
-          int16_t(guest::LoadU16(base, GarageNode(base, garage, LoadU32(base, steps)) + 2));
-      word = uint32_t(int32_t(int16_t(guest::LoadU16(base, uint32_t(again) * 1968 + garage + 212))));
+          int16_t(guest::LoadU16(base, GarageNode(base, garage, saved.selected_car()) + 2));
+      word = uint32_t(int32_t(int16_t(
+          schema::CarMakersCar(base, uint32_t(again) * 1968 + list.cars_address()).paint_pick())));
     }
-    StoreU32(base, car + 1980, word);
+    schema::Type67Car(base, car).set_paint_word(word);
   }
   // The menu: the previous item = the cursor, the cursor = the item picked.
   const schema::FrontEndMenu menu = screen.menu();
@@ -1142,10 +1152,10 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
     answer = calls.call(kRun, frame, lr.run, movie, 0);
   }
   const uint32_t car = type7 ? kType7Car : kType6Car;
-  if (LoadU32(base, car + 1972) == kMinusOne) {
+  if (schema::Type67Car(base, car).source() == kMinusOne) {
     return answer;
   }
-  const uint32_t holder = LoadU32(base, G::stand_holder<schema::View>(base).address);
+  const uint32_t holder = G::stand_holder(base).stage_block_0();
   const uint64_t busy = calls.call(kIsBusy, frame, lr.busy, holder, 0);
   auto named = [&](uint32_t function, uint32_t id, uint32_t at) {
     calls.call(function, frame, at, movie, id);
@@ -1173,15 +1183,15 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
     play(46, lr.play46);
     if (type7) screen.words().set_loading_shown(0);
   }
-  if (LoadU32(base, car + 1968) != 0) {
+  if (schema::Type67Car(base, car).model_made() != 0) {
     const uint64_t args[6] = {holder, 0, 1, 0, 0, 0};
     return calls.call_set(kDraw, args, 3, frame, lr.draw);
   }
-  const uint32_t block = car_makers::BlockOf(LoadU32(base, car + 12));
+  const uint32_t block = car_makers::BlockOf(schema::CarMakersCar(base, car).car_id());
   const uint64_t reloaded =
-      calls.call(kReloadModel, frame, lr.reload, LoadU32(base, G::stand_holder<schema::View>(base).address),
+      calls.call(kReloadModel, frame, lr.reload, G::stand_holder(base).stage_block_0(),
                  uint64_t(int64_t(int32_t(block))));
-  StoreU32(base, car + 1968, uint32_t(reloaded));
+  schema::Type67Car(base, car).set_model_made(uint32_t(reloaded));
   if (int32_t(uint32_t(reloaded)) != 1) {
     return reloaded;
   }
@@ -1193,7 +1203,8 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
     const uint64_t args[6] = {(high | frame) + (object - frame), car, 1884, 0, 0, 0};
     calls.call_set(kMemcpy, args, 3, frame, lr.memcpy);
   }
-  StoreU32(base, object + 3888, LoadU32(base, object + 3888) | 1);
+  const schema::CarMakersCar made(base, object);
+  made.set_flags(made.flags() | 1);
   FlushOff();
   uint32_t refreshed = 0;
   if (!car_specs::CarRefresh(base, object, &refreshed)) {
@@ -1203,7 +1214,7 @@ uint64_t Screen0Update(uint8_t* base, bool type7, uint64_t r3, uint64_t sp, cons
   const uint64_t args[6] = {holder, (high | frame) + (object - frame), ~0ull, 0, 0, 0};
   calls.call_set(kSetCar, args, 3, frame, lr.set_car);
   // cntlzw and rlwinm: 1 for a car from the garage (+1972 2).
-  return GarageStageSetPlates(base, holder, LoadU32(base, car + 1972) == 2 ? 1 : 0);
+  return GarageStageSetPlates(base, holder, schema::Type67Car(base, car).source() == 2 ? 1 : 0);
 }
 
 }  // namespace type67_modes

@@ -56,7 +56,7 @@ uint32_t Context::ChildOf(uint32_t node, uint32_t i) const {
   return ui_movies::Child(base, node, i);
 }
 void Context::Shown(uint32_t sub_scene, uint32_t child, uint32_t shown) const {
-  Store(base, Node(sub_scene, child) + 80, shown);
+  UiNode(base, Node(sub_scene, child)).set_visible(shown);
 }
 void Context::Texture(uint32_t sub_scene, uint32_t child, uint64_t texture) const {
   ui_movies::SetNodeTexture(base, Node(sub_scene, child), uint32_t(texture));

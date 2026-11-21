@@ -8,6 +8,8 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "schema/boot_mode.h"
+#include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
 #include "schema/type5_mode.h"
 
@@ -25,22 +27,22 @@ uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
   return frame;
 }
 
-// Posts the message (id, 0, 0) on the dispatcher's ring (+204: its count
-// +600, start +604, 50 slots of 12 bytes), the id stored first or last, as
+// Posts the message (id, 0, 0) on the dispatcher's ring (boot-mode.toml's
+// ModeDispatcher: 50 slots of 12 bytes), the id stored first or last, as
 // the originals do inline.
 void Post(uint8_t* base, uint32_t dispatcher, uint32_t id, bool id_last = false) {
-  const uint32_t ring = dispatcher + 204;
-  const uint32_t count = LoadU32(base, ring + 600) + 1;
-  const uint32_t end = LoadU32(base, ring + 604) + count - 1;
-  StoreU32(base, ring + 600, count);
-  const uint32_t slot = ring + (end - (end / 50) * 50) * 12;
+  const schema::ModeDispatcher d(base, dispatcher);
+  const uint32_t count = d.ring_count() + 1;
+  const uint32_t end = d.ring_start() + count - 1;
+  d.set_ring_count(count);
+  const schema::ModeMessage slot(base, d.ring_address() + (end - (end / 50) * 50) * 12);
   if (!id_last) {
-    StoreU32(base, slot + 0, id);
+    slot.set_id(id);
   }
-  StoreU32(base, slot + 4, 0);
-  StoreU32(base, slot + 8, 0);
+  slot.set_arg0(0);
+  slot.set_arg1(0);
   if (id_last) {
-    StoreU32(base, slot + 0, id);
+    slot.set_id(id);
   }
 }
 

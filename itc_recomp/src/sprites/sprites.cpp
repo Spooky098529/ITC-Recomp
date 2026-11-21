@@ -1,6 +1,8 @@
 #include "sprites/sprites.h"
 
 #include "guest.h"
+#include "schema/command_list.h"
+#include "schema/race_overlays.h"
 #include "schema/sprites.h"
 
 #include "command_list/command_list.h"
@@ -31,9 +33,12 @@ void ResetSprites(uint8_t* base, uint32_t sprite, uint32_t corners) {
   for (uint32_t row = 0; row < 4; row++) {
     guest::StoreU32(base, sprite + 16 * row + 12, w);
   }
-  guest::StoreU32(base, sprite + 64, 0);
-  guest::StoreU32(base, sprite + 68, 0);
-  guest::StoreU32(base, sprite + 72, 0);
+  // A sprite list's head is laid out as a single sprite (race-overlays'
+  // OverlaySprite) up to its corners.
+  const schema::OverlaySprite s(base, sprite);
+  s.set_skip(0);
+  s.set_blend_mode(0);
+  s.set_address_mode(0);
   // The identity, by `stvx` (16-byte aligned), over the w's above when the
   // sprite is aligned.
   constexpr uint32_t kOneBits = 0x3F800000;
@@ -44,7 +49,7 @@ void ResetSprites(uint8_t* base, uint32_t sprite, uint32_t corners) {
     }
   }
   for (uint32_t i = 0; i < corners; i++) {
-    guest::StoreU32(base, sprite + 92 + 16 * i, w);
+    guest::StoreU32(base, s.corners_address() + 16 * i + 12, w);
   }
 }
 
@@ -100,12 +105,13 @@ constexpr uint32_t kScreenRectAllocations[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 std::optional<uint32_t> RecordScreenRect(uint8_t* base, uint32_t list, uint32_t rect) {
   // What the original's command list calls would print about: another chunk
   // open (OpenChunk), or the list full on any allocation.
-  if (guest::LoadU8(base, list + 52) == 0 && guest::LoadU32(base, command_list::kOpenChunks) != 0) {
+  const schema::CommandList cl(base, list);
+  if (cl.chunk_open() == 0 && schema::CommandListGlobals::open_chunks(base) != 0) {
     return std::nullopt;
   }
   {
-    uint32_t used = guest::LoadU32(base, list + 12);
-    const uint32_t limit = guest::LoadU32(base, list + 8);
+    uint32_t used = cl.used();
+    const uint32_t limit = cl.capacity();
     for (uint32_t count : kScreenRectAllocations) {
       used += count;
       if (used >= limit) {

@@ -6,6 +6,7 @@
 #include "threads/threads.h"
 
 #include "guest.h"
+#include "schema/device_state.h"
 #include "schema/video_output.h"
 
 #include "base/log.h"
@@ -101,7 +102,7 @@ uint32_t AcquireThreadOwnership(uint8_t* base, uint32_t device) {
   // The original reads the thread id once more first when the word was
   // already set, and drops it (a leaf load: nothing to do).
   const uint32_t thread = CurrentThreadId();
-  guest::StoreU32(base, device + kDeviceThread, thread);
+  schema::Device(base, device).set_owning_thread(thread);
   return thread;
 }
 
@@ -109,7 +110,7 @@ void ReleaseThreadOwnership(uint8_t* base, uint32_t device) {
   ITC_NATIVE_RUNNING("sub_8229DA10 Device::ReleaseThreadOwnership");
   // The original's eieio: the device's stores before this one.
   std::atomic_thread_fence(std::memory_order_release);
-  guest::StoreU32(base, device + kDeviceThread, 0);
+  schema::Device(base, device).set_owning_thread(0);
 }
 
 uint32_t Construct(uint8_t* base, uint32_t video_output) {

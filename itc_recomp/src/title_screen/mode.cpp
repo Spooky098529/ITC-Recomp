@@ -3,6 +3,7 @@
 
 #include "base/log.h"
 #include "schema/game_modes.h"
+#include "schema/options_screen.h"
 #include "title_screen/internal.h"
 
 namespace title_screen {
@@ -82,10 +83,12 @@ void SetDelegate(uint8_t* base, uint32_t mode, uint32_t slot, uint32_t function)
   InstallDelegate(base, mode, slot);
 }
 
-// The answer (r3) cleared: +4 and its first byte.
+// The answer (r3, boot-mode's ModeAnswer) cleared: its type, then its
+// first byte.
 void ClearAnswer(uint8_t* base, uint32_t answer) {
-  Store(base, answer + 4, 0);
-  guest::StoreU8(base, answer, 0);
+  const schema::ModeAnswer a(base, answer);
+  a.set_next_type(0);
+  a.set_changed(0);
 }
 
 // The state of the machine the block's `shown` names.
@@ -271,8 +274,9 @@ void NextModeAnswer(uint8_t* base, uint32_t answer, uint32_t mode) {
   const Block block = Mode(base, mode).block();
   const uint32_t first = block.next_answer();
   const uint32_t second = block.next_type();
-  Store(base, answer + 0, first);
-  Store(base, answer + 4, second);
+  const schema::ModeAnswer a(base, answer);
+  a.set_word0(first);
+  a.set_next_type(second);
 }
 
 void Leaving(uint8_t* base, uint32_t answer, uint32_t mode, uint32_t sp, const Calls& calls) {
@@ -304,9 +308,9 @@ uint32_t Interrupt(uint8_t* base, uint32_t object, uint32_t sp) {
   if (AllLoaded(base, block) == 0) {
     return 0;
   }
-  // The options' settings +712 (Settings, options-screen's).
+  // The options' settings (options-screen's OptionsSettings).
   if (int32_t(Block(base, block).save_screen_state()) != 5 &&
-      Load(base, G::options_settings(base) + 712) != 0) {
+      G::options_settings(base).save_page_closed() != 0) {
     return 1;
   }
   PostRing(base, o, 17);

@@ -15,6 +15,7 @@
 #include "base/log.h"
 #include "car_list/car_list.h"
 #include "guest.h"
+#include "schema/tuning_screen.h"
 #include "schema/type67_screens.h"
 #include "race_screens/race_screens.h"
 #include "save_data/save_data.h"
@@ -47,7 +48,7 @@ uint32_t MovieById(uint8_t* base, uint32_t id, uint32_t frame) {
 // UiMovie::HideNode (sub_8211AC48): the node's +80 cleared; the node.
 uint32_t Hide(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  StoreU32(base, node + 80, 0);
+  schema::UiMovieNode(base, node).set_visible(0);
   return node;
 }
 
@@ -132,9 +133,9 @@ uint64_t Type6NodeScreenShowMarks(uint8_t* base, uint64_t r4, uint32_t sp) {
   const uint32_t movie = MovieById(base, kNodeMovie, frame);
   const uint32_t which = uint32_t(r4);
   uint32_t node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 13);
-  StoreU32(base, node + 80, which != 0 ? 1 : 0);
+  schema::UiMovieNode(base, node).set_visible(which != 0 ? 1 : 0);
   node = ui_movies::FindNode(base, movie, 0xFFFFFFFFu, 14);
-  StoreU32(base, node + 80, which + 6 - 8 != 0 ? 1 : 0);
+  schema::UiMovieNode(base, node).set_visible(which + 6 - 8 != 0 ? 1 : 0);
   return node;
 }
 

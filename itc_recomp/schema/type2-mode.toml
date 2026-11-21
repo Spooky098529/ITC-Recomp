@@ -166,8 +166,8 @@ pad_blocked0 = { address = 0x826C7960, type = "u32", note = "the pad blocked (kn
 pad_blocked1 = { address = 0x826C7964, type = "u32" }
 leaving_flag = { address = 0x826364EC, type = "u32", note = "1 from ForceExit (0 or 1), 0 from NextMode when the hub or the car dealer picks mode 4" }
 mode_before = { address = 0x826032E0, type = "u32", note = "the mode before (1 the race): Init's first screen and Career::NextDay" }
-race_data = { address = 0x826C5B2C, type = "u32", note = "the race data (a pointer): Init reads its +0xA3AF4" }
-options_settings = { address = 0x826D8478, type = "u32", note = "the options' settings (options-screen.toml's OptionsSettings, a pointer): Interrupt reads its +712" }
+race_data = { address = 0x826C5B2C, type = "ptr", to = "RaceData", note = "the race data (race-states.toml's RaceData): Init reads its race_mode +0xA3AF4" }
+options_settings = { address = 0x826D8478, type = "ptr", to = "OptionsSettings", note = "the options' settings (options-screen.toml's OptionsSettings): Interrupt reads its save_page_closed +712" }
 dialog_status = { address = 0x82636204, type = "u32", note = "the type 2 dialog's status (type2-dialog.toml's status): Interrupt answers 1 at 3" }
 string_table = { address = 0x826C5C34, type = "u32", note = "the string table Strings::Load gets" }
 fade_in_passes = { address = 0x82001BEC, type = "u32", note = "the passes word ScreenFades::FadeIn is given" }

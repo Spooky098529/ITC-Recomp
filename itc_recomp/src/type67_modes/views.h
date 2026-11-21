@@ -6,7 +6,19 @@
 
 #pragma once
 
+#include "schema/boot_mode.h"
+#include "schema/car_makers.h"
+#include "schema/career.h"
+#include "schema/game_modes.h"
 #include "schema/menu_helpers.h"
+#include "schema/menu_sounds.h"
+#include "schema/options_screen.h"
+#include "schema/save_screen.h"
+#include "schema/stand_models.h"
+#include "schema/strings_and_font.h"
+#include "schema/tuning_screen.h"
+#include "schema/type67_screens.h"
+#include "schema/ui_movies_game.h"
 #include "schema/type6_type7_modes.h"
 
 #include <cstdint>
@@ -84,6 +96,29 @@ struct ModeView {
   }
   void set_delegate_adjustment(uint32_t v) const {
     type7 ? t7.set_delegate_adjustment(v) : t6.set_delegate_adjustment(v);
+  }
+};
+
+// A mode's screen block (Type6Screens or Type7Screens, type67-screens.toml):
+// the words the modes' delegate functions use.
+struct BlockView {
+  schema::Type6Screens t6;
+  schema::Type7Screens t7;
+  bool type7;
+
+  BlockView(uint8_t* base, uint32_t block, bool type7_)
+      : t6(base, block), t7(base, block), type7(type7_) {}
+
+  uint32_t phase() const { return type7 ? t7.phase() : t6.phase(); }
+  void set_phase(uint32_t v) const { type7 ? t7.set_phase(v) : t6.set_phase(v); }
+  uint32_t phase_address() const { return type7 ? t7.phase_address() : t6.phase_address(); }
+  uint32_t answer_word0() const { return type7 ? t7.answer_word0() : t6.answer_word0(); }
+  void set_answer_word0(uint32_t v) const {
+    type7 ? t7.set_answer_word0(v) : t6.set_answer_word0(v);
+  }
+  uint32_t answer_word() const { return type7 ? t7.answer_word() : t6.answer_word(); }
+  void set_answer_word(uint32_t v) const {
+    type7 ? t7.set_answer_word(v) : t6.set_answer_word(v);
   }
 };
 

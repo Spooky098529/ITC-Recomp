@@ -292,12 +292,16 @@ struct Type2ModeGlobals {
   static uint32_t mode_before(uint8_t* base) { return guest::LoadU32(base, 0x826032E0u); }
   static void set_mode_before(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826032E0u, v); }
   static constexpr uint32_t mode_before_address() { return 0x826032E0u; }
-  // the race data (a pointer): Init reads its +0xA3AF4
-  static uint32_t race_data(uint8_t* base) { return guest::LoadU32(base, 0x826C5B2Cu); }
+  // the race data (race-states.toml's RaceData): Init reads its race_mode +0xA3AF4
+  template <typename T = RaceData>
+  static T race_data(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826C5B2Cu)); }
+  static void set_race_data(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826C5B2Cu, v.address); }
   static void set_race_data(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826C5B2Cu, v); }
   static constexpr uint32_t race_data_address() { return 0x826C5B2Cu; }
-  // the options' settings (options-screen.toml's OptionsSettings, a pointer): Interrupt reads its +712
-  static uint32_t options_settings(uint8_t* base) { return guest::LoadU32(base, 0x826D8478u); }
+  // the options' settings (options-screen.toml's OptionsSettings): Interrupt reads its save_page_closed +712
+  template <typename T = OptionsSettings>
+  static T options_settings(uint8_t* base) { return T(base, guest::LoadU32(base, 0x826D8478u)); }
+  static void set_options_settings(uint8_t* base, const View& v) { guest::StoreU32(base, 0x826D8478u, v.address); }
   static void set_options_settings(uint8_t* base, uint32_t v) { guest::StoreU32(base, 0x826D8478u, v); }
   static constexpr uint32_t options_settings_address() { return 0x826D8478u; }
   // the type 2 dialog's status (type2-dialog.toml's status): Interrupt answers 1 at 3

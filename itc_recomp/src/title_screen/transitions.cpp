@@ -3,8 +3,12 @@
 // finds movie 0 (its id at its frame's +80), sets itself up once (its
 // started word, the page object's +24, 0), then runs the movie.
 
+#include <bit>
+
 #include "base/log.h"
 #include "race_screens/race_screens.h"
+#include "schema/career.h"
+#include "schema/tuning_screen.h"
 #include "title_screen/internal.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -43,7 +47,7 @@ void StoreCursor(uint8_t* base, uint32_t slot, uint32_t node, uint32_t n) {
   const uint64_t wide = uint64_t(int64_t(value));
   Store(base, slot, uint32_t(wide >> 32));
   Store(base, slot + 4, uint32_t(wide));
-  guest::StoreFloat(base, node + 16, float(double(int64_t(value))));
+  schema::UiMovieNode(base, node).set_y(float(double(int64_t(value))));
 }
 
 // The page object to page 2 through transition 6 (BackFromCareer's and
@@ -88,22 +92,23 @@ uint64_t SetUpMainMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
   race_screens::ListSetSelection(base, List(base), Words(base).main_item());
   const uint32_t node = uint32_t(calls.Call(kFindNode, frame, 0x82223788, movie, 4, 0));
   StoreCursor(base, frame + 96, node, race_screens::ListSelection(base, List(base)));
-  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  // Player 0's save data (career's CareerSave).
+  const schema::CareerSave save(base, vehicle_accessors::SaveDataOf(base, 0));
   // The save's word first, then the title's pointer, as the original.
-  const uint32_t third = (Load(base, save + 6092) >> 5) & 1;
+  const uint32_t third = (save.stages() >> 5) & 1;
   Words(base).set_career_third_item(third);
-  int32_t day = int32_t(Load(base, save + 6100));
+  int32_t day = int32_t(save.day());
   if (day > 999) {
     day = 999;
   }
-  const bool can_continue = day != 0 && guest::LoadU16(base, save + 6328) != 0;
+  const bool can_continue = day != 0 && save.garage_count() != 0;
   Words(base).set_can_continue(can_continue ? 1 : 0);
   if (Words(base).interrupted() == 0) {
     for (uint32_t k = 0; k < 4; k++) {
       Store(base, G::system_checks_address() + 4 * k, 0);
     }
   }
-  return save;
+  return save.address;
 }
 
 uint64_t SetUpCareerMenu(uint8_t* base, uint32_t sp, const Calls& calls) {
@@ -248,7 +253,7 @@ uint64_t MoveMainCursor(uint8_t* base, uint32_t started, uint32_t sp, const Call
   const uint32_t movie = FindMovie(base, kTitleMovie, frame + 80);
   if (Started(base, started).started() == 0) {
     const uint32_t s = race_screens::ListSelection(base, List(base));
-    const uint32_t p = Load(base, List(base) + 20);
+    const uint32_t p = MenuListOf(base).selection_before();
     Finish(calls, frame, 0x82222EEC, movie, uint64_t(p) + 2);
     if (s == 5 && Words(base).save_item_refused() != 0) {
       Finish(calls, frame, 0x82222F14, movie, 7);
@@ -266,7 +271,7 @@ uint64_t MoveMainCursor(uint8_t* base, uint32_t started, uint32_t sp, const Call
       const uint32_t node = uint32_t(calls.Call(kFindNode, frame, 0x82222FF4, movie, 4, 0));
       StoreCursor(base, frame + 80, node, s);
     } else {
-      const uint32_t up = int32_t(Load(base, List(base) + 24)) == -1 ? 12 : 13;
+      const uint32_t up = int32_t(MenuListOf(base).move()) == -1 ? 12 : 13;
       Play(calls, frame, 0x8222302C, movie, up, 1);
     }
     Started(base, started).set_started(1);
@@ -281,7 +286,7 @@ uint64_t RefreshSaveItem(uint8_t* base, uint32_t started, uint32_t sp, const Cal
   const uint32_t movie = FindMovie(base, kTitleMovie, frame + 80);
   if (Started(base, started).started() == 0) {
     const uint32_t s = race_screens::ListSelection(base, List(base));
-    const uint32_t p = Load(base, List(base) + 20);
+    const uint32_t p = MenuListOf(base).selection_before();
     const uint32_t state = uint32_t(calls.Call(kSlotsState, frame, 0x822230AC, 0));
     Finish(calls, frame, 0x822230BC, movie, uint64_t(p) + 2);
     uint32_t color = 2;
@@ -315,7 +320,7 @@ uint64_t RefreshPadItem(uint8_t* base, uint32_t started, uint32_t sp, const Call
   const uint32_t movie = FindMovie(base, kTitleMovie, frame + 80);
   if (Started(base, started).started() == 0) {
     const uint32_t s = race_screens::ListSelection(base, List(base));
-    const uint32_t p = Load(base, List(base) + 20);
+    const uint32_t p = MenuListOf(base).selection_before();
     const uint32_t entry = G::mapper_entries_address() + (G::player1_controller(base) << 3);
     const uint32_t connected = uint32_t(calls.Call(kPadIsConnected, frame, 0x82223224, entry));
     Finish(calls, frame, 0x82223234, movie, uint64_t(p) + 2);
@@ -404,19 +409,19 @@ uint64_t MoveCareerCursor(uint8_t* base, uint32_t started, uint32_t sp, const Ca
   const uint32_t movie = FindMovie(base, kTitleMovie, frame + 80);
   if (Started(base, started).started() == 0) {
     const uint32_t s = race_screens::ListSelection(base, List(base));
-    const uint32_t p = Load(base, List(base) + 20);
+    const uint32_t p = MenuListOf(base).selection_before();
     Finish(calls, frame, 0x8222348C, movie, uint64_t(p) + 41);
     HighlightCareerItem(base, frame, movie, s,
                         {0x822234C4, 0x822234D0, 0x822234EC, 0x822234F8, 0x8222351C, 0x82223528},
                         calls);
     Finish(calls, frame, 0x82223534, movie, 51);
     Finish(calls, frame, 0x82223540, movie, 52);
-    const uint32_t list = List(base);
-    if (Load(base, list + 32) != 0) {
+    const schema::MenuList list = MenuListOf(base);
+    if (list.wrapped() != 0) {
       const uint32_t node = uint32_t(calls.Call(kFindNode, frame, 0x82223578, movie, 5, 0));
       StoreCursor(base, frame + 80, node, s);
     } else {
-      const uint32_t up = int32_t(Load(base, list + 24)) == -1 ? 51 : 52;
+      const uint32_t up = int32_t(list.move()) == -1 ? 51 : 52;
       Play(calls, frame, 0x822235A8, movie, up, 1);
     }
     Started(base, started).set_started(1);
@@ -489,14 +494,14 @@ uint64_t MoveMenu4Cursor(uint8_t* base, uint32_t started, uint32_t sp, const Cal
     if (moved == -1) {
       if (before == 0 && now == 1) {
         const uint32_t node = uint32_t(calls.Call(kFindNode, frame, 0x82223678, movie, 5, 0));
-        Store(base, node + 16, G::menu4_wrap_up(base));
+        schema::UiMovieNode(base, node).set_y(std::bit_cast<float>(G::menu4_wrap_up(base)));
       } else {
         Play(calls, frame, 0x822236E0, movie, 51, 1);
       }
     } else if (moved == 1) {
       if (before == 1 && now == 0) {
         const uint32_t node = uint32_t(calls.Call(kFindNode, frame, 0x822236B4, movie, 5, 0));
-        Store(base, node + 16, G::menu4_wrap_down(base));
+        schema::UiMovieNode(base, node).set_y(std::bit_cast<float>(G::menu4_wrap_down(base)));
       } else {
         Play(calls, frame, 0x822236E0, movie, 52, 1);
       }

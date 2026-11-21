@@ -19,6 +19,11 @@
 #include "memory/c_runtime_heap.h"
 #include "track_collision/track_collision.h"
 #include "schema/vehicle.h"
+#include "schema/car_physics.h"
+#include "schema/collision_world.h"
+#include "schema/race_event.h"
+#include "schema/race_setup.h"
+#include "schema/track_route.h"
 #include "schema/race_states.h"
 #include "schema/ai_drivers.h"
 #include "track_route/track_route.h"
@@ -49,9 +54,10 @@ constexpr uint32_t kEmptyDestructor = 0x82106540;  // sub_82106540
 // own checks: the pairs' removal, the shape a box the layer gave, the body
 // a block the layer gave).
 bool DestroyPhysicsFits(uint8_t* base, uint32_t vehicle) {
-  const uint32_t object = guest::LoadU32(base, vehicle + 340);
-  const uint32_t shape = guest::LoadU32(base, vehicle + 344);
-  const uint32_t body = guest::LoadU32(base, vehicle + 336);
+  const schema::Vehicle veh(base, vehicle);
+  const uint32_t object = veh.collision_object();
+  const uint32_t shape = veh.box();
+  const uint32_t body = veh.body().address;
   return !((object != 0 && !cp::CollisionWorldPairsMovable(base)) ||
            (shape != 0 && (!co::IsBox(base, shape) || !co::Deletable(shape))) ||
            !co::Deletable(body));
@@ -78,24 +84,22 @@ void MatrixFromRows(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, uint32_
 void TrackPositionCopy(uint8_t* base, uint32_t out, uint32_t from) {
   ITC_NATIVE_RUNNING("sub_820C2150 TrackPosition::Copy");
   const schema::VehicleTrackPositionSource src(base, from);
-  guest::StoreU16(base, out + 0, src.section());
-  guest::StoreU16(base, out + 2, src.slice());
-  guest::StoreU16(base, out + 4, src.route_section());
-  guest::StoreU16(base, out + 6, src.route_slice());
-  auto put = [&](uint32_t at, uint64_t word) {
-    guest::StoreU32(base, out + at, uint32_t(word >> 32));
-    guest::StoreU32(base, out + at + 4, uint32_t(word));
-  };
-  put(16, src.point_xy());
-  put(24, src.point_zw());
-  put(32, src.vector2_xy());
-  put(40, src.vector2_zw());
-  put(48, src.vector3_xy());
-  put(56, src.vector3_zw());
-  put(64, src.vector4_xy());
-  put(72, src.vector4_zw());
-  guest::StoreU16(base, out + 80, src.half_80());
-  guest::StoreU16(base, out + 82, src.half_82());
+  const schema::TrackPosition to(base, out);
+  to.set_section(src.section());
+  to.set_slice(src.slice());
+  to.set_route_section(src.route_section());
+  to.set_route_slice(src.route_slice());
+  // ld and std, as the original: each doubleword's bits.
+  to.set_point_xy(src.point_xy());
+  to.set_point_zw(src.point_zw());
+  to.set_color_xy(src.vector2_xy());
+  to.set_color_zw(src.vector2_zw());
+  to.set_normal_xy(src.vector3_xy());
+  to.set_normal_zw(src.vector3_zw());
+  to.set_unknown_64(src.vector4_xy());
+  to.set_unknown_72(src.vector4_zw());
+  to.set_surface_kind(src.half_80());
+  to.set_flags(src.half_82());
 }
 
 void CameraCurveLoad(uint8_t* base, uint32_t object, uint32_t index, uint32_t word) {
@@ -127,20 +131,20 @@ uint32_t RoutePositionStep(uint8_t* base, uint32_t position, uint32_t step, uint
 
 void VehicleUpdateTrackPositions(uint8_t* base, uint32_t vehicle, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820C1D78 Vehicle::UpdateTrackPositions");
-  const uint32_t car = vehicle + 5232;
-  const schema::VehicleBodyPosition position(
-      base, va::RigidBodyPosition(guest::LoadU32(base, vehicle + 336)));
-  CopyWord(base, position.x_address(), car + 16);
-  CopyWord(base, position.y_address(), car + 20);
-  CopyWord(base, position.z_address(), car + 24);
-  tc::TrackPositionUpdate(base, car, frame - 144);
+  const schema::Vehicle veh(base, vehicle);
+  const schema::TrackPosition car(base, veh.own_track_position_address());
+  const schema::VehicleBodyPosition position(base, va::RigidBodyPosition(veh.body().address));
+  CopyWord(base, position.x_address(), car.point_x_address());
+  CopyWord(base, position.y_address(), car.point_y_address());
+  CopyWord(base, position.z_address(), car.point_z_address());
+  tc::TrackPositionUpdate(base, car.address, frame - 144);
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t mount = vehicle + 480 + 368 * i;
-    const uint32_t wheel = vehicle + 5328 + 96 * i;
-    CopyWord(base, mount + 0, wheel + 16);
-    CopyWord(base, mount + 4, wheel + 20);
-    CopyWord(base, mount + 8, wheel + 24);
-    tc::TrackPositionUpdate(base, wheel, frame - 144);
+    const uint32_t mount = schema::VehicleWheel(base, veh.wheels_address() + 368 * i).mount_point_address();
+    const schema::TrackPosition wheel(base, veh.wheel_track_positions_address() + 96 * i);
+    CopyWord(base, mount + 0, wheel.point_x_address());
+    CopyWord(base, mount + 4, wheel.point_y_address());
+    CopyWord(base, mount + 8, wheel.point_z_address());
+    tc::TrackPositionUpdate(base, wheel.address, frame - 144);
   }
 }
 
@@ -148,15 +152,16 @@ bool VehicleLinkTrackPositions(uint8_t* base, uint32_t vehicle, uint32_t* r3) {
   uint32_t shape = 0;
   // Current asks the template's type (nothing written): first, then the
   // copy's slot 20 must be the box's.
-  if (!co::CollisionShapeCurrent(base, guest::LoadU32(base, vehicle + 340) + 32, &shape) ||
+  const schema::Vehicle veh(base, vehicle);
+  if (!co::CollisionShapeCurrent(base, veh.collision_object() + 32, &shape) ||
       !co::IsBox(base, shape)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_820C1D08 Vehicle::LinkTrackPositions");
-  guest::StoreU32(base, vehicle + 2984, vehicle + 5232);
+  veh.set_track_position(veh.own_track_position_address());
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t position = vehicle + 5328 + 96 * i;
-    guest::StoreU32(base, vehicle + 436 + 368 * i, position);
+    const uint32_t position = veh.wheel_track_positions_address() + 96 * i;
+    schema::VehicleWheel(base, veh.wheels_address() + 368 * i).set_track_position(position);
     co::BoxSetCacheWord(base, shape, i, position);
   }
   *r3 = shape;
@@ -174,25 +179,26 @@ bool VehicleRefresh(uint8_t* base, uint32_t vehicle, uint32_t frame, double* f1,
 }
 
 bool VehicleRemoveFromWorld(uint8_t* base, uint32_t vehicle, uint32_t* r3) {
-  const uint32_t object = guest::LoadU32(base, vehicle + 340);
-  const uint32_t shape = guest::LoadU32(base, vehicle + 344);
+  const schema::Vehicle veh(base, vehicle);
+  const uint32_t object = veh.collision_object();
+  const uint32_t shape = veh.box();
   if ((object != 0 && !cp::CollisionWorldPairsMovable(base)) ||
       (shape != 0 && (!co::IsBox(base, shape) || !co::Deletable(shape)))) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_820C20E0 Vehicle::RemoveFromWorld");
-  guest::StoreU32(base, vehicle + 6148, 0);
+  veh.set_car_flags(0);
   if (object != 0) {
     uint32_t ignored = 0;
     cp::CollisionWorldRemoveObject(base, object, &ignored);
-    guest::StoreU32(base, vehicle + 340, 0);
+    veh.set_collision_object(0);
   }
   // +344 reloaded after the removal, as the original.
-  const uint32_t current = guest::LoadU32(base, vehicle + 344);
+  const uint32_t current = veh.box();
   if (current != 0) {
     co::ShapeDeletingDestructor(base, current, 1);  // slot 0 (a box's)
   }
-  guest::StoreU32(base, vehicle + 344, 0);
+  veh.set_box(0);
   *r3 = current;
   return true;
 }
@@ -203,14 +209,17 @@ void VehicleConstructAll(uint8_t* base, uint32_t vehicle, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820C30D8 Vehicle::Construct");
   double ignored = 0.0;
   cp::VehicleConstruct(base, vehicle, frame - 112, &ignored);
-  cp::CarDataConstruct(base, vehicle + 3376, frame - 96);
+  const schema::Vehicle veh(base, vehicle);
+  cp::CarDataConstruct(base, veh.car_data_block_address(), frame - 96);
   const double one = Lfs(base, kOne);
-  Stfs(base, vehicle + 5260, one);
-  Stfs(base, vehicle + 5276, one);
-  Stfs(base, vehicle + 5292, one);
-  Stfs(base, vehicle + 5308, one);
+  // The track positions' w words (+28, +44, +60, +76: no f32 fields there).
+  const uint32_t own = veh.own_track_position_address();
+  Stfs(base, own + 28, one);
+  Stfs(base, own + 44, one);
+  Stfs(base, own + 60, one);
+  Stfs(base, own + 76, one);
   for (uint32_t k = 0; k < 4; k++) {
-    const uint32_t at = vehicle + 5328 + 44 + 96 * k;
+    const uint32_t at = veh.wheel_track_positions_address() + 44 + 96 * k;
     Stfs(base, at - 16, one);
     Stfs(base, at + 0, one);
     Stfs(base, at + 16, one);
@@ -256,7 +265,8 @@ bool VehiclesDestroy(uint8_t* base) {
       const uint32_t vehicle = block + kVehicleBytes * uint32_t(i);
       // The empty destructor on each: the iterator calls nothing.
       c_runtime::VectorDestruct(
-          base, vehicle + 5328, 96, 4, kEmptyDestructor,
+          base, schema::Vehicle(base, vehicle).wheel_track_positions_address(), 96, 4,
+          kEmptyDestructor,
           [](void*, uint64_t, uint64_t) {
             ITC_LOG_ERROR("vehicle: the track positions' destructor isn't the empty one");
           },
@@ -313,12 +323,13 @@ double PedalCurve(uint8_t* base, const schema::CarInput& in, InputHalf pedal, In
 bool VehicleApplyInput(uint8_t* base, uint32_t vehicle, uint32_t input, uint32_t frame,
                        const SteerOriginal& steer_original) {
   const uint32_t v = vehicle;
+  const schema::Vehicle veh(base, v);
   const schema::CarInput in(base, input);
   const uint32_t kind = uint32_t(int32_t(int8_t(in.kind())));
   const uint32_t flags = in.flags();
   // The callees never seen in play: decided first (the setters before them
   // don't write the flags or +2249).
-  const bool shifts = guest::LoadU8(base, v + 2249) != 0 ? (flags & 0x2000) != 0
+  const bool shifts = veh.automatic() != 0 ? (flags & 0x2000) != 0
                                                           : (flags & 0x3) != 0;
   if (kind == 1 || (flags & 0x20000000) != 0 || (flags & 0x08000000) != 0 || shifts) {
     return false;
@@ -370,10 +381,10 @@ bool VehicleApplyInput(uint8_t* base, uint32_t vehicle, uint32_t input, uint32_t
   cp::VehicleRampReverseThrottle(base, v, (flags & 0x200) != 0 ? 1 : 0, dt);
   if ((flags & 0x10000) != 0) {
     uint8_t on = 0;
-    if (guest::LoadU8(base, v + 2424) == 0 && Lfs(base, v + 2420) > zero) {
+    if (veh.nitrous_on() == 0 && double(veh.nitrous_value()) > zero) {
       on = 1;
     }
-    guest::StoreU8(base, v + 2424, on);
+    veh.set_nitrous_on(on);
   }
   return true;
 }
@@ -386,34 +397,36 @@ double VehicleSlipWheelValue(uint8_t* base, uint32_t vehicle, double speed, uint
     G::set_slip_flag(base, once | 1);
     G::set_slip_threshold(base, float(Fmuls(speed, Lfs(base, kPerKmh))));
   }
+  const schema::Vehicle veh(base, v);
   const double zero = Lfs(base, kZero);
   double best = zero, most = zero;
   for (uint32_t i = 0; i < 4; i++) {
-    const uint32_t w = v + 368 * i;  // the wheel's fields at w + 433 to + 684
-    if (guest::LoadU8(base, w + 433) == 0) {
+    const schema::VehicleWheel wheel(base, veh.wheels_address() + 368 * i);
+    if (wheel.on_ground() == 0) {
       continue;
     }
-    const uint32_t data = guest::LoadU32(base, v + 2160 + 4 * i);
+    // Each wheel's axle record in the car data (+2160 + 4 i).
+    const schema::CarDataAxle data(base, guest::LoadU32(base, veh.wheel_axle_data_address() + 4 * i));
     Stfs(base, f + 124, zero);
     Stfs(base, f + 92, zero);
     Stfs(base, f + 108, zero);
-    const double spin = Lfs(base, w + 664);
-    const uint32_t body = guest::LoadU32(base, v + 336);
-    const double rolled = Fmuls(Lfs(base, data + 52), spin);
+    const double spin = double(wheel.spin());
+    const uint32_t body = veh.body().address;
+    const double rolled = Fmuls(double(data.radius()), spin);
     Stfs(base, f + 84, zero);
     Stfs(base, f + 80, rolled);
     Stfs(base, f + 88, zero);
-    va::RigidBodyPointVelocity(base, f + 144, body, w + 480);
+    va::RigidBodyPointVelocity(base, f + 144, body, wheel.mount_point_address());
     vl::Vec4Copy(base, f + 112, f + 144);
-    Stfs(base, f + 96, double(vl::Vec3DotOf(base, f + 112, w + 560)));
+    Stfs(base, f + 96, double(vl::Vec3DotOf(base, f + 112, wheel.forward_axis_address())));
     Stfs(base, f + 100, zero);
-    Stfs(base, f + 104, double(vl::Vec3DotOf(base, f + 112, w + 544)));
+    Stfs(base, f + 104, double(vl::Vec3DotOf(base, f + 112, wheel.side_axis_address())));
     vl::Vec3Difference(base, f + 128, f + 96, f + 80);
     const double slip = double(vl::Sqrtf(double(vl::Vec3DotOf(base, f + 128, f + 128))));
     // bge on both: on only when the threshold and the most so far are below
     // it (a NaN keeps the wheel so far).
     if (double(G::slip_threshold(base)) < slip && most < slip) {
-      best = Lfs(base, w + 684);
+      best = double(wheel.slip_long());
       most = slip;
     }
   }
@@ -435,7 +448,7 @@ uint32_t RacersNearestHumanVehicle(uint8_t* base, uint32_t point, uint32_t n, ui
   CopyWord(base, point + 4, f + 84);
   uint32_t found = 0;
   for (int32_t racer = 0; racer < count; racer++) {
-    const uint32_t flags = guest::LoadU32(base, minimap::RaceRacerVehicle(base, racer) + 6148);
+    const uint32_t flags = schema::Vehicle(base, minimap::RaceRacerVehicle(base, racer)).car_flags();
     if ((flags & 0x1) != 0 || (flags & 0x80) != 0) {
       guest::StoreU32(base, f + 160 + 4 * found, uint32_t(racer));
       found++;
@@ -443,11 +456,10 @@ uint32_t RacersNearestHumanVehicle(uint8_t* base, uint32_t point, uint32_t n, ui
   }
   for (uint32_t j = 0; j < found; j++) {
     const uint32_t racer = guest::LoadU32(base, f + 160 + 4 * j);
-    const uint32_t vehicle = minimap::RaceRacerVehicle(base, racer);
-    const uint32_t body = guest::LoadU32(base, vehicle + 336);
+    const schema::Vehicle vehicle(base, minimap::RaceRacerVehicle(base, racer));
+    const uint32_t body = vehicle.body().address;
     vl::Vec3Difference(base, f + 208, f + 80, va::RigidBodyPosition(body));
-    vl::Vec3Difference(base, f + 192, f + 80,
-                       va::RigidBodyPosition(guest::LoadU32(base, vehicle + 336)));
+    vl::Vec3Difference(base, f + 192, f + 80, va::RigidBodyPosition(vehicle.body().address));
     Stfs(base, f + 96 + 8 * j, double(vl::Vec3DotOf(base, f + 192, f + 208)));
     guest::StoreU32(base, f + 100 + 8 * j, racer);
   }
@@ -672,7 +684,9 @@ uint32_t VehicleStatusReset(uint8_t* base, uint32_t status, uint32_t vehicle, ui
   st.set_route_slice(0xFFFF);
   st.set_engine_output(guest::LoadFloat(base, kOne));
   const schema::PowerCurve curve(base, frame + 80);  // on its stack
-  PowerCurveFromEngine(base, curve.address, vehicle + 4644, frame - 112);
+  // The car data's engine record (its +1268, the vehicle's +4644).
+  const schema::CarData data(base, schema::Vehicle(base, vehicle).car_data_block_address());
+  PowerCurveFromEngine(base, curve.address, data.gear_count_address(), frame - 112);
   PowerCurveShiftPeak(base, curve.address, 0, frame);
   CopyWord(base, curve.torque_scale_address(), st.torque_scale_address());
   return frame + 80;
@@ -682,11 +696,13 @@ uint32_t VehicleStatusReset(uint8_t* base, uint32_t status, uint32_t vehicle, ui
 
 uint32_t VehicleSetUpSurfaceGrip(uint8_t* base, uint32_t vehicle, uint32_t car, uint32_t frame) {
   ITC_NATIVE_RUNNING("sub_820C1E00 Vehicle::SetUpSurfaceGrip");
-  const uint32_t v = vehicle, f = frame;
+  const uint32_t f = frame;
+  const schema::Vehicle veh(base, vehicle);
+  const schema::Car car_object(base, car);
   const double one = Lfs(base, kOne);
   // The four stack tables (nine floats each), in the original's order.
   Stfs(base, f + 112, one);
-  const uint32_t flags = guest::LoadU32(base, car + 3888);
+  const uint32_t flags = car_object.flags();
   Stfs(base, f + 116, one);
   Stfs(base, f + 120, one);
   Stfs(base, f + 124, one);
@@ -722,19 +738,20 @@ uint32_t VehicleSetUpSurfaceGrip(uint8_t* base, uint32_t vehicle, uint32_t car, 
   const double cbc = Lfs(base, 0x82002CBC);
   Stfs(base, f + 176, cc0);
   Stfs(base, f + 192, cbc);
-  guest::StoreU32(base, v + 2496, (flags & 0x2) != 0 || (flags & 0x4) != 0 ? 0 : 1);
+  veh.set_tire_wear_mode((flags & 0x2) != 0 || (flags & 0x4) != 0 ? 0 : 1);
   const double scale = Lfs(base, 0x8200256C);
   const double quarter = Lfs(base, 0x82002968);
   uint32_t r3 = 0;
   for (uint32_t axle = 0; axle < 2; axle++) {
-    const uint32_t type = guest::LoadU32(base, car + (axle == 0 ? 1712 : 1720));
-    uint32_t grade = guest::LoadU32(base, car + (axle == 0 ? 1716 : 1724));
+    const uint32_t type = axle == 0 ? car_object.front_tire_type() : car_object.rear_tire_type();
+    uint32_t grade = axle == 0 ? car_object.front_tire_grade() : car_object.rear_tire_grade();
     if (type == 0) {
       grade = 0;
     }
     const double g =
         Fmuls(IntThroughStack(base, f + 296, uint64_t(int64_t(int32_t(grade)))), quarter);
-    const uint32_t records = v + (axle == 0 ? 5716 : 5932);
+    const uint32_t records =
+        axle == 0 ? veh.front_grip_records_address() : veh.rear_grip_records_address();
     const uint32_t pair = (type << 3) & 0xFFFFFFF8u;
     const double soften = Fadds(g, one);
     const double a0 = Lfs(base, G::grip_pairs_a_address() + pair),
@@ -769,7 +786,9 @@ uint32_t VehicleSetUpSurfaceGrip(uint8_t* base, uint32_t vehicle, uint32_t car, 
           guest::StoreU8(base, record + i, guest::LoadU8(base, f + 80 + i));
         }
       }
-      guest::StoreU32(base, v + 4 * (j + (axle == 0 ? 667 : 699)), record);
+      const uint32_t surfaces =
+          axle == 0 ? veh.front_surfaces_address() : veh.rear_surfaces_address();
+      guest::StoreU32(base, surfaces + 4 * j, record);
       r3 = record;
     }
   }
@@ -784,17 +803,19 @@ uint32_t VehicleSetUp(uint8_t* base, uint32_t vehicle, uint32_t car, uint32_t fr
     ITC_NATIVE_RUNNING("sub_820C3150 Vehicle::SetUp");
   }
   const uint32_t v = vehicle, f = frame;
-  const uint32_t block2 = va::ObjectRecord1888(car);
-  const uint32_t data = v + 3376;
-  guest::StoreU32(base, v + 6152, 0);
-  const uint32_t flags = guest::LoadU32(base, car + 3888);
-  guest::StoreU32(base, v + 5712, car);
-  guest::StoreU32(base, v + 6148, flags);
+  const schema::Vehicle veh(base, v);
+  const schema::Car car_object(base, car);
+  const schema::CarSpecCopies block2(base, va::ObjectRecord1888(car));
+  const uint32_t data = veh.car_data_block_address();
+  veh.set_collision_flags(0);
+  const uint32_t flags = car_object.flags();
+  veh.set_car(car);
+  veh.set_car_flags(flags);
   double ignored = 0.0;
   if (!cp::VehicleSetupFromCar(base, data, car, f - 368, &ignored)) {
     original(0x820C27E8, data, car, 0, 0);
   }
-  VehicleStatusReset(base, v + 6160, v, f - 1168);
+  VehicleStatusReset(base, veh.status_address(), v, f - 1168);
   uint32_t r3 = 0;
   if (reset) {
     if (!native_heap || !cp::VehicleResetPhysics(base, v, data, 7, f - 208, &ignored, &r3)) {
@@ -808,8 +829,8 @@ uint32_t VehicleSetUp(uint8_t* base, uint32_t vehicle, uint32_t car, uint32_t fr
   if (!VehicleLinkTrackPositions(base, v, &r3)) {
     original(0x820C1D08, v, 0, 0, 0);
   }
-  guest::StoreU8(base, v + 2664, 1);
-  const int8_t extra = int8_t(guest::LoadU8(base, car + 76));
+  veh.set_surfaces_on(1);
+  const int8_t extra = int8_t(car_object.setting_76());
   double value = 0.0;
   uint32_t on = 0;
   if (extra == 0) {
@@ -819,37 +840,38 @@ uint32_t VehicleSetUp(uint8_t* base, uint32_t vehicle, uint32_t car, uint32_t fr
     value = Fmuls(IntThroughStack(base, f + 80, uint64_t(int64_t(extra))), Lfs(base, 0x82002BBC));
   }
   cp::VehicleSetValue2388(base, v, value, on);
-  guest::StoreU8(base, v + 2386, int8_t(guest::LoadU8(base, car + 77)) != 0 ? 1 : 0);
+  veh.set_abs(int8_t(car_object.setting_77()) != 0 ? 1 : 0);
   uint32_t mode = 0;
   uint8_t boosted = 0;
-  if (guest::LoadU8(base, block2 + 131) == 1) {
+  if (block2.list_kind() == 1) {
     mode = 6;
     boosted = 1;
   } else {
-    mode = guest::LoadU32(base, car + 1672);
+    mode = car_object.power_part_b();
     boosted = int32_t(mode) >= 3 ? 1 : 0;
   }
-  guest::StoreU8(base, v + 2512, boosted);
-  guest::StoreU32(base, v + 2524, mode);
-  if (guest::LoadU8(base, block2 + 69) == 1) {
-    if (int32_t(guest::LoadU32(base, car + 1656)) >= 8) {
-      guest::StoreU8(base, data + 1605, 1);
+  veh.set_unknown_2512(boosted);
+  veh.set_unknown_2524(mode);
+  if (block2.turbo() == 1) {
+    const schema::CarData car_data(base, data);
+    if (int32_t(car_object.engine_stage()) >= 8) {
+      car_data.set_blow_off(1);
       if (!reset) {
-        guest::StoreU8(base, v + 2512, 1);
-        guest::StoreU32(base, v + 2524, int32_t(mode) < 3 ? 3 : mode);
+        veh.set_unknown_2512(1);
+        veh.set_unknown_2524(int32_t(mode) < 3 ? 3 : mode);
       }
     } else {
-      guest::StoreU8(base, data + 1605, 0);
+      car_data.set_blow_off(0);
     }
   }
-  guest::StoreU32(base, v + 2372, guest::LoadU32(base, v + 2372) | 2);
-  guest::StoreU8(base, v + 2249, guest::LoadU32(base, car + 3892) != 0 ? 1 : 0);
+  veh.set_flags(veh.flags() | 2);
+  veh.set_automatic(car_object.unknown_3892() != 0 ? 1 : 0);
   VehicleSetUpSurfaceGrip(base, v, car, f - 480);
-  guest::StoreU8(base, v + 2380, 1);
-  guest::StoreU8(base, v + 2384, 0);
+  veh.set_unknown_2380(1);
+  veh.set_forced_rest(0);
   // The nitrous' tables (probably), in the original's order.
   guest::StoreU32(base, f + 96, 0);
-  const uint32_t box = guest::LoadU32(base, v + 344);
+  const uint32_t box = veh.box();
   Stfs(base, f + 128, Lfs(base, kOne));
   guest::StoreU32(base, f + 112, 570);
   Stfs(base, f + 132, Lfs(base, kOneAndHalf));
@@ -861,15 +883,15 @@ uint32_t VehicleSetUp(uint8_t* base, uint32_t vehicle, uint32_t car, uint32_t fr
   guest::StoreU32(base, f + 104, 450);
   guest::StoreU32(base, f + 120, 690);
   guest::StoreU32(base, f + 108, 510);
-  const uint32_t level = (guest::LoadU32(base, car + 1676) << 2) & 0xFFFFFFFCu;
+  const uint32_t level = (car_object.nitrous() << 2) & 0xFFFFFFFCu;
   Stfs(base, f + 148, Lfs(base, 0x82002CF0));
   Stfs(base, f + 152, Lfs(base, 0x82002CEC));
-  CopyWord(base, f + 128 + level, v + 2416);
+  CopyWord(base, f + 128 + level, veh.nitrous_factor_address());
   const int64_t extra_rpm = int32_t(guest::LoadU32(base, f + 96 + level));
-  Stfs(base, v + 2420, IntThroughStack(base, f + 80, uint64_t(extra_rpm)));
+  veh.set_nitrous_value(float(IntThroughStack(base, f + 80, uint64_t(extra_rpm))));
   *f1 = value;
   if (box != 0) {
-    const uint32_t car_flags = guest::LoadU32(base, car + 3888);
+    const uint32_t car_flags = car_object.flags();
     const uint32_t half = (car_flags & 0x4) != 0 ? 2 : ((car_flags >> 1) & 1);
     va::ObjectSetHalf112(base, box, half & 0xFFFF);
   }
@@ -888,12 +910,13 @@ bool VehicleStatusUpdate(uint8_t* base, uint32_t status, uint32_t vehicle, uint3
                          uint32_t flag, uint32_t frame) {
   const uint32_t v = vehicle, f = frame;
   const schema::VehicleStatus st(base, status);
-  if (!c_runtime::Memcpy(base, f + 208, v + 5232, 96)) {
+  const schema::Vehicle veh(base, v);
+  if (!c_runtime::Memcpy(base, f + 208, veh.own_track_position_address(), 96)) {
     return false;
   }
   ITC_NATIVE_RUNNING("sub_820C23E8 VehicleStatus::Update");
   guest::StoreU32(base, f + 80, guest::LoadU32(base, f + 212));
-  const uint32_t body = guest::LoadU32(base, v + 336);
+  const uint32_t body = veh.body().address;
   const schema::VehicleBodyPosition position(base, va::RigidBodyPosition(body));
   guest::StoreU32(base, f + 128, guest::LoadU32(base, position.x_address()));
   guest::StoreU32(base, f + 132, guest::LoadU32(base, position.y_address()));
@@ -925,7 +948,7 @@ bool VehicleStatusUpdate(uint8_t* base, uint32_t status, uint32_t vehicle, uint3
     st.set_across(float(Fmuls(double(st.across()), Lfs(base, 0x82001BE0))));
   }
   const uint32_t axis = st.heading_address();
-  matrix_math::QuaternionXAxis(base, axis, va::RigidBodyField80(guest::LoadU32(base, v + 336)),
+  matrix_math::QuaternionXAxis(base, axis, va::RigidBodyField80(veh.body().address),
                                f - 96);
   st.set_heading_y(float(zero));
   vl::Vec3Normalize(base, axis, axis);
@@ -948,7 +971,7 @@ bool VehicleStatusUpdate(uint8_t* base, uint32_t status, uint32_t vehicle, uint3
   }
   const double per_tick = Lfs(base, 0x820029EC);  // 1/30
   if (flag != 0) {
-    const double moved = Fmuls(Fmuls(Lfs(base, v + 48), per_tick), Lfs(base, 0x820029D8));
+    const double moved = Fmuls(Fmuls(double(veh.speed()), per_tick), Lfs(base, 0x820029D8));
     const double trip = double(st.trip_km());
     st.set_total_km(float(Fadds(double(st.total_km()), moved)));
     st.set_trip_km(float(Fadds(trip, moved)));
@@ -958,9 +981,10 @@ bool VehicleStatusUpdate(uint8_t* base, uint32_t status, uint32_t vehicle, uint3
     // The engine's temperatures (probably), eased toward targets.
     const schema::VehicleCarObject car_object(base, car);
     const int64_t stage = int32_t(car_object.engine_stage());
-    const double top = Lfs(base, v + 4648);
+    const double top =
+        double(schema::CarData(base, veh.car_data_block_address()).max_rpm());
     const int64_t part = int32_t(car_object.engine_part());
-    const double rpm = Lfs(base, v + 2224);
+    const double rpm = double(veh.unknown_2224());
     const double ratio = Fdivs(rpm, top);
     const double water = double(st.water_temperature());
     const double oil = double(st.oil_temperature());
@@ -991,7 +1015,7 @@ bool VehicleStatusUpdate(uint8_t* base, uint32_t status, uint32_t vehicle, uint3
     const double db = Fmuls(Fsubs(target_b, oil), rate_b);
     st.set_water_temperature(float(Fmadds(da, per_tick, water)));
     st.set_oil_temperature(float(Fmadds(db, per_tick, oil)));
-    const double rpm2 = Lfs(base, v + 2228);
+    const double rpm2 = double(veh.rpm());
     const double curve = Fadds(Fnmsubs(rpm2, rpm2, rpm2), rpm2);
     const double root = double(float(std::sqrt(Fmuls(curve, Lfs(base, 0x82002814)))));
     const double torque = cp::VehicleEngineTorque(base, v, rpm2, f);
@@ -1002,25 +1026,26 @@ bool VehicleStatusUpdate(uint8_t* base, uint32_t status, uint32_t vehicle, uint3
     st.set_engine_output(float(value));
   }
   // The brakes' efficiency (+2432) and +2428, lowered.
-  const double speed = Fmuls(Lfs(base, v + 48), per_tick);
-  const double a = Lfs(base, v + 3544);
-  const double fade = Fsubs(Lfs(base, v + 3540), a);
-  const double brake = Lfs(base, v + 292);
-  const double efficiency = Lfs(base, v + 2432);
+  const schema::CarData car_data(base, veh.car_data_block_address());
+  const double speed = Fmuls(double(veh.speed()), per_tick);
+  const double a = double(car_data.brake_heat_start());
+  const double fade = Fsubs(double(car_data.brake_heat_limit()), a);
+  const double brake = double(veh.brake());
+  const double efficiency = double(veh.brake_efficiency());
   double lowered = Fmuls(Fmuls(Fmuls(fade, hundredth), Lfs(base, 0x82002A44)), speed);
   const double least = Lfs(base, kHalf);
   lowered = Fsubs(efficiency, Fmuls(Fmuls(lowered, brake), hundredth));
   if (lowered < least) {
     lowered = least;
   }
-  Stfs(base, v + 2432, lowered);
+  veh.set_brake_efficiency(float(lowered));
   double wear = Fmuls(double(st.oil_temperature()), Lfs(base, 0x82002CC8));
-  wear = Fsubs(Lfs(base, v + 2428), Fmuls(wear, hundredth));
+  wear = Fsubs(double(veh.oil_factor()), Fmuls(wear, hundredth));
   const double floor = Lfs(base, 0x82002A3C);
   if (wear < floor) {
     wear = floor;
   }
-  Stfs(base, v + 2428, wear);
+  veh.set_oil_factor(float(wear));
   return true;
 }
 
@@ -1028,13 +1053,15 @@ void VehicleTick(uint8_t* base, uint32_t vehicle, uint32_t racer, uint32_t car, 
                  uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_820C3020 Vehicle::Tick");
   const uint32_t v = vehicle, f = frame;
-  const uint32_t s = v + 6160;
+  const schema::Vehicle veh(base, v);
+  const uint32_t s = veh.status_address();
   const schema::VehicleStatus st(base, s);
-  const double kmh = Fmuls(Lfs(base, v + 48), Lfs(base, kKmh));
+  const double kmh = Fmuls(double(veh.speed()), Lfs(base, kKmh));
   const uint32_t input = guest::LoadU32(base, G::input_records_address() + ((racer << 2) & 0x3FCu));
   st.set_speed_kmh(float(kmh));
-  st.set_route_section(guest::LoadU16(base, v + 5236));
-  st.set_route_slice(guest::LoadU16(base, v + 5238));
+  const schema::TrackPosition own(base, veh.own_track_position_address());
+  st.set_route_section(own.route_section());
+  st.set_route_slice(own.route_slice());
   for (int step = 0; step < 2; step++) {
     const uint32_t input_frame = f - 176;
     auto steer = [&](double target, double dt, double f3, uint32_t left, uint32_t right) {
@@ -1209,9 +1236,10 @@ bool VehiclePlaceOnRoute(uint8_t* base, uint32_t vehicle, uint32_t position, dou
   }
   ITC_NATIVE_RUNNING("sub_820C3608 Vehicle::PlaceOnRoute");
   const uint32_t v = vehicle, f = frame;
-  const uint32_t car = v + 5232;
+  const schema::Vehicle veh(base, v);
+  const uint32_t car = veh.own_track_position_address();
   auto reset_transform = [&] {
-    const uint32_t object = guest::LoadU32(base, v + 340);
+    const uint32_t object = veh.collision_object();
     if (!cp::CollisionObjectResetTransform(base, object, f - 112)) {
       GuestRegisters r;
       r.r3 = object;
@@ -1226,8 +1254,9 @@ bool VehiclePlaceOnRoute(uint8_t* base, uint32_t vehicle, uint32_t position, dou
   guest::StoreU32(base, f + 144, word);
   RoutePositionStep(base, f + 80, uint32_t(-1), uint32_t(-1), f - 112);
   RoutePositionStep(base, f + 144, 1, uint32_t(-1), f - 112);
-  guest::StoreU16(base, car + 4, route_position.section());
-  guest::StoreU16(base, car + 6, route_position.slice());
+  const schema::TrackPosition car_position(base, car);
+  car_position.set_route_section(route_position.section());
+  car_position.set_route_slice(route_position.slice());
   tc::TrackPositionInit(base, car, f - 128);
   // The slices' points: the centers back (+240) and on (+256), the edges
   // (+192, +208).
@@ -1295,7 +1324,7 @@ bool VehiclePlaceOnRoute(uint8_t* base, uint32_t vehicle, uint32_t position, dou
   }
   MatrixFromRows(base, f + 352, f + 160, f + 128, f + 112, G::last_row_address());
   matrix_math::QuaternionFromMatrix(base, f + 320, f + 352);
-  cp::RigidBodySetOrientation(base, guest::LoadU32(base, v + 336), f + 320, f - 96);
+  cp::RigidBodySetOrientation(base, veh.body().address, f + 320, f - 96);
   cp::VehicleSyncFromBody(base, v, f - 368);
   reset_transform();
   // The velocity: forward x the speed x 1000 / 3600.
@@ -1306,19 +1335,21 @@ bool VehiclePlaceOnRoute(uint8_t* base, uint32_t vehicle, uint32_t position, dou
   vl::Vec4Scaled(base, f + 160, f + 272, speed);
   vl::Vec4Scaled(base, f + 96, f + 160, Lfs(base, kThousand));
   vl::Vec4Scaled(base, f + 336, f + 96, Lfs(base, kPerHour));
-  cp::RigidBodySetVelocity(base, guest::LoadU32(base, v + 336), f + 336, f - 112);
+  cp::RigidBodySetVelocity(base, veh.body().address, f + 336, f - 112);
   // The position: the lane's point or the slice back's center, 0.3 higher.
   Stfs(base, f + 236, zero);
   if (lane >= 0) {
     track_route::LanePoint(base, G::route_address(), f + 224, f + 80, lane);
   } else {
-    const uint32_t sections = guest::LoadU32(base, G::route(base) + 12);
-    const uint32_t record =
+    const uint32_t sections = schema::TrackRouteFile(base, G::route(base)).sections();
+    // The section's slice records start at its +124 (TrackRouteSection::slices).
+    const schema::TrackRouteSlice record(
+        base,
         guest::LoadU32(base, (uint32_t(guest::LoadU16(base, f + 80)) << 2) + sections) +
-        S16At(base, f + 82) * 84u;
-    Stfs(base, f + 224, Lfs(base, record + 124));
-    Stfs(base, f + 228, Lfs(base, record + 128));
-    Stfs(base, f + 232, Lfs(base, record + 132));
+            S16At(base, f + 82) * 84u + 124);
+    Stfs(base, f + 224, double(record.center_x()));
+    Stfs(base, f + 228, double(record.center_y()));
+    Stfs(base, f + 232, double(record.center_z()));
     Stfs(base, f + 236, one);
   }
   Stfs(base, f + 288, Lfs(base, f + 224));
@@ -1326,7 +1357,7 @@ bool VehiclePlaceOnRoute(uint8_t* base, uint32_t vehicle, uint32_t position, dou
   Stfs(base, f + 300, zero);
   Stfs(base, f + 292, Fadds(y, Lfs(base, kRaise)));
   Stfs(base, f + 296, Lfs(base, f + 232));
-  cp::RigidBodySetPosition(base, guest::LoadU32(base, v + 336), f + 288, f - 192);
+  cp::RigidBodySetPosition(base, veh.body().address, f + 288, f - 192);
   cp::VehicleSyncFromBody(base, v, f - 368);
   reset_transform();
   // The wheels' track positions: copies of the car's.
@@ -1338,13 +1369,13 @@ bool VehiclePlaceOnRoute(uint8_t* base, uint32_t vehicle, uint32_t position, dou
       r.r5 = 96;
       call(0x825A7410, f, r);
     }
-    TrackPositionCopy(base, v + 5328 + 96 * i, f + 352);
+    TrackPositionCopy(base, veh.wheel_track_positions_address() + 96 * i, f + 352);
   }
   Stfs(base, f + 304, zero);
   Stfs(base, f + 308, zero);
   Stfs(base, f + 312, zero);
   Stfs(base, f + 316, zero);
-  cp::RigidBodySetAngularVelocity(base, guest::LoadU32(base, v + 336), f + 304, f - 160);
+  cp::RigidBodySetAngularVelocity(base, veh.body().address, f + 304, f - 160);
   return true;
 }
 
